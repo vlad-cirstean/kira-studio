@@ -2694,7 +2694,13 @@ its identity and, if it has one, an opaque token; the server answers `ready`, `v
 one prompt on screen at a time with concurrent requests queued and counted, a 120 s window per
 request measured from enqueue (a request arriving before any window exists is *held*, not
 auto-denied), and a 60 s cooldown after an explicit denial so a reconnecting extension cannot
-re-prompt in a loop. The approved token is 32 `crypto/rand` bytes; **only `sha256(salt‖token)` is
+re-prompt in a loop. Before the handshake the server reads the peer's uid and pid from the kernel
+(`SO_PEERCRED` on Linux, `LOCAL_PEERCRED`/`LOCAL_PEERPID` on macOS) and closes a different uid or a
+failed lookup with no frame. The prompt shows the kernel-reported executable and pid; the label is
+client-reported and marked so. One Approve admits exactly one connection (P172): same-client
+requests queued behind it are aborted with no token and redial, then reuse the token the approved
+window stored in the shared `context.secrets`, or get their own prompt. The macOS credential path
+compiles but has not run on macOS. The approved token is 32 `crypto/rand` bytes; **only `sha256(salt‖token)` is
 stored**, compared with `subtle.ConstantTimeCompare`. The plaintext is never stored and never
 recoverable — not an omission, a consequence: verifying a presented token is the only thing this
 app ever needs to do with one, so a reversible form would mean strictly more exposure for no
@@ -2706,7 +2712,7 @@ human approval always re-admits.
 
 **Version compatibility is hard lockstep, negotiated in that same handshake.**
 `gitrpc.ContractVersion` and `packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are one number
-(**41** today, since P111's pull `rebaseMerges` field bumped it from 40), asserted equal by tests
+(**43** today, since P172 refused prepare-script writes from `repoSettings.set` and removed `settings.setGitPath`), asserted equal by tests
 on both sides, and it is the *sole* compatibility authority — not the
 app version, not a side file. A mismatch is a blocking panel in the extension naming both versions,
 never a degraded mode: the app's own P119 update never touches the separately-installed extension,
@@ -2869,8 +2875,10 @@ none imports or is imported by an adapter package.
 codebase hands a fixed argv straight to `os/exec` with no shell involved. `gitprepare` runs the
 user's own worktree prepare script *through* a shell, and its safety argument rests on a single
 property rather than on sanitisation: **no app-supplied value is ever interpolated into the command
-string.** The command string *is* the user's own typed, explicitly approved (sha256-pinned)
-command. App data — the worktree path, its branch, the repository root — reaches the script only as
+string.** The command string *is* the user's own typed command, written only by Kira Space
+in-process (ADE repo settings); `repoSettings.set` refuses it on every gitrpc connection (P172), so a
+socket client cannot choose or change what runs. `worktree.prepare`'s sha256 is a staleness guard
+against a script edited after the client showed it, not approval. App data — the worktree path, its branch, the repository root — reaches the script only as
 environment variable *values*, so even a maximally adversarial branch name can at worst be a
 word-splittable value, never re-parsed as a command. The package imports nothing beyond the
 standard library and knows nothing about repositories, sessions or approval; `gitsession` owns
@@ -3333,18 +3341,18 @@ what layer one admits, not the shape of the boundary itself.** `allowedMethods` 
 allowlist has not named is refused with `E_READ_ONLY` before the shared router handler is ever
 called, so a future contract addition is refused by construction rather than admitted by omission.
 Of the 57 methods `internal/gitrpc`'s `Router.ForConn` dispatches (56 requests plus the one
-`graph.stream` stream method), the allowlist now admits 54 —
+`graph.stream` stream method), the allowlist now admits 55 (54 requests plus `graph.stream`) —
 every operation that writes through git itself (`op.run`'s kinds, the five `remote.run` kinds,
 every `preflight.*`/`remote.*Preflight`, `undo.run`, `stack.restack`/`cancelRestack`,
 `credential.provide`) alongside every pre-existing read and the nine `review.*` methods (below).
-Exactly three stay refused: `worktree.prepare`/`worktree.cancelPrepare` (arbitrary shell execution
-with no human-approval gate anywhere in this codebase — a security boundary, not a file-editing
-one) and `settings.setGitPath` (owned by this app's own Settings dialog, never called by `git-ui`
-at all). `gitstream_test.go` pins both directions (every allowlisted method reaches the handler;
+Exactly two stay refused: `worktree.prepare`/`worktree.cancelPrepare` (shell execution — a
+security boundary, not a file-editing one). The Router also refuses the prepare-script leaf of
+`repoSettings.set` on every connection (P172); `guardRepoSettingsSet` keeps that, plus
+`worktreeBasePath`, as defence in depth. `settings.setGitPath` no longer exists. `gitstream_test.go` pins both directions (every allowlisted method reaches the handler;
 every refused method **never reaches the handler**, asserted with a spy — one table for a genuine
 refusal, a separate one for a method Go has no handler for at all). Layer two is a handful of
 explicit throwing entries in `repo/git/hostHandlers.ts` (`editor.resolveConflict`,
-`settings.setGitPath`, `worktree.openWindow`) for methods layer one also refuses or never reaches Go
+`worktree.openWindow`) for methods layer one also refuses or never reaches Go
 under VS Code either — `editor.resolveConflict` because this app has no merge editor (the user's
 own stated carve-out: conflicts surface through the conflict banner, resolved in the user's own
 external editor, then Continue/Skip/Abort), `worktree.openWindow` because `vscode.openFolder` has no
@@ -3354,8 +3362,7 @@ native meaning. Layer three is `capabilities.*` — `write: true` now shows ever
 refusal — a convenience and an honesty measure, never the boundary itself; layer one holds
 regardless of what any Vue component believes. The property this three-layer shape now guarantees,
 in both directions: **every `capabilities.*` flag that is `false` corresponds to something layer one
-or layer two refuses, and every method layer one admits has a reachable UI affordance** (or, for
-`settings.setGitPath`'s own refusal, no affordance anywhere — `git-ui` has no caller for it at all).
+or layer two refuses, and every method layer one admits has a reachable UI affordance**.
 
 **`repo.open` itself must never transitively arm a write, either — traced once, C13 round 2's own
 finding.** `repo.open` sits on the allowlist as a pure identify-and-subscribe read, but
@@ -4312,6 +4319,7 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **A paired git socket token is a bearer secret, not bound to the peer (P172).** Any same-user process holding the token connects. Pairing shows the kernel-reported process, but reconnects do not re-check it. Options: pin the pairing-time executable or code signature, or accept the same-user threat model. Open user decision; delete when resolved.
 - **Terminal on darwin: a surviving job still stalls `Close` and keeps a shell-exited tab open (P153, P157).** darwin keeps a blocking pty master (kqueue pollability unverified), so the `exitDrain` close cannot interrupt the pending read. `Close` logs a WARN after 4 s. Delete once darwin's master is pollable or checked on a Mac.
 - **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. The server-tag build also drops terminal output (`EmitTo` needs a native window). Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
 - **`gh` response sizes are estimated, not measured (P169).** Realistic open-PR page is 2-4 MiB, worst case about 45 MiB, from arithmetic only; no authenticated `gh` in the sandbox. Run `gh api` on a large repo's open-PR pages (`per_page=100`, pages 1-3) piped to `wc -c`, plus `time` on page 1. Delete once pages sit well under 64 MiB and under the 10 s `apiTimeout`; otherwise open a phase for a GraphQL-projected snapshot.
