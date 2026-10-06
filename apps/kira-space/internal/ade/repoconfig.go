@@ -57,16 +57,18 @@ func (b *TaskBoard) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs)
 	if err != nil {
 		return adewire.Repo{}, err
 	}
+	// The settings write goes first: the config row was just read, so Upsert is the write that
+	// cannot plausibly fail after it.
+	if (settings.WorktreePrepareScript != nil || settings.WorktreePrepareTimeout != nil) && b.deps.SetRepoSettings != nil {
+		if err := b.deps.SetRepoSettings(cfg.RepoID, settings); err != nil {
+			return adewire.Repo{}, err
+		}
+	}
 	if err := b.deps.RepoConfig.Upsert(args.CodeRepoID, patch); err != nil {
 		if errors.Is(err, repos.ErrRepoConfigMissing) {
 			return adewire.Repo{}, invalid("code repo %s not found", args.CodeRepoID)
 		}
 		return adewire.Repo{}, err
-	}
-	if (settings.WorktreePrepareScript != nil || settings.WorktreePrepareTimeout != nil) && b.deps.SetRepoSettings != nil {
-		if err := b.deps.SetRepoSettings(cfg.RepoID, settings); err != nil {
-			return adewire.Repo{}, err
-		}
 	}
 	if err := b.pruneMarks(args.CodeRepoID, patch); err != nil {
 		return adewire.Repo{}, err
@@ -79,7 +81,7 @@ func (b *TaskBoard) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs)
 	return b.repoByID(ctx, args.CodeRepoID)
 }
 
-// validatePatch checks every field before anything is written, so a bad field leaves both stores untouched.
+// validatePatch checks every field before anything is written, so a bad field leaves both stores untouched (a later store failure can still leave the settings applied).
 func (b *TaskBoard) validatePatch(ctx context.Context, cfg model.AdeRepoConfig, p adewire.RepoPatch) (model.AdeRepoConfigPatch, model.GitRepoSettingsPatch, error) {
 	patch := model.AdeRepoConfigPatch{}
 	if p.Nickname != nil {

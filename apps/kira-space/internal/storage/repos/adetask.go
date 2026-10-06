@@ -29,13 +29,6 @@ var (
 // maxColorSlots is the task colour slot count (0-19).
 const maxColorSlots = 20
 
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 // MaxEstHours and MaxEstDays bound an estimate: a longer one makes the Plan span thousands of days.
 const (
 	MaxEstHours = 480
@@ -244,7 +237,7 @@ func insertTaskBranch(tx *sql.Tx, b model.AdeTaskBranch) error {
 		return err
 	}
 	if _, err := tx.Exec(`INSERT INTO ade_task_branches (`+adeTaskBranchColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
-		b.ID, b.TaskID, b.CodeRepoID, b.Name, b.Kind, b.Base, b.QueuedAfter, b.Position, boolToInt(b.HadCommits), b.AddedAt); err != nil {
+		b.ID, b.TaskID, b.CodeRepoID, b.Name, b.Kind, b.Base, b.QueuedAfter, b.Position, boolInt(b.HadCommits), b.AddedAt); err != nil {
 		if isUniqueViolation(err) {
 			return ErrBranchOnTask
 		}
