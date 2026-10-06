@@ -933,6 +933,7 @@ const toolbarBindings = computed(() => ({
   worktreeState,
   stackState,
   openWorktreeWindowCapability: actions.value?.capabilities.openWorktreeWindow ?? false,
+  editRepoSettingsCapability: actions.value?.capabilities.editRepoSettings ?? false,
   actions: actions.value,
   prState,
   searchOpen: searchOpen.value,
@@ -2104,6 +2105,7 @@ onBeforeUnmount(() => {
           />
         </template>
         <RepoSettingsDialog
+          v-if="actions?.capabilities.editRepoSettings"
           :open="repoSettingsDialogOpen"
           :repo-settings-state="repoSettingsState"
           :date-format="dateFormat"

@@ -46,7 +46,7 @@ test.describe('failure banner and auto-fetch marker (P173)', () => {
     await page.addInitScript(buildFakeGraphHostInitScript({ withFailures: true }));
     await page.goto(`${server.url}/graph`);
 
-    await expect(page.locator('[data-testid="repo-settings-button"]')).toBeVisible();
+    await expect(page.locator('[data-testid="search-toggle-button"]')).toBeVisible();
     await expect(page.locator('[data-testid="autofetch-stopped"]')).toHaveCount(0);
     await page.evaluate(() => {
       (window as unknown as { __emitAutoFetchStopped: () => void }).__emitAutoFetchStopped();

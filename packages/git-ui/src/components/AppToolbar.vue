@@ -76,6 +76,8 @@ const props = defineProps<{
   stackState: StackState;
   /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
   openWorktreeWindowCapability: boolean;
+  /** P178: the repository settings gear shows only where the host edits them (Kira Space). */
+  editRepoSettingsCapability: boolean;
   actions: DetailActions | undefined;
   /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
    *  other G24 prop threaded through this toolbar's own children. */
@@ -485,6 +487,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     />
 
     <TooltipIconButton
+      v-if="editRepoSettingsCapability"
       icon="gear"
       label="Repository settings"
       data-testid="repo-settings-button"

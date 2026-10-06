@@ -7,7 +7,8 @@
  *
  * Upstream's `activate()` built an in-process `RepoService` and two webview providers; neither
  * exists here in that shape. `coerceSettings`/`readRawSettings` and the `onDidChangeConfiguration`
- * re-coercion are kept — the extension still owns settings (SPEC §5 item 3).
+ * re-coercion are kept for the keys VS Code itself owns; the extension stores no settings of its
+ * own (P178: repository settings live in Kira Space).
  *
  * G10 D3/D16/D19: `activationEvents: ["onStartupFinished"]` (the manifest) is what lets the
  * status-bar item created here appear before a user has ever opened the panel by hand — an item
@@ -20,12 +21,11 @@ import {
   coerceSettings,
   type Logger,
   nfcPath,
-  repoSettingKeys,
   SETTINGS,
   type SettingKey,
   type VirtualDocumentSource,
 } from '@kira/git-core';
-import type { RepoSettingsPatch, ServerAppInitResult } from '@kira/git-ipc';
+import type { ServerAppInitResult } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import {
   type BlameDisplayState,
@@ -75,136 +75,18 @@ const SHOW_CONNECTION_STATUS_COMMAND = 'kiraSpace.showConnectionStatus';
 const GRAPH_VIEW_ID = 'kiraSpace.graph';
 const REVIEW_VIEW_ID = 'kiraSpace.review';
 const VIRTUAL_DOCUMENT_CONNECT_TIMEOUT_MS = 10_000;
-const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
+// Only keys VS Code itself owns (`source: 'host'`). Repository settings live in Kira Space (P178).
+const HOST_SETTING_KEYS = (Object.keys(SETTINGS) as readonly SettingKey[]).filter(
+  (key) => SETTINGS[key].source === 'host',
+);
 
 function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, unknown> {
   const raw: Record<string, unknown> = {};
-  for (const key of SETTING_KEYS) {
+  for (const key of HOST_SETTING_KEYS) {
     const value = config.get(key);
     if (value !== undefined) raw[key] = value;
   }
   return raw;
-}
-
-// ---------------------------------------------------------------------------------------
-// G18 D11: a one-time, best-effort migration for a value a user already had set for any of the
-// eight keys that leave contributes.configuration this phase — the seven that moved into the new
-// per-repo store (D1) plus kiraSpace.git.path (D15, fixed but relocated to Kira Space's own
-// server-owned settings, never the per-repo one). Never edits the user's settings.json (§8's own
-// non-goal) — the orphaned legacy value(s) are simply left in place, unread by anything after this
-// migration runs once.
-// ---------------------------------------------------------------------------------------
-
-// D15: kiraSpace.git.path is no longer a SETTINGS key at all (it never belonged in this
-// VS-Code-facing schema once its true home was kira.db's own settings table) — this is the one
-// place its pre-G18 dotted key still needs to be named, purely to look for a legacy value.
-const LEGACY_GIT_PATH_KEY = 'kiraSpace.git.path';
-
-// Tracks whether the one-time migration has already run (successfully) — a context.globalState
-// flag rather than editing settings.json (which stays untouched, §8), the same "per editor
-// installation" scope resolveClientId's own globalState read already uses.
-const SETTINGS_MIGRATED_KEY = 'kira.git.repoSettingsMigrated';
-
-/** The literal value a user had configured for `key`, at whichever scope actually won (workspace
- *  folder, then workspace, then global — VS Code's own precedence order) — `undefined` when the
- *  user never touched it, distinct from a value that merely equals the schema's own default
- *  (`config.get` alone cannot tell the two apart once `key` is no longer declared in
- *  `contributes.configuration`, but `inspect` still can). */
-function inspectedValue(config: vscode.WorkspaceConfiguration, key: string): unknown {
-  const inspected = config.inspect(key);
-  if (!inspected) return undefined;
-  return inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
-}
-
-/** G18 D11: runs once per installation (globalState-tracked). Reads every one of the eight
- *  legacy keys' own pre-G18 value via `inspect()` (never `get()`, which would otherwise conflate
- *  "the user set this" with "this happens to equal a default that no longer exists to fall back
- *  to"); a repo-scoped value is written via `repoSettings.set` against the first workspace
- *  folder's own repo (opened here specifically to learn its repoId, the same `repo.open` every
- *  other caller uses — idempotent per (connection, repoId), so this never disturbs the panel's
- *  own later open of the same repo). `git.path` is not migrated: only Kira Space sets the git
- *  path (P172), so a legacy value gets a one-time message pointing at Kira Space Settings → Git.
- *  A session with no workspace folder open yet, or a request that fails, is retried on the next
- *  activation rather than marked done — the one-shot flag is only set after every applicable
- *  write actually lands. */
-async function migrateLegacySettings(
-  context: vscode.ExtensionContext,
-  manager: ConnectionManager,
-  logger: Logger,
-): Promise<void> {
-  if (context.globalState.get<boolean>(SETTINGS_MIGRATED_KEY)) return;
-
-  const config = vscode.workspace.getConfiguration();
-  const rawRepoValues: Record<string, unknown> = {};
-  for (const key of repoSettingKeys()) {
-    // Kira Space refuses prepare-script writes from socket clients (P172); sending it would fail the whole patch.
-    if (key === 'kiraSpace.worktree.prepareScript') continue;
-    const value = inspectedValue(config, key);
-    if (value !== undefined) rawRepoValues[key] = value;
-  }
-  const gitPathValue = inspectedValue(config, LEGACY_GIT_PATH_KEY);
-
-  const notifyGitPath = (): void => {
-    if (typeof gitPathValue === 'string' && gitPathValue !== '') {
-      void vscode.window.showInformationMessage(
-        `Kira Space no longer reads kiraSpace.git.path ("${gitPathValue}"). Set the Git path in Kira Space, Settings, Git.`,
-      );
-    }
-  };
-
-  if (Object.keys(rawRepoValues).length === 0) {
-    // Nothing per-repo to migrate, ever, for this installation — nothing left to retry either.
-    await context.globalState.update(SETTINGS_MIGRATED_KEY, true);
-    notifyGitPath();
-    return;
-  }
-
-  // Coerced through the same validator settings.json itself is checked against — an invalid or
-  // out-of-range legacy value falls back to the schema's own default rather than being carried
-  // forward verbatim into the new store.
-  const { settings: coerced } = coerceSettings(rawRepoValues);
-
-  // G27 D7: a workspace folder's fsPath is filesystem-sourced, normalized before it is sent on
-  // (here, as repo.open's own path) or compared against a git-sourced value elsewhere.
-  const rawFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (rawFolder === undefined) {
-    // No repository to attach the per-repo half to yet — try again next activation rather than
-    // silently dropping a value a user genuinely set.
-    return;
-  }
-  const folder = nfcPath(rawFolder);
-
-  try {
-    await manager.whenConnected();
-
-    const opened = await manager.request('repo.open', { path: folder });
-    if (opened.kind === 'ok') {
-      const patch: Record<string, unknown> = {};
-      for (const key of Object.keys(rawRepoValues)) {
-        patch[key] = coerced[key as SettingKey];
-      }
-      await manager.request('repoSettings.set', {
-        repoId: opened.repo.repoId,
-        patch: patch as RepoSettingsPatch,
-      });
-    } else {
-      logger.log('warn', 'settings migration: repo.open did not resolve to ok, will retry', {
-        kind: opened.kind,
-      });
-      return;
-    }
-
-    await context.globalState.update(SETTINGS_MIGRATED_KEY, true);
-    notifyGitPath();
-    logger.log('info', 'settings migration complete', {
-      repoKeys: Object.keys(rawRepoValues),
-      gitPath: typeof gitPathValue === 'string',
-    });
-  } catch (err) {
-    logger.log('warn', 'settings migration failed, will retry next activation', {
-      err: String(err),
-    });
-  }
 }
 
 // G14 D5: builds the status-bar tooltip as several lines rather than one run-on sentence. Only the
@@ -352,10 +234,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
   const manager = new ConnectionManager(context, logger.child('connection'), appVersion);
   connection = manager;
-
-  // G18 D11: fire-and-forget — never blocks activation; retries on the next activation on
-  // failure or when no workspace folder is open yet (see the function's own doc comment).
-  void migrateLegacySettings(context, manager, logger.child('settingsMigration'));
 
   // G4 D14: registered once, at activation, disposed with the extension. `key` is opaque to VS
   // Code (virtualKey.ts's own `${repoId}\0${rev}\0${path}` format) — `found` resolves to the
@@ -648,7 +526,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
       // G14 D6b: 'workbench.tree.indent' is a host-owned key (SETTINGS' source: 'host'), read off
-      // the root configuration object like any other SETTING_KEYS member — readRawSettings itself
+      // the root configuration object like any other HOST_SETTING_KEYS member — readRawSettings itself
       // needs no special case (a fully-qualified dotted key resolves there like any other, with
       // VS Code's own user/workspace/folder/language overrides already applied). What must widen
       // is this early return, so a live change to it still reaches both webviews through the same

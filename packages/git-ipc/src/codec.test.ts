@@ -68,6 +68,7 @@ describe('ipc codec', () => {
         resolveConflict: true,
         openWorktreeWindow: true,
         runPrepareScript: true,
+        editRepoSettings: true,
         write: true,
         openExternal: true,
       },

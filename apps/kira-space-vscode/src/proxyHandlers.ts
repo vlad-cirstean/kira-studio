@@ -247,6 +247,8 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
           openWorktreeWindow: true,
           // The manifest requires a trusted workspace; Space runs only the script it stores (P172).
           runPrepareScript: true,
+          // Repository settings live in Kira Space, and git.sock refuses repoSettings.set (P178).
+          editRepoSettings: false,
           // C10 D6: this host's transport forwards every request straight to the socket, which
           // accepts writes — unchanged from before C10 added the flag.
           write: true,

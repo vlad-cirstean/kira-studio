@@ -3,7 +3,7 @@ import { buildFakeGraphHostInitScript } from './support/fakeGraphHost.ts';
 import { type InteractionServer, startInteractionServer } from './support/server.ts';
 
 /**
- * P108 F3 regression: `App.vue`'s dialog/menu refs (`repoSettingsDialogOpen` among them) used to
+ * P108 F3 regression: `App.vue`'s dialog/menu refs (the create-branch dialog's among them) used to
  * survive a repo switch or a reconnect untouched — a dialog left open across either kept acting on
  * (or simply displaying stale data for) the *old* repo.
  *
@@ -17,7 +17,7 @@ import { type InteractionServer, startInteractionServer } from './support/server
  * `connected`, which a same-kind re-push is specifically a no-op for) so the later `'connected'`
  * push is a real transition, not a repeat.
  */
-test.describe('repo-settings dialog vs. reconnect (P108 F3)', () => {
+test.describe('create-branch dialog vs. reconnect (P108 F3)', () => {
   let server: InteractionServer;
 
   test.beforeAll(async () => {
@@ -28,12 +28,16 @@ test.describe('repo-settings dialog vs. reconnect (P108 F3)', () => {
     await server.close();
   });
 
-  test('a reconnect while the repo-settings dialog is open closes it', async ({ page }) => {
-    await page.addInitScript(buildFakeGraphHostInitScript());
+  test('a reconnect while the create-branch dialog is open closes it', async ({ page }) => {
+    await page.addInitScript(buildFakeGraphHostInitScript({ withWrite: true }));
     await page.goto(`${server.url}/graph`);
 
-    await page.locator('[data-testid="repo-settings-button"]').click();
-    const dialog = page.getByRole('dialog', { name: 'Repository settings' });
+    // The repository settings dialog is Kira Space-only (P178); this dialog is reachable in VS Code.
+    await page
+      .locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')
+      .click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Create branch here…' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Create branch' });
     await expect(dialog).toBeVisible();
 
     await page.evaluate(() => {

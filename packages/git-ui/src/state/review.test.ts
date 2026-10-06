@@ -12,6 +12,7 @@ const CAPABILITIES: Capabilities = {
   resolveConflict: false,
   openWorktreeWindow: false,
   runPrepareScript: false,
+  editRepoSettings: false,
   write: true,
   openExternal: true,
 };

@@ -248,7 +248,7 @@ function pickerStash(overrides: Partial<StashEntry> & { sha: string }): StashEnt
   };
 }
 
-function buildResponses(): {
+function buildResponses(write: boolean): {
   appInit: (id: number) => unknown;
   repoList: (id: number) => unknown;
   repoOpen: (id: number) => unknown;
@@ -287,6 +287,8 @@ function buildResponses(): {
             goToFile: true,
             clipboard: true,
             resolveConflict: true,
+            editRepoSettings: false,
+            write,
           },
         },
       }),
@@ -704,8 +706,10 @@ export function buildFakeGraphHostInitScript(options?: {
   readonly persistedScrollRow?: number;
   /** P173: answers `status.get` and exposes `window.__emitAutoFetchStopped()`. */
   readonly withFailures?: boolean;
+  /** Reports `capabilities.write`, which mounts the write dialogs (default: read-only). */
+  readonly withWrite?: boolean;
 }): string {
-  const responses = buildResponses();
+  const responses = buildResponses(options?.withWrite ?? false);
   const streamMode = options?.streamMode ?? 'oneChunk';
   const withPickerData = options?.withPickerData ?? false;
   const withFailures = options?.withFailures ?? false;

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
 // recvRepoSettingsChanged reads one frame and requires it to be an 'evt' frame for
@@ -24,13 +25,11 @@ func recvRepoSettingsChanged(c *testClient) gitrpc.RepoSettingsChangedPayload {
 	return payload
 }
 
-// TestIntegration_RepoSettingsLogLevelIsScopedAcrossRealRepos is P72 §9.2's own end-to-end proof,
-// over the real socket and the real per-test SQLite database (not a fake), replacing G18 §3.5/
-// §3.18's collapse test: repoSettings.set for kiraSpace.log.level on repo A is NOT visible via
-// repoSettings.get on repo B — D14's cross-repo sentinel collapse is deleted, so log.level is an
-// ordinary per-repo leaf now. repoSettings.changed still reaches a connection that only ever
-// opened the OTHER repo (D7's fan-out is unconditional on which key changed, unaffected by this).
-func TestIntegration_RepoSettingsLogLevelIsScopedAcrossRealRepos(t *testing.T) {
+// TestIntegration_RepoSettingsWriteFansOutAndIsPerRepo is P72 §9.2's end-to-end proof over the real
+// socket and the real per-test SQLite database: an in-process write (Kira Space's own dialog, via
+// Router.SetRepoSettings) reaches every connected client as repoSettings.changed, including one
+// that only ever opened the OTHER repo (D7's fan-out), and stays scoped to the repo written.
+func TestIntegration_RepoSettingsWriteFansOutAndIsPerRepo(t *testing.T) {
 	t.Parallel()
 	server, sockPath, _, _ := newIntegrationServer(t)
 
@@ -45,44 +44,52 @@ func TestIntegration_RepoSettingsLogLevelIsScopedAcrossRealRepos(t *testing.T) {
 		t.Fatalf("repoIDA (%s) == repoIDB (%s), want genuinely distinct repositories", repoIDA, repoIDB)
 	}
 
-	// Set log.level via A's own repoSettings.set. requestIgnoringEvents, not requestOK: A is
-	// also a subscriber of its own repoSettings.changed (D7 fans out to every connection, the
-	// requester included), so A's own event can legitimately arrive interleaved with its
-	// request's own response — the same hazard remoteRunOK's own doc comment names for
-	// remote.progress.
-	setResp := requestIgnoringEvents(t, clientA, "repoSettings.set", map[string]any{
-		"repoId": repoIDA,
-		"patch":  map[string]any{"kiraSpace.log.level": "debug"},
-	})
-	var setResult gitrpc.RepoSettingsSnapshot
-	if err := json.Unmarshal(setResp.Result, &setResult); err != nil {
-		t.Fatalf("unmarshal repoSettings.set result: %v", err)
-	}
-	if setResult.LogLevel != "debug" {
-		t.Fatalf("repoSettings.set(a) result.LogLevel = %q, want %q", setResult.LogLevel, "debug")
+	scope := "head"
+	if err := server.deps.Router.SetRepoSettings(repoIDA, model.GitRepoSettingsPatch{GraphScope: &scope}); err != nil {
+		t.Fatalf("SetRepoSettings(a): %v", err)
 	}
 
-	// B, even though it never opened (or heard of) repo A, must still have received
-	// repoSettings.changed for A's own write (D7's fan-out is a general mechanism, not conditioned
-	// on which key changed) — drained here, before B's own request below, since a plain request()
-	// (unlike remote.run's own requestIgnoringEvents) reads exactly one frame and requires it to be
-	// the matching response; a queued event ahead of it would otherwise be mistaken for one (the
-	// same race remote_test.go's own "a fresh connection may still carry queued repo.changed
-	// events" comment names for a different event).
-	changed := recvRepoSettingsChanged(clientB)
-	if changed.RepoID != repoIDA || changed.Settings.LogLevel != "debug" {
-		t.Fatalf("repoSettings.changed on B = %+v, want repoId=%s logLevel=debug", changed, repoIDA)
+	for name, c := range map[string]*testClient{"a": clientA, "b": clientB} {
+		changed := recvRepoSettingsChanged(c)
+		if changed.RepoID != repoIDA || changed.Settings.GraphScope != "head" {
+			t.Fatalf("repoSettings.changed on %s = %+v, want repoId=%s graphScope=head", name, changed, repoIDA)
+		}
 	}
 
-	// B, which has never touched log.level itself, must read back its OWN default — real storage,
-	// not a fake, proving the sentinel collapse no longer happens end to end.
 	getResp := requestOK(t, clientB, "repoSettings.get", map[string]any{"repoId": repoIDB})
 	var getResult gitrpc.RepoSettingsSnapshot
 	if err := json.Unmarshal(getResp.Result, &getResult); err != nil {
 		t.Fatalf("unmarshal repoSettings.get result: %v", err)
 	}
-	if getResult.LogLevel != "info" {
-		t.Fatalf("repoSettings.get(b).LogLevel = %q, want %q (the default — unscoped by a's write)", getResult.LogLevel, "info")
+	if getResult.GraphScope != "all" {
+		t.Fatalf("repoSettings.get(b).GraphScope = %q, want %q (the default, unscoped by a's write)", getResult.GraphScope, "all")
+	}
+}
+
+// P178: repository settings are written in Kira Space only, so a socket client's repoSettings.set
+// is refused outright and changes nothing.
+func TestIntegration_SocketClientCannotSetRepoSettings(t *testing.T) {
+	t.Parallel()
+	server, sockPath, _, _ := newIntegrationServer(t)
+	repoDir := initFixtureRepo(t)
+	client := pairAndReady(t, server, sockPath, "settings-refused")
+	repoID := openRepoOK(t, client, repoDir).Repo.RepoID
+
+	setResp := client.request("repoSettings.set", map[string]any{
+		"repoId": repoID,
+		"patch":  map[string]any{"kiraSpace.graph.scope": "head"},
+	})
+	if setResp.OK == nil || *setResp.OK || setResp.Error == nil || setResp.Error.Code != "E_READ_ONLY" {
+		t.Fatalf("repoSettings.set = %+v, want E_READ_ONLY", setResp)
+	}
+
+	getResp := requestOK(t, client, "repoSettings.get", map[string]any{"repoId": repoID})
+	var got gitrpc.RepoSettingsSnapshot
+	if err := json.Unmarshal(getResp.Result, &got); err != nil {
+		t.Fatalf("unmarshal repoSettings.get result: %v", err)
+	}
+	if got.GraphScope != "all" {
+		t.Fatalf("GraphScope = %q after a refused write, want the default %q", got.GraphScope, "all")
 	}
 }
 

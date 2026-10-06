@@ -1558,9 +1558,14 @@ export type Contract = {
            *  one of). */
           readonly openWorktreeWindow: boolean;
           /** G25 D14: gates the prepare script's own "Run" affordance, extension-side, as
-           *  defence in depth — NOT the primary control (D10/D11 are). VS Code:
-           *  `vscode.workspace.isTrusted`; the harness: `true`. */
+           *  defence in depth — NOT the primary control (D10/D11 are). `true` under VS Code (its
+           *  manifest requires a trusted workspace) and the harness; `false` in Kira Space's
+           *  native window, whose stream refuses `worktree.prepare`. */
           readonly runPrepareScript: boolean;
+          /** P178: whether this host shows the repository settings dialog. Those settings live in
+           *  Kira Space, so only its native window edits them (`true`); VS Code reads them and
+           *  `git.sock` refuses `repoSettings.set`. */
+          readonly editRepoSettings: boolean;
           /** C10 §4.2/§4.3: whether this host's transport accepts a write RPC at all. `true` for
            *  VS Code and the harness (unchanged); `false` for the native `'kira'` host, whose
            *  transport's Go side refuses every write with `E_READ_ONLY` regardless of this flag —

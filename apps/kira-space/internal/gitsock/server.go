@@ -282,6 +282,7 @@ func (s *Server) handleConn(nc net.Conn) {
 // Kira Space alone (P178). The native stream shares the Router and still serves them.
 var spaceOnlyMethods = map[string]string{
 	"credential.provide": "credential prompts are answered in Kira Space",
+	"repoSettings.set":   "repository settings are set in Kira Space",
 }
 
 func refuseSpaceOnly(next func(ctx context.Context, method string, params json.RawMessage) (any, error)) func(ctx context.Context, method string, params json.RawMessage) (any, error) {

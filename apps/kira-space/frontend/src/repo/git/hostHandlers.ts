@@ -207,6 +207,8 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
           // human-approval gate anywhere in this codebase — a security boundary, not a
           // file-editing one, so it stays refused even though write is now true.
           runPrepareScript: false,
+          // Repository settings are edited here, in Kira Space, and nowhere else (P178).
+          editRepoSettings: true,
           // P67e: the native mount now admits every git operation that writes through git
           // itself (fetch/pull/push/force-push, merge/rebase as pull strategies, undo, restack,
           // stash, worktree add/remove) — this is the one flag the UI actually branches on to
