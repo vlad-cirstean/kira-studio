@@ -3998,8 +3998,11 @@ bases, B: Space, C: Studio frontend and Space ADE frontend). Part 1 is the pre-p
 reviewer, findings file committed before the Sonnet fixer, fixes committed per related group, findings
 file deleted. Every findings file is deleted; the per-part plans stay as the record.
 
-**Findings: 376 total, 10 high, 101 medium, 265 low** (summed from each file's own counts; Part 20's
-unrated design finding F12 counts as low). Every finding not listed under "Parked" below was fixed in
+**Findings: 376 total, 10 high, 101 medium, 264 low, 1 unrated design decision** (Part 20 F12). Every
+count re-read from the last version of each findings file before deletion (`git show <sha>^:<path>`):
+Parts 2-11 and 13-18 per-finding severities and summary lines agree with the table; Part 12 from its `Counts`
+line (finding headings carry no severity word); Part 19 from its `Severity:` lines; Part 20 and 21 from
+headings. Part 21's two design decisions are inside its counts. Every finding not listed under "Parked" below was fixed in
 its part. Counts per part, high/medium/low:
 
 | Part | Area | Findings | H/M/L |
@@ -4022,7 +4025,7 @@ its part. Counts per part, high/medium/low:
 | 17 | Git RPC, socket, `git-ipc` | 10 | 0/4/6 |
 | 18 | `git-core` and `git-ui` logic | 18 | 1/5/12 |
 | 19 | `git-ui` components | 29 | 0/13/16 |
-| 20 | Space ADE engine, persistence | 12 | 0/2/10 |
+| 20 | Space ADE engine, persistence | 12 | 0/2/9 + 1 design |
 | 21 | Space ADE frontend | 23 | 1/7/15 |
 | 22 | Space desktop host | 16 | 0/2/14 |
 | 23 | VS Code extension | 14 | 0/6/8 |
