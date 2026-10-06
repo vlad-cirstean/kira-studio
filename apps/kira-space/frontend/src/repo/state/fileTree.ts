@@ -169,12 +169,18 @@ export const useFileTreeStore = defineStore('fileTree', () => {
 
   // C5 §7.1: refresh on workspace open and on an explicit Refresh action — nothing live (recorded
   // in docs/ARCHITECTURE.md's Known open items).
+  const latestRefresh = new Map<string, number>();
+
   async function refreshRepoTree(repoId: string): Promise<void> {
     const state = stateFor(repoId);
+    // Only the newest call writes: an older listing resolving last must not replace a newer one.
+    const seq = (latestRefresh.get(repoId) ?? 0) + 1;
+    latestRefresh.set(repoId, seq);
     state.loading = true;
     state.error = null;
     try {
       const listing = await control.codeWorkspaceListFiles(repoId);
+      if (latestRefresh.get(repoId) !== seq) return;
       state.paths = listing.paths;
       state.status = listing.status;
       state.truncated = listing.truncated;
@@ -186,9 +192,10 @@ export const useFileTreeStore = defineStore('fileTree', () => {
       }
       state.loaded = true;
     } catch (err) {
+      if (latestRefresh.get(repoId) !== seq) return;
       state.error = err instanceof Error ? err.message : String(err);
     } finally {
-      state.loading = false;
+      if (latestRefresh.get(repoId) === seq) state.loading = false;
     }
   }
 
