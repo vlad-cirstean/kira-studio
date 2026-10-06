@@ -64,6 +64,7 @@ const ICON_BTN =
     :data-item-id="item.id"
     @click="emit('pick')"
     @keydown.self.enter="emit('pick')"
+    @keydown.self.space.prevent="emit('pick')"
   >
     <AdeTip text="Higher priority">
       <button

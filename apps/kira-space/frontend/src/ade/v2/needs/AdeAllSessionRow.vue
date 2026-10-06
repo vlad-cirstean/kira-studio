@@ -50,7 +50,8 @@ function open(): void {
     data-testid="ade-all-session"
     :data-session-id="view.session.id"
     @click="open"
-    @keydown.enter="open"
+    @keydown.enter.self="open"
+    @keydown.space.self.prevent="open"
   >
     <AdeActivityIcon :kind="view.kind" :size="14" />
     <span class="truncate text-kira-md" :style="{ color: stateColor }" data-testid="ade-all-state">{{ state }}</span>
