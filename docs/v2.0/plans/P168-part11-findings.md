@@ -216,3 +216,47 @@ real run) or "code-read". `DESIGN-DECISION` marks one needing a product call (no
   handling; truncated values refuse "Filter by this value".
 - `KiraCellEditor`, `onBeforeEditCell`: truncated, generated, deleted, gutter and insert cells
   vetoed. Unmount order in `SlickGridHost` correct; `editorCtx` reset.
+
+## Block 3: grid chrome
+
+### F12. low. Columns menu opened before table meta loads stays empty and stores a bogus order (code-read)
+
+- `apps/kira-studio/frontend/src/views/grid/ColumnsMenu.vue:20,34,39-47,99-106`.
+- `meta` arrives from `loadMeta` after the first page (`state.ts:197`). `order` and `selected` are
+  seeded once from `columnNames` at setup. Opened during that gap: "Loading columns…" shows, then
+  meta lands and the list renders nothing (`order` is still `[]`). On close, `sameOrder([], names)`
+  is false, so `setColumnOrder(tabId, [])` persists an empty order; `columnsIndicator` lights the
+  "changed" dot for a change nobody made.
+- Fix: seed `order`/`selected` when `meta` first becomes non-null (`watch(meta, ..., { once: true })`
+  or render the list only under `v-if="meta"` and mount the sortable after), and treat an empty
+  `order` as "no change" in `onBeforeUnmount`.
+
+### F13. low. ORDER BY text round trip breaks quoted or mixed-case columns (verified)
+
+- `apps/kira-studio/frontend/src/views/grid/FilterToolbar.vue:38-42`,
+  `views/grid/sortTerms.ts:17`.
+- `sortToText` writes a header-click sort as `${t.column} DESC` unquoted. Postgres column
+  `CreatedAt`: the ORDER BY box shows `CreatedAt DESC`; pressing Enter there (or appending `, id`)
+  sends a text sort the server folds to `createdat` and rejects. A name with a space yields invalid
+  SQL.
+- `parseTextSortTerms` never matches a quoted name: `\b` after a closing `"` or backtick needs a
+  word character next. Node check: `'"Created At" DESC'`, `'"a"'`, `` '`b` asc' `` all return
+  `null`; only bare `name desc` matches. Header sort indicators vanish for any quoted term.
+- Fix: in `sortToText`, `quoteIdent(dialect, t.column)` when `identNeedsQuoting(dialect, t.column)`
+  (same rule as `filterCompletion.ts:46`). In the regex, keep `\b` only on the bare-word branch:
+  `/^(?:"([^"]+)"|`([^`]+)`|(\w+)\b)\s*(desc|asc)?/i`. Extend the existing unit coverage if any;
+  otherwise a three-case table in a new spec qualifies (parser with interacting quote rules).
+
+### Block 3 notes (checked, nothing real)
+
+- `fkPreview.ts`/`FkPreviewPopover.vue`: response after close dropped via `signal.cancelled`; server
+  cancel on unmount while loading; one fetch per open, no TanStack Query needed for a one-shot
+  read tied to the popover's lifetime.
+- `focusRequest.ts`: cleared on failed load and tab close. Wrong-page consumption covered by F9.
+- `maskPreview.ts`: transform never mutates the memoised `CellView`; tag cache fails closed.
+- `PreviewCommandPanel.vue`: `gcTime: 0`, refetch per open; the popover closes on any outside click
+  so staged changes cannot drift under an open preview.
+- `filterCompletion.ts`: completions quoted per dialect when needed.
+- `fakeData/*`: binary `0x` values decoded by `sqlmutate.go:95`; temporal formatting per dialect;
+  numeric bounds from `typeBounds`; batches respect `AbortSignal`. `DataToolbar.vue` gating
+  consistent with `canGenerateDataFor` and pending/mask lockouts.
