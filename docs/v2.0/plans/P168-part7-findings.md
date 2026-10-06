@@ -275,6 +275,71 @@ No other block 4 finding. Verified:
 - `CollectionsService.Import`/`Export` and `writeFileAtomically` unchanged since P108 F18/F19.
 - Candidate 4: confirmed, F12.
 
+### Block 5: TS api-core
+
+#### F14 (medium) curl paste with CRLF line continuations imports the URL as `"\r"`
+
+- `packages/api-core/src/http/curl/tokenize.ts:60-83` (`split(text)` on the raw paste),
+  `curl/parse.ts:476-490` (`resolveUrl` takes `nonFlagArgs[0]`).
+- Scenario: a multi-line curl command copied on Windows or from a CRLF document
+  (`curl -X POST \⏎ 'https://x.test/a' \⏎ -d 'k=v'` with `\r\n` line ends). shlex treats `\`
+  before `\r` as an escaped `\r` and emits it as its own token, so argv carries `"\r"` entries.
+  When the first continuation precedes the URL, `"\r"` becomes the request URL and the real URL
+  is dropped as an "extra URL" (`multiple-urls` warning). Probe: `curl -X POST \\\r\n 'https://x.test/a' \\\r\n -d 'k=v'`
+  parsed to `url: "\r"`. When the URL comes first the import is right but warns spuriously.
+- Fix: in `tokenize`, normalise `\r\n` and lone `\r` to `\n` before `split`. Add a CRLF case to
+  `curl-cases.json`.
+
+#### F15 (medium) bulk `.env` editor: a value wrapped in single quotes loses them on a no-edit Apply
+
+- `packages/api-core/src/http/dotenv.ts:77-81` (`needsQuoting` ignores a leading `'`/`"`),
+  `:225-235` (single-quoted decode).
+- Scenario: a non-secret variable value `'%Y-%m-%d'` (or any value starting and ending with `'`).
+  `serializeEnv` emits it raw (`K='%Y-%m-%d'`); `parseEnv` reads it back as single-quoted,
+  `%Y-%m-%d`. Opening the bulk editor and applying after editing any other row (or none)
+  rewrites this variable's value without the quotes (`reconcileEnv` sees a change;
+  `VariablesRepo.ApplyBulk` writes it). A value starting with `'` but not ending with one
+  (`'abc`) serialises to a line `parseEnv` rejects, so the whole editor cannot apply until the
+  user hand-edits it. Probe confirmed both.
+- Fix: `needsQuoting` also returns true when the value starts with `'` or `"`. Add both cases to
+  `http-dotenv.spec.ts`.
+- Related, `design-decision`: `KEY=abc123 # prod key` keeps ` # prod key` in the value (probe),
+  where common dotenv parsers strip an inline comment from an unquoted value; a pasted real `.env`
+  file can thus store a comment inside a secret. Decide whether D21 adopts the inline-comment rule.
+
+#### F16 (low) raw HTTP editor: an `HTTP/2` or `HTTP/3` request line keeps the version in the URL
+
+- `packages/api-core/src/http/raw/parse.ts:102` (`/^(\S+)\s+HTTP\/\d\.\d$/`).
+- Scenario: paste `GET /a HTTP/2` (Firefox and devtools show this form for h2). The version
+  regex needs `major.minor`, so the target becomes `/a HTTP/2` and the URL
+  `https://x.test/a HTTP/2`. Probe confirmed.
+- Fix: `/^(\S+)\s+HTTP\/\d(\.\d)?$/`. Add the case to `http-raw-parse.spec.ts`.
+
+#### F17 (low) raw HTTP editor Apply drops disabled header rows and every header description
+
+- `packages/api-core/src/http/raw/generate.ts:59-69` (emits enabled rows only), `raw/parse.ts:148`
+  (`description: ''`); applied by `frontend/src/api/state/raw.ts:81-87`
+  (`patchHttpRequestTabState(state.tabId, result.state)` replaces `headers`).
+- Scenario: a tab has a disabled `Authorization` row kept for later and descriptions on its
+  enabled headers. Edit as raw HTTP, Apply with no edits: the disabled row is gone and every
+  description is blank. Read-through; the generate/parse pair cannot carry either.
+- Fix: in `applyEditRaw`, merge rather than replace: carry each parsed row's description from
+  the first unused original row with the same name and value, and re-append the original disabled
+  rows. `needs-other-part-file: apps/kira-studio/frontend/src/api/state/raw.ts (Part 10)`; routed.
+
+No other block 5 finding. Verified:
+- `tokenize` stops at bare shell operators; `$'…'` stays on; `-u` UTF-8 and `{{var}}` (P108 F9);
+  `--json @file` dropped (P108 F10); `-d @file`, `--data-urlencode @file`, `-F k=<f` dropped with
+  warnings; `toCurl` quotes with `shlex.quote`. Curl corpus round trip passes.
+- `substitute.ts` grammar against the shared corpus (`http-substitution.spec.ts` and `resolve_test.go` both pass over it);
+  `transforms.ts` byte parity (block 2 probe); `escape.ts` `goQueryEscape` pinned by tests.
+- `url.ts` keeps `{{…}}` spans unencoded and bare flags bare; `body.ts` `defaultContentTypeFor`
+  matches Go `applyHeaders`/`contentTypeByCodeLanguage`. `dynamic/*` and `grpc/{metadata,saved}`
+  skimmed: generators only run in TS stage 1 (Go leaves dynamics verbatim).
+- A pasted `curl.exe …` keeps `curl.exe` as the URL (only `curl` and `*/curl` are dropped):
+  noted, not filed (Chrome's Windows "Copy as cURL (cmd)" uses `^` continuations shlex cannot
+  parse anyway).
+
 ## Coverage
 
 - Block 1 (HTTP client): done. Reviewed `httpclient/{client,options,body,cookies,timeline,wire,errors}.go`,
@@ -291,6 +356,10 @@ No other block 4 finding. Verified:
   `aliases.go` skimmed (P108 F7 path only; round-trip corpus is its guard); `bridge/collections.go` Import/Export unchanged
   (git log). Note: commit `3d8d09a` holds blocks 2 and 3 (two commits raced; the block 3 commit
   found nothing left to commit).
-- Block 5: not reached.
+- Block 5 (TS api-core): done. Reviewed `curl/{tokenize,parse,flags,generate}.ts`, `dotenv.ts`,
+  `raw/{parse,generate}.ts`, `headers.ts`, `url.ts`, `body.ts`, `transforms.ts`, `substitute.ts`
+  (walk and URL sanitiser); skimmed `curl/detect.ts`, `dynamic/{catalog,generators,fakerEntry}.ts`,
+  `grpc/{metadata,saved}.ts`, `http/saved.ts`, `substituteRequest.ts`, `escape.ts`, `index.ts`
+  (thin wrappers or tables; covered by the parity specs).
 - Block 6: not reached.
 - Block 7: not reached.

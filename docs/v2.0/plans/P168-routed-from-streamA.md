@@ -67,3 +67,15 @@ Stream A did not edit those files.
 - Owner: `apps/kira-studio/tests/fixtures/explain-plans/` (Part 12, Stream C).
 - Go `formatJSNumber` now matches JS `String(n)`; `parse_test.go` pins the notation switches. A
   shared fixture with a large untyped numeric key (`1234567.5`, `2e20`) is optional.
+
+## P168 Part 7 F17 (low): raw HTTP editor Apply drops disabled header rows and descriptions
+
+- Owner file: `apps/kira-studio/frontend/src/api/state/raw.ts` (Part 10, Stream C).
+- Source: `P168-part7-findings.md` F17. `generateRawRequest` emits enabled header rows only and
+  `parseRawRequest` returns rows with `description: ''`; `applyEditRaw` (`raw.ts:81-87`) passes
+  `result.state` to `patchHttpRequestTabState`, replacing `headers` wholesale.
+- Issue: a no-edit Edit-as-raw Apply deletes every disabled header row and blanks every header
+  description.
+- Fix: in `applyEditRaw`, build the patched `headers` by giving each parsed row the description
+  of the first not-yet-used original row with the same name and value, then append the original
+  disabled rows in their original order. No api-core change needed.
