@@ -7,7 +7,7 @@ import {
   toCurl,
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/util/clipboard';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
@@ -304,7 +304,9 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
   /** D10: copy is available in both states — the masked form is a legal, useful, non-runnable
    *  command; the revealed form requires having passed the gate above first. */
   function copyCurlCommand(): void {
-    void copyText(currentCurlCommand());
+    void copyOrReportError(currentCurlCommand(), (message) => {
+      state.error = message;
+    });
   }
 
   return {

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/util/clipboard';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useDynamicValuesStore } from './state/dynamicValues';
 
@@ -32,10 +33,15 @@ const ALL_ENTRIES: CatalogueEntry[] = FAKE_NAMES.map((name): CatalogueEntry => (
 // data…*'s own first open, and the same memoised promise a send would use. One sample per name,
 // freshly generated every time the dialog opens (closing and reopening shows a different one).
 // `generate` already accepts either spelling (generators.ts's own D12 dispatch).
+const error = ref<string | null>(null);
 onMounted(async () => {
-  const generate = await loadDynamicGenerator();
-  for (const entry of ALL_ENTRIES) {
-    samples[entry.name] = generate(entry.name) ?? '';
+  try {
+    const generate = await loadDynamicGenerator();
+    for (const entry of ALL_ENTRIES) {
+      samples[entry.name] = generate(entry.name) ?? '';
+    }
+  } catch (err) {
+    error.value = `Could not load sample values: ${err instanceof Error ? err.message : String(err)}`;
   }
 });
 
@@ -56,7 +62,10 @@ const filteredEntries = computed(() => {
 });
 
 function onCopy(name: string): void {
-  void copyText(reference(name));
+  error.value = null;
+  void copyOrReportError(reference(name), (message) => {
+    error.value = message;
+  });
 }
 
 function close(): void {
@@ -97,6 +106,9 @@ function close(): void {
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
+      <Alert v-if="error" variant="destructive" data-testid="dynamic-values-error">
+        <AlertDescription>{{ error }}</AlertDescription>
+      </Alert>
       <Empty
         v-if="isFiltered && filteredEntries.length === 0"
         data-testid="dynamic-values-filter-empty"

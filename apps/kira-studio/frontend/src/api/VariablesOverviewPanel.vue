@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
 import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';
@@ -55,8 +56,12 @@ const filteredRows = computed(() => {
 function reference(name: string): string {
   return `{{${name}}}`;
 }
+const copyError = ref<string | null>(null);
 function onCopy(name: string): void {
-  void copyText(reference(name));
+  copyError.value = null;
+  void copyOrReportError(reference(name), (message) => {
+    copyError.value = message;
+  });
 }
 
 const collectionName = computed(() => collectionsStore.collectionRecord(props.collectionId)?.name ?? '');
@@ -97,6 +102,10 @@ function editEnvironmentVariables(): void {
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
+
+      <Alert v-if="copyError" variant="destructive" data-testid="variables-overview-copy-error">
+        <AlertDescription>{{ copyError }}</AlertDescription>
+      </Alert>
 
       <div class="flex flex-col gap-0.5 overflow-y-auto p-1">
         <Empty

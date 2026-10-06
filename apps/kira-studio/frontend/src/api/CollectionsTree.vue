@@ -4,7 +4,7 @@ import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/util/clipboard';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, nextTick, ref, useTemplateRef } from 'vue';
@@ -88,7 +88,10 @@ const actions: CollectionMenuActions = {
   rename: collectionsStore.beginRename,
   duplicate: (row) => void collectionsStore.duplicateRow(row),
   remove: (row) => void confirmAndDelete(row),
-  copyUrl: (row) => void copyText(row.url),
+  copyUrl: (row) =>
+    void copyOrReportError(row.url, (message) => {
+      collectionsStore.error = message;
+    }),
   importCollection: () => void collectionsStore.importCollection(),
   importCurl: () => importCurlStore.openImportCurlDialog(),
   exportCollection: (row) => void collectionsStore.exportCollection(row.id, row.name),
