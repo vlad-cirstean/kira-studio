@@ -297,7 +297,7 @@ func (e *RepoEntry) FileDiff(ctx context.Context, sha, path, originalPath string
 		baseKey = *baseSHA
 	}
 
-	if body, rawBytes, ok := e.diff.get(baseKey, sha, path); ok {
+	if body, rawBytes, ok := e.diff.get(baseKey, detail.SHA, path); ok {
 		return FileDiffResult{
 			SHA: sha, ParentIndex: parentIndex, BaseSHA: baseSHA, Change: *change,
 			Body: body, RawPatchBytes: rawBytes,
@@ -310,7 +310,7 @@ func (e *RepoEntry) FileDiff(ctx context.Context, sha, path, originalPath string
 	} else if originalPath != "" {
 		origPtr = &originalPath
 	}
-	raw, err := e.runOne(ctx, porcelain.FileDiffArgs(baseSHA, sha, path, origPtr))
+	raw, err := e.runOne(ctx, porcelain.FileDiffArgs(baseSHA, detail.SHA, path, origPtr))
 	if err != nil {
 		return FileDiffResult{}, err
 	}
@@ -328,7 +328,7 @@ func (e *RepoEntry) FileDiff(ctx context.Context, sha, path, originalPath string
 			return FileDiffResult{}, err
 		}
 	}
-	e.diff.set(baseKey, sha, path, body, int64(len(raw)))
+	e.diff.set(baseKey, detail.SHA, path, body, int64(len(raw)))
 	return FileDiffResult{
 		SHA: sha, ParentIndex: parentIndex, BaseSHA: baseSHA, Change: *change,
 		Body: body, RawPatchBytes: int64(len(raw)),
