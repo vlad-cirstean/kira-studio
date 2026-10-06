@@ -13,9 +13,11 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqs"
@@ -458,6 +460,65 @@ func TestSqs_Disconnect_ClearsQueueURLCache(t *testing.T) {
 	}
 	if got := fixture.Proxy.Count(); got != 1 {
 		t.Errorf("proxy count after reconnect+read = %d, want 1 (cache was cleared)", got)
+	}
+}
+
+// P174: a read-only poll hides messages only briefly and keeps no receipt handles, so a second poll
+// still sees every message; the page carries the redrive policy's receive limit.
+func TestSqs_Read_ReadOnlyPollKeepsMessagesVisible(t *testing.T) {
+	fixture := testsupport.StartSqs(t)
+	ctx := context.Background()
+
+	dlq, err := fixture.Client.CreateQueue(ctx, &awssqs.CreateQueueInput{QueueName: aws.String("test-p174-dlq")})
+	if err != nil {
+		t.Fatalf("CreateQueue(dlq): %v", err)
+	}
+	dlqAttrs, err := fixture.Client.GetQueueAttributes(ctx, &awssqs.GetQueueAttributesInput{
+		QueueUrl: dlq.QueueUrl, AttributeNames: []sqstypes.QueueAttributeName{sqstypes.QueueAttributeNameQueueArn},
+	})
+	if err != nil {
+		t.Fatalf("GetQueueAttributes(dlq): %v", err)
+	}
+	queueName := "test-p174-browse"
+	redrive := `{"deadLetterTargetArn":"` + dlqAttrs.Attributes["QueueArn"] + `","maxReceiveCount":3}`
+	q, err := fixture.Client.CreateQueue(ctx, &awssqs.CreateQueueInput{
+		QueueName:  aws.String(queueName),
+		Attributes: map[string]string{"RedrivePolicy": redrive, "VisibilityTimeout": "60"},
+	})
+	if err != nil {
+		t.Fatalf("CreateQueue: %v", err)
+	}
+	for i := 0; i < 3; i++ {
+		if _, err := fixture.Client.SendMessage(ctx, &awssqs.SendMessageInput{QueueUrl: q.QueueUrl, MessageBody: aws.String("m")}); err != nil {
+			t.Fatalf("SendMessage: %v", err)
+		}
+	}
+
+	cfg := fixture.Config
+	cfg.ReadOnly = true
+	a := newAdapter(t)
+	if _, err := a.Connect(ctx, cfg, adapters.NewOpCtx("connect-ro")); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Disconnect(ctx) })
+
+	poll := func() page.StreamPage {
+		p, err := a.Read(ctx, offsetRead(queuePath(fixture, queueName), 10), adapters.NewOpCtx("op-p174"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		return p.(page.StreamPage)
+	}
+	first := poll()
+	if first.RowCount != 3 {
+		t.Fatalf("first poll RowCount = %d, want 3", first.RowCount)
+	}
+	if first.MaxReceiveCount == nil || *first.MaxReceiveCount != 3 {
+		t.Errorf("MaxReceiveCount = %v, want 3", first.MaxReceiveCount)
+	}
+	time.Sleep(2 * time.Second) // past the 1 s browse hide, far short of the queue's own 60 s
+	if second := poll(); second.RowCount != 3 {
+		t.Errorf("second poll RowCount = %d, want 3 (messages stayed visible)", second.RowCount)
 	}
 }
 

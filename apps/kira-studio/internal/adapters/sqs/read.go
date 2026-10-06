@@ -196,24 +196,44 @@ func position(pageSize int) page.PagePosition {
 	return page.PagePosition{Offset: nil, PageSize: pageSize, HasMore: false, NextToken: nil, PrevToken: nil, Strategy: "batch"}
 }
 
-func fetchVisibilityTimeout(ctx context.Context, client *sqs.Client, queueURL string) *int {
+// queueAttributes is what one GetQueueAttributes call tells a poll: the queue's visibility timeout
+// and, when a redrive policy exists, how many receives move a message to its dead-letter queue.
+type queueAttributes struct {
+	visibilityTimeoutSeconds *int
+	maxReceiveCount          *int
+}
+
+func fetchQueueAttributes(ctx context.Context, client *sqs.Client, queueURL string) queueAttributes {
 	result, err := client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
-		QueueUrl:       aws.String(queueURL),
-		AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameVisibilityTimeout},
+		QueueUrl: aws.String(queueURL),
+		AttributeNames: []types.QueueAttributeName{
+			types.QueueAttributeNameVisibilityTimeout, types.QueueAttributeNameRedrivePolicy,
+		},
 	})
 	if err != nil {
-		return nil // best-effort, mirrors redis/read.go's MEMORY USAGE fallback
+		return queueAttributes{} // best-effort, mirrors redis/read.go's MEMORY USAGE fallback
 	}
-	raw, ok := result.Attributes["VisibilityTimeout"]
-	if !ok {
-		return nil
+	var out queueAttributes
+	if n, err := strconv.Atoi(result.Attributes["VisibilityTimeout"]); err == nil {
+		out.visibilityTimeoutSeconds = &n
 	}
-	n, err := strconv.Atoi(raw)
-	if err != nil {
-		return nil
+	if raw := result.Attributes["RedrivePolicy"]; raw != "" {
+		var policy struct {
+			MaxReceiveCount json.Number `json:"maxReceiveCount"`
+		}
+		if json.Unmarshal([]byte(raw), &policy) == nil {
+			if n, err := strconv.Atoi(policy.MaxReceiveCount.String()); err == nil {
+				out.maxReceiveCount = &n
+			}
+		}
 	}
-	return &n
+	return out
 }
+
+// browseVisibilityTimeout is the hide time a read-only poll asks for. SQS has no peek, and the
+// SDK omits a zero VisibilityTimeout from the request (indistinguishable from unset), so 0 would
+// silently keep the queue's own timeout; 1 second is the shortest value that takes effect.
+const browseVisibilityTimeout = 1
 
 // pollQueue is read.ts's pollQueue. Never called automatically — always an explicit user-
 // initiated poll. Loops ReceiveMessage (hard-capped at 10 messages per call) up to
@@ -222,10 +242,15 @@ func fetchVisibilityTimeout(ctx context.Context, client *sqs.Client, queueURL st
 // visibilityTimeoutSeconds and countQueue's approximate count. Every SDK call takes ctx directly
 // (P58d D3): SQS has no server-side kill mechanism, so the op's own context is the entire
 // cancellation story.
-func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req adapters.ReadRequest, op *adapters.OpCtx, handles *receiptHandles) (page.StreamPage, error) {
-	visibilityTimeoutSeconds := fetchVisibilityTimeout(ctx, client, queueURL)
+func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req adapters.ReadRequest, op *adapters.OpCtx, handles *receiptHandles, readOnly bool) (page.StreamPage, error) {
+	attrs := fetchQueueAttributes(ctx, client, queueURL)
+	visibilityTimeoutSeconds := attrs.visibilityTimeoutSeconds
 	builder := page.NewStreamPageBuilder(visibilityTimeoutSeconds)
+	builder.SetMaxReceiveCount(attrs.maxReceiveCount)
 	collected := 0
+	// A read-only poll hides messages for only browseVisibilityTimeout, so a later batch of the same
+	// poll can receive them again; seen keeps each message once and ends the poll when a batch adds none.
+	seen := map[string]struct{}{}
 
 	// F10: the duration a cached receipt handle stays trustworthy for — the queue's own attribute
 	// when it was readable, defaultVisibilityTimeout (AWS's own documented default) otherwise.
@@ -243,22 +268,42 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 		if remaining := req.PageSize - collected; remaining < batchLimit {
 			batchLimit = remaining
 		}
-		result, err := client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		input := &sqs.ReceiveMessageInput{
 			QueueUrl:                    aws.String(queueURL),
 			MaxNumberOfMessages:         int32(batchLimit),
 			WaitTimeSeconds:             waitTimeSeconds,
 			MessageAttributeNames:       []string{"All"},
 			MessageSystemAttributeNames: []types.MessageSystemAttributeName{types.MessageSystemAttributeNameAll},
-		})
+		}
+		if readOnly {
+			input.VisibilityTimeout = browseVisibilityTimeout
+		}
+		result, err := client.ReceiveMessage(ctx, input)
 		if err != nil {
 			return page.StreamPage{}, mapError(err)
 		}
+		added := 0
 		for _, m := range result.Messages {
-			if err := pushMessage(builder, m, handles, visibilityTimeout); err != nil {
+			if readOnly && m.MessageId != nil {
+				if _, dup := seen[*m.MessageId]; dup {
+					continue
+				}
+				seen[*m.MessageId] = struct{}{}
+			}
+			// A read-only connection can never delete, so it keeps no receipt handles.
+			var h *receiptHandles
+			if !readOnly {
+				h = handles
+			}
+			if err := pushMessage(builder, m, h, visibilityTimeout); err != nil {
 				return page.StreamPage{}, mapError(err)
 			}
+			added++
 		}
-		collected += len(result.Messages)
+		collected += added
+		if readOnly && added == 0 {
+			break // only messages already shown: the queue is drained as far as a poll can see
+		}
 		if len(result.Messages) < batchLimit {
 			break // short of a full batch — queue is likely drained
 		}

@@ -189,7 +189,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	return pollQueue(ctx, client, url, req, op, a.state.Load().receiptHandles)
+	return pollQueue(ctx, client, url, req, op, a.state.Load().receiptHandles, a.state.Load().readOnly)
 }
 
 // Count is index.ts's count.
