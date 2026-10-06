@@ -412,6 +412,28 @@ func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
 		t.Fatalf("renderPage error = %q, want it to name the masked column", err.Error())
 	}
 
+	// Second projections the old AS-only regex missed (P168 Part 6 F9): implicit alias, quoted alias,
+	// function wrapper, operator expression.
+	for _, stmt := range []string{
+		"SELECT email, email leak FROM customers",
+		`SELECT email, email AS "leak" FROM customers`,
+		"SELECT email, lower(email) FROM customers",
+		"SELECT email, email || '' FROM customers",
+		"SELECT email, (SELECT email FROM c2 LIMIT 1) FROM customers",
+	} {
+		if _, err := renderPage(pg3, 200, nil, &set, stmt); err == nil {
+			t.Errorf("renderPage(%q) = nil error, want a refusal", stmt)
+		}
+	}
+	for _, stmt := range []string{
+		"SELECT c.email, o.id FROM c JOIN o ON o.email = c.email",
+		`SELECT "email" FROM c ORDER BY email`,
+	} {
+		if _, err := renderPage(pg2, 200, nil, &set, stmt); err != nil {
+			t.Errorf("renderPage(%q) = %v, want no error", stmt, err)
+		}
+	}
+
 	// Filtering on the masked column's own name while also selecting it under that same name
 	// (no second alias anywhere) must still render normally — a WHERE-clause self-reference is
 	// not a second, differently-named projection.

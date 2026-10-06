@@ -312,11 +312,9 @@ func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.C
 		return "", false, false
 	}
 	present := make(map[string]bool, len(columns))
-	presentNames := make([]string, 0, len(columns))
 	for _, c := range columns {
 		lower := strings.ToLower(c.Name)
 		present[lower] = true
-		presentNames = append(presentNames, lower)
 	}
 	words := statementIdentifierWords(statement)
 	// Deterministic across calls despite map iteration order, for a stable error message.
@@ -332,41 +330,139 @@ func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.C
 			}
 			continue
 		}
-		if maskColumnRenamedViaAlias(statement, name, presentNames) {
+		if maskColumnRenamedViaAlias(statement, name) {
 			return name, true, true
 		}
 	}
 	return "", false, false
 }
 
-// maskColumnRenamedViaAlias reports whether statement contains explicit alias evidence — the
-// masked column name, followed (with no intervening top-level comma, i.e. still the same
-// projection item) by an "AS <alias>" — where alias is itself one of the columns actually present
-// in the result set under a name other than the masked column's own. This is what
-// maskedColumnRenamedOrHidden's exact-name presence check alone cannot see: `SELECT email, email
-// AS leak FROM customers` satisfies "email present under its own name" while also carrying a
-// second, unmasked projection of the same value under "leak".
-//
-// Restricted to columns actually present in the output (never "any word after AS anywhere") so
-// this doesn't false-positive on an unrelated alias that merely happens to share a statement with
-// a masked column, e.g. `SELECT id, other_col AS leak, email FROM t` — "leak" there derives from
-// other_col, not email, and the required "email ... AS leak" adjacency (no comma crossed) is absent.
-func maskColumnRenamedViaAlias(statement, name string, presentNames []string) bool {
-	var aliases []string
-	for _, n := range presentNames {
-		if n != name {
-			aliases = append(aliases, regexp.QuoteMeta(n))
+// maskColumnRenamedViaAlias reports whether statement projects the masked column name (already
+// present in the result under its own name) in any form other than a bare item: inside a function
+// call or operator expression, or followed by an alias with or without AS, quoted or not. Such a
+// second projection comes back under a name columnRules cannot match, so the real value would
+// return unmasked (`SELECT email, email leak`, `SELECT email, lower(email)`). WHERE/JOIN/ORDER BY
+// occurrences are fine. A bare item is the name, optionally qualified, between SELECT/`,` and
+// `,`/FROM/end of its list.
+func maskColumnRenamedViaAlias(statement, name string) bool {
+	toks := tokenizeSQL(statement)
+	type level struct{ proj, wrapped, sel bool }
+	stack := []level{{}}
+	top := func() *level { return &stack[len(stack)-1] }
+	isWord := func(i int, w string) bool { return i >= 0 && i < len(toks) && toks[i].kind == 'w' && toks[i].text == w }
+	isPunct := func(i int, p string) bool { return i >= 0 && i < len(toks) && toks[i].kind == 'p' && toks[i].text == p }
+	for i, t := range toks {
+		switch {
+		case t.kind == 'p' && t.text == "(":
+			parent := top()
+			stack = append(stack, level{proj: parent.proj, wrapped: parent.proj || parent.wrapped})
+		case t.kind == 'p' && t.text == ")":
+			if len(stack) > 1 {
+				stack = stack[:len(stack)-1]
+			}
+		case t.kind == 'w' && (t.text == "select" || t.text == "returning"):
+			l := top()
+			l.proj, l.sel = true, true
+		case t.kind == 'w' && top().sel && endsProjection[t.text]:
+			top().proj = false
+		}
+		if t.text != name || t.kind == 'p' || isPunct(i+1, ".") || isPunct(i+1, "(") {
+			continue
+		}
+		l := top()
+		if !l.proj {
+			continue
+		}
+		if l.wrapped {
+			return true
+		}
+		j := i
+		for isPunct(j-1, ".") && j-2 >= 0 && toks[j-2].kind != 'p' {
+			j -= 2
+		}
+		prevOK := isPunct(j-1, ",") || isWord(j-1, "select") || isWord(j-1, "distinct") ||
+			isWord(j-1, "all") || isWord(j-1, "returning")
+		nextOK := i+1 == len(toks) || isPunct(i+1, ",") || isPunct(i+1, ")") || isPunct(i+1, ";") ||
+			isWord(i+1, "from") || isWord(i+1, "into")
+		if !prevOK || !nextOK {
+			return true
 		}
 	}
-	if len(aliases) == 0 {
-		return false
+	return false
+}
+
+var endsProjection = map[string]bool{
+	"from": true, "where": true, "group": true, "having": true, "order": true, "limit": true,
+	"offset": true, "union": true, "intersect": true, "except": true, "window": true,
+	"qualify": true, "fetch": true, "into": true,
+}
+
+type sqlToken struct {
+	kind byte // 'w' word or quoted identifier, 'p' punctuation
+	text string
+}
+
+// tokenizeSQL splits statement into lowercased words, quoted identifiers and single-rune
+// punctuation, dropping whitespace, comments and string literals.
+func tokenizeSQL(statement string) []sqlToken {
+	var toks []sqlToken
+	rs := []rune(statement)
+	for i := 0; i < len(rs); {
+		r := rs[i]
+		switch {
+		case unicode.IsSpace(r):
+			i++
+		case r == '-' && i+1 < len(rs) && rs[i+1] == '-':
+			for i < len(rs) && rs[i] != '\n' {
+				i++
+			}
+		case r == '/' && i+1 < len(rs) && rs[i+1] == '*':
+			i += 2
+			for i < len(rs) && !(rs[i] == '*' && i+1 < len(rs) && rs[i+1] == '/') {
+				i++
+			}
+			i += 2
+		case r == '\'':
+			i = skipQuoted(rs, i, '\'')
+		case r == '"' || r == '`' || r == '[':
+			closer := r
+			if r == '[' {
+				closer = ']'
+			}
+			end := skipQuoted(rs, i, closer)
+			inner := rs[i+1 : max(i+1, end-1)]
+			toks = append(toks, sqlToken{'w', strings.ToLower(string(inner))})
+			i = end
+		case r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r):
+			j := i
+			for j < len(rs) && (rs[j] == '_' || unicode.IsLetter(rs[j]) || unicode.IsDigit(rs[j])) {
+				j++
+			}
+			toks = append(toks, sqlToken{'w', strings.ToLower(string(rs[i:j]))})
+			i = j
+		default:
+			toks = append(toks, sqlToken{'p', string(r)})
+			i++
+		}
 	}
-	pattern := `(?i)\b` + regexp.QuoteMeta(name) + `\b[^,]*\bas\b\s*\b(?:` + strings.Join(aliases, "|") + `)\b`
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return false
+	return toks
+}
+
+// skipQuoted returns the index after the quoted run opened at rs[start], treating a doubled
+// closer as an escape.
+func skipQuoted(rs []rune, start int, closer rune) int {
+	i := start + 1
+	for i < len(rs) {
+		if rs[i] == closer {
+			if i+1 < len(rs) && rs[i+1] == closer {
+				i += 2
+				continue
+			}
+			return i + 1
+		}
+		i++
 	}
-	return re.MatchString(statement)
+	return i
 }
 
 // newMaskRenameRefusedError is §4.4's refusal for the aliasing/expression case (finding #3): the
