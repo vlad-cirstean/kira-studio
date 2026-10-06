@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -624,6 +625,38 @@ func TestPostgres_ReadKeysetForwardBackward(t *testing.T) {
 	forwardAgainFirstID := cellAt(t, forwardAgainPage, 0, 0)
 	if forwardAgainFirstID == nil || *forwardAgainFirstID != "6" {
 		t.Errorf("page after page-before's NextToken: first id = %v, want 6", forwardAgainFirstID)
+	}
+}
+
+// P168 Part 3 F10: an identity column's own sequence is recreated by the identity clause, so the
+// definition must not also emit a standalone CREATE SEQUENCE for it (a serial column still does).
+func TestPostgres_DefinitionIdentityColumnHasNoStraySequence(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+	dbPath := nodePath(fixture, seg("database", "kira_test"))
+	if _, err := a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{
+		"DROP TABLE IF EXISTS app.p168_ident",
+		"DROP TABLE IF EXISTS app.p168_serial",
+		"CREATE TABLE app.p168_ident (id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY, v int)",
+		"CREATE TABLE app.p168_serial (id serial PRIMARY KEY, v int)",
+	}}, adapters.NewOpCtx("op-ident-setup")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE app.p168_ident", "DROP TABLE app.p168_serial"}}, adapters.NewOpCtx("op-ident-cleanup")) //nolint:errcheck
+
+	definition := func(table string) string {
+		def, err := a.Definition(ctx, nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", table)), adapters.NewOpCtx("op-def-"+table))
+		if err != nil {
+			t.Fatalf("Definition(%s): %v", table, err)
+		}
+		return strings.Join(def.Statements, "\n")
+	}
+	if got := definition("p168_ident"); strings.Contains(got, "CREATE SEQUENCE") || strings.Contains(got, "OWNED BY") {
+		t.Errorf("identity table definition has a stray sequence:\n%s", got)
+	}
+	if got := definition("p168_serial"); !strings.Contains(got, "CREATE SEQUENCE") {
+		t.Errorf("serial table definition lost its CREATE SEQUENCE:\n%s", got)
 	}
 }
 

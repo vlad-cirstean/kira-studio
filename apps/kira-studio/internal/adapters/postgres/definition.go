@@ -172,15 +172,15 @@ func fetchIndexes(ctx context.Context, exec queryExec, oid string) ([]indexDDLRo
 
 type serialSeqRow struct{ col, seq string }
 
-// fetchSerialSequences resolves each column's nextval(...) sequence via pg_get_serial_sequence —
-// NULL for an identity column (no default to parse) or one with no serial-style default. The
-// referenced sequence must exist before CREATE TABLE runs, since the column's default resolves its
-// ::regclass cast eagerly.
+// fetchSerialSequences resolves each column's nextval(...) sequence via pg_get_serial_sequence.
+// An identity column is excluded (attidentity): pg_get_serial_sequence returns its internal
+// sequence, which the identity clause recreates itself. The referenced sequence must exist before
+// CREATE TABLE runs, since the column's default resolves its ::regclass cast eagerly.
 func fetchSerialSequences(ctx context.Context, exec queryExec, oid string, qname string) ([]serialSeqRow, error) {
 	var serialSequences []serialSeqRow
 	err := exec(ctx, `SELECT format('%I', a.attname) AS col, pg_get_serial_sequence($2::text, a.attname) AS seq
 	         FROM pg_attribute a
-	         WHERE a.attrelid = $1::oid AND a.attnum > 0 AND NOT a.attisdropped
+	         WHERE a.attrelid = $1::oid AND a.attnum > 0 AND NOT a.attisdropped AND a.attidentity = ''
 	         ORDER BY a.attnum`, []any{oid, qname}, func(rows pgx.Rows) error {
 		var col string
 		var seq *string
