@@ -38,8 +38,7 @@ export interface RowVisual {
  *  parent not loaded yet), not a value relative to the queried row. A consumer building a row's
  *  SVG (W8) derives "does this row start/end/merely cross the edge" itself by comparing its own
  *  row number against these two fields — trivial once both are in hand, and what keeps
- *  `segmentsInRow`'s and `segmentsInWindow`'s results provably the same shape (their `Done
- *  when` requires concatenating the former over a range to equal the latter). */
+ *  `segmentsInRow`'s results a plain per-row shape. */
 export interface EdgeSegment {
   readonly fromRow: number;
   readonly toRow: number;
@@ -50,13 +49,12 @@ export interface EdgeSegment {
 }
 
 /** Edges whose span exceeds this many rows — or whose target has not resolved yet, treated as
- *  unboundedly long until a later chunk's patch says otherwise — are indexed separately in
- *  `#longEdges` rather than relied on to be found by a nearby row's CSR scan. Real repositories
- *  have hundreds of these (long-lived branch merges), not thousands — a bound `#demoteIfNowShort`
- *  is what actually keeps true under paging: an edge that's merely unresolved *at append time*
- *  (every open lane at a chunk boundary) is demoted back out the moment its own patch resolves it
- *  to a genuinely short span, rather than staying a permanent `#longEdges` entry for the rest of
- *  the store's life. */
+ *  unboundedly long until a later chunk's patch says otherwise — are indexed separately rather
+ *  than relied on to be found by a nearby row's CSR scan: a resolved long edge sits in the
+ *  `#longBlocks` bucket of every `LONG_EDGE_ROWS`-row block it covers (a row query reads one
+ *  bucket), an unresolved one in `#openLongEdges`. An edge merely unresolved *at append time*
+ *  (every open lane at a chunk boundary) is demoted back out the moment its own patch resolves
+ *  it to a genuinely short span (`#resolveLong`). */
 const LONG_EDGE_ROWS = 64;
 
 /** A reference into an owning chunk's own `edges` buffer, not a copy of the segment itself: a
@@ -66,6 +64,20 @@ interface LongEdgeRef {
   readonly chunkIndex: number;
   readonly localIndex: number;
   readonly fromRow: number;
+}
+
+/** Orders `out[from, to)` by `fromRow`, stably — insertion sort: the slice is a row's few long
+ *  edges, already almost in order. */
+function sortByFromRow(out: EdgeSegment[], from: number, to: number): void {
+  for (let i = from + 1; i < to; i++) {
+    const item = out[i] as EdgeSegment;
+    let j = i - 1;
+    while (j >= from && (out[j] as EdgeSegment).fromRow > item.fromRow) {
+      out[j + 1] = out[j] as EdgeSegment;
+      j--;
+    }
+    out[j + 1] = item;
+  }
 }
 
 function edgeCount(chunk: LayoutChunk): number {
@@ -119,8 +131,8 @@ interface ChunkSlice {
  * plus one typed-array read. `segmentsInRow` partitions an edge into exactly one of two disjoint
  * scans: a bounded CSR window over the `LONG_EDGE_ROWS` rows just above the query row catches
  * every *short* edge that could possibly cover it (a short edge starting further back than that
- * cannot still be open — its own span bound rules it out), and a binary-search-bounded scan of
- * `#longEdges` catches everything else. Neither is a walk over history.
+ * cannot still be open — its own span bound rules it out), and the row's own block bucket of long
+ * edges (plus the still-unresolved ones) catches everything else. Neither is a walk over history.
  */
 export class LayoutStore {
   readonly #chunks: LayoutChunk[] = [];
@@ -129,11 +141,15 @@ export class LayoutStore {
    *  against. */
   readonly #chunkEdgeStart: number[] = [];
   #nextGlobalEdgeIndex = 0;
-  /** Sorted by `fromRow` ascending — true by construction, never re-sorted: chunks are appended
-   *  in row order, and a chunk's own edges are already sorted by `fromRow` (`edges.ts`'s own
-   *  invariant), so appending one chunk's long edges after every earlier chunk's keeps the
-   *  whole array sorted. */
-  readonly #longEdges: LongEdgeRef[] = [];
+  /** `#longBlocks[b]` holds every resolved long edge covering any row of block `b` (rows
+   *  `[b * LONG_EDGE_ROWS, (b + 1) * LONG_EDGE_ROWS)`), so a row query reads one bucket instead of
+   *  every long edge above it. */
+  readonly #longBlocks: Array<LongEdgeRef[] | undefined> = [];
+  /** Long edges whose target is still `UNRESOLVED_ROW`: they cover every row from `fromRow` down
+   *  to the end of the loaded rows, so no bucket can hold them. Moved into `#longBlocks` (or
+   *  dropped, when short) by `#resolveLong`. */
+  readonly #openLongEdges: LongEdgeRef[] = [];
+  #longEdgeTotal = 0;
   /** `#longLocalIndices[chunkIndex]` is the set of that chunk's own local edge indices decided
    *  long *at append time* (see `isLongAtAppendTime`'s doc comment for why this must be frozen,
    *  not recomputed) — what the CSR window scan excludes, so an edge is reported by exactly one
@@ -150,19 +166,21 @@ export class LayoutStore {
     return this.#laneCount;
   }
 
-  /** Test-observable count of `#longEdges`' own current size — exposed so
-   *  `#demoteIfNowShort`'s bound ("stays close to the genuinely-long edge count, not the total
-   *  number ever appended") is provable from outside the class, not just inferable from
-   *  `segmentsInRow`'s output. Not read by any renderer. */
+  /** Test-observable count of indexed long edges — exposed so `#resolveLong`'s bound ("stays
+   *  close to the genuinely-long edge count, not the total number ever appended") is provable from
+   *  outside the class, not just inferable from `segmentsInRow`'s output. Not read by any
+   *  renderer. */
   get longEdgeCount(): number {
-    return this.#longEdges.length;
+    return this.#longEdgeTotal;
   }
 
   clear(): void {
     this.#chunks.length = 0;
     this.#chunkEdgeStart.length = 0;
     this.#nextGlobalEdgeIndex = 0;
-    this.#longEdges.length = 0;
+    this.#longBlocks.length = 0;
+    this.#openLongEdges.length = 0;
+    this.#longEdgeTotal = 0;
     this.#longLocalIndices.length = 0;
     this.#rowCount = 0;
     this.#laneCount = 0;
@@ -193,7 +211,10 @@ export class LayoutStore {
       const segment = readSegment(chunk, localIndex);
       if (isLongAtAppendTime(segment)) {
         longLocalIndices.add(localIndex);
-        this.#longEdges.push({ chunkIndex, localIndex, fromRow: segment.fromRow });
+        const ref: LongEdgeRef = { chunkIndex, localIndex, fromRow: segment.fromRow };
+        this.#longEdgeTotal++;
+        if (segment.toRow === UNRESOLVED_ROW) this.#openLongEdges.push(ref);
+        else this.#registerLong(ref, segment.toRow);
       }
     }
 
@@ -224,23 +245,6 @@ export class LayoutStore {
     return count;
   }
 
-  /** The batch form over `[firstRow, lastRow]` inclusive — not on the render path (the grid
-   *  calls `segmentsInRow` once per row it draws); this exists as `segmentsInRow`'s own test
-   *  oracle and as the query a future prefetch would use. Defined as literal per-row
-   *  concatenation so the two can never drift in what they consider "covers this row". */
-  segmentsInWindow(firstRow: number, lastRow: number, out: EdgeSegment[]): number {
-    assert(
-      firstRow >= 0 && lastRow < this.#rowCount && firstRow <= lastRow,
-      `LayoutStore.segmentsInWindow(${firstRow}, ${lastRow}): out of range [0, ${this.#rowCount})`,
-    );
-    let count = 0;
-    for (let row = firstRow; row <= lastRow; row++) {
-      count = this.#collectShortSegments(row, out, count);
-      count = this.#collectLongSegments(row, out, count);
-    }
-    return count;
-  }
-
   // ---------------------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------------------
@@ -264,7 +268,7 @@ export class LayoutStore {
       const base = target.localIndex * EDGE_STRIDE;
       if (toRow !== PATCH_UNCHANGED) {
         owner.edges[base + EDGE_TO_ROW] = toRow;
-        this.#demoteIfNowShort(target.chunkIndex, target.localIndex, toRow);
+        this.#resolveLong(target.chunkIndex, target.localIndex, toRow);
       }
       if (toLane !== PATCH_UNCHANGED) owner.edges[base + EDGE_TO_LANE] = toLane;
       if (kind !== PATCH_UNCHANGED) owner.edges[base + EDGE_KIND] = kind;
@@ -273,34 +277,41 @@ export class LayoutStore {
 
   /** G31 round-2 performance review, finding #2: `isLongAtAppendTime` unconditionally classifies
    *  any still-`UNRESOLVED_ROW` edge as long — every open lane at a chunk boundary, not just a
-   *  genuine long-lived merge — and `#longEdges` is append-only, scanned in full by every future
-   *  row query. Most of those edges resolve in the very next chunk to a genuinely SHORT span, but
-   *  the frozen-at-append-time membership rule (`isLongAtAppendTime`'s own doc comment, to avoid a
-   *  double-reported segment) meant they stayed in `#longEdges` forever regardless, so the module
-   *  doc's own "hundreds, not thousands" bound broke under paging — every chunk boundary added a
-   *  permanent entry.
+   *  genuine long-lived merge. Most of those resolve in the very next chunk to a genuinely SHORT
+   *  span; the frozen-at-append-time membership (`isLongAtAppendTime`'s own doc comment, to avoid
+   *  a double-reported segment) must not keep them indexed forever.
    *
-   *  Called the moment a patch resolves an edge's `toRow` (`patchTarget`'s own doc comment: this
-   *  happens at most once per edge, `UNRESOLVED_ROW` → a real row, never patched again). If the
-   *  now-resolved span turns out short, this removes the edge from both `#longEdges` and its
-   *  chunk's own `#longLocalIndices` — un-freezing it, but towards the *same* answer
-   *  `isLongAtAppendTime` would have given had it known the real span up front, so no double
-   *  report results. `#collectShortSegments`' CSR window, `[row - LONG_EDGE_ROWS, row]`, then picks
-   *  it up naturally: a demoted edge's own `toRow` is by definition within
-   *  `fromRow + LONG_EDGE_ROWS`, so every row that could still cover it already falls inside that
-   *  window. Removal via `splice` (not swap-and-pop) preserves `#longEdges`' own
-   *  sorted-by-`fromRow` invariant, which `#longEdgeUpperBound`'s binary search still relies on. */
-  #demoteIfNowShort(chunkIndex: number, localIndex: number, toRow: number): void {
+   *  Called the moment a patch resolves an edge's `toRow` (`patchTarget`'s own doc comment: at
+   *  most once per edge, `UNRESOLVED_ROW` → a real row). The edge leaves `#openLongEdges`; a span
+   *  that is genuinely long moves into `#longBlocks`, a short one is un-frozen — dropped from
+   *  `#longLocalIndices` towards the *same* answer `isLongAtAppendTime` would have given had it
+   *  known the real span, so `#collectShortSegments`' CSR window picks it up and nothing is
+   *  double-reported. */
+  #resolveLong(chunkIndex: number, localIndex: number, toRow: number): void {
     const longLocalIndices = this.#longLocalIndices[chunkIndex] as Set<number>;
     if (!longLocalIndices.has(localIndex)) return; // wasn't long-at-append-time; nothing to do.
-    const index = this.#longEdges.findIndex(
+    const index = this.#openLongEdges.findIndex(
       (ref) => ref.chunkIndex === chunkIndex && ref.localIndex === localIndex,
     );
-    assert(index !== -1, 'LayoutStore: long-at-append-time edge missing from #longEdges');
-    const ref = this.#longEdges[index] as LongEdgeRef;
-    if (toRow - ref.fromRow > LONG_EDGE_ROWS) return; // genuinely long — stays classified long.
+    assert(index !== -1, 'LayoutStore: unresolved long edge missing from #openLongEdges');
+    const ref = this.#openLongEdges[index] as LongEdgeRef;
+    this.#openLongEdges.splice(index, 1);
+    if (toRow - ref.fromRow > LONG_EDGE_ROWS) {
+      this.#registerLong(ref, toRow);
+      return;
+    }
     longLocalIndices.delete(localIndex);
-    this.#longEdges.splice(index, 1);
+    this.#longEdgeTotal--;
+  }
+
+  /** Files a resolved long edge into the bucket of every block its `[fromRow, toRow]` covers. */
+  #registerLong(ref: LongEdgeRef, toRow: number): void {
+    const lastBlock = Math.floor(toRow / LONG_EDGE_ROWS);
+    for (let block = Math.floor(ref.fromRow / LONG_EDGE_ROWS); block <= lastBlock; block++) {
+      const bucket = this.#longBlocks[block];
+      if (bucket === undefined) this.#longBlocks[block] = [ref];
+      else bucket.push(ref);
+    }
   }
 
   /** Binary search over `#chunkEdgeStart`: the chunk whose own range contains `globalEdgeIndex`. */
@@ -396,41 +407,29 @@ export class LayoutStore {
     return count;
   }
 
-  /** The `#longEdges` scan: binary search to the last entry with `fromRow <= row`, then a
-   *  linear filter on `toRow` — the "long edges are hundreds, not thousands" bound from the
-   *  module doc comment is what keeps this cheap.
-   *
-   *  G30 round-1 performance review, finding #3: `readSegment` (a fresh 6-field object) used to
-   *  be allocated for every candidate this scan visits, `coversRow` checked only afterward — so
-   *  an edge that closed thousands of rows ago (still in `[0, upperBound)`, since `#longEdges`
-   *  is append-only and never pruned) paid a full allocation just to be discarded. `fromRow <=
-   *  row` already holds for every entry in that range by construction (`#longEdgeUpperBound`'s
-   *  own binary search), so only `toRow` needs checking — read directly out of the typed array,
-   *  no object built, for every candidate that misses. */
+  /** The long-edge scan: the row's own `#longBlocks` bucket plus the still-unresolved edges, so
+   *  cost follows the long edges that actually touch this block, not every long edge above it
+   *  (G30 finding #3's allocation concern still holds: only a covering edge is read into an
+   *  object). Edges come out ordered by `fromRow`, as the segment painter expects. */
   #collectLongSegments(row: number, out: EdgeSegment[], countIn: number): number {
     let count = countIn;
-    const upperBound = this.#longEdgeUpperBound(row);
-    for (let i = 0; i < upperBound; i++) {
-      const ref = this.#longEdges[i] as LongEdgeRef;
-      const chunk = this.#chunks[ref.chunkIndex] as LayoutChunk;
-      const toRow = chunk.edges[ref.localIndex * EDGE_STRIDE + EDGE_TO_ROW] as number;
-      if (toRow !== UNRESOLVED_ROW && row > toRow) continue;
-      out[count] = readSegment(chunk, ref.localIndex);
+    const bucket = this.#longBlocks[Math.floor(row / LONG_EDGE_ROWS)];
+    if (bucket !== undefined) {
+      for (const ref of bucket) {
+        if (ref.fromRow > row) continue;
+        const chunk = this.#chunks[ref.chunkIndex] as LayoutChunk;
+        const toRow = chunk.edges[ref.localIndex * EDGE_STRIDE + EDGE_TO_ROW] as number;
+        if (row > toRow) continue;
+        out[count] = readSegment(chunk, ref.localIndex);
+        count++;
+      }
+    }
+    for (const ref of this.#openLongEdges) {
+      if (ref.fromRow > row) continue;
+      out[count] = readSegment(this.#chunks[ref.chunkIndex] as LayoutChunk, ref.localIndex);
       count++;
     }
+    sortByFromRow(out, countIn, count);
     return count;
-  }
-
-  /** The index just past the last `#longEdges` entry with `fromRow <= row`. */
-  #longEdgeUpperBound(row: number): number {
-    let low = 0;
-    let high = this.#longEdges.length;
-    while (low < high) {
-      const mid = (low + high) >> 1;
-      const fromRow = (this.#longEdges[mid] as LongEdgeRef).fromRow;
-      if (fromRow <= row) low = mid + 1;
-      else high = mid;
-    }
-    return low;
   }
 }
