@@ -342,6 +342,39 @@ and the custom-scripts repo validator, map only those to `BadRequest`, everythin
 `ipcerr.InternalErr`. Wrap the four raw returns in `ipcerr.InternalErr`/`InternalResult` for
 consistency.
 
+### F17 (low) Deferred emitter's `app` field races an MCP-driven emit during boot
+
+`apps/kira-studio/main.go:122-123,135,195,366,395`; `internal/shell/wails.go:20-29,70-73` (Part 8,
+editable). DB MCP starts serving at `main.go:366` (`StartDbMcpIfEnabled`) and `Events.Attach`
+subscribes to connection state at `:395`. `attachEmitter(app)` writes `emitter.app` at `:195`,
+after `application.New`. `emitter.Emit`/`EmitTo` read `e.app` with no synchronisation.
+
+Scenario: Claude Code is already registered and retrying; Studio starts with the server enabled.
+A `run_query` arrives between `:395` and `:195`, `connectForQuery` calls `Connect`, the
+connection's state change reaches `ev.emit.Emit`, which reads `e.app` on the MCP goroutine while
+`main` writes it: a data race under the Go memory model (reasoned from the code, not run under
+`-race`). Dropping the event
+before attach is fine (the renderer fetches `States()` on mount); the unsynchronised access is
+the defect.
+
+Fix: hold the app in an `atomic.Pointer[application.App]` inside `emitter` (and the same for the
+deferred dialogs' app if it has the same shape).
+
+### F18 (low) `InstallClaudeCode` holds the embedded-server mutex across the `claude` spawn
+
+`SI/bridge/dbmcp.go:325-338`. The lock is held for the whole `Installer.Install` call, up to
+`spawnTimeout` (30 s) for two `claude` invocations. `Status`, `SetEnabled`, `Regenerate` and
+`StopDbMcp` all take the same `embedded.mu`.
+
+Scenario: the user clicks Install while `claude` is slow (first-run update check, a wedged
+config lock) and then quits. Teardown (`main.go:445`) blocks in `StopDbMcp` until the spawn
+times out; the app hangs on quit for up to 30 s. Meanwhile the settings pane's `Status` refresh
+and the toggle freeze too.
+
+Fix: under the lock, check `server != nil` and `helperTokenValid`, copy `server.URL()`, then
+release before calling `Installer.Install`. The registration names a fixed URL and helper path,
+so nothing needs the lock during the spawn.
+
 ## Coverage
 
 - Block 1 (auth and install): done. Reviewed `SI/mcpauth/token.go`, `SI/mcpinstall/install.go`,
@@ -422,3 +455,25 @@ consistency.
     (`maskSecrets`, `maskSendErrTimeline`, `maskGrpcError`, `maskGrpcResult`); streamed gRPC
     message bodies stay unmasked (documented open item, P108 F16).
   - `appcore.Deps` copy order and post-detach emits: checked in block 5 with `main.go`.
+- Block 5 (lifecycle and config): done. Reviewed `apps/kira-studio/main.go`, `SI/config/{paths,
+  env}.go`, `SI/buildinfo`, `SI/layering_test.go`, `Taskfile.yml`, `build/Taskfile.yml`,
+  `build/config.yml`, `build/darwin/{Taskfile.yml,Info.plist,Info.dev.plist}`, `.gitignore`,
+  `cmd/g1measure/main.go`; read `internal/shell/{quit,wails}.go` and `oplog/wire.go` as callees.
+  - `appcore.Deps` copies: `Router`/`Connections`/`Tree` are set in `wireAdapters` and `Events`
+    at `:123`, all before the first copy (`wireEmbeddedServices` at `:135`, Services list at
+    `:152-180`). No stale copy.
+  - Plan §9 #3: events emitted before `attachEmitter` are dropped (no panic, renderer re-reads
+    on mount); the unsynchronised field is F17.
+  - Plan §9 #4 dropped: `oplog.Stop` runs `finishInFlight`, marking still-running ops
+    `error: app exited` (an op that completes during the DB MCP drain is misreported, not lost).
+    Late writes after `db.Close()` (response history, metadata cache) return `sql: database is
+    closed` and are logged; nothing panics. The process exits right after `OnShutdown`.
+  - Quit path: `ShouldQuit` starts `flushThenQuit` once, which runs `beforeFlush` then
+    `teardown` then `app.Quit()`; `OnShutdown` re-runs both through `sync.OnceFunc` (no-ops). No double
+    teardown. Whether a SIGTERM/logout path reaches `OnShutdown` is Wails behaviour, not checked.
+  - Build: release builds use `-tags production -trimpath` and inject `buildinfo.Version` from
+    `build/config.yml`; ad-hoc signing only by default, Developer ID through `darwin:sign`.
+    `frontend/bindings` is gitignored. `layering_test.go`'s exempt list is still the minimal
+    four. `g1measure`: dev tool, no defect.
+  - Minor, not filed: `dbmcp.serverVersion` is the constant `"0.0.0"` while `buildinfo.Version`
+    now exists; harmless for the MCP handshake.
