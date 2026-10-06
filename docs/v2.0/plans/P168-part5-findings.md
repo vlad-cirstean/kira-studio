@@ -3,12 +3,26 @@
 Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD reviewed `8b29250`
 (`p168-stream-a`, rebased on `v2.0` `61e367f`). Reviewer reports only; fixer follows plan §8.
 
+Summary: 11 findings, 0 high, 1 medium (F11), 10 low. F4's binary half is tagged
+`design-decision`. Routed: F4 renderer half to `P168-routed-from-streamA.md` (Part 12, Stream C).
+Every other fix stays in Part 5 files plus Stream A one-hop files (kafka/sqs `read.go`, `dbmcp`
+`render_test.go`).
+
 ## Checks
 
 - `go vet` over `adapterhost`, `enginecache`, `page`, `tree`, `oplog`, `ipcfixture`: clean.
 - `go test -race -count=1` over `adapterhost`, `enginecache`, `page`, `tree`, `oplog`: all pass.
 - Wire regeneration: pinned `flatc` 25.9.23 (SHA-256 verified) run into scratch, `diff -r` against
   `SI/page/wire`, `SP/wire/`, `SP/wire.ts`: identical. No drift.
+- `go test -race -count=1 ./apps/kira-studio/internal/ipcfixture/...` (real containers, Docker up,
+  `TESTCONTAINERS_RYUK_DISABLED=true`, read mode): pass; all six `TestFixture_*` ran (no skip).
+  Images as pinned in `adapters/testsupport` (clickhouse `clickhouse/clickhouse-server:26.3`, etc.).
+- `bun test` `bridge-port`, `bridge-unwrap`, `e2e-real-build-lock` specs: 18 pass.
+- Typecheck: green through every findings commit's pre-commit hook (all nine projects).
+- `bun run test:ipc:fe:studio`: first run failed 7/7 on a missing browser
+  (`chromium_headless_shell-1243`; container ships 1194, Playwright 1.63 wants 1243). After
+  `playwright install chromium chromium-headless-shell`: 7 passed. Environment, not code.
+- `bun run test:e2e-real:studio`: 6/6 fail, `Script not found "build:test"`: F11.
 
 ## Findings
 
@@ -159,6 +173,64 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
   `ipcerr.New(string(ae.Code), ae.Message)`, pass `*ipcerr.Error` through, wrap the rest with
   `ipcerr.Wrap`; apply it to every backend return. Use `ipcerr.BadRequest` for path decode errors.
 
+### F9 (low) IPC fixture tier: backend asserts a hand-synced JSON copy, and one mask outlived its reason
+
+- `apps/kira-studio/internal/ipcfixture/fixture_assert_test.go:16-22,104-125` (read mode compares
+  against `testdata/<kind>.fixture.json`), `write.go:61-83` (`KIRA_IPC_FIXTURES=write` writes only
+  `tests/ipc/<kind>/<kind>.fixture.ts`); `frozen.go` `configSectionMaskedPlaceholder` (kafka
+  "Configuration" section masked wholesale).
+- The `.fixture.ts` header says "The backend spec asserts every run's real response against this
+  file". It does not: the Go assertion reads the JSON copy, which nothing regenerates ("produced
+  once via `bun run`"). The frontend spec mocks from the `.ts`. A `.ts` edit (or a write-mode
+  capture without a manual JSON update) lets the two halves drift silently, which is the exact
+  split the anti-drift rule exists to prevent. Probe: loaded all six `.ts` modules with bun and
+  compared to the JSON copies, key order normalised: five identical; clickhouse differs only in
+  `serverVersion` (`26.3.33.24` vs `26.3.32.14`), which the assertion masks. In sync today, by hand.
+- The kafka Configuration mask's own rationale ("every committed fixture reflects the pre-E11
+  state ... zero rows") is no longer true: `kafka.fixture.ts:173+` carries real rows and
+  `kafka.frontend.spec.ts:135` asserts 33 of them. The backend never checks those rows, so a Go
+  regression in `DescribeTopicConfigs` mapping passes the backend half while the frontend half keeps
+  mocking the old shape.
+- Fix: make write mode emit both files from one capture (or make read mode parse the `.ts`
+  module's two JSON arrays and delete `testdata/*.json`). Add a guard (bun unit spec, or Go reading
+  both) that fails when they disagree modulo masks. Drop the kafka Configuration mask and re-capture
+  with `KIRA_IPC_FIXTURES=write`; if config defaults genuinely vary by broker patch, mask values,
+  not the section, and say so in the comment.
+
+### F10 (low) No test crosses the real Go encoder into the TS decoder for non-tabular pages
+
+- `apps/kira-studio/internal/ipcfixture/harness.go:173-260` calls `Dispatcher` directly and
+  decodes `page.Page` in Go (`decode.go:71`): no FlatBuffers encode. The IPC frontend half decodes
+  frames built by the TS test encoder (`tests/support/encodeFrame.ts`, a third copy of
+  `page/encode.go` + `adapterhost/frame.go`). Only `tests/e2e-real/{postgres,mariadb,sqlite}`
+  send a real Go frame through `decodeFrame`, all tabular.
+- Gap: document, keyvalue and stream encoding (`encode.go:73-132`) and the optional scalars
+  (`ttl_ms`/`memory_bytes`/`visibility_timeout_seconds` absent vs 0, `offset` null on keyset pages,
+  `RedisType.object`, null bits in fixed columns) are never checked Go-to-TS. A Go-side mirror slip
+  (for example writing `ttl_ms` 0 for a no-TTL key) passes every tier, because both test encoders
+  agree with the TS decoder, not with Go. This is codec edge-case logic across two languages: it
+  clears the `CLAUDE.md` test bar.
+- Fix: a Go test in `adapterhost` encodes one response per page kind (each optional field both
+  absent and set, a null row, a truncated row, a keyset position) through `encodeResponse` and
+  writes golden bytes to `testdata/`; a bun unit spec decodes each with `decodeFrame` and asserts
+  the logical page. Regenerate the golden files with the same `KIRA_IPC_FIXTURES=write` switch.
+
+### F11 (medium) `test:e2e-real:studio` cannot run: fixture calls a removed `build:test` script
+
+- `apps/kira-studio/tests/e2e-real/fixtures.ts:125`:
+  `execFileSync('bun', ['run', 'build:test'], { cwd: ROOT_DIR, ... })`. Root `package.json` has
+  `build:test:studio` and `build:test:space`, no `build:test`. The comment above the function
+  (`fixtures.ts:108-110`) already names `build:test:studio`.
+- Real run (this review, Docker up, Playwright chromium-headless-shell 1243 installed):
+  `bun run test:e2e-real:studio` fails all 6 specs in `buildPrerequisites` with
+  `error: Script not found "build:test"`. Decisive line: `Error: Command failed: bun run build:test`
+  at `fixtures.ts:125`.
+- Impact: the kept real-backend tier (`CLAUDE.md`) is dead, and it is the only tier that sends a
+  real Go FlatBuffers frame through `decodeFrame` (see F10). Pre-commit hooks do not run it, so the
+  break is silent.
+- Fix: `['run', 'build:test:studio']`. Then run `bun run test:e2e-real:studio` and fix whatever
+  the now-reachable specs report, same phase.
+
 ## Suspects (plan §9)
 
 1. Concurrent `Router.Connect` on one id: dropped. `Router.Connect`'s only caller is
@@ -254,3 +326,28 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
   completions plus at start; `ReconcileInterrupted` at start covers hard kills. `Command` text is
   stored as the engine set it (redaction is the engine's job; nothing here re-expands it). No oplog
   finding.
+- Block 7 (fixtures and tests): done. `ipcfixture/{harness,frozen,decode,write,types,channels}.go`,
+  `fixture_assert_test.go`, `clickhouse_test.go` read in full; other per-engine tests skimmed (same
+  shape, all green live). `frozen.go` masks reviewed: `serverVersion`, tokens, endpoint,
+  coordinator, `refresh:false`, node-order sort are each justified; kafka Configuration is not
+  (F9). `SetEscapeHTML(false)` in `write.go` confirmed. `ST/ipc/*` frontend specs: green; kafka spec
+  read for the config assertion. `ST/e2e-real/fixtures.ts` read (F11); the other e2e-real specs not
+  reached at runtime because of F11; read only for their `decodeFrame` coverage (tabular only).
+  `ST/support/encodeFrame.ts` read as the third encoder copy (F10). `ST/unit/{bridge-port,
+  bridge-unwrap,e2e-real-build-lock}` green; build-lock spec still matches `fixtures.ts`'s lock
+  functions. `packages/db-fixtures`: seeds scanned for `now()`/`UUID()`/`random` defaults; none
+  reaches a frozen fixture (live comparison passes). Unit-test bar: a few thin Go tests exist
+  (`TestByteLru_UpdateOnMissingKeyIsNoop`, `TestTruncateUTF8ToBoundary_NoTruncationNeeded`,
+  `TestThrottle_SetToZeroRemovesLimiter`); `CLAUDE.md` makes the bar forward-only, so not reported.
+  No true duplicate found.
+
+### Coverage statement
+
+Every one of the 110 owned files was reviewed, except as listed: `ST/ipc/<kind>.frontend.spec.ts`
+(kafka read; other five skimmed: they passed live and only mock from the fixtures F9 covers);
+`ST/e2e-real/{mariadb,postgres,multiwindow,sqlite}-real.spec.ts` and `support/*.ts` (skimmed: the
+tier cannot start, F11; re-review after the fix runs them); `SD/connection.ts` (read for wire use
+only: its validation mirror is Part 2's, closed); `packages/db-fixtures/support/*.ts` and seed SQL
+(scanned for non-determinism only: consumed by Parts 3-4 suites, which pass); per-engine
+`ipcfixture/*_test.go` other than clickhouse (skimmed). Generated `SI/page/wire`, `SP/wire/`
+checked for drift only (none).
