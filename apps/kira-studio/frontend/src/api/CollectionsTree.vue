@@ -7,7 +7,7 @@ import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMe
 import { copyText } from '@workbench/util/clipboard';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
-import { computed, ref, useTemplateRef } from 'vue';
+import { computed, nextTick, ref, useTemplateRef } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
@@ -131,7 +131,19 @@ function onTreeKeydown(e: KeyboardEvent): void {
   if (e.defaultPrevented || e.isComposing) return;
   const target = e.target as HTMLElement | null;
   if (target?.closest('input, textarea, [contenteditable="true"]')) return;
-  const row = collectionsStore.visibleRows.find((r) => r.key === collectionsStore.selected);
+  const rows = collectionsStore.visibleRows;
+  const selectedIndex = rows.findIndex((r) => r.key === collectionsStore.selected);
+  const moveTo = e.key === 'ArrowDown' ? selectedIndex + 1
+    : e.key === 'ArrowUp' ? Math.max(selectedIndex, 1) - 1
+    : e.key === 'Home' ? 0
+    : e.key === 'End' ? rows.length - 1
+    : null;
+  if (moveTo !== null) {
+    e.preventDefault();
+    void focusRow(rows[Math.min(moveTo, rows.length - 1)]);
+    return;
+  }
+  const row = rows[selectedIndex];
   if (!row) return;
 
   if (e.key === 'ArrowRight') {
@@ -157,6 +169,21 @@ function onTreeKeydown(e: KeyboardEvent): void {
   // printed shortcut and the executed action are the same object and `disabled` gating is
   // honoured for free (state/contextMenu.ts's own reasoning for runMenuShortcut).
   if (runMenuShortcut(menuForRow(row, actions), id)) e.preventDefault();
+}
+
+const hasVisibleSelection = computed(() =>
+  collectionsStore.visibleRows.some((r) => r.key === collectionsStore.selected),
+);
+
+// A virtualised row may not be mounted yet: scroll it into view, then focus its element.
+async function focusRow(row: CollectionRowVm | undefined): Promise<void> {
+  if (!row) return;
+  collectionsStore.selectRow(row.key);
+  await revealKey(row.key);
+  await nextTick();
+  scrollEl.value
+    ?.querySelector<HTMLElement>(`[data-testid="collection-row"][data-id="${CSS.escape(row.id)}"]`)
+    ?.focus();
 }
 
 const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplicate'] as const;
@@ -203,6 +230,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
               :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
               :row="collectionsStore.visibleRows[item.index]"
               :selected="collectionsStore.selected === collectionsStore.visibleRows[item.index].key"
+              :tabbable="!hasVisibleSelection && item.index === 0"
               :sticky="false"
               @select="onSelect"
               @toggle="onToggle"

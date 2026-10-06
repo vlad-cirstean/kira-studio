@@ -22,10 +22,12 @@ const props = withDefaults(
   defineProps<{
     row: CollectionRowVm;
     selected: boolean;
+    /** The tree's one tab stop when nothing is selected. */
+    tabbable?: boolean;
     sticky?: boolean;
     class?: HTMLAttributes['class'];
   }>(),
-  { sticky: false },
+  { sticky: false, tabbable: false },
 );
 
 // P110 I2-14: same ternary as TreeRow.vue's own stateClass -- selected beats hover pre-phase on
@@ -140,7 +142,7 @@ function onKeydown(e: KeyboardEvent): void {
     :aria-level="row.depth + 1"
     :aria-expanded="row.hasChildren ? row.expanded : undefined"
     :aria-selected="selected"
-    :tabindex="sticky ? -1 : selected ? 0 : -1"
+    :tabindex="sticky ? -1 : selected || tabbable ? 0 : -1"
     @click="emit('select', row)"
     @dblclick="emit('open', row)"
     @keydown="onKeydown"
