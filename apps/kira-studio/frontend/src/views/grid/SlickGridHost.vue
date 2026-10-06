@@ -1875,13 +1875,20 @@ function onKeydown(e: SlickEventData): void {
   if (!runtimeEntry) return;
 
   const key = (e.key ?? '').toLowerCase();
-  if ((e.ctrlKey || e.metaKey) && key === 'c') {
+  // The cell editor and insert-row inputs sit under SlickGrid's keydown handler; copy and paste
+  // there stay native.
+  const target = e.getNativeEvent<KeyboardEvent>().target;
+  const inTextControl =
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable);
+  if ((e.ctrlKey || e.metaKey) && key === 'c' && !inTextControl) {
     e.preventDefault();
     e.stopImmediatePropagation();
     onCopy();
     return;
   }
-  if ((e.ctrlKey || e.metaKey) && key === 'v') {
+  if ((e.ctrlKey || e.metaKey) && key === 'v' && !inTextControl) {
     e.preventDefault();
     e.stopImmediatePropagation();
     void onPaste();
