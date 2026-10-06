@@ -97,6 +97,8 @@ func isoOrNil(t *time.Time) *string {
 	return &s
 }
 
+var errObjectChanged = adapters.New(adapters.CodeQuery, "this object changed since it was loaded; reload and try again", nil)
+
 // readObject is read.ts's readObject. HeadObject first, always — it answers "is this too large to
 // preview" without ever opening a body stream. Every SDK call takes ctx directly (P58d D3).
 func readObject(ctx context.Context, client *s3.Client, bucket, key string, op *adapters.OpCtx) (page.KeyValuePage, error) {
@@ -117,16 +119,24 @@ func readObject(ctx context.Context, client *s3.Client, bucket, key string, op *
 	if head.ContentLength == nil || *head.ContentLength > int64(page.ObjectBodyPreviewBytes) {
 		pushMetadataFields(builder, headFromHead(head))
 	} else {
-		res, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
+		// IfMatch pins the Get to the object the Head sized: a replacement in between is refused
+		// rather than read whole.
+		res, err := client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key), IfMatch: head.ETag})
 		if err != nil {
+			if isPreconditionFailed(err) {
+				return page.KeyValuePage{}, errObjectChanged
+			}
 			return page.KeyValuePage{}, mapError(err)
 		}
 		pushMetadataFields(builder, headFromGet(res))
 		if res.Body != nil {
-			bodyBytes, err := io.ReadAll(res.Body)
+			bodyBytes, err := io.ReadAll(io.LimitReader(res.Body, int64(page.ObjectBodyPreviewBytes)+1))
 			res.Body.Close()
 			if err != nil {
 				return page.KeyValuePage{}, mapError(err)
+			}
+			if len(bodyBytes) > page.ObjectBodyPreviewBytes {
+				return page.KeyValuePage{}, errObjectChanged
 			}
 			if err := adapters.CheckCancelled(ctx); err != nil {
 				return page.KeyValuePage{}, err

@@ -165,6 +165,64 @@ func applyPreservedAttributes(in *s3.PutObjectInput, head *s3.HeadObjectOutput) 
 	}
 }
 
+// grantHeaders are PutObject's ACL grant headers (`id="..."`, `uri="..."`, comma-joined); nil when
+// the object holds nothing beyond its owner's FULL_CONTROL.
+type grantHeaders struct{ read, readACP, writeACP, fullControl *string }
+
+// aclGrantHeaders reads the object's ACL so applyUpdate can re-send it: PutObject replaces the ACL
+// with the default (owner only), which would silently make a public-read object private. Where the
+// ACL cannot be read (ACLs disabled, no s3:GetObjectAcl, a store without ACL support) the object
+// is edited as before and the gap is logged; only a cancelled op or an unrepresentable grant fails.
+func aclGrantHeaders(ctx context.Context, client *s3.Client, bucket, key string, log func(level, message string)) (grantHeaders, error) {
+	acl, err := client.GetObjectAcl(ctx, &s3.GetObjectAclInput{Bucket: aws.String(bucket), Key: aws.String(key)})
+	if err != nil {
+		if cancelled := adapters.CheckCancelled(ctx); cancelled != nil {
+			return grantHeaders{}, cancelled
+		}
+		log("warn", "s3: could not read the ACL of s3://"+bucket+"/"+key+", it is not preserved across this edit: "+err.Error())
+		return grantHeaders{}, nil
+	}
+	byPermission := map[types.Permission][]string{}
+	for _, g := range acl.Grants {
+		if g.Grantee == nil {
+			continue
+		}
+		if g.Grantee.Type == types.TypeCanonicalUser && acl.Owner != nil && g.Grantee.ID != nil && acl.Owner.ID != nil &&
+			*g.Grantee.ID == *acl.Owner.ID && g.Permission == types.PermissionFullControl {
+			continue
+		}
+		var grantee string
+		switch {
+		case g.Grantee.Type == types.TypeCanonicalUser && g.Grantee.ID != nil:
+			grantee = `id="` + *g.Grantee.ID + `"`
+		case g.Grantee.Type == types.TypeGroup && g.Grantee.URI != nil:
+			grantee = `uri="` + *g.Grantee.URI + `"`
+		case g.Grantee.Type == types.TypeAmazonCustomerByEmail && g.Grantee.EmailAddress != nil:
+			grantee = `emailAddress="` + *g.Grantee.EmailAddress + `"`
+		default:
+			return grantHeaders{}, adapters.New(adapters.CodeUnsupported,
+				"this object has an ACL grant this editor cannot preserve across an edit; edit it outside this app", nil)
+		}
+		switch g.Permission {
+		case types.PermissionRead, types.PermissionReadAcp, types.PermissionWriteAcp, types.PermissionFullControl:
+			byPermission[g.Permission] = append(byPermission[g.Permission], grantee)
+		default:
+			return grantHeaders{}, adapters.New(adapters.CodeUnsupported,
+				"this object has an ACL grant this editor cannot preserve across an edit; edit it outside this app", nil)
+		}
+	}
+	header := func(p types.Permission) *string {
+		if len(byPermission[p]) == 0 {
+			return nil
+		}
+		return aws.String(strings.Join(byPermission[p], ","))
+	}
+	return grantHeaders{
+		read: header(types.PermissionRead), readACP: header(types.PermissionReadAcp),
+		writeACP: header(types.PermissionWriteAcp), fullControl: header(types.PermissionFullControl),
+	}, nil
+}
+
 // isConditionalPutUnsupported reports whether err is an S3-compatible endpoint's own signal that it
 // doesn't honour IfMatch/IfNoneMatch on PutObject (F5) — real for some older S3-compatible object
 // stores (pre-conditional-write MinIO/Ceph releases), which reject the header outright with
@@ -204,8 +262,13 @@ func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model
 		return 0, adapters.New(adapters.CodeUnsupported,
 			"this object has tags, which this editor does not preserve across an edit; remove its tags first, or edit it outside this app", nil)
 	}
+	grants, err := aclGrantHeaders(ctx, client, bucket, key, log)
+	if err != nil {
+		return 0, err
+	}
 	in := &s3.PutObjectInput{
 		Bucket: aws.String(bucket), Key: aws.String(key), Body: strings.NewReader(value),
+		GrantRead: grants.read, GrantReadACP: grants.readACP, GrantWriteACP: grants.writeACP, GrantFullControl: grants.fullControl,
 		// F5: IfMatch closes the lost-update race — a concurrent writer's own change between this
 		// HeadObject and the PutObject below is refused rather than silently overwritten.
 		IfMatch: head.ETag,
@@ -301,12 +364,15 @@ func applyDelete(ctx context.Context, client *s3.Client, bucket string, op model
 }
 
 // mutate is mutate.ts's mutate.
-func mutate(ctx context.Context, client *s3.Client, op *adapters.OpCtx, readOnly bool, plan model.MutationPlan, log func(level, message string)) (model.MutationResult, error) {
+func mutate(ctx context.Context, client *s3.Client, op *adapters.OpCtx, readOnly bool, scopedBucket string, plan model.MutationPlan, log func(level, message string)) (model.MutationResult, error) {
 	if err := adapters.AssertWritable(readOnly); err != nil {
 		return model.MutationResult{}, err
 	}
 	bucket, err := resolveBucketSegment(plan.Path)
 	if err != nil {
+		return model.MutationResult{}, err
+	}
+	if err := enforceScope(scopedBucket, bucket); err != nil {
 		return model.MutationResult{}, err
 	}
 	statements, err := preview(plan)

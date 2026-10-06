@@ -105,6 +105,10 @@ func openUploadBody(sourcePath string) (*os.File, int64, error) {
 	if err != nil {
 		return nil, 0, adapters.New(adapters.CodeQuery, "could not read local file "+sourcePath+": "+err.Error(), err)
 	}
+	// A named pipe blocks os.Open outside ctx, and a device such as /dev/zero stats as 0 bytes.
+	if !info.Mode().IsRegular() {
+		return nil, 0, adapters.New(adapters.CodeQuery, "local path "+sourcePath+" is not a regular file", nil)
+	}
 	if info.Size() > int64(page.ObjectUploadMaxBytes) {
 		return nil, 0, adapters.New(adapters.CodeUnsupported,
 			"file is "+formatBytes(info.Size())+", over the "+formatBytes(int64(page.ObjectUploadMaxBytes))+" single-upload limit — multipart upload is not supported", nil)

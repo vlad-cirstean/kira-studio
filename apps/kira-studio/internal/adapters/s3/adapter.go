@@ -81,6 +81,15 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	return nil
 }
 
+// enforceScope refuses any bucket other than options.bucket: the tree honours the option, so
+// crafted paths (an MCP agent's list_children) must too.
+func enforceScope(scopedBucket, bucket string) error {
+	if scopedBucket != "" && bucket != scopedBucket {
+		return adapters.New(adapters.CodeNotFound, "bucket not found: "+bucket, nil)
+	}
+	return nil
+}
+
 func (a *Adapter) requireClient() (*awss3.Client, error) {
 	return adapters.RequireConnected(a.state.Load().client)
 }
@@ -103,6 +112,9 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	bucketSegment := segments[0]
 	if bucketSegment.Kind != "bucket" {
 		return adapters.TreeChildren{}, adapters.UnexpectedPathKind(0, bucketSegment.Kind)
+	}
+	if err := enforceScope(a.state.Load().scopedBucket, bucketSegment.Name); err != nil {
+		return adapters.TreeChildren{}, err
 	}
 	rest := segments[1:]
 	// Rule 5 (Adapter doc comment): Children returns [] for a leaf, never an error — an 'object'
@@ -152,6 +164,9 @@ func (a *Adapter) resolveObjectTarget(path model.NodePath) (bucket, key string, 
 	if bucketSegment.Kind != "bucket" || objectSegment.Kind != "object" {
 		return "", "", adapters.New(adapters.CodeNotFound, "read requires a bucket/.../object path, got: "+model.EncodePath(segments), nil)
 	}
+	if err := enforceScope(a.state.Load().scopedBucket, bucketSegment.Name); err != nil {
+		return "", "", err
+	}
 	// objectSegment.Name is already the full key (catalog.go encodes it that way) — no
 	// prefix-segment joining needed.
 	return bucketSegment.Name, objectSegment.Name, nil
@@ -196,7 +211,8 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return mutate(ctx, client, op, a.state.Load().readOnly, plan, a.deps.Log)
+	st := a.state.Load()
+	return mutate(ctx, client, op, st.readOnly, st.scopedBucket, plan, a.deps.Log)
 }
 
 // Execute is index.ts's execute — caps.SQL is false; never reached.
