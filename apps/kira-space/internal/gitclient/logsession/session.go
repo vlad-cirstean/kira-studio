@@ -259,19 +259,23 @@ func (s *Session) failLocked(err error) error {
 // leftover bytes, or fields short of a full record, are a protocol violation), reap the child, and
 // classify its exit. Caller holds mu.
 func (s *Session) finishEOFLocked(ctx context.Context) error {
+	var protoErr error
 	if flushed := s.splitter.Flush(); len(flushed) > 0 {
-		return fmt.Errorf("logsession: unterminated trailing field at EOF (%d bytes)", len(flushed))
-	}
-	if pending := s.grouper.Flush(); len(pending) > 0 {
-		return fmt.Errorf("logsession: unterminated trailing record at EOF (%d fields short of a full record)", len(pending))
+		protoErr = fmt.Errorf("unterminated trailing field at EOF (%d bytes)", len(flushed))
+	} else if pending := s.grouper.Flush(); len(pending) > 0 {
+		protoErr = fmt.Errorf("unterminated trailing record at EOF (%d fields short of a full record)", len(pending))
 	}
 	res, waitErr := s.proc.Wait()
 	s.proc = nil
 	if waitErr != nil {
 		return waitErr
 	}
+	// git's own failure (its stderr) outranks the partial record it left behind.
 	if cerr := gitclient.Classify(ctx, s.currentArgs, res, nil); cerr != nil {
 		return cerr
+	}
+	if protoErr != nil {
+		return s.failLocked(protoErr)
 	}
 	s.eof = true
 	return nil

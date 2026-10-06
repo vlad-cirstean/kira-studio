@@ -253,8 +253,9 @@ func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 }
 
 func revParseLine(ctx context.Context, runner Runner, gitPath, dir string, args ...string) (string, error) {
-	res, err := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: append([]string{"rev-parse"}, args...), ReadOnly: true})
-	if cerr := Classify(ctx, args, res, err); cerr != nil {
+	argv := append([]string{"rev-parse"}, args...)
+	res, err := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: argv, ReadOnly: true})
+	if cerr := Classify(ctx, argv, res, err); cerr != nil {
 		return "", cerr
 	}
 	return strings.TrimSpace(string(res.Stdout)), nil
@@ -295,9 +296,11 @@ func ResolveHead(ctx context.Context, runner Runner, gitPath, dir string) (HeadS
 		if verifyRes.ExitCode == 0 {
 			return HeadState{Kind: "branch", Name: name}, nil
 		}
-		// HEAD points at a branch ref that has never been committed to — an unborn branch, git
-		// rev-parse's own "-q --verify" exits non-zero rather than erroring loudly, exactly the
-		// signal this checks for.
+		// "-q --verify" exits exactly 1 for a ref that does not exist: an unborn branch. Any other
+		// code (a signal kill, a cancel) is a failure, not an unborn branch.
+		if verifyRes.ExitCode != 1 {
+			return HeadState{}, Classify(ctx, verifyArgs, verifyRes, nil)
+		}
 		return HeadState{Kind: "unborn", Name: name}, nil
 	}
 
