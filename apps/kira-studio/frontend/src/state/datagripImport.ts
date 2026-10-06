@@ -46,12 +46,33 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
     state.report = null;
   }
 
+  function failToDialog(err: unknown): false {
+    state.error = err instanceof Error ? err.message : String(err);
+    state.preview = null;
+    state.report = null;
+    state.open = true;
+    return false;
+  }
+
   /** Opens the native folder picker and scans the chosen project (D13/D9). Returns false when the
-   *  picker was cancelled or the scan itself failed — the dialog only opens on a real preview. */
+   *  picker was cancelled or failed or the scan failed. A failure opens the dialog on its error
+   *  alert (a closed dialog would make it look like a cancelled picker). Ignored while a pick or
+   *  scan is in flight, so a double click cannot open two pickers. */
   async function pickAndScanDataGripProject(): Promise<boolean> {
-    const chosen = await control.filesChooseFolder('Import from DataGrip');
-    if (chosen.canceled || !chosen.path) return false;
-    return scanDataGripProject(chosen.path);
+    if (state.busy) return false;
+    state.busy = true;
+    state.error = null;
+    let path: string;
+    try {
+      const chosen = await control.filesChooseFolder('Import from DataGrip');
+      if (chosen.canceled || !chosen.path) return false;
+      path = chosen.path;
+    } catch (err) {
+      return failToDialog(err);
+    } finally {
+      state.busy = false;
+    }
+    return scanDataGripProject(path);
   }
 
   async function scanDataGripProject(path: string): Promise<boolean> {
@@ -66,8 +87,7 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
       state.open = true;
       return true;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : String(err);
-      return false;
+      return failToDialog(err);
     } finally {
       state.busy = false;
     }

@@ -213,7 +213,9 @@ export const TAB_KINDS: TabKindRegistry<
     railColor,
     defaultState: () => defaultBrowseTabState(),
     duplicateState: (_tab: BrowseTabRecord): BrowseTabState => defaultBrowseTabState(),
-    dropResources: noDrop,
+    // The split's preview pane keys its page under `${tabId}::preview`; dropResources runs on
+    // close and on disconnect, so the preview bytes are freed on both.
+    dropResources: (id) => dropKeyValuePagesForTab(`${id}::preview`),
     menuExtras: revealInProjectPanel,
     parseState: parseStateWith(browseTabStateSchema),
   },

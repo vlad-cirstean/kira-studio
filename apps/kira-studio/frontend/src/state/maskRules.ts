@@ -66,11 +66,19 @@ export async function removeMaskRule(connectionId: string, id: string): Promise<
 // A plain memoised cache, not TanStack Query — never read reactively by any component (only
 // correlationKeyFor below reads it), so it needs none of Query's cache/invalidation machinery.
 const correlationKeys: Record<string, string> = {};
+// Bumped on every key rotation: a correlationKeyFor fetch that started before one must not write
+// its (now stale) key back.
+const keyGeneration: Record<string, number> = {};
+
+function invalidateCorrelationKey(connectionId: string): void {
+  keyGeneration[connectionId] = (keyGeneration[connectionId] ?? 0) + 1;
+  delete correlationKeys[connectionId];
+}
 
 export async function regenerateMaskKey(connectionId: string): Promise<void> {
   await control.maskRulesRegenerateKey(connectionId);
   // Force the next correlationKeyFor to refetch — every existing tag is now stale.
-  delete correlationKeys[connectionId];
+  invalidateCorrelationKey(connectionId);
   // M7 finding #12: SlickGridHost's own maskPreview/rules watch depends on the `['maskRules',
   // connectionId]` query data's identity, not its contents, and neither that nor maskPreview
   // itself changes here — without this, a tab whose preview is already open on this connection
@@ -96,8 +104,9 @@ function hexToBytes(hex: string): Uint8Array {
 export async function correlationKeyFor(connectionId: string): Promise<Uint8Array | null> {
   let hex = correlationKeys[connectionId];
   if (hex === undefined) {
+    const generation = keyGeneration[connectionId] ?? 0;
     hex = await control.maskRulesCorrelationKey(connectionId);
-    correlationKeys[connectionId] = hex;
+    if ((keyGeneration[connectionId] ?? 0) === generation) correlationKeys[connectionId] = hex;
   }
   return hex ? hexToBytes(hex) : null;
 }
@@ -126,10 +135,11 @@ function applyRemote(event: MaskRulesChangedEvent): void {
   // own cached correlation key wrong (still importable, just no longer the key run_query's render
   // path or a fresh CorrelationKey call would return), so drop it — the next correlationKeyFor call
   // re-fetches the new one, same as a local regenerate already forces for the window that ran it.
-  if (event.keyRegenerated) delete correlationKeys[event.connectionId];
+  if (event.keyRegenerated) invalidateCorrelationKey(event.connectionId);
 }
 
 let unsubscribeChanged: (() => void) | null = null;
+let unsubscribeConnectionsChanged: (() => void) | null = null;
 
 /** main.ts's boot sequence, beside initSchemaSync — live before any Privacy tab, header menu or
  *  grid preview ever mounts, whether or not one does this session (initSchemaSync's own precedent,
@@ -140,4 +150,21 @@ let unsubscribeChanged: (() => void) | null = null;
 export function initMaskRulesSync(): void {
   unsubscribeChanged?.();
   unsubscribeChanged = control.onMaskRulesChanged(applyRemote);
+
+  // A deleted connection keeps no rules, counts or key (state/schemas.ts's own cleanup shape).
+  unsubscribeConnectionsChanged?.();
+  unsubscribeConnectionsChanged = control.onConnectionsChanged((records) => {
+    const liveIds = new Set(records.map((r) => r.id));
+    for (const id of Object.keys(correlationKeys)) {
+      if (!liveIds.has(id)) invalidateCorrelationKey(id);
+    }
+    for (const query of queryClient.getQueryCache().findAll({ queryKey: ['maskRules'] })) {
+      if (!liveIds.has(query.queryKey[1] as string))
+        queryClient.removeQueries({ queryKey: query.queryKey });
+    }
+    queryClient.setQueryData<Record<string, number>>(maskRuleCountsQueryKey, (old) => {
+      if (!old) return old;
+      return Object.fromEntries(Object.entries(old).filter(([id]) => liveIds.has(id)));
+    });
+  });
 }

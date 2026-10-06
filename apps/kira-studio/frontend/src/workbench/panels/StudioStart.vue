@@ -26,6 +26,9 @@ function connectionFor(entry: RecentTableEntry) {
   return connectionsStore.connectionRecord(entry.connectionId);
 }
 
+// An entry whose connection is gone would open a tab that can never be saved.
+const recentEntries = computed(() => recentTablesStore.entries.filter((e) => connectionFor(e)));
+
 function iconFor(entry: RecentTableEntry): string {
   if (entry.kind === 'document') return 'json';
   // P17: a 'keyvalue' entry is a redis key OR an s3 object — same pathTail-kind check
@@ -98,11 +101,11 @@ function openRecent(entry: RecentTableEntry): void {
       <div class="tracking-normal text-kira-xl text-fg">Kira Studio</div>
       <div class="text-kira-md mt-1.5 text-muted-foreground">Pick something from the tree on the left, or reopen one of these.</div>
 
-      <template v-if="recentTablesStore.entries.length > 0">
+      <template v-if="recentEntries.length > 0">
         <div class="uppercase tracking-wider text-kira-sm mb-1.5 mt-4 text-subtle">Recent tables</div>
         <div class="flex flex-col">
           <button
-            v-for="entry in recentTablesStore.entries"
+            v-for="entry in recentEntries"
             :key="`${entry.kind}:${entry.connectionId}:${entry.path}`"
             type="button"
             class="w-full flex items-center cursor-pointer text-left rounded-kira-sm h-6.5 gap-1.5 px-1.5 text-fg text-kira-md hover:bg-hover"
@@ -116,7 +119,7 @@ function openRecent(entry: RecentTableEntry): void {
               <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>
             <span class="truncate min-w-0">{{ entry.path }}</span>
-            <span class="ml-auto text-kira-sm text-subtle">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>
+            <span class="ml-auto text-kira-sm text-subtle">{{ connectionFor(entry)?.name }} · {{ formatRelative(entry.openedAt) }}</span>
           </button>
         </div>
       </template>

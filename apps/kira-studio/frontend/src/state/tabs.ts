@@ -77,7 +77,12 @@ export const useRecentTablesStore = defineStore('recentTables', () => {
     state.entries = withoutThis.slice(0, RECENT_TABLES_LIMIT);
   }
 
-  return { ...toRefs(state), recordRecent };
+  // A deleted connection's entry would reopen a tab whose row can never be saved (FK).
+  function pruneRecent(liveConnectionIds: ReadonlySet<string>): void {
+    state.entries = state.entries.filter((e) => liveConnectionIds.has(e.connectionId));
+  }
+
+  return { ...toRefs(state), recordRecent, pruneRecent };
 });
 
 // Result of an open*Tab call: `reused` tells the caller whether an existing tab was activated
@@ -146,6 +151,7 @@ export const useTabsStore = createTabsStore({
   onClosed(tabId) {
     unmarkHydrated(tabId);
     useCellSelectionStore().clearSelectedCellFor(tabId);
+    useCellSelectionStore().clearSelectedCellFor(`${tabId}::preview`);
     usePendingChangesStore().clearPending(tabId);
   },
   // P71 §3.1: duplicating an incognito tab to try a variant must not silently start persisting it
@@ -170,6 +176,7 @@ export const useTabsStore = createTabsStore({
         .filter((t) => t.connectionId && !liveIds.has(t.connectionId))
         .map((t) => t.id);
       for (const id of stale) actions.closeTab(id);
+      recentTablesStore.pruneRecent(liveIds);
     });
 
     // P43 F9/D12: an explicit Disconnect (or a lost connection surfacing as 'error') never used to
