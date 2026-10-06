@@ -8,6 +8,7 @@ package tree
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/kirathecat/kira-studio/internal/kiratime"
@@ -74,7 +75,16 @@ func New(conns *repos.ConnectionsRepo, meta *repos.MetadataCacheRepo, backend Ba
 	return &Service{conns: conns, meta: meta, backend: backend, states: states}
 }
 
-// wrapErr satisfies P55 §2 D5: every error crossing out of this package is an *ipcerr.Error.
+// wrapErr satisfies P55 §2 D5: every error crossing out of this package is an *ipcerr.Error. An
+// engine *adapters.Error keeps its code (E_ENGINE_DOWN, E_CANCELLED, E_TIMEOUT, E_QUERY) rather
+// than collapsing to E_INTERNAL: the renderer reads codes only from ipcerr's JSON form.
+func wrapErr(err error) error {
+	var ae *adapters.Error
+	if errors.As(err, &ae) {
+		return ipcerr.New(string(ae.Code), ae.Message)
+	}
+	return ipcerr.Wrap(err)
+}
 
 // requireConnected ports tree-service.ts:73-79. name is the connection row's Name, or the id
 // itself if the row is gone — tree-service.ts:77's own fallback, and the message P55 §2 D11
@@ -152,7 +162,7 @@ func (s *Service) resolvePath(connectionID, path string) (model.NodePath, error)
 	}
 	nodePath, err := model.DecodePath(connectionID, path)
 	if err != nil {
-		return model.NodePath{}, ipcerr.Internal(err.Error())
+		return model.NodePath{}, ipcerr.BadRequest(err.Error())
 	}
 	return nodePath, nil
 }
@@ -193,7 +203,7 @@ func cacheAside[T any](s *Service, connectionID, path, kind string, load func(no
 	since := s.sinceEpoch(connectionID)
 	v, err := load(nodePath)
 	if err != nil {
-		return zero, err
+		return zero, wrapErr(err)
 	}
 	if encoded, err := json.Marshal(v); err == nil {
 		s.putIfSinceUnchanged(connectionID, path, kind, since, encoded)
@@ -219,7 +229,7 @@ func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenRes
 	since := s.sinceEpoch(connectionID)
 	result, err := s.backend.Children(context.Background(), connectionID, nodePath)
 	if err != nil {
-		return ChildrenResult{}, err
+		return ChildrenResult{}, wrapErr(err)
 	}
 	truncated := result.Truncated != nil && *result.Truncated
 	if truncated {
@@ -312,13 +322,13 @@ func (s *Service) KeyTypes(connectionID string, paths []string) ([]string, error
 	for i, p := range paths {
 		nodePath, err := model.DecodePath(connectionID, p)
 		if err != nil {
-			return nil, ipcerr.Internal(err.Error())
+			return nil, ipcerr.BadRequest(err.Error())
 		}
 		nodePaths[i] = nodePath
 	}
 	types, err := s.backend.KeyTypes(context.Background(), connectionID, nodePaths)
 	if err != nil {
-		return nil, err
+		return nil, wrapErr(err)
 	}
 	if types == nil {
 		types = []string{}
