@@ -96,6 +96,7 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
       nextToken: null,
       visibilityTimeoutSeconds: 30,
       polled: true,
+      receiveAcknowledged: false,
       searchOpen: false,
       selectedRow: 1,
     };
@@ -140,6 +141,7 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
       nextToken: null,
       visibilityTimeoutSeconds: 30,
       polled: true,
+      receiveAcknowledged: false,
       searchOpen: false,
       selectedRow: null,
     };
@@ -180,6 +182,7 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
       nextToken: null,
       visibilityTimeoutSeconds: null,
       polled: false,
+      receiveAcknowledged: false,
       searchOpen: false,
       selectedRow: null,
     };

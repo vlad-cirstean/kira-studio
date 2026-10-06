@@ -38,6 +38,8 @@ interface StreamViewRuntime extends PagedViewRuntime {
   rowCount: number;
   visibilityTimeoutSeconds: number | null;
   polled: boolean;
+  /** Read-only SQS: the user confirmed the receive-count effect of polling; runtime-only. */
+  receiveAcknowledged: boolean;
   /** The row last clicked, for the cell-editor preview (item 6) and — for SQS — Delete message's
    *  target; `null` once the page reloads out from under it (see stream/page.ts's pageVersion). */
   selectedRow: number | null;
@@ -49,6 +51,7 @@ function defaultRuntime(): StreamViewRuntime {
     rowCount: 0,
     visibilityTimeoutSeconds: null,
     polled: false,
+    receiveAcknowledged: false,
     selectedRow: null,
   };
 }
@@ -197,6 +200,10 @@ export const useStreamViewStore = defineStore('streamView', () => {
   // and never reach the adapter's real ReceiveMessage call — same fix as reload()'s own invalidate,
   // same default scope (ipcfixture/sqs_test.go already recorded this exact call for this exact
   // scenario, anticipating this fix).
+  function acknowledgeReceive(tabId: string): void {
+    ensureRuntime(tabId).receiveAcknowledged = true;
+  }
+
   async function poll(tabId: string): Promise<void> {
     const tab = useTabsStore().findStreamTab(tabId);
     if (!tab?.connectionId) return;
@@ -276,6 +283,7 @@ export const useStreamViewStore = defineStore('streamView', () => {
     runCount,
     stop,
     poll,
+    acknowledgeReceive,
     goNext,
     setPageSize,
     applyStreamFilter,

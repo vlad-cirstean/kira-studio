@@ -103,6 +103,14 @@ const isKafka = computed(() => connRecord.value?.kind === 'kafka');
 const canInsert = computed(() => (caps.value?.canInsert ?? false) && !connRecord.value?.readOnly);
 const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord.value?.readOnly);
 
+const isReadOnlyBatch = computed(() => isBatch.value && (connRecord.value?.readOnly ?? false));
+const redriveLimit = computed(() => page.value?.maxReceiveCount ?? null);
+const redriveSentence = computed(() =>
+  redriveLimit.value === null
+    ? '. '
+    : `. This queue moves a message to its dead-letter queue after ${redriveLimit.value} receives. `,
+);
+
 // D10/D12: a batch tab (SQS) never auto-loads on reconnect — only an explicit Poll does,
 // since every poll consumes from the queue rather than merely browsing it.
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
@@ -271,7 +279,16 @@ function onRefresh(): void {
   refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => streamViewStore.reload(props.tab.id));
 }
 
-function onPoll(): void {
+// A read-only SQS poll leaves messages visible but still raises their receive count; ask once per
+// tab before the first one.
+async function onPoll(): Promise<void> {
+  if (isReadOnlyBatch.value && !rt.value?.receiveAcknowledged) {
+    const ok = await confirmDialogStore.confirmDialog(
+      `Each poll raises the receive count of every message it receives${redriveSentence.value}Poll anyway?`,
+    );
+    if (!ok) return;
+    streamViewStore.acknowledgeReceive(props.tab.id);
+  }
   void streamViewStore.poll(props.tab.id);
 }
 
@@ -962,9 +979,15 @@ onUnmounted(() => {
     <!-- The one destructive truth of this view, stated once at the top. -->
     <Alert v-if="isBatch" variant="warn" data-testid="stream-poll-warning">
       <CodiconIcon name="warning" :size="13" class="text-warn-text" />
-      <AlertDescription>
+      <AlertDescription v-if="isReadOnlyBatch">
+        Polling keeps messages visible, but each poll still raises every received message's
+        receive count<template v-if="redriveLimit !== null">. This queue moves a message to its
+        dead-letter queue after {{ redriveLimit }} receives</template>.
+      </AlertDescription>
+      <AlertDescription v-else>
         Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
-        above) — it does not browse a stable position.
+        above) — it does not browse a stable position.<template v-if="redriveLimit !== null">
+        This queue moves a message to its dead-letter queue after {{ redriveLimit }} receives.</template>
       </AlertDescription>
     </Alert>
 
