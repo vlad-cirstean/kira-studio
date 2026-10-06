@@ -1,7 +1,7 @@
 /**
  * G15 D5/D6 — pure interval algebra plus the two coordinate mappings the editor-side marking
- * controller needs (`selectionToRange`, `hunkChangeBlock`). Imports only types from `@kira/git-ipc`
- * and nothing from `vscode`, which is what lets this run under plain `bun test` (D10) and be shared
+ * controller needs (`selectionToRange`, `hunkChangeBlock`). Imports only `./diff.ts` and
+ * `./review.ts`, nothing from `@kira/git-ipc` or `vscode`, which is what lets this run under plain `bun test` (D10) and be shared
  * by `reviewMarking.ts` without pulling an extension host into either.
  *
  * This algebra is presentation-only (F9): it decides which icon a hunk gets, which of the two
@@ -42,37 +42,6 @@ export function normalizeRanges(ranges: readonly LineRange[]): readonly LineRang
     }
   }
   return merged;
-}
-
-export function unionRanges(
-  a: readonly LineRange[],
-  b: readonly LineRange[],
-): readonly LineRange[] {
-  return normalizeRanges([...a, ...b]);
-}
-
-/** Subtracts `b` from `a`, splitting a range in two when `b` cuts out its middle and dropping a
- *  range entirely when `b` covers it. Both inputs are normalized first, so overlap/adjacency in
- *  either one never produces a wrong split. */
-export function subtractRanges(
-  a: readonly LineRange[],
-  b: readonly LineRange[],
-): readonly LineRange[] {
-  const minuend = normalizeRanges(a);
-  const subtrahend = normalizeRanges(b);
-  const result: LineRange[] = [];
-  for (const range of minuend) {
-    let start = range.start;
-    const end = range.end;
-    for (const cut of subtrahend) {
-      if (cut.end < start || cut.start > end) continue;
-      if (cut.start > start) result.push({ start, end: cut.start - 1 });
-      start = Math.max(start, cut.end + 1);
-      if (start > end) break;
-    }
-    if (start <= end) result.push({ start, end });
-  }
-  return result;
 }
 
 /** Clamps every range into `1..lineCount`, dropping any that fall entirely outside it — a

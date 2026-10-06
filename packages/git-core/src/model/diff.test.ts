@@ -5,7 +5,6 @@ import {
   flattenDiffRows,
   mapDiffLineToRevision,
   mapLineAcrossDiff,
-  splitTrailerBlock,
 } from './diff.ts';
 
 function line(partial: Partial<DiffLine> & { kind: DiffLine['kind'] }): DiffLine {
@@ -259,42 +258,5 @@ describe('mapLineAcrossDiff', () => {
       ],
     });
     expect(mapLineAcrossDiff([insertion], 1000, 'old')).toBe(1003);
-  });
-});
-
-describe('splitTrailerBlock', () => {
-  test('empty body, trailers present: returned unchanged', () => {
-    expect(splitTrailerBlock('', [{ token: 'Signed-off-by', value: 'A <a@example.com>' }])).toBe(
-      '',
-    );
-  });
-
-  test('body that is only trailers: empty result', () => {
-    const body = 'Signed-off-by: A <a@example.com>';
-    expect(splitTrailerBlock(body, [{ token: 'Signed-off-by', value: 'A <a@example.com>' }])).toBe(
-      '',
-    );
-  });
-
-  test('no trailers returned by git: body returned unchanged, even with a colon-prefixed line', () => {
-    const body = 'Subject detail.\n\nNote: this looks like a trailer but git says it is not.';
-    expect(splitTrailerBlock(body, [])).toBe(body);
-  });
-
-  test('folded trailer continuation line is part of the dropped paragraph', () => {
-    const body =
-      'Explanation paragraph.\n\nSigned-off-by: A <a@example.com>\n    continuation of a folded value';
-    expect(
-      splitTrailerBlock(body, [
-        { token: 'Signed-off-by', value: 'A <a@example.com> continuation' },
-      ]),
-    ).toBe('Explanation paragraph.');
-  });
-
-  test('trailing blank lines after the trailer paragraph are also dropped', () => {
-    const body = 'Body text.\n\nSigned-off-by: A <a@example.com>\n\n\n';
-    expect(splitTrailerBlock(body, [{ token: 'Signed-off-by', value: 'A <a@example.com>' }])).toBe(
-      'Body text.',
-    );
   });
 });

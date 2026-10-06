@@ -174,36 +174,3 @@ export function mapLineAcrossDiff(
   }
   return clamp1(line + delta);
 }
-
-const TRAILER_LINE = /^[A-Za-z][A-Za-z0-9-]*:/;
-const FOLDED_CONTINUATION = /^\s/;
-
-/**
- * Removes the trailer paragraph git's `%(trailers:...)` already parsed out of `body`'s own text
- * (probe P5, `docs/plans/P5.md`) — `%b` still contains it verbatim. The rule: take the final
- * blank-line-separated paragraph of `body`; drop it iff at least one trailer was returned *and*
- * every line of that paragraph either looks like a trailer (`^[A-Za-z][A-Za-z0-9-]*:`) or is a
- * folded continuation (starts with whitespace). No trailers → `body` is returned unchanged
- * without inspecting it at all — this is what leaves alone a last paragraph that merely contains
- * a colon (git already determined there is no real trailer block).
- */
-export function splitTrailerBlock(body: string, trailers: readonly CommitTrailer[]): string {
-  if (trailers.length === 0) return body;
-
-  const lines = body.split('\n');
-  let end = lines.length;
-  while (end > 0 && (lines[end - 1]?.trim() ?? '') === '') end--;
-  if (end === 0) return body;
-
-  let start = end;
-  while (start > 0 && (lines[start - 1]?.trim() ?? '') !== '') start--;
-
-  const paragraph = lines.slice(start, end);
-  const isTrailerShaped = (line: string): boolean =>
-    TRAILER_LINE.test(line) || FOLDED_CONTINUATION.test(line);
-  if (!paragraph.every(isTrailerShaped)) return body;
-
-  const before = lines.slice(0, start);
-  while (before.length > 0 && (before[before.length - 1]?.trim() ?? '') === '') before.pop();
-  return before.join('\n');
-}

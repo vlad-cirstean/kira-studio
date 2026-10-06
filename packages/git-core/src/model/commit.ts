@@ -69,7 +69,7 @@ export interface CommitSignature {
 }
 
 export interface CommitDetail extends CommitRecord {
-  /** The message body, trailer paragraph already removed by `splitTrailerBlock` — everything
+  /** The message body, trailer paragraph already removed — everything
    *  else after the subject line, per git's own %b convention. */
   readonly body: string;
   /** Git's own `%(trailers:only=true,unfold=true)` parse — folded onto one line each. */

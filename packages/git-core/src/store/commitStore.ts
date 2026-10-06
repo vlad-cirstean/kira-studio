@@ -120,22 +120,6 @@ export interface PackedCommitChunk {
   readonly decorations: readonly (readonly [row: number, refs: readonly DecorationRef[]])[];
 }
 
-/** Every distinct `ArrayBuffer` backing `chunk`'s fields, exactly once — mirrors
- *  `graph/layout.ts`'s `layoutTransferList` and its reason: a buffer listed twice throws at
- *  `postMessage`, a buffer omitted is silently cloned. */
-export function packedTransferList(chunk: PackedCommitChunk): ArrayBuffer[] {
-  const buffers = new Set<ArrayBuffer>([
-    chunk.shas,
-    chunk.parentOffsets,
-    chunk.parentShas,
-    chunk.identityIds,
-    chunk.times,
-    chunk.subjectBytes,
-    chunk.subjectOffsets,
-  ]);
-  return [...buffers];
-}
-
 export interface CommitStoreStats {
   readonly rowCount: number;
   readonly shaTableBytes: number;

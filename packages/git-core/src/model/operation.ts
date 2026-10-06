@@ -120,9 +120,8 @@ export function classifyInProgress(input: {
       // F3: rebase-apply/ with an "applying" marker is a plain `git am`, not a rebase at all --
       // `rebase --continue`/`--abort`/`--skip` all refuse outright ("It looks like 'git am' is in
       // progress. Cannot rebase."). Report-only: every Can* flag false. A dedicated `am`
-      // InProgressKind would be a git-ipc wire-contract change (Part 17's own boundary, not yet
-      // reviewed) -- out of scope here, so this reuses `'rebase'`'s own kind with every action
-      // gated off rather than widening the union.
+      // InProgressKind would be a git-ipc wire-contract change -- out of scope here, so this
+      // reuses `'rebase'`'s own kind with every action gated off rather than widening the union.
       const op = operationOf('rebase', {
         otherSha: s.rebaseOnto,
         headName: s.rebaseHeadName,

@@ -1,6 +1,5 @@
 /**
- * G15 D10 — the one new test file this phase adds. `normalizeRanges`/`unionRanges`/`subtractRanges`
- * are interval arithmetic with genuinely interacting rules (overlap vs. adjacency vs. containment
+ * G15 D10 — the one new test file this phase adds. `normalizeRanges` is interval arithmetic with genuinely interacting rules (overlap vs. adjacency vs. containment
  * vs. a subtraction that splits one range into two), `selectionToRange` is boundary arithmetic
  * with an off-by-one rule that is wrong in both directions if misread, and `hunkChangeBlock`'s
  * `newLine === undefined` handling is the difference between a correct block and a silently
@@ -15,8 +14,6 @@ import {
   hunkChangeBlock,
   normalizeRanges,
   selectionToRange,
-  subtractRanges,
-  unionRanges,
 } from './reviewRanges.ts';
 
 function line(
@@ -90,61 +87,6 @@ describe('normalizeRanges', () => {
         { start: 5, end: 10 },
       ]),
     ).toEqual([{ start: 1, end: 20 }]);
-  });
-});
-
-describe('unionRanges', () => {
-  test('is normalizeRanges over the concatenation', () => {
-    expect(unionRanges([{ start: 1, end: 5 }], [{ start: 4, end: 8 }])).toEqual([
-      { start: 1, end: 8 },
-    ]);
-  });
-});
-
-describe('subtractRanges', () => {
-  test('a cut in the middle splits one range into two', () => {
-    expect(subtractRanges([{ start: 1, end: 20 }], [{ start: 10, end: 12 }])).toEqual([
-      { start: 1, end: 9 },
-      { start: 13, end: 20 },
-    ]);
-  });
-
-  test('a cut covering the whole range empties it', () => {
-    expect(subtractRanges([{ start: 5, end: 10 }], [{ start: 1, end: 20 }])).toEqual([]);
-  });
-
-  test('a cut at the start trims from the front', () => {
-    expect(subtractRanges([{ start: 1, end: 10 }], [{ start: 1, end: 3 }])).toEqual([
-      { start: 4, end: 10 },
-    ]);
-  });
-
-  test('a cut at the end trims from the back', () => {
-    expect(subtractRanges([{ start: 1, end: 10 }], [{ start: 8, end: 10 }])).toEqual([
-      { start: 1, end: 7 },
-    ]);
-  });
-
-  test('a non-overlapping cut leaves the range untouched', () => {
-    expect(subtractRanges([{ start: 1, end: 5 }], [{ start: 10, end: 15 }])).toEqual([
-      { start: 1, end: 5 },
-    ]);
-  });
-
-  test('several cuts against one range each carve their own piece out', () => {
-    expect(
-      subtractRanges(
-        [{ start: 1, end: 30 }],
-        [
-          { start: 5, end: 7 },
-          { start: 15, end: 17 },
-        ],
-      ),
-    ).toEqual([
-      { start: 1, end: 4 },
-      { start: 8, end: 14 },
-      { start: 18, end: 30 },
-    ]);
   });
 });
 

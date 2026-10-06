@@ -1,12 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { SettingDef, SettingKey } from './schema.ts';
-import {
-  coerceSettings,
-  defaultSettings,
-  repoSettingKeys,
-  SETTINGS,
-  toVsCodeConfiguration,
-} from './schema.ts';
+import { coerceSettings, defaultSettings, repoSettingKeys, SETTINGS } from './schema.ts';
 
 describe('defaultSettings', () => {
   test('returns every SETTINGS key at its declared default', () => {
@@ -124,30 +118,6 @@ describe('coerceSettings', () => {
         'kiraSpace.log.level': {},
       }),
     ).not.toThrow();
-  });
-});
-
-describe('toVsCodeConfiguration', () => {
-  // G18 D1/D10/D15: every SETTINGS key now carries a `source` (seven `'repo'`, one `'host'`) —
-  // there is no longer any `'extension'`-sourced key left for this extension to contribute at
-  // all, so the generated `contributes.configuration` has exactly zero properties.
-  test('produces zero properties — every remaining key carries a source (G18)', () => {
-    const { properties } = toVsCodeConfiguration();
-    expect(properties).toEqual({});
-  });
-
-  // G14 D6/D11/G18 D10: this is the assertion that actually matters — it is the only thing
-  // stopping a key this extension does not itself own the value of (`source: 'host'` or, since
-  // G18, `source: 'repo'`) from being contributed into this extension's own manifest, which VS
-  // Code would treat as a duplicate declaration of someone else's setting.
-  test('does not expose a source: "host" key, e.g. workbench.tree.indent', () => {
-    const { properties } = toVsCodeConfiguration();
-    expect(properties['workbench.tree.indent']).toBeUndefined();
-  });
-
-  test('does not expose a source: "repo" key, e.g. kiraSpace.graph.pageSize (G18)', () => {
-    const { properties } = toVsCodeConfiguration();
-    expect(properties['kiraSpace.graph.pageSize']).toBeUndefined();
   });
 });
 

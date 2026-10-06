@@ -20,8 +20,6 @@ export {
   OTHER_GROUP_KEY,
   projectLayoutInput,
 } from './graph/rowPlan.ts';
-export type { StashRowFilter } from './graph/stashRows.ts';
-export { applyStashRowFilter, buildStashRowFilter } from './graph/stashRows.ts';
 export type {
   ColorState,
   EdgeKind,
@@ -79,7 +77,6 @@ export {
   flattenDiffRows,
   mapDiffLineToRevision,
   mapLineAcrossDiff,
-  splitTrailerBlock,
 } from './model/diff.ts';
 export type {
   InProgressKind,
@@ -102,14 +99,7 @@ export type {
   RemoteOpResult,
 } from './model/remote.ts';
 export type { HeadState, RepoIdentity } from './model/repo.ts';
-export type {
-  BaseCandidate,
-  BaseResolutionCore,
-  BaseResolutionReason,
-  LineRange,
-  ResolveBaseInput,
-} from './model/review.ts';
-export { resolveBase } from './model/review.ts';
+export type { LineRange } from './model/review.ts';
 export type { SelectionShape } from './model/reviewRanges.ts';
 export {
   clampRanges,
@@ -117,8 +107,6 @@ export {
   hunkChangeBlock,
   normalizeRanges,
   selectionToRange,
-  subtractRanges,
-  unionRanges,
 } from './model/reviewRanges.ts';
 export type { StashEntry } from './model/stash.ts';
 export type {
@@ -197,29 +185,20 @@ export type {
   Settings,
   SettingType,
   SettingValue,
-  VsCodeConfigurationSchema,
 } from './settings/schema.ts';
 export {
   coerceSettings,
   defaultSettings,
   repoSettingKeys,
   SETTINGS,
-  toVsCodeConfiguration,
 } from './settings/schema.ts';
 export type { AppendResult, CommitStoreStats, PackedCommitChunk } from './store/commitStore.ts';
-export { CommitStore, packedTransferList } from './store/commitStore.ts';
+export { CommitStore } from './store/commitStore.ts';
 export { StringInterner, SubjectBuffer } from './store/intern.ts';
 export type { ShaTableOptions } from './store/shaTable.ts';
 export { bytesToHex, hexToBytes, ShaTable } from './store/shaTable.ts';
-export { AssertionError, assert, assertDefined, assertNever } from './util/assert.ts';
+export { AssertionError, assert, assertDefined } from './util/assert.ts';
 export { formatAbsoluteDate, formatRelativeDate } from './util/dateFormat.ts';
 export { nfcPath } from './util/nfcPath.ts';
-export type { RecordSplitterOptions } from './util/nulSplit.ts';
-export {
-  RecordSplitter,
-  RemainderOverflowError,
-  splitLimitedFields,
-  splitRecords,
-} from './util/nulSplit.ts';
 export type { WorktreeLabelInput } from './worktree/label.ts';
 export { worktreeLabel } from './worktree/label.ts';

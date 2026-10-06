@@ -1,9 +1,7 @@
 /**
- * D25 — "One schema in `core`, generating `contributes.configuration` for VS Code at build time.
- * Defined at P3, before ~15 settings accrete in two places; a future host's own settings surface
- * would generate from the same schema rather than inventing a second one." `SETTINGS` below is
- * that one place; `scripts/gen-settings.ts` reads `toVsCodeConfiguration()` to keep
- * `packages/host-vscode/package.json` in step with it.
+ * D25 — one settings schema in `core`, defined at P3, before ~15 settings accrete in two places; a
+ * host's own settings surface reads the same schema rather than inventing a second one. `SETTINGS`
+ * below is that one place.
  *
  * The keys this file defines are exactly the keys P3 consumes — each later phase adds its own
  * with its own consumer; the schema's value is being the one place, not being complete on day
@@ -35,10 +33,8 @@ export interface SettingDef<T> {
   /** G14 D6/G18 D10: where a setting's value comes from. `"extension"` (the default, when
    *  omitted) is a key this extension contributes and owns; `"host"` is a key the *editor* owns,
    *  which we only read; `"repo"` (G18) is a key stored server-side, per repository, edited from
-   *  the git-ui RepoSettingsDialog rather than VS Code settings.json. Both `"host"` and `"repo"`
-   *  keys are deliberately absent from `contributes.configuration` (`toVsCodeConfiguration()`
-   *  below skips both), since contributing either would be a duplicate declaration of a setting
-   *  this extension does not itself own the value of. */
+   *  the git-ui RepoSettingsDialog rather than VS Code settings.json. The extension's
+   *  `package.json` contributes no configuration for either. */
   readonly source?: 'extension' | 'host' | 'repo';
 }
 
@@ -53,9 +49,8 @@ export const SETTINGS = {
   //
   // G18 D1/D10: the keys below all moved from VS Code settings.json into a new per-repo
   // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
-  // `source: 'repo'` is what drops each out of `contributes.configuration` (toVsCodeConfiguration
-  // below). P72 §9.2: `kiraSpace.log.level` used to be the one exception among these — not
-  // actually a per-repo fact (`instanceWide: true`, D14) even though it lived in the same table
+  // `source: 'repo'` marks each as server-owned. P72 §9.2: `kiraSpace.log.level` used to be the one
+  // exception among these — not actually a per-repo fact (`instanceWide: true`, D14) even though it lived in the same table
   // and dialog. That special case is now deleted rather than generalised: Kira Space gets its own
   // independent, genuinely app-wide `advanced.gitLogLevel` control instead, and this key goes back
   // to being an ordinary, honestly-per-repo leaf — still the only surface VS Code itself has to
@@ -304,39 +299,6 @@ export function coerceSettings(raw: Readonly<Record<string, unknown>>): CoerceRe
   }
 
   return { settings: settings as Settings, problems };
-}
-
-export interface VsCodeConfigurationSchema {
-  readonly properties: Record<string, unknown>;
-}
-
-/** Drives `scripts/gen-settings.ts`: one JSON Schema property per setting. Any key with a
- *  `source` (G14 D6's `'host'`, G18 D10's `'repo'`) is skipped — this extension reads or edits
- *  those values, but VS Code's own settings.json is not where either lives, so contributing one
- *  into `contributes.configuration` would be a duplicate declaration of a setting owned
- *  elsewhere (the editor itself, or, since G18, kira.db's own per-repo/server-owned storage). */
-export function toVsCodeConfiguration(): VsCodeConfigurationSchema {
-  const properties: Record<string, unknown> = {};
-
-  for (const key of SETTING_KEYS) {
-    const def: SettingDef<unknown> = SETTINGS[key];
-    if (def.source !== undefined) continue;
-
-    const property: Record<string, unknown> = {
-      type: def.type === 'enum' ? 'string' : def.type === 'stringArray' ? 'array' : def.type,
-      default: def.default,
-      description: def.description,
-    };
-    if (def.type === 'stringArray') property.items = { type: 'string' };
-    if (def.enum !== undefined) property.enum = def.enum;
-    if (def.minimum !== undefined) property.minimum = def.minimum;
-    if (def.maximum !== undefined) property.maximum = def.maximum;
-    if (def.scope !== undefined) property.scope = def.scope;
-
-    properties[key] = property;
-  }
-
-  return { properties };
 }
 
 /** G18 D10: the seven keys `source: 'repo'` marks — exactly the settings

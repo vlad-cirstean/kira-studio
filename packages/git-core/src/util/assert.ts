@@ -20,8 +20,3 @@ export function assertDefined<T>(value: T | undefined | null, message: string): 
   assert(value !== undefined && value !== null, message);
   return value;
 }
-
-/** Exhaustiveness check for a `switch` over a union — a type error if a case is missing. */
-export function assertNever(value: never, message = 'unreachable case'): never {
-  throw new AssertionError(`${message}: ${JSON.stringify(value)}`);
-}
