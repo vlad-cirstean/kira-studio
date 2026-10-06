@@ -14,6 +14,7 @@ no Part 14 code change between them).
 - Block 1 (spawn seam and gate): done.
 - Block 2 (askpass): done.
 - Block 3 (catfile, logsession): done.
+- Block 4 (porcelain): done.
 
 ## Findings
 
@@ -119,8 +120,7 @@ app or external) moves HEAD to a commit where that path is a 3 GiB blob before t
 The whole 3 GiB lands in a `bytes.Buffer`. Narrow (newline paths only, local actor), hence low.
 
 Fix: resolve once with `rev-parse --verify <rev>` (already `CheckOneShot`), then run `-s` and
-`blob` against the returned OID; or check `len(res.Stdout)` against the gate is too late, so pin
-the OID.
+`blob` against the returned OID. A post-read length check is too late; the OID must be pinned.
 
 ### F7 (low) `logsession.finishEOFLocked` protocol-error path leaves the child unreaped and masks git's error
 
@@ -138,6 +138,83 @@ trailing partial, the retry would report `Exhausted` and silently drop the recor
 
 Fix: on either Flush violation, `Wait` the child first; if its exit is non-zero return the
 classified git error, else `failLocked` the protocol error.
+
+### F8 (medium) A user's `color.diff=always` breaks patch-id containment
+
+`apps/kira-space/internal/gitclient/porcelain/containment.go:29-37`; root cause
+`apps/kira-space/internal/gitclient/runner.go:135`. `configOverrides` sets only `color.ui=false`.
+`color.diff` takes precedence over `color.ui`, so a user's `color.diff=always` (common for people
+piping into `less -R`) still colors porcelain diff output. `ThreeDotDiffArgs` (`git diff`) and
+`LogPatchArgs` (`git log -p`) pass no `--no-color`; every other patch builder does
+(`FileDiffArgs`, `WorktreeDiffArgs`, `NoIndexDiffArgs`).
+
+Reproduced with real git 2.43:
+`git -c color.ui=false -c color.diff=always log --no-merges -p -n 2 HEAD | git patch-id --stable`
+prints nothing (lines start with `\033[1mdiff --git`, so `patch-id` sees no patch).
+`gitsession/queuefacts.go` `DiffPatchID` then returns `""` and `RecentPatchIDs` returns no ids,
+so `ade/integration.go:121-127` never detects a squash-merged branch: the queue shows it as
+unmerged forever. Silent, no error.
+
+Fix: add `--no-color` to both builders, and add `-c color.diff=false` to `configOverrides` so a
+future patch builder cannot regress.
+
+### F9 (low) LF-framed `for-each-ref` output breaks on a worktree path containing a newline
+
+`apps/kira-space/internal/gitclient/porcelain/refs.go:45,60,206-211` (`HeadsRefsArgs`,
+`SingleRefArgs`, `parseRefRowsLF`) and `inventory.go:107` (`ParseInventory`). Records are framed
+by LF, but `%(worktreepath)` is emitted raw. Probed: after
+`git worktree add -b wt $'/tmp/w\nx'`, `for-each-ref --format='%(refname)%00%(worktreepath)'`
+emits `refs/heads/wt\0/tmp/w\nx\n`. The trailing `x` line parses as a 1-field record, so
+`ParseRefRows` fails with `ref record has 1 fields, want 11` and `ParseInventory` with
+`inventory record has 1 fields, want 8`.
+
+Scenario: a user (or a script) creates a linked worktree under a directory name containing a
+newline. The branches pane (`refs.list`), single-ref lookups and the queue inventory fail for that
+repo until the worktree is removed. Self-inflicted and rare, hence low; the tags path already
+solved this framing (`TagRefsFormat`, trailing `%00`, leading-LF strip).
+
+Fix: use the `parseRefRowsNUL` framing for `RefsFormat` and `InventoryFormat` (append `%00`, strip
+the leading LF of each later record).
+
+### F10 (low) Rev arguments without `--` fail when a worktree file has the same name
+
+`apps/kira-space/internal/gitclient/porcelain/log.go:68` (head scope emits bare `HEAD`, consumed by
+`LogSessionArgs:88`, `LogScanArgs:117`, `logsession/session.go:382` `rev-list --count`) and
+`workingdiff.go:31,38` (`git diff --numstat|--name-status HEAD`, base `"HEAD"` from
+`gitsession/working.go:23`). Probed with a file named `HEAD` at the repo root:
+`git log … HEAD`, `git rev-list --count HEAD` and `git diff --numstat -z HEAD` all fail with
+`fatal: ambiguous argument 'HEAD': both revision and filename`. Ranges (`a..b`, `a...b`) and
+`rev-parse` are unaffected.
+
+Scenario: a repo tracks a file named `HEAD` (or the user creates one). The working-changes pane
+fails, and the graph fails when the repo's graph scope is "head". Rare, hence low.
+
+Fix: append `--` after the revision arguments in `LogSessionArgs`, `LogSessionSkipArgs`,
+`LogScanArgs`, `countTotal`'s argv and both `Working*Args`.
+
+### F11 (low) A 0x1f in a trailer value or GPG signer name corrupts commit-detail body and trailers
+
+`apps/kira-space/internal/gitclient/porcelain/show.go:22,130`. `bodyAndSignatureFormat` uses 0x1f
+between four fields, but only `%b` (last) is safe. `%(trailers:…)` and `%GS` are not last and
+can carry 0x1f. Probed: a commit whose message ends `Reviewed-by: x\x1fy` yields
+`N\x1f\x1fReviewed-by: x\x1fy\n\x1fbody text…`. `SplitLimitedFields(…, 4)` gives trailers
+`[Reviewed-by: x]` and a body of `y\n\x1fbody text…`: a stray `y` and a raw 0x1f at the top of
+the body in commit detail. Any pushed commit can carry this; display corruption only.
+
+Fix: make the format NUL-delimited (`%G?%x00%GS%x00%(trailers…)%x00%b`) and split with
+`splitOneNULRecord(raw, 4)`, the F3 approach `LogFormat` already uses. Probe in block 4 showed git
+truncates message text at an embedded NUL, so no field can contain NUL.
+
+### F12 (low) `ParseBlameLine` fails on a content line longer than 1 MiB
+
+`apps/kira-space/internal/gitclient/porcelain/blame.go:73`. `bufio.Scanner` with a 1 MiB max
+token reads `--line-porcelain` output, whose last line is the blamed content prefixed by a tab. A
+line over 1 MiB (minified bundle, generated JSON on one line) makes `Scan` stop with
+`bufio.ErrTooLong`, so blame on that line returns `porcelain: blame: bufio.Scanner: token too
+long`. Only the content line can be that long, and the parser never uses its text.
+
+Fix: walk `raw` with `bytes.IndexByte(raw, '\n')` and stop at the first line starting with a tab,
+without a token limit (the whole output is already in memory).
 
 ## Coverage
 
@@ -222,3 +299,37 @@ Verified, no finding:
   `rev-list --count`, serialising it with `ReadPage`: a latency cost, not a defect.
 - `RecordSplitter`/`FieldGrouper` (`records.go`, read here for logsession): copies records, caps
   remainder at 64 MiB, `Flush` clears.
+
+### Block 4: porcelain
+
+Reviewed in full: `records.go`, `types.go`, `log.go`, `refs.go`, `refsnapshot.go`, `inventory.go`,
+`status.go`, `show.go`, `stash.go`, `blame.go`, `diff.go`, `difftree.go`, `workingdiff.go`,
+`mergetree.go`, `worktree.go`, `reset.go`, `review.go`, `containment.go`. Testdata captures not
+re-derived; all porcelain tests pass and every parser claim above was probed against real git 2.43.
+
+Verified, no finding:
+- NUL in commit or tag messages: git truncates `%s`, `%b`, `%(contents:*)` at the NUL (probed),
+  so NUL-fielded formats (`LogFormat`, `ScanFormat`, `TagRefsFormat`) cannot be shifted.
+  0x1f in names/emails is harmless there (F3 holds).
+- Ref names cannot contain space, control bytes or 0x1f (`check-ref-format`), so `%D` ", "
+  splitting, `ParseRefSnapshot` 0x1f split and status `# branch.*` headers are safe. Unknown `%D`
+  words (`grafted`, `replaced`) are skipped.
+- Stash list: reflog normalises tabs to spaces in `%gs` (probed `stash push -m $'a\tb\t'`), so a
+  header cannot pose as a rename numstat record. Rename path records are consumed before header
+  detection.
+- `status --porcelain=v2 -z`: path is the absorbing last field; `2` record takes the next record
+  as original path; unborn `(initial)` and `(detached)` handled.
+- Diff parsing: `-z` patch headers C-quote control characters, so no raw LF from a path enters
+  `ParseFileDiffBody`; blank context lines (F4 override holds), `\ No newline`, LFS pointer,
+  binary and mode-only cases handled; `diff.noprefix`/`mnemonicPrefix` only change header text the
+  parser ignores. `textconv` does not affect `--numstat` (probed).
+- Inherited config: `--format` overrides `format.pretty`/`log.decorate`; explicit `--unified=3`,
+  `--no-renames`/`-M -C`, `--no-ext-diff`, `--no-textconv` cover `diff.context`, `diff.renames`,
+  `diff.external`, textconv on every patch builder except F8's color gap.
+- Argv injection: builders without `--` take server-derived shas or caller-validated refs.
+  Spot-checked guards: `gitrpc/detail.go:75` (`commit.detail` sha), `gitrpc/graph.go`
+  `rangedWalkSpecFrom` (range base/branch), `gitsession/preflight.go` `resolveCommit` and
+  `revertMergeParents` (`validOpArg`), `review.resolveBase`. `containment.go` inputs come from
+  ADE tips (shas). No unguarded client string reaches a dash-sensitive position.
+- `SHA-256`: `isHexObjectID` and `IsUncommittedBlameSHA` accept 40 or 64 hex; empty tree derived
+  via `hash-object` (F18 holds).
