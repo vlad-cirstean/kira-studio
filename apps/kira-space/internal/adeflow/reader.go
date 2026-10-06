@@ -2,6 +2,8 @@ package adeflow
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -58,38 +60,9 @@ func (r *Reader) List(usedBy func(id string) int) adewire.WorkflowsResult {
 		}
 	}
 	sort.Strings(names)
-	var last map[string]string
+	lv := &lastValid{store: r.Store}
 	for _, name := range names {
-		entry := adewire.WorkflowEntry{FileName: name, Path: filepath.Join(r.Dir, name)}
-		src, err := os.ReadFile(entry.Path)
-		var wf adewire.Workflow
-		var werr *adewire.WorkflowError
-		if err != nil {
-			werr = &adewire.WorkflowError{Message: "cannot read the file: " + err.Error()}
-		} else {
-			wf, werr = Parse(src)
-			if werr == nil && wf.ID != strings.TrimSuffix(name, ".yaml") {
-				werr = &adewire.WorkflowError{Message: "id must equal the file name without .yaml"}
-			}
-		}
-		if werr == nil {
-			entry.Workflow = &wf
-			r.record(name, &wf)
-		} else {
-			entry.Error = werr
-			if last == nil {
-				if last, err = r.Store.LastValid(); err != nil {
-					slog.Warn("ade workflows: read last valid", "err", err)
-					last = map[string]string{}
-				}
-			}
-			if js, ok := last[name]; ok {
-				var prev adewire.Workflow
-				if json.Unmarshal([]byte(js), &prev) == nil {
-					entry.Workflow = &prev
-				}
-			}
-		}
+		entry := r.entryFor(name, lv)
 		if entry.Workflow != nil && usedBy != nil {
 			entry.UsedBy = usedBy(entry.Workflow.ID)
 		}
@@ -98,28 +71,105 @@ func (r *Reader) List(usedBy func(id string) int) adewire.WorkflowsResult {
 	return out
 }
 
-func (r *Reader) record(file string, wf *adewire.Workflow) {
+// lastValid loads Store.LastValid once per read and keeps it current with the writes made through it.
+type lastValid struct {
+	store  Store
+	loaded bool
+	m      map[string]string
+}
+
+func (l *lastValid) get() map[string]string {
+	if !l.loaded {
+		l.loaded = true
+		m, err := l.store.LastValid()
+		if err != nil {
+			slog.Warn("ade workflows: read last valid", "err", err)
+			m = map[string]string{}
+		}
+		l.m = m
+	}
+	return l.m
+}
+
+// entryFor reads one workflow file: its parsed workflow, or its error plus the last valid version.
+func (r *Reader) entryFor(name string, lv *lastValid) adewire.WorkflowEntry {
+	entry := adewire.WorkflowEntry{FileName: name, Path: filepath.Join(r.Dir, name)}
+	var wf adewire.Workflow
+	var werr *adewire.WorkflowError
+	src, err := readCapped(entry.Path)
+	switch {
+	case err != nil:
+		werr = &adewire.WorkflowError{Message: "cannot read the file: " + err.Error()}
+	default:
+		wf, werr = Parse(src)
+		if werr == nil && wf.ID != strings.TrimSuffix(name, ".yaml") {
+			werr = &adewire.WorkflowError{Message: "id must equal the file name without .yaml"}
+		}
+	}
+	if werr == nil {
+		entry.Workflow = &wf
+		r.record(name, &wf, lv)
+		return entry
+	}
+	entry.Error = werr
+	if js, ok := lv.get()[name]; ok {
+		var prev adewire.Workflow
+		if json.Unmarshal([]byte(js), &prev) == nil {
+			entry.Workflow = &prev
+		}
+	}
+	return entry
+}
+
+var errTooLarge = errors.New("file is larger than 1 MiB")
+
+// readCapped reads a workflow file, refusing one over maxYamlBytes (the cap app writes enforce).
+func readCapped(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	src, err := io.ReadAll(io.LimitReader(f, maxYamlBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(src) > maxYamlBytes {
+		return nil, errTooLarge
+	}
+	return src, nil
+}
+
+func (r *Reader) record(file string, wf *adewire.Workflow, lv *lastValid) {
 	js, err := json.Marshal(wf)
 	if err != nil {
 		slog.Warn("ade workflows: encode", "file", file, "err", err)
 		return
 	}
-	last, err := r.Store.LastValid()
-	if err == nil && last[file] == string(js) {
+	last := lv.get()
+	if last[file] == string(js) {
 		return
 	}
 	if err := r.Store.RecordLastValid(file, string(js), r.now().UnixMilli()); err != nil {
 		slog.Warn("ade workflows: record last valid", "file", file, "err", err)
+		return
 	}
+	last[file] = string(js)
 }
 
 // Get returns the effective workflow with the given id: the file's current version when valid,
-// else the last valid one. ok is false when no file defines it.
+// else the last valid one. ok is false when no file defines it. Only <id>.yaml is read: a workflow's
+// id always equals its file name.
 func (r *Reader) Get(id string) (adewire.Workflow, bool) {
-	for _, e := range r.List(nil).Workflows {
-		if e.Workflow != nil && e.Workflow.ID == id {
-			return *e.Workflow, true
-		}
+	if id == "" || id != filepath.Base(id) || strings.HasPrefix(id, ".") {
+		return adewire.Workflow{}, false
+	}
+	name := id + ".yaml"
+	if _, err := os.Stat(filepath.Join(r.Dir, name)); err != nil {
+		return adewire.Workflow{}, false
+	}
+	if e := r.entryFor(name, &lastValid{store: r.Store}); e.Workflow != nil && e.Workflow.ID == id {
+		return *e.Workflow, true
 	}
 	return adewire.Workflow{}, false
 }
