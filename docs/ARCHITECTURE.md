@@ -3758,8 +3758,13 @@ and `docs/v2.0/plans/`.
   `0013`: deletes the dead `ade.allAgentsFilter` settings row.
   `0014`: `ade_runs.launch_note`, `launch_resume_id`, `launch_prompt`, `launch_extra` (held run's send-back spec, cleared at launch).
   `0015`: rebuilds `ade_runs` without `todo_done`/`todo_total` (P158).
+  `0016`: `ade_logs_task`, partial `ade_tasks_archived` (P177 log purge).
 - Run and setup logs: tail 2 MiB per log, chunks of at most 8 KiB, `truncated` once head chunks drop,
   writes batched every 250 ms.
+- Log retention (P177): logs of a task archived 90+ days ago are deleted (`AdeLogsRepo.PurgeArchived`,
+  inclusive cutoff on `ade_tasks.archived_at`); task, branch, run, session and setup rows stay as
+  history. Live tasks keep logs. `TaskBoard.Start` runs the purge once, then hourly;
+  `PRAGMA incremental_vacuum` after a purge that removed rows.
 - Per-repo prepare timeout is the `GitRepoSettings` leaf `worktreePrepareTimeout` (default 15m, max 2h),
   shared with git-ui worktree add; `Spec.Timeout` must be > 0.
 
@@ -3846,6 +3851,7 @@ and `docs/v2.0/plans/`.
 - Pinia stores, one concern each: `adeBoardUi` (selection, tabs), `adeDialogs` (dialog flow and pending
   keys such as `merge:<branch>:<target>`), `adeTakeOver`, `adeTerminals`. Server state goes through
   TanStack Query (`queries.ts`) invalidated by the push channels above.
+- Backlog Delete confirms through the workbench `ConfirmDialog` store (P177); no undo.
 - Dialogs share `dialog/flow.ts` (target pick: new session via `StartBranch`, or `Send` to a running
   session), `compose.ts` (message templates), `deliver.ts` and `turnWatch.ts`.
 - Plan drag and drop (`plan/usePlanDrag.ts`, `board/dropPlan.ts`) writes the day and position directly

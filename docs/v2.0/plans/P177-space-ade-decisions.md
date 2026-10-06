@@ -289,3 +289,13 @@ Not touched: `SPEC.md` (orchestrator owns row status), `AdeBacklogRow.vue`, `Ade
 - Shared: `docs/ARCHITECTURE.md`. P177 edits only the "ADE: Kira Space task planner" section;
   P173 edits Git sections, P176 Studio sections. Text-disjoint hunks rebase cleanly.
 - No ordering dependency on either stream. P177 can be implemented in parallel with both.
+
+## Result
+
+Commits: `51ef08b` migration 0016, `f16d285` repo purge + test, `332ecf4` engine loop, `3f5be19`
+backlog confirm, docs commit (ARCHITECTURE.md + this section).
+
+Checks: typecheck, lint, lint:go (0 issues), lint:dead, go build/vet, `go test -race` for `ade` and
+`storage/repos`, `bun test apps/kira-space/tests/unit` pass. ADE UI specs (`ade-v2*`, 124 tests) pass.
+
+Deviations: none. Migration 0016 was the next free number at commit time.
