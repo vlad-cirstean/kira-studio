@@ -22,7 +22,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
-	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/redis"
+	redisadapter "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/redis"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/testsupport"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -811,4 +811,96 @@ func TestRedis_SchemaColumns_Unsupported(t *testing.T) {
 	if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
 		t.Fatalf("got %v, want E_UNSUPPORTED", err)
 	}
+}
+
+func consoleRun(a adapters.Adapter, fixture *testsupport.RedisFixture, ctx context.Context, opID string, statements ...string) ([]page.Page, error) {
+	return a.Execute(ctx, model.ConsoleRequest{Path: nodePath(fixture, seg("database", "db0")), Statements: statements}, adapters.NewOpCtx(opID))
+}
+
+// F9: a reply slower than the read timeout is reported as E_TIMEOUT and never re-sent (a retried
+// script would INCR twice).
+func TestRedis_Console_SlowCommandTimesOutWithoutResend(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	a := connectedAdapter(t, fixture)
+	defer redisadapter.SetConsoleReadTimeout(time.Second)()
+	root := goredis.NewClient(&goredis.Options{Addr: fmt.Sprintf("%s:%d", fixture.Host, fixture.Port), Password: testsupport.RedisPassword})
+	defer root.Close()
+	const key = "slow:resend:probe"
+	root.Del(context.Background(), key)
+
+	// ~2.5s of Lua busy work (TIME is frozen inside a script, so it cannot be the clock).
+	script := `local x = 0; for i = 1, 250000000 do x = x + i end; return redis.call('INCR', KEYS[1])`
+	_, err := consoleRun(a, fixture, context.Background(), "op-slow", fmt.Sprintf("EVAL %q 1 %s", script, key))
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeTimeout {
+		t.Fatalf("err = %v, want E_TIMEOUT", err)
+	}
+	var n int
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		if n, err = root.Get(context.Background(), key).Int(); err == nil {
+			break
+		}
+	}
+	time.Sleep(3 * time.Second) // a re-sent script would land a second INCR
+	if n, err = root.Get(context.Background(), key).Int(); err != nil || n != 1 {
+		t.Fatalf("script ran %d times (err %v), want exactly once", n, err)
+	}
+}
+
+// F9: blocking commands honour their own timeout, an unbounded block is refused, and Stop returns
+// at once instead of waiting out the socket deadline.
+func TestRedis_Console_BlockingCommands(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	a := connectedAdapter(t, fixture)
+
+	if _, err := consoleRun(a, fixture, context.Background(), "op-push", "RPUSH blk:q x"); err != nil {
+		t.Fatalf("RPUSH: %v", err)
+	}
+	if _, err := consoleRun(a, fixture, context.Background(), "op-blpop", "BLPOP blk:q 1"); err != nil {
+		t.Fatalf("BLPOP with a 1s timeout: %v", err)
+	}
+	_, err := consoleRun(a, fixture, context.Background(), "op-blpop0", "BLPOP blk:nokey 0")
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
+		t.Fatalf("BLPOP 0: err = %v, want E_QUERY", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(500 * time.Millisecond); cancel() }()
+	start := time.Now()
+	_, err = consoleRun(a, fixture, ctx, "op-blpop-stop", "BLPOP blk:nokey 30")
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeCancelled {
+		t.Fatalf("stopped BLPOP: err = %v, want E_CANCELLED", err)
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Fatalf("Stop took %v to return", elapsed)
+	}
+}
+
+// F10: container commands are classified by their subcommand's own flags.
+func TestRedis_ReadOnlyConnection_ContainerSubcommands(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	ro := fixture.Config
+	ro.ReadOnly = true
+	a := newAdapter(t)
+	if _, err := a.Connect(context.Background(), ro, adapters.NewOpCtx("op-ro-container")); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer a.Disconnect(context.Background())
+
+	for _, stmt := range []string{"OBJECT ENCODING counter", "MEMORY USAGE counter"} {
+		if _, err := consoleRun(a, fixture, context.Background(), "op-ro-ok", stmt); err != nil {
+			t.Errorf("%s on a read-only connection: %v", stmt, err)
+		}
+	}
+	for _, stmt := range []string{"CONFIG SET maxmemory 0", "FUNCTION FLUSH", "CLIENT KILL ID 1", "XGROUP CREATE s g $ MKSTREAM", "NOSUCH SUB"} {
+		_, err := consoleRun(a, fixture, context.Background(), "op-ro-deny", stmt)
+		if code, _ := adapters.CodeOf(err); code != adapters.CodeUnsupported && code != adapters.CodeQuery {
+			t.Errorf("%s on a read-only connection: err = %v, want a refusal", stmt, err)
+		}
+	}
+}
+
+func TestRedis_Connect_CancelledCtxReturns(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	proxy := testsupport.StartPausableProxy(t, fixture.Config)
+	testsupport.ConnectCancelScenario(t, newAdapter(t), proxy.Config(), proxy)
 }

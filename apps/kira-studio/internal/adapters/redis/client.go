@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
@@ -117,19 +118,64 @@ type dbConnectionSet struct {
 	defaultDbIndex int
 	log            func(level, message string)
 
-	inner *adapters.ConnSet[int, *goredis.Client]
+	inner *adapters.ConnSet[int, *clientEntry]
+	// closing is set before inner.CloseAll so Disconnect force-closes entries other ops still hold.
+	closing atomic.Bool
 
 	cmdMu   sync.Mutex
 	cmdInfo map[string]*goredis.CommandInfo
+	subInfo map[string]bool
+}
+
+// clientEntry counts the ops using one db index's client, so an LRU eviction cannot close it
+// under a running op: the close waits for the last release.
+type clientEntry struct {
+	client *goredis.Client
+
+	mu      sync.Mutex
+	refs    int
+	retired bool
+}
+
+func (e *clientEntry) acquire() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.retired {
+		return false
+	}
+	e.refs++
+	return true
+}
+
+func (e *clientEntry) release() {
+	e.mu.Lock()
+	e.refs--
+	closeNow := e.retired && e.refs == 0
+	e.mu.Unlock()
+	if closeNow {
+		_ = e.client.Close()
+	}
+}
+
+// retire marks the entry evicted and closes it now, or on the last release when force is false.
+func (e *clientEntry) retire(force bool) {
+	e.mu.Lock()
+	e.retired = true
+	closeNow := force || e.refs == 0
+	e.mu.Unlock()
+	if closeNow {
+		_ = e.client.Close()
+	}
 }
 
 func newDbConnectionSet(fields connectFields, defaultDbIndex int, log func(level, message string)) *dbConnectionSet {
 	s := &dbConnectionSet{fields: fields, defaultDbIndex: defaultDbIndex, log: log}
-	s.inner = adapters.NewConnSet(adapters.ConnSetOptions[int, *goredis.Client]{
+	s.inner = adapters.NewConnSet(adapters.ConnSetOptions[int, *clientEntry]{
 		Dial: s.dial,
 		// a goredis.Client has no per-connection lock to hold (unlike postgres/mysqlfamily's pinned
-		// single connection, it is already safe for concurrent use and pools its own connections).
-		Close:   func(_ context.Context, c *goredis.Client) { _ = c.Close() },
+		// single connection, it is already safe for concurrent use and pools its own connections);
+		// eviction defers the close to the last op still using it.
+		Close:   func(_ context.Context, e *clientEntry) { e.retire(s.closing.Load()) },
 		Max:     maxConnections,
 		Primary: defaultDbIndex,
 	})
@@ -148,7 +194,7 @@ var redisPing = func(ctx context.Context, client *goredis.Client) error {
 
 // dial is get()'s own single-attempt dial, split out so get() can call it with no lock held —
 // redisPing is a real network round trip, the whole point of the dialing placeholder above.
-func (s *dbConnectionSet) dial(ctx context.Context, dbIndex int) (*goredis.Client, error) {
+func (s *dbConnectionSet) dial(ctx context.Context, dbIndex int) (*clientEntry, error) {
 	opts := &goredis.Options{
 		// F13b: net.JoinHostPort brackets an IPv6 literal correctly — a bare "%s:%d" produces an
 		// invalid address for one (Kafka's own adapter already does this correctly).
@@ -175,15 +221,25 @@ func (s *dbConnectionSet) dial(ctx context.Context, dbIndex int) (*goredis.Clien
 		_ = client.Close()
 		return nil, mapError(err)
 	}
-	return client, nil
+	return &clientEntry{client: client}, nil
 }
 
-// get returns dbIndex's connection, opening one via adapters.ConnSet if none exists yet.
-func (s *dbConnectionSet) get(ctx context.Context, dbIndex int) (*goredis.Client, error) {
-	return s.inner.Get(ctx, dbIndex)
+// get returns dbIndex's connection, opening one via adapters.ConnSet if none exists yet. The
+// caller must call release when its op ends.
+func (s *dbConnectionSet) get(ctx context.Context, dbIndex int) (*goredis.Client, func(), error) {
+	for {
+		e, err := s.inner.Get(ctx, dbIndex)
+		if err != nil {
+			return nil, nil, err
+		}
+		// Evicted between Get and acquire: the next Get dials a fresh entry.
+		if e.acquire() {
+			return e.client, e.release, nil
+		}
+	}
 }
 
-func (s *dbConnectionSet) primary(ctx context.Context) (*goredis.Client, error) {
+func (s *dbConnectionSet) primary(ctx context.Context) (*goredis.Client, func(), error) {
 	return s.get(ctx, s.defaultDbIndex)
 }
 
@@ -192,7 +248,7 @@ func (s *dbConnectionSet) primary(ctx context.Context) (*goredis.Client, error) 
 // scripts (EVAL/EVALSHA/FCALL) and admin commands, which COMMAND INFO already flags as non-readonly.
 // The table is fetched once per connection set and cached; command flags don't change mid-session.
 // An unrecognized command name is treated as a write (deny by default) rather than assumed safe.
-func (s *dbConnectionSet) isReadOnlyCommand(ctx context.Context, client *goredis.Client, name string) bool {
+func (s *dbConnectionSet) isReadOnlyCommand(ctx context.Context, client *goredis.Client, name string, args []string) bool {
 	s.cmdMu.Lock()
 	defer s.cmdMu.Unlock()
 	if s.cmdInfo == nil {
@@ -204,10 +260,49 @@ func (s *dbConnectionSet) isReadOnlyCommand(ctx context.Context, client *goredis
 		s.cmdInfo = info
 	}
 	info, ok := s.cmdInfo[strings.ToLower(name)]
-	return ok && info.ReadOnly
+	if !ok {
+		return false
+	}
+	if info.ReadOnly {
+		return true
+	}
+	// A container command (XINFO, OBJECT, MEMORY, ...) carries no flags at top level; each
+	// subcommand holds its own, so ask for `container|sub`.
+	if len(info.Flags) == 0 && len(args) > 0 {
+		return s.subcommandReadOnly(ctx, client, strings.ToLower(name)+"|"+strings.ToLower(args[0]))
+	}
+	return false
+}
+
+// subcommandReadOnly is isReadOnlyCommand's container lookup, with cmdMu held. An unknown
+// subcommand or a failed lookup is a write, and a failure is not cached.
+func (s *dbConnectionSet) subcommandReadOnly(ctx context.Context, client *goredis.Client, full string) bool {
+	if v, ok := s.subInfo[full]; ok {
+		return v
+	}
+	reply, err := client.Do(ctx, "COMMAND", "INFO", full).Slice()
+	if err != nil || len(reply) != 1 {
+		return false
+	}
+	readOnly := false
+	if entry, ok := reply[0].([]any); ok && len(entry) > 2 {
+		if flags, ok := entry[2].([]any); ok {
+			for _, f := range flags {
+				if str, ok := f.(string); ok && str == "readonly" {
+					readOnly = true
+				}
+			}
+		}
+	}
+	if s.subInfo == nil {
+		s.subInfo = make(map[string]bool)
+	}
+	s.subInfo[full] = readOnly
+	return readOnly
 }
 
 func (s *dbConnectionSet) closeAll() {
+	s.closing.Store(true)
 	s.inner.CloseAll(context.Background())
 }
 
@@ -218,8 +313,10 @@ func connectRedis(ctx context.Context, cfg model.ResolvedConnectionConfig, log f
 		return nil, 0, err
 	}
 	set := newDbConnectionSet(fields, defaultDbIndex, log)
-	if _, err := set.primary(ctx); err != nil { // eagerly validates the connection
+	_, release, err := set.primary(ctx) // eagerly validates the connection
+	if err != nil {
 		return nil, 0, err
 	}
+	release()
 	return set, defaultDbIndex, nil
 }

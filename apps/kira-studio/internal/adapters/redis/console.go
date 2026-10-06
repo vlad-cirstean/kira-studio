@@ -3,10 +3,14 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
+
+	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
@@ -259,11 +263,12 @@ func (a *Adapter) ClassifyStatement(ctx context.Context, statement string) (adap
 	if len(tokens) == 0 {
 		return adapters.ClassUnknown, nil
 	}
-	conn, err := set.get(ctx, a.state.Load().defaultDbIndex)
+	conn, release, err := set.get(ctx, a.state.Load().defaultDbIndex)
 	if err != nil {
 		return adapters.ClassUnknown, err
 	}
-	if set.isReadOnlyCommand(ctx, conn, tokens[0]) {
+	defer release()
+	if set.isReadOnlyCommand(ctx, conn, tokens[0], tokens[1:]) {
 		return adapters.ClassRead, nil
 	}
 	return adapters.ClassWrite, nil
@@ -322,9 +327,94 @@ func rejectConnectionStateCommand(command string, args []string) error {
 // consoleCommand is one already-parsed, already-validated console line (F11): execute below parses
 // and validates every statement in the batch before running any of them.
 type consoleCommand struct {
-	line    string
-	command string
-	args    []string
+	line        string
+	command     string
+	args        []string
+	readTimeout time.Duration
+}
+
+const (
+	maxBlockSeconds = 600
+	blockMargin     = 5 * time.Second
+)
+
+// consoleReadTimeout bounds the wait for any non-blocking console reply; a var so tests can
+// shorten it.
+var consoleReadTimeout = 60 * time.Second
+
+// blockingTimeout reports the server-side wait a blocking command asks for. ok is false for every
+// other command; an unparsable argument also reports false and is left to the server to reject.
+func blockingTimeout(command string, args []string) (d time.Duration, ok bool) {
+	var raw string
+	unit := time.Second
+	switch strings.ToUpper(command) {
+	case "BLPOP", "BRPOP", "BRPOPLPUSH", "BZPOPMIN", "BZPOPMAX", "BLMOVE":
+		if len(args) == 0 {
+			return 0, false
+		}
+		raw = args[len(args)-1]
+	case "BLMPOP", "BZMPOP":
+		if len(args) == 0 {
+			return 0, false
+		}
+		raw = args[0]
+	case "WAIT", "WAITAOF":
+		i := 1
+		if strings.EqualFold(command, "WAITAOF") {
+			i = 2
+		}
+		if len(args) <= i {
+			return 0, false
+		}
+		raw, unit = args[i], time.Millisecond
+	case "XREAD", "XREADGROUP":
+		for i, a := range args {
+			if strings.EqualFold(a, "BLOCK") && i+1 < len(args) {
+				raw, unit = args[i+1], time.Millisecond
+				break
+			}
+		}
+		if raw == "" {
+			return 0, false
+		}
+	default:
+		return 0, false
+	}
+	n, err := strconv.ParseFloat(raw, 64)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return time.Duration(n * float64(unit)), true
+}
+
+// consoleReadTimeoutFor is how long to wait for command's reply. A blocking command waits its own
+// timeout plus a margin; an unbounded or very long block is refused, since nothing but the read
+// deadline would end it once Stop abandons the call.
+func consoleReadTimeoutFor(command string, args []string) (time.Duration, error) {
+	d, blocking := blockingTimeout(command, args)
+	if !blocking {
+		return consoleReadTimeout, nil
+	}
+	if d == 0 || d > maxBlockSeconds*time.Second {
+		return 0, adapters.New(adapters.CodeQuery,
+			fmt.Sprintf("%s: use a finite block timeout of at most %d seconds", strings.ToUpper(command), maxBlockSeconds), nil)
+	}
+	return d + blockMargin, nil
+}
+
+// runConsoleCommand sends one command on a client that never re-sends it (a retried write would
+// run twice) and reads the reply for at most timeout. It races Stop: the call finishes on its own
+// connection within the read deadline, but the caller returns at once.
+func runConsoleCommand(ctx context.Context, conn *goredis.Client, argv []any, timeout time.Duration) (any, error) {
+	cc := conn.WithTimeout(timeout)
+	cc.Options().MaxRetries = 0
+	return adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (any, error) {
+		reply, err := cc.Do(qctx, argv...).Result()
+		if err != nil {
+			return nil, mapError(err)
+		}
+		return reply, nil
+	})
 }
 
 // execute is console.ts's execute — one op-log row for the whole batch (P5.5 D9's precedent).
@@ -348,10 +438,11 @@ func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bo
 	}
 	op.SetCommand(strings.Join(lines, "\n"))
 
-	conn, err := set.get(ctx, dbIndex)
+	conn, release, err := set.get(ctx, dbIndex)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 
 	commands := make([]consoleCommand, 0, len(lines))
 	for _, line := range lines {
@@ -366,10 +457,14 @@ func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bo
 		if err := rejectConnectionStateCommand(command, args); err != nil {
 			return nil, err
 		}
-		if readOnly && !set.isReadOnlyCommand(ctx, conn, command) {
+		if readOnly && !set.isReadOnlyCommand(ctx, conn, command, args) {
 			return nil, adapters.AssertWritable(true)
 		}
-		commands = append(commands, consoleCommand{line: line, command: command, args: args})
+		readTimeout, err := consoleReadTimeoutFor(command, args)
+		if err != nil {
+			return nil, err
+		}
+		commands = append(commands, consoleCommand{line: line, command: command, args: args, readTimeout: readTimeout})
 	}
 	if len(commands) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
@@ -385,9 +480,9 @@ func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bo
 		for _, a := range c.args {
 			argv = append(argv, a)
 		}
-		reply, err := conn.Do(ctx, argv...).Result()
+		reply, err := runConsoleCommand(ctx, conn, argv, c.readTimeout)
 		if err != nil {
-			return nil, mapError(err)
+			return nil, err
 		}
 		pages = append(pages, resultToPage(c.command, c.args, reply))
 	}

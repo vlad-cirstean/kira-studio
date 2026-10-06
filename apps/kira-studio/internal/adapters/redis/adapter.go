@@ -57,11 +57,12 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	if err != nil {
 		return adapters.ConnectInfo{}, err
 	}
-	primary, err := set.primary(ctx)
+	primary, release, err := set.primary(ctx)
 	if err != nil {
 		set.closeAll()
 		return adapters.ConnectInfo{}, err
 	}
+	defer release()
 
 	a.setConnected(set, defaultDbIndex, cfg.ReadOnly)
 
@@ -105,10 +106,11 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	}
 
 	if len(segments) == 0 {
-		primary, err := set.primary(ctx)
+		primary, release, err := set.primary(ctx)
 		if err != nil {
 			return adapters.TreeChildren{}, err
 		}
+		defer release()
 		nodes, err := listDatabases(ctx, primary)
 		if err != nil {
 			return adapters.TreeChildren{}, err
@@ -139,10 +141,11 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	if err != nil {
 		return adapters.TreeChildren{}, err
 	}
-	conn, err := set.get(ctx, dbIndex)
+	conn, release, err := set.get(ctx, dbIndex)
 	if err != nil {
 		return adapters.TreeChildren{}, err
 	}
+	defer release()
 	return listNamespaceChildren(ctx, conn, dbSegment.Name, namespaceSegments, op)
 }
 
@@ -185,10 +188,11 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	conn, err := set.get(ctx, dbIndex)
+	conn, release, err := set.get(ctx, dbIndex)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	result, err := readKey(ctx, conn, key, readReq{PageSize: req.PageSize, Cursor: req.Cursor}, op)
 	if err != nil {
 		return nil, err
@@ -206,10 +210,11 @@ func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adap
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
-	conn, err := set.get(ctx, dbIndex)
+	conn, release, err := set.get(ctx, dbIndex)
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
+	defer release()
 	return countKey(ctx, conn, key)
 }
 
@@ -234,10 +239,11 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	conn, err := set.get(ctx, dbIndex)
+	conn, release, err := set.get(ctx, dbIndex)
 	if err != nil {
 		return model.MutationResult{}, err
 	}
+	defer release()
 	return mutateDB(ctx, conn, op, a.state.Load().readOnly, plan)
 }
 
@@ -289,7 +295,7 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return nil, err
 		}
-		conn, err := set.get(ctx, dbIndex)
+		conn, release, err := set.get(ctx, dbIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -299,6 +305,7 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 			dbKeys[j] = keys[idx]
 		}
 		types, err := keyTypes(ctx, conn, dbKeys)
+		release()
 		if err != nil {
 			return nil, err
 		}
@@ -309,10 +316,10 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 	return out, nil
 }
 
-// Cancel is index.ts's cancel (D7/D8): CheckCancelled between bounded SCAN-family rounds is fully
-// sufficient on its own — every op this adapter issues is either a bounded SCAN-family loop or a
-// single fast command — so this stays a permanent no-op rather than attempting a CLIENT KILL that
-// would be unsafe under dbConnectionSet's one-connection-per-db-index sharing (C9).
+// Cancel is index.ts's cancel (D7/D8): browse ops are bounded SCAN-family loops that
+// CheckCancelled between rounds, and the console races Stop (runConsoleCommand), so this stays a
+// permanent no-op rather than attempting a CLIENT KILL that would be unsafe under
+// dbConnectionSet's one-client-per-db-index sharing (C9).
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	return false, nil
 }

@@ -36,6 +36,9 @@ func mapError(err error) *adapters.Error {
 	}
 
 	if ne := adapters.ClassifyNetError(err); ne.IsNetError {
+		if ne.NetTimeout {
+			return adapters.New(adapters.CodeTimeout, message, err)
+		}
 		return adapters.New(adapters.CodeConnect, message, err)
 	}
 	if errors.Is(err, goredis.ErrClosed) {
