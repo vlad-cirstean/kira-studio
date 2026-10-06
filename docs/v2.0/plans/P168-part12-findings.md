@@ -146,3 +146,32 @@ Block 2 otherwise clean:
 - `formatConsoleText` split options match `ConsoleView.splitOptionsFor`; per-statement verbatim
   fallback, terminator preservation, trailing-comment join, Mongo trailing-content refusal hold.
 - `sqlHover` fence/escape, `tokenizeSql` memo (2 entries, reference-compared options) correct.
+
+### Block 3: autocomplete
+
+**F8. Relation names from the tree cache are unreachable whenever a DDL document or cached columns
+exist.** Low. Verified (scratch probe: `sqlCompletionSources('postgres', empty DDL,
+['orders_archive'], cached [orders])`; at `SELECT * FROM or` and at explicit `SELECT * FROM `, the
+first non-null source offers `orders`, `ORDER`, `OR`; `orders_archive` never appears).
+`SF/views/console/sqlLanguageService.ts:80-96` (relation source composed third),
+`SF/views/console/sqlSchemaCompletion.ts:121-133` (bare-word branch always returns non-null once a
+word is typed or Ctrl+Space pressed), `SF/editor/MonacoHost.vue:245-274` (first non-null source
+wins, no merge).
+- Scenario: root-opened console with one container's columns cached (the case the P4 comment at
+  `sqlLanguageService.ts:91-93` names). Tables the user expanded in other containers never show at
+  `FROM`/`JOIN`, though the comment says they were added for exactly that. The relation source only
+  runs after an unresolved `foo.` (schema source null, keyword source null), where it then replaces
+  `foo.` with a bare relation name.
+- Fix: in `sqlSchemaCompletionSource` take `relations` as an extra input and, when
+  `RELATION_POSITION_RE` matches the text before `from`, merge relation names not already in the
+  namespace into `tableOptions` (deduped, quoted via `toOption`); drop the separately composed
+  relation source from the two schema branches. Keep the relations-only branch as is.
+
+Block 3 otherwise clean:
+- `QUALIFIED_RE` has no `[bracket]` qualifier: SQLite `[t].` gets no completion (no wrong one); fold
+  into F5's fix if cheap (`\[(?:[^\]]|\]\])*\]` alternative plus `unquote`).
+- Alias resolution, CTE shadowing, `toOption` quoting, keyword dedupe and memo, Redis first-token
+  rule, Mongo positions: correct. Per-keystroke cost: sources slice `doc` once and reuse the
+  memoised tokenize for alias lookups only at qualified positions.
+- `MonacoHost` providers are model-scoped and disposed on prop change and unmount; two hosts with
+  one language id do not cross-feed.
