@@ -250,7 +250,12 @@ func (b *TaskBoard) queueUnmark(sb model.AdeTaskBranch) {
 	}
 	b.ghPending[sb.ID] = true
 	b.ghMu.Unlock()
-	b.wg.Add(1)
+	if !b.track() {
+		b.ghMu.Lock()
+		delete(b.ghPending, sb.ID)
+		b.ghMu.Unlock()
+		return
+	}
 	go func() {
 		defer b.wg.Done()
 		mu := b.ghLock(sb.ID)

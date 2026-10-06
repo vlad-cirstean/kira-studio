@@ -12,9 +12,10 @@ import (
 // and Archive. A cancel cause says why; app quit cancels b.ctx and carries no cause.
 
 var (
-	errStopped   = errors.New("stopped by you")
-	errTakenOver = errors.New("taken over in Claude Code")
-	errArchived  = errors.New("task archived")
+	errStopped     = errors.New("stopped by you")
+	errBoardClosed = errors.New("the task board is closed")
+	errTakenOver   = errors.New("taken over in Claude Code")
+	errArchived    = errors.New("task archived")
 )
 
 // stopWait bounds how long a stop waits for the process to exit; a var so a test can shorten it.
@@ -28,11 +29,16 @@ type liveRun struct {
 // beginLive registers id in m and returns its context and the func that ends it. m is b.live or
 // b.setupLive.
 func (b *TaskBoard) beginLive(m map[string]*liveRun, id string) (context.Context, func()) {
+	b.runMu.Lock()
+	defer b.runMu.Unlock()
+	return b.beginLiveLocked(m, id)
+}
+
+// beginLiveLocked is beginLive with runMu held.
+func (b *TaskBoard) beginLiveLocked(m map[string]*liveRun, id string) (context.Context, func()) {
 	ctx, cancel := context.WithCancelCause(b.ctx)
 	lr := &liveRun{cancel: cancel, done: make(chan struct{})}
-	b.runMu.Lock()
 	m[id] = lr
-	b.runMu.Unlock()
 	return ctx, func() {
 		b.runMu.Lock()
 		delete(m, id)

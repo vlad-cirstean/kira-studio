@@ -151,14 +151,22 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	return b
 }
 
-// goTracked runs fn in the background; Close waits for it.
-func (b *TaskBoard) goTracked(fn func()) {
+// track registers one background task with wg; false once Close ran. The caller owes a wg.Done.
+func (b *TaskBoard) track() bool {
 	b.closeMu.Lock()
 	defer b.closeMu.Unlock()
 	if b.closed {
-		return
+		return false
 	}
 	b.wg.Add(1)
+	return true
+}
+
+// goTracked runs fn in the background; Close waits for it.
+func (b *TaskBoard) goTracked(fn func()) {
+	if !b.track() {
+		return
+	}
 	go func() {
 		defer b.wg.Done()
 		fn()

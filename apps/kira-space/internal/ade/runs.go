@@ -3,6 +3,7 @@ package ade
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -25,6 +26,7 @@ const (
 	defaultStepTimeout = 30 * time.Minute
 	noteWaitingSetup   = "waiting for worktree setup"
 	noteSetupFailed    = "worktree setup failed"
+	noteWorktreeGone   = "worktree missing"
 	noteNoFinish       = "ended without finish_step"
 	settingSourcesUser = "user"
 	settingSourcesAll  = "user,project,local"
@@ -355,11 +357,14 @@ func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		ID: b.newID(), TaskID: tc.task.ID, StageID: tc.stage.ID, StepID: plan[idx].Def.ID, BranchID: branchID,
 		Attempt: attempt, State: model.AdeRunPending, Loops: opts.Loops, Launch: opts.Launch,
 	}
-	open := b.setupReady(sb, path, setups)
+	open := path != "" && b.setupReady(sb, path, setups)
 	if !open {
 		run.Note = noteWaitingSetup
-		if s, has := setups[branchID]; has && s.State == model.AdeSetupFailed {
+		switch s, has := setups[branchID]; {
+		case has && s.State == model.AdeSetupFailed:
 			run.Note = noteSetupFailed
+		case !has || s.State == model.AdeSetupReady:
+			run.Note = noteWorktreeGone
 		}
 	}
 	if err := b.deps.Tasks.InsertRun(run); err != nil {
@@ -379,10 +384,34 @@ func (b *TaskBoard) runVarsFor(tc *taskCtx, sb model.AdeTaskBranch, path string)
 	}
 }
 
-// launch marks the run running and starts its process in the background.
+// launch marks the run running and starts its process in the background. A failure other than an
+// archive or shutdown leaves the run failed with the error as note, never a note-less pending row.
 func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, idx int, run model.AdeRun, sb model.AdeTaskBranch, path string) (model.AdeRun, error) {
 	if err := b.checkNotArchiving(run.TaskID); err != nil {
 		return run, err
+	}
+	out, err := b.startRun(ctx, tc, plan, idx, run, sb, path)
+	if err != nil && !errors.Is(err, errBoardClosed) {
+		b.failLaunch(run, err)
+	}
+	return out, err
+}
+
+// failLaunch records a run that could not start as failed.
+func (b *TaskBoard) failLaunch(run model.AdeRun, cause error) {
+	now := b.deps.Now().UnixMilli()
+	state, note := model.AdeRunFailed, "could not start: "+cause.Error()
+	updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{State: &state, Note: &note, FinishedAt: &now})
+	if err != nil {
+		slog.Warn("ade: record launch failure", "scope", "ade", "run", run.ID, "err", err)
+		return
+	}
+	b.emitRuns(updated)
+}
+
+func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, idx int, run model.AdeRun, sb model.AdeTaskBranch, path string) (model.AdeRun, error) {
+	if path == "" {
+		return run, invalid("worktree of %s is missing", sb.Name)
 	}
 	def := plan[idx].Def
 	rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
@@ -395,6 +424,15 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 	if err := b.deps.Logs.Reset(repos.AdeLogRun, run.ID, run.TaskID); err != nil {
 		return run, err
 	}
+	if !b.track() {
+		return run, errBoardClosed
+	}
+	started := false
+	defer func() {
+		if !started {
+			b.wg.Done()
+		}
+	}()
 	now := b.deps.Now().UnixMilli()
 	spec := run.Launch
 	note := spec.Note
@@ -432,7 +470,7 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 
 	timeout := parseStepTimeout(def.Timeout)
 	runCtx, endRun := b.beginLive(b.live, run.ID)
-	b.wg.Add(1)
+	started = true
 	if tc.stage.Kind == "agent" {
 		go func() {
 			defer b.wg.Done()
@@ -677,6 +715,10 @@ func (b *TaskBoard) launchHeldLocked(sb model.AdeTaskBranch) {
 	path, err := b.worktreeOf(b.ctx, sb)
 	if err != nil {
 		slog.Warn("ade: worktree of ready branch", "scope", "ade", "branch", branchID, "err", err)
+		return
+	}
+	if path == "" {
+		b.setPendingNote(branchID, noteWorktreeGone)
 		return
 	}
 	for idx, v := range plan {

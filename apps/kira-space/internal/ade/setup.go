@@ -273,29 +273,40 @@ func (b *TaskBoard) startSetup(rec model.CodeRepo, sb model.AdeTaskBranch, name,
 	if err != nil {
 		return err
 	}
-	if err := b.deps.Logs.Reset(repos.AdeLogSetup, sb.ID, sb.TaskID); err != nil {
-		return err
-	}
-	now := b.deps.Now().UnixMilli()
-	sink := b.newLogSink(repos.AdeLogSetup, sb.ID, sb.TaskID)
 	if settings.WorktreePrepareScript == "" {
+		if err := b.deps.Logs.Reset(repos.AdeLogSetup, sb.ID, sb.TaskID); err != nil {
+			return err
+		}
+		now := b.deps.Now().UnixMilli()
+		sink := b.newLogSink(repos.AdeLogSetup, sb.ID, sb.TaskID)
 		zero := 0
 		sink.add(logEvent, "no prepare script configured")
 		sink.flush()
 		defer b.notifyBoard()
 		return b.deps.Tasks.UpsertSetup(model.AdeWorktreeSetup{BranchID: sb.ID, State: model.AdeSetupReady, StartedAt: now, FinishedAt: &now, ExitCode: &zero})
 	}
+	// Claim before the log reset: a busy retry must not wipe the running or just-failed setup's log.
 	sctx, endSetup, ok := b.claimSetup(sb.ID)
 	if !ok {
 		return invalid("a setup is already running for this branch")
 	}
+	if err := b.deps.Logs.Reset(repos.AdeLogSetup, sb.ID, sb.TaskID); err != nil {
+		endSetup()
+		return err
+	}
+	if !b.track() {
+		endSetup()
+		return errBoardClosed
+	}
+	now := b.deps.Now().UnixMilli()
+	sink := b.newLogSink(repos.AdeLogSetup, sb.ID, sb.TaskID)
 	if err := b.deps.Tasks.UpsertSetup(model.AdeWorktreeSetup{BranchID: sb.ID, State: model.AdeSetupRunning, StartedAt: now}); err != nil {
 		endSetup()
+		b.wg.Done()
 		return err
 	}
 	b.notifyBoard()
 	timeout, timeoutText := gitsession.ParsePrepareTimeout(settings.WorktreePrepareTimeout)
-	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
 		defer endSetup()
@@ -307,12 +318,11 @@ func (b *TaskBoard) startSetup(rec model.CodeRepo, sb model.AdeTaskBranch, name,
 // claimSetup registers the branch's running prepare script; ok is false when one already runs.
 func (b *TaskBoard) claimSetup(branchID string) (context.Context, func(), bool) {
 	b.runMu.Lock()
-	_, busy := b.setupLive[branchID]
-	b.runMu.Unlock()
-	if busy {
+	defer b.runMu.Unlock()
+	if _, busy := b.setupLive[branchID]; busy {
 		return nil, nil, false
 	}
-	ctx, end := b.beginLive(b.setupLive, branchID)
+	ctx, end := b.beginLiveLocked(b.setupLive, branchID)
 	return ctx, end, true
 }
 
