@@ -810,3 +810,31 @@ test('filters dialog — a never-expanded connection seeds the draft from the sa
   expect(replaces).toHaveLength(1);
   expect(replaces[0].args).toEqual({ connectionId: CONNECTION_ID, visibility: SAVED });
 });
+
+test('a failing tree menu action reports on the row and the error popover opens and closes', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [CONNECTION_SUMMARY] },
+      {
+        channel: IPC.connectionsDelete,
+        args: { id: CONNECTION_ID },
+        response: null,
+        error: { code: 'E_BUSY', message: 'database is locked' },
+      },
+    ],
+  });
+
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-delete"]');
+  await acceptConfirm(page);
+
+  const trigger = connectionRow(page).locator('[data-testid="error-popover-trigger"]');
+  await expect(trigger).toContainText('database is locked');
+  await trigger.click();
+  const popover = page.locator('[data-testid="error-popover"]');
+  await expect(popover).toBeVisible();
+  await popover.getByRole('button', { name: 'Close' }).click();
+  await expect(popover).toHaveCount(0);
+});

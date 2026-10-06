@@ -20,7 +20,31 @@ import {
   useTreeStore,
 } from './state/tree';
 
+// Wraps every item's run so a rejection (clipboard denied, delete on a busy DB) lands on the row's
+// error popover instead of an unhandled rejection with no trace.
+function reportingErrors(row: TreeRowVm, items: MenuItem[]): MenuItem[] {
+  const path = row.kind === 'group' ? groupParentPath(row.path) : row.path;
+  return items.map((item): MenuItem => {
+    if (item.type === 'submenu') return { ...item, items: reportingErrors(row, item.items) };
+    if (item.type !== 'item') return item;
+    return {
+      ...item,
+      run: async () => {
+        try {
+          await item.run();
+        } catch (err) {
+          useTreeStore().reportError(row.connectionId, path, err);
+        }
+      },
+    };
+  });
+}
+
 export function menuForRow(row: TreeRowVm): MenuItem[] {
+  return reportingErrors(row, rawMenuForRow(row));
+}
+
+function rawMenuForRow(row: TreeRowVm): MenuItem[] {
   switch (row.kind) {
     case 'group':
       return groupMenu(row);
@@ -128,7 +152,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
           record.mode === 'uri' && record.uri
             ? record.uri
             : formatConnectionUri({ ...record, password: null });
-        copyText(uri);
+        return copyText(uri);
       },
     },
     {

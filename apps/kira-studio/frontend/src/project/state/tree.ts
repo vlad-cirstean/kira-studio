@@ -248,20 +248,31 @@ export const useTreeStore = defineStore('tree', () => {
     // Expanding a disconnected connection's node connects it first, rather than surfacing
     // E_DISCONNECTED — the twisty is the primary way users browse, so it shouldn't require a
     // separate explicit Connect click first.
-    if (useConnectionsStore().states[connectionId]?.status !== 'connected') {
-      treeState.loading.add(k);
-      try {
-        await useConnectionsStore().connectConnection(connectionId);
-      } finally {
-        treeState.loading.delete(k);
+    try {
+      if (useConnectionsStore().states[connectionId]?.status !== 'connected') {
+        treeState.loading.add(k);
+        try {
+          await useConnectionsStore().connectConnection(connectionId);
+        } finally {
+          treeState.loading.delete(k);
+        }
       }
+      if (useConnectionsStore().states[connectionId]?.status !== 'connected') return;
+      await loadVisibility(connectionId);
+    } catch (err) {
+      reportError(connectionId, path, err);
+      return;
     }
-    if (useConnectionsStore().states[connectionId]?.status !== 'connected') return;
-    await loadVisibility(connectionId);
     if (collapseSignalFor(k) !== intent) return;
     treeState.expanded.add(k);
     if (treeState.children[k]) return;
     await loadChildren(connectionId, path, false);
+  }
+
+  // A failed tree action (expand, menu item) shows on its row through the same ErrorPopover a
+  // failed children load uses.
+  function reportError(connectionId: string, path: string, err: unknown): void {
+    treeState.errors[rowKey(connectionId, path)] = err instanceof Error ? err.message : String(err);
   }
 
   function collapse(connectionId: string, path: string): void {
@@ -286,9 +297,14 @@ export const useTreeStore = defineStore('tree', () => {
   // only ever replaced 'children', leaving describe/definition/columns for the same path stale);
   // dropSchemaColumns clears the console-facing copy of 'columns' (F11); loadChildren's own
   // refresh:false is now a guaranteed miss, since the row was just dropped.
+  // A disconnect that lands during the invalidate await drops the connection's state and bumps the
+  // epoch; loadChildren would then capture the new epoch and write children for a dropped
+  // connection, so both refreshers bail when it moved.
   async function refresh(connectionId: string, path: string): Promise<void> {
+    const epoch = connectionEpochFor(connectionId);
     treeState.expanded.add(rowKey(connectionId, path));
     await control.treeInvalidate(connectionId, path);
+    if (connectionEpochFor(connectionId) !== epoch) return;
     useSchemaColumnsStore().dropSchemaColumns(connectionId, path);
     await loadChildren(connectionId, path, false);
   }
@@ -298,7 +314,9 @@ export const useTreeStore = defineStore('tree', () => {
   // expanded set — the same lazy, per-path re-fetch a reconnect's invalidation push already
   // produces, so this and a reconnect never disagree about what "refreshed" means.
   async function refreshConnection(connectionId: string): Promise<void> {
+    const epoch = connectionEpochFor(connectionId);
     await control.treeInvalidate(connectionId);
+    if (connectionEpochFor(connectionId) !== epoch) return;
     useSchemaColumnsStore().dropSchemaColumns(connectionId);
     await refreshExpanded(connectionId);
   }
@@ -695,6 +713,7 @@ export const useTreeStore = defineStore('tree', () => {
     loadSavedQueries,
     loadVisibility,
     saveVisibility,
+    reportError,
     expand,
     collapse,
     toggleGroup,
