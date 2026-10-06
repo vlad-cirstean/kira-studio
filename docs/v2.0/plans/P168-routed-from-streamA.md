@@ -45,3 +45,25 @@ Stream A did not edit those files.
   `readRequestWireSchema` with `E_BAD_REQUEST`.
 - Fix: comment-only. Say Go `ReadRequestWire.Validate` rejects a `pageSize` other than
   10/100/1000/10000 (`adapterhost/wire.go`, error code `E_QUERY`).
+
+## P168 Part 6 F13 (low): renderer half of saved-request not-found
+
+- Owner file: `apps/kira-studio/frontend/src/api/state/apiQueries.ts` (Part 10, Stream C).
+- Go half landed: `CollectionsService.GetRequest`/`GetGrpcRequest` now return `E_NOT_FOUND` for a
+  missing item (`ipcerr.NotFound`), `E_BAD_REQUEST` for a folder or other-protocol item,
+  `E_INTERNAL` for the rest.
+- Fix: `apiSavedRequestQueryOptions` returns `null` only for `E_NOT_FOUND`, rethrows every other
+  code so a transient failure is not cached as "deleted".
+
+## P168 Part 6 F11 (low): mask parity fixtures
+
+- Owner: `apps/kira-studio/tests/fixtures/mask/` (Part 12, Stream C).
+- Go-parity code fix landed in `packages/shared/domain/mask.ts` (Go whitespace set, `\p{Nd}`).
+- Add hand-written fixtures from the Go output: U+FEFF inside a name (`Ann\uFEFFLee`: Go keeps one
+  word) and an Arabic-Indic date tail (`2024-01-01T١٢:00`).
+
+## P168 Part 6 F19 (low): optional explain-plan fixture
+
+- Owner: `apps/kira-studio/tests/fixtures/explain-plans/` (Part 12, Stream C).
+- Go `formatJSNumber` now matches JS `String(n)`; `parse_test.go` pins the notation switches. A
+  shared fixture with a large untyped numeric key (`1234567.5`, `2e20`) is optional.

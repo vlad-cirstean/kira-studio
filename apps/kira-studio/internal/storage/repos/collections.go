@@ -95,6 +95,13 @@ func scanItem(row rowScanner) (model.CollectionItem, error) {
 	return item, nil
 }
 
+// ErrItemNotFound is a read of an item id that has no row; ErrNotARequest is a read that names a
+// folder or a request of the other protocol. Bridges map them to E_NOT_FOUND and E_BAD_REQUEST.
+var (
+	ErrItemNotFound = errors.New("repos/collections: item not found")
+	ErrNotARequest  = errors.New("repos/collections: item is not a request of this protocol")
+)
+
 // getRequestBody is GetRequest's and GetGrpcRequest's shared shape (P107 I2-9): read
 // kind/protocol/request_json by item id, refuse a missing row, a non-request item or a protocol
 // mismatch, then hand the raw body to decode. errLabel keeps the two callers' error text exactly
@@ -107,16 +114,16 @@ func getRequestBody[T any](db *sql.DB, itemID, wantProtocol, errLabel string, de
 	)
 	err := db.QueryRow(`SELECT kind, protocol, request_json FROM api_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &body)
 	if errors.Is(err, sql.ErrNoRows) {
-		return zero, fmt.Errorf("repos/collections: no item %s", itemID)
+		return zero, fmt.Errorf("%w: %s", ErrItemNotFound, itemID)
 	}
 	if err != nil {
 		return zero, fmt.Errorf("repos/collections: get %srequest %s: %w", errLabel, itemID, err)
 	}
 	if kind != model.CollectionItemRequest {
-		return zero, fmt.Errorf("repos/collections: item %s is a %s, not a request", itemID, kind)
+		return zero, fmt.Errorf("%w: item %s is a %s", ErrNotARequest, itemID, kind)
 	}
 	if protocol != wantProtocol {
-		return zero, fmt.Errorf("repos/collections: item %s is a %s request, not %s", itemID, protocol, wantProtocol)
+		return zero, fmt.Errorf("%w: item %s is a %s request, not %s", ErrNotARequest, itemID, protocol, wantProtocol)
 	}
 	return decode(itemID, body)
 }

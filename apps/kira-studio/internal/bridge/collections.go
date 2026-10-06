@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
@@ -58,11 +60,26 @@ type CollectionsItemArgs struct {
 	ItemID string `json:"itemId"`
 }
 
+// readErr maps a saved-request read failure: a missing item is E_NOT_FOUND, a folder or
+// other-protocol item is E_BAD_REQUEST, everything else (including corrupt stored JSON) E_INTERNAL.
+func readErr[T any](v T, err error) (T, error) {
+	var zero T
+	switch {
+	case err == nil:
+		return v, nil
+	case errors.Is(err, repos.ErrItemNotFound):
+		return zero, ipcerr.NotFound(err.Error())
+	case errors.Is(err, repos.ErrNotARequest):
+		return zero, ipcerr.BadRequest(err.Error())
+	}
+	return zero, ipcerr.Internal(err.Error())
+}
+
 func (s *CollectionsService) GetRequest(args CollectionsItemArgs) (model.SavedRequest, error) {
 	if args.ItemID == "" {
 		return model.SavedRequest{}, ipcerr.BadRequest("itemId is required")
 	}
-	return ipcerr.InternalResult(s.Deps.Repos.Collections.GetRequest(args.ItemID))
+	return readErr(s.Deps.Repos.Collections.GetRequest(args.ItemID))
 }
 
 // GetGrpcRequest is GetRequest's own gRPC sibling (P11 D12).
@@ -70,7 +87,7 @@ func (s *CollectionsService) GetGrpcRequest(args CollectionsItemArgs) (model.Sav
 	if args.ItemID == "" {
 		return model.SavedGrpcRequest{}, ipcerr.BadRequest("itemId is required")
 	}
-	return ipcerr.InternalResult(s.Deps.Repos.Collections.GetGrpcRequest(args.ItemID))
+	return readErr(s.Deps.Repos.Collections.GetGrpcRequest(args.ItemID))
 }
 
 type CollectionsSaveRequestArgs struct {
