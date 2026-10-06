@@ -221,7 +221,9 @@ export interface OtherCommand {
  *  still registers all five from data (D19), not a second hand-written list. `refresh` still
  *  reaches the webview through `runUiAction('refresh')`, wired explicitly in extension.ts, since it
  *  isn't one of the contract's mutating kinds. */
-export const OTHER_COMMANDS: readonly OtherCommand[] = [
+// `as const satisfies`, not a `readonly OtherCommand[]` annotation: the annotation widens
+// `OtherCommandId` to `string`, so extension.ts's `Record<OtherCommandId, ...>` enforced nothing.
+export const OTHER_COMMANDS = [
   { command: 'kiraSpace.showConnectionStatus', title: 'Show Connection Status' },
   { command: 'kiraSpace.openRepository', title: 'Open Repository' },
   { command: 'kiraSpace.focusGraph', title: 'Open Kira' },
@@ -268,7 +270,7 @@ export const OTHER_COMMANDS: readonly OtherCommand[] = [
   // MutatingAction (maps to no OpRequest/RemoteOpParams kind), same reasoning as
   // toggleFileReviewed/goToStackParent above.
   { command: 'kiraSpace.toggleSearch', title: 'Toggle Search' },
-];
+] as const satisfies readonly OtherCommand[];
 
 export type OtherCommandId = (typeof OTHER_COMMANDS)[number]['command'];
 

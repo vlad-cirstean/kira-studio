@@ -481,7 +481,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // G10 D19: every command this extension contributes is registered from commands.ts's own
   // tables — no hand-written second list. Mutating commands all dispatch through the graph
   // provider's runUiAction; the other ids get an explicit handler each, so TypeScript requires one
-  // per id and rejects one for an id that does not exist.
+  // per id (OTHER_COMMANDS is `as const`) and rejects one for an id that does not exist.
   //
   // G13 D9: the value type is `(...args: any[]) => unknown` rather than `() => void` — two of
   // these ids (submitReviewComment/deleteReviewComment) are contributed to a comment menu
@@ -518,6 +518,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // tab/selection resolution for the last two).
     'kiraSpace.markSelectionReviewed': markSelectionReviewedCommand(reviewMarking),
     'kiraSpace.markSelectionUnreviewed': markSelectionUnreviewedCommand(reviewMarking),
+    'kiraSpace.goToStackParent': () => graphProvider.runUiAction('checkoutStackParent'),
+    'kiraSpace.goToStackChild': () => graphProvider.runUiAction('checkoutStackChild'),
     // G-UX D9 (item 9): the palette's own route to toggling the graph panel's search row.
     'kiraSpace.toggleSearch': () => graphProvider.runUiAction('toggleSearch'),
   };
