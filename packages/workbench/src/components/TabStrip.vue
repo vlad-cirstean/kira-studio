@@ -244,7 +244,6 @@ if (moveTab) {
       ref="stripRef"
       class="h-full flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 scrollbar-none px-1"
       data-testid="tab-strip-row"
-      role="tablist"
       @wheel="onWheel"
     >
       <!-- P105 §11: a focusable close control nested inside the tab's own <button> is invalid
@@ -256,7 +255,6 @@ if (moveTab) {
         :key="tab.id"
         class="group/tab"
         :class="tabChipVariants({ active: tab.active })"
-        role="presentation"
         data-testid="tab"
         :data-tab-id="tab.id"
         :data-tab-kind="tab.kind"
@@ -269,8 +267,7 @@ if (moveTab) {
         <span class="w-0.5 h-3.5 rounded-xs shrink-0 bg-(--kira-rail)" />
         <button
           type="button"
-          role="tab"
-          :aria-selected="tab.active"
+          :aria-current="tab.active || undefined"
           class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
           @click="onClick(tab)"
           @dblclick="host.tabs.promoteTab?.(tab.id)"
