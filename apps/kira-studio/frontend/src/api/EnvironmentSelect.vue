@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@theme/components/ui/dropdown-menu';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
-import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { connColorVar } from '@theme/connColor';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useVariablesStore } from './state/variables';
 
 const variablesStore = useVariablesStore();
@@ -45,33 +53,29 @@ const variablesStore = useVariablesStore();
 // gets exactly today's global behaviour for free.
 const props = withDefaults(defineProps<{ tabId?: string }>(), { tabId: '' });
 
-const open = ref(false);
+// reka radio values cannot be '' — "No environment" travels as this sentinel.
+const NONE = '__none__';
+const radioValue = computed(() => (activeEnvironmentId.value === '' ? NONE : activeEnvironmentId.value));
 
 const activeEnvironmentId = computed(() => variablesStore.environmentIdForTab(props.tabId));
 const activeEnvironment = computed(
   () => variablesStore.environments.find((e) => e.id === activeEnvironmentId.value) ?? null,
 );
 
-function selectNone(): void {
-  open.value = false;
-  void variablesStore.selectEnvironmentForTab(props.tabId, '');
-}
-
-function selectEnvironment(id: string): void {
-  open.value = false;
-  void variablesStore.selectEnvironmentForTab(props.tabId, id);
+function onSelect(value: unknown): void {
+  const id = String(value);
+  void variablesStore.selectEnvironmentForTab(props.tabId, id === NONE ? '' : id);
 }
 
 function manage(): void {
-  open.value = false;
   variablesStore.openEnvironments();
 }
 </script>
 
 <template>
-  <Popover v-model:open="open">
+  <DropdownMenu :modal="false">
     <div class="relative flex min-w-0 flex-initial ml-auto">
-      <PopoverTrigger as-child>
+      <DropdownMenuTrigger as-child>
         <button
           type="button"
           :class="[nativeSelectVariants({ variant: 'bordered' }), 'min-w-0']"
@@ -87,35 +91,27 @@ function manage(): void {
           <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ activeEnvironment?.name ?? 'No environment' }}</span>
           <CodiconIcon name="chevron-down" :size="12" />
         </button>
-      </PopoverTrigger>
+      </DropdownMenuTrigger>
     </div>
-    <PopoverContent
-      align="end"
-      class="w-52 gap-0 p-0"
-      data-testid="api-environment-menu"
-    >
-      <div class="flex flex-col p-0.5">
-        <button
-          type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full"
+    <DropdownMenuContent align="end" class="w-52" data-testid="api-environment-menu">
+      <DropdownMenuRadioGroup :model-value="radioValue" @update:model-value="onSelect">
+        <DropdownMenuRadioItem
+          :value="NONE"
+          class="h-control"
           data-testid="api-environment-option-none"
           data-value=""
-          @click="selectNone"
         >
           <span class="size-1.25 rounded-full shrink-0 bg-none border border-disabled" data-testid="conn-dot" />
           <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">No environment</span>
-          <span class="size-4 flex items-center justify-center shrink-0">
-            <CodiconIcon v-if="activeEnvironmentId === ''" name="check" :size="13" />
-          </span>
-        </button>
-        <button
+          <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
+        </DropdownMenuRadioItem>
+        <DropdownMenuRadioItem
           v-for="env in variablesStore.environments"
           :key="env.id"
-          type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full"
+          :value="env.id"
+          class="h-control"
           data-testid="api-environment-option"
           :data-value="env.id"
-          @click="selectEnvironment(env.id)"
         >
           <span
             class="size-1.25 rounded-full shrink-0"
@@ -124,20 +120,13 @@ function manage(): void {
             :style="{ '--kira-rail': connColorVar(env.color) }"
           />
           <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ env.name }}</span>
-          <span class="size-4 flex items-center justify-center shrink-0">
-            <CodiconIcon v-if="env.id === activeEnvironmentId" name="check" :size="13" />
-          </span>
-        </button>
-        <div class="my-0.5 border-t border-border" />
-        <button
-          type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full"
-          data-testid="api-environment-manage"
-          @click="manage"
-        >
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Manage environments…</span>
-        </button>
-      </div>
-    </PopoverContent>
-  </Popover>
+          <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
+        </DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem class="h-control" data-testid="api-environment-manage" @select="manage">
+        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Manage environments…</span>
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
 </template>

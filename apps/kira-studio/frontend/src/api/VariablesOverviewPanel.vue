@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
+import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { PopoverContent } from '@theme/components/ui/popover';
@@ -143,12 +144,12 @@ function editEnvironmentVariables(): void {
         >
           <Tooltip>
             <TooltipTrigger as-child>
-              <button
-                type="button"
-                class="min-w-0 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-data"
+              <Button
+                variant="ghost"
+                class="h-auto min-w-0 justify-start overflow-hidden text-ellipsis rounded-none p-0 text-left font-data font-normal hover:bg-transparent"
                 data-testid="variables-overview-name"
                 @click="onCopy(row.name)"
-                >{{ reference(row.name) }}</button
+                >{{ reference(row.name) }}</Button
               >
             </TooltipTrigger>
             <TooltipContent>Copy</TooltipContent>
@@ -180,20 +181,20 @@ function editEnvironmentVariables(): void {
       </div>
 
       <div class="flex flex-col gap-0.5 border-t border-border p-1">
-        <button
+        <Button
           v-if="canEdit"
-          type="button"
-          class="inline-flex items-center gap-1 text-info text-kira-md border-0 bg-transparent cursor-pointer disabled:cursor-default disabled:text-subtle disabled:opacity-60"
+          variant="link"
+          class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle disabled:opacity-60"
           :disabled="!collectionId"
           data-testid="variables-overview-edit-collection"
           @click="editCollectionVariables"
         >
           Edit collection variables…
-        </button>
-        <button
+        </Button>
+        <Button
           v-if="canEdit"
-          type="button"
-          class="inline-flex items-center gap-1 text-info text-kira-md border-0 bg-transparent cursor-pointer disabled:cursor-default disabled:text-subtle disabled:opacity-60"
+          variant="link"
+          class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle disabled:opacity-60"
           :disabled="!environmentId"
           data-testid="variables-overview-edit-environment"
           @click="editEnvironmentVariables"
@@ -206,7 +207,7 @@ function editEnvironmentVariables(): void {
             data-testid="variables-overview-environment-dot"
           />
           Edit environment variables…
-        </button>
+        </Button>
       </div>
     </div>
     <!-- P110 I2-18: `.overview-link`'s `all: unset` + @apply folded directly onto both footer

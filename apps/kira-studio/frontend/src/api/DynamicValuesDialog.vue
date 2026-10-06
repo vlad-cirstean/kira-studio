@@ -118,9 +118,9 @@ function close(): void {
       </Empty>
       <Tooltip v-for="entry in filteredEntries" :key="entry.name">
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="h-auto flex items-center justify-between gap-1 px-1.5 py-1 min-h-6.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full border-0 text-left"
+          <Button
+            variant="ghost"
+            class="h-auto min-h-6.5 w-full justify-between gap-1 rounded-kira-sm px-1.5 py-1 text-left text-kira-md font-normal"
             data-testid="dynamic-values-fake-row"
             :data-name="entry.name"
             @click="onCopy(entry.name)"
@@ -131,7 +131,7 @@ function close(): void {
             <Badge variant="info" class="min-w-0 overflow-hidden text-ellipsis" data-testid="dynamic-values-sample">{{
               samples[entry.name] ?? ''
             }}</Badge>
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Copy</TooltipContent>
       </Tooltip>

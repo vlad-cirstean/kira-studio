@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -181,15 +182,15 @@ onUnmounted(() => {
                (a rarer action than environments', which starts collapsed by default) never fights
                environments-category's fixed 40% cap below for space. -->
           <div class="flex flex-1 min-h-0 flex-col" :class="{ collapsed: !collectionsExpanded }">
-            <button
-              type="button"
-              class="flex shrink-0 items-center gap-1 px-1.5 h-control text-kira-sm uppercase tracking-wider border-0 bg-transparent text-muted-foreground cursor-pointer hover:text-fg"
+            <Button
+              variant="toolbar"
+              class="h-control justify-start gap-1 rounded-none bg-transparent px-1.5 text-kira-sm font-normal uppercase tracking-wider hover:bg-transparent"
               data-testid="collections-category-toggle"
               @click="collectionsExpanded = !collectionsExpanded"
             >
               <CodiconIcon :name="collectionsExpanded ? 'chevron-down' : 'chevron-right'" :size="13" />
               <span>Collections</span>
-            </button>
+            </Button>
             <CollectionsTree v-if="collectionsExpanded" class="flex-1 min-h-0" />
           </div>
           <!-- P28 D16(d) removes P22b D8's environments category from this panel by user request

@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { HTTP_METHODS, type HttpMethod, httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@theme/components/ui/dropdown-menu';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
-import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
-import { ref } from 'vue';
 
 // P17 D18/D19, item 1: an app-drawn menu trigger, on the exact P42 D27 precedent
 // (views/shared/celleditor/CellEditorView.vue's own format-select/openFormatMenu, F12) — a native
@@ -24,18 +29,15 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ 'update:modelValue': [HttpMethod] }>();
 
-const open = ref(false);
-
-function select(method: HttpMethod): void {
-  emit('update:modelValue', method);
-  open.value = false;
+function select(method: unknown): void {
+  emit('update:modelValue', String(method) as HttpMethod);
 }
 </script>
 
 <template>
-  <Popover v-model:open="open">
+  <DropdownMenu :modal="false">
     <div class="relative flex">
-      <PopoverTrigger as-child>
+      <DropdownMenuTrigger as-child>
         <button
           type="button"
           :class="cn(nativeSelectVariants({ variant: 'bordered' }), 'font-semibold font-data', methodTextClass(httpMethodToken(props.modelValue)))"
@@ -45,30 +47,22 @@ function select(method: HttpMethod): void {
           <span class="method-select-label">{{ props.modelValue }}</span>
           <CodiconIcon name="chevron-down" :size="12" />
         </button>
-      </PopoverTrigger>
+      </DropdownMenuTrigger>
     </div>
-    <PopoverContent align="start" class="w-36 gap-0 p-0" data-testid="method-menu">
-      <div class="flex flex-col p-0.5">
-        <button
+    <DropdownMenuContent align="start" class="w-36" data-testid="method-menu">
+      <DropdownMenuRadioGroup :model-value="props.modelValue" @update:model-value="select">
+        <DropdownMenuRadioItem
           v-for="m in HTTP_METHODS"
           :key="m"
-          type="button"
-          :class="
-            cn(
-              'h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full font-semibold',
-              methodTextClass(httpMethodToken(m)),
-            )
-          "
+          :value="m"
+          :class="cn('h-control font-semibold', methodTextClass(httpMethodToken(m)))"
           :data-testid="`method-menu-item-${m}`"
           :data-value="m"
-          @click="select(m)"
         >
-          <span class="flex-1">{{ m }}</span>
-          <span class="size-4 flex items-center justify-center shrink-0">
-            <CodiconIcon v-if="m === props.modelValue" name="check" :size="13" />
-          </span>
-        </button>
-      </div>
-    </PopoverContent>
-  </Popover>
+          {{ m }}
+          <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
+        </DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
+    </DropdownMenuContent>
+  </DropdownMenu>
 </template>
