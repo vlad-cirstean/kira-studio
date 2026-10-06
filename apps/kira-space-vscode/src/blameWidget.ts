@@ -9,6 +9,7 @@
  * is never blamed against its own live buffer (shown as its own `'dirty'` state below, resolved
  * again once `onDidSaveTextDocument` fires).
  */
+import { realpath } from 'node:fs/promises';
 import { isAbsolute, relative } from 'node:path';
 import { nfcPath } from '@kira/git-core';
 import type { EventPayload } from '@kira/git-ipc';
@@ -145,9 +146,12 @@ export function createBlameWidgetController(deps: BlameWidgetDeps): BlameWidgetC
     lineKey: string,
   ): Promise<void> {
     const repo = await resolveRepo(folder);
-    const rel = repo
-      ? nfcPath(relative(repo.root, nfcPath(editor.document.uri.fsPath)))
+    // repo.root is git's symlink-resolved toplevel; the document path keeps the opened spelling.
+    const real = repo
+      ? await realpath(editor.document.uri.fsPath).catch(() => undefined)
       : undefined;
+    const rel =
+      repo && real !== undefined ? nfcPath(relative(nfcPath(repo.root), nfcPath(real))) : undefined;
     if (!repo || rel === undefined || /^\.\.(?:[\\/]|$)/.test(rel) || isAbsolute(rel)) {
       if (lineKey === lastLineKey) setState({ kind: 'none' });
       return;
