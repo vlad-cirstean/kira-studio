@@ -21,8 +21,8 @@
  *
  * There is no `remotes.list` endpoint (P6/P8 both skip it, per `rowMenuModel.ts`'s own
  * `remoteNamesFrom` doc comment) and remote *management* is out of scope entirely (§10's scope
- * table), so this toolbar assumes the single-remote-per-repo shape every other P8 affordance
- * assumes and reads the remote's name from whatever remote-tracking branches already loaded —
+ * table), so this toolbar reads remote names from whatever remote-tracking branches already
+ * loaded and targets the current branch's upstream remote, else `origin`, else the first name —
  * `defaultRemote` below. Fetch/Pull/Push are simply absent (not disabled) when no remote is
  * known at all: there is nothing to name in the tooltip and no useful default to pick.
  */
@@ -61,7 +61,7 @@ import MenuSections from './MenuSections.vue';
 import PullStrategyPicker from './PullStrategyPicker.vue';
 import type { PickerTab } from './pickerModel.ts';
 import RefreshButton from './RefreshButton.vue';
-import { remoteNamesFrom } from './rowMenuModel.ts';
+import { defaultRemoteFor, remoteNamesFrom } from './rowMenuModel.ts';
 import UndoButton from './UndoButton.vue';
 
 const props = defineProps<{
@@ -142,8 +142,11 @@ const pullStrategyPickerRef = ref<InstanceType<typeof PullStrategyPicker> | null
 // P8 W17: fetch/pull/push
 // ---------------------------------------------------------------------------------------
 
-const defaultRemote = computed(
-  () => remoteNamesFrom(props.refsState.remoteBranches.value.map((row) => row.shortName))[0],
+const defaultRemote = computed(() =>
+  defaultRemoteFor(
+    remoteNamesFrom(props.refsState.remoteBranches.value.map((row) => row.shortName)),
+    props.refsState.branches.value.find((row) => row.isHead)?.upstream,
+  ),
 );
 const currentBranch = computed(() => props.refsState.currentBranchName.value);
 const hasRemote = computed(() => defaultRemote.value !== undefined);

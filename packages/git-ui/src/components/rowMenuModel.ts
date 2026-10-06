@@ -435,3 +435,14 @@ export function remoteNamesFrom(remoteBranchNames: readonly string[]): string[] 
   }
   return [...names].sort();
 }
+
+/** The remote Fetch/Pull/Push target: the current branch's upstream remote when it names a known
+ *  remote, else `origin` when present, else the first (alphabetical) name. */
+export function defaultRemoteFor(
+  knownRemotes: readonly string[],
+  upstream: string | undefined,
+): string | undefined {
+  const fromUpstream = knownRemotes.find((name) => upstream?.startsWith(`${name}/`));
+  if (fromUpstream !== undefined) return fromUpstream;
+  return knownRemotes.includes('origin') ? 'origin' : knownRemotes[0];
+}
