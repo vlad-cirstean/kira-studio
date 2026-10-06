@@ -175,3 +175,90 @@ Block 3 otherwise clean:
   memoised tokenize for alias lookups only at qualified positions.
 - `MonacoHost` providers are model-scoped and disposed on prop change and unmount; two hosts with
   one language id do not cross-feed.
+
+### Block 4: console run and results
+
+**F9. Shared page-version counter used as "this tab's page changed": other tabs' loads and closes
+clear this tab's cell dock and restart its search.** Medium. Code-read (the F4 spill from Part 11,
+plan §1, confirmed and widened).
+- `SF/views/console/search.ts:110-117`: `createPageSearch` gets no `pageOf`, so
+  `SearchToolbar.vue:184-195` restarts on every `resultPages` `pageVersion` bump. That store is
+  shared by every console tab (`resultPages.ts:13`).
+- `SF/views/console/ConsoleResultGrid.vue:191-194`: `watch([pageKey, pageVersion.n])` clears
+  `selected` and calls `cellSelectionStore.clearSelectedCellFor(tabId)` on any bump.
+- `SF/views/stream/StreamSearchToolbar.vue:53-58` and `SF/views/stream/StreamView.vue:252-255`:
+  same two patterns over the stream store (shared by every stream tab).
+- Scenario: user has console tab B open with the cell editor dock showing a value and a search with
+  "show only matching rows" on. They middle-click-close console tab A in the strip (`dropForTab`
+  bumps the counter), or a run started in A finishes in the background (`setPage` bumps it). B's
+  dock closes, B's selection clears, and B's scan restarts: matches reset to `pending`, so the
+  filtered grid flashes every row (`matchedRows` returns null while pending) and the current-match
+  index snaps back. Same for two stream tabs (close one, or a Fetch more / Poll finishing in the
+  other after a tab switch).
+- Fix (own files): console `pageOf: (tabId) => useConsoleViewStore().activePage(tabId)` (page
+  identity changes on run, active-result switch and close; the explicit `bumpPageVersion` in
+  `setActiveResult` then stays only for readers without `pageOf`); stream `StreamSearchToolbar`
+  watch `() => (void pageVersion.n, getPage(props.tabId))`. In `ConsoleResultGrid` and `StreamView`
+  watch page identity (`getPage(pageKey)` / `getPage(tab.id)`, reading `pageVersion.n` first for
+  the dependency) instead of the raw counter. No unit test (single condition).
+
+**F10. Clipboard writes left bare: a rejected write is an unhandled rejection with no feedback.**
+Low. Code-read (plan §5.3 and §5.6 suspects confirmed).
+`SF/views/console/resultMenu.ts:37,44,51,86,93,100,128,134,140,163,169` (every tabular cell, range,
+row and column item), `SF/views/console/ConsoleSlickGrid.vue:522,527,531,534` (Cmd+C),
+`SF/views/stream/menu.ts:15,23`, `SF/views/browse/menu.ts:33`,
+`SF/views/definition/DefinitionView.vue:68`, `SF/views/definition/columnsMenu.ts:53`.
+- Scenario: window not focused or clipboard permission denied (WebKit rejects
+  `navigator.clipboard.writeText`). `contextMenu`'s `void item.run()` drops the promise: nothing is
+  copied and nothing says so. The Mongo/kv items in the same file (`:199-300`) and
+  `documents/menu.ts` already route through `copyOrReportError`; Part 10 fixed this class in its
+  views (`510214f`).
+- Fix: route each through `copyOrReportError(text, onError)`; console tabular builders take an
+  `onError` in their context (ConsoleResultGrid's existing `onCopyError` strip; thread it to
+  `ConsoleSlickGrid` as a prop or emit); stream/browse/definition report through their existing
+  `setActionError` (stream, browse) or a local strip (definition).
+
+**F11. Run/Run all/Explain proceed after a failed reconnect.** Low. Code-read.
+`SF/views/console/ConsoleView.vue:371-373` (`ensureConnectedForRun` drops
+`onReconnectAndLoad`'s `Promise<boolean>`), `:386-394`, `:403-411`, `:508-517`.
+- Scenario: restored console tab, server down. Run: `connectConnection` resolves with an error
+  state (`useConnectionGate.ts:41-49` returns `false`), then `run()` still fires `data.execute`,
+  which fails `E_ENGINE_DOWN`; `applyLoadFailure`'s disconnected branch sets `idle` with no error,
+  so the console shows nothing at all for the press. A `connectConnection` rejection escapes the
+  `void (async…)` IIFE as an unhandled rejection.
+- Fix: `ensureConnectedForRun` returns the boolean (catching a rejection as `false`); each caller
+  returns early on `false` and shows the connection's own error (`connectionsStore.states[id]
+  ?.error`, or a console-local strip like `explainError`).
+
+**F12. A Stop that reaches Go before the op registers is lost; the statement still runs.** Low.
+Code-read. `needs-other-part-file: apps/kira-studio/internal/adapterhost/host.go (Part 5)`.
+`SI/adapterhost/host.go:306-311` (`CancelOp` returns `false, nil` for an unknown id, remembers
+nothing), `:201-207` (`RunOp` registers on arrival); renderer `SF/views/console/state.ts:530-543`.
+- Scenario: Run an `UPDATE`, press Stop at once. `stop()` marks `cancelled` and sends
+  `opsCancel(opId)`; if the cancel IPC lands before `RunOp` registers `opId`, it is a no-op, the
+  update commits, `run()` then lands results and flips `cancelled` back to `idle`. Window is IPC
+  latency only (auto-explain's window is covered client-side by the `status` check).
+- Fix (Go): keep a short-TTL set of cancelled-but-unknown op ids in `Host`; `RunOp` fails a
+  matching id with `E_CANCELLED` before running. Routed to `P168-routed-from-streamC.md`.
+
+**F13. Saved-query menu actions fail silently.** Low. Code-read.
+`SF/views/console/ConsoleSavedMenu.vue:31-72` (`reload`, `togglePin`, `rename`, `remove`,
+`saveCurrent`: no catch; emitted from `SavedListMenu` and a button `@click`, never awaited).
+- Scenario: `queriesSaveConsole` rejects (storage error): the prompt closes, nothing is saved, an
+  unhandled rejection is logged, the user sees nothing. Same for pin/rename/delete.
+- Fix: one local `error` ref shown in the menu (an `Alert` in the footer), set from a catch in each
+  action. A TanStack Query migration of this list is not needed for the fix (the sibling
+  `FilterHistoryMenu.vue` keeps the same hand-rolled shape, Part 11 accepted).
+
+Block 4 otherwise clean:
+- `run` opId supersession, detached runtime on tab close (`registerTabRuntimeCleanup` cancels both
+  ids and flips status), auto-explain gate (`stop`, overlap, clobber, run-after-close), result cap
+  and `releaseResult` on every removal path: correct, and the five race specs drive current code.
+- `explain` after a lost Stop race pushes the plan: matches `console-stop-explain-resolves-anyway`
+  intent; tab closed mid-explain is caught by `pushPlanResult`'s `findConsoleTab`.
+- `dropForPrefix` matches `prefix` or `prefix:` only; tab ids are UUIDs, no prefix collision.
+- `ConsoleSlickGrid` keyed by `pageKey`; teardown order (P99 §9.3 decline) correct.
+- Copy all inline/worker split and abort-on-unmount (reported into an unmounted strip, harmless);
+  out-of-range `$date` goes raw per Part 11's `ejson.ts`.
+- Explain parsers and `SI/queryplan` agree on all 15 fixture pairs (`go test ./internal/queryplan`
+  green, `explain-plan.spec.ts` parity block green).
