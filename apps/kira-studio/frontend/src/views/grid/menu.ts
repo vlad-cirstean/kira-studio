@@ -103,9 +103,11 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
     ctx.rowValues,
   );
   if (filter === null) return;
-  const { id: tabId } = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
+  const opened = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
     newTab: true,
   });
+  if (!opened) return;
+  const tabId = opened.id;
   void useGridViewStore().setFilter(tabId, filter);
 }
 
@@ -128,9 +130,11 @@ async function editReferencedRow(entry: ForeignKeyMeta, ctx: FkNavContext): Prom
     ctx.rowValues,
   );
   if (filter === null) return;
-  const { id: tabId } = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
+  const opened = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
     newTab: true,
   });
+  if (!opened) return;
+  const tabId = opened.id;
   await useGridViewStore().setFilter(tabId, filter);
   requestCellFocus(tabId, { row: 0, prefer: 'first-non-key', edit: true });
 }

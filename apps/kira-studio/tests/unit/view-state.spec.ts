@@ -19,6 +19,7 @@ import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
 import { pinia } from '../../frontend/src/state/pinia';
+import { seedConnectionRecord } from './support/connectionRecord.ts';
 
 setActivePinia(pinia);
 
@@ -34,6 +35,8 @@ restoreAfterEach(data);
 beforeEach(() => {
   (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 });
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { useBrowseViewStore } = await import('../../frontend/src/views/browse/state');
@@ -209,7 +212,8 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
   }
 
   test('4. a cursor-strategy page reloads with offset: 0 and returns pageIndex to 0', async () => {
-    const { id } = tabsStore.openKeyValueTab('conn4', 'db0/key:big-hash', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn4');
+    const { id } = tabsStore.openKeyValueTab('conn4', 'db0/key:big-hash', { newTab: true })!;
     setPage(id, makeKeyValuePage('cursor'));
     let capturedCursor: PageCursor | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
@@ -225,7 +229,8 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
   });
 
   test('5. an offset-strategy page on the same code path still reloads with pageIndex * pageSize, unchanged', async () => {
-    const { id } = tabsStore.openKeyValueTab('conn5', 'db0/key:big-list', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn5');
+    const { id } = tabsStore.openKeyValueTab('conn5', 'db0/key:big-list', { newTab: true })!;
     setPage(id, makeKeyValuePage('offset'));
     let capturedCursor: PageCursor | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
@@ -250,7 +255,8 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
 // actually fetched.
 describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled load (P2 R2, task #93)', () => {
   test('6. goNext reverts pageIndex to the previous page when the load fails', async () => {
-    const { id } = tabsStore.openDataTab('conn6', 'public.orders', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn6');
+    const { id } = tabsStore.openDataTab('conn6', 'public.orders', { newTab: true })!;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
@@ -262,7 +268,8 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
   });
 
   test('7. goNext reverts pageIndex to the previous page when the load is cancelled', async () => {
-    const { id } = tabsStore.openDataTab('conn7', 'public.orders', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn7');
+    const { id } = tabsStore.openDataTab('conn7', 'public.orders', { newTab: true })!;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('cancelled'), { code: 'E_CANCELLED' }));
@@ -274,7 +281,8 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
   });
 
   test('8. goPrev reverts pageIndex to the previous page when the load fails', async () => {
-    const { id } = tabsStore.openDataTab('conn8', 'public.orders', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn8');
+    const { id } = tabsStore.openDataTab('conn8', 'public.orders', { newTab: true })!;
     const tab = tabsStore.findDataTab(id);
     if (!tab) throw new Error('expected the tab to exist');
     tab.state.pageIndex = 3;
@@ -294,7 +302,8 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
   // stacking can no longer happen at all — rewritten to assert the guard, not the old two-in-
   // flight scenario it made impossible.
   test('9. a second goNext call while a load is in flight is a no-op, not a second optimistic advance', async () => {
-    const { id } = tabsStore.openDataTab('conn9', 'public.orders', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn9');
+    const { id } = tabsStore.openDataTab('conn9', 'public.orders', { newTab: true })!;
     const first = deferred<{ page: unknown; source: string }>();
     let readCalls = 0;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
@@ -329,7 +338,8 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
 
 describe('views/shared/keyvalue/state.ts — pageIndex reverts on a failed load (P2 R2, task #93)', () => {
   test('10. goNext reverts pageIndex to the previous page when the load fails', async () => {
-    const { id } = tabsStore.openKeyValueTab('conn10', 'db0/key:big-list', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn10');
+    const { id } = tabsStore.openKeyValueTab('conn10', 'db0/key:big-list', { newTab: true })!;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));

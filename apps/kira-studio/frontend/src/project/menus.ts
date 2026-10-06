@@ -434,7 +434,9 @@ function savedFiltersSubmenu(row: TreeRowVm): MenuItem[] {
     id: `saved-filter-${entry.id}`,
     label: entry.name,
     run: async () => {
-      const { id: tabId } = useTabsStore().openDataTab(row.connectionId, row.path);
+      const opened = useTabsStore().openDataTab(row.connectionId, row.path);
+      if (!opened) return;
+      const tabId = opened.id;
       await dataQueryCommands().setFilter(tabId, entry.body.where);
       await dataQueryCommands().setSort(tabId, entry.body.orderBy);
       await control.queriesTouch(entry.id);

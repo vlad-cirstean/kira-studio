@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
+import { seedConnectionRecord } from './support/connectionRecord.ts';
 
 setActivePinia(pinia);
 
@@ -25,6 +26,8 @@ restoreAfterEach(control);
 beforeEach(() => {
   (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 });
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { useDocumentViewStore } = await import('../../frontend/src/views/documents/state');
@@ -45,19 +48,28 @@ interface Case {
 const cases: Case[] = [
   {
     name: 'documents',
-    open: () => tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id,
+    open: () => {
+      seedConnectionRecord(connectionsStore, 'conn-doc');
+      return tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true })!.id;
+    },
     runCount: (tabId: string) => documentViewStore.runCount(tabId),
     runtime: documentViewStore.runtime,
   },
   {
     name: 'keyvalue',
-    open: () => tabsStore.openKeyValueTab('conn-kv', 'db0/key:big', { newTab: true }).id,
+    open: () => {
+      seedConnectionRecord(connectionsStore, 'conn-kv');
+      return tabsStore.openKeyValueTab('conn-kv', 'db0/key:big', { newTab: true })!.id;
+    },
     runCount: (tabId: string) => keyValueViewStore.runCount(tabId),
     runtime: keyValueViewStore.runtime,
   },
   {
     name: 'stream',
-    open: () => tabsStore.openStreamTab('conn-strm', 'topic:events', { newTab: true }).id,
+    open: () => {
+      seedConnectionRecord(connectionsStore, 'conn-strm');
+      return tabsStore.openStreamTab('conn-strm', 'topic:events', { newTab: true })!.id;
+    },
     runCount: (tabId: string) => streamViewStore.runCount(tabId),
     runtime: streamViewStore.runtime,
   },

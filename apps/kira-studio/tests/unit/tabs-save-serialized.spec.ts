@@ -12,11 +12,14 @@ import { deferred } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
+import { seedConnectionRecord } from './support/connectionRecord.ts';
 
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 
@@ -32,7 +35,8 @@ describe('state/tabs.ts saveIfChanged serialises and coalesces overlapping saves
     };
 
     // S1: open a tab -- triggers saveNow() -> the first tabsSave call, held open on gates[0].
-    const { id } = tabsStore.openStreamTab('conn-tabs-2', 'topic:orders', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn-tabs-2');
+    const { id } = tabsStore.openStreamTab('conn-tabs-2', 'topic:orders', { newTab: true })!;
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(calls.length).toBe(1);
 

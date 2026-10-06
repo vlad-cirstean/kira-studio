@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
+import { seedConnectionRecord } from './support/connectionRecord.ts';
 
 setActivePinia(pinia);
 
@@ -22,6 +23,8 @@ restoreAfterEach(control);
 beforeEach(() => {
   (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 });
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { useDocumentViewStore } = await import('../../frontend/src/views/documents/state');
@@ -29,7 +32,8 @@ const documentViewStore = useDocumentViewStore();
 
 describe('setAllExpanded merges rather than replaces state.expanded (finding 13)', () => {
   test('collapsing page 2 does not re-expand documents collapsed on page 1', () => {
-    const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id;
+    seedConnectionRecord(connectionsStore, 'conn-doc');
+    const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true })!.id;
 
     documentViewStore.setAllExpanded(tabId, ['p1-a', 'p1-b'], false); // collapse all on page 1
     expect(documentViewStore.isDocumentExpanded(tabId, 'p1-a')).toBe(false);
@@ -46,7 +50,8 @@ describe('setAllExpanded merges rather than replaces state.expanded (finding 13)
   });
 
   test('a single per-document collapse on page 1 survives a "collapse all" on page 2', () => {
-    const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id;
+    seedConnectionRecord(connectionsStore, 'conn-doc');
+    const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true })!.id;
 
     documentViewStore.toggleExpanded(tabId, 'p1-a'); // collapse just this one document, on page 1
     expect(documentViewStore.isDocumentExpanded(tabId, 'p1-a')).toBe(false);
@@ -59,7 +64,8 @@ describe('setAllExpanded merges rather than replaces state.expanded (finding 13)
   });
 
   test('"expand all" still clears the whole map — every page, not just the current one', () => {
-    const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id;
+    seedConnectionRecord(connectionsStore, 'conn-doc');
+    const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true })!.id;
 
     documentViewStore.setAllExpanded(tabId, ['p1-a'], false);
     documentViewStore.setAllExpanded(tabId, ['p2-a'], false);

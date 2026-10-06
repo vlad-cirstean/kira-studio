@@ -16,11 +16,14 @@ import { describe, expect, test } from 'bun:test';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
+import { seedConnectionRecord } from './support/connectionRecord.ts';
 
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 
@@ -37,7 +40,8 @@ describe('state/tabs.ts saveIfChanged retries a snapshot a failed save never act
       return shouldFail ? Promise.reject(new Error('simulated FK failure')) : Promise.resolve();
     };
 
-    const { id } = tabsStore.openStreamTab('conn-tabs-1', 'topic:orders', { newTab: true });
+    seedConnectionRecord(connectionsStore, 'conn-tabs-1');
+    const { id } = tabsStore.openStreamTab('conn-tabs-1', 'topic:orders', { newTab: true })!;
     await flush();
     expect(calls).toBe(1); // the open itself triggers saveNow -> saveIfChanged's first (failing) call
 

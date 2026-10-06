@@ -7,7 +7,7 @@ import { dataQueryCommands } from '../../state/viewCommands';
 // D9: the definition view's Columns section reuses the tree's former column-row menu items, but it
 // already has the table's own path directly (`tab.path`) — no `pathParent()` needed the way the
 // tree's former column rows required.
-function targetTabForTable(connectionId: string, tablePath: string): string {
+function targetTabForTable(connectionId: string, tablePath: string): string | null {
   const active = useModeStore().activeTab;
   // D9: this menu lives only in the Definition view's Columns section, so `active` here is
   // always that table's *definition* tab, never its data tab — matching on connectionId/path
@@ -21,7 +21,7 @@ function targetTabForTable(connectionId: string, tablePath: string): string {
   ) {
     return active.id;
   }
-  return useTabsStore().openDataTab(connectionId, tablePath).id;
+  return useTabsStore().openDataTab(connectionId, tablePath)?.id ?? null;
 }
 
 // F1/P21 round 1: the pure half of "Add to projection". `currentProjection === null` means "every
@@ -60,6 +60,7 @@ export function columnsSectionMenu(
       icon: 'list-selection',
       run: () => {
         const tabId = targetTabForTable(connectionId, tablePath);
+        if (tabId === null) return;
         const tab = useTabsStore().findDataTab(tabId);
         const next = nextProjectionAfterAddingColumn(tab?.state.projection ?? null, columnName);
         if (next === null) return;
@@ -73,6 +74,7 @@ export function columnsSectionMenu(
       icon: 'sort-precedence',
       run: () => {
         const tabId = targetTabForTable(connectionId, tablePath);
+        if (tabId === null) return;
         void dataQueryCommands().setSort(tabId, {
           kind: 'structured',
           terms: [{ column: columnName, direction: 'asc' }],

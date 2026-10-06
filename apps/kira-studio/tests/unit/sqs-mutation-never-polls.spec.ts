@@ -14,6 +14,7 @@ import type { ConnectionState } from '@shared/domain/connection';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
+import { seedConnectionRecord } from './support/connectionRecord.ts';
 
 setActivePinia(pinia);
 
@@ -82,7 +83,8 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
   test('reload() on a batch-paginated (SQS) tab does not call data.read', async () => {
     const connectionId = 'sqs-conn-1';
     markConnected(connectionId, sqsCaps);
-    const { id } = tabsStore.openStreamTab(connectionId, 'queue:orders', { newTab: true });
+    seedConnectionRecord(connectionsStore, connectionId);
+    const { id } = tabsStore.openStreamTab(connectionId, 'queue:orders', { newTab: true })!;
     streamViewStore.runtime[id] = {
       status: 'idle',
       error: null,
@@ -126,8 +128,10 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
   test('reloadTabsForTarget fanning out to a sibling SQS stream tab does not poll it either', async () => {
     const connectionId = 'sqs-conn-2';
     markConnected(connectionId, sqsCaps);
-    const mutatingTab = tabsStore.openStreamTab(connectionId, 'queue:events', { newTab: true });
-    const siblingTab = tabsStore.openStreamTab(connectionId, 'queue:events', { newTab: true });
+    seedConnectionRecord(connectionsStore, connectionId);
+    const mutatingTab = tabsStore.openStreamTab(connectionId, 'queue:events', { newTab: true })!;
+    seedConnectionRecord(connectionsStore, connectionId);
+    const siblingTab = tabsStore.openStreamTab(connectionId, 'queue:events', { newTab: true })!;
     streamViewStore.runtime[siblingTab.id] = {
       status: 'idle',
       error: null,
@@ -168,7 +172,8 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
   test('a non-batch (Kafka) stream tab still reloads normally', async () => {
     const connectionId = 'kafka-conn-1';
     markConnected(connectionId, { ...sqsCaps, pagination: 'offsetWindow', canDelete: false });
-    const { id } = tabsStore.openStreamTab(connectionId, 'topic:events', { newTab: true });
+    seedConnectionRecord(connectionsStore, connectionId);
+    const { id } = tabsStore.openStreamTab(connectionId, 'topic:events', { newTab: true })!;
     streamViewStore.runtime[id] = {
       status: 'idle',
       error: null,

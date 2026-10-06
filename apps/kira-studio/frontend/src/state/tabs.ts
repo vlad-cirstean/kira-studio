@@ -85,7 +85,7 @@ export const useRecentTablesStore = defineStore('recentTables', () => {
   return { ...toRefs(state), recordRecent, pruneRecent };
 });
 
-// Result of an open*Tab call: `reused` tells the caller whether an existing tab was activated
+// Result of an open*Tab call (`null` when the connection is gone): `reused` tells the caller whether an existing tab was activated
 // (Task 62) rather than a fresh one created — a fresh tab is about to fetch on mount anyway, so
 // only a caller that cares about the double-click "also reload the data" behavior needs to check
 // this; everyone else can destructure just `id` and ignore it.
@@ -225,7 +225,9 @@ export const useTabsStore = createTabsStore({
       path: string,
       defaultState: () => S,
       opts: { newTab?: boolean } | undefined,
-    ): OpenTabResult {
+    ): OpenTabResult | null {
+      // A tab for a deleted connection violates the tabs FK and fails every later save.
+      if (!useConnectionsStore(pinia).connectionRecord(connectionId)) return null;
       const result = actions.openTab(kind, connectionId, path, defaultState, {
         reuse: !opts?.newTab,
       });
@@ -240,7 +242,7 @@ export const useTabsStore = createTabsStore({
       connectionId: string,
       path: string,
       opts?: { newTab?: boolean },
-    ): OpenTabResult {
+    ): OpenTabResult | null {
       return openTrackedTab(
         'data',
         connectionId,
@@ -286,7 +288,7 @@ export const useTabsStore = createTabsStore({
       connectionId: string,
       path: string,
       opts?: { newTab?: boolean },
-    ): OpenTabResult {
+    ): OpenTabResult | null {
       return openTrackedTab(
         'document',
         connectionId,
@@ -302,7 +304,7 @@ export const useTabsStore = createTabsStore({
       connectionId: string,
       path: string,
       opts?: { newTab?: boolean },
-    ): OpenTabResult {
+    ): OpenTabResult | null {
       return openTrackedTab(
         'keyvalue',
         connectionId,
@@ -318,7 +320,7 @@ export const useTabsStore = createTabsStore({
       connectionId: string,
       path: string,
       opts?: { newTab?: boolean },
-    ): OpenTabResult {
+    ): OpenTabResult | null {
       return openTrackedTab(
         'stream',
         connectionId,

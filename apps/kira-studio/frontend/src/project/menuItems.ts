@@ -133,7 +133,7 @@ export function countItem(
     id: string;
     label: string;
     kind: CountableKind;
-    openTab: (connectionId: string, path: string) => { id: string };
+    openTab: (connectionId: string, path: string) => { id: string } | null;
   },
 ): MenuItem {
   return {
@@ -142,8 +142,8 @@ export function countItem(
     label: opts.label,
     icon: 'symbol-numeric',
     run: () => {
-      const { id: tabId } = opts.openTab(row.connectionId, row.path);
-      countTab(opts.kind, tabId);
+      const opened = opts.openTab(row.connectionId, row.path);
+      if (opened) countTab(opts.kind, opened.id);
     },
   };
 }

@@ -99,23 +99,23 @@ function onOpen(row: TreeRowVm): void {
     return;
   }
   if (OPENABLE_KINDS.has(row.kind)) {
-    const { id, reused } = tabsStore.openDataTab(row.connectionId, row.path);
-    if (reused) reloadTab('data', id);
+    const opened = tabsStore.openDataTab(row.connectionId, row.path);
+    if (opened?.reused) reloadTab('data', opened.id);
     return;
   }
   if (DOCUMENT_OPENABLE_KINDS.has(row.kind)) {
-    const { id, reused } = tabsStore.openDocumentTab(row.connectionId, row.path);
-    if (reused) reloadTab('document', id);
+    const opened = tabsStore.openDocumentTab(row.connectionId, row.path);
+    if (opened?.reused) reloadTab('document', opened.id);
     return;
   }
   if (KEYVALUE_OPENABLE_KINDS.has(row.kind)) {
-    const { id, reused } = tabsStore.openKeyValueTab(row.connectionId, row.path);
-    if (reused) reloadTab('keyvalue', id);
+    const opened = tabsStore.openKeyValueTab(row.connectionId, row.path);
+    if (opened?.reused) reloadTab('keyvalue', opened.id);
     return;
   }
   if (STREAM_OPENABLE_KINDS.has(row.kind)) {
-    const { id, reused } = tabsStore.openStreamTab(row.connectionId, row.path);
-    if (reused) reloadTab('stream', id);
+    const opened = tabsStore.openStreamTab(row.connectionId, row.path);
+    if (opened?.reused) reloadTab('stream', opened.id);
     return;
   }
   if (isKeyBrowserRow(row)) {
