@@ -181,6 +181,18 @@ async function findChangeInDetail(
   return lookupChangeInDetail(detail, path);
 }
 
+/** `path` is webview- or server-supplied: join onto `root` and refuse a result outside it (also an
+ *  absolute `relative()` result, a cross-drive path on Windows). Mirrors gitsession's
+ *  ErrPathEscapesRoot. */
+function containedPath(method: string, root: string, path: string): string {
+  const abs = join(root, path);
+  const rel = relative(root, abs);
+  if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error(`${method}: path escapes the repository root: ${path}`);
+  }
+  return abs;
+}
+
 export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandlers {
   const {
     connection,
@@ -414,7 +426,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       const right: DocumentRef =
         status === 'deleted'
           ? { kind: 'empty', label: basename(path) }
-          : { kind: 'file', path: join(root, path) };
+          : { kind: 'file', path: containedPath('editor.openWorkingDiff', root, path) };
       await editor.openDiff({
         left,
         right,
@@ -453,11 +465,8 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // non-bare repo (F11) — refused with a clear error when the repo is unknown or bare (a bare
     // repo has no checkout and therefore cannot have a conflicted file at all).
     //
-    // G30 round-1 architecture review, finding #9: `path` is server-supplied over the wire, not a
-    // constant this process picked — a `../../../etc/passwd`-shaped value used to resolve outside
-    // `root` unchecked and open in the editor. Mirrors gitsession's own ErrPathEscapesRoot
-    // containment check (queries.go): join, then verify the relative path back to root is neither
-    // `..` nor `..`-prefixed nor itself absolute (a cross-drive relative() result on Windows).
+    // G30 round-1 architecture review, finding #9: `path` is server-supplied over the wire — a
+    // `../../../etc/passwd`-shaped value used to open outside `root` (see containedPath).
     'editor.resolveConflict': async ({ repoId, path }) => {
       const root = repoRoots.get(repoId);
       if (!root) {
@@ -465,12 +474,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
           `editor.resolveConflict: repo ${repoId} has no known worktree root (not open, or bare)`,
         );
       }
-      const abs = join(root, path);
-      const rel = relative(root, abs);
-      if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
-        throw new Error(`editor.resolveConflict: path escapes the repository root: ${path}`);
-      }
-      await editor.resolveConflict({ path: abs });
+      await editor.resolveConflict({ path: containedPath('editor.resolveConflict', root, path) });
       return {};
     },
     // G18 D6: baseCandidates is no longer injected here — a raw request omitting it now resolves
