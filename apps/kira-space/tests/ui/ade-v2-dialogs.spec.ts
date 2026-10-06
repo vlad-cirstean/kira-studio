@@ -86,6 +86,29 @@ test('queue after a review branch says not to modify it and records the order af
   await expect.poll(() => calls(control, IPC.adeTaskSetQueuedAfter)).toHaveLength(1);
 });
 
+test('a failed order record after delivery closes the dialog and reports in the panel', async ({
+  relaunch,
+}) => {
+  const board = adeBoard((bd) => {
+    (bd.pairs as unknown[]).push({
+      a: 'b_authui',
+      b: 'b_sara',
+      shared: ['src/payments/client.ts'],
+      conflicts: ['src/payments/client.ts'],
+    });
+  });
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+    { channel: IPC.adeTaskSetQueuedAfter, error: { code: 'invalid', message: 'branch is gone' } },
+  ]);
+  await page.locator(row('b_authui')).click();
+  await page.locator(t('ade-panel-action-queueAfter')).click();
+  await page.locator(t('ade-dialog-send')).click();
+  await expect(page.locator(t('ade-dialog'))).toHaveCount(0);
+  await expect(page.getByText('recording the order failed: branch is gone')).toBeVisible();
+  expect(calls(control, IPC.adeTaskSetQueuedAfter)).toHaveLength(1);
+});
+
 test('a TUI session at work lists a busy block with an override', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await emitAgentSessions(page, ['term-tk01']);

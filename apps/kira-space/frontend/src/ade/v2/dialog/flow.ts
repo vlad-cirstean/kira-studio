@@ -108,17 +108,31 @@ async function sendRebase(deps: FlowDeps, spec: DialogSpec, state: DialogState):
   const onto = spec.onto ?? 'main';
   const key = `rebase:${root}`;
   deps.pending.add(key);
+  let delivered: Awaited<ReturnType<typeof deliverToBranch>>;
   try {
-    const { watch, launch } = await deliverToBranch(deps, spec, messageOf(deps, spec, state));
-    if (onto !== 'main') await deps.setQueuedAfter({ branchId: root, afterBranchId: onto });
-    announce(deps, launch, taskOfBranch(deps, root), root);
-    void (watch as TurnWatch | null)?.done.then(() => deps.pending.remove(key));
-    if (!watch) deps.pending.remove(key);
-    deps.closeDialog();
+    delivered = await deliverToBranch(deps, spec, messageOf(deps, spec, state));
   } catch (err) {
     deps.pending.remove(key);
     deps.setError(errMessage(err));
+    return;
   }
+  // Claude already has the prompt: a failure from here on must not leave Send armed to repeat it.
+  const { watch, launch } = delivered;
+  const taskId = taskOfBranch(deps, root);
+  if (onto !== 'main') {
+    try {
+      await deps.setQueuedAfter({ branchId: root, afterBranchId: onto });
+    } catch (err) {
+      deps.setActionError(
+        taskId,
+        `rebase sent, but recording the order failed: ${errMessage(err)}`,
+      );
+    }
+  }
+  announce(deps, launch, taskId, root);
+  void (watch as TurnWatch | null)?.done.then(() => deps.pending.remove(key));
+  if (!watch) deps.pending.remove(key);
+  deps.closeDialog();
 }
 
 /** Merge: recorded only when the dialog's own turn finishes (`Stop`), never on `SessionEnd`. */
@@ -206,6 +220,7 @@ async function sendArchive(deps: FlowDeps, spec: DialogSpec, state: DialogState)
   const message = messageOf(deps, spec, state);
   const key = `archive:${taskId}`;
   const watches: TurnWatch[] = [];
+  let sent = 0;
   deps.pending.add(key);
   try {
     for (const tg of spec.targets) {
@@ -218,11 +233,21 @@ async function sendArchive(deps: FlowDeps, spec: DialogSpec, state: DialogState)
         },
       );
       announce(deps, launch, taskId, tg.branchId);
+      sent++;
     }
   } catch (err) {
     for (const w of watches) w.cancel();
     deps.pending.remove(key);
-    deps.setError(errMessage(err));
+    if (sent === 0) {
+      deps.setError(errMessage(err));
+      return;
+    }
+    // Some branches already have the prompt: close, so Send cannot repeat it to them.
+    deps.setActionError(
+      taskId,
+      `Archive prompt sent to ${sent} of ${spec.targets.length} branches: ${errMessage(err)}. Archive again when ready`,
+    );
+    deps.closeDialog();
     return;
   }
   deps.closeDialog();
