@@ -139,8 +139,9 @@ duplicated here; this file only points at them.
   module or root cause), not one commit per finding, so the commit log stays short and still durable. Carry forward only a genuinely still-open item (see "Known open items"),
   never a running narrative of what each round found. **A review has no separate planner step.**
   The reviewer scopes its own area at the start of its run (owned files, one-hop callers, what
-  earlier rounds already fixed or parked) and goes straight to findings. Implementation phases keep
-  their Opus plan.
+  earlier rounds already fixed or parked) and goes straight to findings. It treats commits other
+  fixers made in its files since the base as unreviewed code. Implementation phases keep their
+  Opus plan.
 - **A review's scope is everything changed since the last review session**, not the whole repo and not
   just the latest chapter. Find that session in git (the last commit of a prior review's findings or
   fixes, e.g. P108's close-out `771512bc`) and diff from there. State the base commit in the review's
