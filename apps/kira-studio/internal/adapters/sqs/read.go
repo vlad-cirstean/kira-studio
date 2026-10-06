@@ -277,37 +277,14 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 		if remaining := req.PageSize - collected; remaining < batchLimit {
 			batchLimit = remaining
 		}
-		input := &sqs.ReceiveMessageInput{
-			QueueUrl:                    aws.String(queueURL),
-			MaxNumberOfMessages:         int32(batchLimit),
-			WaitTimeSeconds:             waitTimeSeconds,
-			MessageAttributeNames:       []string{"All"},
-			MessageSystemAttributeNames: []types.MessageSystemAttributeName{types.MessageSystemAttributeNameAll},
-		}
-		if readOnly {
-			input.VisibilityTimeout = browseVisibilityTimeout
-		}
+		input := receiveInput(queueURL, batchLimit, readOnly)
 		result, err := client.ReceiveMessage(ctx, input)
 		if err != nil {
 			return page.StreamPage{}, mapError(err)
 		}
-		added := 0
-		for _, m := range result.Messages {
-			if readOnly && m.MessageId != nil {
-				if _, dup := seen[*m.MessageId]; dup {
-					continue
-				}
-				seen[*m.MessageId] = struct{}{}
-			}
-			// A read-only connection can never delete, so it keeps no receipt handles.
-			var h *receiptHandles
-			if !readOnly {
-				h = handles
-			}
-			if err := pushMessage(builder, m, h, visibilityTimeout); err != nil {
-				return page.StreamPage{}, mapError(err)
-			}
-			added++
+		added, err := pushBatch(builder, result.Messages, handles, visibilityTimeout, readOnly, seen)
+		if err != nil {
+			return page.StreamPage{}, err
 		}
 		collected += added
 		if readOnly && added == 0 {
@@ -319,6 +296,44 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 	}
 
 	return builder.Finish(position(req.PageSize)), nil
+}
+
+// receiveInput builds one ReceiveMessage request; a read-only poll hides messages only briefly.
+func receiveInput(queueURL string, batchLimit int, readOnly bool) *sqs.ReceiveMessageInput {
+	input := &sqs.ReceiveMessageInput{
+		QueueUrl:                    aws.String(queueURL),
+		MaxNumberOfMessages:         int32(batchLimit),
+		WaitTimeSeconds:             waitTimeSeconds,
+		MessageAttributeNames:       []string{"All"},
+		MessageSystemAttributeNames: []types.MessageSystemAttributeName{types.MessageSystemAttributeNameAll},
+	}
+	if readOnly {
+		input.VisibilityTimeout = browseVisibilityTimeout
+	}
+	return input
+}
+
+// pushBatch adds one received batch to the page and returns how many messages it added. A read-only
+// poll skips messages already seen and keeps no receipt handles (it can never delete).
+func pushBatch(builder *page.StreamPageBuilder, messages []types.Message, handles *receiptHandles, visibilityTimeout time.Duration, readOnly bool, seen map[string]struct{}) (int, error) {
+	added := 0
+	for _, m := range messages {
+		if readOnly && m.MessageId != nil {
+			if _, dup := seen[*m.MessageId]; dup {
+				continue
+			}
+			seen[*m.MessageId] = struct{}{}
+		}
+		var h *receiptHandles
+		if !readOnly {
+			h = handles
+		}
+		if err := pushMessage(builder, m, h, visibilityTimeout); err != nil {
+			return added, mapError(err)
+		}
+		added++
+	}
+	return added, nil
 }
 
 // countQueue is read.ts's countQueue — approximate only; SQS has no exact-count operation.
