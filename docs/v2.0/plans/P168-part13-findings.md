@@ -176,8 +176,10 @@ fix, "verified" (scratch probe or run) or "code-read".
   honours `KIRA_HOME`.
 - Fix: change the literal to `kira.db`; better, show `config.DbPath()` from an existing control
   call if one exposes it (none found; a new bridge field would be Part 5/6, so keep the literal).
-  Re-check `ST/visual/settings.spec.ts` snapshots for the footer text; a snapshot change cannot be
-  regenerated in this sandbox (`docs/DEV_ENVIRONMENT.md` font drift): route the baseline update.
+  All 7 `ST/visual/settings.spec.ts` snapshots capture the whole dialog, footer included, so each
+  changes. They cannot be regenerated in this sandbox (`docs/DEV_ENVIRONMENT.md` font drift): the
+  fixer records the baseline update as a follow-up for a machine that can run
+  `test:visual:update:studio`.
 - Also stale: `state/settingsDomain.ts:138` "an older kira.sqlite".
 - Code-read.
 
@@ -425,10 +427,13 @@ fix, "verified" (scratch probe or run) or "code-read".
 - Same class, smaller: `ST/ui/tree.spec.ts:386-590` (12 sites of `waitForTimeout(100)`) where the
   next line is a non-retrying `boundingBox()` read (`:404-410`, `:417-422`); a slow frame reads
   stale geometry.
+- Same pattern again: `closeAllTabs` is copied byte-for-byte in `ST/ui/perf.spec.ts:73-80` and
+  `ST/ui/leaks.spec.ts:117-123`, each with its own 400 ms sleep.
 - Fix: in `openRowMenu`, record `scrollTop` before and after `scrollIntoViewIfNeeded` (one
   `evaluate`) and await the `scroll` event only when it moved (reuse `scrollAndSettle`'s promise
   shape); then wait two rAFs. In `tree.spec.ts`, replace each sleep before a geometry read with an
-  `expect.poll` on the measured value, or a two-rAF settle.
+  `expect.poll` on the measured value, or a two-rAF settle. Move `closeAllTabs` into
+  `support/` with the same scroll-settle.
 - Code-read.
 
 ### Block 4: checked, nothing to report
@@ -447,3 +452,37 @@ fix, "verified" (scratch probe or run) or "code-read".
   percentile question, block 5), `bootSnapshots.ts`, `fixtures.ts`, `global.d.ts`: no defect.
 - `ST/perf/perfProbe.ts` vs `PW/testing/ui/perfProbe.ts`: different measures (process-tree RSS vs
   WebKit RSS, frame lists vs live rAF capture); overlap is names, not logic. Not reported.
+
+## Block 6: tests against the `CLAUDE.md` bar
+
+### F23 (low): `mode-switch.spec.ts`'s `61e367f` wait matches a substring
+
+- `ST/ui/mode-switch.spec.ts:101-108`. The poll waits for any `tabsSave` whose serialised log entry
+  contains `'1000'`. A UUID (`crypto.randomUUID()` tab id) or any other number containing those
+  digits satisfies it before the page-size save lands, which reopens the race `61e367f` closed. The
+  product side is right: a mode switch calls only `setMode` (`createModeStore.ts:77-80`), which
+  writes the window mode, never `tabsSave`.
+- Fix: parse the entry, `(entry.args as { tabs: { state: { pageSize?: number } }[] }).tabs
+  .some((t) => t.state.pageSize === 1000)`. Same check for any later edit of the baseline.
+- Other own specs reading `tabsSave` (`tabs.spec.ts:349-355`) poll on the parsed payload: fine.
+- Code-read.
+
+### Block 6: checked
+
+- Unit specs (9): each passes alone and together (29 tests). `tabs-save-serialized`,
+  `tabs-save-retries-after-failure`, `tree-state`, `run-state` import the real stores
+  (`frontend/src/state/tabs`, `project/state/tree`, `state/ops`) over a fake `control`: they drive
+  current code and guard ordering/race logic, so they meet the bar. `mongo-srv-uri` (28 lines)
+  still drives `canRoundTripToFields`. The four misplaced specs (`beautify-depth`, `frame-golden`,
+  `history-view-supersession`, `ipc-fixture-sync`): pass alone, exercise current code
+  (golden frames, cross-language fixture sync, supersession race, depth limit); none restates a
+  body. No prune.
+- Gaps tied to fixes above: `uri.ts` round trip (F3), cancel-gated mock (F20), Filters seed (F12),
+  DataGrip failed scan (F5), settings cleared field (F6), FQN/bindings guard (F21). No other
+  missing test qualifies under the bar.
+- `waitForTimeout` sites (27): `tooltips.spec.ts` (5) prove an absence inside a tooltip delay
+  window: legitimate. `tabs.spec.ts:326` waits Sortable's emulated dragover interval:
+  documented, legitimate. `interaction.spec.ts:1078-1081` and `budgets.spec.ts:691` settle a
+  pointer/scroll before a count: tolerable. The rest are F22.
+- Visual (4 own specs) and `ST/perf/tree-scroll.spec.ts` (report-only by design): no defect.
+- Not run: the full UI suite (plan rule), `test:visual:*` (sandbox font drift).
