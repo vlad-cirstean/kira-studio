@@ -23,7 +23,7 @@ import { computed, reactive, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { EnvironmentsTabRecord } from '../state/tabDomain';
-import { mergeDrafts } from './state/draftMerge';
+import { mergeDrafts, reconcileOrder } from './state/draftMerge';
 import { useVariablesStore } from './state/variables';
 import { openVariableSetTab } from './tabs';
 
@@ -122,8 +122,8 @@ const { dragging } = useSortableReorder(
   listEl,
   () => displayEnvironments.value.map((env) => env.id),
   (from, to) => {
-    order.value = moveId(order.value, from, to);
-    void variablesStore.reorderEnvironmentsList(order.value);
+    order.value = moveId(reconcileOrder(order.value, environmentIds()), from, to);
+    void persistOrder();
   },
   {
     draggable: '[data-testid="environment-row"]',
@@ -133,6 +133,16 @@ const { dragging } = useSortableReorder(
   },
 );
 watch(() => variablesStore.environments, syncDrafts, { immediate: true });
+
+const environmentIds = () => variablesStore.environments.map((e) => e.id);
+// syncDrafts skips the order reseed during a drag: replay it once the drag ends.
+watch(dragging, (isDragging) => {
+  if (!isDragging) order.value = reconcileOrder(order.value, environmentIds());
+});
+// Go never stored a failed reorder: show the server's order again.
+async function persistOrder(): Promise<void> {
+  if (!(await variablesStore.reorderEnvironmentsList(order.value))) order.value = environmentIds();
+}
 
 // P17 D14: renaming and describing are one row update — both fields' drafts commit together
 // whichever one blurred, rather than two separate IPC calls for two cells of one row.
@@ -162,8 +172,11 @@ function onEditVariables(id: string, name: string): void {
   openVariableSetTab('environment', id, name);
 }
 
+// A failed activation leaves the clicked native radio checked while the store's active row is
+// unchanged; bumping the epoch re-keys the radios so they redraw from `isActive`.
+const radioEpoch = ref(0);
 async function onSetActive(id: string): Promise<void> {
-  await variablesStore.setActiveEnvironment(id);
+  if (!(await variablesStore.setActiveEnvironment(id))) radioEpoch.value++;
 }
 
 async function onDelete(id: string, name: string): Promise<void> {
@@ -188,7 +201,7 @@ async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   const next = [...order.value];
   [next[from], next[to]] = [next[to], next[from]];
   order.value = next;
-  await variablesStore.reorderEnvironmentsList(order.value);
+  await persistOrder();
 }
 function onKeydown(e: KeyboardEvent, id: string): void {
   if (isFiltered.value || !e.altKey) return;
@@ -263,7 +276,7 @@ useEventListener(listEl, 'keydown', (e) => {
       </AlertDescription>
     </Alert>
 
-    <div ref="listEl" class="flex flex-col gap-0.5 p-1">
+    <div ref="listEl" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-y-auto p-1">
         <div
           v-for="env in displayEnvironments"
           :key="env.id"
@@ -291,8 +304,10 @@ useEventListener(listEl, 'keydown', (e) => {
           <Tooltip>
             <TooltipTrigger as-child>
               <input
+                :key="radioEpoch"
                 type="radio"
                 name="active-environment"
+                :aria-label="`Active environment: ${env.name}`"
                 :checked="env.isActive"
                 data-testid="environment-active"
                 @change="onSetActive(env.id)"
@@ -304,6 +319,7 @@ useEventListener(listEl, 'keydown', (e) => {
             <Input
               v-model="nameDrafts[env.id]"
               size="kira"
+              aria-label="Environment name"
               data-testid="environment-name"
               @blur="onFieldBlur(env.id)"
             />
@@ -312,6 +328,7 @@ useEventListener(listEl, 'keydown', (e) => {
             <Input
               v-model="descriptionDrafts[env.id]"
               placeholder="description"
+              aria-label="Environment description"
               size="kira"
               data-testid="environment-description"
               @blur="onFieldBlur(env.id)"

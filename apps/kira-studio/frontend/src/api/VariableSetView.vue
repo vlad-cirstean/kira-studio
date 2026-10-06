@@ -27,7 +27,7 @@ import type { VariableSetTabRecord } from '../state/tabDomain';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
 import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';
-import { mergeDrafts, reseedCommitted } from './state/draftMerge';
+import { mergeDrafts, reconcileOrder, reseedCommitted } from './state/draftMerge';
 import { useVariableSetStore, useVariablesStore } from './state/variables';
 import VariableRow from './VariableRow.vue';
 
@@ -285,8 +285,8 @@ const { dragging } = useSortableReorder(
   listRef,
   () => displayRows.value.filter((row) => row.id !== '').map((row) => row.id),
   (from, to) => {
-    order.value = moveId(order.value, from, to);
-    void variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, order.value);
+    order.value = moveId(reconcileOrder(order.value, rowIds()), from, to);
+    void persistOrder();
   },
   {
     draggable: '[data-testid="variable-row"]:not([data-id=""])',
@@ -296,6 +296,22 @@ const { dragging } = useSortableReorder(
   },
 );
 watch(rows, syncDrafts, { immediate: true });
+
+const rowIds = () => rows.value.map((r) => r.id);
+// syncDrafts skips the order reseed during a drag: replay it once the drag ends.
+watch(dragging, (isDragging) => {
+  if (!isDragging) order.value = reconcileOrder(order.value, rowIds());
+});
+// Go never stored a failed reorder: show the server's order again.
+async function persistOrder(): Promise<void> {
+  const ok = await variableSetStore.reorderVariables(
+    props.tab.id,
+    scope.value,
+    ownerId.value,
+    order.value,
+  );
+  if (!ok) order.value = rowIds();
+}
 
 function duplicateFor(row: ApiVariable): boolean {
   const full = [...allRealRows.value, trailingRow.value];
@@ -429,7 +445,7 @@ async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   const next = [...order.value];
   [next[from], next[to]] = [next[to], next[from]];
   order.value = next;
-  await variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, order.value);
+  await persistOrder();
 }
 
 async function onRemove(id: string): Promise<void> {

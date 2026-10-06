@@ -103,12 +103,14 @@ export const useVariablesStore = defineStore('variables', () => {
   );
 
   /** id: '' selects "No environment" (D3). */
-  async function setActiveEnvironment(id: string): Promise<void> {
+  async function setActiveEnvironment(id: string): Promise<boolean> {
     try {
       await setActiveEnvironmentMutation.mutateAsync(id);
       state.error = null;
+      return true;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
+      return false;
     }
   }
 
@@ -279,12 +281,14 @@ export const useVariablesStore = defineStore('variables', () => {
     queryClient,
   );
 
-  async function reorderEnvironmentsList(ids: string[]): Promise<void> {
+  async function reorderEnvironmentsList(ids: string[]): Promise<boolean> {
     try {
       await reorderEnvironmentsMutation.mutateAsync(ids);
       state.error = null;
+      return true;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
+      return false;
     }
   }
 
@@ -584,12 +588,14 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     scope: VariableScope,
     ownerId: string,
     ids: string[],
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await reorderVariablesMutation.mutateAsync({ scope, ownerId, ids });
       setVariableSetError(tabId, null);
+      return true;
     } catch (err) {
       setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+      return false;
     }
   }
 

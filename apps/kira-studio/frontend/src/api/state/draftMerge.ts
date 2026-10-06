@@ -75,3 +75,12 @@ export function reseedCommitted<TDraft>(
   seeds[id] = incoming;
   return true;
 }
+
+/** Keeps the user's current order for ids still present and appends ids it lacks (a row added
+ *  remotely while a drag held the order frozen); drops ids no longer present. */
+export function reconcileOrder(order: readonly string[], ids: readonly string[]): string[] {
+  const live = new Set(ids);
+  const kept = order.filter((id) => live.has(id));
+  const known = new Set(kept);
+  return [...kept, ...ids.filter((id) => !known.has(id))];
+}
