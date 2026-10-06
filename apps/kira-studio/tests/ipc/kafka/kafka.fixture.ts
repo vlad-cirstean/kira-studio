@@ -59,7 +59,7 @@ export const controlSnapshots: ControlSnapshot[] = [
         schemaColumns: false,
         projection: false,
         serverFilter: false,
-        exactCount: true,
+        exactCount: false,
         pagination: 'offsetWindow',
         foreignKeys: false,
         canInsert: true,

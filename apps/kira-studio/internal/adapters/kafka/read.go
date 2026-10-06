@@ -594,5 +594,7 @@ func countTopic(ctx context.Context, adm *kadm.Client, topic string, rawFilter *
 	for _, w := range windows {
 		total += w.End - w.Next
 	}
-	return adapters.CountResult{Value: total, Exact: true}, nil
+	// An offset span is an upper bound: compaction and transaction markers leave offsets with no
+	// record behind them.
+	return adapters.CountResult{Value: total, Exact: false}, nil
 }

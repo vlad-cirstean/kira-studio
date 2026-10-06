@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -56,27 +57,60 @@ func DispatchUpdateDeleteInsert(update, delete, insert func(ctx context.Context,
 	}
 }
 
-// ParseHeaderJSON is kafka/produce.go's parseProduceHeaders == sqs/mutate.go's parseHeaders: a
-// $headers value is a flat JSON object of string values, or absent entirely.
-func ParseHeaderJSON(raw *string) (map[string]string, error) {
+// HeaderPair is one $headers entry, in the order the JSON object spelled it.
+type HeaderPair struct{ Key, Value string }
+
+// ParseHeaderPairs decodes a $headers value (a flat JSON object of string values, or absent) in
+// document order, keeping repeated names: Kafka headers are an ordered list that may repeat a key.
+func ParseHeaderPairs(raw *string) ([]HeaderPair, error) {
 	if raw == nil || *raw == "" {
 		return nil, nil
 	}
-	var parsed any
-	if err := json.Unmarshal([]byte(*raw), &parsed); err != nil {
-		return nil, New(CodeQuery, "malformed $headers JSON", err)
+	malformed := func(err error) error { return New(CodeQuery, "malformed $headers JSON", err) }
+	dec := json.NewDecoder(strings.NewReader(*raw))
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, malformed(err)
 	}
-	obj, ok := parsed.(map[string]any)
-	if !ok {
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
 		return nil, New(CodeQuery, "$headers must be a JSON object of string values", nil)
 	}
-	out := make(map[string]string, len(obj))
-	for k, v := range obj {
-		s, ok := v.(string)
-		if !ok {
-			return nil, New(CodeQuery, "$headers."+k+" must be a string", nil)
+	var out []HeaderPair
+	for dec.More() {
+		keyTok, err := dec.Token()
+		if err != nil {
+			return nil, malformed(err)
 		}
-		out[k] = s
+		key, _ := keyTok.(string)
+		valTok, err := dec.Token()
+		if err != nil {
+			return nil, malformed(err)
+		}
+		value, ok := valTok.(string)
+		if !ok {
+			return nil, New(CodeQuery, "$headers."+key+" must be a string", nil)
+		}
+		out = append(out, HeaderPair{Key: key, Value: value})
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, malformed(err)
+	}
+	if _, err := dec.Token(); err != io.EOF {
+		return nil, malformed(err)
+	}
+	return out, nil
+}
+
+// ParseHeaderJSON is sqs/mutate.go's parseHeaders: ParseHeaderPairs as a map (a repeated name
+// keeps its last value), since SQS message attributes are unordered and unique.
+func ParseHeaderJSON(raw *string) (map[string]string, error) {
+	pairs, err := ParseHeaderPairs(raw)
+	if err != nil || pairs == nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(pairs))
+	for _, p := range pairs {
+		out[p.Key] = p.Value
 	}
 	return out, nil
 }

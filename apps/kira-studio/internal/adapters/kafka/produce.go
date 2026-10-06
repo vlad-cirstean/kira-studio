@@ -2,6 +2,10 @@ package kafka
 
 import (
 	"context"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
@@ -39,13 +43,13 @@ func preview(plan model.MutationPlan, topic string) ([]string, error) {
 	return adapters.PreviewProduce(plan, topic, renderOpText)
 }
 
-func toRecordHeaders(headers map[string]string) []kgo.RecordHeader {
+func toRecordHeaders(headers []adapters.HeaderPair) []kgo.RecordHeader {
 	if headers == nil {
 		return nil
 	}
 	out := make([]kgo.RecordHeader, 0, len(headers))
-	for k, v := range headers {
-		out = append(out, kgo.RecordHeader{Key: k, Value: []byte(v)})
+	for _, h := range headers {
+		out = append(out, kgo.RecordHeader{Key: h.Key, Value: []byte(h.Value)})
 	}
 	return out
 }
@@ -85,7 +89,7 @@ func produce(ctx context.Context, client *kgo.Client, topic string, readOnly boo
 			return model.MutationResult{}, adapters.New(adapters.CodeQuery, "a new message requires a "+bodyField, nil)
 		}
 		headersRaw, _ := rowOp.Values.Get(headersField)
-		headers, err := adapters.ParseHeaderJSON(headersRaw)
+		headers, err := adapters.ParseHeaderPairs(headersRaw)
 		if err != nil {
 			return model.MutationResult{}, err
 		}
@@ -100,8 +104,38 @@ func produce(ctx context.Context, client *kgo.Client, topic string, readOnly boo
 	// into librdkafka", not "the broker acknowledged this specific message" — ProduceSync reports
 	// exactly that (P58e E14).
 	results := client.ProduceSync(ctx, records...)
-	if err := results.FirstErr(); err != nil {
-		return model.MutationResult{}, mapError(err)
+	// Results arrive in completion order, so a record's position comes from its identity.
+	position := make(map[*kgo.Record]int, len(records))
+	for i, rec := range records {
+		position[rec] = i + 1
+	}
+	landed := 0
+	var failedAt []int
+	var firstErr error
+	for _, r := range results {
+		if r.Err == nil {
+			landed++
+			continue
+		}
+		if firstErr == nil {
+			firstErr = r.Err
+		}
+		failedAt = append(failedAt, position[r.Record])
+	}
+	sort.Ints(failedAt)
+	failed := make([]string, len(failedAt))
+	for i, n := range failedAt {
+		failed[i] = strconv.Itoa(n)
+	}
+	if firstErr != nil {
+		mapped := mapError(firstErr)
+		if landed == 0 {
+			return model.MutationResult{}, mapped
+		}
+		// The host drops a result that travels with an error; the message must say what landed so a
+		// retry does not duplicate it.
+		return model.MutationResult{AffectedRows: landed}, adapters.New(mapped.Code,
+			fmt.Sprintf("%d of %d messages were produced; message(s) %s failed: %s", landed, len(records), strings.Join(failed, ", "), mapped.Message), mapped.Cause)
 	}
 
 	return model.MutationResult{AffectedRows: len(records)}, nil

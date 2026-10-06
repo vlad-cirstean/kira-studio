@@ -41,6 +41,25 @@ func resolveTLSOpt(cfg model.ResolvedConnectionConfig) (ssl bool, skipVerify boo
 	return true, adapters.SkipsVerification(sslmode), nil
 }
 
+// closeOnError runs call and closes cl when it fails or ctx ends first. franz-go's request wait
+// does not watch ctx while a broker withholds its response, so a cancelled Connect would block
+// until the request timeout; closing the client fails the pending request. A cancelled ctx returns
+// E_CANCELLED at once, without waiting for call.
+func closeOnError(ctx context.Context, cl *kgo.Client, call func() error) error {
+	errc := make(chan error, 1)
+	go func() { errc <- call() }()
+	select {
+	case err := <-errc:
+		if err != nil {
+			cl.Close()
+		}
+		return err
+	case <-ctx.Done():
+		go cl.Close()
+		return adapters.CheckCancelled(ctx)
+	}
+}
+
 func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(level, message string)) (*kgo.Client, *kadm.Client, []kgo.Opt, error) {
 	var host string
 	var port int
@@ -137,8 +156,10 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 	if err != nil {
 		return nil, nil, nil, mapError(err)
 	}
-	if err := cl.Ping(ctx); err != nil {
-		cl.Close()
+	if err := closeOnError(ctx, cl, func() error { return cl.Ping(ctx) }); err != nil {
+		if code, _ := adapters.CodeOf(err); code == adapters.CodeCancelled {
+			return nil, nil, nil, err
+		}
 		// Only when the anonymous dial fails the specific way a SASL-requiring broker's own
 		// missing-credential refusal does — franz-go's own *kgo.ErrFirstReadEOF, its "is SASL
 		// missing?" diagnosis (confirmed against a real SASL_PLAINTEXT broker: an anonymous dial

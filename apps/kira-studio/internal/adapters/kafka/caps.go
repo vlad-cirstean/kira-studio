@@ -6,7 +6,7 @@ import (
 )
 
 // caps is caps.ts's kafkaCaps, field for field (P58e E17). Stream-shaped, offsetWindow
-// pagination, exact count (high - low watermark subtraction, summed across partitions), no FK
+// pagination, estimated count (high - low watermark subtraction, summed across partitions), no FK
 // navigation, no console (P10's D13 — neither engine has an ad-hoc command surface named in
 // scope).
 var caps = adapters.Caps{
@@ -27,7 +27,7 @@ var caps = adapters.Caps{
 	SchemaColumns: false,
 	Projection:    false,
 	ServerFilter:  false,
-	ExactCount:    true, // ListStartOffsets/ListEndOffsets: high - low, summed across partitions
+	ExactCount:    false, // high - low summed across partitions over-counts compacted and transactional topics
 	Pagination:    adapters.PaginationOffsetWindow,
 	ForeignKeys:   false,
 	// produce.go's ProduceSync lands canInsert here. A topic's log is immutable, so Kafka never

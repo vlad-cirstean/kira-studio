@@ -189,8 +189,8 @@ func TestKafka_Caps(t *testing.T) {
 	if c.SQL {
 		t.Error("SQL = true, want false")
 	}
-	if !c.ExactCount {
-		t.Error("ExactCount = false, want true")
+	if c.ExactCount {
+		t.Error("ExactCount = true, want false (offset span over-counts compacted topics)")
 	}
 	if c.Pagination != adapters.PaginationOffsetWindow {
 		t.Errorf("Pagination = %v, want offsetWindow", c.Pagination)
@@ -588,8 +588,8 @@ func TestKafka_Read_NonexistentTopicIsQueryError(t *testing.T) {
 	}
 }
 
-// 12. count: exact via high/low watermark subtraction.
-func TestKafka_Count_ExactViaWatermarkSubtraction(t *testing.T) {
+// 12. count: high/low watermark subtraction, reported as an estimate (F13).
+func TestKafka_Count_EstimateViaWatermarkSubtraction(t *testing.T) {
 	f := testsupport.StartKafka(t)
 	a := connectedAdapter(t, f)
 	ctx := context.Background()
@@ -598,15 +598,15 @@ func TestKafka_Count_ExactViaWatermarkSubtraction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Count(orders): %v", err)
 	}
-	if got.Value != testsupport.KafkaOrdersMessageCount || !got.Exact {
-		t.Errorf("Count(orders) = %+v, want {%d true}", got, testsupport.KafkaOrdersMessageCount)
+	if got.Value != testsupport.KafkaOrdersMessageCount || got.Exact {
+		t.Errorf("Count(orders) = %+v, want {%d false}", got, testsupport.KafkaOrdersMessageCount)
 	}
 	gotEmpty, err := a.Count(ctx, adapters.CountRequest{Path: topicPath(f, testsupport.KafkaEmptyTopic)}, adapters.NewOpCtx("op-12b"))
 	if err != nil {
 		t.Fatalf("Count(empty): %v", err)
 	}
-	if gotEmpty.Value != 0 || !gotEmpty.Exact {
-		t.Errorf("Count(empty) = %+v, want {0 true}", gotEmpty)
+	if gotEmpty.Value != 0 || gotEmpty.Exact {
+		t.Errorf("Count(empty) = %+v, want {0 false}", gotEmpty)
 	}
 }
 
@@ -641,8 +641,8 @@ func TestKafka_Count_ScopedToPartitionFilter(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Count(filter=%s): %v", partitions, err)
 		}
-		if !got.Exact {
-			t.Errorf("Count(filter=%s).Exact = false, want true", partitions)
+		if got.Exact {
+			t.Errorf("Count(filter=%s).Exact = true, want false", partitions)
 		}
 		return got.Value
 	}
@@ -1140,4 +1140,42 @@ func TestKafka_Read_ExactlyPageCappedGapEventuallyTerminates(t *testing.T) {
 	if lastPage.Position.NextToken != nil {
 		t.Error("NextToken != nil, want nil")
 	}
+}
+
+// F14: when some messages of a batch land and one is refused, the error says which, so a retry
+// does not duplicate the ones that landed.
+func TestKafka_Mutate_PartialBatchFailureNamesWhatLanded(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+	ctx := context.Background()
+	const topic = "test-14-partial"
+	testsupport.CreateTopic(t, f, topic)
+
+	insert := func(body string) model.MutationRowOp {
+		return model.MutationRowOp{Kind: "insert", Values: model.RowValues{
+			{Name: "$body", Value: testsupport.Strp(body)}, {Name: "$headers", Value: testsupport.Strp(`{"b":"1","a":"2","b":"3"}`)},
+		}}
+	}
+	tooLarge := strings.Repeat("x", 3<<20)
+	plan := model.MutationPlan{Path: topicPath(f, topic), Ops: []model.MutationRowOp{insert("one"), insert(tooLarge), insert("three")}}
+	_, err := a.Mutate(ctx, plan, adapters.NewOpCtx("op-14a"))
+	if err == nil {
+		t.Fatal("want an error for the oversized message")
+	}
+	if !strings.Contains(err.Error(), "2 of 3 messages were produced") || !strings.Contains(err.Error(), "message(s) 2 failed") {
+		t.Errorf("error = %q, want it to name 2 of 3 produced and message 2 failed", err)
+	}
+	p, err := a.Read(ctx, offsetRead(topicPath(f, topic), 10), adapters.NewOpCtx("op-14b"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if rc := p.(page.StreamPage).RowCount; rc != 2 {
+		t.Errorf("RowCount = %d, want the 2 acknowledged messages", rc)
+	}
+}
+
+func TestKafka_Connect_CancelledCtxReturns(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	proxy := testsupport.StartPausableProxy(t, f.Config)
+	testsupport.ConnectCancelScenario(t, newAdapter(t), proxy.Config(), proxy)
 }

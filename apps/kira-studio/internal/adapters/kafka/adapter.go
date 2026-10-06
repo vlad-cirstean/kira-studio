@@ -69,9 +69,15 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	if err != nil {
 		return adapters.ConnectInfo{}, err
 	}
-	meta, err := adm.Metadata(ctx)
+	var meta kadm.Metadata
+	err = closeOnError(ctx, cl, func() (err error) {
+		meta, err = adm.Metadata(ctx)
+		return err
+	})
 	if err != nil {
-		cl.Close()
+		if code, _ := adapters.CodeOf(err); code == adapters.CodeCancelled {
+			return adapters.ConnectInfo{}, err
+		}
 		return adapters.ConnectInfo{}, mapError(err)
 	}
 	a.setConnected(cl, adm, opts, cfg.ReadOnly)
