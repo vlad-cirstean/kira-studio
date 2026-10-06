@@ -532,15 +532,12 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'remote.pushPreflight': forward('remote.pushPreflight'),
     'remote.run': forward('remote.run'),
     'remote.cancel': forward('remote.cancel'),
-    // G7 D4/§4.2: credential.provide is answered by the extension's own credential relay
-    // (extension.ts), never proxied from the webview — the webview must never be able to answer a
-    // credential prompt. ServerHandlers.requests is total over RequestKey, so this key still needs
-    // an entry; a thrown handler is the way to say "impossible from here" in a total map, the same
-    // shape editor.resolveConflict's own G4 precedent uses for a genuinely unreachable call.
+    // Credential prompts are answered in Kira Space only (P178), so the webview has nothing to
+    // provide. ServerHandlers.requests is total over RequestKey, so this key still needs an entry;
+    // a thrown handler is the way to say "impossible from here" in a total map, the same shape
+    // editor.resolveConflict's own G4 precedent uses for a genuinely unreachable call.
     'credential.provide': () => {
-      throw new Error(
-        'credential.provide is answered by the extension, never proxied from the webview',
-      );
+      throw new Error('credential.provide is answered in Kira Space only');
     },
     'stash.list': forward('stash.list'),
     'stash.show': forward('stash.show'),

@@ -3,6 +3,7 @@ package gitsession
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -85,13 +86,23 @@ type RemoteDeps struct {
 // beyond Conn.AskCredential itself, since the broker has no notion of a repository (D21):
 // gitsession imports gitaskpass (a stdlib-only leaf package) rather than the reverse.
 type repoPrompter struct {
-	repoID string
-	conn   *Conn
+	repoID    string
+	repoLabel string
+	conn      *Conn
 }
 
 func (p repoPrompter) Ask(ctx context.Context, req gitaskpass.Request) (string, bool) {
 	req.RepoID = p.repoID
+	req.RepoLabel = p.repoLabel
 	return p.conn.AskCredential(ctx, req)
+}
+
+// repoLabel is the folder name a window shows beside a prompt; a bare repo has no worktree root.
+func repoLabel(s gitclient.RepoSummary) string {
+	if s.Root != "" {
+		return filepath.Base(s.Root)
+	}
+	return filepath.Base(s.GitDir)
 }
 
 // coreAskPass is D10's own per-entry, lazy, once-per-RepoEntry read of `core.askPass` — cached for
@@ -121,7 +132,7 @@ func (e *RepoEntry) withAskpass(ctx context.Context, conn *Conn, deps RemoteDeps
 	if deps.Askpass == nil || conn == nil || !deps.Askpass.ShouldInterpose(e.coreAskPass(ctx)) {
 		return fn(nil)
 	}
-	prompter := repoPrompter{repoID: e.Summary.RepoID, conn: conn}
+	prompter := repoPrompter{repoID: e.Summary.RepoID, repoLabel: repoLabel(e.Summary), conn: conn}
 	return deps.Askpass.WithOp(ctx, prompter, func(opEnv []string) error {
 		env := make([]string, 0, len(opEnv)+5)
 		env = append(env, deps.Askpass.Env()...)

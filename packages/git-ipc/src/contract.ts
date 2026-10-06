@@ -2092,12 +2092,12 @@ export type Contract = {
        *  fault. */
       result: { readonly cancelled: boolean };
     };
-    /** G7 D2/D4: answers exactly one `credential.request` by id — sent by the connection that
-     *  owns the in-flight remote op, never proxied from the webview (`proxyHandlers.ts` throws on
-     *  this key). `secret` is `null` for a dismissal, never omitted — a value the wire carries,
-     *  not an absence the server has to infer (the same discipline G4 D5 set for this chapter).
-     *  Answering twice, or presenting an id this connection never received, is a no-op, never an
-     *  error (D4's own anti-abuse rules). */
+    /** G7 D2/D4: answers exactly one `credential.request` by id. Only the native stream (Kira
+     *  Space's own window) sends it: a socket client's op prompts in Kira Space instead (P178), and
+     *  `git.sock` refuses this key with `E_READ_ONLY`. `secret` is `null` for a dismissal, never
+     *  omitted — a value the wire carries, not an absence the server has to infer (the same
+     *  discipline G4 D5 set for this chapter). Answering twice, or presenting an id this connection
+     *  never received, is a no-op, never an error (D4's own anti-abuse rules). */
     'credential.provide': {
       params: {
         readonly requestId: string;
@@ -2339,16 +2339,12 @@ export type Contract = {
      *  `stack.restack` is in flight. */
     'stack.progress': RestackProgress;
     /** G7 D2/D4: one prompt from git's own askpass protocol, sent to the connection that owns the
-     *  in-flight remote op — never Kira Space's own window (SPEC §5 item 4, §6, confirmed
-     *  2026-09-07). `requestId` is a server-minted, unguessable id; the extension answers exactly
-     *  once with `credential.provide`. Nothing here is ever logged or stored on either side —
-     *  `prompt` can itself contain a username the user just typed (probe P1's second prompt).
-     *
-     *  P67e: "never Kira Space's own window" scopes an *external paired client's* op, owned by
-     *  that client's own `gitsession.Conn` — the native stream's own remote op is owned by the
-     *  native `Conn` (`internal/bridge/gitstream.go`), so its prompt is answered by this same
-     *  window (`state/gitCredential.ts` + `workbench/GitCredentialDialog.vue`). Routing it there
-     *  applies this rule rather than breaking it. */
+     *  in-flight remote op. Only the native stream receives it (`internal/bridge/gitstream.go`; its
+     *  window answers in `state/gitCredential.ts` + `workbench/GitCredentialDialog.vue`). A socket
+     *  client never sees one: its prompts open in Kira Space (P178). `requestId` is a server-minted,
+     *  unguessable id, answered exactly once with `credential.provide`. Nothing here is ever logged
+     *  or stored on either side — `prompt` can itself contain a username the user just typed
+     *  (probe P1's second prompt). */
     'credential.request': {
       readonly requestId: string;
       readonly repoId: string;

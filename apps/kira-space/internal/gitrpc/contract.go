@@ -168,7 +168,10 @@ package gitrpc
 // P173: 43 -> 44, one new request (graph.reportFailure), one new event (autoFetch.changed) and one
 // new StatusSummary field (autoFetch) -- the toolbar's "Auto-fetch stopped" marker and the
 // server-side record of a corrupted graph stream. The frame cap rises 8 -> 32 MiB on both sides.
-const ContractVersion = 44
+// P178: 44 -> 45, behaviour changes. A socket client never receives credential.request (its
+// prompts open in Kira Space) and git.sock refuses credential.provide with E_READ_ONLY. Only the
+// native stream still uses both.
+const ContractVersion = 45
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

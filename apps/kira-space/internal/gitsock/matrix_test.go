@@ -746,12 +746,13 @@ func TestMatrix_M4_DisconnectDuringACredentialPrompt(t *testing.T) {
 	id := clientA.next
 	clientA.next++
 	clientA.sendRaw(wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: id, Method: "remote.run", Params: params}})
-	_ = clientA.recvEvent("credential.request") // wait for the prompt to actually arrive.
-	_ = clientA.nc.Close()                      // A disconnects WITHOUT answering.
+	_ = waitRelayPrompt(t, server) // wait for the prompt to actually arrive.
+	_ = clientA.nc.Close()         // A disconnects WITHOUT answering.
+	waitRelayEmpty(t, server)
 
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		result := runRemoteAnsweringCredentials(t, clientB, gitrpc.RemoteRunParams{
+		result := runRemoteAnsweringCredentials(t, clientB, server, gitrpc.RemoteRunParams{
 			RepoID: repoID, RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"},
 		}, strPtr("does-not-matter"))
 		if result.Error != nil && result.Error.Kind == "OperationInProgress" {

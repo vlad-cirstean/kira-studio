@@ -107,7 +107,7 @@ func main() {
 	logging.SetLevel(settings.Advanced.GitLogLevel)
 
 	credentialRelay := gitcred.New()
-	git := wireGit(repositories)
+	git := wireGit(repositories, credentialRelay)
 	gitDiscovery, gitRunner, gitRegistry := git.discovery, git.runner, git.registry
 	askpassBroker, gitRouter, gitSock := git.askpassBroker, git.router, git.sock
 
@@ -565,7 +565,7 @@ func shutdownTracker(tracker *ade.Tracker, hooks *agenthooks.Manager) {
 
 // wireGit is Kira Studio's own wireGit (main.go), lifted wholesale onto this app's own
 // repositories/config/buildinfo.
-func wireGit(repositories *repos.Repos) gitWired {
+func wireGit(repositories *repos.Repos, credentials *gitcred.Relay) gitWired {
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(gitclient.NewPlatformLocator(), gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
@@ -598,6 +598,7 @@ func wireGit(repositories *repos.Repos) gitWired {
 		LockPath:      filepath.Join(config.KiraSpaceHome(), "git.sock.lock"),
 		Clients:       repositories.GitClients,
 		Registry:      gitRegistry,
+		Credentials:   credentials,
 		Router:        gitRouter,
 		ServerVersion: buildinfo.Version,
 		Now:           time.Now,

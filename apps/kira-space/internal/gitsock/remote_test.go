@@ -16,6 +16,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
@@ -193,10 +194,11 @@ func newRemoteIntegrationServerWithRunner(t *testing.T, timeout time.Duration, g
 	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
 
 	server = New(Deps{
-		SocketPath: filepath.Join(kiraHome, "git.sock"),
-		LockPath:   filepath.Join(kiraHome, "git.sock.lock"),
-		Clients:    repositories.GitClients,
-		Registry:   gitRegistry,
+		SocketPath:  filepath.Join(kiraHome, "git.sock"),
+		LockPath:    filepath.Join(kiraHome, "git.sock.lock"),
+		Clients:     repositories.GitClients,
+		Registry:    gitRegistry,
+		Credentials: gitcred.New(),
 		Router: gitrpc.New(gitrpc.Deps{
 			Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: "test-version",
 			Askpass: broker,
@@ -227,12 +229,66 @@ func remoteRunOK(t *testing.T, c *testClient, params gitrpc.RemoteRunParams) git
 	return unmarshalResult[gitsession.RemoteOpResult](t, resp.Result)
 }
 
-// runRemoteAnsweringCredentials drives one remote.run call to completion, answering every
-// interleaved credential.request event with answer (nil dismisses it) — D24's own "answered"/
-// "dismissed" scenarios. Handles either wire ordering of the two requests' own responses, since
-// rpcstream dispatches them independently.
-func runRemoteAnsweringCredentials(t *testing.T, c *testClient, params gitrpc.RemoteRunParams, answer *string) gitsession.RemoteOpResult {
+// answerRelayPrompts answers every prompt that reaches the server's credential relay with answer
+// (nil dismisses it) until stop runs. Answers go through a goroutine: a Subscribe callback runs
+// inside the relay's own emit, so calling Provide from it would deadlock.
+func answerRelayPrompts(t *testing.T, server *Server, answer *string) (stop func()) {
 	t.Helper()
+	relay := server.deps.Credentials
+	snaps := make(chan gitcred.Snapshot, 64)
+	unsub := relay.Subscribe(func(s gitcred.Snapshot) { snaps <- s })
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case s := <-snaps:
+				for _, p := range s {
+					relay.Provide(p.RequestID, answer)
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+	return func() {
+		unsub()
+		close(done)
+	}
+}
+
+// waitRelayPrompt blocks until the relay holds a prompt and returns it.
+func waitRelayPrompt(t *testing.T, server *Server) gitcred.Prompt {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if snap := server.deps.Credentials.Pending(); len(snap) > 0 {
+			return snap[0]
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("no credential prompt reached the relay")
+	return gitcred.Prompt{}
+}
+
+// waitRelayEmpty blocks until the relay holds no prompt: a withdrawn prompt must leave it.
+func waitRelayEmpty(t *testing.T, server *Server) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(server.deps.Credentials.Pending()) == 0 {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("the relay still holds a prompt after its connection ended")
+}
+
+// runRemoteAnsweringCredentials drives one remote.run call to completion, answering every prompt
+// the op raises through the server's credential relay (nil dismisses it) — D24's own "answered"/
+// "dismissed" scenarios. The socket client must never see a credential.request event (P178).
+func runRemoteAnsweringCredentials(t *testing.T, c *testClient, server *Server, params gitrpc.RemoteRunParams, answer *string) gitsession.RemoteOpResult {
+	t.Helper()
+	defer answerRelayPrompts(t, server, answer)()
 	runID := c.next
 	c.next++
 	paramsJSON, err := json.Marshal(params)
@@ -250,25 +306,11 @@ func runRemoteAnsweringCredentials(t *testing.T, c *testClient, params gitrpc.Re
 
 		switch {
 		case env.Body.T == "evt" && env.Body.Method == "credential.request":
-			var payload struct {
-				RequestID string `json:"requestId"`
-			}
-			if err := json.Unmarshal(env.Body.Payload, &payload); err != nil {
-				t.Fatalf("unmarshal credential.request payload: %v", err)
-			}
-			provideID := c.next
-			c.next++
-			provideParams, err := json.Marshal(gitrpc.CredentialProvideParams{RequestID: payload.RequestID, Secret: answer})
-			if err != nil {
-				t.Fatalf("marshal credential.provide params: %v", err)
-			}
-			c.sendRaw(wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: provideID, Method: "credential.provide", Params: provideParams}})
+			t.Fatal("a socket client received credential.request; prompts open in Kira Space only")
 		case env.Body.T == "evt":
 			// remote.progress or another event — irrelevant here.
 		case env.Body.ID == runID:
 			return unmarshalResult[gitsession.RemoteOpResult](t, env.Body.Result)
-		default:
-			// credential.provide's own {} response — nothing to do with it.
 		}
 	}
 }
@@ -745,7 +787,7 @@ func TestIntegration_CredentialRelayAnswersAndNeverHangs(t *testing.T) {
 
 		answer := "does-not-matter"
 		deadline := time.Now().Add(10 * time.Second)
-		result := runRemoteAnsweringCredentials(t, client, gitrpc.RemoteRunParams{
+		result := runRemoteAnsweringCredentials(t, client, server, gitrpc.RemoteRunParams{
 			RepoID:         repoID,
 			RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"},
 		}, &answer)
@@ -767,7 +809,7 @@ func TestIntegration_CredentialRelayAnswersAndNeverHangs(t *testing.T) {
 		repoID := openRepoOK(t, client, dir).Repo.RepoID
 
 		start := time.Now()
-		result := runRemoteAnsweringCredentials(t, client, gitrpc.RemoteRunParams{
+		result := runRemoteAnsweringCredentials(t, client, server, gitrpc.RemoteRunParams{
 			RepoID:         repoID,
 			RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"},
 		}, nil)
@@ -798,18 +840,10 @@ func TestIntegration_CredentialRelayAnswersAndNeverHangs(t *testing.T) {
 		clientA.next++
 		clientA.sendRaw(wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: id, Method: "remote.run", Params: params}})
 
-		// Wait for the credential.request event, then close the connection without answering.
-		for {
-			raw := clientA.readRaw("frame")
-			var env wireEnvelope
-			if err := json.Unmarshal(raw, &env); err != nil {
-				t.Fatalf("unmarshal: %v\n%s", err, raw)
-			}
-			if env.Body.T == "evt" && env.Body.Method == "credential.request" {
-				break
-			}
-		}
+		// Wait for the prompt to reach the relay, then close the connection without answering.
+		_ = waitRelayPrompt(t, server)
 		_ = clientA.nc.Close()
+		waitRelayEmpty(t, server)
 
 		// Proven via clientB: the shared slot must free up promptly (the op ends with AuthFailed,
 		// never hangs) — a second remote.run on the same repository succeeding within a bound is
@@ -818,7 +852,7 @@ func TestIntegration_CredentialRelayAnswersAndNeverHangs(t *testing.T) {
 		// immediately here, since this subtest only cares that the FIRST op's slot released.
 		deadline := time.Now().Add(10 * time.Second)
 		for time.Now().Before(deadline) {
-			result := runRemoteAnsweringCredentials(t, clientB, gitrpc.RemoteRunParams{
+			result := runRemoteAnsweringCredentials(t, clientB, server, gitrpc.RemoteRunParams{
 				RepoID:         repoID,
 				RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"},
 			}, nil)
@@ -987,5 +1021,17 @@ func TestIntegration_PullPreflightHonorsRepoStoredStrategy(t *testing.T) {
 	}
 	if preflight.RebaseMerges != false {
 		t.Fatalf("preflight.RebaseMerges = %v, want false -- the stored setting, not config, decided to rebase", preflight.RebaseMerges)
+	}
+}
+
+// TestIntegration_SocketClientCannotAnswerCredentials: a prompt is answered in Kira Space, so a
+// socket client's credential.provide is refused outright rather than silently ignored.
+func TestIntegration_SocketClientCannotAnswerCredentials(t *testing.T) {
+	server, sockPath, _, _ := newRemoteIntegrationServer(t, 3*time.Second)
+	client := pairAndReady(t, server, sockPath, "cred-provide-refused")
+
+	resp := requestIgnoringEvents(t, client, "credential.provide", gitrpc.CredentialProvideParams{RequestID: "any", Secret: strPtr("x")})
+	if resp.T != "res" || resp.OK == nil || *resp.OK || resp.Error == nil || resp.Error.Code != "E_READ_ONLY" {
+		t.Fatalf("credential.provide = %+v, want E_READ_ONLY", resp)
 	}
 }

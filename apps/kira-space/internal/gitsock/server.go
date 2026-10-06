@@ -1,6 +1,8 @@
 package gitsock
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -8,9 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/internal/rpcstream"
 )
@@ -21,11 +26,14 @@ import (
 // Handlers value (D18/D19): every connection now gets its own Handlers, built from its own
 // gitsession.Conn, so repo.close only ever releases that connection's own hold (F7).
 type Deps struct {
-	SocketPath    string
-	LockPath      string
-	Clients       TrustStore
-	Router        *gitrpc.Router
-	Registry      *gitsession.Registry
+	SocketPath string
+	LockPath   string
+	Clients    TrustStore
+	Router     *gitrpc.Router
+	Registry   *gitsession.Registry
+	// Credentials receives every credential prompt a socket client's op raises: the extension
+	// shows none, Kira Space answers (P178).
+	Credentials   *gitcred.Relay
 	ServerVersion string
 	Now           func() time.Time
 }
@@ -254,7 +262,12 @@ func (s *Server) handleConn(nc net.Conn) {
 	gconn := gitsession.NewConn(gitsession.ConnID(sessionID), clientID, label, nil)
 	defer gconn.Close()
 
+	gconn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
+		return s.deps.Credentials.Ask(ctx, label, req)
+	})
+
 	handlers := s.deps.Router.ForConn(gconn)
+	handlers.Request = refuseSpaceOnly(handlers.Request)
 	sess := rpcstream.NewSession(c, rpcstream.Handlers{
 		ContractVersion: gitrpc.ContractVersion,
 		Request:         handlers.Request,
@@ -263,6 +276,21 @@ func (s *Server) handleConn(nc net.Conn) {
 	})
 	gconn.SetEmit(sess.Emit)
 	sess.Serve()
+}
+
+// spaceOnlyMethods are requests a socket client may not make: what they change or answer lives in
+// Kira Space alone (P178). The native stream shares the Router and still serves them.
+var spaceOnlyMethods = map[string]string{
+	"credential.provide": "credential prompts are answered in Kira Space",
+}
+
+func refuseSpaceOnly(next func(ctx context.Context, method string, params json.RawMessage) (any, error)) func(ctx context.Context, method string, params json.RawMessage) (any, error) {
+	return func(ctx context.Context, method string, params json.RawMessage) (any, error) {
+		if msg, refused := spaceOnlyMethods[method]; refused {
+			return nil, ipcerr.New("E_READ_ONLY", "gitsock: "+method+": "+msg)
+		}
+		return next(ctx, method, params)
+	}
 }
 
 func (s *Server) addConn(clientID string, nc net.Conn) {

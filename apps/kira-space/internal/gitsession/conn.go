@@ -100,6 +100,7 @@ type Conn struct {
 	// same "not answered" outcome the caller sees.
 	credMu    sync.Mutex
 	creds     map[string]chan string
+	routeCred func(ctx context.Context, req gitaskpass.Request) (string, bool)
 	closeOnce sync.Once
 }
 
@@ -143,6 +144,14 @@ func (c *Conn) Done() <-chan struct{} { return c.done }
 // starts each request-handling goroutine) is what makes this safe with no lock of its own.
 func (c *Conn) DisableAutoFetch() { c.noAutoFetch = true }
 
+// RouteCredentials sends every credential prompt this connection raises to fn instead of emitting
+// credential.request on it (P178: a socket client never sees one). Call it once, before this Conn
+// serves — the same happens-before rule as DisableAutoFetch. fn gets a ctx that also ends when
+// this connection closes.
+func (c *Conn) RouteCredentials(fn func(ctx context.Context, req gitaskpass.Request) (string, bool)) {
+	c.routeCred = fn
+}
+
 // credentialRequestPayload mirrors @kira/git-ipc's own 'credential.request' event payload field
 // for field (G7 D2).
 type credentialRequestPayload struct {
@@ -164,6 +173,18 @@ func newCredentialRequestID() string {
 // table's three bounds that live on this side; the broker's own timer is the fourth, layered on
 // top of ctx by the broker itself. Every exit path deletes this waiter's own map entry.
 func (c *Conn) AskCredential(ctx context.Context, req gitaskpass.Request) (string, bool) {
+	if c.routeCred != nil {
+		routed, cancel := context.WithCancel(ctx)
+		defer cancel()
+		go func() {
+			select {
+			case <-c.done:
+				cancel()
+			case <-routed.Done():
+			}
+		}()
+		return c.routeCred(routed, req)
+	}
 	id := newCredentialRequestID()
 	ch := make(chan string, 1)
 	c.credMu.Lock()

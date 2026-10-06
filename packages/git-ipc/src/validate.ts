@@ -166,7 +166,10 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // P173: 43 -> 44, one new request ('graph.reportFailure'), one new event ('autoFetch.changed') and
 // one new field on 'StatusSummary' ('autoFetch'): the toolbar's "Auto-fetch stopped" marker and the
 // server-side record of a corrupted graph stream. The frame cap rises 8 -> 32 MiB on both sides.
-export const CONTRACT_VERSION = 44;
+// P178: 44 -> 45, behaviour changes. A socket client never receives 'credential.request' (its
+// prompts open in Kira Space) and 'git.sock' refuses 'credential.provide' with E_READ_ONLY. Only
+// the native stream still uses both.
+export const CONTRACT_VERSION = 45;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

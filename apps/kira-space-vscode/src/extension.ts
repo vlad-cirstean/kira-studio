@@ -44,7 +44,6 @@ import { goToFileFromDiffCommand, openCommitInGraphCommand } from './diffToolbar
 import { KiraGraphViewProvider } from './panelView.ts';
 import { VsCodeBrowser } from './ports/browser.ts';
 import { VsCodeClipboard } from './ports/clipboard.ts';
-import { VsCodeCredentialPrompt } from './ports/credentialPrompt.ts';
 import { VsCodeEditorIntegration } from './ports/editorIntegration.ts';
 import { VsCodeLogger } from './ports/logger.ts';
 import { VsCodeWindows } from './ports/windows.ts';
@@ -348,13 +347,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const windows = new VsCodeWindows();
   // P74 §3.3: the PR row's/badge's external-open action.
   const browser = new VsCodeBrowser();
-  // G7 D4/D21: the migrated, previously-unused credential port — this phase's own relay is its
-  // first (and only) caller.
-  const credentialPrompt = new VsCodeCredentialPrompt();
-  let credentialQueue: Promise<void> = Promise.resolve();
-  // Aborted whenever the connection leaves `connected`; scopes a credential box to its connection.
-  let connectionLifetime = new AbortController();
-
   const appVersion = String(
     (context.extension.packageJSON as { version?: unknown }).version ?? '0.0.0',
   );
@@ -553,35 +545,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         blameWidget.notifyRepoChanged(payload);
       }),
     },
-    // G7 D4/D21: the credential relay's whole client half — askpass becomes a relay, per SPEC §5
-    // item 4. No try/catch that logs anywhere on this path: the prompt text can itself contain a
-    // credential (a pasted token echoed back in git's own next prompt, probe P1), so a failed
-    // `credential.provide` call (the socket dropped between prompt and answer) is swallowed
-    // silently — the broker's own disconnect bound has already fired by the time this would run.
-    {
-      dispose: manager.on('credential.request', (req) => {
-        // One box at a time (a second createInputBox hides the first, which would answer null),
-        // and a box dies with the connection its request arrived on.
-        const { signal } = connectionLifetime;
-        credentialQueue = credentialQueue
-          .then(async () => {
-            if (signal.aborted) return;
-            const secret = await credentialPrompt.ask({
-              prompt: req.prompt,
-              masked: req.masked,
-              signal,
-            });
-            if (signal.aborted) return;
-            await manager.request('credential.provide', {
-              requestId: req.requestId,
-              secret: secret ?? null,
-            });
-          })
-          .catch(() => {
-            /* the broker's own bound (dismissal/timeout/disconnect/cancel) already ends the wait */
-          });
-      }),
-    },
     // G7 D20/§4.2: the graph provider only — the review sidebar renders no operation UI at all.
     {
       dispose: manager.on('remote.progress', (payload) => {
@@ -639,8 +602,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       logger.log('info', 'connection state', state);
       if (state.kind !== 'connected') {
         lastAppInit = undefined;
-        connectionLifetime.abort();
-        connectionLifetime = new AbortController();
       }
       // G15 D7: "connection state leaves connected" — every tracked decoration/state is dropped
       // rather than left showing a diff over a connection that may reconnect to a different repo.

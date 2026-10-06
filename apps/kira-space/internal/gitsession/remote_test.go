@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -574,5 +575,51 @@ func TestRunRemote_Pull_BranchChangedIsDetectedInsideTheWrite(t *testing.T) {
 	}
 	if result.OK || result.Error == nil || result.Error.Kind != "BranchChanged" {
 		t.Fatalf("pull result = %+v, want a blocked BranchChanged result -- feat is checked out, not main", result)
+	}
+}
+
+// A routed Conn emits no credential.request, and the routed ctx ends on the op's ctx or on Close.
+func TestConn_RouteCredentials_DelegatesAndEndsOnCtxOrClose(t *testing.T) {
+	t.Parallel()
+	var emitted atomic.Int32
+	c := NewConn("c1", "client-1", "label-1", func(string, any) { emitted.Add(1) })
+	routed := make(chan struct{}, 2)
+	c.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
+		if req.Prompt == "answer" {
+			return "s3cret", true
+		}
+		routed <- struct{}{}
+		<-ctx.Done()
+		return "", false
+	})
+
+	if secret, ok := c.AskCredential(context.Background(), gitaskpass.Request{Prompt: "answer"}); !ok || secret != "s3cret" {
+		t.Fatalf("got (%q, %v), want the routed answer", secret, ok)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	byCtx := make(chan bool, 1)
+	go func() {
+		_, ok := c.AskCredential(ctx, gitaskpass.Request{Prompt: "wait"})
+		byCtx <- ok
+	}()
+	<-routed
+	cancel()
+	if ok := <-byCtx; ok {
+		t.Fatal("cancelled routed Ask answered")
+	}
+
+	byClose := make(chan bool, 1)
+	go func() {
+		_, ok := c.AskCredential(context.Background(), gitaskpass.Request{Prompt: "wait"})
+		byClose <- ok
+	}()
+	<-routed
+	c.Close()
+	if ok := <-byClose; ok {
+		t.Fatal("routed Ask answered after Close")
+	}
+	if n := emitted.Load(); n != 0 {
+		t.Fatalf("routed Conn emitted %d events, want none", n)
 	}
 }

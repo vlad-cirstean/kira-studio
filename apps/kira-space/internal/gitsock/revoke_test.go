@@ -255,11 +255,12 @@ func TestRevoke_WhileACredentialPromptIsPending(t *testing.T) {
 	id := client.next
 	client.next++
 	client.sendRaw(wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: id, Method: "remote.run", Params: params}})
-	_ = client.recvEvent("credential.request") // wait for the prompt to actually arrive.
+	_ = waitRelayPrompt(t, server) // wait for the prompt to actually arrive.
 
 	if err := server.Revoke("revoke-cred"); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
+	waitRelayEmpty(t, server)
 
 	client2, _ := pairFreshWithToken(t, server, sockPath, "revoke-cred-2")
 	_ = openRepoOK(t, client2, dir)
