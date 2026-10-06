@@ -15,7 +15,10 @@ export function parseConnectionUri(uri: string): ParsedUri | null {
   try {
     const url = new URL(uri);
     const scheme = url.protocol.replace(/:$/, '');
-    const database = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
+    // A malformed escape throws into the catch below: the dialog then stays in URI mode.
+    const database = decodeURIComponent(
+      url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname,
+    );
     const params: Record<string, string> = {};
     for (const [key, value] of url.searchParams) params[key] = value;
     return {
@@ -41,7 +44,8 @@ export function formatConnectionUri(input: Omit<ConnectionInput, 'uri' | 'mode'>
   if (input.password) url.password = encodeURIComponent(input.password);
   url.pathname = input.database ? `/${input.database}` : '';
   for (const [key, value] of Object.entries(input.options)) {
-    if (typeof value === 'string') url.searchParams.set(key, value);
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+      url.searchParams.set(key, String(value));
   }
   return url.toString();
 }

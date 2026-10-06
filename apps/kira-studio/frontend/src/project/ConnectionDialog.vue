@@ -166,7 +166,7 @@ function refreshUriNote(): void {
   if (!d) return;
   const parsed = d.uri ? parseConnectionUri(d.uri) : null;
   uriNote.value = parsed
-    ? `${parsed.host ?? '?'}:${parsed.port ?? '?'} / ${parsed.database ?? '(default)'}`
+    ? `${parsed.host ?? '?'}:${parsed.port ?? '?'} / ${parsed.database ?? '(default)'}${d.password && !parsed.password ? ' (password kept separately)' : ''}`
     : 'Cannot be parsed into fields — will be used as-is.';
 }
 
@@ -179,7 +179,9 @@ function setMode(mode: 'fields' | 'uri'): void {
   if (!d || mode === d.mode) return;
 
   if (mode === 'uri') {
-    d.uri = formatConnectionUri(d);
+    // The URI field is plain text: keep the password out of it; it stays in the draft and Save
+    // still sends it.
+    d.uri = formatConnectionUri({ ...d, password: null });
     d.mode = 'uri';
     refreshUriNote();
     return;
@@ -391,9 +393,12 @@ const TAB_FOR_FIELD: Record<string, DetailTab> = {
   mcpDescription: 'MCP',
 };
 
+// Guards a double click: two in-flight creates would insert two connections.
+const saving = ref(false);
+
 async function onSave(): Promise<void> {
   const d = draft.value;
-  if (!d) return;
+  if (!d || saving.value) return;
   const parsed = connectionInputSchema.safeParse(d);
   if (!parsed.success) {
     const errors: Record<string, string> = {};
@@ -413,10 +418,13 @@ async function onSave(): Promise<void> {
   // one while the new one is in flight; saveDialog() throws rather than returning null on
   // failure (see its own comment), so catching here is the one place a failed save is handled.
   connectionDialogStore.error = null;
+  saving.value = true;
   try {
     await connectionDialogStore.saveDialog();
   } catch (err) {
     connectionDialogStore.error = err instanceof Error ? err.message : String(err);
+  } finally {
+    saving.value = false;
   }
 }
 
@@ -1288,7 +1296,7 @@ const preconnectText = computed({
             variant="dialog-primary"
             size="kira-lg"
             data-testid="connection-save"
-            :disabled="!isValid"
+            :disabled="!isValid || saving"
             @click="onSave"
           >
             Save

@@ -361,6 +361,17 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   // Discard — do not persist this exotic-URI draft.
   await page.click('[data-testid="connection-cancel"]');
 
+  // A password typed in fields mode must not land in the plain-text URI field on the switch.
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-host"]', 'db.example');
+  await page.fill('[data-testid="connection-username"]', 'alice');
+  await page.fill('[data-testid="connection-password"]', 'hunter2-secret');
+  await page.click('[data-testid="mode-uri"]');
+  await expect(page.locator('[data-testid="connection-uri"]')).toHaveValue(/alice@db\.example/);
+  expect(await page.inputValue('[data-testid="connection-uri"]')).not.toContain('hunter2');
+  await page.click('[data-testid="connection-cancel"]');
+
   // --- URI mode with an embedded password: stored URI is passwordless, reveal() has it ----
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
