@@ -631,3 +631,253 @@ Raw samples (sorted for budgets.spec.ts, arrival order for perf.spec.ts):
   - cached tree expand: `[15,17,17,18,18,18,18,19,19,20,20,21,22,26,27,29,33,40,41,49]`
   - cached tab switch: `[101,101,103,111,116,117,119,127,129,130,131,137,144,145,145,156,172,196,203,207]`
   - perf scroll deltas: `[20,28,52,59,52,48,50,48,50,48,46,51,63,60,50,50,48,56,72,82,54,43]`
+
+### Block 5 raw numbers, round 2 (runs 9-18, same method)
+
+    head-9   11:27:42 load0=3.89 maxload=3.89 foreign=0 rc=0 COUNTED | cell p50=17 p95(max)=31 2nd=21 | scroll n=22 p50=34 p95=41 max=48
+    base-9   11:28:34 load0=3.49 maxload=9.2 foreign=0 rc=0 not-counted | cell p50=17 p95(max)=30 2nd=21 | scroll n=22 p50=33 p95=47 max=50
+    head-10  11:38:50 load0=3.71 maxload=3.71 foreign=2 rc=0 not-counted | cell p50=21 p95(max)=30 2nd=28 | scroll n=22 p50=45 p95=64 max=80
+    base-10  11:41:28 load0=1.17 maxload=6.64 foreign=0 rc=1 not-counted | cell p50=25 p95(max)=33 2nd=30 | scroll n=22 p50=46 p95=70 max=84
+    head-11  11:43:20 load0=3.31 maxload=7.92 foreign=0 rc=0 not-counted | cell p50=33 p95(max)=42 2nd=39 | scroll n=22 p50=48 p95=58 max=64
+    base-11  11:45:41 load0=3.86 maxload=8.42 foreign=1 rc=1 not-counted | cell p50=27 p95(max)=46 2nd=39 | scroll n=22 p50=47 p95=63 max=64
+    head-12  11:47:23 load0=3.88 maxload=3.88 foreign=3 rc=0 not-counted | cell p50=26 p95(max)=42 2nd=38 | scroll n=22 p50=37 p95=52 max=54
+    base-12  11:48:35 load0=2.89 maxload=6.73 foreign=0 rc=1 not-counted | cell p50=26 p95(max)=157 2nd=121 | scroll n=22 p50=50 p95=66 max=67
+    head-13  11:54:31 load0=3.87 maxload=7.74 foreign=0 rc=0 not-counted | cell p50=17 p95(max)=39 2nd=25 | scroll n=22 p50=48 p95=72 max=73
+    base-13  11:56:40 load0=3.82 maxload=3.82 foreign=0 rc=0 COUNTED | cell p50=17 p95(max)=27 2nd=22 | scroll n=22 p50=36 p95=51 max=73
+    head-14  11:57:33 load0=2.79 maxload=2.79 foreign=0 rc=0 COUNTED | cell p50=18 p95(max)=24 2nd=22 | scroll n=22 p50=34 p95=44 max=49
+    base-14  11:58:28 load0=2.03 maxload=2.03 foreign=0 rc=0 COUNTED | cell p50=18 p95(max)=29 2nd=22 | scroll n=22 p50=38 p95=44 max=48
+    head-15  11:59:21 load0=1.51 maxload=2.53 foreign=3 rc=0 not-counted | cell p50=20 p95(max)=26 2nd=24 | scroll n=22 p50=39 p95=54 max=59
+    base-15  12:00:22 load0=2.49 maxload=2.7 foreign=2 rc=0 not-counted | cell p50=18 p95(max)=25 2nd=25 | scroll n=22 p50=36 p95=43 max=63
+    head-16  12:01:17 load0=2.07 maxload=2.15 foreign=0 rc=0 COUNTED | cell p50=19 p95(max)=50 2nd=27 | scroll n=22 p50=46 p95=57 max=60
+    base-16  12:02:14 load0=1.59 maxload=5.43 foreign=0 rc=0 not-counted | cell p50=20 p95(max)=26 2nd=25 | scroll n=22 p50=40 p95=53 max=71
+    head-17  12:24:15 load0=3.93 maxload=3.93 foreign=0 rc=0 COUNTED | cell p50=18 p95(max)=28 2nd=22 | scroll n=22 p50=36 p95=41 max=58
+    base-17  12:25:09 load0=2.57 maxload=2.79 foreign=0 rc=0 COUNTED | cell p50=15 p95(max)=25 2nd=21 | scroll n=22 p50=38 p95=49 max=56
+    head-18  12:26:04 load0=2.22 maxload=2.22 foreign=0 rc=0 COUNTED | cell p50=17 p95(max)=43 2nd=23 | scroll n=22 p50=34 p95=38 max=39
+    base-18  12:26:59 load0=1.84 maxload=2.15 foreign=0 rc=0 COUNTED | cell p50=18 p95(max)=26 2nd=25 | scroll n=22 p50=34 p95=50 max=65
+
+- `base-9` 11:28:34, load start 3.49, max 9.20, foreign 0, rc 0
+  - cell -> editor: `[15,15,16,16,16,16,16,17,17,17,17,17,18,18,19,19,20,21,21,30]`
+  - cached tree expand: `[15,15,15,16,16,16,17,17,18,18,18,18,18,20,21,21,21,22,22,24]`
+  - cached tab switch: `[87,91,96,97,111,112,112,115,115,115,119,122,122,125,126,129,131,135,137,214]`
+  - perf scroll deltas: `[14,15,47,43,40,33,33,32,32,31,33,33,38,35,32,50,40,34,30,31,29,26]`
+- `head-9` 11:27:42, load start 3.89, max 3.89, foreign 0, rc 0
+  - cell -> editor: `[12,14,14,15,15,15,15,15,16,17,17,17,17,17,18,18,18,19,21,31]`
+  - cached tree expand: `[14,15,15,15,16,16,16,16,17,17,17,17,17,18,18,18,19,19,21,29]`
+  - cached tab switch: `[83,85,93,94,97,100,100,111,112,113,113,114,118,118,123,137,145,147,180,186]`
+  - perf scroll deltas: `[11,14,37,35,33,32,32,33,34,33,31,35,32,33,33,34,35,48,38,35,34,41]`
+- `base-10` 11:41:28, load start 1.17, max 6.64, foreign 0, rc 1, FAIL ['apps/kira-studio/tests/ui/budgets.spec.ts:372'] [('50', '52')]
+  - cell -> editor: `[19,20,21,21,23,23,23,24,24,24,25,26,27,28,29,29,30,30,30,33]`
+  - cached tree expand: `[17,17,17,17,17,17,18,19,19,19,20,20,23,25,29,29,30,30,31,52]`
+  - cached tab switch: `[102,104,108,117,122,126,130,133,137,139,149,153,155,163,165,166,169,187,208,229]`
+  - perf scroll deltas: `[0,23,70,51,67,47,42,43,44,38,38,49,50,48,44,46,46,43,84,40,44,46]`
+- `head-10` 11:38:50, load start 3.71, max 3.71, foreign 2, rc 0
+  - cell -> editor: `[15,16,16,16,17,17,17,17,18,19,21,21,21,22,22,22,25,26,28,30]`
+  - cached tree expand: `[16,16,16,16,16,17,17,17,18,18,18,18,19,19,19,19,21,21,21,22]`
+  - cached tab switch: `[91,95,100,100,102,109,112,115,117,119,123,124,124,129,130,132,133,142,161,175]`
+  - perf scroll deltas: `[2,16,45,44,42,38,45,46,43,48,42,80,62,45,42,50,52,40,39,64,45,35]`
+- `base-11` 11:45:41, load start 3.86, max 8.42, foreign 1, rc 1, FAIL ['apps/kira-studio/tests/ui/budgets.spec.ts:372'] [('50', '52')]
+  - cell -> editor: `[13,17,20,22,23,25,25,26,26,27,27,28,28,30,31,32,33,36,39,46]`
+  - cached tree expand: `[15,16,17,17,17,18,18,20,20,20,20,22,23,26,28,31,32,35,44,52]`
+  - cached tab switch: `[93,100,104,110,120,120,120,122,123,126,127,131,133,139,141,148,159,161,181,240]`
+  - perf scroll deltas: `[16,27,51,52,47,64,57,55,63,43,41,47,47,55,46,45,44,43,47,53,63,43]`
+- `head-11` 11:43:20, load start 3.31, max 7.92, foreign 0, rc 0
+  - cell -> editor: `[16,23,24,26,27,27,27,31,32,32,33,33,33,34,35,35,37,38,39,42]`
+  - cached tree expand: `[16,16,16,17,17,17,18,18,19,19,20,20,22,22,23,23,24,25,36,48]`
+  - cached tab switch: `[97,103,108,115,115,117,122,123,124,135,135,136,137,142,149,161,163,166,168,216]`
+  - perf scroll deltas: `[14,19,64,46,53,49,43,48,48,40,55,44,57,56,56,46,40,48,45,58,55,49]`
+- `base-12` 11:48:35, load start 2.89, max 6.73, foreign 0, rc 1, FAIL ['apps/kira-studio/tests/ui/budgets.spec.ts:372'] [('50', '157')]
+  - cell -> editor: `[18,22,22,22,23,24,25,25,25,26,26,26,27,28,29,35,37,43,121,157]`
+  - perf scroll deltas: `[8,22,58,49,58,54,56,66,65,50,46,63,56,44,42,67,46,44,53,43,44,33]`
+- `head-12` 11:47:23, load start 3.88, max 3.88, foreign 3, rc 0
+  - cell -> editor: `[19,19,20,21,21,23,26,26,26,26,26,26,27,28,28,28,31,33,38,42]`
+  - cached tree expand: `[16,16,16,17,17,18,18,18,18,18,18,18,19,19,20,21,22,23,23,32]`
+  - cached tab switch: `[94,95,96,97,98,99,109,111,113,113,114,119,121,126,127,128,129,131,141,236]`
+  - perf scroll deltas: `[3,12,37,46,39,36,36,49,35,34,31,32,37,33,32,52,40,54,43,44,42,27]`
+- `base-13` 11:56:40, load start 3.82, max 3.82, foreign 0, rc 0
+  - cell -> editor: `[13,13,13,14,14,15,15,16,17,17,17,18,18,18,19,19,20,20,22,27]`
+  - cached tree expand: `[16,17,18,18,18,18,18,18,19,19,19,20,20,21,21,23,23,24,24,38]`
+  - cached tab switch: `[89,89,90,90,92,92,94,98,108,110,113,115,116,121,127,127,136,138,173,190]`
+  - perf scroll deltas: `[1,10,42,45,44,40,34,35,36,39,51,41,40,33,34,33,36,45,73,34,34,27]`
+- `head-13` 11:54:31, load start 3.87, max 7.74, foreign 0, rc 0
+  - cell -> editor: `[14,15,15,15,15,15,15,16,16,17,17,17,17,17,17,18,19,19,25,39]`
+  - cached tree expand: `[15,15,16,16,16,16,17,17,17,17,18,18,18,19,19,19,20,21,21,27]`
+  - cached tab switch: `[88,90,93,95,100,105,106,108,110,111,111,113,115,119,119,154,162,164,165,239]`
+  - perf scroll deltas: `[0,17,46,56,51,44,72,66,72,54,55,68,48,47,45,48,45,43,73,49,44,46]`
+- `base-14` 11:58:28, load start 2.03, max 2.03, foreign 0, rc 0
+  - cell -> editor: `[13,14,14,16,16,17,17,17,17,18,18,18,18,19,19,20,20,21,22,29]`
+  - cached tree expand: `[15,16,17,17,18,18,18,18,18,19,19,20,20,21,21,22,22,23,25,27]`
+  - cached tab switch: `[91,91,97,97,98,104,110,112,113,114,115,115,118,121,121,121,127,158,169,179]`
+  - perf scroll deltas: `[1,18,43,44,39,37,37,38,44,38,37,40,48,43,36,38,44,39,37,34,34,27]`
+- `head-14` 11:57:33, load start 2.79, max 2.79, foreign 0, rc 0
+  - cell -> editor: `[14,14,15,15,15,15,16,16,17,17,18,18,19,19,20,21,21,21,22,24]`
+  - cached tree expand: `[15,16,16,16,17,17,18,18,18,18,19,19,19,20,21,21,24,24,26,36]`
+  - cached tab switch: `[86,100,100,102,102,103,103,105,112,115,120,121,125,125,128,132,134,154,167,210]`
+  - perf scroll deltas: `[8,16,40,40,44,34,35,34,36,34,32,34,34,34,49,37,36,35,33,34,33,28]`
+- `base-15` 12:00:22, load start 2.49, max 2.70, foreign 2, rc 0
+  - cell -> editor: `[13,14,16,16,16,17,17,17,17,17,18,18,18,19,19,19,23,24,25,25]`
+  - cached tree expand: `[16,17,17,18,19,19,19,19,20,20,20,21,21,21,22,24,24,26,27,41]`
+  - cached tab switch: `[89,92,92,96,99,100,103,104,105,110,111,112,114,122,122,122,130,131,160,196]`
+  - perf scroll deltas: `[6,22,35,41,43,33,35,33,40,36,36,36,35,36,38,37,36,41,63,42,33,32]`
+- `head-15` 11:59:21, load start 1.51, max 2.53, foreign 3, rc 0
+  - cell -> editor: `[15,16,17,17,18,18,19,19,20,20,20,20,21,21,22,22,22,23,24,26]`
+  - cached tree expand: `[14,16,16,16,17,17,17,17,17,18,18,18,18,18,19,20,20,20,21,22]`
+  - cached tab switch: `[84,89,95,95,99,104,106,109,113,113,114,115,117,122,130,133,137,156,157,222]`
+  - perf scroll deltas: `[1,12,43,42,59,40,46,39,37,36,38,36,48,39,37,54,38,37,40,47,38,29]`
+- `base-16` 12:02:14, load start 1.59, max 5.43, foreign 0, rc 0
+  - cell -> editor: `[15,16,16,17,18,18,19,19,20,20,20,21,22,22,22,23,23,23,25,26]`
+  - cached tree expand: `[16,16,16,17,17,17,18,18,18,18,19,19,19,19,20,20,21,21,21,41]`
+  - cached tab switch: `[89,90,90,91,91,93,94,99,106,106,113,113,115,116,121,124,128,142,146,207]`
+  - perf scroll deltas: `[10,16,39,48,43,36,36,36,40,36,39,38,44,45,53,71,43,53,52,46,39,32]`
+- `head-16` 12:01:17, load start 2.07, max 2.15, foreign 0, rc 0
+  - cell -> editor: `[12,13,14,14,15,16,16,16,17,18,19,19,20,21,21,22,23,25,27,50]`
+  - cached tree expand: `[15,15,15,16,17,17,17,17,19,20,20,21,21,22,22,23,23,23,26,28]`
+  - cached tab switch: `[97,98,98,99,100,101,113,114,119,120,121,124,131,137,138,146,146,153,163,179]`
+  - perf scroll deltas: `[0,16,55,57,48,37,60,35,37,50,56,36,49,46,36,37,48,44,39,45,46,48]`
+- `base-17` 12:25:09, load start 2.57, max 2.79, foreign 0, rc 0
+  - cell -> editor: `[12,12,13,13,13,14,14,14,15,15,15,15,16,16,16,16,17,20,21,25]`
+  - cached tree expand: `[15,16,16,18,18,18,19,19,19,20,20,20,21,21,21,21,21,22,23,25]`
+  - cached tab switch: `[93,94,95,98,98,99,100,103,110,117,119,119,125,127,127,129,132,133,150,164]`
+  - perf scroll deltas: `[6,23,47,49,40,48,39,36,45,42,34,37,44,49,38,38,38,37,56,38,36,28]`
+- `head-17` 12:24:15, load start 3.93, max 3.93, foreign 0, rc 0
+  - cell -> editor: `[13,13,14,14,15,15,16,16,16,18,18,18,19,20,21,21,21,21,22,28]`
+  - cached tree expand: `[16,16,17,17,18,18,18,18,18,19,19,19,20,20,21,21,24,25,28,31]`
+  - cached tab switch: `[95,96,96,98,105,106,108,112,115,117,118,119,119,122,124,129,131,137,139,191]`
+  - perf scroll deltas: `[14,16,39,39,39,39,41,34,35,36,36,35,36,36,37,58,36,35,38,35,33,31]`
+- `base-18` 12:26:59, load start 1.84, max 2.15, foreign 0, rc 0
+  - cell -> editor: `[15,15,15,15,16,16,17,17,17,17,18,18,18,19,19,20,21,24,25,26]`
+  - cached tree expand: `[15,16,16,17,17,17,17,18,18,19,20,20,20,21,24,26,28,29,35,37]`
+  - cached tab switch: `[86,91,91,91,92,94,94,103,107,111,113,113,117,118,118,120,120,131,149,168]`
+  - perf scroll deltas: `[3,15,42,42,65,38,50,38,37,33,33,34,33,34,33,33,34,36,34,34,34,30]`
+- `head-18` 12:26:04, load start 2.22, max 2.22, foreign 0, rc 0
+  - cell -> editor: `[14,14,14,15,16,16,17,17,17,17,17,17,17,18,19,19,19,22,23,43]`
+  - cached tree expand: `[15,16,16,16,16,17,17,17,17,17,17,18,18,18,19,19,19,20,20,24]`
+  - cached tab switch: `[88,92,93,93,93,94,94,97,115,116,118,118,119,121,125,129,131,136,140,167]`
+  - perf scroll deltas: `[0,22,39,36,34,32,36,33,38,36,34,35,34,33,31,33,35,34,33,34,33,26]`
+
+### Block 5 raw numbers, round 3 (cell -> editor only, 100 samples per run)
+
+A scratch copy of `budgets.spec.ts` in each scratch tree (`zz-cell-probe.spec.ts`, `ui` project): same setup, the cell loop runs 100 times over the first 20 rendered rows, then returns. Machine quiet (load 1.3-3.5, no foreign test process) for all 10 runs.
+
+- `head-1` max load 1.31: `[9, 9, 10, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 26, 27]`
+- `head-2` max load 2.51: `[9, 11, 11, 11, 11, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 21, 22, 23, 24, 24, 25, 25, 26, 28, 31]`
+- `head-3` max load 2.04: `[9, 10, 12, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 24, 24, 24, 24, 24, 25, 25, 26, 26, 31, 31, 292]`
+- `head-4` max load 3.21: `[9, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 22, 22, 23, 23, 23, 23, 25, 25, 35]`
+- `head-5` max load 3.47: `[8, 11, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 22, 22, 22, 23, 23, 23, 24, 24, 24, 25, 25, 25, 26, 27, 28, 31]`
+- head pooled: n 500, p50 17, p90 23, p95 24, p99 31, max 292, samples > 30 ms: 6, > 50 ms: 1
+- `base-1` max load 2.20: `[9, 10, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 21, 23, 23, 26, 30, 35]`
+- `base-2` max load 2.32: `[8, 12, 13, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 22, 22, 22, 22, 22, 23, 26, 31, 35]`
+- `base-3` max load 2.78: `[12, 12, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 22, 23, 24, 27, 38, 44]`
+- `base-4` max load 3.28: `[11, 14, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 29, 32, 35, 36]`
+- `base-5` max load 3.01: `[10, 11, 12, 12, 12, 13, 13, 13, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 24, 24, 24, 25, 25, 26, 26, 26, 27, 27, 28, 28, 29, 30, 30, 70]`
+- base pooled: n 500, p50 18, p90 23, p95 26, p99 35, max 70, samples > 30 ms: 9, > 50 ms: 1
+
+### Block 5 conclusion
+
+Counted runs (max load <= 4, no foreign test process): HEAD 6 of 18, base 6 of 18 for the full
+project; 10 of 10 for the 100-sample cell probe.
+
+- **Lead confirmed.** `percentile(values, p)` takes `sorted[floor(p/100 * n)]`
+  (`ST/ui/support/measure.ts:11-16`, copied at `ST/ui/perf.spec.ts:62-66`). For n = 20,
+  `percentile(.., 95)` is index 19, the maximum; nearest-rank p95 is index 18
+  (`ceil(0.95 * n) - 1`). Every `budgets.spec.ts` p95 gate (scroll, cell -> editor, cached tab
+  switch, cached tree expand) collects 20 samples, so each is "no single sample may exceed".
+- **Failures seen (5 in 36 runs, all `budgets.spec.ts`, none in `perf.spec.ts`):** each one is a
+  single top sample over the bound while the second largest passes easily: tree expand 52 (2nd 49,
+  HEAD, load 12.3), tab switch 310 (2nd 241, base, load 12.9), tree expand 52 (2nd 31, base, load
+  6.6), tree expand 52 (2nd 44, base, load 8.4), cell -> editor 157 (2nd 121, base, load 6.7).
+  Quiet runs passed every time, but HEAD run 16 (load 2.2) logged cell -> editor max 50 (2nd 27):
+  one sample from failing at idle.
+- **Isolated outliers occur at idle on both trees.** 100-sample probe, quiet: HEAD pooled p50 17,
+  p95 24, p99 31, one sample > 50 (292); base p50 18, p95 26, p99 35, one sample > 50 (70). About
+  1 in 500 samples is a > 50 ms outlier on either tree, so a 20-sample max fails roughly 4% of
+  quiet runs and more under load. Bootstrap over the loaded samples of the full runs: P(fail) with
+  the current max-of-20 is 7.8% (cell), 13% (tree expand), 4.4% (tab switch); with nearest-rank
+  p95 over 20 samples 0.3%, 0.7%, 0.1%; over 40 samples 0.06%, 0.26%, 0%. (The bootstrap treats
+  samples as independent; load spikes cluster, so the real gain is smaller, but the order holds.)
+- **No code regression.** HEAD and base have the same robust statistics: cell p50 median 17.5 both,
+  second-largest 21-27 vs 21-25 (quiet full runs); probe p50/p90/p95 17/23/24 vs 18/23/26. HEAD
+  failed 1 of 18 full runs, base 4 of 18. No bisect: nothing on the measured path got worse
+  (`c68b1b0`, `0044c74`, `SlickGridHost.vue`, grid CSS `0eeedb6`/`4d65b17`/`b6843c1` all inside the
+  range compared).
+- **`perf.spec.ts` scroll frame p95 is noise, not a defect of the code.** 22 rAF deltas, p95 =
+  index 20 (second largest). Quiet: HEAD p95 38-57, base 44-55 (p50 34-46 vs 32-38); loaded: 40-72
+  vs 41-70; bound 80; no failure in 36 runs. The first delta is short (0-28 ms, setup before the
+  first scroll) and pulls p50 down slightly; it never sets p95. Its margin to the bound is 23-42 ms
+  quiet, 8 ms at the worst loaded run: a failure needs heavy load, i.e. the Part 11/12 sightings
+  ran beside other suites.
+
+### F25 (medium): `ui-timing` p95 gates are max-of-20 gates (measurement defect)
+
+- `ST/ui/support/measure.ts:11-16` (`percentile`), the three p95 gates in `ST/ui/budgets.spec.ts`
+  (cell -> editor `:784`, cached tab switch `:847`, cached tree expand `:880`), and
+  `ST/ui/perf.spec.ts:62-66` (own copy).
+- Scenario: block 5. A single GC pause or late Monaco/SlickGrid frame (about 1 in 500 samples, both
+  trees, at idle) fails the whole `ui-timing` project; under load the failure rate reaches 4-13%
+  per gate.
+- Fix (PERF.md §2.1 budgets unchanged, P139 standard: the code is within budget, the statistic is
+  wrong):
+  1. The p95 gates use nearest rank: `sorted[Math.max(0, Math.ceil((p / 100) * n) - 1)]` (a
+     second helper, or a flag): applied to every gate, nearest rank would move the p50 gates
+     (`:443,:491,:501,:905`) one rank lower, a loosening this evidence does not cover.
+  2. The cell -> editor, cached tab switch and cached tree expand loops collect 40 samples, so p95
+     excludes the 2 largest (the scroll loops already gate p50 and note p95). The 40-sample cell
+     loop must cycle over at most the first 20 rendered rows (`renderedRows[i % Math.min(20,
+     renderedRows.length)]`): with the editor panel open, rows past about 20 are virtualised away
+     and the locator waits forever (seen when the probe first cycled over all rendered rows).
+  3. `perf.spec.ts` imports `percentile` from `support/measure.ts` instead of its own copy.
+  4. `logStats` also prints the second largest and the max, so a later failure shows at once
+     whether it is one outlier.
+  Cost: about +3 s per `ui-timing` run (20 extra samples each at ~20-150 ms).
+- Verified (36 full runs plus 10 probe runs, numbers above).
+
+## Summary and coverage
+
+Findings: 25. High 1 (F12). Medium 9 (F3, F5, F6, F13, F14, F15, F20, F24, F25). Low 15 (F1, F2,
+F4, F7, F8, F9, F10, F11, F16, F17, F18, F19, F21, F22, F23). No DESIGN-DECISION finding. Routed:
+F1's Go comment (`P168-routed-from-streamC.md`, "From Part 13 F1"). F7's visual baselines need a
+machine that can run `test:visual:update:studio` (a follow-up, not a routed file). Every other fix
+lands in own files or a Part 10-12 file Stream C may edit (`StreamView.vue:282` in F1,
+`data-view.spec.ts` in F20).
+
+Scratch state: two scratch worktrees (HEAD, base) and probe specs live only in the session
+scratchpad; none is committed. Both worktrees were removed (`git worktree remove`) after block 5.
+
+Coverage (155 own files):
+- Block 1, reviewed: all 29 `SF/state/*.ts`; `packages/shared/caps.ts`;
+  `SD/{uri,datagrip,mode,tree-filter,secrets}.ts`. Contract read: `PW/state/createTabsStore.ts`,
+  `createSettingsStore`, `createModeStore`, `createLayoutStore`, `createKeepAwakeStore`,
+  `createAppMetricsStore`, `createOpLogStore`, `createTerminalsStore`, `createTerminalTabs`,
+  `tabs/{types,terminalTabKind}.ts`; Go `SI/adapters/*/caps.go`, `SI/storage/model/settings.go`.
+- Block 2, reviewed: `main.ts`, `App.vue`, `fonts.ts`; `SF/workbench/{host,tabViews,modes,
+  terminalModule}.ts`, `TitleBar.vue`, `WorkbenchShell.vue`, `StatusBar.vue`, `SettingsDialog.vue`,
+  `DbMcpApprovalDialog.vue`, `UploadObjectDialog.vue`, `panels/{OperationsPanel,StudioStart}.vue`,
+  `settings/{ApiPane,CachePane,AdvancedPane,DatabaseMcpPane,ClaudeCodePane}.vue`;
+  `SF/shortcuts/{state.ts,CommandPalette.vue}`; `SF/theme/{icons.ts,EngineIcon.vue}`.
+  Skimmed (grep for the rubric's patterns, no logic read line by line):
+  `GenerateDataDialog.vue` (tab-null handling and native controls only; its generator logic is
+  Part 11's `grid/fakeData`), `panels/ProjectPanel.vue`, `settings/{AppearancePane,DataPane}.vue`,
+  `settings/types.ts`, `theme/{completion,cellClass}.ts` (small mapping tables, no state).
+- Block 3, reviewed: `project/state/tree.ts`, `ProjectTree.vue`, `TreeRow.vue`, `menus.ts`,
+  `menuItems.ts`, `ConnectionDialog.vue` (reveal, save, test, mode switch, URI; the per-kind field
+  layout skimmed), `FiltersDialog.vue`, `SchemaDialog.vue`, `ErrorPopover.vue`,
+  `DataGripImportDialog.vue`. Skimmed: `filterTree.ts`, `grouping.ts`, `filter.ts` (pure helpers
+  exercised by `tree.spec.ts`).
+- Block 4, reviewed: `playwright.config.ts`, `playwright.perf.config.ts`, `frontend/{index.html,
+  vite.config.ts,tsconfig.json}`; `ST/ui/{fixtures.ts}`, `ST/ui/support/{mockRuntime,mockStream,
+  mockStreamBrowser,measure,tree,clock,clipboard,ipcChannels,settings,bootSnapshots}`.
+  Skimmed: `frontend/{package.json,components.json,wails/runtime.js}`, `tsconfig.json`,
+  `tsconfig.tests.json`, `ST/ui/global.d.ts`, `ST/ui/support/{connect,grid,editor,editorText,
+  tooltip,dialogs,apiMode}.ts`, `ST/perf/{perfProbe,blockMeter}.ts`,
+  `ST/visual/support/pin-fonts.css`. Not read line by line, by size and role (captured fixture
+  data, checked only for use): `postgresFixture.ts`, `cellEditorCaptures.ts`, `mariadbFixture.ts`,
+  `mongoFixture.ts`, `redisFixture.ts`, `engineFixture.ts`.
+- Block 5: `budgets.spec.ts`, `perf.spec.ts`, `measure.ts` in full on the measured paths; 36 full
+  `ui-timing` runs and 10 probe runs across HEAD and base.
+- Block 6, reviewed: 9 unit specs (run together and alone); `mode-switch`, `tabs`, `datagrip-import`,
+  `tree` (waits and filter steps), `data-view` Stop step (routed F17), `visual/settings`.
+  Skimmed for the flake patterns only (fixed sleeps, non-retrying reads, `tabsSave` reads):
+  `interaction`, `control-sizing`, `connections`, `tooltips`, `mask-preview`, `leaks`,
+  `terminal-module`, `connection-dialog-tabs`, `preconnect`, `settings-apply-on-save`,
+  `operations`, `font-roles`, `workbench`, `update-dialog`, `focus-ring`, `settings-claude-code`,
+  `smoke`; visual `connection-dialog`, `terminal-module`, `workbench`; `ST/perf/tree-scroll.spec.ts`.
+- Not reached: none.
