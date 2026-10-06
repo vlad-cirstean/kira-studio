@@ -10,7 +10,7 @@ import { useConnectionsStore } from '../../state/connections';
 import type { DataTabRecord } from '../../state/tabDomain';
 import AutocompleteField from '../shared/AutocompleteField.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
-import { sqlDialectFor } from '../shared/sqlIdent';
+import { identNeedsQuoting, quoteIdent, sqlDialectFor } from '../shared/sqlIdent';
 import {
   orderByCandidates as buildOrderByCandidates,
   whereCandidates as buildWhereCandidates,
@@ -38,7 +38,14 @@ const orderByCandidates = computed(() => buildOrderByCandidates(props.tab.id, di
 function sortToText(sort: SortSpec | null): string {
   if (!sort) return '';
   if (sort.kind === 'text') return sort.text;
-  return sort.terms.map((t) => `${t.column} ${t.direction.toUpperCase()}`).join(', ');
+  return sort.terms
+    .map((t) => {
+      const column = identNeedsQuoting(dialect.value, t.column)
+        ? quoteIdent(dialect.value, t.column)
+        : t.column;
+      return `${column} ${t.direction.toUpperCase()}`;
+    })
+    .join(', ');
 }
 
 const whereText = ref('');

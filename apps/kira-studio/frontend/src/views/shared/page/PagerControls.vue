@@ -46,7 +46,7 @@ const pageCount = computed(() => {
 // result silently asked for an offset far past the end.
 function onJump(e: Event): void {
   const value = Number((e.target as HTMLInputElement).value);
-  const valid = Number.isFinite(value) && value >= 1;
+  const valid = Number.isInteger(value) && value >= 1;
   if (!valid) {
     // Resync to the actual current page rather than leaving the box permanently out of sync with
     // what the grid is really showing.
@@ -95,6 +95,7 @@ function onJump(e: Event): void {
           v-model="pageInputValue"
           type="number"
           min="1"
+          step="1"
           class="h-control w-full px-1 text-center not-focus:not-hover:border-transparent not-focus:not-hover:bg-none"
           :data-testid="`${testidPrefix}pager-page-input`"
           @change="onJump"

@@ -8,7 +8,7 @@ import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { moveId, useSortableReorder } from '@workbench/util/useSortableReorder';
-import { computed, onBeforeUnmount, ref, useTemplateRef } from 'vue';
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import { nextProjectionFromSelectedColumns } from './menu';
 import { useGridViewStore } from './state';
@@ -45,6 +45,16 @@ function initialOrder(): string[] {
   return [...kept, ...missing];
 }
 const order = ref<string[]>(initialOrder());
+
+// Meta lands after the first page; a menu opened before then seeds once it arrives, and commits
+// nothing if it closes first.
+let seeded = columnNames.value.length > 0;
+watch(columnNames, (names) => {
+  if (seeded || names.length === 0) return;
+  seeded = true;
+  selected.value = new Set(currentProjection() ?? names);
+  order.value = initialOrder();
+});
 
 function toggle(name: string): void {
   if (pkNames.value.has(name)) return; // primary key: always visible, checkbox is a no-op
@@ -86,6 +96,7 @@ useSortableReorder(
 // only while its own columnsOpen is true (v-if), so unmount fires exactly once, for the same set
 // of reasons, and commits whatever's staged in `selected`/`order` regardless of why it closed.
 onBeforeUnmount(() => {
+  if (!seeded) return;
   const nextProjection = nextProjectionFromSelectedColumns([...selected.value], columnNames.value);
   if (!sameProjection(nextProjection, currentProjection())) {
     void gridViewStore.setProjection(props.tabId, nextProjection);

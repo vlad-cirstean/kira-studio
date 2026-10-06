@@ -14,7 +14,7 @@ export function parseTextSortTerms(
   for (const raw of text.split(',')) {
     const trimmed = raw.trim();
     if (!trimmed) continue;
-    const match = trimmed.match(/^(?:"([^"]+)"|`([^`]+)`|(\w+))\b\s*(desc|asc)?/i);
+    const match = trimmed.match(/^(?:"([^"]+)"|`([^`]+)`|(\w+)\b)\s*(desc|asc)?/i);
     const name = match?.[1] ?? match?.[2] ?? match?.[3];
     if (!name || !known.has(name)) continue;
     terms.push({ column: name, direction: match?.[4]?.toLowerCase() === 'desc' ? 'desc' : 'asc' });
