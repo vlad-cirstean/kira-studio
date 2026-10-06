@@ -1,6 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { lintSql } from '@shared/domain/sql-lint';
+import { splitSqlStatements } from '@shared/domain/sql-split';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import { tryParseShellText } from '../shared/document/ejson';
 import { lexOptionsFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
@@ -37,6 +38,24 @@ function skipLineComment(text: string, i: number): number {
   return j;
 }
 
+// A `/* */` block comment starting at `text[i]` — returns the index just past it (EOF if unclosed).
+function skipBlockComment(text: string, i: number): number {
+  const end = text.indexOf('*/', i + 2);
+  return end === -1 ? text.length : end + 2;
+}
+
+// Index of the first character that is not whitespace or a `//` / `/* */` comment.
+function skipLeadingTrivia(text: string): number {
+  let i = 0;
+  while (i < text.length) {
+    if (/\s/.test(text[i])) i++;
+    else if (text[i] === '/' && text[i + 1] === '/') i = skipLineComment(text, i);
+    else if (text[i] === '/' && text[i + 1] === '*') i = skipBlockComment(text, i);
+    else break;
+  }
+  return i;
+}
+
 // A single/double-quoted run starting at `text[i]` (the opening quote itself) — `\` escapes the
 // next character. `next` is one past the closing quote when `closed`, or `text.length` when the
 // string ran to EOF unterminated.
@@ -66,6 +85,10 @@ export function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
     const c = text[i];
     if (c === '/' && text[i + 1] === '/') {
       i = skipLineComment(text, i);
+      continue;
+    }
+    if (c === '/' && text[i + 1] === '*') {
+      i = skipBlockComment(text, i);
       continue;
     }
     if (c === "'" || c === '"') {
@@ -112,11 +135,40 @@ export function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
 // against this app's own Mongo shell-literal grammar (views/shared/document/ejson.ts's
 // tryParseShellText) — not JSON.parse, which would reject valid shell input this console actually
 // accepts (unquoted keys, single quotes, ObjectId(…)/ISODate(…) constructor calls).
+//
+// Statements split exactly as Run all/Format split them (`;`, `//` comments), so each one is
+// linted on its own and an error in a later statement is never hidden behind an earlier one.
 function lintMongoConsole(text: string): ConsoleDiagnostic[] {
   if (text.trim().length === 0) return [];
-  const bracketIssues = lintMongoBrackets(text);
+  const statements = splitSqlStatements(text, {
+    ...lexOptionsFor(undefined),
+    slashSlashComments: true,
+  });
+  const issues: ConsoleDiagnostic[] = [];
+  for (const stmt of statements) {
+    for (const d of lintMongoStatement(text.slice(stmt.start, stmt.end))) {
+      issues.push({ ...d, from: d.from + stmt.start, to: d.to + stmt.start });
+    }
+  }
+  return issues;
+}
+
+function lintMongoStatement(raw: string): ConsoleDiagnostic[] {
+  const bracketIssues = lintMongoBrackets(raw);
   if (bracketIssues.length > 0) return bracketIssues;
 
+  const lead = skipLeadingTrivia(raw);
+  if (lead >= raw.length) return [];
+  const text = raw.slice(lead);
+  const shift = (d: ConsoleDiagnostic): ConsoleDiagnostic => ({
+    ...d,
+    from: d.from + lead,
+    to: d.to + lead,
+  });
+  return lintMongoShape(text).map(shift);
+}
+
+function lintMongoShape(text: string): ConsoleDiagnostic[] {
   const match = MONGO_STATEMENT_RE.exec(text);
   if (!match) {
     return [

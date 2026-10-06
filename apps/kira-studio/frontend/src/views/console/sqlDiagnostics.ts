@@ -1,7 +1,7 @@
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import type { SqlDialect } from '../shared/sqlIdent';
 import { type DdlSchema, type DdlTable, findTable } from './ddl';
-import { childrenOf, type LNode } from './sqlNodes';
+import { childrenOf, type LNode, unquotedName } from './sqlNodes';
 import { deepCompositeIdentifiers, statementsWithRefs, type TableRef } from './sqlRefs';
 
 // P18 (v1.1) D7: two diagnostics, both warnings, both bounded by what the DDL can actually prove —
@@ -69,10 +69,8 @@ function unknownColumnDiagnostics(
     const columnNode = segs[segs.length - 1];
     const qualifierNode = segs[segs.length - 2];
     if (!columnNode || !qualifierNode) continue;
-    const qualifierText = source
-      .slice(qualifierNode.from, qualifierNode.to)
-      .replace(/^["`]|["`]$/g, '');
-    const columnText = source.slice(columnNode.from, columnNode.to).replace(/^["`]|["`]$/g, '');
+    const qualifierText = unquotedName(qualifierNode, source);
+    const columnText = unquotedName(columnNode, source);
 
     let table = aliasMap.get(qualifierText.toLowerCase());
     // P12 round 2 finding #7: same CTE-shadow guard as resolveAliasMap — this fallback path

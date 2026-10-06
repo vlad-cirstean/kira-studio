@@ -3,7 +3,7 @@
 // conformance exemption doesn't cover, so this pins its behaviour first, ahead of commit 8's
 // extraction of skipLineComment/scanStringLiteral out of it.
 import { describe, expect, test } from 'bun:test';
-import { lintMongoBrackets } from '../../frontend/src/views/console/lint';
+import { consoleLintSource, lintMongoBrackets } from '../../frontend/src/views/console/lint';
 
 describe('lintMongoBrackets', () => {
   test('unterminated string literal', () => {
@@ -34,5 +34,19 @@ describe('lintMongoBrackets', () => {
       { from: 0, to: 1, severity: 'error', message: 'unbalanced {' },
       { from: 1, to: 2, severity: 'error', message: 'unbalanced [' },
     ]);
+  });
+});
+
+describe('consoleLintSource mongodb', () => {
+  const lint = consoleLintSource('mongodb') as (t: string) => unknown[];
+  test('leading comments and quotes inside block comments are not errors', () => {
+    expect(lint('// users\ndb.users.find({})')).toEqual([]);
+    expect(lint("/* don't */ db.a.find({})")).toEqual([]);
+  });
+  test('every statement is linted, offsets stay absolute', () => {
+    expect(lint('db.a.find({});\ndb.b.nope({})')).toEqual([
+      expect.objectContaining({ from: 20, to: 24, message: expect.stringContaining('nope') }),
+    ]);
+    expect(lint('db.a.find({}); db.b.find({x: })')).toHaveLength(1);
   });
 });

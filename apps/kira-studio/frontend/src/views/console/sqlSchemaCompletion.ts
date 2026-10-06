@@ -13,21 +13,18 @@ import type { EditorCompletion, EditorCompletionSource } from '../../editor/comp
 import { identNeedsQuoting, quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import type { SchemaNamespace } from './ddl';
 import { sqlKeywordCompletionSource } from './sqlKeywordCompletion';
+import { unquoteIdent } from './sqlNodes';
 import { statementsWithRefs } from './sqlRefs';
 
 // A qualifier immediately before the cursor: `<name-or-"quoted">.<partial>` — the same
 // "plain regex over doc.slice(0, offset)" technique `relationCompletionSource`/
 // `mongoCompletionSource` (`completion.ts`) already use for their own trigger positions.
-const QUALIFIED_RE = /("(?:[^"]|"")*"|`(?:[^`]|``)*`|[A-Za-z_][\w$]*)\.([\w$]*)$/;
+const QUALIFIED_RE =
+  /("(?:[^"]|"")*"|`(?:[^`]|``)*`|\[(?:[^\]]|\]\])*\]|[A-Za-z_][\w$]*)\.([\w$]*)$/;
+// P19 D14: fires only right after FROM/JOIN/UPDATE/INTO/TABLE; a column list or WHERE clause gets no
+// table-name noise.
+export const RELATION_POSITION_RE = /\b(from|join|update|into|table)\s+$/i;
 const BARE_WORD_RE = /[\w$]*$/;
-
-function unquote(raw: string): string {
-  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith('`') && raw.endsWith('`'))) {
-    const q = raw[0] as string;
-    return raw.slice(1, -1).replaceAll(q + q, q);
-  }
-  return raw;
-}
 
 function toOption(dialect: SqlDialect, entry: EditorCompletion): EditorCompletion {
   if (entry.insert !== undefined) return entry;
@@ -90,6 +87,7 @@ function aliasColumns(
 export function sqlSchemaCompletionSource(
   dialect: SqlDialect,
   namespace: SchemaNamespace,
+  relations: readonly string[] = [],
 ): EditorCompletionSource {
   const keywordSource = sqlKeywordCompletionSource(dialect);
   return (ctx) => {
@@ -98,7 +96,7 @@ export function sqlSchemaCompletionSource(
     if (qualifiedMatch) {
       const qualifierRaw = qualifiedMatch[1] as string;
       const partial = qualifiedMatch[2] as string;
-      const qualifier = unquote(qualifierRaw);
+      const qualifier = unquoteIdent(qualifierRaw);
       const from = ctx.offset - partial.length;
 
       const aliasCols = aliasColumns(dialect, namespace, ctx.doc, ctx.offset, qualifier);
@@ -128,6 +126,16 @@ export function sqlSchemaCompletionSource(
     const tableOptions: EditorCompletion[] = Object.keys(namespace).map((name) =>
       toOption(dialect, { label: name, type: 'class' }),
     );
+    // Tree-cache relations outside the namespace (other containers of a root-opened console): the
+    // first non-null source wins, so they must be merged here, not left to a separate source.
+    if (relations.length > 0 && RELATION_POSITION_RE.test(before.slice(0, from))) {
+      const known = new Set(Object.keys(namespace).map((n) => n.toLowerCase()));
+      for (const name of relations) {
+        if (known.has(name.toLowerCase())) continue;
+        known.add(name.toLowerCase());
+        tableOptions.push(toOption(dialect, { label: name, type: 'class' }));
+      }
+    }
     const keywordResult = keywordSource(ctx);
     const keywordOptions = keywordResult?.options ?? [];
     return { from, options: [...tableOptions, ...keywordOptions] };

@@ -34,15 +34,21 @@ export function isNameNode(node: LNode): boolean {
   return NAME_NODE_KINDS.has(node.name);
 }
 
+/** Strips one level of identifier quoting: `"x"`, `` `x` `` (doubled quote escapes) or SQLite `[x]`
+ *  (`]]` escapes). Anything else returns unchanged. */
+export function unquoteIdent(raw: string): string {
+  const q = raw[0];
+  if ((q === '"' || q === '`') && raw.length >= 2 && raw.endsWith(q)) {
+    return raw.slice(1, -1).replaceAll(q + q, q);
+  }
+  if (q === '[' && raw.length >= 2 && raw.endsWith(']'))
+    return raw.slice(1, -1).replaceAll(']]', ']');
+  return raw;
+}
+
 export function unquotedName(node: LNode, source: string): string {
   const raw = text(node, source);
-  if (node.name === 'QuotedIdentifier') {
-    const q = raw[0];
-    if (q === '"' || q === '`') {
-      return raw.slice(1, -1).replaceAll(q + q, q);
-    }
-  }
-  return raw;
+  return node.name === 'QuotedIdentifier' ? unquoteIdent(raw) : raw;
 }
 
 // A CompositeIdentifier's own children alternate name '.' name ['.' name ...] — every

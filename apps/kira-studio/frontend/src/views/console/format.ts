@@ -17,7 +17,10 @@ type SqlFormatterModule = typeof import('./sqlFormatterEntry');
 // D2: memoised so only the first Format press ever pays the import cost.
 let sqlFormatterModule: Promise<SqlFormatterModule> | undefined;
 function loadSqlFormatter(): Promise<SqlFormatterModule> {
-  if (!sqlFormatterModule) sqlFormatterModule = import('./sqlFormatterEntry');
+  sqlFormatterModule ??= import('./sqlFormatterEntry').catch((e: unknown) => {
+    sqlFormatterModule = undefined;
+    throw e;
+  });
   return sqlFormatterModule;
 }
 

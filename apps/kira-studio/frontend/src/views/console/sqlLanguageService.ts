@@ -3,7 +3,7 @@ import type { EditorCompletion, EditorCompletionSource } from '../../editor/comp
 import { identNeedsQuoting, quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import { type DdlSchema, namespaceFromCached, toSqlNamespace } from './ddl';
 import { sqlKeywordCompletionSource } from './sqlKeywordCompletion';
-import { sqlSchemaCompletionSource } from './sqlSchemaCompletion';
+import { RELATION_POSITION_RE, sqlSchemaCompletionSource } from './sqlSchemaCompletion';
 
 // P18 (v1.1) D1 — why this is a "language service", not a language server.
 //
@@ -20,13 +20,6 @@ import { sqlSchemaCompletionSource } from './sqlSchemaCompletion';
 // (completionSources, lintSource, hoverSource) — the same providers an LSP would run, in-process,
 // with none of the machinery a real one exists for. Don't re-litigate this from the SPEC's wording
 // alone.
-
-// P19 D14: fires only at a relation position — right after FROM/JOIN/UPDATE/INTO/TABLE — the same
-// "look at the text before the word" technique mongoCompletionSource (completion.ts) uses for its
-// own `db.` and `db.<collection>.` positions. Deliberately narrow: offering table names at a bare
-// identifier position (a column list, a WHERE clause) would flood it with irrelevant noise, and
-// bare identifiers are exactly what the keyword/schema sources already cover.
-const RELATION_POSITION_RE = /\b(from|join|update|into|table)\s+$/i;
 
 // P4: a relation name needing quotes (case-sensitive, a reserved word) gets `insert` set to its
 // quoted form, the same identNeedsQuoting/quoteIdent rule namespaceFromCached (ddl.ts) and
@@ -55,9 +48,8 @@ function relationCompletionSource(
 }
 
 /** P19 D14, widened by P22c D4 and P4: layered, not all-or-nothing. A DDL document (`schema`) still
- *  wins wholesale when one has any tables — today's schema+keyword pair, now with the relation
- *  source ranked after them so a document's own real column-aware completions are never shadowed
- *  by a bare table name. With no document, `cached` (P22c: the metadata cache's own columns for
+ *  wins wholesale when one has any tables, with `relations` merged into its table names at a
+ *  relation position (the schema source takes `relations` itself: the first non-null source wins). With no document, `cached` (P22c: the metadata cache's own columns for
  *  this console's container, state/schemaColumns.ts's cachedRelationsFor) fills in the identical
  *  schema-aware completion — table names, `table.` column completion, alias resolution — with no
  *  manual step, ALSO paired with `relations` (P4): a root-opened console's cached container and its
@@ -79,19 +71,15 @@ export function sqlCompletionSources(
 ): readonly EditorCompletionSource[] | undefined {
   if (schema.tables.length > 0) {
     return [
-      sqlSchemaCompletionSource(dialect, toSqlNamespace(schema)),
+      sqlSchemaCompletionSource(dialect, toSqlNamespace(schema), relations),
       sqlKeywordCompletionSource(dialect),
-      relationCompletionSource(relations, dialect),
     ];
   }
   if (cached.length > 0) {
     return [
-      sqlSchemaCompletionSource(dialect, namespaceFromCached(cached, dialect)),
+      // Relations from a container OTHER than the cached one (a root-opened console) merge in.
+      sqlSchemaCompletionSource(dialect, namespaceFromCached(cached, dialect), relations),
       sqlKeywordCompletionSource(dialect),
-      // P4: was missing here with no stated reason — relations from a container OTHER than the
-      // cached one (the common shape for a root-opened console, completion.ts's own root branch)
-      // were silently discarded even though the document branch above already offers this.
-      relationCompletionSource(relations, dialect),
     ];
   }
   if (relations.length > 0) {

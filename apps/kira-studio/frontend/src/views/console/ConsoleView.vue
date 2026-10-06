@@ -2,6 +2,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { EditorLanguageId } from '@shared/domain/editor';
 import {
+  type SqlStatement,
   splitSqlStatements,
   statementAtCursor,
   statementAtOffset,
@@ -420,23 +421,37 @@ function onStop(): void {
 // statement the user was working in is exactly what they expect to still be under the caret (and
 // what Run statement itself reads, P13 OQ-2). Exact whenever the statement count is preserved,
 // which D13 guarantees (a statement Format couldn't format is emitted verbatim, never dropped).
+const formatting = ref(false);
+
 function onFormat(): void {
   const kind = connectionKind.value;
-  if (!kind || !canFormat.value) return;
+  if (!kind || !canFormat.value || formatting.value) return;
   const splitOptions = splitOptionsFor(dialect.value);
-  const before = splitSqlStatements(props.tab.state.text, splitOptions);
-  const beforeIndex = before.findIndex(
-    (s) => cursorPos.value >= s.start && cursorPos.value <= s.end,
-  );
   const originalText = props.tab.state.text;
+  const before = splitSqlStatements(originalText, splitOptions);
+  // Same ownership rule Run/Explain use, so Format and Run agree on the caret's statement.
+  const beforeIndex = before.indexOf(
+    statementAtOffset(before, originalText, cursorPos.value) as SqlStatement,
+  );
+  formatting.value = true;
   void (async () => {
     // Over the inline threshold the whole pass (split, per-statement sql-formatter) runs in the
     // shared parse worker: a pasted multi-hundred-KB dump would otherwise block the main thread.
-    const result =
-      originalText.length <= INLINE_CHARS
-        ? await formatConsoleText(kind, originalText)
-        : await parse.run('console.format', { kind, text: originalText }).catch(() => null);
-    if (!result) return; // the view unmounted mid-run
+    let result: Awaited<ReturnType<typeof formatConsoleText>>;
+    try {
+      result =
+        originalText.length <= INLINE_CHARS
+          ? await formatConsoleText(kind, originalText)
+          : await parse.run('console.format', { kind, text: originalText });
+    } catch (e) {
+      // AbortError: the view unmounted mid-run.
+      if (!(e instanceof DOMException && e.name === 'AbortError')) {
+        formatError.value = e instanceof Error ? e.message : 'could not format this query';
+      }
+      return;
+    } finally {
+      formatting.value = false;
+    }
     // P108 Part 11 F13: the first Format press awaits a dynamic import('sql-formatter') — a
     // keystroke typed before it resolves used to be silently overwritten by the formatted version
     // of the OLDER text underneath it. `result` was computed against `originalText`, which is no
