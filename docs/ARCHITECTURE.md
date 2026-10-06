@@ -4532,20 +4532,12 @@ Performance:
   `review.comment.list` re-anchoring passes** (a server-side cost) — C13-12 fixed the diff-reload
   fan-out (C14-2 fixed a regression in that same split) but not the comment-reload fan-out.
 
-- **`.github/workflows/pr.yml` still has no Kira Space coverage in what's actually live, and a
-  staged fix for part of it sits unapplied.** As shipped, its `checks`/`container-tests` jobs run
-  `bun run build:studio` (Kira Studio's frontend only), `go build ./...` (covers Kira Space's Go,
-  since it is one module) and `verify:packaging` (Kira Studio's own bundle only); there is no
-  `build:vscode`, `test:webview` or `test:ui:space` step anywhere in CI. `typecheck`/`lint` already
-  cover Kira Space, since those are whole-repo scripts.
-  `docs/pending-changes/.github__workflows__pr.yml.patch` (P108 Part 2 F3/F4) stages `bun run
-  build:space` beside every `build:studio` step in both jobs and retargets the darwin `go test` list
-  onto `apps/kira-space/internal/gitclient` — still unapplied. Even once it is,
-  `build:vscode`/`test:webview`/`test:ui:space` remain absent from CI; that gap needs its own
-  follow-up. Not fixed here: `docs/DEV_ENVIRONMENT.md`'s own section explains this session
-  cannot push a `.github/workflows/*.yml` change directly (an OAuth scope limit) and requires
-  staging one under `docs/pending-changes/` for a session that can; that staging step is real,
-  separate work this phase's own icon/docs/audit scope does not cover.
+- **`.github/workflows/pr.yml` has no `build:vscode`, `test:webview` or `test:ui:space` step.**
+  `typecheck`/`lint` cover Kira Space (whole-repo scripts), `build:space` and the Space `gitclient`
+  tests run. `verify:packaging` in `pr.yml` finds no packaged bundle, so its artifact checks skip;
+  `release.yml` runs them. Closing this needs its own follow-up. This session cannot push a
+  `.github/workflows/*.yml` change (`docs/DEV_ENVIRONMENT.md`); stage it under
+  `docs/pending-changes/`.
 
 - **No light theme; `ade`'s kept tone and palette values are dark-only (P138)**. Kira Space has
   one dark `:root`; design §7 has no light palette. Kept tone text measures 1.6-2.4:1 on white

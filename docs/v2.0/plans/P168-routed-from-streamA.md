@@ -93,3 +93,9 @@ Stream A did not edit those files.
 - Fix: where each pane already shows its body-truncated note for a history entry, show "request
   field values were not stored (too large)" when `requestFieldsElided`, and the gRPC equivalent
   for `metadataElided`. Land after the Part 7 Go/SD half; before it the field is absent.
+
+## P168 Part 12 F17 (medium): Kafka tombstone UI assertion, blocked on Docker
+
+- Owner files: `apps/kira-studio/tests/ipc/kafka/kafka.frontend.spec.ts`, `kafka.fixture.ts`, `apps/kira-studio/internal/ipcfixture/kafka_test.go` (Part 5).
+- Not done in Part 8: the fixture needs a Docker recapture (`KIRA_IPC_FIXTURES=write`) and Docker is unavailable in the sandbox. Tracked as `SPEC.md` P171.
+
