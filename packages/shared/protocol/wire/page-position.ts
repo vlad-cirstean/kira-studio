@@ -59,8 +59,13 @@ strategy():Strategy {
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : Strategy.keyset;
 }
 
+truncated():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
 static startPagePosition(builder:flatbuffers.Builder) {
-  builder.startObject(6);
+  builder.startObject(7);
 }
 
 static addOffset(builder:flatbuffers.Builder, offset:number) {
@@ -87,12 +92,16 @@ static addStrategy(builder:flatbuffers.Builder, strategy:Strategy) {
   builder.addFieldInt8(5, strategy, Strategy.keyset);
 }
 
+static addTruncated(builder:flatbuffers.Builder, truncated:boolean) {
+  builder.addFieldInt8(6, +truncated, +false);
+}
+
 static endPagePosition(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createPagePosition(builder:flatbuffers.Builder, offset:number|null, pageSize:number, hasMore:boolean, nextTokenOffset:flatbuffers.Offset, prevTokenOffset:flatbuffers.Offset, strategy:Strategy):flatbuffers.Offset {
+static createPagePosition(builder:flatbuffers.Builder, offset:number|null, pageSize:number, hasMore:boolean, nextTokenOffset:flatbuffers.Offset, prevTokenOffset:flatbuffers.Offset, strategy:Strategy, truncated:boolean):flatbuffers.Offset {
   PagePosition.startPagePosition(builder);
   if (offset !== null)
     PagePosition.addOffset(builder, offset);
@@ -101,6 +110,7 @@ static createPagePosition(builder:flatbuffers.Builder, offset:number|null, pageS
   PagePosition.addNextToken(builder, nextTokenOffset);
   PagePosition.addPrevToken(builder, prevTokenOffset);
   PagePosition.addStrategy(builder, strategy);
+  PagePosition.addTruncated(builder, truncated);
   return PagePosition.endPagePosition(builder);
 }
 }

@@ -38,6 +38,7 @@ table PagePosition {
   next_token:string;            // absent == null
   prev_token:string;            // absent == null
   strategy:Strategy;
+  truncated:bool;               // console result stopped at the cap; at least one more row existed
 }
 
 // P11 D4: offsets/truncated are [uint], never [ubyte] -- a [uint] vector is 4-byte aligned by
@@ -48,6 +49,7 @@ table Chunk {
   offsets:[uint] (required);    // rowCount + 1 entries
   nulls:[ubyte] (required);     // ceil(rowCount / 8) bytes, 1 = NULL
   truncated:[uint] (required);  // sorted row indices; usually empty, never absent
+  binary:[uint];                // sorted row indices whose text is base64 of non-UTF-8 bytes; absent == none
 }
 
 table TabularPage {
@@ -92,6 +94,7 @@ table StreamPage {
   byte_size:double;
   fetched_at:double;
   visibility_timeout_seconds:int = null;   // optional scalar; SQS-only
+  max_receive_count:int = null;            // optional scalar; SQS-only, from the queue's redrive policy
 }
 
 union PageBody { TabularPage, DocumentPage, KeyValuePage, StreamPage }

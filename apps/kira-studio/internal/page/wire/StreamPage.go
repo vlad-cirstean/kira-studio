@@ -168,8 +168,21 @@ func (rcv *StreamPage) MutateVisibilityTimeoutSeconds(n int32) bool {
 	return rcv._tab.MutateInt32Slot(22, n)
 }
 
+func (rcv *StreamPage) MaxReceiveCount() *int32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(24))
+	if o != 0 {
+		v := rcv._tab.GetInt32(o + rcv._tab.Pos)
+		return &v
+	}
+	return nil
+}
+
+func (rcv *StreamPage) MutateMaxReceiveCount(n int32) bool {
+	return rcv._tab.MutateInt32Slot(24, n)
+}
+
 func StreamPageStart(builder *flatbuffers.Builder) {
-	builder.StartObject(10)
+	builder.StartObject(11)
 }
 func StreamPageAddPosition(builder *flatbuffers.Builder, position flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(position), 0)
@@ -201,6 +214,10 @@ func StreamPageAddFetchedAt(builder *flatbuffers.Builder, fetchedAt float64) {
 func StreamPageAddVisibilityTimeoutSeconds(builder *flatbuffers.Builder, visibilityTimeoutSeconds int32) {
 	builder.PrependInt32(visibilityTimeoutSeconds)
 	builder.Slot(9)
+}
+func StreamPageAddMaxReceiveCount(builder *flatbuffers.Builder, maxReceiveCount int32) {
+	builder.PrependInt32(maxReceiveCount)
+	builder.Slot(10)
 }
 func StreamPageEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

@@ -29,6 +29,8 @@ export interface TextColumnChunk {
   nulls: Uint8Array; // ceil(rowCount / 8) bytes
   /** Sorted row indices whose text was cut at MAX_CELL_BYTES. Usually empty. */
   truncated: Uint32Array;
+  /** Sorted row indices whose text is base64 of non-UTF-8 bytes. Absent when none. */
+  binary?: Uint32Array;
 }
 
 export interface PagePosition {
@@ -46,6 +48,8 @@ export interface PagePosition {
   nextToken: string | null;
   prevToken: string | null;
   strategy: 'keyset' | 'offset' | 'cursor' | 'offsetWindow' | 'batch';
+  /** Console result stopped at the result cap; at least one more row existed. Absent == false (Go omits it). */
+  truncated?: boolean;
 }
 
 // P48 F23: a page that is the whole result — no offset, no continuation, nothing more to fetch.
@@ -138,6 +142,8 @@ export interface StreamPage {
   byteSize: number;
   fetchedAt: number; // epoch ms
   visibilityTimeoutSeconds: number | null;
+  /** SQS redrive policy limit; null when none (and for Kafka). */
+  maxReceiveCount: number | null;
 }
 
 export type Page = TabularPage | DocumentPage | KeyValuePage | StreamPage;
@@ -219,12 +225,17 @@ export function isTruncated(chunk: TextColumnChunk, row: number): boolean {
   return binarySearch(chunk.truncated, row) >= 0;
 }
 
+export function isBinary(chunk: TextColumnChunk, row: number): boolean {
+  return chunk.binary !== undefined && binarySearch(chunk.binary, row) >= 0;
+}
+
 export function chunkByteSize(chunk: TextColumnChunk): number {
   return (
     chunk.data.byteLength +
     chunk.offsets.byteLength +
     chunk.nulls.byteLength +
-    chunk.truncated.byteLength
+    chunk.truncated.byteLength +
+    (chunk.binary?.byteLength ?? 0)
   );
 }
 
@@ -503,6 +514,7 @@ export interface StreamPageBuilder {
 
 export function createStreamPageBuilder(opts: {
   visibilityTimeoutSeconds: number | null;
+  maxReceiveCount?: number | null;
 }): StreamPageBuilder {
   const columnar = createColumnarBuilder(
     ['keys', 'headers', 'attrs', 'timestamps', 'bodies'] as const,
@@ -533,6 +545,7 @@ export function createStreamPageBuilder(opts: {
         byteSize,
         fetchedAt: Date.now(),
         visibilityTimeoutSeconds: opts.visibilityTimeoutSeconds,
+        maxReceiveCount: opts.maxReceiveCount ?? null,
       };
     },
   };

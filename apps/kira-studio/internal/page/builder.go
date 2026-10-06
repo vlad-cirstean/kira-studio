@@ -36,6 +36,26 @@ type PagePosition struct {
 	NextToken *string `json:"nextToken"`
 	PrevToken *string `json:"prevToken"`
 	Strategy  string  `json:"strategy"` // "keyset" | "offset" | "cursor" | "offsetWindow" | "batch"
+	// Truncated: a console result stopped at the ResultCap with at least one more row available.
+	Truncated bool `json:"truncated,omitempty"`
+}
+
+// ResultCap bounds one console result. Zero fields mean "no limit on that axis".
+type ResultCap struct {
+	Rows  int
+	Bytes int
+}
+
+// Reached reports whether a result already holding rows rows and bytes cell bytes is at the cap.
+func (c ResultCap) Reached(rows, bytes int) bool {
+	return (c.Rows > 0 && rows >= c.Rows) || (c.Bytes > 0 && bytes >= c.Bytes)
+}
+
+// CappedPosition is UnpagedPosition plus the console cap's truncation flag.
+func CappedPosition(rowCount int, truncated bool) PagePosition {
+	p := UnpagedPosition(rowCount)
+	p.Truncated = truncated
+	return p
 }
 
 // UnpagedPosition is page.ts's unpagedPosition — a page that is the whole result.
@@ -149,10 +169,32 @@ func (b *TabularPageBuilder) AppendRow(values []*string) error {
 	return nil
 }
 
+// RowCount is the number of rows appended so far.
+func (b *TabularPageBuilder) RowCount() int { return b.rowCount }
+
+// Bytes is the cell text bytes held so far, after per-cell truncation.
+func (b *TabularPageBuilder) Bytes() int {
+	total := 0
+	for _, s := range b.scratches {
+		total += s.used
+	}
+	return total
+}
+
+// SetColumns swaps the column descriptors, for a caller that streams rows before the final
+// descriptors are known. Length must match the columns the builder was created with.
+func (b *TabularPageBuilder) SetColumns(columns []ColumnDescriptor) error {
+	if len(columns) != len(b.columns) {
+		return fmt.Errorf("page: SetColumns got %d columns, builder has %d", len(columns), len(b.columns))
+	}
+	b.columns = columns
+	return nil
+}
+
 // Reverse reverses the accumulated rows before Finish — used by a keyset 'before' page.
 func (b *TabularPageBuilder) Reverse() { b.reversed = true }
 
-// Finish builds the TabularPage.
+// Finish builds the TabularPage; ByteSize is measured against the descriptors current at Finish.
 func (b *TabularPageBuilder) Finish(position PagePosition) TabularPage {
 	chunks := make([]Chunk, len(b.scratches))
 	for i, s := range b.scratches {
@@ -210,6 +252,12 @@ func (b *DocumentPageBuilder) Push(id, body string) {
 	b.bodies.appendValue(&body, row, b.maxBytes)
 	b.rowCount++
 }
+
+// RowCount is the number of documents pushed so far.
+func (b *DocumentPageBuilder) RowCount() int { return b.rowCount }
+
+// Bytes is the cell text bytes held so far.
+func (b *DocumentPageBuilder) Bytes() int { return b.ids.used + b.bodies.used }
 
 func (b *DocumentPageBuilder) Finish(position PagePosition) DocumentPage {
 	ids := b.ids.finish(b.rowCount, false)
@@ -310,6 +358,8 @@ type StreamPage struct {
 	ByteSize                 int
 	FetchedAt                int64
 	VisibilityTimeoutSeconds *int
+	// MaxReceiveCount is the SQS redrive policy limit; nil when the queue has none (or Kafka).
+	MaxReceiveCount *int
 }
 
 func (StreamPage) PageKind() PageKind { return PageKindStream }
@@ -324,11 +374,14 @@ type StreamRow struct {
 	Timestamp *string
 	// Body nil is a null cell (a Kafka tombstone), distinct from "".
 	Body *string
+	// KeyBinary/BodyBinary: the cell text is base64 of non-UTF-8 bytes (see BytesCell).
+	KeyBinary, BodyBinary bool
 }
 
 // StreamPageBuilder mirrors page.ts's StreamPageBuilder.
 type StreamPageBuilder struct {
 	visibilityTimeoutSeconds                 *int
+	maxReceiveCount                          *int
 	keys, headers, attrs, timestamps, bodies *columnScratch
 	rowCount                                 int
 }
@@ -342,15 +395,24 @@ func NewStreamPageBuilder(visibilityTimeoutSeconds *int) *StreamPageBuilder {
 	}
 }
 
+// SetMaxReceiveCount records the SQS redrive limit on the finished page.
+func (b *StreamPageBuilder) SetMaxReceiveCount(n *int) { b.maxReceiveCount = n }
+
 func (b *StreamPageBuilder) Push(row StreamRow) {
 	i := b.rowCount
 	b.keys.appendValue(row.Key, i, MaxCellBytes)
+	if row.KeyBinary {
+		b.keys.markBinary(i)
+	}
 	headers := row.Headers
 	b.headers.appendValue(&headers, i, MaxCellBytes)
 	attrs := row.Attrs
 	b.attrs.appendValue(&attrs, i, MaxCellBytes)
 	b.timestamps.appendValue(row.Timestamp, i, MaxCellBytes)
 	b.bodies.appendValue(row.Body, i, MaxCellBytes)
+	if row.BodyBinary {
+		b.bodies.markBinary(i)
+	}
 	b.rowCount++
 }
 
@@ -364,6 +426,6 @@ func (b *StreamPageBuilder) Finish(position PagePosition) StreamPage {
 		Kind: PageKindStream, Position: position, Keys: keys, Headers: headers, Attrs: attrs, Timestamps: timestamps,
 		Bodies: bodies, RowCount: b.rowCount,
 		ByteSize:  sumChunkBytes(keys, headers, attrs, timestamps, bodies),
-		FetchedAt: nowEpochMs(), VisibilityTimeoutSeconds: b.visibilityTimeoutSeconds,
+		FetchedAt: nowEpochMs(), VisibilityTimeoutSeconds: b.visibilityTimeoutSeconds, MaxReceiveCount: b.maxReceiveCount,
 	}
 }

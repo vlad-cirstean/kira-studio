@@ -106,8 +106,20 @@ func (rcv *PagePosition) MutateStrategy(n Strategy) bool {
 	return rcv._tab.MutateByteSlot(14, byte(n))
 }
 
+func (rcv *PagePosition) Truncated() bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
+	if o != 0 {
+		return rcv._tab.GetBool(o + rcv._tab.Pos)
+	}
+	return false
+}
+
+func (rcv *PagePosition) MutateTruncated(n bool) bool {
+	return rcv._tab.MutateBoolSlot(16, n)
+}
+
 func PagePositionStart(builder *flatbuffers.Builder) {
-	builder.StartObject(6)
+	builder.StartObject(7)
 }
 func PagePositionAddOffset(builder *flatbuffers.Builder, offset int32) {
 	builder.PrependInt32(offset)
@@ -127,6 +139,9 @@ func PagePositionAddPrevToken(builder *flatbuffers.Builder, prevToken flatbuffer
 }
 func PagePositionAddStrategy(builder *flatbuffers.Builder, strategy Strategy) {
 	builder.PrependByteSlot(5, byte(strategy), 0)
+}
+func PagePositionAddTruncated(builder *flatbuffers.Builder, truncated bool) {
+	builder.PrependBoolSlot(6, truncated, false)
 }
 func PagePositionEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

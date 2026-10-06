@@ -128,7 +128,8 @@ function encodeChunk(b: flatbuffers.Builder, c: TextColumnChunk): flatbuffers.Of
   const offsetsOff = wire.Chunk.createOffsetsVector(b, c.offsets);
   const nullsOff = wire.Chunk.createNullsVector(b, c.nulls);
   const truncatedOff = wire.Chunk.createTruncatedVector(b, c.truncated);
-  return wire.Chunk.createChunk(b, dataOff, offsetsOff, nullsOff, truncatedOff);
+  const binaryOff = c.binary ? wire.Chunk.createBinaryVector(b, c.binary) : 0;
+  return wire.Chunk.createChunk(b, dataOff, offsetsOff, nullsOff, truncatedOff, binaryOff);
 }
 
 function encodeColumnDescriptor(b: flatbuffers.Builder, c: ColumnDescriptor): flatbuffers.Offset {
@@ -156,6 +157,7 @@ function encodePagePosition(b: flatbuffers.Builder, p: PagePosition): flatbuffer
     nextTokenOff,
     prevTokenOff,
     encodeStrategy(p.strategy),
+    p.truncated ?? false,
   );
 }
 
@@ -231,6 +233,7 @@ function encodeStreamPage(b: flatbuffers.Builder, p: StreamPage): flatbuffers.Of
   if (p.visibilityTimeoutSeconds !== null) {
     wire.StreamPage.addVisibilityTimeoutSeconds(b, p.visibilityTimeoutSeconds);
   }
+  if (p.maxReceiveCount !== null) wire.StreamPage.addMaxReceiveCount(b, p.maxReceiveCount);
   return wire.StreamPage.endStreamPage(b);
 }
 

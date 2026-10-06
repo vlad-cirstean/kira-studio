@@ -76,8 +76,13 @@ visibilityTimeoutSeconds():number|null {
   return offset ? this.bb!.readInt32(this.bb_pos + offset) : null;
 }
 
+maxReceiveCount():number|null {
+  const offset = this.bb!.__offset(this.bb_pos, 24);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : null;
+}
+
 static startStreamPage(builder:flatbuffers.Builder) {
-  builder.startObject(10);
+  builder.startObject(11);
 }
 
 static addPosition(builder:flatbuffers.Builder, positionOffset:flatbuffers.Offset) {
@@ -118,6 +123,10 @@ static addFetchedAt(builder:flatbuffers.Builder, fetchedAt:number) {
 
 static addVisibilityTimeoutSeconds(builder:flatbuffers.Builder, visibilityTimeoutSeconds:number) {
   builder.addFieldInt32(9, visibilityTimeoutSeconds, null);
+}
+
+static addMaxReceiveCount(builder:flatbuffers.Builder, maxReceiveCount:number) {
+  builder.addFieldInt32(10, maxReceiveCount, null);
 }
 
 static endStreamPage(builder:flatbuffers.Builder):flatbuffers.Offset {

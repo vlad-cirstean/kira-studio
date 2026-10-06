@@ -82,8 +82,23 @@ truncatedArray():Uint32Array|null {
   return offset ? new Uint32Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
+binary(index: number):number|null {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.readUint32(this.bb!.__vector(this.bb_pos + offset) + index * 4) : 0;
+}
+
+binaryLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
+binaryArray():Uint32Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? new Uint32Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
+}
+
 static startChunk(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(5);
 }
 
 static addData(builder:flatbuffers.Builder, dataOffset:flatbuffers.Offset) {
@@ -160,6 +175,27 @@ static startTruncatedVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
 }
 
+static addBinary(builder:flatbuffers.Builder, binaryOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(4, binaryOffset, 0);
+}
+
+static createBinaryVector(builder:flatbuffers.Builder, data:number[]|Uint32Array):flatbuffers.Offset;
+/**
+ * @deprecated This Uint8Array overload will be removed in the future.
+ */
+static createBinaryVector(builder:flatbuffers.Builder, data:number[]|Uint8Array):flatbuffers.Offset;
+static createBinaryVector(builder:flatbuffers.Builder, data:number[]|Uint32Array|Uint8Array):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addInt32(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startBinaryVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
 static endChunk(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   builder.requiredField(offset, 4) // data
@@ -169,12 +205,13 @@ static endChunk(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createChunk(builder:flatbuffers.Builder, dataOffset:flatbuffers.Offset, offsetsOffset:flatbuffers.Offset, nullsOffset:flatbuffers.Offset, truncatedOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createChunk(builder:flatbuffers.Builder, dataOffset:flatbuffers.Offset, offsetsOffset:flatbuffers.Offset, nullsOffset:flatbuffers.Offset, truncatedOffset:flatbuffers.Offset, binaryOffset:flatbuffers.Offset):flatbuffers.Offset {
   Chunk.startChunk(builder);
   Chunk.addData(builder, dataOffset);
   Chunk.addOffsets(builder, offsetsOffset);
   Chunk.addNulls(builder, nullsOffset);
   Chunk.addTruncated(builder, truncatedOffset);
+  Chunk.addBinary(builder, binaryOffset);
   return Chunk.endChunk(builder);
 }
 }

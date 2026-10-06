@@ -36,7 +36,10 @@ function decodeChunk(c: wire.Chunk): TextColumnChunk {
   if (!data || !offsets || !nulls || !truncated) {
     throw new Error('frame: chunk is missing a buffer');
   }
-  return { data, offsets, nulls, truncated };
+  const binary = c.binaryArray();
+  return binary && binary.length > 0
+    ? { data, offsets, nulls, truncated, binary }
+    : { data, offsets, nulls, truncated };
 }
 
 // P5 C7/F8: decodeChunk's four arrays are views over the *whole received frame's* ArrayBuffer
@@ -52,6 +55,7 @@ function copyChunk(c: TextColumnChunk): TextColumnChunk {
     offsets: c.offsets.slice(),
     nulls: c.nulls.slice(),
     truncated: c.truncated.slice(),
+    ...(c.binary ? { binary: c.binary.slice() } : {}),
   };
 }
 
@@ -117,6 +121,7 @@ function decodePosition(p: wire.PagePosition): PagePosition {
     nextToken: p.nextToken(),
     prevToken: p.prevToken(),
     strategy: decodeStrategy(p.strategy()),
+    truncated: p.truncated() || undefined,
   };
 }
 
@@ -287,6 +292,7 @@ function decodeStreamPage(s: wire.StreamPage): StreamPage {
     byteSize: s.byteSize(),
     fetchedAt: s.fetchedAt(),
     visibilityTimeoutSeconds: s.visibilityTimeoutSeconds(),
+    maxReceiveCount: s.maxReceiveCount(),
   };
 }
 

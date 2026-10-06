@@ -128,6 +128,9 @@ func encodeStreamPage(b *flatbuffers.Builder, p StreamPage) flatbuffers.UOffsetT
 	if p.VisibilityTimeoutSeconds != nil {
 		wire.StreamPageAddVisibilityTimeoutSeconds(b, int32(*p.VisibilityTimeoutSeconds))
 	}
+	if p.MaxReceiveCount != nil {
+		wire.StreamPageAddMaxReceiveCount(b, int32(*p.MaxReceiveCount))
+	}
 	return wire.StreamPageEnd(b)
 }
 
@@ -139,12 +142,19 @@ func encodeChunk(b *flatbuffers.Builder, c Chunk) flatbuffers.UOffsetT {
 	offsetsOff := createUint32Vector(b, c.Offsets)
 	nullsOff := b.CreateByteVector(c.Nulls)
 	truncatedOff := createUint32Vector(b, c.Truncated)
+	var binaryOff flatbuffers.UOffsetT
+	if len(c.Binary) > 0 {
+		binaryOff = createUint32Vector(b, c.Binary)
+	}
 
 	wire.ChunkStart(b)
 	wire.ChunkAddData(b, dataOff)
 	wire.ChunkAddOffsets(b, offsetsOff)
 	wire.ChunkAddNulls(b, nullsOff)
 	wire.ChunkAddTruncated(b, truncatedOff)
+	if len(c.Binary) > 0 {
+		wire.ChunkAddBinary(b, binaryOff)
+	}
 	return wire.ChunkEnd(b)
 }
 
@@ -184,6 +194,7 @@ func encodePagePosition(b *flatbuffers.Builder, p PagePosition) flatbuffers.UOff
 		wire.PagePositionAddPrevToken(b, prevTokenOff)
 	}
 	wire.PagePositionAddStrategy(b, encodeStrategy(p.Strategy))
+	wire.PagePositionAddTruncated(b, p.Truncated)
 	return wire.PagePositionEnd(b)
 }
 

@@ -14,6 +14,7 @@ type columnScratch struct {
 	rowStart      []int
 	isNullRow     []bool
 	truncatedRows map[int]struct{}
+	binaryRows    map[int]struct{}
 }
 
 func newColumnScratch() *columnScratch {
@@ -62,6 +63,14 @@ func truncateUTF8ToBoundary(b []byte, maxBytes int) []byte {
 	return b[:end]
 }
 
+// markBinary flags row's text as base64 of non-UTF-8 bytes.
+func (s *columnScratch) markBinary(row int) {
+	if s.binaryRows == nil {
+		s.binaryRows = make(map[int]struct{})
+	}
+	s.binaryRows[row] = struct{}{}
+}
+
 // appendValue appends one row's value (nil for NULL) and reports whether it was truncated.
 func (s *columnScratch) appendValue(value *string, row int, maxBytes int) bool {
 	if value == nil {
@@ -95,6 +104,7 @@ func (s *columnScratch) finish(rowCount int, reversed bool) Chunk {
 	// `truncated` vector is (required) and must always be written, even at length zero — an
 	// omitted field decodes as `null` on the TypeScript side, not an empty array (P11 schema note).
 	truncated := make([]uint32, 0, len(s.truncatedRows))
+	var binary []uint32
 
 	cursor := 0
 	for newRow := 0; newRow < rowCount; newRow++ {
@@ -116,8 +126,11 @@ func (s *columnScratch) finish(rowCount int, reversed bool) Chunk {
 		if _, ok := s.truncatedRows[oldRow]; ok {
 			truncated = append(truncated, uint32(newRow))
 		}
+		if _, ok := s.binaryRows[oldRow]; ok {
+			binary = append(binary, uint32(newRow))
+		}
 	}
 	// truncatedRows iterates the map above in newRow order already (the loop runs newRow
 	// ascending), so the result is already sorted — no separate sort needed.
-	return Chunk{Data: data, Offsets: offsets, Nulls: nulls, Truncated: truncated}
+	return Chunk{Data: data, Offsets: offsets, Nulls: nulls, Truncated: truncated, Binary: binary}
 }

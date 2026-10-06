@@ -7,7 +7,11 @@
 // TypeScript can hand back a zero-copy Uint32Array view (P11 D4).
 package page
 
-import "sort"
+import (
+	"encoding/base64"
+	"sort"
+	"unicode/utf8"
+)
 
 // Constants, from page.ts:175-197.
 const (
@@ -43,6 +47,17 @@ type Chunk struct {
 	Offsets   []uint32
 	Nulls     []byte
 	Truncated []uint32
+	// Binary lists sorted row indices whose text is standard base64 of raw bytes that were not
+	// valid UTF-8. Nil when none.
+	Binary []uint32
+}
+
+// BytesCell returns b as cell text: as-is when valid UTF-8, else standard base64 with binary set.
+func BytesCell(b []byte) (text string, binary bool) {
+	if utf8.Valid(b) {
+		return string(b), false
+	}
+	return base64.StdEncoding.EncodeToString(b), true
 }
 
 func bitsetBytes(rowCount int) int {
@@ -67,9 +82,15 @@ func IsTruncated(chunk Chunk, row int) bool {
 	return i < len(chunk.Truncated) && chunk.Truncated[i] == uint32(row)
 }
 
+// IsBinary reports whether row's cell is base64 of non-UTF-8 bytes.
+func IsBinary(chunk Chunk, row int) bool {
+	i := sort.Search(len(chunk.Binary), func(i int) bool { return chunk.Binary[i] >= uint32(row) })
+	return i < len(chunk.Binary) && chunk.Binary[i] == uint32(row)
+}
+
 // ChunkByteSize is the real, measured byte cost of chunk — what L2 budgets against. Unchanged by
 // P11's []byte->[]uint32 switch: four uint32s of pre-encoded little-endian bytes and one []uint32
 // of the same four bytes each cost exactly the same number of bytes.
 func ChunkByteSize(chunk Chunk) int {
-	return len(chunk.Data) + len(chunk.Offsets)*4 + len(chunk.Nulls) + len(chunk.Truncated)*4
+	return len(chunk.Data) + len(chunk.Offsets)*4 + len(chunk.Nulls) + len(chunk.Truncated)*4 + len(chunk.Binary)*4
 }
