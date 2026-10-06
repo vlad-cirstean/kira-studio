@@ -81,7 +81,11 @@ auto-connect racing a tab open, or Update's own reconnect) wakes in the same ins
   `Preconnect.Stop`, and writes `states[id]` after Remove deleted it. Result: a leaked sidecar
   process and a live adapter for a deleted connection id, until app quit.
 Before `51e6259` such a waiter returned the aborted attempt's `disconnected` result, so this race
-is new.
+is new. Probe (scratch test on the package's own `fakeBackend`, deleted): Connect A on
+`slow-conn`, Connect B waiting, `Disconnect` returns `disconnected`, release the backend; final
+state is `connected` with 2 backend connects, 3 runs of 3. The Remove variant did not reproduce
+with the instant fake `Disconnect` (C's `Conns.Get` lands after the delete); a real adapter's
+slower `Disconnect` widens that window.
 Fix: hold a per-id lifecycle lock across abort plus teardown in Disconnect/Remove/Update, and take
 it in Connect before registering an attempt; or keep the old "waiter returns the aborted result"
 behaviour and only start fresh for a Connect that arrives after the teardown finished. Add a
@@ -118,9 +122,86 @@ single message flushes alone), Postman single-pass decode, depth cap and example
 
 ## Part 8: shared Go base and tooling
 
-Nothing real found in Go. Checked: `localsock` Close race and token floor (`efc14be`; both real
+### S6 (medium, tooling) release workflow lint now fails on macOS: no GNU grep
+`scripts/check-theme-classes.sh:28-40`, `docs/pending-changes/.github__workflows__release.yml.patch`,
+`.github/workflows/release.yml:111`.
+Fix `32f37fc` (Part 8 F12) makes `check-theme-classes.sh` exit 1 when no grep with `-P` exists
+(macOS BSD grep). `bun run lint` runs that script. The `release` job runs on `macos-15` and runs
+`bun run lint`. The pr.yml patch (`21cbb53`) adds `brew install grep`; the release.yml patch does
+not. Applying both patches as written still leaves the next tagged release red at its lint step,
+before packaging. Until a human applies the pr.yml patch, the macOS PR job fails the same way
+(expected, but the patch's `Why` line is the only place that says so).
+Fix: add the same `brew install grep` step before `bun run lint` in the release.yml patch. Action
+SHA pins in both patches checked against `git ls-remote`: all match their tags.
+
+Go: nothing real found. Checked: `localsock` Close race and token floor (`efc14be`; both real
 callers use 32 bytes), `toolexec` group SIGKILL on cancel (`9f92a40`), terminal registry
 pending/doomed handling and `ErrRegistryClosed` mapping (`2ffdb82`; `AbortAgent` still runs on
 that error), keep-awake toggle lock, `startupfail` rune cut, `Quitter` atomic app (`8c9030d`),
 early `CancelOp` memory (`469cf3f`; renderer op ids are `crypto.randomUUID`, so a remembered
 cancel cannot hit a reused id).
+
+## Part 3: SQL adapters
+
+Nothing real found. Checked: dialect-aware comment lexer, `ANALYSE`/`ABORT`/`INTO`, parse_bool
+prefixes and per-statement read-only re-verification for Postgres and MySQL/MariaDB (`140b4a7`;
+every `ClassifySQL`/`StripSQLComments` caller passes its dialect), `ConnGuard` acquire, release,
+cancel bookkeeping and bounded close (`3ab6aa5`; `BeginCancel` runs under the tracker lock that the
+query's own release takes, so a cancel cannot slip past `Release`), binary keyset tokens
+(`5831d1d`; ClickHouse has no keyset path, so no sibling missed), sqlite `draining` guard
+(`71453e9`), ClickHouse NULL flag, `#` comments, command drain and param escaping (`7e67680`),
+Postgres identity DDL (`c048264`), ClickHouse select list (`800c6b5`).
+
+## Part 4: document, key-value, stream, object-store adapters
+
+Nothing real found. Checked: Redis no-retry console client, blocking-command timeouts, container
+subcommand read-only gate and ref-counted eviction (`7b45362`; `WithTimeout` clones options, so
+`MaxRetries = 0` stays on the console clone), S3 bucket scope on every path-taking method, ACL
+re-send, pinned preview read, regular-file uploads (`187efdf`), Mongo per-call cancel handle,
+bare-delete refusal and collection-name parsing (`e4dc5c5`; classifier and executor share
+`parseStatement`), Kafka estimated count, partial-produce report, ordered headers, Connect cancel
+(`2352bc4`, `2908620`). Read at diff depth only, no probe: Mongo literal parser depth and
+`NumberInt` range (`299d617`), `awscfg` (`7bae46e`), Redis/SQS Connect cancel (`2c77874`).
+
+## Part 5: data plane and page wire
+
+Nothing real found. Checked: bounded adapter `Cancel`, per-id connect epoch in `Router`, cache
+drop before teardown, 64 KiB error cap, writer closing the conn on `Send` failure, oversized pages
+kept out of L2 (`6d144c8`). Read at diff depth only: null stream bodies (`21c1338`), wire schema
+removal and error codes (`f33f54f`, `1dca4ef`), golden frames and fixture capture (`c013e93`,
+`e901ab0`, `c8e0b4f`, `7f20a8f`), e2e-real build target (`b879003`).
+
+## Routed
+
+- space-go: `apps/kira-space/internal/bridge/agentsessions.go:41` `AgentSessionsChanged` has the
+  S3 shape: `Registry.OnChange` fires outside the registry lock on several goroutines, each takes
+  its own `AgentSessions()` snapshot and emits it, so an older snapshot can land last and the
+  renderer's agent list shows a closed session as live until the next change. Pre-existing, not a
+  P168 fix; low.
+
+## Dropped candidates
+
+- `EnsureOnScreen` (`a6e5ef2`) treats a 1 px overlap as on screen. The real case (display
+  unplugged, window wholly off screen) is handled; a sliver overlap needs a deliberate drag there.
+  Not verifiable without macOS.
+- `maskrules` `gen` and `adapterhost` `connects` maps never shrink: one entry per connection id
+  ever seen, bytes each. Not a real cost.
+- `InstallClaudeCode` (`8fa92d2`) can run with a URL of a server stopped meanwhile: the URL is
+  fixed (`DefaultPort`), so the registration stays correct.
+- Postman `originalRequest.header` may hold an `Authorization` header in `origin_json`: request
+  headers are stored as live data anyway, so this is consistent with the import model, not a
+  regression of F13.
+- `toolexec` group SIGKILL after reap could hit a recycled pgid: a pgid stays reserved while any
+  member lives, and an empty group returns ESRCH.
+
+## Coverage
+
+Every fixer commit of Parts 2-8 in `f40cd35..1ff382e` touching `apps/kira-studio/internal`,
+`internal`, `scripts`, `docs/pending-changes` or `apps/kira-studio/main.go` was read in full at
+diff level, with one-hop callers via `codegraph_explore` for the masking scanner and keyset
+binder. Probes (scratch tests, deleted): masked-projection tokenizer and set operations (S1, S2),
+Connect waiter versus Disconnect and Remove (S4, `-race`, no data race reported; the bug is
+logical ordering), grep wrapper error capture under `dash` (no finding). `fab7dca` (TypeScript
+`packages/api-core`) and the Part 6 TS mask parity change are outside this area.
+
+Counts: high 0, medium 4 (S1, S2, S4, S6), low 2 (S3, S5). Routed 1.
