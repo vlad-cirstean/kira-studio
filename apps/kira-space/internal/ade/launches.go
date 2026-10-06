@@ -64,6 +64,8 @@ func (b *TaskBoard) launchGate(ctx context.Context, tc *taskCtx, sb model.AdeTas
 		} else if s != nil && s.State != model.AdeSetupReady {
 			return "", invalid("preparing the worktree of %s; try again when it is ready", sb.Name)
 		}
+		// Ready at once (no prepare script): no onReady fires, so release runs held as "worktree missing".
+		b.launchHeldLocked(sb)
 	}
 	return res.Path, nil
 }
@@ -469,6 +471,12 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 	path, err := b.launchGate(ctx, tc, sb)
 	if err != nil {
 		return adewire.Launch{}, err
+	}
+	// The gate may have released a held run onto this worktree.
+	if has, err := b.deps.Tasks.HasRunningOn(sb.ID); err != nil {
+		return adewire.Launch{}, err
+	} else if has {
+		return adewire.Launch{}, invalid("a background run is working on %s", sb.Name)
 	}
 	message := args.Message
 	if message == "" {

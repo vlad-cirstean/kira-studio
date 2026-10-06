@@ -622,3 +622,31 @@ func TestRunEngine_takeOverConcurrentOpensOnce(t *testing.T) {
 		t.Fatalf("%d concurrent take overs opened the conversation, want 1", opened)
 	}
 }
+
+func TestRunEngine_startBranchReleasesRunHeldForMissingWorktree(t *testing.T) {
+	ctx := context.Background()
+	e := newEngine(t, map[string][]string{"*": {"done"}})
+	e.repo("api")
+	e.workflow(flowYAML(agentStage("build", agentStep("one", "")+agentStep("two", "        before: approval\n"))))
+	id := e.task("api")
+	e.start(id)
+	e.waitRun(id, "one/api", model.AdeRunDone)
+	sb, err := e.repos.AdeTasks.GetBranch(branchOf(t, e, id, "api"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := e.board.worktreeOf(ctx, sb)
+	if err != nil || wt == "" {
+		t.Fatalf("worktree = %q, %v", wt, err)
+	}
+	runGitQueue(t, e.code["api"].Root, "worktree", "remove", "--force", wt)
+	if err := e.board.Approve(ctx, adewire.StepArgs{TaskID: id, StageID: "build", StepID: "two"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.runs(id)["two/api"]; got.State != model.AdeRunPending || got.Note != noteWorktreeGone {
+		t.Fatalf("held run = %+v", got)
+	}
+	// Start recreates the worktree; the released run then holds the branch, so Start itself is refused.
+	_, _ = e.board.StartBranch(ctx, adewire.StartBranchArgs{BranchID: sb.ID})
+	e.waitRun(id, "two/api", model.AdeRunRunning, model.AdeRunDone)
+}
