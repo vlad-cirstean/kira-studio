@@ -97,6 +97,16 @@ test('mode switch — three mode tabs, an empty Http mode, and Studio state that
   await expect(studioTab).toHaveCount(1);
   const studioTabId = await studioTab.getAttribute('data-tab-id');
 
+  // The 1s-debounced tabsSave for the page-size change must land before the baseline, or it
+  // counts as a save caused by the mode switch under load.
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some((entry) => entry.channel === IPC.tabsSave && JSON.stringify(entry).includes('1000')),
+    )
+    .toBe(true);
+
   const panelWidthBefore = (await page.locator('[data-testid="project-panel"]').boundingBox())
     ?.width;
   const tabsSaveCallsBeforeSwitch = control
