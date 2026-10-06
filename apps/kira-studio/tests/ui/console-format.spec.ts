@@ -275,6 +275,9 @@ test('Query console — pressing Format twice shows "Already formatted" the seco
 
   await typeInto(view, page, 'select a,b from t');
   await page.click('[data-testid="console-format"]');
+  // Format applies off the main thread; a second press before it lands re-formats the unformatted
+  // text and never reports "Already formatted".
+  await expect.poll(() => consoleText(view)).toMatch(/^select\n/);
   await expect(view.locator('[data-testid="console-format-note"]')).toHaveCount(0);
 
   await page.click('[data-testid="console-format"]');
