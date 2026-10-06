@@ -244,3 +244,129 @@ fix, "verified" (scratch probe or run) or "code-read".
 - `EngineIcon.vue` covers all 10 `ConnectionKind`s; `shortcuts/state.ts` commands all reachable.
 - One `<script setup lang="ts">` per own `.vue` file (grep); no `<TooltipTrigger>` wraps a
   disabled control without `TooltipDisabledTrigger`.
+
+## Block 3: project tree and connection management
+
+### F12 (high): Filters dialog can overwrite saved tree filters with an empty set
+
+- `project/FiltersDialog.vue:48-66` (seed), `:129-134` (`onSave`); `project/state/tree.ts:201-217`
+  (`loadVisibility` is private, called only from `expand`); `project/menus.ts:139,263`.
+- The dialog seeds its draft from `treeStore.visibility[connectionId] ?? EMPTY_VISIBILITY`.
+  `visibility[id]` is loaded only by `expand()`. "Filters…" is offered on every connection row and
+  container row, connected or not, expanded or not. `onSave` calls `filtersReplace`, which
+  replaces the whole persisted set (`saveVisibility`).
+- Scenario: fresh launch; a connection whose saved filters hide `pg_catalog` and 40 paths. User
+  right-clicks the (never expanded) connection, Filters…, sees an empty dialog (no cached nodes),
+  clicks Save filters (or Cancel's neighbour by habit). The 40 hidden paths and hidden kinds are
+  replaced by `{hiddenKinds: [], hiddenPaths: []}` in the DB. Data loss, no undo.
+- Also `onSave` has no catch: a rejected `filtersReplace` leaves the dialog open with no message
+  (unhandled rejection), after `saveVisibility` already bumped the generation.
+- Fix: export `loadVisibility`; the dialog's `connectionId` watch awaits it before seeding the
+  draft (disable Save and show a loading state until then; on a load failure show the error and
+  keep Save disabled). Catch `onSave` into a dialog error line. A UI spec: `filtersList` returns a
+  non-empty set, open Filters… without expanding, Save, assert the `filtersReplace` payload equals
+  the loaded set.
+- Code-read (no UI run).
+
+### F13 (medium): Connection dialog Save has no in-flight guard
+
+- `project/ConnectionDialog.vue:394-422` (`onSave`), `:1286-1294` (Save `:disabled="!isValid"`
+  only); `state/connections.ts:246-262`.
+- Scenario: create a connection, double-click Save (or press Save twice while the keychain prompt
+  for the secret write is up). Two `connectionsCreate` calls run; both succeed; the tree shows two
+  identical connections, each with its own encrypted secret row. Edit mode issues two
+  `connectionsUpdate` calls (idempotent, so only create duplicates).
+- Fix: a `saving` ref (or `useBusyAction`) set across `saveDialog()`; Save disabled while it is
+  true. Test (`:1261`) has no gate either: two clicks race two `connectionsTest` calls; the snapshot check keeps the result honest, so only Save is a defect.
+- Code-read.
+
+### F14 (medium): switching Fields -> URI puts the typed password into a plain-text input
+
+- `project/ConnectionDialog.vue:181-185` (`d.uri = formatConnectionUri(d)`),
+  `:878-885` (URI `<Input>` has no `type="password"`), `packages/shared/domain/uri.ts:41`.
+- `formatConnectionUri` embeds `draft.password` in the URI userinfo. The password field
+  (`:858-865`) is masked and, in edit mode, gated behind local auth (P14 D1); the URI field shows
+  everything as text. Go's design is the opposite: a URI shown back never carries a password (D7
+  comment at `SI/connections/service.go:281-289`), and `in.Password` stands when the URI has none.
+- Scenario: create dialog, type a password (masked), click URI: the secret is now visible on
+  screen and in the DOM (`connection-uri` value), readable by a screen share or screenshot.
+- Fix: `formatConnectionUri({ ...d, password: null })` in `setMode('uri')`; keep `d.password` in the
+  draft so Save still sends it (Go keeps `in.Password` for a passwordless URI). Update the URI note
+  to say "password kept separately" when `d.password` is set.
+- Code-read.
+
+### F15 (medium): project tree has no arrow-key navigation (WAI-ARIA tree)
+
+- `project/TreeRow.vue:116-121` (`onKeydown` handles Space only), `:139-146` (`role="treeitem"`,
+  roving `tabindex`); `project/ProjectTree.vue:166-181` (`onTreeKeydown`: Enter plus menu
+  shortcuts). git grep: no `Arrow`/`Home`/`End` handling in `project/*.vue` or `ProjectPanel.vue`.
+  ProjectPanel's type-ahead only redirects printable keys into the search box.
+- The tree declares `role="tree"` and one tabbable row, so a keyboard user can Tab in but cannot
+  move to another row, expand (Right) or collapse (Left) a node. Carried suspect from Part 10 F13:
+  confirmed.
+- Fix: in `onTreeKeydown`, ArrowUp/ArrowDown move `selected` over `visibleRows` (and focus the row
+  after `revealKey`), Right expands or moves to the first child, Left collapses or moves to the
+  parent, Home/End jump. `revealKey` already handles virtualised rows. One UI spec step in
+  `tree.spec.ts`.
+- Code-read.
+
+### F16 (low): "Reveal in project panel" fails when the panel is hidden, and a repeated reveal never scrolls
+
+- `project/state/tree.ts:345-368` (`revealPath`), `project/ProjectTree.vue:64-71`
+  (`watch(pendingScrollKey)`, not `immediate`), `PW/components/WorkbenchShell.vue:103,121`
+  (`v-if="projectVisible"`).
+- With the panel toggled off, `ProjectTree` is unmounted: the reveal expands and selects, nothing
+  shows, and `pendingScrollKey` stays set. On the next mount the non-immediate watch never fires;
+  a second reveal of the same row writes the same value, so the watch still does not fire.
+- Fix: the tab-menu item (`state/tabKinds.ts:118`) shows the project panel first (layout store
+  `panel.project.visible = true` via its own setter); the `pendingScrollKey` watch gets
+  `{ immediate: true }`.
+- Code-read.
+
+### F17 (low): `refresh()` has no connection-epoch guard across its first await
+
+- `project/state/tree.ts:282-287`. `refresh` adds the row to `expanded`, awaits `treeInvalidate`,
+  then calls `loadChildren`, which captures the epoch only then. A disconnect landing during the
+  first await runs `dropConnectionState` (clears `expanded`, bumps the epoch); `loadChildren` then
+  starts under the new epoch and writes `children[k]` (or `errors[k]`) for a dropped connection.
+  A later `expand` returns early on the stale `children[k]` (`:256`), and the reconnect
+  invalidation skips it because `k` is no longer expanded.
+- Fix: capture `connectionEpochFor(connectionId)` at the top of `refresh` (and
+  `refreshConnection`) and return after each await when it changed.
+- Code-read.
+
+### F18 (low): tree actions drop rejections and clipboard failures
+
+- `project/menuItems.ts:101,110` and `project/menus.ts:131`: `copyText(...)` result ignored (Part 12
+  F10's class, fixed in views with `copyOrReportError`). `menus.ts:112-114` (duplicate),
+  `:176-190` (read-only), `:200-204` (delete), colour items: async `run`s whose rejection is
+  unhandled. `ProjectTree.vue:87,128` `void treeStore.expand(...)`: a rejected connect or
+  `filtersList` leaves the row collapsed with no error (`errors[k]` is set only by
+  `loadChildren`).
+- Scenario: WebKit denies clipboard write (no user activation after the menu closes); Copy URI
+  silently copies nothing. Delete fails on a busy DB; the row stays and nothing says why.
+- Fix: route each through one tree-level reporter: write the message to `treeState.errors[row.key]`
+  (the row already renders `ErrorPopover` for it), or a shared toast if Part 9 grows one. `expand`
+  catches and sets `errors[k]`.
+- Code-read.
+
+### F19 (low): `ErrorPopover.vue` hand-rolls a popover
+
+- `project/ErrorPopover.vue:1-72`: floating-ui positioning, outside-click and Escape wiring, no focus
+  management, beside an existing shadcn-vue `Popover` (`PT/components/ui/popover`). Its Copy button
+  also ignores the `copyText` promise.
+- Fix: rebuild on `Popover`/`PopoverTrigger`/`PopoverContent` (reka handles positioning, outside
+  click, Escape and focus return); keep `data-testid`s. Report a copy failure inline.
+- Code-read.
+
+### Block 3: checked, nothing to report
+
+- `loadChildren` epoch plus per-key token, `loadVisibility` single-flight plus generation,
+  `expand` collapse intent, `refreshExpanded` serial by depth: hold (P108 F9-F11).
+- `dropConnectionState` on delete and on `disconnected` only (decided, P5 D6).
+- `requestReveal` identity re-check after each await; `revealed` reset on draft swap (P108 F4);
+  `closeDialog` clears the draft; `uriNote` shows host/port/db only; no `console.*` of a secret.
+- DataGrip dialog: Import disabled while busy, report view replaces the button, selection reset on
+  each scan.
+- `SchemaDialog.vue` save catches; `filterTree.ts`/`grouping.ts`: no defect found.
+- No drag-and-drop in the project tree (git grep).
