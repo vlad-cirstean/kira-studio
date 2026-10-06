@@ -16,6 +16,10 @@ import (
 // ChunkRows sets for CHUNK_ROWS.
 const DefaultSearchLimit = gitsearch.DefaultLimit
 
+// MaxSearchLimit bounds a client-supplied limit: hits are built in memory before the frame cap
+// can refuse them.
+const MaxSearchLimit = DefaultSearchLimit * 10
+
 // handleSearchRun serves search.run: §7.8's git-backed tail scan (D12/D13). search.run carries no
 // `range`/`scope` of its own (contract.ts's own doc comment: "the tail scan is commits-only");
 // this resolves and, if needed, lazily opens the connection's current GRAPH walk exactly as
@@ -45,7 +49,7 @@ func (r *Router) handleSearchRun(ctx context.Context, c *gitsession.Conn, params
 
 	limit := DefaultSearchLimit
 	if p.Limit != nil && *p.Limit > 0 {
-		limit = *p.Limit
+		limit = min(*p.Limit, MaxSearchLimit)
 	}
 
 	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
