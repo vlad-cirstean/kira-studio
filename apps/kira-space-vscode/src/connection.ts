@@ -345,7 +345,14 @@ export class ConnectionManager implements vscode.Disposable {
     this.#socket?.destroy();
     const dialToken = ++this.#dialToken;
     const clientId = await this.#clientId;
-    const storedToken = await this.#context.secrets.get(TOKEN_SECRET_KEY);
+    // A locked/unavailable keychain must not stall the loop: dial with no token and pair afresh.
+    const storedToken = await this.#context.secrets.get(TOKEN_SECRET_KEY).then(
+      (token) => token,
+      (err: unknown) => {
+        this.#logger.log('warn', 'secret read failed, pairing afresh', { err: String(err) });
+        return undefined;
+      },
+    );
     if (dialToken !== this.#dialToken) return;
 
     const socket = net.connect(socketPath());
@@ -421,7 +428,15 @@ export class ConnectionManager implements vscode.Disposable {
         return;
       }
       case 'paired': {
-        if (resp.token) await this.#context.secrets.store(TOKEN_SECRET_KEY, resp.token);
+        if (resp.token) {
+          try {
+            await this.#context.secrets.store(TOKEN_SECRET_KEY, resp.token);
+          } catch (err) {
+            this.#logger.log('warn', 'secret store failed, token not persisted', {
+              err: String(err),
+            });
+          }
+        }
         return;
       }
       case 'pairingRequired': {
@@ -438,7 +453,13 @@ export class ConnectionManager implements vscode.Disposable {
         // branch's own immediate #dial() to run too, two dials racing over one dialToken, one of
         // them left sitting in the server's pairing queue as a dead entry (F12) beside the other.
         this.#disconnectHandledFor = dialToken;
-        await this.#context.secrets.delete(TOKEN_SECRET_KEY);
+        try {
+          await this.#context.secrets.delete(TOKEN_SECRET_KEY);
+        } catch (err) {
+          this.#logger.log('warn', 'secret delete failed, re-pairing anyway', {
+            err: String(err),
+          });
+        }
         socket.destroy();
         if (dialToken === this.#dialToken) void this.#dial();
         return;
