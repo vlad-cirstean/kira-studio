@@ -5,7 +5,12 @@ import { watch } from 'vue';
 import { useCodeReposStore } from '../../state/coderepos';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 import { useWorkspaceStore } from '../../state/workspace';
-import { disposeGitTransport, gitTransportFor } from '../git/transport';
+import {
+  disposeGitTransport,
+  gitTransportFor,
+  onTransportEvicted,
+  RELEASE_RETRY_MS,
+} from '../git/transport';
 import { createPerRepoState } from './perRepo.ts';
 import { useRepoLinksStore } from './repoLinks';
 
@@ -103,16 +108,36 @@ export const useWorktreesStore = defineStore('worktrees', () => {
     }
     state.expanded = true;
     state.error = null;
+    lease(codeRepoId);
+    void refresh(codeRepoId);
+  }
+
+  function lease(codeRepoId: string): void {
     const transport = gitTransportFor(codeRepoId);
     // §6.4: live refresh while expanded — the same repo.changed filter WorktreeState uses, so a
     // worktree created from the graph's own dialog appears without a collapse/expand round trip.
-    const off = transport.on('repo.changed', (event) => {
+    const offChanged = transport.on('repo.changed', (event) => {
       const record = codeReposStore.codeRepoRecord(codeRepoId);
       if (!record || event.repoId !== record.repoId || event.kind !== 'refsChanged') return;
       void refresh(codeRepoId);
     });
-    leases.set(codeRepoId, { transport, off });
-    void refresh(codeRepoId);
+    // The client closed on its own: the lease is dead, so take a new one while the row is expanded.
+    const offEvicted = onTransportEvicted(codeRepoId, () => {
+      leases.delete(codeRepoId);
+      offEvicted();
+      setTimeout(() => {
+        if (!isWorktreesExpanded(codeRepoId) || leases.has(codeRepoId)) return;
+        lease(codeRepoId);
+        void refresh(codeRepoId);
+      }, RELEASE_RETRY_MS);
+    });
+    leases.set(codeRepoId, {
+      transport,
+      off: () => {
+        offChanged();
+        offEvicted();
+      },
+    });
   }
 
   function collapseRepoWorktrees(codeRepoId: string): void {

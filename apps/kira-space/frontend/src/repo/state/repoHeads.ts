@@ -4,7 +4,7 @@ import { reactive, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { useCodeReposStore } from '../../state/coderepos';
 import { useWorkspaceStore } from '../../state/workspace';
-import { gitTransportFor } from '../git/transport';
+import { gitTransportFor, onTransportEvicted, RELEASE_RETRY_MS } from '../git/transport';
 
 export const useRepoHeadsStore = defineStore('repoHeads', () => {
   const codeReposStore = useCodeReposStore();
@@ -34,13 +34,21 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
     }
   }
 
+  let warned = false;
+
   /** One batched `RepoHeads` call — every row when `ids` is omitted (mount, a records change), one
    *  row for a `refsChanged` event (§12.3 trigger 3, a one-row `RepoHeads` call over the same
    *  batched method). No coalescing: each trigger fires at most once per its own event, nothing
    *  bursts this. */
   async function refreshRepoHeads(ids?: string[]): Promise<void> {
-    const rows = await control.codeWorkspaceRepoHeads(ids);
-    for (const row of rows) byRepoId.set(row.id, row.head);
+    try {
+      const rows = await control.codeWorkspaceRepoHeads(ids);
+      for (const row of rows) byRepoId.set(row.id, row.head);
+    } catch (err) {
+      // Fired without awaiting from watchers and events; keep the labels already shown.
+      if (!warned) console.warn('repoHeads: refresh failed', err);
+      warned = true;
+    }
   }
 
   // §12.3 trigger 2: an import, a remove, or a P82 worktree switch changes the row set — a new row
@@ -61,19 +69,38 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
   // too, not only one opened afterward.
   const leases = new Map<string, { transport: Transport; off: () => void }>();
 
+  function lease(id: string): void {
+    const transport = gitTransportFor(id);
+    // A checkout is what actually changes a HEAD, and it happens in the workspace's own graph.
+    const offChanged = transport.on('repo.changed', (event) => {
+      const record = codeReposStore.codeRepoRecord(id);
+      if (!record || event.repoId !== record.repoId || event.kind !== 'refsChanged') return;
+      void refreshRepoHeads([id]);
+    });
+    // The client closed on its own: the lease is dead, so take a new one while the workspace is open.
+    const offEvicted = onTransportEvicted(id, () => {
+      leases.delete(id);
+      offEvicted();
+      setTimeout(() => {
+        if (!workspaceStore.openRepos.includes(id) || leases.has(id)) return;
+        lease(id);
+        void refreshRepoHeads([id]);
+      }, RELEASE_RETRY_MS);
+    });
+    leases.set(id, {
+      transport,
+      off: () => {
+        offChanged();
+        offEvicted();
+      },
+    });
+  }
+
   watch(
     () => workspaceStore.openRepos,
     (openRepos, previous) => {
       for (const id of openRepos) {
-        if (leases.has(id)) continue;
-        const transport = gitTransportFor(id);
-        // A checkout is what actually changes a HEAD, and it happens in the workspace's own graph.
-        const off = transport.on('repo.changed', (event) => {
-          const record = codeReposStore.codeRepoRecord(id);
-          if (!record || event.repoId !== record.repoId || event.kind !== 'refsChanged') return;
-          void refreshRepoHeads([id]);
-        });
-        leases.set(id, { transport, off });
+        if (!leases.has(id)) lease(id);
       }
       if (!previous) return;
       for (const id of previous) {

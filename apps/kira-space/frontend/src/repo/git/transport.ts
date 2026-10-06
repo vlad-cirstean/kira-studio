@@ -46,7 +46,7 @@ import { Stream } from '/wails/runtime.js';
 import { useGitCredentialStore } from '../../state/gitCredential';
 import { pinia } from '../../state/pinia';
 import { forgetRepoOpen } from '../../state/repoOpenHold';
-import { createHostHandlers, gitRepoIdFor } from './hostHandlers';
+import { clearPendingTargets, createHostHandlers, gitRepoIdFor } from './hostHandlers';
 
 // Reached via state/workspace.ts's static import (main.ts imports it at module scope), before
 // app.use(pinia) runs — needs the explicit instance (state/pinia.ts's own header comment).
@@ -221,9 +221,12 @@ function createNativeGitTransport(codeRepoId: string): Transport {
   // but unreachable from `sharedClientsByCodeRepoId` for the rest of the window's life.
   channel.onClose(() => {
     remote.dispose();
-    if (sharedClientsByCodeRepoId.get(codeRepoId)?.transport === transport) {
-      sharedClientsByCodeRepoId.delete(codeRepoId);
-    }
+    const shared = sharedClientsByCodeRepoId.get(codeRepoId);
+    if (shared?.transport !== transport) return;
+    evictSharedClient(codeRepoId, shared);
+    // Leases died with the client; their holders re-lease on demand (a self-inflicted close is the
+    // only path here — an intentional one already evicted the entry).
+    for (const fn of [...(evictionListeners.get(codeRepoId) ?? [])]) fn();
   });
 
   return transport;
@@ -302,6 +305,39 @@ function leaseOf(shared: SharedClient): Transport {
 }
 
 const sharedClientsByCodeRepoId = new Map<string, SharedClient>();
+/** Pause before a lease holder re-leases after an unexpected close, so a client that keeps dying
+ *  cannot spin a redial loop. */
+export const RELEASE_RETRY_MS = 1000;
+const evictionListeners = new Map<string, Set<() => void>>();
+
+/** Runs `fn` when `codeRepoId`'s shared client closes on its own, not through
+ *  `disposeGitTransport`. Long-lived lease holders use it to re-lease; returns the unsubscribe. */
+export function onTransportEvicted(codeRepoId: string, fn: () => void): () => void {
+  let set = evictionListeners.get(codeRepoId);
+  if (!set) {
+    set = new Set();
+    evictionListeners.set(codeRepoId, set);
+  }
+  set.add(fn);
+  return () => {
+    set.delete(fn);
+    if (set.size === 0 && evictionListeners.get(codeRepoId) === set)
+      evictionListeners.delete(codeRepoId);
+  };
+}
+
+/** Everything tied to one shared client's life, whether it ended on purpose or not. */
+function evictSharedClient(codeRepoId: string, shared: SharedClient): void {
+  sharedClientsByCodeRepoId.delete(codeRepoId);
+  gitCredentialStore.dropCredentialRequests(codeRepoId);
+  // blameAnnotation.ts's `repoOpenMemo` records a `repo.open` hold scoped to this shared
+  // client's own Conn — a reopened workspace gets a new Conn, so the memo must not outlive this
+  // one (Group 3, P69 review).
+  const gitRepoId = gitRepoIdFor(codeRepoId);
+  if (gitRepoId !== undefined) forgetRepoOpen(gitRepoId);
+  for (const lease of [...shared.leases]) lease.dispose();
+  shared.transport.dispose();
+}
 
 /** One transport LEASE per call (§2.1), over one shared client per repo workspace — cached across
  *  mount/unmount of the pinned graph tab, so a cold remount reuses the same underlying stream
@@ -325,13 +361,6 @@ export function gitTransportFor(codeRepoId: string): Transport {
 export function disposeGitTransport(codeRepoId: string): void {
   const shared = sharedClientsByCodeRepoId.get(codeRepoId);
   if (!shared) return;
-  sharedClientsByCodeRepoId.delete(codeRepoId);
-  gitCredentialStore.dropCredentialRequests(codeRepoId);
-  // blameAnnotation.ts's `repoOpenMemo` records a `repo.open` hold scoped to this shared
-  // client's own Conn — a reopened workspace gets a new Conn, so the memo must not outlive this
-  // one (Group 3, P69 review).
-  const gitRepoId = gitRepoIdFor(codeRepoId);
-  if (gitRepoId !== undefined) forgetRepoOpen(gitRepoId);
-  for (const lease of [...shared.leases]) lease.dispose();
-  shared.transport.dispose();
+  clearPendingTargets(codeRepoId);
+  evictSharedClient(codeRepoId, shared);
 }
