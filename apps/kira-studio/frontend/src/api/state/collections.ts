@@ -7,6 +7,7 @@ import type {
   HttpSavedRequest,
   ImportReport,
 } from '@shared/domain/collections';
+import { defaultGrpcSavedRequest, defaultHttpSavedRequest } from '@shared/domain/collections';
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { refDebounced } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
@@ -15,6 +16,8 @@ import { computed, reactive, toRef, toRefs, watch } from 'vue';
 import { control } from '../../bridge/control';
 import {
   closeVariableSetTabsForOwner,
+  openCollectionGrpcRequestTab,
+  openCollectionRequestTab,
   patchGrpcRequestTabState,
   patchHttpRequestTabState,
   renameApiRequestTabs,
@@ -534,6 +537,24 @@ export const useCollectionsStore = defineStore('collections', () => {
     }
   }
 
+  /** Opens a request row into its tab (reusing one already bound to the row). A row deleted between
+   *  the tree listing and the fetch loads as `null` (D14's orphan case) and opens as a brand-new
+   *  saved row; any other load failure lands in `state.error` and opens nothing. P11 D12: a gRPC row
+   *  opens the 'grpc-request' kind, which the protocol column alone tells apart. */
+  async function openRequestRow(row: CollectionRowVm): Promise<void> {
+    try {
+      if (row.protocol === 'grpc') {
+        const saved = (await loadSavedGrpcRequest(row.id)) ?? defaultGrpcSavedRequest();
+        openCollectionGrpcRequestTab(row.id, row.name, saved);
+      } else {
+        const saved = (await loadSavedRequest(row.id)) ?? defaultHttpSavedRequest();
+        openCollectionRequestTab(row.id, row.name, saved);
+      }
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
   function beginRename(row: CollectionRowVm): void {
     state.selected = row.key;
     state.renamingKey = row.key;
@@ -788,6 +809,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     renameRow,
     deleteRow,
     duplicateRow,
+    openRequestRow,
     beginRename,
     cancelRename,
     submitSaveDialog,

@@ -61,17 +61,23 @@ export function apiCollectionsTreeQueryOptions() {
   };
 }
 
-// `null` means "confirmed orphan" (GetRequest threw — the row was deleted, in this window or
-// another); `undefined` (no data) means "not loaded yet". Keeps P108 F4's orphan/not-loaded split
-// exactly, without two parallel maps.
+// `null` means "confirmed orphan" (GetRequest answered E_NOT_FOUND — the row was deleted, in this
+// window or another); `undefined` (no data) means "not loaded yet". Keeps P108 F4's
+// orphan/not-loaded split exactly, without two parallel maps. Any other failure rethrows, so a
+// transient error never caches as "deleted" under staleTime: Infinity (P175 D5).
+function nullOnNotFound(err: unknown): null {
+  if ((err as { code?: string }).code === 'E_NOT_FOUND') return null;
+  throw err;
+}
+
 function apiSavedRequestQueryOptions(itemId: string) {
   return {
     queryKey: apiSavedRequestKey(itemId),
     queryFn: async (): Promise<HttpSavedRequest | null> => {
       try {
         return httpSavedRequestSchema.parse(await control.collectionsGetRequest(itemId));
-      } catch {
-        return null;
+      } catch (err) {
+        return nullOnNotFound(err);
       }
     },
     staleTime: Number.POSITIVE_INFINITY,
@@ -85,8 +91,8 @@ function apiSavedGrpcRequestQueryOptions(itemId: string) {
     queryFn: async (): Promise<GrpcSavedRequest | null> => {
       try {
         return grpcSavedRequestSchema.parse(await control.collectionsGetGrpcRequest(itemId));
-      } catch {
-        return null;
+      } catch (err) {
+        return nullOnNotFound(err);
       }
     },
     staleTime: Number.POSITIVE_INFINITY,

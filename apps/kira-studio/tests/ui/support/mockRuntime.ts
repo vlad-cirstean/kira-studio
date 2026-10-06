@@ -158,7 +158,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   terminalResize: 'TerminalService.Resize',
   terminalClose: 'TerminalService.Close',
   terminalDefaultCwd: 'TerminalService.DefaultCwd',
-  terminalShutdown: 'TerminalService.Shutdown',
 
   customScriptsList: 'CustomScriptsService.List',
   customScriptsCreate: 'CustomScriptsService.Create',
