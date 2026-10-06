@@ -105,3 +105,28 @@ func ConnectionLifecycleScenarios(t *testing.T, cfg model.ResolvedConnectionConf
 		}
 	})
 }
+
+// ConnectCancelScenario asserts that Connect honours its ctx: with the server's responses withheld
+// by proxy, a cancelled ctx must end Connect promptly with an error, never block (Part 2's
+// abortInFlight waits on it unbounded). cfg is the config that dials through proxy.
+func ConnectCancelScenario(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig, proxy *PausableProxy) {
+	t.Helper()
+	proxy.Pause()
+	t.Cleanup(func() { proxy.Resume(); _ = a.Disconnect(context.Background()) })
+	ctx, cancel := context.WithCancel(context.Background())
+	errc := make(chan error, 1)
+	go func() {
+		_, err := a.Connect(ctx, cfg, adapters.NewOpCtx("lc-connect-cancel"))
+		errc <- err
+	}()
+	time.Sleep(500 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-errc:
+		if err == nil {
+			t.Fatal("Connect on a cancelled ctx returned nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Connect still blocked 5s after its ctx was cancelled")
+	}
+}

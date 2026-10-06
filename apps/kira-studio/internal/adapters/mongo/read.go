@@ -322,7 +322,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 	// out. bson.Raw/bson.RawValue have their own codecs (rawEncodeValue/rawValueEncodeValue) that
 	// bson.MarshalExtJSON dispatches to automatically, streaming the wire bytes straight into the
 	// EJSON writer with no intermediate tree at all.
-	docs, err := adapters.RunWithAbortRace(ctx, track(), func(queryCtx context.Context) ([]bson.Raw, error) {
+	docs, err := runTracked(ctx, track, func(queryCtx context.Context) ([]bson.Raw, error) {
 		cursor, err := collection.Find(queryCtx, filter, findOpts)
 		if err != nil {
 			return nil, mapError(err)
@@ -533,7 +533,7 @@ func countRows(ctx context.Context, db *mongodriver.Database, collectionName str
 	wantsExact := filter != nil && strings.TrimSpace(*filter) != ""
 
 	if wantsExact {
-		value, err := adapters.RunWithAbortRace(ctx, track(), func(queryCtx context.Context) (int64, error) {
+		value, err := runTracked(ctx, track, func(queryCtx context.Context) (int64, error) {
 			n, err := collection.CountDocuments(queryCtx, parsedFilter, options.Count().SetComment(op.OpID))
 			if err != nil {
 				return 0, mapError(err)
@@ -549,7 +549,7 @@ func countRows(ctx context.Context, db *mongodriver.Database, collectionName str
 	// EstimatedDocumentCount has no per-call comment/killOp-fallback tag in the driver — a single
 	// fast metadata command, so this is not a gap in the cancel coverage in practice (mirrors
 	// read.ts's own note that estimatedDocumentCount() has no AbortSignal support either).
-	value, err := adapters.RunWithAbortRace(ctx, track(), func(queryCtx context.Context) (int64, error) {
+	value, err := runTracked(ctx, track, func(queryCtx context.Context) (int64, error) {
 		n, err := collection.EstimatedDocumentCount(queryCtx)
 		if err != nil {
 			return 0, mapError(err)

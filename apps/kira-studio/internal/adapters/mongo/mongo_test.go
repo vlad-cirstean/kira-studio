@@ -1077,3 +1077,79 @@ func TestMongo_Cancel_KillsServerSideOp(t *testing.T) {
 	}
 	t.Fatal("slow op still visible in $currentOp after being killed")
 }
+
+// F4: a delete with no filter argument must refuse like mongosh, never widen to {}.
+func TestMongo_Console_DeleteRequiresFilter(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	a := connectedAdapter(t, fixture)
+	path := nodePath(fixture, seg("database", testsupport.MongoDatabase))
+	exec := func(stmt string) ([]page.Page, error) {
+		return a.Execute(context.Background(), model.ConsoleRequest{Path: path, Statements: []string{stmt}}, adapters.NewOpCtx("op-del-filter"))
+	}
+	if _, err := exec(`db.del_filter_probe.insertMany([{n: 1}, {n: 2}])`); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	for _, stmt := range []string{`db.del_filter_probe.deleteMany()`, `db.del_filter_probe.deleteOne()`} {
+		_, err := exec(stmt)
+		if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
+			t.Fatalf("%s: err = %v, want E_QUERY", stmt, err)
+		}
+	}
+	pages, err := exec(`db.del_filter_probe.countDocuments({})`)
+	if err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	body := docBodyAt(t, pages[0].(page.DocumentPage), 0)
+	if body == nil || !strings.Contains(*body, `"count":{"$numberLong":"2"}`) {
+		t.Fatalf("count after refused deletes = %v, want 2", derefStr(body))
+	}
+	if _, err := exec(`db.del_filter_probe.deleteMany({})`); err != nil {
+		t.Fatalf("explicit {} deleteMany: %v", err)
+	}
+}
+
+// F3: a Stop issued while no command is executing server-side (response withheld here, as between
+// getMore batches) must still end the detached op: killOp alone cannot, so the op's own ctx is
+// cancelled and Disconnect's drain returns at once instead of waiting out its deadline.
+func TestMongo_Cancel_StopsDetachedOpBetweenCommands(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	proxy := testsupport.StartPausableProxy(t, fixture.Config)
+	a := newAdapter(t)
+	if _, err := a.Connect(context.Background(), proxy.Config(), adapters.NewOpCtx("stop-connect")); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { proxy.Resume(); _ = a.Disconnect(context.Background()) })
+	path := nodePath(fixture, seg("database", testsupport.MongoDatabase))
+
+	proxy.Pause()
+	opCtx, cancelOp := context.WithCancel(context.Background())
+	errc := make(chan error, 1)
+	go func() {
+		_, err := a.Execute(opCtx, model.ConsoleRequest{Path: path, Statements: []string{`db.widgets.find()`}}, adapters.NewOpCtx("stop-op"))
+		errc <- err
+	}()
+	time.Sleep(500 * time.Millisecond)
+	cancelOp()
+	cancelCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := a.Cancel(cancelCtx, "stop-op"); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+	if err := <-errc; err == nil {
+		t.Fatal("Execute: want E_CANCELLED, got nil")
+	}
+
+	drainCtx, cancelDrain := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelDrain()
+	start := time.Now()
+	_ = a.Disconnect(drainCtx)
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Fatalf("Disconnect took %v: the cancelled op is still running detached", elapsed)
+	}
+}
+
+func TestMongo_Connect_CancelledCtxReturns(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	proxy := testsupport.StartPausableProxy(t, fixture.Config)
+	testsupport.ConnectCancelScenario(t, newAdapter(t), proxy.Config(), proxy)
+}

@@ -27,7 +27,13 @@ type PausableProxy struct {
 // Config for the connection config that dials through it.
 func StartPausableProxy(t *testing.T, cfg model.ResolvedConnectionConfig) *PausableProxy {
 	t.Helper()
-	target := net.JoinHostPort(*cfg.Host, strconv.Itoa(*cfg.Port))
+	return StartPausableProxyTo(t, net.JoinHostPort(*cfg.Host, strconv.Itoa(*cfg.Port)), cfg)
+}
+
+// StartPausableProxyTo forwards a fresh local port to target ("host:port"); cfg is the config
+// Config re-points. Engines configured by endpoint option (sqs, s3) use Addr instead of Config.
+func StartPausableProxyTo(t *testing.T, target string, cfg model.ResolvedConnectionConfig) *PausableProxy {
+	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("proxy listen: %v", err)
@@ -113,3 +119,6 @@ func (p *PausableProxy) Config() model.ResolvedConnectionConfig {
 	cfg.Port = &port
 	return cfg
 }
+
+// Addr is the proxy's listen address, "127.0.0.1:port".
+func (p *PausableProxy) Addr() string { return p.ln.Addr().String() }

@@ -91,7 +91,7 @@ func applyUpdate(ctx context.Context, collection *mongodriver.Collection, op *ad
 		return 0, err
 	}
 	replacement := setField(parsed, "_id", id)
-	matchedCount, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (int64, error) {
+	matchedCount, err := runTracked(ctx, track, func(qctx context.Context) (int64, error) {
 		result, err := collection.ReplaceOne(qctx, bson.D{{Key: "_id", Value: id}}, replacement, options.Replace().SetComment(op.OpID))
 		if err != nil {
 			return 0, mapError(err)
@@ -114,7 +114,7 @@ func applyDelete(ctx context.Context, collection *mongodriver.Collection, op *ad
 	if err != nil {
 		return 0, err
 	}
-	deletedCount, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (int64, error) {
+	deletedCount, err := runTracked(ctx, track, func(qctx context.Context) (int64, error) {
 		result, err := collection.DeleteOne(qctx, bson.D{{Key: "_id", Value: id}}, options.DeleteOne().SetComment(op.OpID))
 		if err != nil {
 			return 0, mapError(err)
@@ -143,7 +143,7 @@ func applyInsert(ctx context.Context, collection *mongodriver.Collection, op *ad
 	if err != nil {
 		return 0, err
 	}
-	acknowledged, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (bool, error) {
+	acknowledged, err := runTracked(ctx, track, func(qctx context.Context) (bool, error) {
 		result, err := collection.InsertOne(qctx, parsed, options.InsertOne().SetComment(op.OpID))
 		if err != nil {
 			return false, mapError(err)

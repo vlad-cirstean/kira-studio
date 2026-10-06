@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -47,16 +46,10 @@ type Adapter struct {
 
 	state adapters.Guarded[connState]
 
-	// tracker replaces a bare inFlight sync.WaitGroup (F4): the old field's own doc comment claimed
-	// it tracked RunWithAbortRace's detached background goroutines, but every RunWithAbortRace call
-	// site in read.go/mutate.go/console.go passed a no-op release (func(){}), so nothing was ever
-	// actually counted — Add/Done only ever wrapped the synchronous foreground call in
-	// Read/Count/Mutate/Execute below, which returns to its caller in lockstep with the call it
-	// wraps and proves nothing about the detached goroutine RunWithAbortRace itself spawns.
-	// QueryTracker[uint64] (mirroring postgres/mysqlfamily/clickhouse's own shared tracker) is
-	// registered directly at each RunWithAbortRace call site instead (via trackerFor below), and
-	// additionally gives Disconnect a real opID Snapshot to killOp/Cancel before it Drains.
-	tracker adapters.QueryTracker[uint64]
+	// tracker registers every detached driver call (via trackerFor) so Disconnect can Snapshot,
+	// cancel and Drain them. The value is a per-call handle whose cancel stops the detached call
+	// itself, which killOp alone cannot do between cursor batches or before the command starts.
+	tracker adapters.QueryTracker[*queryHandle]
 }
 
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
@@ -77,24 +70,41 @@ func (a *Adapter) clearConnected() {
 	})
 }
 
-// queryTokenSeq hands trackerFor a unique identity per registration (F4b/c): mongo has no natural
-// per-call identity the way postgres's own backend PID is — RunWithAbortRace can return to its
-// caller well before its own goroutine actually finishes, so a later statement in the same
-// batch/op can start (and register) while an earlier one's release is still pending; without a
-// unique token, the earlier release's own identity check in QueryTracker could delete the later
-// registration out from under it.
-var queryTokenSeq atomic.Uint64
+// queryHandle is one tracked driver call's identity (pointer-unique, so a stale release never
+// deletes a later registration for the same op) and its cancel path.
+type queryHandle struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
 
-// TrackQuery is trackerFor's own release-registration hook, threaded down to read.go/mutate.go/
-// console.go's RunWithAbortRace call sites in place of the previous no-op release (F4b).
-type TrackQuery func() (release func())
+// TrackQuery registers one driver call and returns its release and handle; runTracked consumes both.
+type TrackQuery func() (release func(), h *queryHandle)
 
-// trackerFor is Read/Count/Mutate/Execute's own registration hook (F4b/c).
+// trackerFor is Read/Count/Mutate/Execute's own registration hook.
 func (a *Adapter) trackerFor(opID string) TrackQuery {
 	register := a.tracker.TrackerFor(opID)
-	return func() (release func()) {
-		return register(queryTokenSeq.Add(1))
+	return func() (func(), *queryHandle) {
+		ctx, cancel := context.WithCancel(context.Background())
+		h := &queryHandle{ctx: ctx, cancel: cancel}
+		release := register(h)
+		return func() {
+			release()
+			cancel()
+		}, h
 	}
+}
+
+// runTracked runs issue under RunWithAbortRace on a ctx that Cancel can stop: RunWithAbortRace's
+// own detached ctx has no cancel path, so a Stop landing between cursor batches would leave the
+// fetch running.
+func runTracked[T any](ctx context.Context, track TrackQuery, issue func(context.Context) (T, error)) (T, error) {
+	release, h := track()
+	return adapters.RunWithAbortRace(ctx, release, func(qctx context.Context) (T, error) {
+		qctx, cancel := context.WithCancel(qctx)
+		defer cancel()
+		defer context.AfterFunc(h.ctx, cancel)()
+		return issue(qctx)
+	})
 }
 
 func (a *Adapter) Kind() string        { return "mongodb" }
@@ -375,6 +385,18 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	if client == nil {
 		return false, nil
 	}
+	// killOp needs the command executing server-side; the handle covers every moment it is not
+	// (between getMore batches, before dispatch). A killed op ends with the server's own error, so
+	// the handle is cancelled only when killOp found nothing.
+	h, tracked := a.tracker.PopRunning(opID)
+	killed := a.killOp(ctx, client, opID)
+	if tracked && !killed {
+		h.cancel()
+	}
+	return killed || tracked, nil
+}
+
+func (a *Adapter) killOp(ctx context.Context, client *mongodriver.Client, opID string) bool {
 	admin := client.Database("admin")
 	pipeline := mongodriver.Pipeline{
 		{{Key: "$currentOp", Value: bson.D{{Key: "allUsers", Value: false}, {Key: "idleConnections", Value: false}}}},
@@ -383,13 +405,13 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	cursor, err := admin.Aggregate(ctx, pipeline)
 	if err != nil {
 		a.deps.Log("warn", "mongodb cancel("+opID+") failed: "+err.Error())
-		return false, nil
+		return false
 	}
 	defer cursor.Close(ctx)
 	var ops []currentOpEntry
 	if err := cursor.All(ctx, &ops); err != nil {
 		a.deps.Log("warn", "mongodb cancel("+opID+") failed: "+err.Error())
-		return false, nil
+		return false
 	}
 	killed := false
 	for _, op := range ops {
@@ -398,9 +420,9 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 		}
 		if err := admin.RunCommand(ctx, bson.D{{Key: "killOp", Value: 1}, {Key: "op", Value: op.OpID}}).Err(); err != nil {
 			a.deps.Log("warn", "mongodb cancel("+opID+") failed: "+err.Error())
-			return false, nil
+			return false
 		}
 		killed = true
 	}
-	return killed, nil
+	return killed
 }
