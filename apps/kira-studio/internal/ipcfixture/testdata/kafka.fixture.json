@@ -45,6 +45,7 @@
           "keyValue": false,
           "stream": true,
           "keyBrowser": false,
+          "keyTypes": false,
           "defaultPageKind": "stream",
           "sql": false,
           "definition": true,
@@ -61,8 +62,7 @@
           "writable": true,
           "transactions": false,
           "cancel": true,
-          "fileTransfer": false,
-          "keyTypes": false
+          "fileTransfer": false
         }
       }
     },

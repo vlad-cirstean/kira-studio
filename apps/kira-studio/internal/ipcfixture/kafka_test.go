@@ -152,11 +152,7 @@ func TestFixture_Kafka(t *testing.T) {
 	if partitionsSection == nil || len(partitionsSection.Rows) != testsupport.KafkaOrdersPartitionCount {
 		t.Fatalf("Partitions section = %+v, want %d rows", partitionsSection, testsupport.KafkaOrdersPartitionCount)
 	}
-	// P58e E11 (see frozen.go's configSectionMaskedPlaceholder doc comment): unlike the deleted
-	// TypeScript engine's own kafkajs binding, this Go adapter's kadm.DescribeTopicConfigs call
-	// succeeds, so the Configuration section is genuinely populated — not the permanent "could not
-	// be read"/zero-rows state every committed fixture reflects. The section's own content is
-	// masked wholesale at comparison time (frozen.go), so only its presence matters here.
+	// The Configuration section is compared row for row against the committed fixture.
 	if sectionByTitle(topicDefinitionResult.Definition.Sections, "Configuration") == nil {
 		t.Fatalf("expected a Configuration section, got %+v", topicDefinitionResult.Definition.Sections)
 	}

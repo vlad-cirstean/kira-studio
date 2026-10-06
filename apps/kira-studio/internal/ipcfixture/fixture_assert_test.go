@@ -13,15 +13,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// committedJSONFixture is one adapter's testdata/<adapter>.fixture.json: a JSON transcription of
-// the committed tests/ipc/<adapter>/<adapter>.fixture.ts, produced once via `bun run` and never
-// hand-edited — the TypeScript file stays authoritative; this is a fast-loop-friendly copy of it
-// so a TestFixture_* needs no Node at all to run (§4.2: "no GTK/WebKit headers").
-type committedJSONFixture struct {
-	ControlSnapshots []ControlSnapshot `json:"controlSnapshots"`
-	PortSnapshots    []PortSnapshot    `json:"portSnapshots"`
-}
-
 // readFirstIDThenFilterToOne is clickhouse_test.go's and mysql_test.go's own shared shape (P107
 // I2-28): read tablePath's first page, pull the first row's id column, then re-read filtered to
 // `id = '<value>'` and assert exactly one row survives. Neither caller reuses readReq/tabular
@@ -144,7 +135,7 @@ func maybeWriteFixture(t *testing.T, rec *Recorder, adapterName string) bool {
 		return false
 	}
 	path := FixturePathFor(repoRootForWrite(t), adapterName)
-	if err := WriteFixtureModule(path, adapterName, rec.Control, rec.Port); err != nil {
+	if err := WriteFixtureModule(path, filepath.Join("testdata", adapterName+".fixture.json"), adapterName, rec.Control, rec.Port); err != nil {
 		t.Fatalf("ipcfixture: write fixture %s: %v", adapterName, err)
 	}
 	t.Logf("ipcfixture: wrote %s (KIRA_IPC_FIXTURES=write)", path)

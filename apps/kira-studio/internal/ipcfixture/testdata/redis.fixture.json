@@ -36,7 +36,7 @@
       "response": {
         "connectionId": "test-redis",
         "status": "connected",
-        "serverVersion": "Redis 8.10.1",
+        "serverVersion": "Redis 8.10.2",
         "error": null,
         "since": 0,
         "caps": {
@@ -45,6 +45,7 @@
           "keyValue": true,
           "stream": false,
           "keyBrowser": true,
+          "keyTypes": true,
           "defaultPageKind": "keyvalue",
           "sql": true,
           "definition": false,
@@ -61,8 +62,7 @@
           "writable": true,
           "transactions": false,
           "cancel": true,
-          "fileTransfer": false,
-          "keyTypes": true
+          "fileTransfer": false
         }
       }
     },

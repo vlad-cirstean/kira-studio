@@ -263,18 +263,6 @@ const coordinatorPlaceholder = "fixture-broker-host:0"
 // JSON — see the "protocolType" case in MaskContinuationTokens for the full attribution.
 const protocolTypePlaceholder = "<protocolType>"
 
-// configSectionMaskedPlaceholder is what MaskContinuationTokens substitutes for a kafka topic
-// definition's own "Configuration" section rows and its statements doc's own "config" array.
-//
-// P58e E11 (kafka/definition.go's own comment): the Configuration section is populated via
-// kadm.DescribeTopicConfigs, a capability this Go adapter has that the deleted TypeScript engine's
-// own kafkajs binding never did ("this binding simply does not wrap [DescribeConfigs]") — every
-// committed fixture reflects the pre-E11 state (a permanent "could not be read" note, zero rows).
-// That capability gap closed well before P58f; the committed content is simply stale for this one
-// subtree, not a P58f-port non-determinism, so it is masked wholesale here (both sides) rather
-// than reproduced or diffed row for row against a fixture from before the capability existed.
-const configSectionMaskedPlaceholder = "<configuration-masked-P58e-E11>"
-
 // canonicalizeJSONTextEntries re-parses every string element of arr that is itself JSON text,
 // recursively masks the parsed value through MaskContinuationTokens, and re-serializes it —
 // applied to a stream page's own "attrs"/"headers" entries and an ObjectDefinition's own
@@ -346,12 +334,11 @@ func MaskContinuationTokens(v any) {
 // applyStructuralMasks runs MaskContinuationTokens' own cross-field rules on one map — each keys
 // off more than one field together (or a field's own value, not just its name), so none of them
 // fit the {key, mask} shape keyMaskRules below is built from. Same rules, same order as the
-// single switch this map arm used to open with, split across three group-specific helpers only to
+// single switch this map arm used to open with, split across two group-specific helpers only to
 // stay under one function's own complexity budget.
 func applyStructuralMasks(t map[string]any) {
 	dropGroupTypeFields(t)
 	maskGroupRowByName(t)
-	maskTopicSections(t)
 }
 
 // dropGroupTypeFields drops kadm.DescribedGroup's own Type/PartitionAssignor fields — from a
@@ -420,35 +407,6 @@ func maskGroupRowByName(t map[string]any) {
 	case "protocolType":
 		if _, hasValue := t["value"]; hasValue {
 			t["value"] = protocolTypePlaceholder
-		}
-	}
-}
-
-// maskTopicSections masks a kafka topic's own ObjectDefinition (see configSectionMaskedPlaceholder's
-// own doc comment for the P58e E11 attribution): the Configuration section's rows, the definition's
-// own notes (a permanent "could not be read" note pre-E11, empty post-E11), and — once
-// canonicalizeJSONTextEntries below parses the same topic's own statements doc —
-// {partitions, config}'s config field (kafka/definition.go's own doc struct), are all masked
-// wholesale rather than compared row for row against a fixture captured before the capability
-// existed.
-func maskTopicSections(t map[string]any) {
-	if kind, _ := t["kind"].(string); kind == "topic" {
-		if sections, ok := t["sections"].([]any); ok {
-			for _, s := range sections {
-				if sm, ok := s.(map[string]any); ok {
-					if title, _ := sm["title"].(string); title == "Configuration" {
-						sm["rows"] = []any{configSectionMaskedPlaceholder}
-					}
-				}
-			}
-		}
-		if _, hasNotes := t["notes"]; hasNotes {
-			t["notes"] = []any{}
-		}
-	}
-	if _, hasPartitions := t["partitions"]; hasPartitions {
-		if _, hasConfig := t["config"]; hasConfig {
-			t["config"] = []any{configSectionMaskedPlaceholder}
 		}
 	}
 }
