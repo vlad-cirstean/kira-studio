@@ -129,7 +129,14 @@ function encodeChunk(b: flatbuffers.Builder, c: TextColumnChunk): flatbuffers.Of
   const nullsOff = wire.Chunk.createNullsVector(b, c.nulls);
   const truncatedOff = wire.Chunk.createTruncatedVector(b, c.truncated);
   const binaryOff = c.binary ? wire.Chunk.createBinaryVector(b, c.binary) : 0;
-  return wire.Chunk.createChunk(b, dataOff, offsetsOff, nullsOff, truncatedOff, binaryOff);
+  // Not createChunk: under forceDefaults an absent `binary` would be written as a null offset.
+  wire.Chunk.startChunk(b);
+  wire.Chunk.addData(b, dataOff);
+  wire.Chunk.addOffsets(b, offsetsOff);
+  wire.Chunk.addNulls(b, nullsOff);
+  wire.Chunk.addTruncated(b, truncatedOff);
+  if (binaryOff) wire.Chunk.addBinary(b, binaryOff);
+  return wire.Chunk.endChunk(b);
 }
 
 function encodeColumnDescriptor(b: flatbuffers.Builder, c: ColumnDescriptor): flatbuffers.Offset {
