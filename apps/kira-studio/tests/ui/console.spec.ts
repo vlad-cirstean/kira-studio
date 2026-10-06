@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
@@ -994,6 +995,15 @@ function mongoCreateArgs(name: string) {
   };
 }
 
+async function clipboardJsonLength(page: Page): Promise<number> {
+  try {
+    const parsed = JSON.parse(await lastClipboardWrite(page));
+    return Array.isArray(parsed) ? parsed.length : -1;
+  } catch {
+    return -1;
+  }
+}
+
 test('Query console — a Mongo document result copies as JSON, one row or all displayed (P19 D6/D11)', async ({
   relaunch,
 }) => {
@@ -1108,7 +1118,8 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
   await page.locator('[data-testid="menu-item-copy-all-submenu"]').hover();
   await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-all-as-json"]');
-  expect(JSON.parse(await lastClipboardWrite(page))).toHaveLength(3);
+  // Copy all encodes on a worker, so the clipboard write lands after the click returns.
+  await expect.poll(() => clipboardJsonLength(page)).toBe(3);
 
   // --- every displayed row, shell mode (documents joined by a newline, not a JSON array) ------
   await docRows.nth(0).click({ button: 'right' });
@@ -1116,8 +1127,8 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
   await page.locator('[data-testid="menu-item-copy-all-submenu"]').hover();
   await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-all-shell"]');
+  await expect.poll(async () => (await lastClipboardWrite(page)).split('\n').length).toBe(3);
   const allShell = await lastClipboardWrite(page);
-  expect(allShell.split('\n')).toHaveLength(3);
   expect(allShell).toContain('ObjectId("000000000000000000000000")');
 
   // --- narrowed to what the find-filter actually shows ----------------------------------------
@@ -1134,7 +1145,7 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
   await page.locator('[data-testid="menu-item-copy-all-submenu"]').hover();
   await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-all-as-json"]');
+  await expect.poll(() => clipboardJsonLength(page)).toBe(1);
   const filtered = JSON.parse(await lastClipboardWrite(page));
-  expect(filtered).toHaveLength(1);
   expect(filtered[0].name).toBe('beta');
 });
