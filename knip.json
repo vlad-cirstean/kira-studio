@@ -49,6 +49,9 @@
         "packages/db-fixtures/fixtures/*.ts",
         "packages/db-fixtures/support/*.ts"
       ],
+      // Project holds no SFC or CSS: drop root's Vue and Tailwind compilers.
+      "vue": false,
+      "tailwind": false,
       "project": ["scripts/**/*.ts", "packages/db-fixtures/**/*.ts"]
     },
     "apps/kira-studio/frontend": {
@@ -76,7 +79,7 @@
         // playwright.config.ts dropped (P94 pass 3 §3.2): knip's own Playwright plugin already
         // reaches it — a redundant entry pattern.
       ],
-      "project": ["src/**/*.{ts,vue}", "tests/**/*.ts"]
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
     },
     "packages/shared": { "entry": ["**/*.ts"], "project": ["**/*.ts"] },
     "packages/theme": {
@@ -125,7 +128,7 @@
       // src/index.ts and src/icons/setiFileIcon.ts both dropped (P94 pass 3 §3.2) — knip already
       // reaches both through package.json's own `main`/`exports` field.
       "entry": ["src/**/*.test.ts"],
-      "project": ["src/**/*.{ts,vue}"]
+      "project": ["src/**/*.{ts,vue,css}"]
     },
     "packages/kira-ui": {
       // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.

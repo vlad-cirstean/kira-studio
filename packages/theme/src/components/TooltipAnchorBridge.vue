@@ -20,4 +20,4 @@ defineExpose({
 });
 </script>
 
-<template></template>
+<template><slot /></template>

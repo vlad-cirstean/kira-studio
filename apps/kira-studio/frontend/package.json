@@ -12,6 +12,7 @@
   "dependencies": {
     "@kira/api-core": "workspace:*",
     "@kira/kira-ui": "workspace:*",
+    "vue": "3.5.42",
     "zod": "4.6.5"
   }
 }

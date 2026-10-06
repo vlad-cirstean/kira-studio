@@ -84,6 +84,7 @@
         "@kira/git-core": "workspace:*",
         "@kira/git-ipc": "workspace:*",
         "@kira/git-ui": "workspace:*",
+        "vue": "3.5.42",
         "zod": "4.6.5",
       },
     },
@@ -93,6 +94,7 @@
       "dependencies": {
         "@kira/api-core": "workspace:*",
         "@kira/kira-ui": "workspace:*",
+        "vue": "3.5.42",
         "zod": "4.6.5",
       },
     },
@@ -171,12 +173,16 @@
     "packages/theme": {
       "name": "@kira/theme",
       "version": "0.0.0",
+      "dependencies": {
+        "vue": "3.5.42",
+      },
     },
     "packages/workbench": {
       "name": "@kira/workbench",
       "version": "0.0.0",
       "dependencies": {
         "@kira/kira-ui": "workspace:*",
+        "vue": "3.5.42",
       },
     },
   },

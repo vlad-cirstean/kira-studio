@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@kira/kira-ui": "workspace:*"
+    "@kira/kira-ui": "workspace:*",
+    "vue": "3.5.42"
   }
 }
