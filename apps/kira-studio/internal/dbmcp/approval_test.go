@@ -238,8 +238,8 @@ func TestApprovalBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 	}
 
 	out := b.Request(context.Background(), ApprovalRequest{ConnectionID: "over-cap"})
-	if out != ApprovalDenied {
-		t.Fatalf("over-cap outcome: got %v, want ApprovalDenied", out)
+	if out != ApprovalQueueFull {
+		t.Fatalf("over-cap outcome: got %v, want ApprovalQueueFull", out)
 	}
 	if snap := b.Pending(); snap.Queued != maxPendingApprovals {
 		t.Fatalf("Queued after the over-cap attempt = %d, want unchanged %d", snap.Queued, maxPendingApprovals)

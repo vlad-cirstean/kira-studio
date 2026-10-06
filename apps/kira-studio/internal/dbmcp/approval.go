@@ -27,6 +27,7 @@ const (
 	ApprovalDenied
 	ApprovalTimedOut
 	ApprovalAbandoned // the server stopped, or the MCP client went away (ctx cancelled)
+	ApprovalQueueFull // maxPendingApprovals already waiting; no human saw this request
 )
 
 // ApprovalActionResult is what Approve/Deny report — also never an error.
@@ -137,12 +138,12 @@ func (b *ApprovalBroker) snapshotLocked() ApprovalSnapshot {
 
 // Request enqueues req (minting its RequestID, EnqueuedAt and ExpiresAt) and blocks the calling
 // goroutine until it is approved, denied, its deadline elapses, or ctx is done — whichever comes
-// first. Past maxPendingApprovals it returns ApprovalDenied immediately rather than queueing.
+// first. Past maxPendingApprovals it returns ApprovalQueueFull immediately rather than queueing.
 func (b *ApprovalBroker) Request(ctx context.Context, req ApprovalRequest) ApprovalOutcome {
 	b.mu.Lock()
 	if b.queue.Len() >= maxPendingApprovals {
 		b.mu.Unlock()
-		return ApprovalDenied
+		return ApprovalQueueFull
 	}
 	now := b.now()
 	req.RequestID = uuid.NewString()
