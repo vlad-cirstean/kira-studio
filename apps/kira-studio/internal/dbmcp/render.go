@@ -346,49 +346,70 @@ func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.C
 // `,`/FROM/end of its list.
 func maskColumnRenamedViaAlias(statement, name string) bool {
 	toks := tokenizeSQL(statement)
-	type level struct{ proj, wrapped, sel bool }
-	stack := []level{{}}
-	top := func() *level { return &stack[len(stack)-1] }
-	isWord := func(i int, w string) bool { return i >= 0 && i < len(toks) && toks[i].kind == 'w' && toks[i].text == w }
-	isPunct := func(i int, p string) bool { return i >= 0 && i < len(toks) && toks[i].kind == 'p' && toks[i].text == p }
+	stack := []projLevel{{}}
 	for i, t := range toks {
-		switch {
-		case t.kind == 'p' && t.text == "(":
-			parent := top()
-			stack = append(stack, level{proj: parent.proj, wrapped: parent.proj || parent.wrapped})
-		case t.kind == 'p' && t.text == ")":
-			if len(stack) > 1 {
-				stack = stack[:len(stack)-1]
-			}
-		case t.kind == 'w' && (t.text == "select" || t.text == "returning"):
-			l := top()
-			l.proj, l.sel = true, true
-		case t.kind == 'w' && top().sel && endsProjection[t.text]:
-			top().proj = false
-		}
-		if t.text != name || t.kind == 'p' || isPunct(i+1, ".") || isPunct(i+1, "(") {
+		stack = advanceProjStack(stack, t)
+		if t.text != name || t.kind == 'p' || tokIsPunct(toks, i+1, ".") || tokIsPunct(toks, i+1, "(") {
 			continue
 		}
-		l := top()
+		l := stack[len(stack)-1]
 		if !l.proj {
 			continue
 		}
-		if l.wrapped {
-			return true
-		}
-		j := i
-		for isPunct(j-1, ".") && j-2 >= 0 && toks[j-2].kind != 'p' {
-			j -= 2
-		}
-		prevOK := isPunct(j-1, ",") || isWord(j-1, "select") || isWord(j-1, "distinct") ||
-			isWord(j-1, "all") || isWord(j-1, "returning")
-		nextOK := i+1 == len(toks) || isPunct(i+1, ",") || isPunct(i+1, ")") || isPunct(i+1, ";") ||
-			isWord(i+1, "from") || isWord(i+1, "into")
-		if !prevOK || !nextOK {
+		if l.wrapped || !isBareProjection(toks, i) {
 			return true
 		}
 	}
 	return false
+}
+
+// projLevel is one paren depth of maskColumnRenamedViaAlias's scan: proj when inside a projection
+// list, wrapped when that list feeds a function call or expression, sel once a SELECT opened it.
+type projLevel struct{ proj, wrapped, sel bool }
+
+func advanceProjStack(stack []projLevel, t sqlToken) []projLevel {
+	top := &stack[len(stack)-1]
+	switch {
+	case t.kind == 'p' && t.text == "(":
+		return append(stack, projLevel{proj: top.proj, wrapped: top.proj || top.wrapped})
+	case t.kind == 'p' && t.text == ")":
+		if len(stack) > 1 {
+			return stack[:len(stack)-1]
+		}
+	case t.kind == 'w' && (t.text == "select" || t.text == "returning"):
+		top.proj, top.sel = true, true
+	case t.kind == 'w' && top.sel && endsProjection[t.text]:
+		top.proj = false
+	}
+	return stack
+}
+
+func tokIsPunct(toks []sqlToken, i int, p string) bool {
+	return i >= 0 && i < len(toks) && toks[i].kind == 'p' && toks[i].text == p
+}
+
+func tokIsWord(toks []sqlToken, i int, ws ...string) bool {
+	if i < 0 || i >= len(toks) || toks[i].kind != 'w' {
+		return false
+	}
+	for _, w := range ws {
+		if toks[i].text == w {
+			return true
+		}
+	}
+	return false
+}
+
+// isBareProjection reports whether toks[i] (optionally qualified) is a whole projection item.
+func isBareProjection(toks []sqlToken, i int) bool {
+	j := i
+	for tokIsPunct(toks, j-1, ".") && j-2 >= 0 && toks[j-2].kind != 'p' {
+		j -= 2
+	}
+	prevOK := tokIsPunct(toks, j-1, ",") || tokIsWord(toks, j-1, "select", "distinct", "all", "returning")
+	nextOK := i+1 == len(toks) || tokIsPunct(toks, i+1, ",") || tokIsPunct(toks, i+1, ")") ||
+		tokIsPunct(toks, i+1, ";") || tokIsWord(toks, i+1, "from", "into")
+	return prevOK && nextOK
 }
 
 var endsProjection = map[string]bool{
