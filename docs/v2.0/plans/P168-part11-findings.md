@@ -115,3 +115,104 @@ real run) or "code-read". `DESIGN-DECISION` marks one needing a product call (no
   `gridHostShared.ts`: arithmetic consistent with `displayPositionOf`/`isRowVisible`; search
   matches are always visible rows under filter, so `displayPositionOf`'s nearest-row fallback never
   mislabels a match.
+
+## Block 2: data grid core
+
+### F6. high. Commit can run twice; edits staged during a commit are dropped (code-read)
+
+- `apps/kira-studio/frontend/src/views/grid/DataView.vue:117-126,276-283`,
+  `views/grid/pendingChanges.ts:295-311`.
+- Commit is disabled only on `!isWritable`. `commitPending` builds the plan, awaits `data.mutate`,
+  then `clearPending`. Nothing marks the tab as committing.
+- Scenario A: user double-clicks Commit on a staged insert. Click 2 runs `buildPlan` while click 1
+  awaits `mutate`; pending is not cleared yet, so both send the same ops. Two INSERTs land (a
+  serial PK makes both succeed). A staged UPDATE runs twice; a staged DELETE's second run fails the
+  adapter's exactly-one-row check and shows an error strip although the first commit succeeded.
+- Scenario B: user stages another cell while the commit is in flight (slow network, large plan).
+  `clearPending` after the await deletes it, then `reloadAfterMutation` replaces the page. The edit
+  vanishes with no message. Discard during the await is also accepted while the ops are already on
+  the wire.
+- Fix: add per-tab `committing` state to `usePendingChangesStore` (set before `buildPlan`, cleared
+  in `finally`). `commitPending` returns early when set. Disable Commit, Discard, Preview while
+  set. Fold `!committing` into `canEditTable()` (`SlickGridHost.vue:274`) and the toolbar's
+  `isWritable` so no edit path stages during the await. Unit guard (concurrency, meets the test
+  bar): fake `data.mutate` that resolves on demand, call `commitPending` twice, assert one
+  `mutate` call.
+
+### F7. medium. DESIGN-DECISION: paging, sort, filter, projection and Refresh silently discard staged changes
+
+- `apps/kira-studio/frontend/src/views/grid/state.ts:180` (`load` apply calls `clearPending`),
+  callers `navigation.ts:144-200`, `state.ts:208,272-305`; gating present only in
+  `DataToolbar.vue:80-137` (mask preview, Generate Data).
+- Staged edits are scoped to page-row indices, so a new page must drop them (D3, F2 P108 Part 10).
+  But only Generate Data and the mask toggle refuse while changes are pending ("Commit or discard
+  pending changes first"). Next/Prev/First/Last/jump, page size, sort header, filter Enter,
+  projection, ↻ Refresh and `view.refresh` all reload and drop 20 staged edits without a prompt.
+- Decision needed: gate these controls like Generate Data, or confirm before discarding
+  (`PW/state/confirmDialog`), or keep staged changes keyed by primary key across reloads. No fix
+  proposed.
+
+### F8. medium. Paste stages against a page and selection captured before the clipboard await (code-read)
+
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1794-1826`.
+- `sel` and `p` are read, then `await navigator.clipboard.readText()`. WebKit can hold that await
+  on its "Paste" callout until the user clicks it. Meanwhile a sibling tab's commit reloads this
+  tab (`reloadTabsForTarget`, no pending yet so no stale guard), or a pager/sort load lands. After
+  the await, `applyPastedCells` stages `stageEdit(row)` by the old page-row index. `buildPlan`
+  later reads keys from the new page, so the UPDATE targets whatever record now sits at that index,
+  not the record the user selected. The user may toggle mask preview during the callout too; the
+  paste then stages while masked, the invariant `setMaskPreview` guards. If the tab closes during
+  the await, `ensure(tabId)` recreates a pending record for a dead tab.
+- Fix: after the await, return unless `getPage(props.tabId) === p`, `rt()?.selection === sel`,
+  `grid !== null` and `canEditTable()` still hold.
+
+### F9. low. Host `pageVersion` watch rebuilds the grid when any other data tab's page changes (code-read)
+
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2226-2258`, cause shared with F4.
+- Grid `pageVersion` counts every tab's `setPage`/`drop`. The active host runs `setColumns`,
+  `invalidateAllRows`, full render, `consumeCellFocus` on each bump. Scenario: user types in an
+  inline cell editor in tab A; a background load lands in tab B (slow first load, or a sibling
+  reload after A's commit). `setColumns`/`invalidateAllRows` destroy the open editor without
+  committing: typed text lost. Also: a pending `editReferencedRow` focus request is consumed
+  against the wrong page and dropped (`applyCellFocusRequest` result ignored at `:2251`, unlike the
+  mount path at `:2172`).
+- Fix: keep `lastAppliedPage`; in the watch, return when `getPage(props.tabId) === lastAppliedPage`
+  (and the column order is unchanged). On a failed `applyCellFocusRequest`, re-request as the
+  mount path does.
+
+### F10. low. Overlapping mask tag refreshes can install the previous page's tag cache (code-read)
+
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:613-624,634-653`.
+- Two page loads close together with preview on start two `refreshMaskTagCache` calls. If the
+  first (old page) resolves last, `maskTagCache` holds old-page values; the current page's
+  correlating cells render without their `#TAG` until the next load.
+- Fix: sequence token per call; assign `maskTagCache` only when the token is still current and
+  `getPage(props.tabId)` is still the page it read.
+
+### F11. low. Insert-row inputs accept typing into generated columns (code-read)
+
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:200-206,1586-1590`;
+  `DataToolbar.vue:197-205` seeds inserts without generated columns.
+- `cellFormatter` renders an `<input>` for every column of an insert row. `onInsertGridInput`
+  stages any typed value via `stageInsertValue`, generated columns included. Commit sends the
+  generated column in the INSERT; Postgres/MySQL reject it. Every other insert path skips
+  generated columns (P36 D28).
+- Fix: render generated-column insert cells read-only (`input.readOnly = true`, muted), and skip
+  them in `onInsertGridInput`.
+
+### Block 2 notes (checked, nothing real)
+
+- Silent no-op UPDATE/DELETE suspect: dropped. Relational adapters assert exactly one affected row
+  per op and roll back (`mysqlfamily/client.go:43-50` comment, `AssertAffectedExactlyOne`);
+  MySQL uses `CLIENT_FOUND_ROWS`.
+- `buildPlan`: composite/hidden PK guards hold (`missingColumns`); PK value read from the stored
+  cell, not a staged edit, so editing a PK column updates the right row. `discardCellEdit` deletes
+  an emptied `changes`. `stageDelete` idempotent. `duplicateAsInsert` skips PK, generated and
+  truncated values.
+- `applyPastedCells`: generated columns skipped on both paths; insert reuse positional and
+  consistent; paste into pending-delete rows is ignored by `stageEdit` (documented).
+- `onCopy`: masking-aware on every kind; NULL copies as empty (documented, F5 P108 Part 10).
+- `menu.ts` filter and FK literals use `quoteIdent`/`quoteLiteral` with per-dialect backslash
+  handling; truncated values refuse "Filter by this value".
+- `KiraCellEditor`, `onBeforeEditCell`: truncated, generated, deleted, gutter and insert cells
+  vetoed. Unmount order in `SlickGridHost` correct; `editorCtx` reset.
