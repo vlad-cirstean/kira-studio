@@ -4,7 +4,7 @@ Plan: `P168-part17-git-rpc.md`. Base `30ec62f` (plan survey), HEAD reviewed `0bc
 (`p168-stream-b`). One Opus reviewer, report only. Paths repo-relative; `GR`/`GK`/`GV`/`IPC` as in
 the plan.
 
-Block status: 1 done.
+Block status: 1, 2 done.
 
 ## Block 1: error mapping
 
@@ -67,3 +67,42 @@ Block status: 1 done.
   `notARepository`, `permissionDenied`, `cancelled`, `timeout`, `unknown`). The code predates
   `11f097d` (discovery not ok, `graph.go:156,259`, `search.go:53`); the store-closed arm reuses it
   on purpose. Not a finding.
+
+## Block 2: router and read handlers
+
+### F4 (low) Several read results have no size guard below the 8 MiB frame cap
+
+- `GR/detail.go:69-88` (`commit.detail`: full changed-file list), `GR/refs.go:13-29`
+  (`refs.list`: every ref), `GR/refs.go:31-47` (`status.get`), `GR/detail.go:217-233`
+  (`working.detail`), `GR/search.go:46-49` (`search.run`: `limit` taken from the client with no
+  upper bound). Only `commit.fileDiff`/`file.read` (`MaxResultBytes`, `wire.go:168`) and
+  `review.snapshot` truncate.
+- Scenario: `commit.detail` on a vendoring commit touching ~70k files (about 120 bytes per
+  `FileChange` JSON), or `refs.list` on a monorepo with ~60k remote branches/tags. The encoded
+  result passes 8 MiB; `rpcstream.sendResult` (`internal/rpcstream/session.go:148-152`) answers
+  `E_FRAME_TOO_LARGE`. The client shows an error and cannot open that commit or list any ref at
+  all, where a truncated list would work. A raw socket client sending `search.run {limit: 1e7}`
+  with a one-letter query makes the server build every hit in memory before the same refusal.
+- Fix: clamp `search.run` `limit` to a server max (e.g. `gitsearch.DefaultLimit * 10`); give
+  `commit.detail` and `refs.list` a count cap with a `truncated` flag (additive contract field,
+  `CONTRACT_VERSION` bump, git-ui display in Parts 18-19). The cap values need a product call;
+  the `limit` clamp does not.
+
+### Block 2 candidate fates and notes
+
+- §9 #6 (method sets drift): dropped. Diffed `requestHandlers` (57) against `validate.ts`
+  `REQUEST_KEY_MAP` (72): every Go method has a TS key; the 15 TS-only keys
+  (`clipboard.write`, `editor.*` x7, `graph.revealCommit`, `link.openExternal`, `pr.openExternal`,
+  `repo.list`, `review.open`, `review.session.{load,save}`, `worktree.openWindow`) are each
+  answered in Space `hostHandlers.ts` (grep, all 15 present) and in vscode `proxyHandlers.ts`
+  (total `ServerHandlers` map, enforced by typecheck). Stream keys: `graph.stream` only, both
+  sides. A pinning test would guard a set comparison, not complex logic (`CLAUDE.md` bar).
+- §9 #11 reported as F4.
+- `search.run` calls `c.Walk` with the repo's default spec (`search.go:55-62`), which can replace
+  a graph walk opened with an explicit `scope`. git-ui never sends `scope` on `graph.stream` or
+  `graph.loadMore` (`graphView.ts:174-178,206`), so both resolve to the same spec and share one
+  walk. Not a finding today.
+- `ContractVersion` 42 (`contract.go:168`, `validate.ts:164`) and `Protocol` 1 (`contract.go:172`,
+  vscode `connection.ts:36`) agree.
+- `ForConn` settings mailbox and its two goroutines exit on `c.Done()` (`handlers.go:119-132`);
+  `GK/server.go` closes `gconn` on every exit path (block 4).
