@@ -3,7 +3,7 @@
 Plan: `P168-part19-git-ui-components.md`. Base `1e2b327`; plan commit `d9d3b35`; HEAD reviewed
 `d9d3b35` (branch `p168-stream-b`). Reviewer reports only; fixes nothing.
 
-Status: blocks 1-7 done.
+Status: all 8 blocks done.
 
 ## Checks (block 1, §1.1)
 
@@ -323,8 +323,12 @@ Status: blocks 1-7 done.
   (`flattenItems`: doc says "every enabled item" but returns all; only `menuModel.test.ts` calls
   it). `enabledNeighbour`/`firstEnabled` are live (`BranchPicker.vue:231-291`). Grouped with
   candidate 18: `components/searchResultsModel.ts:52-53` doc comment runs past 100 columns.
+- Also stale: `packages/git-ui/vite.config.ts:26-27` says the prefixed root scans
+  "packages/git-ui and packages/kira-ui"; `theme/tailwind.css:34` has only `@source "../"` (its
+  own header says the kira-ui line is gone).
 - Fix: delete `flattenItems` and its test cases, reword the module doc to "roving-focus helpers
-  for `BranchPicker.vue`'s row list", rewrap `searchResultsModel.ts:52-55`.
+  for `BranchPicker.vue`'s row list", rewrap `searchResultsModel.ts:52-55`, drop "and
+  packages/kira-ui" from the vite comment.
 
 ### F20. Review "reviewed" checkbox cannot be toggled from the keyboard
 
@@ -470,6 +474,23 @@ Status: blocks 1-7 done.
   button per comment, or keep the option rows but move Delete outside them and guard the Enter
   handler with `event.target === event.currentTarget`; give the glyph `role="img"`.
 
+### F29. Raw DOM listeners, observers and timers where VueUse is the rule
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/App.vue:1669-1681` (`document.addEventListener('keydown')`, raw
+  `ResizeObserver` plus manual rAF throttle and teardown); `components/review/ReviewView.vue:743-745`
+  and `:487` (`document` keydown, removed by hand in `onBeforeUnmount`);
+  `components/CommitGrid.vue:954`, `:959`, `:961-962` (`contextmenu` on `host`, `document`
+  `focusin`, `ResizeObserver`); `components/ConnectionBanner.vue:36-63` (`setTimeout` grace timer).
+  CLAUDE.md: event-listener wiring, resize observers and timers come from VueUse.
+- Scenario: no runtime defect found (each has matching teardown today). The cost is the one this
+  rule exists for: every new listener repeats the manual add/remove pairing, and a missed
+  `removeEventListener` leaks a handler per mount in Space's long-lived document.
+- Fix: `useEventListener(document, 'keydown', …)`, `useEventListener(host, 'contextmenu', …)`,
+  `useEventListener(document, 'focusin', …)`, `useResizeObserver(rootEl/host, …)`,
+  `useTimeoutFn` for the grace timer. SlickGrid's own `grid.onKeyDown`/`onClick` subscriptions
+  stay (library event API, not DOM wiring). One-shot `requestAnimationFrame` perf marks may stay.
+
 ## Candidate fates (§9)
 
 - 1 (lanes blank after layout lands): dropped. Probe passed for expand, toggle and refresh;
@@ -510,9 +531,17 @@ Status: blocks 1-7 done.
   host's `onOpenExternal` or inert text, never an `<a href>`; it runs in Vue-rendered
   `CommitMeta`, not a SlickGrid formatter, so listeners die with their nodes.
 - 14 (`ReviewCommentsPane` listbox children): reported as F28.
+- 15 (undeclared runtime dependencies): dropped. `clsx`, `tailwind-merge`,
+  `class-variance-authority`, `@lucide/vue` and `reka-ui` are pinned in the root `package.json`
+  (`:108-134`), the repo's home for shared UI libraries (`packages/theme` declares none of them
+  either); resolution is deterministic, not a hoisting accident.
 - 16 (`crypto.subtle` outside a secure context): dropped. Every real origin is a secure context:
   `vscode-webview://` (VS Code), Wails' localhost origin (Space), `http://127.0.0.1` (Playwright
   harnesses) and `http://localhost` (Vite dev) are all potentially trustworthy.
+- 17 (unprefixed classes missing from one host root): dropped, verified. Every static unprefixed
+  class in own `.vue`/`.ts` files, plus the dynamic ones (`ml-auto`, `animate-spin`, the
+  `badgeClass.ts` arbitrary-value tokens), has a matching selector in both the built VS Code
+  webview CSS and Space's `build:test` CSS (scratch script over `dist/**/assets/*.css`).
 - 18 (comment over 100 columns, `searchResultsModel.ts:52-53`): held for grouping with a comment
   finding.
 
@@ -582,4 +611,24 @@ holds; dispose checked in block 2.
   tabindex; `revealInGraph` and `transport-closed` handling read, nothing new), the review row
   keyboard cursor and `REVIEW_ROW_RENDER_CAP` (guarded by `review-commit-list-cap.spec.ts`, which
   passed).
-- Block 8: not reached yet.
+- Block 8: done. Reviewed `theme/vscode-tokens.css` (dark, light and high-contrast blocks),
+  `theme/density.css`, `theme/kira-structure.css` (colourless), `theme/tailwind.css`,
+  `lib/cn.ts` (prefix-only merge; unprefixed tokens pass through untouched), `lib/rowVariants.ts`,
+  `vite.config.ts`, `package.json`, `tsconfig.json`, `testing/fakeTransport.ts` (used by 9 state
+  specs); host roots `VS/webview/tailwind.css` and `PF/styles.css` (read). All 53 `.vue` files
+  use `<script setup lang="ts">` only. `bun run lint` (biome, token, theme-class, ADE colour and
+  class-conflict checks) and `bun run typecheck:git` ran green in the pre-commit hook on every
+  findings commit. Own unit specs: 114 pass, 0 fail. Tests against the bar: the 10 specs drive
+  current code; `menuModel.test` partly guards dead `flattenItems` (F19); `countFormat.test`,
+  `dateFormat.test`, `refBadges.test` read as restated bodies but the bar is forward-only and no
+  fix here touches them.
+
+## Totals
+
+29 findings: high 0, medium 13 (F1, F2, F3, F4, F5, F6, F8, F9, F10, F12, F14, F20, F21), low 16
+(F7, F11, F13, F15, F16, F17, F18, F19, F22, F23, F24, F25, F26, F27, F28, F29). DESIGN-DECISION:
+F4. `needs-other-part-file`: F1 (`GU/state/review.ts`, Part 18), F8 and F20 (VS Code
+interaction specs, Part 23); all Stream B, so nothing routes to `P168-routed-from-streamB.md`.
+
+Coverage: every one of the 101 owned files was reviewed or skimmed with a stated reason in the
+block notes above; none was left unread.
