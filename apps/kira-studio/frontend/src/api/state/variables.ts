@@ -729,9 +729,15 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     historyMenuState.ownerId = ownerId;
     historyMenuState.variableId = variableId;
     historyMenuState.open = true;
-    const entries = await control.variablesHistory(variableId);
-    if (historyMenuState.variableId === variableId) {
-      historyMenuState.entries = entries;
+    try {
+      const entries = await control.variablesHistory(variableId);
+      if (historyMenuState.variableId === variableId) {
+        historyMenuState.entries = entries;
+      }
+    } catch (err) {
+      if (historyMenuState.variableId === variableId) {
+        setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+      }
     }
   }
 
