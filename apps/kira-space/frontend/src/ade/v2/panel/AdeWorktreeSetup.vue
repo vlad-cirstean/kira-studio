@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { useIntervalFn } from '@vueuse/core';
+import { queryClient } from '@workbench/state/queryClient';
 import { computed, nextTick, ref, watch } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import type { Tone } from '../board/actions';
 import { formatElapsed } from '../board/actions';
 import type { CardModel } from '../plan/usePlanModel';
-import { useRetrySetup } from '../queries';
+import { logKey, useRetrySetup } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { solidStyle } from '../tones';
 import type { WorktreeSetup } from '../wire';
@@ -36,6 +37,15 @@ watch(
     } else ticker.pause();
   },
   { immediate: true },
+);
+// A retry restarts the log's sequence numbers at 1, so the cached log (and its pushes) is stale.
+watch(
+  () => setup.value?.startedAt,
+  (next, prev) => {
+    if (prev !== undefined && next !== prev) {
+      void queryClient.resetQueries({ queryKey: logKey('setup', props.row.id), exact: true });
+    }
+  },
 );
 const root = ref<HTMLElement | null>(null);
 const error = ref('');
