@@ -352,7 +352,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	if err != nil {
 		return nil, err
 	}
-	return execute(ctx, db, a.state.Load().readOnly, op, req.Statements, a.trackerFor(op.OpID))
+	return execute(ctx, db, a.state.Load().readOnly, op, req.Statements, a.trackerFor(op.OpID), adapters.ConsoleCapFor(req))
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false, so no UI ever offers

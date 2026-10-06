@@ -22,6 +22,8 @@ type parsedStatement struct {
 	collection string
 	method     string
 	args       []any
+	// limit bounds a cursor-returning statement's result; set by execute.
+	limit page.ResultCap
 }
 
 var supportedConsoleMethods = func() map[string]bool {
@@ -232,22 +234,29 @@ func asDocArray(value any, label string) ([]bson.D, error) {
 	return out, nil
 }
 
+func pushDoc(builder *page.DocumentPageBuilder, doc bson.D) error {
+	id := ""
+	if idVal, ok := lookupField(doc, "_id"); ok {
+		text, err := IDText(idVal)
+		if err != nil {
+			return mapError(err)
+		}
+		id = text
+	}
+	body, err := ejsonStringify(doc, true)
+	if err != nil {
+		return mapError(err)
+	}
+	builder.Push(id, body)
+	return nil
+}
+
 func docsToPage(docs []bson.D) (page.DocumentPage, error) {
 	builder := page.NewDocumentPageBuilder(false)
 	for _, doc := range docs {
-		id := ""
-		if idVal, ok := lookupField(doc, "_id"); ok {
-			text, err := IDText(idVal)
-			if err != nil {
-				return page.DocumentPage{}, mapError(err)
-			}
-			id = text
+		if err := pushDoc(builder, doc); err != nil {
+			return page.DocumentPage{}, err
 		}
-		body, err := ejsonStringify(doc, true)
-		if err != nil {
-			return page.DocumentPage{}, mapError(err)
-		}
-		builder.Push(id, body)
 	}
 	return builder.Finish(page.UnpagedPosition(len(docs))), nil
 }
@@ -290,24 +299,36 @@ var statementRunners = map[string]statementRunner{
 }
 
 // runCursorOp folds find/aggregate's own shared shape: run a cursor-returning driver call with
-// RunWithAbortRace, materialize every document, render the page (P107 I2-12).
-func runCursorOp(ctx context.Context, track TrackQuery, open func(qctx context.Context) (*mongodriver.Cursor, error)) (page.DocumentPage, error) {
-	docs, err := runTracked(ctx, track, func(qctx context.Context) ([]bson.D, error) {
+// RunWithAbortRace, stream documents into the page, and stop at limit — the deferred Close kills
+// the server cursor (P107 I2-12).
+func runCursorOp(ctx context.Context, track TrackQuery, limit page.ResultCap, open func(qctx context.Context) (*mongodriver.Cursor, error)) (page.DocumentPage, error) {
+	return runTracked(ctx, track, func(qctx context.Context) (page.DocumentPage, error) {
 		cursor, err := open(qctx)
 		if err != nil {
-			return nil, mapError(err)
+			return page.DocumentPage{}, mapError(err)
 		}
 		defer cursor.Close(qctx)
-		var out []bson.D
-		if err := cursor.All(qctx, &out); err != nil {
-			return nil, mapError(err)
+		builder := page.NewDocumentPageBuilder(false)
+		truncated := false
+		for cursor.Next(qctx) {
+			// Next just proved another document exists; stopping makes truncated mean "more existed".
+			if limit.Reached(builder.RowCount(), builder.Bytes()) {
+				truncated = true
+				break
+			}
+			var doc bson.D
+			if err := cursor.Decode(&doc); err != nil {
+				return page.DocumentPage{}, mapError(err)
+			}
+			if err := pushDoc(builder, doc); err != nil {
+				return page.DocumentPage{}, err
+			}
 		}
-		return out, nil
+		if err := cursor.Err(); err != nil {
+			return page.DocumentPage{}, mapError(err)
+		}
+		return builder.Finish(page.CappedPosition(builder.RowCount(), truncated)), nil
 	})
-	if err != nil {
-		return page.DocumentPage{}, err
-	}
-	return docsToPage(docs)
 }
 
 func runFind(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
@@ -323,7 +344,7 @@ func runFind(ctx context.Context, collection *mongodriver.Collection, stmt parse
 		}
 		findOpts.SetProjection(projection)
 	}
-	return runCursorOp(ctx, track, func(qctx context.Context) (*mongodriver.Cursor, error) {
+	return runCursorOp(ctx, track, stmt.limit, func(qctx context.Context) (*mongodriver.Cursor, error) {
 		return collection.Find(qctx, filter, findOpts)
 	})
 }
@@ -536,7 +557,7 @@ func runAggregate(ctx context.Context, collection *mongodriver.Collection, stmt 
 		}
 		pipeline = p
 	}
-	return runCursorOp(ctx, track, func(qctx context.Context) (*mongodriver.Cursor, error) {
+	return runCursorOp(ctx, track, stmt.limit, func(qctx context.Context) (*mongodriver.Cursor, error) {
 		return collection.Aggregate(qctx, pipeline, options.Aggregate().SetComment(op.OpID))
 	})
 }
@@ -557,7 +578,7 @@ func runStatement(ctx context.Context, db *mongodriver.Database, stmt parsedStat
 // runs. The previous shape parsed statement N only after 1..N-1 had already executed, so a typo
 // further down a batch discarded the already-committed earlier writes with no rollback path;
 // re-running after fixing the typo then double-applied them.
-func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *adapters.OpCtx, statements []string, track TrackQuery) ([]page.Page, error) {
+func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *adapters.OpCtx, statements []string, track TrackQuery, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
@@ -572,6 +593,7 @@ func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *a
 		if readOnly && isWriteStatement(stmt) {
 			return nil, adapters.AssertWritable(true)
 		}
+		stmt.limit = limit
 		parsed[i] = stmt
 	}
 

@@ -922,6 +922,34 @@ func TestMongo_Console_Execute(t *testing.T) {
 	}
 }
 
+// P174: find stops at the result cap; exactly-cap results are not flagged.
+func TestMongo_Console_StopsAtResultCap(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	a := connectedAdapter(t, fixture)
+	path := nodePath(fixture, seg("database", testsupport.MongoDatabase))
+	if _, err := a.Execute(context.Background(), model.ConsoleRequest{
+		Path:       path,
+		Statements: []string{`db.cap_probe.insertMany([{n:1},{n:2},{n:3},{n:4},{n:5},{n:6}])`},
+	}, adapters.NewOpCtx("op-cap-seed")); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	find := func(limit int) page.DocumentPage {
+		pages, err := a.Execute(context.Background(), model.ConsoleRequest{
+			Path: path, Statements: []string{`db.cap_probe.find({})`}, Cap: page.ResultCap{Rows: limit},
+		}, adapters.NewOpCtx("op-cap-find"))
+		if err != nil {
+			t.Fatalf("find: %v", err)
+		}
+		return pages[0].(page.DocumentPage)
+	}
+	if p := find(5); p.RowCount != 5 || !p.Position.Truncated {
+		t.Errorf("cap 5 of 6: RowCount = %d, Truncated = %v, want 5, true", p.RowCount, p.Position.Truncated)
+	}
+	if p := find(6); p.RowCount != 6 || p.Position.Truncated {
+		t.Errorf("cap 6 of 6: RowCount = %d, Truncated = %v, want 6, false", p.RowCount, p.Position.Truncated)
+	}
+}
+
 // console: an unsupported method is rejected
 func TestMongo_Console_UnsupportedMethod(t *testing.T) {
 	fixture := testsupport.StartMongo(t)
