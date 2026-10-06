@@ -15,9 +15,8 @@ import (
 // GIT_AUTHOR_NAME=$'Mal\x1fory'), which would silently shift every field after it when that field
 // is not last. Those formats are NUL-delimited instead (FieldGrouper/splitOneNULRecord, below) —
 // NUL is the one byte git guarantees can never appear inside any of its own field values. fieldDelim
-// stays 0x1f only where the hostile field is provably already last (StashFormat's own %gs,
-// bodyAndSignatureFormat's own %b) — SplitLimitedFields' absorb-the-last-field behavior is exactly
-// what makes 0x1f safe there.
+// stays 0x1f only where the hostile field is provably already last (StashFormat's own %gs) —
+// SplitLimitedFields' absorb-the-last-field behavior is exactly what makes 0x1f safe there.
 const fieldDelim = 0x1f
 
 // maxRemainderBytes bounds how much unterminated data RecordSplitter buffers across Push calls —

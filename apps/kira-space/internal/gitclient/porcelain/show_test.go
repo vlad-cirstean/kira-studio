@@ -7,24 +7,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
-// readShowFixture reads a `show -s -z --format=...` fixture and returns its own single record
-// with the -z terminator already removed — ParseShowBodyAndSignature's contract, like
-// ParseLogRecord's, is to receive a record RecordSplitter already framed, never raw -z stdout.
+// readShowFixture reads a `show -s -z --format=...` fixture: ParseShowBodyAndSignature takes the
+// raw -z-terminated record.
 func readShowFixture(t *testing.T, relPath string) []byte {
 	t.Helper()
-	raw := readDiffFixture(t, relPath)
-	splitter := porcelain.NewRecordSplitter(0)
-	recs, err := splitter.Push(raw)
-	if err != nil {
-		t.Fatalf("split %s: %v", relPath, err)
-	}
-	if flushed := splitter.Flush(); flushed != nil {
-		t.Fatalf("%s: unterminated trailing bytes: %q", relPath, flushed)
-	}
-	if len(recs) != 1 {
-		t.Fatalf("%s: got %d records, want exactly 1", relPath, len(recs))
-	}
-	return recs[0]
+	return readDiffFixture(t, relPath)
 }
 
 func TestParseShowBodyAndSignature_Trailers(t *testing.T) {
@@ -141,5 +128,19 @@ func TestSplitTrailerBlock_BodyIsOnlyTrailers(t *testing.T) {
 	trailers := []porcelain.CommitTrailer{{Token: "Signed-off-by", Value: "Alice <alice@example.com>"}}
 	if got := porcelain.SplitTrailerBlock(body, trailers); got != "" {
 		t.Fatalf("got %q, want empty", got)
+	}
+}
+
+// A 0x1f in a non-last field (trailer value) must not shift the body.
+func TestParseShowBodyAndSignature_Trailer0x1f(t *testing.T) {
+	b := newRepoBuilder(t)
+	sha := b.commit("a.txt", "a\n", "Subject\n\nbody text\n\nReviewed-by: x\x1fy")
+	raw := captureShowBodyAndSignature(t, b.dir, sha)
+	_, trailers, body, err := porcelain.ParseShowBodyAndSignature(raw)
+	if err != nil {
+		t.Fatalf("ParseShowBodyAndSignature: %v", err)
+	}
+	if len(trailers) != 1 || body != "body text" {
+		t.Fatalf("trailers = %+v, body = %q", trailers, body)
 	}
 }

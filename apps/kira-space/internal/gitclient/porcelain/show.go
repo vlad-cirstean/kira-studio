@@ -1,7 +1,6 @@
 package porcelain
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -17,9 +16,10 @@ func ShowMetadataArgs(sha string) []string {
 // bodyAndSignatureFieldCount is bodyAndSignatureFormat's own field count.
 const bodyAndSignatureFieldCount = 4
 
-// bodyAndSignatureFormat is upstream's own %G?/%GS/%(trailers)/%b format — body last (probe P5),
-// so a stray 0x1f inside a commit message can only ever corrupt the field that is already last.
-const bodyAndSignatureFormat = "%G?%x1f%GS%x1f%(trailers:only=true,unfold=true)%x1f%b"
+// bodyAndSignatureFormat is upstream's own %G?/%GS/%(trailers)/%b format, NUL-delimited: trailer
+// values and the signer name are attacker-controlled and can carry 0x1f, while NUL never appears
+// in a field (git truncates message text at an embedded NUL).
+const bodyAndSignatureFormat = "%G?%x00%GS%x00%(trailers:only=true,unfold=true)%x00%b"
 
 // ShowBodyAndSignatureArgs is commit.detail's second spawn: the minimal `show` that reads
 // signature status/signer, git's own parsed trailer block, and the raw body.
@@ -125,14 +125,13 @@ func SplitTrailerBlock(body string, trailers []CommitTrailer) string {
 	return strings.Join(before, "\n")
 }
 
-// ParseShowBodyAndSignature parses ShowBodyAndSignatureArgs' own record: signature status/signer,
-// structured trailers, and body with its trailer paragraph already removed (D9).
-func ParseShowBodyAndSignature(record []byte) (CommitSignature, []CommitTrailer, string, error) {
-	fields := SplitLimitedFields(record, fieldDelim, bodyAndSignatureFieldCount)
-	if len(fields) != bodyAndSignatureFieldCount {
-		return CommitSignature{}, nil, "", fmt.Errorf(
-			"porcelain: body/signature record has %d fields, want %d", len(fields), bodyAndSignatureFieldCount,
-		)
+// ParseShowBodyAndSignature parses ShowBodyAndSignatureArgs' own raw `-z`-terminated record:
+// signature status/signer, structured trailers, and body with its trailer paragraph already
+// removed (D9).
+func ParseShowBodyAndSignature(raw []byte) (CommitSignature, []CommitTrailer, string, error) {
+	fields, err := splitOneNULRecord(raw, bodyAndSignatureFieldCount)
+	if err != nil {
+		return CommitSignature{}, nil, "", err
 	}
 	sig := CommitSignature{Status: SignatureStatus(fields[0]), Signer: string(fields[1])}
 	trailers := ParseTrailerBlock(fields[2])

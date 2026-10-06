@@ -241,11 +241,7 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 		if rerr != nil {
 			return rerr
 		}
-		rec, rerr := oneRecord(raw)
-		if rerr != nil {
-			return rerr
-		}
-		sig, trailers, body, rerr = porcelain.ParseShowBodyAndSignature(rec)
+		sig, trailers, body, rerr = porcelain.ParseShowBodyAndSignature(raw)
 		return rerr
 	})
 	g.Go(func() error {
