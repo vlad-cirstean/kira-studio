@@ -25,8 +25,8 @@ const vscodeApp = resolve(repoRoot, 'apps', 'kira-space-vscode');
 export default defineConfig({
   root: repoRoot,
   base: './',
-  // P110 A1: compiles GU/theme/tailwind.css's `kv:`-prefixed root, scanning packages/git-ui and
-  // packages/kira-ui only (that file's own @source lines).
+  // P110 A1: compiles GU/theme/tailwind.css's `kv:`-prefixed root, scanning packages/git-ui only
+  // (that file's own @source line).
   // P131 Part 1 §3.3: also compiles the webview's own second, unprefixed root
   // (apps/kira-space-vscode/src/webview/tailwind.css), which imports packages/theme/src/
   // tailwind-core.css and packages/theme/src/components/** by their `@theme/*` alias -- resolved

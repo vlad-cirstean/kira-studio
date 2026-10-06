@@ -50,9 +50,9 @@ export interface SearchResultsModel {
    *  the only way to see a hit past the cap. */
   readonly tailFooter: string | undefined;
   /** G23 D6: set for `tail?.kind === 'unsupportedPattern'` — a tail outcome that is neither
-   *  silence nor a smaller `ok` — and when the tail request itself failed (`tailError`). The loaded-commit half is unaffected and still complete;
-   *  this notice is what tells a user why a `regex`-mode pattern's tail (and therefore any
-   *  body-only match) is missing. */
+   *  silence nor a smaller `ok` — and when the tail request itself failed (`tailError`). The
+   *  loaded-commit half is unaffected and still complete; this notice is what tells a user why a
+   *  `regex`-mode pattern's tail (and therefore any body-only match) is missing. */
   readonly tailNotice: string | undefined;
 }
 

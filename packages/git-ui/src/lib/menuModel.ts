@@ -1,12 +1,7 @@
 /**
- * G19 D3b: promoted verbatim (moved, not rewritten) from `packages/git-ui/src/components/
- * RowContextMenu.vue`'s own `<script setup>` — the ARIA-menu keyboard-roving-focus logic was
- * already correct there (F3), so this module is the same neighbour-skipping algorithm, made
- * framework-agnostic and testable on its own, plus the `MenuItem`/`MenuSection` shape every
- * `packages/git-ui` menu-building function (`rowMenuModel.ts`) already produced — now generalised
- * with two new optional fields (`icon`, `danger`) so a `MenuItem` built before this phase existed
- * (any G17-authored menu, in particular) still satisfies this type unchanged and renders exactly
- * as it always has, just without an icon-box.
+ * `MenuItem`/`MenuSection`, the shape every menu-building function (`rowMenuModel.ts`) produces,
+ * plus the roving-focus helpers (`enabledNeighbour`, `firstEnabled`) for
+ * `BranchPicker.vue`'s row list. Framework-agnostic so they test on their own.
  */
 
 export interface MenuItem {
@@ -32,12 +27,6 @@ export interface MenuItem {
 
 export interface MenuSection {
   readonly items: readonly MenuItem[];
-}
-
-/** Every enabled item across every section, in DOM order — the flat list keyboard navigation
- *  actually steps through (a separator between sections is not a stop). */
-export function flattenItems(sections: readonly MenuSection[]): MenuItem[] {
-  return sections.flatMap((section) => section.items);
 }
 
 /**

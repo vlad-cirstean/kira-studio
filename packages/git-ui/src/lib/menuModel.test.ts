@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { enabledNeighbour, firstEnabled, flattenItems, type MenuSection } from './menuModel.ts';
+import { enabledNeighbour, firstEnabled, type MenuSection } from './menuModel.ts';
 
 function item(id: string, disabled = false) {
   return { id, label: id, disabled, disabledReason: disabled ? 'nope' : undefined };
@@ -10,15 +10,11 @@ const sections: MenuSection[] = [
   { items: [item('d'), item('e')] },
 ];
 
-describe('flattenItems', () => {
-  test('flattens every section into one list, preserving order', () => {
-    expect(flattenItems(sections).map((entry) => entry.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
-  });
-});
+const flatten = (list: readonly MenuSection[]) => list.flatMap((section) => section.items);
 
 describe('firstEnabled', () => {
   test('is the first item whose disabled flag is false', () => {
-    expect(firstEnabled(flattenItems(sections))).toBe('a');
+    expect(firstEnabled(flatten(sections))).toBe('a');
   });
 
   test('is undefined when every item is disabled', () => {
@@ -27,7 +23,7 @@ describe('firstEnabled', () => {
 });
 
 describe('enabledNeighbour', () => {
-  const flat = flattenItems(sections);
+  const flat = flatten(sections);
 
   test('ArrowDown from undefined lands on the first enabled item', () => {
     expect(enabledNeighbour(flat, undefined, 1)).toBe('a');
@@ -55,7 +51,7 @@ describe('enabledNeighbour', () => {
 
   test('returns undefined when no item is enabled', () => {
     const allDisabled: MenuSection[] = [{ items: [item('x', true), item('y', true)] }];
-    expect(enabledNeighbour(flattenItems(allDisabled), undefined, 1)).toBeUndefined();
+    expect(enabledNeighbour(flatten(allDisabled), undefined, 1)).toBeUndefined();
   });
 
   test('an empty menu returns undefined', () => {
