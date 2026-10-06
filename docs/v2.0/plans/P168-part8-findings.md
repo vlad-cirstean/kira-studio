@@ -271,6 +271,55 @@ Block 5 other checks, nothing filed:
   an app's `internal/` is already impossible under Go's internal rule. `testx` cleans its temp
   root after `m.Run` (a panic inside `m.Run` exits the binary anyway).
 
+### Block 6: scripts, mutation tooling, hooks, Claude config
+
+#### F12 (medium): `check-theme-classes.sh` depends on GNU `grep -P` and hides grep errors, so it passes silently on macOS, including the CI lint job
+
+- `scripts/check-theme-classes.sh:45-47,62-65,82-86,105-113,129-131` and every other `grep -P`
+  call (37 in the file); each pipes through `2>/dev/null` and `|| true`.
+- BSD grep (macOS `/usr/bin/grep`) has no `-P` (PCRE) option. On a Mac, every `grep -rnoP` call
+  exits 2 with "invalid option", the error goes to `/dev/null`, `|| true` turns it into empty
+  output, and every check reports nothing. The script then prints "no retired class names found"
+  and exits 0. `pr.yml`'s `checks` job runs `bun run lint` on `macos-15` (`pr.yml:20,50`), so this
+  guard is not enforced in CI at all, and not on a Mac dev machine; it only runs for real in Linux
+  sandboxes (pre-commit here). Same masking on Linux: a malformed pattern (grep exit 2) also reads
+  as "no hits". Not run on macOS here; BSD grep's man page lists no `-P`.
+- Fix: stop swallowing errors. Distinguish grep's exit 1 (no match) from 2 (error) and fail the
+  script on 2. Then either (a) require GNU grep explicitly (`ggrep` on macOS, a `require_cmd`
+  check that `grep -P '' </dev/null` works, and `brew install grep` on the CI runner via
+  `docs/pending-changes/`), or (b) port the checks to `rg` (PCRE2 via `rg -P`, already used by
+  agents here) or to a small bun script, matching `check-class-conflicts.ts`. (b) removes the
+  platform dependency; prefer it.
+
+Block 6 other checks, nothing filed:
+- Candidate 12 (`check-class-conflicts.ts` returns on an SFC parse error) dropped: `parseSFC`
+  reports syntax errors in `descriptor.errors` and rarely throws; a file that breaks the SFC
+  parser also fails `vue-tsc` in the same pre-commit hook (`bun run typecheck`). Its `SCAN_DIRS`
+  omit `packages/kira-ui/src`, which holds one `.vue` file with a single literal class; not filed.
+- Candidate 13 dropped. `summarize.ts:81`'s `URL.pathname` is used only for tool version lookups
+  wrapped in try/catch (a space in the path degrades the "tools:" line to "unknown"). `run.sh`
+  target splitting: Go package dirs and `areas.json` keys contain no spaces in this repo.
+- Candidate 14 (no Go check in pre-commit) not filed: recorded decision, P94 plan §0/§5
+  ("pre-commit unchanged ... pre-push is new: go build, golangci-lint, knip").
+- `areas.json`: every area's `mutate` globs and `tests` dirs match real files (scratch bun probe:
+  22-645 mutate files, 3-102 spec files per area).
+- `check-tokens.sh`: `var(--x, fallback)` references and `.ts` files are not scanned; the one TS
+  reference with no definition (`--kira-float-max-h`) is set at runtime by `floatingPosition.ts`.
+  Not filed.
+- `install-golangci-lint.sh`: version and toolchain pinned, binary rebuilt when either differs
+  (`go install` verifies against `go.sum`/sumdb, no separate checksum needed).
+  `generate-wire.sh`: flatc pinned by version and SHA-256 per platform; output paths hold
+  (P108 Part 2 F6). `sign-bundle.sh`: ad-hoc identity by design (ARCHITECTURE packaging row).
+- `setup.sh`/`prepare-worktree.sh`: idempotent; stamp-driven bindings regen; `version_lt` safe under
+  `set -e`. `prepare-worktree.sh` prints "deps already present" on macOS too (cosmetic).
+- Hooks: `pre-commit` (lint, typecheck) and `pre-push` (go build, lint:go, lint:dead) run from the
+  repo top level (git's hook cwd), so subdirectory commits and worktrees behave the same.
+- `.claude/settings.json`: a missing `codegraph` binary makes `UserPromptSubmit` exit non-zero but
+  not 2, which Claude Code reports without blocking the prompt. `postcompact-style-reminder.sh`
+  needs `jq`, listed in `docs/DEV_ENVIRONMENT.md:560`. `.mcp.json` assumes a global `codegraph`,
+  installed by `codegraph-setup.sh`.
+- `codegraph-duplicates.ts` (report tool, `dedup:*`) runs clean against this index.
+
 ## Coverage
 
 - Block 1 (listeners and RPC): done. Read in full: `localsock/localsock.go`, `agenthooks/{agenthooks,
@@ -294,3 +343,13 @@ Block 5 other checks, nothing filed:
   `layeringtest`. Skimmed: `kirapaths/{env,prod}.go`, `appstorage/appstorage.go`,
   `metrics/{responsible_*,processlist_other,probe_other}.go` (build-tag stubs). Routed
   `SI/adapterhost/host.go` read (`RunOp`, `CancelOp`).
+- Block 6 (scripts, tooling, hooks): done. Read in full: `.githooks/{pre-commit,pre-push}`,
+  `.claude/{settings.json,hooks/postcompact-style-reminder.sh}`, `.mcp.json`, `scripts/{lib,setup,
+  prepare-worktree,prepare-dev-environment,prepare-ui-tests,codegraph-setup,install-golangci-lint,
+  generate-wire,sign-bundle,check-tokens}.sh`, `scripts/mutation/{run,go,ts}.sh`,
+  `tools/mutation/{summarize.ts,stryker.config.mjs,areas.json}`. Read in part:
+  `check-theme-classes.sh` (helpers, lines 1-140, and the `grep -P` call sites),
+  `check-class-conflicts.ts` (scan dirs, parse path, main), `verify-packaging.sh` (every check
+  header and S6/S7/S11), `codegraph-duplicates.ts` (CLI, DB open). Skimmed: `check-ade-colours.sh`
+  (`grep -E` only, BSD-safe), `tools/mutation/{package.json,tsconfig.json,.gitignore}`.
+  `scripts/install.sh` covered in block 3.
