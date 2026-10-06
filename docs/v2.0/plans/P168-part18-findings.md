@@ -21,6 +21,7 @@ top). Reviewer reports only; no source edited. Paths as in plan: `GC` = `package
 - Block 3 (graph and review session state): done.
 - Block 4 (search): done.
 - Block 5 (ops and side state): done.
+- Block 6 (`git-core` models, preflight, settings, util, ports): done.
 
 ## Findings
 
@@ -268,6 +269,36 @@ number), and in `App.vue` clear `liveAnnouncement` before setting it on the next
 text actually changes (`needs-other-part-file: packages/git-ui/src/App.vue (Part 19)`, Stream B,
 editable).
 
+### Block 6: `git-core` models, preflight, settings, util, ports
+
+**F17 (low): `git-core` exports logic that only its own tests reach.** `git grep -w` over
+`packages` and `apps`, excluding `packages/git-core` and test files, finds no consumer for:
+- `resolveBase` (`GC/model/review.ts:104-166`, 63 lines; test `review.test.ts`): base resolution
+  runs in Go (`apps/kira-space/internal/gitreview/resolve.go`); the vscode `reviewMarking.ts`
+  `resolveBase` is an unrelated local function that calls `review.resolveBase` over the wire.
+- `util/nulSplit.ts` (`splitRecords`, `splitLimitedFields`, `RemainderOverflowError`, 124 lines;
+  test 93): the git parsing it served moved to Go.
+- `toVsCodeConfiguration` (`GC/settings/schema.ts:313-340`): its doc names
+  `scripts/gen-settings.ts`, which does not exist; every `SETTINGS` entry now carries a `source`,
+  so it returns `{}` (verified by running it) and the extension's `package.json` contributes no
+  configuration.
+- `subtractRanges`, `unionRanges` (`GC/model/reviewRanges.ts`), `splitTrailerBlock`
+  (`GC/model/diff.ts`), `packedTransferList` (`GC/store/commitStore.ts:126`), `assertNever`
+  (`GC/util/assert.ts:25`): exported, used by tests only or not at all.
+Together with F5's graph-side items this is dead weight the next reader must keep consistent with
+Go by hand (e.g. `resolveBase` vs `gitreview/resolve.go`). Code-read. Fix: delete each item, its
+`GC/index.ts` export and the tests that only exercise it (keep a helper that another live export
+calls internally, e.g. `normalizeRanges`); drop the `gen-settings.ts` references.
+
+Nothing else real in this block. Checked: `classifyInProgress` (`operation.ts:104-215`, consumed by
+`ConflictBanner.vue` types and mirrored in Go `gitpreflight/operation.go`) handles `git am` (F3),
+merge, cherry-pick, revert, a bare sequencer, bisect and unmerged-only in a coherent precedence;
+`dateFormat.ts` clamps future timestamps to `now` and formats absolute dates in UTC by documented
+design; `coerceSettings` reports unknown keys and type failures without throwing;
+`findChangeInDetail` returns `undefined` (not a throw) on a miss with an out-of-range
+`parentIndex` mapping to `null`; `testing/packedChunk.ts` has no production importer (only
+`apps/kira-space/tsconfig.tests.json` and test files).
+
 ## Candidate fates (plan §9)
 
 1. Dropped. Webview-side cancel is local: the webview's own `createRpcClient` rejects with a
@@ -305,6 +336,12 @@ editable).
 13. Reported as F12 (DESIGN-DECISION) plus F11 (repeat-count cap). `\w`, `\b`, `\d` agree (ASCII in
     both); `.` vs line terminators is already rewritten (`dialect.go:147-150`) and pinned by a corpus row.
 14. Confirmed stale; grouped into the comments finding (block 7).
+15. Dropped, verified. A throwaway type probe in `GU` asserted mutual assignability of all 48 type
+    names exported by both `@kira/git-core` and `@kira/git-ipc/contract.ts` (incl. `OpRequest`,
+    `OpResult`, `OpErrorKind`, `RemoteOpResult`, `InProgressOperation`, `HostKind`, `LineRange`,
+    `PackedCommitChunk`, every preflight type); `vue-tsc` passed them all (a sentinel mismatch line
+    failed as expected, proving the file was checked). No drift today. A committed one-line-per-type
+    `satisfies` guard would be cheap but is a convention choice, not a defect; not reported.
 16. Reported as F9.
 17. Dropped. Both stores persist JSON (VS Code `getState`, Space `viewStateStore.ts`), which cannot
     carry `NaN`/`Infinity` (they serialize to `null` and fail the `typeof` gate). `loadedRows` is
