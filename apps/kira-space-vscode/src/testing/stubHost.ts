@@ -29,7 +29,6 @@ export function buildStubProxyHandlers(
     // biome-ignore lint/suspicious/noExplicitAny: unused by the handler under test, stubbed minimally.
     windows: {} as any,
     browser: { openExternal: async (u: string) => void opened.push(u) },
-    isWorkspaceTrusted: () => true,
     revealReview: () => {},
     revealCommitInGraph: () => {},
     renderReviewComments: () => {},

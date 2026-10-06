@@ -25,6 +25,12 @@
   "extensionKind": [
     "workspace"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Kira Space runs git operations, and Kira Space's repository prepare script, for this workspace's folders."
+    }
+  },
   "dependencies": {
     "@kira/git-core": "workspace:*",
     "@kira/git-ipc": "workspace:*",

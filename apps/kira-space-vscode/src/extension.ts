@@ -344,8 +344,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const roots = new VsCodeWorkspaceRoots();
   const clipboard = new VsCodeClipboard();
   const editor = new VsCodeEditorIntegration();
-  // G25 D6/D14: the "Open in New Window" port and the workspace-trust probe behind
-  // capabilities.runPrepareScript.
+  // G25 D6: the "Open in New Window" port.
   const windows = new VsCodeWindows();
   // P74 §3.3: the PR row's/badge's external-open action.
   const browser = new VsCodeBrowser();
@@ -424,7 +423,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logger,
     windows,
     browser,
-    isWorkspaceTrusted: () => vscode.workspace.isTrusted,
     revealReview: (repoId, branch) => reviewProvider.reviewBranch(repoId, branch),
     // P75 §2.3: graphProvider is declared just below, but this closure only runs once a request
     // arrives (well after activate() returns), so this needs no `let` forward-declaration break

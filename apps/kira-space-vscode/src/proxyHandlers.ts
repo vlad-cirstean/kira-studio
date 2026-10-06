@@ -85,14 +85,10 @@ export interface CreateProxyHandlersDeps {
   readonly clipboard: Clipboard;
   readonly editor: EditorIntegration;
   readonly logger: Logger;
-  // G25 D6/D14: the "Open in New Window" port and the workspace-trust probe behind
-  // `runPrepareScript` — both plain, narrow shapes so this file stays vscode-free (this file's own
-  // doc comment, above): `windows` wraps `vscode.commands.executeCommand('vscode.openFolder', ...)`
-  // (`ports/windows.ts`); `isWorkspaceTrusted` wraps `vscode.workspace.isTrusted` — a function,
-  // read fresh on every `app.init`, never cached (trust can change during a session, e.g. the user
-  // clicking "Trust" in the banner).
+  // G25 D6: the "Open in New Window" port — a plain, narrow shape so this file stays vscode-free
+  // (this file's own doc comment, above): `windows` wraps
+  // `vscode.commands.executeCommand('vscode.openFolder', ...)` (`ports/windows.ts`).
   readonly windows: Windows;
-  readonly isWorkspaceTrusted: () => boolean;
   // P74 §3.3: `pr.openExternal`'s own port — wraps `vscode.env.openExternal` (`ports/browser.ts`),
   // the same "narrow port, this file stays vscode-free" shape `windows` above already follows.
   readonly browser: Browser;
@@ -203,7 +199,6 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     logger,
     windows,
     browser,
-    isWorkspaceTrusted,
     revealReview,
     revealCommitInGraph,
     renderReviewComments,
@@ -248,10 +243,10 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
           goToFile: true,
           clipboard: true,
           resolveConflict: true,
-          // G25 D14: true under VS Code (vscode.openFolder always exists); isWorkspaceTrusted is
-          // read fresh on every app.init, never cached (trust can change mid-session).
+          // G25 D14: true under VS Code (vscode.openFolder always exists).
           openWorktreeWindow: true,
-          runPrepareScript: isWorkspaceTrusted(),
+          // The manifest requires a trusted workspace; Space runs only the script it stores (P172).
+          runPrepareScript: true,
           // C10 D6: this host's transport forwards every request straight to the socket, which
           // accepts writes — unchanged from before C10 added the flag.
           write: true,

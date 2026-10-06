@@ -54,10 +54,9 @@ const props = defineProps<{
   /** This repository's own stored `kiraSpace.worktree.prepareScript` — "" means the feature is
    *  off, and the prepare phase is skipped entirely after a successful create. */
   prepareScript: string;
-  /** `capabilities.runPrepareScript` (D14) — false for VS Code's own workspace-trust gate, or
-   *  because a host (Kira Space's native window) refuses running arbitrary scripts outright.
-   *  When false, the prepare phase still shows the script (transparency costs nothing) but offers
-   *  no way to run it — the message below stays host-neutral rather than naming either reason. */
+  /** `capabilities.runPrepareScript` (D14) — false when the host (Kira Space's native window)
+   *  refuses running arbitrary scripts outright. When false, the prepare phase still shows the
+   *  script (transparency costs nothing) but offers no way to run it. */
   runPrepareScriptCapability: boolean;
 }>();
 

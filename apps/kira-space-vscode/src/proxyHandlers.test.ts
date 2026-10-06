@@ -45,7 +45,6 @@ function buildHandlers(reviewSessionStore: ReviewSessionStore) {
     windows: {} as any,
     // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
     browser: {} as any,
-    isWorkspaceTrusted: () => true,
     revealReview: () => {},
     revealCommitInGraph: () => {},
     renderReviewComments: () => {},
@@ -225,7 +224,6 @@ function buildOpenDiffHandlers(connection: ConnectionManager) {
     windows: {} as any,
     // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
     browser: {} as any,
-    isWorkspaceTrusted: () => true,
     revealReview: () => {},
     revealCommitInGraph: () => {},
     renderReviewComments: () => {},
@@ -413,7 +411,6 @@ describe('graph.stream relay — never decodes or rebuilds the chunk it forwards
       windows: {} as any,
       // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
       browser: {} as any,
-      isWorkspaceTrusted: () => true,
       revealReview: () => {},
       revealCommitInGraph: () => {},
       renderReviewComments: () => {},
@@ -489,7 +486,6 @@ describe('editor.resolveConflict — path containment', () => {
       windows: {} as any,
       // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
       browser: {} as any,
-      isWorkspaceTrusted: () => true,
       revealReview: () => {},
       revealCommitInGraph: () => {},
       renderReviewComments: () => {},
