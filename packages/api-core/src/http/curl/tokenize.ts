@@ -73,10 +73,6 @@ export function tokenize(text: string): TokenizeResult {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
-  if (argv.length > 0 && (argv[0] === 'curl' || argv[0].endsWith('/curl'))) {
-    argv = argv.slice(1);
-  }
-
   const warnings: CurlWarning[] = [];
   const stopIndex = argv.findIndex((token) => SHELL_OPERATORS.has(token));
   if (stopIndex !== -1) {

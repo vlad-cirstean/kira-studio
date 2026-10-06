@@ -31,6 +31,18 @@
       "warnings": []
     },
     {
+      "name": "a URL ending in /curl is an argument, not a command word",
+      "command": "curl https://example.com/tools/curl",
+      "argv": ["https://example.com/tools/curl"],
+      "warnings": []
+    },
+    {
+      "name": "a second bare curl after the command word is kept",
+      "command": "curl curl -X GET https://x.test",
+      "argv": ["curl", "-X", "GET", "https://x.test"],
+      "warnings": []
+    },
+    {
       "name": "curl.exe prefix",
       "command": "curl.exe https://x.test/a",
       "argv": ["https://x.test/a"],
