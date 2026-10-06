@@ -4,8 +4,9 @@
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
-import { rowsForSelection } from '../../frontend/src/views/grid/slick/rowValues';
 import type { Selection } from '../../frontend/src/views/shared/slick/selection';
+
+const { rowsForSelection } = await import('../../frontend/src/views/grid/slick/rowValues');
 
 // Real-interaction fix (reported bug family — right-click Copy on a multi-row selection was a
 // no-op, Delete did nothing for a column or whole-table selection, and the keyboard shortcut and
