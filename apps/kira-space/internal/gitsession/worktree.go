@@ -468,6 +468,9 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 		e.prepare.release()
 		cancel()
 	}()
+	if err := e.errIfTornDown(); err != nil {
+		return WorktreePrepareResult{}, err
+	}
 
 	settings := e.RepoSettings()
 	script := settings.WorktreePrepareScript

@@ -2,6 +2,7 @@ package gitsession
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -530,5 +531,23 @@ func TestConcurrent_WalkPairIsolationUnderLoad(t *testing.T) {
 	}
 	if rl != 7 || !re {
 		t.Fatalf("review walk = {loaded:%d exhausted:%v}, want {7 true} -- disturbed by the graph walk", rl, re)
+	}
+}
+
+// TestConcurrent_PrepareAndRestackAfterTeardownAreRefused: a slot claimed after teardown's
+// forceCancel is uncancellable, so the claimers re-check tornDown (as RunRemote does).
+func TestConcurrent_PrepareAndRestackAfterTeardownAreRefused(t *testing.T) {
+	reg := newTestRegistry()
+	entry, _, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
+	if err != nil {
+		t.Fatalf("Acquire: %v", err)
+	}
+	reg.Close()
+
+	if _, err := entry.RunPrepare(context.Background(), nil, "/repo", "", WorktreePrepareDeps{}); !errors.Is(err, ErrRepoTornDown) {
+		t.Fatalf("RunPrepare after teardown = %v, want ErrRepoTornDown", err)
+	}
+	if _, err := entry.RunRestack(context.Background(), nil, "main"); !errors.Is(err, ErrRepoTornDown) {
+		t.Fatalf("RunRestack after teardown = %v, want ErrRepoTornDown", err)
 	}
 }

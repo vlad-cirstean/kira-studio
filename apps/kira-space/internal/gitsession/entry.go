@@ -426,6 +426,17 @@ func (e *RepoEntry) closeCatFile() {
 	}
 }
 
+// errIfTornDown is the check a slot claimer runs after claiming: teardown's forceCancel finds
+// nothing claimed later, so a claim made after teardown would run uncancellable on a dead entry.
+func (e *RepoEntry) errIfTornDown() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.tornDown {
+		return ErrRepoTornDown
+	}
+	return nil
+}
+
 // teardown stops the watcher, waits for pump to drain, stops every remaining subscriber, and
 // closes the cat-file session if one was ever started — called by Registry once refcount and
 // linger both say the entry is really done, or unconditionally by Registry.Close() at shutdown

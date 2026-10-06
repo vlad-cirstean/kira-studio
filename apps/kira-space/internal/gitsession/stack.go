@@ -704,6 +704,9 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 		e.restack.release()
 		cancel()
 	}()
+	if err := e.errIfTornDown(); err != nil {
+		return RestackResult{}, err
+	}
 
 	prep, res, done, err := e.restackPrepare(ctx, conn, branch)
 	if done {
