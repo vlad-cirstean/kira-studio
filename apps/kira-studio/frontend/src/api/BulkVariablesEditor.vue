@@ -114,7 +114,8 @@ async function onApply(): Promise<void> {
         `Remove ${live.removed.length === 1 ? 'variable' : 'variables'} ${names}? Its value history goes with it.`,
       );
     }
-    if (!(await confirmDialogStore.confirmDialog(parts.join(' ')))) return;
+    const confirmLabel = live.removed.length > 0 ? 'Remove' : 'Apply';
+    if (!(await confirmDialogStore.confirmDialog(parts.join(' '), { confirmLabel }))) return;
   }
   applying.value = true;
   applyError.value = null;

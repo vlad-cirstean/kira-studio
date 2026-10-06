@@ -13,7 +13,7 @@ export function useRemoveScript(): (
   return async (scripts, script) => {
     const ok = await confirmDialogStore.confirmDialog(
       `Remove "${script.name}"? It will no longer appear in Quick commands.`,
-      { danger: true },
+      { danger: true, confirmLabel: 'Remove' },
     );
     if (!ok) return false;
     await scripts.remove(script.id);

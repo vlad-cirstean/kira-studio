@@ -36,6 +36,7 @@ const adding = ref(false);
 const newName = ref('');
 const newCommand = ref('');
 const addError = ref<string | null>(null);
+const removeError = ref<string | null>(null);
 
 const canAdd = computed(() => newName.value.trim() !== '' && newCommand.value.trim() !== '');
 
@@ -97,9 +98,15 @@ async function onAdd(): Promise<void> {
 // §11.2: the tab therefore titles itself with the script's name and paints its rail with the
 // script's colour, through tabKinds.ts's existing title()/railColor() — no new title or colour
 // logic needed here.
+function scriptCwd(script: CustomScript): string {
+  return script.workingDir || ctx.defaultCwd();
+}
+
 function runScript(script: CustomScript): void {
+  const cwd = scriptCwd(script);
+  if (cwd === '') return;
   ctx.openTerminalTab({
-    cwd: script.workingDir || ctx.defaultCwd(),
+    cwd,
     launch: { command: script.command, label: script.name, color: script.color, kind: 'script' },
   });
 }
@@ -107,12 +114,24 @@ function runScript(script: CustomScript): void {
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
 async function onRemove(script: CustomScript): Promise<void> {
   if (!scripts.value) return;
-  await removeScript(scripts.value, script);
+  removeError.value = null;
+  try {
+    await removeScript(scripts.value, script);
+  } catch (err) {
+    removeError.value = err instanceof Error ? err.message : String(err);
+  }
 }
 
 function onContextMenu(e: MouseEvent, script: CustomScript): void {
   const items: MenuItem[] = [
-    { type: 'item', id: 'run', label: 'Run', icon: 'play', run: () => runScript(script) },
+    {
+      type: 'item',
+      id: 'run',
+      label: 'Run',
+      icon: 'play',
+      disabled: scriptCwd(script) === '',
+      run: () => runScript(script),
+    },
     {
       type: 'item',
       id: 'edit',
@@ -206,6 +225,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
               <span v-if="addError" class="text-error text-kira-sm leading-normal">{{ addError }}</span>
             </div>
 
+            <span v-if="removeError" class="px-1.5 py-1 text-error text-kira-sm leading-normal" data-testid="quick-command-remove-error">{{ removeError }}</span>
             <div
               v-if="filteredRecords.length > 0"
               class="flex flex-col"
@@ -215,7 +235,8 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
                 v-for="script in filteredRecords"
                 :key="script.id"
                 type="button"
-                class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover"
+                :disabled="scriptCwd(script) === ''"
+                class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover disabled:opacity-50"
                 :data-testid="`quick-command-${script.id}`"
                 @click="runScript(script)"
                 @contextmenu.prevent="onContextMenu($event, script)"

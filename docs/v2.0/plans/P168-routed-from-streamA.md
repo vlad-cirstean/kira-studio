@@ -98,16 +98,3 @@ Stream A did not edit those files.
 
 - Owner files: `apps/kira-studio/tests/ipc/kafka/kafka.frontend.spec.ts`, `kafka.fixture.ts`, `apps/kira-studio/internal/ipcfixture/kafka_test.go` (Part 5).
 - Not done in Part 8: the fixture needs a Docker recapture (`KIRA_IPC_FIXTURES=write`) and Docker is unavailable in the sandbox. Tracked as `SPEC.md` P171.
-
-
-## P168 Part 9 F10 (low): confirm button label for non-delete confirms
-
-- Owner files: `apps/kira-studio/frontend/src/project/ConnectionDialog.vue:568` (regenerate
-  correlation key), `apps/kira-studio/frontend/src/api/BulkVariablesEditor.vue:117` (remove
-  variables), `apps/kira-space/frontend/src/workbench/settings/ConnectedEditorsPane.vue:24` (revoke
-  editor).
-- Source: `P168-part9-findings.md` F10. Part 9 adds `confirmLabel?: string` to
-  `useConfirmDialogStore().confirmDialog` options (default "Delete" when `danger`, "Continue"
-  otherwise).
-- Fix: pass `confirmLabel: 'Regenerate'`, `'Remove'`, `'Revoke'` at the three sites. Land after the
-  Part 9 option exists; before it, the extra property fails typecheck.

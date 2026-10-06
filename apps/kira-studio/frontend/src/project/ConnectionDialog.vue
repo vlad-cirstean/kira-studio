@@ -570,6 +570,7 @@ async function onRegenerateMaskKey(): Promise<void> {
       'Masked results already given to an AI client, or saved anywhere outside this app, will no ' +
       'longer correlate with results produced after the change. The real values are not affected, ' +
       'and this cannot be undone.',
+    { confirmLabel: 'Regenerate' },
   );
   if (!ok) return;
   await regenerateMaskKey(connectionId);

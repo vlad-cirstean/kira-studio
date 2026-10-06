@@ -58,7 +58,7 @@ function onConfirm(): void {
           data-testid="confirm-dialog-confirm"
           @click="onConfirm"
         >
-          {{ confirmDialogStore.danger ? 'Delete' : 'Continue' }}
+          {{ confirmDialogStore.confirmLabel || (confirmDialogStore.danger ? 'Delete' : 'Continue') }}
         </Button>
       </DialogFooter>
 

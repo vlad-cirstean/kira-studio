@@ -34,15 +34,25 @@ interface ScriptDraft {
   workingDir: string;
 }
 const scriptDrafts = reactive<Record<string, ScriptDraft>>({});
+const FIELDS = ['name', 'command', 'workingDir'] as const;
+// Last-seen records: a broadcast overwrites only the draft fields the user has not touched, so a
+// round trip landing mid-typing (or another window's edit) never erases the text being typed.
+let seen = new Map<string, ScriptDraft>();
 function syncScriptDrafts(): void {
-  for (const key of Object.keys(scriptDrafts)) delete scriptDrafts[key];
+  const next = new Map<string, ScriptDraft>();
   for (const script of props.scripts.records()) {
-    scriptDrafts[script.id] = {
-      name: script.name,
-      command: script.command,
-      workingDir: script.workingDir,
-    };
+    const record = { name: script.name, command: script.command, workingDir: script.workingDir };
+    next.set(script.id, record);
+    const draft = scriptDrafts[script.id];
+    const prev = seen.get(script.id);
+    if (!draft || !prev) {
+      scriptDrafts[script.id] = { ...record };
+      continue;
+    }
+    for (const field of FIELDS) if (draft[field] === prev[field]) draft[field] = record[field];
   }
+  for (const id of seen.keys()) if (!next.has(id)) delete scriptDrafts[id];
+  seen = next;
 }
 watch(() => props.scripts.records(), syncScriptDrafts, { immediate: true });
 

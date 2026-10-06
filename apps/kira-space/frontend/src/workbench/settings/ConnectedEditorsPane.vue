@@ -23,7 +23,7 @@ const gitClientsStore = useGitClientsStore();
 async function onRevokeGitClient(id: string, label: string): Promise<void> {
   const ok = await confirmDialogStore.confirmDialog(
     `Revoke access for "${label || id}"? It will need to be re-approved.`,
-    { danger: true },
+    { danger: true, confirmLabel: 'Revoke' },
   );
   if (ok) await gitClientsStore.revokeGitClient(id);
 }
