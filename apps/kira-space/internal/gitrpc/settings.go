@@ -36,6 +36,7 @@ func repoSettingsSnapshotFrom(s model.GitRepoSettings) RepoSettingsSnapshot {
 
 // toModel converts the wire's own dotted-key patch into storage/model's own patch shape — a plain
 // field-for-field rename, since both are already "every leaf optional" (D4's own doc comment).
+// WorktreePrepareScript is deliberately not mapped: handleRepoSettingsSet refuses it first.
 //
 // G27 D5d: WorktreeBasePath is a client-supplied directory parameter (D2 tier 1), normalized to
 // NFC when set to a non-empty value — nil (leave unset) and "" (explicitly reset to no override,
@@ -57,7 +58,6 @@ func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
 		PullStrategy:          p.PullStrategy,
 		LogLevel:              p.LogLevel,
 		GithubEnabled:         p.GithubEnabled,
-		WorktreePrepareScript: p.WorktreePrepareScript,
 		WorktreeBasePath:      worktreeBasePath,
 		CheckoutAutoStash:     p.CheckoutAutoStash,
 	}
@@ -92,6 +92,10 @@ func (r *Router) handleRepoSettingsGet(_ context.Context, _ *gitsession.Conn, pa
 func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, params json.RawMessage) (any, error) {
 	return handleCall("repoSettings.set", params,
 		func(p RepoSettingsSetParams) error {
+			if p.Patch.WorktreePrepareScript != nil {
+				return ipcerr.New("E_READ_ONLY",
+					"gitrpc: repoSettings.set: kiraSpace.worktree.prepareScript is set in Kira Space only")
+			}
 			return requireNonEmpty("repoSettings.set", "repoId", p.RepoID)
 		},
 		func(p RepoSettingsSetParams) (RepoSettingsSnapshot, error) {
@@ -119,8 +123,9 @@ func (r *Router) setRepoSettings(repoID string, patch model.GitRepoSettingsPatch
 	return snapshot, nil
 }
 
-// SetRepoSettings is repoSettings.set's write-and-fan-out path for in-process callers (ADE's
-// prepare-timeout leaf), so connected git-ui clients see the change.
+// SetRepoSettings is repoSettings.set's write-and-fan-out path for in-process callers (ADE), so
+// connected git-ui clients see the change. The only writer of the prepare script, never reachable
+// from the wire (P172): a socket client cannot choose what worktree.prepare runs.
 func (r *Router) SetRepoSettings(repoID string, patch model.GitRepoSettingsPatch) error {
 	_, err := r.setRepoSettings(gitpath.CleanNFC(repoID), patch)
 	return err

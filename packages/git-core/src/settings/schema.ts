@@ -124,10 +124,8 @@ export const SETTINGS = {
     source: 'repo',
   },
   // G25 D10: the worktree prepare script and its own path pre-fill — two more `source: 'repo'`
-  // leaves, same table, same dialog. The sha256-pinned approval this script requires before it
-  // can run (D11) is DELIBERATELY absent from this schema entirely: it is a server-only key this
-  // extension never reads, writes, or even names — repoSettings.set cannot write it, and no
-  // setting in this file could ever expose it.
+  // leaves, same table, same dialog. The script is written only by Kira Space (P172);
+  // repoSettings.set refuses it from any client.
   'kiraSpace.worktree.prepareScript': {
     key: 'kiraSpace.worktree.prepareScript',
     type: 'string',
@@ -136,8 +134,8 @@ export const SETTINGS = {
       'A shell command run automatically after creating a worktree (e.g. "npm ci"). Runs as ' +
       'your own login shell with your own permissions — treat it exactly like a command you ' +
       'would type into a terminal yourself. Empty disables the feature entirely: no shell is ' +
-      'ever spawned. The exact script text is always shown before it runs for the first time, ' +
-      'and any edit here requires re-approving it.',
+      "ever spawned. Set in Kira Space's repo settings only. The exact script text is always " +
+      'shown before it runs for the first time.',
     source: 'repo',
   },
   'kiraSpace.worktree.basePath': {

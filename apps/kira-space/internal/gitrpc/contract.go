@@ -75,10 +75,7 @@ package gitrpc
 // the extension (D6) — the same "editor.*-shaped" precedent editor.openDiff/editor.openRangeDiff
 // already set (this constant still moves, for the same reason ui.action first did at G10 D9: it is
 // the sole compatibility authority, even for an addition the Go server neither emits nor parses).
-// Deliberately absent from every wire type this phase touches: the prepare script's own approval
-// sha (prepareScriptApprovedSha) — a server-only key, D11/F15, reachable only through
-// storage/repos.GitRepoSettingsRepo's two new dedicated methods, never through repoSettings.get/set
-// or any OpRequest/OpResult shape.
+// The prepare script is written only in-process by Kira Space (P172); repoSettings.set refuses it.
 // G26 D17 (2026-09-09): 28 -> 29, for four new Go-served requests (stack.list, preflight.restack,
 // stack.restack, stack.cancelRestack), one new event (stack.progress), nine new wire types
 // (StackBranchState, StackBranch, StackSummary, StackListResult, RestackBlocker, RestackPlanEntry,

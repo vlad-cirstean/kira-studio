@@ -16,7 +16,7 @@
 //   - OnBatch is never called after Run returns.
 //
 // Guards that live in callers, not here:
-//   - gitsession/worktree.go: directory validated against `worktree list`, sha256 staleness check
+//   - gitsession/worktree.go: directory validated against `worktree list`, sha256 staleness guard
 //     against the text the client showed, at most one run per repository, no repository gate held.
 //   - Confirmation dialog and workspace trust: extension-side.
 //   - ade: one setup claim per branch, independent of gitsession's slot, so several runs can

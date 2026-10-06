@@ -100,12 +100,10 @@ var allowedMethods = map[string]struct{}{
 	"pr.browserUrl": {},
 	"worktree.list": {}, "stack.list": {},
 	// repoSettings.set: §4.4 says it only ever writes Kira's own SQLite, never the repository — true,
-	// but two of its patch fields are write-only surface this stream must still refuse at the FIELD
-	// level (guardRepoSettingsSet below): WorktreePrepareScript/WorktreeBasePath — an approved patch
-	// here can later be executed as a real shell command by worktree.prepare; RunPrepare's only gate
-	// is "does this match what's currently stored", not "did a human approve this content", and there
-	// is no separate prepareScriptApprovedSha gate anywhere in this codebase despite contract.go's own
-	// comment naming one. PullStrategy/CheckoutAutoStash are now ordinary settings for operations this
+	// but two of its patch fields are refused at the FIELD level (guardRepoSettingsSet below):
+	// WorktreePrepareScript/WorktreeBasePath. gitrpc's Router already refuses the prepare script on
+	// every connection (P172); this guard keeps that as defence in depth and also covers
+	// WorktreeBasePath, which the socket still accepts. PullStrategy/CheckoutAutoStash are now ordinary settings for operations this
 	// stream admits (P67e) and are no longer restricted. GraphPageSize/GraphScope/StashShowInGraph/
 	// StashIncludeUntracked/ReviewBaseCandidates/LogLevel/GithubEnabled stay allowed, as before.
 	"repoSettings.get": {}, "repoSettings.set": {},

@@ -3,12 +3,15 @@ package gitrpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // fakeRepoSettingsStore is a minimal, in-memory stand-in for storage/repos.GitRepoSettingsRepo,
@@ -56,6 +59,9 @@ func (f *fakeRepoSettingsStore) set(repoID string, patch model.GitRepoSettingsPa
 	}
 	if patch.LogLevel != nil {
 		current.LogLevel = *patch.LogLevel
+	}
+	if patch.WorktreePrepareScript != nil {
+		current.WorktreePrepareScript = *patch.WorktreePrepareScript
 	}
 	f.rows[repoID] = current
 	return current, nil
@@ -412,5 +418,83 @@ func TestHandleSettingsSetGitPath_NotWired(t *testing.T) {
 	router := New(Deps{})
 	if _, err := router.handleSettingsSetGitPath(context.Background(), []byte(`{"gitPath":"/usr/bin/git"}`)); err == nil {
 		t.Fatal("settings.setGitPath with no Deps.SetGitPath wired: want an error, got nil")
+	}
+}
+
+// P172: a socket client never writes the prepare script — the whole patch is refused, nothing is
+// stored and no event fans out.
+func TestRepoSettings_PrepareScriptIsRefusedFromTheWire(t *testing.T) {
+	for name, patch := range map[string]string{
+		"alone":             `{"kiraSpace.worktree.prepareScript": "touch /tmp/x"}`,
+		"with allowed leaf": `{"kiraSpace.worktree.prepareScript": "touch /tmp/x", "kiraSpace.graph.pageSize": 77}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			router, _ := newTestRouter()
+			connA := gitsession.NewConn("conn-a", "client-a", "label-a", nil)
+			connB := gitsession.NewConn("conn-b", "client-b", "label-b", nil)
+			t.Cleanup(connA.Close)
+			t.Cleanup(connB.Close)
+			var got changedEventCollector
+			connB.SetEmit(func(method string, payload any) {
+				if method == "repoSettings.changed" {
+					got.record(payload.(RepoSettingsChangedPayload))
+				}
+			})
+			handlersA := router.ForConn(connA)
+			router.ForConn(connB)
+
+			_, err := handlersA.Request(context.Background(), "repoSettings.set",
+				[]byte(`{"repoId": "/repos/a", "patch": `+patch+`}`))
+			if err == nil || !strings.Contains(err.Error(), "prepareScript") {
+				t.Fatalf("repoSettings.set err = %v, want a prepareScript refusal", err)
+			}
+			var ie *ipcerr.Error
+			if !errors.As(err, &ie) || ie.Code != "E_READ_ONLY" {
+				t.Fatalf("err = %v, want E_READ_ONLY", err)
+			}
+
+			snap, err := router.deps.Registry.RepoSettingsGet("/repos/a")
+			if err != nil {
+				t.Fatalf("RepoSettingsGet: %v", err)
+			}
+			def := model.DefaultGitRepoSettings()
+			if snap.WorktreePrepareScript != def.WorktreePrepareScript || snap.GraphPageSize != def.GraphPageSize {
+				t.Fatalf("stored = %+v, want defaults (nothing written)", snap)
+			}
+			time.Sleep(50 * time.Millisecond)
+			if n := len(got.snapshot()); n != 0 {
+				t.Fatalf("repoSettings.changed delivered %d times, want 0", n)
+			}
+		})
+	}
+}
+
+// The in-process host path (ADE) still writes the script and fans out.
+func TestRepoSettings_SetRepoSettingsWritesPrepareScriptInProcess(t *testing.T) {
+	router, _ := newTestRouter()
+	conn := gitsession.NewConn("conn-a", "client-a", "label-a", nil)
+	t.Cleanup(conn.Close)
+	var got changedEventCollector
+	conn.SetEmit(func(method string, payload any) {
+		if method == "repoSettings.changed" {
+			got.record(payload.(RepoSettingsChangedPayload))
+		}
+	})
+	router.ForConn(conn)
+
+	script := "npm ci"
+	if err := router.SetRepoSettings("/repos/a", model.GitRepoSettingsPatch{WorktreePrepareScript: &script}); err != nil {
+		t.Fatalf("SetRepoSettings: %v", err)
+	}
+	snap, _ := router.deps.Registry.RepoSettingsGet("/repos/a")
+	if snap.WorktreePrepareScript != script {
+		t.Fatalf("stored script = %q, want %q", snap.WorktreePrepareScript, script)
+	}
+	deadline := time.Now().Add(time.Second)
+	for len(got.snapshot()) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("repoSettings.changed not delivered")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }

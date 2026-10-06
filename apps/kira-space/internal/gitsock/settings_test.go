@@ -1,7 +1,11 @@
 package gitsock
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
@@ -79,5 +83,44 @@ func TestIntegration_RepoSettingsLogLevelIsScopedAcrossRealRepos(t *testing.T) {
 	}
 	if getResult.LogLevel != "info" {
 		t.Fatalf("repoSettings.get(b).LogLevel = %q, want %q (the default — unscoped by a's write)", getResult.LogLevel, "info")
+	}
+}
+
+// P172: over a real socket, a paired client cannot store a prepare script, so worktree.prepare
+// with any sha spawns nothing.
+func TestIntegration_SocketClientCannotStorePrepareScript(t *testing.T) {
+	t.Parallel()
+	server, sockPath, _, _ := newIntegrationServer(t)
+	repoDir := initFixtureRepo(t)
+	client := pairAndReady(t, server, sockPath, "prepare-refused")
+	repoID := openRepoOK(t, client, repoDir).Repo.RepoID
+
+	script := "touch " + filepath.Join(repoDir, "pwned")
+	setResp := client.request("repoSettings.set", map[string]any{
+		"repoId": repoID,
+		"patch":  map[string]any{"kiraSpace.worktree.prepareScript": script},
+	})
+	if setResp.OK == nil || *setResp.OK || setResp.Error == nil || setResp.Error.Code != "E_READ_ONLY" {
+		t.Fatalf("repoSettings.set = %+v, want E_READ_ONLY", setResp)
+	}
+
+	sum := sha256.Sum256([]byte(script))
+	prepResp := requestOK(t, client, "worktree.prepare", map[string]any{
+		"repoId": repoID, "path": repoDir, "scriptSha256": hex.EncodeToString(sum[:]),
+	})
+	var result struct {
+		OK    bool `json:"ok"`
+		Error *struct {
+			Kind string `json:"kind"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(prepResp.Result, &result); err != nil {
+		t.Fatalf("unmarshal worktree.prepare result: %v", err)
+	}
+	if result.OK || result.Error == nil || result.Error.Kind != "NotConfigured" {
+		t.Fatalf("worktree.prepare = %+v, want NotConfigured", result)
+	}
+	if _, err := os.Stat(filepath.Join(repoDir, "pwned")); err == nil {
+		t.Fatal("script ran")
 	}
 }

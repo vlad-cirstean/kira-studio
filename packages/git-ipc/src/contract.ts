@@ -86,9 +86,8 @@ export interface RepoSettingsSnapshot {
    *  array. Empty means the feature is off for this repository: no spawn, no shell, ever. Read
    *  ONLY from this table (`source: 'repo'`) — never from `.git/config`, a tracked file, or any
    *  repo-carried convention, which is the single highest-value safety property in the whole
-   *  feature (D10). The sha256-pinned approval this script requires before it can run
-   *  (`prepareScriptApprovedSha`) is deliberately NOT a member here, or anywhere near
-   *  `RepoSettingsPatch` — it is a server-only key `repoSettings.set` cannot write (D11/F15). */
+   *  feature (D10). Written only by Kira Space itself (P172): `RepoSettingsPatch` omits it and
+   *  `repoSettings.set` refuses it with `E_READ_ONLY`. */
   readonly 'kiraSpace.worktree.prepareScript': string;
   /** G25 D10: pure UX — pre-fills `WorktreeDialog`'s own path field. Empty means no suggestion
    *  beyond the dialog's own basename default. Never a security boundary. */
@@ -102,7 +101,9 @@ export interface RepoSettingsSnapshot {
 
 /** G18: `RepoSettingsSnapshot`'s own `.partial()` shape — `repoSettings.set`'s request, every leaf
  *  optional so the dialog patches only the field the user actually changed. */
-export type RepoSettingsPatch = Partial<RepoSettingsSnapshot>;
+export type RepoSettingsPatch = Partial<
+  Omit<RepoSettingsSnapshot, 'kiraSpace.worktree.prepareScript'>
+>;
 
 export interface RepoSummary {
   readonly repoId: string;
@@ -2220,10 +2221,10 @@ export type Contract = {
       result: WorktreeRemovePreflight;
     };
     /** D13: a long, cancellable, streaming method modelled exactly on `remote.run` —
-     *  `scriptSha256` is the client's own belief about which script text it is approving; the
-     *  server ALWAYS re-hashes the currently-stored text and refuses with `ScriptChanged` on any
-     *  mismatch before spawning anything (D11) — never trusts that the approval the client
-     *  believes it holds still matches what is on file. */
+     *  the script is written only by Kira Space (P172); the client never supplies it.
+     *  `scriptSha256` is a staleness guard: the text the client showed its user. The server ALWAYS
+     *  re-hashes the currently-stored text and refuses with `ScriptChanged` on any mismatch before
+     *  spawning anything (D11). */
     'worktree.prepare': {
       params: { repoId: string; path: string; scriptSha256: string };
       result: WorktreePrepareResult;

@@ -4,8 +4,8 @@
  * Each field here is hand-written, not schema-driven (no loop over `repoSettingKeys()`) — a new
  * `source: 'repo'` leaf needs an explicit field/patch-diff line added here, same as every leaf
  * already present. `kiraSpace.worktree.prepareScript`/`.basePath` (G25) are the two `'repo'`
- * leaves this dialog deliberately does NOT surface — they are edited from `WorktreeDialog.vue`
- * itself instead, where the prepare-script approval flow they gate lives. G28 D16 adds
+ * leaves this dialog deliberately does NOT surface. The prepare script is read-only in git-ui and
+ * set in Kira Space (P172); `WorktreeDialog.vue` only reads it. G28 D16 adds
  * `kiraSpace.checkout.autoStash`, its own new "Checkout" section.
  *
  * P72 §8.3/§9: `kiraSpace.log.level` **used to not be per-repo** (D14) — a hardcoded sentinel

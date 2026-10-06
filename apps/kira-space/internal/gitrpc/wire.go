@@ -596,9 +596,11 @@ type RepoSettingsPatchWire struct {
 	PullStrategy          *string   `json:"kiraSpace.pull.strategy,omitempty"`
 	LogLevel              *string   `json:"kiraSpace.log.level,omitempty"`
 	GithubEnabled         *bool     `json:"kiraSpace.github.enabled,omitempty"`
-	WorktreePrepareScript *string   `json:"kiraSpace.worktree.prepareScript,omitempty"`
-	WorktreeBasePath      *string   `json:"kiraSpace.worktree.basePath,omitempty"`
-	CheckoutAutoStash     *bool     `json:"kiraSpace.checkout.autoStash,omitempty"`
+	// WorktreePrepareScript is decoded only so repoSettings.set can refuse it (json.Unmarshal drops
+	// unknown keys silently, which would report success). Never written from the wire (P172).
+	WorktreePrepareScript *string `json:"kiraSpace.worktree.prepareScript,omitempty"`
+	WorktreeBasePath      *string `json:"kiraSpace.worktree.basePath,omitempty"`
+	CheckoutAutoStash     *bool   `json:"kiraSpace.checkout.autoStash,omitempty"`
 }
 
 // RepoSettingsSetParams is repoSettings.set's own request.
@@ -750,9 +752,10 @@ type PreflightWorktreeRemoveParams struct {
 	Path   string `json:"path"`
 }
 
-// WorktreePrepareParams is worktree.prepare's own request (D13) — ScriptSha256 is the client's own
-// belief about which script text it is approving; the server always re-hashes the CURRENTLY STORED
-// text and refuses with ScriptChanged on any mismatch before spawning anything (D11).
+// WorktreePrepareParams is worktree.prepare's own request (D13). The script is written only by Kira
+// Space (P172); the client never supplies it. ScriptSha256 is a staleness guard: the text the
+// client showed its user. The server re-hashes the CURRENTLY STORED text and refuses with
+// ScriptChanged on any mismatch before spawning anything (D11).
 type WorktreePrepareParams struct {
 	RepoID       string `json:"repoId"`
 	Path         string `json:"path"`

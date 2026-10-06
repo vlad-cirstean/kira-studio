@@ -101,8 +101,8 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 	//
 	// Mirrors gitstream.go's own repoSettingsSetTouchesRestrictedField doc comment: the two `true`
 	// entries are write-only surface a compromised graph mount could otherwise stage (a prepare
-	// script/base path later executed verbatim by worktree.prepare) with no separate human-approval
-	// gate. PullStrategy/CheckoutAutoStash flipped to `false` in P67e (docs/v1.6/plans/
+	// script/base path; gitrpc refuses the script on every connection since P172, this guard is
+	// defence in depth). PullStrategy/CheckoutAutoStash flipped to `false` in P67e (docs/v1.6/plans/
 	// P67e-git-relax-read-only.md D4) — they configure operations this stream now admits, not
 	// write-only surface. Every `false` entry is a per-repo graph/UI preference.
 	knownFields := map[string]bool{

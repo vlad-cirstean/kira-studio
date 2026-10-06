@@ -138,6 +138,8 @@ async function migrateLegacySettings(
   const config = vscode.workspace.getConfiguration();
   const rawRepoValues: Record<string, unknown> = {};
   for (const key of repoSettingKeys()) {
+    // Kira Space refuses prepare-script writes from socket clients (P172); sending it would fail the whole patch.
+    if (key === 'kiraSpace.worktree.prepareScript') continue;
     const value = inspectedValue(config, key);
     if (value !== undefined) rawRepoValues[key] = value;
   }

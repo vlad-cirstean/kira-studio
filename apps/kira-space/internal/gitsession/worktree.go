@@ -440,11 +440,10 @@ func noSpawnPrepareResult(kind, message string) (WorktreePrepareResult, error) {
 //  1. claim the ≤1 prepare slot (else AlreadyRunning, no spawn).
 //  2. resolve the stored script (empty ⇒ NotConfigured, no spawn).
 //  3. re-hash the CURRENTLY STORED text and compare to params.ScriptSha256 (mismatch ⇒
-//     ScriptChanged, no spawn) — re-checked immediately before the spawn, never trusting that the
-//     script the client believes it is running still matches what is on file (a second window may
-//     have edited it since the client last read it). The human-confirmation gate itself — did
-//     someone actually look at this text before clicking Run — lives entirely client-side, in the
-//     extension's own confirmation dialog; this check is a staleness guard, not that gate.
+//     ScriptChanged, no spawn) — re-checked immediately before the spawn, so the client's user never
+//     runs text they did not see (Kira Space may have changed the script since the dialog showed
+//     it). A staleness guard, not approval: only Kira Space writes the script (P172), and the
+//     human-confirmation dialog lives client-side.
 //  4. verify path is a real worktree of THIS repository (⇒ NotAWorktree, no spawn) — the same
 //     security property D8's notAWorktree blocker states for remove, restated here for prepare.
 //  5. resolve the shell (D9/D16), build the env (D12/F12) from the worktree's own facts, and spawn

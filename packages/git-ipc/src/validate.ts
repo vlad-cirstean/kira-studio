@@ -68,10 +68,8 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // in a SEPARATE, dedicated 'WorktreePrepareErrorKind' instead, spending none of this budget), two
 // new capabilities ('openWorktreeWindow', 'runPrepareScript'), one new 'UiActionKind' member
 // ('createWorktree'), and two new 'RepoSettingsSnapshot' members ('kiraSpace.worktree.
-// prepareScript', 'kiraSpace.worktree.basePath'). Deliberately absent from every wire type this
-// phase touches: the prepare script's own sha256-pinned approval -- a server-only key, reachable
-// only through the Go server's own dedicated storage accessors, never through 'repoSettings.get'/
-// 'set' or any 'OpRequest'/'OpResult' shape (D11/F15).
+// prepareScript', 'kiraSpace.worktree.basePath'). The prepare script is written only in-process by
+// Kira Space (P172); 'repoSettings.set' refuses it.
 // G26 D17 (2026-09-09): 28 -> 29, for four new Go-served requests ('stack.list',
 // 'preflight.restack', 'stack.restack', 'stack.cancelRestack'), one new event ('stack.progress'),
 // nine new wire types ('StackBranchState', 'StackBranch', 'StackSummary', 'StackListResult',
