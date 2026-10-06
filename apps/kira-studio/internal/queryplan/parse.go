@@ -65,6 +65,13 @@ func FromPages(kind string, pages []page.Page, thresholdRows int) (Plan, error) 
 		return Plan{}, fmt.Errorf("queryplan: EXPLAIN did not return a tabular result")
 	}
 
+	// A page the console cap stopped is an incomplete plan.
+	for _, p := range pages {
+		if tp, ok := p.(page.TabularPage); ok && tp.Position.Truncated {
+			return Plan{}, ErrTruncated
+		}
+	}
+
 	switch kind {
 	case "postgres":
 		if firstCellTruncated(first) {

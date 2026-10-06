@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/queryplan"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -156,7 +157,7 @@ type runQueryArgs struct {
 	ConnectionID string `json:"connectionId" jsonschema:"Connection id from list_connections."`
 	SQL          string `json:"sql" jsonschema:"One statement to run. Not a script — send one statement per call."`
 	Path         string `json:"path,omitempty" jsonschema:"Encoded path selecting the database to run against, from list_children. Required for engines with more than one database; ignored by engines with one."`
-	MaxRows      int    `json:"maxRows,omitempty" jsonschema:"Rows to return, 1-2000. Default 200. The query still runs in full; this caps what is returned."`
+	MaxRows      int    `json:"maxRows,omitempty" jsonschema:"Rows to return, 1-2000. Default 200. Reading stops once this many rows are fetched; rowCount is then a lower bound."`
 }
 
 // runQuery builds an adapterhost.ExecuteRequestWire and calls Query.Execute — literally the method
@@ -202,6 +203,7 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		ConnectionID: args.ConnectionID,
 		Path:         args.Path,
 		Statements:   []string{args.SQL},
+		Cap:          page.ResultCap{Rows: rv.maxRows},
 	})
 	if err != nil {
 		// Finding #4, M6: a Postgres/MySQL driver error routinely embeds the offending value (a

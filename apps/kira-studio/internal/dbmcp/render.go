@@ -888,7 +888,7 @@ func renderTabularPage(pg page.TabularPage, maxRows int, mk *maskset) tabularRes
 	return tabularResult{
 		Kind: "tabular", Columns: columns, Rows: rows,
 		RowCount: pg.RowCount, Returned: returned, TruncatedCells: pg.TruncatedCells,
-		Truncated: returned < pg.RowCount,
+		Truncated: returned < pg.RowCount || pg.Position.Truncated,
 	}
 }
 
@@ -898,7 +898,7 @@ func renderDocumentPage(pg page.DocumentPage, maxRows int) documentResult {
 	for r := 0; r < returned; r++ {
 		docs[r] = documentEntry{ID: cellAt(pg.IDs, r), Body: cellAt(pg.Bodies, r)}
 	}
-	return documentResult{Kind: "document", Documents: docs, RowCount: pg.RowCount, Returned: returned, Truncated: returned < pg.RowCount}
+	return documentResult{Kind: "document", Documents: docs, RowCount: pg.RowCount, Returned: returned, Truncated: returned < pg.RowCount || pg.Position.Truncated}
 }
 
 // renderKeyValuePage also masks (§4.3): a Redis hash field or an S3 metadata key is column-shaped,
@@ -920,7 +920,7 @@ func renderKeyValuePage(pg page.KeyValuePage, maxRows int, mk *maskset) keyValue
 	}
 	return keyValueResult{
 		Kind: "keyvalue", RedisType: pg.RedisType, TTLMs: pg.TTLMs, MemoryBytes: pg.MemoryBytes,
-		Entries: entries, RowCount: pg.RowCount, Returned: returned, Truncated: returned < pg.RowCount,
+		Entries: entries, RowCount: pg.RowCount, Returned: returned, Truncated: returned < pg.RowCount || pg.Position.Truncated,
 	}
 }
 
@@ -933,5 +933,5 @@ func renderStreamPage(pg page.StreamPage, maxRows int) streamResult {
 			Headers: cellAt(pg.Headers, r), Attrs: cellAt(pg.Attrs, r), Body: cellAt(pg.Bodies, r),
 		}
 	}
-	return streamResult{Kind: "stream", Messages: messages, RowCount: pg.RowCount, Returned: returned, Truncated: returned < pg.RowCount}
+	return streamResult{Kind: "stream", Messages: messages, RowCount: pg.RowCount, Returned: returned, Truncated: returned < pg.RowCount || pg.Position.Truncated}
 }
