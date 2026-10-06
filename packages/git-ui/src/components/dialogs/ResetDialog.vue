@@ -18,7 +18,14 @@
 import type { ResetMode } from '@kira/git-ipc';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
@@ -79,7 +86,6 @@ function confirm(): void {
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      :aria-describedby="undefined"
       class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
@@ -95,15 +101,15 @@ function confirm(): void {
           You are not on a branch, so no branch is changed — this moves HEAD only.
         </p>
 
-        <p v-if="preflight?.leaving === 0 && preflight.gaining === 0">
+        <DialogDescription v-if="preflight?.leaving === 0 && preflight.gaining === 0">
           HEAD is already here — this resets your working state only.
-        </p>
+        </DialogDescription>
         <template v-else-if="preflight?.gaining === 0">
-          <p>
+          <DialogDescription>
             {{ preflight.leaving }} commit{{ preflight.leaving === 1 ? '' : 's' }} will leave
             <template v-if="preflight.branch"><code>{{ preflight.branch }}</code></template>
             <template v-else>HEAD</template>:
-          </p>
+          </DialogDescription>
           <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="c in preflight.leavingCommits" :key="c.sha">
               <code>{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
@@ -111,12 +117,12 @@ function confirm(): void {
           </ul>
           <p v-if="preflight.leavingTruncated" class="kv:text-muted-foreground kv:italic">and more…</p>
         </template>
-        <p v-else-if="preflight">
+        <DialogDescription v-else-if="preflight">
           This moves to a different line of history: {{ preflight.leaving }} commit{{
             preflight.leaving === 1 ? '' : 's'
           }}
           leave, {{ preflight.gaining }} arrive.
-        </p>
+        </DialogDescription>
 
         <fieldset class="kv:my-2 kv:p-1 kv:border kv:border-panel-border kv:rounded-sm">
           <legend class="kv:px-0.5 kv:text-muted-foreground">Mode</legend>

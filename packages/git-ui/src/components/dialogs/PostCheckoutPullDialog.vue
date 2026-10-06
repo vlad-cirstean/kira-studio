@@ -9,7 +9,14 @@
  * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now.
  */
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -31,18 +38,17 @@ function pullNow(): void {
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && notNow()">
     <DialogContent
       :show-close-button="false"
-      :aria-describedby="undefined"
       class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Pull the latest changes?</DialogTitle>
       </DialogHeader>
       <div class="min-h-0 overflow-y-auto">
-        <p>
+        <DialogDescription>
           <strong>{{ pending.branch }}</strong> is {{ pending.behind }}
           {{ pending.behind === 1 ? 'commit' : 'commits' }} behind
           <code>{{ pending.upstreamShortName }}</code> — pull now?
-        </p>
+        </DialogDescription>
       </div>
 
       <DialogFooter class="justify-end gap-1">

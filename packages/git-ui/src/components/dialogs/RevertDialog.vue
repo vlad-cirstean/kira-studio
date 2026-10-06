@@ -9,7 +9,14 @@
  * only supplies its own body/footer content.
  */
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { computed, ref, watch } from 'vue';
@@ -57,18 +64,17 @@ function confirm(): void {
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      :aria-describedby="undefined"
       class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Revert</DialogTitle>
       </DialogHeader>
       <div class="min-h-0 overflow-y-auto">
-        <p>
+        <DialogDescription>
           Reverting applies the inverse of {{ isMultiSha ? 'each selected commit' : 'this commit' }}
           as a new commit — the original stays in history, so this is safe on branches you've already
           pushed.
-        </p>
+        </DialogDescription>
 
         <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
           HEAD is detached: the revert commit will not belong to any branch until you create one.

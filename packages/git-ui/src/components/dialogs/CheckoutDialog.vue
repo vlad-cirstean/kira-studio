@@ -27,7 +27,14 @@
  */
 import type { CheckoutPreflight } from '@kira/git-ipc';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -72,7 +79,6 @@ function stashAndCarry(): void {
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      :aria-describedby="undefined"
       class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
@@ -80,19 +86,19 @@ function stashAndCarry(): void {
       </DialogHeader>
       <div class="min-h-0 overflow-y-auto">
         <template v-if="headline?.kind === 'inProgressOperation'">
-          <p>An operation is already in progress. Resolve or abort it first.</p>
+          <DialogDescription>An operation is already in progress. Resolve or abort it first.</DialogDescription>
         </template>
 
         <template v-else-if="headline?.kind === 'worktreeConflict'">
-          <p>
+          <DialogDescription>
             <code>{{ headline.branch }}</code> is already checked out in another worktree
             (<code>{{ headline.worktreePath }}</code>). Git will not check out the same branch in two
             places at once.
-          </p>
+          </DialogDescription>
         </template>
 
         <template v-else-if="headline?.kind === 'blockedByUntracked'">
-          <p>These untracked files would be overwritten by the checkout:</p>
+          <DialogDescription>These untracked files would be overwritten by the checkout:</DialogDescription>
           <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="path in headline.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
@@ -100,7 +106,7 @@ function stashAndCarry(): void {
         </template>
 
         <template v-else-if="trackedBlocker">
-          <p>These local changes would be overwritten by the checkout:</p>
+          <DialogDescription>These local changes would be overwritten by the checkout:</DialogDescription>
           <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="path in trackedBlocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>

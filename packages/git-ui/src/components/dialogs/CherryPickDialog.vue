@@ -10,7 +10,14 @@
  * only supplies its own body/footer content.
  */
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { computed, ref, watch } from 'vue';
@@ -77,14 +84,15 @@ function confirm(): void {
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      :aria-describedby="undefined"
       class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Cherry-pick</DialogTitle>
       </DialogHeader>
       <div class="min-h-0 overflow-y-auto">
-        <p>Applies this commit's changes here as a new commit — the original stays where it is.</p>
+        <DialogDescription>
+          Applies this commit's changes here as a new commit — the original stays where it is.
+        </DialogDescription>
 
         <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
           HEAD is detached: the new commit will not belong to any branch until you create one.

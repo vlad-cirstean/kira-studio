@@ -22,7 +22,14 @@
  */
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { computed, ref, useId, watch } from 'vue';
@@ -84,21 +91,20 @@ function confirmPlain(): void {
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      :aria-describedby="undefined"
       class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Force push {{ pending.branch }} to {{ pending.remote }}?</DialogTitle>
       </DialogHeader>
       <div class="min-h-0 overflow-y-auto">
-        <p>
+        <DialogDescription>
           This will overwrite <code>{{ pending.remote }}/{{ resolvedBranch }}</code>, currently at
           <code>{{ shortSha(pending.preflight.remoteTip) }}</code>.
           <template v-if="pending.preflight.behind > 0">
             It is {{ pending.preflight.behind }} commit{{ pending.preflight.behind === 1 ? '' : 's' }}
             ahead of what you last saw.
           </template>
-        </p>
+        </DialogDescription>
 
         <p v-if="protectedBy" class="kv:text-diff-deleted kv:my-0.5">
           <code>{{ resolvedBranch }}</code> matches your protected pattern
