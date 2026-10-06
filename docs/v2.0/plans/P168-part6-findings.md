@@ -8,7 +8,38 @@ Paths repo-relative. `SI` = `apps/kira-studio/internal`, `SF` = `apps/kira-studi
 
 ## Checks run
 
-Filled in block 7.
+All green at `0705586` (no code changed by this review):
+- `go build ./apps/kira-studio/...`: ok.
+- `go vet` over `SI/{bridge,appshell,appcore,buildinfo,config,dbmcp,queryplan,mask,maskrules,
+  mcpauth,mcpinstall}/...`, `SI` (`layering_test.go`), `apps/kira-studio/cmd/...`: ok.
+- `go test -race -count=1` over the same set: ok (`bridge`, `dbmcp`, `queryplan`, `mask`,
+  `mcpauth`, `mcpinstall`, `internal`; the rest have no tests).
+- `go test ./apps/kira-studio/internal/ipcfixture/...` (Docker up): ok, 27 s.
+- `bun test` `mask-parity.spec.ts`, `explain-plan.spec.ts`, `explain-truncated.spec.ts`: 103 pass.
+- `bun run typecheck`: ok (pre-commit hook on every findings commit).
+- `bun run test:ui:studio -- --grep "settings-claude-code|mask-preview|connections|update-dialog"`:
+  9 passed.
+
+Probes (scratch, deleted before each commit; none committed): `sh` round trip of the `Command`
+payload (F1); go-sdk stateless handler with a client-side deadline (F2); live `mysql:8.4` and
+`mariadb:11.4` containers running `EXPLAIN FORMAT=JSON` (F6); `renderPage` with unaliased and
+quoted-alias projections (F9); `maskrules` invalidate-versus-store race, 300 rounds, not
+reproduced (F10); Go `unicode`/`uniseg` versus Bun `Intl.Segmenter`/RegExp (F11); cookie jar
+delete by name (F12); Go versus JS number formatting (F19).
+
+## Summary
+
+19 findings: 2 high (F6, F9), 2 medium (F2, F12), 15 low (F1, F3, F4, F5, F7, F8, F10, F11, F13,
+F14, F15, F16, F17, F18, F19). DESIGN-DECISION: F8 (cites Part 4 F8; not a second phase), F12's
+exact-cookie half (routed Part 10 F18). Fix order suggestion: masking leaks first (F9, F6), then
+F2, then the rest grouped by file.
+
+Edit scope: every fix lands in Part 6 files or Stream A one-hop files (`httpclient/cookies.go`,
+`storage/repos/collections.go`, `internal/ipcerr`, `internal/terminal`, `internal/shell`), except
+these tagged items for `P168-routed-from-streamA.md`: F11 fixtures (`tests/fixtures/mask/`, Part
+12), F13 renderer half (`api/state/apiQueries.ts`, Part 10), F19 optional fixture
+(`tests/fixtures/explain-plans/`, Part 12), F15 Kira Space teardown call only if renamed (Stream
+B). Routed Part 10 F18 renderer half: do not route (F12: no domain/path exists to pass).
 
 ## Findings
 
@@ -31,7 +62,9 @@ Probe (scratch Go program rendering the exact payload, run through `sh`):
 Fix: build the add-json word with `shellSingleQuote(string(payload))` and quote `name` the same
 way. Add a `sh -c` round-trip case to `install_test.go` (space and `'` in the path) asserting the
 argv the shell produces equals what `Install` passes. This is shell-escaping with interacting
-rules, so it clears the unit-test bar.
+rules, so it clears the unit-test bar. The existing `TestCommandQuotesHeadersHelperPath`
+(`install_test.go:31-52`) slices the payload out of the string and JSON-decodes it, never through
+a shell, so it passes on the broken output; replace it with the round-trip case.
 
 ### F2 (medium) MCP tool handlers keep running after the client disconnects; a stale approval still executes
 
@@ -517,3 +550,22 @@ fixture is wanted: `needs-other-part-file: apps/kira-studio/tests/fixtures/expla
     `index_condition` is F6.
   - Issue rules (`full-scan`, `unused-index`, `filesort`, `temp-table`, `wide-scan`,
     `pk-not-narrowed`, `all-parts-read`, `nested-loop-wide-inner`) match the TS parsers.
+- Block 7 (tests and checks): done. Every Part 6 `_test.go` listed by name and read where it is
+  the sole guard of a claim (`mcpinstall/install_test.go`, `dbmcp/render_test.go`,
+  `dbmcp/explain_test.go`, `bridge/{connections,files}_test.go`); `mask-parity.spec.ts`. All §0
+  checks green (see Checks run).
+  - No new finding beyond F1's note: `TestCommandQuotesHeadersHelperPath` pins the broken
+    `Command` output.
+  - Unit-test bar: `http_test.go`/`grpc_test.go` cases each guard a distinct masking surface or
+    encoding (QueryEscape, PathEscape, piped base64, replacer ordering, stream event order); no
+    true duplicate. `TestConnectionsServiceRejectsBareID` is a required-field guard below the
+    bar, but `CLAUDE.md` applies the bar going forward, not as a retroactive cleanup; not filed.
+  - `mask/parity_test.go` and `queryplan/parse_test.go` read Part 12 fixtures; gaps are F11/F19.
+
+Coverage statement: all 95 owned files reviewed. Production: every file in plan §2's list
+(`SI/bridge` 30, `SI/dbmcp` 8, `SI/queryplan` 10, `SI/mask`, `SI/mcpauth`, `SI/mcpinstall` 2,
+`SI/maskrules`, `SI/appshell` 3, `SI/appcore`, `SI/config` 2, `SI/buildinfo`, `main.go`,
+`cmd/g1measure/main.go`, `SD/mask.ts`, `SD/dbmcp.ts`). Tests: all 24 test files listed and run;
+read in full only where noted above (skimmed by name otherwise, since they passed and guard
+logic already reviewed in its production file). Non-code: all 7 build files read. Nothing skipped
+without reason, nothing not reached.
