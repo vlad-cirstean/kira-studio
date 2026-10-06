@@ -128,16 +128,14 @@ func TestOutputCollector_UnterminatedStreamBufDoesNotGrowUnbounded(t *testing.T)
 		t.Fatal("want Truncated true — the forced flush of an oversized unterminated chunk exceeds maxRetainedOutput")
 	}
 
-	// The collector must still work normally afterward — a real '\n'-terminated line right after
-	// the oversized one is decoded cleanly, proving this isn't a stuck or corrupted state. The
-	// leading '\n' terminates whatever unterminated remainder of the oversized write is still
-	// buffered (huge's own length need not be an exact multiple of maxUnterminatedBuf), so
-	// "ordinary line" itself starts clean.
+	// The collector must still decode normally afterward: the line after the oversized one
+	// reaches the live stream, though the retained transcript has stopped at the gap.
+	var live []Line
+	c.onBatch = func(b []Line) { live = append(live, b...) }
 	c.write("stdout", []byte("\nordinary line\n"))
 	c.flush()
-	lines := c.finalLines()
-	if lines[len(lines)-1].Text != "ordinary line" {
-		t.Fatalf("last line = %q, want %q — the collector must recover cleanly after an oversized flush", lines[len(lines)-1].Text, "ordinary line")
+	if len(live) == 0 || live[len(live)-1].Text != "ordinary line" {
+		t.Fatalf("live = %v, want last line %q", live, "ordinary line")
 	}
 }
 
@@ -368,5 +366,61 @@ func TestOutputCollector_DeliveriesSerializeInFormationOrder(t *testing.T) {
 	defer mu.Unlock()
 	if len(order) != 2 || order[0] != "first" || order[1] != "second" {
 		t.Fatalf("delivery order = %v, want [first second]", order)
+	}
+}
+
+// A tick that claimed the last lines before flush must finish its onBatch before flush returns;
+// writes after flush deliver nothing.
+func TestOutputCollector_FlushWaitsForInFlightTickAndRejectsLaterWrites(t *testing.T) {
+	release := make(chan struct{})
+	started := make(chan struct{})
+	var mu sync.Mutex
+	var got []string
+	c := newOutputCollector(func(b []Line) {
+		if b[0].Text == "last" {
+			close(started)
+			<-release
+		}
+		mu.Lock()
+		got = append(got, b[0].Text)
+		mu.Unlock()
+	})
+	c.now = func() time.Time { return time.Unix(0, 0).Add(time.Hour) }
+	c.mu.Lock()
+	c.addLineLocked("stdout", "last")
+	c.mu.Unlock()
+	go c.tick()
+	<-started
+
+	flushed := make(chan struct{})
+	go func() {
+		c.flush()
+		close(flushed)
+	}()
+	select {
+	case <-flushed:
+		t.Fatal("flush returned while a tick delivery was still in flight")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	<-flushed
+
+	c.write("stdout", []byte("late\n"))
+	c.tick()
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 1 || got[0] != "last" {
+		t.Fatalf("delivered %v, want [last]", got)
+	}
+}
+
+// Once a line is dropped for size, later shorter lines are not retained: no silent gap.
+func TestOutputCollector_RetainedTranscriptStopsAtFirstDroppedLine(t *testing.T) {
+	c := newOutputCollector(nil)
+	c.write("stdout", []byte("head\n"+strings.Repeat("x", maxRetainedOutput+1)+"\ntail\n"))
+	c.flush()
+	lines := c.finalLines()
+	if len(lines) != 1 || lines[0].Text != "head" || !c.isTruncated() {
+		t.Fatalf("lines=%d truncated=%v, want only head retained", len(lines), c.isTruncated())
 	}
 }

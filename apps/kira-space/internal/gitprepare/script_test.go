@@ -92,14 +92,13 @@ var scrubbedKeysForTest = []string{
 	"GIT_CONFIG", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM",
 	"GIT_ASKPASS", "SSH_ASKPASS", "SSH_ASKPASS_REQUIRE",
 	"KIRA_ASKPASS_SOCK", "KIRA_ASKPASS_TOKEN",
+	"GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_NAMESPACE", "GIT_SSH_COMMAND",
+	"GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_KEY_12",
 }
 
 // TestBuildEnv_ScrubsEveryNamedKey is the exit-criteria's own env-scrub test: a base environment
-// containing all fourteen named keys produces a child environment containing NONE of them.
+// containing all named keys produces a child environment containing NONE of them.
 func TestBuildEnv_ScrubsEveryNamedKey(t *testing.T) {
-	if len(scrubbedKeysForTest) != 14 {
-		t.Fatalf("test's own list has %d keys, want 14", len(scrubbedKeysForTest))
-	}
 	base := make([]string, 0, len(scrubbedKeysForTest)+2)
 	for _, k := range scrubbedKeysForTest {
 		base = append(base, k+"=poison")

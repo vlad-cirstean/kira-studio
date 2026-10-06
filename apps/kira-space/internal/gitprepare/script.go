@@ -3,6 +3,7 @@ package gitprepare
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // DefaultShell is D9/F16's own fallback — used whenever $SHELL is unset, not an absolute path, or
@@ -51,7 +52,7 @@ func BuildArgv(shell string, loginShell bool, scriptText string) []string {
 	return []string{shell, "-c", scriptText}
 }
 
-// scrubbedEnvKeys is D12/F12's exact, exhaustive removal list — fourteen keys, REMOVED (never
+// scrubbedEnvKeys is D12/F12's exact, exhaustive removal list — eighteen keys plus the GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_* prefixes, REMOVED (never
 // merely overwritten with an empty value, which would still leave the key present for a script
 // that checks `[ -n "$GIT_DIR" ]` rather than reading its value) from the inherited environment
 // before any KIRA_*/hygiene addition below. Every key here carries either a mis-targeting hazard
@@ -69,11 +70,27 @@ var scrubbedEnvKeys = []string{
 	"GIT_CONFIG",
 	"GIT_CONFIG_GLOBAL",
 	"GIT_CONFIG_SYSTEM",
+	"GIT_CONFIG_PARAMETERS",
+	"GIT_CONFIG_COUNT",
+	"GIT_NAMESPACE",
+	"GIT_SSH_COMMAND",
 	"GIT_ASKPASS",
 	"SSH_ASKPASS",
 	"SSH_ASKPASS_REQUIRE",
 	"KIRA_ASKPASS_SOCK",
 	"KIRA_ASKPASS_TOKEN",
+}
+
+// scrubbedEnvPrefixes covers git's indexed injected-config variables (GIT_CONFIG_KEY_<n>/_VALUE_<n>).
+var scrubbedEnvPrefixes = []string{"GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"}
+
+func scrubbedEnvKey(k string) bool {
+	for _, p := range scrubbedEnvPrefixes {
+		if strings.HasPrefix(k, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // Vars is D9's own app-data-via-environment table — the ONLY channel app-supplied values reach the
@@ -99,7 +116,7 @@ func envKey(kv string) string {
 }
 
 // BuildEnv builds the CHILD'S ENTIRE environment (D12/F12) — base is normally os.Environ() (a
-// fake slice in every test), scrubbed of scrubbedEnvKeys' fourteen names, with three fixed hygiene
+// fake slice in every test), scrubbed of scrubbedEnvKeys' names, with three fixed hygiene
 // values and the five KIRA_* values (D9) appended after. Later entries winning over earlier
 // duplicates (Go's os/exec, and every real exec(3), both honour last-one-wins for a repeated key)
 // is exactly why the scrub happens FIRST and unconditionally: a base environment that happens to
@@ -113,7 +130,7 @@ func BuildEnv(base []string, vars Vars) []string {
 
 	env := make([]string, 0, len(base)+9)
 	for _, kv := range base {
-		if scrubbed[envKey(kv)] {
+		if k := envKey(kv); scrubbed[k] || scrubbedEnvKey(k) {
 			continue
 		}
 		env = append(env, kv)

@@ -59,7 +59,7 @@ type Result struct {
 }
 
 // Runner is the spawn seam (D18/F5) — the one thing gitsession's own tests fake; NewOSRunner is the
-// only production implementation, and nothing in this package's own test suite calls it.
+// only production implementation.
 type Runner interface {
 	Run(ctx context.Context, spec Spec) (Result, error)
 }
@@ -111,8 +111,10 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	}
 
 	tickerDone := make(chan struct{})
+	tickerExited := make(chan struct{})
 	ticker := time.NewTicker(batchInterval)
 	go func() {
+		defer close(tickerExited)
 		defer ticker.Stop()
 		for {
 			select {
@@ -127,6 +129,7 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	waitErr := cmd.Wait()
 	stopEscalate()
 	close(tickerDone)
+	<-tickerExited
 	collector.flush()
 
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)

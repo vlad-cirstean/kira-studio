@@ -167,6 +167,7 @@ type outputCollector struct {
 	final        []Line
 	finalBytes   int
 	truncated    bool
+	closed       bool
 	pending      []Line
 	pendingBytes int
 	lastFlush    time.Time
@@ -203,6 +204,10 @@ func (c *outputCollector) stderrWriter() *streamWriter { return &streamWriter{c:
 
 func (c *outputCollector) write(stream string, chunk []byte) {
 	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return
+	}
 	c.streamBuf[stream] = append(c.streamBuf[stream], chunk...)
 	buf := c.streamBuf[stream]
 	for {
@@ -229,6 +234,7 @@ func (c *outputCollector) write(stream string, chunk []byte) {
 // final line, and any batch still pending is delivered unconditionally.
 func (c *outputCollector) flush() {
 	c.mu.Lock()
+	c.closed = true
 	for _, stream := range []string{"stdout", "stderr"} {
 		if rest := c.streamBuf[stream]; len(rest) > 0 {
 			c.addLineLocked(stream, sanitizeLine(string(rest)))
@@ -239,6 +245,17 @@ func (c *outputCollector) flush() {
 	ticket, reserved := c.reserveDelivery(batch)
 	c.mu.Unlock()
 	c.finishDelivery(batch, ticket, reserved)
+	c.awaitDrained()
+}
+
+// awaitDrained blocks until every reserved ticket has delivered, so a tick that claimed lines
+// before closed was set finishes its onBatch before flush returns.
+func (c *outputCollector) awaitDrained() {
+	c.deliverMu.Lock()
+	for c.deliveredSeq != c.nextTicket {
+		c.deliverCond.Wait()
+	}
+	c.deliverMu.Unlock()
 }
 
 // tick is the idle-flush path: called periodically while the process runs so a small pending batch
@@ -294,7 +311,7 @@ func (c *outputCollector) finishDelivery(batch []Line, ticket uint64, reserved b
 }
 
 func (c *outputCollector) addLineLocked(stream, text string) {
-	if len(c.final) < maxRetainedLines && c.finalBytes+len(text) <= maxRetainedOutput {
+	if !c.truncated && len(c.final) < maxRetainedLines && c.finalBytes+len(text) <= maxRetainedOutput {
 		c.final = append(c.final, Line{Stream: stream, Text: text})
 		c.finalBytes += len(text)
 	} else {
