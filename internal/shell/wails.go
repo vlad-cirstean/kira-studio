@@ -2,6 +2,7 @@ package shell
 
 import (
 	"errors"
+	"sync/atomic"
 
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -18,14 +19,15 @@ import (
 // single argument is how a payload-free signal (nil, D6) or a real payload is expressed either
 // way. app is nil until attach runs — see NewDeferredEmitter.
 type emitter struct {
-	app *application.App
+	app atomic.Pointer[application.App] // written by attach on main, read from any goroutine
 }
 
 func (e *emitter) Emit(name string, data any) {
-	if e.app == nil {
+	app := e.app.Load()
+	if app == nil {
 		return
 	}
-	e.app.Event.Emit(name, data)
+	app.Event.Emit(name, data)
 }
 
 // EmitTo delivers to exactly one window (P8 D6/C6) — the mechanism the per-window close-flush
@@ -33,10 +35,11 @@ func (e *emitter) Emit(name string, data any) {
 // naming no live window (already closed, or never existed) is a silent no-op, matching Emit's own
 // "no app yet" no-op above.
 func (e *emitter) EmitTo(windowKey string, name string, data any) {
-	if e.app == nil {
+	app := e.app.Load()
+	if app == nil {
 		return
 	}
-	win, ok := e.app.Window.GetByName(windowKey)
+	win, ok := app.Window.GetByName(windowKey)
 	if !ok {
 		return
 	}
@@ -50,10 +53,11 @@ func (e *emitter) EmitTo(windowKey string, name string, data any) {
 // nothing focused) it returns nil, and there is nothing to deliver to, so this is a silent no-op —
 // the same "no live target" shape EmitTo already has, not a broadcast fallback.
 func (e *emitter) EmitFocused(name string, data any) {
-	if e.app == nil {
+	app := e.app.Load()
+	if app == nil {
 		return
 	}
-	win := e.app.Window.Current()
+	win := app.Window.Current()
 	if win == nil {
 		return
 	}
@@ -69,7 +73,7 @@ func (e *emitter) EmitFocused(name string, data any) {
 // anything has a chance to actually emit.
 func NewDeferredEmitter() (e appevent.Emitter, attach func(*application.App)) {
 	em := &emitter{}
-	return em, func(app *application.App) { em.app = app }
+	return em, func(app *application.App) { em.app.Store(app) }
 }
 
 // Dialogs is the Wails adapter behind every app's own bound-service Dialogs interface — plain
@@ -80,12 +84,28 @@ func NewDeferredEmitter() (e appevent.Emitter, attach func(*application.App)) {
 // left behind is two four-field structs, correct and expected, not a miss. Attaches each panel to
 // the main window so it opens as a sheet rather than a free-floating modal (dialogs.go:456 / :247).
 type Dialogs struct {
+	target atomic.Pointer[dialogTarget] // set once by attach, read from bound-method goroutines
+}
+
+type dialogTarget struct {
 	app    *application.App
 	window func() application.Window
 }
 
+func (d *Dialogs) attached() (*dialogTarget, error) {
+	t := d.target.Load()
+	if t == nil {
+		return nil, errors.New("no application")
+	}
+	return t, nil
+}
+
 func (d *Dialogs) SaveFile(directory, filename string) (string, error) {
-	dlg := d.app.Dialog.SaveFile().AttachToWindow(d.window())
+	t, err := d.attached()
+	if err != nil {
+		return "", err
+	}
+	dlg := t.app.Dialog.SaveFile().AttachToWindow(t.window())
 	if directory != "" {
 		dlg.SetDirectory(directory)
 	}
@@ -96,7 +116,11 @@ func (d *Dialogs) SaveFile(directory, filename string) (string, error) {
 }
 
 func (d *Dialogs) OpenFile(title, filterName, filterPattern string) (string, error) {
-	dlg := d.app.Dialog.OpenFile().AttachToWindow(d.window())
+	t, err := d.attached()
+	if err != nil {
+		return "", err
+	}
+	dlg := t.app.Dialog.OpenFile().AttachToWindow(t.window())
 	if title != "" {
 		dlg.SetTitle(title)
 	}
@@ -110,7 +134,11 @@ func (d *Dialogs) OpenFile(title, filterName, filterPattern string) (string, err
 // CanChooseDirectories(bool)/CanChooseFiles(bool) already exist on Wails v3 beta.16's
 // OpenFileDialogStruct, so a folder picker is one more method on this seam, not a new mechanism.
 func (d *Dialogs) OpenDirectory(title string) (string, error) {
-	dlg := d.app.Dialog.OpenFile().AttachToWindow(d.window()).CanChooseFiles(false).CanChooseDirectories(true)
+	t, err := d.attached()
+	if err != nil {
+		return "", err
+	}
+	dlg := t.app.Dialog.OpenFile().AttachToWindow(t.window()).CanChooseFiles(false).CanChooseDirectories(true)
 	if title != "" {
 		dlg.SetTitle(title)
 	}
@@ -123,20 +151,22 @@ func (d *Dialogs) OpenDirectory(title string) (string, error) {
 func NewDeferredDialogs() (d *Dialogs, attach func(app *application.App, window func() application.Window)) {
 	da := &Dialogs{}
 	return da, func(app *application.App, window func() application.Window) {
-		da.app = app
-		da.window = window
+		da.target.Store(&dialogTarget{app: app, window: window})
 	}
 }
 
 // browserOpener satisfies each app's own bridge.Browser (OpenURL(url string) error) over the real
 // Wails BrowserManager. app is nil until attach runs — see NewDeferredBrowser.
-type browserOpener struct{ app *application.App }
+type browserOpener struct {
+	app atomic.Pointer[application.App]
+}
 
 func (b *browserOpener) OpenURL(url string) error {
-	if b.app == nil {
+	app := b.app.Load()
+	if app == nil {
 		return errors.New("no application")
 	}
-	return b.app.Browser.OpenURL(url)
+	return app.Browser.OpenURL(url)
 }
 
 // NewDeferredBrowser is NewDeferredDialogs' counterpart for UpdateService/GitHubService: built
@@ -146,7 +176,7 @@ func (b *browserOpener) OpenURL(url string) error {
 // needed at the call site.
 func NewDeferredBrowser() (b *browserOpener, attach func(*application.App)) {
 	bo := &browserOpener{}
-	return bo, func(app *application.App) { bo.app = app }
+	return bo, func(app *application.App) { bo.app.Store(app) }
 }
 
 // AttachReopen is src/main/index.ts:141-145's `activate` handler: on macOS, closing the last
