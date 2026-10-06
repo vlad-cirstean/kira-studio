@@ -64,6 +64,9 @@ export interface LayoutRange {
 export class GraphViewState {
   readonly store: CommitStore;
   readonly layout: LayoutStore;
+  /** The plan `layout` was built for. Display rows move between plans in grouped mode, so a
+   *  mismatch means every lane read from `layout` belongs to a different commit. */
+  #layoutPlan: RowPlan | undefined;
   readonly loadedRows: ShallowRef<number>;
   readonly remaining: ShallowRef<number>;
   readonly exhausted: ShallowRef<boolean>;
@@ -438,7 +441,15 @@ export class GraphViewState {
     this.#autoRefreshPending = false;
   }
 
+  /** False in grouped mode while `plan` is ahead of `layout` (one worker round trip after each
+   *  rebuild): `graphColumn.ts` draws no lanes then rather than the previous layout's. Identity
+   *  mode never moves rows, so its older layout stays valid for the rows it covers. */
+  get layoutCurrent(): boolean {
+    return this.#order === undefined || this.#layoutPlan === this.plan.value;
+  }
+
   #resetLayout(): void {
+    this.#layoutPlan = undefined;
     this.layout.clear();
     this.#layoutClient.reset();
     this.laneCount.value = 0;
@@ -494,6 +505,7 @@ export class GraphViewState {
     // passes through 0 the way it would if `clear()` ran on its own, earlier.
     this.layout.clear();
     this.layout.append(layoutChunk);
+    this.#layoutPlan = plan;
     this.laneCount.value = this.layout.laneCount;
   }
 

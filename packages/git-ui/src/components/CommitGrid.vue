@@ -187,6 +187,7 @@ const graphFormatter = createGraphFormatter(
   props.graphView.layout,
   props.graphView.store,
   plan,
+  () => props.graphView.layoutCurrent,
   (row) => grid?.getRowHeight(row) ?? compactRowHeightPx(tokenReader),
   () => compactRowHeightPx(tokenReader),
   () => widths.value.graph,

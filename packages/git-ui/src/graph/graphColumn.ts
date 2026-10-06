@@ -30,14 +30,15 @@ declare global {
  *  P93 §7: `row` is the *display* row (SlickGrid's own indexing, and what `layout` is now keyed
  *  by — `projectLayoutInput`'s output is already in display-row coordinates). `store`, whose rows
  *  are arrival-order, is read through `plan.storeRowAt(row)` instead. */
-function readSlice(
+export function readSlice(
   layout: LayoutStore,
   store: CommitStore,
   plan: RowPlan,
   row: number,
   reusable: EdgeSegment[],
+  layoutCurrent: boolean,
 ): RowSlice {
-  if (row >= layout.rowCount) {
+  if (!layoutCurrent || row >= layout.rowCount) {
     return {
       row,
       lane: undefined,
@@ -113,11 +114,14 @@ function readSlice(
  * P93 §7: `plan` is likewise an accessor (`() => graphView.plan.value`), re-read on every row
  * rather than captured once — a plan rebuild (a page landing, tips changing) never needs this
  * formatter rebuilt, only the grid invalidated (`CommitGrid.vue`'s own `plan` watcher).
+ * `layoutCurrent` (`GraphViewState.layoutCurrent`) is an accessor for the same reason: while it is
+ * false the formatter draws no lanes, so a new plan never paints the previous layout's.
  */
 export function createGraphFormatter(
   layout: LayoutStore,
   store: CommitStore,
   plan: () => RowPlan,
+  layoutCurrent: () => boolean,
   rowHeight: (row: number) => number,
   compactRowHeight: () => number,
   columnWidth: () => number,
@@ -133,12 +137,22 @@ export function createGraphFormatter(
     if (samples) {
       const start = performance.now();
       wrapper.appendChild(
-        buildRowSvg(readSlice(layout, store, plan(), row, reusable), total, nodeCenterY, width),
+        buildRowSvg(
+          readSlice(layout, store, plan(), row, reusable, layoutCurrent()),
+          total,
+          nodeCenterY,
+          width,
+        ),
       );
       samples.push(performance.now() - start);
     } else {
       wrapper.appendChild(
-        buildRowSvg(readSlice(layout, store, plan(), row, reusable), total, nodeCenterY, width),
+        buildRowSvg(
+          readSlice(layout, store, plan(), row, reusable, layoutCurrent()),
+          total,
+          nodeCenterY,
+          width,
+        ),
       );
     }
     return wrapper;
