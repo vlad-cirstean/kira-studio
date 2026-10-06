@@ -1,6 +1,8 @@
 package bridge
 
 import (
+	"sync"
+
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -38,7 +40,12 @@ func (s *TerminalService) AgentSessions() AgentSessionsEvent {
 // AgentSessionsChanged is Registry.OnChange's own target (main.go) — a package-level function
 // rather than an exported method, since Wails binds every exported method of a registered service:
 // emit itself must never become renderer-triggerable.
+// agentSessionsMu orders snapshot and emit together so an older snapshot never lands last.
+var agentSessionsMu sync.Mutex
+
 func AgentSessionsChanged(e appevent.Emitter, reg *terminal.Registry) {
+	agentSessionsMu.Lock()
+	defer agentSessionsMu.Unlock()
 	e.Emit(ChannelAgentSessions, AgentSessionsEvent{Sessions: toWireAgentSessions(reg.AgentSessions())})
 }
 
