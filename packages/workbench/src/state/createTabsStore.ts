@@ -120,10 +120,6 @@ export interface TabsHost<
   /** A restored tab persists by default whenever `kind !== 'terminal'` (Kira Space's own rule,
    *  the whole rule). Kira Studio narrows it further: also never an incognito tab. */
   persistable?(tab: R): boolean;
-  /** Replaces the default `cleanupTabRuntime` call `dropAllPagesForTab` makes after
-   *  `dropPageStoresForTab` — no app overrides this today, but it exists for the same reason
-   *  `persistable` does: composing a difference without the factory needing to know it exists. */
-  onCleanup?(tabId: string): void;
   /** Runs once, after `hydrateTabs` has parsed every restored tab and seeded
    *  `activeIdByWorkspace` — Kira Space's own hook, deriving `useWorkspaceStore().openRepos` from
    *  the restored tabs' workspace keys. */
@@ -172,7 +168,7 @@ export function createTabsStore<
 
     function dropAllPagesForTab(id: string): void {
       dropPageStoresForTab(id);
-      (host.onCleanup ?? cleanupTabRuntime)(id);
+      cleanupTabRuntime(id);
     }
 
     // Vue's own `reactive<T>` return type (`UnwrapNestedRefs<T>`) recomputes a structurally-equal
@@ -224,7 +220,11 @@ export function createTabsStore<
           () => {
             lastSavedSnapshot = toSave;
           },
-          () => {},
+          (err) => {
+            console.error('tabs save failed', err);
+            // Re-queue for the next saveIfChanged/flush; never loops on its own.
+            nextSnapshot ??= toSave;
+          },
         );
       });
       return saveChain;

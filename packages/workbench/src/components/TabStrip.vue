@@ -14,8 +14,8 @@ import { wheelToHorizontal } from '../util/wheelScroll';
 // The strip, drag-reorder (vue-draggable-plus since P137), wheel-scroll, keyboard-scroll-into-view
 // and the six generic context-menu items are exactly the two apps' shared skeleton (confirmed side by side); every
 // per-app extra — Kira Studio's incognito eye glyph, Kira Space's seti file icons — arrives
-// through the host's own `iconFor`/`tabIndicator`/`tabBadge`/`tabAttention` hooks (host.ts,
-// tabAttention wired by no app as of P127) instead of an app-local import. The trailing "+"
+// through the host's own `iconFor`/`tabIndicator`/`tabBadge` hooks (host.ts) instead of an
+// app-local import. The trailing "+"
 // new-tab affordance is real per-app
 // divergence (Kira Studio: the Terminal module's own plain-session menu; Kira Space: one repo-root
 // terminal, no menu) — not a lookup a host hook can express cleanly, so it stays a `#new-tab` slot,
@@ -24,12 +24,6 @@ import { wheelToHorizontal } from '../util/wheelScroll';
 const props = defineProps<{ host?: TabStripHost<string, TabLike> }>();
 const host: TabStripHost<string, TabLike> = props.host ?? useWorkbenchHost();
 const contextMenuStore = useContextMenuStore();
-
-// P110 I2-20: `.tab-chip.is-attention::after`'s generated pseudo-element dot, as a conditional
-// class string -- content-[''] is section 1.2's own allowlist entry for this exact attention-dot
-// pseudo-element.
-const ATTENTION_CLASS =
-  "relative after:absolute after:top-1 after:right-1 after:size-1.5 after:rounded-full after:bg-state-on after:content-['']";
 
 function isPinned(tab: TabLike): boolean {
   return host.kinds[tab.kind]?.pinned === true;
@@ -45,10 +39,6 @@ function badgeFor(tab: TabLike): { icon: string; tooltip: string } | null {
 
 function indicatorFor(tab: TabLike): { icon: string; tooltip: string } | null {
   return host.tabIndicator?.(tab) ?? null;
-}
-
-function isAttention(tab: TabLike): boolean {
-  return host.tabAttention?.(tab) ?? false;
 }
 
 function onClick(tab: TabLike): void {
@@ -114,7 +104,7 @@ function closeItems(tab: TabLike): MenuItem[] {
 }
 
 // §8.10's Tab row: Close · Close others · Close to the right · Close all · — · Duplicate tab ·
-// Copy name · plus whatever the tab's own kind appends (D22), plus `extraTabMenu` (host.ts).
+// Copy name · plus whatever the tab's own kind appends (D22).
 // §6.1: a pinned tab's own menu is reduced to just "Copy name".
 function onContextMenu(e: MouseEvent, tab: TabLike): void {
   if (isPinned(tab)) {
@@ -153,7 +143,6 @@ function onContextMenu(e: MouseEvent, tab: TabLike): void {
       run: () => copyText(titleFor(tab)),
     },
     ...(host.kinds[tab.kind]?.menuExtras(tab) ?? []),
-    ...(host.extraTabMenu?.(tab) ?? []),
   ];
   contextMenuStore.openContextMenu(e, items);
 }
@@ -223,30 +212,7 @@ if (moveTab) {
       data-testid="tab-strip-pinned"
     >
       <template v-for="{ tab, icon } in pinnedTabs" :key="tab.id">
-        <button
-          v-if="host.kinds[tab.kind]?.pinnedTitle"
-          type="button"
-          :class="tabChipVariants({ active: tab.active })"
-          data-testid="tab"
-          :data-tab-id="tab.id"
-          :data-tab-kind="tab.kind"
-          :data-active="tab.active"
-          data-pinned="true"
-          :aria-label="titleFor(tab)"
-          @click="onClick(tab)"
-          @contextmenu.prevent="onContextMenu($event, tab)"
-        >
-          <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
-          <span
-            v-else
-            class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground mask-contain mask-no-repeat mask-center"
-            :style="icon.fileStyle"
-            aria-hidden="true"
-          />
-          <slot name="tab-leading" :tab="tab" />
-          <span class="tab-title truncate min-w-0">{{ titleFor(tab) }}</span>
-        </button>
-        <Tooltip v-else>
+        <Tooltip>
           <TooltipTrigger as-child>
             <button
               type="button"
@@ -278,6 +244,7 @@ if (moveTab) {
       ref="stripRef"
       class="h-full flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 scrollbar-none px-1"
       data-testid="tab-strip-row"
+      role="tablist"
       @wheel="onWheel"
     >
       <!-- P105 §11: a focusable close control nested inside the tab's own <button> is invalid
@@ -288,10 +255,8 @@ if (moveTab) {
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
         class="group/tab"
-        :class="[
-          tabChipVariants({ active: tab.active }),
-          isAttention(tab) ? ATTENTION_CLASS : '',
-        ]"
+        :class="tabChipVariants({ active: tab.active })"
+        role="presentation"
         data-testid="tab"
         :data-tab-id="tab.id"
         :data-tab-kind="tab.kind"
@@ -304,6 +269,8 @@ if (moveTab) {
         <span class="w-0.5 h-3.5 rounded-xs shrink-0 bg-(--kira-rail)" />
         <button
           type="button"
+          role="tab"
+          :aria-selected="tab.active"
           class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
           @click="onClick(tab)"
           @dblclick="host.tabs.promoteTab?.(tab.id)"
@@ -343,8 +310,8 @@ if (moveTab) {
           v-if="host.tabs.closeTab"
           type="button"
           class="tab-close shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 rounded-kira-sm hover:bg-hover"
-          :class="tab.active ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
-          aria-label="Close tab"
+          :class="tab.active ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100'"
+          :aria-label="`Close ${titleFor(tab)}`"
           data-testid="tab-close"
           @click="onClose($event, tab)"
         >
@@ -363,9 +330,7 @@ if (moveTab) {
     <!-- P110 I2-20: `.tab-chip`'s hover/attention/close-reveal rules moved into `:class` ternaries
          above -- `group/tab` on each chip replaces `.tab-chip:hover .tab-close`/`.tab-chip.is-active
          .tab-close` (`group-hover/tab:opacity-100`, plus the active branch's own `opacity-100`).
-         ATTENTION_CLASS (P86 §14.2: a Claude Code session waiting on you, in a tab that is not the
-         active one) replaces `.tab-chip.is-attention`/`::after`. `.tab-chip`/`.is-attention` were
-         marker-only (no CSS-class test locator); `.is-active`/`.tab-file-icon`/`.tab-title`/
+         `.tab-chip` was marker-only (no CSS-class test locator); `.is-active`/`.tab-file-icon`/`.tab-title`/
          `.tab-close` stay real classes (slick-grid.spec.ts, budgets.spec.ts,
          repo-workspace.spec.ts, font-roles.spec.ts, multiwindow-real.spec.ts, definition.spec.ts). -->
   </div>

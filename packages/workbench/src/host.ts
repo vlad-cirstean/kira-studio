@@ -49,8 +49,6 @@ export type TabIconRender = { codicon: string } | { fileStyle: Record<string, st
 /** What `TabStrip.vue` reads of a kind. A capability a host omits hides the matching affordance. */
 export interface TabStripKind<R extends TabLike> {
   pinned?: true;
-  /** A pinned chip of this kind shows its title, not icon-only. */
-  pinnedTitle?: true;
   title(tab: R): string;
   menuExtras(tab: R): MenuItem[];
 }
@@ -77,21 +75,9 @@ export interface TabStripHost<WK extends string, R extends TabLike> {
   readonly kinds: { readonly [kind: string]: TabStripKind<R> | undefined };
   iconFor(tab: R): TabIconRender;
   railColorFor(tab: R): string | undefined;
-  /** Appended after the six generic context-menu items and the tab kind's own `menuExtras` —
-   *  neither app populates this today (their per-kind extras, incognito toggle included, already
-   *  flow through `kinds[tab.kind].menuExtras`); the hook exists so a future extra doesn't need a
-   *  third context-menu seam invented later. */
-  extraTabMenu?(tab: R): MenuItem[];
   /** A trailing mark after the tab title — Kira Studio's kind-supplied `badge()` member
    *  (`TAB_KINDS[tab.kind].badge`); Kira Space wires none, since no kind of its own declares one. */
   tabBadge?(tab: R): { icon: string; tooltip: string } | null;
-  /** `.is-attention`'s own boolean — a Claude Code tab that wants the user's attention, not the
-   *  active tab. No app wires this as of P129 Part 3 (agent-activity monitoring moved to a shared
-   *  home, packages/workbench/src/state/{agentActivity,createAgentSessionsStore}.ts; Kira Space's
-   *  own instance, ade/state/agentSessions.ts, feeds the ade module's repo tabs directly rather
-   *  than through a tab-strip indicator): kept as a generic optional host seam, `extraTabMenu`'s
-   *  own zero-consumer precedent. */
-  tabAttention?(tab: R): boolean;
   /** A leading mark before the tab title, the one per-tab extra neither `iconFor` (the tab's own
    *  icon) nor `tabBadge` (a trailing, kind-supplied mark) covers — Kira Studio's own incognito eye
    *  glyph, uniform across every kind rather than supplied by one kind's own registry entry. Found

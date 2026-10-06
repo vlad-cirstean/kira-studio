@@ -18,10 +18,9 @@ import { TAB_VIEWS } from './tabViews';
 export { useTabsStore };
 
 // P103 Part 2 (§5.4): the WorkbenchHost instance this app provides once, in App.vue — no
-// `tabBadge`/`tabAttention`/`tabIndicator`: this app has no Claude Code hook integration of its own
-// (P127: neither does Kira Studio's own copy any more) and no TabIncognito store (a Kira
-// Studio-only feature), and no kind of its own declares a `badge()` member, so all three stay
-// unwired, matching today's TabStrip.vue exactly (it renders neither element at all).
+// `tabBadge`/`tabIndicator`: this app has no TabIncognito store (a Kira Studio-only feature) and no
+// kind of its own declares a `badge()` member, so both stay unwired (TabStrip.vue renders neither
+// element).
 export function createWorkbenchHost(): WorkbenchHost<WorkspaceKey, TabRecord> {
   const tabsStore = useTabsStore();
 
