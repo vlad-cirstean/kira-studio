@@ -156,7 +156,10 @@ test('__kiraScrollTrace — inert until start(), documented shape on stop()', as
   expect(secondStop).toBeNull();
 
   // 5. start() again resets state — no leftover frames from the previous recording leak in.
-  await page.evaluate(() => window.__kiraScrollTrace?.start());
-  const freshResult = await page.evaluate(() => window.__kiraScrollTrace?.stop());
+  // One evaluate: a round trip between start and stop lets real frames land under load.
+  const freshResult = await page.evaluate(() => {
+    window.__kiraScrollTrace?.start();
+    return window.__kiraScrollTrace?.stop();
+  });
   expect(freshResult?.frames.length ?? 0).toBeLessThanOrEqual(1); // at most the immediate tick
 });
