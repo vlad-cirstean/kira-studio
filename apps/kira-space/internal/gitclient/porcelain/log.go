@@ -80,9 +80,9 @@ func RevSetArgs(spec WalkSpec) []string {
 	return args
 }
 
-// WalkArgs is RevSetArgs under the name every log/rev-list/scan argv builder below actually
-// calls, matching upstream's own walkArgs/revSetArgs split.
-func WalkArgs(spec WalkSpec) []string { return RevSetArgs(spec) }
+// WalkArgs is RevSetArgs plus a closing "--", the tail every log/rev-list/scan argv builder
+// uses: without it a worktree file named like a rev (HEAD) makes git fail as ambiguous.
+func WalkArgs(spec WalkSpec) []string { return append(RevSetArgs(spec), "--") }
 
 // LogSessionArgs is the paged walk's full argv: the fixed log vocabulary plus spec's rev set.
 func LogSessionArgs(spec WalkSpec) []string {

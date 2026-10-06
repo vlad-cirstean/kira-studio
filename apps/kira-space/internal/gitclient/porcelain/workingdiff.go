@@ -29,12 +29,12 @@ func ParseEmptyTreeHash(stdout []byte) string {
 // NumstatArgs/NameStatusArgs exactly, so CombineFileChanges' own no-rename-branch join is correct
 // here too.
 func WorkingNumstatArgs(base string) []string {
-	return []string{"diff", "--numstat", "-M", "-C", "-z", base}
+	return []string{"diff", "--numstat", "-M", "-C", "-z", base, "--"}
 }
 
 // WorkingNameStatusArgs is WorkingNumstatArgs' twin over `--name-status` — CombineFileChanges joins
 // this onto WorkingNumstatArgs' own additions/deletions/isBinary, identically to the commit-detail
 // pair.
 func WorkingNameStatusArgs(base string) []string {
-	return []string{"diff", "--name-status", "-M", "-C", "-z", base}
+	return []string{"diff", "--name-status", "-M", "-C", "-z", base, "--"}
 }
