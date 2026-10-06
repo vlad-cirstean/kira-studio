@@ -87,6 +87,12 @@ export function takePendingBlameReveal(codeRepoId: string): { repoId: string; sh
   return target;
 }
 
+/** Workspace close: a stashed target must not replay into a later workspace on the same repo. */
+export function clearPendingTargets(codeRepoId: string): void {
+  pendingReviewTargetByCodeRepoId.delete(codeRepoId);
+  pendingBlameRevealByCodeRepoId.delete(codeRepoId);
+}
+
 /** git's own well-known empty-tree object id — `<sha>:<path>` against it always resolves to
  *  `file.read`'s existing `{kind: 'missing'}` classification (the path never existed in an empty
  *  tree), which is exactly the rendering a root commit's added file needs on its left side. Used
@@ -160,7 +166,7 @@ export type HostHandlers = Partial<{ [K in RequestKey]: HostHandler<K> }>;
 
 // 8b (P68 review): named readOnlyRefusal until this rename — a boundary (a3753dd5 deliberately
 // purged "read-only" wording from gitstream.go's own comments) that no longer applies to any of
-// this function's 4 call sites below, each of which refuses for an unrelated reason (no native
+// this function's 3 call sites below, each of which refuses for an unrelated reason (no native
 // caller, needs a merge editor, no native meaning).
 function refuseLocally<K extends RequestKey>(method: K, reason: string): HostHandler<K> {
   return async () => {
@@ -364,11 +370,13 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       if (codeRepoId === undefined) {
         throw new Error(`hostHandlers: review.open: unknown git repoId ${gitRepoId}`);
       }
-      pendingReviewTargetByCodeRepoId.set(codeRepoId, { repoId: gitRepoId, branch });
       useRepoPanelTabStore().setRepoPanelTab('review');
       const layoutStore = useLayoutStore();
       if (!layoutStore.panel.project.visible) layoutStore.toggleProjectPanel();
-      deps.emitLocal('review.target', { repoId: gitRepoId, branch });
+      // Stash only when no mounted review view heard it; the cold mount consumes it.
+      if (!deps.emitLocal('review.target', { repoId: gitRepoId, branch })) {
+        pendingReviewTargetByCodeRepoId.set(codeRepoId, { repoId: gitRepoId, branch });
+      }
       return {};
     },
 

@@ -7,31 +7,12 @@
 // each mount holds its own lease over that shared transport, P67b §2.1 — so this mount's own
 // unmount/dispose never tears down the graph tab's peers).
 //
-// P72 §3: `MainView.vue` now wraps this view in a `KeepAlive` (Studio only) — a tab switch away
-// deactivates it rather than destroying it, so `mountGraph()`'s own layout stays computed instead
-// of rebuilding from row 0 on every return (the "reload on tab focus" symptom). `defineOptions`'s
-// `name` is what makes `KeepAlive`'s `include` match this component at all; without it a
-// `<script setup>` component has no name and the include list matches nothing — a silent no-op.
-// `onUnmounted`'s `handle?.unmount()` below still only runs on genuine destruction (a closed tab,
-// or a `:max` eviction); reactivation needs no imperative resize call — verified during
-// implementation (not assumed) with a standalone Chromium + WebKit repro reproducing this exact
-// KeepAlive shape: `CommitGrid.vue`'s own `ResizeObserver` reliably fired both the deactivate
-// (0×0) and reactivate (real size) transitions on both engines, so `scheduleResize()`'s existing
-// `resizeCanvas()` + `rebuildColumns()` path already runs on return (now guarded against the 0×0
-// leg doing wasted work, P79 review fix). `MountHandle`'s own doc comment (`main.ts`) names the
-// fallback this would have needed had the observer not covered it.
-//
-// P79 review fix (Performance, LOW): deactivation DOES now add one hook — `onDeactivated`/
-// `onActivated` call `handle.setVisible`, so `CommitGrid.vue`'s own generation-triggered rebuild
-// (the layout worker's output, a `repo.changed` refresh) defers to a single catch-up on return
-// instead of paying full rebuild cost against an invisible grid for as long as this tab stays
-// backgrounded. This only pauses that one, specifically-measured live cost — every other retained
-// bit of state this `KeepAlive` exists to keep (layout, scroll position, loaded rows, the git
-// transport lease) is untouched, exactly as before.
+// A tab switch away unmounts this view; the transport outlives it and view state restores
+// through TabViewStateStore.
 import type { MountHandle } from '@kira/git-ui';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
-import { onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';
 import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
@@ -39,8 +20,6 @@ import { TabViewStateStore } from '../../repo/git/viewStateStore';
 import { useSettingsStore } from '../../state/settings';
 import type { RepoGraphTabRecord } from '../../state/tabDomain';
 import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
-
-defineOptions({ name: 'RepoGraphView' });
 
 const props = defineProps<{ tab: RepoGraphTabRecord }>();
 
@@ -94,13 +73,6 @@ onUnmounted(() => {
   handle?.unmount();
   handle = null;
 });
-
-// P79 review fix (Performance, LOW): `setVisible` is optional on `MountHandle` (main.ts) — a
-// no-op call here is only reachable if `mountGraph()` hasn't resolved yet (this tab was opened
-// and immediately backgrounded before its own chunk import settled), in which case there is
-// nothing live yet to pause anyway.
-onDeactivated(() => handle?.setVisible?.(false));
-onActivated(() => handle?.setVisible?.(true));
 </script>
 
 <template>

@@ -3295,12 +3295,8 @@ loaded rows are serialized out on unmount and rebuilt from that serialized state
 the same round trip a real relaunch already exercises, not an in-memory instance surviving in the
 background. `graphVisibility.ts`'s `GRAPH_VISIBLE_KEY`/`MountHandle.setVisible` (P79's own
 background-pause optimization, keyed off a KeepAlive `onDeactivated`/`onActivated` pair) is
-consequently unreachable in Kira Space today — no caller (VS Code's own webview host never called it
-either, by design) ever invokes it, since there is no "mounted but backgrounded" state left for it to
-pause; `RepoGraphView.vue`'s own `onDeactivated`/`onActivated` hooks need a `KeepAlive` ancestor to
-fire at all, and none exists. This is a real behavior change from source comments still describing
-the old KeepAlive design, not merely a doc drift — flagged as a finding, not fixed here (source
-change, out of this phase's own docs-only scope).
+consequently unreachable in Kira Space today — no caller ever invokes it, since there is no
+"mounted but backgrounded" state left for it to pause. `RepoGraphView.vue` carries no such hooks.
 
 Also worth noting here: PR ancestry is now rebuilt with a **base cutoff** (`state/pr.ts`'s
 `rebuildAncestry`) — each PR's `baseRef` is resolved locally through
@@ -4432,7 +4428,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   event fires — a materially larger structural change than this fix.
 
 **As of P100, every item from here through the comment-reload fan-out item below (including the
-Correctness: and Performance: subsections) describes Kira Space, not Kira Studio** — the native code
+Performance: subsection) describes Kira Space, not Kira Studio** — the native code
 workspace and git module both moved there in full, unchanged, so each limitation moved with the code
 it describes. The items after it are Kira Studio's own (or, for the workflow-coverage item,
 repo-wide).
@@ -4492,35 +4488,6 @@ repo-wide).
   nothing drives pairing, token reuse or revocation against a real `-tags server` Kira Space binary
   and a real `git.sock`. Go unit tests cover `gitsock` in-process only. Closing it needs a Kira Space
   `e2e-real` project (fixtures, a `playwright.config.ts` project, the spec).
-- **The graph tab's P72/P79 KeepAlive-based persistence is dead code — real, unflagged before now**
-  (found v1.9 P109, verified against a real `repo-workspace.spec.ts` run). Neither app's
-  `packages/workbench/src/components/MainView.vue` wraps its `<component :is>` in a `KeepAlive` any
-  more (confirmed by grep across every `.vue` file in both apps and the shared workbench package);
-  `RepoGraphView.vue`'s own `onActivated`/`onDeactivated` hooks, and `graphVisibility.ts`'s
-  `GRAPH_VISIBLE_KEY`/`MountHandle.setVisible` (P79's background-pause optimization) they drive, need
-  a `KeepAlive` ancestor to fire at all and consequently never do. The graph tab still fully unmounts
-  and remounts on every tab switch; the continuity users observe comes entirely from
-  `TabViewStateStore` persisting/restoring view state through the tab's own `state.viewState` (see
-  "The native code workspace" above), not from an in-memory instance surviving in the background.
-  Source comments in both files still describe the old KeepAlive design as current. No functional
-  bug (the test that exercises the user-visible behavior passes), but the background-pause
-  optimization is silently inert, and any future change assuming a live KeepAlive ancestor exists
-  would be building on a false premise. Closing this needs either restoring a real `KeepAlive`
-  wrapper (recovering the pause optimization) or deleting the now-dead `setVisible`/`onActivated`/
-  `onDeactivated` machinery and its source comments — a source change, out of this phase's own
-  docs-only scope.
-
-Correctness:
-- **`review.open`'s pending-target map entry (`hostHandlers.ts`'s `pendingReviewTargetByCodeRepoId`)
-  is never cleared when consumed via the live-event path** (`review.target`, for an already-mounted
-  review view) — only the cold-mount path (`takePendingReviewTarget`) ever drains it. Checked
-  against C14-4's own `GitPanel.vue` `:key="repoId"` fix: NOT made moot by it — if anything, that
-  fix makes a later cold remount of the same repo (switch away, switch back) more reachable than
-  before, which is exactly when a leftover stale entry could now be replayed. Also never cleared on
-  workspace close. A stale target can theoretically be re-applied on a later cold remount.
-- **`loadComments` in `reviewDecorations.ts` swallows a failed `review.comment.list` request into an
-  empty list with no retry banner**, unlike `loadDiff`'s own C13-9 treatment — a transient failure
-  looks identical to "all comments were deleted."
 
 Performance:
 - **`repo/state/fileTree.ts`'s `useFileTreeStore` (Pinia now, same file) tree-filter computed has

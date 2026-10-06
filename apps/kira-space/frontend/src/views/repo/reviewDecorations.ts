@@ -402,15 +402,26 @@ export function attachReviewDecorations(
     return true;
   }
 
+  // True while the shown banner is a failed comment load, so a later success clears only that.
+  let commentsLoadFailed = false;
+
   async function loadComments(): Promise<void> {
     const seq = ++commentsSeq;
-    const commentsResult = await deps.transport
-      .request('review.comment.list', {
+    let commentsResult: Awaited<ReturnType<typeof deps.transport.request<'review.comment.list'>>>;
+    try {
+      commentsResult = await deps.transport.request('review.comment.list', {
         repoId: deps.gitRepoId,
         branch: deps.review.branch,
         at: deps.review.branchTip,
-      })
-      .catch(() => ({ at: deps.review.branchTip, comments: [] as readonly ReviewComment[] }));
+      });
+    } catch (err) {
+      if (disposed || seq !== commentsSeq) return;
+      // Keep the comments already painted: a transient failure must not look like "all deleted".
+      console.error('reviewDecorations: review.comment.list failed', err);
+      commentsLoadFailed = true;
+      showLoadError();
+      return;
+    }
     if (disposed || seq !== commentsSeq) return;
     // C14-6: review.comment.list is scoped to the whole review SESSION (every file on the
     // branch), not this editor's own file -- without this filter, a comment on another file could
@@ -418,6 +429,10 @@ export function attachReviewDecorations(
     // number. (The VS Code extension's own reviewComments.ts:renderThreads has the identical gap,
     // left unfixed there -- out of this chapter's scope.)
     comments = commentsResult.comments.filter((c) => c.path === deps.path);
+    if (commentsLoadFailed) {
+      commentsLoadFailed = false;
+      closeErrorZone();
+    }
     paint();
   }
 
