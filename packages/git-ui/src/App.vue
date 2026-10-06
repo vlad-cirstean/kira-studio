@@ -120,9 +120,8 @@ const props = defineProps<{
    *  the two are kept separate). */
   hostConnectionState: EventPayload<'connection.changed'>['state'];
   /** P72 §9.1: Kira Space's own app-wide `appearance.dateFormat`, read once at mount time — see
-   *  `main.ts`'s own `MountOptions.dateFormat` doc comment for the full shape (not reactive, and
-   *  `undefined` under `'vscode'`/`'harness'`, where `PersistedViewState.dateFormat` stays the
-   *  only source). Preferred over the persisted value below whenever present. */
+   *  `main.ts`'s own `MountOptions.dateFormat` doc comment (not reactive). Preferred over
+   *  `app.init`'s `dateFormat` and the persisted value whenever present. */
   dateFormat?: DateFormat;
   /** P173: opens the host's Operations log (`MountOptions.onShowOperations`); absent in VS Code. */
   showOperations?: () => void;
@@ -1395,6 +1394,10 @@ async function bootstrap(): Promise<void> {
   );
 
   const persisted = props.viewState.read();
+  // Kira Space's app-wide date format (mount option, or the server's app.init under VS Code) wins
+  // over what this webview persisted for itself.
+  const serverDateFormat = props.dateFormat ?? init.dateFormat;
+  if (serverDateFormat) dateFormat.value = serverDateFormat;
   // A failure below must not leave persistence off: the persisted state is loaded, so later user
   // changes still write.
   try {
@@ -1403,10 +1406,7 @@ async function bootstrap(): Promise<void> {
       lastPersisted = persisted;
       detailOpen.value = persisted.detailOpen;
       columnWidths.value = persisted.columnWidths;
-      // P72 §9.1: Kira Space's own app-wide appearance.dateFormat mount option wins over whatever
-      // this webview last persisted for itself — 'vscode'/'harness' never pass one, so persisted
-      // stays the only source there, unchanged.
-      dateFormat.value = props.dateFormat ?? persisted.dateFormat;
+      dateFormat.value = serverDateFormat ?? persisted.dateFormat;
       detailWidth.value = persisted.detailWidth;
       initialScrollRow.value = persisted.scrollRow;
       detailState.setListMode(persisted.fileListMode);
@@ -2108,11 +2108,8 @@ onBeforeUnmount(() => {
           v-if="actions?.capabilities.editRepoSettings"
           :open="repoSettingsDialogOpen"
           :repo-settings-state="repoSettingsState"
-          :date-format="dateFormat"
-          :host="props.host"
           :write-capability="actions?.capabilities.write ?? false"
           @close="repoSettingsDialogOpen = false"
-          @update:date-format="dateFormat = $event"
         />
       </template>
     </template>

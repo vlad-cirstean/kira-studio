@@ -237,6 +237,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
         contractVersion: server.contractVersion,
         settings: settings(),
         git: server.git,
+        dateFormat: server.dateFormat,
         // D11: all four host ports are constructed and all four methods now answer.
         capabilities: {
           openInEditor: true,

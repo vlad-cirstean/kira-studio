@@ -1201,6 +1201,8 @@ export interface ServerAppInitResult {
   readonly contractVersion: number;
   readonly serverVersion: string;
   readonly git: GitStatus;
+  /** Kira Space's app-wide `appearance.dateFormat`. */
+  readonly dateFormat: 'relative' | 'absolute';
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1538,6 +1540,9 @@ export type Contract = {
         contractVersion: number;
         settings: SettingsSnapshot;
         git: GitStatus;
+        /** Kira Space's app-wide date format; the VS Code host passes the server's value and the
+         *  UI falls back to its own persisted preference when absent. */
+        dateFormat?: 'relative' | 'absolute';
         /** An optional capability the UI feature-detects rather than assumes (§3.3). Nothing in
          *  P5 or P6 branches on host kind. */
         capabilities: {

@@ -592,6 +592,14 @@ func wireGit(repositories *repos.Repos, credentials *gitcred.Relay) gitWired {
 	gitRouter := gitrpc.New(gitrpc.Deps{
 		Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
 		Askpass: askpassBroker,
+		DateFormat: func() string {
+			s, err := repositories.Settings.GetAll()
+			if err != nil {
+				slog.Warn("read date format", "scope", "git", "err", err)
+				return "relative"
+			}
+			return s.Appearance.DateFormat
+		},
 	})
 	gitSock := gitsock.New(gitsock.Deps{
 		SocketPath:    filepath.Join(config.KiraSpaceHome(), "git.sock"),

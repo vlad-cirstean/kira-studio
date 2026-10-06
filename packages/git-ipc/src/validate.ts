@@ -171,7 +171,8 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // the native stream still uses both. 'git.sock' also refuses 'repoSettings.set' with E_READ_ONLY
 // (repository settings are edited in Kira Space only), and 'app.init' gains the
 // 'capabilities.editRepoSettings' flag (Kira Space's native window true, VS Code false). The 'kiraSpace.log.level' leaf is removed
-// from 'RepoSettingsSnapshot'/'RepoSettingsPatch' (it was never read).
+// from 'RepoSettingsSnapshot'/'RepoSettingsPatch' (it was never read). 'app.init' gains 'dateFormat'
+// (Kira Space's app-wide appearance.dateFormat), which the VS Code graph follows.
 export const CONTRACT_VERSION = 45;
 
 export class ContractVersionMismatchError extends Error {

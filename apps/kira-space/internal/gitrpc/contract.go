@@ -172,7 +172,7 @@ package gitrpc
 // prompts open in Kira Space) and git.sock refuses credential.provide with E_READ_ONLY. Only the
 // native stream still uses both. git.sock also refuses repoSettings.set with E_READ_ONLY
 // (repository settings are edited in Kira Space only), and app.init's capabilities (composed
-// host-side) gain editRepoSettings. The kiraSpace.log.level repoSettings leaf is removed (it was never read).
+// host-side) gain editRepoSettings. The kiraSpace.log.level repoSettings leaf is removed (it was never read). app.init gains dateFormat (Kira Space's appearance.dateFormat).
 const ContractVersion = 45
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from

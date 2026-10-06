@@ -13,11 +13,7 @@
  * three modes do, so this is a second file in that shape, not a fourth mode grafted onto
  * `StashDialog.vue` itself (a settings dialog and a stash workflow share no state).
  *
- * G-UX D8: the **Display** section's `dateFormat` field is a SECOND kind of exception to "hand-
- * written from `RepoSettingsSnapshot`" — it does not live in that snapshot at all
- * (`PersistedViewState` owns it under `'vscode'`/`'harness'`, a view preference, not a repository
- * fact, D8's own rejected alternative explains why) — so it arrives as a plain prop/emit pair and
- * applies immediately, never joining `draft`/`save()`'s patch diff.
+ * Mounted only when `capabilities.editRepoSettings` (Kira Space native); VS Code never shows it.
  *
  * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now. Every
  * `KuiSelect` is `NativeSelect` (git-ui has no fancier dropdown primitive — same choice
@@ -30,7 +26,7 @@
  * (Vue only auto-casts `.number` for a native element's own `v-model`, not a component's).
  */
 import { SETTINGS } from '@kira/git-core';
-import type { HostKind, RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
+import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -40,18 +36,10 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed, reactive, ref, useId, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
-import type { DateFormat } from '../../state/viewState.ts';
 
 const props = defineProps<{
   open: boolean;
   repoSettingsState: RepoSettingsState;
-  dateFormat: DateFormat;
-  /** P72 §8.3: which shell mounted this dialog — 'kira' hides the Display/Diagnostics sections
-   *  (Kira Space owns both app-wide now, appearance.dateFormat/advanced.gitLogLevel,
-   *  packages/shared/domain/settings.ts), 'vscode'/'harness' keep showing them, since the
-   *  extension has no app-wide settings dialog of its own (this dialog is its only surface for
-   *  either value, §8.3's own finding). */
-  host: HostKind;
   /** C10 §4.4: `false` under the native read-only graph — hides the Pull section (`strategy`
    *  configures `remote.pull`, a write this host's transport never issues). Graph scope/page size
    *  stay: genuine read-side controls, and `repoSettings.set` itself stays allowed at layer 1
@@ -61,19 +49,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'update:dateFormat', value: DateFormat): void;
 }>();
 
 type SelectOption = { readonly value: string; readonly label: string };
-
-const dateFormatOptions: readonly SelectOption[] = [
-  { value: 'relative', label: 'Relative (3 days ago)' },
-  { value: 'absolute', label: 'Absolute (2024-12-30 22:48)' },
-];
-
-function onDateFormatChange(value: string): void {
-  emit('update:dateFormat', value as DateFormat);
-}
 
 /** `RepoSettingsSnapshot`'s own leaves are `readonly` (a wire type is never a mutation target) —
  *  this dialog's draft needs a genuinely mutable copy of the same shape for `v-model` to write
@@ -143,7 +121,6 @@ const pageSizeValid = computed(() => {
   return Number.isInteger(size) && size >= minimum && size <= maximum;
 });
 
-const dateFormatId = useId();
 const pageSizeId = useId();
 const graphScopeId = useId();
 const baseCandidatesId = useId();
@@ -209,29 +186,6 @@ async function save(): Promise<void> {
         <DialogTitle>Repository settings</DialogTitle>
       </DialogHeader>
       <div class="min-h-0 overflow-y-auto">
-        <!-- P72 §8.3/§9.1: dateFormat moved to Kira Space's own app-wide appearance.dateFormat
-             (SettingsDialog.vue) — Studio owns it there now, so this section is VS Code's only
-             remaining surface for it. -->
-        <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
-          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Display</h3>
-          <label :for="dateFormatId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-            Commit date
-            <NativeSelect
-              :id="dateFormatId"
-              :model-value="dateFormat"
-              variant="bordered"
-              size="kira"
-              class="w-full"
-              @update:model-value="(v) => onDateFormatChange(v as string)"
-            >
-              <option v-for="opt in dateFormatOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </NativeSelect>
-          </label>
-          <p class="kv:text-diff-deleted">This applies to every repository in this panel, not just this one.</p>
-        </section>
-
         <section class="kv:my-2 kv:first:mt-1">
           <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Graph</h3>
           <label :for="pageSizeId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">

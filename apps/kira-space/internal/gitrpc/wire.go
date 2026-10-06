@@ -16,6 +16,8 @@ type AppInitResult struct {
 	ContractVersion int                 `json:"contractVersion"`
 	ServerVersion   string              `json:"serverVersion"`
 	Git             gitclient.GitStatus `json:"git"`
+	// DateFormat is Kira Space's app-wide appearance.dateFormat ("relative" | "absolute").
+	DateFormat string `json:"dateFormat"`
 }
 
 // RepoOpenParams is repo.open's request — @kira/git-ipc's own shape (a bare path).

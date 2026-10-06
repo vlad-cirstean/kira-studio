@@ -26,6 +26,8 @@ type Deps struct {
 	// Askpass is G7's credential broker — nil when it failed to start (main.go's own D8 posture:
 	// every remote op then runs with no askpass interposition at all, never a fatal boot error).
 	Askpass *gitaskpass.Broker
+	// DateFormat reads Kira Space's appearance.dateFormat; nil means "relative".
+	DateFormat func() string
 }
 
 // Handlers is gitrpc's own two-function method table — deliberately not rpcstream.Handlers: gitrpc
@@ -333,7 +335,15 @@ func (r *Router) handleAppInit(ctx context.Context) AppInitResult {
 		ContractVersion: ContractVersion,
 		ServerVersion:   r.deps.ServerVersion,
 		Git:             r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry)),
+		DateFormat:      r.dateFormat(),
 	}
+}
+
+func (r *Router) dateFormat() string {
+	if r.deps.DateFormat == nil {
+		return "relative"
+	}
+	return r.deps.DateFormat()
 }
 
 // gitPathFrom is G18 D15's own tiny helper: Registry.Settings' three-value destructure, named so
