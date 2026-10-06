@@ -164,6 +164,47 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   evicted client until its count drops to zero, or raise Max to the server's `databases` count
   since a `*goredis.Client` per index is cheap when idle.
 
+### F12 (low) kafka browse: tombstones and empty values render identically; binary payloads are irrecoverably replaced
+
+- `apps/kira-studio/internal/adapters/kafka/read.go:113-116` (`body := ""` when
+  `rec.Value == nil`), `:69-70` (header nil value becomes `""`), `:89`/`:115`
+  (`strings.ToValidUTF8(..., "\uFFFD")`).
+- Scenario: on a compacted topic, a delete (tombstone, null value) and a message whose value is
+  the empty string both show an empty body; the user cannot tell which keys are deleted. A
+  protobuf/Avro value shows as replacement characters with no way to see the bytes (no hex or
+  base64 form), so browse is lossy for any binary topic. Key handling already distinguishes null
+  from empty (`Key *string`), so the asymmetry is in the body only.
+- Fix: carry a null flag for the body (the page builder already supports nullable cells via
+  `StreamRow.Key`'s pattern; `Body` would become `*string`, which touches `page.StreamRow` and the
+  renderer: `needs-other-part-file: apps/kira-studio/internal/page/builder.go (Part 5)`,
+  `needs-other-part-file: apps/kira-studio/frontend/src/views/stream/page.ts (Part 12)`), and
+  encode non-UTF-8 values as base64 with a marker instead of replacing bytes.
+
+### F13 (low) kafka count claims exact but over-counts compacted and transactional topics
+
+- `apps/kira-studio/internal/adapters/kafka/read.go:583-600` (`countTopic` returns
+  `Exact: true` for the sum of `End - Next`), `caps.go` (`ExactCount: true`).
+- Scenario: a compacted topic with offsets 0..1,000,000 of which 10,000 records survive, or a
+  transactional topic where every commit marker takes an offset. The toolbar shows "1,000,000
+  total" as exact while paging through the browse yields 10,000 rows (the browse itself handles
+  the gaps via `clampExhaustedWindows`).
+- Fix: report `Exact: false` (offset span is an upper bound), or `Exact: true` only when the
+  topic's `cleanup.policy` is `delete` and no transactional producer wrote to it (not knowable
+  cheaply, so the estimate flag is the honest answer).
+
+### F14 (low) kafka produce: partial batch failure reports nothing landed; header order is randomised
+
+- `apps/kira-studio/internal/adapters/kafka/produce.go:102-107` (`FirstErr` returns an error
+  and `AffectedRows` is lost), `:42-51` (`toRecordHeaders` ranges over a `map`).
+- Scenario: a plan with three messages; the second fails (e.g. `MESSAGE_TOO_LARGE`), the first
+  and third are acknowledged. The op reports an error with no affected rows; the user retries all
+  three and two are duplicated. Headers typed as `{"a":"1","b":"2"}` are produced in random order
+  across runs (Go map iteration), and duplicate header names cannot be expressed.
+- Fix: count successful results (`results` carries per-record `Err`) and return them with the
+  error (message names which records failed); keep header order by decoding the JSON object with
+  an ordered decoder (`internal/jsonx` already has ordered pairs) in `ParseHeaderJSON`
+  (`needs-other-part-file` not needed: `adapters/rowops.go` is Part 3, a Stream A one-hop file).
+
 ## Coverage
 
 - Block 1 (awscfg, core callee contract): done. `awscfg/config.go`, `awscfg/errors.go` reviewed
@@ -216,7 +257,23 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   `db<digits>` to db 0; only a hand-crafted path reaches it, same server, not reported. Caps
   match the unsupported stubs; leaf `Children` returns `[]`. `Cancel` no-op: see F9 for what Stop
   actually does.
-- Block 4 (kafka): not reached.
+- Block 4 (kafka): done. All nine production files read in full: `client`, `adapter`, `read`,
+  `produce`, `catalog`, `definition`, `errors`, `caps`, `kafka` (doc). Verified, no finding: browse
+  uses `kgo.ConsumePartitions` only; no `ConsumerGroup`, `ConsumeTopics` or `CommitOffsets` is
+  reachable; `buildGroupDefinition` uses `DescribeGroups`/`FetchOffsets` (reads). `produce`
+  checks `AssertWritable` first. `Connect`: `Ping(ctx)` and `Metadata(ctx)` honour ctx; client
+  closed on failure. Browse client is per page, closed by `defer`, bounded by `pollTimeout` 1 s
+  rounds and 2 empty polls; `Disconnect` never shares it, so no leak and no hang. TLS verifies by
+  default; unknown `sslmode` fails. Credentials never reach error text (fixed messages for URI
+  parse; franz-go SASL errors carry no password). Forged or stale page tokens are bounded: an
+  unknown partition or an `End` past the log ends after two empty polls and is clamped. Retention
+  moving `low` past `Next` resets to the start and the `rec.Offset < w.Next` guard keeps order.
+  Candidate refuted by a real run (throwaway `_test.go` on the kafka container, deleted): a fetch
+  response cut by `FetchMaxBytes`/`FetchMaxPartitionBytes` (forced down to 300 KB/200 KB over four
+  partitions of 1.2 MB each) never clamped a window mid-data; 80 of 80 rows browsed under both
+  default and small limits. `ErrClientClosed` branch in `pollRound` is unreachable (the browse
+  client closes only after the loop) but harmless. Caps match the unsupported stubs (`Describe`,
+  `SchemaColumns`, `Execute`, `KeyTypes`, `DownloadObject`); leaf `Children` returns `[]`.
 - Block 5 (sqs): not reached.
 - Block 6 (s3): not reached.
 - Block 7 (tests, real-container runs): not reached.
