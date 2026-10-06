@@ -97,15 +97,21 @@ func (s *KeepAwakeService) SetAgentAware(args KeepAwakeSetAgentAwareArgs) (KeepA
 // cached, since the setting can change independently of a session starting or ending. The read is
 // local SQLite and happens at most once per PTY open/close, settings toggle, or boot. A read
 // failure is silently skipped, never fatal, leaving the agent reason at whatever it already was.
+//
+// mu spans the settings read, the count read and Ctl.Set, so two interleaved callers cannot apply
+// their results out of order and leave a stale assertion.
 func (s *KeepAwakeService) recomputeAgent() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recomputeAgentLocked()
+}
+
+func (s *KeepAwakeService) recomputeAgentLocked() {
 	settings, err := s.Deps.Repos.Settings.GetAll()
 	if err != nil {
 		return
 	}
-	s.mu.Lock()
-	count := s.agentCount
-	s.mu.Unlock()
-	s.Ctl.Set(keepawake.ReasonAgent, settings.ClaudeCode.KeepAwakeWithAgents && count > 0)
+	s.Ctl.Set(keepawake.ReasonAgent, settings.ClaudeCode.KeepAwakeWithAgents && s.agentCount > 0)
 }
 
 // KeepAwakeAgentSessionsChanged is main.go's own trigger, wired onto terminal.Registry.OnChange —
@@ -113,9 +119,9 @@ func (s *KeepAwakeService) recomputeAgent() {
 // safe.
 func KeepAwakeAgentSessionsChanged(s *KeepAwakeService, count int) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.agentCount = count
-	s.mu.Unlock()
-	s.recomputeAgent()
+	s.recomputeAgentLocked()
 }
 
 // KeepAwakeSystemDidWake is shell.AttachSystemWake's own trigger (§5) — release-then-reacquire
