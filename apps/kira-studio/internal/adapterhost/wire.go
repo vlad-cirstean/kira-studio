@@ -179,6 +179,8 @@ type ExecuteRequestWire struct {
 	ConnectionID string   `json:"connectionId"`
 	Path         string   `json:"path"`
 	Statements   []string `json:"statements"`
+	// Cap is set by Go callers only (dbmcp); zero means adapters.DefaultConsoleCap.
+	Cap page.ResultCap `json:"-"`
 }
 
 func (r ExecuteRequestWire) Validate() error {

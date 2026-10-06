@@ -216,7 +216,7 @@ func (d *Dispatcher) Execute(ctx context.Context, req ExecuteRequestWire) (Execu
 			// takes — recorded as-is so a re-run can reopen at the exact same path, no NodePath
 			// round-trip needed.
 			op.SetPath(req.Path)
-			pages, err := adapter.Execute(ctx, model.ConsoleRequest{Path: path, Statements: req.Statements}, op)
+			pages, err := adapter.Execute(ctx, model.ConsoleRequest{Path: path, Statements: req.Statements, Cap: req.Cap}, op)
 			if err != nil {
 				return nil, err
 			}

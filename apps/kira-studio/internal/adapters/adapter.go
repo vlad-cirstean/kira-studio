@@ -83,7 +83,9 @@ type Adapter interface {
 	// Execute runs every statement in req.Statements in order over one connection, one op-log row
 	// for the whole batch (op.SetCommand called once). All-or-nothing — a mid-batch failure fails
 	// the whole call; there is no partial-results-with-per-statement-error shape. One Page per
-	// statement, in order. Gated by Caps().SQL.
+	// statement, in order. Gated by Caps().SQL. Each Page stops at ConsoleCapFor(req): rows past
+	// the cap are never held, the cursor closes early, and Position.Truncated reports that at
+	// least one more row existed (exactly-cap results report false).
 	Execute(ctx context.Context, req model.ConsoleRequest, op *OpCtx) ([]page.Page, error)
 
 	// DownloadObject streams one object's bytes into req.DestPath. A read — never blocked by the
