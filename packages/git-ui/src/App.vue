@@ -80,15 +80,11 @@ import {
   composeLoadMoreAnnouncement,
   composeRefreshAnnouncement,
 } from './state/liveAnnouncements.ts';
-import { OpsState } from './state/ops.ts';
-import { PrState } from './state/pr.ts';
-import { RefsState } from './state/refs.ts';
 import { RepoState } from './state/repo.ts';
-import { RepoSettingsState } from './state/repoSettings.ts';
+import { createRepoStates } from './state/repoStates.ts';
 import { SearchState } from './state/search.ts';
 import { SelectionState } from './state/selection.ts';
 import { SettingsState } from './state/settings.ts';
-import { StackState } from './state/stack.ts';
 import { StashState } from './state/stash.ts';
 import {
   type ColumnWidths,
@@ -147,20 +143,10 @@ const selection = new SelectionState(graphView.store);
 const detailState = new DetailState(bridge);
 const actions = shallowRef<DetailActions | undefined>(undefined);
 
-// `docs/plans/P6.md` W12: one `RefsState`/`OpsState` for the life of this component, exactly like
-// `graphView`/`selection`/`detailState` above — `handleRepoOpened`/the active-repo watch below
-// reset them via `setRepoId` rather than replacing either instance.
-const refsState = new RefsState(bridge);
-// G24 D10/D18: one PrState for the life of this component, exactly like refsState above — reset
-// via setRepoId rather than replaced. Constructed early (before opsState/searchState) so it can
-// be threaded into both (matchRef's own pr arm, D11; G26 F13's stack.list-driven warm-up below).
-const prState = new PrState(bridge);
-// G26 D3: one StackState for the life of this component, exactly like prState above — reset via
-// setRepoId rather than replaced. Constructed before opsState so its own runRestack/cancelRestack
-// can be threaded into it (D13/4.16 — OpsState layers busy/announcement over StackState's own
-// execution rather than duplicating it).
-const stackState = new StackState(bridge, prState);
-const opsState = new OpsState(bridge, refsState, stackState);
+// One instance each of refs/pr/stack/repoSettings/ops for the life of this component, reset via
+// `setRepoId` rather than replaced. `createRepoStates` wires `repoSettingsState` into `opsState`
+// (checkout.autoStash) and `prState` into `stackState`.
+const { refsState, prState, stackState, repoSettingsState, opsState } = createRepoStates(bridge);
 // `docs/plans/P9.md` W13: one `StashState` for the life of this component, exactly like
 // `refsState`/`opsState` above — reset via `setRepoId` rather than replaced.
 const stashState = new StashState(bridge);
@@ -177,11 +163,8 @@ const worktreeState = new WorktreeState(bridge);
 // `refsState`/`graphView` in directly (both already exist above), matching the plan's own "threads
 // RefsState and GraphViewState into it".
 const searchState = new SearchState(bridge, refsState, graphView, prState);
-// G18 D13: one RepoSettingsState for the life of this component, exactly like `refsState`/
-// `opsState`/`stashState`/`searchState` above — reset via `setRepoId` rather than replaced.
-// `RepoSettingsDialog.vue` reads/writes through this instance; `pageSize`/
-// `stashIncludeUntrackedDefault` below are re-sourced from it instead of `settingsState`.
-const repoSettingsState = new RepoSettingsState(bridge);
+// G18 D13: `repoSettingsState` (from `createRepoStates`) backs `RepoSettingsDialog.vue`;
+// `pageSize`/`stashIncludeUntrackedDefault` below are re-sourced from it instead of `settingsState`.
 
 const repoState = shallowRef<RepoState | undefined>(undefined);
 const settingsState = shallowRef<SettingsState | undefined>(undefined);

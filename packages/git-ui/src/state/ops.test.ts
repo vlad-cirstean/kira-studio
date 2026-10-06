@@ -14,6 +14,7 @@ import { BridgeClient } from '../bridge/client.ts';
 import { FakeTransport } from '../testing/fakeTransport.ts';
 import { OpsState, remoteFromUpstreamRef } from './ops.ts';
 import { RefsState } from './refs.ts';
+import { RepoSettingsState } from './repoSettings.ts';
 
 const REPO = '/repos/a';
 
@@ -55,7 +56,7 @@ describe('OpsState — #stashAndCarry (via runPull) never touches a pre-existing
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const refs = new RefsState(bridge);
-    const ops = new OpsState(bridge, refs);
+    const ops = new OpsState(bridge, refs, new RepoSettingsState(bridge));
 
     const preflight: PullPreflight = {
       strategy: 'merge',
@@ -183,7 +184,7 @@ describe('OpsState — post-checkout pull prompt', () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const refs = new RefsState(bridge);
-    const ops = new OpsState(bridge, refs);
+    const ops = new OpsState(bridge, refs, new RepoSettingsState(bridge));
     transport.onRequest = (method) => {
       switch (method) {
         case 'status.get':
@@ -318,7 +319,7 @@ describe('OpsState — a stale confirm dialog no-ops if the active repo changed 
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const refs = new RefsState(bridge);
-    const ops = new OpsState(bridge, refs);
+    const ops = new OpsState(bridge, refs, new RepoSettingsState(bridge));
 
     const preflight: RevertPreflight = {
       shas: ['sha1'],
@@ -376,7 +377,7 @@ describe('OpsState — runPull carries rebaseMerges from the preflight, not a cl
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const refs = new RefsState(bridge);
-    const ops = new OpsState(bridge, refs);
+    const ops = new OpsState(bridge, refs, new RepoSettingsState(bridge));
     transport.onRequest = (method) => {
       switch (method) {
         case 'status.get':

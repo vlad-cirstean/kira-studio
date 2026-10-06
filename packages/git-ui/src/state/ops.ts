@@ -286,11 +286,9 @@ export class OpsState {
    *  mutating action here gets. Optional so a test can construct `OpsState` without one, mirroring
    *  `PrState`'s own optional threading through `StackState`/`SearchState`. */
   readonly #stack: StackState | undefined;
-  /** G28 D16: `kiraSpace.checkout.autoStash`'s own read point — optional, same "a test can
-   *  construct `OpsState` without one" convention `#stack` already establishes; `undefined`
-   *  resolves to the setting's own default (`true`, the fail-safe direction: a stale/absent
-   *  value can only ever produce the OLD dialog, never an unexpected write, D16). */
-  readonly #repoSettings: RepoSettingsState | undefined;
+  /** G28 D16: `kiraSpace.checkout.autoStash`'s own read point. Required: an omitted instance
+   *  would silently pin the schema default and ignore the user's opt-out (P168 Part 18 F13). */
+  readonly #repoSettings: RepoSettingsState;
   readonly #repo: RepoScopedReload;
   #resolvePull: ((proceed: boolean) => void) | undefined;
   #resolvePostCheckoutPull: ((proceed: boolean) => void) | undefined;
@@ -306,8 +304,8 @@ export class OpsState {
   constructor(
     bridge: BridgeClient,
     refs: RefsState,
+    repoSettings: RepoSettingsState,
     stack?: StackState,
-    repoSettings?: RepoSettingsState,
   ) {
     this.#bridge = bridge;
     this.#refs = refs;
@@ -461,8 +459,7 @@ export class OpsState {
     const hasAutoStash = preflight.routes.includes('autoStash');
     if (hasDetachHere && hasAutoStash) return { mode: 'detach', autoStash: true };
     if (hasDetachHere) return { mode: 'detach', autoStash: false };
-    const autoStashSetting =
-      this.#repoSettings?.settings.value['kiraSpace.checkout.autoStash'] ?? true;
+    const autoStashSetting = this.#repoSettings.settings.value['kiraSpace.checkout.autoStash'];
     if (hasAutoStash && autoStashSetting) return { mode: requestedMode, autoStash: true };
     return null;
   }
