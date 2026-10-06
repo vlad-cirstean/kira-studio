@@ -40,3 +40,34 @@ func TestDeleteJarCookieRemovesPathAndDomainScopedCookies(t *testing.T) {
 		})
 	}
 }
+
+// TestDeleteJarCookieCanonicalisesHost guards P168 Part 7 F3/F4: the jar rejects a non-canonical
+// Domain attribute, and Send defaults a scheme-less URL to https.
+func TestDeleteJarCookieCanonicalisesHost(t *testing.T) {
+	cases := []struct {
+		name, setURL, domain, target string
+	}{
+		{"idn host", "https://a.xn--bcher-kva.example/x", "xn--bcher-kva.example", "https://a.bücher.example/x"},
+		{"trailing dot", "https://a.example.com/x", "example.com", "https://a.example.com./x"},
+		{"scheme-less", "https://a.example.com/x", "example.com", "a.example.com/x"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			old := currentJar()
+			ClearJar()
+			t.Cleanup(func() { jarMu.Lock(); sharedJar = old; jarMu.Unlock() })
+
+			setU, _ := url.Parse(tc.setURL)
+			currentJar().SetCookies(setU, []*http.Cookie{{Name: "sid", Value: "1", Domain: tc.domain, Path: "/"}})
+			if got, _ := JarCookies(tc.target); len(got) != 1 {
+				t.Fatalf("cookies before delete = %+v, want sid", got)
+			}
+			if err := DeleteJarCookie(tc.target, "sid"); err != nil {
+				t.Fatalf("DeleteJarCookie: %v", err)
+			}
+			if got, _ := JarCookies(tc.target); len(got) != 0 {
+				t.Fatalf("cookies after delete = %+v, want none", got)
+			}
+		})
+	}
+}

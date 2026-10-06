@@ -8,6 +8,7 @@ package httpclient
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"log/slog"
 	"mime"
@@ -106,6 +107,51 @@ func sameRedirectHost(from, dest *url.URL) bool {
 	return dh == fh || strings.HasSuffix(dh, "."+fh)
 }
 
+// effectivePort is u's explicit port, else the scheme default ("" for an unknown scheme).
+func effectivePort(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http":
+		return "80"
+	case "https":
+		return "443"
+	}
+	return ""
+}
+
+// isPortChange reports a hop to another service on the same host. net/http compares hostnames
+// only, so it keeps Authorization/Cookie across a port change. The default-port http to https
+// upgrade counts as same-origin: it targets the same service and never downgrades.
+func isPortChange(from, dest *url.URL) bool {
+	fp, dp := effectivePort(from), effectivePort(dest)
+	if fp == dp {
+		return false
+	}
+	return !(fp == "80" && dp == "443" && from.Port() == "" && dest.Port() == "")
+}
+
+// transportErrText renders err without the request URL. net/url.Error quotes the URL with %q,
+// which escapes quotes and backslashes in an inlined secret so the plaintext secret masker never
+// matches. The URL already sits in the (masked) timeline, so the text keeps the operation and
+// the underlying cause only.
+func transportErrText(err error) string {
+	var ue *url.Error
+	if !errors.As(err, &ue) {
+		return err.Error()
+	}
+	inner := ue.Err
+	for {
+		var nested *url.Error
+		if !errors.As(inner, &nested) {
+			break
+		}
+		inner = nested.Err
+	}
+	return ue.Op + ": " + inner.Error()
+}
+
 // isSchemeDowngrade reports whether dest drops from https to http on an otherwise same-host hop
 // (F3). net/http's own sensitive-header stripping (shouldCopyHeaderOnRedirect) compares hostnames
 // only, never scheme, so an https-to-http redirect keeps Authorization/Cookie on the wire in
@@ -149,7 +195,7 @@ func resolveURL(raw string) (*url.URL, error) {
 	}
 	u, err := url.Parse(trimmed)
 	if err != nil {
-		return nil, newError(CodeBadRequest, "invalid URL: "+err.Error(), err)
+		return nil, newError(CodeBadRequest, "invalid URL: "+transportErrText(err), err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return nil, newError(CodeBadRequest, "unsupported URL scheme: "+u.Scheme, nil)
@@ -173,7 +219,7 @@ func classifySendErr(sendCtx context.Context, err error, tl Timeline) *Error {
 	case sendCtx.Err() != nil:
 		e = newError(CodeCancelled, "request was cancelled", err)
 	default:
-		e = newError(CodeHTTPTransport, err.Error(), err)
+		e = newError(CodeHTTPTransport, transportErrText(err), err)
 	}
 	e.Timeline = &tl
 	return e
@@ -296,13 +342,13 @@ func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 	start := time.Now()
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return Response{}, classifySendErr(sendCtx, err, tl.finishFailed(time.Now(), err.Error()))
+		return Response{}, classifySendErr(sendCtx, err, tl.finishFailed(time.Now(), transportErrText(err)))
 	}
 	defer resp.Body.Close()
 
 	data, truncated, readErr := readResponseBody(resp, r.maxResponseBytes)
 	if readErr != nil {
-		return Response{}, classifySendErr(sendCtx, readErr, tl.finishFailed(time.Now(), readErr.Error()))
+		return Response{}, classifySendErr(sendCtx, readErr, tl.finishFailed(time.Now(), transportErrText(readErr)))
 	}
 	// now is also P10 D5's own "the hop's end" instant for the final hop's download phase — the
 	// same instant elapsed is computed from, so download for the final hop is genuinely "how long

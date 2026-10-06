@@ -112,6 +112,17 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 			snap.Request.Body.Raw = ""
 			snap.Request.Body.Code = ""
 			snap.RequestFieldsElided = true
+			// Response-side header sets are the other unbounded part; drop them too so no row
+			// stays over the budget the sweep assumes.
+			snap.Response.Headers = nil
+			snap.Response.SentCookies = nil
+			snap.Response.ReceivedCookies = nil
+			hops := make([]httpclient.TimelineHop, len(snap.Response.Timeline.Hops))
+			copy(hops, snap.Response.Timeline.Hops)
+			for i := range hops {
+				hops[i].Headers = nil
+			}
+			snap.Response.Timeline.Hops = hops
 			return json.Marshal(snap)
 		},
 		func(tx *sql.Tx, id string, itemID *string, sentAt, environment string, storedBytes int, snapshotJSON []byte) error {

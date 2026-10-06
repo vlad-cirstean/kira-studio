@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -530,4 +532,60 @@ func doForcedVersionSend(t *testing.T, url string, version *string, _ *http.Clie
 		t.Fatalf("Send: %v", err)
 	}
 	return resp
+}
+
+// TestSend_PortChangeRedirectStripsCredentials is P168 Part 7 F2: net/http compares hostnames only,
+// so a redirect to another service on the same host kept every header.
+func TestSend_PortChangeRedirectStripsCredentials(t *testing.T) {
+	var got http.Header
+	dest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+	}))
+	defer dest.Close()
+	start := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, dest.URL, http.StatusFound)
+	}))
+	defer start.Close()
+
+	if _, err := Send(context.Background(), Request{
+		Method: "GET",
+		URL:    start.URL,
+		Headers: []Header{
+			{Name: "X-Api-Key", Value: "sk"},
+			{Name: "Authorization", Value: "Bearer s"},
+		},
+	}, Options{}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if got.Get("X-Api-Key") != "" || got.Get("Authorization") != "" {
+		t.Errorf("credentials reached the other port: %v", got)
+	}
+}
+
+// TestSend_TransportErrorOmitsQuotedURL is P168 Part 7 F1: url.Error quotes the URL with %q, which
+// escapes quotes and backslashes in an inlined secret so the plaintext masker never matches it.
+func TestSend_TransportErrorOmitsQuotedURL(t *testing.T) {
+	secret := `p"w\d`
+	for _, raw := range []string{
+		"http://127.0.0.1:1/p?k=" + url.QueryEscape(secret),
+		"http://127.0.0.1:1/p?k=" + secret,
+	} {
+		_, err := Send(context.Background(), Request{Method: "GET", URL: raw}, Options{})
+		if err == nil {
+			t.Fatal("Send: want transport error")
+		}
+		msg := err.Error()
+		var e *Error
+		if errors.As(err, &e) && e.Timeline != nil {
+			for _, h := range e.Timeline.Hops {
+				msg += " " + h.Error
+			}
+		}
+		if strings.Contains(msg, "p\\\"w") || strings.Contains(msg, "127.0.0.1:1/p") {
+			t.Errorf("error text echoes the request URL: %q", msg)
+		}
+	}
+	if _, err := resolveURL("http://h/\x01" + secret); err == nil || strings.Contains(err.Error(), "p\\\"w") {
+		t.Errorf("resolveURL error = %v, want no URL echo", err)
+	}
 }

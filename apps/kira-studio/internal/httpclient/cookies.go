@@ -5,10 +5,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"strings"
 	"sync"
 
+	"golang.org/x/net/idna"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -82,9 +82,9 @@ func jarFor(r resolved) http.CookieJar {
 // implementation, which is not worth it for a display column — the response-side cookie list
 // (client.go's SentCookies/ReceivedCookies) is the one that carries the full attribute set.
 func JarCookies(rawURL string) ([]Cookie, error) {
-	u, err := url.Parse(rawURL)
+	u, err := resolveURL(rawURL)
 	if err != nil {
-		return nil, newError(CodeBadRequest, "invalid URL: "+err.Error(), err)
+		return nil, err
 	}
 	raw := currentJar().Cookies(u)
 	out := make([]Cookie, 0, len(raw))
@@ -102,9 +102,9 @@ func JarCookies(rawURL string) ([]Cookie, error) {
 // prefix of the URL path) a sent cookie could carry. Two same-name cookies that both match the URL
 // are removed together: the jar reports no domain or path, so one cannot be singled out.
 func DeleteJarCookie(rawURL, name string) error {
-	u, err := url.Parse(rawURL)
+	u, err := resolveURL(rawURL)
 	if err != nil {
-		return newError(CodeBadRequest, "invalid URL: "+err.Error(), err)
+		return err
 	}
 	jar := currentJar()
 	for _, domain := range cookieDomainCandidates(u.Hostname()) {
@@ -120,6 +120,12 @@ func DeleteJarCookie(rawURL, name string) error {
 // address or a public suffix has no parents.
 func cookieDomainCandidates(host string) []string {
 	out := []string{""}
+	// The jar canonicalises (lowercase, no trailing dot, IDNA ASCII) before it matches and rejects
+	// a non-canonical Domain attribute, so the candidates must be canonical too.
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	if ascii, err := idna.Lookup.ToASCII(host); err == nil {
+		host = ascii
+	}
 	if net.ParseIP(host) != nil {
 		return out
 	}

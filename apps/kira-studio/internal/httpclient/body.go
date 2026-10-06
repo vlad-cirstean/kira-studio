@@ -219,6 +219,7 @@ func prepareFormParts(fields []FormField) ([]formPart, error) {
 		if info.IsDir() {
 			return nil, newError(CodeBadRequest, trimmed+" is a directory, not a file", nil)
 		}
+		f.Path = trimmed
 		parts = append(parts, formPart{field: f, size: info.Size()})
 	}
 	return parts, nil

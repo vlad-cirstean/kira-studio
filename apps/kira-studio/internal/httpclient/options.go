@@ -61,7 +61,7 @@ type resolved struct {
 func (o Options) normalize() resolved {
 	r := resolved{
 		http1:            false,
-		timeout:          30 * time.Second,
+		timeout:          0,
 		maxResponseBytes: 5 * 1024 * 1024,
 		sslVerify:        true,
 		followRedirects:  true,
@@ -107,6 +107,9 @@ func (o Options) normalize() resolved {
 // *http.Transport itself is built — everything else (redirects, jar, timeout) varies per
 // *http.Client instead, so connection reuse (sharedClient's whole reason to exist, D4) survives
 // per-send Options.
+// maxResponseHeaderBytes bounds one response's header block.
+const maxResponseHeaderBytes = 1 << 20
+
 type transportKey struct {
 	http1      bool
 	skipVerify bool
@@ -125,7 +128,11 @@ func transportFor(k transportKey) *http.Transport {
 	if tr, ok := transports[k]; ok {
 		return tr
 	}
-	tr := &http.Transport{Proxy: http.ProxyFromEnvironment}
+	// Clone keeps DefaultTransport's dial, TLS-handshake and idle timeouts; a bare Transport has none.
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	// A hostile endpoint can otherwise stream 10 MiB of headers (Set-Cookie) per hop into the
+	// timeline and the history snapshot.
+	tr.MaxResponseHeaderBytes = maxResponseHeaderBytes
 	p := new(http.Protocols)
 	p.SetHTTP1(true)
 	if !k.http1 {
@@ -184,12 +191,19 @@ func checkRedirectFor(r resolved) func(*http.Request, []*http.Request) error {
 		if len(via) > 0 {
 			origin := via[0].URL
 			crossHost := !sameRedirectHost(origin, req.URL)
+			portChange := isPortChange(origin, req.URL)
 			downgrade := isSchemeDowngrade(origin, req.URL)
-			if crossHost || downgrade {
+			if crossHost || portChange || downgrade {
 				if names, ok := req.Context().Value(redirectHeaderNamesCtxKey{}).([]string); ok {
 					for _, name := range names {
 						req.Header.Del(name)
 					}
+				}
+			}
+			if portChange {
+				// Same hostname, other service: net/http keeps the credential headers.
+				for _, h := range []string{"Authorization", "WWW-Authenticate", "Cookie", "Cookie2"} {
+					req.Header.Del(h)
 				}
 			}
 			if downgrade {
