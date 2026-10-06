@@ -281,6 +281,24 @@ describe('ripple', () => {
     expect(rippleOf(v, { kind: 'task', id: 'sharer' }).text).toBe('nothing to rebase');
   });
 
+  test('a base cycle neither recurses without end nor drops its rows', () => {
+    const b = board([
+      { id: 'a', day: 0 },
+      { id: 'kid', day: 1 },
+    ]);
+    for (const [id, base] of [
+      ['b_a', 'b_kid'],
+      ['b_kid', 'b_a'],
+    ] as const) {
+      const br = b.branches.find((x) => x.id === id);
+      if (br) br.baseBranchId = base;
+    }
+    const v = view(b);
+    expect(rippleOf(v, { kind: 'task', id: 'a' }).branchIds).toEqual(['b_kid']);
+    expect(v.branchRows('a').map((r) => r.id)).toEqual(['b_a']);
+    expect(v.branchRows('kid').map((r) => r.id)).toEqual(['b_kid']);
+  });
+
   test('review and parked selections show a dash', () => {
     const v = view(
       board([

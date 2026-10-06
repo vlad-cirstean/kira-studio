@@ -209,7 +209,10 @@ function makeBranchRows(
       label(a) < label(b) ? -1 : label(a) > label(b) ? 1 : 0,
     );
     const out: { id: string; depth: number }[] = [];
+    const emitted = new Set<string>();
     const walk = (id: string, depth: number): void => {
+      if (emitted.has(id)) return;
+      emitted.add(id);
       out.push({ id, depth });
       for (const c of graph.kids.get(id) ?? []) if (inTask(c)) walk(c, depth + 1);
     };
@@ -217,6 +220,8 @@ function makeBranchRows(
       const p = graph.parentOf.get(id);
       if (p === undefined || !inTask(p)) walk(id, 0);
     }
+    // A base/queue cycle leaves no root: render its rows anyway.
+    for (const id of sorted) walk(id, 0);
     return out;
   };
 }
@@ -511,7 +516,10 @@ export function rippleOf(
   const add = (id: string): void => {
     if (!rootSet.has(id) && !out.includes(id)) out.push(id);
   };
+  const seen = new Set<string>();
   const down = (id: string): void => {
+    if (seen.has(id)) return;
+    seen.add(id);
     for (const c of graph.kids.get(id) ?? []) {
       if (graph.byBranch.get(c)?.kind !== 'mine') continue;
       add(c);
