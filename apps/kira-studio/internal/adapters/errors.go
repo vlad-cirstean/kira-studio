@@ -306,17 +306,48 @@ var (
 // outside it, which quote-awareness (above) and this scanner's char-by-char scan both already give
 // unconditionally.
 func StripSQLComments(s string, d SQLDialect) string {
+	out, _ := lexSQLComments(s, d)
+	return out
+}
+
+// SQLQuotingHazard reports the first construct in s whose extent a quote-unaware or ANSI-only
+// scanner would misjudge: a backslash inside a quoted run (MySQL default, Postgres E'...'), a
+// dollar-quoted string, or a MySQL/MariaDB executable comment (`/*! */`, whose body the server
+// runs). Lexed under both the Postgres and MySQL dialects, since the caller does not know the
+// server; callers refuse the statement, never guess.
+func SQLQuotingHazard(s string) (reason string, found bool) {
+	for _, d := range []SQLDialect{PostgresDialect, MySQLDialect} {
+		if _, reason = lexSQLComments(s, d); reason != "" {
+			return reason, true
+		}
+	}
+	return "", false
+}
+
+// lexSQLComments is StripSQLComments's scan; hazard names the first quoting hazard met, if any.
+func lexSQLComments(s string, d SQLDialect) (stripped, hazard string) {
 	r := []rune(s)
 	var out strings.Builder
 	st := commentScanState{}
+	note := func(h string) {
+		if hazard == "" {
+			hazard = h
+		}
+	}
 	for i := 0; i < len(r); {
 		switch {
 		case st.depth == 0 && isQuoteStart(r[i]):
 			next, chunk := scanQuoteArm(r, i)
+			if strings.ContainsRune(chunk, '\\') {
+				note("a backslash inside a quoted string")
+			}
 			out.WriteString(chunk)
 			i = next
 		case st.depth == 0 && r[i] == '$':
 			next, chunk := scanDollarArm(r, i)
+			if len(chunk) > 1 {
+				note("a dollar-quoted string")
+			}
 			out.WriteString(chunk)
 			i = next
 		case st.depth == 0 && startsLineComment(r, i, d):
@@ -330,6 +361,9 @@ func StripSQLComments(s string, d SQLDialect) string {
 			st.execComment = false
 		case startsBlockCommentOpen(r, i) && !(d.FlatBlocks && st.depth > 0):
 			next, chunk, next2 := scanBlockCommentOpenArm(r, i, st)
+			if next2.execComment && !st.execComment {
+				note("a MySQL/MariaDB executable comment (/*! ... */)")
+			}
 			out.WriteString(chunk)
 			i = next
 			st = next2
@@ -345,7 +379,7 @@ func StripSQLComments(s string, d SQLDialect) string {
 			i++
 		}
 	}
-	return out.String()
+	return out.String(), hazard
 }
 
 // commentScanState is StripSQLComments's threaded state: block-comment nesting depth and whether

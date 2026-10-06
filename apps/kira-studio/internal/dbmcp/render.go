@@ -576,6 +576,9 @@ func hasPositionalColumnAliasList(statement string) bool {
 // Refused outright on a masked connection regardless of what the result set's own columns look
 // like — the statement's own syntax is the evidence, not the result.
 func refuseRiskyStatementSyntax(statement string) (reason string, found bool) {
+	if reason, found := adapters.SQLQuotingHazard(statement); found {
+		return reason, true
+	}
 	switch {
 	case riskyUnicodeEscapedIdent.MatchString(statement):
 		return `a Postgres Unicode-escaped identifier (U&"...")`, true

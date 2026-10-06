@@ -628,6 +628,13 @@ func TestRefuseRiskyStatementSyntax(t *testing.T) {
 		{"FROM-clause positional column-alias list", `SELECT e FROM customers AS c(i, n, e)`},
 		{"ClickHouse APPLY column transform", `SELECT * APPLY(toString) FROM customers`},
 		{"ClickHouse COLUMNS transform", `SELECT COLUMNS('.*') APPLY(toString) FROM customers`},
+		{"Postgres E-string backslash quote", `SELECT email, E'\'' AS a, email AS leak FROM t`},
+		{"MySQL backslash-escaped quote", `SELECT email, '\'' AS a, email AS leak FROM t`},
+		{"Postgres dollar quote", `SELECT email, $$'$$ AS a, email AS leak FROM t`},
+		{"Postgres tagged dollar quote", `SELECT email, $q$'$q$ AS a, email AS leak FROM t`},
+		{"MySQL executable comment", "SELECT email /*!, email AS leak */ FROM t"},
+		{"MariaDB executable comment", "SELECT email /*M!100000 , email AS leak */ FROM t"},
+		{"executable comment after quote in comment", "SELECT email /* ' */ /*!, email AS leak */ FROM t"},
 	}
 	for _, tc := range risky {
 		t.Run(tc.name, func(t *testing.T) {
@@ -644,6 +651,7 @@ func TestRefuseRiskyStatementSyntax(t *testing.T) {
 		{"ordinary CAST with precision", "SELECT CAST(price AS numeric(10,2)) FROM orders"},
 		{"ordinary CAST to varchar with length", "SELECT CAST(name AS varchar(255)) FROM customers"},
 		{"plain select, no risky syntax", "SELECT id, email FROM customers WHERE id = 1"},
+		{"placeholder and ordinary comment", "SELECT id /* note */ FROM customers WHERE id = $1 AND n = 'it''s'"},
 	}
 	for _, tc := range safe {
 		t.Run(tc.name, func(t *testing.T) {
