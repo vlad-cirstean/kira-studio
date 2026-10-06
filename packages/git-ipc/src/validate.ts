@@ -170,7 +170,8 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // prompts open in Kira Space) and 'git.sock' refuses 'credential.provide' with E_READ_ONLY. Only
 // the native stream still uses both. 'git.sock' also refuses 'repoSettings.set' with E_READ_ONLY
 // (repository settings are edited in Kira Space only), and 'app.init' gains the
-// 'capabilities.editRepoSettings' flag (Kira Space's native window true, VS Code false).
+// 'capabilities.editRepoSettings' flag (Kira Space's native window true, VS Code false). The 'kiraSpace.log.level' leaf is removed
+// from 'RepoSettingsSnapshot'/'RepoSettingsPatch' (it was never read).
 export const CONTRACT_VERSION = 45;
 
 export class ContractVersionMismatchError extends Error {

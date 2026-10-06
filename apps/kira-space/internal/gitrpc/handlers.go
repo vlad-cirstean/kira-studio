@@ -69,7 +69,7 @@ func New(deps Deps) *Router { return &Router{deps: deps} }
 //
 // G18 D7: also subscribes c to repoSettingsChanged for the life of the connection — unsubscribed
 // via c.Done() rather than repo.close, since repoSettings.changed is not scoped to any one repo
-// being held open (log.level, in particular, is instance-wide). c.Emit (gitsession.Conn) is a
+// being held open. c.Emit (gitsession.Conn) is a
 // mutex-guarded accessor, not a bare field (P108 Part 17 review F9) — c.SetEmit is not called until
 // just after ForConn returns (gitsock's own handleConn), so an event landing in that narrow window
 // safely no-ops rather than racing gitsession.Conn's own unguarded field the way it used to: an

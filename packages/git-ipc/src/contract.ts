@@ -51,7 +51,7 @@ export type DecorationRef =
  *  G18: the one remaining window/host-scoped key after this phase — `kiraSpace.git.path` and
  *  the six originally-named per-repo keys are gone (`git.path` is server-owned elsewhere now,
  *  D15; the rest moved to `RepoSettingsSnapshot` below). `kiraSpace.pull.strategy` and
- *  `kiraSpace.log.level` moved too (D14). */
+ */
 export interface SettingsSnapshot {
   /** G14 D6: VS Code's own tree indentation, mirrored so the webview's file trees match the
    *  Explorer. Read from the host, never contributed by this extension. */
@@ -60,12 +60,7 @@ export interface SettingsSnapshot {
 
 /** G18 D4: the per-repo display settings, server-stored, edited from the new in-app dialog
  *  (`RepoSettingsDialog.vue`) rather than VS Code's settings.json — every leaf here is genuinely
- *  scoped by repoId. P72 §9.2: `kiraSpace.log.level` used to be the one exception (D14, `its
- *  value shared across every repo this installation opens, stored under a reserved key rather
- *  than repoId`) — that collapse is deleted; Kira Space gets its own independent, genuinely
- *  app-wide `advanced.gitLogLevel` control instead (`packages/shared/domain/settings.ts`), and
- *  `kiraSpace.log.level` reverts to an ordinary per-repo leaf, still the only surface VS Code
- *  itself has to set it. */
+ *  scoped by repoId. */
 export interface RepoSettingsSnapshot {
   readonly 'kiraSpace.graph.pageSize': number;
   readonly 'kiraSpace.graph.scope': 'all' | 'head';
@@ -76,7 +71,6 @@ export interface RepoSettingsSnapshot {
   /** P7 W7/D43: Branch review's own candidate base branches (§6.8). */
   readonly 'kiraSpace.review.baseCandidates': readonly string[];
   readonly 'kiraSpace.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
-  readonly 'kiraSpace.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
   /** G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
    *  this repository at all — genuinely per-repo, default true. Off means no
    *  `gh` probe, no spawn, no cache fill: both commit.resolvePr/branch.resolvePr answer
@@ -2156,9 +2150,7 @@ export type Contract = {
           };
     };
     // ---- G18: the per-repo settings dialog (D4) --------------------------------------------
-    /** Reads repoId's own stored settings — six genuinely per-repo, one (`log.level`) shared
-     *  across every repo this installation opens (D14), transparently to this request's own
-     *  shape: repoId is still required and still named for every key. */
+    /** Reads repoId's own stored settings — every leaf is scoped by repoId. */
     'repoSettings.get': {
       params: { repoId: string };
       result: RepoSettingsSnapshot;
@@ -2323,11 +2315,8 @@ export type Contract = {
       };
     };
     /** G18 D4/D7: fanned out to every connected client whenever `repoSettings.set` succeeds
-     *  anywhere, not only to the connection that made the change — `log.level`'s own
-     *  instance-wide collapse (D14) means a value change made through repo A's own dialog must
-     *  still be visible on a window that only ever opened repo B. `repoId` names which repo's own
-     *  write triggered the emit; a viewer decides for itself whether that repoId (or, for the
-     *  instance-wide `log.level`, any repoId at all) is relevant to what it is showing. */
+     *  anywhere, not only to the connection that made the change. `repoId` names which repo's own
+     *  write triggered the emit; a viewer decides for itself whether it is relevant. */
     'repoSettings.changed': { repoId: string; settings: RepoSettingsSnapshot };
     /** P173: auto-fetch stopped (non-null) or re-armed (`null`) for a held repository. */
     'autoFetch.changed': { repoId: string; autoFetch: AutoFetchStatus | null };

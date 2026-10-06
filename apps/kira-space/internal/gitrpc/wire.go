@@ -560,10 +560,7 @@ type ReviewCommentExportResult struct {
 // ---------------------------------------------------------------------------------------
 
 // RepoSettingsSnapshot is repoSettings.get/set's own result — the settings D1 moved into their
-// own per-repo table. P72 §9.2: kiraSpace.log.level used to be the one exception, its value
-// shared across every repo this installation opens (D14) — that collapse is now deleted (Kira
-// Studio gets its own independent, genuinely app-wide advanced.gitLogLevel control instead), so
-// every leaf here, log.level included, is genuinely scoped by repoId.
+// own per-repo table. Every leaf is scoped by repoId.
 type RepoSettingsSnapshot struct {
 	GraphPageSize         int      `json:"kiraSpace.graph.pageSize"`
 	GraphScope            string   `json:"kiraSpace.graph.scope"`
@@ -571,7 +568,6 @@ type RepoSettingsSnapshot struct {
 	StashIncludeUntracked bool     `json:"kiraSpace.stash.includeUntracked"`
 	ReviewBaseCandidates  []string `json:"kiraSpace.review.baseCandidates"`
 	PullStrategy          string   `json:"kiraSpace.pull.strategy"`
-	LogLevel              string   `json:"kiraSpace.log.level"`
 	// GithubEnabled is G24 D16's own eighth leaf — genuinely per-repo, default true.
 	GithubEnabled bool `json:"kiraSpace.github.enabled"`
 	// WorktreePrepareScript/WorktreeBasePath are G25 D10/D16's own ninth and tenth leaves.
@@ -599,7 +595,6 @@ type RepoSettingsPatchWire struct {
 	StashIncludeUntracked *bool     `json:"kiraSpace.stash.includeUntracked,omitempty"`
 	ReviewBaseCandidates  *[]string `json:"kiraSpace.review.baseCandidates,omitempty"`
 	PullStrategy          *string   `json:"kiraSpace.pull.strategy,omitempty"`
-	LogLevel              *string   `json:"kiraSpace.log.level,omitempty"`
 	GithubEnabled         *bool     `json:"kiraSpace.github.enabled,omitempty"`
 	// WorktreePrepareScript is decoded only so repoSettings.set can refuse it (json.Unmarshal drops
 	// unknown keys silently, which would report success). Never written from the wire (P172).

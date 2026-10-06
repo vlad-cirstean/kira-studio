@@ -104,7 +104,7 @@ var allowedMethods = map[string]struct{}{
 	// every connection (P172); this guard keeps that as defence in depth and also covers
 	// WorktreeBasePath, which the socket still accepts. PullStrategy/CheckoutAutoStash are now ordinary settings for operations this
 	// stream admits (P67e) and are no longer restricted. GraphPageSize/GraphScope/StashShowInGraph/
-	// StashIncludeUntracked/ReviewBaseCandidates/LogLevel/GithubEnabled stay allowed, as before.
+	// StashIncludeUntracked/ReviewBaseCandidates/GithubEnabled stay allowed, as before.
 	"repoSettings.get": {}, "repoSettings.set": {},
 	"review.resolveBase": {}, "review.files": {}, "review.fileDiff": {}, "review.mark": {}, "review.snapshot": {},
 	"review.comment.add": {}, "review.comment.list": {}, "review.comment.remove": {},

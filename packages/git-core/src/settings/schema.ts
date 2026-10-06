@@ -49,14 +49,9 @@ export const SETTINGS = {
   //
   // G18 D1/D10: the keys below all moved from VS Code settings.json into a new per-repo
   // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
-  // `source: 'repo'` marks each as server-owned. P72 §9.2: `kiraSpace.log.level` used to be the one
-  // exception among these — not actually a per-repo fact (`instanceWide: true`, D14) even though it lived in the same table
-  // and dialog. That special case is now deleted rather than generalised: Kira Space gets its own
-  // independent, genuinely app-wide `advanced.gitLogLevel` control instead, and this key goes back
-  // to being an ordinary, honestly-per-repo leaf — still the only surface VS Code itself has to
-  // set it (RepoSettingsDialog.vue's Diagnostics section, shown only under that host).
+  // `source: 'repo'` marks each as server-owned.
   // G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
-  // this repository at all — genuinely per-repo (unlike log.level), default true. Off means no
+  // this repository at all — default true. Off means no
   // `gh` probe, no spawn, no cache fill, no badge: both commit.resolvePr/branch.resolvePr answer
   // {kind:'disabled'} outright.
   'kiraSpace.github.enabled': {
@@ -83,14 +78,6 @@ export const SETTINGS = {
     default: 'all',
     description: 'Whether the graph shows every ref ("all") or only the current HEAD\'s ancestry.',
     enum: ['all', 'head'],
-    source: 'repo',
-  },
-  'kiraSpace.log.level': {
-    key: 'kiraSpace.log.level',
-    type: 'enum',
-    default: 'info',
-    description: "Verbosity of kira-space's own diagnostic log.",
-    enum: ['off', 'error', 'warn', 'info', 'debug'],
     source: 'repo',
   },
   'kiraSpace.review.baseCandidates': {

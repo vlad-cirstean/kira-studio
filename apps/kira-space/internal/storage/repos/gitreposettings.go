@@ -9,13 +9,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
-// logLevelSettingKey names the one leaf that used to carry G18 D14's sentinel-row special case —
-// kept as a named constant so the two ordinary reads/writes below (Get, Set) never risk the magic
-// string drifting out of step with itself.
-const logLevelSettingKey = "logLevel"
-
 // worktreePrepareScriptKey/worktreeBasePathKey are G25 D10's own two new leaves — ordinary
-// per-repo rows, same shape as every other leaf including logLevel now (P72 §9.2).
+// per-repo rows, same shape as every other leaf.
 const (
 	worktreePrepareScriptKey  = "worktreePrepareScript"
 	worktreeBasePathKey       = "worktreeBasePath"
@@ -35,10 +30,7 @@ type GitRepoSettingsRepo struct {
 const gitRepoSettingsSelectSQL = `SELECT key, value FROM git_repo_settings WHERE repo_id = ?`
 
 // Get reads repoID's stored settings, falling back to model.DefaultGitRepoSettings() leaf by leaf
-// for anything never written. logLevel is read from repoID's own row like every other leaf — the
-// sentinel-row substitution G18 D14 gave it is deleted along with `instanceWide`'s only user;
-// Kira Studio's own equivalent is now the independent, genuinely app-wide `advanced.gitLogLevel`
-// (this app's own settings.go carries the same leaf).
+// for anything never written.
 func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) {
 	result := model.DefaultGitRepoSettings()
 
@@ -59,7 +51,6 @@ func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) 
 		return err == nil
 	})
 	appsettings.Leaf(stored, worktreeBasePathKey, &result.WorktreeBasePath)
-	appsettings.LeafValid(stored, logLevelSettingKey, &result.LogLevel, appsettings.ValidLogLevel)
 	appsettings.Leaf(stored, checkoutAutoStashKey, &result.CheckoutAutoStash)
 
 	return result, nil
@@ -87,9 +78,8 @@ func (r *GitRepoSettingsRepo) selectAllFor(repoID string) (map[string]json.RawMe
 	return stored, nil
 }
 
-// Set validates the patch, writes only the leaves the caller actually patched (D14's own
-// resolveRepoID decides, per leaf, which repo_id row that lands in), and returns Get(repoID)
-// afterwards — which, for logLevel, already reads back through the same sentinel substitution.
+// Set validates the patch, writes only the leaves the caller actually patched, and returns
+// Get(repoID) afterwards.
 func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
 	if err := patch.Validate(); err != nil {
 		return model.GitRepoSettings{}, fmt.Errorf("repos: %w", err)
@@ -114,7 +104,6 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 		{"stashIncludeUntracked", patch.StashIncludeUntracked != nil, derefAny(patch.StashIncludeUntracked)},
 		{"reviewBaseCandidates", patch.ReviewBaseCandidates != nil, derefAny(patch.ReviewBaseCandidates)},
 		{"pullStrategy", patch.PullStrategy != nil, derefAny(patch.PullStrategy)},
-		{logLevelSettingKey, patch.LogLevel != nil, derefAny(patch.LogLevel)},
 		{"githubEnabled", patch.GithubEnabled != nil, derefAny(patch.GithubEnabled)},
 		{worktreePrepareScriptKey, patch.WorktreePrepareScript != nil, derefAny(patch.WorktreePrepareScript)},
 		{worktreePrepareTimeoutKey, patch.WorktreePrepareTimeout != nil, derefAny(patch.WorktreePrepareTimeout)},

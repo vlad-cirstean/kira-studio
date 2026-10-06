@@ -16,9 +16,7 @@ import (
 
 // fakeRepoSettingsStore is a minimal, in-memory stand-in for storage/repos.GitRepoSettingsRepo,
 // the same "closures over a plain map" shape registry_test.go's own fakes already use elsewhere in
-// this chapter. P72 §9.2: logLevel is an ordinary per-repo leaf now — D14's sentinel substitution
-// this fake used to reproduce is gone from the storage layer, so this fake no longer needs to
-// simulate it either.
+// this chapter.
 type fakeRepoSettingsStore struct {
 	rows map[string]model.GitRepoSettings
 }
@@ -56,9 +54,6 @@ func (f *fakeRepoSettingsStore) set(repoID string, patch model.GitRepoSettingsPa
 	}
 	if patch.PullStrategy != nil {
 		current.PullStrategy = *patch.PullStrategy
-	}
-	if patch.LogLevel != nil {
-		current.LogLevel = *patch.LogLevel
 	}
 	if patch.WorktreePrepareScript != nil {
 		current.WorktreePrepareScript = *patch.WorktreePrepareScript
@@ -185,20 +180,16 @@ func TestRepoSettings_DecomposedRepoIDReadsBackTheComposedlyWrittenRow(t *testin
 	}
 }
 
-// TestRepoSettings_LogLevelIsScopedAcrossRepos is P72 §9.2's own cross-connection regression
-// guard, at the RPC layer (storage/repos/gitreposettings_test.go's own
-// TestGitRepoSettingsRepo_LogLevelIsScopedPerRepo covers the storage layer directly): replaces
-// G18 §3.18's collapse guard for D14 now that the sentinel substitution is deleted —
-// repoSettings.set for kiraSpace.log.level on repo A must NOT be visible via repoSettings.get on
-// repo B.
-func TestRepoSettings_LogLevelIsScopedAcrossRepos(t *testing.T) {
+// TestRepoSettings_GraphScopeIsScopedAcrossRepos guards, at the RPC layer, that repoSettings.set
+// on repo A is not visible via repoSettings.get on repo B.
+func TestRepoSettings_GraphScopeIsScopedAcrossRepos(t *testing.T) {
 	router, _ := newTestRouter()
 	conn := gitsession.NewConn("conn-1", "client-1", "label", nil)
 	t.Cleanup(conn.Close)
 
 	if _, err := router.handleRepoSettingsSet(context.Background(), conn, []byte(`{
 		"repoId": "/repos/a",
-		"patch": {"kiraSpace.log.level": "debug"}
+		"patch": {"kiraSpace.graph.scope": "head"}
 	}`)); err != nil {
 		t.Fatalf("repoSettings.set(a): %v", err)
 	}
@@ -208,8 +199,8 @@ func TestRepoSettings_LogLevelIsScopedAcrossRepos(t *testing.T) {
 		t.Fatalf("repoSettings.get(b): %v", err)
 	}
 	snap := got.(RepoSettingsSnapshot)
-	if snap.LogLevel != "info" {
-		t.Fatalf("Get(b).LogLevel = %q, want %q (the default — unscoped by a's write)", snap.LogLevel, "info")
+	if snap.GraphScope != "all" {
+		t.Fatalf("Get(b).GraphScope = %q, want %q (the default — unscoped by a's write)", snap.GraphScope, "all")
 	}
 }
 
@@ -244,9 +235,7 @@ func (c *changedEventCollector) reset() {
 // TestRepoSettings_ChangedEventReachesEveryConnection is G18 §3.18's own event-fan-out guard: two
 // different Conns — even ones that have never opened the repo the write happened on — both
 // receive repoSettings.changed, proving D7's live-propagation mechanism fans every change out to
-// every open connection, not just the one that made the request, regardless of which key changed
-// (settings.go's own handleRepoSettingsSet doc comment) — log.level is only this test's example
-// patch, not the reason fan-out happens.
+// every open connection, not just the one that made the request, regardless of which key changed.
 func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	router, _ := newTestRouter()
 
@@ -269,12 +258,12 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 		}
 	})
 
-	// A sets log.level on repo A; both connections must be told, even though connB never opened
+	// A sets graph.scope on repo A; both connections must be told, even though connB never opened
 	// (or even heard of) repo A — the RPC layer never filters repoSettings.changed recipients by
 	// repoId, for any key.
 	if _, err := handlersA.Request(context.Background(), "repoSettings.set", []byte(`{
 		"repoId": "/repos/a",
-		"patch": {"kiraSpace.log.level": "warn"}
+		"patch": {"kiraSpace.graph.scope": "head"}
 	}`)); err != nil {
 		t.Fatalf("repoSettings.set via connA: %v", err)
 	}
@@ -291,11 +280,11 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	}
 
 	a, b := gotA.snapshot(), gotB.snapshot()
-	if len(a) != 1 || a[0].Settings.LogLevel != "warn" {
-		t.Fatalf("connA received %v, want exactly one repoSettings.changed with logLevel=warn", a)
+	if len(a) != 1 || a[0].Settings.GraphScope != "head" {
+		t.Fatalf("connA received %v, want exactly one repoSettings.changed with graphScope=head", a)
 	}
-	if len(b) != 1 || b[0].Settings.LogLevel != "warn" {
-		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=warn (fanned out even though connB never opened repo A)", b)
+	if len(b) != 1 || b[0].Settings.GraphScope != "head" {
+		t.Fatalf("connB received %v, want exactly one repoSettings.changed with graphScope=head (fanned out even though connB never opened repo A)", b)
 	}
 
 	// §3.18's own "via EITHER one's repoSettings.set" — the reverse direction, B setting on a
@@ -304,7 +293,7 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	gotB.reset()
 	if _, err := handlersB.Request(context.Background(), "repoSettings.set", []byte(`{
 		"repoId": "/repos/c",
-		"patch": {"kiraSpace.log.level": "debug"}
+		"patch": {"kiraSpace.pull.strategy": "rebase"}
 	}`)); err != nil {
 		t.Fatalf("repoSettings.set via connB: %v", err)
 	}
@@ -315,11 +304,11 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 		}
 	}
 	a, b = gotA.snapshot(), gotB.snapshot()
-	if len(a) != 1 || a[0].Settings.LogLevel != "debug" {
-		t.Fatalf("connA received %v, want exactly one repoSettings.changed with logLevel=debug (reverse direction)", a)
+	if len(a) != 1 || a[0].Settings.PullStrategy != "rebase" {
+		t.Fatalf("connA received %v, want exactly one repoSettings.changed with pullStrategy=rebase (reverse direction)", a)
 	}
-	if len(b) != 1 || b[0].Settings.LogLevel != "debug" {
-		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=debug (reverse direction)", b)
+	if len(b) != 1 || b[0].Settings.PullStrategy != "rebase" {
+		t.Fatalf("connB received %v, want exactly one repoSettings.changed with pullStrategy=rebase (reverse direction)", b)
 	}
 }
 
@@ -358,7 +347,7 @@ func TestRepoSettings_WedgedConnectionDoesNotBlockOthers(t *testing.T) {
 	go func() {
 		_, err := handlersOther.Request(context.Background(), "repoSettings.set", []byte(`{
 			"repoId": "/repos/a",
-			"patch": {"kiraSpace.log.level": "warn"}
+			"patch": {"kiraSpace.graph.scope": "head"}
 		}`))
 		done <- err
 	}()
@@ -379,8 +368,8 @@ func TestRepoSettings_WedgedConnectionDoesNotBlockOthers(t *testing.T) {
 		}
 	}
 	got := gotOther.snapshot()
-	if len(got) != 1 || got[0].Settings.LogLevel != "warn" {
-		t.Fatalf("the healthy connection received %v, want exactly one repoSettings.changed with logLevel=warn", got)
+	if len(got) != 1 || got[0].Settings.GraphScope != "head" {
+		t.Fatalf("the healthy connection received %v, want exactly one repoSettings.changed with graphScope=head", got)
 	}
 }
 

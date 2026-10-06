@@ -62,9 +62,7 @@ type Registry struct {
 	// RepoSettingsGet/RepoSettingsSet are G18 D8's own closures: the seven per-repo display
 	// settings (D3), backed by storage/repos.GitRepoSettingsRepo — the same "plain func, not an
 	// interface" seam Settings above already is, for the same reason (this package stays under
-	// gitclient/gitreview/stdlib only). D14's log.level sentinel substitution happens entirely
-	// inside GitRepoSettingsRepo itself — neither this Registry nor anything above it needs to
-	// know the substitution exists. Defaulted to the schema's own defaults, read-only, writing
+	// gitclient/gitreview/stdlib only). Defaulted to the schema's own defaults, read-only, writing
 	// nowhere — a Registry a test constructs by hand (rather than via NewRegistry) still answers
 	// something sane rather than nil-panicking.
 	RepoSettingsGet func(repoID string) (model.GitRepoSettings, error)

@@ -14,7 +14,6 @@ function defaultSnapshot(): RepoSettingsSnapshot {
     'kiraSpace.stash.includeUntracked': SETTINGS['kiraSpace.stash.includeUntracked'].default,
     'kiraSpace.review.baseCandidates': SETTINGS['kiraSpace.review.baseCandidates'].default,
     'kiraSpace.pull.strategy': SETTINGS['kiraSpace.pull.strategy'].default,
-    'kiraSpace.log.level': SETTINGS['kiraSpace.log.level'].default,
     'kiraSpace.github.enabled': SETTINGS['kiraSpace.github.enabled'].default,
     'kiraSpace.worktree.prepareScript': SETTINGS['kiraSpace.worktree.prepareScript'].default,
     'kiraSpace.worktree.basePath': SETTINGS['kiraSpace.worktree.basePath'].default,
@@ -110,9 +109,6 @@ describe('RepoSettingsState', () => {
     state.dispose();
   });
 
-  // P72 §9.2: replaces G18 §3.18/§4.12's own D14 sentinel-collapse guard — a repoSettings.changed
-  // event naming a DIFFERENT repo must now be ignored entirely, log.level included; the cross-repo
-  // collapse it used to carry is deleted.
   test('repoSettings.changed from a different repo is ignored entirely', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
@@ -129,15 +125,10 @@ describe('RepoSettingsState', () => {
       repoId: '/repos/b',
       settings: {
         ...defaultSnapshot(),
-        'kiraSpace.log.level': 'debug',
         'kiraSpace.pull.strategy': 'merge',
       },
     });
 
-    // /repos/b's own write must NOT have touched /repos/a's state at all, log.level included.
-    expect(state.settings.value['kiraSpace.log.level']).toBe(
-      SETTINGS['kiraSpace.log.level'].default,
-    );
     expect(state.settings.value['kiraSpace.pull.strategy']).toBe('rebase');
     state.dispose();
   });

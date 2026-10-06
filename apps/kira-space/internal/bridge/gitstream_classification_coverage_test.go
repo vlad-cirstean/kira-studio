@@ -115,7 +115,6 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 		"StashShowInGraph":      false,
 		"StashIncludeUntracked": false,
 		"ReviewBaseCandidates":  false,
-		"LogLevel":              false,
 		"GithubEnabled":         false,
 	}
 

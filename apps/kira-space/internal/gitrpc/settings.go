@@ -26,7 +26,6 @@ func repoSettingsSnapshotFrom(s model.GitRepoSettings) RepoSettingsSnapshot {
 		StashIncludeUntracked: s.StashIncludeUntracked,
 		ReviewBaseCandidates:  candidates,
 		PullStrategy:          s.PullStrategy,
-		LogLevel:              s.LogLevel,
 		GithubEnabled:         s.GithubEnabled,
 		WorktreePrepareScript: s.WorktreePrepareScript,
 		WorktreeBasePath:      s.WorktreeBasePath,
@@ -56,7 +55,6 @@ func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
 		StashIncludeUntracked: p.StashIncludeUntracked,
 		ReviewBaseCandidates:  p.ReviewBaseCandidates,
 		PullStrategy:          p.PullStrategy,
-		LogLevel:              p.LogLevel,
 		GithubEnabled:         p.GithubEnabled,
 		WorktreeBasePath:      worktreeBasePath,
 		CheckoutAutoStash:     p.CheckoutAutoStash,
@@ -85,10 +83,7 @@ func (r *Router) handleRepoSettingsGet(_ context.Context, _ *gitsession.Conn, pa
 
 // handleRepoSettingsSet writes the patch, then emits repoSettings.changed to EVERY currently
 // connected client (D7) — not only the one that made the change, via this Router's own
-// notify.Emitter[RepoSettingsChangedPayload] (repoSettingsChanged, ForConn below). D14's
-// log.level sentinel collapse is invisible here: RepoID still names whichever repo the caller
-// passed, even for a log.level-only patch; the storage layer is what already made that write
-// visible to every other repo.
+// notify.Emitter[RepoSettingsChangedPayload] (repoSettingsChanged, ForConn below).
 func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, params json.RawMessage) (any, error) {
 	return handleCall("repoSettings.set", params,
 		func(p RepoSettingsSetParams) error {

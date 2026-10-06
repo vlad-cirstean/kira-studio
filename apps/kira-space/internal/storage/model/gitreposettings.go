@@ -8,11 +8,7 @@ import (
 )
 
 // GitRepoSettings is G18 D3's display settings a user edits from the git graph's own dialog,
-// moved out of VS Code's contributes.configuration entirely (D1). P72 §9.2: LogLevel used to be
-// the one exception (D14) — GitRepoSettingsRepo.Get/Set collapsed it onto a reserved sentinel repo
-// id regardless of which real repo id the caller passed — but that collapse is now deleted; Kira
-// Studio gets its own independent, genuinely app-wide `advanced.gitLogLevel` control instead
-// (packages/shared/domain/settings.ts), and every leaf here, LogLevel included, is an ordinary
+// moved out of VS Code's contributes.configuration entirely (D1). Every leaf is an ordinary
 // per-repository fact.
 type GitRepoSettings struct {
 	GraphPageSize         int      `json:"graphPageSize"`
@@ -21,8 +17,6 @@ type GitRepoSettings struct {
 	StashIncludeUntracked bool     `json:"stashIncludeUntracked"`
 	ReviewBaseCandidates  []string `json:"reviewBaseCandidates"`
 	PullStrategy          string   `json:"pullStrategy"`
-	// LogLevel is an ordinary per-repo leaf (P72 §9.2) — see this struct's own doc comment.
-	LogLevel string `json:"logLevel"`
 	// GithubEnabled is G24 D16's own eighth leaf: off means no gh probe, no spawn, no cache fill, no
 	// badge, no search PR arm, no reaper re-resolve — both commit.resolvePr/branch.resolvePr answer
 	// {kind:'disabled'} outright. Genuinely per-repo, default true.
@@ -58,7 +52,6 @@ func DefaultGitRepoSettings() GitRepoSettings {
 		StashIncludeUntracked:  false,
 		ReviewBaseCandidates:   []string{"main", "master"},
 		PullStrategy:           "auto",
-		LogLevel:               "info",
 		GithubEnabled:          true,
 		WorktreePrepareScript:  "",
 		WorktreePrepareTimeout: DefaultPrepareTimeout,
@@ -77,7 +70,6 @@ type GitRepoSettingsPatch struct {
 	StashIncludeUntracked *bool     `json:"stashIncludeUntracked,omitempty"`
 	ReviewBaseCandidates  *[]string `json:"reviewBaseCandidates,omitempty"`
 	PullStrategy          *string   `json:"pullStrategy,omitempty"`
-	LogLevel              *string   `json:"logLevel,omitempty"`
 	GithubEnabled         *bool     `json:"githubEnabled,omitempty"`
 	// WorktreePrepareScript/WorktreeBasePath: G25 D10's two new leaves.
 	WorktreePrepareScript *string `json:"worktreePrepareScript,omitempty"`
@@ -124,9 +116,7 @@ func ValidPullStrategy(v string) bool {
 var validGraphPageSize = appsettings.InRange(100, 50000)
 
 // Validate checks every leaf the caller actually patched against schema.ts's own bounds, naming
-// the offending leaf in the error — the same discipline SettingsPatch.Validate follows. LogLevel
-// reuses appsettings.ValidLogLevel (P103 Part 4 §7.1) — the same off/error/warn/info/debug enum
-// Settings.Advanced.GitLogLevel validates against, genuinely shared, not merely parallel.
+// the offending leaf in the error — the same discipline SettingsPatch.Validate follows.
 func (p GitRepoSettingsPatch) Validate() error {
 	if p.GraphPageSize != nil && !validGraphPageSize(*p.GraphPageSize) {
 		return fmt.Errorf("model: graphPageSize: out of range value %d", *p.GraphPageSize)
@@ -136,9 +126,6 @@ func (p GitRepoSettingsPatch) Validate() error {
 	}
 	if p.PullStrategy != nil && !ValidPullStrategy(*p.PullStrategy) {
 		return fmt.Errorf("model: pullStrategy: invalid value %q", *p.PullStrategy)
-	}
-	if p.LogLevel != nil && !appsettings.ValidLogLevel(*p.LogLevel) {
-		return fmt.Errorf("model: logLevel: invalid value %q", *p.LogLevel)
 	}
 	if p.WorktreePrepareTimeout != nil {
 		if _, err := ParsePrepareTimeout(*p.WorktreePrepareTimeout); err != nil {

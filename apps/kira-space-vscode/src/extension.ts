@@ -215,13 +215,13 @@ function updateStatusBar(
 let connection: ConnectionManager | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const outputChannel = vscode.window.createOutputChannel('Kira Space');
+  const outputChannel = vscode.window.createOutputChannel('Kira Space', { log: true });
   context.subscriptions.push(outputChannel);
 
   let currentSettings = coerceSettings(
     readRawSettings(vscode.workspace.getConfiguration()),
   ).settings;
-  const logger = new VsCodeLogger(outputChannel, () => currentSettings['kiraSpace.log.level']);
+  const logger = new VsCodeLogger(outputChannel);
   const roots = new VsCodeWorkspaceRoots();
   const clipboard = new VsCodeClipboard();
   const editor = new VsCodeEditorIntegration();
@@ -528,15 +528,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // G14 D6b: 'workbench.tree.indent' is a host-owned key (SETTINGS' source: 'host'), read off
       // the root configuration object like any other HOST_SETTING_KEYS member — readRawSettings itself
       // needs no special case (a fully-qualified dotted key resolves there like any other, with
-      // VS Code's own user/workspace/folder/language overrides already applied). What must widen
-      // is this early return, so a live change to it still reaches both webviews through the same
-      // settings.changed event below.
-      if (
-        !event.affectsConfiguration('kiraSpace') &&
-        !event.affectsConfiguration('workbench.tree.indent')
-      ) {
-        return;
-      }
+      // VS Code's own user/workspace/folder/language overrides already applied). The early
+      // return keeps a live change to it reaching both webviews through settings.changed below.
+      if (!event.affectsConfiguration('workbench.tree.indent')) return;
       const { settings, problems } = coerceSettings(
         readRawSettings(vscode.workspace.getConfiguration()),
       );

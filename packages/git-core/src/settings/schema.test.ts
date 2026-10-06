@@ -104,9 +104,9 @@ describe('coerceSettings', () => {
   test('an unknown key falls back to defaults for everything and is reported, without touching known keys', () => {
     const result = coerceSettings({
       'kiraSpace.nonsense': true,
-      'kiraSpace.log.level': 'debug',
+      'workbench.tree.indent': 12,
     });
-    expect(result.settings).toEqual({ ...defaultSettings(), 'kiraSpace.log.level': 'debug' });
+    expect(result.settings).toEqual({ ...defaultSettings(), 'workbench.tree.indent': 12 });
     expect(result.problems).toEqual([{ key: 'kiraSpace.nonsense', reason: 'unknown key' }]);
   });
 
@@ -115,20 +115,19 @@ describe('coerceSettings', () => {
       coerceSettings({
         'kiraSpace.git.path': 42,
         'kiraSpace.graph.pageSize': null,
-        'kiraSpace.log.level': {},
+        'workbench.tree.indent': {},
       }),
     ).not.toThrow();
   });
 });
 
 describe('repoSettingKeys', () => {
-  test('returns exactly the eleven source: "repo" keys, G18 D1/G24 D16/G25 D10/G28 D16', () => {
+  test('returns exactly the ten source: "repo" keys, G18 D1/G24 D16/G25 D10/G28 D16', () => {
     const expected: SettingKey[] = [
       'kiraSpace.checkout.autoStash',
       'kiraSpace.github.enabled',
       'kiraSpace.graph.pageSize',
       'kiraSpace.graph.scope',
-      'kiraSpace.log.level',
       'kiraSpace.pull.strategy',
       'kiraSpace.review.baseCandidates',
       'kiraSpace.stash.includeUntracked',

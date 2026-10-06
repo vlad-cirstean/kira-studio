@@ -14,7 +14,6 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
     'kiraSpace.stash.includeUntracked': SETTINGS['kiraSpace.stash.includeUntracked'].default,
     'kiraSpace.review.baseCandidates': SETTINGS['kiraSpace.review.baseCandidates'].default,
     'kiraSpace.pull.strategy': SETTINGS['kiraSpace.pull.strategy'].default,
-    'kiraSpace.log.level': SETTINGS['kiraSpace.log.level'].default,
     'kiraSpace.github.enabled': SETTINGS['kiraSpace.github.enabled'].default,
     'kiraSpace.worktree.prepareScript': SETTINGS['kiraSpace.worktree.prepareScript'].default,
     'kiraSpace.worktree.basePath': SETTINGS['kiraSpace.worktree.basePath'].default,
@@ -27,12 +26,7 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
  * "one instance for the life of the component, reset via `setRepoId`" shape (P9 W13) — a repo's
  * own settings are exactly as reset-on-switch as its stash stack.
  *
- * P72 §9.2: `kiraSpace.log.level`'s own cross-repo collapse (D14) is deleted, storage layer and
- * here together — `repoSettings.changed`'s own `repoId` naming a DIFFERENT repository than the one
- * this instance is currently tracking is irrelevant now for every field, log.level included, and
- * is ignored outright, the same as it always was for the other ten leaves. Kira Space's own
- * equivalent, genuinely app-wide `advanced.gitLogLevel`, lives in `SettingsState` instead
- * (`packages/shared/domain/settings.ts`), entirely separate from this per-repo mechanism.
+ * `repoSettings.changed` naming a different repository than the one tracked is ignored.
  */
 export class RepoSettingsState {
   readonly settings: ShallowRef<RepoSettingsSnapshot>;

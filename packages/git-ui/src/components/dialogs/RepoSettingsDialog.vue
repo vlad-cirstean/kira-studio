@@ -8,15 +8,6 @@
  * set in Kira Space (P172); `WorktreeDialog.vue` only reads it. G28 D16 adds
  * `kiraSpace.checkout.autoStash`, its own new "Checkout" section.
  *
- * P72 §8.3/§9: `kiraSpace.log.level` **used to not be per-repo** (D14) — a hardcoded sentinel
- * collapse in `gitreposettings.go`, surfaced here as a visible note. Both that collapse and the
- * note are deleted: Kira Space now has its own independent, genuinely app-wide
- * `advanced.gitLogLevel` (`SettingsDialog.vue`), and this leaf reverts to an ordinary per-repo
- * fact, same as `dateFormat` below moved to `appearance.dateFormat` there. Both sections
- * (Display/Diagnostics) are host-conditional (the `host` prop) — shown under `'vscode'`/
- * `'harness'`, since the extension has no app-wide settings dialog of its own and this remains
- * its only surface for either value; hidden under `'kira'`, where Studio's own dialog owns both.
- *
  * Mirrors `StashDialog.vue`'s own "one instance, `open` prop + `close` emit" convention — the
  * whole per-repo settings surface fits in one dialog the same way stash's create/branch/popConfirm
  * three modes do, so this is a second file in that shape, not a fourth mode grafted onto
@@ -133,24 +124,12 @@ const pullStrategyOptions: readonly SelectOption[] = [
   { value: 'rebase', label: 'Rebase' },
 ];
 
-const logLevelOptions: readonly SelectOption[] = [
-  { value: 'off', label: 'Off' },
-  { value: 'error', label: 'Error' },
-  { value: 'warn', label: 'Warn' },
-  { value: 'info', label: 'Info' },
-  { value: 'debug', label: 'Debug' },
-];
-
 function onGraphScopeChange(value: string): void {
   draft['kiraSpace.graph.scope'] = value as RepoSettingsSnapshot['kiraSpace.graph.scope'];
 }
 
 function onPullStrategyChange(value: string): void {
   draft['kiraSpace.pull.strategy'] = value as RepoSettingsSnapshot['kiraSpace.pull.strategy'];
-}
-
-function onLogLevelChange(value: string): void {
-  draft['kiraSpace.log.level'] = value as RepoSettingsSnapshot['kiraSpace.log.level'];
 }
 
 function onPageSizeChange(value: string | number): void {
@@ -169,7 +148,6 @@ const pageSizeId = useId();
 const graphScopeId = useId();
 const baseCandidatesId = useId();
 const pullStrategyId = useId();
-const logLevelId = useId();
 
 function close(): void {
   emit('close');
@@ -204,9 +182,6 @@ async function save(): Promise<void> {
   }
   if (draft['kiraSpace.pull.strategy'] !== current['kiraSpace.pull.strategy']) {
     patch['kiraSpace.pull.strategy'] = draft['kiraSpace.pull.strategy'];
-  }
-  if (draft['kiraSpace.log.level'] !== current['kiraSpace.log.level']) {
-    patch['kiraSpace.log.level'] = draft['kiraSpace.log.level'];
   }
   if (draft['kiraSpace.github.enabled'] !== current['kiraSpace.github.enabled']) {
     patch['kiraSpace.github.enabled'] = draft['kiraSpace.github.enabled'];
@@ -348,29 +323,6 @@ async function save(): Promise<void> {
               @update:model-value="(v) => onPullStrategyChange(v as string)"
             >
               <option v-for="opt in pullStrategyOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </NativeSelect>
-          </label>
-        </section>
-
-        <!-- P72 §8.3/§9.2: Kira Space now has its own independent, genuinely app-wide
-             advanced.gitLogLevel (SettingsDialog.vue) — this per-repo leaf is VS Code's only
-             remaining surface for log level, and, with D14's cross-repo collapse deleted, it is
-             genuinely per-repo again, so no "applies everywhere" note belongs here any more. -->
-        <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
-          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Diagnostics</h3>
-          <label :for="logLevelId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-            Log level
-            <NativeSelect
-              :id="logLevelId"
-              :model-value="draft['kiraSpace.log.level']"
-              variant="bordered"
-              size="kira"
-              class="w-full"
-              @update:model-value="(v) => onLogLevelChange(v as string)"
-            >
-              <option v-for="opt in logLevelOptions" :key="opt.value" :value="opt.value">
                 {{ opt.label }}
               </option>
             </NativeSelect>
