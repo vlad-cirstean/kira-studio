@@ -421,7 +421,7 @@ onUnmounted(() => {
         <div class="relative w-full" :style="{ height: `${totalMessagesSize}px` }">
           <div
             v-for="entry in visibleMessages"
-            :key="entry.row.index"
+            :key="entry.m.seq"
             class="flex flex-col absolute top-0 left-0 w-full"
             data-testid="grpc-message-entry"
             :style="{ transform: `translateY(${entry.row.start}px)` }"

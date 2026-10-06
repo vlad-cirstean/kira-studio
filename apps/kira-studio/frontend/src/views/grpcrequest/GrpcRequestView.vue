@@ -3,6 +3,7 @@ import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kir
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
@@ -243,8 +244,10 @@ function toggleFieldDescriptions(): void {
 const overviewOpen = ref(false);
 const overviewAnchorRef = ref<HTMLElement | null>(null);
 
+const beautifyError = ref<string | null>(null);
 function onMessageInput(value: string): void {
   patchGrpcRequestTabState(props.tab.id, { message: value });
+  beautifyError.value = null;
 }
 
 const DEFAULT_REQUEST_PANE_HEIGHT = 260;
@@ -263,8 +266,12 @@ async function onBeautify(): Promise<void> {
       ? beautifyJson(source, 'indented')
       : await parse.run('json.beautify', { text: source, mode: 'indented' }).catch(() => null);
   // Null: the view unmounted mid-run. Otherwise the message may have moved on while the worker ran.
-  if (result?.ok && props.tab.state.message === source) {
+  if (!result || props.tab.state.message !== source) return;
+  if (result.ok) {
     patchGrpcRequestTabState(props.tab.id, { message: result.text });
+    beautifyError.value = null;
+  } else {
+    beautifyError.value = result.reason ?? 'could not format this message';
   }
 }
 
@@ -496,6 +503,9 @@ onUnmounted(() => {
         :order="1"
         @resize="onResizeRequestPane"
       >
+        <Alert v-if="beautifyError && tab.state.requestPane === 'message'" variant="destructive" data-testid="grpc-beautify-error">
+          <AlertDescription>{{ beautifyError }}</AlertDescription>
+        </Alert>
         <MonacoHost
           v-if="tab.state.requestPane === 'message'"
           :doc="tab.state.message"
