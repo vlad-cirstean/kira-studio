@@ -92,7 +92,7 @@ func main() {
 
 	// P5 D8: the SAME authorizer instance connections.New below is given — that is what makes the
 	// reveal grace genuinely shared between a connection-password reveal and a variable reveal.
-	apiVarsSvc := apivars.New(repositories.Variables, cipher, authorizer)
+	apiVarsSvc := apivars.New(repositories.Variables, authorizer)
 
 	deps := appcore.Deps{
 		DB:        db.DB,

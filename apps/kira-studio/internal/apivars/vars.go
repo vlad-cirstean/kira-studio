@@ -13,7 +13,6 @@ package apivars
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
@@ -24,13 +23,11 @@ type Authorizer interface {
 	Authorize(reason string, confirmed bool) (localauth.Outcome, error)
 }
 
-// Deps is everything the service needs. Cipher is carried for parity with New's own signature and
-// with connections.Deps' identical field — every method here that actually touches a stored
-// secret goes through Repo (which holds its own copy of the same Cipher), not this one directly.
+// Deps is everything the service needs. Every stored secret goes through Repo, which holds the
+// Cipher itself.
 type Deps struct {
-	Repo   *repos.VariablesRepo
-	Cipher *secrets.Cipher
-	Auth   Authorizer
+	Repo *repos.VariablesRepo
+	Auth Authorizer
 }
 
 // Service is the Go analogue of a P5-scoped connections.Service: the bridge (bridge/variables.go)
@@ -43,6 +40,6 @@ type Service struct {
 // uses (D8) — main.go constructs exactly one Authorizer and passes it to both, which is what makes
 // the 5-minute reveal grace genuinely shared between a connection-password reveal and a variable
 // reveal.
-func New(repo *repos.VariablesRepo, cipher *secrets.Cipher, auth *localauth.Authorizer) *Service {
-	return &Service{deps: Deps{Repo: repo, Cipher: cipher, Auth: auth}}
+func New(repo *repos.VariablesRepo, auth *localauth.Authorizer) *Service {
+	return &Service{deps: Deps{Repo: repo, Auth: auth}}
 }

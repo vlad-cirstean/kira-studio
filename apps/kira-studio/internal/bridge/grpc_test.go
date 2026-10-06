@@ -158,7 +158,7 @@ func newGrpcServiceForTest(t *testing.T) (*GrpcService, *storage.DB, *repos.Vari
 	cipher := secrets.New()
 	variablesRepo := repos.NewVariables(db.DB, cipher)
 	repositories.Variables = variablesRepo
-	apiVars := apivars.New(variablesRepo, cipher, nil)
+	apiVars := apivars.New(variablesRepo, nil)
 
 	svc := &GrpcService{Deps: appcore.Deps{DB: db.DB, Repos: repositories, ApiVars: apiVars}}
 	return svc, db, variablesRepo, repositories.Collections

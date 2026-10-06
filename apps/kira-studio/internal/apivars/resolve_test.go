@@ -104,7 +104,7 @@ func newResolveService(t *testing.T) (*apivars.Service, *repos.VariablesRepo, *r
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	variablesRepo := repos.NewVariables(db.DB, secrets.New())
-	return apivars.New(variablesRepo, secrets.New(), nil), variablesRepo, &repos.CollectionsRepo{DB: db.DB}
+	return apivars.New(variablesRepo, nil), variablesRepo, &repos.CollectionsRepo{DB: db.DB}
 }
 
 // findUsed is resolve_test.go's own small lookup over ResolveRequest/Resolver.Used()'s
