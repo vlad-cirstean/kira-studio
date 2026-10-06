@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
 // M1 §6.2: the Database MCP section's own domain — bridge/dbmcp.go's DbMcpStatus/
-// DbMcpInstallResult wire projections. Command carries the plaintext token exactly once — this is
-// the one place in the whole system it ever appears at rest in the renderer, never persisted (no
-// localStorage, no settings leaf).
+// DbMcpInstallResult wire projections. command is the copy-paste registration text naming the
+// headersHelper script path; it holds no secret.
 export const dbMcpStatusSchema = /*#__PURE__*/ z.object({
   running: z.boolean(),
   command: z.string(),
@@ -44,7 +43,7 @@ export type DbMcpApprovalPlan = z.infer<typeof dbMcpApprovalPlanSchema>;
 
 // M2 §5/§7.1: the prompt-mode approval queue — bridge/dbmcp.go's DbMcpApprovalRequest/
 // DbMcpApprovalSnapshot, gitPairingRequestSchema/gitPairingSnapshotSchema's own shape. statement
-// is capped at 4000 (rune-safe) characters on the wire; truncated says whether it was cut.
+// is sent uncapped.
 // M3 §6.2: reason distinguishes M2's own permission prompt from M3's heavy-plan flag — both raise
 // the same dialog, one queue, one question ("should this run?"); plan carries the evidence for
 // either, null for an ordinary permission prompt with no plan attached.
@@ -55,7 +54,6 @@ export const dbMcpApprovalSchema = /*#__PURE__*/ z.object({
   kind: z.string(),
   class: /*#__PURE__*/ z.enum(['read', 'write', 'ddl', 'unknown']),
   statement: z.string(),
-  truncated: z.boolean(),
   expiresAtMs: z.number(),
   reason: /*#__PURE__*/ z.enum(['permission', 'heavy']),
   plan: dbMcpApprovalPlanSchema.nullable(),
