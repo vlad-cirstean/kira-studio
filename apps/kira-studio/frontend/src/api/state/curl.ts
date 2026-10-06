@@ -185,6 +185,9 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
   // map.
   const revealedSecretValuesExpiry = createRevealExpiry(state.revealedSecretValues);
 
+  // Bumped on open and close: a reveal loop from a superseded dialog stops and writes nothing.
+  let openSeq = 0;
+
   function openCopyAsCurlDialog(
     method: string,
     resolved: ResolvedRequest,
@@ -193,6 +196,7 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
     collectionId: string,
     environmentId: string,
   ): void {
+    openSeq++;
     state.open = true;
     state.method = method;
     state.resolved = resolved;
@@ -209,7 +213,9 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
   }
 
   function closeCopyAsCurlDialog(): void {
+    openSeq++;
     state.open = false;
+    state.revealing = false;
     state.resolved = null;
     // D10: nothing generated is ever persisted — dropped on close, the same discipline
     // `revealedValues` follows.
@@ -267,26 +273,31 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
    *  refused. */
   async function revealSecretValues(): Promise<void> {
     const { deferredNames, collectionId, environmentId } = state;
+    const mySeq = openSeq;
     state.revealing = true;
     state.error = null;
     try {
       for (const name of deferredNames) {
         if (state.revealedSecretValues[name] !== undefined) continue;
         const id = await findSecretVariableId(name, collectionId, environmentId);
+        if (mySeq !== openSeq) return;
         if (!id) continue;
-        // Finding 1 (v1.2 P14 round 2): branch on this call's own return value, not on the shared
-        // revealedValues map — a cancelled/unavailable/errored outcome here must not be masked by a
-        // stale success the map already holds from an earlier, unrelated reveal of the same id.
+        // Branch on this call's own return value, not on the shared revealedValues map: a stale
+        // success there for the same id must not mask a cancelled/unavailable/errored outcome.
         const value = await useVariableSetStore().revealVariable(id, (message) => {
-          state.error = message;
+          if (mySeq === openSeq) state.error = message;
         });
+        if (mySeq !== openSeq) {
+          useVariableSetStore().clearRevealed();
+          return;
+        }
         if (value !== undefined) {
           state.revealedSecretValues[name] = value;
           revealedSecretValuesExpiry.schedule(name);
         }
       }
     } finally {
-      state.revealing = false;
+      if (mySeq === openSeq) state.revealing = false;
     }
   }
 
