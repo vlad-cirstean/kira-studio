@@ -24,8 +24,19 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     return state.records.find((r) => r.id === id);
   }
 
+  function upsertRecord(repo: RepoSummary): void {
+    const idx = state.records.findIndex((r) => r.id === repo.id);
+    if (idx >= 0) state.records[idx] = repo;
+    else state.records = [...state.records, repo];
+  }
+
+  // A list response older than a newer request's is dropped: it could lack a repo imported since.
+  let listSeq = 0;
   async function hydrateCodeRepos(): Promise<void> {
-    state.records = await control.codeWorkspaceListRepos();
+    const seq = ++listSeq;
+    const list = await control.codeWorkspaceListRepos();
+    if (seq !== listSeq) return;
+    state.records = list;
     // Another window removed a repository: an open workspace on it would answer every call E_NOT_FOUND.
     const live = new Set(state.records.map((r) => r.id));
     for (const id of [...workspaceStore.openRepos]) {
@@ -39,7 +50,7 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     const chosen = await control.filesChooseFolder('Import repository…');
     if (chosen.canceled || !chosen.path) return undefined;
     const repo = await control.codeWorkspaceImportRepo(chosen.path);
-    state.records = [...state.records, repo];
+    upsertRecord(repo);
     return repo;
   }
 
@@ -100,7 +111,7 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     }
     try {
       const imported = await control.codeWorkspaceImportRepo(path);
-      state.records = [...state.records, imported];
+      upsertRecord(imported);
       workspaceStore.openRepoWorkspace(imported.id);
     } catch (err) {
       // Another window imported this root between the lookup above and this call — re-read the list
