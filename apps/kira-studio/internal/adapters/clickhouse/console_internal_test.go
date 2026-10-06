@@ -90,3 +90,41 @@ func TestClassifyClickHouseSQLOtherExplainKinds(t *testing.T) {
 		})
 	}
 }
+
+// isRowReturning decides streamed query vs command: a misroute buffers a whole result and shows
+// "0 row(s) written" (P168 Part 3 F12).
+func TestIsRowReturning(t *testing.T) {
+	cases := []struct {
+		sql  string
+		want bool
+	}{
+		{"SELECT 1", true},
+		{"-- c\nSELECT 1", true},
+		{"# c\nSELECT 1", true},
+		{"# a\n-- b\n/* c */ SELECT 1", true},
+		{"(SELECT 1) UNION ALL (SELECT 2)", true},
+		{"FROM t SELECT x", true},
+		{"INSERT INTO t VALUES (1)", false},
+		{"# c\nINSERT INTO t VALUES (1)", false},
+		{"CREATE TABLE t (x UInt8) ENGINE = Memory", false},
+	}
+	for _, tc := range cases {
+		if got := isRowReturning(tc.sql); got != tc.want {
+			t.Errorf("isRowReturning(%q) = %v, want %v", tc.sql, got, tc.want)
+		}
+	}
+}
+
+// decodeRow reads the sentinel as NULL only where the column can be NULL (P168 Part 3 F11).
+func TestDecodeRowNullSentinel(t *testing.T) {
+	got := decodeRow([]string{nullSentinel, nullSentinel, "x"}, nullableColumns([]string{"Nullable(String)", "String", "LowCardinality(Nullable(String))"}))
+	if got[0] != nil || got[1] == nil || *got[1] != nullSentinel || got[2] == nil {
+		t.Fatalf("decodeRow = %v %v %v, want NULL, the literal text, a value", got[0], got[1], got[2])
+	}
+}
+
+func TestEscapeParamValue(t *testing.T) {
+	if got, want := escapeParamValue("a\\b\tc\nd\re"), `a\\b\tc\nd\re`; got != want {
+		t.Fatalf("escapeParamValue = %q, want %q", got, want)
+	}
+}

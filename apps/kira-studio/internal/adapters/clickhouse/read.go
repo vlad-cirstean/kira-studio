@@ -171,6 +171,15 @@ func readPage(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx
 	for i, c := range projectedColumns {
 		selectNames[i] = quoteIdent(c.Name)
 	}
+	// A Nullable column also selects isNull(col) after the projected ones: the *Strings format
+	// renders NULL as a sentinel a real string can equal, the flag settles which it is.
+	var nullableCols []int
+	for i, c := range projectedColumns {
+		if c.Nullable {
+			nullableCols = append(nullableCols, i)
+			selectNames = append(selectNames, "isNull("+quoteIdent(c.Name)+")")
+		}
+	}
 	selectList := strings.Join(selectNames, ", ")
 	whereSQL := adapters.WhereClause(req.Filter)
 	orderBySQL, err := computeOrderBySql(req.Sort, target)
@@ -205,7 +214,16 @@ func readPage(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx
 			hasMore = true
 			return
 		}
-		_ = builder.AppendRow(values)
+		cells := values[:len(projectedColumns)]
+		for k, i := range nullableCols {
+			if flag := values[len(projectedColumns)+k]; flag != nil && *flag == "1" {
+				cells[i] = nil
+			} else if cells[i] == nil {
+				literal := nullSentinel
+				cells[i] = &literal
+			}
+		}
+		_ = builder.AppendRow(cells)
 		rowCount++
 	})
 	if err != nil {

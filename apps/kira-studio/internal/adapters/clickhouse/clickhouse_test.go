@@ -551,6 +551,94 @@ func TestClickHouse(t *testing.T) {
 		}
 	})
 
+	// P168 Part 3 F11: the *Strings formats render NULL as a sentinel a real string can equal.
+	t.Run("NULL sentinel text: a real string is a value, a real NULL is NULL", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		ctx := context.Background()
+		dbPath := nodePath(cfg.ID, seg("database", "kira_test"))
+		if _, err := a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{
+			"DROP TABLE IF EXISTS p168_sentinel",
+			"CREATE TABLE p168_sentinel (id UInt8, n Nullable(String), s String) ENGINE = Memory",
+			"INSERT INTO p168_sentinel VALUES (1, NULL, 'ᴺᵁᴸᴸ'), (2, 'ᴺᵁᴸᴸ', 'x')",
+		}}, adapters.NewOpCtx("op-sentinel-setup")); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE p168_sentinel"}}, adapters.NewOpCtx("op-sentinel-cleanup")) //nolint:errcheck
+
+		p, err := a.Read(ctx, adapters.ReadRequest{
+			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "p168_sentinel")),
+			Sort:     &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "id", Direction: "asc"}}},
+			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-sentinel-read"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		tp := p.(page.TabularPage)
+		if n := cellAt(t, tp, 1, 0); n != nil {
+			t.Errorf("row 1 n = %v, want a real NULL", derefStr(n))
+		}
+		if s := cellAt(t, tp, 2, 0); s == nil || *s != "ᴺᵁᴸᴸ" {
+			t.Errorf("row 1 s = %v, want the literal sentinel text", derefStr(s))
+		}
+		if n := cellAt(t, tp, 1, 1); n == nil || *n != "ᴺᵁᴸᴸ" {
+			t.Errorf("row 2 n = %v, want the literal sentinel text, not NULL", derefStr(n))
+		}
+		if len(tp.Columns) != 3 {
+			t.Errorf("columns = %d, want 3 (the isNull flag is not a visible column)", len(tp.Columns))
+		}
+
+		pages, err := a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"SELECT s FROM p168_sentinel ORDER BY id"}}, adapters.NewOpCtx("op-sentinel-console"))
+		if err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		if s := cellAt(t, pages[0].(page.TabularPage), 0, 0); s == nil || *s != "ᴺᵁᴸᴸ" {
+			t.Errorf("console s row 1 = %v, want the literal sentinel text from a non-Nullable column", derefStr(s))
+		}
+	})
+
+	// P168 Part 3 F12: a leading # comment, a parenthesised SELECT and a FROM-first query all
+	// return rows, like the --/block-comment forms.
+	t.Run("execute: # comment, parenthesised and FROM-first queries return rows", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		pages, err := a.Execute(context.Background(), model.ConsoleRequest{
+			Path:       nodePath(cfg.ID, seg("database", "kira_test")),
+			Statements: []string{"# note\nSELECT 42", "(SELECT 43)", "FROM system.one SELECT 44"},
+		}, adapters.NewOpCtx("op-rowreturning"))
+		if err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		for i, want := range []string{"42", "43", "44"} {
+			tp := pages[i].(page.TabularPage)
+			if got := cellAt(t, tp, 0, 0); tp.RowCount != 1 || got == nil || *got != want {
+				t.Errorf("statement %d = %d rows, first cell %v, want 1 row of %q", i, tp.RowCount, derefStr(got), want)
+			}
+		}
+	})
+
+	// P168 Part 3 F13: a tab or newline in an identifier travels in a catalog query parameter.
+	t.Run("quoting: a table name containing a tab and a newline", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		ctx := context.Background()
+		dbPath := nodePath(cfg.ID, seg("database", "kira_test"))
+		const table = "p168_tab\tnew\nline"
+		if _, err := a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{
+			"DROP TABLE IF EXISTS `p168_tab\\tnew\\nline`",
+			"CREATE TABLE `p168_tab\\tnew\\nline` (x UInt8) ENGINE = Memory",
+			"INSERT INTO `p168_tab\\tnew\\nline` VALUES (7)",
+		}}, adapters.NewOpCtx("op-tabname-setup")); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE `p168_tab\\tnew\\nline`"}}, adapters.NewOpCtx("op-tabname-cleanup")) //nolint:errcheck
+		path := nodePath(cfg.ID, seg("database", "kira_test"), seg("table", table))
+		if _, err := a.Describe(ctx, path, adapters.NewOpCtx("op-tabname-describe")); err != nil {
+			t.Fatalf("Describe: %v", err)
+		}
+		count, err := a.Count(ctx, adapters.CountRequest{Path: path}, adapters.NewOpCtx("op-tabname-count"))
+		if err != nil || count.Value != 1 {
+			t.Fatalf("Count = %+v, %v, want 1", count, err)
+		}
+	})
+
 	t.Run("execute: a failing statement rejects the whole call", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		_, err := a.Execute(context.Background(), model.ConsoleRequest{

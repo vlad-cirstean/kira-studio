@@ -89,8 +89,8 @@ func stripClickHouseExplainKindAndSettings(rest string) string {
 // appending FORMAT to a non-SELECT statement would be wrong for an INSERT, whose own FORMAT names
 // the *input* data's format.
 var (
-	leadingCommentRE = regexp.MustCompile(`(?s)^\s*(?:--[^\n]*\n|/\*.*?\*/\s*)*`)
-	rowReturningRE   = regexp.MustCompile(`(?i)^\s*(SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN|EXISTS)\b`)
+	leadingCommentRE = regexp.MustCompile(`(?s)^\s*(?:(?:--|#)[^\n]*\n|/\*.*?\*/\s*)*`)
+	rowReturningRE   = regexp.MustCompile(`(?i)^\s*(?:\(|(?:SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN|EXISTS|FROM)\b)`)
 )
 
 func isRowReturning(sql string) bool {

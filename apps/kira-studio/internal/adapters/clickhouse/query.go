@@ -27,13 +27,25 @@ type TrackQuery func(RunningQuery) (release func())
 // nullSentinel is the *Strings JSON formats' own literal for a Nullable NULL (D16) — chosen by
 // ClickHouse itself specifically so it can't collide with an empty string. Verified empirically
 // against clickhouse-server:26.3 in M6.0's own CH-1 probe: a Nullable(String) NULL and an empty string come
-// back as "ᴺᵁᴸᴸ" and "" respectively, never JSON null.
+// back as "ᴺᵁᴸᴸ" and "" respectively, never JSON null. It can still collide with a real string of
+// the same text: decodeRow reads it as NULL only in a Nullable column, and the table read path
+// resolves a Nullable column exactly with an isNull flag (read.go).
 const nullSentinel = "ᴺᵁᴸᴸ"
 
-func decodeRow(values []string) []*string {
+// nullableColumns reports, per header type, whether a column can hold NULL.
+func nullableColumns(types []string) []bool {
+	out := make([]bool, len(types))
+	for i, t := range types {
+		_, out[i] = unwrapType(t)
+	}
+	return out
+}
+
+// decodeRow maps the sentinel to NULL for a Nullable column (or one past the header's types).
+func decodeRow(values []string, nullable []bool) []*string {
 	out := make([]*string, len(values))
 	for i, v := range values {
-		if v == nullSentinel {
+		if v == nullSentinel && (i >= len(nullable) || nullable[i]) {
 			continue
 		}
 		vv := v
@@ -74,9 +86,15 @@ func buildURL(h *Handle, queryID string, extraParams map[string]string, readOnly
 // "a<backspace>c", since \b is a real recognized escape) or, dangling at the end of the value,
 // fails outright with CANNOT_PARSE_ESCAPE_SEQUENCE — both observed against a real table named
 // with a trailing backslash (P2 R1).
+//
+// A raw tab, newline or carriage return stops the same parser early ("only 1 of 3 bytes was
+// parsed"), so those are escaped too — a database or table name containing one otherwise fails
+// every catalog lookup.
 func escapeParamValue(v string) string {
-	return strings.ReplaceAll(v, `\`, `\\`)
+	return paramEscaper.Replace(v)
 }
+
+var paramEscaper = strings.NewReplacer(`\`, `\\`, "\t", `\t`, "\n", `\n`, "\r", `\r`)
 
 func doRequest(ctx context.Context, h *Handle, sql, queryID string, extraParams map[string]string, readOnly bool) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, buildURL(h, queryID, extraParams, readOnly), strings.NewReader(sql))
@@ -120,6 +138,7 @@ func streamRows(resp *http.Response, onHeader func(names, types []string), onRow
 	scanner.Buffer(make([]byte, maxCellBytes), scanBufferBytes)
 	lineIndex := 0
 	var names []string
+	var nullable []bool
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
@@ -135,9 +154,10 @@ func streamRows(resp *http.Response, onHeader func(names, types []string), onRow
 		case 0:
 			names = values
 		case 1:
+			nullable = nullableColumns(values)
 			onHeader(names, values)
 		default:
-			onRow(decodeRow(values))
+			onRow(decodeRow(values, nullable))
 		}
 		lineIndex++
 	}
@@ -179,10 +199,12 @@ func RunCommand(ctx context.Context, h *Handle, queryID string, sql string, op *
 			return 0, err
 		}
 		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			body, _ := io.ReadAll(resp.Body)
 			return 0, mapHTTPError(resp.Header.Get("X-ClickHouse-Exception-Code"), string(body))
 		}
+		// A command's own result body is never shown; drain it unbuffered (a misrouted SELECT can be huge).
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return writtenRowsFromSummary(resp.Header.Get("X-ClickHouse-Summary")), nil
 	})
 }

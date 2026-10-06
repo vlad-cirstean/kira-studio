@@ -4553,3 +4553,5 @@ Performance:
   1.86-3.76:1 (`ade/v2/tones.ts`, `palette.ts`). All `ade` chrome resolves through `--kira-*`, so a light `:root` flips it with no
   `ade` edit. Closing this needs light tone variants plus a light `:root` in `packages/theme`,
   which changes kept values.
+
+- **ClickHouse console: a `Nullable` string equal to `ᴺᵁᴸᴸ` renders as NULL (P168 Part 3).** The `*Strings` JSON format prints NULL as that text. The table read path settles it exactly with an `isNull(col)` flag; arbitrary console SQL has no safe place for one. Non-Nullable columns are exact. Delete if the console moves to a typed format.
