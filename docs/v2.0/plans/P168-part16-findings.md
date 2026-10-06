@@ -13,7 +13,7 @@ Checks at HEAD: `go vet ./apps/kira-space/internal/gitsession/...` clean;
 - Block 2 walk and reads: done
 - Block 3 ops and undo: done
 - Block 4 stack and worktree: done
-- Block 5 remote and auto-fetch: pending
+- Block 5 remote and auto-fetch: done
 - Block 6 review: pending
 - Block 7 GitHub and ADE facts: pending
 - Block 8 tests and §7: pending
@@ -180,7 +180,8 @@ with one `runWriteArgvList(ctx, record.Replay)`.
 
 ### F9 (low): post-write read-back error hides a completed write and loses its undo
 
-`GS/ops.go:1228-1249` (`RunOp`), `GS/ops.go:1323-1330` (`UndoRun`). Owner: Stream B (`GS`).
+`GS/ops.go:1228-1249` (`RunOp`), `GS/ops.go:1323-1330` (`UndoRun`), `GS/remote.go:399-406`
+(`RunRemote`: a completed push or pull answers a Go error the same way). Owner: Stream B (`GS`).
 
 Candidate 10. After a successful write, `statusAndInProgress` or `Head` failing returns
 `OpResult{}, err`. `e.undo.Set(record)` runs after both reads, so the undo record captured before the
@@ -232,6 +233,34 @@ verifies them before replaying and answers `{ok:false}` with a "changed since" m
 like the recreated-ref case. For the restack `update-ref` lines use the three-argument form with the
 post-restack tip as the expected old value.
 
+### F12 (low, design-decision): auto-fetch disables itself for the entry's life on any failure
+
+`GS/autofetch.go:414-428` (`autoFetchTick`).
+
+Every non-OK result except `OperationInProgress`, and every Go error, calls `disableAutoFetch`,
+which only teardown resets. The doc names AuthFailed as the case; `NetworkFailed` (laptop asleep,
+offline, VPN down), `RemoteNotFound` after a remote rename, and a Go error from the post-fetch
+read-back (F9) disable it the same way. ADE's board Conn never releases its holds
+(`ade/board.go:283`), so for any repository ADE touched the entry lives as long as the app: one
+offline tick turns auto-fetch off until restart, silently (no UI marker, per the code's own comment).
+Which kinds count as transient (reschedule, maybe with backoff) versus permanent is a product call
+on D23. Not proposed as a fix.
+
+### F13 (low): auto-fetch tick racing teardown runs an uncancellable fetch on a dead entry
+
+`GS/autofetch.go:390-416`, `GS/entry.go:434-437`, `GS/remote.go:293-299`. Owner: Stream B (`GS`).
+
+`autoFetchTick` reads `disabled` once, then calls `pickAutoFetchRemote` and `RunRemote`. `teardown`
+can run in between: `stopAutoFetch` cannot stop a timer that already fired, and `remoteOp.forceCancel`
+finds nothing claimed yet. The tick then claims the slot on the torn-down entry and runs `git fetch
+--prune` with `context.WithoutCancel(Background)` that nothing will ever cancel, then the read-back
+spawns. Reached at linger expiry and at `Registry.Close` during quit. One stray network fetch per
+race; no state corruption.
+
+Fix: after `remoteOp.claim` succeeds in `RunRemote`, check `e.tornDown` under `e.mu` and release and
+return `ErrRepoTornDown` when set (covers every caller); in `autoFetchTick` re-read `disabled` right
+before `RunRemote`.
+
 ## §9 candidates
 
 1. Dropped. `Registry.acquire` after `Close` does build an untracked entry, but only reachable at
@@ -250,6 +279,7 @@ post-restack tip as the expected old value.
 8. Reported as F7 (real git probe).
 9. Reported as F5.
 10. Reported as F9.
+11. Reported as F12 (permanent disable, design-decision) and F13 (teardown race).
 12. Dropped. Every write to `autoFetch.timer` outside a tick (`startAutoFetch`) refuses while a timer
    is set, and a running tick's fired timer stays in the field until the tick itself reschedules,
    pauses or disables. No path arms a second timer. A setting flip 0 to positive racing a tick's
