@@ -31,6 +31,12 @@ const treeStore = useTreeStore();
 const draft = ref<TreeVisibility>(EMPTY_VISIBILITY);
 const expandedPaths = ref<Set<string>>(new Set());
 const nameFilter = ref('');
+// Saving replaces the whole persisted set, so the draft must seed from the loaded set, never from
+// an empty default: Filters... is offered on connections that were never expanded.
+const loading = ref(false);
+const loadError = ref<string | null>(null);
+const saveError = ref<string | null>(null);
+const saving = ref(false);
 
 // D20: every ancestor segment of `path`, outermost first — mirrors state/tree.ts's own
 // revealPath() accumulation, since a dialog row and a tree row share the same path encoding.
@@ -51,8 +57,23 @@ watch(
     const focusPath = filtersDialogStore.focusPath;
     expandedPaths.value = focusPath ? ancestorsOf(focusPath) : new Set();
     nameFilter.value = '';
+    loadError.value = null;
+    saveError.value = null;
+    loading.value = false;
     if (!connectionId) return;
-    const existing = treeStore.visibility[connectionId] ?? EMPTY_VISIBILITY;
+    loading.value = true;
+    try {
+      await treeStore.loadVisibility(connectionId);
+    } catch (err) {
+      loadError.value = err instanceof Error ? err.message : String(err);
+    }
+    if (filtersDialogStore.connectionId !== connectionId) return;
+    loading.value = false;
+    const existing = treeStore.visibility[connectionId];
+    if (!existing) {
+      loadError.value ??= 'Saved filters could not be loaded.';
+      return;
+    }
     draft.value = {
       hiddenKinds: [...existing.hiddenKinds],
       hiddenPaths: [...existing.hiddenPaths],
@@ -128,9 +149,17 @@ function noneKinds(): void {
 
 async function onSave(): Promise<void> {
   const connectionId = filtersDialogStore.connectionId;
-  if (!connectionId) return;
-  await treeStore.saveVisibility(connectionId, draft.value);
-  filtersDialogStore.closeFiltersDialog();
+  if (!connectionId || saving.value) return;
+  saving.value = true;
+  saveError.value = null;
+  try {
+    await treeStore.saveVisibility(connectionId, draft.value);
+    filtersDialogStore.closeFiltersDialog();
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    saving.value = false;
+  }
 }
 
 // Title identity (FiltersDialog.html: "Tree filters — prod-analytics") — reads the name off
@@ -281,11 +310,21 @@ const connectionName = computed(
     </div>
       </div>
 
+      <Alert v-if="loadError || saveError" variant="destructive" class="self-stretch" data-testid="filters-error">
+        <AlertDescription>{{ loadError ?? saveError }}</AlertDescription>
+      </Alert>
+
       <DialogFooter>
         <span class="help text-kira-sm leading-normal text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
-          <Button variant="dialog-primary" size="kira-lg" @click="onSave">Save filters</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="filters-save"
+            :disabled="loading || !!loadError || saving"
+            @click="onSave"
+          >Save filters</Button>
         </span>
       </DialogFooter>
     </DialogContent>

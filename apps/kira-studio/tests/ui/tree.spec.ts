@@ -768,3 +768,31 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   expect(await page.locator(`[data-path="${APP_PATH}"]`).count()).toBeGreaterThan(0);
   expect(opsCount(control.log())).toBe(opsBeforeFilter);
 });
+
+test('filters dialog — a never-expanded connection seeds the draft from the saved set, so Save does not wipe it', async ({
+  relaunch,
+}) => {
+  const SAVED = { hiddenKinds: ['sequence'], hiddenPaths: [ANALYTICS_PATH] };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [CONNECTION_SUMMARY] },
+      { channel: IPC.filtersList, args: { connectionId: CONNECTION_ID }, response: SAVED },
+      {
+        channel: IPC.filtersReplace,
+        args: { connectionId: CONNECTION_ID, visibility: SAVED },
+        response: SAVED,
+      },
+    ],
+  });
+
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-filters"]');
+  await expect(page.locator('[data-testid="filters-error"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="filters-save"]')).toBeEnabled();
+  await page.click('[data-testid="filters-save"]');
+  await expect(page.locator('[data-slot="dialog-content"]')).toHaveCount(0);
+
+  const replaces = control.log().filter((e) => e.channel === IPC.filtersReplace);
+  expect(replaces).toHaveLength(1);
+  expect(replaces[0].args).toEqual({ connectionId: CONNECTION_ID, visibility: SAVED });
+});

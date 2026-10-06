@@ -192,23 +192,30 @@ export const useTreeStore = defineStore('tree', () => {
   // guarded — saveVisibility bumps `visibilityGeneration` on every explicit save, so a filtersList
   // read already in flight when the user saves new visibility settings discards its now-stale
   // result on resolve instead of overwriting the save.
-  const pendingVisibilityLoads = new Set<string>();
+  const pendingVisibilityLoads = new Map<string, Promise<void>>();
   const visibilityGeneration = new Map<string, number>();
   function visibilityGenerationFor(connectionId: string): number {
     return visibilityGeneration.get(connectionId) ?? 0;
   }
 
-  async function loadVisibility(connectionId: string): Promise<void> {
-    if (treeState.visibility[connectionId] || pendingVisibilityLoads.has(connectionId)) return;
-    pendingVisibilityLoads.add(connectionId);
+  // Concurrent callers share one flight and all await its result (the Filters dialog seeds its
+  // draft from it).
+  function loadVisibility(connectionId: string): Promise<void> {
+    if (treeState.visibility[connectionId]) return Promise.resolve();
+    const pending = pendingVisibilityLoads.get(connectionId);
+    if (pending) return pending;
     const generation = visibilityGenerationFor(connectionId);
-    try {
-      const result = await control.filtersList(connectionId);
-      if (visibilityGenerationFor(connectionId) !== generation) return;
-      treeState.visibility[connectionId] = result;
-    } finally {
-      pendingVisibilityLoads.delete(connectionId);
-    }
+    const flight = (async () => {
+      try {
+        const result = await control.filtersList(connectionId);
+        if (visibilityGenerationFor(connectionId) !== generation) return;
+        treeState.visibility[connectionId] = result;
+      } finally {
+        pendingVisibilityLoads.delete(connectionId);
+      }
+    })();
+    pendingVisibilityLoads.set(connectionId, flight);
+    return flight;
   }
 
   async function saveVisibility(connectionId: string, visibility: TreeVisibility): Promise<void> {
@@ -686,6 +693,7 @@ export const useTreeStore = defineStore('tree', () => {
     ...toRefs(treeState),
     selectRow,
     loadSavedQueries,
+    loadVisibility,
     saveVisibility,
     expand,
     collapse,
