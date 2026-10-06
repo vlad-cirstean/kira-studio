@@ -32,9 +32,9 @@ func StashListArgs() []string {
 // comment states the mechanism directly: %gs cannot name a PARENT commit's subject, only the stash
 // commit's own.
 func StashBaseSubjectArgs(shas []string) []string {
-	args := make([]string, 0, 4+len(shas))
+	args := make([]string, 0, 5+len(shas))
 	args = append(args, "log", "--no-walk", "--format=%H%x1f%s", "-z")
-	return append(args, shas...)
+	return append(append(args, shas...), "--")
 }
 
 // StashShowArgs is stash.show's own spawn pair — a thin wrapper over NumstatArgs/NameStatusArgs

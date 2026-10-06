@@ -10,7 +10,7 @@ import (
 // ShowMetadataArgs is commit.detail's first spawn (D8): the log walk's own format, so its parser
 // (ParseLogRecord) is exactly the one that already exists — F6, resolved.
 func ShowMetadataArgs(sha string) []string {
-	return []string{"show", "-s", "--decorate=full", "-z", "--format=" + LogFormat, sha}
+	return []string{"show", "-s", "--decorate=full", "-z", "--format=" + LogFormat, sha, "--"}
 }
 
 // bodyAndSignatureFieldCount is bodyAndSignatureFormat's own field count.
@@ -24,7 +24,7 @@ const bodyAndSignatureFormat = "%G?%x00%GS%x00%(trailers:only=true,unfold=true)%
 // ShowBodyAndSignatureArgs is commit.detail's second spawn: the minimal `show` that reads
 // signature status/signer, git's own parsed trailer block, and the raw body.
 func ShowBodyAndSignatureArgs(sha string) []string {
-	return []string{"show", "-s", "-z", "--format=" + bodyAndSignatureFormat, sha}
+	return []string{"show", "-s", "-z", "--format=" + bodyAndSignatureFormat, sha, "--"}
 }
 
 // SignatureStatus mirrors @kira/git-ipc's own SignatureStatus — `%G?`'s raw one-letter code.

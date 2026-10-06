@@ -43,5 +43,5 @@ func SwitchCreateTrackingArgs(branch, upstream string, discard bool) []string {
 // RewrittenPathsArgs is T: the paths target's checkout would rewrite relative to HEAD — a read,
 // never a write.
 func RewrittenPathsArgs(target string) []string {
-	return []string{"diff", "--name-only", "-z", "HEAD", target}
+	return []string{"diff", "--name-only", "-z", "HEAD", target, "--"}
 }

@@ -49,13 +49,13 @@ func (r *CodeReposRepo) Get(id string) (*model.CodeRepo, error) {
 	return rec, nil
 }
 
+// ErrCodeRepoExists reports a Create that hit the unique repo_id index (a concurrent import).
+var ErrCodeRepoExists = errors.New("repos: code repo already exists")
+
 // Create inserts a new row, sort_order set to one past the current max — repo_id's UNIQUE index is
 // what actually refuses importing the same checkout twice; the caller
 // (CodeWorkspaceService.ImportRepo) checks first only to return a friendlier error than a raw
 // constraint violation.
-// ErrCodeRepoExists reports a Create that hit the unique repo_id index (a concurrent import).
-var ErrCodeRepoExists = errors.New("repos: code repo already exists")
-
 func (r *CodeReposRepo) Create(rec model.CodeRepo) (model.CodeRepo, error) {
 	if err := rec.Validate(); err != nil {
 		return model.CodeRepo{}, fmt.Errorf("repos: %w", err)

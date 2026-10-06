@@ -33,7 +33,7 @@ func ThreeDotDiffArgs(base, tip string) []string {
 // LogPatchArgs is `log --no-merges -p -n <n> <ref>`, the input `patch-id` reads one patch per commit
 // from.
 func LogPatchArgs(ref string, n int) []string {
-	return []string{"log", "--no-merges", "-p", "--no-color", "--no-ext-diff", "--no-textconv", "-n", strconv.Itoa(n), ref}
+	return []string{"log", "--no-merges", "-p", "--no-color", "--no-ext-diff", "--no-textconv", "-n", strconv.Itoa(n), ref, "--"}
 }
 
 // PatchIDArgs is `patch-id --stable`: stable ids do not change with file order in the patch.
