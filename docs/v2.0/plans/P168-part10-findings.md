@@ -342,6 +342,57 @@ Probes: `bun test` harnesses in session scratchpad (Pinia store, stubbed `contro
   model as text. Status message, header and trailer values render via interpolation.
 - All 5 components single `<script setup lang="ts">`, no `<style>`.
 
+## Findings (block 5, tests and cross-cutting)
+
+### F24 low, design decision: three server-state caches still hand-rolled outside TanStack Query
+
+- `SF/views/httprequest/cookies.ts` (per-tab list, `loading`, `fetchSeq`), `SF/api/state/history.ts`
+  (`createHistoryStore`: `entries`/`loading`/`error`, `latestSeq`/`staleSeq` retry), and the gRPC
+  schema runtime (`SF/views/grpcrequest/state.ts:120-260`, `genId`). CLAUDE.md routes server state
+  fetched over the bridge, with loading/error/cache handling, through TanStack Query. F2, F3 and
+  F18 are races of exactly the kind keyed queries remove (cookies keyed by URL, history by scope,
+  schema by source).
+- Too large for the point fixer: needs a decision and its own `SPEC.md` phase (key design,
+  invalidation from send/call completion, the P8 D11 lazy-when-hidden rule as `enabled`).
+  F2/F3/F18 stay point fixes in the meantime.
+
+### Tests (no findings)
+
+- 13 unit specs: all import and drive current P112-era code (`apiQueries`, store mutations,
+  `createHistoryStore`, `useGrpcRequestViewStore`, `useCookiesStore`, `mergeDrafts`). They guard
+  races, supersession, expiry, eviction and draft merge, which meets the CLAUDE.md bar. A few cases
+  read close to restated bodies (`api-collections-search-debounce` test 2,
+  `history-runtime-reactivity` tests 4 and 6); CLAUDE.md's test rule applies going forward, not as
+  retroactive cleanup, so not reported.
+- Guard gaps tied to findings: F1 (reveal loop cancellation), F7 (secret draft reseed, extend
+  `api-draft-merge`), F15/F21 (pre-flight failure and close, extend `http-send-tab-close-leak`,
+  `grpc-stream-terminal-race`). The fixer adds these with the fixes.
+- 16 UI specs run (`build:test:studio`, Playwright `--project=ui`): 133 passed, 0 failed (2.1 min).
+  `api-cross-window-sync` covers environments, variables and tree broadcasts, not a cross-window
+  rename (F17). `http-timeline` "a failed send carries the timeline" covers only a tab with no
+  earlier response (F20 is the other case). `credential-reveal` and `secrets` exercise the
+  connection dialog only; their API half is nil (secret reveal for variables is covered by
+  `api-secret-reveal-isolation` and `http-variables`).
+- 2 perf specs (`perf/http-response*.spec.ts`, opt-in `perf:http:studio`) select
+  `.response-body .monaco-host`, both present in current `ResponsePane.vue`/`MonacoHost.vue`, so they
+  still measure the P163 path. Not run (opt-in, no claim depends on them).
+- 1 visual spec (`visual/http-request-view.spec.ts`): read, not run (no visual claim made).
+
+## Summary
+
+24 findings: 0 high, 8 medium, 16 low.
+
+- Medium: F1, F7, F8, F9, F15, F16, F17, F21. Verified by probe: F1, F7, F15, F16.
+- Routed (`needs-other-part-file`): F6 (`SI/bridge/collections.go`, Part 6).
+- Needs design decision: F24 (own `SPEC.md` phase).
+
+### Ranking
+
+1. F15 medium (verified) 2. F16 medium (verified) 3. F7 medium (verified) 4. F1 medium (verified)
+5. F8 medium 6. F21 medium 7. F17 medium 8. F9 medium 9. F6 low (routed) 10. F18 low 11. F10 low
+12. F11 low 13. F3 low 14. F2 low 15. F20 low 16. F19 low 17. F22 low 18. F13 low 19. F12 low
+20. F14 low 21. F4 low 22. F5 low 23. F23 low 24. F24 low (design).
+
 ## Coverage
 
 - Block 1 reviewed in full: `apiQueries.ts`, `collections.ts`, `variables.ts`, `draftMerge.ts`,
@@ -360,4 +411,8 @@ Probes: `bun test` harnesses in session scratchpad (Pinia store, stubbed `contro
 - Block 4 reviewed in full: `state.ts`, `history.ts`, `GrpcRequestView.vue`, `ResponsePane.vue`,
   `SchemaBrowser.vue`, `CallHistoryList.vue`, `GrpcMetadataTable.vue` (thin `FieldRowsTable`
   wrapper). Contract read: `SI/bridge/grpc.go` recording paths, `SI/grpcclient/errors.go`.
-- Block 5: pending.
+- Block 5 reviewed: 13 unit specs (all read, all run), 16 UI specs (test lists read, all run),
+  2 perf specs (read), 1 visual spec (read).
+- No unexplained gaps. Skimmed only: the five HTTP row-table wrappers and `GrpcMetadataTable.vue`
+  (thin `FieldRowsTable` callers, Part 11 owns the logic). Out of scope per plan §9: Part 7/9/11/
+  12/13 internals beyond the contracts named per block.
