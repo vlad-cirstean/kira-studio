@@ -420,13 +420,6 @@ type LogEvent struct {
 	Chunks []LogChunk `json:"chunks"`
 }
 
-type CredentialRequest struct {
-	RequestID  string `json:"requestId"`
-	CodeRepoID string `json:"codeRepoId"`
-	Prompt     string `json:"prompt"`
-	Masked     bool   `json:"masked"`
-}
-
 type OpenSessionEvent struct {
 	TaskID    string `json:"taskId"`
 	BranchID  string `json:"branchId"`
@@ -485,11 +478,6 @@ type RefreshArgs struct {
 
 type BranchArgs struct {
 	BranchID string `json:"branchId"`
-}
-
-type ProvideCredentialArgs struct {
-	RequestID string  `json:"requestId"`
-	Secret    *string `json:"secret"`
 }
 
 type AddBacklogItemArgs struct {

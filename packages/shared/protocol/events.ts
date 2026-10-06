@@ -72,7 +72,6 @@ export const CHANNEL = {
   // Payload types live in apps/kira-space/frontend/src/ade/v2/wire.ts.
   adeTaskBoard: 'kira:adetask:board',
   adeTaskBacklog: 'kira:adetask:backlog',
-  adeTaskCredential: 'kira:adetask:credential',
   adeTaskWorkflows: 'kira:adetask:workflows',
   adeTaskRepos: 'kira:adetask:repos',
   adeTaskRuns: 'kira:adetask:runs',

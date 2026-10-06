@@ -99,7 +99,6 @@ export const IPC = {
   adeTaskPrs: 'kira:adetask:prs',
   adeTaskRefresh: 'kira:adetask:refresh',
   adeTaskForcePush: 'kira:adetask:forcePush',
-  adeTaskProvideCredential: 'kira:adetask:provideCredential',
   adeTaskCreateTask: 'kira:adetask:createTask',
   adeTaskCandidateBranches: 'kira:adetask:candidateBranches',
   adeTaskAddExistingBranch: 'kira:adetask:addExistingBranch',
@@ -154,7 +153,6 @@ export const IPC = {
   adeTaskWorkflowsChanged: 'kira:adetask:workflows',
   adeTaskRunsChanged: 'kira:adetask:runs',
   adeTaskLogChanged: 'kira:adetask:log',
-  adeTaskCredential: 'kira:adetask:credential',
   adeTaskSessionsChanged: 'kira:adetask:sessions',
   adeTaskOpenSession: 'kira:adetask:open-session',
 } as const;

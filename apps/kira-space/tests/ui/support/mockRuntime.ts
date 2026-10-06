@@ -94,7 +94,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskPrs: 'AdeTaskService.Prs',
   adeTaskRefresh: 'AdeTaskService.Refresh',
   adeTaskForcePush: 'AdeTaskService.ForcePush',
-  adeTaskProvideCredential: 'AdeTaskService.ProvideCredential',
   adeTaskCreateTask: 'AdeTaskService.CreateTask',
   adeTaskCandidateBranches: 'AdeTaskService.CandidateBranches',
   adeTaskAddExistingBranch: 'AdeTaskService.AddExistingBranch',

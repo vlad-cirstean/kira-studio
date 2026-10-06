@@ -2,7 +2,6 @@ import type { QueryClient } from '@tanstack/vue-query';
 import { watch } from 'vue';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
-import { useGitCredentialStore } from '../state/gitCredential';
 import type { useAgentSessionsStore } from './state/agentSessions';
 import { adeTurns } from './v2/dialog/turnWatch';
 import {
@@ -90,19 +89,5 @@ export function installAdeSignals(
     queryClient.setQueryData<LogPage>(logKey(event.kind, event.id), (page) =>
       page ? appendChunks(page, event.chunks) : page,
     );
-  });
-  control.onAdeTaskCredential((request) => {
-    useGitCredentialStore().enqueueCredentialRequest({
-      codeRepoId: request.codeRepoId,
-      prompt: request.prompt,
-      masked: request.masked,
-      answer: (secret: string | null) => {
-        void control
-          .adeTaskProvideCredential({ requestId: request.requestId, secret })
-          .catch(() => {
-            /* the broker's own bound already ended the wait. */
-          });
-      },
-    });
   });
 }

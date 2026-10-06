@@ -437,12 +437,6 @@ export interface LogEvent {
   id: string;
   chunks: LogChunk[];
 }
-export interface CredentialRequest {
-  requestId: string;
-  codeRepoId: string;
-  prompt: string;
-  masked: boolean;
-}
 export interface OpenSessionEvent {
   taskId: string;
   branchId: string;
@@ -493,10 +487,6 @@ export interface RefreshArgs {
 }
 export interface BranchArgs {
   branchId: string;
-}
-export interface ProvideCredentialArgs {
-  requestId: string;
-  secret: string | null /* null = cancel */;
 }
 export interface AddBacklogItemArgs {
   text: string;

@@ -2,6 +2,7 @@ package ade
 
 import (
 	"context"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -55,7 +56,8 @@ func newIntegFixture(t *testing.T) *integFixture {
 	h := &boardHarness{t: t, repos: r}
 	h.status.Store(gitclient.GitStatus{Kind: "ok", Path: "git"})
 	h.board = NewTaskBoard(TaskBoardDeps{
-		Tasks: r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
+		Credentials: gitcred.New(),
+		Tasks:       r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		Runner: cr, Registry: registry, GitPath: func() string { return "git" },
 		GitStatus: func(context.Context) gitclient.GitStatus { return h.status.Load().(gitclient.GitStatus) },
 		Workflows: &adeflow.Reader{Dir: t.TempDir(), Store: r.AdeTasks},

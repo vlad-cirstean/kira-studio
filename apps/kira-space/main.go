@@ -155,7 +155,7 @@ func main() {
 	// windows holds every open window; created here so Archive can close a task's review windows.
 	windows := shell.NewWindowRegistry()
 	adeTaskBoard := wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry),
-		closeTaskReviewWindows(repositories, windows))
+		closeTaskReviewWindows(repositories, windows), credentialRelay)
 	adeTaskSvc := &bridge.AdeTaskService{Engine: adeTaskBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -464,7 +464,7 @@ func wireReviewWindows(svc *bridge.AdeTaskService, winDeps shell.WindowOpenerDep
 // It recovers rows a restart left running, then starts the board.
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
-	closeReviewWindows func(taskID string),
+	closeReviewWindows func(taskID string), credentials *gitcred.Relay,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -485,7 +485,7 @@ func wireAdeTask(
 		Facts:           repositories.AdeFacts,
 		Runner:          git.runner,
 		SetRepoSettings: git.router.SetRepoSettings,
-		OnCredential:    func(payload any) { bridge.AdeTaskCredentialRequested(events, payload) },
+		Credentials:     credentials,
 		Logs:            repositories.AdeLogs,
 		Sessions:        repositories.AdeSessions,
 		Tracker:         tracker,

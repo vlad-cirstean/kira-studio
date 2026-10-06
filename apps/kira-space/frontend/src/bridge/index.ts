@@ -165,8 +165,6 @@ const spaceControl = {
     unwrap(AdeTaskService.Refresh(args)).then((r) => trust<V2.RefreshResult>(r)),
   adeTaskForcePush: (args: V2.BranchArgs): Promise<V2.ForcePushResult> =>
     unwrap(AdeTaskService.ForcePush(args)).then((r) => trust<V2.ForcePushResult>(r)),
-  adeTaskProvideCredential: (args: V2.ProvideCredentialArgs): Promise<boolean> =>
-    unwrap(AdeTaskService.ProvideCredential(args)).then((r) => trust<boolean>(r)),
   adeTaskCreateTask: (args: V2.CreateTaskArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.CreateTask(args)).then((r) => trust<V2.Task>(r)),
   adeTaskUpdateTask: (args: V2.UpdateTaskArgs): Promise<V2.Task> =>
@@ -272,8 +270,6 @@ const spaceControl = {
     on(CHANNEL.adeTaskRuns, cb),
   onAdeTaskLog: (cb: (event: V2.LogEvent) => void): (() => void) => on(CHANNEL.adeTaskLog, cb),
   onAdeTaskSessions: (cb: () => void): (() => void) => on(CHANNEL.adeTaskSessions, cb),
-  onAdeTaskCredential: (cb: (request: V2.CredentialRequest) => void): (() => void) =>
-    on(CHANNEL.adeTaskCredential, cb),
   onAdeTaskOpenSession: (cb: (event: V2.OpenSessionEvent) => void): (() => void) =>
     on(CHANNEL.adeTaskOpenSession, cb),
 };

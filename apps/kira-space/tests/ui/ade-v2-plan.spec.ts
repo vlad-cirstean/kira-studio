@@ -2,7 +2,6 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeFixture, bandOf, openPlan } from './support/adeV2';
 import { IPC } from './support/ipcChannels';
-import { emitWailsEvent } from './support/mockRuntime';
 
 // The ade v2 Plan on the committed board fixture, anchored to Tue 2026-09-22.
 
@@ -102,25 +101,6 @@ test('Refresh all and a repo chip refresh send their repo ids', async ({ relaunc
     .click();
   await expect.poll(() => calls().length).toBe(2);
   expect(calls()[1]?.args).toEqual({ codeRepoIds: ['repo-api'] });
-});
-
-test('a credential prompt is answered through the v2 broker', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskProvideCredential, response: true },
-  ]);
-  await emitWailsEvent(page, IPC.adeTaskCredential, adeFixture('event-credential'));
-  await expect(page.locator('[data-testid="git-credential-prompt"]')).toContainText(
-    'Password for https://github.com/acme/api.git',
-  );
-  await page.locator('[data-testid="git-credential-input"]').fill('s3cret');
-  await page.locator('[data-testid="git-credential-submit"]').click();
-  await expect
-    .poll(() => control.log().filter((e) => e.channel === IPC.adeTaskProvideCredential))
-    .toHaveLength(1);
-  expect(control.log().find((e) => e.channel === IPC.adeTaskProvideCredential)?.args).toEqual({
-    requestId: 'cred-1',
-    secret: 's3cret',
-  });
 });
 
 test('dragging a card to another day writes the plan once, with no dialog', async ({

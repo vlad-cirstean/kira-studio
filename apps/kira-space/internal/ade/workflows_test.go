@@ -2,6 +2,7 @@ package ade
 
 import (
 	"context"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,7 +46,8 @@ func TestWorkflows_writesAndExternalEdits(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "workflows")
 	var emitted atomic.Int32
 	b := NewTaskBoard(TaskBoardDeps{
-		Tasks: r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
+		Credentials: gitcred.New(),
+		Tasks:       r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		Logs:   r.AdeLogs,
 		Runner: gitclient.NewExecRunner(), Registry: registry, GitPath: func() string { return "git" },
 		GitStatus: func(context.Context) gitclient.GitStatus { return gitclient.GitStatus{Kind: "ok", Path: "git"} },

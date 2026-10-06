@@ -36,7 +36,6 @@ func TestFixturesMatchWireTypes(t *testing.T) {
 		"launch.json":              func() any { return new(Launch) },
 		"event-runs.json":          func() any { return new(RunsChangedEvent) },
 		"event-log.json":           func() any { return new(LogEvent) },
-		"event-credential.json":    func() any { return new(CredentialRequest) },
 		"event-open-session.json":  func() any { return new(OpenSessionEvent) },
 		"review-target.json":       func() any { return new(ReviewWindowTarget) },
 		"review-agent.json":        func() any { return new(ReviewAgentState) },

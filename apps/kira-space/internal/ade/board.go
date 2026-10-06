@@ -18,6 +18,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -79,12 +80,13 @@ type TaskBoardDeps struct {
 	HeadlessSettingSources func() string
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
 	// uses, notification included, so git-ui sees a new prepare script.
-	SetRepoSettings  func(repoID string, patch model.GitRepoSettingsPatch) error
-	OnBoard          func()
-	OnBacklog        func()
-	OnWorkflows      func()
-	OnRepos          func()
-	OnCredential     func(payload any)
+	SetRepoSettings func(repoID string, patch model.GitRepoSettingsPatch) error
+	OnBoard         func()
+	OnBacklog       func()
+	OnWorkflows     func()
+	OnRepos         func()
+	// Credentials receives the remote ops' credential prompts, shown in Kira Space's windows.
+	Credentials      *gitcred.Relay
 	AutofetchMinutes func() int
 	HomeDir          string
 	Now              func() time.Time
@@ -147,6 +149,9 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	}
 	b.agent = adeagent.NewServer(deps.AgentDir, b.recordFinish)
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
+	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
+		return deps.Credentials.Ask(ctx, boardConnLabel, req)
+	})
 	b.checker = newRebaseChecker(ctx, deps.GitStatus, b.scheduleBoard)
 	return b
 }
@@ -212,28 +217,7 @@ func (b *TaskBoard) handleEmit(method string, payload any) {
 		if _, ok := payload.(gitsession.Event); ok {
 			b.scheduleBoard()
 		}
-	case "credential.request":
-		if b.deps.OnCredential != nil {
-			b.deps.OnCredential(b.credentialRequest(payload))
-		}
 	}
-}
-
-// credentialRequest re-keys the Conn's credential payload (git repo id) to the wire's codeRepoId.
-func (b *TaskBoard) credentialRequest(payload any) adewire.CredentialRequest {
-	var in struct {
-		RequestID string `json:"requestId"`
-		RepoID    string `json:"repoId"`
-		Prompt    string `json:"prompt"`
-		Masked    bool   `json:"masked"`
-	}
-	if raw, err := json.Marshal(payload); err == nil {
-		_ = json.Unmarshal(raw, &in)
-	}
-	b.mu.Lock()
-	codeRepoID := b.byGitRepoID[in.RepoID]
-	b.mu.Unlock()
-	return adewire.CredentialRequest{RequestID: in.RequestID, CodeRepoID: codeRepoID, Prompt: in.Prompt, Masked: in.Masked}
 }
 
 // scheduleBoard debounces a board invalidation (a burst of ref moves or check completions).
@@ -810,11 +794,6 @@ func (b *TaskBoard) ForcePush(ctx context.Context, branchID string) (adewire.For
 	out.Error = remoteOpError(res.Error)
 	b.notifyBoard()
 	return out, nil
-}
-
-// ProvideCredential answers a credential prompt raised by a remote op on the board's Conn.
-func (b *TaskBoard) ProvideCredential(requestID string, secret *string) bool {
-	return b.conn.ProvideCredential(requestID, secret)
 }
 
 func lastFetchAt(entry *gitsession.RepoEntry) *int64 {

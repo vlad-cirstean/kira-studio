@@ -66,12 +66,6 @@ func AdeTaskLogAppended(ev *Events, payload adewire.LogEvent) {
 // AdeTaskSessionsChanged is TaskBoard.OnSessions' target: payload-free.
 func AdeTaskSessionsChanged(ev *Events) { ev.Broadcast(adewire.ChannelSessions) }
 
-// AdeTaskCredentialRequested is TaskBoard.OnCredential's target; EmitFocused because a prompt
-// belongs to the window driving the op.
-func AdeTaskCredentialRequested(ev *Events, payload any) {
-	ev.emit.EmitFocused(adewire.ChannelCredential, payload)
-}
-
 // AdeTaskWorkflowsChanged is TaskBoard.OnWorkflows' target: payload-free.
 func AdeTaskWorkflowsChanged(ev *Events) { ev.Broadcast(adewire.ChannelWorkflows) }
 
@@ -248,14 +242,6 @@ func (s *AdeTaskService) ForcePush(ctx context.Context, args adewire.BranchArgs)
 	}
 	r, err := s.Engine.ForcePush(ctx, args.BranchID)
 	return r, adeTaskError(err)
-}
-
-// ProvideCredential answers a pending kira:adetask:credential prompt; true when it was pending.
-func (s *AdeTaskService) ProvideCredential(args adewire.ProvideCredentialArgs) (bool, error) {
-	if err := validateAdeTaskID(args.RequestID, "requestId"); err != nil {
-		return false, err
-	}
-	return s.Engine.ProvideCredential(args.RequestID, args.Secret), nil
 }
 
 func (s *AdeTaskService) CandidateBranches(ctx context.Context) (adewire.CandidateBranchesResult, error) {

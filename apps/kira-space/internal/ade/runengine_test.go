@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -214,7 +215,8 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 		Grace: 20 * time.Millisecond, PendingTTL: time.Minute,
 	})
 	e.board = NewTaskBoard(TaskBoardDeps{
-		Tracker: e.tracker,
+		Credentials: gitcred.New(),
+		Tracker:     e.tracker,
 		CloseTerminal: func(id string) error {
 			e.live.remove(id)
 			e.mu.Lock()
