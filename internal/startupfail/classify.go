@@ -3,6 +3,7 @@ package startupfail
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 // detailCap bounds Message.Detail (D5): the alert body carries a collapsed, single-line, truncated
@@ -48,6 +49,9 @@ func collapse(s string, max int) string {
 	s = strings.ReplaceAll(s, "\r", " ")
 	s = strings.TrimSpace(s)
 	if len(s) > max {
+		for max > 0 && !utf8.RuneStart(s[max]) {
+			max--
+		}
 		s = s[:max]
 	}
 	return s

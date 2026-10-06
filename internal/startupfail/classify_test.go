@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 )
@@ -169,5 +170,13 @@ func TestCollapseDetail(t *testing.T) {
 	}
 	if len(msg.Detail) > 500 {
 		t.Fatalf("Detail exceeds the 500-byte cap: %d bytes", len(msg.Detail))
+	}
+}
+
+// TestCollapseDetailKeepsRuneBoundary: a multi-byte rune straddling byte 500 must not leave invalid UTF-8.
+func TestCollapseDetailKeepsRuneBoundary(t *testing.T) {
+	msg := startupfail.Classify(startupfail.StepRepos, errors.New(strings.Repeat("a", 499)+"é"+"tail"), testInfo())
+	if !utf8.ValidString(msg.Detail) {
+		t.Fatalf("Detail is not valid UTF-8: %q", msg.Detail)
 	}
 }

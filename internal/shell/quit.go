@@ -26,7 +26,7 @@ type Quitter struct {
 	timeout        time.Duration
 	liveWindowKeys func() []string // seeds the pending set at the moment quitting starts
 
-	app     *application.App
+	app     atomic.Pointer[application.App] // written by Attach on main, read from other goroutines
 	started atomic.Bool
 	done    atomic.Bool
 
@@ -58,7 +58,7 @@ func NewQuitter(events Signaller, beforeFlush, teardown func(), flushTimeout tim
 // application.New as a method value before that, which is why the app cannot be a constructor
 // argument.
 func (q *Quitter) Attach(app *application.App) {
-	q.app = app
+	q.app.Store(app)
 }
 
 // ShouldQuit is application.Options.ShouldQuit. It NEVER blocks (P56 D2): the renderer's ack is
@@ -78,7 +78,11 @@ func (q *Quitter) ShouldQuit() bool {
 
 // RequestQuit is the menu Quit item's click handler. App.Quit() routes through
 // applicationShouldTerminate: too, so this is the same path, not a second one.
-func (q *Quitter) RequestQuit() { q.app.Quit() }
+func (q *Quitter) RequestQuit() {
+	if app := q.app.Load(); app != nil {
+		app.Quit()
+	}
+}
 
 // Flushed is one window's ack, bound as Lifecycle.Flushed (IPC.appFlushed) — fire-and-forget and
 // idempotent: an unknown key (never live at flushThenQuit's start, or already removed — a
@@ -138,5 +142,9 @@ func (q *Quitter) flushThenQuit() {
 	}
 	q.teardown()
 	q.done.Store(true)
-	q.app.Quit() // second pass: ShouldQuit now returns true
+	if app := q.app.Load(); app != nil {
+		app.Quit() // second pass: ShouldQuit now returns true
+	} else {
+		slog.Warn("quit before app attached", "scope", "lifecycle")
+	}
 }

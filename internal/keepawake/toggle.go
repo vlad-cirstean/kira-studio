@@ -41,7 +41,7 @@ func (t *Toggle) State() State {
 func (t *Toggle) SetManual(on bool) State {
 	t.mu.Lock()
 	t.manual = on
+	t.Ctl.Set(ReasonManual, on) // under t.mu so concurrent toggles cannot reorder the two writes
 	t.mu.Unlock()
-	t.Ctl.Set(ReasonManual, on)
 	return t.State()
 }
