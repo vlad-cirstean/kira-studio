@@ -9,7 +9,7 @@
  * is never blamed against its own live buffer (shown as its own `'dirty'` state below, resolved
  * again once `onDidSaveTextDocument` fires).
  */
-import { relative } from 'node:path';
+import { isAbsolute, relative } from 'node:path';
 import { nfcPath } from '@kira/git-core';
 import type { EventPayload } from '@kira/git-ipc';
 import * as vscode from 'vscode';
@@ -34,7 +34,7 @@ export interface BlameWidgetController extends vscode.Disposable {
   notifyRepoChanged(payload: EventPayload<'repo.changed'>): void;
   /** Mirrors `reviewMarking.ts`'s own `notifyConnectionState` — called from `extension.ts`'s single
    *  `manager.onStateChange` dispatcher, not a second internal subscription. Drops the memoized
-   *  `repoId` per workspace folder on leaving `connected` (a reconnect may land on a different Kira
+   *  repo per workspace folder on leaving `connected` (a reconnect may land on a different Kira
    *  Studio process, the same reset `lastAppInit` already gets), and re-resolves. */
   notifyConnectionState(state: ConnectionState): void;
 }
@@ -49,8 +49,16 @@ export function createBlameWidgetController(deps: BlameWidgetDeps): BlameWidgetC
   // in the extension host already holds "the repoId for the active editor's workspace folder"
   // (plan §5), so this controller resolves it itself via repo.open, idempotent per (connection,
   // repoId), the same way migrateLegacySettings/openRepository (extension.ts) already do.
-  const repoIdByFolder = new Map<string, string | null>();
-  const repoIdResolving = new Map<string, Promise<string | null>>();
+  // Only definitive answers are stored (`ok`, `notARepository`) — never a rejection. `root` is
+  // what `blame.line`'s path is relative to (the repo root, which can sit above the folder).
+  interface ResolvedRepo {
+    readonly repoId: string;
+    readonly root: string;
+  }
+  const repoByFolder = new Map<string, ResolvedRepo | null>();
+  const repoResolving = new Map<string, Promise<ResolvedRepo | null>>();
+  // Bumped on leaving `connected`; a resolve that started under an older epoch is not stored.
+  let epoch = 0;
 
   let debounce: ReturnType<typeof setTimeout> | undefined;
   let inFlight: AbortController | undefined;
@@ -61,22 +69,26 @@ export function createBlameWidgetController(deps: BlameWidgetDeps): BlameWidgetC
     changeEmitter.fire();
   }
 
-  function resolveRepoId(folder: vscode.WorkspaceFolder): Promise<string | null> {
+  function resolveRepo(folder: vscode.WorkspaceFolder): Promise<ResolvedRepo | null> {
     const key = nfcPath(folder.uri.fsPath);
-    const cached = repoIdByFolder.get(key);
+    const cached = repoByFolder.get(key);
     if (cached !== undefined) return Promise.resolve(cached);
-    let pending = repoIdResolving.get(key);
+    let pending = repoResolving.get(key);
     if (!pending) {
-      pending = connection
+      const startedAt = epoch;
+      const request = connection
         .request('repo.open', { path: key })
-        .then((r) => (r.kind === 'ok' ? r.repo.repoId : null))
+        .then((r) => (r.kind === 'ok' ? { repoId: r.repo.repoId, root: r.repo.root } : null));
+      pending = request
+        .then((repo) => {
+          if (startedAt === epoch) repoByFolder.set(key, repo);
+          return repo;
+        })
         .catch(() => null)
-        .then((repoId) => {
-          repoIdByFolder.set(key, repoId);
-          repoIdResolving.delete(key);
-          return repoId;
+        .finally(() => {
+          if (repoResolving.get(key) === pending) repoResolving.delete(key);
         });
-      repoIdResolving.set(key, pending);
+      repoResolving.set(key, pending);
     }
     return pending;
   }
@@ -132,12 +144,15 @@ export function createBlameWidgetController(deps: BlameWidgetDeps): BlameWidgetC
     line: number,
     lineKey: string,
   ): Promise<void> {
-    const repoId = await resolveRepoId(folder);
-    if (repoId === null) {
+    const repo = await resolveRepo(folder);
+    const rel = repo
+      ? nfcPath(relative(repo.root, nfcPath(editor.document.uri.fsPath)))
+      : undefined;
+    if (!repo || rel === undefined || /^\.\.(?:[\\/]|$)/.test(rel) || isAbsolute(rel)) {
       if (lineKey === lastLineKey) setState({ kind: 'none' });
       return;
     }
-    const rel = relative(folder.uri.fsPath, editor.document.uri.fsPath);
+    const { repoId } = repo;
     const controller = new AbortController();
     inFlight = controller;
     try {
@@ -187,7 +202,11 @@ export function createBlameWidgetController(deps: BlameWidgetDeps): BlameWidgetC
       refresh();
     },
     notifyConnectionState: (state) => {
-      if (state.kind !== 'connected') repoIdByFolder.clear();
+      if (state.kind !== 'connected') {
+        epoch++;
+        repoByFolder.clear();
+        repoResolving.clear();
+      }
       refresh();
     },
     dispose: () => {
