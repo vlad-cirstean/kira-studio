@@ -9,6 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 )
 
@@ -63,11 +64,16 @@ func Import(ctx context.Context, store RepoStore, runner gitclient.Runner, gitPa
 			return model.CodeRepo{}, &importError{ErrAlreadyImported, r.Name + " is already imported"}
 		}
 	}
-	return store.Create(model.CodeRepo{
+	name := filepath.Base(summary.Root)
+	rec, err := store.Create(model.CodeRepo{
 		ID:        uuid.NewString(),
-		Name:      filepath.Base(summary.Root),
+		Name:      name,
 		Root:      summary.Root,
 		RepoID:    summary.RepoID,
 		CreatedAt: kiratime.NowISO(),
 	})
+	if errors.Is(err, repos.ErrCodeRepoExists) {
+		return model.CodeRepo{}, &importError{ErrAlreadyImported, name + " is already imported"}
+	}
+	return rec, err
 }

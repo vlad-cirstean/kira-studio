@@ -2,6 +2,7 @@ package repos
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -52,6 +53,9 @@ func (r *CodeReposRepo) Get(id string) (*model.CodeRepo, error) {
 // what actually refuses importing the same checkout twice; the caller
 // (CodeWorkspaceService.ImportRepo) checks first only to return a friendlier error than a raw
 // constraint violation.
+// ErrCodeRepoExists reports a Create that hit the unique repo_id index (a concurrent import).
+var ErrCodeRepoExists = errors.New("repos: code repo already exists")
+
 func (r *CodeReposRepo) Create(rec model.CodeRepo) (model.CodeRepo, error) {
 	if err := rec.Validate(); err != nil {
 		return model.CodeRepo{}, fmt.Errorf("repos: %w", err)
@@ -65,6 +69,9 @@ func (r *CodeReposRepo) Create(rec model.CodeRepo) (model.CodeRepo, error) {
 		`INSERT INTO code_repos (id, name, root, repo_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Name, rec.Root, rec.RepoID, rec.SortOrder, rec.CreatedAt,
 	); err != nil {
+		if isUniqueViolation(err) {
+			return model.CodeRepo{}, ErrCodeRepoExists
+		}
 		return model.CodeRepo{}, fmt.Errorf("repos: insert code repo: %w", err)
 	}
 	return rec, nil

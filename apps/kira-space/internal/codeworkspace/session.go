@@ -63,17 +63,19 @@ func NewRegistry() *Registry {
 // time the tree panel refreshes.
 func (r *Registry) Open(repoID, root string, runner gitclient.Runner, gitPath string) *Session {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if existing, ok := r.sessions[repoID]; ok {
-		if existing.Root == root && existing.GitPath == gitPath {
-			return existing
-		}
-		existing.Close()
+	existing, ok := r.sessions[repoID]
+	if ok && existing.Root == root && existing.GitPath == gitPath {
+		r.mu.Unlock()
+		return existing
 	}
-
 	s := &Session{RepoID: repoID, Root: root, Runner: runner, GitPath: gitPath}
 	r.sessions[repoID] = s
+	r.mu.Unlock()
+
+	// Close outside the lock: it waits on an in-flight cat-file read.
+	if ok {
+		existing.Close()
+	}
 	return s
 }
 

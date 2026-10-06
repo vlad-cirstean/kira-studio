@@ -58,8 +58,8 @@ function emptySearchState(): RepoSearchState {
 
 // D11: workers emit out of order; git ls-files' own output is already sorted, so inserting each
 // incoming group at its sorted position gives a stable, alphabetical list that never reshuffles.
-// Replaces an existing group for the same path rather than duplicating it — defensive: today's
-// Search never reports the same path twice in one run, but the merge stays correct either way.
+// Replaces an existing group for the same path rather than duplicating it, so a repeated path never
+// shows twice.
 // Pure function over its arguments alone — no reactive state, stays outside the store.
 function insertByPath(files: FileMatches[], group: FileMatches): void {
   let lo = 0;

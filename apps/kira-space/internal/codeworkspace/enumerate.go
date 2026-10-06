@@ -26,5 +26,13 @@ func EnumerateAll(ctx context.Context, runner gitclient.Runner, gitPath, root st
 	if out == "" {
 		return nil, nil
 	}
-	return strings.Split(out, "\x00"), nil
+	split := strings.Split(out, "\x00")
+	// An unmerged path lists once per index stage; stages are adjacent.
+	paths := split[:1]
+	for _, p := range split[1:] {
+		if p != paths[len(paths)-1] {
+			paths = append(paths, p)
+		}
+	}
+	return paths, nil
 }
