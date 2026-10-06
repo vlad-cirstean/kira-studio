@@ -241,3 +241,37 @@ describe('ReviewFilesState — a failed mark() surfaces on markError instead of 
     expect(state.markError.value).toBeUndefined();
   });
 });
+
+// P168 Part 18 F9: a mark made while another is in flight used to be dropped silently.
+describe('ReviewFilesState — marks queue instead of dropping', () => {
+  test('a second mark during an in-flight one is sent after it, in order', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const state = new ReviewFilesState(bridge);
+    const resolvers: Array<() => void> = [];
+    transport.onRequest = (method, params) => {
+      if (method === 'review.files') return { files: [], branchTip: 't', mergeBase: 'm' };
+      if (method === 'review.mark') {
+        const { path } = params as { path: string };
+        return new Promise((resolve) => {
+          resolvers.push(() => resolve({ review: { path } }));
+        });
+      }
+      throw new Error(`unscripted request: ${method}`);
+    };
+    state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
+    await sleep();
+    const first = state.mark('a.ts', true);
+    const second = state.mark('b.ts', true);
+    await sleep();
+    expect(transport.calls.filter((c) => c.method === 'review.mark')).toHaveLength(1);
+    resolvers[0]?.();
+    await first;
+    await sleep();
+    expect(transport.calls.filter((c) => c.method === 'review.mark')).toHaveLength(2);
+    expect(state.pending.value).toBe(true);
+    resolvers[1]?.();
+    await second;
+    expect(state.pending.value).toBe(false);
+  });
+});

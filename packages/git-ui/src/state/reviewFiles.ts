@@ -64,8 +64,8 @@ export class ReviewFilesState {
   readonly reviewedAtSha: ShallowRef<string | null | undefined> = shallowRef(undefined);
   readonly diffError: ShallowRef<string | undefined> = shallowRef(undefined);
 
-  /** A review.mark request in flight — the two header buttons disable themselves while true
-   *  rather than let a double-click race two writes against the same file. */
+  /** A review.mark request in flight or queued — the two header buttons disable themselves while
+   *  true rather than let a double-click race two writes against the same file. */
   readonly pending: ShallowRef<boolean> = shallowRef(false);
   // G30 round-1 functional-correctness review, finding #7: mark()'s own request had no catch at
   // all — a rejection propagated straight out of mark() as a rejected promise, and every caller
@@ -80,6 +80,10 @@ export class ReviewFilesState {
 
   readonly #bridge: BridgeClient;
   #target: ReviewFilesTarget | undefined;
+  /** Marks run one at a time, in call order; `#runMark` never rejects. */
+  #markChain: Promise<void> = Promise.resolve();
+  #markState = { count: 0 };
+  #lastQueuedKey: string | undefined;
   readonly #filesRequest = createLatestRequest<ResultOf<'review.files'>>();
   readonly #diffRequest = createLatestRequest<ResultOf<'review.fileDiff'>>();
 
@@ -108,6 +112,9 @@ export class ReviewFilesState {
     // is a pane-wide "is a mark in flight" flag, not a per-target one, so a fresh target — which
     // already discards everything else about the in-flight request above — discards this too.
     this.pending.value = false;
+    this.#markState = { count: 0 };
+    this.#markChain = Promise.resolve();
+    this.#lastQueuedKey = undefined;
     if (target) void this.#loadFiles();
   }
 
@@ -249,10 +256,31 @@ export class ReviewFilesState {
    */
   async mark(path: string, reviewed: boolean, ranges?: readonly LineRange[]): Promise<void> {
     const target = this.#target;
-    if (!target || this.pending.value) return;
+    if (!target) return;
+    // Queued, never dropped: a second tick while one is in flight (the tree's checkboxes are not
+    // disabled on `pending`) must still reach the server, in order. Only an identical whole-file
+    // repeat of the newest queued mark is a no-op.
+    const key = ranges === undefined ? `${path}\0${reviewed}` : undefined;
+    if (key !== undefined && key === this.#lastQueuedKey) return;
+    this.#lastQueuedKey = key;
+    const state = this.#markState;
+    state.count++;
     this.pending.value = true;
-    this.markError.value = undefined;
+    const run = this.#markChain.then(() => this.#runMark(target, state, path, reviewed, ranges));
+    this.#markChain = run;
+    await run;
+  }
+
+  async #runMark(
+    target: ReviewFilesTarget,
+    state: { count: number },
+    path: string,
+    reviewed: boolean,
+    ranges: readonly LineRange[] | undefined,
+  ): Promise<void> {
     try {
+      if (this.#target !== target) return;
+      this.markError.value = undefined;
       const result = await this.#bridge.request('review.mark', {
         repoId: target.repoId,
         branch: target.branch,
@@ -270,7 +298,11 @@ export class ReviewFilesState {
       if (this.#target !== target) return;
       this.markError.value = error instanceof Error ? error.message : String(error);
     } finally {
-      if (this.#target === target) this.pending.value = false;
+      state.count--;
+      if (state === this.#markState && state.count === 0) {
+        this.pending.value = false;
+        this.#lastQueuedKey = undefined;
+      }
     }
   }
 
