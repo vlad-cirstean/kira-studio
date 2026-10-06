@@ -83,11 +83,16 @@ const previewDoc = computed(() =>
   props.doc.length > PENDING_PREVIEW_CHARS ? props.doc.slice(0, PENDING_PREVIEW_CHARS) : props.doc,
 );
 let fillCtrl: AbortController | null = null;
-const cancelFill = (): void => {
-  fillCtrl?.abort();
-  fillCtrl = null;
-};
+// §4.7's own `externalSync` annotation equivalent — a plain flag, no annotation machinery needed.
+let applyingExternal = false;
 let filling = false;
+const cancelFill = (): void => {
+  if (!fillCtrl) return;
+  fillCtrl.abort();
+  fillCtrl = null;
+  filling = false;
+  applyingExternal = false;
+};
 let lastAppliedDoc: string | null = null;
 let lastAppliedVersionId = -1;
 
@@ -102,8 +107,6 @@ let completionDisposable: MonacoDisposable | null = null;
 let hoverDisposable: MonacoDisposable | null = null;
 let wrapDisposable: MonacoDisposable | null = null;
 let lintTimer: ReturnType<typeof setTimeout> | undefined;
-// §4.7's own `externalSync` annotation equivalent — a plain flag, no annotation machinery needed.
-let applyingExternal = false;
 
 function resolveWordWrap(): 'on' | 'off' {
   if (props.singleLine) return 'off';

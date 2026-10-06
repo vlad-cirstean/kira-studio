@@ -48,7 +48,7 @@ export function createParseClient(makeWorker: () => WorkerLike): ParseClient {
 
   function settle(job: Job, run: () => unknown): void {
     Promise.resolve()
-      .then(run)
+      .then(() => (job.aborted ? undefined : run()))
       .then(
         (v) => {
           if (!job.aborted) job.resolve(v as never);
@@ -73,7 +73,7 @@ export function createParseClient(makeWorker: () => WorkerLike): ParseClient {
     const inflight = running;
     running = null;
     const pending = inflight ? [inflight, ...queue.splice(0)] : queue.splice(0);
-    for (const job of pending) runInline(job);
+    for (const job of pending) if (!job.aborted) runInline(job);
   }
 
   function spawn(): WorkerLike {

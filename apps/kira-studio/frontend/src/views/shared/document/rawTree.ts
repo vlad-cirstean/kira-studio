@@ -203,8 +203,8 @@ export type ParseResult = { ok: true; node: RawNode } | { ok: false; offset: num
 /** Parses `text` in full: one value via `parseValue`, trailing whitespace via `skipWs`, then
  *  requires every remaining character consumed — anything left over is `new ErrorClass(offset)` at
  *  that final position, the same "trailing content" error `parseValue`'s own grammar throws for a
- *  mid-parse defect. Catches only `ErrorClass`'s own instances (never a stray bug in `parseValue`,
- *  which still throws through). */
+ *  mid-parse defect. Catches `ErrorClass` and stack-overflow `RangeError` only (never a stray bug in
+ *  `parseValue`, which still throws through). */
 export function tryParse<C extends Cursor, E extends Error & { offset: number }>(
   text: string,
   parseValue: (c: C) => RawNode,
@@ -219,6 +219,8 @@ export function tryParse<C extends Cursor, E extends Error & { offset: number }>
     return { ok: true, node };
   } catch (err) {
     if (err instanceof ErrorClass) return { ok: false, offset: err.offset };
+    // Recursive descent overflows the stack on extreme nesting: same refusal as a syntax error.
+    if (err instanceof RangeError) return { ok: false, offset: c.i };
     throw err;
   }
 }
@@ -246,7 +248,13 @@ export function beautifyWith(
 ): BeautifyResult {
   const r = tryParseText(text);
   if (!r.ok) return { text, ok: false, reason: `invalid ${errorLabel} at offset ${r.offset}` };
-  const rendered =
-    mode === 'indented' ? renderIndented(r.node, keyText) : renderCompact(r.node, keyText);
-  return { text: rendered, ok: true };
+  try {
+    const rendered =
+      mode === 'indented' ? renderIndented(r.node, keyText) : renderCompact(r.node, keyText);
+    return { text: rendered, ok: true };
+  } catch (err) {
+    if (err instanceof RangeError)
+      return { text, ok: false, reason: `${errorLabel} nested too deep` };
+    throw err;
+  }
 }

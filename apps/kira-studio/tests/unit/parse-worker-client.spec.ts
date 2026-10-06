@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { createParseClient, type WorkerLike } from '../../frontend/src/workers/parse/client';
+import { handlers } from '../../frontend/src/workers/parse/handlers';
 import type { WorkerRequest, WorkerResponse } from '../../frontend/src/workers/parse/protocol';
 
 class FakeWorker implements WorkerLike {
@@ -98,6 +99,23 @@ describe('parse worker client', () => {
     void c.run('json.beautify', input);
     await tick();
     expect(FakeWorker.all.length).toBe(2);
+  });
+
+  test('a worker error skips an already-aborted in-flight job', async () => {
+    const spy = spyOn(handlers, 'json.beautify');
+    try {
+      const c = setup();
+      const ctrl = new AbortController();
+      const a = c.run('json.beautify', input, { signal: ctrl.signal });
+      const settled = a.catch((e: unknown) => (e as Error).name);
+      ctrl.abort();
+      (FakeWorker.all[0] as FakeWorker).fail();
+      expect(await settled).toBe('AbortError');
+      await tick();
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   test('a worker that cannot be constructed falls back inline', async () => {

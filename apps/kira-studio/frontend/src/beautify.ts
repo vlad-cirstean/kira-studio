@@ -375,6 +375,7 @@ function tryParseXml(text: string): { ok: true; nodes: XmlNode[] } | { ok: false
     return { ok: true, nodes };
   } catch (err) {
     if (err instanceof XmlScanError) return { ok: false, reason: err.reason };
+    if (err instanceof RangeError) return { ok: false, reason: 'nested too deep' };
     throw err;
   }
 }
@@ -430,12 +431,17 @@ function renderXmlCompact(nodes: XmlNode[], out: string[]): void {
 export function beautifyXml(text: string, mode: BeautifyMode): BeautifyResult {
   const r = tryParseXml(text);
   if (!r.ok) return { text, ok: false, reason: r.reason };
-  if (mode === 'indented') {
-    const lines: string[] = [];
-    collectXmlIndentedLines(r.nodes, 0, lines);
-    return { text: lines.join('\n'), ok: true };
+  try {
+    if (mode === 'indented') {
+      const lines: string[] = [];
+      collectXmlIndentedLines(r.nodes, 0, lines);
+      return { text: lines.join('\n'), ok: true };
+    }
+    const out: string[] = [];
+    renderXmlCompact(r.nodes, out);
+    return { text: out.join(''), ok: true };
+  } catch (err) {
+    if (err instanceof RangeError) return { text, ok: false, reason: 'nested too deep' };
+    throw err;
   }
-  const out: string[] = [];
-  renderXmlCompact(r.nodes, out);
-  return { text: out.join(''), ok: true };
 }
