@@ -57,7 +57,7 @@ type Result struct {
 	Complete bool
 }
 
-// DefaultScanBudget is upstream's own SEARCH_SCAN_BUDGET_MS. Checked every 1024 scanned records.
+// DefaultScanBudget is upstream's own SEARCH_SCAN_BUDGET_MS. Checked every 1024 scanned records and while a read blocks.
 //
 // One Go-specific note: RE2 has no backtracking and is linear in input, so upstream's own
 // probe-10 catastrophic-backtracking hazard (a pathological pattern taking 853ms against a
@@ -69,6 +69,8 @@ const DefaultScanBudget = 5 * time.Second
 const DefaultLimit = 200
 
 const scanReadChunkSize = 64 * 1024
+
+var errScanBudget = errors.New("gitsearch: scan budget exhausted")
 
 // Scan runs one streaming, cancellable, time-boxed tail scan: Runner.Start -> a 64 KiB read loop
 // (cancellable exactly like logsession.readChunkLocked) -> porcelain.RecordSplitter.Push (NUL-
@@ -103,9 +105,13 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 	splitter := porcelain.NewRecordSplitter(0)
 	grouper := porcelain.NewFieldGrouper(porcelain.ScanFieldCount)
 	deadline := time.Now().Add(budget)
+	// expired wakes a read blocked while git emits nothing (a --topo-order walk with no
+	// commit-graph prints nothing until it has walked everything).
+	timer := time.NewTimer(budget)
+	defer timer.Stop()
 
 	for {
-		cont, roundErr := scanRound(ctx, proc, splitter, grouper, opts, limit, deadline, &result)
+		cont, roundErr := scanRound(ctx, proc, splitter, grouper, opts, limit, deadline, timer.C, &result)
 		if roundErr != nil {
 			return Result{}, roundErr
 		}
@@ -119,17 +125,20 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 		return result, nil
 	}
 
+	// git's own failure (its stderr) outranks the partial record it left behind, as in
+	// logsession.finishEOFLocked.
+	var protoErr error
 	if flushed := splitter.Flush(); len(flushed) > 0 {
-		_ = proc.Close()
-		return Result{}, fmt.Errorf("gitsearch: unterminated trailing field at EOF (%d bytes)", len(flushed))
-	}
-	if pending := grouper.Flush(); len(pending) > 0 {
-		_ = proc.Close()
-		return Result{}, fmt.Errorf("gitsearch: unterminated trailing record at EOF (%d fields short of a full record)", len(pending))
+		protoErr = fmt.Errorf("gitsearch: unterminated trailing field at EOF (%d bytes)", len(flushed))
+	} else if pending := grouper.Flush(); len(pending) > 0 {
+		protoErr = fmt.Errorf("gitsearch: unterminated trailing record at EOF (%d fields short of a full record)", len(pending))
 	}
 	res, waitErr := proc.Wait()
 	if cerr := gitclient.Classify(ctx, opts.Args, res, waitErr); cerr != nil {
 		return Result{}, cerr
+	}
+	if protoErr != nil {
+		return Result{}, protoErr
 	}
 	result.Truncated = result.Total > len(result.Hits)
 	return result, nil
@@ -141,8 +150,8 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 // every 1024 scanned records, same as the unextracted loop) — that last case leaves result.Complete
 // false, which the caller uses to skip the post-loop flush/Wait and return result immediately, byte
 // for byte as the original inline loop did.
-func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.RecordSplitter, grouper *porcelain.FieldGrouper, opts Options, limit int, deadline time.Time, result *Result) (bool, error) {
-	chunk, readErr := readScanChunk(ctx, proc)
+func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.RecordSplitter, grouper *porcelain.FieldGrouper, opts Options, limit int, deadline time.Time, expired <-chan time.Time, result *Result) (bool, error) {
+	chunk, readErr := readScanChunk(ctx, proc, expired)
 	if len(chunk) > 0 {
 		toks, splitErr := splitter.Push(chunk)
 		if splitErr != nil {
@@ -187,6 +196,11 @@ func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.
 		if errors.Is(readErr, io.EOF) {
 			return false, nil
 		}
+		if errors.Is(readErr, errScanBudget) {
+			result.Complete = false
+			result.Truncated = result.Total > len(result.Hits)
+			return false, nil
+		}
 		if ctx.Err() != nil {
 			// A caller cancellation (supersede, or the connection tearing down) — classified
 			// the same way every other read in this app is (gitclient.Classify), so a
@@ -203,7 +217,7 @@ func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.
 // readScanChunk reads one raw chunk off proc's stdout, cancellable by ctx — mirrors
 // logsession.readChunkLocked exactly: a cancelled ctx kills the child (Process.Close) and returns
 // promptly rather than leaving the read (and the caller) blocked indefinitely.
-func readScanChunk(ctx context.Context, proc gitclient.Process) ([]byte, error) {
+func readScanChunk(ctx context.Context, proc gitclient.Process, expired <-chan time.Time) ([]byte, error) {
 	type readResult struct {
 		b   []byte
 		err error
@@ -221,5 +235,8 @@ func readScanChunk(ctx context.Context, proc gitclient.Process) ([]byte, error) 
 	case <-ctx.Done():
 		_ = proc.Close()
 		return nil, ctx.Err()
+	case <-expired:
+		_ = proc.Close()
+		return nil, errScanBudget
 	}
 }

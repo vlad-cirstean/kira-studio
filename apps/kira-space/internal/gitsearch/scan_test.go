@@ -148,7 +148,7 @@ func TestScan_BudgetFiresEarly(t *testing.T) {
 	res, err := Scan(context.Background(), scanDeps(dir), Options{
 		Args:    porcelain.LogScanArgs(porcelain.WalkSpec{Scope: "all"}),
 		Matcher: m,
-		Budget:  1, // already in the past by the time the first 1024-record check runs.
+		Budget:  1, // already in the past before the first read or 1024-record check.
 	})
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
@@ -156,8 +156,8 @@ func TestScan_BudgetFiresEarly(t *testing.T) {
 	if res.Complete {
 		t.Fatal("expected Complete = false -- the budget must have fired before EOF")
 	}
-	if res.Scanned != 1024 {
-		t.Fatalf("Scanned = %d, want exactly 1024 (the first deadline-check boundary)", res.Scanned)
+	if res.Scanned%1024 != 0 {
+		t.Fatalf("Scanned = %d, want a deadline-check boundary (0 when the timer fires before any read)", res.Scanned)
 	}
 	if res.Scanned >= n {
 		t.Fatalf("Scanned = %d, want less than the full walk (%d) -- the scan must have stopped early", res.Scanned, n)
