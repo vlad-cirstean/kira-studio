@@ -308,26 +308,9 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
 // reka's own TooltipContentImpl defaults to `side: "top"` (not this app's old 'bottom-start'), so
 // the two cases below test the flip/shift this app's markup actually exercises today.
 //
-// Real bug found live, this session: slickTheme.css's own `.slick-header-columns { will-change:
-// transform }` (P22's measured header-scroll-flicker fix, unrelated to this test and not to be
-// touched) makes that element the CONTAINING BLOCK for a `position: fixed` descendant — the exact
-// same effect a real `transform` has (CSS spec) — so a `top`/`left`/`right`/`bottom` given to
-// `style` below is no longer viewport-relative once appended; converting the desired
-// viewport-relative box into a `.slick-header-columns`-relative one before assigning it (the same
-// math the containing-block reassignment implies) restores that. That alone still isn't enough,
-// though: the reassignment also means this "fixed" child no longer escapes the normal box/paint
-// tree the way a real viewport-fixed element does, so it's now clipped by `.slick-pane`'s own
-// `overflow: hidden` (slick.grid.css) two ancestors up whenever it's positioned outside that
-// pane's own ~29px header band — confirmed live (`getBoundingClientRect()` reports the intended
-// coordinate correctly; `elementFromPoint()` at that same coordinate finds an unrelated element
-// underneath instead). A real `.hover()` therefore can't reach it for either geometry scenario
-// below (both intentionally place it away from the header's own natural position, to force reka's
-// flip/shift). `hoverInjectedTrigger` dispatches a real, bubbling `pointermove` DOM event targeted
-// at the (correctly, if invisibly, positioned) element directly instead of asking Playwright to
-// hit-test it on screen — same DOM-tree bubble path AttributeTooltip.vue's own listener reads
-// (`closest('[data-kira-tip]')`), same `getBoundingClientRect()` reka's own popper math reads for
-// flip/shift, just without requiring the pixel to be paint-visible for Playwright's own
-// actionability check, which the pane's clipping defeats independent of anything under test here.
+// The trigger is `position: fixed`, so offsets are viewport-relative. `hoverInjectedTrigger`
+// dispatches a bubbling `pointermove` directly: the pane's `overflow: hidden` may clip the trigger
+// off-screen, which would fail Playwright's hit-test actionability check.
 async function injectHeaderTooltipTrigger(
   page: Page,
   style: { top?: string; bottom?: string; left?: string; right?: string },
@@ -335,18 +318,6 @@ async function injectHeaderTooltipTrigger(
   await page.evaluate((s) => {
     const header = document.querySelector('.slick-header-columns');
     if (!header) throw new Error('.slick-header-columns not found — grid not open');
-    const rect = header.getBoundingClientRect();
-    const px = (v: string | undefined): number | null =>
-      v === undefined ? null : Number.parseFloat(v);
-    const relative: Record<string, string> = {};
-    const top = px(s.top);
-    if (top !== null) relative.top = `${top - rect.top}px`;
-    const left = px(s.left);
-    if (left !== null) relative.left = `${left - rect.left}px`;
-    const right = px(s.right);
-    if (right !== null) relative.right = `${right - (window.innerWidth - rect.right)}px`;
-    const bottom = px(s.bottom);
-    if (bottom !== null) relative.bottom = `${bottom - (window.innerHeight - rect.bottom)}px`;
     const btn = document.createElement('button');
     btn.id = 'g20-tooltip-trigger';
     btn.textContent = 'x';
@@ -355,7 +326,7 @@ async function injectHeaderTooltipTrigger(
       position: 'fixed',
       width: '20px',
       height: '20px',
-      ...relative,
+      ...s,
     });
     header.appendChild(btn);
   }, style);
