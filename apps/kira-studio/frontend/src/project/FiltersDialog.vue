@@ -60,6 +60,7 @@ watch(
     loadError.value = null;
     saveError.value = null;
     loading.value = false;
+    draft.value = EMPTY_VISIBILITY;
     if (!connectionId) return;
     loading.value = true;
     try {
@@ -106,11 +107,12 @@ const preview = computed(() => {
 });
 
 function onToggleKind(kind: NodeKind): void {
+  if (loading.value) return;
   draft.value = toggleKind(draft.value, kind);
 }
 
 function onToggleNode(row: FilterNodeRow): void {
-  if (row.disabled) return;
+  if (row.disabled || loading.value) return;
   draft.value = toggleNode(draft.value, row);
 }
 
@@ -124,6 +126,7 @@ function onToggleExpand(path: string): void {
 // D18: All/None act on the currently listed subset only — under a name filter, that is just the
 // matching rows and their ancestors, not the whole cached tree.
 function allObjects(): void {
+  if (loading.value) return;
   let v = draft.value;
   for (const row of objects.value.rows) {
     if (row.state !== 'on' && !row.disabled) v = toggleNode(v, row);
@@ -132,6 +135,7 @@ function allObjects(): void {
 }
 
 function noneObjects(): void {
+  if (loading.value) return;
   let v = draft.value;
   for (const row of objects.value.rows) {
     if (row.state !== 'off' && !row.disabled) v = toggleNode(v, row);
@@ -140,10 +144,12 @@ function noneObjects(): void {
 }
 
 function allKinds(): void {
+  if (loading.value) return;
   draft.value = { ...draft.value, hiddenKinds: [] };
 }
 
 function noneKinds(): void {
+  if (loading.value) return;
   draft.value = { ...draft.value, hiddenKinds: kinds.value.map((r) => r.kind) };
 }
 
