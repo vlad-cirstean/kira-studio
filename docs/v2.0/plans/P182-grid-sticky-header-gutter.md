@@ -539,3 +539,72 @@ unintended diff).
    by the user. Commit `docs: P182 result`. SPEC row status per the orchestrator.
 
 Never push.
+
+## Result
+
+Commits on `v2.0` (local, not pushed): `29b5d5912` stage 1 header sticky; `ca2c33c3d` fix(test)
+`measure.ts` coverage; `7f48bb4fc` stage 2 sticky gutter column. Stage 2 gate: pass. Both stages stay.
+
+### Perf (headless WPE, `NCOLS=20 grid-scroll`, 3 runs, mean of 5 flicks per run)
+
+load1 at run 1 start: 0.96 (base), 0.96 (s1), 0.84 (s2). Runs 2-3 started at 2.4-2.7 (own browser).
+
+| | data grid fps | p95 ms | frames over 50 ms (3 runs) | RSS rise per flick | console fps |
+|---|---|---|---|---|---|
+| baseline `32da15b17` | 51.9 (51.8/51.8/52.2) | 28.8 | 5 | 23.6 MB | 61.5 |
+| stage 1 | 49.1 (50.2/48.6/48.4) | 31.6 | 13 | 23.3 MB | 60.2 |
+| stage 2 | 50.7 (51.8/50.4/50.0) | 30.1 | 6 | 22.7 MB | 60.5 |
+
+Stage 2 vs baseline: -1.2 fps, inside the 2 fps gate. Stage 1 report-only: -2.8 fps. Probe viewport
+is 29 px taller (1104x758 vs 1104x729): scroller now spans the header band. Run-to-run spread is
+about 1.5 fps, so the stage 1 dip is near noise. Peak RSS 719/709/715 MB.
+
+### Tests
+
+- Baseline: `test:ui:studio` 311 passed, 1 fail (`cell-editor.spec.ts:332` 60 s timeout under load
+  12; passes alone), 4 not run. Treated as load flake, not pre-existing code failure.
+- Stage 1: ui 318 passed (3 new). Stage 2 final tree: ui 322 passed (7 new total), no flake.
+- New tests (`slick-grid.spec.ts`): header lockstep in one task; last row reachable (keyboard,
+  native scroll end not written back); short table `scrollHeight === clientHeight` (appended to the
+  P16 D3 test); gutter lockstep + pinned + `elementFromPoint`; right-edge ArrowRight nav; gutter
+  click and right-click keep `scrollLeft`; wheel over gutter scrolls. Stage 2 lockstep/pinned and
+  wheel tests fail with stage 2 reverted; edge-nav and click tests are regression guards (pass both).
+- `test:proto:studio` 6 passed (both stages). `test:unit` 1794 pass, 1 fail:
+  `mock-runtime-bindings` wants `TerminalService.Shutdown` unmapped. Cause: gitignored generated
+  `frontend/bindings/` is stale (Go source has no such method). Not a tracked-code defect, not fixed.
+- `lint:dead`: pre-existing unused exports only (`columns.ts`, `git-core`, `rowMenuModel`, `page.ts`).
+- Budget coverage: stage 1 left `uncoveredPx` 29 (header height) on `scroll_grid` bottom rows because
+  `support/measure.ts` compared canvas-relative offsets to `clientHeight`. Fixed in `ca2c33c3d`
+  (subtract canvas `offsetTop`, as `scrollTrace.ts`). Now 0 at 40/100/200 px per frame. Not a loosened
+  budget.
+
+### Visual
+
+Baseline: 13 passed, 1 failed (`console.png`, 36 px, sandbox font drift). Stage 1: 14 passed
+(console borderline, passed). Stage 2: same as baseline, `console-actual.png` byte-identical to
+baseline copy. Intended scrollbar-track diffs not visible: WPE draws overlay scrollbars. No
+snapshot updated.
+
+### Independence (6.3)
+
+First attempt conflicted (stage 2 hunks adjacent to stage 1: class comment, `applyColumnWidths`
+lines, method insertion point, `headerCell` import, appended tests). Restructured stage 2 only: its
+class-comment text moved onto its methods, `--sg-pin-w` set after the loop, methods placed after
+`applyColumnWidths`, own local `gutterCell` helper, tests inserted mid-file, no stage 1 symbols.
+Then `git revert --no-commit 29b5d5912` applied clean in a scratch worktree; `ui` project
+`slick-grid data-view console`: 48 passed. Worktree removed.
+
+### Deviations from plan
+
+- Extra commit `ca2c33c3d` (`support/measure.ts`, not in file table) for the coverage metric above.
+- Stage 2 rebuilt once after the independence failure (same design, hunks re-placed).
+- Gate item "pinned in WebKit": proven in WPE only (test passes); macOS WKWebView unverified.
+
+### Not verified (owed by user, per 6.5)
+
+Compositor lag on macOS (horizontal after stage 1, vertical after stage 2); Web Inspector layer
+count and footprint plateau; classic-scrollbar visual diffs; smoke of column resize, header select
+zone, sort arrow, header tooltip, gutter drag, inline edit at right edge, console grid. Known
+accepted residues: range-selector drag autoscroll downward triggers `hh` px below the grid bottom;
+resize/drag autoscroll-left triggers at the grid's left edge, not the gutter's right edge. `contain`
+and header `will-change` untouched. Shipped `dist` rebuilt (gitignored).
