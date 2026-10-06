@@ -138,6 +138,30 @@ routes through the same `loaders` registry now, so there is nothing left to flag
 not; only a stale comment survives it
 (`apps/kira-studio/internal/storage/repos/connections.go:172`).
 
+**Console results are capped, not buffered (P174).** `adapters.DefaultConsoleCap` is 10,000 rows and
+64 MiB of held cell text; `model.ConsoleRequest.Cap` (Go callers only, never on the renderer wire)
+lowers it, and `adapters.ConsoleCapFor` clamps anything above it. An engine checks the cap after
+`Next()` and before appending, so `PagePosition.Truncated` means at least one more row existed and an
+exactly-cap result reports `false`. The flag is a `truncated` field on `PagePosition` (wire and TS).
+`has_more` stays `false` for console pages: no continuation exists. Early close per engine: SQLite
+and MongoDB stop for real (`rows.Close()` resets the statement, `cursor.Close` kills the server
+cursor). ClickHouse closes the HTTP body and sends `cancel_http_readonly_queries_on_client_close`.
+PostgreSQL and MySQL/MariaDB drain the remaining rows off the wire without allocating them: memory
+is bounded, server and network time are not. A `CancelRequest` after the cap was declined: it aborts
+the `BEGIN READ ONLY` wrap and fails later statements in the batch. Redis rewrites `KEYS`,
+`HGETALL`/`HKEYS`/`HVALS`, `SMEMBERS`, `LRANGE`, `ZRANGE`/`ZREVRANGE`, `ZRANGEBYSCORE`/`ZRANGEBYLEX`
+and `XRANGE`/`XREVRANGE` into bounded forms (`SCAN`/`HSCAN`/`SSCAN` loops, clamped ranges,
+`LIMIT`/`COUNT`) in `redis/consolebound.go`; the reply keeps its original shape. The renderer shows a
+banner on a truncated console page, and `queryplan` and `console/plan.ts` refuse a truncated page as
+an incomplete plan.
+
+A `Chunk` also carries an optional sorted `binary` row list: those cells hold standard base64 of
+bytes that were not valid UTF-8 (`page.BytesCell`). Kafka keys, values and header values use it
+instead of a replacement-character string; a non-UTF-8 header value becomes `{"base64":"…"}` in the
+headers JSON. SQS bodies go through the same helper but never fire it: SQS rejects a body outside
+its Unicode set at `SendMessage`, and binary attributes were already base64 in the `headers` cell.
+The stream view marks a binary cell with a `base64` badge; copy and search use the base64 text.
+
 ### Per-database mapping
 
 | DB | Tree levels | Default view | Pagination | Exact count | EXPLAIN form (P18) | Cancel mechanism |
@@ -156,6 +180,15 @@ not; only a stale comment survives it
 **SQS read policy.** Reads are **never automatic**. The stream view has an explicit
 **Poll** button with a visible warning: `ReceiveMessage` makes messages invisible to real
 consumers for the visibility timeout. Nothing is fetched on tab open, on refresh, or on a timer.
+SQS has no peek API: every receive raises `ApproximateReceiveCount`, and a message past the redrive
+policy's `maxReceiveCount` moves to its dead-letter queue. A **read-only** connection therefore
+hides messages for 1 second instead of the queue's timeout (the SDK omits `VisibilityTimeout: 0`
+from the request, so 1 s is the smallest hide it can send), dedupes by `MessageId` across the
+receives of one poll, and stores no receipt handles. The warning on that connection says each poll
+still raises the receive count, names the dead-letter threshold when the queue has one
+(`StreamPage.max_receive_count`), and the first Poll or Refresh per tab asks for confirmation
+(`rt.receiveAcknowledged`, in-memory). Writable connections keep the queue's own timeout and keep
+receipt handles for Delete.
 SQS's authentication is by **named AWS profile** (static keys accepted only in URI mode).
 
 Cancellation is never "stop showing the result" — always forwarded to the server. If a driver
@@ -297,6 +330,9 @@ than a `partition.eof` event, with a fixed-count empty-poll counter kept as a se
 terminator — the same clamp the old driver needed after a real regression (P43 iter2 F19/D26), now
 without the native event that made it possible before.
 
+Key, value and header bytes that are not valid UTF-8 are base64-encoded and flagged in the chunk's
+`binary` row list (Adapter contract, above), never passed through `strings.ToValidUTF8`.
+
 Two capabilities the old driver's binding never exposed come back: a topic's Configuration section
 now has real rows (`kadm.DescribeTopicConfigs`) instead of "not available: no `DescribeConfigs`
 call", and `ConnectInfo.details.cluster` reports a real cluster id (`kadm.Metadata`). One row is
@@ -331,6 +367,10 @@ it, and the Go port needs an explicit mutex plus a FIFO eviction queue where the
 original relied on single-threadedness and `Map` insertion order, neither of which survives
 translation). No `canUpdate`: a delivered message can't be edited in place, only replaced by
 delete + resend.
+
+A read-only connection's poll never locks messages for real consumers and keeps no receipt handles
+(read policy, above). `fetchQueueAttributes` reads `VisibilityTimeout` and `RedrivePolicy` in one
+`GetQueueAttributes` call; `maxReceiveCount` comes from the redrive JSON.
 
 **Unlike every native adapter built before this sub-phase, neither SQS nor S3 has a server-side
 kill mechanism at all.** Both adapters pass the op's own `context.Context` directly to every AWS
@@ -417,6 +457,10 @@ result is shown moved. Redis's `DbConnectionSet` is a `mysql-family`-style LRU (
 keyed by db index rather than by database name), with go-redis's `Protocol: 2` pinned explicitly —
 its RESP3 default changes reply shapes for `HGETALL`/`CONFIG GET` and the console's own generic
 dispatch, from a flat array to a map.
+
+The Redis console runs bounded forms of the commands that can return an unbounded reply (Adapter
+contract, above). Every other command (`SUNION`, `SINTER`, `SDIFF`, `EVAL`/`FCALL`, module commands,
+`GET` of a huge string) is read whole by go-redis before the page cap applies.
 
 ### `sslmode` semantics per engine (P21 round 1)
 
@@ -1956,7 +2000,12 @@ gate every view kind uses for this state, including Browse tabs.
 **The write model is staged for SQL tables, immediate everywhere else.** PostgreSQL/MariaDB/
 MySQL/SQLite table writes (add row, delete row, cell edit) accumulate in a per-tab pending-change
 set — nothing reaches the database until *Commit*, and *Preview command* renders the exact
-statements first. ClickHouse tables get add-row only, staged the same way (no addressable row to
+statements first. A staged edit or delete is keyed by its row's primary key, not its page position, so it
+survives paging, sort, filter, projection and Refresh. Staging needs the table's full primary key in
+the page: a cell on a page without it is not editable. Each entry keeps the key it was staged
+under, so a primary-key edit still addresses the original row and an off-page entry still commits.
+The toolbar counts every staged entry and names how many are not on the current page. Only closing
+the tab or a successful commit clears the set. ClickHouse tables get add-row only, staged the same way (no addressable row to
 update/delete — a MergeTree `PRIMARY KEY` is a sparse index). MongoDB/Redis/Kafka/SQS/S3 write
 **immediately**, gated per adapter's `canInsert`/`canUpdate`/`canDelete` capability, with no
 staging or preview — no pending-change set exists to opt into for these engines at all.
@@ -3861,7 +3910,9 @@ a restart.
 `explain_query` (`server.go`'s `buildMCPServer`, which registers all six via `mcp.AddTool`). Metadata routes through the existing `internal/adapters`
 layer, and `run_query` through the same adapter query path the console uses
 (`adapterhost.Router.Execute`, exported for this at `ee98b26d`) — no second metadata or query path
-exists. `list_children` replaces the fixed-name `list_databases`/`list_schemas` pair
+exists. `run_query` passes its `maxRows` as the console cap, so the adapter stops
+reading at that row count and `rowCount` is the rows fetched: a lower bound when `truncated` is
+true. `list_children` replaces the fixed-name `list_databases`/`list_schemas` pair
 `docs/v1.7/SPEC.md`'s M1 row names: the adapter layer's metadata primitive is one lazy level
 (`Adapter.Children`), and the levels differ per kind, so one tool returning the node's own `kind`
 carries strictly more information than a fixed pair of names could. M7's fix (`21e5d77d`) gates
@@ -4320,6 +4371,8 @@ Kept only while genuinely open — delete an item the moment it's resolved, neve
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **A paired git socket token is a bearer secret, not bound to the peer (P172).** Any same-user process holding the token connects. Pairing shows the kernel-reported process, but reconnects do not re-check it. Options: pin the pairing-time executable or code signature, or accept the same-user threat model. Open user decision; delete when resolved.
+- **Console reads on PostgreSQL and MySQL/MariaDB drain past the cap (P174).** At the cap `rows.Close()` discards the remaining rows off the wire: memory is bounded, server and network time are not. The Stop button ends a long drain. Delete once a driver offers a cheap server-side stop that keeps later statements in the batch intact.
+- **Some Redis console commands are read whole before the cap (P174).** `SUNION`, `SINTER`, `SDIFF`, `EVAL`/`FCALL`, module commands and `GET` of a huge string have no bounded form; go-redis reads the reply whole, then the page is capped. Delete once those commands get bounded rewrites or a streaming reader.
 - **Terminal on darwin: a surviving job still stalls `Close` and keeps a shell-exited tab open (P153, P157).** darwin keeps a blocking pty master (kqueue pollability unverified), so the `exitDrain` close cannot interrupt the pending read. `Close` logs a WARN after 4 s. Delete once darwin's master is pollable or checked on a Mac.
 - **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. The server-tag build also drops terminal output (`EmitTo` needs a native window). Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
 - **`gh` response sizes are estimated, not measured (P169).** Realistic open-PR page is 2-4 MiB, worst case about 45 MiB, from arithmetic only; no authenticated `gh` in the sandbox. Run `gh api` on a large repo's open-PR pages (`per_page=100`, pages 1-3) piped to `wc -c`, plus `time` on page 1. Delete once pages sit well under 64 MiB and under the 10 s `apiTimeout`; otherwise open a phase for a GraphQL-projected snapshot.
