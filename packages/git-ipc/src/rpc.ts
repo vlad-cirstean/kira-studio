@@ -184,7 +184,6 @@ export function createRpcClient(
   let nextId = 1;
   const pendingRequests = new Map<number, PendingRequest>();
   const pendingStreams = new Map<number, PendingStream>();
-  const openStreamIdByMethod = new Map<StreamKey, number>();
   const eventHandlers = new Map<EventKey, Set<(payload: unknown) => void>>();
 
   function finishStream(id: number): void {
@@ -192,7 +191,6 @@ export function createRpcClient(
     if (!entry) return;
     entry.done = true;
     pendingStreams.delete(id);
-    if (openStreamIdByMethod.get(entry.method) === id) openStreamIdByMethod.delete(entry.method);
   }
 
   function handleFrame(frame: Frame): void {
@@ -306,18 +304,8 @@ export function createRpcClient(
       onChunk: (chunk: StreamChunkOf<K>) => void,
       signal?: AbortSignal,
     ): Promise<void> {
-      // Opening a second stream for the same method supersedes the first (W2) — the same
-      // "superseded query is killed" rule §4.3 states for reads.
-      const priorId = openStreamIdByMethod.get(method);
-      if (priorId !== undefined) {
-        const prior = pendingStreams.get(priorId);
-        if (prior && !prior.done) {
-          finishStream(priorId);
-          post(channel, { t: 'cancel', id: priorId });
-          prior.resolve();
-        }
-      }
-
+      // Concurrent streams of one method are independent; supersession belongs to the caller
+      // (its own AbortSignal), never to the transport shared by unrelated views.
       if (signal?.aborted) {
         return Promise.reject(
           new TransportError('cancelled', `stream '${method}' was already cancelled`),
@@ -335,7 +323,6 @@ export function createRpcClient(
           done: false,
         };
         pendingStreams.set(id, entry);
-        openStreamIdByMethod.set(method, id);
 
         if (signal) {
           signal.addEventListener(
@@ -368,7 +355,6 @@ export function createRpcClient(
         }
         pendingStreams.delete(id);
       }
-      openStreamIdByMethod.clear();
       eventHandlers.clear();
       channel.close();
     },

@@ -367,7 +367,7 @@ describe('ipc rpc — streams', () => {
     server.dispose();
   });
 
-  test('opening a second stream for the same method supersedes and cancels the first', async () => {
+  test('concurrent streams of one method on one client complete independently', async () => {
     const [a, b] = createInMemoryChannelPair();
     const cancelledIds: string[] = [];
     const handlers = stubHandlers(
@@ -402,18 +402,15 @@ describe('ipc rpc — streams', () => {
     await tick(2); // first chunk delivered and frozen — the stream is genuinely still open
 
     const secondReceived: number[] = [];
-    const secondPromise = client.stream('graph.stream', { repoId: 'r2' }, (chunk) => {
+    await client.stream('graph.stream', { repoId: 'r2' }, (chunk) => {
       secondReceived.push((chunk as StreamChunkOf<'graph.stream'>).seq);
     });
-
-    await expect(firstPromise).resolves.toBeUndefined();
-    await secondPromise;
-    await tick(2);
     freezeFirst.resolve();
-    await tick(2);
+    await firstPromise;
 
-    expect(cancelledIds).toEqual(['r1']);
+    expect(cancelledIds).toEqual([]);
     expect(secondReceived).toEqual([0, 1, 2, 3, 4]);
+    expect(firstReceived).toEqual([0, 1, 2, 3, 4]);
 
     client.dispose();
     server.dispose();
