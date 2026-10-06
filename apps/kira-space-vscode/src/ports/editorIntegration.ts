@@ -6,8 +6,9 @@
  *    extension. The URI is `kira-space:/<opaque key>/<basename>` — the key is opaque to VS
  *    Code and meaningful only to the registered `VirtualDocumentSource`; the *last* path segment
  *    is the real filename, because that is what VS Code resolves the language mode from.
- * 2. Content is cached by VS Code per URI and never invalidated: a `<rev>:<path>` blob is
- *    immutable, so this provider fires no `onDidChange` and needs no emitter.
+ * 2. Content is cached by VS Code per URI: a `<rev>:<path>` blob is immutable, so the only
+ *    `onDidChange` is `refreshOpenDocuments` — a document that resolved empty because the
+ *    connection was not up yet (a tab restored at window reload) must be re-fetched.
  * 3. `vscode.diff` is given two virtual (or empty) URIs for every *historical* diff — both sides
  *    of a commit-to-commit comparison are historical, so neither is ever the live working file.
  *    P7 (item 2) is the one deliberate exception: the uncommitted-changes strip's own diff has a
@@ -68,6 +69,7 @@ export class VsCodeEditorIntegration implements EditorIntegration {
     resolveConflict: true,
   };
   #source: VirtualDocumentSource | undefined;
+  readonly #changeEmitter = new vscode.EventEmitter<vscode.Uri>();
   /** G21 D8b: `vscode.changes` is a built-in command with no entry in `@types/vscode` (F8) — a
    *  real capability probe rather than a version assumption, and memoized (`getCommands(true)` is
    *  not free) since this extension's own lifetime never sees the host gain or lose a built-in
@@ -77,6 +79,7 @@ export class VsCodeEditorIntegration implements EditorIntegration {
   registerVirtualDocuments(source: VirtualDocumentSource): Disposable {
     this.#source = source;
     const provider: vscode.TextDocumentContentProvider = {
+      onDidChange: this.#changeEmitter.event,
       provideTextDocumentContent: async (uri) => {
         const segments = pathSegments(uri);
         const first = segments[0];
@@ -95,6 +98,14 @@ export class VsCodeEditorIntegration implements EditorIntegration {
         this.#source = undefined;
       },
     };
+  }
+
+  /** Re-requests every open `kira-space:` document's content. */
+  refreshOpenDocuments(): void {
+    for (const doc of vscode.workspace.textDocuments) {
+      if (doc.uri.scheme !== SCHEME || pathSegments(doc.uri)[0] === EMPTY_SEGMENT) continue;
+      this.#changeEmitter.fire(doc.uri);
+    }
   }
 
   async openDiff(req: {

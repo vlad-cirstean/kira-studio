@@ -10,7 +10,7 @@
  */
 import type { ReviewComment } from '@kira/git-ipc';
 import * as vscode from 'vscode';
-import type { ConnectionManager } from './connection.ts';
+import type { ConnectionManager, ConnectionState } from './connection.ts';
 import { SCHEME } from './ports/editorIntegration.ts';
 import { reviewAnchorFor, reviewDocumentUri } from './virtualUri.ts';
 
@@ -48,6 +48,9 @@ export interface ReviewCommentController extends vscode.Disposable {
    *  mutation already travels through `proxyHandlers.ts`, so no new event is needed, only this
    *  callback after the forward succeeds. */
   notifyCommentsMutated(repoId: string, branch: string): void;
+  /** Re-renders every visible review document on entering `connected` — a tab restored at window
+   *  reload asks for its threads before the first handshake completes. */
+  notifyConnectionState(state: ConnectionState): void;
   /** `comments/commentThread/context`'s own handler (D9's "submitting"). */
   submit(reply: vscode.CommentReply): Promise<void>;
   /** `comments/comment/title`'s own handler (D9's "deleting"). */
@@ -112,9 +115,16 @@ export function createReviewCommentController(
     return thread;
   }
 
+  // Latest renderThreads call per URI: overlapping calls must not each build a thread set (the
+  // second `set` would orphan the first's threads, rendering every comment twice).
+  const renderGeneration = new Map<string, number>();
+
   async function renderThreads(uri: vscode.Uri): Promise<void> {
     const anchor = reviewAnchorFor(uri);
-    disposeTracked(uri.toString());
+    const key = uri.toString();
+    const generation = (renderGeneration.get(key) ?? 0) + 1;
+    renderGeneration.set(key, generation);
+    disposeTracked(key);
     if (!anchor) return;
     let comments: readonly ReviewComment[];
     try {
@@ -127,10 +137,20 @@ export function createReviewCommentController(
     } catch {
       return; // a transient failure leaves the document with no rendered threads, not an error UI
     }
+    if (renderGeneration.get(key) !== generation) return;
+    disposeTracked(key);
     threadsByUri.set(
-      uri.toString(),
+      key,
       comments.map((c) => buildThread(uri, anchor.branch, c)),
     );
+  }
+
+  function notifyConnectionState(state: ConnectionState): void {
+    if (state.kind !== 'connected') return;
+    for (const editor of vscode.window.visibleTextEditors) {
+      const uri = editor.document.uri;
+      if (uri.scheme === SCHEME && reviewAnchorFor(uri)) void renderThreads(uri);
+    }
   }
 
   function renderThreadsForKey(
@@ -229,6 +249,7 @@ export function createReviewCommentController(
   return {
     renderThreadsForKey,
     notifyCommentsMutated,
+    notifyConnectionState,
     submit,
     deleteComment,
     addAtSelection,

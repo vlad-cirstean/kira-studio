@@ -198,13 +198,17 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
       // G18 D6: baseCandidates is no longer injected here — a raw request (omitting it) now
       // resolves the repo's own stored kiraSpace.review.baseCandidates server-side, the exact
       // upgrade D6 describes, so this call needs nothing beyond repoId/branch any more.
-      cached = connection
+      const pending = connection
         .request('review.resolveBase', { repoId, branch })
-        .then((r) => r.base)
-        .catch(() => null);
-      baseMemo.set(key, cached);
+        .then((r) => r.base);
+      cached = pending;
+      baseMemo.set(key, pending);
+      // A rejection (not connected yet, transient error) must not stick as "no base".
+      pending.catch(() => {
+        if (baseMemo.get(key) === pending) baseMemo.delete(key);
+      });
     }
-    return cached;
+    return cached.catch(() => null);
   }
 
   function dropBaseMemoFor(repoId: string): void {
@@ -523,6 +527,8 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
   // D8: new commits produce a new URI on their own (the tip is embedded in it), so there is
   // nothing to reconcile on the tab a fresh open creates. This is entirely about the *old* one.
   async function notifyRepoChanged(payload: EventPayload<'repo.changed'>): Promise<void> {
+    // A branch tip only moves on refsChanged; a worktree save would cost two RPCs per branch.
+    if (payload.kind !== 'refsChanged') return;
     const { repoId } = payload;
     dropBaseMemoFor(repoId);
     const branches = new Set<string>();
@@ -552,7 +558,13 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
   }
 
   function notifyConnectionState(state: ConnectionState): void {
-    if (state.kind === 'connected') return;
+    if (state.kind === 'connected') {
+      for (const editor of vscode.window.visibleTextEditors) {
+        if (reviewAnchorFor(editor.document.uri)) void loadAndPaint(editor.document.uri);
+      }
+      return;
+    }
+    baseMemo.clear();
     for (const key of [...states.keys()]) clearForUri(vscode.Uri.parse(key));
     states.clear();
     for (const controller of inFlight.values()) controller.abort();

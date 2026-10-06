@@ -75,6 +75,7 @@ const FOCUS_GRAPH_COMMAND = 'kiraSpace.focusGraph';
 const SHOW_CONNECTION_STATUS_COMMAND = 'kiraSpace.showConnectionStatus';
 const GRAPH_VIEW_ID = 'kiraSpace.graph';
 const REVIEW_VIEW_ID = 'kiraSpace.review';
+const VIRTUAL_DOCUMENT_CONNECT_TIMEOUT_MS = 10_000;
 const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
 
 function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, unknown> {
@@ -367,6 +368,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const parsed = parseVirtualKey(key);
       if (!parsed) return undefined;
       try {
+        // A tab restored at window reload asks before the first handshake completes.
+        await manager.whenConnected(AbortSignal.timeout(VIRTUAL_DOCUMENT_CONNECT_TIMEOUT_MS));
         const result = await manager.request('file.read', parsed);
         return result.kind === 'found' ? result.content : undefined;
       } catch {
@@ -620,6 +623,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // G15 D7: "connection state leaves connected" — every tracked decoration/state is dropped
       // rather than left showing a diff over a connection that may reconnect to a different repo.
       reviewMarking.notifyConnectionState(state);
+      reviewComments.notifyConnectionState(state);
+      if (state.kind === 'connected') editor.refreshOpenDocuments();
       // P5: mirrors reviewMarking's own notifyConnectionState — drops the blame widget's memoized
       // repoId-per-folder map on leaving connected (a reconnect may land on a different Kira
       // Studio process) and re-resolves against the now-current state.
