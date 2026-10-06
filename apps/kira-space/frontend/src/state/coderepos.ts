@@ -26,6 +26,11 @@ export const useCodeReposStore = defineStore('coderepos', () => {
 
   async function hydrateCodeRepos(): Promise<void> {
     state.records = await control.codeWorkspaceListRepos();
+    // Another window removed a repository: an open workspace on it would answer every call E_NOT_FOUND.
+    const live = new Set(state.records.map((r) => r.id));
+    for (const id of [...workspaceStore.openRepos]) {
+      if (!live.has(id)) workspaceStore.closeRepoWorkspace(id);
+    }
   }
 
   /** Opens the native folder picker and imports the chosen directory — undefined when cancelled or

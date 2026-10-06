@@ -125,6 +125,7 @@ func main() {
 
 	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
 		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
+		OnReposChanged: func() { bridge.AdeTaskReposChanged(events) },
 	}
 	gitClientsSvc := &bridge.GitClientsService{
 		Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{}),

@@ -30,6 +30,14 @@ type CodeWorkspaceService struct {
 	Runner    gitclient.Runner
 	// Registry is internal/codeworkspace's own per-repo session registry (§2/§12).
 	Registry *codeworkspace.Registry
+	// OnReposChanged fires after a successful repo-list mutation so other windows re-read the list.
+	OnReposChanged func()
+}
+
+func (s *CodeWorkspaceService) reposChanged() {
+	if s.OnReposChanged != nil {
+		s.OnReposChanged()
+	}
 }
 
 type CodeWorkspaceIDArgs struct {
@@ -278,6 +286,9 @@ func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspac
 	case errors.Is(err, codeworkspace.ErrAlreadyImported):
 		return model.CodeRepo{}, ipcerr.New("E_ALREADY_IMPORTED", err.Error())
 	}
+	if err == nil {
+		s.reposChanged()
+	}
 	return ipcerr.InternalResult(rec, err)
 }
 
@@ -288,7 +299,11 @@ func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.C
 	if args.Name == "" {
 		return model.CodeRepo{}, ipcerr.BadRequest("name is required")
 	}
-	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.Rename(args.ID, args.Name))
+	rec, err := s.Deps.Repos.CodeRepos.Rename(args.ID, args.Name)
+	if err == nil {
+		s.reposChanged()
+	}
+	return ipcerr.InternalResult(rec, err)
 }
 
 // ReorderRepos persists a user's drag order (ade repo tabs) — the same list ListRepos and the
@@ -304,7 +319,11 @@ func (s *CodeWorkspaceService) ReorderRepos(args CodeWorkspaceReorderArgs) ([]mo
 		}
 		seen[id] = true
 	}
-	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.Reorder(args.IDs))
+	list, err := s.Deps.Repos.CodeRepos.Reorder(args.IDs)
+	if err == nil {
+		s.reposChanged()
+	}
+	return ipcerr.InternalResult(list, err)
 }
 
 // RemoveRepo drops the row, its tab rows (CodeReposRepo.Remove's own transaction, §3.1) and stops
@@ -318,6 +337,7 @@ func (s *CodeWorkspaceService) RemoveRepo(args CodeWorkspaceIDArgs) error {
 		return ipcerr.InternalErr(err)
 	}
 	s.Registry.Close(args.ID)
+	s.reposChanged()
 	return nil
 }
 
