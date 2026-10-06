@@ -1,4 +1,5 @@
 import { split } from 'shlex';
+import { isCurlCommandName } from './detect';
 
 // P7 D1/D3: the shell-quoting half of curl parsing is `shlex@3.0.0` (F8's measurement) — this
 // module is the whole of that half. `split()` is called with no options, so ANSI-C (`$'…'`) and
@@ -58,6 +59,13 @@ const SHELL_OPERATORS = new Set(['|', '||', '&', '&&', ';', '>', '>>', '<', '#']
  *    `shell-operator` warning naming what was dropped.
  */
 export function tokenize(text: string): TokenizeResult {
+  // shlex reads `\` before `\r` as an escaped `\r` token, so CRLF continuations would leak "\r" argv entries.
+  text = text.replace(/\r\n?/g, '\n');
+  // The command word is dropped before shlex: it consumes the backslashes of a Windows path.
+  const command = /^\s*(?:"([^"]*)"|'([^']*)'|(\S+))/.exec(text);
+  if (command && isCurlCommandName(command[1] ?? command[2] ?? command[3] ?? '')) {
+    text = text.slice(command[0].length);
+  }
   let argv: string[];
   try {
     argv = split(text);

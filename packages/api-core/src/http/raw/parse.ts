@@ -99,7 +99,7 @@ export function parseRawRequest(
   const method = methodToken as HttpRequestTabState['method'];
 
   const afterMethod = requestLine.slice(firstSpace + 1).trim();
-  const versionMatch = afterMethod.match(/^(\S+)\s+HTTP\/\d\.\d$/);
+  const versionMatch = afterMethod.match(/^(\S+)\s+HTTP\/\d(?:\.\d)?$/);
   const target = versionMatch ? versionMatch[1] : afterMethod;
   if (target === '') {
     return { error: 'No request target was found on the first line.' };

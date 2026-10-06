@@ -77,6 +77,7 @@ export const SECRET_MARKER =
 function needsQuoting(value: string): boolean {
   if (value === '') return true; // empty-but-not-secret — a bare `KEY=` would parse as hasValue: false
   if (value !== value.trim()) return true; // leading/trailing whitespace would be lost unquoted
+  if (value.startsWith("'")) return true; // parseEnv would read it back as a single-quoted value
   return /[\n"#]/.test(value);
 }
 
@@ -100,7 +101,7 @@ function quoteIfNeeded(value: string): string {
  * - a secret row emits the fixed marker comment and an **empty value** — the renderer never has
  *   the plaintext to write out (F3), so this is a property of the architecture, not a choice;
  * - a non-secret value is quoted (double, with `\n`/`\t`/`\\`/`"` escapes) iff it is empty, has
- *   leading/trailing whitespace, or contains `\n`, `"` or `#`; otherwise emitted raw.
+ *   leading/trailing whitespace, starts with `'`, or contains `\n`, `"` or `#`; otherwise emitted raw.
  */
 export function serializeEnv(rows: readonly EnvRow[]): string {
   const blocks = rows.map((row) => {

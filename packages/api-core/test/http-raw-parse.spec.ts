@@ -91,6 +91,13 @@ describe('http/raw/parse.ts — parseRawRequest (P9 D10/D11)', () => {
   // ---- 4: a leading-'/' target joins onto the tab's existing origin; an absolute target
   // replaces it outright. ----
 
+  test('an HTTP/2 request line keeps the version out of the URL', () => {
+    const result = parseRawRequest('GET /a HTTP/2\n\n', ORIGIN);
+    expect('error' in result).toBe(false);
+    if ('error' in result) return;
+    expect(result.state.url).toBe('https://api.example.com/a');
+  });
+
   test('a leading-"/" target joins onto the current origin', () => {
     const result = parseRawRequest('GET /v2/health HTTP/1.1\n\n', ORIGIN);
     expect('error' in result).toBe(false);

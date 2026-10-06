@@ -47,6 +47,11 @@ export function looksLikeCurlCommand(text: string): boolean {
   const rest = match[4] ?? '';
   if (rest.trim() === '') return false;
 
+  return isCurlCommandName(command);
+}
+
+/** True for `curl` or `curl.exe` under any `/` or `\` path, any case. */
+export function isCurlCommandName(command: string): boolean {
   const base = (command.split(/[/\\]/).pop() ?? '').toLowerCase();
   return base === 'curl' || base === 'curl.exe';
 }

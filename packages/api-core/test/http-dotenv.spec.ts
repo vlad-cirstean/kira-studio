@@ -126,6 +126,11 @@ describe('serializeEnv', () => {
     expect(serializeEnv([row({ name: 'HASH', value: 'a#b' })])).toBe('HASH="a#b"\n');
   });
 
+  test('a leading single quote is quoted so it is not read back as single-quoted', () => {
+    expect(serializeEnv([row({ name: 'FMT', value: "'%Y-%m-%d'" })])).toBe('FMT="\'%Y-%m-%d\'"\n');
+    expect(serializeEnv([row({ name: 'OPEN', value: "'abc" })])).toBe('OPEN="\'abc"\n');
+  });
+
   test('an embedded newline is quoted and escaped', () => {
     expect(serializeEnv([row({ name: 'MULTI', value: 'a\nb' })])).toBe('MULTI="a\\nb"\n');
   });
@@ -166,6 +171,8 @@ describe('serializeEnv -> parseEnv round trip', () => {
       row({ id: '3', name: 'HASH', value: 'a#b' }),
       row({ id: '4', name: 'MULTI', value: 'line1\nline2' }),
       row({ id: '5', name: 'QUOTE', value: 'a "b" c' }),
+      row({ id: '7', name: 'WRAPPED', value: "'%Y-%m-%d'" }),
+      row({ id: '8', name: 'OPEN', value: "'abc" }),
       row({ id: '6', name: 'PLAIN', value: 'plain-value', description: 'a description' }),
     ];
     const text = serializeEnv(rows);
