@@ -12,7 +12,16 @@ Edit-scope tags per plan §8. `needs-other-part-file` items are also listed in
 - `go build ./apps/kira-studio/...`: pass.
 - `go vet` over `httpclient`, `grpcclient`, `apivars`, `postman`: pass.
 - `go test -race` over `httpclient`, `grpcclient`, `apivars`, `postman`, `bridge`, `storage/repos`: pass.
-- (TS checks recorded in block 7)
+- `bun test packages/api-core/test apps/kira-studio/tests/unit/go-ts-vocabulary-parity.spec.ts`:
+  254 pass, 0 fail.
+- `bun run --cwd packages/api-core typecheck`, `bun run typecheck`: pass.
+- UI subset `bun run test:ui:studio -- --grep "http-|grpc-|collections|api-|secrets|credential-reveal"`
+  (mock runtime): 134 passed.
+- Probes (scratch, deleted): cookie delete on IDN/trailing-dot/uppercase/scheme-less hosts;
+  same-host port redirect; `%q` error text; form-data trailing-space path; Go vs Bun case
+  mapping; Postman deep nesting and `originalRequest.auth`; curl CRLF and `curl.exe`; dotenv
+  quote round trip; raw `HTTP/2` line.
+- No red check.
 
 ## Findings
 
@@ -373,6 +382,37 @@ optional in TS; `Fidelity` three values); `grpcclient.CallResult`/`Message`/`Sch
 Unpinned vocabulary (not a finding): `HTTP_METHODS` vs Go `validMethods` and
 `postman.builderMethods` agree today but no extractor pins them.
 
+### Block 7: tests and checks
+
+#### F19 (low) curl paste detection accepts `curl.exe`/`CURL`/Windows paths the tokenizer does not strip
+
+- `packages/api-core/src/http/curl/detect.ts:44-51` (accepts `curl.exe`, quoted or
+  backslash paths, case-insensitive) vs `curl/tokenize.ts:68-70` (drops only exact `curl` or a
+  `*/curl` suffix).
+- Scenario: pasting `curl.exe https://x.dev` (or `CURL https://x.dev`, or
+  `C:\tools\curl.exe https://x.dev`) into the URL field is detected as a curl command and parsed,
+  but the command name stays in argv and becomes the URL: `curl.exe`, `CURL`, `C:toolscurl.exe`
+  (shlex consumes the backslashes). Probe confirmed all three; `http-curl-detect.spec.ts` pins
+  the detector side only.
+- Fix: share one command-name predicate: in `tokenize`, drop a leading token whose basename
+  (split on `/` or `\\` before shlex, or test the detector's own regex on the raw first line) is
+  `curl` or `curl.exe`, case-insensitively, matching `looksLikeCurlCommand`. Add the three cases
+  to `curl-cases.json`.
+
+Unit-test bar (plan §5.7): no finding. `transforms_test.go` is the WHATWG padding table (boundary
+arithmetic, beyond the corpus's two cases); `cookies_test.go` is the multi-rule candidate
+enumeration; `http-curl-detect.spec.ts` covers several interacting rules; `http-dynamic-fake.spec.ts`
+asserts catalogue completeness. `write_test.go` (one gRPC-skip filter) reads close to the bar's
+"single `if`" case, but CLAUDE.md applies the bar going forward, not as retroactive cleanup: not
+filed. Missing tests for complex logic are named in each finding's fix (F3, F12, F14, F15, F16,
+F19).
+
+## Summary
+
+19 findings: 0 high, 5 medium (F1, F12, F13, F14, F15), 14 low (F2-F11, F16-F19). One
+`design-decision` sub-item (F15, dotenv inline comments). Routed to `P168-routed-from-streamA.md`:
+F17 (renderer, whole fix), F18 (renderer half).
+
 ## Coverage
 
 - Block 1 (HTTP client): done. Reviewed `httpclient/{client,options,body,cookies,timeline,wire,errors}.go`,
@@ -398,4 +438,10 @@ Unpinned vocabulary (not a finding): `HTTP_METHODS` vs Go `validMethods` and
   structs; skimmed `SD/{collections,grpc-history}.ts` (field lists match `model`);
   `go-ts-api-parity.spec.ts`, `go-ts-vocabulary-parity.spec.ts` test lists;
   `SF/bridge/apiControl.ts` cookie and send types.
-- Block 7: not reached.
+- Block 7 (tests and checks): done. Read every Part 7 test file's case list; read in full
+  `cookies_test.go`, `transforms_test.go`, `write_test.go`, `parse_limit_test.go`; ran every
+  §0 check.
+
+Every owned file was reviewed or skimmed with the reason stated above. Not reviewed line by line:
+`grpcclient/*_test.go`, `postman/roundtrip_test.go`, `AC/test/http-*.spec.ts` bodies and the JSON
+fixtures (read for case lists and as guards of specific claims only, per plan §8).
