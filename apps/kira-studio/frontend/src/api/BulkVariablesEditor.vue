@@ -80,15 +80,41 @@ function toBulkEntries(
   }));
 }
 
+function sameRows(a: readonly EnvRow[], b: readonly EnvRow[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((row, i) => {
+      const other = b[i];
+      return (
+        row.id === other?.id &&
+        row.name === other.name &&
+        row.value === other.value &&
+        row.isSecret === other.isSecret &&
+        row.description === other.description
+      );
+    })
+  );
+}
+
 async function onApply(): Promise<void> {
-  const d = diff.value;
-  if (!d || applying.value) return;
-  if (d.removed.length > 0) {
-    const names = d.removed.map((r) => `"${r.name}"`).join(', ');
-    const ok = await confirmDialogStore.confirmDialog(
-      `Remove ${d.removed.length === 1 ? 'variable' : 'variables'} ${names}? Its value history goes with it.`,
-    );
-    if (!ok) return;
+  if (!diff.value || applying.value) return;
+  // Go deletes every live row named in no line, so removals and the warning below come from the
+  // rows as they are now, not the ones this editor opened on.
+  const liveRows = toEnvRows(props.rows);
+  const live = reconcileEnv(liveRows, parsed.value.entries);
+  const changedSinceOpen = !sameRows(baseline, liveRows);
+  if (live.removed.length > 0 || changedSinceOpen) {
+    const parts: string[] = [];
+    if (changedSinceOpen) {
+      parts.push('Variables changed since you opened bulk edit; applying overwrites those changes.');
+    }
+    if (live.removed.length > 0) {
+      const names = live.removed.map((r) => `"${r.name}"`).join(', ');
+      parts.push(
+        `Remove ${live.removed.length === 1 ? 'variable' : 'variables'} ${names}? Its value history goes with it.`,
+      );
+    }
+    if (!(await confirmDialogStore.confirmDialog(parts.join(' ')))) return;
   }
   applying.value = true;
   applyError.value = null;
