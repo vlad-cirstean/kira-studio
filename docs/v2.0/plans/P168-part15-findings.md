@@ -14,6 +14,7 @@ no Part 15 file changed). Worktree `p168-stream-b`.
 - Block 1 `gitprepare`: done.
 - Block 2 `gitops`: done.
 - Block 3 `gitpreflight`: done.
+- Block 4 `gitreview` store: done.
 
 ## Findings
 
@@ -185,8 +186,69 @@ an intact branch.
 Fix: do not memoize a result caused by budget exhaustion (or memoize depth and compare), so each
 node's verdict is independent of which candidate reached it first.
 
+### F10 (low) `gitreview.Store` has no closed state: concurrent `Close` panics, use after `Close` reopens and leaks a reaper
+
+`apps/kira-space/internal/gitreview/store.go:87-105`, `db.go:24-58`, `reaper.go`
+`startReaperLocked`.
+
+- `Close` releases `openMu` while waiting on `reapDone` but leaves `reapStop` set. A second
+  `Close` entering in that window sees `reapStop != nil` and calls `close(reapStop)` again:
+  panic "close of closed channel". Today's callers are sequential (`gitsock/server.go:350` then
+  `main.go:226`), so this is latent; the doc comment promises idempotence without that caveat.
+- After `Close` sets `sqlDB = nil`, any `conn()` (a review RPC still in flight on the bridge's
+  native git stream, which `gitSock.Close` does not drain, or an ADE `SetPinned`/`Purge` racing
+  quit) runs `ensureOpen` again: reopens review.db, re-runs migrations and the startup sweep, and
+  starts a new reaper goroutine nothing will ever stop or join. At quit this is a leaked goroutine
+  and a DB handle open past `Registry.Close`; in tests it is a goroutine leak per store.
+
+Fix: add a `closed bool` under `openMu`; `Close` sets it and nils `reapStop` before unlocking;
+`ensureOpen` returns an `ErrStoreClosed` once closed.
+
+### F11 (low) repo-id NFC collision keeps the stale row and drops the pinned one
+
+`apps/kira-space/internal/gitreview/normalize.go` `normalizeSessionRepoIDs`
+(`UPDATE OR REPLACE review_session SET repo_id = ?`).
+
+Probe (throwaway test, `sqlitex.Open` with `_foreign_keys=1`, removed): an NFC session (pinned,
+one file mark, one comment) and an NFD session for the same branch. After `normalizeStoredPaths`:
+1 session, 0 files, 0 comments, `pinned=0`, no FK violations. The cascade does run (no orphans),
+but the surviving row is always the renamed NFD one, whatever its age or pin. The doc comment
+accepts losing one side; it predates `pinned` (P150) and does not consider that the NFC row is the
+one the current build writes to, so it is the live one. A pinned session, which `Purge` and the
+sweep deliberately keep, is lost on the next lazy open.
+
+Fix: on collision delete the NFD row instead (`DELETE … WHERE repo_id = ? AND EXISTS (NFC row for
+same branch)` before the rename), or keep the row with the newer `last_used_at` and OR the
+`pinned` flags.
+
+### F12 (low) `Decompress` reads the whole flate stream before checking the length
+
+`apps/kira-space/internal/gitreview/snapshot.go` `Decompress` (`io.ReadAll(r)`).
+
+`content_bytes` is capped at `MaxSnapshotBytes` (1 MiB) on write (`gitsession/incremental.go:313`)
+but `Decompress` trusts nothing about the stream. A corrupt or tampered BLOB (flate expands up to
+about 1032:1, so a 1 MiB row inflates to about 1 GiB) is fully allocated before the length check
+rejects it, on every `review.fileDiff`/mark read of that path. Requires a damaged review.db, so
+low.
+
+Fix: `io.ReadAll(io.LimitReader(r, int64(want)+1))`, and reject `want > MaxSnapshotBytes`.
+
 ## §9 candidate outcomes
 
+- 1 (double `Close` panic): real but no concurrent caller today; reported as part of F10.
+- 2 (reopen after `Close`, orphan reaper): reported F10.
+- 3 (`Delete` notifies with zero rows): true (`store.go:389-394` ignores `RowsAffected`), but
+  `ade.onReviewChange` (`ade/ghsync.go:214-245`) only queues an unmark when the path is in the
+  GitHub-synced ledger, and the queued worker reconciles; a spurious notify costs one recompute.
+  Observer runs under `Store.Lock` and does two kira.db reads: latency only. Dropped.
+- 4 (`UPDATE OR REPLACE` cascade, pin): probed; cascade fires, no orphans; pin and live data lost
+  on collision. Reported F11.
+- 5 (`Decompress` unbounded): reported F12 (low; needs a corrupt DB).
+- 6 (`SchemaTooNewError`): `ensureOpen` returns it unwrapped and not memoised; every review call
+  fails with "database schema_version (N) is newer than this build knows about (M) — refusing to
+  run against a downgraded app", which is clear, not opaque. Only a stale comment
+  (`migrate.go:17-18` says `startupfail` classifies it; a lazy open never reaches startup). No
+  failure. Dropped.
 - 9 (tick after flush): reported F1 (mechanism differs: the late tick wins the last batch, so
   `flush` has nothing to wait on).
 - 10 (nil `Env`, scrub gaps): every production caller passes `BuildEnv` output
@@ -210,8 +272,8 @@ node's verdict is independent of which candidate reached it first.
 - 17 (`checkedOutElsewhere` first only): the loop breaks after the first blocked branch; the
   verdict is still `blocked`, and a re-run reports the next one. UX only, no wrong outcome.
   Dropped.
-- 18 (`ConfirmToken` trailing slash or `/`): `filepath.Base` strips trailing slashes; `/` is the
-  main worktree and is blocked first (`mainWorktree`); `prepareWorktreeRemove` re-derives the token
+- 18 (`ConfirmToken` trailing slash or `/`): `filepath.Base` strips trailing slashes; `/` is
+  either the main worktree (blocked `mainWorktree`) or not a worktree (blocked `notAWorktree`); `prepareWorktreeRemove` re-derives the token
   from the same fresh preflight. Dropped.
 - 19 (multi-sha revert verdict): by contract, prediction covers `Shas[0]` only and
   `PredictedFor` names it on the wire (`gitpreflight/revert.go`), so the client can say so;
@@ -261,3 +323,19 @@ worktree add/remove, `DetectCycleFrom`, cycle detection inside `resolveStackBase
 commit cherry-pick prediction folds to `unknown` (merge-tree on missing `sha^1` exits 128).
 A recorded `kirastackbase` that does not resolve as a commit falls back to merge-base, so a
 dash-leading config value never reaches `RebaseOntoArgs` (lead 12 base half).
+
+### Block 4 `gitreview` store
+
+Reviewed: `db.go`, `migrate.go`, `migrations/{0001,0002,0003}.sql`, `migrations/embed.go`,
+`store.go`, `reaper.go`, `snapshot.go`, `normalize.go`, `comments.go`, `export.go`. Callers:
+`gitsession/registry.go:109,309` (`NewStore`, `Close`), `main.go:200-240` shutdown order,
+`gitsock/server.go:300-355`, `ade/ghsync.go:205-245` (`SetObserver`, `onReviewChange`),
+`gitsession/incremental.go:292-314,776` (size cap, `Put`); `internal/sqlitex` `Open`, `Migrate`,
+`SchemaTooNewError`. Probe: NFC/NFD collision (F11). Checked and clean: migration order and
+FK shape (`review_range` cascades from `review_file`, comments from session), `upsertSession`
+read-back, `Put` atomicity (file + ranges in one tx, notify after commit), `Touch` never creates,
+`SetPinned` creates by design, `sweepDB`/`Purge` skip pinned, `incremental_vacuum` only after
+deletes, `keyedMutex` refcount (release via `sync.Once`), `RemoveComment` scoped by session
+subquery (no cross-session delete), `ClearComments`, `SortAnchored` total order,
+`FormatComments` (body is the user's own text; no app data injected). G32 round-3 #6 holds (paths
+never NFC-rewritten).
