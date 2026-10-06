@@ -3,7 +3,7 @@
 Plan: `P168-part19-git-ui-components.md`. Base `1e2b327`; plan commit `d9d3b35`; HEAD reviewed
 `d9d3b35` (branch `p168-stream-b`). Reviewer reports only; fixes nothing.
 
-Status: blocks 1-2 done.
+Status: blocks 1-3 done.
 
 ## Checks (block 1, §1.1)
 
@@ -145,6 +145,75 @@ Status: blocks 1-2 done.
   ("Couldn't load the repository — …") in both hosts; keep "isn't reachable" for the
   `ConnectionBanner`, which only VS Code drives.
 
+### F8. Grid has no Tab stop once the selected row scrolls out of the rendered range
+
+- Severity: medium. Verified (scratch probe, `fakeGraphHost` `manyRows`, 300 rows).
+- Where: `packages/git-ui/src/components/CommitGrid.vue:719-736` (`applyAccessibility`:
+  `tabbableRow` is the selected display row, else row 0, and only rows inside the rendered range
+  get `tabIndex` set).
+- Scenario: VS Code webview or Space. Click row 2, scroll the grid to the bottom with the wheel.
+  Rendered rows are 262-299; none carries `tabindex="0"` (probe: the only `[tabindex="0"]` nodes
+  under `commit-grid` are the three `KuiColumnResizeHandle`s). Tab from the toolbar lands on the
+  resize handles and then leaves the grid. A keyboard user cannot reach any row until the
+  selection is scrolled back into view by other means. The same holds with nothing selected once
+  row 0 is scrolled away, and when the selected commit is hidden in a collapsed group.
+- Fix: when `tabbableRow` is outside `[range.startRow, range.endRow]` (or not rendered), give
+  `tabIndex = 0` to the first rendered row at or below the viewport top instead, so exactly one
+  rendered row is always tabbable. Add a VS Code interaction assertion (Part 23 file).
+- `needs-other-part-file: apps/kira-space-vscode/tests/interaction/graph-columns.spec.ts (Part 23)`
+  for the guard (or a new spec beside it).
+
+### F9. Every row-height index rebuild materializes every loaded commit twice
+
+- Severity: medium. Verified for cost (scratch bun probe, not committed: two `commitAt` calls per
+  row over a 50,000-row store took 139-191 ms); call path code-read.
+- Where: `packages/git-ui/src/components/CommitGrid.vue:868-882` (no `rowHeightProvider`, so
+  SlickGrid's default is used); `components/columns.ts:423-432` (`rowHasBadges` calls
+  `store.commitAt(row).sha`) and `:471-476` (`getItem` is `store.commitAt`). SlickGrid 5.20
+  `ensureRowPositionIndexer` (`slick.grid.ts:6356-6383`) calls
+  `provider(grid, row, this.getDataItem(row))` for every row, so each rebuild runs `getItem`
+  (one full `commitAt`: hex SHA, parent SHAs, two identities, subject, decorations) and
+  `getItemMetadata` (a second `commitAt` for every undecorated row once `prsFor` is wired, which
+  `CommitGrid` always does).
+- Scenario: Space or VS Code, 200k-commit repo. The index rebuilds on every `invalidateRowHeights`
+  (each relayout landing in `handleChunkLayout`, each coalesced PR resolution in
+  `scheduleAncestryRebuild`, each token change) and on every row-count change. At the measured
+  rate that is several hundred ms of main-thread work per rebuild, repeated while history
+  streams in and while PRs resolve: input and scroll stall.
+- Fix: pass `rowHeightProvider: (_grid, row) => rowMetadata(deps, row)?.height` (no data item),
+  and make `rowHasBadges` read `store.shaAt(row)` instead of `commitAt(row).sha`. Optionally
+  short-circuit rows with no decoration when `prByAncestry`/`bySha` are empty.
+
+### F10. Grid PR badge buttons are Tab stops that Enter cannot activate
+
+- Severity: medium. Code-read.
+- Where: `packages/git-ui/src/components/refBadges.ts:288-293` (`<button data-pr-number>` with
+  default tab order, built inside SlickGrid rows when `openExternalCapability`);
+  `gridKeyboard.ts:76-86` (Enter is claimed for `toggleDetail` with `preventDefault()`).
+- Scenario: Space (`openExternal: true`) or VS Code with PRs resolved. `prForCommit` answers for
+  every commit reachable from a PR head (`state/pr.ts:397-402`), so many rendered rows carry a
+  badge. Each is a native Tab stop inside the roving-tabindex grid: Tab walks through every
+  rendered badge instead of leaving the grid. On a focused badge, Enter bubbles to the canvas
+  listener, toggles the detail pane and cancels the button's activation; Space opens the PR. The
+  focus also snaps back to the row div on the next re-render (`applyAccessibility`'s
+  `focusedRowIndex` restore). G21 D5 removed the in-row SHA button for the same class of reason.
+- Fix: set `badge.tabIndex = -1` on the grid's PR button (keyboard users reach the PR through
+  the detail pane's PR row and the context menu); keep it a `<button>` for pointer clicks.
+
+### F11. F1's lane gate does not cover lane colour or fork-stub hit testing
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/CommitGrid.vue:341-342` (`colorOf` checks only
+  `row < layout.rowCount`) and `:531` (`handleForkStubClick` compares against
+  `layout.laneOf(displayRow)`); both read `layout` while `graphView.layoutCurrent` is false.
+- Scenario: grouped mode, expand a group. For one worker round trip the plan has moved rows but
+  `layout` is still keyed by the old plan. The graph cell is blank (F1, verified), yet the message
+  cell's HEAD/lane badge tint (`buildRefBadges(..., laneCtx.colorOf(row))`) comes from whichever
+  commit sat at that display row before, and a click in the graph cell tests a stale lane (or a
+  row past the old `layout.rowCount`, where `#locateRow` has no chunk).
+- Fix: gate both on `props.graphView.layoutCurrent` (return `undefined` / `false`), matching
+  `readSlice`.
+
 ## Candidate fates (§9)
 
 - 1 (lanes blank after layout lands): dropped. Probe passed for expand, toggle and refresh;
@@ -165,6 +234,17 @@ Status: blocks 1-2 done.
 - 7 (second persistence watcher on retry): dropped as stated. The watcher registers only after
   every `await` succeeded, and a successful run hides Retry, so it registers at most once. The
   related defects (never registered after a partial failure, not stopped on unmount) are F6.
+- 11 (`TokenReader.watch()` layout thrash): dropped. The observer watches only `class`/`style`
+  on `html` and `body` (not the subtree), and each callback does one `getComputedStyle` plus
+  three probe reads; probes are `body` children, so reading them cannot re-trigger it. The
+  realistic trigger rate in Space (reka scroll-lock on dialog open/close) is a handful per user
+  action.
+- 12 (row heights after PR data arrives): dropped. `scheduleAncestryRebuild`
+  (`CommitGrid.vue:623-641`) calls `invalidateRowHeights()` after `pr.generation` and row-count
+  changes; stack decoration never changes row height. (The cost of that rebuild is F9.)
+- 13 (`linkify.ts`): dropped. Only `https?://` matches, segments become a `<button>` calling the
+  host's `onOpenExternal` or inert text, never an `<a href>`; it runs in Vue-rendered
+  `CommitMeta`, not a SlickGrid formatter, so listeners die with their nodes.
 - 18 (comment over 100 columns, `searchResultsModel.ts:52-53`): held for grouping with a comment
   finding.
 
@@ -190,4 +270,12 @@ holds; dispose checked in block 2.
   Content states are mutually exclusive through the `v-if` chain. `onBeforeUnmount` does not call
   `detailState.dispose()`; `bridge.dispose()` rejects its pending request with
   `transport-closed` anyway, so no finding.
-- Blocks 3-8: not reached yet.
+- Block 3: done. Reviewed `CommitGrid.vue` (script in full; template; `<style>` selectors: every
+  rule targets SlickGrid-built DOM or formatter output, plus the `.kv-badge*` kind colours that
+  `badgeClass.ts` documents as staying there), `columns.ts`, `gridKeyboard.ts`,
+  `rowAccessibility.ts`, `refBadges.ts` (DOM construction), `linkify.ts`, `searchHighlight.ts`
+  (zero-width matches skipped, `matchAll` advances), `dateFormat.ts`, `LoadMoreButton`,
+  `ShowMoreButton`, `theme/readTokens.ts`. Skimmed `countFormat.ts`, `badgeClass.ts` (trivial).
+  Lifecycle: `onBeforeUnmount` disconnects the observer, cancels both rAFs, unsubscribes layout and
+  tokens, removes probes and listeners, destroys the grid; no callback outlives it.
+- Blocks 4-8: not reached yet.
