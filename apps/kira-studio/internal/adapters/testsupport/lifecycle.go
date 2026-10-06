@@ -126,7 +126,7 @@ func ConnectCancelScenario(t *testing.T, a adapters.Adapter, cfg model.ResolvedC
 		if err == nil {
 			t.Fatal("Connect on a cancelled ctx returned nil")
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("Connect still blocked 5s after its ctx was cancelled")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Connect still blocked 2s after its ctx was cancelled")
 	}
 }

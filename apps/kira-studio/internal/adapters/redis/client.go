@@ -217,9 +217,19 @@ func (s *dbConnectionSet) dial(ctx context.Context, dbIndex int) (*clientEntry, 
 		opts.TLSConfig = s.fields.tlsConfig
 	}
 	client := goredis.NewClient(opts)
-	if err := redisPing(ctx, client); err != nil {
+	// go-redis reads without watching ctx, so a cancelled dial would wait out the read timeout;
+	// closing the client fails the pending read.
+	pingErr := make(chan error, 1)
+	go func() { pingErr <- redisPing(ctx, client) }()
+	select {
+	case err := <-pingErr:
+		if err != nil {
+			_ = client.Close()
+			return nil, mapError(err)
+		}
+	case <-ctx.Done():
 		_ = client.Close()
-		return nil, mapError(err)
+		return nil, adapters.CheckCancelled(ctx)
 	}
 	return &clientEntry{client: client}, nil
 }

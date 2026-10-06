@@ -11,6 +11,7 @@ package sqs_test
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -530,4 +531,12 @@ func TestSqs_Mutate_DeleteWithoutReceiptHandleIsQueryError(t *testing.T) {
 	if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
 		t.Errorf("code = %v, want E_QUERY", code)
 	}
+}
+
+func TestSqs_Connect_CancelledCtxReturns(t *testing.T) {
+	fixture := testsupport.StartSqs(t)
+	proxy := testsupport.StartPausableProxyTo(t, strings.TrimPrefix(fixture.Proxy.Endpoint, "http://"), fixture.Config)
+	cfg := fixture.Config
+	cfg.Options = map[string]any{"endpoint": "http://" + proxy.Addr()}
+	testsupport.ConnectCancelScenario(t, newAdapter(t), cfg, proxy)
 }
