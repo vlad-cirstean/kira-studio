@@ -217,4 +217,6 @@ snapshot), since that is a design change, not a tweak.
 
 ## Result
 
-(Filled in by the implementer.)
+Implemented as planned, no deviations. Commit 1 holds code and tests; `TestOpenPulls_LargePage` builds a
+100-item, over-4 MiB page in the test and runs it through the real `execRunner` with a fake `gh`.
+Size measurement still open (Known open item in ARCHITECTURE.md).
