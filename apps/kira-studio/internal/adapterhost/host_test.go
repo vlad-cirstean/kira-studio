@@ -215,3 +215,36 @@ func TestSubscribe_UnsubscribeRacesEmitWithoutPanicking(t *testing.T) {
 }
 
 func strp(s string) *string { return &s }
+
+func TestCancelOp_BeforeRunOpCancelsTheLaterRun(t *testing.T) {
+	h := NewHost(adapters.Deps{}, nil)
+	if ok, err := h.CancelOp(context.Background(), "early"); ok || err != nil {
+		t.Fatalf("CancelOp = %v, %v", ok, err)
+	}
+	_, _, err := h.RunOp(context.Background(), OpSpec{OpID: "early", Kind: "read"},
+		func(context.Context, *adapters.OpCtx) (any, error) {
+			t.Fatal("a pre-cancelled op must not run")
+			return nil, nil
+		})
+	var ae *adapters.Error
+	if !errors.As(err, &ae) || ae.Code != adapters.CodeCancelled {
+		t.Fatalf("got %v, want E_CANCELLED", err)
+	}
+
+	h.earlyTTL = time.Millisecond
+	_, _ = h.CancelOp(context.Background(), "stale")
+	time.Sleep(5 * time.Millisecond)
+	ran := false
+	_, _, err = h.RunOp(context.Background(), OpSpec{OpID: "stale", Kind: "read"},
+		func(context.Context, *adapters.OpCtx) (any, error) { ran = true; return nil, nil })
+	if err != nil || !ran {
+		t.Fatalf("expired early cancel blocked a later run: ran=%v err=%v", ran, err)
+	}
+
+	for i := range maxEarlyCancels + 10 {
+		_, _ = h.CancelOp(context.Background(), "flood-"+strconv.Itoa(i))
+	}
+	if n := len(h.earlyCancels); n > maxEarlyCancels {
+		t.Fatalf("earlyCancels grew to %d", n)
+	}
+}

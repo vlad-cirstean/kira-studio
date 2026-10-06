@@ -132,9 +132,19 @@ type Host struct {
 
 	mu      sync.Mutex
 	running map[string]runningOp
+	// earlyCancels remembers an op id whose CancelOp arrived before RunOp registered it (the
+	// renderer sends Run and Stop as separate bound calls), keyed to its expiry.
+	earlyCancels map[string]time.Time
+	earlyTTL     time.Duration
 
 	throttles *throttleRegistry
 }
+
+const (
+	earlyCancelTTL = 5 * time.Second
+	// maxEarlyCancels bounds earlyCancels so a misbehaving renderer cannot grow it.
+	maxEarlyCancels = 1024
+)
 
 // NewHost constructs a Host. cache is used by the native Connect/Disconnect handlers
 // (disconnecting releases the connection's cached pages, §2.2 — see router.go).
@@ -148,7 +158,8 @@ type Host struct {
 // downstream can be — and has been — dropped.
 func NewHost(deps adapters.Deps, cache *enginecache.Cache) *Host {
 	deps = withDefaultLog(deps)
-	return &Host{deps: deps, cache: cache, running: make(map[string]runningOp), throttles: newThrottleRegistry()}
+	return &Host{deps: deps, cache: cache, running: make(map[string]runningOp),
+		earlyCancels: make(map[string]time.Time), earlyTTL: earlyCancelTTL, throttles: newThrottleRegistry()}
 }
 
 // withDefaultLog substitutes a no-op for a nil deps.Log, so nothing downstream needs to nil-check
@@ -202,6 +213,13 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 	if _, exists := h.running[opID]; exists {
 		h.mu.Unlock()
 		return "", nil, adapters.New(adapters.CodeQuery, "duplicate operation id: "+opID, nil)
+	}
+	if expiry, ok := h.earlyCancels[opID]; ok {
+		delete(h.earlyCancels, opID)
+		if time.Now().Before(expiry) {
+			h.mu.Unlock()
+			return "", nil, adapters.New(adapters.CodeCancelled, "operation was cancelled before it started", nil)
+		}
 	}
 	derived, cancel := context.WithCancel(ctx)
 	h.running[opID] = runningOp{cancel: cancel, connectionID: spec.ConnectionID}
@@ -298,14 +316,39 @@ func (h *Host) emitJSON(topic string, payload any) {
 	h.events.Emit(oplog.Event{Topic: topic, Payload: body})
 }
 
+// rememberEarlyCancelLocked records an unknown id for RunOp to refuse; h.mu must be held.
+func (h *Host) rememberEarlyCancelLocked(opID string) {
+	now := time.Now()
+	for id, expiry := range h.earlyCancels {
+		if !now.Before(expiry) {
+			delete(h.earlyCancels, id)
+		}
+	}
+	if len(h.earlyCancels) >= maxEarlyCancels {
+		var oldest string
+		var oldestExpiry time.Time
+		for id, expiry := range h.earlyCancels {
+			if oldest == "" || expiry.Before(oldestExpiry) {
+				oldest, oldestExpiry = id, expiry
+			}
+		}
+		delete(h.earlyCancels, oldest)
+	}
+	h.earlyCancels[opID] = now.Add(h.earlyTTL)
+}
+
 // CancelOp is scheduler/ops.ts's cancelOp, in the same order and for the same reason: the local
 // abort unblocks the running RunOp call immediately; the adapter call is what actually kills the
 // server-side work (§5.1: cancellation is always forwarded). Both steps are best-effort — an
-// unknown op id, or an adapter that has already gone, is not an error, matching cancel()'s own
+// unknown op id (remembered briefly, so a Stop that beats its own Run still cancels it), or an
+// adapter that has already gone, is not an error, matching cancel()'s own
 // "never throws for already finished" contract.
 func (h *Host) CancelOp(ctx context.Context, opID string) (bool, error) {
 	h.mu.Lock()
 	op, ok := h.running[opID]
+	if !ok {
+		h.rememberEarlyCancelLocked(opID)
+	}
 	h.mu.Unlock()
 	if !ok {
 		return false, nil
