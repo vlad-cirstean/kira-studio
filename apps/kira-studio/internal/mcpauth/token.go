@@ -166,7 +166,7 @@ func Save(path string, rec Record) error {
 	if err != nil {
 		return fmt.Errorf("mcpauth: encode %s: %w", path, err)
 	}
-	return atomicWrite0600(path, data)
+	return AtomicWriteFile(path, data, 0o600)
 }
 
 // SaveHelperToken persists plain to path (HelperTokenPathNamed's own path), mode 0600, atomically
@@ -175,7 +175,7 @@ func Save(path string, rec Record) error {
 // (dbMcpTokenProviderFor's mint branch, Regenerate) — never on a load-only path, where this file
 // already holds the correct value from the last mint and needs no update.
 func SaveHelperToken(path, plain string) error {
-	return atomicWrite0600(path, []byte(plain))
+	return AtomicWriteFile(path, []byte(plain), 0o600)
 }
 
 // LoadHelperToken reads path's plaintext back (F8): the embedded server's own "can I show
@@ -193,13 +193,14 @@ func LoadHelperToken(path string) (plain string, ok bool, err error) {
 	return string(data), true, nil
 }
 
-// atomicWrite0600 is Save/SaveHelperToken's own shared temp-file-plus-rename write, mode 0600.
+// AtomicWriteFile is the shared temp-file-plus-rename write (Save, SaveHelperToken, the header
+// helper script), file mode perm. Rename replaces a symlink rather than following it.
 // Rename is atomic on both target platforms (POSIX same-filesystem rename; this repo's own
 // KIRA_HOME layout keeps the temp file alongside the real one, so it is), so a reader only ever
 // sees the old complete file or the new complete file, never a partial one — a crash or a full disk
 // mid-write must not leave a file its own reader (json.Unmarshal for a Record, a shell `cat` for a
 // helper token) then fails to parse.
-func atomicWrite0600(path string, data []byte) error {
+func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("mcpauth: mkdir %s: %w", dir, err)
@@ -210,7 +211,7 @@ func atomicWrite0600(path string, data []byte) error {
 	}
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName) // no-op once the rename below succeeds
-	if err := tmp.Chmod(0o600); err != nil {
+	if err := tmp.Chmod(perm); err != nil {
 		tmp.Close()
 		return fmt.Errorf("mcpauth: chmod %s: %w", tmpName, err)
 	}

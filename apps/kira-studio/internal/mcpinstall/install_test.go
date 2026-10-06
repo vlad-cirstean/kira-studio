@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -25,29 +26,29 @@ func TestShellSingleQuoteRoundTrips(t *testing.T) {
 	}
 }
 
-// TestCommandQuotesHeadersHelperPath guards F10: the displayed command's own JSON payload must
-// carry a single-quoted headersHelper value, the same way Install below sends it, so a path with a
-// space in it does not silently split into two shell words once Claude Code later runs it.
-func TestCommandQuotesHeadersHelperPath(t *testing.T) {
-	helperPath := "/Users/vlad cirstean/.kira/mcp-header-helper.sh"
-	cmd := Command("kira-db", "http://127.0.0.1:8766/mcp", helperPath)
-
-	// Extract the add-json payload — the single-quoted JSON blob after "add-json --scope user
-	// kira-db ".
-	idx := strings.Index(cmd, "add-json --scope user kira-db '")
-	if idx < 0 {
-		t.Fatalf("command %q does not contain the expected add-json invocation", cmd)
+// TestCommandRoundTripsThroughShell guards F10/P168 Part 6 F1: the copy-paste text, run through a
+// real shell, must hand `claude` the same argv Install passes, including for a helper path with a
+// space or a single quote.
+func TestCommandRoundTripsThroughShell(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no sh")
 	}
-	payloadStart := idx + len("add-json --scope user kira-db '")
-	payloadJSON := cmd[payloadStart : len(cmd)-1] // trailing closing quote
-
-	var decoded serverJSON
-	if err := json.Unmarshal([]byte(payloadJSON), &decoded); err != nil {
-		t.Fatalf("payload is not valid JSON: %v (payload: %s)", err, payloadJSON)
-	}
-	want := shellSingleQuote(helperPath)
-	if decoded.HeadersHelper != want {
-		t.Fatalf("HeadersHelper = %q, want %q (single-quoted)", decoded.HeadersHelper, want)
+	for _, helperPath := range []string{
+		"/Users/a/.kira/mcp-header-helper.sh",
+		"/Users/a b/.kira/mcp-header-helper.sh",
+		"/Users/o'n/.kira/mcp-header-helper.sh",
+	} {
+		cmd := Command("kira-db", "http://127.0.0.1:8766/mcp", helperPath)
+		script := "claude() { for a; do printf '%s\\n' \"$a\"; done; }\n" + cmd
+		out, err := exec.Command("sh", "-c", script).Output()
+		if err != nil {
+			t.Fatalf("sh rejected %q: %v", cmd, err)
+		}
+		payload, _ := json.Marshal(serverJSON{Type: "http", URL: "http://127.0.0.1:8766/mcp", HeadersHelper: shellSingleQuote(helperPath)})
+		want := "mcp\nremove\n--scope\nuser\nkira-db\nmcp\nadd-json\n--scope\nuser\nkira-db\n" + string(payload) + "\n"
+		if string(out) != want {
+			t.Errorf("helper %q: shell argv = %q, want %q", helperPath, out, want)
+		}
 	}
 }
 
