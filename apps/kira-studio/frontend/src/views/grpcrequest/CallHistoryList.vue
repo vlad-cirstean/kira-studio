@@ -19,10 +19,10 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import { useGrpcCallHistoryStore } from './history';
+import { useGrpcCallHistoryStore, useGrpcHistoryList, useGrpcHistoryViewing } from './history';
 
 const confirmDialogStore = useConfirmDialogStore();
 const tabIncognitoStore = useTabIncognitoStore();
@@ -38,17 +38,19 @@ const grpcCallHistoryStore = useGrpcCallHistoryStore();
 // message *sequence* with metadata, a genuinely different design left for a future row (§5).
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
-const rt = computed(() => grpcCallHistoryStore.runtime[props.tab.id]);
-const entries = computed<GrpcCallHistoryEntry[]>(() => rt.value?.entries ?? []);
-const viewingId = computed(() => rt.value?.viewing?.id ?? null);
+const { query: listQuery, entries } = useGrpcHistoryList(() => props.tab);
+const { viewingId, error: snapshotError } = useGrpcHistoryViewing(() => props.tab.id);
+const errorMessage = computed(
+  () =>
+    grpcCallHistoryStore.ui[props.tab.id]?.actionError ??
+    listQuery.error.value?.message ??
+    snapshotError.value?.message ??
+    null,
+);
 // P18 D6: HTTP's own "the list is full" predicate, restated for gRPC's cap.
 const atCap = computed(() => entries.value.length >= GRPC_HISTORY_PER_SCOPE_LIMIT);
 // P71 §3.5: ResponseHistoryList.vue's own explanation for the silence, restated for gRPC.
 const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
-
-onMounted(() => {
-  grpcCallHistoryStore.ensureGrpcHistoryFresh(props.tab.id);
-});
 
 // P22b D14: HTTP's own ResponseHistoryList.vue idiom (P16 D15) — an always-visible filter box
 // above the list, not a toggle (a compact history pane, not a big document). Matches method,
@@ -107,8 +109,8 @@ async function onClear(): Promise<void> {
       </Button>
     </div>
 
-    <Alert v-if="rt?.error" variant="destructive">
-      <AlertDescription>{{ rt.error }}</AlertDescription>
+    <Alert v-if="errorMessage" variant="destructive">
+      <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
     <Empty v-else-if="entries.length === 0">
       <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>

@@ -11,9 +11,9 @@ import '@workbench/testing/unit/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcCallEvent, GrpcCallResultWire, GrpcSchemaWire } from '@shared/domain/grpc';
-import { deferred } from '@workbench/testing/unit/async';
+import { deferred, sleep } from '@workbench/testing/unit/async';
 import { setActivePinia } from 'pinia';
-import { isReactive } from 'vue';
+import { effectScope, isReactive } from 'vue';
 import { pinia } from '../../frontend/src/state/pinia';
 
 setActivePinia(pinia);
@@ -30,6 +30,8 @@ const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
   '../../frontend/src/api/tabs'
 );
 const { useGrpcRequestViewStore } = await import('../../frontend/src/views/grpcrequest/state');
+const { useGrpcHistoryList } = await import('../../frontend/src/views/grpcrequest/history');
+const { findGrpcRequestTab } = await import('../../frontend/src/api/tabs');
 const grpcRequestViewStore = useGrpcRequestViewStore();
 
 // call()'s pre-flight loads the tree and environments; unstubbed they never settle in this harness.
@@ -46,7 +48,7 @@ afterEach(() => {
   control.grpcHistoryList = originalGrpcHistoryList;
 });
 
-// P108 F1: counts how many times the gRPC call-history store actually fetches its list — the
+// P108 F1: counts how many times the gRPC call-history list query actually fetches — the
 // direct, observable signature of noteGrpcCallRecorded firing. Set to `historyListCalls = 0`
 // (below) and the tab's `responsePane` to 'history' (so noteRecorded's own eager branch fires a
 // real load()) at the top of any test that needs to assert on it.
@@ -107,10 +109,12 @@ function terminalResult(): GrpcCallResultWire {
 
 function setUpStreamingTab(): string {
   const id = openGrpcRequestTab();
-  // responsePane: 'history' so noteGrpcCallRecorded's own eager branch (api/state/history.ts's
-  // noteRecorded) fires a real list() fetch per call — the observable signal the F1 test below
-  // counts via historyListCalls, rather than the lazy `stale` flag a non-History pane would set.
+  // responsePane: 'history' plus a mounted list observer, so noteGrpcCallRecorded's refresh
+  // (api/state/history.ts's noteRecorded) refetches the active list — the observable signal the F1
+  // test below counts via historyListCalls, rather than the lazy stale mark a hidden pane gets.
   patchGrpcRequestTabState(id, { service: 'Svc', method: 'Stream', responsePane: 'history' });
+  const tab = findGrpcRequestTab(id) as NonNullable<ReturnType<typeof findGrpcRequestTab>>;
+  effectScope().run(() => useGrpcHistoryList(() => tab));
   grpcRequestViewStore.schemaRuntime[id] = {
     status: 'idle',
     schema: streamingSchema(),
@@ -124,6 +128,8 @@ function setUpStreamingTab(): string {
 describe("a server-streaming call's terminal event race (F5)", () => {
   test('the control-plane response arriving before the terminal event does not lose the trailing batch', async () => {
     const id = setUpStreamingTab();
+    await sleep(); // the observer's own initial list fetch is not the signal under test
+    historyListCalls = 0;
 
     const grpcCallDeferred = deferred<GrpcCallResultWire>();
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall

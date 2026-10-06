@@ -27,7 +27,7 @@ import ResponseFindBar, {
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
 import CallHistoryList from './CallHistoryList.vue';
-import { useGrpcCallHistoryStore } from './history';
+import { useGrpcCallHistoryStore, useGrpcHistoryList, useGrpcHistoryViewing } from './history';
 import { useGrpcRequestViewStore } from './state';
 
 // D14: three segments — Messages · Metadata · History — and deliberately no Raw, no Timeline (D14
@@ -38,28 +38,16 @@ const grpcRequestViewStore = useGrpcRequestViewStore();
 const grpcCallHistoryStore = useGrpcCallHistoryStore();
 
 const rt = computed(() => grpcRequestViewStore.runtime[props.tab.id]);
-const historyRt = computed(() => grpcCallHistoryStore.runtime[props.tab.id]);
-
-onMounted(() => {
-  grpcCallHistoryStore.ensureGrpcHistoryFresh(props.tab.id);
-});
-
-watch(
-  () => props.tab.state.itemId,
-  () => {
-    const hrt = historyRt.value;
-    if (hrt) hrt.entries = null;
-    grpcCallHistoryStore.ensureGrpcHistoryFresh(props.tab.id);
-  },
-);
+// P175 D4: HTTP ResponsePane.vue's own history queries, restated for gRPC.
+const { entries: historyEntries } = useGrpcHistoryList(() => props.tab);
+const { viewing } = useGrpcHistoryViewing(() => props.tab.id);
 
 // D10: the source swap — a selected history entry's snapshot, or the live call, or none.
-const viewing = computed(() => historyRt.value?.viewing ?? null);
 const liveResult = computed(() => rt.value?.result ?? null);
 const liveMessages = computed(() => rt.value?.messages ?? []);
 
-const hasHistory = computed(() => (historyRt.value?.entries?.length ?? 0) > 0);
-const historyCount = computed(() => historyRt.value?.entries?.length ?? 0);
+const hasHistory = computed(() => historyEntries.value.length > 0);
+const historyCount = computed(() => historyEntries.value.length);
 
 const codeName = computed(() => {
   if (viewing.value) return viewing.value.snapshot.entry.codeName;

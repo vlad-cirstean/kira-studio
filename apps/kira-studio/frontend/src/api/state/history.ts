@@ -1,253 +1,210 @@
+import { useQuery } from '@tanstack/vue-query';
+import { queryClient } from '@workbench/state/queryClient';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
-import { reactive } from 'vue';
+import { computed, type MaybeRefOrGetter, reactive, toValue, watch } from 'vue';
+import { refreshApiQuery } from './apiQueries';
 
-// P12 D12: the per-tab history runtime the two protocols shared byte-for-byte (F9) — same
-// {entries, loading, stale, viewing, error} shape, same seven functions, differing only in the
-// four `control` methods, the two snapshot types, the tab finder and HTTP's own extra
-// `selected: string[]` compare list (carried through `Extra` rather than forcing gRPC to have
-// one). Deliberately does not reuse views/shared/viewOp.ts's createRuntimeStore: that file lives
-// under views/**, which api/** (D16 rule (a)) may not import — the five-line reactive-record
-// pattern is small enough to own here rather than reach across that boundary for it.
-export interface HistoryRuntime<Entry, Snapshot> {
-  entries: Entry[] | null; // null = never loaded; [] = loaded and empty
-  loading: boolean;
-  stale: boolean; // a send/call happened while the pane was not showing
-  viewing: { id: string; snapshot: Snapshot } | null;
-  error: string | null;
+// P175 D4 (P12 D12's successor): the per-protocol response-history server state — the list per
+// scope and one snapshot per entry — as TanStack Query, plus the small per-tab UI state (the entry
+// being viewed, the last action error) the two Pinia stores wrap. Deliberately does not reuse
+// views/shared/viewOp.ts's createRuntimeStore: that file lives under views/**, which api/** (D16
+// rule (a)) may not import.
+//
+// Keys mirror Go's scope key (repos/history.go): `[domain, itemId, scratchTabId]`, the tab id only
+// for a scratch tab, so two tabs on one saved request share one list.
+//
+// P8 D11 is `enabled`: the list observer is enabled only while the History pane shows. A disabled
+// observer still reads the cached list (the segment count) but is not `active`, so invalidating
+// after a send only marks it stale; showing the pane refetches once. A prefetch on pane mount and
+// on an itemId change (Save as adopts the scratch history) is D11's "one initial fetch".
+
+interface HistoryTab {
+  id: string;
+  state: { itemId?: string | null; responsePane: string };
 }
 
-interface HistoryStoreOptions<Entry, Snapshot, Extra extends object> {
+interface HistoryQueriesOptions<Entry, Snapshot, Extra extends object> {
+  domain: 'httpHistory' | 'grpcHistory';
   list: (itemId: string, tabId: string) => Promise<Entry[]>;
   get: (id: string) => Promise<Snapshot>;
   remove: (id: string) => Promise<void>;
   clear: (itemId: string, tabId: string) => Promise<void>;
-  findTab: (tabId: string) => { state: { itemId?: string | null; responsePane: string } } | null;
+  findTab: (tabId: string) => HistoryTab | null;
   extra?: () => Extra;
 }
 
-export function createHistoryStore<Entry, Snapshot, Extra extends object = Record<string, never>>(
-  opts: HistoryStoreOptions<Entry, Snapshot, Extra>,
-) {
-  type Runtime = HistoryRuntime<Entry, Snapshot> & Extra;
+/** Per-tab UI state — not server state. */
+interface HistoryUi {
+  viewingId: string | null;
+  /** A failed delete or clear; cleared by the next view or successful action. */
+  actionError: string | null;
+}
 
-  const runtime = reactive({} as Record<string, Runtime>);
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
-  // F8/P21 round 1: load() had no sequencing against noteRecorded()/del()/clearAll() — a load
-  // issued before a send/call completed, but resolving after noteRecorded ran, cleared `stale`
-  // (and wrote the pre-send list) as if it were the freshest answer, leaving the just-recorded
-  // entry permanently missing from the list until the next send or an explicit delete/clear (the
-  // same failure P18 S1/S2 root-caused for the read side). Each tab's own monotonic counter: a
-  // load only commits its result if nothing newer (another load, or a noteRecorded marking stale)
-  // has started since — the same opId-supersession shape the view stores already use elsewhere.
-  //
-  // P108 F1: this used one counter for both signals — "a newer load exists" and "marked stale
-  // while in flight" — and had every retry re-bump it. Two overlapping loads each saw the other's
-  // bump as "I was superseded", retried, and that retry's own bump made the other's in-flight
-  // fetch look superseded too, forever (109 list calls in 300ms in the finding's harness, `loading`
-  // stuck true). `latestSeq` now means only "a newer load() call exists" (a load discards quietly
-  // — the newer load owns the result, no retry). `staleSeq` means only "noteRecorded marked stale
-  // while a load was in flight" (that load retries once to pick it up). A retry bumps `latestSeq`
-  // like any other load, but that no longer causes a loop: the older load it supersedes just
-  // discards, and nothing keeps re-triggering `staleSeq` on its own.
-  const latestSeq = new Map<string, number>();
-  function bumpSeq(tabId: string): number {
-    const next = (latestSeq.get(tabId) ?? 0) + 1;
-    latestSeq.set(tabId, next);
-    return next;
+export function createHistoryQueries<
+  Entry extends { id: string },
+  Snapshot,
+  Extra extends object = Record<string, never>,
+>(opts: HistoryQueriesOptions<Entry, Snapshot, Extra>) {
+  type Ui = HistoryUi & Extra;
+  const { domain } = opts;
+  const ui = reactive({} as Record<string, Ui>);
+
+  function listKey(itemId: string, tabId: string) {
+    return [domain, itemId, itemId ? '' : tabId] as const;
   }
-  // Per-tab: view() commits only if no newer view/backToLatest/noteRecorded started since, so a
-  // slow snapshot never lands over a newer selection or a fresh response.
-  const viewSeq = new Map<string, number>();
-  function bumpView(tabId: string): number {
-    const next = (viewSeq.get(tabId) ?? 0) + 1;
-    viewSeq.set(tabId, next);
-    return next;
+  function listOptions(itemId: string, tabId: string) {
+    return {
+      queryKey: listKey(itemId, tabId),
+      queryFn: () => opts.list(itemId, tabId),
+      staleTime: Number.POSITIVE_INFINITY,
+    };
   }
-  const staleSeq = new Map<string, number>();
-  function bumpStale(tabId: string): void {
-    staleSeq.set(tabId, (staleSeq.get(tabId) ?? 0) + 1);
+  function snapshotKey(id: string) {
+    return [`${domain}Snapshot`, id] as const;
+  }
+  function snapshotOptions(id: string) {
+    return {
+      queryKey: snapshotKey(id),
+      queryFn: () => opts.get(id),
+      staleTime: Number.POSITIVE_INFINITY,
+    };
+  }
+  /** Null once the tab is closed. */
+  function listKeyFor(tabId: string) {
+    const tab = opts.findTab(tabId);
+    return tab ? listKey(tab.state.itemId ?? '', tabId) : null;
   }
 
-  function ensure(tabId: string): Runtime {
-    // D2: always hand back runtime[tabId] — never the freshly-built literal. `runtime` is a deep
-    // reactive(); reading the indexed property returns the tracked proxy, but returning the local
-    // object on the creating call hands out the untracked target instead, so a write through it
-    // (e.g. noteRecorded's own `rt.stale = true` on a tab's first-ever call) mutates the right
-    // memory but triggers no effect. One extra lookup, permanently closes that class of bug (F4).
-    if (!runtime[tabId]) {
-      runtime[tabId] = {
-        entries: null,
-        loading: false,
-        stale: false,
-        viewing: null,
-        error: null,
+  function ensure(tabId: string): Ui {
+    // Always hand back ui[tabId], never the fresh literal: the reactive proxy tracks writes.
+    if (!ui[tabId]) {
+      ui[tabId] = {
+        viewingId: null,
+        actionError: null,
         ...(opts.extra ? opts.extra() : ({} as Extra)),
       };
     }
-    return runtime[tabId] as Runtime;
+    return ui[tabId];
   }
 
+  // `tab:` scope lists die with the tab; item-scope lists are left to gcTime.
   registerTabRuntimeCleanup((tabId) => {
-    delete runtime[tabId];
-    latestSeq.delete(tabId);
-    staleSeq.delete(tabId);
-    viewSeq.delete(tabId);
+    const viewingId = ui[tabId]?.viewingId;
+    delete ui[tabId];
+    queryClient.removeQueries({ queryKey: listKey('', tabId), exact: true });
+    if (viewingId) queryClient.removeQueries({ queryKey: snapshotKey(viewingId), exact: true });
   });
 
-  function scopeIdsFor(tabId: string): { itemId: string; tabId: string } {
-    const tab = opts.findTab(tabId);
-    return { itemId: tab?.state.itemId ?? '', tabId };
+  /** The tab's history list; enabled only while the History pane shows (P8 D11). */
+  function useHistoryList(tab: MaybeRefOrGetter<HistoryTab>) {
+    const query = useQuery(() => {
+      const t = toValue(tab);
+      return {
+        ...listOptions(t.state.itemId ?? '', t.id),
+        enabled: t.state.responsePane === 'history',
+      };
+    }, queryClient);
+    watch(
+      () => {
+        const t = toValue(tab);
+        return listOptions(t.state.itemId ?? '', t.id);
+      },
+      (options) => void queryClient.prefetchQuery(options),
+      { immediate: true },
+    );
+    return { query, entries: computed<Entry[]>(() => query.data.value ?? []) };
   }
 
-  /** Fetches (or re-fetches) the list for this tab's own scope — the saved request's history, or
-   *  a scratch tab's own. */
-  async function load(tabId: string): Promise<void> {
-    const rt = ensure(tabId);
-    const mySeq = bumpSeq(tabId);
-    const staleAtStart = staleSeq.get(tabId) ?? 0;
-    rt.loading = true;
-    rt.error = null;
-    // P21 round 3 functional finding 4 / P108 F1: set below whenever this call's own `finally`
-    // must not clear `loading` out from under someone else still owning it — either a retry this
-    // call itself kicked off, or a newer load() call that started while this one was in flight.
-    let skipLoadingClear = false;
-    try {
-      const { itemId, tabId: tid } = scopeIdsFor(tabId);
-      const entries = await opts.list(itemId, tid);
-      if (!opts.findTab(tabId)) return; // the tab closed while this was in flight
-      if (latestSeq.get(tabId) !== mySeq) {
-        // P108 F1: a newer load() call started while this fetch was in flight — that load owns
-        // `loading`/`entries` and (if itself superseded) its own retry chain. This one's answer is
-        // simply stale; discard quietly. Retrying here too was the bug: the retry's own bumpSeq
-        // made the newer load look superseded in turn, and the pair kept re-superseding each other
-        // forever (F1's 300ms/109-call harness).
-        skipLoadingClear = true;
-        return;
-      }
-      // Only commit if no noteRecorded marked this tab stale while the fetch was in flight —
-      // otherwise this answer predates a send/call this fetch's own snapshot doesn't reflect.
-      // `?? 0` matters here: an untouched tab's `staleSeq` entry is `undefined`, and `staleAtStart`
-      // above already normalizes that same read to `0` — comparing this read bare against that
-      // would spuriously mismatch (`undefined !== 0`) and force a retry on every ordinary load.
-      if ((staleSeq.get(tabId) ?? 0) === staleAtStart) {
-        rt.entries = entries;
-        rt.stale = false;
-      } else {
-        // F8's own retry-side hole: a load superseded by noteRecorded's `stale = true` branch
-        // used to be silently discarded here, leaving `stale` set with nothing left to ever clear
-        // it. The just-sent response then never appeared in History until the user sent again or
-        // deleted/cleared an entry. Retrying converges: `staleSeq` only advances on a genuine new
-        // noteRecorded call, so this bottoms out once sends/calls stop arriving faster than a
-        // fetch can complete — unlike the old shared counter, a retry does not itself re-trigger
-        // this branch.
-        skipLoadingClear = true;
-        void load(tabId);
-      }
-    } catch (err) {
-      if (!opts.findTab(tabId)) return;
-      rt.error = err instanceof Error ? err.message : String(err);
-    } finally {
-      if (opts.findTab(tabId) && !skipLoadingClear) rt.loading = false;
-    }
+  /** The stored entry being viewed, null until its snapshot has loaded. */
+  function useHistoryViewing(tabId: MaybeRefOrGetter<string>) {
+    const viewingId = computed(() => ui[toValue(tabId)]?.viewingId ?? null);
+    const query = useQuery(
+      () => ({ ...snapshotOptions(viewingId.value ?? ''), enabled: viewingId.value !== null }),
+      queryClient,
+    );
+    const viewing = computed(() =>
+      viewingId.value !== null && query.data.value
+        ? { id: viewingId.value, snapshot: query.data.value }
+        : null,
+    );
+    return { viewing, viewingId, error: computed(() => query.error.value) };
   }
 
-  /** The one refetch a tab's history ever gets unprompted: on the pane's own mount, and whenever
-   *  the pane becomes visible again. Fetches when the list has never loaded (entries === null) OR
-   *  when a send/call happened while this pane was not showing (stale, D1). Idempotent via the
-   *  loading guard, so two callers mounting in the same tick pay one fetch. */
-  function ensureFresh(tabId: string): void {
-    const rt = ensure(tabId);
-    if ((rt.entries === null || rt.stale) && !rt.loading) void load(tabId);
-  }
-
-  /** Eager when the History pane is showing, lazy (just a `stale` flag) otherwise — a user who
-   *  never opens the pane pays no IPC per send/call. D3: a send/call always asks for *this*
-   *  response, so it also clears any stored entry currently being viewed — leaving one on screen
-   *  after a fresh send is the same complaint as a stale list. */
-  function noteRecorded(tabId: string): void {
-    const tab = opts.findTab(tabId);
-    // P108 F8: HttpRequestView.vue's own send() used to call this for a tab already closed
-    // (findHttpRequestTab guard added there fixes the call site, but this is the one place every
-    // protocol's send/call funnels through) — without this guard, `ensure()` recreates a runtime
-    // and seq entry (history.ts's own module state) for a tab id registerTabRuntimeCleanup already
-    // deleted both of, and nothing closes that gap again.
-    if (!tab) return;
-    const rt = ensure(tabId);
-    bumpView(tabId);
-    rt.viewing = null;
-    if (tab?.state.responsePane === 'history') {
-      void load(tabId);
-    } else {
-      rt.stale = true;
-      // Mark any in-flight load stale (F8) — one issued before this send/call completed must not
-      // resolve afterward and clear the `stale` flag this line just set. P108 F1: this used to
-      // share `latestSeq` with load()'s own "a newer load exists" signal, which made every retry
-      // this triggered look like a newer load to any other in-flight load too. `staleSeq` is its
-      // own counter now — it only tells an in-flight load "retry once", never "someone else owns
-      // this now".
-      bumpStale(tabId);
-    }
-  }
-
-  /** Selects one entry to view — the full snapshot, not the list row alone. */
-  async function view(tabId: string, id: string): Promise<void> {
-    const rt = ensure(tabId);
-    const mySeq = bumpView(tabId);
-    try {
-      const snapshot = await opts.get(id);
-      if (!opts.findTab(tabId) || viewSeq.get(tabId) !== mySeq) return;
-      rt.viewing = { id, snapshot };
-    } catch (err) {
-      if (!opts.findTab(tabId) || viewSeq.get(tabId) !== mySeq) return;
-      rt.error = err instanceof Error ? err.message : String(err);
-    }
+  /** Selects one entry to view; its snapshot loads through useHistoryViewing. */
+  function view(tabId: string, id: string): void {
+    if (!opts.findTab(tabId)) return;
+    const state = ensure(tabId);
+    state.actionError = null;
+    state.viewingId = id;
   }
 
   /** The viewing band's "Back to latest" / "Close" action. */
   function backToLatest(tabId: string): void {
-    const rt = runtime[tabId];
-    if (!rt) return;
-    bumpView(tabId);
-    rt.viewing = null;
+    const state = ui[tabId];
+    if (state) state.viewingId = null;
   }
 
-  // A tab closed during the remove/clear await must not get its runtime recreated by load();
-  // a failed remove/clear lands in rt.error, which the list already renders.
+  /** D3: a send/call always asks for *this* response, so it also clears any stored entry being
+   *  viewed. Refetches the list only while the pane shows; otherwise the list just turns stale. */
+  function noteRecorded(tabId: string): void {
+    const key = listKeyFor(tabId);
+    if (!key) return;
+    ensure(tabId).viewingId = null;
+    void refreshApiQuery(key);
+  }
+
   async function del(tabId: string, id: string): Promise<void> {
     try {
       await opts.remove(id);
     } catch (err) {
-      const rt = opts.findTab(tabId) ? ensure(tabId) : undefined;
-      if (rt) rt.error = err instanceof Error ? err.message : String(err);
+      if (opts.findTab(tabId)) ensure(tabId).actionError = message(err);
       return;
     }
-    if (!opts.findTab(tabId)) return;
-    const rt = runtime[tabId];
-    if (rt?.viewing?.id === id) {
-      bumpView(tabId);
-      rt.viewing = null;
-    }
-    await load(tabId);
+    const key = listKeyFor(tabId);
+    if (!key) return;
+    const state = ensure(tabId);
+    state.actionError = null;
+    if (state.viewingId === id) state.viewingId = null;
+    queryClient.removeQueries({ queryKey: snapshotKey(id), exact: true });
+    await refreshApiQuery(key);
   }
 
   /** The destructive, unrecoverable action — the caller gates this behind confirmDialog(). */
   async function clearAll(tabId: string): Promise<void> {
-    const { itemId, tabId: tid } = scopeIdsFor(tabId);
+    const tab = opts.findTab(tabId);
+    if (!tab) return;
+    const itemId = tab.state.itemId ?? '';
     try {
-      await opts.clear(itemId, tid);
+      await opts.clear(itemId, tabId);
     } catch (err) {
-      const rt = opts.findTab(tabId) ? ensure(tabId) : undefined;
-      if (rt) rt.error = err instanceof Error ? err.message : String(err);
+      if (opts.findTab(tabId)) ensure(tabId).actionError = message(err);
       return;
     }
-    if (!opts.findTab(tabId)) return;
-    const rt = runtime[tabId];
-    if (rt) {
-      bumpView(tabId);
-      rt.viewing = null;
+    const key = listKeyFor(tabId);
+    if (!key) return;
+    const state = ensure(tabId);
+    state.actionError = null;
+    state.viewingId = null;
+    for (const entry of queryClient.getQueryData<Entry[]>(key) ?? []) {
+      queryClient.removeQueries({ queryKey: snapshotKey(entry.id), exact: true });
     }
-    await load(tabId);
+    await refreshApiQuery(key);
   }
 
-  return { runtime, ensure, load, ensureFresh, noteRecorded, view, backToLatest, del, clearAll };
+  return {
+    ui,
+    ensure,
+    listKeyFor,
+    useHistoryList,
+    useHistoryViewing,
+    view,
+    backToLatest,
+    noteRecorded,
+    del,
+    clearAll,
+  };
 }

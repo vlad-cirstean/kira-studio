@@ -2,7 +2,7 @@
 // Unlike gRPC's own cleanup (views/grpcrequest/state.ts, stopOp before delete), HTTP's cleanup was
 // only `delete runtime[tabId]` — the send kept running in Go and recording history, and on
 // completion `rt.opId !== opId` still passed (rt is a captured reference cleanup never mutates),
-// so noteSendRecorded ran for the closed tab, recreating a history runtime and seq entry
+// so noteSendRecorded ran for the closed tab, recreating a history UI entry
 // (api/state/history.ts) nothing ever cleans up again. This pins both halves: the op is cancelled
 // on close, and the post-await path is a no-op once the tab is gone.
 import '@workbench/testing/unit/window';
@@ -82,7 +82,7 @@ describe('closing an HTTP tab mid-send stops the op and leaks no history runtime
 
     // Neither runtime was resurrected by the post-await path.
     expect(httpRequestViewStore.runtime[tabId]).toBeUndefined();
-    expect(useHttpHistoryStore().runtime[tabId]).toBeUndefined();
+    expect(useHttpHistoryStore().ui[tabId]).toBeUndefined();
   });
 });
 

@@ -11,7 +11,7 @@ import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import type { FindBarHost } from '../shared/ResponseFindBar.vue';
-import { useHttpHistoryStore } from './history';
+import { useHttpHistoryViewing } from './history';
 import { useHttpRequestViewStore } from './state';
 
 // P9 D12/D14/D15: the inspector — the SPEC's own "view the exact bytes sent and received", with
@@ -31,10 +31,8 @@ const props = defineProps<{
 // "each pane computes its own runtime over the tab id" shape ResponseHistoryList.vue already
 // uses, so a future pane needs no prop-plumbing change to this component's siblings.
 const httpRequestViewStore = useHttpRequestViewStore();
-const httpHistoryStore = useHttpHistoryStore();
 const rt = computed(() => httpRequestViewStore.runtime[props.tab.id]);
-const historyRt = computed(() => httpHistoryStore.runtime[props.tab.id]);
-const viewingStored = computed(() => historyRt.value?.viewing ?? null);
+const { viewing: viewingStored } = useHttpHistoryViewing(() => props.tab.id);
 const response = computed(
   () => viewingStored.value?.snapshot.response ?? rt.value?.response ?? null,
 );

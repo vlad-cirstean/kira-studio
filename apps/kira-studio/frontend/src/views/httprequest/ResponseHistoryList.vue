@@ -21,11 +21,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { methodTextClass } from '@theme/methodColor';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatBytes, formatRelative } from '@workbench/util/format';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import { useHttpHistoryStore } from './history';
+import { useHttpHistoryList, useHttpHistoryStore, useHttpHistoryViewing } from './history';
 
 // P8 D15: the History pane's list — one row per response, capped at HISTORY_PER_SCOPE_LIMIT by
 // construction (P18 D4/D6), so no VirtualList/TreeHost involvement.
@@ -35,10 +35,13 @@ const httpHistoryStore = useHttpHistoryStore();
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const emit = defineEmits<{ compare: [ids: [string, string]] }>();
 
-const rt = computed(() => httpHistoryStore.runtime[props.tab.id]);
-const entries = computed<ResponseHistoryEntry[]>(() => rt.value?.entries ?? []);
-const selected = computed(() => rt.value?.selected ?? []);
-const viewingId = computed(() => rt.value?.viewing?.id ?? null);
+const { query: listQuery, entries } = useHttpHistoryList(() => props.tab);
+const { viewingId, error: snapshotError } = useHttpHistoryViewing(() => props.tab.id);
+const ui = computed(() => httpHistoryStore.ui[props.tab.id]);
+const selected = computed(() => ui.value?.selected ?? []);
+const errorMessage = computed(
+  () => ui.value?.actionError ?? listQuery.error.value?.message ?? snapshotError.value?.message ?? null,
+);
 const isScratch = computed(() => !props.tab.state.itemId);
 // P71 §3.5: nothing is suppressed here — with nothing recorded, historyList simply returns the
 // empty set, so this only exists to explain the silence rather than leave it looking broken.
@@ -48,10 +51,6 @@ const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 // never say more than "the list is full" without a new column and write path). Not suppressed by
 // the filter (§6 OQ-5): the note describes what is *stored*, not what is currently shown.
 const atCap = computed(() => entries.value.length >= HISTORY_PER_SCOPE_LIMIT);
-
-onMounted(() => {
-  httpHistoryStore.ensureHistoryFresh(props.tab.id);
-});
 
 // P16 D15: matches method, URL, status text, or environment name — the fields already on screen
 // in each row.
@@ -140,8 +139,8 @@ async function onClear(): Promise<void> {
         Clear history
       </Button>
     </div>
-    <Alert v-if="rt?.error" variant="destructive" data-testid="http-history-error">
-      <AlertDescription>{{ rt.error }}</AlertDescription>
+    <Alert v-if="errorMessage" variant="destructive" data-testid="http-history-error">
+      <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
 
     <Empty v-if="entries.length === 0" data-testid="http-history-empty">
