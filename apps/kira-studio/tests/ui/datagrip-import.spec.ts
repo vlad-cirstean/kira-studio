@@ -279,3 +279,26 @@ test('datagrip import — shows the secret-storage-unavailable banner and still 
     page.locator('[data-testid="datagrip-preview-rows"] > div[data-testid^="datagrip-row-"]'),
   ).toHaveCount(4);
 });
+
+test('datagrip import — a failed scan opens the dialog on the error and offers another folder', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    { channel: IPC.filesChooseFolder, response: { canceled: false, path: PROJECT_DIR } },
+    {
+      channel: IPC.datagripScan,
+      response: null,
+      error: { code: 'E_DATAGRIP', message: 'no .idea/dataSources.xml in this folder' },
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await importFromMenu(page);
+  await expect(page.locator('[data-testid="datagrip-import-error"]')).toContainText(
+    'dataSources.xml',
+  );
+  await expect(page.locator('[data-testid="datagrip-preview-rows"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="datagrip-import-choose-another"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="datagrip-import-confirm"]')).toBeDisabled();
+});

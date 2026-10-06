@@ -175,7 +175,7 @@ async function onConfirm(): Promise<void> {
         <AlertDescription>{{ datagripImportStore.error }}</AlertDescription>
       </Alert>
 
-      <div class="flex flex-col py-1" data-testid="datagrip-preview-rows">
+      <div v-if="datagripImportStore.preview" class="flex flex-col py-1" data-testid="datagrip-preview-rows">
         <div
           v-for="row in rows"
           :key="row.uuid"
@@ -279,6 +279,16 @@ async function onConfirm(): Promise<void> {
         <template v-if="!report">
           <span class="help">{{ datagripImportStore.projectPath }}</span>
           <span class="flex items-center gap-1 ml-auto">
+            <Button
+              v-if="!datagripImportStore.preview"
+              variant="dialog"
+              size="kira-lg"
+              data-testid="datagrip-import-choose-another"
+              :disabled="datagripImportStore.busy"
+              @click="datagripImportStore.pickAndScanDataGripProject"
+            >
+              Choose another folder
+            </Button>
             <Button variant="dialog" size="kira-lg" data-testid="datagrip-import-cancel" @click="datagripImportStore.closeDataGripImportDialog">
               Cancel
             </Button>
