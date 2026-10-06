@@ -29,6 +29,12 @@ func (e *RepoEntry) startOp(kind, source string) *oplog.Op {
 	return e.opLog.Start(oplog.Meta{Kind: kind, RepoRoot: root, RepoName: filepath.Base(root), Source: source})
 }
 
+// recordFailure logs one finished failure that no running op covers (auto-fetch stop, graph load).
+func (e *RepoEntry) recordFailure(kind, source, message string) {
+	root := repoWorkingDir(e.Summary)
+	e.opLog.Record(oplog.Meta{Kind: kind, RepoRoot: root, RepoName: filepath.Base(root), Source: source}, oplog.StatusError, message)
+}
+
 // noteWrite records argv on the op carried by ctx, immediately before a write spawn.
 func (e *RepoEntry) noteWrite(ctx context.Context, argv []string) {
 	opFrom(ctx).AddCommand(argv)

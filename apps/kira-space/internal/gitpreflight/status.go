@@ -32,6 +32,15 @@ type StatusUpstream struct {
 	Behind int    `json:"behind"`
 }
 
+// AutoFetchStatus mirrors @kira/git-ipc's own AutoFetchStatus: set only while auto-fetch is stopped
+// by a permanent failure.
+type AutoFetchStatus struct {
+	State   string `json:"state"`
+	Kind    string `json:"kind"`
+	Message string `json:"message"`
+	At      string `json:"at"`
+}
+
 // StatusSummary mirrors @kira/git-ipc's own StatusSummary field for field (D5's encoding rule).
 type StatusSummary struct {
 	Head           HeadState            `json:"head"`

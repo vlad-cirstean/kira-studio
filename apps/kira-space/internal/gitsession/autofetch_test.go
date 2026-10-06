@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 )
 
 // §8.1(e)'s own TestIntegration_AutoFetchNeverPrompts, at the package that can actually drive it
@@ -50,7 +51,7 @@ func runAutoFetchGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
-func TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure(t *testing.T) {
+func TestAutoFetch_NeverPromptsAndStopsAfterAuthFailure(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
@@ -72,6 +73,7 @@ func TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure(t *testing.T) {
 
 	runner := gitclient.NewExecRunner()
 	reg := NewRegistry(runner)
+	reg.OpLog = oplog.New()
 	// An arbitrary positive interval — irrelevant here since autoFetchTick is called directly
 	// rather than waiting on the real (one-minute-granularity) timer newRepoEntry also arms.
 	reg.Settings = func() ([]string, int, string) { return nil, 5, "" }
@@ -94,10 +96,90 @@ func TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure(t *testing.T) {
 	}
 
 	entry.autoFetch.mu.Lock()
-	disabled := entry.autoFetch.disabled
+	stopped := entry.autoFetch.stopped
 	entry.autoFetch.mu.Unlock()
-	if !disabled {
-		t.Fatal("auto-fetch must disable itself after a real failure (AuthFailed)")
+	if stopped == nil || stopped.Kind != "AuthFailed" {
+		t.Fatalf("auto-fetch must stop after a real failure (AuthFailed), got %+v", stopped)
+	}
+	if got := len(reg.OpLog.Recent(10)); got != 1 {
+		t.Fatalf("op-log records = %d, want exactly 1 for the stop", got)
+	}
+}
+
+func TestAutoFetch_NetworkFailureBacksOff(t *testing.T) {
+	t.Parallel()
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not on PATH")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close() // nothing listens: connection refused
+
+	dir := t.TempDir()
+	runAutoFetchGit(t, dir, "init", "-q", "-b", "main")
+	runAutoFetchGit(t, dir, "remote", "add", "origin", fmt.Sprintf("http://%s/repo.git", addr))
+
+	reg := NewRegistry(gitclient.NewExecRunner())
+	reg.Settings = func() ([]string, int, string) { return nil, 5, "" }
+	entry, release, err := reg.Acquire(context.Background(), gitPath, dir)
+	if err != nil {
+		t.Fatalf("Acquire: %v", err)
+	}
+	defer release()
+
+	entry.autoFetchTick()
+
+	entry.autoFetch.mu.Lock()
+	stopped, failures, timer := entry.autoFetch.stopped, entry.autoFetch.failures, entry.autoFetch.timer
+	entry.autoFetch.mu.Unlock()
+	if stopped != nil {
+		t.Fatalf("a network failure must not stop auto-fetch, got %+v", stopped)
+	}
+	if failures != 1 || timer == nil {
+		t.Fatalf("failures=%d timer=%v, want 1 and an armed timer", failures, timer)
+	}
+}
+
+func TestNextAutoFetchDelay(t *testing.T) {
+	t.Parallel()
+	m := time.Minute
+	for _, c := range []struct {
+		interval time.Duration
+		failures int
+		want     time.Duration
+	}{
+		{m, 0, m},
+		{m, 1, 2 * m},
+		{m, 5, 32 * m},
+		{m, 6, 60 * m},
+		{m, 7, 60 * m},
+		{5 * m, 3, 40 * m},
+		{5 * m, 4, 60 * m},
+		{120 * m, 1, 120 * m},
+		{1440 * m, 1000, 1440 * m},
+		{m, 1000, 60 * m},
+	} {
+		if got := nextAutoFetchDelay(c.interval, c.failures); got != c.want {
+			t.Errorf("nextAutoFetchDelay(%v, %d) = %v, want %v", c.interval, c.failures, got, c.want)
+		}
+	}
+}
+
+func TestAutoFetchOutcome(t *testing.T) {
+	t.Parallel()
+	for kind, want := range map[string]autoFetchVerdict{
+		"OperationInProgress": verdictBusy, "Cancelled": verdictBusy,
+		"NetworkFailed": verdictTransient, "LockHeld": verdictTransient,
+		"AuthFailed": verdictPermanent, "RemoteNotFound": verdictPermanent, "RemoteRefMissing": verdictPermanent,
+		"NotFound": verdictPermanent, "Unknown": verdictPermanent, "SomethingNew": verdictPermanent,
+	} {
+		if got := autoFetchOutcome(kind); got != want {
+			t.Errorf("autoFetchOutcome(%q) = %v, want %v", kind, got, want)
+		}
 	}
 }
 
@@ -105,7 +187,7 @@ func TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure(t *testing.T) {
 // correctness review finding #8's own proof: before this fix, autoFetchTick treated a user-set
 // interval of zero identically to a genuine fetch failure — both called disableAutoFetch, whose
 // `disabled` flag is meant as a PERMANENT, for-the-entry's-whole-life kill switch reserved for a
-// real failure (TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure above). That conflation
+// real failure (TestAutoFetch_NeverPromptsAndStopsAfterAuthFailure above). That conflation
 // meant turning fetch.autoInterval to 0 and back to a positive value again left auto-fetch off
 // forever, silently, since startAutoFetch's own `disabled` guard never distinguished "the user
 // turned this off" from "this entry is broken".
@@ -144,7 +226,7 @@ func TestAutoFetch_ZeroIntervalPausesWithoutPermanentlyDisabling(t *testing.T) {
 
 	// The user turns auto-fetch off. The real timer armed above is never awaited — autoFetchTick
 	// is invoked directly instead, simulating "the armed timer's own tick landed after the
-	// setting changed", the same shortcut TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure
+	// setting changed", the same shortcut TestAutoFetch_NeverPromptsAndStopsAfterAuthFailure
 	// already takes to avoid a real one-minute-granularity wait.
 	currentMinutes = 0
 	entry.autoFetchTick()

@@ -1,5 +1,5 @@
 // Package oplog is Kira Space's in-memory operation log: a bounded ring of user-initiated git
-// writes, shared by every window. Nothing persists; the log resets when the app quits.
+// writes, plus auto-fetch stops and graph-load failures, shared by every window. Nothing persists; the log resets when the app quits.
 package oplog
 
 import (
@@ -92,6 +92,11 @@ func (l *Log) Start(m Meta) *Op {
 	l.mu.Unlock()
 	l.emit.Emit(snap)
 	return o
+}
+
+// Record logs one already-finished operation.
+func (l *Log) Record(m Meta, status, errMsg string) {
+	l.Start(m).Finish(status, errMsg)
 }
 
 // Recent returns up to limit records, newest first.

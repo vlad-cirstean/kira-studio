@@ -283,11 +283,16 @@ func (e *RepoEntry) remoteResultNoSpawn(ctx context.Context, opErr *RemoteOpErro
 //  8. read back head + in-progress, ALWAYS — success, failure or cancellation.
 //  9. release the slot (deferred, so it holds across every early return) and return.
 func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpParams, deps RemoteDeps) (result RemoteOpResult, runErr error) {
-	// A nil conn is auto-fetch: background, never logged.
+	// A nil conn is auto-fetch: background, never logged here (autoFetchTick logs its own stop).
 	var logOp *oplog.Op
 	if conn != nil {
 		logOp = e.startOp(params.Kind, conn.ClientLabel)
-		defer func() { finishRemoteResult(logOp, result, runErr) }()
+		defer func() {
+			finishRemoteResult(logOp, result, runErr)
+			if runErr == nil && result.OK && (params.Kind == "fetch" || params.Kind == "pull") {
+				e.rearmAutoFetch()
+			}
+		}()
 		ctx = withOp(ctx, logOp)
 	}
 	opCtx, cancel := context.WithCancel(ctx)

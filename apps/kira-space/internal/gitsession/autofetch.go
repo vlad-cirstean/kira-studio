@@ -2,19 +2,71 @@ package gitsession
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
+// AutoFetchChange is the event payload for a stop (non-nil) or a re-arm (nil).
+type AutoFetchChange struct{ AutoFetch *gitpreflight.AutoFetchStatus }
+
+type autoFetchVerdict int
+
+const (
+	verdictBusy autoFetchVerdict = iota
+	verdictTransient
+	verdictPermanent
+)
+
+const (
+	autoFetchBackoffCap = 60 * time.Minute
+	// maxBackoffShift keeps interval<<failures from overflowing int64 (interval <= 1440 min).
+	maxBackoffShift = 16
+)
+
+// autoFetchOutcome classifies a failed background fetch's error kind. Unknown kinds stop: the app
+// cannot tell, and silent endless retry would hide a real problem.
+func autoFetchOutcome(kind string) autoFetchVerdict {
+	switch kind {
+	case "OperationInProgress", "Cancelled":
+		return verdictBusy
+	case "NetworkFailed", "LockHeld":
+		return verdictTransient
+	}
+	return verdictPermanent
+}
+
+// nextAutoFetchDelay doubles the interval per consecutive transient failure, capped at an hour (or
+// the interval itself when that is longer). No attempt limit: an offline night must not stop it.
+func nextAutoFetchDelay(interval time.Duration, failures int) time.Duration {
+	if failures <= 0 {
+		return interval
+	}
+	ceiling := max(interval, autoFetchBackoffCap)
+	d := interval << min(failures, maxBackoffShift)
+	if d <= 0 || d > ceiling {
+		return ceiling
+	}
+	return d
+}
+
 // autoFetchState is one RepoEntry's own background-fetch timer (D23) — one per repository,
-// regardless of how many windows have it open, silent, credential-free and self-disabling.
+// regardless of how many windows have it open, silent, credential-free and self-stopping.
 type autoFetchState struct {
-	mu       sync.Mutex
-	timer    *time.Timer
+	mu    sync.Mutex
+	timer *time.Timer
+	// disabled is teardown's permanent flag; stopped is a failure stop that a successful explicit
+	// fetch or pull clears (rearmAutoFetch).
 	disabled bool
+	stopped  *gitpreflight.AutoFetchStatus
+	failures int
+	changed  notify.Emitter[AutoFetchChange]
 	// everAcquiredNonQuiet is C14-3's own gate: true once at least one non-quiet (real, e.g. a
 	// paired external client) acquirer has held this entry — set by markAcquiredNonQuiet, read by
 	// EnsureAutoFetch. See markAcquiredNonQuiet's own comment for why this exists.
@@ -30,7 +82,7 @@ func (e *RepoEntry) startAutoFetch(minutes int) {
 	}
 	e.autoFetch.mu.Lock()
 	defer e.autoFetch.mu.Unlock()
-	if e.autoFetch.disabled || e.autoFetch.timer != nil {
+	if e.autoFetch.disabled || e.autoFetch.stopped != nil || e.autoFetch.timer != nil {
 		return
 	}
 	e.autoFetch.timer = time.AfterFunc(time.Duration(minutes)*time.Minute, e.autoFetchTick)
@@ -42,10 +94,9 @@ func (e *RepoEntry) startAutoFetch(minutes int) {
 // path: a user flipping fetch.autoInterval from 0 back to a positive value while the repository is
 // already open, with no repo.open in between to reach this any other way (ReconcileAutoFetch's own
 // comment traces the rest of that call chain up to bridge/settings.go).
-// startAutoFetch already no-ops when a timer is already running or the entry is `disabled` (a
-// fetch that failed once stays off for the entry's life, G7 D23), so calling this redundantly
-// (both an open AND a settings change, or several windows) arms exactly one timer, and this can
-// never resurrect one G7 killed. Exported for registry.go's own cross-file call; unexported callers
+// startAutoFetch already no-ops when a timer is already running, the entry is `disabled` (torn
+// down) or `stopped` (permanent failure, cleared only by rearmAutoFetch), so calling this
+// redundantly (both an open AND a settings change, or several windows) arms exactly one timer. Exported for registry.go's own cross-file call; unexported callers
 // within this package (conn.go) use it exactly the same way.
 //
 // C14-3: also no-ops entirely when this entry has never had a non-quiet acquirer (see
@@ -92,13 +143,13 @@ func (e *RepoEntry) stopAutoFetch() {
 	e.autoFetch.disabled = true
 }
 
-func (e *RepoEntry) rescheduleAutoFetch(minutes int) {
+func (e *RepoEntry) rescheduleAutoFetch(delay time.Duration) {
 	e.autoFetch.mu.Lock()
 	defer e.autoFetch.mu.Unlock()
-	if e.autoFetch.disabled {
+	if e.autoFetch.disabled || e.autoFetch.stopped != nil {
 		return
 	}
-	e.autoFetch.timer = time.AfterFunc(time.Duration(minutes)*time.Minute, e.autoFetchTick)
+	e.autoFetch.timer = time.AfterFunc(delay, e.autoFetchTick)
 }
 
 func (e *RepoEntry) disableAutoFetch() {
@@ -108,16 +159,8 @@ func (e *RepoEntry) disableAutoFetch() {
 	e.autoFetch.mu.Unlock()
 }
 
-// pauseAutoFetch stops the ticking loop for a user-set interval of zero — deliberately NOT the
-// same as disableAutoFetch (G30 round-1 functional-correctness review, finding #8): `disabled` is
-// this entry's permanent, for-its-whole-life kill switch, reserved for a genuine fetch failure
-// (most commonly AuthFailed). Before this fix, autoFetchTick called disableAutoFetch for BOTH
-// cases — so a user turning fetch.autoInterval to 0 tripped the same permanent switch a real
-// failure does, and startAutoFetch's own `e.autoFetch.disabled` guard then refused to ever re-arm
-// again, even after the user set the interval back to a positive value: auto-fetch stayed off
-// forever, silently, for the rest of the entry's life. Clearing only `timer` (never `disabled`)
-// leaves startAutoFetch's other guard (`timer != nil`) false too, so the next ensureAutoFetch call
-// (Conn.Open, the same off→on path D5 already established) arms a fresh timer once the interval
+// pauseAutoFetch stops the ticking loop for a user-set interval of zero. Clearing only `timer`
+// (never `disabled` or `stopped`) lets the next EnsureAutoFetch arm a fresh timer once the interval
 // reads positive again.
 func (e *RepoEntry) pauseAutoFetch() {
 	e.autoFetch.mu.Lock()
@@ -125,17 +168,11 @@ func (e *RepoEntry) pauseAutoFetch() {
 	e.autoFetch.mu.Unlock()
 }
 
-// autoFetchTick re-reads the server-owned interval fresh (so a setting change takes effect within
-// one interval, with no need to recreate the entry) and, when nothing else is using the
-// repository, runs one silent fetch through the SAME RunRemote path an explicit fetch takes — with
-// conn == nil, which is what makes it silent and credential-free structurally rather than by
-// policy (D23): no askpass env at all (withAskpass's own nil-conn guard), no progress emission
-// (RunRemote's progressEmit is a no-op for a nil conn), and it never touches the undo slot
-// (RunRemote never does, for any conn). "Busy right now" (another op running, or Repo.Write held)
-// reschedules rather than disabling — only a genuine fetch failure (most commonly AuthFailed, since
-// a remote needing a credential fails immediately with no prompt) disables the timer for the rest
-// of this entry's life, logged once by the caller... no caller logs it today; disabling IS the
-// user-visible signal (G8's own open item: no toolbar marker exists yet to surface it further).
+// autoFetchTick re-reads the server-owned interval fresh (a setting change takes effect within one
+// interval) and, when nothing else is using the repository, runs one silent fetch through the SAME
+// RunRemote path an explicit fetch takes — with conn == nil, which makes it credential-free
+// structurally (D23): no askpass env, no progress emission, never the undo slot. Busy right now
+// reschedules; settleAutoFetch decides what each failure kind means.
 func (e *RepoEntry) autoFetchTick() {
 	if e.autoFetchDisabled() {
 		return
@@ -146,14 +183,15 @@ func (e *RepoEntry) autoFetchTick() {
 		e.pauseAutoFetch()
 		return
 	}
+	interval := time.Duration(minutes) * time.Minute
 	if e.Repo.Writing() {
-		e.rescheduleAutoFetch(minutes)
+		e.rescheduleAutoFetch(interval)
 		return
 	}
 
 	remote, ok := e.pickAutoFetchRemote(context.Background())
 	if !ok {
-		e.rescheduleAutoFetch(minutes)
+		e.rescheduleAutoFetch(interval)
 		return
 	}
 
@@ -163,19 +201,77 @@ func (e *RepoEntry) autoFetchTick() {
 	result, err := e.RunRemote(context.WithoutCancel(context.Background()), nil, RemoteOpParams{
 		Kind: "fetch", Remote: remote, Prune: true,
 	}, RemoteDeps{})
-	if err != nil {
+	e.settleAutoFetch(interval, remote, result, err)
+}
+
+func (e *RepoEntry) settleAutoFetch(interval time.Duration, remote string, result RemoteOpResult, err error) {
+	switch {
+	case errors.Is(err, ErrRepoTornDown):
 		e.disableAutoFetch()
 		return
-	}
-	if !result.OK {
-		if result.Error != nil && result.Error.Kind == "OperationInProgress" {
-			e.rescheduleAutoFetch(minutes) // another op is running right now — not a failure.
-			return
-		}
-		e.disableAutoFetch()
+	case err != nil:
+		e.stopAutoFetchFor(remote, "Unknown", err.Error())
+		return
+	case result.OK:
+		e.autoFetch.mu.Lock()
+		e.autoFetch.failures = 0
+		e.autoFetch.mu.Unlock()
+		e.rescheduleAutoFetch(interval)
 		return
 	}
-	e.rescheduleAutoFetch(minutes)
+	kind, msg := "Unknown", ""
+	if result.Error != nil {
+		kind, msg = result.Error.Kind, result.Error.Message
+	}
+	switch autoFetchOutcome(kind) {
+	case verdictBusy:
+		e.rescheduleAutoFetch(interval)
+	case verdictTransient:
+		e.autoFetch.mu.Lock()
+		e.autoFetch.failures++
+		delay := nextAutoFetchDelay(interval, e.autoFetch.failures)
+		e.autoFetch.mu.Unlock()
+		e.rescheduleAutoFetch(delay)
+	default:
+		e.stopAutoFetchFor(remote, kind, msg)
+	}
+}
+
+// stopAutoFetchFor stops the timer on a permanent failure, records the marker, and logs the stop
+// once (never each retry).
+func (e *RepoEntry) stopAutoFetchFor(remote, kind, message string) {
+	line, _, _ := strings.Cut(strings.TrimSpace(message), "\n")
+	status := &gitpreflight.AutoFetchStatus{State: "stopped", Kind: kind, Message: line, At: kiratime.NowISO()}
+	e.autoFetch.mu.Lock()
+	if e.autoFetch.disabled {
+		e.autoFetch.mu.Unlock()
+		return
+	}
+	e.autoFetch.stopped = status
+	e.autoFetch.timer = nil
+	e.autoFetch.failures = 0
+	e.autoFetch.mu.Unlock()
+
+	logMsg := remote + ": " + kind
+	if line != "" {
+		logMsg += " — " + line
+	}
+	e.recordFailure("autoFetch", "Auto-fetch", logMsg)
+	e.autoFetch.changed.Emit(AutoFetchChange{AutoFetch: status})
+}
+
+// rearmAutoFetch clears a failure stop after a successful explicit fetch or pull, then re-arms
+// through EnsureAutoFetch (keeps the non-quiet gate).
+func (e *RepoEntry) rearmAutoFetch() {
+	e.autoFetch.mu.Lock()
+	wasStopped := e.autoFetch.stopped != nil
+	e.autoFetch.stopped = nil
+	e.autoFetch.failures = 0
+	e.autoFetch.mu.Unlock()
+	if wasStopped {
+		e.autoFetch.changed.Emit(AutoFetchChange{})
+	}
+	e.EnsureAutoFetch()
 }
 
 func (e *RepoEntry) autoFetchDisabled() bool {
