@@ -37,7 +37,7 @@ const liveLeft = ref<number | null>(null);
 const leftWidth = computed(() => liveLeft.value ?? storedLeft.value);
 
 function commitLeft(w: number): void {
-  storedLeft.value = Math.round(w);
+  storedLeft.value = Math.round(Math.max(LEFT_MIN, Math.min(LEFT_MAX, w)));
   liveLeft.value = null;
 }
 
@@ -48,7 +48,7 @@ const liveRight = ref<number | null>(null);
 const rightWidth = computed(() => liveRight.value ?? storedRight.value);
 
 function commitRight(w: number): void {
-  storedRight.value = Math.round(w);
+  storedRight.value = Math.round(Math.max(RIGHT_MIN, Math.min(RIGHT_MAX, w)));
   liveRight.value = null;
 }
 </script>

@@ -136,3 +136,25 @@ reviewTest('the sync button is hidden when the branch has no PR', async ({ relau
   await expect(page.locator(t('ade-review-header'))).toBeVisible();
   await expect(page.locator(t('ade-review-sync'))).toHaveCount(0);
 });
+
+reviewTest(
+  'dragging a pane handle stores the dragged width; a click stores none',
+  async ({ relaunch }) => {
+    const page = await openReview(relaunch);
+    const left = page.locator(t('ade-review-left'));
+    const handle = page.locator(t('ade-panel-resize-handle')).first();
+    const start = (await left.boundingBox())?.width ?? 0;
+    const box = await handle.boundingBox();
+    if (!box) throw new Error('no handle');
+    const x = box.x + box.width / 2;
+    const y = box.y + 200;
+    const stored = () => page.evaluate(() => localStorage.getItem('kira.ade.review.leftWidth'));
+    await page.mouse.click(x, y);
+    expect(await stored()).toBe(String(start));
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 60, y, { steps: 6 });
+    await page.mouse.up();
+    await expect.poll(stored).toBe(String(Math.round(start + 60)));
+  },
+);

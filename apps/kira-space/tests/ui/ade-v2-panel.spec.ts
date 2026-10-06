@@ -157,7 +157,7 @@ test('typing in Notes saves once, debounced', async ({ relaunch }) => {
   await editor.click();
   await page.keyboard.type('check the digest', { delay: 20 });
   await expect.poll(() => updates(control)).toHaveLength(1);
-  await page.waitForTimeout(900);
+  await page.clock.runFor(900);
   expect(updates(control)).toHaveLength(1);
   const args = updates(control)[0]?.args as { patch: { notes: string } };
   expect(args.patch.notes).toContain('check the digest');
@@ -220,27 +220,31 @@ test('Force push in the branch header asks first and sends the branch', async ({
   });
 });
 
-test('dragging the handle persists the panel width', async ({ relaunch }) => {
+test('dragging the handle persists the dragged width; a click persists nothing', async ({
+  relaunch,
+}) => {
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_bill');
   const handle = page.locator('[data-testid="ade-panel-resize-handle"]');
+  const startWidth = Number(await handle.getAttribute('aria-valuenow'));
   const box = await handle.boundingBox();
   if (!box) throw new Error('no handle');
   const x = box.x + box.width / 2;
   const y = box.y + 200;
+  const widthWrites = () =>
+    control
+      .log()
+      .filter(
+        (e) => e.channel === IPC.settingsSet && JSON.stringify(e.args).includes('panelWidth'),
+      );
+  await page.mouse.click(x, y);
+  expect(widthWrites()).toHaveLength(0);
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x - 120, y, { steps: 6 });
   await page.mouse.up();
-  await expect
-    .poll(() =>
-      control
-        .log()
-        .some(
-          (e) => e.channel === IPC.settingsSet && JSON.stringify(e.args).includes('panelWidth'),
-        ),
-    )
-    .toBe(true);
+  await expect.poll(() => widthWrites()).toHaveLength(1);
+  expect(widthWrites()[0]?.args).toEqual({ patch: { ade: { panelWidth: startWidth + 120 } } });
 });
 
 test('the Advanced switch saves ade.headlessSettingSources with the dialog', async ({

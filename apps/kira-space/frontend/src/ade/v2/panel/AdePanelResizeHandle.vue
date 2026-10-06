@@ -34,22 +34,27 @@ function clamp(w: number): number {
 
 const commitDebounced = useDebounceFn((w: number) => emit('commit', w), 400);
 
-// A zero `initialValue` makes `position` the raw pointer delta since drag start; the handle never
-// moves. Dragging right narrows the panel.
+// `position` is the handle's viewport offset plus the delta, not the delta (VueUse seeds it from
+// the pointer-down offset), so the delta comes from the pointer events. Dragging right narrows the
+// panel.
+let startX = 0;
 let lastDrag = 0;
+let moved = false;
 useDraggable(handleEl, {
   axis: 'x',
   preventDefault: true,
-  initialValue: { x: 0, y: 0 },
-  onStart: () => {
+  onStart: (_pos, e) => {
     dragStartValue.value = props.value;
+    startX = e.clientX;
+    moved = false;
   },
-  onMove: (position) => {
-    lastDrag = clamp(dragStartValue.value + sign() * position.x);
+  onMove: (_pos, e) => {
+    moved = true;
+    lastDrag = clamp(dragStartValue.value + sign() * (e.clientX - startX));
     emit('resize', lastDrag);
   },
   onEnd: () => {
-    emit('commit', lastDrag);
+    if (moved) emit('commit', lastDrag);
   },
 });
 
