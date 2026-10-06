@@ -236,3 +236,32 @@ func StreamBodyAt(t *testing.T, p page.StreamPage, row int) *string {
 	t.Helper()
 	return chunkCellAt(t, p.Bodies, row)
 }
+
+// KeysetForwardIDs pages a table forward by following NextToken from an offset-0 first page and
+// returns column 0's text of every row, failing on a runaway loop (a token that never advances).
+// A binary-key keyset regression (P168 Part 3 F4) loops forever or repeats rows.
+func KeysetForwardIDs(t *testing.T, a adapters.Adapter, path model.NodePath, sort *model.SortSpec, pageSize, wantRows int) []string {
+	t.Helper()
+	cursor := model.PageCursor{Mode: "offset", Offset: 0}
+	var ids []string
+	for pages := 0; ; pages++ {
+		if pages > wantRows {
+			t.Fatalf("keyset paging did not terminate after %d pages (ids so far %v)", pages, ids)
+		}
+		p, err := a.Read(context.Background(), adapters.ReadRequest{Path: path, Sort: sort, PageSize: pageSize, Cursor: cursor}, adapters.NewOpCtx("op-keyset-forward"))
+		if err != nil {
+			t.Fatalf("Read(%v): %v", cursor, err)
+		}
+		tp := p.(page.TabularPage)
+		for row := 0; row < tp.RowCount; row++ {
+			ids = append(ids, *CellAt(t, tp, 0, row))
+		}
+		if !tp.Position.HasMore {
+			return ids
+		}
+		if tp.Position.NextToken == nil {
+			t.Fatal("HasMore without a NextToken: table is not keyset-eligible")
+		}
+		cursor = model.PageCursor{Mode: "after", Token: *tp.Position.NextToken}
+	}
+}

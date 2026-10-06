@@ -129,7 +129,7 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 	addParam, paramsPtr := adapters.NewParamAccumulator()
 	whereSQL := adapters.WhereClause(req.Filter)
 	if plan.WantsKeyset {
-		whereSQL, err = adapters.BuildKeysetWhereSQL(req, order, plan.Fingerprint, whereSQL, quoteIdent, questionPlaceholder, addParam)
+		whereSQL, err = adapters.BuildKeysetWhereSQL(req, order, plan.Fingerprint, whereSQL, quoteIdent, questionPlaceholder, addParam, plan.IsBinaryColumn)
 		if err != nil {
 			return page.TabularPage{}, err
 		}

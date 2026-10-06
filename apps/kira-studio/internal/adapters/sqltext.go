@@ -58,7 +58,10 @@ type ReadReq struct {
 // BuildKeysetWhereSQL extends whereSQL with the keyset boundary predicate decoded from the cursor
 // token, when the request actually wants one. addParam appends a value and returns its 1-based
 // placeholder index (a "?"-style placeholder ignores the index; a "$N"-style one needs it).
-func BuildKeysetWhereSQL(req ReadReq, order EffectiveOrder, fingerprint, whereSQL string, quote func(string) string, placeholder func(int) string, addParam func(any) int) (string, error) {
+// Token values are cell display text; isBinary names the columns whose "0x<hex>" display text must
+// be decoded back to raw bytes before binding, or the predicate compares the column with the ASCII
+// of the display text and pages wrongly.
+func BuildKeysetWhereSQL(req ReadReq, order EffectiveOrder, fingerprint, whereSQL string, quote func(string) string, placeholder func(int) string, addParam func(any) int, isBinary func(string) bool) (string, error) {
 	keyValues, err := DecodePageToken(req.Cursor.Token, fingerprint)
 	if err != nil {
 		return "", err
@@ -68,7 +71,15 @@ func BuildKeysetWhereSQL(req ReadReq, order EffectiveOrder, fingerprint, whereSQ
 	}
 	firstIndex := 0
 	for i, v := range keyValues {
-		idx := addParam(v)
+		var bound any = v
+		if isBinary(order.KeysetColumns[i]) {
+			decoded, err := DecodeBinaryCellText(v)
+			if err != nil {
+				return "", New(CodeQuery, "page token key "+order.KeysetColumns[i]+": "+err.Error(), nil)
+			}
+			bound = decoded
+		}
+		idx := addParam(bound)
 		if i == 0 {
 			firstIndex = idx
 		}

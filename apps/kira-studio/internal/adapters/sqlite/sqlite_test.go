@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -306,6 +307,30 @@ func TestSqlite(t *testing.T) {
 		}
 		if tp := p.(page.TabularPage); tp.RowCount != 2 {
 			t.Errorf("RowCount = %d, want 2", tp.RowCount)
+		}
+	})
+
+	// P168 Part 3 F4: a binary key's token must bind as raw bytes, not its 0x<hex> display text.
+	t.Run("read: keyset over a blob primary key terminates and covers every row", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		ctx := context.Background()
+		dbPath := nodePath(cfg.ID, seg("database", "main"))
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path: dbPath,
+			Statements: []string{
+				"DROP TABLE IF EXISTS p168_kbin",
+				"CREATE TABLE p168_kbin (id BLOB PRIMARY KEY)",
+				"INSERT INTO p168_kbin VALUES (x'01'), (x'0A'), (x'30'), (x'7F'), (x'80'), (x'81FF'), (x'FF'), (x'FFFF')",
+			},
+		}, adapters.NewOpCtx("op-kbin-setup")); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE p168_kbin"}}, adapters.NewOpCtx("op-kbin-cleanup")) //nolint:errcheck
+		sort := &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "id", Direction: "asc"}}}
+		got := testsupport.KeysetForwardIDs(t, a, nodePath(cfg.ID, seg("database", "main"), seg("table", "p168_kbin")), sort, 2, 8)
+		want := []string{"0x01", "0x0a", "0x30", "0x7f", "0x80", "0x81ff", "0xff", "0xffff"}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("ids = %v, want %v", got, want)
 		}
 	})
 

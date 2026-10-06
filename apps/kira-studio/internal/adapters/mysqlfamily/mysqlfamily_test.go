@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -423,6 +424,29 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		tp := p.(page.TabularPage)
 		if tp.RowCount != 2 {
 			t.Errorf("RowCount = %d, want 2", tp.RowCount)
+		}
+	})
+
+	// P168 Part 3 F4: a binary key's token must bind as raw bytes, not its 0x<hex> display text.
+	t.Run("read: keyset over a binary primary key terminates and covers every row", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		ctx := context.Background()
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path: nodePath(cfg.ID, seg("database", "kira_test")),
+			Statements: []string{
+				"DROP TABLE IF EXISTS p168_kbin",
+				"CREATE TABLE p168_kbin (id VARBINARY(4) PRIMARY KEY)",
+				"INSERT INTO p168_kbin VALUES (0x01), (0x0A), (0x30), (0x7F), (0x80), (0x81FF), (0xFF), (0xFFFF)",
+			},
+		}, adapters.NewOpCtx("op-kbin-setup")); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		defer a.Execute(ctx, model.ConsoleRequest{Path: nodePath(cfg.ID, seg("database", "kira_test")), Statements: []string{"DROP TABLE p168_kbin"}}, adapters.NewOpCtx("op-kbin-cleanup")) //nolint:errcheck
+		sort := &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "id", Direction: "asc"}}}
+		got := testsupport.KeysetForwardIDs(t, a, nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "p168_kbin")), sort, 2, 8)
+		want := []string{"0x01", "0x0a", "0x30", "0x7f", "0x80", "0x81ff", "0xff", "0xffff"}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("ids = %v, want %v", got, want)
 		}
 	})
 

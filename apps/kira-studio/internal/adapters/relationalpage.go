@@ -48,6 +48,8 @@ type RelationalPagePlan struct {
 	ReverseRows      bool
 	OrderBySQL       string
 	WantsKeyset      bool
+	// IsBinaryColumn reports binary-typed columns among Fetch.Columns (hidden tiebreakers included).
+	IsBinaryColumn func(name string) bool
 }
 
 // PlanRelationalPage runs the shared readPage prologue. See the per-adapter readPage for the
@@ -102,6 +104,7 @@ func PlanRelationalPage(args RelationalPageArgs) (RelationalPagePlan, error) {
 		ReverseRows:      reverseRows,
 		OrderBySQL:       orderBySQL,
 		WantsKeyset:      wantsKeyset,
+		IsBinaryColumn:   BinaryColumnsOf(fetch.Columns, args.TypeClassFor),
 	}, nil
 }
 

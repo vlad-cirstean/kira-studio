@@ -124,7 +124,7 @@ func readPage(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track 
 
 	whereSQL := adapters.WhereClause(req.Filter)
 	if plan.WantsKeyset {
-		whereSQL, err = adapters.BuildKeysetWhereSQL(req, order, plan.Fingerprint, whereSQL, quoteIdent, dollarPlaceholder, addParam)
+		whereSQL, err = adapters.BuildKeysetWhereSQL(req, order, plan.Fingerprint, whereSQL, quoteIdent, dollarPlaceholder, addParam, plan.IsBinaryColumn)
 		if err != nil {
 			return page.TabularPage{}, err
 		}
@@ -177,10 +177,16 @@ func readPage(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track 
 	return collector.Finish(builder, plan, req, fetch, order,
 		func() { firstRow, lastRow = lastRow, firstRow },
 		func(row, col int) *string {
+			raw := lastRow[col]
 			if row == 0 {
-				return firstRow[col]
+				raw = firstRow[col]
 			}
-			return lastRow[col]
+			if raw == nil {
+				return nil
+			}
+			// Keyset tokens carry the app-wide 0x<hex> binary spelling, not bytea's \x<hex>.
+			normalized := normalizeCellText(*raw, typeClassFor(fetch.Columns[col].DataType))
+			return &normalized
 		})
 }
 

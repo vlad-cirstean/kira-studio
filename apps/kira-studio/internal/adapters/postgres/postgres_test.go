@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"sync"
@@ -623,6 +624,31 @@ func TestPostgres_ReadKeysetForwardBackward(t *testing.T) {
 	forwardAgainFirstID := cellAt(t, forwardAgainPage, 0, 0)
 	if forwardAgainFirstID == nil || *forwardAgainFirstID != "6" {
 		t.Errorf("page after page-before's NextToken: first id = %v, want 6", forwardAgainFirstID)
+	}
+}
+
+// P168 Part 3 F4: a binary key's token must bind as raw bytes, not its 0x<hex> display text.
+func TestPostgres_ReadKeysetBinaryPrimaryKey(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+	dbPath := nodePath(fixture, seg("database", "kira_test"))
+	if _, err := a.Execute(ctx, model.ConsoleRequest{
+		Path: dbPath,
+		Statements: []string{
+			"DROP TABLE IF EXISTS app.p168_kbin",
+			"CREATE TABLE app.p168_kbin (id bytea PRIMARY KEY)",
+			`INSERT INTO app.p168_kbin VALUES ('\x01'), ('\x0A'), ('\x30'), ('\x7F'), ('\x80'), ('\x81FF'), ('\xFF'), ('\xFFFF')`,
+		},
+	}, adapters.NewOpCtx("op-kbin-setup")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer a.Execute(ctx, model.ConsoleRequest{Path: dbPath, Statements: []string{"DROP TABLE app.p168_kbin"}}, adapters.NewOpCtx("op-kbin-cleanup")) //nolint:errcheck
+	sort := &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "id", Direction: "asc"}}}
+	got := testsupport.KeysetForwardIDs(t, a, nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "p168_kbin")), sort, 2, 8)
+	want := []string{"0x01", "0x0a", "0x30", "0x7f", "0x80", "0x81ff", "0xff", "0xffff"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ids = %v, want %v", got, want)
 	}
 }
 
