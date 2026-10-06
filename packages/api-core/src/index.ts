@@ -57,6 +57,7 @@ export {
   generateRawRequest,
   generateRawRequestFromStored,
 } from './http/raw/generate';
+export { mergeRawHeaders } from './http/raw/mergeHeaders';
 export { type ParsedRawRequest, parseRawRequest, type RawWarning } from './http/raw/parse';
 export { fromSavedRequest, isDirty, toBuilderMethod, toSavedRequest } from './http/saved';
 export {

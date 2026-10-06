@@ -1,4 +1,9 @@
-import type { HttpBodyWire, HttpHeaderWire, HttpRequestTabState } from '@kira/shared/domain/http';
+import type {
+  HttpBodyWire,
+  HttpHeaderState,
+  HttpHeaderWire,
+  HttpRequestTabState,
+} from '@kira/shared/domain/http';
 import { goQueryEscape } from '../escape';
 
 // P9 D10: the raw editor is generated for these four modes only — `formdata`/`file` have no text
@@ -34,6 +39,11 @@ function bodyTextFor(state: HttpRequestTabState): string {
   }
 }
 
+/** The rows `generateRawRequest` emits; `mergeRawHeaders` reads the rest as non-emitted. */
+export function isRawEmittedHeader(h: HttpHeaderState): boolean {
+  return h.enabled && h.name.trim() !== '';
+}
+
 function hasUserContentType(state: HttpRequestTabState): boolean {
   return state.headers.some((h) => h.enabled && h.name.trim().toLowerCase() === 'content-type');
 }
@@ -59,7 +69,7 @@ function hasUserContentType(state: HttpRequestTabState): boolean {
 export function generateRawRequest(state: HttpRequestTabState, defaultContentType: string): string {
   const lines = [`${state.method} ${state.url} HTTP/1.1`];
   for (const h of state.headers) {
-    if (h.enabled && h.name.trim() !== '') lines.push(`${h.name}: ${h.value}`);
+    if (isRawEmittedHeader(h)) lines.push(`${h.name}: ${h.value}`);
   }
   if (state.bodyMode !== 'none' && defaultContentType && !hasUserContentType(state)) {
     lines.push(`Content-Type: ${defaultContentType}`);

@@ -252,3 +252,48 @@ test('Http raw — the editor', async ({ relaunch }) => {
     /has no text form that can be edited and parsed back/,
   );
 });
+
+// P175 D6 (P168 F17): a no-edit Apply keeps disabled header rows and every description.
+test('Http raw — a no-edit Apply keeps disabled header rows and descriptions', async ({
+  relaunch,
+}) => {
+  const RESTORED_TAB = {
+    id: 'tab-raw-merge',
+    connectionId: null,
+    path: 'request',
+    kind: 'http-request',
+    order: 0,
+    active: true,
+    state: {
+      method: 'GET',
+      url: 'https://api.example.com/ping',
+      headers: [
+        { name: 'X-On', value: '1', enabled: true, description: 'kept note' },
+        { name: 'X-Off', value: '2', enabled: false, description: '' },
+      ],
+      bodyMode: 'none',
+      body: '',
+      requestPane: 'headers',
+      responsePane: 'body',
+      responseView: 'pretty',
+      requestPaneHeight: 0,
+    },
+  };
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.tabsList, response: [RESTORED_TAB] }];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="http-field-descriptions-toggle"]');
+  await page.click('[data-testid="http-edit-raw"]');
+  const dialog = page.locator('[data-testid="edit-raw-dialog"]');
+  await expect(dialog).toBeVisible();
+  await page.click('[data-testid="edit-raw-apply"]');
+  await expect(dialog).toHaveCount(0);
+
+  const names = page.locator('[data-testid="http-header-name"]');
+  await expect(names.nth(0)).toHaveValue('X-On');
+  await expect(names.nth(1)).toHaveValue('X-Off');
+  await expect(page.locator('[data-testid="http-header-description"]').first()).toHaveValue(
+    'kept note',
+  );
+  await expect(page.locator('[data-testid="http-header-enabled"]').nth(1)).not.toBeChecked();
+});

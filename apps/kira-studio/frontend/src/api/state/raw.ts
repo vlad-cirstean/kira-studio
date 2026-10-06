@@ -1,8 +1,8 @@
-import { parseRawRequest, type RawWarning } from '@kira/api-core';
+import { mergeRawHeaders, parseRawRequest, type RawWarning } from '@kira/api-core';
 import type { HttpBodyMode } from '@shared/domain/http';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
-import { patchHttpRequestTabState } from '../tabs';
+import { findHttpRequestTab, patchHttpRequestTabState } from '../tabs';
 
 // P9 D8: the raw editor's own state — mirrors http/state/curl.ts's importCurlDialogState shape
 // (one `open` flag plus what the dialog needs to seed itself and to Apply). The pasted/generated
@@ -81,7 +81,12 @@ export const useEditRawStore = defineStore('editRaw', () => {
   function applyEditRaw(text: string): boolean {
     const result = parseRawRequest(text, state.originalUrl);
     if ('error' in result) return false;
-    patchHttpRequestTabState(state.tabId, result.state);
+    // The editor shows only enabled, named rows; merge keeps the disabled/blank rows and descriptions.
+    const current = findHttpRequestTab(state.tabId)?.state.headers ?? [];
+    patchHttpRequestTabState(state.tabId, {
+      ...result.state,
+      headers: mergeRawHeaders(current, result.state.headers),
+    });
     closeEditRawDialog();
     return true;
   }
