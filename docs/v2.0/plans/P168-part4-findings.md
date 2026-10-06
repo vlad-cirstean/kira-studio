@@ -205,6 +205,23 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   an ordered decoder (`internal/jsonx` already has ordered pairs) in `ParseHeaderJSON`
   (`needs-other-part-file` not needed: `adapters/rowops.go` is Part 3, a Stream A one-hop file).
 
+### F15 (medium, design-decision) sqs browse on a read-only connection consumes messages
+
+- `apps/kira-studio/internal/adapters/sqs/read.go:225-268` (`pollQueue` calls
+  `ReceiveMessage` with the queue's own visibility timeout); no read-only branch anywhere in the
+  read path (`adapter.go:179-193` passes no `readOnly`).
+- `ReceiveMessage` is not a read: every browsed message is hidden from real consumers for the
+  queue's visibility timeout (default 30 s, up to 12 h), its `ApproximateReceiveCount` goes up,
+  and a FIFO receive locks the message group. Scenario: an operator opens a production queue on a
+  connection marked read-only and polls it a few times to look at a stuck message. With a
+  `RedrivePolicy` of `maxReceiveCount: 3`, the third poll moves the message to the DLQ; between
+  polls the real consumer cannot see it. The connection's read-only flag promised "nothing but a
+  read" and did not prevent either effect.
+- Fix (needs a decision): on a read-only connection receive with `VisibilityTimeout: 0` (messages
+  reappear at once; the receive count still rises), and refuse or confirm a poll on a queue whose
+  `RedrivePolicy` would count it; or block browse on read-only connections outright and say why.
+  Writable connections keep today's behaviour (the delete flow needs the hidden window).
+
 ## Coverage
 
 - Block 1 (awscfg, core callee contract): done. `awscfg/config.go`, `awscfg/errors.go` reviewed
@@ -274,6 +291,20 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   default and small limits. `ErrClientClosed` branch in `pollRound` is unreachable (the browse
   client closes only after the loop) but harmless. Caps match the unsupported stubs (`Describe`,
   `SchemaColumns`, `Execute`, `KeyTypes`, `DownloadObject`); leaf `Children` returns `[]`.
-- Block 5 (sqs): not reached.
+- Block 5 (sqs): done. All eight production files read in full: `client`, `adapter`, `read`,
+  `mutate`, `catalog`, `definition`, `errors`, `caps`. Verified, no finding: no `PurgeQueue`,
+  `DeleteQueue` or other destructive queue call exists; `dbmcp` has no read tool and SQS has no
+  console, so only an explicit UI poll receives. `Mutate` checks `AssertWritable` first.
+  `cacheQueueURL` after `Disconnect` is a no-op (P108 F3 holds); an op past `requireClient` keeps a
+  valid client (the SDK holds no per-connection socket state) and a cleared `receiptHandles` makes
+  a racing delete fail with "poll again", never succeed wrongly. Queue URLs are deterministic per
+  account and name, so a recreated queue reuses its URL; the cache is per adapter instance (one
+  region). `forDelete` measures from a local `receivedAt` taken after the receive returned: the
+  error is one round trip in the safe direction for the client but up to one round trip late
+  against the server's timer; too small to report. Same `MessageId` received twice keeps the
+  newest handle. FIFO group/dedup sentinels hold (P108 F9). Cap of 5,000 handles evicts oldest.
+  `encodeHeaders` base64s binary attributes; `SentTimestamp` parse failure leaves the cell null.
+  Every SDK call takes the op ctx; `Connect` returns on ctx cancel through `LoadDefaultConfig(ctx)`
+  and `ListQueues(ctx)`. Caps match the unsupported stubs; leaf `Children` returns `[]`.
 - Block 6 (s3): not reached.
 - Block 7 (tests, real-container runs): not reached.
