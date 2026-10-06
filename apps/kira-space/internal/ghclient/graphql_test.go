@@ -80,14 +80,14 @@ func TestSetFilesViewed_WholeCallErrorFailsRemainingPaths(t *testing.T) {
 }
 
 func TestPullFiles_Pagination(t *testing.T) {
-	page1 := `{"data":{"repository":{"pullRequest":{"id":"PR_9","headRefOid":"abc","state":"OPEN","files":{"nodes":[{"path":"a.go","viewerViewedState":"VIEWED"},{"path":"b.go","viewerViewedState":"UNVIEWED"}],"pageInfo":{"hasNextPage":true,"endCursor":"C1"}}}}}}`
-	page2 := `{"data":{"repository":{"pullRequest":{"id":"PR_9","headRefOid":"abc","state":"OPEN","files":{"nodes":[{"path":"c.go","viewerViewedState":"DISMISSED"}],"pageInfo":{"hasNextPage":false,"endCursor":"C2"}}}}}}`
+	page1 := `{"data":{"repository":{"pullRequest":{"id":"PR_9","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","state":"OPEN","files":{"nodes":[{"path":"a.go","viewerViewedState":"VIEWED"},{"path":"b.go","viewerViewedState":"UNVIEWED"}],"pageInfo":{"hasNextPage":true,"endCursor":"C1"}}}}}}`
+	page2 := `{"data":{"repository":{"pullRequest":{"id":"PR_9","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","state":"OPEN","files":{"nodes":[{"path":"c.go","viewerViewedState":"DISMISSED"}],"pageInfo":{"hasNextPage":false,"endCursor":"C2"}}}}}}`
 	c, r := scriptedClient(Result{Stdout: []byte(page1)}, Result{Stdout: []byte(page2)})
 	got, status := c.PullFiles(context.Background(), testRepo, 7)
 	if !status.OK() {
 		t.Fatal(status)
 	}
-	if got.NodeID != "PR_9" || got.HeadSha != "abc" || len(got.Files) != 3 || !got.Files[0].Viewed || got.Files[2].Viewed {
+	if got.NodeID != "PR_9" || got.HeadSha != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" || len(got.Files) != 3 || !got.Files[0].Viewed || got.Files[2].Viewed {
 		t.Fatalf("got = %+v", got)
 	}
 	if len(r.calls) != 2 {
@@ -99,5 +99,23 @@ func TestPullFiles_Pagination(t *testing.T) {
 	}
 	if !reflect.DeepEqual(r.calls[0][6:], []string{"-f", "owner=o", "-f", "name=r", "-F", "number=7"}) {
 		t.Fatalf("first page vars = %v", r.calls[0][6:])
+	}
+}
+
+func TestPullFiles_StopsOnPageWithoutProgress(t *testing.T) {
+	oid := strings.Repeat("a", 40)
+	page := `{"data":{"repository":{"pullRequest":{"id":"PR_9","headRefOid":"` + oid + `","state":"OPEN","files":{"nodes":[],"pageInfo":{"hasNextPage":true,"endCursor":"C1"}}}}}}`
+	c, r := scriptedClient(Result{Stdout: []byte(page)}, Result{Stdout: []byte(page)}, Result{Stdout: []byte(page)})
+	got, status := c.PullFiles(context.Background(), testRepo, 7)
+	if !status.OK() || !got.Truncated || len(r.calls) != 1 {
+		t.Fatalf("status = %+v truncated = %v calls = %d, want 1 call and truncated", status, got.Truncated, len(r.calls))
+	}
+}
+
+func TestPullFiles_RejectsMalformedHeadOid(t *testing.T) {
+	page := `{"data":{"repository":{"pullRequest":{"id":"PR_9","headRefOid":"abc\nHEAD","state":"OPEN","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`
+	c, _ := scriptedClient(Result{Stdout: []byte(page)})
+	if _, status := c.PullFiles(context.Background(), testRepo, 7); status.OK() {
+		t.Fatal("want a non-OK status for a malformed head oid")
 	}
 }

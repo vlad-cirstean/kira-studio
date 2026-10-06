@@ -122,11 +122,25 @@ type pullFilesData struct {
 	} `json:"repository"`
 }
 
+// validObjectID reports whether s is a full SHA-1 or SHA-256 hex object id.
+func validObjectID(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	for _, r := range s {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 // PullFiles reads the PR's files with their viewed state, paged to the end (stopping at 3000 files).
 func (c *Client) PullFiles(ctx context.Context, repo Repo, number int) (PullFiles, Status) {
 	var out PullFiles
 	cursor := ""
-	for {
+	done := false
+	for page := 0; !done && page <= maxPullFiles/pullFilesPageSize; page++ {
 		vars := []GraphQLVar{
 			{Name: "owner", Str: repo.Owner}, {Name: "name", Str: repo.Name}, {Name: "number", Int: number, IsInt: true},
 		}
@@ -142,6 +156,9 @@ func (c *Client) PullFiles(ctx context.Context, repo Repo, number int) (PullFile
 		if pr == nil {
 			return PullFiles{}, Status{Kind: KindForbidden, Host: repo.Host, Reason: "not found, or you cannot see it"}
 		}
+		if !validObjectID(pr.HeadRefOid) {
+			return PullFiles{}, Status{Kind: KindForbidden, Host: repo.Host, Reason: "GitHub returned an unreadable response"}
+		}
 		out.NodeID, out.HeadSha, out.State = pr.ID, pr.HeadRefOid, pr.State
 		for _, n := range pr.Files.Nodes {
 			out.Files = append(out.Files, PullFile{Path: n.Path, Viewed: n.Viewed == viewedStateViewed})
@@ -149,12 +166,23 @@ func (c *Client) PullFiles(ctx context.Context, repo Repo, number int) (PullFile
 		if len(out.Files) >= maxPullFiles {
 			out.Truncated = pr.Files.PageInfo.HasNextPage || len(out.Files) > maxPullFiles
 			out.Files = out.Files[:min(len(out.Files), maxPullFiles)]
+			done = true
 			break
 		}
 		if !pr.Files.PageInfo.HasNextPage || pr.Files.PageInfo.EndCursor == "" {
+			done = true
+			break
+		}
+		// A page with no nodes or a cursor that did not advance would loop without progress.
+		if len(pr.Files.Nodes) == 0 || pr.Files.PageInfo.EndCursor == cursor {
+			out.Truncated = true
+			done = true
 			break
 		}
 		cursor = pr.Files.PageInfo.EndCursor
+	}
+	if !done {
+		out.Truncated = true
 	}
 	return out, Status{Kind: KindOK, Host: repo.Host}
 }
