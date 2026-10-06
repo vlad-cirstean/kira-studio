@@ -42,7 +42,10 @@ func Resolve(ctx context.Context, cfg model.ResolvedConnectionConfig, kindLabel 
 		region = u.Hostname()
 		if u.User != nil {
 			password, hasPassword := u.User.Password()
-			if u.User.Username() != "" && hasPassword {
+			if u.User.Username() != "" {
+				if !hasPassword || password == "" {
+					return Resolved{}, mapConfigError("an access key needs a secret key; add the password or drop the access key")
+				}
 				opts = append(opts, awsconfig.WithCredentialsProvider(
 					credentials.NewStaticCredentialsProvider(u.User.Username(), password, ""),
 				))
