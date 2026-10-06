@@ -202,17 +202,16 @@ async function migrateLegacySettings(
   }
 }
 
-// G14 D5: builds the status-bar tooltip as several labelled lines rather than one run-on
-// sentence — the detail item.text no longer carries (F7) lives here instead, where it can be
-// structured. Markdown line breaks (two trailing spaces) between each entry.
+// G14 D5: builds the status-bar tooltip as several lines rather than one run-on sentence. Only the
+// fixed title is Markdown; every other line (commit summary, author, paths) is repository- or
+// filesystem-sourced and goes through appendText, so it can neither format nor load remote images.
 function markdownTooltip(lines: readonly string[]): vscode.MarkdownString {
-  return new vscode.MarkdownString(lines.join('  \n'));
-}
-
-// The label vscode.MarkdownString's own first line reads as plain text — used for
-// accessibilityInformation below, since an icon-only item needs *some* accessible name.
-function plainTextOf(markdownLine: string): string {
-  return markdownLine.replaceAll('**', '').replaceAll('`', '');
+  const md = new vscode.MarkdownString();
+  lines.forEach((line, index) => {
+    if (index === 0) md.appendMarkdown(`**${line}**`);
+    else md.appendMarkdown('  \n').appendText(line);
+  });
+  return md;
 }
 
 // G12 D10: an entry point genuinely visible in every state, not only the one state (connected)
@@ -245,13 +244,13 @@ function updateStatusBar(
   switch (state.kind) {
     case 'connecting': {
       item.text = '$(sync~spin)';
-      tooltipLines = ['**Kira Space**', 'Connecting…', `\`${socketPath()}\``];
+      tooltipLines = ['Kira Space', 'Connecting…', socketPath()];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       break;
     }
     case 'pairing': {
       item.text = '$(key) Approve';
-      tooltipLines = ['**Kira Space**', "Waiting for approval in Kira Space's window"];
+      tooltipLines = ['Kira Space', "Waiting for approval in Kira Space's window"];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       break;
     }
@@ -261,17 +260,17 @@ function updateStatusBar(
       item.command = FOCUS_GRAPH_COMMAND;
       if (active) {
         item.text = '$(sync~spin)';
-        tooltipLines = ['**Kira Space**', 'Loading…'];
+        tooltipLines = ['Kira Space', 'Loading…'];
       } else if (blame?.kind === 'dirty') {
         item.text = '$(git-branch) Unsaved changes';
-        tooltipLines = ['**Kira Space**', 'Unsaved changes — blame updates once you save'];
+        tooltipLines = ['Kira Space', 'Unsaved changes — blame updates once you save'];
       } else if (blame?.kind === 'uncommitted') {
         item.text = '$(git-branch) Uncommitted';
-        tooltipLines = ['**Kira Space**', 'This line has not been committed yet'];
+        tooltipLines = ['Kira Space', 'This line has not been committed yet'];
       } else if (blame?.kind === 'resolved') {
         item.text = `$(git-branch) ${blameStatusText(blame)}`;
         tooltipLines = [
-          '**Kira Space**',
+          'Kira Space',
           blame.summary,
           `${blame.author}, ${new Date(blame.authorTimeSeconds * 1000).toLocaleString()}`,
         ];
@@ -285,7 +284,7 @@ function updateStatusBar(
         // G27 D7: a workspace folder's fsPath is filesystem-sourced.
         const rawRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         const root = rawRoot === undefined ? undefined : nfcPath(rawRoot);
-        const lines = ['**Kira Space**', 'Connected'];
+        const lines = ['Kira Space', 'Connected'];
         if (root) lines.push(root);
         if (appInit) {
           lines.push(`Kira Space ${appInit.serverVersion}`, `Contract v${appInit.contractVersion}`);
@@ -298,9 +297,9 @@ function updateStatusBar(
       item.text = '$(error) Kira';
       tooltipLines =
         state.reason === 'remote'
-          ? ['**Kira Space**', 'Runs on your Mac — remote workspaces are not supported']
+          ? ['Kira Space', 'Runs on your Mac — remote workspaces are not supported']
           : [
-              '**Kira Space**',
+              'Kira Space',
               state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied',
               'Click to retry',
             ];
@@ -311,7 +310,7 @@ function updateStatusBar(
     case 'versionMismatch': {
       item.text = '$(error) Kira';
       tooltipLines = [
-        '**Kira Space**',
+        'Kira Space',
         `Version mismatch — extension expects contract ${state.expected}, ` +
           `Kira Space (${state.serverVersion}) speaks ${state.received}`,
         'Both need to be on the same release',
@@ -322,7 +321,7 @@ function updateStatusBar(
     }
   }
   item.tooltip = markdownTooltip(tooltipLines);
-  item.accessibilityInformation = { label: plainTextOf(tooltipLines[0]) };
+  item.accessibilityInformation = { label: tooltipLines.join(', ') };
   item.show();
 }
 
@@ -347,6 +346,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // G7 D4/D21: the migrated, previously-unused credential port — this phase's own relay is its
   // first (and only) caller.
   const credentialPrompt = new VsCodeCredentialPrompt();
+  let credentialQueue: Promise<void> = Promise.resolve();
+  // Aborted whenever the connection leaves `connected`; scopes a credential box to its connection.
+  let connectionLifetime = new AbortController();
 
   const appVersion = String(
     (context.extension.packageJSON as { version?: unknown }).version ?? '0.0.0',
@@ -559,15 +561,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // silently — the broker's own disconnect bound has already fired by the time this would run.
     {
       dispose: manager.on('credential.request', (req) => {
-        void (async () => {
-          const secret = await credentialPrompt.ask({ prompt: req.prompt, masked: req.masked });
-          await manager.request('credential.provide', {
-            requestId: req.requestId,
-            secret: secret ?? null,
+        // One box at a time (a second createInputBox hides the first, which would answer null),
+        // and a box dies with the connection its request arrived on.
+        const { signal } = connectionLifetime;
+        credentialQueue = credentialQueue
+          .then(async () => {
+            if (signal.aborted) return;
+            const secret = await credentialPrompt.ask({
+              prompt: req.prompt,
+              masked: req.masked,
+              signal,
+            });
+            if (signal.aborted) return;
+            await manager.request('credential.provide', {
+              requestId: req.requestId,
+              secret: secret ?? null,
+            });
+          })
+          .catch(() => {
+            /* the broker's own bound (dismissal/timeout/disconnect/cancel) already ends the wait */
           });
-        })().catch(() => {
-          /* the broker's own bound (dismissal/timeout/disconnect/cancel) already ends the wait */
-        });
       }),
     },
     // G7 D20/§4.2: the graph provider only — the review sidebar renders no operation UI at all.
@@ -619,7 +632,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     manager.onStateChange((state) => {
       logger.log('info', 'connection state', state);
-      if (state.kind !== 'connected') lastAppInit = undefined;
+      if (state.kind !== 'connected') {
+        lastAppInit = undefined;
+        connectionLifetime.abort();
+        connectionLifetime = new AbortController();
+      }
       // G15 D7: "connection state leaves connected" — every tracked decoration/state is dropped
       // rather than left showing a diff over a connection that may reconnect to a different repo.
       reviewMarking.notifyConnectionState(state);
