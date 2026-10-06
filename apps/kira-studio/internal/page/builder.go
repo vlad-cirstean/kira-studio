@@ -238,9 +238,9 @@ type DocumentPageBuilder struct {
 
 // NewDocumentPageBuilder mirrors page.ts's createDocumentPageBuilder.
 func NewDocumentPageBuilder(singleRow bool) *DocumentPageBuilder {
-	maxBytes := DocumentTruncateBytes
+	maxBytes := MaxCellBytes
 	if singleRow {
-		maxBytes = DocumentTruncateBytesSingle
+		maxBytes = SingleRowMaxBytes
 	}
 	return &DocumentPageBuilder{maxBytes: maxBytes, ids: newColumnScratch(), bodies: newColumnScratch()}
 }
@@ -310,7 +310,7 @@ type KeyValuePageBuilder struct {
 func NewKeyValuePageBuilder(redisType string, ttlMs, memoryBytes *int64, singleRow bool) *KeyValuePageBuilder {
 	valueMaxBytes := MaxCellBytes
 	if singleRow {
-		valueMaxBytes = DocumentTruncateBytesSingle
+		valueMaxBytes = SingleRowMaxBytes
 	}
 	return &KeyValuePageBuilder{
 		redisType: redisType, ttlMs: ttlMs, memoryBytes: memoryBytes, valueMaxBytes: valueMaxBytes,

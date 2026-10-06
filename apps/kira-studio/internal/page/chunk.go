@@ -13,15 +13,15 @@ import (
 	"unicode/utf8"
 )
 
-// Constants, from page.ts:175-197.
+// Constants, mirroring page.ts.
 const (
-	MaxCellBytes                = 64 << 10
-	MaxPageSize                 = 10_000
-	DocumentTruncateBytes       = MaxCellBytes
-	DocumentTruncateBytesSingle = MaxCellBytes * 64
-	ObjectBodyPreviewBytes      = DocumentTruncateBytesSingle
-	ObjectBodyEditBytes         = MaxCellBytes * 16
-	ObjectUploadMaxBytes        = 5 << 30
+	MaxCellBytes = 64 << 10
+	MaxPageSize  = 10_000
+	// SingleRowMaxBytes is the per-value budget for a page that is one explicitly requested row,
+	// and the ceiling on an object body fetched and rendered at all.
+	SingleRowMaxBytes    = MaxCellBytes * 64
+	ObjectBodyEditBytes  = MaxCellBytes * 16
+	ObjectUploadMaxBytes = 5 << 30
 
 	// columnEnvelopeBytes is the per-column object overhead estimate pageByteSize adds — a
 	// measurement, not a guess (page.ts's own comment); changing it changes L2 eviction behaviour.

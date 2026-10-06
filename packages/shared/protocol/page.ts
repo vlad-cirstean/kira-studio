@@ -102,7 +102,7 @@ export interface DocumentPage {
  *
  * P17 reuses this exact shape for a single s3 object (`redisType: 'object'`): `fields`/`values`
  * carry the object's metadata (ContentType, ContentLength, LastModified, ETag, StorageClass, ...)
- * plus, for an object at or under `OBJECT_BODY_PREVIEW_BYTES` (P33 D4), a synthetic `Body` row for
+ * plus, for an object at or under `SINGLE_ROW_MAX_BYTES` (P33 D4), a synthetic `Body` row for
  * its (possibly truncated) text content — a flat field/value listing is exactly what a hash-like
  * key already renders, and s3's own tree (bucket → prefix → object, '/'-delimited) already mirrors
  * redis's own namespace tree (db → namespace, ':'-delimited) closely enough that browsing one
@@ -150,16 +150,12 @@ export type Page = TabularPage | DocumentPage | KeyValuePage | StreamPage;
 
 export const MAX_CELL_BYTES = 64 * 1024;
 export const MAX_PAGE_SIZE = 10_000;
-/** Per-document-body truncation budget for a multi-row document page (P8's D1/D6). */
-export const DOCUMENT_TRUNCATE_BYTES = MAX_CELL_BYTES;
-/** Per-document-body budget for a single explicitly-requested document ("show all", P8's D1). */
-export const DOCUMENT_TRUNCATE_BYTES_SINGLE = MAX_CELL_BYTES * 64;
-
-/** P33: the ceiling on an object body the app fetches, decodes and renders **at all**. Equal to
- *  DOCUMENT_TRUNCATE_BYTES_SINGLE by construction, not by coincidence: a body that could only be
- *  shown truncated is a body whose remainder was transferred for nothing, now that Download
- *  hands over the whole file instead. Above this, nothing is fetched and no Body row exists. */
-export const OBJECT_BODY_PREVIEW_BYTES = DOCUMENT_TRUNCATE_BYTES_SINGLE; // 4 MB
+/** Per-value budget for a page that is one explicitly requested row (`singleRow`): a document
+ *  body ("show all", P8 D1) or an s3 object's Body (P33). Also the ceiling on an object body the
+ *  app fetches, decodes and renders **at all**: a body that could only be shown truncated is a
+ *  body whose remainder was transferred for nothing, now that Download hands over the whole file.
+ *  Above this, nothing is fetched and no Body row exists. */
+export const SINGLE_ROW_MAX_BYTES = MAX_CELL_BYTES * 64; // 4 MB
 
 /** P33: the ceiling on an object body the app will let the user edit and write back. Lower than
  *  the render ceiling because editing is a different cost class — a mutable CodeMirror buffer,
@@ -435,7 +431,7 @@ export interface DocumentPageBuilder {
 }
 
 export function createDocumentPageBuilder(opts?: { singleRow?: boolean }): DocumentPageBuilder {
-  const maxBytes = opts?.singleRow ? DOCUMENT_TRUNCATE_BYTES_SINGLE : DOCUMENT_TRUNCATE_BYTES;
+  const maxBytes = opts?.singleRow ? SINGLE_ROW_MAX_BYTES : MAX_CELL_BYTES;
   const columnar = createColumnarBuilder(['ids', 'bodies'] as const, () => maxBytes);
 
   return {
@@ -467,13 +463,13 @@ export function createKeyValuePageBuilder(opts: {
   redisType: KeyValuePage['redisType'];
   ttlMs: number | null;
   memoryBytes: number | null;
-  // Mirrors createDocumentPageBuilder's own singleRow — DOCUMENT_TRUNCATE_BYTES_SINGLE's "a
+  // Mirrors createDocumentPageBuilder's own singleRow — SINGLE_ROW_MAX_BYTES's "a
   // bigger budget when this is the one thing being fetched directly" reasoning applies just as
   // well to an s3 object's Body field (P17) as it does to a document; every redis type keeps the
   // plain MAX_CELL_BYTES default since none of them have a single dominant large-value field.
   singleRow?: boolean;
 }): KeyValuePageBuilder {
-  const valueMaxBytes = opts.singleRow ? DOCUMENT_TRUNCATE_BYTES_SINGLE : MAX_CELL_BYTES;
+  const valueMaxBytes = opts.singleRow ? SINGLE_ROW_MAX_BYTES : MAX_CELL_BYTES;
   const columnar = createColumnarBuilder(['fields', 'values'] as const, (k) =>
     k === 'values' ? valueMaxBytes : MAX_CELL_BYTES,
   );

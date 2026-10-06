@@ -116,7 +116,7 @@ func readObject(ctx context.Context, client *s3.Client, bucket, key string, op *
 
 	// P33 D4: one number governs fetch, decode and render alike — above it nothing is transferred
 	// and no Body row exists at all.
-	if head.ContentLength == nil || *head.ContentLength > int64(page.ObjectBodyPreviewBytes) {
+	if head.ContentLength == nil || *head.ContentLength > int64(page.SingleRowMaxBytes) {
 		pushMetadataFields(builder, headFromHead(head))
 	} else {
 		// IfMatch pins the Get to the object the Head sized: a replacement in between is refused
@@ -130,12 +130,12 @@ func readObject(ctx context.Context, client *s3.Client, bucket, key string, op *
 		}
 		pushMetadataFields(builder, headFromGet(res))
 		if res.Body != nil {
-			bodyBytes, err := io.ReadAll(io.LimitReader(res.Body, int64(page.ObjectBodyPreviewBytes)+1))
+			bodyBytes, err := io.ReadAll(io.LimitReader(res.Body, int64(page.SingleRowMaxBytes)+1))
 			res.Body.Close()
 			if err != nil {
 				return page.KeyValuePage{}, mapError(err)
 			}
-			if len(bodyBytes) > page.ObjectBodyPreviewBytes {
+			if len(bodyBytes) > page.SingleRowMaxBytes {
 				return page.KeyValuePage{}, errObjectChanged
 			}
 			if err := adapters.CheckCancelled(ctx); err != nil {
@@ -183,12 +183,12 @@ func countObject(ctx context.Context, client *s3.Client, bucket, key string, op 
 	// ContentType/ContentLength/LastModified/ETag are effectively always present on a real object;
 	// StorageClass is the only field readObject may skip. The Body row itself is pushed only when
 	// readObject would actually fetch and decode one — a known length at or under
-	// ObjectBodyPreviewBytes — so Count and the visible row count never disagree.
+	// SingleRowMaxBytes — so Count and the visible row count never disagree.
 	value := int64(4 + len(res.Metadata))
 	if res.StorageClass != "" {
 		value++
 	}
-	if res.ContentLength != nil && *res.ContentLength <= int64(page.ObjectBodyPreviewBytes) {
+	if res.ContentLength != nil && *res.ContentLength <= int64(page.SingleRowMaxBytes) {
 		value++
 	}
 	return adapters.CountResult{Value: value, Exact: true}, nil

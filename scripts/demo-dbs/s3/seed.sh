@@ -31,7 +31,7 @@ echo -n '{"quarter":"Q1"}' |
     --content-type application/json >/dev/null
 
 # The size/type ladder (P33 D4/D6/D7's own thresholds: OBJECT_BODY_EDIT_BYTES = 1 MB,
-# OBJECT_BODY_PREVIEW_BYTES = 4 MB).
+# SINGLE_ROW_MAX_BYTES = 4 MB).
 echo -n "" |
   awslocal s3 cp - s3://kira-demo-bucket/sizes/tiny.txt --content-type text/plain >/dev/null
 head -c 4000 /dev/zero | tr '\0' 'a' |

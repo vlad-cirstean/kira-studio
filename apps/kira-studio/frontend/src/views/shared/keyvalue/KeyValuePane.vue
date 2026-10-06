@@ -34,7 +34,7 @@ import { decodePath, pathParent, pathTail } from '@shared/domain/tree';
 import {
   type ColumnDescriptor,
   OBJECT_BODY_EDIT_BYTES,
-  OBJECT_BODY_PREVIEW_BYTES,
+  SINGLE_ROW_MAX_BYTES,
 } from '@shared/protocol/page';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -285,7 +285,7 @@ const downloadTitle = computed(() =>
 const isSingleObjectPage = computed(() => page.value?.redisType === 'object');
 const canDownload = computed(() => !!caps.value?.fileTransfer);
 
-// P33 D4: the Body row is present only when the object is at or under OBJECT_BODY_PREVIEW_BYTES —
+// P33 D4: the Body row is present only when the object is at or under SINGLE_ROW_MAX_BYTES —
 // scanning the small, already-loaded field list for it (never a second fetch) is how the view
 // tells "too large to preview" apart from "this object genuinely has no readable body".
 function objectBodyRowFor(p: typeof page.value): { value: string; isTruncated: boolean } | null {
@@ -976,7 +976,7 @@ onUnmounted(() => {
       <Alert v-if="rt?.actionError" variant="destructive" data-testid="keyvalue-action-error">
         <AlertDescription>{{ rt.actionError }}</AlertDescription>
       </Alert>
-      <!-- P33 D4: an object over OBJECT_BODY_PREVIEW_BYTES has no Body row at all — this is the
+      <!-- P33 D4: an object over SINGLE_ROW_MAX_BYTES has no Body row at all — this is the
            renderer's own honest explanation of that absence, gated on the same shared constant
            the adapter used, not a parsed string. -->
       <Alert
@@ -986,7 +986,7 @@ onUnmounted(() => {
       >
         <AlertDescription>
           Too large to preview ({{ formatBytes(page.memoryBytes) }}, over the
-          {{ formatBytes(OBJECT_BODY_PREVIEW_BYTES) }} limit) — use Download to save it locally.
+          {{ formatBytes(SINGLE_ROW_MAX_BYTES) }} limit) — use Download to save it locally.
         </AlertDescription>
       </Alert>
       <!-- The S3 object body is edited through the docked cell editor below (onRowClick's

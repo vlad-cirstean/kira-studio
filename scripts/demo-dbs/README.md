@@ -147,7 +147,7 @@ and parentheses, to exercise path encoding through download/delete/the tab title
 `sizes/` ladder — `tiny.txt` (0 bytes), `small.json` (~4 KB, ordinary edit case), `medium.csv`
 (~512 KB, editable but large enough to feel it), `large.log` (~2 MB — renders, but Edit is
 disabled since it's over `OBJECT_BODY_EDIT_BYTES`), `huge.bin` (~8 MB — over
-`OBJECT_BODY_PREVIEW_BYTES`, no Body row at all, Download is the only way to see it), `logo.png`
+`SINGLE_ROW_MAX_BYTES`, no Body row at all, Download is the only way to see it), `logo.png`
 (a real tiny PNG — previews lossily, Edit refused as not valid UTF-8); and `bulk/` with 1,200
 small JSON objects, past `ListObjectsV2`'s 1,000-key page, to exercise the tree's continuation
 loop. `kira-uploads-bucket` is empty — the upload target, and the case of a bucket with nothing

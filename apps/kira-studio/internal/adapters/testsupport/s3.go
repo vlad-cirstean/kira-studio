@@ -51,7 +51,7 @@ const (
 
 // S3OversizedObjectBytes mirrors 0007_s3_seed.ts's own OVERSIZED_OBJECT_BYTES — sized relative to
 // the real shared threshold so this fixture tracks any future change to it automatically.
-var S3OversizedObjectBytes = page.ObjectBodyPreviewBytes + 1024
+var S3OversizedObjectBytes = page.SingleRowMaxBytes + 1024
 
 // S3Fixture is support/s3.ts's S3Fixture.
 type S3Fixture struct {

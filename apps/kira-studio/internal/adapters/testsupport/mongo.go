@@ -195,7 +195,7 @@ func seedMongo(ctx context.Context, db *mongodriver.Database) error {
 		return err
 	}
 
-	// P27 §5/D22: a document well past DocumentTruncateBytes (64 KB) on a multi-row page, so a
+	// P27 §5/D22: a document well past MaxCellBytes (64 KB) on a multi-row page, so a
 	// real read exercises the tree's raw-text fallback rather than a synthetic string.
 	oversizedID, err := bson.ObjectIDFromHex(hexID(900))
 	if err != nil {
