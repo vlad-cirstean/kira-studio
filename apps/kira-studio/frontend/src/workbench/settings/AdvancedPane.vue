@@ -9,23 +9,23 @@ import {
   EXPENSIVE_QUERY_ROWS_RANGE,
   OP_LOG_RETENTION_DAYS_RANGE,
 } from '../../state/settingsDomain';
-import type { SettingsPaneProps } from './types';
+import { parseIntField, type SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Advanced'"` branch.
 const props = defineProps<SettingsPaneProps>();
 
 function onOpLogRetentionInput(e: Event): void {
-  props.draft.advanced.opLogRetentionDays = Number((e.target as HTMLInputElement).value);
+  props.draft.advanced.opLogRetentionDays = parseIntField((e.target as HTMLInputElement).value);
 }
 
 function onExpensiveQueryRowsInput(e: Event): void {
-  props.draft.advanced.expensiveQueryRows = Number((e.target as HTMLInputElement).value);
+  props.draft.advanced.expensiveQueryRows = parseIntField((e.target as HTMLInputElement).value);
 }
 
 const opLogRetentionError = computed<string | null>(() => {
   const v = props.draft.advanced.opLogRetentionDays;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isInteger(v)) return 'Enter a whole number.';
   if (v < OP_LOG_RETENTION_DAYS_RANGE.min || v > OP_LOG_RETENTION_DAYS_RANGE.max) {
     return `${OP_LOG_RETENTION_DAYS_RANGE.min}–${OP_LOG_RETENTION_DAYS_RANGE.max} days`;
   }
@@ -35,7 +35,7 @@ props.registerFieldError('advanced.opLogRetentionDays', opLogRetentionError);
 
 const expensiveQueryRowsError = computed<string | null>(() => {
   const v = props.draft.advanced.expensiveQueryRows;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isInteger(v)) return 'Enter a whole number.';
   if (v < EXPENSIVE_QUERY_ROWS_RANGE.min || v > EXPENSIVE_QUERY_ROWS_RANGE.max) {
     return `${EXPENSIVE_QUERY_ROWS_RANGE.min.toLocaleString()}–${EXPENSIVE_QUERY_ROWS_RANGE.max.toLocaleString()}`;
   }

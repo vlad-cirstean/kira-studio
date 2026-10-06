@@ -200,6 +200,25 @@ test('the Api section round-trips a single changed leaf through Save', async ({ 
   expect(calls[0].args).toEqual({ patch: { api: { maxResponseMb: 10 } } });
 });
 
+// A cleared numeric field is "not a number", never 0 (0 is a valid "unlimited" for this leaf).
+test('a cleared numeric field blocks Save instead of writing 0', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch();
+  await openSettings(page);
+  await page.click('[data-testid="settings-section-Api"]');
+
+  await page.fill('[data-testid="settings-api-maxResponseMb"]', '');
+  await expect(page.locator('[data-testid="settings-api-maxResponseMb-error"]')).toHaveText(
+    'Enter a whole number.',
+  );
+  await expect(page.locator('[data-testid="settings-save"]')).toBeDisabled();
+  expect(settingsSetCalls(control)).toHaveLength(0);
+
+  await page.fill('[data-testid="settings-api-maxResponseMb"]', '1.5');
+  await expect(page.locator('[data-testid="settings-api-maxResponseMb-error"]')).toHaveText(
+    'Enter a whole number.',
+  );
+});
+
 // P117 S2: a `:value`/`@change` NativeSelect bound alongside `useVModel({ passive: true })` shows
 // blank on open -- the passive vModel's own internal state overwrites the prop-driven value before
 // paint. The log-level field binds through `model-value`/`update:model-value` instead.

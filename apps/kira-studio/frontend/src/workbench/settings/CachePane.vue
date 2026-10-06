@@ -10,7 +10,7 @@ import { computed, useId } from 'vue';
 import { data } from '../../bridge/data';
 import { useCacheStatsStore } from '../../state/cacheStats';
 import { CACHE_L2_BUDGET_MB_RANGE } from '../../state/settingsDomain';
-import type { SettingsPaneProps } from './types';
+import { parseIntField, type SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Cache'"` branch.
@@ -19,12 +19,12 @@ const props = defineProps<SettingsPaneProps>();
 const cacheStatsStore = useCacheStatsStore();
 
 function onCacheBudgetInput(e: Event): void {
-  props.draft.cache.l2BudgetMb = Number((e.target as HTMLInputElement).value);
+  props.draft.cache.l2BudgetMb = parseIntField((e.target as HTMLInputElement).value);
 }
 
 const cacheBudgetError = computed<string | null>(() => {
   const v = props.draft.cache.l2BudgetMb;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isInteger(v)) return 'Enter a whole number.';
   if (v < CACHE_L2_BUDGET_MB_RANGE.min || v > CACHE_L2_BUDGET_MB_RANGE.max) {
     return `${CACHE_L2_BUDGET_MB_RANGE.min}–${CACHE_L2_BUDGET_MB_RANGE.max} MB`;
   }

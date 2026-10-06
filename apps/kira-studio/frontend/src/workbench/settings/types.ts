@@ -17,3 +17,11 @@ type SettingsSections = Pick<Settings, 'appearance' | 'data' | 'cache' | 'advanc
 // P115 H9: this app and Kira Space each declared the identical SettingsPaneProps interface,
 // differing only in SettingsSections' own Pick — both now instantiate the shared generic instead.
 export type SettingsPaneProps = GenericSettingsPaneProps<SettingsSections>;
+
+/** A numeric field's input text as a draft value. A cleared or non-integer input is NaN, never 0
+ *  or a fraction: `Number('')` is 0, a valid in-range value for some leaves, and Go decodes these
+ *  leaves into `*int`. The pane's validator shows "Enter a whole number." for NaN. */
+export function parseIntField(raw: string): number {
+  const text = raw.trim();
+  return text === '' ? Number.NaN : Number(text);
+}

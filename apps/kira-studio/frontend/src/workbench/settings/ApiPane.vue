@@ -14,7 +14,7 @@ import {
   MAX_RESPONSE_MB_RANGE,
   REQUEST_TIMEOUT_MS_RANGE,
 } from '../../state/settingsDomain';
-import type { SettingsPaneProps } from './types';
+import { parseIntField, type SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Api'"` branch — P90 §2.7's own global Api section.
@@ -24,10 +24,10 @@ function onHttpVersionChange(value: unknown): void {
   props.draft.api.httpVersion = String(value) as ApiSettings['httpVersion'];
 }
 function onRequestTimeoutMsInput(e: Event): void {
-  props.draft.api.requestTimeoutMs = Number((e.target as HTMLInputElement).value);
+  props.draft.api.requestTimeoutMs = parseIntField((e.target as HTMLInputElement).value);
 }
 function onMaxResponseMbInput(e: Event): void {
-  props.draft.api.maxResponseMb = Number((e.target as HTMLInputElement).value);
+  props.draft.api.maxResponseMb = parseIntField((e.target as HTMLInputElement).value);
 }
 function onSslVerifyChange(checked: boolean): void {
   props.draft.api.sslVerify = checked;
@@ -36,7 +36,7 @@ function onFollowRedirectsChange(checked: boolean): void {
   props.draft.api.followRedirects = checked;
 }
 function onMaxRedirectsInput(e: Event): void {
-  props.draft.api.maxRedirects = Number((e.target as HTMLInputElement).value);
+  props.draft.api.maxRedirects = parseIntField((e.target as HTMLInputElement).value);
 }
 function onDisableCookieJarChange(checked: boolean): void {
   props.draft.api.disableCookieJar = checked;
@@ -44,7 +44,7 @@ function onDisableCookieJarChange(checked: boolean): void {
 
 const requestTimeoutMsError = computed<string | null>(() => {
   const v = props.draft.api.requestTimeoutMs;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isInteger(v)) return 'Enter a whole number.';
   if (v < REQUEST_TIMEOUT_MS_RANGE.min || v > REQUEST_TIMEOUT_MS_RANGE.max) {
     return `${REQUEST_TIMEOUT_MS_RANGE.min}–${REQUEST_TIMEOUT_MS_RANGE.max.toLocaleString()} ms`;
   }
@@ -54,7 +54,7 @@ props.registerFieldError('api.requestTimeoutMs', requestTimeoutMsError);
 
 const maxResponseMbError = computed<string | null>(() => {
   const v = props.draft.api.maxResponseMb;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isInteger(v)) return 'Enter a whole number.';
   if (v < MAX_RESPONSE_MB_RANGE.min || v > MAX_RESPONSE_MB_RANGE.max) {
     return `${MAX_RESPONSE_MB_RANGE.min}–${MAX_RESPONSE_MB_RANGE.max} MB`;
   }
@@ -64,7 +64,7 @@ props.registerFieldError('api.maxResponseMb', maxResponseMbError);
 
 const maxRedirectsError = computed<string | null>(() => {
   const v = props.draft.api.maxRedirects;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isInteger(v)) return 'Enter a whole number.';
   if (v < MAX_REDIRECTS_RANGE.min || v > MAX_REDIRECTS_RANGE.max) {
     return `${MAX_REDIRECTS_RANGE.min}–${MAX_REDIRECTS_RANGE.max}`;
   }
