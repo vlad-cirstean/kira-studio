@@ -89,24 +89,6 @@ func (e *RepoEntry) runAllowingExit(ctx context.Context, args []string, ok ...in
 	return res, err
 }
 
-// oneRecord frames raw (a single `-z`-terminated record — every `show -s -z` spawn in this file
-// produces exactly one) through RecordSplitter, same as the log walk's own framing, so a record
-// this package hands to a parser never carries its own trailing NUL.
-func oneRecord(raw []byte) ([]byte, error) {
-	splitter := porcelain.NewRecordSplitter(0)
-	recs, err := splitter.Push(raw)
-	if err != nil {
-		return nil, err
-	}
-	if flushed := splitter.Flush(); flushed != nil {
-		return nil, fmt.Errorf("gitsession: unterminated trailing bytes: %q", flushed)
-	}
-	if len(recs) != 1 {
-		return nil, fmt.Errorf("gitsession: got %d records, want exactly 1", len(recs))
-	}
-	return recs[0], nil
-}
-
 // allRecords frames raw through RecordSplitter and returns every complete record — the diff-tree
 // spawns' own framing, which (unlike oneRecord) genuinely produces a variable number of records.
 func allRecords(raw []byte) ([][]byte, error) {
