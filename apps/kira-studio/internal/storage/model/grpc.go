@@ -102,8 +102,11 @@ type GrpcCallSnapshot struct {
 	Metadata                []SavedGrpcMetaRow        `json:"metadata"`
 	Messages                []GrpcCallSnapshotMessage `json:"messages"`
 	MessagesElided          bool                      `json:"messagesElided"`
-	Header                  []SavedGrpcMetaRow        `json:"header"`
-	Trailer                 []SavedGrpcMetaRow        `json:"trailer"`
+	// MetadataElided: metadata, header and trailer were dropped to keep the row within the
+	// history budget (repos/grpc_history.go).
+	MetadataElided bool               `json:"metadataElided,omitempty"`
+	Header         []SavedGrpcMetaRow `json:"header"`
+	Trailer        []SavedGrpcMetaRow `json:"trailer"`
 }
 
 // GrpcCallHistoryRecord is Record's one argument — the bridge's own call site builds this from

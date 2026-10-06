@@ -48,6 +48,9 @@ type ResponseHistorySnapshot struct {
 	BodyStored                  bool                   `json:"bodyStored"`
 	BodyStorageTruncated        bool                   `json:"bodyStorageTruncated"`
 	RequestBodyStorageTruncated bool                   `json:"requestBodyStorageTruncated"`
+	// RequestFieldsElided: urlencoded/form-data field values were dropped to keep the row within
+	// the history budget (repos/response_history.go).
+	RequestFieldsElided bool `json:"requestFieldsElided,omitempty"`
 }
 
 // ResponseHistoryRecord is Record's one argument — D2's bridge/http.go call site builds this

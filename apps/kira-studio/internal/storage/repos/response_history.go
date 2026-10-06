@@ -229,6 +229,7 @@ func (r *ResponseHistoryRepo) Get(id string) (model.ResponseHistorySnapshot, err
 			BodyStored:                  snap.BodyStored,
 			BodyStorageTruncated:        snap.BodyStorageTruncated,
 			RequestBodyStorageTruncated: snap.RequestBodyStorageTruncated,
+			RequestFieldsElided:         snap.RequestFieldsElided,
 		}, nil
 	})
 }

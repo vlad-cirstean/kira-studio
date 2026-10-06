@@ -206,7 +206,8 @@ func (r *GrpcHistoryRepo) Get(id string) (model.GrpcCallSnapshot, error) {
 			Message: snap.Message, RequestMessageTruncated: snap.RequestMessageTruncated,
 			Metadata: snap.Metadata,
 			Messages: snap.Messages, MessagesElided: snap.MessagesElided,
-			Header: snap.Header, Trailer: snap.Trailer,
+			MetadataElided: snap.MetadataElided,
+			Header:         snap.Header, Trailer: snap.Trailer,
 		}, nil
 	})
 }

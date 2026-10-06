@@ -48,6 +48,8 @@ export interface GrpcCallSnapshot {
   messages: GrpcCallHistoryMessage[];
   // D11's own "showing the first 100 of N" flag — the true count is entry.messageCount.
   messagesElided: boolean;
+  // Metadata, header and trailer were dropped to keep the row within the history budget.
+  metadataElided?: boolean;
   header: GrpcMetaPairWire[];
   trailer: GrpcMetaPairWire[];
 }

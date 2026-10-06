@@ -45,4 +45,6 @@ export interface ResponseHistorySnapshot {
   // as response.bodyTruncated (F9) — that one is about the transfer, this one is about storage.
   bodyStorageTruncated: boolean;
   requestBodyStorageTruncated: boolean;
+  // Urlencoded/form-data field values were dropped to keep the row within the history budget.
+  requestFieldsElided?: boolean;
 }
