@@ -14,7 +14,7 @@ Checks at HEAD: `go vet ./apps/kira-space/internal/gitsession/...` clean;
 - Block 3 ops and undo: done
 - Block 4 stack and worktree: done
 - Block 5 remote and auto-fetch: done
-- Block 6 review: pending
+- Block 6 review: done
 - Block 7 GitHub and ADE facts: pending
 - Block 8 tests and §7: pending
 
@@ -73,7 +73,9 @@ Self-heals on the client's own `refs.list` refetch only when that refetch reache
 
 Fix: capture `gen := e.cacheGeneration()` before the spawns in `refsSnapshot` and before `ResolveHead`
 in `Head`; call `setHead` only when the generation still matches (`Head` still returns the value it
-resolved). Same shape as `status.go:106-133`.
+resolved). Same shape as `status.go:106-133`. `ResolveReviewBase` (`GS/review.go:157-214`) has the same
+gap for `RememberRangeCount`: a count computed before a refsChanged is stored after `note` dropped the
+slot and seeds the next ranged walk's `PrecomputedTotal`; guard it the same way.
 
 ### F4 (low): `diffCache` keyed by client-supplied `sha`, which may be a ref name
 
@@ -261,6 +263,31 @@ Fix: after `remoteOp.claim` succeeds in `RunRemote`, check `e.tornDown` under `e
 return `ErrRepoTornDown` when set (covers every caller); in `autoFetchTick` re-read `disabled` right
 before `RunRemote`.
 
+### F14 (medium): review line count derived from a non-text record's zero `LineCount`
+
+`GS/incremental.go:395-437` (`FileDelta` tiers 1 and 2), consumer `GS/incremental.go:728-738`
+(`MarkFile`), `GS/incremental.go:670` (`ReviewFileDiff`). Owner: Stream B (`GS`).
+
+`readSnapshotSource` stores `LineCount: 0` for `ContentTooLarge` (over `gitreview.MaxSnapshotBytes`,
+1 MiB), `ContentBinary` and `ContentAbsent`. `FileDelta` then uses `rec.LineCount` as the base:
+
+- Tier 1 computes `rec.LineCount + sumHunkDelta(parsed.Hunks)`. G31 F7 re-measures only when the
+  patch is `BodyTooLarge`. A file marked at 1.2 MiB (tooLarge, `LineCount` 0) and trimmed to 0.9 MiB by
+  one hunk deleting 3,000 lines yields `currentLineCount = -3000`. A binary-to-text change has no
+  hunks (`Binary files differ`), so the result is 0 for a text file of N lines.
+- Tier 2 `snapshotUnavailable` (history rewritten, record not text) returns `rec.LineCount` (0) as
+  the current count.
+
+`MarkFile` adopts `delta.CurrentLineCount` whenever the current content is text, so a ranged mark is
+clamped to 0 or a negative bound and silently stores nothing, and the record is written with that
+`LineCount`. Tier 0 then keeps returning the bad count for as long as the blob is unchanged, so the
+file can never take a ranged mark. `ReviewFileDiff` sends the same value as `LineCount` to the client.
+
+Fix: in `FileDelta`, when `rec.ContentKind != gitreview.ContentText`, measure the current count
+directly (`readCurrentContent` plus `countLines`, as the slow path does) in tiers 1 and 2; keep the
+hunk arithmetic only for a text record. Add a real-git test: mark a >1 MiB file, shrink it below the
+cap, mark a range, assert the stored range and `LineCount`.
+
 ## §9 candidates
 
 1. Dropped. `Registry.acquire` after `Close` does build an untracked entry, but only reachable at
@@ -303,3 +330,5 @@ before `RunRemote`.
    needs the typed token once the script dirtied the tree, and the script then fails on a missing
    directory with no app state left inconsistent. `prepareWorktreeRemove` could refuse while
    `e.prepare` is running on `target.Path`; noted, not reported.
+19. Dropped. A clobbered `reviewRangeCountSlot` makes the other window's `TakeRangeCount` miss and
+   logsession count itself (`review.go:31-42`, D9 fallback). Cost only, never wrong data.
