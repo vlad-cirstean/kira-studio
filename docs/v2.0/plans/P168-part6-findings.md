@@ -105,6 +105,14 @@ overstates the renderer's exposure and misleads a reviewer of the pane.
 Fix: say `command` is the copy-paste registration text naming the headersHelper script; it holds
 no secret.
 
+Same file, same kind of drift (block 3): `dbMcpApprovalSchema` (`SD/dbmcp.ts:46-62`) declares
+`truncated: z.boolean()` and its comment says the statement "is capped at 4000 (rune-safe)
+characters on the wire". Go's `DbMcpApprovalRequest` (`SI/bridge/dbmcp.go:385-396`) has no
+`truncated` field and sends the statement uncapped (M7 finding, comment at `:410-413`). The schema
+is type-only (`SF/bridge/index.ts:270-276` uses `trust<>`, no parse), so nothing fails at runtime;
+a future reader of `pending.truncated` gets `undefined` typed as `boolean`. Drop the field and the
+4000-character sentence.
+
 ### F6 (high) `explain_query` leaks real row values through MySQL/MariaDB `index_condition` on a masked connection
 
 `SI/dbmcp/explain.go:87-107` (`maskPlanNode`), `SI/queryplan/mysql.go:56-71`
@@ -158,6 +166,87 @@ Same decision as P168 Part 4 F8 (console row/byte cap, shared with SQL consoles;
 `SPEC.md` phase). Not a second phase: when F8's cap lands, `run_query` should pass
 `maxRows` (plus one, for the truncation flag) as the console cap. No fix proposed here.
 
+### F9 (high) A masked column selected by its own name excuses an unaliased second projection of it
+
+`SI/dbmcp/render.go:310-370` (`maskedColumnRenamedOrHidden`, `maskColumnRenamedViaAlias`). Once
+the masked column is present under its own name, the only remaining check is the regex
+`\bname\b[^,]*\bas\b\s*\b(?:alias)\b`. It needs a literal `AS` and a bare alias. Every other
+second projection passes, and `columnRules` masks only the column named `email`.
+
+Probe (scratch test calling `renderPage`, deleted), rule `email: email, keepHint`, value
+`person@example.com`:
+- `SELECT email, email leak FROM customers` (implicit alias) returned
+  `[["p•••••@example.com","person@example.com"]]`.
+- `SELECT email, email AS "x" FROM customers` (quoted alias: no `\b` before `"`) returned the
+  same.
+- `SELECT email, lower(email) FROM customers` with result columns `email`, `lower` (Postgres
+  naming) or `email`, `lower(email)` (MySQL naming): no refusal, second column unmasked.
+- `SELECT email, email || '' FROM customers` (`?column?`): no refusal.
+
+These are ordinary queries, not adversarial ones (normalising or trimming an email beside the raw
+column), so they fall inside the documented threat model of accidental exposure
+(`docs/ARCHITECTURE.md` Known open items, M6 correlation-tag entry). P108/M7 finding #1 closed only
+the `AS` spelling.
+
+Fix: when a masked name is present and mentioned, refuse unless every occurrence of it inside a
+projection list (any `SELECT ... FROM` span, subqueries included) is a bare projection item: the
+masked name, optionally qualified (`t.email`, `"email"`), followed by `,`, `FROM` or the end of
+the list. Any other occurrence in a projection (inside a function call, an operator expression, or
+followed by an alias with or without `AS`) refuses with the rename message. WHERE/ORDER BY/JOIN
+occurrences stay allowed (today's behaviour). Add the four probe statements above to
+`TestRenderPageRefusesRenamedOrTransformedMaskedColumn`, plus `SELECT email FROM c WHERE email =
+'x'` and `SELECT c.email, o.id FROM c JOIN o ON o.email = c.email` as must-render cases.
+
+### F10 (low) `maskrules.Service.MaskSetFor` can cache a rule set from before a concurrent write
+
+`SI/maskrules/service.go:107-159,199-209`. `MaskSetFor` checks the cache, unlocks, queries
+`ListForConnection`, folds, then `store`s. `Upsert`/`Remove`/`RegenerateKey` write then
+`invalidate`. If a write and its `invalidate` land between the query and the `store`, the stale
+set is stored after the invalidation and stays cached until the next write to that connection or
+an app restart.
+
+Scenario: an agent's `run_query` on connection C resolves `MaskSetFor` while the user clicks
+*Mark column as PII* on `email`. Interleaving: query (no rules), Upsert + invalidate, store (no
+rules). Every later `run_query` on C returns `email` unmasked although the Privacy tab shows the
+rule.
+
+Probe: a scratch test (deleted) racing 4 reader goroutines against one `Upsert`, 300 rounds, saw
+0 stale results. `SetMaxOpenConns(1)` serialises the queries, so the write (three statements)
+must fit inside the reader's fold-and-store step, which needs the reader goroutine preempted
+there. Confirmed by reading only; rare, but silent and persistent when hit.
+
+Fix: a per-connection generation counter under `mu`. `invalidate` bumps it; `MaskSetFor` reads it
+before the query and `store`s only if it is unchanged. A `-race` test with a hook between query
+and store (concurrency with cache invalidation; clears the unit-test bar).
+
+### F11 (low) Go/TS mask parity drifts on three inputs; no fixture covers them
+
+`SI/mask/mask.go` against `SD/mask.ts`. Scratch probes (Go `unicode`/`uniseg` v0.4.7, Bun's
+`Intl.Segmenter` and RegExp):
+- **U+FEFF in a name.** `NAME_WORD_SPLIT_RE` (`mask.ts:105`, `\s` plus a raw U+0085 byte pair)
+  matches U+FEFF; Go `strings.Fields` (`unicode.IsSpace`) does not. `"Ann﻿Lee"` is one word in
+  Go, two in TS. `decadeRange`'s `trim()` versus `strings.TrimSpace` differs on U+FEFF the same
+  way. Plan §9 suspect 10 confirmed.
+- **Indic conjuncts.** `uniseg` v0.4.7 counts `क्ष` as 2 graphemes; ICU (Unicode 15.1 rule GB9c)
+  counts 1. A Hindi name masks with a different bullet count. v0.4.7 is the latest `uniseg`
+  release, so an upgrade does not fix it.
+- **Non-ASCII digits in a date tail.** `destroyDigits` uses `unicode.IsDigit` (every `Nd`); TS
+  uses ASCII `/\d/`. `2024-01-01T١٢:00` keeps `١٢` in the TS preview.
+
+The MCP render path (Go) is the security boundary; the grid preview is advisory
+(`docs/ARCHITECTURE.md` Masking section). Impact: the preview shows a string different from what
+the agent sees, which the parity suite exists to prevent. The raw U+0085 byte in a regex literal
+is invisible in an editor.
+
+Fix: in `mask.ts`, spell the whitespace class out to match `unicode.IsSpace`
+(`/[\t\n\v\f\r \u0085   -     　]+/`), replace
+`trim()` in `decadeRange` with a trim over the same class, and use `/\p{Nd}/u` in
+`destroyDigits`. Record the GB9c skew under `docs/ARCHITECTURE.md` Known open items (no library
+fix exists). Add fixtures for U+FEFF and an Arabic-Indic date tail. `needs-other-part-file:
+apps/kira-studio/tests/fixtures/mask/ (Part 12, Stream C)` for the fixtures. No fixture generator
+is committed (`parity_test.go:13-17` claims Go-generated fixtures); new fixtures are hand-written
+from the Go output, which is acceptable at this size.
+
 ## Coverage
 
 - Block 1 (auth and install): done. Reviewed `SI/mcpauth/token.go`, `SI/mcpinstall/install.go`,
@@ -202,3 +291,17 @@ Same decision as P168 Part 4 F8 (console row/byte cap, shared with SQL consoles;
   - Part 4 F8: reachable, F8 above. Part 4 F15: not reachable through dbmcp. `sqs` `Execute`
     returns `NoQueryConsole` (`sqs/adapter.go:239-241`); `Children` calls `ListQueues` only;
     `Describe`/`SchemaColumns` return `E_UNSUPPORTED`. No path reaches `ReceiveMessage`.
+- Block 3 (masking): done. Reviewed `SI/mask/mask.go`, `SI/maskrules/service.go`,
+  `SI/bridge/maskrules.go`, `SI/dbmcp/render.go`, `SD/mask.ts`, `SD/dbmcp.ts` against
+  `bridge/dbmcp.go`'s wire structs.
+  - `Stricter`/`KIND_STRICTNESS` identical; Go ranks unknown kinds as redact, TS rejects them via
+    zod. HMAC input, Crockford alphabet, 6-char tag, number buckets, `pow10String`, empty-string
+    identity and `MaskNullable` NULL pass-through match line for line.
+  - Every rule write goes through `maskrules.Service` and broadcasts `ChannelMaskRulesChanged`.
+    The one other writer, `connections.Duplicate`'s `CopyForConnection`, writes to a fresh id and
+    enables MCP only after the copy, so no stale cache entry can exist for it.
+  - `render.go` reads stream `Body` through `cellAt` (Part 5 F4 null body): handled, no finding.
+  - Masked-error withholding, document/stream refusal, columnless keyvalue refusal, risky type
+    classes and risky syntax all hold. A filter-predicate oracle (`SELECT email FROM c WHERE email
+    LIKE 'a%'`) is adversarial probing, outside the documented threat model; not reported.
+  - Plan §9 #2 confirmed by reading (F10), #10 confirmed (F11).
