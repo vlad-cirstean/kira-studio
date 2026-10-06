@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -325,6 +326,10 @@ var constructors = map[string]constructorFn{
 			return nil, adapters.New(adapters.CodeQuery,
 				fmt.Sprintf("invalid NumberInt %q at position %d", s, pos), err)
 		}
+		if f != math.Trunc(f) || f < math.MinInt32 || f > math.MaxInt32 {
+			return nil, adapters.New(adapters.CodeQuery,
+				fmt.Sprintf("invalid NumberInt %q at position %d", s, pos), nil)
+		}
 		return int32(f), nil
 	},
 	"NumberDecimal": func(arg any, hasArg bool, pos int) (any, error) {
@@ -346,7 +351,12 @@ var constructors = map[string]constructorFn{
 type LiteralParser struct {
 	tokens []token
 	pos    int
+	depth  int
 }
+
+// maxLiteralDepth bounds ParseValue recursion: a Go stack overflow is fatal, not recoverable.
+// BSON itself caps nesting at 100 levels.
+const maxLiteralDepth = 200
 
 // NewLiteralParser tokenizes text up front, exactly like literal.ts's own constructor — a
 // tokenize error surfaces here, before any parsing begins.
@@ -404,7 +414,13 @@ func (p *LiteralParser) ExpectIdent(expected string) (string, error) {
 // literal.ts:161 is `Number(t.value)`, a JS double, not an int64), a boolean a bool, and null/
 // undefined a nil `any`.
 func (p *LiteralParser) ParseValue() (any, error) {
+	p.depth++
+	defer func() { p.depth-- }()
 	t := p.peekTok()
+	if p.depth > maxLiteralDepth {
+		return nil, adapters.New(adapters.CodeQuery,
+			fmt.Sprintf("literal nested too deep at position %d", t.pos), nil)
+	}
 	switch {
 	case t.typ == tokPunct && t.value == "{":
 		return p.parseObject()
@@ -564,7 +580,7 @@ func ParseJSON5Literal(text string) (any, error) {
 
 // --- EJSON wrapper resolution ----------------------------------------------------------------
 
-// The thirteen wrapper keys EJSON v2 defines, verbatim (literal.ts:259-273). A plain object
+// The EJSON v2 wrapper keys (literal.ts:259-273) plus the deprecated `$symbol`/`$undefined`/`$dbPointer` canonical output emits. A plain object
 // matching one of these shapes is a BSON value spelled as extended JSON rather than a shell
 // constructor call — `ObjectId(...)` is already resolved to a real bson.ObjectID by the
 // constructor table above, at parse time; `{"$oid": "..."}` is not.
@@ -582,6 +598,9 @@ var ejsonWrapperKeys = map[string]struct{}{
 	"$ref":               {},
 	"$minKey":            {},
 	"$maxKey":            {},
+	"$symbol":            {},
+	"$undefined":         {},
+	"$dbPointer":         {},
 }
 
 func looksLikeEJSONWrapper(d bson.D) bool {

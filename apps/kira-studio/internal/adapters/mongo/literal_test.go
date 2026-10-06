@@ -6,6 +6,7 @@
 package mongo_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -404,5 +405,41 @@ func TestLiteral_PositionBearingErrorMessages(t *testing.T) {
 			_, err := mongo.ParseJSON5Literal(tc.text)
 			wantQueryError(t, err, tc.want)
 		})
+	}
+}
+
+func TestLiteral_DeepNestingReturnsErrorNotOverflow(t *testing.T) {
+	for name, open := range map[string]string{"array": "[", "object": "{a:", "ctor": "ObjectId("} {
+		_, err := mongo.ParseJSON5Literal(strings.Repeat(open, 2_000_000))
+		if code, ok := adapters.CodeOf(err); !ok || code != adapters.CodeQuery || !strings.Contains(err.Error(), "nested too deep") {
+			t.Errorf("%s: err = %v, want E_QUERY nested too deep", name, err)
+		}
+	}
+	if _, err := mongo.ParseJSON5Literal(strings.Repeat("[", 150) + strings.Repeat("]", 150)); err != nil {
+		t.Errorf("150 levels: %v", err)
+	}
+}
+
+func TestLiteral_NumberIntRejectsOutOfRangeAndFractions(t *testing.T) {
+	for _, in := range []string{`NumberInt("3000000000")`, `NumberInt("-2147483649")`, `NumberInt("1.5")`} {
+		if _, err := mongo.ParseJSON5Literal(in); err == nil {
+			t.Errorf("%s: want error", in)
+		}
+	}
+	if v := mustParseValue(t, `NumberInt("-2147483648")`); v != int32(-2147483648) {
+		t.Errorf("min int32 = %v", v)
+	}
+}
+
+func TestLiteral_DeprecatedEJSONTypesResolve(t *testing.T) {
+	d, err := mongo.ParseDocumentLiteral(`{s: {"$symbol": "x"}, u: {"$undefined": true}}`)
+	if err != nil {
+		t.Fatalf("ParseDocumentLiteral: %v", err)
+	}
+	if _, ok := d[0].Value.(bson.Symbol); !ok {
+		t.Errorf("$symbol = %T, want bson.Symbol", d[0].Value)
+	}
+	if _, ok := d[1].Value.(bson.Undefined); !ok {
+		t.Errorf("$undefined = %T, want bson.Undefined", d[1].Value)
 	}
 }
