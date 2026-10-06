@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { reactive, toRefs } from 'vue';
+import { reactive, toRaw, toRefs } from 'vue';
 
 // P67e (docs/v1.6/plans/P67e-git-relax-read-only.md D9) — the native counterpart to git's own
 // askpass prompt, relayed here for the first time now that the native mount can push a remote op
@@ -49,11 +49,12 @@ export const useGitCredentialStore = defineStore('gitCredential', () => {
     }
   }
 
-  /** Settles `active` (never a queued entry) and pumps the next one in, if any. A call with nothing
-   *  active is a no-op — answering twice must never double-pump the queue. */
-  function answerCredential(secret: string | null): void {
+  /** Settles `pending` if it is still `active` (never a queued entry) and pumps the next one in. A
+   *  stale `pending` (already settled, or dropped) is a no-op — a duplicate close event must never
+   *  answer the next prompt, which was never shown. */
+  function answerCredential(pending: PendingCredential, secret: string | null): void {
     const current = state.active;
-    if (!current) return;
+    if (!current || toRaw(current) !== toRaw(pending)) return;
     state.active = null;
     current.answer(secret);
     const next = queue.shift();

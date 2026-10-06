@@ -40,7 +40,7 @@ async function onApprove(): Promise<void> {
       <DialogHeader>
         <DialogTitle>Editor wants to connect</DialogTitle>
         <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close" @click="onDeny">
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
             <CodiconIcon name="close" :size="13" />
           </Button>
         </DialogClose>
@@ -49,7 +49,7 @@ async function onApprove(): Promise<void> {
       <div class="overflow-auto">
         <p class="whitespace-pre-wrap mb-1.5 px-3 pt-2">
           <strong>{{ gitClientsStore.pending.label || 'A VS Code editor' }}</strong> wants to connect
-          to this repository's git data over <span class="font-data">~/.kira-studio/git.sock</span>.
+          to this repository's git data over Kira Space's local git socket.
           Approving lets it read and change git state in repositories it opens.
         </p>
         <p class="m-0 text-subtle px-3 pb-2" data-testid="git-pairing-expires">

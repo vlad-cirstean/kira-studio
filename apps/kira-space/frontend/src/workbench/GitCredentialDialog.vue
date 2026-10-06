@@ -5,7 +5,7 @@ import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogT
 import { Input } from '@theme/components/ui/input';
 import { nextTick, ref, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
-import { useGitCredentialStore } from '../state/gitCredential';
+import { type PendingCredential, useGitCredentialStore } from '../state/gitCredential';
 
 const gitCredentialStore = useGitCredentialStore();
 
@@ -24,10 +24,14 @@ const codeReposStore = useCodeReposStore();
 
 const value = ref('');
 const inputField = ref<InstanceType<typeof Input> | null>(null);
+// What the user is looking at. A pre-flush watch updates it only after a close event's duplicate
+// handler calls ran, so both settle the same prompt and the second one is ignored.
+const shown = ref<PendingCredential | null>(null);
 
 watch(
   () => gitCredentialStore.active,
   (active) => {
+    shown.value = active;
     value.value = '';
     if (active) {
       // Input.vue's own root IS the <input> element, unlike TextField's wrapping <span> --
@@ -35,18 +39,19 @@ watch(
       void nextTick(() => (inputField.value?.$el as HTMLInputElement | undefined)?.focus());
     }
   },
+  { immediate: true },
 );
 
 function onSubmit(): void {
-  if (!gitCredentialStore.active) return;
+  if (!shown.value) return;
   const secret = value.value;
   value.value = '';
-  gitCredentialStore.answerCredential(secret);
+  gitCredentialStore.answerCredential(shown.value, secret);
 }
 
 function onCancel(): void {
   value.value = '';
-  gitCredentialStore.answerCredential(null);
+  if (shown.value) gitCredentialStore.answerCredential(shown.value, null);
 }
 </script>
 
@@ -66,7 +71,6 @@ function onCancel(): void {
             class="ml-auto"
             aria-label="Close"
             data-testid="git-credential-dialog-close"
-            @click="onCancel"
           >
             <CodiconIcon name="close" :size="13" />
           </Button>
