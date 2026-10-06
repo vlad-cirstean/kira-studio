@@ -167,7 +167,8 @@ fix, "verified" (scratch probe or run) or "code-read".
 - Fix: one own helper (e.g. `settings/types.ts` `parseIntField(raw): number` returning `NaN` for
   `''` or a non-integer) used by the six handlers; validators check `Number.isInteger(v)` with
   "Enter a whole number." Extend `settings-apply-on-save.spec.ts` with the cleared-field case.
-- Verified by language semantics (`Number('') === 0`); UI not run.
+- Verified (scratch Playwright probe): Settings, Api, clear Max response size. No field error, Save
+  enabled; Save sends `{"patch":{"api":{"maxResponseMb":0}}}` (unlimited).
 
 ### F7 (low): Settings footer names the wrong database file
 
@@ -268,7 +269,10 @@ fix, "verified" (scratch probe or run) or "code-read".
   keep Save disabled). Catch `onSave` into a dialog error line. A UI spec: `filtersList` returns a
   non-empty set, open Filters… without expanding, Save, assert the `filtersReplace` payload equals
   the loaded set.
-- Code-read (no UI run).
+- Verified (scratch Playwright probe in a scratch worktree, `ui` project): connection listed,
+  `filtersList` would return `{hiddenKinds: ['sequence'], hiddenPaths: [<analytics schema>]}`;
+  Filters… on the never-expanded connection, Save. `filtersList` calls: 0. `filtersReplace` sent
+  `{"hiddenKinds":[],"hiddenPaths":[]}`.
 
 ### F13 (medium): Connection dialog Save has no in-flight guard
 
@@ -295,7 +299,9 @@ fix, "verified" (scratch probe or run) or "code-read".
 - Fix: `formatConnectionUri({ ...d, password: null })` in `setMode('uri')`; keep `d.password` in the
   draft so Save still sends it (Go keeps `in.Password` for a passwordless URI). Update the URI note
   to say "password kept separately" when `d.password` is set.
-- Code-read.
+- Verified (scratch Playwright probe): host `db.example`, user `alice`, password typed into the
+  masked field, click URI: `connection-uri` value is `postgresql://alice:hunter2-secret@db.example:5432`
+  in a plain text input (no `type` attribute).
 
 ### F15 (medium): project tree has no arrow-key navigation (WAI-ARIA tree)
 
@@ -486,3 +492,27 @@ fix, "verified" (scratch probe or run) or "code-read".
   pointer/scroll before a count: tolerable. The rest are F22.
 - Visual (4 own specs) and `ST/perf/tree-scroll.spec.ts` (report-only by design): no defect.
 - Not run: the full UI suite (plan rule), `test:visual:*` (sandbox font drift).
+
+## Late finding (block 1 and 2 files)
+
+### F24 (medium): a recent-tables entry for a deleted connection breaks every later tab save
+
+- `state/tabs.ts:67-81` (`useRecentTablesStore`, never pruned), `:167-173` (the
+  `onConnectionsChanged` listener closes a deleted connection's tabs but leaves its recent
+  entries), `workbench/panels/StudioStart.vue:46-50` (`openRecent` opens without checking the
+  connection still exists). Go: `tabs.connection_id REFERENCES connections(id) ON DELETE CASCADE`
+  (`SI/storage/migrations/0002_p8_windows.sql:26`), and `TabsService.Save` replaces the window's
+  whole tab set in one transaction.
+- Scenario: open table T on connection C (recorded as recent), delete C, close every tab. The start
+  screen lists T under Recent tables; click it. `openDataTab(C, T)` creates a tab for a connection
+  that no longer exists and `saveNow` sends it. The insert violates the FK, the whole
+  `ReplaceKeyed` transaction fails, and `enqueueSave` swallows the rejection
+  (`PW/state/createTabsStore.ts:223-228`). Every later save fails the same way while that tab is
+  open, so no tab change in that window persists; `onConnectionsChanged` never fires again for C
+  to close it. This is the exact failure the `tabs.ts:162-166` D7 comment says the listener
+  prevents.
+- Fix: in the `onConnectionsChanged` listener also drop recent entries whose `connectionId` is not
+  live (a `pruneRecent(liveIds)` action on `useRecentTablesStore`); `StudioStart` hides an entry
+  with no `connectionRecord`; `openTrackedTab` returns early (no tab) when the connection record is
+  missing.
+- Code-read.
