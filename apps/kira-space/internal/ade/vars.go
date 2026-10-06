@@ -106,7 +106,7 @@ func composeStageMessage(stage adewire.Stage, title, jiraKey, jiraURL, notes str
 	}
 	vars := repoVars(title, jiraKey, repos)
 	if notes != "" {
-		lines = append(lines, "- Notes: "+notes)
+		lines = append(lines, "- Notes: "+capNotes(notes))
 	}
 	if stage.Prompt != "" {
 		lines = append(lines, substitute(stage.Prompt, vars, false))
@@ -129,6 +129,14 @@ func repoVars(title, jiraKey string, repos []repoLine) runVars {
 
 const reviewNotesMax = 2000
 
+// capNotes keeps a session's first message well under the terminal's command bound.
+func capNotes(notes string) string {
+	if r := []rune(notes); len(r) > reviewNotesMax {
+		return string(r[:reviewNotesMax])
+	}
+	return notes
+}
+
 // composeReviewMessage is the first message of a task's review agent.
 func composeReviewMessage(title, jiraKey, jiraURL, notes string, repos []repoLine) string {
 	lines := []string{"Task: " + title}
@@ -136,10 +144,7 @@ func composeReviewMessage(title, jiraKey, jiraURL, notes string, repos []repoLin
 		lines = append(lines, l)
 	}
 	if notes != "" {
-		if r := []rune(notes); len(r) > reviewNotesMax {
-			notes = string(r[:reviewNotesMax])
-		}
-		lines = append(lines, "- Notes: "+notes)
+		lines = append(lines, "- Notes: "+capNotes(notes))
 	}
 	for _, r := range repos {
 		if r.ReadOnlyRoot != "" {

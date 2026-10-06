@@ -305,6 +305,20 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 		return "", nil, ErrCommandMismatch
 	}
 
+	// Build the final command first: Open rejects an over-long one after this returns, which would
+	// leave a persisted row for a conversation that never ran.
+	composed, env := command, []string(nil)
+	if hooks := t.hooksFn(); hooks != nil {
+		composed, env = hooks(terminalID, command)
+	}
+	if intent.Message != "" {
+		// The command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
+		composed += " -- " + quotePOSIX(normalizeMessage(intent.Message))
+	}
+	if len(composed) > terminal.MaxCommandBytes {
+		return "", nil, fmt.Errorf("%w: command is too long", ErrInvalidInput)
+	}
+
 	now := t.deps.Now()
 	if intent.Resume {
 		// Reserve before MarkRunning so two concurrent composes cannot both resume one record;
@@ -346,15 +360,6 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 	// Reconcile racing the spawn (Registry.OnChange fires on both open and exit) must not stop a
 	// record that only just started (§4.4).
 	time.AfterFunc(t.deps.Grace, t.Reconcile)
-
-	composed, env := command, []string(nil)
-	if hooks := t.hooksFn(); hooks != nil {
-		composed, env = hooks(terminalID, command)
-	}
-	if intent.Message != "" {
-		// The command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
-		composed += " -- " + quotePOSIX(normalizeMessage(intent.Message))
-	}
 
 	if t.deps.OnChange != nil {
 		t.deps.OnChange()
