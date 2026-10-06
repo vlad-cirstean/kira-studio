@@ -55,8 +55,8 @@ describe('commitPending in-flight guard', () => {
     store.stageDelete(tabId, [5]);
     store.stageEdit(tabId, 0, 'id', 'x');
     store.discardRowChange(tabId, 0);
-    expect(store.pendingFor(tabId)?.deletes.has(0)).toBe(true);
-    expect(store.pendingFor(tabId)?.deletes.has(5)).toBe(false);
+    expect(store.isPendingDelete(tabId, 0)).toBe(true);
+    expect(store.isPendingDelete(tabId, 5)).toBe(false);
     expect(store.pendingFor(tabId)?.edits.size).toBe(0);
     release();
     await first;
