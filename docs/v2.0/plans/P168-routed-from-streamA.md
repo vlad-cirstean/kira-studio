@@ -110,5 +110,4 @@ Stream A did not edit those files.
   `useConfirmDialogStore().confirmDialog` options (default "Delete" when `danger`, "Continue"
   otherwise).
 - Fix: pass `confirmLabel: 'Regenerate'`, `'Remove'`, `'Revoke'` at the three sites. Land after the
-  Part 9 option exists; before it, the option is ignored by the type checker as an excess property
-  error, so order matters.
+  Part 9 option exists; before it, the extra property fails typecheck.
