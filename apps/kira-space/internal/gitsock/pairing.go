@@ -74,11 +74,8 @@ type pendingEntry struct {
 	result chan PairingOutcome // buffered 1; exactly one send over the entry's lifetime.
 }
 
-// approvedToken is the single token an approval decision mints (F6) — shared verbatim by the
-// presented head and every sibling request already queued from the same clientID, so every window
-// of one VS Code install receives and stores the identical token instead of each one racing its
-// own independently-minted token against the same trust-store row. Read via TakeApprovedToken,
-// keyed by RequestID so each connection's own runHandshake fetches only its own copy.
+// approvedToken is the token an approval decision mints for the presented request alone (P172).
+// Read via TakeApprovedToken, keyed by RequestID so the connection's own runHandshake fetches it.
 type approvedToken struct {
 	plain string
 	hash  []byte
@@ -104,7 +101,7 @@ type Broker struct {
 	// Request must refuse outright rather than enqueue once this is set.
 	closed bool
 	// tokens holds each still-unclaimed approvedToken, keyed by the RequestID it was minted for
-	// (F6) — populated by answer() at the moment of Approve, drained by TakeApprovedToken.
+	// — populated by answer() at the moment of Approve, drained by TakeApprovedToken.
 	tokens map[string]approvedToken
 
 	emitter notify.OrderedEmitter[PairingSnapshot]
@@ -203,13 +200,14 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 	return <-entry.result
 }
 
-// Approve resolves requestID as approved, and — F6 — every OTHER request already queued from the
-// SAME clientID too, sharing one freshly minted token across all of them (TakeApprovedToken).
-// Deny resolves requestID as denied and starts its client's 60s cooldown (D8), also purging every
-// sibling request from the same clientID as denied under that same cooldown. Either way, a
-// deadline that had already passed by the time the decision arrived is reported Expired instead,
-// exactly like a timeout, and neither a cooldown nor a token is set (the decision arrived too
-// late to be one).
+// Approve resolves requestID as approved and mints one token for that request only (P172). Every
+// other request already queued from the SAME clientID resolves PairingAborted (close, no frame):
+// the client redials, and a sibling window reads the token the approved window stored in the shared
+// secret store, or is prompted on its own. A client-asserted id never carries one approval to a
+// second connection. Deny resolves requestID as denied, starts its client's 60s cooldown (D8) and
+// purges every sibling from the same clientID as denied. A deadline that had already passed by the
+// time the decision arrived is reported Expired instead, exactly like a timeout, and neither a
+// cooldown nor a token is set (the decision arrived too late to be one).
 func (b *Broker) Approve(requestID string) PairingActionResult {
 	return b.answer(requestID, PairingApproved, false)
 }
@@ -229,33 +227,17 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, isDeny bool) P
 	var others []*pendingEntry
 	var mintFailed bool
 	if !expired {
-		// G31 round-2 architecture/security review, finding #10 (Deny's own half) / F6 (Approve's):
-		// a decision on requestID only ever resolved that ONE entry — in practice always the
-		// presented head, since that is the only request a window's dialog ever has a RequestID
-		// for. Nothing stops the SAME clientID from having other requests already queued behind it
-		// (opened from several concurrent connections — one VS Code install's several windows —
-		// before the first was ever presented), and those survived untouched: for Deny, bypassing
-		// the cooldown this denial just started; for Approve, each sibling window's own
-		// finishPairing call would separately mint and store ITS OWN token, racing the others
-		// against the same trust-store row (G12 D4's "one row covers every window" design intent
-		// violated). Both decisions now also resolve every other request already queued from the
-		// same clientID, under the same outcome.
+		// Deny purges siblings so none bypasses the cooldown just started (G31 round-2 finding #10);
+		// Approve aborts them so one click admits exactly one connection (P172).
 		others = b.removeAllForClientLocked(entry.req.ClientID)
 		if isDeny {
 			b.cooldown[entry.req.ClientID] = b.now().Add(pairingCooldown)
 		} else {
-			// F6: mint exactly once for this whole approval decision, and stash it for the head
-			// and every sibling alike — TakeApprovedToken hands each connection's own runHandshake
-			// its copy once that connection's own outcome resolves.
 			plain, hash, salt, err := mintToken()
 			if err != nil {
 				mintFailed = true
 			} else {
-				tok := approvedToken{plain: plain, hash: hash, salt: salt}
-				b.tokens[entry.req.RequestID] = tok
-				for _, other := range others {
-					b.tokens[other.req.RequestID] = tok
-				}
+				b.tokens[entry.req.RequestID] = approvedToken{plain: plain, hash: hash, salt: salt}
 			}
 		}
 	}
@@ -267,15 +249,13 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, isDeny bool) P
 		slog.Warn("gitsock: mint token for pairing approval", "scope", "gitsock", "client", entry.req.ClientID)
 	}
 
-	// A mint failure degrades the whole decision to denied (fail-closed, D6's own posture) rather
-	// than approving without a token to hand any window — every sibling shares this fate exactly
-	// like it would have shared a successfully minted token.
+	// A mint failure degrades the decision to denied (fail-closed, D6's own posture) rather than
+	// approving without a token to hand the window.
 	headOutcome, siblingOutcome := outcome, PairingDenied
 	if !isDeny {
+		siblingOutcome = PairingAborted
 		if mintFailed {
 			headOutcome = PairingDenied
-		} else {
-			siblingOutcome = PairingApproved
 		}
 	}
 
@@ -316,9 +296,8 @@ func (b *Broker) Cancel(requestID string) {
 	b.emitter.Emit(seq, snap)
 }
 
-// TakeApprovedToken returns (and forgets) the token Approve minted for requestID — the single
-// token shared by the whole approval decision (F6: the presented head and every sibling request
-// from the same clientID). ok is false when nothing was ever stored for this id: a Denied or
+// TakeApprovedToken returns (and forgets) the token Approve minted for requestID. ok is false
+// when nothing was ever stored for this id: a Denied or
 // TimedOut outcome, or an Approved outcome that lost the race against a token-mint failure
 // (degraded to Denied — see answer's own comment).
 func (b *Broker) TakeApprovedToken(requestID string) (approvedToken, bool) {

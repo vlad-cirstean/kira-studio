@@ -1,7 +1,6 @@
 package gitsock
 
 import (
-	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -409,16 +408,11 @@ func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T)
 	<-doneB
 }
 
-// TestBroker_ApproveResolvesEveryOtherQueuedRequestFromTheSameClientWithTheSameToken is F6's own
-// regression guard, mirroring TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient's
-// shape for the Approve path: one VS Code install shares one clientId and one shared
-// context.secrets token store across every open window, so Approve resolving only the ONE entry
-// named by requestID used to leave sibling windows' own queued requests unresolved — each would
-// later mint and store ITS OWN token independently, racing the others against the same
-// trust-store row. This proves approving one request from a client also resolves every other
-// request already queued from that SAME client, as approved, sharing the IDENTICAL token — while
-// leaving an unrelated client's own queued request untouched.
-func TestBroker_ApproveResolvesEveryOtherQueuedRequestFromTheSameClientWithTheSameToken(t *testing.T) {
+// TestBroker_ApproveAdmitsOnlyThePresentedRequest is P172's guard: a client id is client-asserted,
+// so one Approve must admit exactly one connection. A same-client sibling resolves PairingAborted
+// with no token (it redials and reuses the stored token, or is prompted itself); an unrelated
+// client's request stays queued.
+func TestBroker_ApproveAdmitsOnlyThePresentedRequest(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
@@ -432,13 +426,9 @@ func TestBroker_ApproveResolvesEveryOtherQueuedRequestFromTheSameClientWithTheSa
 		return <-enqueued, done
 	}
 
-	reqA1, doneA1 := enqueue("client-a") // presented head.
-	reqA2, doneA2 := enqueue("client-a") // a second connection from the SAME client, queued behind it.
-	reqB, doneB := enqueue("client-b")   // an unrelated client, queued behind both of A's.
-
-	if snap := b.Pending(); snap.Queued != 3 {
-		t.Fatalf("Queued = %d, want 3", snap.Queued)
-	}
+	reqA1, doneA1 := enqueue("client-a")
+	reqA2, doneA2 := enqueue("client-a")
+	reqB, doneB := enqueue("client-b")
 
 	if got := b.Approve(reqA1.RequestID); got != PairingActionResolved {
 		t.Fatalf("approve reqA1: got %v", got)
@@ -446,30 +436,26 @@ func TestBroker_ApproveResolvesEveryOtherQueuedRequestFromTheSameClientWithTheSa
 	if out := recvOrTimeout(t, doneA1); out != PairingApproved {
 		t.Fatalf("reqA1 outcome: got %v", out)
 	}
-	if out := recvOrTimeout(t, doneA2); out != PairingApproved {
-		t.Fatalf("reqA2 outcome: got %v, want PairingApproved — a client's OTHER queued request must be approved alongside it", out)
+	if tok, ok := b.TakeApprovedToken(reqA1.RequestID); !ok || tok.plain == "" {
+		t.Fatal("TakeApprovedToken(reqA1): want a minted token for the approved head")
+	}
+	if out := recvOrTimeout(t, doneA2); out != PairingAborted {
+		t.Fatalf("reqA2 outcome: got %v, want PairingAborted", out)
+	}
+	if _, ok := b.TakeApprovedToken(reqA2.RequestID); ok {
+		t.Fatal("TakeApprovedToken(reqA2): sibling must get no token")
+	}
+	if b.InCooldown("client-a") {
+		t.Fatal("approving client-a must not start a cooldown")
 	}
 
-	tokA1, okA1 := b.TakeApprovedToken(reqA1.RequestID)
-	if !okA1 {
-		t.Fatal("TakeApprovedToken(reqA1): ok = false, want a token minted for the approved head")
-	}
-	tokA2, okA2 := b.TakeApprovedToken(reqA2.RequestID)
-	if !okA2 {
-		t.Fatal("TakeApprovedToken(reqA2): ok = false, want a token minted for the approved sibling")
-	}
-	if tokA1.plain == "" || !reflect.DeepEqual(tokA1, tokA2) {
-		t.Fatalf("sibling tokens: reqA1=%+v reqA2=%+v, want identical non-empty tokens shared across both windows", tokA1, tokA2)
-	}
-
-	// client-b's own request must be entirely unaffected: still queued, still pending.
 	select {
 	case out := <-doneB:
-		t.Fatalf("client-b's own request resolved (%v) — it must not be touched by client-a's approval", out)
+		t.Fatalf("client-b's request resolved (%v), want still queued", out)
 	default:
 	}
 	if snap := b.Pending(); snap.Pending == nil || snap.Pending.ClientID != "client-b" || snap.Queued != 1 {
-		t.Fatalf("after resolving client-a: got %+v, want head=client-b queued=1", snap)
+		t.Fatalf("after approving client-a: got %+v, want head=client-b queued=1", snap)
 	}
 	if got := b.Deny(reqB.RequestID); got != PairingActionResolved {
 		t.Fatalf("deny reqB: got %v", got)

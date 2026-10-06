@@ -142,8 +142,8 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 	}
 
 	// Row 7: pairingRequired, then §3.1.2's own follow-up table. requestID is captured from
-	// onEnqueued so an Approved outcome can claim this connection's own share of the token the
-	// broker minted (F6) — TakeApprovedToken is keyed by it. F12: a watcher goroutine starts
+	// onEnqueued so an Approved outcome can claim the token the broker minted for this request
+	// alone (P172) — TakeApprovedToken is keyed by it. F12: a watcher goroutine starts
 	// watching this connection for a disconnect the moment the request is enqueued, so a requester
 	// that goes away mid-wait (window closed, extension reload) has its entry cancelled instead of
 	// sitting in the queue, presentable, until Approve mints a token nobody holds.
@@ -222,9 +222,8 @@ func stopWatch(c *conn, done chan struct{}) {
 }
 
 // finishPairing inserts the row *before* sending "paired" (§3.1.2: the reverse order can hand out
-// a token no row backs, which reads as a silent pairing loop to the user). tok is the single token
-// Broker.Approve already minted for this whole approval decision (F6) — shared verbatim by every
-// sibling window of the same clientID, never minted again here.
+// a token no row backs, which reads as a silent pairing loop to the user). tok is the token
+// Broker.Approve already minted for this connection's own request (P172), never minted again here.
 func finishPairing(c *conn, deps handshakeDeps, clientID, sessionID, label string, tok approvedToken) bool {
 	now := deps.Now().UnixMilli()
 	row := repos.GitClientRow{
