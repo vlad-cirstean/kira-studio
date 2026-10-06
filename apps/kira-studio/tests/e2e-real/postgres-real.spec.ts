@@ -20,6 +20,8 @@ import {
 let pg: PgFixture | null = null;
 
 test.beforeAll(async () => {
+  // Container pull/start plus the 1M-row seed outlast the 60 s default (postgres took 57 s here).
+  test.setTimeout(240_000);
   if (!(await isDockerAvailable())) {
     test.skip(true, DOCKER_UNAVAILABLE_MESSAGE);
     return;
@@ -114,7 +116,7 @@ async function firstGutterNumber(page: Page): Promise<string> {
 }
 
 // C1 §7 step 11 — keyset paging (BuildKeysetPosition) against a real 1,000,000-row table, over the
-// real base64 wire path, forward then back: the pagination mode itself (not just row counts) is
+// real FlatBuffers wire path, forward then back: the pagination mode itself (not just row counts) is
 // asserted, since an adapter that silently fell back to offset paging on a keyset-eligible sort
 // would still show correct rows here, just not via the code path this step exists to prove.
 test('real Postgres: keyset paging over app.big_rows, forward then back', async ({

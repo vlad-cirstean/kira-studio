@@ -122,7 +122,7 @@ function buildPrerequisites(): Promise<void> {
       // `build:wails` (a separate `vite.wails.config.ts`) was folded into the main `vite build`
       // once P57 removed Electron — this repo's own `vite.config.ts` already outputs straight to
       // `apps/kira-studio/frontend/dist`, main.go's `//go:embed` target.
-      execFileSync('bun', ['run', 'build:test'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
+      execFileSync('bun', ['run', 'build:test:studio'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
       await mkdir(resolve(APP_DIR, 'bin'), { recursive: true });
       execFileSync('go', ['build', '-tags', 'server', '-o', SERVER_BINARY, '.'], {
         cwd: APP_DIR,

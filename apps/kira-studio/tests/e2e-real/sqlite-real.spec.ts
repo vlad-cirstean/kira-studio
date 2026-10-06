@@ -9,8 +9,7 @@ import {
 } from './support/sqlite';
 
 // E1 (P57-e2e-revisit.md §6/§8) — the Docker-free anchor for the real-backend tier: a real SQLite
-// connection through the real dialog, through the real Go bridge, through the real vendored Node
-// engine, to a real file seeded from packages/db-fixtures/fixtures/0009_sqlite_seed.sql, and back. This is a
+// connection through the real dialog, through the real Go bridge, to a real file seeded from packages/db-fixtures/fixtures/0009_sqlite_seed.sql, and back. This is a
 // *wiring* proof, not a UI-fidelity one (D5) — everything about rendering/interaction (selection
 // edges, keyboard nav, the cell editor, sticky bands, virtualisation, word wrap) already has a
 // verified tests/ui/ port against a mock; this spec exists to prove the real bytes travel the
@@ -104,8 +103,7 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   await expect(firstIdCell).toHaveText('1');
 
   // P56's own named symptom ("engine connecting" forever) turning `ok` is the single clearest
-  // signal the whole stack — bridge/port.ts's Stream, the Go stream, the vendored Node
-  // engine — is really wired, not stubbed (P57-e2e-revisit.md §3.3).
+  // signal the whole stack — bridge/port.ts's Stream and the Go stream — is really wired, not stubbed (P57-e2e-revisit.md §3.3).
   // A handled bound-call error is a real HTTP 422 under Wails (CLAUDE.md P57 finding) — nothing in
   // this scenario should trigger one, so the console should carry nothing at all, not even that.
   expect(consoleErrors).toEqual([]);

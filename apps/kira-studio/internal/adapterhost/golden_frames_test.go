@@ -18,8 +18,8 @@ type goldenFrame struct {
 	payload any
 }
 
-func ip(v int) *int       { return &v }
-func i64(v int64) *int64  { return &v }
+func ip(v int) *int      { return &v }
+func i64(v int64) *int64 { return &v }
 
 func goldenFrames(t *testing.T) []goldenFrame {
 	t.Helper()

@@ -30,6 +30,8 @@ let maria: MariaFixture | null = null;
 let kafka: KafkaFixture | null = null;
 
 test.beforeAll(async () => {
+  // Container pull/start plus the 1M-row seed outlast the 60 s default (postgres took 57 s here).
+  test.setTimeout(240_000);
   if (!(await isMariadbDockerAvailable())) {
     test.skip(true, MARIADB_DOCKER_UNAVAILABLE_MESSAGE);
     return;
@@ -210,8 +212,7 @@ test('two native kinds in one session: both survive a reload and serve a real re
   });
 
   // A real read through each adapter, after the reload — MariaDB's own TabularPage over `regions`,
-  // Kafka's own StreamPage over `topic:orders` (through the Go-native adapter's base64-encoded
-  // chunks, toTypedArray's first branch — Kafka has no database:/schema: level, so topics sit
+  // Kafka's own StreamPage over `topic:orders` (Kafka has no database:/schema: level, so topics sit
   // directly under the connection root).
   await mariaRowFinal.locator('[data-testid="tree-twisty"]').click();
   const mariaDbRow = page.locator('[data-testid="tree-row"][data-path="database:kira_test"]');
