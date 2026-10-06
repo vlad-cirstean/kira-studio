@@ -40,6 +40,8 @@ type fakeBackend struct {
 	disconnectN   atomic.Int64
 	release       chan struct{}
 	unwind        chan struct{}
+	// disconnectGate, when non-nil, blocks Disconnect until closed: a real adapter's slow teardown.
+	disconnectGate chan struct{}
 	throttleCalls []throttleCall
 }
 
@@ -90,6 +92,9 @@ func (b *fakeBackend) Test(ctx context.Context, cfg model.ResolvedConnectionConf
 }
 
 func (b *fakeBackend) Disconnect(ctx context.Context, connectionID string) error {
+	if b.disconnectGate != nil {
+		<-b.disconnectGate
+	}
 	b.disconnectN.Add(1)
 	return nil
 }
@@ -686,6 +691,56 @@ func TestConnectAfterDisconnectStartsFreshAttempt(t *testing.T) {
 	}
 	if got := h.backend.connectCount(); got != 2 {
 		t.Fatalf("Backend.Connect calls = %d, want 2", got)
+	}
+}
+
+// TestConnectWaiterDoesNotRestartDuringTeardown is P170 S4: a Connect already waiting on an
+// attempt that Disconnect/Remove aborts must not start a fresh attempt while that teardown is
+// still running — it would reconnect what the user just closed, or leak an adapter for a deleted
+// id.
+func TestConnectWaiterDoesNotRestartDuringTeardown(t *testing.T) {
+	teardowns := map[string]func(svc *connections.Service, id string){
+		"Disconnect": func(svc *connections.Service, id string) { _, _ = svc.Disconnect(id) },
+		"Remove":     func(svc *connections.Service, id string) { _ = svc.Remove(id) },
+	}
+	for name, teardown := range teardowns {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t)
+			created := mustCreate(t, h.svc, fieldsInput("slow-conn"))
+			h.backend.disconnectGate = make(chan struct{})
+
+			var wg sync.WaitGroup
+			for range 2 { // A runs the attempt, B waits on it
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					_, _ = h.svc.Connect(created.ID)
+				}()
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			teardownDone := make(chan struct{})
+			go func() {
+				teardown(h.svc, created.ID)
+				close(teardownDone)
+			}()
+			time.Sleep(200 * time.Millisecond)
+
+			if got := h.backend.connectCount(); got != 1 {
+				t.Errorf("Backend.Connect calls during teardown = %d, want 1 (no waiter restart)", got)
+			}
+			close(h.backend.disconnectGate)
+			h.backend.releaseSlow() // keeps a regressed restart from hanging wg.Wait
+			<-teardownDone
+			wg.Wait()
+
+			if got := h.backend.connectCount(); got != 1 {
+				t.Errorf("Backend.Connect calls = %d, want 1", got)
+			}
+			if got := h.svc.StateOf(created.ID).Status; got == "connected" {
+				t.Errorf("status after teardown = %q, want not connected", got)
+			}
+		})
 	}
 }
 

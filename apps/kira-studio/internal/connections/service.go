@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/kirathecat/kira-studio/internal/kiratime"
@@ -120,9 +119,12 @@ type attempt struct {
 	state  model.ConnectionState
 	err    error
 	cancel context.CancelFunc
-	// aborted is set by abortInFlight before it cancels: a later Connect must not join this
-	// attempt's stale result.
-	aborted atomic.Bool
+}
+
+// teardown counts the Disconnect/Remove calls tearing one id down; done closes when the last ends.
+type teardown struct {
+	n    int
+	done chan struct{}
 }
 
 // Service is the Go analogue of connections.ts's ConnectionsService.
@@ -132,6 +134,8 @@ type Service struct {
 	mu       sync.Mutex
 	states   map[string]model.ConnectionState
 	inFlight map[string]*attempt
+	// tearing holds one entry per id while Disconnect/Remove is aborting and tearing it down.
+	tearing map[string]*teardown
 	// closed is set once by Shutdown (F13, P108 Part 7): every Connect arriving after refuses
 	// outright rather than racing a StopAll that has already taken its own snapshot of what to kill.
 	closed bool
@@ -149,6 +153,7 @@ func New(d Deps) *Service {
 		deps:     d,
 		states:   make(map[string]model.ConnectionState),
 		inFlight: make(map[string]*attempt),
+		tearing:  make(map[string]*teardown),
 	}
 }
 
@@ -483,6 +488,7 @@ func (s *Service) copyMaskRules(fromID, toID string) error {
 func (s *Service) Remove(id string) error {
 	// F4 (P108 Part 3): abort a racing in-flight Connect before it can finish and re-register a
 	// live adapter/states entry/sidecar for an id this call is about to delete outright.
+	defer s.beginTeardown(id)()
 	s.abortInFlight(id)
 	current := s.StateOf(id)
 	if current.Status == "connected" || current.Status == "connecting" {
@@ -650,17 +656,22 @@ func (s *Service) Connect(id string) (model.ConnectionState, error) {
 			s.mu.Unlock()
 			return model.ConnectionState{}, ipcerr.Internal("connections service is shutting down")
 		}
+		// A Connect arriving mid-teardown waits it out, then starts fresh: starting now would race
+		// the teardown's own Backend.Disconnect / row delete.
+		if t, ok := s.tearing[id]; ok {
+			s.mu.Unlock()
+			<-t.done
+			continue
+		}
 		prev, ok := s.inFlight[id]
 		if !ok {
 			break
 		}
 		s.mu.Unlock()
 		<-prev.done
-		// A cancelled attempt (Disconnect/Remove/Update raced it) reports a stale "disconnected";
-		// this explicit Connect starts a fresh attempt instead of joining it.
-		if !prev.aborted.Load() {
-			return prev.state, prev.err
-		}
+		// An aborted attempt's waiters get its result, never a fresh attempt: the aborting
+		// teardown is still running and may delete the connection.
+		return prev.state, prev.err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a := &attempt{done: make(chan struct{}), cancel: cancel}
@@ -682,6 +693,27 @@ func (s *Service) Connect(id string) (model.ConnectionState, error) {
 	return a.state, a.err
 }
 
+// beginTeardown marks id as being torn down until the returned func runs; Connect holds off new
+// attempts meanwhile.
+func (s *Service) beginTeardown(id string) (end func()) {
+	s.mu.Lock()
+	t, ok := s.tearing[id]
+	if !ok {
+		t = &teardown{done: make(chan struct{})}
+		s.tearing[id] = t
+	}
+	t.n++
+	s.mu.Unlock()
+	return func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if t.n--; t.n == 0 {
+			delete(s.tearing, id)
+			close(t.done)
+		}
+	}
+}
+
 // abortInFlight cancels id's in-flight Connect attempt, if any, and waits for it to unwind —
 // Disconnect, Remove and Update call it first (F4, P108 Part 3; P168 Part 2 F4). Cancelling only
 // *asks* the attempt to stop, promptly inside a cancellation-aware wait (Backend.Connect,
@@ -693,7 +725,6 @@ func (s *Service) abortInFlight(id string) {
 	a, ok := s.inFlight[id]
 	s.mu.Unlock()
 	if ok {
-		a.aborted.Store(true)
 		a.cancel()
 		<-a.done
 	}
@@ -827,6 +858,7 @@ func (s *Service) finalizeAbortedAttempt(id string) (model.ConnectionState, erro
 func (s *Service) Disconnect(id string) (model.ConnectionState, error) {
 	// F4 (P108 Part 3): abort a racing in-flight Connect before it can finish and re-register a
 	// live adapter/"connected" state moments after this call reports "disconnected".
+	defer s.beginTeardown(id)()
 	s.abortInFlight(id)
 	s.deps.Preconnect.Stop(id)
 	_ = s.deps.Backend.Disconnect(context.Background(), id)
