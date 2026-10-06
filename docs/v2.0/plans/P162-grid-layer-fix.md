@@ -408,26 +408,16 @@ Per toggle, run section 4 protocol: Layers tab count, Activity Monitor footprint
 scroll, `__kiraScrollTrace` `gapFrames`/`uncoveredMax`/`frameP95` over one hard flick. Report
 layer count, plateau, gap frames, p95. Graph: check seams, HEAD ring, badges, hover, menu.
 
-## Result: header will-change and cell borders removed
+## Result: header will-change and border removal reverted
 
-Changes, `slickTheme.css`:
+Mac report: white and dotted cell borders, header and frozen gutter lag while scrolling. Reverted
+71d7c6a28 and 60ed063c8 (`will-change: transform` on `.slick-header-columns`, cell borders,
+`tooltips.spec.ts` compensation, data-view baseline). Both stay out. `contain: layout paint` on
+`.grid-canvas` (slickTheme.css, CommitGrid.vue) kept.
 
-- Removed `will-change: transform` on `.slick-header-columns`. Comment now one line. P22 horizontal
-  header flicker needs a Mac check via `ab-hdr-wc` if it returns.
-- Removed `border-right` and `border-bottom` from `.slick-cell`. Header column separators kept.
-- No row-level `border-bottom` added. Rows stay separable by 28px/22px height, hover fill and
-  selection fill, no zebra (same as before this phase). Not measured; adding one stays open if rows
-  read poorly.
-- Git graph `CommitGrid.vue`: no cell borders (`.slick-row` has `border: 0`). Untouched.
+Open: Mac A/B must show whether `contain: layout paint` alone also causes the gutter lag. Paste the
+section 4 `kiraAB` helper, then:
 
-Visual change: the data grid loses all hairlines between cells, vertical and horizontal.
-`data-view` baseline `data-grid-visual-linux.png` regenerated. Only that spec differed; other 13
-visual specs pass.
+`kiraAB('ab-canvas-off', '.slick-grid-host .grid-canvas{contain:none !important}')`
 
-Test fix: `tooltips.spec.ts` injected trigger compensated for `will-change` making the header a
-containing block for `position: fixed`. Compensation removed; trigger now viewport-fixed.
-
-Checks: lint, typecheck clean. ui slick-grid, scroll-trace, tooltips: 19 passed.
-Perf `NCOLS=20 grid-scroll` headless WebKit: 50-53 fps avg, p95 27-31 ms, 0 frames over 100 ms.
-
-Mac A/B for flicker and smoothness remains the user's.
+Compare gutter and header lag with it on and off.
