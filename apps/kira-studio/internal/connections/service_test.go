@@ -33,16 +33,16 @@ func intPtr(i int) *int       { return &i }
 // M9.3, so there is no more Node-served path left to exercise here, only Backend's own contract.
 // Connect blocks on release until it is closed, for TestInFlightConnectDedupe's slow-connect case.
 type fakeBackend struct {
-	mu            sync.Mutex
-	lastConfig    model.ResolvedConnectionConfig
-	connectN      atomic.Int64
-	testN         atomic.Int64
-	disconnectN   atomic.Int64
-	release       chan struct{}
-	unwind        chan struct{}
+	mu          sync.Mutex
+	lastConfig  model.ResolvedConnectionConfig
+	connectN    atomic.Int64
+	testN       atomic.Int64
+	disconnectN atomic.Int64
+	release     chan struct{}
+	unwind      chan struct{}
 	// disconnectGate, when non-nil, blocks Disconnect until closed: a real adapter's slow teardown.
 	disconnectGate chan struct{}
-	throttleCalls []throttleCall
+	throttleCalls  []throttleCall
 }
 
 type throttleCall struct {

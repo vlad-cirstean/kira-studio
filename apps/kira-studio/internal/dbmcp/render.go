@@ -449,12 +449,15 @@ func bareProjectionOrdinals(branch []sqlToken, name string) []int {
 	sel := -1
 	depth := 0
 	for i, t := range branch {
-		if t.kind == 'p' && t.text == "(" {
+		switch {
+		case t.kind == 'p' && t.text == "(":
 			depth++
-		} else if t.kind == 'p' && t.text == ")" {
+		case t.kind == 'p' && t.text == ")":
 			depth--
-		} else if depth == 0 && t.kind == 'w' && t.text == "select" {
+		case depth == 0 && t.kind == 'w' && t.text == "select":
 			sel = i
+		}
+		if sel >= 0 {
 			break
 		}
 	}
@@ -467,12 +470,15 @@ func bareProjectionOrdinals(branch []sqlToken, name string) []int {
 	}
 	end, depth := len(list), 0
 	for i, t := range list {
-		if t.kind == 'p' && t.text == "(" {
+		switch {
+		case t.kind == 'p' && t.text == "(":
 			depth++
-		} else if t.kind == 'p' && t.text == ")" {
+		case t.kind == 'p' && t.text == ")":
 			depth--
-		} else if depth == 0 && t.kind == 'w' && endsProjection[t.text] {
+		case depth == 0 && t.kind == 'w' && endsProjection[t.text]:
 			end = i
+		}
+		if end != len(list) {
 			break
 		}
 	}
