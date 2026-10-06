@@ -6,7 +6,6 @@ package maskrules
 
 import (
 	"encoding/hex"
-	"fmt"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"strings"
 	"sync"
@@ -54,10 +53,10 @@ func (s *Service) List(connectionID string) ([]model.MaskRule, error) {
 // the user needing to know or care which table it came from.
 func (s *Service) Upsert(connectionID string, f model.MaskRuleFields) (model.MaskRule, error) {
 	if !model.ValidMaskKind(string(f.Kind)) {
-		return model.MaskRule{}, fmt.Errorf("maskrules: invalid kind %q", f.Kind)
+		return model.MaskRule{}, model.Invalid("maskrules: invalid kind %q", f.Kind)
 	}
 	if strings.TrimSpace(f.ColumnName) == "" {
-		return model.MaskRule{}, fmt.Errorf("maskrules: column name is required")
+		return model.MaskRule{}, model.Invalid("maskrules: column name is required")
 	}
 	if strings.TrimSpace(f.TableName) == "" {
 		f.TableName = "*"

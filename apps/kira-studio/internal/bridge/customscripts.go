@@ -37,7 +37,7 @@ type CustomScriptsCreateArgs struct {
 func (s *CustomScriptsService) Create(args CustomScriptsCreateArgs) (model.CustomScript, error) {
 	rec, err := s.Deps.Repos.CustomScripts.Create(args.Fields)
 	if err != nil {
-		return model.CustomScript{}, ipcerr.BadRequest(err.Error())
+		return model.CustomScript{}, writeErr(err)
 	}
 	s.broadcastList()
 	return rec, nil
@@ -54,7 +54,7 @@ func (s *CustomScriptsService) Update(args CustomScriptsUpdateArgs) (model.Custo
 	}
 	rec, err := s.Deps.Repos.CustomScripts.Update(args.ID, args.Fields)
 	if err != nil {
-		return model.CustomScript{}, ipcerr.BadRequest(err.Error())
+		return model.CustomScript{}, writeErr(err)
 	}
 	s.broadcastList()
 	return rec, nil
@@ -72,7 +72,7 @@ func (s *CustomScriptsService) Remove(args CustomScriptsRemoveArgs) error {
 	// idempotent-remove semantics are the Terminal module's own confirm-first UI, not this
 	// layer's job.
 	if err := s.Deps.Repos.CustomScripts.Remove(args.ID); err != nil {
-		return ipcerr.BadRequest(err.Error())
+		return writeErr(err)
 	}
 	s.broadcastList()
 	return nil

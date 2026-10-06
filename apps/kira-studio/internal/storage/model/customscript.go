@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -38,16 +37,16 @@ func (f *CustomScriptFields) Validate() error {
 	f.Name = strings.TrimSpace(f.Name)
 	f.Command = strings.TrimSpace(f.Command)
 	if f.Name == "" {
-		return fmt.Errorf("model: custom script: name is required")
+		return Invalid("model: custom script: name is required")
 	}
 	if f.Command == "" {
-		return fmt.Errorf("model: custom script: command is required")
+		return Invalid("model: custom script: command is required")
 	}
 	if f.WorkingDir != "" && !filepath.IsAbs(f.WorkingDir) {
-		return fmt.Errorf("model: custom script: working directory must be an absolute path")
+		return Invalid("model: custom script: working directory must be an absolute path")
 	}
 	if !ValidPaletteColor(f.Color) {
-		return fmt.Errorf("model: custom script: invalid colour")
+		return Invalid("model: custom script: invalid colour")
 	}
 	return nil
 }

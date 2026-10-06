@@ -1,6 +1,9 @@
 package bridge
 
 import (
+	"database/sql"
+	"errors"
+
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -14,6 +17,16 @@ type MaskRulesService struct {
 	Deps appcore.Deps
 }
 
+// writeErr labels a rule/script write failure: caller-input problems (a validation error, an
+// unknown id) are E_BAD_REQUEST, anything else (locked DB, full disk) is E_INTERNAL.
+func writeErr(err error) error {
+	var ve *model.ValidationError
+	if errors.As(err, &ve) || errors.Is(err, sql.ErrNoRows) {
+		return ipcerr.BadRequest(err.Error())
+	}
+	return ipcerr.InternalErr(err)
+}
+
 // MaskRulesListArgs is shared by every method below that needs nothing but a connection id.
 type MaskRulesListArgs struct {
 	ConnectionID string `json:"connectionId"`
@@ -23,7 +36,7 @@ func (s *MaskRulesService) List(args MaskRulesListArgs) ([]model.MaskRule, error
 	if args.ConnectionID == "" {
 		return nil, ipcerr.BadRequest("connectionId is required")
 	}
-	return s.Deps.MaskRules.List(args.ConnectionID)
+	return ipcerr.InternalResult(s.Deps.MaskRules.List(args.ConnectionID))
 }
 
 // MaskRulesChangedEvent is ChannelMaskRulesChanged's own payload — schemaChanged's per-connection
@@ -65,7 +78,7 @@ func (s *MaskRulesService) Upsert(args MaskRulesUpsertArgs) (model.MaskRule, err
 	}
 	rec, err := s.Deps.MaskRules.Upsert(args.ConnectionID, args.Fields)
 	if err != nil {
-		return model.MaskRule{}, ipcerr.BadRequest(err.Error())
+		return model.MaskRule{}, writeErr(err)
 	}
 	s.broadcastRules(args.ConnectionID, false)
 	return rec, nil
@@ -88,7 +101,7 @@ func (s *MaskRulesService) Remove(args MaskRulesRemoveArgs) error {
 		return ipcerr.InternalErr(err)
 	}
 	if err := s.Deps.MaskRules.Remove(args.ID); err != nil {
-		return ipcerr.BadRequest(err.Error())
+		return writeErr(err)
 	}
 	if existing != nil {
 		s.broadcastRules(existing.ConnectionID, false)
@@ -105,7 +118,7 @@ func (s *MaskRulesService) RegenerateKey(args MaskRulesRegenerateKeyArgs) error 
 		return ipcerr.BadRequest("connectionId is required")
 	}
 	if err := s.Deps.MaskRules.RegenerateKey(args.ConnectionID); err != nil {
-		return err
+		return ipcerr.InternalErr(err)
 	}
 	s.broadcastRules(args.ConnectionID, true)
 	return nil
@@ -114,7 +127,7 @@ func (s *MaskRulesService) RegenerateKey(args MaskRulesRegenerateKeyArgs) error 
 // Counts is the Settings glance's own backend (§7.5) — every connection id with at least one rule,
 // mapped to its rule count.
 func (s *MaskRulesService) Counts() (map[string]int, error) {
-	return s.Deps.MaskRules.Counts()
+	return ipcerr.InternalResult(s.Deps.MaskRules.Counts())
 }
 
 // CorrelationKey returns connectionID's own correlation key, hex-encoded ("" when none is needed)
@@ -126,5 +139,5 @@ func (s *MaskRulesService) CorrelationKey(args MaskRulesListArgs) (string, error
 	if args.ConnectionID == "" {
 		return "", ipcerr.BadRequest("connectionId is required")
 	}
-	return s.Deps.MaskRules.CorrelationKeyHex(args.ConnectionID)
+	return ipcerr.InternalResult(s.Deps.MaskRules.CorrelationKeyHex(args.ConnectionID))
 }
