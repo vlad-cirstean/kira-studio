@@ -16,3 +16,8 @@ every Go server while the TS server (vscode proxy) can fill it, two behaviours o
 Fix: only if the Part 17 fixer drops `kind` from the TS contract (its preferred option), remove
 the `Kind` field and update the struct comment in `rpcstream/frame.go`. If instead the fixer keeps
 `kind` and sets it, no Stream A change is needed. Pointer: `P168-part17-findings.md` F2.
+
+Update (Part 17 fixer): the fixer chose the preferred option and dropped `kind` from TS
+`WireError`/`RpcError`. Stream A may now remove `wireError.Kind` and the "kind only for a
+classified error" struct comment in `internal/rpcstream/frame.go`. No ordering constraint: the TS
+decoder ignores an unknown `kind` field, so either order is safe.

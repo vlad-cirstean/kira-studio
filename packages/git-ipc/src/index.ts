@@ -101,6 +101,7 @@ export type {
   TagAnnotation,
   UiActionKind,
   UndoSlotSnapshot,
+  WireErrorCode,
   WorktreeAddBlocker,
   WorktreeAddNote,
   WorktreeAddPreflight,

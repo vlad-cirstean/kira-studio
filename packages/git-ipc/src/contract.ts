@@ -1033,6 +1033,24 @@ export type OpRequest =
    *  (an exact single `update-ref <ref> <sha>` replay). */
   | { readonly kind: 'globalStashRemove'; readonly sha: string };
 
+/** Every `WireError.code` the git RPC emits: Go (`internal/ipcerr`, `gitrpc` `mapGitError`,
+ *  `rpcstream`) and this package's server. `E_GIT_*` is `gitclient`'s error kind in
+ *  SCREAMING_SNAKE_CASE. A locally thrown JS error crosses as its class name instead. Keep in
+ *  step with `apps/kira-space/internal/gitrpc/contract.go`. */
+export type WireErrorCode =
+  | 'E_BAD_REQUEST'
+  | 'E_INTERNAL'
+  | 'E_UNKNOWN_METHOD'
+  | 'E_READ_ONLY'
+  | 'E_TOO_LARGE'
+  | 'E_FRAME_TOO_LARGE'
+  | 'E_GIT_NOT_A_REPOSITORY'
+  | 'E_GIT_PERMISSION_DENIED'
+  | 'E_GIT_CANCELLED'
+  | 'E_GIT_TIMEOUT'
+  | 'E_GIT_UNKNOWN'
+  | 'E_GIT_UNAVAILABLE';
+
 export type OpErrorKind =
   | 'AuthFailed'
   | 'NonFastForward'

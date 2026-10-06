@@ -210,10 +210,10 @@ describe('ipc rpc — request/response', () => {
     server.dispose();
   });
 
-  test("a request rejects with an RpcError carrying the handler's error kind", async () => {
+  test("a request rejects with an RpcError carrying the handler's error code", async () => {
     const [a, b] = createInMemoryChannelPair();
     class FakeGitError extends Error {
-      readonly kind = 'NotFound';
+      readonly code = 'E_BAD_REQUEST';
       constructor() {
         super('no such repo');
         this.name = 'GitError';
@@ -229,8 +229,7 @@ describe('ipc rpc — request/response', () => {
 
     await expect(client.request('repo.open', { path: '/nope' })).rejects.toMatchObject({
       name: 'RpcError',
-      code: 'GitError',
-      kind: 'NotFound',
+      code: 'E_BAD_REQUEST',
       message: 'no such repo',
     });
 

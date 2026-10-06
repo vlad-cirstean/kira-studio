@@ -404,7 +404,8 @@ func handleRepoClose(c *gitsession.Conn, params json.RawMessage) (any, error) {
 // mapGitError turns gitclient's closed error vocabulary into ipcerr codes so the classification
 // survives the wire (D6, resolving F6). rpcstream folds anything that is not an *ipcerr.Error into
 // E_INTERNAL (bridge/rpcstream/frame.go), which is the whole reason this exists — a git failure
-// must cross as E_GIT_<KIND>, never as an anonymous internal error.
+// must cross as E_GIT_<KIND>, never as an anonymous internal error. Every code the server emits is
+// listed in packages/git-ipc/src/contract.ts WireErrorCode; add new ones there.
 func mapGitError(err error) error {
 	switch {
 	case errors.Is(err, gitsession.ErrRepoNotHeld), errors.Is(err, gitsession.ErrRepoTornDown):

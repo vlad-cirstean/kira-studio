@@ -46,25 +46,22 @@ export interface MessageChannelLike {
   close(): void;
 }
 
-/** An error that crossed the wire as data (§3.5): `code` and `message` always; `kind` is P1's
- *  `GitErrorKind` when the failure was a `GitError`, carried structurally since `ipc` cannot
- *  import the git driver's own type (upstream's `@kira-version/git`; this repo's replacement is
- *  Go, `internal/gitclient`). Raw stderr never crosses — see `toWireError` below. */
+/** An error that crossed the wire as data (§3.5): `code` and `message`. `code` is a
+ *  `WireErrorCode` (contract.ts) from Go and from this file's server for forwarded errors; a
+ *  locally thrown JS error crosses as its class name. A git failure's kind is folded into the
+ *  code (`E_GIT_<KIND>`) by Go's `mapGitError`. Raw stderr never crosses — see `toWireError`. */
 export interface WireError {
   readonly code: string;
   readonly message: string;
-  readonly kind?: string;
 }
 
 export class RpcError extends Error {
   readonly code: string;
-  readonly kind: string | undefined;
 
   constructor(wire: WireError) {
     super(wire.message);
     this.name = 'RpcError';
     this.code = wire.code;
-    this.kind = wire.kind;
   }
 }
 
@@ -100,10 +97,9 @@ const INITIAL_STREAM_CREDIT = 2;
 
 function toWireError(error: unknown): WireError {
   if (error instanceof Error) {
-    const kind = (error as { readonly kind?: unknown }).kind;
-    return typeof kind === 'string'
-      ? { code: error.name, message: error.message, kind }
-      : { code: error.name, message: error.message };
+    // A forwarded error (`RpcError`, `TransportError`) already carries the wire code; keep it.
+    const code = (error as { readonly code?: unknown }).code;
+    return { code: typeof code === 'string' ? code : error.name, message: error.message };
   }
   return { code: 'Unknown', message: String(error) };
 }
@@ -400,6 +396,8 @@ export function createRpcServer(channel: MessageChannelLike, handlers: ServerHan
     try {
       assertContractShape('request', method, params);
       const handler = handlers.requests[method];
+      if (!handler)
+        throw new RpcError({ code: 'E_UNKNOWN_METHOD', message: `unknown method ${method}` });
       const result = await handler(params as never, { signal: controller.signal });
       if (activeWork.delete(id)) post(channel, { t: 'res', id, ok: true, result });
     } catch (error) {
@@ -438,6 +436,8 @@ export function createRpcServer(channel: MessageChannelLike, handlers: ServerHan
     try {
       assertContractShape('stream', method, params);
       const handler = handlers.streams[method];
+      if (!handler)
+        throw new RpcError({ code: 'E_UNKNOWN_METHOD', message: `unknown method ${method}` });
       await handler(params as never, { signal: controller.signal, emit: emit as never });
       if (activeWork.delete(id)) {
         creditGates.delete(id);
