@@ -19,6 +19,7 @@ top). Reviewer reports only; no source edited. Paths as in plan: `GC` = `package
 - Block 1 (bridge, Part 17 consumers): done.
 - Block 2 (graph data and layout): done.
 - Block 3 (graph and review session state): done.
+- Block 4 (search): done.
 
 ## Findings
 
@@ -150,6 +151,54 @@ dropping only an identical same-path/same-state duplicate), keeping `pending` tr
 drains; or disable the tree checkboxes on `pending` (`needs-other-part-file:
 packages/git-ui/src/components/FileTree.vue (Part 19)`).
 
+### Block 4: search
+
+**F10 (low): `matchCount` reports an exact count in two incomplete cases.**
+`GU/state/search.ts:285-307`:
+- Loaded cap: `n` adds `loaded.hits.length` (capped at `LOADED_HIT_LIMIT` 500, `:20`), and
+  `loadedExact` checks only `loaded.complete` (`:297`), not `loaded.truncated`. Scenario: 3,000
+  loaded commits match `fix`, tail skipped (small exhausted repo) or not yet back: `SearchBox.vue`
+  shows "1 of 500" with no `+`. The `LOADED_HIT_LIMIT` doc ("`matchCount` stays exact regardless
+  (`LoadedScanResult.total` keeps counting past it)") describes code that does not exist.
+- Tail failure: `#runTail` swallows every non-cancel rejection (`:486-491`) and leaves `tail`
+  `undefined`, which `tailExact` (`:302-305`) counts as exact. Scenario: `search.run` fails
+  (`E_GIT_UNAVAILABLE`, repo released, socket drop): results show only loaded hits, count exact, no
+  notice that the unloaded history was never searched.
+Code-read. Fix: `loadedExact = loaded === undefined || (loaded.complete && !loaded.truncated)`;
+record a tail failure (e.g. `tailError: ShallowRef<string | undefined>`, cleared on the next run)
+and treat it as inexact; surface it through `searchResultsModel.ts`'s existing `tailNotice`
+(`needs-other-part-file: packages/git-ui/src/components/searchResultsModel.ts (Part 19)`, Stream
+B, editable). Fix the `LOADED_HIT_LIMIT` comment.
+
+**F11 (low): Go answers `invalidPattern` for patterns JS accepts; the client then claims an exact
+count.** RE2 caps repeat counts at 1000; JS does not. Verified: `Compile({Text: "a{1001}", Regex:
+true})` returns `ErrInvalidPattern` ("invalid repeat count"), while `new RegExp('a{1001}','i')`
+compiles. `gitrpc/search.go:79-80` maps it to `{kind: "invalidPattern"}`; `search.ts:302-305`
+counts `invalidPattern` as exact because "the client never sends a request for" one, and
+`searchResultsModel.ts:148` shows a notice only for `unsupportedPattern`. Result: the unloaded
+history is silently unsearched under an exact count. `gitsearch/query.go:33-37` calls this path
+unreachable from the webview. Fix: in `gitsearch.Compile`, return `ErrUnsupportedPattern` (wrapped
+with RE2's message) for a `regexp.Compile` failure after a clean translation, since the client
+already proved the pattern valid JS; keep `ErrInvalidPattern` only for non-client callers if
+needed, and correct the comment. Add a corpus row (`a{1001}`, `supported: false`).
+`needs-other-part-file: apps/kira-space/internal/gitsearch/query.go (Part 15)` (Stream B,
+editable).
+
+**F12 (low, DESIGN-DECISION): residual JS non-`u` vs RE2 dialect gaps in regex mode.** Verified
+with a throwaway Go test against `Compile`/`matchText` and `bun` against `new RegExp`:
+- Case folding: regex mode prepends `(?i)` (`query.go:84-86`), which folds Unicode orbits. JS
+  non-`u` `i` canonicalizes by `toUpperCase` and refuses a non-ASCII to ASCII mapping. `k` vs
+  KELVIN SIGN U+212A: Go true, JS false; `s` vs LONG S U+017F: Go true, JS false; `[a-z]x` vs
+  `U+212Ax`: Go true, JS false (also expected: `å` vs ANGSTROM SIGN U+212B, `ß` vs U+1E9E).
+  Literal mode already matches JS (`literal.go` `foldRune`).
+- Astral characters: JS non-`u` sees UTF-16 units, Go sees runes. `^.$` on an emoji: Go true, JS
+  false; `^..$`: Go false, JS true. RE2 cannot express half a surrogate pair, so this one cannot
+  be closed in the translator.
+Effect: a hit counted by the git tail but not by the loaded scan (or the reverse) for these rare
+inputs. Decision needed: emulate JS canonicalization in the translator (expand literal runes and
+class ranges into explicit JS-equivalence classes and drop `(?i)`), or accept and document the
+gap (the corpus would then need a per-engine expectation, which its schema lacks today).
+
 ## Candidate fates (plan §9)
 
 1. Dropped. Webview-side cancel is local: the webview's own `createRpcClient` rejects with a
@@ -175,6 +224,9 @@ packages/git-ui/src/components/FileTree.vue (Part 19)`).
 10. Reported as F2 (probe numbers there).
 11. Reported as F3.
 12. Reported as F8 (verified).
+13. Reported as F12 (DESIGN-DECISION) plus F11 (repeat-count cap). `\w`, `\b`, `\d` agree (ASCII in
+    both); `.` vs line terminators is already rewritten (`dialect.go:147-150`) and pinned by a corpus row.
+14. Confirmed stale; grouped into the comments finding (block 7).
 16. Reported as F9.
 17. Dropped. Both stores persist JSON (VS Code `getState`, Space `viewStateStore.ts`), which cannot
     carry `NaN`/`Infinity` (they serialize to `null` and fail the `typeof` gate). `loadedRows` is
