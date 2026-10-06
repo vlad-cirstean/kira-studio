@@ -102,7 +102,7 @@ function cancelCreate(): void {
 }
 
 async function submitCreate(): Promise<void> {
-  await props.ops.runStashPush({
+  const result = await props.ops.runStashPush({
     message: message.value.trim() === '' ? undefined : message.value.trim(),
     includeUntracked: includeUntracked.value,
     keepIndex: keepIndex.value,
@@ -114,6 +114,7 @@ async function submitCreate(): Promise<void> {
     // request needs; nothing here relies on the reactive wrapper past this call.
     paths: [...pathspec.value],
   });
+  if (!result.ok) return;
   emit('close-create');
 }
 
@@ -176,7 +177,8 @@ function cancelBranch(): void {
 async function submitBranch(): Promise<void> {
   const entry = props.branchTarget;
   if (entry === undefined || !canSubmitBranch.value) return;
-  await props.ops.runStashBranch(entry, branchName.value.trim());
+  const result = await props.ops.runStashBranch(entry, branchName.value.trim());
+  if (!result.ok) return;
   emit('close-branch');
 }
 
@@ -220,7 +222,8 @@ function cancelSave(): void {
 async function submitSave(): Promise<void> {
   if (!canSubmitSave.value) return;
   const sha = saveSource.value === 'entry' ? props.saveSourceEntry?.sha : undefined;
-  await props.ops.runGlobalStashSave(saveLabel.value.trim(), sha);
+  const result = await props.ops.runGlobalStashSave(saveLabel.value.trim(), sha);
+  if (!result.ok) return;
   emit('close-save');
 }
 

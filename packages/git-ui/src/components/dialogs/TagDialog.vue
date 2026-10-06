@@ -56,12 +56,13 @@ function cancel(): void {
 
 async function submit(): Promise<void> {
   if (!canSubmit.value) return;
-  await props.ops.tagCreate({
+  const result = await props.ops.tagCreate({
     name: name.value,
     target: props.target,
     message: annotated.value ? message.value : undefined,
     force: force.value,
   });
+  if (!result.ok) return;
   emit('close');
 }
 </script>

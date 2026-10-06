@@ -49,12 +49,13 @@ function cancel(): void {
 
 async function submit(): Promise<void> {
   if (!canSubmit.value) return;
-  await props.ops.branchCreate({
+  const result = await props.ops.branchCreate({
     name: name.value,
     startPoint: props.startPoint,
     checkout: checkout.value,
     track: undefined,
   });
+  if (!result.ok) return;
   emit('close');
 }
 </script>

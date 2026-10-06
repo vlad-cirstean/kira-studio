@@ -64,7 +64,8 @@ const parentCandidates = computed(() =>
 async function submitSetParent(): Promise<void> {
   const target = props.target;
   if (target === undefined) return;
-  await props.ops.runStackSet(target.branch, selectedParent.value || undefined);
+  const result = await props.ops.runStackSet(target.branch, selectedParent.value || undefined);
+  if (!result.ok) return;
   emit('close');
 }
 

@@ -48,7 +48,8 @@ function cancel(): void {
 
 async function submit(): Promise<void> {
   if (!canSubmit.value) return;
-  await props.ops.branchRename(props.currentName, name.value);
+  const result = await props.ops.branchRename(props.currentName, name.value);
+  if (!result.ok) return;
   emit('close');
 }
 </script>
