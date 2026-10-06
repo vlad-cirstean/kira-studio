@@ -247,6 +247,101 @@ apps/kira-studio/tests/fixtures/mask/ (Part 12, Stream C)` for the fixtures. No 
 is committed (`parity_test.go:13-17` claims Go-generated fixtures); new fixtures are hand-written
 from the Go output, which is acceptable at this size.
 
+### F12 (medium) Cookie Remove silently fails for the common cookie; exact delete needs a jar decision (routed Part 10 F18)
+
+`SI/httpclient/cookies.go:82-105` (Part 7, one hop), `SI/bridge/http.go:201-223`.
+`DeleteJarCookie` sends `SetCookies(u, {Name, MaxAge: -1})` with no `Domain` and no `Path`.
+`net/http/cookiejar` then keys the expiry as a host-only cookie on `u.Host`, path
+`defaultPath(u.Path)` (the URL's directory), and deletes only an entry with exactly that
+`domain;path;name` id.
+
+Probe (scratch test in `httpclient`, deleted):
+- Cookie `sid` set by `https://api.example.com/login` with `Path=/`; delete via
+  `https://api.example.com/api/v1/users`: before `[sid]`, after `[sid]`. Not deleted (expiry
+  keyed on path `/api/v1`).
+- Same cookie, delete via `https://api.example.com/`: deleted.
+- Cookie with `Domain=example.com; Path=/`, delete via `https://api.example.com/`: not deleted
+  (expiry keyed host-only on `api.example.com`).
+
+Scenario: the user opens the Cookies tab on a request to `/api/v1/users`, clicks Remove on the
+session cookie a login set with `Path=/`. `DeleteCookie` returns the refreshed list with the
+cookie still in it. Every later send still carries it.
+
+Feasibility of Part 10 F18's exact-cookie delete: not feasible over `net/http/cookiejar`.
+`JarCookies` gets name and value only from `jar.Cookies(u)` (`Domain`/`Path` are always `""` in
+the listing, `cookies.go:82-92`), so the renderer's `c.domain`/`c.path` for a jar row are empty and
+cannot identify one of two same-name cookies. The jar exposes no entry list and no delete. An
+exact delete needs a jar that exposes entries (a replacement or fork of `cookiejar`, licence to be
+checked per `CLAUDE.md`). **DESIGN-DECISION** for that part: keep name-scoped delete, or replace
+the jar. No renderer change until it is decided; the `apiControl.ts`/`HttpCookieDeleteArgs`
+widening routed by plan §7 should not land, since there is no domain/path to pass.
+
+Fix for the bug itself (no design decision needed): make `DeleteJarCookie` expire every entry
+named `name` that `Cookies(u)` would return. For each candidate domain (host-only, plus
+`Domain=` each parent of `u.Host` down to `publicsuffix.EffectiveTLDPlusOne`) and each candidate
+path (`/` plus every prefix of `u.Path`), call `SetCookies` with that `Domain`/`Path` and
+`MaxAge: -1`. Then re-read `Cookies(u)`. Document it as "remove every cookie named X sent to this
+URL". A test with path-scoped and domain-scoped cookies (enumeration with interacting rules;
+clears the bar).
+
+### F13 (low) Saved-request reads cannot report not-found (routed Part 10 F6, Go half)
+
+`SI/bridge/collections.go:61-74`, `SI/storage/repos/collections.go:102-121`. Confirmed:
+`getRequestBody` returns `fmt.Errorf("repos/collections: no item %s")` on `sql.ErrNoRows`, and
+`GetRequest`/`GetGrpcRequest` wrap every error in `ipcerr.InternalResult` (`E_INTERNAL`). The
+renderer cannot tell a deleted item from a transient DB failure, so
+`apiSavedRequestQueryOptions` caches `null` forever for both (Part 10 F6 scenario).
+
+Fix (edit set per plan §7): `repos.ErrItemNotFound` sentinel, wrapped by `getRequestBody` on
+`sql.ErrNoRows`. Add `ipcerr.NotFound(message)` (`E_NOT_FOUND`) in `internal/ipcerr`.
+`GetRequest`/`GetGrpcRequest` map `errors.Is(err, repos.ErrItemNotFound)` to it. A non-request item
+or a protocol mismatch is the caller asking for the wrong thing: add `repos.ErrNotARequest` and map
+it to `E_BAD_REQUEST`. Corrupt stored JSON stays `E_INTERNAL`. `E_NOT_FOUND` already means "unknown
+object" in the data views (`SF/views/shared/viewOp.ts:12-19` treats it as ordinary), so the code
+does not collide with the reconnect gate. Record the code name in `P168-routed-from-streamA.md`.
+Renderer half: `needs-other-part-file: apps/kira-studio/frontend/src/api/state/apiQueries.ts
+(Part 10, Stream C)` (return `null` only for `E_NOT_FOUND`, rethrow the rest).
+
+### F14 (low) `KeepAwakeService.recomputeAgent` can leave a stale agent assertion
+
+`SI/bridge/keepawake.go` (`recomputeAgent`, `KeepAwakeAgentSessionsChanged`, `SetAgentAware`).
+`recomputeAgent` reads settings, then `agentCount` under `mu`, releases `mu`, then calls
+`Ctl.Set`. Two callers (a terminal agent-session change from `main.go:391` and a `SetAgentAware`
+click, or two session changes) interleave: caller A reads count 1, caller B sets count 0 and
+calls `Set(false)`, caller A then calls `Set(true)`. The Mac stays awake with no agent running
+until the next session change.
+
+Fix: hold one mutex across the settings read, the count read and `Ctl.Set` (a `recomputeMu`, or
+widen `mu` to cover the whole body; `Ctl.Set` is not re-entrant into this service).
+
+### F15 (low) `TerminalService.Shutdown` is Wails-bound
+
+`SI/bridge/terminal.go` embeds `*terminal.BoundService`; Wails binds every exported method of the
+registered type, promoted ones included (the type's own doc comment, `internal/terminal/bound.go:
+10-15`). `BoundService.Shutdown` (`bound.go:33-36`) is main.go's teardown hook, not a binding.
+Any window can call it and close every terminal session in every window. Same shape that
+`startIfEnabled`/`StartDbMcpIfEnabled` already avoids for `DbMcpService`.
+
+Fix: replace the method with a package function `terminal.ShutdownBound(b *BoundService)` (or an
+unexported method plus a package-level wrapper), and call that from `main.go`. `internal/terminal`
+is Part 8 (same stream, editable). Kira Space embeds the same type:
+`needs-other-part-file: apps/kira-space/main.go (Stream B)` only if its teardown call must change
+name too.
+
+### F16 (low) Mask-rule and custom-script bridges label DB failures `E_BAD_REQUEST`
+
+`SI/bridge/maskrules.go:66-69,90-92`, `SI/bridge/customscripts.go` (`Create`, `Update`, `Remove`).
+Every error from `maskrules.Service.Upsert`/`Remove` and `CustomScriptsRepo` becomes
+`ipcerr.BadRequest(err.Error())`, including SQLite failures. `MaskRulesService.List`, `Counts`,
+`CorrelationKey` and `RegenerateKey` return raw errors (the renderer's `unwrap` falls back to
+`E_INTERNAL`, so those work). Scenario: the DB is locked or the disk is full; the Privacy tab shows
+the SQLite text as if the user had entered an invalid rule.
+
+Fix: return typed validation errors from `maskrules.Service.Upsert` (invalid kind, empty column)
+and the custom-scripts repo validator, map only those to `BadRequest`, everything else to
+`ipcerr.InternalErr`. Wrap the four raw returns in `ipcerr.InternalErr`/`InternalResult` for
+consistency.
+
 ## Coverage
 
 - Block 1 (auth and install): done. Reviewed `SI/mcpauth/token.go`, `SI/mcpinstall/install.go`,
@@ -305,3 +400,25 @@ from the Go output, which is acceptable at this size.
     classes and risky syntax all hold. A filter-predicate oracle (`SELECT email FROM c WHERE email
     LIKE 'a%'`) is adversarial probing, outside the documented threat model; not reported.
   - Plan §9 #2 confirmed by reading (F10), #10 confirmed (F11).
+- Block 4 (bridge services): done. Reviewed every remaining `SI/bridge/*.go` (`collections`,
+  `http`, `grpc`, `variables`, `files`, `connections`, `tree`, `ops`, `events`, `stream`,
+  `queries`, `schema`, `datagrip`, `customscripts`, `settings`, `layout`, `tabs`, `windows`,
+  `terminal`, `keepawake`, `update`, `lifecycle`, `app`, `apidata`, `filters`,
+  `responsehistory`, `grpchistory`), `SI/appcore/deps.go`, `SI/appshell/{menu,dialogs,stream}.go`;
+  read `httpclient/cookies.go`, `internal/terminal/bound.go`, `internal/windowsvc`,
+  `apivars/reveal.go`, `adapterhost` `Router.Cancel`/`Host.CancelOp` as callees.
+  - Routed Part 10 F6: confirmed, F13. Routed Part 10 F18: exact delete infeasible over
+    `cookiejar` (DESIGN-DECISION), and the current delete is broken for path/domain cookies,
+    F12.
+  - `OpsService.Cancel` with `context.Background()`: `Router.Cancel` goes straight to
+    `Host.CancelOp`, which bounds the adapter call with `disconnectTimeout` (Part 5 F1 holds).
+  - Plan §9 #11 dropped: `op_log` is capped at `hardCapRows` by `OpsRepo.Prune`, so an
+    unbounded `limit` reads at most that many rows.
+  - Plan §9 #7 dropped under the trust model: `Import`/`Export` paths come from the first-party
+    renderer; `Export` resolves symlinks, mirrors the target mode and writes atomically
+    (`writeFileAtomically`); `Import` only parses. Same for `DataGripService.Scan`/`Import`.
+  - Secret reveal (`VariablesService.Reveal`/`RevealHistory`, `ConnectionsService.Reveal`) goes
+    through `localauth.Gated` in the callee. HTTP/gRPC secret masking covers every copyable hop
+    (`maskSecrets`, `maskSendErrTimeline`, `maskGrpcError`, `maskGrpcResult`); streamed gRPC
+    message bodies stay unmasked (documented open item, P108 F16).
+  - `appcore.Deps` copy order and post-detach emits: checked in block 5 with `main.go`.
