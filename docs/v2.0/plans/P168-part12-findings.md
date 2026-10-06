@@ -262,3 +262,49 @@ Block 4 otherwise clean:
   out-of-range `$date` goes raw per Part 11's `ejson.ts`.
 - Explain parsers and `SI/queryplan` agree on all 15 fixture pairs (`go test ./internal/queryplan`
   green, `explain-plan.spec.ts` parity block green).
+
+### Block 5: documents and key-value
+
+**F14. Editing a truncated document is allowed; a hand-closed buffer replaces the whole document
+with its first 64 KiB.** Medium. Verified (scratch probe: `toShellText` on a body cut mid-string
+returns the cut text unchanged) plus code-read.
+`SF/views/documents/DocumentView.vue:128-143` (`editGate` checks caps, read-only, projection; never
+`isTruncated`), `:585-591` (`startEdit` seeds `toShellText(body)` from the page's truncated body),
+`:1086-1094` (Edit button), `SF/views/documents/menu.ts:133-139` (menu Edit uses the same gate),
+`SF/views/documents/mutations.ts:16-24` (whole-document `$document` replace).
+- Scenario: a 90 KB document arrives truncated at 64 KiB (`isTruncated`, the row shows its
+  truncated badge). Edit opens the cut text. Save as is fails to parse (safe), but a user who
+  closes the dangling string and braces to make it save sends a valid literal: `replaceOne` drops
+  every field past the cut. The plan names this as a must-refuse.
+- Fix: make the gate per row: `editGateFor(row)` returns `{ editable: false, label: 'Document
+  truncated at 64 KB — not editable' }` when `documentRow(tab.id, row)?.isTruncated`, before the
+  projection check; use it for the row button and pass it to `rowMenu`. `startEdit` re-checks.
+
+**F15. The open editor stays on a row index after the page changes under it.** Low. Code-read.
+`SF/views/documents/DocumentView.vue:343-355,585-609` (`editingRow`/`editingId` are reset only by
+cancel and a successful save; nothing watches the page).
+- Scenario: user edits row 3, then deletes row 1 from its menu (immediate mutation, reload) or pages
+  forward. Row 3 now holds a different document; the "editing" badge and the editor with document
+  A's buffer render under document B's header. Save writes A (by `editingId`), but the screen says
+  B. After paging, Save from page 2 still overwrites A.
+- Fix: watch page identity (`() => (void pageVersion.n, getPage(props.tab.id))`); on change,
+  re-resolve `editingRow` by `editingId` on the new page (scan the loaded ids) and cancel the edit
+  when it is gone. Same treatment for `rt.selectedRow` is already done by the store.
+
+**F16. `RowActionButton` puts two tab stops on every row action.** Low. Code-read.
+`SF/views/documents/RowActionButton.vue:17-21` (`<span tabindex="0">` wrapping an enabled `Button`).
+- Scenario: keyboard user tabs through the document list: each Edit/Delete takes two stops, the first
+  (the span) does nothing on Enter/Space and announces no role. Four dead stops per row.
+- Fix: put `tabindex="0"` on the span only while the button is disabled (the case that needs a live
+  ancestor for the tooltip), e.g. a `disabled` prop that drives both `:tabindex="disabled ? 0 :
+  undefined"` and the `Button`'s `disabled`.
+
+Block 5 otherwise clean:
+- F4 double check (plan §1): every documents path that changes rows on screen goes through
+  `setPage` (load, reload after mutation, projection, filter, sort, page size) and gets a new frozen
+  page; `onSet` resets the row parse cache. A `drop` on tab close runs one empty scan before the
+  toolbar unmounts and `clearSearchState` runs: harmless.
+- `fieldNamesOnPage` memo per frozen page, expansion state (absent = expanded), projection close
+  decision, sort text round trip, new-document buffer, delete confirm: correct.
+- `KeyValueView.vue` is a thin shell; host key `tab.id` matches `KeyValuePane`'s contract.
+- `SD/queries.ts` (zod schemas) matches its importers; no defect.
