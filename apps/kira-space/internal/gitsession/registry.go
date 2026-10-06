@@ -209,17 +209,13 @@ func (reg *Registry) release(repoID string) {
 		lingerFor = defaultLingerFor
 	}
 	sl.lingerTimer = time.AfterFunc(lingerFor, func() { reg.expire(repoID) })
-	entry := sl.entry
+	// Detached under reg.mu (a re-acquirer then builds a fresh session); closed after unlock
+	// because Close can block on an in-flight cat-file request and must not stall other repos.
+	sess := sl.entry.detachCatFile()
 	reg.mu.Unlock()
-
-	// F13 (P108 Part 16 review): closeCatFile can block waiting for any in-flight cat-file
-	// request to finish (e.g. a slow lazy-object fetch in a partial clone) — called here, after
-	// reg.mu is released, so every OTHER repo's Acquire/release/IsOpen/ReconcileAutoFetch (all of
-	// which take this same registry-wide lock) never waits behind it. closeCatFile is idempotent
-	// and guarded by its own entry-local catfileMu, independent of reg.mu, so releasing the
-	// registry lock first is safe regardless of what a concurrent expire/teardown does with the
-	// same entry in the meantime.
-	entry.closeCatFile()
+	if sess != nil {
+		sess.Close()
+	}
 }
 
 // expire tears an entry down once its linger window has elapsed — re-checking refs == 0 under the

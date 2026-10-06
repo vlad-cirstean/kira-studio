@@ -524,7 +524,10 @@ func (e *RepoEntry) eagerResolveClosedBranches() {
 	if _, armed := e.gh.breakerStatus(); armed {
 		return
 	}
-	ctx := context.Background()
+	ctx := e.life
+	if ctx.Err() != nil {
+		return
+	}
 	if _, ok := e.githubRepo(ctx); !ok {
 		return
 	}
@@ -537,6 +540,9 @@ func (e *RepoEntry) eagerResolveClosedBranches() {
 		branches = branches[:maxEagerPurgeBranches]
 	}
 	for _, branch := range branches {
+		if ctx.Err() != nil {
+			return
+		}
 		e.ResolveBranchPr(ctx, branch)
 	}
 }

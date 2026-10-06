@@ -70,6 +70,8 @@ type RepoEntry struct {
 	// find, remove and close its own entry.
 	subs      map[subscriptionID]*subscriber
 	nextSubID subscriptionID
+	life      context.Context // cancelled first in teardown; bounds background passes
+	lifeStop  context.CancelFunc
 	tornDown  bool // set once, under mu, by teardown() (D4) — makes Subscribe/CatFile/teardown itself
 	// safe against a concurrent subscribe or a second teardown call (F2/F3), guarded by the SAME
 	// mu that already serialises subs.
@@ -176,7 +178,10 @@ func newRepoEntry(
 	review *gitreview.Store, ghClient *ghclient.Client, isOpen func(string) bool,
 	skipInitialAutoFetch bool, opLog *oplog.Log,
 ) *RepoEntry {
+	life, lifeStop := context.WithCancel(context.Background())
 	e := &RepoEntry{
+		life:            life,
+		lifeStop:        lifeStop,
 		Summary:         summary,
 		Repo:            repo,
 		watcher:         w,
@@ -399,16 +404,22 @@ func (e *RepoEntry) CatFile() *catfile.Session {
 	return e.catfile
 }
 
-// closeCatFile closes and forgets the memoised cat-file session, if one exists — called by
-// teardown, and by Registry.release at refcount zero (D13a): the pair is pure cost during the
-// linger window (two OS processes for a session nobody is using) and restarts lazily on the next
-// use, exactly as it already does on first use.
-func (e *RepoEntry) closeCatFile() {
+// detachCatFile forgets the memoised cat-file session and returns it for the caller to Close
+// outside any lock. Registry.release calls it under reg.mu so a re-acquirer always builds a fresh
+// session rather than receiving one about to be closed.
+func (e *RepoEntry) detachCatFile() *catfile.Session {
 	e.catfileMu.Lock()
 	defer e.catfileMu.Unlock()
-	if e.catfile != nil {
-		e.catfile.Close()
-		e.catfile = nil
+	s := e.catfile
+	e.catfile = nil
+	return s
+}
+
+// closeCatFile closes and forgets the memoised cat-file session, if one exists — called by
+// teardown. It restarts lazily on the next use.
+func (e *RepoEntry) closeCatFile() {
+	if s := e.detachCatFile(); s != nil {
+		s.Close()
 	}
 }
 
@@ -430,6 +441,7 @@ func (e *RepoEntry) teardown() {
 	// find a real, writable-looking map rather than panic; it is refused by the tornDown check
 	// above before it would ever write into it.
 	e.mu.Unlock()
+	e.lifeStop()
 
 	e.stopAutoFetch()
 	e.remoteOp.forceCancel()
