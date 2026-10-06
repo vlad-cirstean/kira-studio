@@ -226,6 +226,51 @@ Block 4 other checks, nothing filed:
   `PendingQueue` documented caller-locked. `windowsvc` validates `windowKey`; `mode` is normalised
   in `appstorage.WindowRepo.SetMode`.
 
+### Block 5: storage, paths, misc
+
+#### F11 (low, routed Part 12 F12): `adapterhost.Host.CancelOp` forgets a cancel that arrives before `RunOp` registers
+
+- `apps/kira-studio/internal/adapterhost/host.go:306-312` (`CancelOp`), `:195-208` (`RunOp`).
+  Part 5's file; Part 8 one-hop caller (`host.go` imports `internal/notify`); fixer edits it per
+  plan §7.
+- `CancelOp` returns `false, nil` for an id not in `h.running` and records nothing. The renderer
+  mints the op id and sends Run and Stop as separate bound calls on separate goroutines. A Stop
+  pressed right after Run can win the race to `h.mu`; the cancel is dropped and the statement
+  (possibly a write) runs to completion. Confirmed by reading: no other path remembers the id.
+- Fix: per routed note. `Host` keeps `cancelledEarly map[string]time.Time` under `h.mu`.
+  `CancelOp` on an unknown id records it (TTL a few seconds; prune expired entries on insert; cap
+  the map, e.g. 1024 entries, dropping the oldest, so a misbehaving renderer cannot grow it).
+  `RunOp` checks and deletes the id under `h.mu` before registering; a match returns
+  `adapters.New(adapters.CodeCancelled, ...)` without running and without op:start/op:end (the
+  throttle-queue cancel path's precedent at `host.go:227-229`). Test: cancel-before-run returns
+  `E_CANCELLED` and never calls fn; an expired entry does not block a later run. Commit names
+  `P168 Part 8 (routed Part 12 F12)`. Checks: `go test -race ./apps/kira-studio/internal/
+  {adapterhost,bridge,ipcfixture}/...` (ipcfixture needs Docker; see coverage).
+
+Block 5 other checks, nothing filed:
+- Candidate 6 (WAL sidecar modes) dropped by probe (scratch `_test.go`, deleted): under umask 022,
+  first and second `sqlitex.Open` runs both leave `x.db`, `-wal`, `-shm` at 0600. The sidecars are
+  created on first write, after `Open`'s `Chmod`, and SQLite copies the main file's mode.
+- Candidate 5 (`EnsureLayoutAt` chmods an existing `KIRA_HOME` to 0700) not filed. Documented
+  intent ("tightening an existing loose directory too"); `KIRA_HOME`/`KIRA_SPACE_HOME` are
+  dev/test overrides; and that chmod is what keeps every file under the home private regardless
+  of where the override points.
+- `66174c8` new code (`ReorderSortOrder`) holds: rejects an id outside the set or listed twice,
+  appends unlisted rows in existing order, runs inside the caller's tx. Empty `ids` degenerates to
+  a reindex. Errors are plain (`E_INTERNAL` at the bridge); acceptable for a stale reorder.
+- `ee9a71e` new code (`ipcerr.NotFound`) has a real caller (`SI/bridge/collections.go:71`).
+- `sqlitex.Migrate`: per-step tx, `SchemaTooNew` before any step. `BuildDSN` escaping (P108 Part 2
+  F9) holds. `pathsafe` dangling-symlink fix (P108 Part 2 F10) holds; `..` and absolute refused;
+  root resolved once. `logging`: 0600 daily files, writer under a mutex, `Sweep` prefix/suffix
+  bound. `appsettings`: `fontSize` unbounded on both sides (Go and `SD/settings.ts` `z.number()`),
+  consistent. `appstorage`: bounds and mode writes bounded, `ReplaceKeyed` one tx.
+- `metrics`: create-time guard on CPU deltas; `elapsed <= 0`/`logicalCPUs <= 0` return 0;
+  `Ticker.Stop` without `Start` would block on `done`, but both apps call `Start` right after
+  construction (latent only). darwin cgo probes read, not runnable here.
+- `layeringtest` scans `<app>/internal/...` for a bridge import; repo-root `internal/` importing
+  an app's `internal/` is already impossible under Go's internal rule. `testx` cleans its temp
+  root after `m.Run` (a panic inside `m.Run` exits the binary anyway).
+
 ## Coverage
 
 - Block 1 (listeners and RPC): done. Read in full: `localsock/localsock.go`, `agenthooks/{agenthooks,
@@ -242,3 +287,10 @@ Block 4 other checks, nothing filed:
   wails,security,link,debounce,dialogs,accel,menu}.go`, `appevent/{coalescer,appevent}.go`,
   `notify/{notify,ordered}.go`, `windowsvc/windowsvc.go`. Skimmed: `shell/{menutemplate,deps,wake}.go`
   (types and one-line event hooks). Both `main.go` wiring read at the Attach/teardown sites.
+- Block 5 (storage, paths, misc): done. Read in full: `sqlitex/{sqlitex,reindex,query,load}.go`,
+  `kirapaths/{paths,prod_default}.go`, `appsettings/{repo,appsettings}.go`, `appstorage/{window,tabs,
+  leaves}.go`, `pathsafe`, `logging/{log,sweep}.go`, `metrics/{sampler,ticker,probe_darwin,
+  processlist_darwin}.go`, `jsonx`, `kiratime`, `ipcerr/errors.go`, `testx/{testx,apphome}.go`,
+  `layeringtest`. Skimmed: `kirapaths/{env,prod}.go`, `appstorage/appstorage.go`,
+  `metrics/{responsible_*,processlist_other,probe_other}.go` (build-tag stubs). Routed
+  `SI/adapterhost/host.go` read (`RunOp`, `CancelOp`).
