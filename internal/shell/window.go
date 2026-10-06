@@ -228,3 +228,28 @@ func cascadeRect(from application.Rect, work *application.Rect) *WindowBounds {
 	}
 	return &WindowBounds{X: float64(x), Y: float64(y), Width: float64(from.Width), Height: float64(from.Height)}
 }
+
+// onAnyScreen reports whether b overlaps at least one work area.
+func onAnyScreen(b application.Rect, work []application.Rect) bool {
+	for _, w := range work {
+		if b.X < w.X+w.Width && b.X+b.Width > w.X && b.Y < w.Y+w.Height && b.Y+b.Height > w.Y {
+			return true
+		}
+	}
+	return false
+}
+
+// EnsureOnScreen moves a window restored with stored bounds to the primary work-area origin when
+// those bounds overlap no current screen (an external display unplugged since the last run).
+func EnsureOnScreen(win *application.WebviewWindow, app *application.App) {
+	screens := app.Screen.GetAll()
+	work := make([]application.Rect, 0, len(screens))
+	for _, sc := range screens {
+		work = append(work, sc.WorkArea)
+	}
+	primary := app.Screen.GetPrimary()
+	if len(work) == 0 || primary == nil || onAnyScreen(win.Bounds(), work) {
+		return
+	}
+	win.SetPosition(primary.WorkArea.X, primary.WorkArea.Y)
+}

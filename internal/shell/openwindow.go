@@ -74,6 +74,12 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 	}
 	win := d.App.Window.NewWithOptions(Options(Harden(), rec, primaryWorkArea, d.Cfg))
 	detach := Attach(win, d.WindowDeps, rec.Key)
+	if rec.Bounds != nil {
+		// Screens are only known once the run loop starts; startup windows open before app.Run.
+		win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+			EnsureOnScreen(win, d.App)
+		})
+	}
 	ephemeral := d.Ephemeral != nil && d.Ephemeral(rec.Key)
 	if ephemeral {
 		d.Windows.AddEphemeral(rec.Key, win, detach)
