@@ -27,13 +27,13 @@ func ParseCherry(stdout []byte) (plus, minus int) {
 // ThreeDotDiffArgs is the PR-shaped diff `diff <base>...<tip>` (merge base to tip), the input a
 // squash-merge comparison patch-ids.
 func ThreeDotDiffArgs(base, tip string) []string {
-	return []string{"diff", "--no-ext-diff", "--no-textconv", base + "..." + tip}
+	return []string{"diff", "--no-color", "--no-ext-diff", "--no-textconv", base + "..." + tip}
 }
 
 // LogPatchArgs is `log --no-merges -p -n <n> <ref>`, the input `patch-id` reads one patch per commit
 // from.
 func LogPatchArgs(ref string, n int) []string {
-	return []string{"log", "--no-merges", "-p", "--no-ext-diff", "--no-textconv", "-n", strconv.Itoa(n), ref}
+	return []string{"log", "--no-merges", "-p", "--no-color", "--no-ext-diff", "--no-textconv", "-n", strconv.Itoa(n), ref}
 }
 
 // PatchIDArgs is `patch-id --stable`: stable ids do not change with file order in the patch.

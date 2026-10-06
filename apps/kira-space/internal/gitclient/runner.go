@@ -117,6 +117,8 @@ const stderrTruncationMarker = "\n…[stderr truncated]"
 //     safe on every platform this app runs on.
 //   - color.ui=false — a user's color.ui=always must not inject ANSI escapes into output this
 //     app parses.
+//   - color.diff=false — color.diff outranks color.ui, so a user's color.diff=always would colour
+//     patch output and make `patch-id` see no patch.
 //   - log.showSignature=false — nor log.showSignature=true inject PGP blocks into `git log`'s
 //     record framing.
 //   - i18n.logOutputEncoding=UTF-8 — commit text arrives in a known encoding, not the repo's own
@@ -133,6 +135,7 @@ var configOverrides = []string{
 	"-c", "core.quotepath=false",
 	"-c", "core.precomposeunicode=true", // G27 D3
 	"-c", "color.ui=false",
+	"-c", "color.diff=false",
 	"-c", "log.showSignature=false",
 	"-c", "i18n.logOutputEncoding=UTF-8",
 	"-c", "diff.suppressBlankEmpty=false",
