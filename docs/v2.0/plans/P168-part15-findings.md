@@ -12,6 +12,7 @@ no Part 15 file changed). Worktree `p168-stream-b`.
 ## Block status
 
 - Block 1 `gitprepare`: done.
+- Block 2 `gitops`: done.
 
 ## Findings
 
@@ -90,6 +91,44 @@ comes from user-entered app settings and workflows, not repo files, so no trust-
 
 Fix: rewrite the doc to list every caller and which guard each has.
 
+### F5 (medium) `BranchCreateArgs` with `track`: always a usage error, and a dash value deletes branches
+
+`apps/kira-space/internal/gitops/branch.go:10-16`; caller `gitsession/ops.go:425-441`.
+
+`git branch` has no `-t <upstream>`: `-t`/`--track` is a flag (optionally `=direct|inherit`). The
+argv `branch <name> <start> -t <track>` makes `<track>` a third positional. Probed on git 2.43:
+- `git branch nb main -t origin/main`: exit 129, usage text. So `branchCreate` with
+  `checkout: false` and any `track` never creates the branch.
+- `git branch keep1 keep2 -t -D`: exit 0, "Deleted branch keep1", "Deleted branch keep2".
+  `op.Track` is never passed through `validOpArg` (`ops.go:428-433` checks `name`/`startPoint`
+  only) and `gitrpc` has no `Track` check. An `op.run` request
+  `{kind:"branchCreate", name:"main", startPoint:"release", checkout:false, track:"-D"}` from any
+  paired client force-deletes two branches, bypassing `branchDelete`'s preflight and undo.
+The in-app `BranchDialog.vue:56` always sends `track: undefined`, so the bug is latent for the
+built-in UI but live on the wire contract (`git-ipc/src/contract.ts:923`).
+
+Fix: build `branchCreate` without `-t`, then append `BranchSetUpstreamArgs(name, track)` (the
+`checkout: true` arm already does this, `ops.go:438-441`); run `validOpArg("track", …)` on a
+non-nil `Track`. Drop the `track` parameter from `BranchCreateArgs`.
+`needs-other-part-file: apps/kira-space/internal/gitsession/ops.go (Part 16)`.
+
+### F6 (low) `ClassifyOpError` still matches user paths listed in git's own error text
+
+`apps/kira-space/internal/gitops/errors.go:59-170` (rule table), `173-184`.
+
+F4 anchored only the conflict markers. Rows ahead of `DirtyWorktree`/`UntrackedWouldBeOverwritten`
+still run `strings.Contains` over the whole stderr, which for those two errors lists every
+affected path, one per tab-indented line (probed: `error: Your local changes to the following
+files would be overwritten by checkout:\n\t<path>`). A dirty path containing `already exists`,
+`repository not found`, `connection refused`, `fetch first`, `is not fully merged`,
+`conflicts in index` or `hook declined` (paths may contain spaces) is classified as that earlier
+kind. Example: dirty `docs/errors/already exists.md`, then switch: `AlreadyExists` instead of
+`DirtyWorktree`, so the UI offers the wrong remedy and the auto-stash offer for a dirty switch is
+not shown.
+
+Fix: drop lines that start with `\t` (git's path-list indent) before running the substring rows,
+or match each row on lines starting with `error:`/`fatal:`/`!`/`hint:` only.
+
 ## §9 candidate outcomes
 
 - 9 (tick after flush): reported F1 (mechanism differs: the late tick wins the last batch, so
@@ -99,6 +138,19 @@ Fix: rewrite the doc to list every caller and which guard each has.
   `runs.go:494` to `adeagent`, which only falls back to `os.Environ()` on nil). Nil-env part
   dropped. Scrub gaps reported F3.
 - 11 (doc stale): reported F4.
+- 12 (dash-leading remote or stack-config values): remote names are rejected at `gitrpc`
+  (`gitrpc/remote.go:73,99` `validRefArg`) for push/fetch/pushPreflight; autofetch takes remotes
+  from `git remote` output (local config only, already code execution for whoever can write it).
+  `RebaseOntoArgs` parent/branch are branch names; base is checked in block 3. Lead dropped for
+  these; a different unguarded builder parameter (`Track`) is reported as F5.
+- 13 (`git am` as rebase): `ClassifyInProgress` (`gitpreflight/operation.go:132-145`) maps
+  `rebase-apply/applying` to rebase with every `Can*` false. `prepareSequencerVerb`
+  (`gitsession/ops.go:965-984`) ignores the `Can*` flags and would still run `rebase --continue`
+  for a client that skips the UI gate, but probed git 2.43 refuses all three verbs on an `am`
+  session ("It looks like 'git am' is in progress. Cannot rebase.", exit 128, state untouched).
+  No harm. Dropped.
+- 14 (stash `-m` newline): probed, git collapses the newline into a space in the reflog
+  (`stash list` shows `On main: line1 line2 x`). Parsing unaffected. Dropped.
 
 ## Coverage
 
@@ -112,3 +164,19 @@ transcript (F7 holds), `cmd.Start` failure path, CSI/OSC stripping incl. untermi
 and BEL/ST, invalid UTF-8, ticket ordering of write/tick/flush (aside from F1). `fish`/`nu`
 accept `-l -c`; NUL in script fails `Start` with an error (surfaced). A panicking `onBatch` would
 strand later tickets, but no production `onBatch` can panic (emit/append only); not reported.
+
+### Block 2 `gitops`
+
+Reviewed: all 16 files. Callers: `gitsession/ops.go` (`opTable`, `prepareSequencerVerb`,
+`runWriteArgvList`, `validOpArg`, `prepareBranchCreate`, `prepareWorktreeRemove`,
+`captureStashDropUndo`), `remote.go` (`runFetch`, `runPushFamily`, `RunRemote` protected gate),
+`stack.go:813-860`, `gitrpc/remote.go` validation. Probes (git 2.43, isolated `HOME`): `am`
+session verbs, stash message newline, checkout path-list stderr, `branch -t`. Checked and clean:
+continue/abort/skip table per kind (bisect reset only, unmergedOnly refused), sequencer todo
+verbs (git writes full `pick`/`revert` for cherry-pick/revert sequences; CRLF trimmed),
+`gitDir` per-worktree reads, `ParsePushPorcelain` flags incl. delete (`:dst`) and tab-free refs,
+`ExtractRemoteMessage`, `ProgressParser` CR/LF split and 64 KiB cap, `Throttle`, every
+`validOpArg`-guarded builder parameter, `worktree remove` path (resolved against `worktree list`),
+`-m` values (option arguments, never options), `PullConfigArgs`/`BranchConfigRegexpArgs`
+`QuoteMeta` (F5 of P108 holds), auto-stash partial failure (`ops.go:1207`). No parser reads
+coloured output (§7 colour item holds).
