@@ -13,6 +13,7 @@ no Part 14 code change between them).
 
 - Block 1 (spawn seam and gate): done.
 - Block 2 (askpass): done.
+- Block 3 (catfile, logsession): done.
 
 ## Findings
 
@@ -79,6 +80,65 @@ Fix: track the in-flight count under a mutex with a `closed` flag checked before
 Accept error).
 `needs-stream-A-file: internal/localsock/localsock.go`
 
+### F5 (high) A ctx cancel mid-read counts toward catfile's circuit breaker and kills the Session for good
+
+`apps/kira-space/internal/gitclient/catfile/session.go:146-155` (`request`), `194-211`
+(`requestPipelined`). When the request's ctx fires, `watchCtx` closes the process, the blocked
+`readResp` (or write) returns an I/O error, and the error branch calls `stop()` then `p.fail()`
+without checking whether `stop()` reported fired. `fail()` increments `failures`. `drop()` (the
+no-count path, whose doc says "a ctx cancel is not a process fault and must not trip the circuit
+breaker") is reached only when the reply was already fully read. After 3 such cancels in a row,
+`ensureStarted` returns `errCircuitOpen` forever: `failures` resets only on a success, and no
+success can happen. The caller also gets `read |0: file already closed` instead of `ctx.Err()`, so
+`gitclient.Classify`-style cancel handling upstream sees a generic error.
+
+Reproduced (throwaway test, deleted): `GitPath` = a script that sleeps, `Check` with a 50 ms
+timeout, four times:
+`call 0..2: err=read |0: file already closed failures=1..3`,
+`call 3: err=catfile: process failed 3 consecutive times, refusing to restart`.
+
+Real scenario: blobless partial clone (`--filter=blob:none`). Each `Read` of a not-yet-fetched
+blob triggers a promisor fetch lasting seconds. The user clicks through three files in the commit
+detail pane; rpcstream cancels each superseded request mid-read. Every later blob read, file diff,
+size lookup (`blobSizeOrNil`), ghsync head check and undo check on that repo fails with
+`errCircuitOpen` until the `RepoEntry` is evicted. Same with a slow disk on a cold cache.
+
+Fix: in every error branch, `if stop() { p.drop(); return ctx.Err() }` before `p.fail()`. A fired
+watcher means the process was killed by us, not that it misbehaved.
+
+### F6 (low) `ReadOneShot` size gate and read resolve the rev in two separate spawns
+
+`apps/kira-space/internal/gitclient/catfile/session.go:403-431`. `cat-file -s <rev>` checks the
+size, then `cat-file blob <rev>` reads it through buffered `Run` with uncapped stdout. For a mutable
+rev (`HEAD:<path>`, the shape `codeworkspace/diff.go:75` and `gitsession/queries.go:451` pass) the
+object can change between the two spawns. `Read` re-checks the second process's own header size
+(F9); `ReadOneShot` has no second check.
+
+Scenario: a path containing a newline at `HEAD:<path>` is 1 KiB when `-s` runs; a checkout (in
+app or external) moves HEAD to a commit where that path is a 3 GiB blob before the `blob` spawn.
+The whole 3 GiB lands in a `bytes.Buffer`. Narrow (newline paths only, local actor), hence low.
+
+Fix: resolve once with `rev-parse --verify <rev>` (already `CheckOneShot`), then run `-s` and
+`blob` against the returned OID; or check `len(res.Stdout)` against the gate is too late, so pin
+the OID.
+
+### F7 (low) `logsession.finishEOFLocked` protocol-error path leaves the child unreaped and masks git's error
+
+`apps/kira-space/internal/gitclient/logsession/session.go:262-267`. On an unterminated trailing
+field or partial record at EOF it returns before `s.proc.Wait()`, leaves `s.proc` set, and does
+not mark `failed`. `Flush` cleared both buffers. The next `ReadPage` reads EOF again, flushes
+nothing, waits and classifies. 
+
+Scenario: `git log` dies mid-walk on a missing object in a shallow or partial clone (`fatal: bad
+object`); stdio flush at `exit()` leaves half a record. The first `ReadPage` returns
+`unterminated trailing field at EOF` (stderr's real reason is lost, the child is a zombie until
+the next call or `Close`), and `gitsession/walk.go` treats it as a resumable error because
+`Failed()` is false. Only the retry surfaces `fatal: bad object`. If git ever exited 0 with a
+trailing partial, the retry would report `Exhausted` and silently drop the record.
+
+Fix: on either Flush violation, `Wait` the child first; if its exit is non-zero return the
+classified git error, else `failLocked` the protocol error.
+
 ## Coverage
 
 ### Block 1: spawn seam and gate
@@ -132,3 +192,33 @@ Verified, no finding:
 - `ShouldInterpose`: inherited `SSH_ASKPASS` without `GIT_ASKPASS` is overridden (upstream D10
   rule, by design). Staleness after a user edits `core.askPass` is the documented per-entry cache;
   F3 covers the failure-caching defect only.
+
+### Block 3: persistent and streaming processes
+
+Reviewed in full: `GC/catfile/{batch,session}.go`, `GC/logsession/session.go`; caller guards in
+`codeworkspace/diff.go`, `gitsession/{incremental,queries,stack,ghsync,ops}.go` for newline revs.
+
+Verified, no finding:
+- `watchCtx` (`context.AfterFunc`, synchronous stop): a fired watcher's `Close` runs
+  `killAndWait`, which reaps through `Wait`, so the `drop()` path leaves no zombie.
+  `requestPipelined` drains `writeErrCh` on every path; F8 ordering holds.
+- `Session.Close` cancels `spawnCtx` first, so an in-flight read gets EOF and `close()` acquires
+  `mu`. A request after `Close` fails to spawn (cancelled ctx) and trips the breaker, which is
+  fine for a closed session.
+- `readHeader`: `missing`/`ambiguous` suffix rule holds for inputs with spaces; other non-found
+  replies (`excluded`, `dangling`, `loop`, `notdir`) need `--filter`/`--follow-symlinks`, which
+  are never passed. `Read` re-checks the `--batch` header size (F9 holds) and consumes oversized
+  content to keep framing.
+- Newline revs: every `Check`/`Read`/`CheckMany` caller that builds `<rev>:<path>` routes a newline
+  to the one-shot path. `ghsync.go:129` passes `files.HeadSha` from GitHub JSON unguarded; judged
+  in block 5 (`ghclient` validation).
+- One-shot argv without `--`: reached only for newline revs; a dash-leading value with a newline
+  cannot equal a `cat-file`/`rev-parse` option name, and `--opt=value` forms either error or are
+  harmless (`--path=`), so no injection.
+- `logsession`: ctx cancel kills the child and keeps `readCount` exact (splitter and grouper reset
+  on resume); bytes discarded by a lost select race are re-read via `--skip`. A reclaim timer
+  that fired while `ReadPage` held `mu` can kill the next, non-idle process once; the resume path
+  handles it (snapshot check, `--skip`), so only a wasted respawn. `Remaining` holds `mu` across
+  `rev-list --count`, serialising it with `ReadPage`: a latency cost, not a defect.
+- `RecordSplitter`/`FieldGrouper` (`records.go`, read here for logsession): copies records, caps
+  remainder at 64 MiB, `Flush` clears.
