@@ -55,6 +55,10 @@ export function parseExplainPages(
     throw new Error('EXPLAIN did not return a tabular result');
   }
 
+  // A page the console cap stopped is an incomplete plan.
+  if (pages.some((p) => p.kind === 'tabular' && p.position.truncated))
+    throw new ExplainTruncatedError();
+
   switch (kind) {
     case 'postgres':
       if (firstCellTruncated(first)) throw new ExplainTruncatedError();

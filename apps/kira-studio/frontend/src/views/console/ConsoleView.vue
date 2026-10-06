@@ -572,6 +572,10 @@ const resultGridRef = ref<{
 const activeResultIsDocument = computed(
   () => getPage(rt.value?.activeKey ?? '')?.kind === 'document',
 );
+const activeResultTruncated = computed(() => {
+  const page = getPage(rt.value?.activeKey ?? '');
+  return page ? { rows: page.rowCount, truncated: page.position.truncated === true } : null;
+});
 // P18 D17: the find toolbar resolves a Page (search.ts's activePage) and a plan result set is not
 // one — gated off here the same way the expand/collapse-all pair above is gated on document-ness,
 // rather than left to just silently find nothing.
@@ -989,6 +993,11 @@ const statusLine = computed(() => {
           @go-to-match="onGoToMatch"
           @close="onCloseSearch"
         />
+        <Alert v-if="activeResultTruncated?.truncated" variant="warn" data-testid="console-result-truncated">
+          <AlertDescription>
+            Result stopped at {{ activeResultTruncated.rows.toLocaleString() }} rows (console limit). Narrow the query to see the rest.
+          </AlertDescription>
+        </Alert>
         <div class="flex-1 min-h-0">
           <!-- D17: a plan result set renders through its own view — reusing the strip/close/
                eviction machinery above, but never ConsoleResultGrid, which resolves a Page that a
