@@ -21,6 +21,7 @@ import type { DetailActions } from '../state/detailActions.ts';
 import type { StashState } from '../state/stash.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import FileTree from './FileTree.vue';
+import { openFileAnnounced } from './openFileAnnounced.ts';
 
 const props = defineProps<{
   stash: StashState;
@@ -42,14 +43,16 @@ function onOpenFile(index: number, pinned: boolean): void {
   const file = files.value[index];
   const current = entry.value;
   if (!file || !current) return;
-  void props.actions.openInEditor({
-    sha: current.sha,
-    path: file.path,
-    originalPath: file.originalPath,
-    parentIndex: 0,
-    pinned,
-    ...(current.untrackedSha !== undefined ? { fallbackSha: current.untrackedSha } : {}),
-  });
+  openFileAnnounced(props.actions, file.path, () =>
+    props.actions.openInEditor({
+      sha: current.sha,
+      path: file.path,
+      originalPath: file.originalPath,
+      parentIndex: 0,
+      pinned,
+      ...(current.untrackedSha !== undefined ? { fallbackSha: current.untrackedSha } : {}),
+    }),
+  );
 }
 </script>
 

@@ -31,6 +31,7 @@ import CommitMeta from './CommitMeta.vue';
 // type` erases it, and Vue then renders <FileTree> as an unknown element with nothing inside it
 // (G14 F1/F3).
 import FileTree from './FileTree.vue';
+import { openFileAnnounced } from './openFileAnnounced.ts';
 
 const props = defineProps<{
   detailState: DetailState;
@@ -51,13 +52,15 @@ const detail = computed(() => props.detailState.detail.value);
 function onOpenFile(index: number, pinned: boolean): void {
   const file = detail.value?.files[index];
   if (!file) return;
-  void props.actions.openInEditor({
-    sha: props.detailState.sha.value ?? '',
-    path: file.path,
-    originalPath: file.originalPath,
-    parentIndex: props.detailState.parentIndex.value,
-    pinned,
-  });
+  openFileAnnounced(props.actions, file.path, () =>
+    props.actions.openInEditor({
+      sha: props.detailState.sha.value ?? '',
+      path: file.path,
+      originalPath: file.originalPath,
+      parentIndex: props.detailState.parentIndex.value,
+      pinned,
+    }),
+  );
 }
 </script>
 

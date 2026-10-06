@@ -16,6 +16,7 @@ import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { WorkingDetailState } from '../state/working.ts';
 import FileTree from './FileTree.vue';
+import { openFileAnnounced } from './openFileAnnounced.ts';
 
 const props = defineProps<{
   workingState: WorkingDetailState;
@@ -37,12 +38,14 @@ const files = computed(() => props.workingState.files.value);
 function onOpenFile(index: number, pinned: boolean): void {
   const file = files.value[index];
   if (!file) return;
-  void props.openFile({
-    path: file.path,
-    originalPath: file.originalPath,
-    status: file.kind,
-    pinned,
-  });
+  openFileAnnounced(props.actions, file.path, () =>
+    props.openFile({
+      path: file.path,
+      originalPath: file.originalPath,
+      status: file.kind,
+      pinned,
+    }),
+  );
 }
 </script>
 
