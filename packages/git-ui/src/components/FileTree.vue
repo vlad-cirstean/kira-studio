@@ -209,12 +209,13 @@ watch(
  *  container — the same real-DOM-focus roving pattern `CommitGrid.vue`'s own rows use, not
  *  `aria-activedescendant` (a screen reader tracks whichever DOM node actually has focus, and this
  *  keeps every row a genuinely reachable `Tab` stop). */
+const rowIdPrefix = useId();
 function rowId(index: number): string {
-  return `kv-file-tree-row-${index}`;
+  return `${rowIdPrefix}-row-${index}`;
 }
 function focusRowEl(index: number): void {
   void nextTick(() => {
-    treeEl.value?.querySelector<HTMLElement>(`#${rowId(index)}`)?.focus({ preventScroll: true });
+    treeEl.value?.querySelector<HTMLElement>(`[id="${rowId(index)}"]`)?.focus({ preventScroll: true });
   });
 }
 watch(focusedRow, (index) => {
@@ -349,6 +350,18 @@ function onKeydown(event: KeyboardEvent): void {
         event.preventDefault();
         collapseDir(row.node.path);
       }
+      break;
+    }
+    case 'ContextMenu':
+    case 'F10': {
+      if (event.key === 'F10' && !event.shiftKey) break;
+      const row = visible[focusedRow.value];
+      if (row?.kind !== 'file') break;
+      const rowEl = treeEl.value?.querySelector<HTMLElement>(`[id="${rowId(focusedRow.value)}"]`);
+      if (!rowEl) break;
+      event.preventDefault();
+      const rect = rowEl.getBoundingClientRect();
+      fileMenuState.value = { x: rect.left, y: rect.bottom, path: row.node.change.path };
       break;
     }
     case 'Enter': {
@@ -678,26 +691,6 @@ const parentSelectId = useId();
           ></span>
         </template>
       </div>
-
-      <Button
-        v-if="capped.hiddenCount > 0"
-        variant="link"
-        size="kira"
-        class="text-focus w-full border-t border-border p-1 h-auto justify-start"
-        @click="capLifted = true"
-      >
-        Show all {{ rows.length }} files
-      </Button>
-
-      <RowContextMenu
-        v-if="fileMenuState"
-        :sections="fileMenuSections"
-        :x="fileMenuState.x"
-        :y="fileMenuState.y"
-        label="File actions"
-        @select="onFileMenuSelect"
-        @close="fileMenuState = undefined"
-      />
     </div>
     <div
       v-else
@@ -809,27 +802,28 @@ const parentSelectId = useId();
           ></span>
         </template>
       </div>
-
-      <Button
-        v-if="capped.hiddenCount > 0"
-        variant="link"
-        size="kira"
-        class="text-focus w-full border-t border-border p-1 h-auto justify-start"
-        @click="capLifted = true"
-      >
-        Show all {{ rows.length }} files
-      </Button>
-
-      <RowContextMenu
-        v-if="fileMenuState"
-        :sections="fileMenuSections"
-        :x="fileMenuState.x"
-        :y="fileMenuState.y"
-        label="File actions"
-        @select="onFileMenuSelect"
-        @close="fileMenuState = undefined"
-      />
     </div>
+
+    <!-- Outside the tree/listbox: those roles may own only treeitems/options. -->
+    <Button
+      v-if="capped.hiddenCount > 0"
+      variant="link"
+      size="kira"
+      class="text-focus w-full border-t border-border p-1 h-auto justify-start"
+      @click="capLifted = true"
+    >
+      Show all {{ rows.length }} files
+    </Button>
+
+    <RowContextMenu
+      v-if="fileMenuState"
+      :sections="fileMenuSections"
+      :x="fileMenuState.x"
+      :y="fileMenuState.y"
+      label="File actions"
+      @select="onFileMenuSelect"
+      @close="fileMenuState = undefined"
+    />
   </div>
 </template>
 
