@@ -397,8 +397,9 @@ function snapshotsThunk(ctx: RowMenuContext): () => RowSnapshot[] {
 }
 
 function hasPendingChange(ctx: RowMenuContext): boolean {
-  const p = usePendingChangesStore().pendingFor(ctx.tabId);
-  if (!p) return false;
+  const store = usePendingChangesStore();
+  const p = store.pendingFor(ctx.tabId);
+  if (!p || store.isCommitting(ctx.tabId)) return false;
   return ctx.rows.some((row) => p.edits.has(row) || p.deletes.has(row));
 }
 

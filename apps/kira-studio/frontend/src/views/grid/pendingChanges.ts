@@ -121,7 +121,10 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // A plain <input> can't distinguish "clear to NULL" from "clear to empty string" — every inline
   // edit stages the typed text verbatim, `''` included. An explicit NULL affordance is not built
   // in this phase (P6+ nicety); a NULL value's own cell must be retyped, not blanked.
+  // Every stage/discard function below refuses while this tab's commit is in flight: a change
+  // staged against ops already on the wire would be dropped by the post-commit clearPending.
   function stageEdit(tabId: string, row: number, column: string, value: string): void {
+    if (committingState[tabId]) return;
     const p = ensure(tabId);
     if (p.deletes.has(row)) return; // a row marked for delete is not independently editable
     const existing = p.edits.get(row);
@@ -135,6 +138,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // (hasPending/the pending-count badge, and DataGrid's own yellow row highlight) after its only
   // edit is undone.
   function discardCellEdit(tabId: string, row: number, column: string): void {
+    if (committingState[tabId]) return;
     const p = pendingState[tabId];
     const existing = p?.edits.get(row);
     if (!existing || !(column in existing.changes)) return;
@@ -148,6 +152,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // was never staged is a silent no-op, so callers can run this over an arbitrary selection without
   // first checking which of those rows actually have something to revert.
   function discardRowChange(tabId: string, row: number): void {
+    if (committingState[tabId]) return;
     const p = pendingState[tabId];
     if (!p) return;
     p.edits.delete(row);
@@ -157,6 +162,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // D4: the cell menu's "Set NULL" — sibling to stageEdit, skipping the inline <input> (which can
   // only ever produce a string) to stage an actual SQL NULL directly.
   function stageNull(tabId: string, row: number, column: string): void {
+    if (committingState[tabId]) return;
     const p = ensure(tabId);
     if (p.deletes.has(row)) return;
     const existing = p.edits.get(row);
@@ -170,6 +176,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // P36 D28: a generated column is skipped the same way — the server computes it, so copying its
   // displayed value forward would only ever be rejected on commit (F18).
   function duplicateAsInsert(tabId: string, row: number): string | null {
+    if (committingState[tabId]) return null;
     const page = getPage(tabId);
     if (!page) return null;
     const columns = page.columns.filter((c) => !c.isPrimaryKey && !c.generated).map((c) => c.name);
@@ -205,6 +212,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // stageEdit/stageNull above never toggle either: "Revert row(s)" (discardRowChange) is the one and
   // only way to undo a pending delete, for every pending-change kind this module has.
   function stageDelete(tabId: string, rows: number[]): void {
+    if (committingState[tabId]) return;
     const p = ensure(tabId);
     for (const row of rows) {
       p.deletes.add(row);
@@ -213,6 +221,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   }
 
   function addInsertRow(tabId: string, columns: string[]): string {
+    if (committingState[tabId]) return '';
     const p = ensure(tabId);
     const id = crypto.randomUUID();
     const values: Record<string, string | null> = {};
@@ -222,11 +231,13 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   }
 
   function stageInsertValue(tabId: string, insertId: string, column: string, value: string): void {
+    if (committingState[tabId]) return;
     const insert = pendingState[tabId]?.inserts.find((i) => i.id === insertId);
     if (insert) insert.values[column] = value;
   }
 
   function discardInsertRow(tabId: string, insertId: string): void {
+    if (committingState[tabId]) return;
     const p = pendingState[tabId];
     if (!p) return;
     p.inserts = p.inserts.filter((i) => i.id !== insertId);

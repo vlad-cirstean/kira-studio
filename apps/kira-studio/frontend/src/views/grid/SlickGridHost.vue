@@ -76,6 +76,7 @@ import {
 } from './focusRequest';
 import { buildMaskTagCache, createMaskPreviewTransform } from './maskPreview';
 import { cellMenu, type FkNavContext, headerMenu, rowMenu } from './menu';
+import { registerOpenEditFlush, unregisterOpenEditFlush } from './openEdit';
 import { applyPastedCells, resolvePasteTarget } from './paste';
 import { usePendingChangesStore } from './pendingChanges';
 import { matchedRows, searchState } from './search';
@@ -206,6 +207,7 @@ function cellFormatter(
     input.className = 'cell-input';
     input.dataset.testid = 'grid-cell-insert-input';
     input.value = view.isNull ? '' : view.text;
+    if (pendingChangesStore.isCommitting(props.tabId)) input.readOnly = true;
     // The server computes generated columns; the insert paths already skip them (P36 D28).
     if (isGeneratedColumn(String(columnDef.field))) {
       input.readOnly = true;
@@ -2198,8 +2200,9 @@ onMounted(() => {
   // real backend slower than this mount), `applyCellFocusRequest` returns false and the request is
   // put right back pending — the `pageVersion` watch then has a real future bump to catch it on.
   registerGridHost(props.tabId, applyCellFocusRequest);
+  registerOpenEditFlush(props.tabId, () => grid?.getEditorLock().commitCurrentEdit());
   const pendingFocus = consumeCellFocus(props.tabId);
-  if (pendingFocus && !applyCellFocusRequest(pendingFocus)) {
+  if (pendingFocus && !applyCellFocusRequest(pendingFocus) && !getPage(props.tabId)) {
     requestCellFocus(props.tabId, pendingFocus);
   }
 
@@ -2218,6 +2221,7 @@ onUnmounted(() => {
   // P67 §4.3: an open preview popover has nothing left to anchor to once this host is gone.
   closeFkPreview();
   unregisterGridHost(props.tabId);
+  unregisterOpenEditFlush(props.tabId);
   resizeObserver?.disconnect();
   resizeObserver = null;
   persistScroll.cancel();
@@ -2285,7 +2289,9 @@ watch(
     // — the point a pending focus request (a host that wasn't registered yet, or one that was but
     // had no matching page at request time) can finally be satisfied.
     const pendingFocus = consumeCellFocus(props.tabId);
-    if (pendingFocus && !applyCellFocusRequest(pendingFocus)) {
+    // A page that landed without the referenced row (it was deleted) drops the request, so a later
+    // unrelated load cannot consume it.
+    if (pendingFocus && !applyCellFocusRequest(pendingFocus) && !getPage(props.tabId)) {
       requestCellFocus(props.tabId, pendingFocus);
     }
 
@@ -2380,6 +2386,18 @@ subscribeRowHeight(rowHeight, () => grid, rootRef);
 watch(canEditTableReactive, (editable) => {
   grid?.setOptions({ editable });
 });
+// Insert inputs are plain DOM the formatter built before the commit started.
+watch(
+  () => pendingChangesStore.isCommitting(props.tabId),
+  (committing) => {
+    for (const input of gridRootEl?.querySelectorAll<HTMLInputElement>(
+      'input[data-testid="grid-cell-insert-input"]',
+    ) ?? []) {
+      const column = input.closest<HTMLElement>('.slick-cell[data-column]')?.dataset.column ?? '';
+      input.readOnly = committing || isGeneratedColumn(column);
+    }
+  },
+);
 
 // M5 §6.2/§6.3: the mask preview toggle itself — `runtime` is a real `reactive()` map (D0's own
 // note on `canEditTableReactive`, above, restated: `rt()?.maskPreview` needs no `pageVersion.n`
@@ -2452,6 +2470,7 @@ watch(
       const t = selectionTarget();
       return t ? isDeleted(t.row) : false;
     },
+    () => pendingChangesStore.isCommitting(props.tabId),
   ],
   () => {
     const p = getPage(props.tabId);

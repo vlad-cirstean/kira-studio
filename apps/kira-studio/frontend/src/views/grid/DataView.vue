@@ -26,6 +26,7 @@ import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGa
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
 import { canGenerateDataFor } from './fakeData/generate';
+import { flushOpenEdit } from './openEdit';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { usePendingChangesStore } from './pendingChanges';
 import SlickGridHost from './SlickGridHost.vue';
@@ -117,6 +118,8 @@ const previewAnchorRef = ref<HTMLElement | null>(null);
 // missing was telling the user why.
 async function onCommit(): Promise<void> {
   if (!props.tab.connectionId) return;
+  // An open inline edit stages here, before the plan is built and the store starts refusing edits.
+  flushOpenEdit(props.tab.id);
   try {
     await pendingChangesStore.commitPending(
       props.tab.connectionId,

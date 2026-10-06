@@ -52,7 +52,12 @@ describe('commitPending in-flight guard', () => {
     expect(store.isCommitting(tabId)).toBe(true);
     expect(await store.commitPending('conn-1', 'db:x/table:t', tabId)).toBeNull();
     store.discardPending(tabId);
-    expect(store.hasPending(tabId)).toBe(true);
+    store.stageDelete(tabId, [5]);
+    store.stageEdit(tabId, 0, 'id', 'x');
+    store.discardRowChange(tabId, 0);
+    expect(store.pendingFor(tabId)?.deletes.has(0)).toBe(true);
+    expect(store.pendingFor(tabId)?.deletes.has(5)).toBe(false);
+    expect(store.pendingFor(tabId)?.edits.size).toBe(0);
     release();
     await first;
 
