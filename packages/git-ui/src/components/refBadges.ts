@@ -289,6 +289,8 @@ export function buildPrBadge(
   badge.className = `${REF_BADGE_CLASS} kv-badge-pr kv-badge-pr--${best.state}`;
   if (badge instanceof HTMLButtonElement) {
     badge.type = 'button';
+    // Not a Tab stop inside the roving-tabindex grid; Enter on it would toggle the detail pane.
+    badge.tabIndex = -1;
     badge.dataset.prNumber = String(best.number);
   }
   const extra = prs.length > 1 ? ` (+${prs.length - 1} more)` : '';
