@@ -372,4 +372,39 @@ diff is large; same prefix). Phase-end fixes: `fix:` commits per root cause.
 
 ## Result
 
-(Implementer fills: commits, Docker runs and their outcome, anything left open.)
+Steps 1-11 done, one commit each: `d21a03e`, `3183d1f`, `abacd4d`, `1f6314a`, `83c0023`, `efea829`,
+`37d97c5`, `5a1a9b2`, `61c4eb1`, `66b5fb6`, `5349ad1`. Step 12 (docs) is the last commit. Follow-up
+fixes: `30d2b3d` (test encoder wrote a null `Chunk.binary` offset under `forceDefaults`, broke
+every UI spec's grid load), `f26b7e3` (`interaction.spec.ts` asserted the old drop-on-reload rule).
+
+Checks run:
+
+- `bun run typecheck`, `bun run lint`, `go build ./...`, `go vet ./...`: pass.
+- `bun test apps/kira-studio/tests/unit`: 810 pass.
+- `go test` for `page`, `queryplan`, `dbmcp`, `adapterhost`, `adapters`, `adapters/redis`,
+  `adapters/sqs`, `adapters/kafka`: pass (no Docker). SQLite cap scenarios run in `adapters/sqlite`.
+- `bun run lint:dead`: only the 6 duplicate-export groups and 8 config hints already present on
+  the base; nothing from P174.
+- Playwright `ui` project, full run: 303 pass, 4 fail. Reruns alone: `slick-grid.spec.ts:544`,
+  `:1221` and `cell-editor.spec.ts:332` pass (timing under 100% workers; 332 takes 56 s of its 60 s
+  budget). `interaction.spec.ts:1100` failed on the old drop-on-reload rule; spec updated, passes.
+
+Deviations:
+
+- SQS read-only hide time is 1 second, not 0: the AWS SDK omits `VisibilityTimeout: 0` from the
+  request (indistinguishable from unset). Dedupe by `MessageId` covers a message re-received inside
+  one poll.
+- TS `PagePosition.truncated` is optional (decoded `|| undefined`) so existing fixtures stay valid.
+- PostgreSQL keeps raw rows, capped, before `bytea` normalisation instead of streaming into the
+  builder.
+- Redis also rewrites `ZREVRANGE`. New helper files `adapters/consolecap.go` and
+  `adapters/testsupport/consolecap.go`.
+- The pending-guard registry, stale-marker, `pageStale` field and `page-stale-strip` alert are
+  removed with the survival change; the Generate Data pending lockout is removed, mask-preview
+  lockout stays. Two pk-guard unit specs are folded into `grid-pending-by-primary-key.spec.ts`
+  (staging is refused without a full primary key, so the commit-time throw is gone).
+
+Not run, step 13 left open: Docker-backed adapter suites (postgres, mysqlfamily, clickhouse, mongo,
+redis, kafka, sqs/LocalStack), the cap scenarios on those engines, the SQS read-only second-poll
+check, `test:ipc:fe:studio`, and the manual 20,000-row Postgres console pass. No Docker in this
+session.
