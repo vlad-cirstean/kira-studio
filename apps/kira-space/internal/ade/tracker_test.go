@@ -505,3 +505,44 @@ func TestTracker_PrepareRequiresTask(t *testing.T) {
 		t.Fatalf("Prepare without a task: err = %v, want ErrInvalidInput", err)
 	}
 }
+
+func TestTracker_AbortDeletesFreshAndStopsResumed(t *testing.T) {
+	tr, _, live, clock := newTestTracker(t)
+	repo := t.TempDir()
+
+	fresh, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: repo})
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if _, _, err := tr.Compose(fresh.TerminalID, fresh.Command); err != nil {
+		t.Fatalf("Compose: %v", err)
+	}
+	tr.Abort(fresh.TerminalID)
+	if sessions, _ := listSessions(tr); len(sessions) != 0 {
+		t.Fatalf("sessions after aborting a fresh launch = %d, want 0", len(sessions))
+	}
+
+	first := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: repo})
+	sessions, _ := listSessions(tr)
+	recordID := sessions[0].ID
+	live.remove(first.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+
+	resumed, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: repo, Resume: recordID})
+	if err != nil {
+		t.Fatalf("Prepare resume: %v", err)
+	}
+	if _, _, err := tr.Compose(resumed.TerminalID, resumed.Command); err != nil {
+		t.Fatalf("Compose resume: %v", err)
+	}
+	tr.Abort(resumed.TerminalID)
+	sessions, _ = listSessions(tr)
+	if len(sessions) != 1 || sessions[0].State != model.AdeSessionStateStopped {
+		t.Fatalf("after aborting a resume: %+v, want one stopped row", sessions)
+	}
+	if _, _, err := tr.Compose("unknown", "claude"); err != nil {
+		t.Fatalf("Compose: %v", err)
+	}
+	tr.Abort("unknown")
+}

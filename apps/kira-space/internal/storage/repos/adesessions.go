@@ -158,6 +158,15 @@ func (r *AdeSessionsRepo) MarkStopped(id string, lastActiveAt int64) error {
 	return sqlitex.RequireOneRow(res, "ade session "+id)
 }
 
+// Delete removes a row — Tracker.Abort's own path for a fresh session whose terminal never opened.
+func (r *AdeSessionsRepo) Delete(id string) error {
+	res, err := r.DB.Exec(`DELETE FROM ade_sessions WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("repos: delete ade session %s: %w", id, err)
+	}
+	return sqlitex.RequireOneRow(res, "ade session "+id)
+}
+
 // SetClaudeSessionID updates the tracked Claude session id — a session's own id can change across
 // a /clear (a fresh SessionStart with a different session_id, same terminal_id); this keeps the
 // row pointed at whichever id `--resume` must pass next.

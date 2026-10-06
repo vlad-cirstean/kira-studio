@@ -98,16 +98,3 @@ Stream A did not edit those files.
 
 - Owner files: `apps/kira-studio/tests/ipc/kafka/kafka.frontend.spec.ts`, `kafka.fixture.ts`, `apps/kira-studio/internal/ipcfixture/kafka_test.go` (Part 5).
 - Not done in Part 8: the fixture needs a Docker recapture (`KIRA_IPC_FIXTURES=write`) and Docker is unavailable in the sandbox. Tracked as `SPEC.md` P171.
-
-## P168 Part 22 F8 (low, optional): abort hook for a composed agent launch that fails to open
-
-- Owner files: `internal/terminal/bound.go` (Part 8, Stream A), `apps/kira-space/internal/ade/tracker.go`
-  (Part 20, Stream B). Part 22 owns only the `main.go` wiring line.
-- Source: `P168-part22-findings.md` F8, carrying Part 20 F2 (`P168-routed-from-streamB.md`).
-- Issue: `BoundService.Open` runs `ComposeAgent` (`Tracker.Compose` persists a running row), then
-  `OpenWithCoalescedOutput` can still fail. The row stays running until the 30 s grace
-  `Reconcile`; a fresh row's Claude session id never ran, so resuming it fails.
-- Fix: `AbortAgent func(terminalID string)` beside `ComposeAgent`, called on every failure after a
-  successful compose. `Tracker.Abort(terminalID)` drops the in-memory maps and grace timer, deletes
-  a fresh row or marks a resumed one stopped, fires `OnChange`. `main.go` wires
-  `AbortAgent: adeTracker.Abort`.

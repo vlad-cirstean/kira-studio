@@ -22,6 +22,9 @@ type BoundService struct {
 	// method: Wails' binding generator only ever sees exported *methods* on the registered type
 	// (§1.7's FQN rule), so adding this never grows either app's own bound-call surface.
 	ComposeAgent func(terminalID, command string) (string, []string, error)
+	// AbortAgent undoes ComposeAgent's persisted side effects when Open fails after a successful
+	// compose. Set together with ComposeAgent; a no-op for a terminalID it composed nothing for.
+	AbortAgent func(terminalID string)
 }
 
 // svc is the internal/terminal.Service this bound type delegates its generic half to — built fresh
@@ -90,7 +93,8 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	agent := args.LaunchKind == LaunchKindClaudeCode
 
 	command, env := args.Command, []string(nil)
-	if agent && b.ComposeAgent != nil {
+	composedAgent := agent && b.ComposeAgent != nil
+	if composedAgent {
 		composed, composedEnv, err := b.ComposeAgent(args.TerminalID, command)
 		if err != nil {
 			return OpenResult{}, ipcerr.New("E_INVALID", err.Error())
@@ -98,6 +102,7 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		// ValidateOpen already checked args.Command alone; composing can grow it (the `--settings`
 		// flag, a quoted prompt), so the same bound is rechecked here with the same message.
 		if len(composed) > MaxCommandBytes {
+			b.abortAgent(args.TerminalID)
 			return OpenResult{}, ipcerr.New("E_INVALID", "command is too long")
 		}
 		command, env = composed, composedEnv
@@ -114,6 +119,9 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		Agent:     agent,
 	}, args.WindowKey, args.TerminalID)
 	if err != nil {
+		if composedAgent {
+			b.abortAgent(args.TerminalID)
+		}
 		if errors.Is(err, ErrDuplicateSession) {
 			return OpenResult{}, ipcerr.New("E_INVALID", "terminalId is already open")
 		}
@@ -124,6 +132,12 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	}
 
 	return OpenResult{Shell: sess.Shell()}, nil
+}
+
+func (b *BoundService) abortAgent(terminalID string) {
+	if b.AbortAgent != nil {
+		b.AbortAgent(terminalID)
+	}
 }
 
 // Write decodes args.Data and forwards it to the pty. A no-op for an id with no live session

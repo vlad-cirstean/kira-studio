@@ -136,6 +136,8 @@ type Tracker struct {
 	// claudeSessionID caches each live record's own current Claude session id, so HandleEvent can
 	// detect a SessionStart naming a different one (a /clear) without a DB read on every event.
 	claudeSessionID map[string]string
+	// fresh marks records Compose inserted (not resumed), so Abort deletes rather than stops them.
+	fresh map[string]bool
 
 	hooks func(terminalID, command string) (string, []string)
 
@@ -166,6 +168,7 @@ func NewTracker(deps TrackerDeps) *Tracker {
 		spawnedAt:       map[string]time.Time{},
 		lastActive:      map[string]int64{},
 		claudeSessionID: map[string]string{},
+		fresh:           map[string]bool{},
 		graceTimers:     map[string]*time.Timer{},
 	}
 }
@@ -374,6 +377,9 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 	t.byRecord[intent.RecordID] = terminalID
 	t.spawnedAt[intent.RecordID] = now
 	t.claudeSessionID[intent.RecordID] = intent.ClaudeSessionID
+	if !intent.Resume {
+		t.fresh[intent.RecordID] = true
+	}
 	t.armGraceLocked(intent.RecordID)
 	t.mu.Unlock()
 
@@ -386,6 +392,53 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 	}
 
 	return composed, env, nil
+}
+
+// Abort is BoundService.AbortAgent's own target: Open failed after Compose, so the terminal never
+// ran. A fresh record is deleted (its Claude session never existed, so a resume would fail); a
+// resumed one goes back to stopped. A terminal Compose tracked nothing for is a no-op.
+func (t *Tracker) Abort(terminalID string) {
+	t.mu.Lock()
+	recordID, ok := t.live[terminalID]
+	if !ok {
+		t.mu.Unlock()
+		return
+	}
+	fresh := t.fresh[recordID]
+	delete(t.live, terminalID)
+	delete(t.byRecord, recordID)
+	delete(t.spawnedAt, recordID)
+	delete(t.lastActive, recordID)
+	delete(t.claudeSessionID, recordID)
+	delete(t.fresh, recordID)
+	if timer := t.graceTimers[recordID]; timer != nil {
+		timer.Stop()
+		delete(t.graceTimers, recordID)
+	}
+	now := t.deps.Now().UnixMilli()
+	t.mu.Unlock()
+
+	var err error
+	if fresh {
+		err = t.deps.Store.Delete(recordID)
+	} else {
+		err = t.deps.Store.MarkStopped(recordID, now)
+	}
+	if err != nil {
+		slog.Warn("ade: abort", "scope", "ade", "recordId", recordID, "err", err)
+		return
+	}
+	if t.deps.OnChange != nil {
+		t.deps.OnChange()
+	}
+	if !fresh {
+		t.mu.Lock()
+		onStopped := t.deps.OnStopped
+		t.mu.Unlock()
+		if onStopped != nil {
+			onStopped(recordID)
+		}
+	}
 }
 
 // armGraceLocked schedules the Reconcile that follows a record's grace window; mu is held.
@@ -451,6 +504,7 @@ func (t *Tracker) Reconcile() {
 			flushed[recordID] = now.UnixMilli()
 		}
 		delete(t.claudeSessionID, recordID)
+		delete(t.fresh, recordID)
 	}
 	t.mu.Unlock()
 

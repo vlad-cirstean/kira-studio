@@ -48,17 +48,13 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// main's startup order is Kira Studio's own main.go, trimmed to this app's own four bridge
-// services and a minimal window (P100 Part 1, plan §4.2): the askpass argv shim -> config.
-// EnsureLayout -> logging.Init/Sweep -> storage.Open (migrates) -> repos.New -> wireGit ->
-// gitsock.Server (inside wireGit) -> application.New(Services: GitClientsService,
-// CodeWorkspaceService, the git stream registration, GitHubService) -> the menu -> the startup
-// window list, opened -> app.Run(). No adapters, no connections, no HTTP/gRPC, no DB MCP, no
-// terminal, no keep-awake, no Claude Code hooks, no system notifications for pairing requests —
-// none of that is this app's own module. P119 added an update checker/installer, the one
-// exception. gitClientsSvc.AttachPush() wires
-// gitsock's pairing/clients-changed feeds onto the two push channels the pairing prompt and
-// Connected-editors pane read (P108 Part 20 F1).
+// Startup order: the askpass argv shim -> config.EnsureLayout -> logging.Init/Sweep ->
+// storage.Open (migrates) -> repos.New -> wireGit (starts gitsock.Server) -> terminal registry and
+// the ADE tracker (wireTracker, with the Claude Code hooks) -> wireAdeTask -> keep-awake ->
+// application.New (15 bound services plus the git stream registration) -> the menu -> the startup
+// window list, opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP: not this app's
+// module. gitClientsSvc.AttachPush() wires gitsock's pairing/clients-changed feeds onto the two
+// push channels the pairing prompt and Connected-editors pane read.
 func main() {
 	// Askpass shim, before anything Wails-related runs, so it can never accidentally start a
 	// window — Kira Studio's own main.go:83, deleted there in this same phase's cleanup commit.
@@ -149,7 +145,7 @@ func main() {
 	// app's own TerminalService only embeds it (own binding-name FQN, no behaviour of its own).
 	// ComposeAgent (P129 Part 1 §4.1) rewrites every claude-code launch through adeTracker.Compose.
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{
-		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose,
+		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose, AbortAgent: adeTracker.Abort,
 	}}
 	// windows holds every open window; created here so Archive can close a task's review windows.
 	windows := shell.NewWindowRegistry()
