@@ -22,11 +22,13 @@ type embeddedService[S comparable, ST any] struct {
 
 	startFn  func(enable bool) (S, error)
 	stopFn   func(S)
-	statusFn func(S) ST
+	statusFn func(S, error) ST
+
+	lastErr error // last start failure; cleared by a successful start or a stop. Guarded by mu.
 }
 
 func (e *embeddedService[S, ST]) statusLocked() ST {
-	return e.statusFn(e.server)
+	return e.statusFn(e.server, e.lastErr)
 }
 
 // Status reads the embedded instance's current state — never starts or stops anything.
@@ -45,14 +47,17 @@ func (e *embeddedService[S, ST]) startLocked(enable bool) error {
 	}
 	srv, err := e.startFn(enable)
 	if err != nil {
+		e.lastErr = err
 		return err
 	}
+	e.lastErr = nil
 	e.server = srv
 	return nil
 }
 
 // stopLocked stops and drops the embedded instance, if any. mu must be held by the caller.
 func (e *embeddedService[S, ST]) stopLocked() {
+	e.lastErr = nil
 	var zero S
 	if e.server == zero {
 		return

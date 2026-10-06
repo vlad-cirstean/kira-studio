@@ -92,10 +92,13 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 			s.Approvals.AbandonAll()
 			_ = srv.Close()
 		},
-		statusFn: func(srv *dbmcp.Server) DbMcpStatus {
+		statusFn: func(srv *dbmcp.Server, startErr error) DbMcpStatus {
 			inst := s.Installer.Status()
 			st := DbMcpStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
 			if srv == nil {
+				if startErr != nil {
+					st.Error = startErr.Error()
+				}
 				return st
 			}
 			st.Running = true
@@ -273,7 +276,6 @@ func (s *DbMcpService) SetEnabled(args DbMcpSetEnabledArgs) (DbMcpStatus, error)
 	st, err := s.embedded.setRunning(args.Enabled)
 	if err != nil {
 		slog.Warn("db mcp: start on enable", "scope", "dbmcp", "err", err)
-		st.Error = err.Error()
 	}
 	return st, nil
 }
@@ -323,18 +325,20 @@ func toWireDbMcpInstallResult(r mcpinstall.Result) DbMcpInstallResult {
 // connections.Service.Reveal's own precedent. A no-op result (outcome notFound) when nothing is
 // running: there is nothing to register yet.
 func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
+	// The lock covers only the state check: the spawn below can take up to 30 s and names a fixed
+	// URL and helper path, so holding mu would block Status, the toggle and app quit behind it.
 	s.embedded.mu.Lock()
-	defer s.embedded.mu.Unlock()
-	if s.embedded.server == nil {
-		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
-	}
+	srv := s.embedded.server
 	// F8: same gate statusFn uses — the on-disk helper mirror must exist and verify against the
 	// live record, not just "this run minted a fresh token".
-	if !helperTokenValid(s.embedded.server) {
+	if srv == nil || !helperTokenValid(srv) {
+		s.embedded.mu.Unlock()
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
+	url := srv.URL()
+	s.embedded.mu.Unlock()
 	helperPath := mcpinstall.HeaderHelperScriptPath(config.KiraHome())
-	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, s.embedded.server.URL(), helperPath))
+	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, url, helperPath))
 }
 
 // dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own
