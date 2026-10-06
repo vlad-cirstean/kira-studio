@@ -54,6 +54,7 @@ import { SettingsState } from '../../state/settings.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import ConnectionBanner from '../ConnectionBanner.vue';
 import { buildRefListSections } from '../refListModel.ts';
+import { useLiveRegion } from '../useLiveRegion.ts';
 import BaseSelector from './BaseSelector.vue';
 import ReviewCommentsPane from './ReviewCommentsPane.vue';
 import ReviewCommitRow from './ReviewCommitRow.vue';
@@ -119,12 +120,14 @@ let targetSequence = 0;
 /** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited) async
  *  operation that rejects becomes a silent, unhandled rejection. Every fire-and-forget call in
  *  this file routes its own rejection through this, into the same live region this file's other
- *  `liveAnnouncement.value = ...` assignments already drive. `transport-closed` (the one code
+ *  `announce(...)` calls already drive. `transport-closed` (the one code
  *  `bridge.dispose()` itself produces, this file's own `onBeforeUnmount`) is ignored outright —
  *  this view is already gone by the time it lands, so there is nothing left to announce it to. */
+const { text: liveAnnouncement, announce } = useLiveRegion();
+
 function reportAsyncError(err: unknown, prefix: string): void {
   if (err instanceof TransportError && err.code === 'transport-closed') return;
-  liveAnnouncement.value = `${prefix} — ${err instanceof Error ? err.message : String(err)}`;
+  announce(`${prefix} — ${err instanceof Error ? err.message : String(err)}`);
 }
 
 async function applyTarget(
@@ -319,7 +322,7 @@ function onUiAction(action: UiActionKind): void {
       const rf = reviewFiles.value;
       const path = rf?.selectedPath.value;
       if (!rf || path === null || path === undefined) {
-        liveAnnouncement.value = 'Open a file in the Files tab first.';
+        announce('Open a file in the Files tab first.');
         return;
       }
       const entry = rf.files.value.find((e) => e.change.path === path);
@@ -414,12 +417,10 @@ const filesActions = computed<DetailActions | undefined>(() => {
     capabilities: caps,
     copy(text, whatCopied) {
       void copyToClipboard(bridge, text, whatCopied).then((outcome) => {
-        liveAnnouncement.value = outcome.message;
+        announce(outcome.message);
       });
     },
-    announce(text) {
-      liveAnnouncement.value = text;
-    },
+    announce,
     async openInEditor({ sha, path, originalPath, parentIndex, pinned }) {
       const repo = repoId.value;
       if (!repo) return;
@@ -750,13 +751,12 @@ onMounted(() => {
 // four non-list states are *entered* (W17: "a screen-reader user learns 'nothing to review'
 // rather than meeting silence").
 // ---------------------------------------------------------------------------------------
-const liveAnnouncement = ref('');
-
 watch(
   () => review.value?.announcement.value,
   (text) => {
-    if (text !== undefined) liveAnnouncement.value = text;
+    if (text !== undefined) announce(text);
   },
+  { deep: true },
 );
 
 watch(
@@ -768,19 +768,19 @@ watch(
     const base = r.resolution.value?.base ?? '';
     switch (phase) {
       case 'ask':
-        liveAnnouncement.value = `No base detected for ${branch}. Choose one to compare against.`;
+        announce(`No base detected for ${branch}. Choose one to compare against.`);
         break;
       case 'unrelated':
-        liveAnnouncement.value = `${branch} and ${base} share no common history.`;
+        announce(`${branch} and ${base} share no common history.`);
         break;
       case 'empty':
-        liveAnnouncement.value = `${branch} adds no commits to ${base}.`;
+        announce(`${branch} adds no commits to ${base}.`);
         break;
       case 'listing':
-        liveAnnouncement.value = `Comparing ${branch} to ${base}: ${commitCountLabel.value}.`;
+        announce(`Comparing ${branch} to ${base}: ${commitCountLabel.value}.`);
         break;
       case 'error':
-        liveAnnouncement.value = `Couldn't compare ${branch} — ${r.resolveError.value ?? ''}`;
+        announce(`Couldn't compare ${branch} — ${r.resolveError.value ?? ''}`);
         break;
       default:
         break;

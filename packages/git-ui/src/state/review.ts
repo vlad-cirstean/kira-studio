@@ -1,9 +1,10 @@
 import type { BaseResolution, CommitRange } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import { type ShallowRef, shallowRef } from 'vue';
+import { type Ref, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { DetailState } from './detail.ts';
 import { type Capabilities, createDetailActions, type DetailActions } from './detailActions.ts';
+import { createAnnouncementRef } from './liveAnnouncements.ts';
 import { PackedStreamState } from './packedStream.ts';
 
 /**
@@ -81,7 +82,7 @@ export class ReviewSessionState {
   readonly staleReview: ShallowRef<boolean> = shallowRef(false);
   /** One shared announcement feeding one live region (`liveAnnouncements.ts`'s own precedent) —
    *  every expanded row's `DetailActions` writes here rather than each owning its own region. */
-  readonly announcement: ShallowRef<string> = shallowRef('');
+  readonly announcement: Ref<string> = createAnnouncementRef();
   readonly expandedShas: ShallowRef<ReadonlySet<string>> = shallowRef(new Set());
   /** P75 §1.2: the row-level action bundle, one per targeted session rather than one per expanded
    *  row — every bundle `#createRowActions` ever built closed over `repoId` and nothing else, so

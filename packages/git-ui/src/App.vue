@@ -69,6 +69,7 @@ import StashDetailPane from './components/StashDetailPane.vue';
 import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
 import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
+import { useLiveRegion } from './components/useLiveRegion.ts';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
 import { useGraphVisible } from './graphVisibility.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
@@ -283,6 +284,8 @@ watch(graphView.generation, () => {
   contextMenuState.value = undefined;
   stashContextMenuState.value = undefined;
 });
+
+const { text: liveAnnouncement, announce } = useLiveRegion();
 
 /** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited)
  *  async operation that rejects becomes a silent, unhandled rejection — no feedback ever reaches
@@ -1030,15 +1033,6 @@ async function resolveConflictInEditor(path: string): Promise<void> {
 // so the completion message can report how many rows the operation itself actually added, not
 // just the total the store now holds.
 // ---------------------------------------------------------------------------------------
-const liveAnnouncement = ref('');
-// Clear first, set on the next tick: an unchanged string would not change the live region's DOM
-// text, so a repeated identical message (a retried failing fetch) would go unread.
-function announce(text: string): void {
-  liveAnnouncement.value = '';
-  void nextTick(() => {
-    liveAnnouncement.value = text;
-  });
-}
 let loadedRowsBeforeLoad = 0;
 // G-UX D10: captured together, at the moment `loading` *enters* `'refreshing'` — synchronous with
 // `GraphViewState` setting `autoRefreshing` (no `await` between the two), so this is reliable in
