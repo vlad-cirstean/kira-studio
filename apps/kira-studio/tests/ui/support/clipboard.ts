@@ -34,3 +34,20 @@ export async function lastClipboardWrite(page: Page): Promise<string> {
     () => (window as unknown as { __clipboard: string[] }).__clipboard.at(-1) ?? '',
   );
 }
+
+/** Replaces `navigator.clipboard` with an in-memory stub (WebKit refuses an ungestured
+ *  `readText()` even with the permission granted). Install before the page loads. */
+export const CLIPBOARD_SHIM = `(() => {
+  let text = '';
+  const clip = {
+    writeText: (t) => { text = String(t); return Promise.resolve(); },
+    readText: () => Promise.resolve(text),
+  };
+  Object.defineProperty(navigator, 'clipboard', { value: clip, configurable: true });
+})();`;
+
+export async function installClipboardShim(page: Page): Promise<void> {
+  await page.addInitScript(CLIPBOARD_SHIM);
+  await page.reload();
+  await page.waitForSelector('[data-testid="status-bar"]');
+}

@@ -2,6 +2,7 @@ import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { CLIPBOARD_SHIM } from './support/clipboard';
 import { cellNavButton, gridCell, gridRow, gridScroller, mutationsForScroll } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
@@ -1093,17 +1094,8 @@ test('P22 Pass B C12 T7 — select-all stays within the 150ms sandbox gate with 
 // actual displayed rows into the pending-insert-row address space (`rowAtDisplayPosition` maps an
 // out-of-range display position to `pageRowCount + (pos - count)`), producing dozens/thousands of
 // spurious extra lines on copy — a page-row range far past the real, loaded data. `navigator.
-// clipboard` is stubbed the same way interaction.spec.ts's own `installClipboardShim` does
+// clipboard` is stubbed the same way support/clipboard.ts's own `CLIPBOARD_SHIM` does
 // (WebKit refuses an ungestured `readText()` even with the permission granted).
-const CLIPBOARD_SHIM = `(() => {
-  let text = '';
-  const clip = {
-    writeText: (t) => { text = String(t); return Promise.resolve(); },
-    readText: () => Promise.resolve(text),
-  };
-  Object.defineProperty(navigator, 'clipboard', { value: clip, configurable: true });
-})();`;
-
 test('P22 Pass B follow-up — select-all under an active row filter copies only the visible rows', async ({
   relaunch,
 }) => {

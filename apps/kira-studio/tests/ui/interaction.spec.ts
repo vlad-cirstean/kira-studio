@@ -4,6 +4,7 @@ import type { ObjectMeta } from '@shared/domain/tree';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { installClipboardShim } from './support/clipboard';
 import { connectAndExpand, connectionCreateArgs } from './support/connect';
 import {
   cellNavButton,
@@ -1034,21 +1035,6 @@ const PORT: PortSnapshot[] = [
   },
 ];
 
-const CLIPBOARD_SHIM = `(() => {
-  let text = '';
-  const clip = {
-    writeText: (t) => { text = String(t); return Promise.resolve(); },
-    readText: () => Promise.resolve(text),
-  };
-  Object.defineProperty(navigator, 'clipboard', { value: clip, configurable: true });
-})();`;
-
-async function installClipboardShim(page: Page): Promise<void> {
-  await page.addInitScript(CLIPBOARD_SHIM);
-  await page.reload();
-  await page.waitForSelector('[data-testid="status-bar"]');
-}
-
 async function menuItemIds(page: Page): Promise<string[]> {
   const menu = page.locator('[data-testid="context-menu"]');
   return menu
@@ -1428,6 +1414,28 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await page.click('[data-testid="menu-item-paste"]');
   await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'name')).toBe('typed via paste menu');
+  await discardChanges(page);
+
+  // =============================================================================================
+  // P176: Ctrl/Cmd+V inside the open cell editor is the browser's own paste, not the grid's
+  // spread-down paste. A multi-line clipboard must not stage rows below, and the editor must hold
+  // a line break exactly.
+  // =============================================================================================
+  const editorBefore = await cellText(page, 1, 'name');
+  await page.evaluate(() => navigator.clipboard.writeText('line one\nline two'));
+  await gridCell(page, 0, 'name').dblclick();
+  const editorInput = page.locator('[data-testid="grid-cell-input"]');
+  await expect(editorInput).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+V');
+  await expect(editorInput).toBeVisible();
+  expect(await cellText(page, 1, 'name')).toBe(editorBefore);
+  await expect(gridCell(page, 1, 'name')).not.toHaveClass(/pending-edit/);
+  await editorInput.fill('a\nb');
+  await page.keyboard.press('Enter');
+  await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
+  await gridCell(page, 0, 'name').dblclick();
+  await expect(editorInput).toHaveValue('a\nb');
+  await page.keyboard.press('Escape');
   await discardChanges(page);
 
   // =============================================================================================
