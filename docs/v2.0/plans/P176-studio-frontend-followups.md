@@ -272,3 +272,20 @@ All paths below are under `apps/kira-studio/` unless they start with `docs/`.
   that one bullet, resolved on rebase. CLAUDE.md's default is still one phase at a time.
 - **Within P176:** one sequential implementer. Items 1 and 5 are file-disjoint, but the phase is
   small, and step 8's UI run covers both. A split buys nothing.
+
+## Result
+
+Landed in 8 commits on `p168-stream-b`:
+
+1. `c6d6119` fix(studio): `openTrackedTab` and the four openers return `null` for a deleted connection; callers branch. Test helper at `tests/unit/support/connectionRecord.ts` (not `tests/support/`: the studio tests tsconfig would pull the bridge in; it takes the store as an argument because a static store import loads the bridge before a spec's runtime mocks).
+2. `ffbfd99` docs(grid): fk preview comment.
+3. `e5b8033` test(mask): two parity fixtures. Go output matched TS with no TS change.
+4. `3522743` test(queryplan): `mysql-large-untyped-metric` fixture. Go and TS agree.
+5. `cc81f67` fix(grid): Ctrl/Cmd+C and V skip the grid handler inside a text control.
+6. `7e1614f` fix(grid): inline editor is a one-row textarea. `docs/ARCHITECTURE.md` Known open items gains the insert-row `<input>` entry.
+7. `867aa57` test(grid): Playwright regression for paste in the open editor. Clipboard shim moved to `tests/ui/support/clipboard.ts`.
+8. `91b723d` refactor(adapters): `runRaw` (mysqlfamily, 32) and `pollQueue` (sqs, 31) exceeded the gocognit limit of 30. Pre-existing from P174/P175, fixed on the spot by extracting helpers.
+
+Checks: `bun run typecheck`, `bun run lint`, `bun run lint:dead`, `bun run lint:go` (0 issues), `bun test apps/kira-studio/tests/unit packages/api-core/test` (1061 pass), `go test` for mask, queryplan, sqs, mysqlfamily, full `bun run test:ui:studio` (316 passed).
+
+Not verified: the new Playwright paste test was not run against a tree without the step 5 guard, so it is not proven to fail without the fix. The sandbox cannot place text on the real system clipboard, so the test asserts the grid handler stays out and a typed multi-line value round-trips; the native paste insert itself is not exercised.
