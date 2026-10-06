@@ -3,7 +3,7 @@
 Plan: `P168-part19-git-ui-components.md`. Base `1e2b327`; plan commit `d9d3b35`; HEAD reviewed
 `d9d3b35` (branch `p168-stream-b`). Reviewer reports only; fixes nothing.
 
-Status: blocks 1-3 done.
+Status: blocks 1-4 done.
 
 ## Checks (block 1, §1.1)
 
@@ -214,6 +214,113 @@ Status: blocks 1-3 done.
 - Fix: gate both on `props.graphView.layoutCurrent` (return `undefined` / `false`), matching
   `readSlice`.
 
+### F12. Enter on a picker row's inner button also fires the row's main action (checkout)
+
+- Severity: medium. Code-read.
+- Where: `packages/git-ui/src/components/BranchPicker.vue:263-300` (`onRowsKeydown`, bound on the
+  rows scroll container at `:304`): `Enter` resolves the row from `event.target.closest(...)` and
+  calls `.kv-branch-row-main.click()` without checking that the target is the row itself and
+  without `preventDefault()`.
+- Scenario: VS Code (write) or Space. Open the branch picker, Tab to a non-HEAD branch's "More
+  actions" button (`RowActionsButton`) or its `#123` PR badge, press Enter. The native button
+  activation opens the menu (or the PR), and the handler also clicks the row's main button:
+  `checkoutBranch` runs, closes the picker and starts `runCheckout`. A clean preflight switches
+  branch with no dialog. Same in the Tags tab (`TagList.vue:121`, tag checkout) and Stashes tab
+  (`StashRows.vue:104`, select). Enter on the main button itself activates it twice (handler plus
+  native), relying on `OpsState.busy` to drop the second.
+- Fix: in `onRowsKeydown`, handle `Enter` only when `event.target === rowEl` (the roving-tabindex
+  row div), and `preventDefault()` when it does.
+
+### F13. PR badge `<button>` nested inside the branch row's main `<button>`
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/BranchPicker.vue:698-725` (`<button
+  class="kv-branch-row-main">` contains `<button class="kv-badge-pr" @click.stop>` at `:711-716`).
+- Scenario: any host with `openExternal` and a branch with a PR. Interactive content inside a
+  `<button>` is invalid HTML; assistive tech flattens the outer button's name to include "#123"
+  and may not expose the inner one (axe `nested-interactive`). Keyboard focus order enters the
+  inner button from the outer one, and Enter on it also hits F12.
+- Fix: render the badge as a sibling of the main button inside the row div (as `StackList.vue`
+  does, where the main element is a `div`), keeping `@click.stop`.
+
+### F14. Fetch, Pull and Push target the alphabetically first remote, not the branch's upstream
+
+- Severity: medium. Code-read.
+- Where: `packages/git-ui/src/components/AppToolbar.vue:143-144` (`defaultRemote` =
+  `remoteNamesFrom(...)[0]`, sorted by name, `rowMenuModel.ts:430-437`), used by `doFetch`,
+  `doPush`, `doForcePush` (`:184-204`) and passed to `PullStrategyPicker` as `remote` (`:349-354`,
+  `runPull(props.remote, ...)`).
+- Scenario: repo with remotes `fork` and `origin`; local `main` tracks `origin/main`
+  (`RefRow.upstream === 'origin/main'`). Push sends `main` to `fork` (and `wouldSetUpstream` may
+  repoint tracking there); Pull merges `fork/main`; Fetch never updates `origin`. The tooltip says
+  "Push to fork", but nothing else warns. The file comment assumes one remote per repo; the data
+  needed to do better is already loaded (`RefRow.upstream` for the current branch).
+- Fix: derive the remote from the current branch's `upstream` (text before the first `/` that
+  matches a known remote name), falling back to `origin` when present, then to the first name.
+  Use it for push/pull; fetch the same remote (or every known remote).
+
+### F15. Context-menu focus return targets a grid row node that a re-render already replaced
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/RowContextMenu.vue:41-50` (captures
+  `document.activeElement` at mount, refocuses it on close).
+- Scenario: graph grid, Shift+F10 on a row while history is still streaming or PRs are
+  resolving. `handleChunkLayout`/`scheduleAncestryRebuild` (`CommitGrid.vue:637-639`,
+  `:656-658`) recreate every rendered row's DOM node while the menu is open. Escape calls
+  `invoker.focus()` on the detached node, focus falls to `body`, and `focusedRowIndex` was already
+  cleared by the `focusin` on the menu item, so nothing restores it. The keyboard user loses
+  their place.
+- Fix: on close, if `invoker?.isConnected` is false, emit a `restore-focus` (or accept a
+  `restoreFocus` callback prop) and let `App.vue` call `commitGridRef.value?.focusGrid()` for the
+  three grid menus.
+
+### F16. Search box acts on Enter and Escape during IME composition
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/SearchBox.vue` `onKeydown` (Enter and Escape branches, no
+  `event.isComposing` check).
+- Scenario: a Japanese/Chinese/Korean IME user types a query and presses Enter to commit the
+  composition. Chromium delivers that keydown with `key: 'Enter'`, `isComposing: true`: the
+  handler `preventDefault()`s it and calls `search.next()` (reveals and selects a commit) or
+  selects the highlighted option. Escape to cancel a composition clears the whole query.
+- Fix: return early when `event.isComposing || event.keyCode === 229`.
+
+### F17. Invalid-regex alert re-announces on every keystroke
+
+- Severity: low. Code-read (message format checked in Node).
+- Where: `packages/git-ui/src/components/SearchBox.vue:316-324` (`role="alert"`, text
+  `search.error`); the message comes from `RegExp`'s own text minus the prefix
+  (`packages/git-core/src/search/query.ts:85-90`), e.g. `/a(/: Unterminated group`, then
+  `/ab(/: Unterminated group`. It embeds the compiled source (including the whole-word lookaround
+  wrapper), so it changes with every character typed.
+- Scenario: regex mode, typing `foo(bar` one key at a time: each keystroke while the group is open
+  changes an assertive region's text, so the screen reader interrupts the user's own typing echo
+  each time.
+- Fix: strip the `/source/: ` part so the text only changes when the error kind changes, and use
+  `aria-live="polite"` (or keep `alert` but only for a changed error kind).
+
+### F18. Pull-strategy preview has no supersede guard and an unhandled rejection
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/PullStrategyPicker.vue:95-105` (`onOpenChange`), `:107-112`.
+- Scenario: open the Pull menu on branch A (slow `remote.pullPreflight`), close it, check out B,
+  reopen. B's answer lands, then A's late answer overwrites `preview`, so "Follow your
+  configuration" describes A's strategy for B. A rejected preflight (disconnect) rejects the
+  async `@update:open` handler with nothing catching it.
+- Fix: capture the branch (or a counter) before the await and drop a result that no longer
+  matches `props.branch`; catch and show no detail on failure.
+
+### F19. `lib/menuModel.ts` keeps a test-only helper and stale doc comments
+
+- Severity: low. Code-read (`git grep` per symbol).
+- Where: `packages/git-ui/src/lib/menuModel.ts:1-10` (module doc still describes "the ARIA-menu
+  keyboard-roving-focus logic" of `RowContextMenu.vue`, which reka now owns), `:37-41`
+  (`flattenItems`: doc says "every enabled item" but returns all; only `menuModel.test.ts` calls
+  it). `enabledNeighbour`/`firstEnabled` are live (`BranchPicker.vue:231-291`). Grouped with
+  candidate 18: `components/searchResultsModel.ts:52-53` doc comment runs past 100 columns.
+- Fix: delete `flattenItems` and its test cases, reword the module doc to "roving-focus helpers
+  for `BranchPicker.vue`'s row list", rewrap `searchResultsModel.ts:52-55`.
+
 ## Candidate fates (§9)
 
 - 1 (lanes blank after layout lands): dropped. Probe passed for expand, toggle and refresh;
@@ -234,6 +341,14 @@ Status: blocks 1-3 done.
 - 7 (second persistence watcher on retry): dropped as stated. The watcher registers only after
   every `await` succeeded, and a successful run hides Retry, so it registers at most once. The
   related defects (never registered after a partial failure, not stopped on unmount) are F6.
+- 8 (`RowContextMenu` focus return to a rebuilt row): reported as F15. reka's `FocusScope`
+  moves focus only after `nextTick`, so `onMounted` captures the real invoker; the defect is the
+  invoker being replaced while the menu is open.
+- 9 (`lib/menuModel.ts` dead): partly. `flattenItems` is test-only; `enabledNeighbour` and
+  `firstEnabled` are live in `BranchPicker.vue`. Reported as F19.
+- 10 (two polite regions double-read): dropped. The toolbar's region is the `v-if`'d
+  "Restacking…" chip (`AppToolbar.vue:313-322`), which never carries the same text as `App.vue`'s
+  region (that one announces the restack result afterwards).
 - 11 (`TokenReader.watch()` layout thrash): dropped. The observer watches only `class`/`style`
   on `html` and `body` (not the subtree), and each callback does one `getComputedStyle` plus
   three probe reads; probes are `body` children, so reading them cannot re-trigger it. The
@@ -278,4 +393,15 @@ holds; dispose checked in block 2.
   `ShowMoreButton`, `theme/readTokens.ts`. Skimmed `countFormat.ts`, `badgeClass.ts` (trivial).
   Lifecycle: `onBeforeUnmount` disconnects the observer, cancels both rAFs, unsubscribes layout and
   tokens, removes probes and listeners, destroys the grid; no callback outlives it.
-- Blocks 4-8: not reached yet.
+- Block 4: done. Reviewed `AppToolbar` (script, template: Fetch/Push/Stash buttons carry visible
+  text, so they have names), `BranchPicker` (keyboard, open/close and focus handling, branch and
+  remote rows), `RowContextMenu`, `MenuSections`, `useRowMenu.ts`, `lib/menuModel.ts`,
+  `SearchBox`, `SearchResults`, `searchResultsModel.ts`, `searchListboxId.ts`,
+  `PullStrategyPicker`, `RowActionsButton`. Skimmed with reason (logic covered by their unit
+  specs, rows follow the `BranchPicker` pattern already reviewed): `pickerModel.ts`, `TagList`,
+  `StackList`, `stackListModel.ts`, `StashList`, `StashRows`, `GlobalStashList`,
+  `stashListModel.ts`, `WorktreeList`, `refListModel.ts`, `RefSectionHeader`,
+  `pullStrategyModel.ts`, `rowMenuModel.ts` (gating table, tested). Stash ops pass the rendered
+  `StashEntry` (server re-verifies `stash@{N}`). `MenuSections` ids: one menu renders at a time
+  per section list, so `${item.id}-reason` does not collide.
+- Blocks 5-8: not reached yet.
