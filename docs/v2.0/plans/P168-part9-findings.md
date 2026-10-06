@@ -48,7 +48,8 @@ Part 9 file (every item there targets Go, Stream C views, or Part 8).
 - Scenario: one `TabsService.Save` fails (DB busy, validation error on one record). No log, no
   retry. The tab layout on disk stays stale until some unrelated tab change saves again. On close,
   `flushPendingTabState` acks after a failed save and the window closes with the newest tab state
-  lost.
+  lost. Go validates the whole batch (`appstorage.ValidateTab` per record, `TabsRepo.Save`), so one
+  bad record makes every later save fail the same silent way.
 - Fix: in the rejection handler, `console.error` the error and, when `nextSnapshot === null`, put
   `toSave` back into `nextSnapshot` so the next `saveIfChanged`/flush retries it. Do not loop
   automatically on a persistent failure.
@@ -222,3 +223,47 @@ Block 1 other checks, nothing filed:
   `prompt/useTextPrompt.ts:9-10`, `shared/domain/settings.ts:37-39`, `shared/domain/shortcuts.ts:1-7,20`, `theme/src/wrapSelection.ts:1-5`.
 - Fix: delete each unused symbol/branch and its comment; reword stale comments to the current stack
   (Wails, Monaco) or drop them. `CHANNEL.quickOpen` removal is TS-only (no Go constant exists).
+
+Block 2 other checks, nothing filed:
+- `CHANNEL` table checked key by key against Go (`grep` of each literal in `apps/*/internal`,
+  `internal/`): every channel except `quickOpen` (F12) has one Go emitter and a TS subscriber.
+- `opKindSchema` matches Go `model.opKinds` (guarded by `go-ts-vocabulary-parity.spec.ts`).
+- Zod schemas in `domain/{git,repo,ops,layout,scripts}.ts` that nothing parses at runtime
+  (`gitClientSchema`, `fileListingSchema`, `codeSearchEventSchema`, `layoutSchema`, ...) dropped as a
+  finding: they are the single source of the exported types, `/*#__PURE__*/` tree-shakes them, and
+  converting them to plain interfaces is churn with no behaviour change.
+- `bootstrapShell` retry re-runs `mountShell` with the same module-level Pinia: store setups run
+  once, every hydrate unsubscribes before resubscribing. No duplicate listeners. Dropped.
+- `ContextMenu.vue` item `run()` rejections: callers own error surfacing (`copyOrReportError`,
+  `attempt` wrappers); a generic catch here would hide them. Dropped.
+- `useVirtualRows`: `@tanstack/vue-virtual`'s `useVirtualizer` spreads the options object inside a
+  `computed`, so the `count` getter is tracked and the pre-flush watcher updates the virtualizer
+  before render. No stale-index read in `OpLogPanel`. Dropped.
+- `stickyBand` per-scroll cost: one backward ancestor walk plus one forward subtree scan per pinned
+  row (at most 3). Tens of microseconds for a 20k-row tree. Dropped.
+- `testing/ui/server.ts` serves only `127.0.0.1` and resolves paths from a parsed URL (`..`
+  normalized away). `canonical()` canonicalizes only top-level keys; fixtures are recorded and
+  replayed by the same code paths, so nested key order matches. Dropped.
+- `viteAppConfig` dev server binds `127.0.0.1` with `strictPort`. No exposure.
+- Every `.vue` file in the owned tree is `<script setup lang="ts">`; no `<style>` block, no
+  `defineComponent`. Stores are one concern each.
+- Observation outside Part 9 (repo tooling, Part 8, closed): `bunx knip` prints "Extension in
+  project not registered as a compiler" for `.vue` in every frontend workspace and reports no unused
+  export, yet F12's unused exports exist. Knip is not tracing `.vue` imports, so `lint:dead` is
+  blind to dead TS exports reachable only from SFCs. Needs its own `SPEC.md` follow-up (not a Part 9
+  edit).
+
+## Coverage
+
+Read in full: every file under `packages/workbench/src` except `editor/monarch/*` (static token
+tables), `testing/unit/*` and `testing/ui/{fixtures,perfProbe}.ts` (skimmed for wiring only);
+`packages/theme/src` (`components/ui/**` checked for script-setup and local edits, otherwise shadcn
+registry output); `packages/kira-ui/src/**`; the owned `packages/shared` files. One-hop callers
+read where a finding depended on them: both apps' `main.ts`, `WorkbenchShell.vue`, `state/tabs.ts`
+(Studio), `tabIncognito.ts`, Space `ade/v2/{dialog/deliver.ts,state/adeDialogs.ts,
+state/adeTerminals.ts,sessions/AdeTuiPane.vue}`, `GitPanel.vue`, `PagerControls.vue`, Go
+`TabsRepo.Save`, `appstorage/tabs.go`, `internal/shell/accel.go`, and reka-ui 2.10.5
+`callPanelCallbacks`, VueUse 15 `useDraggable`, `@tanstack/vue-virtual` 3.13 `useVirtualizer`.
+
+Counts: high 0, medium 1 (F1), low 11 (F2-F12). DESIGN-DECISION: none. Routed out: F10 caller
+labels (`P168-routed-from-streamA.md`). Routed in: none.
