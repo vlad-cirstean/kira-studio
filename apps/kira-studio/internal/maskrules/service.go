@@ -28,11 +28,17 @@ type Service struct {
 
 	mu    sync.Mutex
 	cache map[string]mask.Set // connectionID -> resolved Set; cleared for a connection on any write to it
+	// gen counts invalidations per connection: MaskSetFor stores a freshly folded set only if no
+	// invalidation landed since it started reading, so a write racing the read never leaves a stale
+	// set cached.
+	gen map[string]uint64
+
+	afterRead func() // test seam: runs between MaskSetFor's query and its store
 }
 
 // New constructs a Service over the two repos it owns.
 func New(rules *repos.MaskRulesRepo, keys *repos.MaskKeysRepo) *Service {
-	return &Service{rules: rules, keys: keys, cache: map[string]mask.Set{}}
+	return &Service{rules: rules, keys: keys, cache: map[string]mask.Set{}, gen: map[string]uint64{}}
 }
 
 // List returns every rule on connectionID, repo order (lower(table_name), lower(column_name)).
@@ -110,15 +116,19 @@ func (s *Service) MaskSetFor(connectionID string) (mask.Set, error) {
 		s.mu.Unlock()
 		return cached, nil
 	}
+	startGen := s.gen[connectionID]
 	s.mu.Unlock()
 
 	rows, err := s.rules.ListForConnection(connectionID)
 	if err != nil {
 		return mask.Set{}, err
 	}
+	if s.afterRead != nil {
+		s.afterRead()
+	}
 	if len(rows) == 0 {
 		set := mask.Set{Masker: mask.New(nil)}
-		s.store(connectionID, set)
+		s.store(connectionID, startGen, set)
 		return set, nil
 	}
 
@@ -154,7 +164,7 @@ func (s *Service) MaskSetFor(connectionID string) (mask.Set, error) {
 	}
 
 	set := mask.Set{Masker: mask.New(key), Rules: folded}
-	s.store(connectionID, set)
+	s.store(connectionID, startGen, set)
 	return set, nil
 }
 
@@ -196,14 +206,17 @@ func (s *Service) CorrelationKeyHex(connectionID string) (string, error) {
 	return hex.EncodeToString(key), nil
 }
 
-func (s *Service) store(connectionID string, set mask.Set) {
+func (s *Service) store(connectionID string, startGen uint64, set mask.Set) {
 	s.mu.Lock()
-	s.cache[connectionID] = set
+	if s.gen[connectionID] == startGen {
+		s.cache[connectionID] = set
+	}
 	s.mu.Unlock()
 }
 
 func (s *Service) invalidate(connectionID string) {
 	s.mu.Lock()
 	delete(s.cache, connectionID)
+	s.gen[connectionID]++
 	s.mu.Unlock()
 }
