@@ -358,3 +358,91 @@ Block 6 otherwise clean:
   write the same object; a failed Refresh shows its error above the previous definition, which is
   the data views' convention). `onCopy` is in F10. Structure filter and Source find bar correct.
 - `SD/streamFilter.ts`, `SD/definition.ts`: correct for their callers.
+
+### Block 6 addendum (found during the coverage pass)
+
+**F19. Re-applying a pinned stream filter unpins it.** Low. Verified (scratch probe: record, pin,
+record the same filter again; `pinned` goes `[true]` to `[false]`).
+`SF/views/stream/streamFilterHistory.ts:59-73` (`recordStreamFilterUse` drops the matching entry
+and unshifts a fresh `pinned: false` one).
+- Scenario: user pins a Kafka offset/partition filter, later applies it again from the history menu
+  (`applyStreamFilter` records every use). The pin is gone, and the entry can now age out of the
+  20-entry cap.
+- Fix: keep the matched entry's pin: `const prior = existing.find((e) => sameFilter(filter, e));`
+  then `pinned: prior?.pinned ?? false` on the new entry.
+
+### Block 7: tests
+
+**F20. `document-console-row-menu-lazy-snapshot.spec.ts` fails when run alone (no active Pinia).**
+Low. Verified (alone: 3 fail, `getActivePinia()` thrown from `useDocumentViewStore()` at
+`SF/views/documents/menu.ts:59`, reached from the spec's `run()` at `:71`; in the 40-spec subset it
+passes because an earlier spec leaves a Pinia active). Same shape as Part 11 F2.
+`ST/unit/document-console-row-menu-lazy-snapshot.spec.ts:12-25` (no Pinia setup).
+- Scenario: `bun test` on this file alone, or any reorder of the subset, goes red.
+- Fix: `setActivePinia(createPinia())` at module top (or `beforeEach`), as the other own specs that
+  reach a store do. Re-run each own spec alone and the subset.
+
+Block 7 otherwise clean:
+- All 40 own unit specs plus `support/consoleHarness.ts` drive current code: the race specs
+  (`console-{auto-explain-race,overlapping-explain-clobber,run-after-tab-close,stop-auto-explain,
+  stop-explain-resolves-anyway}`) exercise `run`/`stop`/`explain` through the harness; the thin
+  specs (`console-explain-embedded-semicolon`, `hover-value-caption`, `console-mongo-brackets`,
+  `sql-cte-shadow`, `sql-lint`, `sql-keywords`) import live exports and assert current rules.
+- `ST/perf/parse-callers.spec.ts` measures real callers end to end (opt-in, asserts nothing); not a
+  duplicate of `parse-worker-client.spec.ts` (client ordering with a fake worker).
+- Gaps a fix needs: F1 (abort-then-worker-error ordering in `parse-worker-client.spec.ts`), F2 (depth
+  guard). F17 assertion routed to Part 5's Kafka frontend spec. No other new test warranted
+  (single-condition fixes).
+- `waitForTimeout` in own UI specs (`autocomplete:741,850,929`, `sql-schema:466`, `definition:184`)
+  assert an absence after a quiet period; none races a fixed mock delay against Stop.
+- Fixtures: 162 JSON (30 `explain-plans`, 132 `mask`) all parse, every `*.input.json` has its
+  `*.expected.json`; `go test ./internal/queryplan` and `./internal/mask -run Parity` green,
+  `mask-parity.spec.ts` green (67), `explain-plan.spec.ts` parity block green. Sampled
+  `postgres-join`, `mysql-truncated`, `clickhouse-with-estimate` and three `mask` pairs by eye.
+
+## Routing
+
+- F12 (Go cancel-before-register) and the F17 test assertion are appended to
+  `P168-routed-from-streamC.md` (`## From Part 12 F12`, `## From Part 12 F17`). The fixer lands the
+  F17 renderer fix itself and does not re-append.
+- Part 13 tags: none. Every other fix is in own files, plus the Part 11 file `rawTree.ts` for F2
+  (allowed in Stream C, state why in the commit).
+- DESIGN-DECISION: none.
+
+## Coverage
+
+Base `8b20119`; HEAD reviewed `54b5c10`. Checks: see top. UI, perf and visual specs not run (no
+claim needed a run; plan forbids the full UI suite).
+
+- Block 1 reviewed: `workers/parse/*` (6), `editor/{chunkedText,paintSpans,findRanges,hoverInfo,
+  searchPattern,monacoLanguages,completion,ranges,diagnostics}.ts`, `edDecorations.css`,
+  `MonacoHost.vue`, `beautify.ts`.
+- Block 2 reviewed: `SD/{sql-lex,sql-split,sql-lint}.ts`, `console/{format,sqlFormatterEntry,lint,
+  sqlDiagnostics,sqlNodes,sqlRefs,sqlHover,mongoStatement}.ts`, `ddl.ts` (`parseDdl`, namespace
+  builders, `findTable`; statement handlers skimmed: data-driven, exercised by `ddl-schema` and
+  `schema-*` specs), `SD/{console,schema,editor}.ts`. Skimmed: `SD/sql-tokens.ts` (span/identifier
+  scanners, memo; grouping read via `statementsWithRefs`), `SD/sql-keywords.ts` (word lists).
+- Block 3 reviewed: `console/{completion,sqlLanguageService,sqlSchemaCompletion,
+  sqlKeywordCompletion}.ts`, MonacoHost provider glue.
+- Block 4 reviewed: `console/{state,resultPages,search,resultMenu,copyAll,explain,explainResults,
+  plan,planIssues,planModel}.ts`, `ConsoleView.vue`, `ConsoleResultGrid.vue`, `ConsoleSlickGrid.vue`
+  (lifecycle, copy, menus, watches; column building skimmed), `ConsoleSavedMenu.vue`. Skimmed:
+  `planParsers/*` (5) and `ExplainResultView.vue` (no `v-html`; renders parsed model): covered by the
+  green two-sided fixture parity.
+- Block 5 reviewed: `documents/{state,page,search,menu,mutations,projection,sortDocument}.ts`,
+  `RowActionButton.vue`, `ProjectionMenu.vue`, `DocumentView.vue` (edit, gate, rows, menus, search,
+  watches; toolbar markup skimmed), `keyvalue/KeyValueView.vue`, `SD/queries.ts`.
+- Block 6 reviewed: `stream/{page,state,search,menu,mutations,streamFilterHistory}.ts`,
+  `StreamSearchToolbar.vue`, `StreamComposeMessage.vue` (submit path), `StreamView.vue` (cells,
+  menus, dock, delete, watches; filter-row markup skimmed), `browse/{state,menu}.ts`,
+  `BrowseView.vue` (host, key types, row actions), `definition/{state,structure,columnsMenu}.ts`,
+  `DefinitionView.vue`, `SD/{streamFilter,definition}.ts`. Skimmed: `StreamFilterHistoryMenu.vue`,
+  `definition/{Columns,Constraints,Validation,Indexes,Properties}Section.vue` (presentational, no
+  `v-html`, props only).
+- Block 7 reviewed: 40 unit specs and harness (each run alone and together), perf spec structure,
+  UI spec timing waits, fixtures (all 162 parsed and paired, six sampled by eye, both parity suites
+  run). Not reached line by line: UI spec bodies (7), visual specs (2), `ST/perf/{documents-*,
+  console-grid-scroll,pureFns.entry,documentsFixture}.ts` (measurement harnesses; nothing to judge
+  without a run, none needed).
+
+Counts: high 0, medium 5 (F2, F4, F9, F14, F17), low 15.
