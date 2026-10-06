@@ -61,9 +61,6 @@ type Service struct {
 	Registry *Registry
 }
 
-// Shutdown closes every live session — app teardown.
-func (s *Service) Shutdown() { s.Registry.CloseAll() }
-
 // Write decodes dataB64 and forwards it to the pty. A no-op for an id with no live session
 // (Registry.Write's own rule) — a renderer can have a keystroke in flight when a shell exits.
 func (s *Service) Write(terminalID, dataB64 string) error {

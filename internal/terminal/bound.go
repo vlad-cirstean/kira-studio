@@ -117,6 +117,9 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		if errors.Is(err, ErrDuplicateSession) {
 			return OpenResult{}, ipcerr.New("E_INVALID", "terminalId is already open")
 		}
+		if errors.Is(err, ErrRegistryClosed) {
+			return OpenResult{}, ipcerr.New("E_INVALID", "terminal window is closing")
+		}
 		return OpenResult{}, ipcerr.InternalErr(err)
 	}
 

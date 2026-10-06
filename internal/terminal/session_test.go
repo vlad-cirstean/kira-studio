@@ -345,3 +345,33 @@ func TestRegistryRejectsDuplicateID(t *testing.T) {
 		t.Fatal("second Open spawned a process for a duplicate id")
 	}
 }
+
+func TestRegistryOpenRacingCloseWindowRegistersNothing(t *testing.T) {
+	reg := NewRegistry()
+	started, release := make(chan struct{}), make(chan struct{})
+	reg.spawn = func(p OpenParams) (*Session, error) {
+		close(started)
+		<-release
+		return newSession(p)
+	}
+	errc := make(chan error, 1)
+	col := &collector{}
+	go func() {
+		_, err := reg.Open(OpenParams{ID: "late", WindowKey: "w1", Cwd: t.TempDir(), Cols: 80, Rows: 24, OnData: col.onData, OnExit: col.onExit})
+		errc <- err
+	}()
+	<-started
+	reg.CloseWindow("w1")
+	close(release)
+	if err := <-errc; err != ErrRegistryClosed {
+		t.Fatalf("Open error = %v, want ErrRegistryClosed", err)
+	}
+	if reg.get("late") != nil || len(reg.AgentSessions()) != 0 {
+		t.Fatal("session registered under a closed window")
+	}
+
+	reg.CloseAll()
+	if _, err := reg.Open(OpenParams{ID: "after", WindowKey: "w2", Cwd: t.TempDir(), Cols: 80, Rows: 24}); err != ErrRegistryClosed {
+		t.Fatalf("Open after CloseAll = %v, want ErrRegistryClosed", err)
+	}
+}

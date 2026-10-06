@@ -33,7 +33,7 @@ const closeGracePeriod = 2 * time.Second
 // actually return (F1/P108 Part 2). On Linux readLoop closes the master exitDrain after the shell
 // exits, so a surviving job no longer stalls Close; this bound remains for a shell that survives
 // SIGKILL and for darwin, where the blocking master cannot be interrupted. Close's own callers —
-// Registry.CloseAll/CloseWindow, in turn both apps' TerminalService.Shutdown (on the app-quit
+// Registry.CloseAll/CloseWindow, in turn ShutdownBound (on the app-quit
 // teardown path, before db.Close()) and shell.OpenWindow's own per-window close — must never hang
 // on one stuck session, so this is a second, independent bound, not a substitute for the SIGKILL
 // escalation above it.
@@ -48,6 +48,10 @@ const exitDrain = 200 * time.Millisecond
 // still spawning — the registry rejects it before touching the PTY, per §4/§17.1's
 // TestRegistryRejectsDuplicateID.
 var ErrDuplicateSession = errors.New("terminal: session id already in use")
+
+// ErrRegistryClosed is Open's error when CloseAll ran, or CloseWindow ran for the session's own
+// window, while the spawn was in flight — the new session is closed instead of registered.
+var ErrRegistryClosed = errors.New("terminal: window or registry closed during open")
 
 // Session is one live PTY: the process, the master fd, and the single reader goroutine that owns
 // both (§4). Every exported method is safe to call from any goroutine.
@@ -322,6 +326,12 @@ type Registry struct {
 	mu       sync.Mutex
 	sessions map[string]*Session
 	byWindow map[string]map[string]struct{}
+	// closed is set by CloseAll; pending maps a reserved id to its window while its spawn is in
+	// flight, and doomed marks those whose window closed meanwhile.
+	closed  bool
+	pending map[string]string
+	doomed  map[string]struct{}
+	spawn   func(OpenParams) (*Session, error)
 
 	// OnChange, when set, is called — outside the mutex, so it may safely call back into
 	// AgentSessions below — after Open registers a new agent session and after remove deletes one
@@ -335,6 +345,9 @@ func NewRegistry() *Registry {
 	return &Registry{
 		sessions: map[string]*Session{},
 		byWindow: map[string]map[string]struct{}{},
+		pending:  map[string]string{},
+		doomed:   map[string]struct{}{},
+		spawn:    newSession,
 	}
 }
 
@@ -344,23 +357,40 @@ func NewRegistry() *Registry {
 // (§17.1's TestRegistryRejectsDuplicateID).
 func (r *Registry) Open(p OpenParams) (*Session, error) {
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return nil, ErrRegistryClosed
+	}
 	if _, exists := r.sessions[p.ID]; exists {
 		r.mu.Unlock()
 		return nil, ErrDuplicateSession
 	}
 	r.sessions[p.ID] = nil // reserved: a spawn is in flight for this id
+	r.pending[p.ID] = p.WindowKey
 	r.mu.Unlock()
 
-	sess, err := newSession(p)
-	if err != nil {
-		r.mu.Lock()
+	sess, err := r.spawn(p)
+	r.mu.Lock()
+	doomed := r.closed
+	if _, ok := r.doomed[p.ID]; ok {
+		doomed = true
+	}
+	delete(r.pending, p.ID)
+	delete(r.doomed, p.ID)
+	if err != nil || doomed {
 		delete(r.sessions, p.ID)
 		r.mu.Unlock()
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+		// Close waits on readLoop's done channel, so the loop must run to reap the shell.
+		sess.unregister = func() {}
+		go sess.readLoop()
+		sess.Close()
+		return nil, ErrRegistryClosed
 	}
 	sess.unregister = func() { r.remove(p.WindowKey, p.ID) }
 
-	r.mu.Lock()
 	r.sessions[p.ID] = sess
 	if r.byWindow[p.WindowKey] == nil {
 		r.byWindow[p.WindowKey] = map[string]struct{}{}
@@ -465,6 +495,11 @@ func (r *Registry) WindowOf(id string) (string, bool) {
 // opened it even when the renderer never gets to ack.
 func (r *Registry) CloseWindow(key string) {
 	r.mu.Lock()
+	for id, w := range r.pending {
+		if w == key {
+			r.doomed[id] = struct{}{}
+		}
+	}
 	ids := make([]string, 0, len(r.byWindow[key]))
 	for id := range r.byWindow[key] {
 		ids = append(ids, id)
@@ -482,6 +517,7 @@ func (r *Registry) CloseWindow(key string) {
 // cost once per open terminal instead of ~once total.
 func (r *Registry) CloseAll() {
 	r.mu.Lock()
+	r.closed = true
 	ids := make([]string, 0, len(r.sessions))
 	for id, sess := range r.sessions {
 		if sess != nil {
