@@ -230,6 +230,51 @@ No other block 3 finding. Verified:
   grpc-go. `maskGrpcError`/`maskGrpcResult` run before the terminal event and history. P108 F1,
   F4, F11, F13 hold.
 
+### Block 4: Postman import and export
+
+#### F12 (medium) nested collection quadratic decode: a small deep file costs gigabytes and can crash the app
+
+- `apps/kira-studio/internal/postman/parse.go:135-193` (`walkItems` recursion), `:137-138`
+  (`decodeArray`/`decodeObject` per level), `collection.go:212-233` (each `json.Unmarshal` into
+  `json.RawMessage` copies the whole subtree); `parse_limit_test.go` covers size only.
+- Scenario: a collection whose folders nest N deep with a payload at the bottom. Every level
+  re-validates and re-copies the remaining subtree, and the recursion keeps every level's `obj`
+  alive, so allocation is about N x payload and live memory grows with depth too. Probe (2 MiB
+  file, raw body at the leaf): depth 250 allocated 1.0 GiB in 2.1 s; depth 500, 3.0 GiB in 4.8 s;
+  depth 1000, 7.0 GiB in 7.2 s. Go's decoder allows nesting to 10,000, so a 64 MiB file
+  (`maxCollectionBytes`) at depth ~3,000 needs on the order of 100 GiB; the Wails process is
+  OOM-killed while importing a file a colleague shared. Postman itself caps nothing, but no real
+  collection nests past a few dozen folders.
+- Fix: refuse a folder depth past a fixed cap (e.g. 64, reported in the error) and an item count
+  cap in `walkItems`; better, decode once: unmarshal the whole document into a typed recursive
+  struct whose leaves stay `json.RawMessage` (one copy total) instead of re-decoding each level.
+  Add a deep-nesting case to `parse_limit_test.go`.
+
+#### F13 (medium) saved example responses keep `originalRequest.auth` in `origin_json`
+
+- `apps/kira-studio/internal/postman/parse.go:153-163` (`stripSensitiveOrigin` removes item
+  `auth`/secret `variable` values, `stripRequestAuthOrigin` removes `request.auth`), `:216-246`.
+- Scenario: Postman exports a request's saved examples as `item.response[]`, each with an
+  `originalRequest` that repeats the request including its `auth` block (bearer token, basic
+  password, API key). Import strips `request.auth` but leaves `response[].originalRequest.auth`
+  in the item origin, so the plaintext credential is written unencrypted to `api_items.origin_json`
+  and re-emitted on every export: the exact leak P108 F8 closed for `request.auth`. Probe: item
+  with `request.auth` `REQSECRET` and `response[0].originalRequest.auth` `RESPSECRET`; the stored
+  origin had no `REQSECRET` but kept `"auth":{"type":"bearer","bearer":[{"key":"token","value":"RESPSECRET"}]}`.
+- Fix: in `walkItems`, also walk `origin["response"]` and apply `stripRequestAuthOrigin` to each
+  entry's `originalRequest`. Add the case to `roundtrip_test.go`'s strip assertions.
+
+No other block 4 finding. Verified:
+- `Parse` refusals (size, non-object, no `info`, v2.0/v1 gate); non-object items, `item` as an
+  object (folder kept with no children; the object survives only in origin), `request` string form, `url`
+  string/object with `raw`/`host`/`path` arrays, unknown `body.mode` (defaults to none), formdata
+  `src` string/null/array never kept as a path (P21 F3/F5), `file` body path never kept,
+  graphql envelope, header string form, variable non-string values (`decodeScalarString`).
+- `$alias` rewrite runs before origin comparison on both export and `ShedOrigin` (P108 F7).
+  `Write` uses `SetEscapeHTML(false)`, skips gRPC items, blanks secret variable values.
+- `CollectionsService.Import`/`Export` and `writeFileAtomically` unchanged since P108 F18/F19.
+- Candidate 4: confirmed, F12.
+
 ## Coverage
 
 - Block 1 (HTTP client): done. Reviewed `httpclient/{client,options,body,cookies,timeline,wire,errors}.go`,
@@ -241,7 +286,11 @@ No other block 3 finding. Verified:
 - Block 3 (gRPC client): done. Reviewed `grpcclient/{target,call,descriptors,reflect,proto,errors}.go`,
   `bridge/grpc.go` (Describe, Call, runServerStream, coalescer, recordGrpcHistory, masking,
   mapGrpcError), `repos/grpc_history.go` caps.
-- Block 4: not reached.
+- Block 4 (Postman): done. Reviewed `postman/{parse,body,write,collection}.go` in full,
+  `url.go` (`ImportURL`, `reconstructURL`, `reconstructQuery`, `joinStringOrArray`) and
+  `aliases.go` skimmed (P108 F7 path only; round-trip corpus is its guard); `bridge/collections.go` Import/Export unchanged
+  (git log). Note: commit `3d8d09a` holds blocks 2 and 3 (two commits raced; the block 3 commit
+  found nothing left to commit).
 - Block 5: not reached.
 - Block 6: not reached.
 - Block 7: not reached.
