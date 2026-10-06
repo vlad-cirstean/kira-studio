@@ -1,6 +1,4 @@
-import { z } from 'zod';
-import { type MutationRowOp, mutationRowOpSchema } from '../domain/mutations';
-import { localFilePathSchema } from '../domain/object-store';
+import type { MutationRowOp } from '../domain/mutations';
 import { type SortSpec, sortSpecSchema } from '../domain/queries';
 import type { Page } from './page';
 
@@ -35,19 +33,6 @@ export type PageCursor =
   | { mode: 'after'; token: string }
   | { mode: 'before'; token: string };
 
-export const pageCursorSchema = /*#__PURE__*/ z.discriminatedUnion('mode', [
-  /*#__PURE__*/ z.object({ mode: z.literal('offset'), offset: z.number().int().min(0) }),
-  /*#__PURE__*/ z.object({ mode: z.literal('after'), token: z.string() }),
-  /*#__PURE__*/ z.object({ mode: z.literal('before'), token: z.string() }),
-]);
-
-const pageSizeSchema = /*#__PURE__*/ z.union([
-  z.literal(10),
-  z.literal(100),
-  z.literal(1000),
-  z.literal(10000),
-]);
-
 /** The wire form: `path` is the encoded string (P1 D6). engine/data.ts decodes it. */
 export interface ReadRequestWire {
   opId: string; // renderer-generated (D2)
@@ -61,18 +46,6 @@ export interface ReadRequestWire {
   cursor: PageCursor;
 }
 
-export const readRequestWireSchema = /*#__PURE__*/ z.object({
-  opId: z.string(),
-  tabId: z.string().nullable(),
-  connectionId: z.string(),
-  path: z.string(),
-  projection: /*#__PURE__*/ z.array(z.string()).nullable(),
-  filter: z.string().max(4096).nullable(),
-  sort: sortSpecSchema.nullable(),
-  pageSize: pageSizeSchema,
-  cursor: pageCursorSchema,
-});
-
 export interface CountRequestWire {
   opId: string;
   tabId: string | null;
@@ -83,15 +56,6 @@ export interface CountRequestWire {
   refresh?: boolean;
 }
 
-export const countRequestWireSchema = /*#__PURE__*/ z.object({
-  opId: z.string(),
-  tabId: z.string().nullable(),
-  connectionId: z.string(),
-  path: z.string(),
-  filter: z.string().max(4096).nullable(),
-  refresh: z.boolean().optional(),
-});
-
 export interface InvalidateRequestWire {
   connectionId: string;
   path: string;
@@ -100,12 +64,6 @@ export interface InvalidateRequestWire {
    *  instead, via DATA_OP.mutate, not this channel. */
   scope?: 'all' | 'pages';
 }
-
-export const invalidateRequestWireSchema = /*#__PURE__*/ z.object({
-  connectionId: z.string(),
-  path: z.string(),
-  scope: /*#__PURE__*/ z.enum(['all', 'pages']).optional(),
-});
 
 export interface ReadResponse {
   page: Page;
@@ -126,12 +84,6 @@ export interface PreviewRequestWire {
   ops: MutationRowOp[];
 }
 
-export const previewRequestWireSchema = /*#__PURE__*/ z.object({
-  connectionId: z.string(),
-  path: z.string(),
-  ops: /*#__PURE__*/ z.array(mutationRowOpSchema),
-});
-
 export interface PreviewResponse {
   statements: string[];
 }
@@ -143,14 +95,6 @@ export interface MutateRequestWire {
   path: string;
   ops: MutationRowOp[];
 }
-
-export const mutateRequestWireSchema = /*#__PURE__*/ z.object({
-  opId: z.string(),
-  tabId: z.string().nullable(),
-  connectionId: z.string(),
-  path: z.string(),
-  ops: /*#__PURE__*/ z.array(mutationRowOpSchema),
-});
 
 export interface MutateResponse {
   affectedRows: number;
@@ -164,14 +108,6 @@ export interface ExecuteRequestWire {
   statements: string[];
 }
 
-export const executeRequestWireSchema = /*#__PURE__*/ z.object({
-  opId: z.string(),
-  tabId: z.string().nullable(),
-  connectionId: z.string(),
-  path: z.string(),
-  statements: /*#__PURE__*/ z.array(z.string()).min(1),
-});
-
 export interface ExecuteResponse {
   pages: Page[];
 }
@@ -184,24 +120,15 @@ export interface ObjectDownloadRequestWire {
   destPath: string;
 }
 
-export const objectDownloadRequestWireSchema = /*#__PURE__*/ z.object({
-  opId: z.string(),
-  tabId: z.string().nullable(),
-  connectionId: z.string(),
-  path: z.string(),
-  destPath: localFilePathSchema,
-});
-
 export interface ObjectDownloadResponse {
   bytes: number;
 }
 
-export const cacheStatsSchema = /*#__PURE__*/ z.object({
-  l2Bytes: z.number(),
-  l2BudgetBytes: z.number(),
-  l2Entries: z.number(),
-  l2Hits: z.number(),
-  l2Misses: z.number(),
-  l3Entries: z.number(),
-});
-export type CacheStats = z.infer<typeof cacheStatsSchema>;
+export interface CacheStats {
+  l2Bytes: number;
+  l2BudgetBytes: number;
+  l2Entries: number;
+  l2Hits: number;
+  l2Misses: number;
+  l3Entries: number;
+}

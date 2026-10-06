@@ -36,3 +36,12 @@ Stream A did not edit those files.
   half; before it, no row has the bit set.
 - Binary payloads: held as Part 5 F4's `design-decision` (encoding flag vs marker); no renderer
   change until that decision lands.
+
+## P168 Part 5 F7 (low): stale wire-schema comment in fkPreview
+
+- Owner file: `apps/kira-studio/frontend/src/views/grid/fkPreview.ts:63` (Stream C).
+- Source: `P168-part5-findings.md` F7. Part 5 deleted the dead `readRequestWireSchema` (Go
+  `Validate` is the wire gate). The comment still says a literal `pageSize: 2` fails
+  `readRequestWireSchema` with `E_BAD_REQUEST`.
+- Fix: comment-only. Say Go `ReadRequestWire.Validate` rejects a `pageSize` other than
+  10/100/1000/10000 (`adapterhost/wire.go`, error code `E_QUERY`).

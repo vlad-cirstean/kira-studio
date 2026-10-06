@@ -122,9 +122,12 @@ func (r *Router) respondPing(session *Session, id int) {
 
 func decodeAndValidate[T interface{ Validate() error }](payload json.RawMessage, out *T) error {
 	if err := json.Unmarshal(payload, out); err != nil {
-		return err
+		return adapters.New(adapters.CodeQuery, err.Error(), err)
 	}
-	return (*out).Validate()
+	if err := (*out).Validate(); err != nil {
+		return adapters.New(adapters.CodeQuery, err.Error(), err)
+	}
+	return nil
 }
 
 func (r *Router) handleDataOp(session *Session, op string, id int, payload json.RawMessage) {

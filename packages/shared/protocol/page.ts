@@ -1,18 +1,6 @@
-import { z } from 'zod';
-
 export type { PageKind } from '../caps';
 
 export type TypeClass = 'number' | 'text' | 'boolean' | 'temporal' | 'binary' | 'json' | 'other';
-
-export const typeClassSchema = /*#__PURE__*/ z.enum([
-  'number',
-  'text',
-  'boolean',
-  'temporal',
-  'binary',
-  'json',
-  'other',
-]);
 
 export interface ColumnDescriptor {
   name: string;
@@ -27,15 +15,6 @@ export interface ColumnDescriptor {
    *  never detects the concept (console results, or an adapter that hasn't wired detection yet). */
   generated: boolean;
 }
-
-export const columnDescriptorSchema = /*#__PURE__*/ z.object({
-  name: z.string(),
-  dataType: z.string(),
-  typeClass: typeClassSchema,
-  nullable: z.boolean(),
-  isPrimaryKey: z.boolean(),
-  generated: z.boolean(),
-});
 
 /**
  * One column of one page. Three exactly-sized buffers (D4) and no per-row object:
@@ -59,8 +38,8 @@ export interface PagePosition {
    *  src/ tests/`) finds no consumer. Every adapter writes it (some as the size requested, some as
    *  the size actually served — the two disagree by design where an adapter overshoots or clamps,
    *  e.g. redis/read.ts's SCAN-family round overshoot), but nothing downstream reads it back, so
-   *  "requested or served?" has no observable answer. Not removed: it is on this validated wire
-   *  schema and on every page every adapter builds, so deleting it would be an eleven-adapter
+   *  "requested or served?" has no observable answer. Not removed: it is on the wire
+   *  and on every page every adapter builds, so deleting it would be an eleven-adapter
    *  change to delete something harmless. */
   pageSize: number;
   hasMore: boolean;
@@ -69,18 +48,9 @@ export interface PagePosition {
   strategy: 'keyset' | 'offset' | 'cursor' | 'offsetWindow' | 'batch';
 }
 
-export const pagePositionSchema = /*#__PURE__*/ z.object({
-  offset: z.number().int().nullable(),
-  pageSize: z.number().int(),
-  hasMore: z.boolean(),
-  nextToken: z.string().nullable(),
-  prevToken: z.string().nullable(),
-  strategy: /*#__PURE__*/ z.enum(['keyset', 'offset', 'cursor', 'offsetWindow', 'batch']),
-});
-
 // P48 F23: a page that is the whole result — no offset, no continuation, nothing more to fetch.
 // Ten adapters' console/read paths wrote this six-field literal out by hand, its only variable
-// being pageSize; the wire shape lives here beside its own schema, not under engine/adapters/,
+// being pageSize; the wire shape lives here, not under engine/adapters/,
 // since callers span SQL and non-SQL adapters alike.
 export function unpagedPosition(rowCount: number): PagePosition {
   return {
@@ -567,55 +537,6 @@ export function createStreamPageBuilder(opts: {
     },
   };
 }
-
-/**
- * The envelope-only schema (§4a): running Zod over every cell of a 600 000-cell page would
- * cost more than the query. Pair with `assertPageStructure` for the typed-array invariants.
- */
-export const tabularPageEnvelopeSchema = /*#__PURE__*/ z.object({
-  kind: z.literal('tabular'),
-  columns: /*#__PURE__*/ z.array(columnDescriptorSchema),
-  rowCount: z.number().int().min(0),
-  position: pagePositionSchema,
-  truncatedCells: z.number().int().min(0),
-  byteSize: z.number().int().min(0),
-  fetchedAt: z.number(),
-});
-
-export const documentPageEnvelopeSchema = /*#__PURE__*/ z.object({
-  kind: z.literal('document'),
-  rowCount: z.number().int().min(0),
-  position: pagePositionSchema,
-  byteSize: z.number().int().min(0),
-  fetchedAt: z.number(),
-});
-
-export const keyValuePageEnvelopeSchema = /*#__PURE__*/ z.object({
-  kind: z.literal('keyvalue'),
-  redisType: /*#__PURE__*/ z.enum(['string', 'hash', 'list', 'set', 'zset', 'stream', 'object']),
-  ttlMs: z.number().int().nullable(),
-  memoryBytes: z.number().int().nullable(),
-  rowCount: z.number().int().min(0),
-  position: pagePositionSchema,
-  byteSize: z.number().int().min(0),
-  fetchedAt: z.number(),
-});
-
-export const streamPageEnvelopeSchema = /*#__PURE__*/ z.object({
-  kind: z.literal('stream'),
-  rowCount: z.number().int().min(0),
-  position: pagePositionSchema,
-  byteSize: z.number().int().min(0),
-  fetchedAt: z.number(),
-  visibilityTimeoutSeconds: z.number().int().nullable(),
-});
-
-export const pageEnvelopeSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
-  tabularPageEnvelopeSchema,
-  documentPageEnvelopeSchema,
-  keyValuePageEnvelopeSchema,
-  streamPageEnvelopeSchema,
-]);
 
 function assertChunkStructure(chunk: TextColumnChunk, rowCount: number, label: string): void {
   if (!(chunk.data instanceof Uint8Array)) throw new Error(`${label}.data is not a Uint8Array`);

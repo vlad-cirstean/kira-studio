@@ -16,8 +16,8 @@ import (
 const maxFilterChars = 4096
 
 func validFilter(f *string) error {
-	if f != nil && len([]rune(*f)) > maxFilterChars {
-		return fmt.Errorf("filter exceeds %d characters", maxFilterChars)
+	if f != nil && model.UTF16Len(*f) > maxFilterChars {
+		return fmt.Errorf("filter exceeds %d UTF-16 units", maxFilterChars)
 	}
 	return nil
 }

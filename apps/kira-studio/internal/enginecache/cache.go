@@ -10,7 +10,7 @@ import (
 // CacheStats is data-ops.ts's CacheStats, six ints. A16 governs how the router merges this with
 // the Node engine's own stats during coexistence — that merge lives in the router, not here.
 // JSON tags matter here, not just style: this struct crosses the wire directly as a data-plane
-// response/event payload, and the renderer's cacheStatsSchema expects these exact lowercase-first
+// response/event payload, and the renderer's CacheStats expects these exact lowercase-first
 // key names — without the tags, encoding/json would emit "L2Bytes" and the renderer's zod parse
 // would fail (its own decode is more forgiving, matching case-insensitively, which is exactly the
 // kind of one-way compatibility that hides this bug until the marshal side is exercised).
