@@ -28,6 +28,20 @@ function patch(fields: Partial<HttpRequestTabRecord['state']['settings']>): void
   patchHttpRequestTabState(props.tab.id, { settings: { ...props.tab.state.settings, ...fields } });
 }
 
+// The schema persists `int().min(0)`: a fractional or negative value would fail hydrate (resetting
+// the whole request) and Go's JSON decode. Empty/NaN keeps the previous value.
+function boundedInt(
+  e: Event,
+  range: { readonly min: number; readonly max: number },
+): number | undefined {
+  const input = e.target as HTMLInputElement;
+  const raw = Number(input.value);
+  if (input.value.trim() === '' || !Number.isFinite(raw)) return undefined;
+  const value = Math.min(range.max, Math.max(range.min, Math.trunc(raw)));
+  input.value = String(value);
+  return value;
+}
+
 const settings = computed(() => props.tab.state.settings);
 const global = computed(() => settingsStore.api);
 
@@ -39,14 +53,16 @@ function onHttpVersionInherit(inherit: boolean): void {
 }
 
 function onRequestTimeoutMsInput(e: Event): void {
-  patch({ requestTimeoutMs: Number((e.target as HTMLInputElement).value) });
+  const value = boundedInt(e, REQUEST_TIMEOUT_MS_RANGE);
+  if (value !== undefined) patch({ requestTimeoutMs: value });
 }
 function onRequestTimeoutMsInherit(inherit: boolean): void {
   patch({ requestTimeoutMs: inherit ? null : global.value.requestTimeoutMs });
 }
 
 function onMaxResponseMbInput(e: Event): void {
-  patch({ maxResponseMb: Number((e.target as HTMLInputElement).value) });
+  const value = boundedInt(e, MAX_RESPONSE_MB_RANGE);
+  if (value !== undefined) patch({ maxResponseMb: value });
 }
 function onMaxResponseMbInherit(inherit: boolean): void {
   patch({ maxResponseMb: inherit ? null : global.value.maxResponseMb });
@@ -67,7 +83,8 @@ function onFollowRedirectsInherit(inherit: boolean): void {
 }
 
 function onMaxRedirectsInput(e: Event): void {
-  patch({ maxRedirects: Number((e.target as HTMLInputElement).value) });
+  const value = boundedInt(e, MAX_REDIRECTS_RANGE);
+  if (value !== undefined) patch({ maxRedirects: value });
 }
 function onMaxRedirectsInherit(inherit: boolean): void {
   patch({ maxRedirects: inherit ? null : global.value.maxRedirects });
