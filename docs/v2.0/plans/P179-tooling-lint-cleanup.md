@@ -219,4 +219,22 @@ Never `--no-verify`, never `git stash`. A failing hook or check gets fixed in th
 
 ## 6. Result
 
-(Implementer fills: commit hashes per group, final `lint:dead` output, check results.)
+Commits (on `p168-stream-a`, base `7fff004`):
+
+- `4d9c800` chore(knip): register SFC and CSS compilers per workspace (4.1)
+- `3779fa6` refactor(studio): give grid tuning knobs their own values (4.2)
+- `6bc3d44` refactor(git-core): give PATCH_UNCHANGED its own literal (4.3)
+- `7e5054a` refactor(git-ui): one read-only commit row menu builder (4.4)
+- `b580c01` refactor(page): drop aliased byte budgets (4.5)
+- `8c2c2c9` chore(knip): fail on duplicate exports (4.6)
+
+Deviation: adding `vue` to the four manifests turns on Biome's vue domain for them. That
+surfaced one lint error, an empty root `<template>` in `packages/theme/src/components/TooltipAnchorBridge.vue`
+(not in section 3's list). Fixed in 4.1 with `<template><slot /></template>`; renders the same
+(no slot content passed). Biome reports 23 warnings and 18 infos (mostly
+`useVueMultiWordComponentNames`); none fail the hook, left as is.
+
+Checks: `bun run lint:dead` exit 0, empty output. `bun run lint` (0 errors), `typecheck`,
+`lint:go` (0 issues), `go build ./...`, `go test` page, s3, testsupport (s3 container suite skips
+without Docker), `bun test` git-core, git-ui, studio unit (1249 pass). Grep for the old constant
+names clean outside `docs/v1*/`, `docs/v2.0/plans/`, `SPEC.md`.
