@@ -1,6 +1,7 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
 import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 
@@ -97,7 +98,7 @@ const URI_CONNECTION: ConnectionSummary = {
   port: null,
   database: null,
   username: null,
-  uri: 'postgresql://uriuser@10.0.0.9:5555/uridb',
+  uri: null, // P181: a summary never carries the stored URI
   options: {},
   preconnect: null,
   preconnectSidecar: false,
@@ -195,8 +196,45 @@ const CONTROL: ControlSnapshot[] = [
 
   {
     channel: IPC.connectionsReveal,
-    args: { id: URI_CONNECTION.id },
-    response: { password: 'secretpw', error: null },
+    args: { id: URI_CONNECTION.id, confirmed: false },
+    response: {
+      outcome: 'revealed',
+      password: null,
+      uri: 'postgresql://uriuser:secretpw@10.0.0.9:5555/uridb',
+      error: null,
+    },
+  },
+  // A URI-mode save with the URI never shown sends uri: null ("unchanged"), never a stale string.
+  {
+    channel: IPC.connectionsUpdate,
+    args: {
+      id: URI_CONNECTION.id,
+      input: {
+        name: 'URI Connection',
+        kind: 'postgres',
+        color: 'none',
+        mode: 'uri',
+        readOnly: false,
+        host: null,
+        port: null,
+        database: null,
+        username: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+        throttlePerSec: 0,
+        mcpEnabled: false,
+        mcpDescription: '',
+        mcpReadMode: 'allow',
+        mcpWriteMode: 'prompt',
+        mcpDdlMode: 'deny',
+        mcpAutoExplain: true,
+        password: null,
+      },
+    },
+    response: URI_CONNECTION,
   },
   // Every `Edit` menu click on Test PG reveals its (password-less) secret first — same answer
   // every time, so a single snapshot for this id covers all three edit-opens below.
@@ -278,7 +316,8 @@ const CONTROL: ControlSnapshot[] = [
 ];
 
 test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relaunch }) => {
-  const { window: page } = await relaunch({ control: CONTROL });
+  const { window: page, control } = await relaunch({ control: CONTROL });
+  await installClipboardSpy(page);
 
   // --- P42 D34: a connection already stored with a retired colour (orange, dropped from the
   // picker by D35) still lists and still paints its own rail. ---------------------------------
@@ -372,7 +411,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   expect(await page.inputValue('[data-testid="connection-uri"]')).not.toContain('hunter2');
   await page.click('[data-testid="connection-cancel"]');
 
-  // --- URI mode with an embedded password: stored URI is passwordless, reveal() has it ----
+  // --- URI mode: the whole stored URI is ciphertext (P181) -------------------------------
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
   await page.fill('[data-testid="connection-name"]', 'URI Connection');
@@ -384,28 +423,45 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 
-  // What the backend actually stripped the password down to is this test's own fixture
-  // (URI_CONNECTION), not something to re-query here (no `window.kira` any more — CLAUDE.md's
-  // P57 finding) — so what's left to prove from the UI is that the renderer displays whatever it
-  // was handed correctly: the row renders, and re-opening it for edit still shows URI mode.
   const uriConnRow = await connectionRow(page, 'URI Connection');
   await expect(uriConnRow).toBeVisible();
+  const revealCalls = () => control.log().filter((e) => e.channel === IPC.connectionsReveal);
+  const uriField = page.locator('[data-testid="connection-uri"]');
+
+  // Opening Edit shows the URI fully masked: empty, password-typed, nothing derived from it, and
+  // no reveal call. Flipping to fields has no URI to convert until it is shown.
   await uriConnRow.click({ button: 'right' });
   await page.click('[data-testid="menu-item-edit"]');
   await expect(page.locator('[data-testid="mode-uri"]')).toHaveClass(/active/);
-
-  // P2 R2: opening a URI-mode connection for edit must not load a plaintext secret into the
-  // draft — there is no password input to show it in while `mode === 'uri'` (the URI text is the
-  // only thing this dialog exposes there). Flipping to fields mode is the only way to see what
-  // the draft's password field actually holds — it must be empty, not a revealed secret.
-  //
-  // P14 D1: this now holds for both modes, for a stronger reason than P2 R2's own — the dialog no
-  // longer reveals anything at all on open, fields or URI, so the CONTROL fixture's own
-  // connectionsReveal snapshots above (for both URI_CONNECTION and TEST_PG_GREEN) go uncalled by
-  // this spec now; that is expected, not a gap, since nothing here presses the eye button.
+  await expect(uriField).toHaveValue('');
+  await expect(uriField).toHaveAttribute('type', 'password');
+  await expect(uriField).toHaveAttribute('placeholder', 'Unchanged — click the eye to reveal');
   await page.click('[data-testid="mode-fields"]');
-  await expect(page.locator('[data-testid="connection-password"]')).toHaveValue('');
+  await expect(page.locator('[data-testid="mode-uri"]')).toHaveClass(/active/);
+  await expect(page.locator('.uri-note')).toContainText('Show the URI first');
+  expect(revealCalls()).toHaveLength(0);
+
+  // Save with the URI never shown: the matching snapshot above only answers uri: null.
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+  expect(revealCalls()).toHaveLength(0);
+
+  // Show decrypts through the gated reveal and fills the field.
+  await uriConnRow.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-edit"]');
+  await page.click('[aria-label="Show URI"]');
+  await expect(uriField).toHaveValue('postgresql://uriuser:secretpw@10.0.0.9:5555/uridb');
+  await expect(uriField).toHaveAttribute('type', 'text');
+  expect(revealCalls()).toHaveLength(1);
   await page.click('[data-testid="connection-cancel"]');
+
+  // Copy URI on a URI-mode row is a reveal too.
+  await uriConnRow.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-copy-uri"]');
+  await expect
+    .poll(() => lastClipboardWrite(page))
+    .toBe('postgresql://uriuser:secretpw@10.0.0.9:5555/uridb');
+  expect(revealCalls()).toHaveLength(2);
 
   // --- color change via the dialog and via the context menu, both apply -------------------
   await (await connectionRow(page, 'Test PG')).click({ button: 'right' });

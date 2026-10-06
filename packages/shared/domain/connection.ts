@@ -90,6 +90,8 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   database: z.string().nullable(),
   username: z.string().nullable(),
   password: z.string().nullable(), // present on the way IN only; never on the way OUT (D9)
+  // Input: null = unchanged (URI mode, masked and never revealed), blank is refused, else replaces.
+  // Never carries a value on the way out (P181) — see connectionSummarySchema.
   uri: z.string().nullable(),
   options: /*#__PURE__*/ z.record(z.string(), z.unknown()),
   // P11: optional shell command run before connect (e.g. a port-forward). A first-class column
@@ -186,16 +188,26 @@ export const connectionInputSchema = connectionFieldsSchema.superRefine((input, 
       }
     }
   } else {
-    if (!input.uri || input.uri.trim() === '') {
+    if (input.uri !== null && input.uri.trim() === '') {
       ctx.addIssue({ code: 'custom', path: ['uri'], message: 'A connection URI is required.' });
     }
   }
 });
 
+// Query keys whose value is a secret fields mode cannot store; mirrors the Go side's
+// secretOptionKeys (connections/uri.go). Lowercase — compare case-insensitively.
+export const SECRET_OPTION_KEYS: ReadonlySet<string> = /*#__PURE__*/ new Set([
+  'password',
+  'sslpassword',
+  'tlscertificatekeyfilepassword',
+  'proxypassword',
+]);
+
 export type ConnectionInput = z.infer<typeof connectionInputSchema>;
 
 // What the renderer gets. Note the absence of `password` — this is D9 enforced by the type.
 export const connectionSummarySchema = connectionFieldsSchema.omit({ password: true }).extend({
+  uri: z.null(), // P181: the stored URI is ciphertext, only the gated reveal returns it
   id: z.string(),
   sortOrder: z.number(),
   createdAt: z.string(),

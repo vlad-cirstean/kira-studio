@@ -10,6 +10,7 @@ import {
   EXPLAIN_SUPPORTED_KINDS,
   FILE_KINDS,
   MIN_SERVER_VERSION,
+  SECRET_OPTION_KEYS,
 } from '@shared/domain/connection';
 import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
@@ -33,7 +34,7 @@ import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
 import {
@@ -45,6 +46,7 @@ import {
 } from '../state/maskRules';
 import { schemaDialectFor } from '../state/schemas';
 import EngineIcon from '../theme/EngineIcon.vue';
+import { revealConnectionSecret } from './state/connectionReveal';
 
 const confirmDialogStore = useConfirmDialogStore();
 const connectionsStore = useConnectionsStore();
@@ -155,44 +157,42 @@ const showPassword = ref(false);
 // start. Editing an existing connection starts un-revealed; pressing the eye is what fetches the
 // real secret, gated behind local authentication (onReveal, below).
 const revealed = ref(!isEdit.value);
+// Only the mode-flip messages: nothing derives display from the URI, which stays masked (P181).
 const uriNote = ref('');
 const testState = ref<{ status: 'idle' | 'testing' | 'ok' | 'error'; message?: string }>({
   status: 'idle',
 });
 const fieldErrors = ref<Record<string, string>>({});
 
-function refreshUriNote(): void {
-  const d = draft.value;
-  if (!d) return;
-  const parsed = d.uri ? parseConnectionUri(d.uri) : null;
-  uriNote.value = parsed
-    ? `${parsed.host ?? '?'}:${parsed.port ?? '?'} / ${parsed.database ?? '(default)'}${d.password && !parsed.password ? ' (password kept separately)' : ''}`
-    : 'Cannot be parsed into fields — will be used as-is.';
-}
-
-onMounted(() => {
-  if (draft.value?.mode === 'uri') refreshUriNote();
-});
-
 function setMode(mode: 'fields' | 'uri'): void {
   const d = draft.value;
   if (!d || mode === d.mode) return;
+  uriNote.value = '';
 
   if (mode === 'uri') {
-    // The URI field is plain text: keep the password out of it; it stays in the draft and Save
-    // still sends it.
+    // Keep the password out of the URI text; it stays in the draft and Go folds it into the
+    // stored URI on Save.
     d.uri = formatConnectionUri({ ...d, password: null });
     d.mode = 'uri';
-    refreshUriNote();
     return;
   }
 
+  // Masked and never shown: the draft holds no URI to convert.
+  if (d.uri === null) {
+    uriNote.value = 'Show the URI first to switch it to fields.';
+    return;
+  }
   // URI -> fields: only flip if it round-trips (§8.12); otherwise stay in URI mode and say why.
-  const parsed = d.uri ? parseConnectionUri(d.uri) : null;
+  const parsed = parseConnectionUri(d.uri);
   if (!parsed || !canRoundTripToFields(parsed, d.kind)) {
     uriNote.value = parsed
       ? 'This URI cannot be represented as fields (multi-host, socket path, or unsafe characters) — staying in URI mode.'
       : 'Cannot be parsed into fields — will be used as-is.';
+    return;
+  }
+  const secretKey = Object.keys(parsed.params).find((k) => SECRET_OPTION_KEYS.has(k.toLowerCase()));
+  if (secretKey) {
+    uriNote.value = `This URI holds a secret parameter (${secretKey}) that fields mode cannot store — staying in URI mode.`;
     return;
   }
   d.host = parsed.host;
@@ -202,9 +202,8 @@ function setMode(mode: 'fields' | 'uri'): void {
   if (parsed.password) d.password = parsed.password;
   d.options = parsed.params;
   d.mode = 'fields';
-  // Fields mode is now authoritative; a stale URI (which can carry a password in memory)
-  // must not linger — the backend also refuses to store/return `uri` outside URI mode, but
-  // there is no reason to keep it around in the draft either.
+  // Fields mode is authoritative; a stale URI (which can carry a password in memory) must not
+  // linger in the draft.
   d.uri = null;
 }
 
@@ -218,18 +217,13 @@ function setPort(value: string): void {
   d.port = Number.isNaN(n) ? null : n;
 }
 
+// Typing replaces the masked value, so the eye is a plain toggle from here on (same as
+// onPasswordInput). Options are derived from the URI in Go, never copied here.
 function setUri(value: string): void {
   const d = draft.value;
   if (!d) return;
   d.uri = value;
-  // options only used to sync from a parsed URI on the fields<->URI mode switch (see toggleMode
-  // above) — which never runs for a connection created directly in URI mode (SQS's only mode).
-  // Without this, an endpoint override in the URI's query string (e.g. SQS's LocalStack
-  // `?endpoint=...`) never reaches `draft.options`, so the resolved config falls through to
-  // real AWS instead. A URI that doesn't parse leaves `d.options` alone rather than clearing it.
-  const parsed = parseConnectionUri(value);
-  if (parsed) d.options = parsed.params;
-  refreshUriNote();
+  revealed.value = true;
 }
 
 function onKindChange(kind: ConnectionKind): void {
@@ -298,47 +292,36 @@ async function onTest(): Promise<void> {
     : { status: 'error', message: result.error };
 }
 
-// P14 D6: the backend decides, this just renders what comes back. requestReveal recurses exactly
-// once, for the confirmation-required -> user confirms -> re-ask-with-confirmed:true path; every
-// other outcome is terminal.
-//
 // P108 Part 12 F4: this dialog stays mounted across a draft swap (openCreateDialog/openEditDialog
 // Object.assign a new draft into the same reactive `dialog` in place — no close/reopen — so the
 // menu-bar New Connection, or closing and opening a different Edit, can replace
-// connectionDialogStore.draft while an OS auth prompt or the confirm dialog above is still up).
-// `target`/`targetEditingId` pin down which draft this reveal was requested for; every await
-// re-checks identity before touching state, so a reveal that outlives its own draft writes (and
-// shows) a secret into a draft the user never asked to reveal, instead of bailing quietly.
-async function requestReveal(id: string, confirmed: boolean): Promise<void> {
+// connectionDialogStore.draft while an OS auth prompt or the confirm dialog is still up).
+// `target`/`targetEditingId` pin down which draft this reveal was requested for;
+// revealConnectionSecret re-checks stillCurrent after every await, so a reveal that outlives its
+// own draft never writes (or shows) a secret into a draft the user never asked to reveal.
+async function requestReveal(id: string): Promise<void> {
   const target = draft.value;
   const targetEditingId = connectionDialogStore.editingId;
   const stillCurrent = (): boolean =>
     connectionDialogStore.draft === target && connectionDialogStore.editingId === targetEditingId;
 
-  const result = await control.connectionsReveal(id, confirmed);
-  if (!stillCurrent()) return;
-  switch (result.outcome) {
-    case 'revealed':
-      if (target) target.password = result.password;
-      revealed.value = true;
-      showPassword.value = true;
-      return;
-    case 'cancelled':
-      // D11: the user cancelled the OS prompt on purpose — nothing to show for it.
-      return;
-    case 'confirmation-required': {
-      const name = target?.name || 'this connection';
-      const ok = await confirmDialogStore.confirmDialog(
-        `Show the saved password for "${name}"? It will be displayed in plain text.`,
-        { danger: false },
-      );
-      if (!stillCurrent()) return;
-      if (ok) await requestReveal(id, true);
-      return;
-    }
-    default:
-      if (stillCurrent()) connectionDialogStore.error = result.error ?? 'Could not reveal the saved password.';
+  const result = await revealConnectionSecret(
+    id,
+    target?.name || 'this connection',
+    target?.mode === 'uri' ? 'uri' : 'fields',
+    stillCurrent,
+  );
+  if (!result) return;
+  if (result.outcome === 'error') {
+    connectionDialogStore.error = result.error;
+    return;
   }
+  if (target) {
+    target.password = result.password;
+    if (result.uri !== null) target.uri = result.uri;
+  }
+  revealed.value = true;
+  showPassword.value = true;
 }
 
 // P108 Part 12 F4: revealed/showPassword are plain refs, set once at setup — a draft swap while
@@ -357,10 +340,11 @@ watch(
 function onReveal(): void {
   const id = connectionDialogStore.editingId;
   if (!id) return;
-  void requestReveal(id, false);
+  void requestReveal(id);
 }
 
-// Not yet revealed: the eye button is the reveal action itself (gated in Go). Once revealed (or
+// Shared by the password and URI inputs (only one is on screen at a time). Not yet revealed: the
+// eye button is the reveal action itself (gated in Go). Once revealed (or
 // for a brand-new connection, which was never gated to begin with), it's a free client-side mask
 // toggle — no second round trip, no second prompt (F8/D5).
 function onEyeClick(): void {
@@ -886,13 +870,23 @@ const preconnectText = computed({
           <template v-else>
             <div class="flex flex-col gap-1 flex-1 text-kira-md">
               <Label class="leading-none text-muted-foreground">Connection URI</Label>
-              <Input
-                :model-value="draft.uri ?? ''"
-                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
-                data-testid="connection-uri"
-                @update:model-value="(v) => setUri(String(v))"
-                @blur="refreshUriNote"
-              />
+              <div class="flex items-center gap-1">
+                <div class="flex-1 min-w-0">
+                  <Input
+                    :model-value="draft.uri ?? ''"
+                    :type="showPassword ? 'text' : 'password'"
+                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                    :placeholder="revealed ? undefined : 'Unchanged — click the eye to reveal'"
+                    data-testid="connection-uri"
+                    @update:model-value="(v) => setUri(String(v))"
+                  />
+                </div>
+                <TooltipIconButton
+                  :icon="showPassword ? 'eye-closed' : 'eye'"
+                  :label="showPassword ? 'Hide URI' : 'Show URI'"
+                  @click="onEyeClick"
+                />
+              </div>
             </div>
             <p class="font-data uri-note text-muted-foreground text-kira-sm">{{ uriNote }}</p>
           </template>

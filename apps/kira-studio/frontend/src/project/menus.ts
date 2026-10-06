@@ -12,6 +12,7 @@ import { useTabsStore } from '../state/tabs';
 import { dataQueryCommands } from '../state/viewCommands';
 import { nodeIcon } from '../theme/icons';
 import { copyNameItems, countItem, definitionItem, openItems, refreshItem } from './menuItems';
+import { revealConnectionSecret } from './state/connectionReveal';
 import {
   groupParentPath,
   rowKey,
@@ -144,15 +145,17 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       label: 'Copy URI',
       icon: 'link',
       shortcut: 'tree.copyUri',
-      // Always passwordless (D7) — for a fields-mode connection there is no stored URI, so
-      // one is synthesised from the fields, matching what the dialog itself would generate.
-      run: () => {
+      // Fields mode has no stored URI: one is synthesised from the fields, passwordless. A URI-mode
+      // URI is ciphertext and may hold secrets, so copying it is a gated reveal (P7, P181).
+      run: async () => {
         if (!record) return;
-        const uri =
-          record.mode === 'uri' && record.uri
-            ? record.uri
-            : formatConnectionUri({ ...record, password: null });
-        return copyText(uri);
+        if (record.mode !== 'uri')
+          return copyText(formatConnectionUri({ ...record, password: null }));
+        const result = await revealConnectionSecret(record.id, record.name, 'uri', () => true);
+        if (!result) return;
+        if (result.outcome === 'error') throw new Error(result.error);
+        if (result.uri === null) throw new Error('This connection has no stored URI.');
+        return copyText(result.uri);
       },
     },
     {

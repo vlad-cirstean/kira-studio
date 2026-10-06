@@ -261,3 +261,34 @@ test("a reveal error renders in the dialog's existing error slot", async ({ rela
   );
   await expect(page.locator('[data-testid="connection-password"]')).toHaveValue('');
 });
+
+test('a URI-mode connection reveals its URI, not a password', async ({ relaunch }) => {
+  const URI_CONN: ConnectionSummary = { ...CONN, id: 'conn-reveal-uri', mode: 'uri' };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [URI_CONN] },
+      {
+        channel: IPC.connectionsReveal,
+        args: { id: URI_CONN.id, confirmed: false },
+        response: {
+          outcome: 'revealed',
+          password: null,
+          uri: 'postgresql://u:hunter2@h:5432/db',
+          error: null,
+        },
+      },
+    ],
+  });
+
+  await openEdit(page);
+  const uriField = page.locator('[data-testid="connection-uri"]');
+  await expect(uriField).toHaveValue('');
+  await expect(uriField).toHaveAttribute('placeholder', 'Unchanged — click the eye to reveal');
+
+  await page.click('[aria-label="Show URI"]');
+  await expect(uriField).toHaveValue('postgresql://u:hunter2@h:5432/db');
+  await expect(uriField).toHaveAttribute('type', 'text');
+  await page.click('[aria-label="Hide URI"]');
+  await expect(uriField).toHaveAttribute('type', 'password');
+  expect(control.log().filter((e) => e.channel === IPC.connectionsReveal)).toHaveLength(1);
+});

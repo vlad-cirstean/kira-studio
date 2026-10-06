@@ -98,8 +98,12 @@ const studioControl = {
   connectionsReveal: (
     id: string,
     confirmed: boolean,
-  ): Promise<{ password: string | null; error: string | null; outcome: string }> =>
-    unwrap(ConnectionsService.Reveal({ id, confirmed })),
+  ): Promise<{
+    password: string | null;
+    uri: string | null;
+    error: string | null;
+    outcome: string;
+  }> => unwrap(ConnectionsService.Reveal({ id, confirmed })),
   // The generated TestResult's serverVersion/error are `string | null | undefined`; the pre-P57
   // shape was `string | undefined` only (no null) — normalized here rather than pushed onto
   // ConnectionDialog.vue, which assigns straight into its own `?: string` reactive state.
