@@ -7,6 +7,7 @@ import { type OpLogColumn, opLogMenuItems } from '@workbench/components/opLog';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
+import { useModeStore, workspaceKeyOf } from '../../state/mode';
 import { useOpsStore } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
@@ -20,6 +21,7 @@ import { ensureConnectedOnce } from '../../views/shared/useConnectionGate';
 const opsStore = useOpsStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
+const modeStore = useModeStore();
 const consoleViewStore = useConsoleViewStore();
 
 const columns: OpLogColumn[] = [
@@ -49,9 +51,11 @@ function tabTitleFor(record: OpRecord): string {
 // closed, never an error. A plain click just expands the row's command/error detail; it used to
 // also jump to the originating tab, which surprised anyone just trying to read a log entry.
 function revealTab(record: OpRecord): void {
-  if (record.tabId && tabsStore.tabs.some((t) => t.id === record.tabId)) {
-    tabsStore.activateTab(record.tabId);
-  }
+  const tab = record.tabId ? tabsStore.tabs.find((t) => t.id === record.tabId) : undefined;
+  if (!tab) return;
+  // The dock lists every mode's ops: switch to the tab's own workspace so the reveal is visible.
+  modeStore.setMode(workspaceKeyOf(tab));
+  tabsStore.activateTab(tab.id);
 }
 
 function opSqlDialect(record: OpRecord) {

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Field, FieldContent, FieldDescription } from '@theme/components/ui/field';
+import { Field, FieldContent, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { useId } from 'vue';
 import { useKeepAwakeStore } from '../../state/keepAwake';
 import { useSettingsStore } from '../../state/settings';
 import type { SettingsPaneProps } from './types';
+import { useActionError } from './useActionError';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Claude Code'"` branch. P127: the section used to also carry the
@@ -22,8 +23,9 @@ const settingsStore = useSettingsStore();
 
 // P87 §9: independent of the title bar's own keep-awake button — either source is enough to hold
 // the assertion.
+const { error: actionError, guard } = useActionError();
 const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = useBusyAction(
-  (enabled: boolean) => keepAwakeStore.setKeepAwakeAgentAware(enabled),
+  guard((enabled: boolean) => keepAwakeStore.setKeepAwakeAgentAware(enabled)),
 );
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
@@ -55,5 +57,6 @@ const keepAwakeAgentAwareId = useId();
         >
       </FieldContent>
     </Field>
+    <FieldError v-if="actionError" data-testid="settings-action-error">{{ actionError }}</FieldError>
   </div>
 </template>

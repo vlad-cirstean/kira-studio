@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Field, FieldContent, FieldDescription, FieldLegend } from '@theme/components/ui/field';
+import { Field, FieldContent, FieldDescription, FieldError, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { computed, useId } from 'vue';
@@ -13,6 +13,7 @@ import { useDbMcpStore } from '../../state/dbmcp';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
 import { useSettingsStore } from '../../state/settings';
 import type { SettingsPaneProps } from './types';
+import { useActionError } from './useActionError';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Database MCP'"` branch. Bypasses draft/Save entirely —
@@ -34,14 +35,15 @@ function tokenExpired(expiresAt: string): boolean {
   return !!expiresAt && new Date(expiresAt).getTime() <= Date.now();
 }
 
-const { busy: dbMcpToggling, run: onToggleDbMcpEnabled } = useBusyAction((enabled: boolean) =>
-  dbMcpStore.setDbMcpEnabled(enabled),
+const { error: actionError, guard } = useActionError();
+const { busy: dbMcpToggling, run: onToggleDbMcpEnabled } = useBusyAction(
+  guard((enabled: boolean) => dbMcpStore.setDbMcpEnabled(enabled)),
 );
-const { busy: dbMcpRegenerating, run: onRegenerateDbMcpToken } = useBusyAction(() =>
-  dbMcpStore.regenerateDbMcpToken(),
+const { busy: dbMcpRegenerating, run: onRegenerateDbMcpToken } = useBusyAction(
+  guard(() => dbMcpStore.regenerateDbMcpToken()),
 );
-const { busy: dbMcpInstalling, run: onInstallDbMcpClaudeCode } = useBusyAction(() =>
-  dbMcpStore.installDbMcpClaudeCode(),
+const { busy: dbMcpInstalling, run: onInstallDbMcpClaudeCode } = useBusyAction(
+  guard(() => dbMcpStore.installDbMcpClaudeCode()),
 );
 
 const dbMcpInstallMessage = computed(() => {
@@ -64,9 +66,9 @@ const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpStore.status.expiresA
 // M1 §6.1: exposure itself (deny by default) stays an instant toggle here. M2 §7.3: the three
 // permission modes and the description are edited in the connection's own MCP tab, not here —
 // this list stays a read-only glance plus the one control it already had.
-async function onToggleConnectionMcpEnabled(id: string, enabled: boolean): Promise<void> {
+const onToggleConnectionMcpEnabled = guard(async (id: string, enabled: boolean) => {
   await connectionsStore.setConnectionMcpEnabled(id, enabled);
-}
+});
 
 // M2 §7.3: the row's own description glance — first line only, "" when unset.
 function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
@@ -219,5 +221,6 @@ const dbMcpEnabledId = useId();
     <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-connections-empty">
       No connections yet — add one first.
     </p>
+    <FieldError v-if="actionError" data-testid="settings-action-error">{{ actionError }}</FieldError>
   </div>
 </template>
