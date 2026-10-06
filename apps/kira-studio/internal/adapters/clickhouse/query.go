@@ -58,7 +58,7 @@ func decodeRow(values []string, nullable []bool) []*string {
 // session, so every setting travels as a query parameter on every request). extraParams are
 // catalog bound values, sent as ClickHouse's own `param_<name>` convention (D19) — never
 // interpolated into the SQL text.
-func buildURL(h *Handle, queryID string, extraParams map[string]string, readOnly bool) string {
+func buildURL(h *Handle, queryID string, settings, extraParams map[string]string, readOnly bool) string {
 	q := url.Values{}
 	for k, v := range fixedSettings {
 		q.Set(k, v)
@@ -71,6 +71,9 @@ func buildURL(h *Handle, queryID string, extraParams map[string]string, readOnly
 	// it; Cancel's own KILL QUERY never does (readOnly is always false there).
 	if readOnly {
 		q.Set("readonly", "2")
+	}
+	for k, v := range settings {
+		q.Set(k, v)
 	}
 	for k, v := range extraParams {
 		q.Set("param_"+k, escapeParamValue(v))
@@ -96,8 +99,8 @@ func escapeParamValue(v string) string {
 
 var paramEscaper = strings.NewReplacer(`\`, `\\`, "\t", `\t`, "\n", `\n`, "\r", `\r`)
 
-func doRequest(ctx context.Context, h *Handle, sql, queryID string, extraParams map[string]string, readOnly bool) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, buildURL(h, queryID, extraParams, readOnly), strings.NewReader(sql))
+func doRequest(ctx context.Context, h *Handle, sql, queryID string, settings, extraParams map[string]string, readOnly bool) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, buildURL(h, queryID, settings, extraParams, readOnly), strings.NewReader(sql))
 	if err != nil {
 		return nil, adapters.New(adapters.CodeQuery, err.Error(), err)
 	}
@@ -127,7 +130,7 @@ const (
 // per row. Three terminal conditions (§4.3's own three, B12's third extraction site being the one
 // @clickhouse/client hid): a non-2xx status, a clean end of body, or a line that fails to parse as
 // a JSON array — which means the `__exception__` trailer has begun.
-func streamRows(resp *http.Response, onHeader func(names, types []string), onRow func(values []*string)) error {
+func streamRows(resp *http.Response, onHeader func(names, types []string), onRow func(values []*string) bool) error {
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
@@ -157,7 +160,10 @@ func streamRows(resp *http.Response, onHeader func(names, types []string), onRow
 			nullable = nullableColumns(values)
 			onHeader(names, values)
 		default:
-			onRow(decodeRow(values, nullable))
+			// false: the caller has what it needs. Returning closes the body, ending the read.
+			if !onRow(decodeRow(values, nullable)) {
+				return nil
+			}
 		}
 		lineIndex++
 	}
@@ -170,13 +176,13 @@ func streamRows(resp *http.Response, onHeader func(names, types []string), onRow
 // StreamQuery is query.ts's streamQuery — registers with track but never calls op.SetCommand():
 // console.go's execute() calls it once for the whole batch (P5 D9's precedent) and read.go calls
 // it itself before this runs.
-func StreamQuery(ctx context.Context, h *Handle, queryID string, sql string, op *adapters.OpCtx, track TrackQuery, onHeader func(names, types []string), onRow func(values []*string)) error {
+func StreamQuery(ctx context.Context, h *Handle, queryID string, sql string, op *adapters.OpCtx, track TrackQuery, settings map[string]string, onHeader func(names, types []string), onRow func(values []*string) bool) error {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return err
 	}
 	release := track(RunningQuery{QueryID: queryID})
 	_, err := adapters.RunWithAbortRace(ctx, release, func(reqCtx context.Context) (struct{}, error) {
-		resp, err := doRequest(reqCtx, h, sql, queryID, nil, h.ReadOnly)
+		resp, err := doRequest(reqCtx, h, sql, queryID, settings, nil, h.ReadOnly)
 		if err != nil {
 			return struct{}{}, err
 		}
@@ -194,7 +200,7 @@ func RunCommand(ctx context.Context, h *Handle, queryID string, sql string, op *
 	}
 	release := track(RunningQuery{QueryID: queryID})
 	return adapters.RunWithAbortRace(ctx, release, func(reqCtx context.Context) (int64, error) {
-		resp, err := doRequest(reqCtx, h, sql, queryID, nil, h.ReadOnly)
+		resp, err := doRequest(reqCtx, h, sql, queryID, nil, nil, h.ReadOnly)
 		if err != nil {
 			return 0, err
 		}
@@ -241,7 +247,7 @@ func RunCatalogQuery[T any](ctx context.Context, h *Handle, queryID string, sql 
 	}
 	release := track(RunningQuery{QueryID: queryID})
 	return adapters.RunWithAbortRace(ctx, release, func(reqCtx context.Context) ([]T, error) {
-		resp, err := doRequest(reqCtx, h, sql+"\nFORMAT JSON", queryID, params, h.ReadOnly)
+		resp, err := doRequest(reqCtx, h, sql+"\nFORMAT JSON", queryID, nil, params, h.ReadOnly)
 		if err != nil {
 			return nil, err
 		}

@@ -11,6 +11,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"regexp"
@@ -490,7 +491,27 @@ func TestSqlite(t *testing.T) {
 			nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
 			[]string{"name"},
 		),
+		testsupport.ConsoleResultCap(nodePath(cfg.ID, seg("database", "main")), func(n int) string {
+			return fmt.Sprintf("WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM s WHERE n < %d) SELECT n FROM s", n)
+		}),
 	)
+
+	t.Run("execute: console result stops at the byte cap", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		pages, err := a.Execute(context.Background(), model.ConsoleRequest{
+			Path:       nodePath(cfg.ID, seg("database", "main")),
+			Statements: []string{"WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM s WHERE n < 4) SELECT hex(zeroblob(1000)) FROM s"},
+			Cap:        page.ResultCap{Bytes: 3000},
+		}, adapters.NewOpCtx("op-byte-cap"))
+		if err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		p := pages[0].(page.TabularPage)
+		// 2000-byte cells: row 2 starts under the cap (2000 < 3000), row 3 starts over it (4000).
+		if p.RowCount != 2 || !p.Position.Truncated {
+			t.Fatalf("RowCount = %d, Truncated = %v, want 2, true", p.RowCount, p.Position.Truncated)
+		}
+	})
 
 	t.Run("count", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)

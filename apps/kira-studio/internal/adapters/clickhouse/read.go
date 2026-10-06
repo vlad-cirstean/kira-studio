@@ -211,10 +211,10 @@ func readPage(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx
 	builder := page.NewTabularPageBuilder(columns)
 	rowCount := 0
 	hasMore := false
-	err = StreamQuery(ctx, h, queryID, sql, op, track, func(names, types []string) {}, func(values []*string) {
+	err = StreamQuery(ctx, h, queryID, sql, op, track, nil, func(names, types []string) {}, func(values []*string) bool {
 		if rowCount >= req.PageSize {
 			hasMore = true
-			return
+			return true
 		}
 		cells := values[:len(projectedColumns)]
 		for k, i := range nullableCols {
@@ -227,6 +227,7 @@ func readPage(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx
 		}
 		_ = builder.AppendRow(cells)
 		rowCount++
+		return true
 	})
 	if err != nil {
 		return page.TabularPage{}, err

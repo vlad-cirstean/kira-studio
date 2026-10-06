@@ -7,6 +7,7 @@ package clickhouse_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -362,6 +363,9 @@ func TestClickHouse(t *testing.T) {
 			nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
 			[]string{"name"},
 		),
+		testsupport.ConsoleResultCap(nodePath(cfg.ID, seg("database", "kira_test")), func(n int) string {
+			return fmt.Sprintf("SELECT number FROM numbers(%d)", n)
+		}),
 	)
 
 	// P26 §3.1(3), the phase's flagship test for this adapter: catalog.go's own parser is exercised

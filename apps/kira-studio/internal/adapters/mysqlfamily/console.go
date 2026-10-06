@@ -60,45 +60,57 @@ func typeClassForField(dbType string) page.TypeClass {
 // never ExecContext: MY-1 confirmed a non-row-returning statement (UPDATE/INSERT/DDL) still comes
 // back through QueryContext with zero columns, the same signal SQLite's own StatementSync gives —
 // so the console needs no per-statement leading-keyword decision the way ClickHouse's does.
-func runRaw(ctx context.Context, conn Entry, query string, op *adapters.OpCtx, track TrackQuery) (rows [][]*string, dbTypes []string, names []string, err error) {
+// Rows stream into the page builder and stop at limit; Close then drains the rest off the wire
+// without holding it. A zero-column statement renders a generic "OK" status, not "<N> row(s)
+// affected": go-sql-driver's Rows type exposes no affected-row count over QueryContext (confirmed
+// against its own source — mysqlRows implements no driver.Result), a real, documented capability
+// loss (docs/ARCHITECTURE.md's per-engine section), not an oversight.
+func runRaw(ctx context.Context, conn Entry, query string, op *adapters.OpCtx, track TrackQuery, limit page.ResultCap) (page.TabularPage, error) {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
-		return nil, nil, nil, err
+		return page.TabularPage{}, err
 	}
 	release := track(conn.running())
 	done := conn.track()
 
-	type result struct {
-		rows    [][]*string
-		dbTypes []string
-		names   []string
-	}
-	r, err := adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (result, error) {
+	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (page.TabularPage, error) {
 		sqlRows, err := conn.QueryContext(queryCtx, query)
 		if err != nil {
-			return result{}, mapError(err)
+			return page.TabularPage{}, mapError(err)
 		}
 		defer sqlRows.Close()
 
 		types, err := sqlRows.ColumnTypes()
 		if err != nil {
-			return result{}, mapError(err)
+			return page.TabularPage{}, mapError(err)
 		}
-		names := make([]string, len(types))
+		if len(types) == 0 {
+			return adapters.SingleStatusPage("OK", "text"), nil
+		}
 		dbTypes := make([]string, len(types))
+		columns := make([]page.ColumnDescriptor, len(types))
 		for i, t := range types {
-			names[i] = t.Name()
 			dbTypes[i] = t.DatabaseTypeName()
+			columns[i] = page.ColumnDescriptor{
+				Name: t.Name(), DataType: dbTypes[i], TypeClass: typeClassForField(dbTypes[i]),
+				Nullable: true, IsPrimaryKey: false, Generated: false,
+			}
 		}
 
-		var out [][]*string
+		builder := page.NewTabularPageBuilder(columns)
+		truncated := false
 		for sqlRows.Next() {
+			// Next just proved another row exists; stopping here makes truncated mean "more existed".
+			if limit.Reached(builder.RowCount(), builder.Bytes()) {
+				truncated = true
+				break
+			}
 			raw := make([]sql.RawBytes, len(types))
 			dest := make([]any, len(types))
 			for i := range raw {
 				dest[i] = &raw[i]
 			}
 			if err := sqlRows.Scan(dest...); err != nil {
-				return result{}, mapError(err)
+				return page.TabularPage{}, mapError(err)
 			}
 			cells := make([]*string, len(types))
 			for i, rb := range raw {
@@ -108,42 +120,17 @@ func runRaw(ctx context.Context, conn Entry, query string, op *adapters.OpCtx, t
 				text := cellText(rb, dbTypes[i])
 				cells[i] = &text
 			}
-			out = append(out, cells)
+			if err := builder.AppendRow(cells); err != nil {
+				return page.TabularPage{}, err
+			}
 		}
+		// Close before reading the error: it drains what the cap left on the wire.
+		sqlRows.Close()
 		if err := sqlRows.Err(); err != nil {
-			return result{}, mapError(err)
+			return page.TabularPage{}, mapError(err)
 		}
-		return result{rows: out, dbTypes: dbTypes, names: names}, nil
+		return builder.Finish(page.CappedPosition(builder.RowCount(), truncated)), nil
 	})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return r.rows, r.dbTypes, r.names, nil
-}
-
-// buildPage is console.ts's buildPage. A non-row-returning statement (zero columns) renders a
-// generic "OK" status, not "<N> row(s) affected": go-sql-driver's Rows type exposes no affected-row
-// count over QueryContext (confirmed against its own source — mysqlRows implements no
-// driver.Result), a real, documented capability loss (docs/ARCHITECTURE.md's per-engine section),
-// not an oversight.
-func buildPage(rows [][]*string, dbTypes, names []string) page.TabularPage {
-	if len(names) == 0 {
-		return adapters.SingleStatusPage("OK", "text")
-	}
-
-	columns := make([]page.ColumnDescriptor, len(names))
-	for i, name := range names {
-		columns[i] = page.ColumnDescriptor{
-			Name: name, DataType: dbTypes[i], TypeClass: typeClassForField(dbTypes[i]),
-			Nullable: true, IsPrimaryKey: false, Generated: false,
-		}
-	}
-
-	builder := page.NewTabularPageBuilder(columns)
-	for _, row := range rows {
-		_ = builder.AppendRow(row)
-	}
-	return builder.Finish(page.UnpagedPosition(len(rows)))
 }
 
 // errTxCharacteristics is MySQL/MariaDB's "Transaction characteristics can't be changed while a
@@ -157,18 +144,18 @@ const errTxCharacteristics = 1568
 // take effect only once the wrap ends). On a violation, roll back and re-assert the session
 // default. A probe that succeeds outside a transaction only arms the next transaction read-only.
 func verifyReadOnlyWrap(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery) error {
-	_, _, _, err := runRaw(ctx, conn, "SET TRANSACTION READ ONLY", op, track)
+	_, err := runRaw(ctx, conn, "SET TRANSACTION READ ONLY", op, track, page.ResultCap{})
 	var myErr *mysql.MySQLError
 	inTx := errors.As(err, &myErr) && myErr.Number == errTxCharacteristics
 	if err != nil && !inTx {
 		return err
 	}
 	if inTx {
-		rows, _, _, err := runRaw(ctx, conn, "SHOW SESSION VARIABLES WHERE Variable_name IN ('transaction_read_only', 'tx_read_only')", op, track)
+		vars, err := runRaw(ctx, conn, "SHOW SESSION VARIABLES WHERE Variable_name IN ('transaction_read_only', 'tx_read_only')", op, track, page.ResultCap{})
 		if err != nil {
 			return err
 		}
-		if sessionReadOnly(rows) {
+		if sessionReadOnly(vars) {
 			return nil
 		}
 	}
@@ -184,13 +171,19 @@ func verifyReadOnlyWrap(ctx context.Context, conn Entry, op *adapters.OpCtx, tra
 
 // sessionReadOnly reports whether every variable row (MariaDB lists both spellings) is ON, and at
 // least one exists.
-func sessionReadOnly(rows [][]*string) bool {
-	for _, r := range rows {
-		if len(r) != 2 || r[1] == nil || (*r[1] != "ON" && *r[1] != "1") {
+func sessionReadOnly(p page.TabularPage) bool {
+	if len(p.Chunks) != 2 {
+		return false
+	}
+	for r := 0; r < p.RowCount; r++ {
+		if page.IsNull(p.Chunks[1], r) {
+			return false
+		}
+		if v := page.CellText(p.Chunks[1], r); v != "ON" && v != "1" {
 			return false
 		}
 	}
-	return len(rows) > 0
+	return p.RowCount > 0
 }
 
 // execute is console.ts's execute. readOnly closes the gap client.go's own
@@ -203,7 +196,7 @@ func sessionReadOnly(rows [][]*string) bool {
 // end the wrap (COMMIT through a comment-lexer gap, an implicit commit) or flip the session default
 // for what follows, so verifyReadOnlyWrap re-checks after every statement;
 // AssertNoTransactionEscalation is the cheap first line of defense.
-func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
+func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
@@ -233,11 +226,11 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return nil, err
 		}
-		rows, dbTypes, names, err := runRaw(ctx, conn, stmt, op, track)
+		p, err := runRaw(ctx, conn, stmt, op, track, limit)
 		if err != nil {
 			return nil, err
 		}
-		pages[i] = buildPage(rows, dbTypes, names)
+		pages[i] = p
 		if readOnly {
 			if err := verifyReadOnlyWrap(ctx, conn, op, track); err != nil {
 				return nil, err

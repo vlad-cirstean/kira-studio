@@ -1542,6 +1542,17 @@ func TestPostgres_ExecuteOnePagePerStatement(t *testing.T) {
 	}
 }
 
+// P174: the console stops at the result cap; cell-count and truncation flag are exact.
+func TestPostgres_ExecuteStopsAtResultCap(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	cfg := fixture.Config
+	testsupport.RunScenarios(t, connectedAdapter(t, fixture), cfg,
+		testsupport.ConsoleResultCap(nodePath(fixture, seg("database", "kira_test")), func(n int) string {
+			return fmt.Sprintf("SELECT generate_series(1, %d)", n)
+		}),
+	)
+}
+
 // 29. execute: a failing statement rejects the whole call — earlier statements already landed.
 func TestPostgres_ExecuteFailingStatementRejectsBatch(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)

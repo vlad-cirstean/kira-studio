@@ -583,6 +583,9 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
 			[]string{"name"},
 		),
+		testsupport.ConsoleResultCap(nodePath(cfg.ID, seg("database", "kira_test")), func(n int) string {
+			return fmt.Sprintf("WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM s WHERE n < %d) SELECT n FROM s", n)
+		}),
 	)
 
 	t.Run("count", func(t *testing.T) {

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -29,6 +30,8 @@ type rawResult struct {
 	rows    [][]*string
 	fields  []rawField
 	command string
+	// truncated: the row cap stopped the read with at least one more row available.
+	truncated bool
 }
 
 // runRaw is console.ts's runRaw: §8.14's own low-level runner, deliberately separate from
@@ -37,7 +40,7 @@ type rawResult struct {
 // the whole batch (P5 D9's precedent). Always text-mode (mirrors read.go's identity type parsing)
 // so every cell arrives as the server's own text representation, with no per-type Go conversion to
 // undo.
-func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op *adapters.OpCtx, track TrackQuery) (rawResult, error) {
+func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, limit page.ResultCap) (rawResult, error) {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return rawResult{}, err
 	}
@@ -58,7 +61,14 @@ func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op
 		}
 
 		var out [][]*string
+		held := 0
+		truncated := false
 		for rows.Next() {
+			// Next just proved another row exists; stopping here makes truncated mean "more existed".
+			if limit.Reached(len(out), held) {
+				truncated = true
+				break
+			}
 			dest := make([]any, len(descs))
 			cells := make([]*string, len(descs))
 			for i := range cells {
@@ -67,8 +77,24 @@ func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op
 			if err := rows.Scan(dest...); err != nil {
 				return rawResult{}, mapError(err)
 			}
+			// held mirrors what the page builder will keep. A cell past MaxCellBytes keeps one extra
+			// byte, enough for the builder to clip and flag it, so a huge cell is not held whole.
+			for i, c := range cells {
+				if c == nil {
+					continue
+				}
+				if len(*c) > page.MaxCellBytes {
+					clipped := strings.Clone((*c)[:page.MaxCellBytes+1])
+					cells[i] = &clipped
+					held += page.MaxCellBytes
+				} else {
+					held += len(*c)
+				}
+			}
 			out = append(out, cells)
 		}
+		// Close before reading the tag or error: it drains what the cap left on the wire.
+		rows.Close()
 		if err := rows.Err(); err != nil {
 			return rawResult{}, mapError(err)
 		}
@@ -78,7 +104,7 @@ func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op
 		// status cell's text for a statement with no output columns (buildPage, below), which is at
 		// least as faithful as console.ts's own documented approximation (`${command} ${rowCount}`),
 		// closer in fact since it is the server's own tag rather than a reconstruction of it.
-		return rawResult{rows: out, fields: fields, command: rows.CommandTag().String()}, nil
+		return rawResult{rows: out, fields: fields, command: rows.CommandTag().String(), truncated: truncated}, nil
 	})
 }
 
@@ -143,11 +169,11 @@ func buildPage(result rawResult, typeMeta map[uint32]pgTypeMeta) page.TabularPag
 		}
 		_ = builder.AppendRow(values)
 	}
-	return builder.Finish(page.UnpagedPosition(len(result.rows)))
+	return builder.Finish(page.CappedPosition(len(result.rows), result.truncated))
 }
 
 func lookupTypeNames(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, oids []uint32) (map[uint32]pgTypeMeta, error) {
-	result, err := runRaw(ctx, conn, "SELECT oid, typname, typtype FROM pg_type WHERE oid = ANY($1::oid[])", []any{oids}, op, track)
+	result, err := runRaw(ctx, conn, "SELECT oid, typname, typtype FROM pg_type WHERE oid = ANY($1::oid[])", []any{oids}, op, track, page.ResultCap{})
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +209,7 @@ func parseUint32(s string) (uint32, error) {
 // session default read-only. On a violation, roll back and re-assert the session default.
 func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery) error {
 	if conn.PgConn().TxStatus() == 'T' {
-		res, err := runRaw(ctx, conn, "SELECT current_setting('transaction_read_only'), current_setting('default_transaction_read_only')", nil, op, track)
+		res, err := runRaw(ctx, conn, "SELECT current_setting('transaction_read_only'), current_setting('default_transaction_read_only')", nil, op, track, page.ResultCap{})
 		if err != nil {
 			return err
 		}
@@ -209,7 +235,7 @@ func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpC
 // Wrapping the whole batch in an explicit BEGIN READ ONLY transaction closes every angle actually
 // tried against a real server except that one specific statement, which
 // AssertNoTransactionEscalation rejects outright before anything runs.
-func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
+func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
@@ -241,7 +267,7 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return nil, err
 		}
-		result, err := runRaw(ctx, conn, sql, nil, op, track)
+		result, err := runRaw(ctx, conn, sql, nil, op, track, limit)
 		if err != nil {
 			return nil, err
 		}

@@ -319,7 +319,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		return nil, err
 	}
 	seq := a.newOpSeq(op.OpID)
-	return execute(ctx, handle, op, a.trackerFor(op.OpID), req.Statements, func() string { return seq.next(a) })
+	return execute(ctx, handle, op, a.trackerFor(op.OpID), req.Statements, func() string { return seq.next(a) }, adapters.ConsoleCapFor(req))
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false, so no UI ever offers
@@ -344,7 +344,7 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 		return false, nil
 	}
 
-	resp, err := doRequest(ctx, handle, "KILL QUERY WHERE query_id = {qid:String} SYNC", "", map[string]string{"qid": queryID}, false)
+	resp, err := doRequest(ctx, handle, "KILL QUERY WHERE query_id = {qid:String} SYNC", "", nil, map[string]string{"qid": queryID}, false)
 	if err != nil {
 		a.deps.Log("warn", "clickhouse cancel("+opID+") failed: "+err.Error())
 		return false, nil

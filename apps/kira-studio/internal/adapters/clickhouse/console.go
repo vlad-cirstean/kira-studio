@@ -98,11 +98,15 @@ func isRowReturning(sql string) bool {
 	return rowReturningRE.MatchString(stripped)
 }
 
-func runRowReturning(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx, track TrackQuery, sql string) (page.TabularPage, error) {
+// cancelOnCloseSettings makes the server cancel a read when the client closes the connection at the
+// cap; allowed alongside the console's readonly=2.
+var cancelOnCloseSettings = map[string]string{"cancel_http_readonly_queries_on_client_close": "1"}
+
+func runRowReturning(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx, track TrackQuery, sql string, limit page.ResultCap) (page.TabularPage, error) {
 	var columns []page.ColumnDescriptor
 	var builder *page.TabularPageBuilder
-	rowCount := 0
-	err := StreamQuery(ctx, h, queryID, sql, op, track, func(names, types []string) {
+	truncated := false
+	err := StreamQuery(ctx, h, queryID, sql, op, track, cancelOnCloseSettings, func(names, types []string) {
 		// §8.14's console never consults the catalog — nullability/PK-ness are unknowable here;
 		// console results are always read-only regardless (mirrors mysql-family/console.go).
 		columns = make([]page.ColumnDescriptor, len(names))
@@ -114,11 +118,17 @@ func runRowReturning(ctx context.Context, h *Handle, queryID string, op *adapter
 			columns[i] = page.ColumnDescriptor{Name: name, DataType: t, TypeClass: typeClassFor(t), Nullable: true}
 		}
 		builder = page.NewTabularPageBuilder(columns)
-	}, func(values []*string) {
-		if builder != nil {
-			_ = builder.AppendRow(values)
-			rowCount++
+	}, func(values []*string) bool {
+		if builder == nil {
+			return true
 		}
+		// A row just arrived, so another existed; stopping makes truncated mean "more existed".
+		if limit.Reached(builder.RowCount(), builder.Bytes()) {
+			truncated = true
+			return false
+		}
+		_ = builder.AppendRow(values)
+		return true
 	})
 	if err != nil {
 		return page.TabularPage{}, err
@@ -126,11 +136,11 @@ func runRowReturning(ctx context.Context, h *Handle, queryID string, op *adapter
 	if builder == nil {
 		builder = page.NewTabularPageBuilder(columns)
 	}
-	return builder.Finish(page.UnpagedPosition(rowCount)), nil
+	return builder.Finish(page.CappedPosition(builder.RowCount(), truncated)), nil
 }
 
 // execute is console.ts's own execute.
-func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuery, statements []string, nextQueryID func() string) ([]page.Page, error) {
+func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuery, statements []string, nextQueryID func() string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
@@ -144,7 +154,7 @@ func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuer
 			return nil, err
 		}
 		if isRowReturning(sql) {
-			p, err := runRowReturning(ctx, h, nextQueryID(), op, track, sql)
+			p, err := runRowReturning(ctx, h, nextQueryID(), op, track, sql, limit)
 			if err != nil {
 				return nil, err
 			}
