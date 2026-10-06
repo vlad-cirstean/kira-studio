@@ -109,50 +109,54 @@ const listEl = useTemplateRef<HTMLElement>('list');
 
     <template v-else>
       <template v-if="groups.length > 0">
-      <div
-        ref="list"
-        class="kv:flex-1 kv:min-h-0 kv:overflow-auto"
-        role="listbox"
-        aria-label="Comments"
-      >
-        <div
+      <section ref="list" class="kv:flex-1 kv:min-h-0 kv:overflow-auto" aria-label="Comments">
+        <section
           v-for="group in groups"
           :key="group.path"
+          :aria-label="group.path"
           class="kv:border-t kv:border-panel-border kv:first:border-t-0"
         >
-          <div class="kv:pt-1 kv:px-2 kv:pb-0.5 kv:font-data kv:font-semibold kv:text-row-fg">
+          <div
+            class="kv:pt-1 kv:px-2 kv:pb-0.5 kv:font-data kv:font-semibold kv:text-row-fg"
+            aria-hidden="true"
+          >
             {{ group.path }}
           </div>
-          <div
-            v-for="c in group.comments"
-            :key="c.id"
-            class="kv:flex kv:flex-col kv:gap-0.5 kv:pt-0.5 kv:px-2 kv:pb-1 kv:cursor-pointer kv:hover:bg-hover"
-            role="option"
-            :aria-selected="false"
-            tabindex="0"
-            @click="emit('select-comment', group.path)"
-            @keydown.enter="emit('select-comment', group.path)"
-          >
-            <div class="kv:flex kv:items-center kv:gap-1">
-              <span class="kv:font-data kv:text-muted-foreground kv:text-sm">{{ lineLabel(c.range) }}</span>
-              <span
-                v-if="anchorTitle(c)"
-                class="codicon codicon-warning kv:text-diff-modified"
-                :data-kira-tip="anchorTitle(c)"
-                :aria-label="anchorTitle(c)"
-              ></span>
-              <TooltipIconButton
-                icon="trash"
-                label="Delete comment"
-                class="ml-auto"
-                :disabled="reviewComments.pending.value"
-                @click.stop="reviewComments.remove(c.id)"
-              />
-            </div>
-            <p class="kv:m-0 kv:pl-2.5 kv:whitespace-pre-wrap kv:text-row-fg kv:text-base">{{ c.body }}</p>
-          </div>
-        </div>
-      </div>
+          <ul class="kv:m-0 kv:p-0 kv:list-none">
+            <li
+              v-for="c in group.comments"
+              :key="c.id"
+              class="kv:relative kv:flex kv:flex-col kv:gap-0.5 kv:pt-0.5 kv:px-2 kv:pb-1 kv:hover:bg-hover"
+            >
+              <div class="kv:flex kv:items-center kv:gap-1">
+                <button
+                  type="button"
+                  class="kv:font-data kv:text-muted-foreground kv:text-sm kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:after:absolute kv:after:inset-0"
+                  :aria-label="`Open ${group.path} ${lineLabel(c.range)}`"
+                  @click="emit('select-comment', group.path)"
+                >
+                  {{ lineLabel(c.range) }}
+                </button>
+                <span
+                  v-if="anchorTitle(c)"
+                  class="codicon codicon-warning kv:text-diff-modified"
+                  role="img"
+                  :data-kira-tip="anchorTitle(c)"
+                  :aria-label="anchorTitle(c)"
+                ></span>
+                <TooltipIconButton
+                  icon="trash"
+                  label="Delete comment"
+                  class="relative z-10 ml-auto"
+                  :disabled="reviewComments.pending.value"
+                  @click="reviewComments.remove(c.id)"
+                />
+              </div>
+              <p class="kv:m-0 kv:pl-2.5 kv:whitespace-pre-wrap kv:text-row-fg kv:text-base">{{ c.body }}</p>
+            </li>
+          </ul>
+        </section>
+      </section>
       <AttributeTooltip :container="listEl" />
       </template>
 

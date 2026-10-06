@@ -168,6 +168,10 @@ async function handleReconnect(): Promise<void> {
   refsState.setRepoId(id);
 }
 
+function retryCompare(): void {
+  handleReconnect().catch((err: unknown) => reportAsyncError(err, "Couldn't compare"));
+}
+
 async function bootstrap(): Promise<void> {
   // P108 F7: a retry re-enters here after an earlier run already subscribed and constructed
   // states — unsubscribe and dispose that run's own before replacing them, so a failed run never
@@ -1012,9 +1016,15 @@ watch(
           Resolving comparison…
         </p>
 
-        <p v-else-if="review.phase.value === 'error'" class="kv:m-0 kv:p-3 kv:text-error">
-          Couldn't compare — {{ review.resolveError.value }}
-        </p>
+        <div
+          v-else-if="review.phase.value === 'error'"
+          class="kv:flex kv:flex-col kv:items-start kv:gap-1 kv:p-3"
+        >
+          <p class="kv:m-0 kv:text-error">Couldn't compare — {{ review.resolveError.value }}</p>
+          <Button variant="dialog" size="kira" data-testid="review-retry" @click="retryCompare">
+            Retry
+          </Button>
+        </div>
 
         <div
           v-else-if="review.phase.value === 'ask'"

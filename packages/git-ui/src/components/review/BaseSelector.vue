@@ -76,6 +76,13 @@ const sections = computed(() =>
   ),
 );
 
+/** `head` stays `undefined` until the first `refs.list` lands (and after a repo switch), so an
+ *  empty list then means "not loaded yet", not "no branch matches". */
+const refsLoading = computed(() => props.refsState.head.value === undefined);
+const hiddenCount = computed(
+  () => sections.value.branches.hiddenCount + sections.value.remoteBranches.hiddenCount,
+);
+
 /** The candidate shortlist minus whichever entry is already the current base — picking it again
  *  would be a no-op re-resolve for nothing the user could see change. */
 const suggested = computed<readonly BaseCandidate[]>(() => {
@@ -171,10 +178,17 @@ function onOpenAutoFocus(e: Event): void {
                 <span class="kv:truncate">{{ row.shortName }}</span>
               </button>
               <div
+                v-if="hiddenCount > 0"
+                class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
+                data-testid="base-selector-hidden"
+              >
+                {{ hiddenCount }} more — type to filter
+              </div>
+              <div
                 v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
                 class="kv:py-1 kv:px-2 kv:text-muted-foreground"
               >
-                No matching branches
+                {{ refsLoading ? 'Loading branches…' : 'No matching branches' }}
               </div>
             </section>
           </div>
