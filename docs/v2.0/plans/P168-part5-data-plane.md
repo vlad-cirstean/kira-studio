@@ -59,8 +59,8 @@ SPEC row and orchestrator agree on the name `P168-part5-data-plane.md`.
   decode of a crafted page; an oversized frame; a port request racing `onclose`).
 - **Checks:** `go vet ./apps/kira-studio/internal/{adapterhost,enginecache,page,tree,oplog,ipcfixture}/...`;
   `go test -race` over the same six packages; `bun test ST/unit/bridge-port.spec.ts
-  ST/unit/bridge-unwrap.spec.ts ST/unit/e2e-real-build-lock.spec.ts`; `bun run typecheck` (or the
-  repo's tsc entry) for `SP`/`SD`/`SF/bridge`. **Docker daemon is up in this container** at plan
+  ST/unit/bridge-unwrap.spec.ts ST/unit/e2e-real-build-lock.spec.ts`; `bun run typecheck` (covers
+  `SP`/`SD`/`SF/bridge` through the web, unit and tests projects). **Docker daemon is up in this container** at plan
   time (`docker info` succeeds). Run the real-container backend half of the IPC tier
   (`go test ./apps/kira-studio/internal/ipcfixture/...`, six engines, compares against committed
   fixtures; never `KIRA_IPC_FIXTURES=write` during review), the frontend half
@@ -162,9 +162,10 @@ on this branch and on `v2.0`. Review the whole chunk, not a diff.
   `views/{console,documents,grid,stream}/state.ts`, `views/grid/{fkPreview,pendingChanges,
   fakeData/generate}.ts`, `views/shared/{immediateMutation,keyvalue/mutations,keyvalue/state}.ts`,
   `workbench/{GenerateDataDialog,settings/CachePane}.vue`.
-- **TS, `SF/bridge/control.ts`/`index.ts`**: 43 files across `state/` (17), `views/*`, `api/state`,
-  `project/`, `workbench/`. `apiControl.ts` is imported only by `index.ts` (composition root).
-- **`port.ts`**: imported by `data.ts`, `index.ts`-free; test `bridge-port.spec.ts`.
+- **TS, `SF/bridge/control.ts`**: 47 files outside `SF/bridge` (`state/` 17, `views/*`, `api/state`,
+  `project/`, `workbench/`, tests); none import `index.ts` directly. `apiControl.ts` is imported
+  only by `index.ts` (composition root).
+- **`port.ts`**: imported only by `data.ts` in production; test `bridge-port.spec.ts`.
   `decodeFrame` (Studio) has exactly one caller, `port.ts:93` (verified).
 - **`SP` importers outside Part 5**: `SF/views/{grid,console,documents,stream,shared/*}`,
   `SF/state`, `SF/theme`, tests (`ui`, `unit`, `perf`, `fixtures/explain-plans`), the excluded
@@ -269,7 +270,8 @@ caching and back-pressure for all of them.
   copy. Check every field both ways: optional scalars (`TtlMs`, `MemoryBytes` absent vs 0),
   `VisibilityTimeoutSeconds` nil, `PagePosition.Offset` nil for keyset pages, `Strategy` enum,
   `NextToken`/cursor strings, `RedisType` enum incl. `object`, `TypeClass` mapping, `generated`
-  and `isPrimaryKey` flags, `FieldsAreColumns` (Go field: is it on the wire?), `Source` enum,
+  and `isPrimaryKey` flags, `FieldsAreColumns` (Go-only, read by `dbmcp` masking, not on the wire:
+  confirm intended and that no renderer path needs it), `Source` enum,
   `RowCount` int32. A field present in Go and absent in TS (or the reverse) is a finding.
 - **Chunk invariants**: offsets length `rowCount+1`, nulls `ceil(rowCount/8)`, truncated sorted;
   `assertPageStructure` (`SP/page.ts`) runs only in `data.ts` read/execute: which paths bypass it
@@ -338,7 +340,7 @@ caching and back-pressure for all of them.
   (`on(CHANNEL.*)`) return unsubscribers: callers that never call them are Stream C's concern, but
   a bridge-side leak is in scope.
 - `control.ts` re-export shim: still needed? (dead shim is a finding only if nothing imports it:
-  45 files import `bridge/control`).
+  47 files import `bridge/control`).
 
 ### 5.7 Fixtures and test tiers
 
@@ -420,7 +422,7 @@ Read `docs/v2.0/plans/P168-routed-from-streamA.md`, `P168-routed-to-stream-a.md`
   consumers, then tests). About 10.8k production lines plus 10.8k test lines: read tests only where
   they are the sole guard of a claim, or in block 7.
   1. **Contract and callees**: `SP/wire.fbs`, the adapter registry and `OpCtx` as callee only
-     (`SI/adapters/{adapter,registry}.go`), wire regeneration check (§0).
+     (`SI/adapters/{adapter,registry,live}.go`), wire regeneration check (§0).
   2. **adapterhost core**: `host`, `throttle`, `op`, `router`, `data`, `wire`.
   3. **Data frames and session**: `session`, `dataframe`, `frame`; Go side of `SI/page`
      (`chunk`, `scratch`, `builder`, `encode`).
@@ -488,8 +490,9 @@ Raised during planning discovery. Each is a lead, not a finding.
 10. `enqueueResponse` does not bound frame size; an error frame from a huge driver message
     (`session.go:160`, `dataframe.go:273-280`).
 11. `emitJSON` back-pressure to `oplog`: blocked producer or dropped `op:end` (`host.go:293`).
-12. `encodeSource` and `EncodePage` panic on unknown values; recovered by `HandleDataFrame` but
-    not on the `pushCacheStats` event path (`frame.go:197-205`, `encode.go:39`).
+12. `encodeSource` and `EncodePage` panic on unknown values (`frame.go:197-205`, `encode.go:39`);
+    `HandleDataFrame`'s `recover` covers the response path. Confirm no other encode path
+    (`pushCacheStats` encodes only `CacheStats`) can reach a panic outside that `recover`.
 
 ## 10. Out of scope
 
