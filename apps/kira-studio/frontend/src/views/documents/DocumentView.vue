@@ -327,7 +327,12 @@ function cancelCreate(): void {
   creatingNew.value = false;
 }
 
+// A second Save while the first awaits the server would insert a second document (no `_id` yet).
+const saving = ref(false);
+
 async function commitCreate(): Promise<void> {
+  if (saving.value) return;
+  saving.value = true;
   try {
     await saveNewDocument(props.tab.id, newBuffer.doc.value);
     documentViewStore.setActionError(props.tab.id, null);
@@ -335,6 +340,8 @@ async function commitCreate(): Promise<void> {
     newBuffer.reseed();
   } catch (err) {
     documentViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+  } finally {
+    saving.value = false;
   }
 }
 
@@ -621,7 +628,8 @@ watch(currentPage, (page) => {
 
 async function commitEdit(): Promise<void> {
   const id = editingId.value;
-  if (id === null) return;
+  if (id === null || saving.value) return;
+  saving.value = true;
   try {
     await saveDocumentEdit(props.tab.id, id, editBuffer.doc.value);
     documentViewStore.setActionError(props.tab.id, null);
@@ -629,6 +637,8 @@ async function commitEdit(): Promise<void> {
     editingId.value = null;
   } catch (err) {
     documentViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+  } finally {
+    saving.value = false;
   }
 }
 
@@ -1014,7 +1024,7 @@ onUnmounted(() => {
       <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
         <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" :show-compact="false" />
         <span class="flex-1 min-w-0"></span>
-        <Button variant="toolbar-primary" size="kira" data-testid="document-new-save" @click="commitCreate"
+        <Button variant="toolbar-primary" size="kira" data-testid="document-new-save" :disabled="saving" @click="commitCreate"
           >Save</Button
         >
         <Button variant="toolbar" size="kira" data-testid="document-new-cancel" @click="cancelCreate"
@@ -1154,7 +1164,7 @@ onUnmounted(() => {
                     <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
                       <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
                       <span class="flex-1 min-w-0"></span>
-                      <Button variant="toolbar-primary" size="kira" data-testid="document-edit-save" @click="commitEdit"
+                      <Button variant="toolbar-primary" size="kira" data-testid="document-edit-save" :disabled="saving" @click="commitEdit"
                         >Save</Button
                       >
                       <Button variant="toolbar" size="kira" data-testid="document-edit-cancel" @click="cancelEdit"

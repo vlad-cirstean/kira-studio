@@ -103,7 +103,7 @@ const saveError = ref<string | null>(null);
 
 async function onSave(): Promise<void> {
   const id = connectionId.value;
-  if (!id) return;
+  if (!id || saving.value) return;
   saveError.value = null;
   try {
     await saveDdl({ connectionId: id, ddl: draft.value });
