@@ -3,7 +3,7 @@
 Plan: `P168-part19-git-ui-components.md`. Base `1e2b327`; plan commit `d9d3b35`; HEAD reviewed
 `d9d3b35` (branch `p168-stream-b`). Reviewer reports only; fixes nothing.
 
-Status: blocks 1-4 done.
+Status: blocks 1-5 done.
 
 ## Checks (block 1, §1.1)
 
@@ -321,6 +321,75 @@ Status: blocks 1-4 done.
 - Fix: delete `flattenItems` and its test cases, reword the module doc to "roving-focus helpers
   for `BranchPicker.vue`'s row list", rewrap `searchResultsModel.ts:52-55`.
 
+### F20. Review "reviewed" checkbox cannot be toggled from the keyboard
+
+- Severity: medium. Verified (scratch probe on `fakeReviewHost`, `/review` with a target).
+- Where: `packages/git-ui/src/components/FileTree.vue:586` and `:714`
+  (`@keydown.space.prevent="onRowClick(index)"` on the treeitem/option row) around the reka
+  `Checkbox` at `:615-626` / `:743-754`; `onKeydown` (`:346-355`) claims Enter for the row.
+- Scenario: VS Code review sidebar, Space review sidebar or ADE window, Files pane. Tab to a
+  file's checkbox (it is a native tab stop) and press Space: the keydown bubbles to the row, whose
+  `.prevent` cancels the button activation, so no click reaches the checkbox (probe: `" "`
+  defaultPrevented, 0 clicks on `[role=checkbox]`, no mark) and the row opens the file instead.
+  Enter goes to the tree handler and pins the file. Mouse click works. Space and the ADE window
+  have no palette route (`toggleFileReviewed` is a VS Code `ui.action`), so a keyboard user there
+  cannot mark a file reviewed at all.
+- Fix: in the row's Space handler, return when `event.target` is not the row itself (or put
+  `@keydown.space.stop` on the `Checkbox`), and optionally map `x`/Space-on-row to
+  `toggleReviewed` when `reviewStates` is set. Add a keyboard case to
+  `review-interaction.spec.ts`.
+- `needs-other-part-file: apps/kira-space-vscode/tests/interaction/review-interaction.spec.ts
+  (Part 23)` for the guard.
+
+### F21. Opening a file from the detail, stash or working-tree pane fails silently
+
+- Severity: medium. Code-read.
+- Where: `packages/git-ui/src/components/DetailPane.vue:51-60` and `StashDetailPane.vue:41-50`
+  (`void props.actions.openInEditor(...)`; `createDetailActions.openInEditor` awaits
+  `editor.openDiff` with no catch, `state/detailActions.ts:105-117`);
+  `WorkingDetailPane.vue:22-31` (`void props.openFile(...)` into `App.vue:1544-1553`
+  `openWorkingDiff`, no catch).
+- Scenario: Space graph tab. Click a file in a commit whose change the host cannot resolve
+  (`hostHandlers.ts` throws "`<path>` is not one of commit `<sha>`'s changed files", or the
+  transport drops). The rejection is unhandled, nothing is announced, and the click looks dead.
+  The same class was fixed for `goToFile`, `openAllChanges`, `openPullRequest` and `openLink`
+  (each announces), but not for the primary file-open action.
+- Fix: catch in the three `onOpenFile` handlers and call `actions.announce("Couldn't open
+  <path> — <message>")`, skipping `transport-closed`; `App.vue`'s `openWorkingDiff` likewise.
+
+### F22. File tree structure: no keyboard route to the row menu, invalid tree children, duplicate ids
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/FileTree.vue:310-359` (`onKeydown` has no
+  `ContextMenu`/`Shift+F10` case, and rows have no actions button), `:674-692`/`:805-823`
+  (`Button` and `RowContextMenu` rendered inside `role="tree"`/`role="listbox"`), `:212-213`
+  (`rowId(index)` = `kv-file-tree-row-<n>`, the same in every instance).
+- Scenario: (a) "Copy path" and "Go to file" exist only in the right-click menu (G21 D11 made it
+  the one copy-path affordance), so keyboard users cannot reach either. (b) A tree/listbox may
+  only own treeitems/options; the "Show all N files" button sits inside it (axe
+  `aria-required-children`). (c) The review view mounts one tree per expanded commit plus the
+  Files pane, so `kv-file-tree-row-0` repeats in one document.
+- Fix: handle `ContextMenu` and `Shift+F10` in `onKeydown` (open the menu at the focused row's
+  rect, as `CommitGrid.openMenuFromKeyboard` does); move the button and menu outside the
+  `role` container; prefix row ids with a `useId()` value.
+
+### F23. Uncommitted-changes strip reads the display-row layout with a store row
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/UncommittedChangesStrip.vue:72-102` (`headRow` scans
+  store rows, then `layout.laneOf(row)`/`colorOf(row)`), `:104-107` (comment says the gutter must
+  match the grid's graph column, but it uses `graphColumnWidth(laneCount)` while the grid uses the
+  user-set `widths.graph` since P92 item 1).
+- Scenario: grouped mode (default on). `layout` is keyed by display row (`graphColumn.ts:30-32`).
+  When HEAD's tip is not the newest commit, its store row differs from its display row (group 0
+  is always row 0), so the dashed working-tree node takes the lane and colour of whichever commit
+  sits at that display row. During a relayout it also reads a layout that lags the plan (F11).
+  After a user resizes the graph column, the strip's label no longer lines up with the message
+  column.
+- Fix: map through `graphView.plan.value.displayRowOf(headRow)` (skip when `-1`), gate on
+  `layoutCurrent`, and pass the grid's `columnWidths.graph` in as the gutter width (or drop the
+  claim from the comment).
+
 ## Candidate fates (§9)
 
 - 1 (lanes blank after layout lands): dropped. Probe passed for expand, toggle and refresh;
@@ -404,4 +473,11 @@ holds; dispose checked in block 2.
   `pullStrategyModel.ts`, `rowMenuModel.ts` (gating table, tested). Stash ops pass the rendered
   `StashEntry` (server re-verifies `stash@{N}`). `MenuSections` ids: one menu renders at a time
   per section list, so `${item.id}-reason` does not collide.
-- Blocks 5-8: not reached yet.
+- Block 5: done. Reviewed `FileTree.vue` (script and both templates), `CommitMeta.vue` (actions,
+  PR row and link handling announce on failure; no `<style>` remains), `DetailPane`,
+  `StashDetailPane`, `WorkingDetailPane`, `UncommittedChangesStrip`,
+  `openAllChangesAnnounced.ts`. Skimmed with reason: `fileTreeModel.ts` (`capRows`, tested),
+  `icons/setiFileIcon.ts` (tested; mask URLs, no `v-html`), `icons/index.ts` (constants),
+  `icons/codicon.css` (font import). `FILE_TREE_ROW_CAP` plus "Show all" bounds a 50k-file
+  commit; the cap announcement fires once per boundary crossing.
+- Blocks 6-8: not reached yet.
