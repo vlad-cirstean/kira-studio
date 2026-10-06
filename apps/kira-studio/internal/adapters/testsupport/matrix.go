@@ -6,6 +6,7 @@ package testsupport
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -170,8 +171,10 @@ func runMatrixCase(t *testing.T, kind string, fixture any, deps adapters.Deps, b
 	if p := cfg.Password; p != nil && *p != "" && strings.Contains(err.Error(), *p) {
 		t.Error("Connect error text contains the connection password verbatim")
 	}
-	if p := passwordFromURI(cfg.URI); p != "" && strings.Contains(err.Error(), p) {
-		t.Error("Connect error text contains the URI-embedded password verbatim")
+	for _, secret := range secretsFromURI(cfg.URI) {
+		if strings.Contains(err.Error(), secret) {
+			t.Error("Connect error text contains a URI-embedded secret verbatim")
+		}
 	}
 	code, _ := adapters.CodeOf(err)
 	if c.Expect.FailWith != "" && code != c.Expect.FailWith {
@@ -195,32 +198,53 @@ func RunMatrix(t *testing.T, kind string, fixture any, base model.ResolvedConnec
 	}
 }
 
-// passwordFromURI extracts a uri-mode case's embedded password from its userinfo segment (a
-// read-only sibling of internal/connections' own unexported stripURIPassword, kept local since
-// that one isn't exported) — P29 F6's leak assertion needs it because a uri-mode Case carries the
-// password inside cfg.URI rather than cfg.Password.
-func passwordFromURI(uri *string) string {
+// uriSecretQueryKeys mirrors internal/connections' secretOptionKeys (a local copy: importing that
+// package here would invert the dependency).
+var uriSecretQueryKeys = map[string]bool{
+	"password": true, "sslpassword": true, "tlscertificatekeyfilepassword": true, "proxypassword": true,
+}
+
+// secretsFromURI extracts a uri-mode case's embedded secrets: the userinfo password plus the
+// decoded value of each secret query pair (P181). A uri-mode Case carries them inside cfg.URI
+// rather than cfg.Password, and the leak assertion needs every one.
+func secretsFromURI(uri *string) []string {
 	if uri == nil {
-		return ""
+		return nil
 	}
 	idx := strings.Index(*uri, "://")
 	if idx < 0 {
-		return ""
+		return nil
 	}
-	authority := (*uri)[idx+3:]
-	if i := strings.IndexAny(authority, "/?#"); i >= 0 {
-		authority = authority[:i]
+	rest := (*uri)[idx+3:]
+	authority, query := rest, ""
+	if i := strings.IndexAny(rest, "/?#"); i >= 0 {
+		authority = rest[:i]
+		if q := strings.IndexByte(rest[i:], '?'); q >= 0 {
+			query = rest[i+q+1:]
+			if h := strings.IndexByte(query, '#'); h >= 0 {
+				query = query[:h]
+			}
+		}
 	}
-	at := strings.LastIndex(authority, "@")
-	if at < 0 {
-		return ""
+
+	var out []string
+	if at := strings.LastIndex(authority, "@"); at >= 0 {
+		if colon := strings.IndexByte(authority[:at], ':'); colon >= 0 && colon+1 < at {
+			out = append(out, authority[colon+1:at])
+		}
 	}
-	userinfo := authority[:at]
-	colon := strings.IndexByte(userinfo, ':')
-	if colon < 0 {
-		return ""
+	for _, pair := range strings.Split(query, "&") {
+		key, raw, _ := strings.Cut(pair, "=")
+		if !uriSecretQueryKeys[strings.ToLower(key)] || raw == "" {
+			continue
+		}
+		value, err := url.QueryUnescape(raw)
+		if err != nil {
+			value = raw
+		}
+		out = append(out, value)
 	}
-	return userinfo[colon+1:]
+	return out
 }
 
 // RunScenarios applies the same Requires gate RunMatrix does, outside a matrix table (P26 §2.1) —
