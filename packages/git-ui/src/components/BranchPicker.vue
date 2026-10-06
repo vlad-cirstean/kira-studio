@@ -292,6 +292,9 @@ function onRowsKeydown(event: KeyboardEvent): void {
       void focusRow(focusedRowId.value);
       return;
     case 'Enter':
+      // Only the row itself: Enter on an inner button (actions, PR badge, main) activates natively.
+      if (event.target !== rowEl) return;
+      event.preventDefault();
       rowEl.querySelector<HTMLElement>('.kv-branch-row-main')?.click();
       return;
     default:
@@ -708,19 +711,6 @@ watch(visibleBranchNames, (names) => {
                   >{{ row.isHead ? "●" : "" }}</span
                 >
                 <span class="kv:truncate">{{ row.shortName }}</span>
-                <button
-                  v-if="prFor(row.shortName) && openExternalCapability"
-                  type="button"
-                  :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${prFor(row.shortName)!.state}`]"
-                  :data-kira-tip="prTooltip(row.shortName)"
-                  @click.stop="openPullRequest(prFor(row.shortName)!.number)"
-                >#{{ prFor(row.shortName)!.number }}</button>
-                <span
-                  v-else-if="prFor(row.shortName)"
-                  :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${prFor(row.shortName)!.state}`]"
-                  :data-kira-tip="prTooltip(row.shortName)"
-                  >#{{ prFor(row.shortName)!.number }}</span
-                >
                 <span
                   v-if="row.checkedOutIn"
                   class="kv:text-sm kv:px-0.5 kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm kv:text-muted-foreground"
@@ -730,6 +720,19 @@ watch(visibleBranchNames, (names) => {
                 </span>
                 <span v-if="formatTrack(row.track)" class="kv:text-sm kv:text-muted-foreground">{{ formatTrack(row.track) }}</span>
               </button>
+              <button
+                v-if="prFor(row.shortName) && openExternalCapability"
+                type="button"
+                :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${prFor(row.shortName)!.state}`]"
+                :data-kira-tip="prTooltip(row.shortName)"
+                @click.stop="openPullRequest(prFor(row.shortName)!.number)"
+              >#{{ prFor(row.shortName)!.number }}</button>
+              <span
+                v-else-if="prFor(row.shortName)"
+                :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${prFor(row.shortName)!.state}`]"
+                :data-kira-tip="prTooltip(row.shortName)"
+                >#{{ prFor(row.shortName)!.number }}</span
+              >
               <RowActionsButton
                 @click="openRefMenuFromButton(row, $event)"
                 @contextmenu="openRefMenu(row, $event)"
