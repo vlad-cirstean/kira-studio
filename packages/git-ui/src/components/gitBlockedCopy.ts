@@ -11,7 +11,7 @@
  * platforms' commands at once — the honest single-command copy §6.1 asks for, sourced from the
  * one place that can actually answer it.
  */
-import type { GitStatus } from '@kira/git-ipc';
+import type { GitStatus, HostKind } from '@kira/git-ipc';
 
 export type Platform = 'mac' | 'windows' | 'linux' | 'unknown';
 
@@ -40,20 +40,29 @@ export interface GitBlockedCopy {
   readonly detail: string;
 }
 
-export function gitBlockedCopy(status: BlockedGitStatus, platform: Platform): GitBlockedCopy {
+/** Where this host lets the user point at a git executable. */
+function gitPathHint(host: HostKind, vscodeSettingId: string): string {
+  return host === 'kira' ? 'Settings → Git → Git executable path' : vscodeSettingId;
+}
+
+export function gitBlockedCopy(
+  status: BlockedGitStatus,
+  platform: Platform,
+  host: HostKind,
+): GitBlockedCopy {
   switch (status.kind) {
     case 'notFound':
       return {
         title: 'Git was not found',
         detail:
           status.probed.length > 0
-            ? `Looked for git at: ${status.probed.join(', ')}. Install git, or set kiraSpace.git.path to point at it.`
-            : 'Install git, or set kiraSpace.git.path to point at it.',
+            ? `Looked for git at: ${status.probed.join(', ')}. Install git, or set ${gitPathHint(host, 'kiraSpace.git.path')} to point at it.`
+            : `Install git, or set ${gitPathHint(host, 'kiraSpace.git.path')} to point at it.`,
       };
     case 'tooOld':
       return {
         title: 'Git is too old',
-        detail: `Found ${status.detected} at ${status.path}; Kira Space needs at least ${status.required}. Run "${upgradeCommandFor(platform)}", or set ${status.settingId} to a newer git.`,
+        detail: `Found ${status.detected} at ${status.path}; Kira Space needs at least ${status.required}. Run "${upgradeCommandFor(platform)}", or set ${gitPathHint(host, status.settingId)} to a newer git.`,
       };
     case 'unusable':
       return {

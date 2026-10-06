@@ -810,7 +810,7 @@ watch(
 
     <template v-if="bootError">
       <div class="kv:flex kv:flex-col kv:gap-2 kv:p-3" data-testid="boot-error">
-        <p class="kv:m-0 kv:text-muted-foreground">Kira Space isn't reachable — {{ bootError }}</p>
+        <p class="kv:m-0 kv:text-muted-foreground">Couldn't load the repository — {{ bootError }}</p>
         <Button variant="dialog" size="kira" class="self-start" data-testid="boot-retry" @click="retryBootstrap">
           Retry
         </Button>

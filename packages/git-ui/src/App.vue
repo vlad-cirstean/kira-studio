@@ -1740,7 +1740,7 @@ onBeforeUnmount(() => {
       class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-center kv:text-fg"
       data-testid="boot-error"
     >
-      <p class="kv:m-0 kv:max-w-120 kv:text-muted-foreground">Kira Space isn't reachable — {{ bootError }}</p>
+      <p class="kv:m-0 kv:max-w-120 kv:text-muted-foreground">Couldn't load the repository — {{ bootError }}</p>
       <Button variant="dialog" size="kira" data-testid="boot-retry" @click="retryBootstrap">
         Retry
       </Button>
@@ -1757,7 +1757,7 @@ onBeforeUnmount(() => {
         role="status"
         data-testid="boot-error-banner"
       >
-        <span>Kira Space isn't reachable — {{ bootError }}</span>
+        <span>Couldn't load the repository — {{ bootError }}</span>
         <Button
           variant="dialog"
           size="kira"
@@ -1769,11 +1769,16 @@ onBeforeUnmount(() => {
         </Button>
       </div>
 
-      <GitBlockedPanel v-if="repoState.git.value.kind !== 'ok'" :status="repoState.git.value" />
+      <GitBlockedPanel
+        v-if="repoState.git.value.kind !== 'ok'"
+        :status="repoState.git.value"
+        :host="props.host"
+      />
 
       <NoRepositoryPanel
         v-else-if="!repoState.activeRepo.value"
         :repo-state="repoState"
+        :host="props.host"
         @repo-opened="handleRepoOpened"
       />
 

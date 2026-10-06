@@ -4,16 +4,20 @@
  * this holds — "the app does not start into a degraded mode" — so `App.vue` (W11) shows this in
  * place of the toolbar and list entirely, not layered over them.
  */
-import type { GitStatus } from '@kira/git-ipc';
+import type { GitStatus, HostKind } from '@kira/git-ipc';
 import { computed } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import { type BlockedGitStatus, detectPlatform, gitBlockedCopy } from './gitBlockedCopy.ts';
 
-const props = defineProps<{ status: GitStatus }>();
+const props = defineProps<{ status: GitStatus; host: HostKind }>();
 
 const copy = computed(() => {
   if (props.status.kind === 'ok') return null;
-  return gitBlockedCopy(props.status as BlockedGitStatus, detectPlatform(navigator.userAgent));
+  return gitBlockedCopy(
+    props.status as BlockedGitStatus,
+    detectPlatform(navigator.userAgent),
+    props.host,
+  );
 });
 </script>
 
