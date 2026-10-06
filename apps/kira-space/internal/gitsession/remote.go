@@ -103,7 +103,10 @@ func (e *RepoEntry) coreAskPass(ctx context.Context) string {
 		return e.askPassValue
 	}
 	res, err := e.runAllowingExit(ctx, gitops.CoreAskPassArgs(), 0, 1)
-	if err == nil && res.ExitCode == 0 {
+	if err != nil {
+		return ""
+	}
+	if res.ExitCode == 0 {
 		e.askPassValue = strings.TrimSpace(string(res.Stdout))
 	}
 	e.askPassChecked = true
