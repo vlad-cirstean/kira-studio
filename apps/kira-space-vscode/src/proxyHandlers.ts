@@ -400,7 +400,9 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       const root = repoRoots.get(repoId);
       const files = detail.files.map((change) => {
         const { left, right } = documentRefsFor(repoId, sha, change.path, change, baseSha);
-        const resource = root ? join(root, change.path) : change.path;
+        const resource = root
+          ? containedPath('editor.openAllChanges', root, change.path)
+          : change.path;
         return { left, right, resource };
       });
       const shortSha = sha.slice(0, 7);
