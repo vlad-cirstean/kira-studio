@@ -355,8 +355,7 @@ Nothing real found in this block.
 - `go test -race -count=1` over the same: gitrpc ok 12.0 s, gitsock ok 153.2 s, gitvsix ok 1.1 s.
 - Pre-commit hook on each findings commit (biome, token/theme/class checks, every `typecheck:*`
   incl. `typecheck:git`): green.
-- `bun test packages/git-ipc/src` not run as its own step; the throwaway F9 probe ran under
-  `bun test` and passed; the fixer re-runs the full suite.
+- `bun test packages/git-ipc/src`: 58 pass, 0 fail.
 - Regeneration diff: clean (block 6).
 - §6.8 isolation probe: 91 failures (F10).
 
