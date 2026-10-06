@@ -74,12 +74,12 @@ func (b *TaskBoard) repoNick(tc *taskCtx, sb model.AdeTaskBranch) string {
 
 // runningTUI reports whether a task session terminal is open for the filter.
 func (b *TaskBoard) runningTUI(match func(model.AdeSession) bool) (*model.AdeSession, error) {
-	rows, err := b.deps.Sessions.ListTask()
+	rows, err := b.deps.Sessions.ListRunningTUI()
 	if err != nil {
 		return nil, err
 	}
 	for i := range rows {
-		if rows[i].Mode == model.AdeSessionModeTUI && rows[i].State == model.AdeSessionStateRunning && match(rows[i]) {
+		if match(rows[i]) {
 			return &rows[i], nil
 		}
 	}
@@ -345,6 +345,9 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 	} else if open != nil {
 		return adewire.Launch{}, invalid("a %s session is already running", stage.Name)
 	}
+	if tr.hasPending(func(p pendingIntent) bool { return p.TaskID == tc.task.ID && p.StageID == stage.ID && p.Purpose == "" }) {
+		return adewire.Launch{}, invalid("a %s session is already starting", stage.Name)
+	}
 
 	lines, cwd, extra, err := b.launchDirs(ctx, tc)
 	if err != nil {
@@ -436,6 +439,9 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 		return adewire.Launch{}, err
 	} else if open != nil {
 		return adewire.Launch{}, invalid("a session is already open on %s", sb.Name)
+	}
+	if tr.hasPending(func(p pendingIntent) bool { return p.BranchID == sb.ID }) {
+		return adewire.Launch{}, invalid("a session is already starting on %s", sb.Name)
 	}
 	if has, err := b.deps.Tasks.HasRunningOn(sb.ID); err != nil {
 		return adewire.Launch{}, err

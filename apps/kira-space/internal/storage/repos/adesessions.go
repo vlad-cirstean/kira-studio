@@ -57,6 +57,16 @@ func (r *AdeSessionsRepo) ListTask() ([]model.AdeSession, error) {
 	})
 }
 
+// ListRunningTUI returns the task rows whose interactive terminal is open.
+func (r *AdeSessionsRepo) ListRunningTUI() ([]model.AdeSession, error) {
+	rows, err := r.DB.Query(`SELECT `+adeSessionsSelectColumns+` FROM ade_sessions
+		WHERE task_id != '' AND mode = ? AND state = ?`, model.AdeSessionModeTUI, model.AdeSessionStateRunning)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeSession, bool, error) {
+		rec, err := scanAdeSessionRow(rows)
+		return rec, true, err
+	})
+}
+
 // InsertHeadless writes a headless task session row (no terminal).
 func (r *AdeSessionsRepo) InsertHeadless(rec model.AdeSession) error {
 	if rec.TaskID == "" {

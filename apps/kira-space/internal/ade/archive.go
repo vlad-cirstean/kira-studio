@@ -201,12 +201,12 @@ func (b *TaskBoard) stopTaskWork(tc *taskCtx) error {
 }
 
 func (b *TaskBoard) closeTaskTerminals(taskID string) error {
-	rows, err := b.deps.Sessions.ListTask()
+	rows, err := b.deps.Sessions.ListRunningTUI()
 	if err != nil {
 		return err
 	}
 	for _, s := range rows {
-		if s.TaskID != taskID || s.Mode != model.AdeSessionModeTUI || s.State != model.AdeSessionStateRunning || s.TerminalID == "" {
+		if s.TaskID != taskID || s.TerminalID == "" {
 			continue
 		}
 		if b.deps.CloseTerminal == nil {

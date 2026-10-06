@@ -280,6 +280,20 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
 }
 
+// hasPending reports whether a prepared launch matching the filter still awaits its Compose; a
+// launch past PendingTTL no longer counts.
+func (t *Tracker) hasPending(match func(pendingIntent) bool) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.pruneExpiredPendingLocked(t.deps.Now())
+	for _, p := range t.pending {
+		if match(p) {
+			return true
+		}
+	}
+	return false
+}
+
 // Compose is BoundService.ComposeAgent's own target (wired in main.go) — internal/terminal.Open
 // calls it for every claude-code launch, composed or not. No intent for terminalID (a claude-code
 // launch not started through Prepare; this app has none today) means hooks-only composition, no
