@@ -103,7 +103,9 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
 ### F8 (low, design-decision) console results are fully materialised with no row or byte cap
 
 - `apps/kira-studio/internal/adapters/mongo/console.go:242-259` (`runCursorOp`: `cursor.All`
-  into `[]bson.D`, then a page of every document).
+  into `[]bson.D`, then a page of every document); `redis/console.go:388` plus `resultToPage`
+  (`KEYS *`, `HGETALL`, `LRANGE k 0 -1`, `SMEMBERS` on a huge key: whole reply in memory, one row
+  per element).
 - Scenario: `db.events.find()` on a 10 GB collection buffers every document as `bson.D`, then
   again as EJSON text in the page builder (per-cell truncation only, `page/builder.go:207`) before
   `dbmcp` caps rendered rows. Memory grows until the process is killed. The SQL consoles share
@@ -111,6 +113,56 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   decision, not a Part 4 regression. Combined with F3 the buffering also continues after Stop.
 - Fix: decide a console row cap (e.g. a few thousand rows plus a "truncated" flag on the page),
   applied in `runCursorOp` with `SetBatchSize`/early cursor close; same cap for the SQL consoles.
+
+### F9 (medium) redis console: slow and blocking commands are silently re-sent, then reported as a connection failure
+
+- `apps/kira-studio/internal/adapters/redis/client.go:151-179` (`dial` leaves go-redis defaults:
+  `ReadTimeout` 5 s, `MaxRetries` 3, `ContextTimeoutEnabled` false), `console.go:388`
+  (`conn.Do(ctx, argv...)`), `errors.go:38-40` (timeout is a net error, so `E_CONNECT`).
+- go-redis v9.22 retries a read timeout for any command without its own read timeout
+  (`redis.go:1332-1443`, `error.go:84-119`), and generic `Do` never sets one. So any console
+  command whose reply takes over 5 s is written to the server again, up to four times in all.
+- Real run (throwaway `_test.go` against `redis:8.10`, deleted): `BLPOP nokey 5` failed after
+  20.1 s with `read tcp ...: i/o timeout` (four attempts); `WAIT 1 5000` took 20.1 s; a
+  `BLPOP nokey 10` whose ctx was cancelled after 0.5 s returned only after 5.0 s (Stop waits for
+  the socket deadline: `ContextTimeoutEnabled` false means ctx never reaches the read). A Lua
+  script running about 5 s returned `BUSY Redis is busy running a script` to the user although the
+  first attempt ran to completion and its write landed.
+- Failure scenarios: `XREAD BLOCK 10000 ...` (allowed on a read-only connection),
+  `BLPOP q 0`, `WAIT 1 10000` always fail after about 20 s as `E_CONNECT`, which reads as a dropped
+  connection. A slow non-idempotent write (a script between 5 s and the busy limit, a large
+  `DEL` reporting its count) is re-executed or misreported.
+- Fix: console path uses `MaxRetries: -1` (a separate console client options set, or
+  `conn.WithTimeout` plus no retry) and `ContextTimeoutEnabled: true` so Stop interrupts the read;
+  either reject blocking forms with an unbounded or over-limit timeout, or set the per-command
+  read timeout from the command's own timeout argument. Map a read timeout to `E_TIMEOUT`, not
+  `E_CONNECT`.
+
+### F10 (low) redis read-only gate refuses every container subcommand, including pure reads
+
+- `apps/kira-studio/internal/adapters/redis/client.go:195-208` (`isReadOnlyCommand` reads the
+  top-level `COMMAND` entry by name only).
+- Real run (same probe): on a read-only connection `XINFO HELP`, `OBJECT ENCODING k`,
+  `MEMORY USAGE k`, `CLIENT LIST` all fail with "connection is read-only". Redis 7+ container
+  commands carry no flags at top level; the read-only flag lives on each subcommand
+  (`xinfo|stream`, `config|get`, `object|encoding`, `function|list`, `pubsub|channels`). Fail
+  closed, so not a write escape, but every one of those reads is unusable on a read-only
+  connection and `ClassifyStatement` classifies them as writes for `dbmcp` (prompt or deny).
+- Fix: for a container command, look up `COMMAND INFO <container>|<subcommand>` (cache per name)
+  and use the subcommand's flags; unknown stays deny.
+
+### F11 (low) redis ConnSet eviction closes a client another op is still using
+
+- `apps/kira-studio/internal/adapters/redis/client.go:128-135` (`Close` is an unconditional
+  `c.Close()`), `adapters/connset.go:118-125` (victim chosen by LRU at `Get` time).
+- Scenario: Browse tabs on nine or more db indices (Max 8, primary never evicted). A
+  `listNamespaceChildren` walk on db3 (up to 200 SCAN rounds) got its client early; the user then
+  opens db9, db10, ... and db3 becomes LRU and is closed mid-walk. The walk's next `SCAN` fails
+  with `redis: client is closed`, mapped to `E_CONNECT` (`errors.go:41-43`): a healthy connection
+  reported as broken. Code-read, not reproduced.
+- Fix: reference-count entries handed out by `get` (release on op end) and defer `Close` of an
+  evicted client until its count drops to zero, or raise Max to the server's `databases` count
+  since a `*goredis.Client` per index is cheap when idle.
 
 ## Coverage
 
@@ -143,7 +195,27 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   to `E_CANCELLED`. Caps match the unsupported stubs (`SchemaColumns`, `KeyTypes`,
   `DownloadObject`); leaf `Children` returns `[]`. Whole-document `ReplaceOne` is last-writer-wins
   (no version check); same as the SQL grid's PK-only update, not reported.
-- Block 3 (redis): not reached.
+- Block 3 (redis): done. All eight production files read in full: `client`, `adapter`,
+  `console`, `catalog`, `read`, `mutate`, `errors`, `caps`. Real probes against `redis:8.10`
+  (throwaway, deleted) for F9/F10. Verified, no finding: `Connect` dial takes ctx with a 10 s dial
+  timeout and closes the client on ping failure; the second `set.primary` hits the cached entry.
+  `rediss://` and every `sslmode` spelling enable TLS; unknown spellings fail; no plaintext
+  downgrade. `tokenize`: a newline is whitespace and RESP framing sends one command per statement;
+  `\x` escapes produce raw bytes (P108 F12 holds). Denylist holds for `SELECT`, `MULTI`/`EXEC`,
+  `WATCH`, the subscribe family, `MONITOR`, `HELLO`, `AUTH`, `RESET`, `QUIT`, `CLIENT REPLY`
+  (P108 F1). `CLIENT TRACKING` under RESP2 needs `REDIRECT`; `CLIENT KILL` on the pool's own
+  connections only forces a redial; neither corrupts pooled state. Read-only probe: `PUBLISH`,
+  `CLIENT KILL`, `SCRIPT FLUSH`, `FUNCTION FLUSH`, `CONFIG SET` refused; `SORT_RO` and
+  `XREAD BLOCK` allowed. `COMMAND` failure fails closed and is not cached. `escapeGlobPrefix`
+  escapes every MATCH metacharacter; paths encode names byte-wise, so binary keys round-trip.
+  SCAN loops are bounded (200 rounds tree, page size per read). `XRANGE` uses an exclusive start
+  and a `pageSize+1` probe. PTTL sentinels handled. `KeyTypes` reports `none` for a key deleted
+  mid-window. `AUTH` text never reaches `SetCommand` (denied before execution, and `HELLO` is
+  denied whole). `assertEditableType` then `SET KEEPTTL` is a TOCTOU of one round trip; same
+  last-writer-wins class as the SQL grid, not reported. `dbIndexFromName` maps an overflowing
+  `db<digits>` to db 0; only a hand-crafted path reaches it, same server, not reported. Caps
+  match the unsupported stubs; leaf `Children` returns `[]`. `Cancel` no-op: see F9 for what Stop
+  actually does.
 - Block 4 (kafka): not reached.
 - Block 5 (sqs): not reached.
 - Block 6 (s3): not reached.
