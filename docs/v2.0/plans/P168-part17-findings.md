@@ -4,7 +4,7 @@ Plan: `P168-part17-git-rpc.md`. Base `30ec62f` (plan survey), HEAD reviewed `0bc
 (`p168-stream-b`). One Opus reviewer, report only. Paths repo-relative; `GR`/`GK`/`GV`/`IPC` as in
 the plan.
 
-Block status: 1-5 done.
+Block status: 1-7 done.
 
 ## Block 1: error mapping
 
@@ -277,3 +277,37 @@ Block status: 1-5 done.
   keyed by user data whose value is the string `'b64'`; no such contract shape exists.
 - F2/F3 comments in `rpc.ts` (chunk queue never rejects), `streamChannel.ts` (decode and delivery
   share one try), `socketChannel.ts` (delivery errors destroy, pending queue capped at 64) hold.
+
+## Block 6: contract parity and generated code
+
+Nothing real found in this block.
+
+- Regeneration diff (required): `sh scripts/generate-wire.sh` (downloaded pinned flatc 25.9.23,
+  SHA-256 verified, into gitignored `.tools/`), then `git diff --exit-code` over
+  `packages/git-ipc/src/generated` and `apps/kira-space/internal/gitwire`: exit 0, and the whole
+  tree is clean (Studio `wire.fbs` outputs too). No drift. §9 #7 dropped.
+- Method sets: see block 2 (57 Go, 72 TS, 15 host-answered, all present). Event names Go emits
+  (`credential.request`, `remote.progress`, `repo.changed`, `repoSettings.changed`,
+  `stack.progress`, `worktree.progress`) are all in `validate.ts` `EVENT_KEY_MAP`, so
+  `assertContractShape('event', ...)` never kills a live connection on a Go event.
+- `RepoSettingsSnapshot`: Go json tags (`GR/wire.go`) and `contract.ts` `kiraSpace.*` keys diff
+  clean (11 each). `review.snapshot` params/result match (`wire.go:470-478`,
+  `gitsession/incremental.go:619-623`, `contract.ts:1667-1674`). `OpErrorKind` parity: block 3.
+- `assertContractShape` checks only method membership and a string `kind`: proportionate, since
+  both halves of each hop are one build (webview/extension) or gated by the handshake's contract
+  check (extension/Go). Not reported.
+- `graphChunkCodec.ts` mirror: guarded by `codec.test.ts` against
+  `testdata/graphChunkFrame.{bin,json}` (P166/P167 regenerated); the Go half is Part 15's.
+
+## Block 7: VSIX
+
+Nothing real found in this block.
+
+- `GV/install.go` `vsixFileName` `kira-space.vsix` at `<exe>/../Resources/` matches
+  `scripts/package-vscode.ts:27` output and the bundle copy
+  (`build/darwin/Taskfile.yml:160-165,191-193`) and `verify-packaging.sh:317`. §9 #18 dropped.
+- `code` located via `toolexec.Locate` (PATH, then macOS absolute candidates); argv-only spawn, so
+  spaces are safe and the path is absolute (no leading `-`). `spawnTimeout` 60 s with
+  SIGTERM-then-SIGKILL (`toolexec.Run`). `detailFor` returns the first stderr line, bounded 4 KiB.
+- On Linux `vsixPath` is absent (no `Resources/`), so `Install` answers `notBundled` before
+  `open -R`: the macOS-only reveal path is unreachable there.
