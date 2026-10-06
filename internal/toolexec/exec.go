@@ -116,6 +116,11 @@ func Run(ctx context.Context, path string, args []string) error {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	// On timeout/cancel a SIGTERM-ignoring group member can outlive the direct child; stopEscalate
+	// would disarm the SIGKILL that targets it, so kill the group outright first.
+	if ctx.Err() != nil && cmd.Process != nil {
+		_ = procgroup.Kill(cmd.Process.Pid, syscall.SIGKILL)
+	}
 	stopEscalate()
 	if err == nil {
 		return nil

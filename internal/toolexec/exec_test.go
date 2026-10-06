@@ -23,7 +23,7 @@ func TestRun_CancelKillsGrandchild(t *testing.T) {
 	}
 	pidFile := filepath.Join(t.TempDir(), "grandchild.pid")
 	script := "#!/bin/sh\n" +
-		"sleep 30 &\n" +
+		"(trap '' TERM; exec sleep 30) &\n" +
 		"echo $! > " + pidFile + "\n" +
 		"sleep 30\n" // the direct child also sleeps, so it is still alive when the context expires.
 
