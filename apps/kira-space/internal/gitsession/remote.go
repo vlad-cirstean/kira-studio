@@ -303,6 +303,14 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		e.remoteOp.release()
 		cancel()
 	}()
+	// teardown's forceCancel finds nothing claimed before this point, so a claim made after
+	// teardown would run an uncancellable spawn on a dead entry.
+	e.mu.Lock()
+	tornDown := e.tornDown
+	e.mu.Unlock()
+	if tornDown {
+		return RemoteOpResult{}, ErrRepoTornDown
+	}
 
 	protectedBranches, _, _ := e.settings()
 
@@ -396,14 +404,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		return RemoteOpResult{}, spawnErr
 	}
 
-	_, inProgress, serr := e.statusAndInProgress(ctx)
-	if serr != nil {
-		return RemoteOpResult{}, serr
-	}
-	head, herr := e.Head(ctx)
-	if herr != nil {
-		return RemoteOpResult{}, herr
-	}
+	_, inProgress, head, _ := e.readBackAfterWrite(ctx)
 
 	return RemoteOpResult{OK: opErr == nil, Error: opErr, Updates: nonNil(updates), Head: head, InProgress: inProgress}, nil
 }

@@ -1,6 +1,9 @@
 package gitops
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 // BranchCreateArgs builds `git branch <name> <startPoint>`. An explicit upstream goes through
 // BranchSetUpstreamArgs: `git branch` has no `-t <upstream>` form, `-t` is a bare flag.
@@ -45,7 +48,8 @@ func BranchRevParseArgs(name string) []string {
 	return []string{"rev-parse", "--verify", "refs/heads/" + name}
 }
 
-// BranchConfigRegexpArgs is undo-capture read #2: every branch.<name>.* config line, verbatim —
+// BranchConfigRegexpArgs is undo-capture read #2: every local branch.<name>.* config entry, NUL-framed
+// (`key\nvalue\0`, so a multi-line value never splits into fake entries) —
 // replayed back through `git config` on undo so .remote/.merge (and anything else set under that
 // prefix) comes back exactly, not just the two keys probe P4 happened to name.
 //
@@ -63,5 +67,24 @@ func BranchRevParseArgs(name string) []string {
 // back to a stale captured value. regexp.QuoteMeta escapes exactly POSIX ERE's own metacharacter
 // set (`\.+*?()|[]{}^$`), so the escaped name can only ever match itself, literally.
 func BranchConfigRegexpArgs(name string) []string {
-	return []string{"config", "--get-regexp", `^branch\.` + regexp.QuoteMeta(name) + `\.`}
+	return []string{"config", "--local", "--null", "--get-regexp", `^branch\.` + regexp.QuoteMeta(name) + `\.`}
+}
+
+// BranchConfigRestoreArgs parses BranchConfigRegexpArgs output into one `config --add` argv per
+// entry. --add (not a plain set) because the section is gone after the delete and a multi-valued
+// key must come back with every value; `--` keeps a value starting with `-` from parsing as a flag.
+// A valueless boolean key (no newline in its record) is restored as "true".
+func BranchConfigRestoreArgs(raw []byte) [][]string {
+	var argvList [][]string
+	for _, rec := range strings.Split(string(raw), "\x00") {
+		if rec == "" {
+			continue
+		}
+		key, value, found := strings.Cut(rec, "\n")
+		if !found {
+			value = "true"
+		}
+		argvList = append(argvList, []string{"config", "--local", "--add", "--", key, value})
+	}
+	return argvList
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -160,6 +161,11 @@ type prepared struct {
 	// a later argv's own failure message with "your changes were stashed", rather than leaving
 	// that fact silent, once a real stash exists to point to.
 	autoStashApplied bool
+	// partialNote names what already landed when a later argv fails (failedAt > 0); empty falls
+	// back to a generic sentence.
+	partialNote string
+	// expectRefs names the refs whose post-op tips guard the undo replay (see UndoRecord.ExpectedTips).
+	expectRefs []string
 }
 
 // opSpec is one opTable entry (D6) — the Go stand-in for upstream's TypeScript mapped type
@@ -445,7 +451,11 @@ func prepareBranchCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op
 	if op.Track != nil {
 		argvList = append(argvList, gitops.BranchSetUpstreamArgs(op.Name, *op.Track))
 	}
-	return prepared{argvList: argvList}, nil
+	p := prepared{argvList: argvList}
+	if op.Track != nil {
+		p.partialNote = fmt.Sprintf("Branch %s was created; setting its upstream failed.", op.Name)
+	}
+	return p, nil
 }
 
 // prepareBranchDelete is branchDelete's own Prepare, widened at G26 §10.9/D-3.12 to re-parent the
@@ -495,7 +505,10 @@ func prepareBranchDelete(ctx context.Context, e *RepoEntry, conn ConnID, connLab
 		}
 	}
 
-	return prepared{argvList: argv, undo: undo}, nil
+	return prepared{
+		argvList: argv, undo: undo,
+		partialNote: fmt.Sprintf("Branch %s was deleted; updating its stack children failed.", op.Name),
+	}, nil
 }
 
 // prepareBranchRename is branchRename's own Prepare, widened at G26 D1/D-3.12: `git branch -m`
@@ -521,7 +534,10 @@ func prepareBranchRename(ctx context.Context, e *RepoEntry, _ ConnID, _ string, 
 	for _, child := range stackChildrenOf(config, op.From) {
 		argv = append(argv, gitops.StackConfigSetArgs(gitops.StackParentKey(child), op.To))
 	}
-	return prepared{argvList: argv}, nil
+	return prepared{
+		argvList:    argv,
+		partialNote: fmt.Sprintf("Branch %s was renamed to %s; updating its stack children failed.", op.From, op.To),
+	}, nil
 }
 
 func prepareTagCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
@@ -862,7 +878,7 @@ func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel stri
 
 	// F14: op.Target passed to the write verbatim, never resolved.Sha — classifyReset's own
 	// contract is that target is echoed unchanged, and the client always passes a full sha anyway.
-	return prepared{argvList: [][]string{gitops.ResetArgs(op.Mode, op.Target)}, undo: undo}, nil
+	return prepared{argvList: [][]string{gitops.ResetArgs(op.Mode, op.Target)}, undo: undo, expectRefs: []string{"HEAD"}}, nil
 }
 
 // shortSha7 truncates sha to its first 7 characters — the same convention captureTagDeleteUndo's
@@ -910,7 +926,7 @@ func prepareCherryPick(ctx context.Context, e *RepoEntry, conn ConnID, connLabel
 		}
 	}
 
-	return prepared{argvList: [][]string{gitops.CherryPickArgs(op.Sha, op.Mainline, op.NoCommit)}, undo: undo}, nil
+	return prepared{argvList: [][]string{gitops.CherryPickArgs(op.Sha, op.Mainline, op.NoCommit)}, undo: undo, expectRefs: []string{"HEAD"}}, nil
 }
 
 // reclassifyCherryPick is cherryPick's own Reclassify (D6/F6). Probe 6: an empty pick exits
@@ -1005,20 +1021,9 @@ func (e *RepoEntry) captureBranchDeleteUndo(ctx context.Context, conn ConnID, co
 		return nil
 	}
 
-	var configLines []string
-	if cfgRes, cfgErr := e.runAllowingExit(ctx, gitops.BranchConfigRegexpArgs(name), 0, 1); cfgErr == nil && cfgRes.ExitCode == 0 {
-		for _, line := range strings.Split(strings.TrimSpace(string(cfgRes.Stdout)), "\n") {
-			if trimmed := strings.TrimSpace(line); trimmed != "" {
-				configLines = append(configLines, trimmed)
-			}
-		}
-	}
-
 	replay := [][]string{gitops.RecreateRefArgs("refs/heads/"+name, sha)}
-	for _, line := range configLines {
-		if idx := strings.IndexByte(line, ' '); idx != -1 {
-			replay = append(replay, []string{"config", line[:idx], line[idx+1:]})
-		}
+	if cfgRes, cfgErr := e.runAllowingExit(ctx, gitops.BranchConfigRegexpArgs(name), 0, 1); cfgErr == nil && cfgRes.ExitCode == 0 {
+		replay = append(replay, gitops.BranchConfigRestoreArgs(cfgRes.Stdout)...)
 	}
 
 	// G26 §10.9/D-3.12: prepareBranchDelete re-parents this branch's own stack children onto ITS
@@ -1210,51 +1215,91 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 	if werr != nil {
 		return OpResult{}, werr
 	}
-	if opErr != nil && failedAt > 0 && prep.autoStashApplied {
-		// The auto-stash's own `stash push` (argv 0) already succeeded for real before this LATER
-		// argv (the switch) failed — say so explicitly, with the exact stash ref, rather than
-		// leaving the user's changes stashed with no mention of it. A plain read, safe outside the
-		// write that already completed.
-		if raw, rerr := e.runOne(ctx, []string{"rev-parse", "-q", "--verify", "refs/stash"}); rerr == nil {
-			if sha := strings.TrimSpace(string(raw)); sha != "" {
-				short := sha
-				if len(short) > 7 {
-					short = short[:7]
-				}
-				opErr.Message += fmt.Sprintf(" Your local changes were stashed as %s (stash@{0}) before the switch failed — see stash.list.", short)
-			}
+	if opErr != nil && failedAt > 0 {
+		// An earlier argv already wrote for real: the user must hear it, and the prepared undo
+		// record (captured before any write) still restores it.
+		if prep.autoStashApplied {
+			opErr.Message += e.autoStashFailureNote(ctx)
+		} else if prep.partialNote != "" {
+			opErr.Message += " " + prep.partialNote
+		} else {
+			opErr.Message += " Earlier steps of this operation were already applied."
 		}
 	}
-	statusResult, inProgress, serr := e.statusAndInProgress(ctx)
-	if serr != nil {
-		return OpResult{}, serr
+	undoable := spec.Undo.Kind == gitpreflight.Undoable && prep.undo != nil
+	// Set before the read-back: a read failure must never drop the record of a write that landed.
+	armed := undoable && (opErr == nil || failedAt > 0)
+	if armed && len(prep.expectRefs) > 0 {
+		// An unguarded absolute-position replay could drop commits made outside the app, so a
+		// record that cannot be pinned is not armed.
+		if err := e.stampExpectedTips(ctx, prep.undo, prep.expectRefs); err != nil {
+			slog.Warn("gitsession: pin undo tips failed; undo withheld", "repo", e.Summary.RepoID, "err", err)
+			armed = false
+		}
 	}
-	// D6: reuses the status read RunOp already performs (the line above) — no second spawn — to let
-	// a kind reclassify its own stderr-only result. A nil Reclassify (ten of fifteen kinds today) is
-	// a no-op by construction.
-	if spec.Reclassify != nil {
+	if armed {
+		e.undo.Set(prep.undo)
+	}
+	statusResult, inProgress, head, readOK := e.readBackAfterWrite(ctx)
+	if readOK && spec.Reclassify != nil {
+		// D6: reuses the status read above to let a kind reclassify its own stderr-only result. A
+		// nil Reclassify is a no-op by construction.
 		opErr = spec.Reclassify(opErr, statusResult, inProgress)
 	}
 	succeeded := opErr == nil
-
-	head, herr := e.Head(ctx)
-	if herr != nil {
-		return OpResult{}, herr
+	if armed && !succeeded && failedAt == 0 {
+		e.undo.Set(nil)
 	}
-
-	var record *gitpreflight.UndoRecord
-	if succeeded && spec.Undo.Kind == gitpreflight.Undoable {
-		record = prep.undo
-	}
-	e.undo.Set(record)
 
 	var undoSnapshot *gitpreflight.UndoSlotSnapshot
-	if record != nil {
-		snap := record.SnapshotFor(string(conn))
+	if armed {
+		snap := prep.undo.SnapshotFor(string(conn))
 		undoSnapshot = &snap
 	}
 
 	return OpResult{OK: succeeded, Error: opErr, Undo: undoSnapshot, Head: head, InProgress: inProgress}, nil
+}
+
+// autoStashFailureNote names the stash a failed switch left behind: the auto-stash's own `stash
+// push` (argv 0) already succeeded before the later argv failed. A plain read, safe outside the
+// write that already completed.
+func (e *RepoEntry) autoStashFailureNote(ctx context.Context) string {
+	raw, err := e.runOne(ctx, []string{"rev-parse", "-q", "--verify", "refs/stash"})
+	if err != nil {
+		return ""
+	}
+	sha := strings.TrimSpace(string(raw))
+	if sha == "" {
+		return ""
+	}
+	short := sha
+	if len(short) > 7 {
+		short = short[:7]
+	}
+	return fmt.Sprintf(" Your local changes were stashed as %s (stash@{0}) before the switch failed — see stash.list.", short)
+}
+
+// readBackAfterWrite reads status and head once a write has already landed. A read error is
+// logged and degrades to the last known head and nil in-progress state (ok false): the write
+// happened, so the caller still reports it rather than answering a Go error.
+func (e *RepoEntry) readBackAfterWrite(ctx context.Context) (porcelain.StatusResult, *gitpreflight.InProgressOperation, gitclient.HeadState, bool) {
+	statusResult, inProgress, err := e.statusAndInProgress(ctx)
+	if err != nil {
+		slog.Warn("gitsession: read-back after write failed", "repo", e.Summary.RepoID, "err", err)
+		return porcelain.StatusResult{}, nil, e.lastKnownHead(), false
+	}
+	head, err := e.Head(ctx)
+	if err != nil {
+		slog.Warn("gitsession: head read-back after write failed", "repo", e.Summary.RepoID, "err", err)
+		return statusResult, inProgress, e.lastKnownHead(), true
+	}
+	return statusResult, inProgress, head, true
+}
+
+func (e *RepoEntry) lastKnownHead() gitclient.HeadState {
+	e.headMu.Lock()
+	defer e.headMu.Unlock()
+	return e.head
 }
 
 // UndoPeek is undo.peek's own query — the current slot, attributed for conn (D7's SnapshotFor), or
@@ -1268,18 +1313,56 @@ func (e *RepoEntry) UndoPeek(conn ConnID) *gitpreflight.UndoSlotSnapshot {
 	return &snap
 }
 
-// UndoRun is undo.run's own executor: Take(id) (so a replayed undo cannot be replayed twice, and a
-// stale/already-superseded id answers NotFound), then a recovery-sha existence check through the
-// entry's own cat-file batch session (§7.12's "so the user can recover manually even after the
-// slot is cleared" only holds if a stale sha is refused rather than replayed against something
-// else), then the replay argv list in order — the same read-back/error-mapping shape as RunOp.
+// stampExpectedTips records where refs sit now (right after the write) on record, pinning its
+// replay to that state.
+func (e *RepoEntry) stampExpectedTips(ctx context.Context, record *gitpreflight.UndoRecord, refs []string) error {
+	tips, err := e.resolveTips(ctx, refs)
+	if err != nil {
+		return err
+	}
+	record.ExpectTips(tips)
+	return nil
+}
+
+func (e *RepoEntry) resolveTips(ctx context.Context, refs []string) (map[string]string, error) {
+	tips := make(map[string]string, len(refs))
+	for _, ref := range refs {
+		raw, err := e.runOne(ctx, []string{"rev-parse", "--verify", "--end-of-options", ref})
+		if err != nil {
+			return nil, err
+		}
+		tips[ref] = strings.TrimSpace(string(raw))
+	}
+	return tips, nil
+}
+
+// tipsMoved reports whether any ref in want no longer sits at its recorded tip.
+func (e *RepoEntry) tipsMoved(ctx context.Context, want map[string]string) (bool, error) {
+	for ref, sha := range want {
+		res, err := e.runAllowingExit(ctx, []string{"rev-parse", "--verify", "-q", "--end-of-options", ref}, 0, 1)
+		if err != nil {
+			return false, err
+		}
+		if res.ExitCode != 0 || strings.TrimSpace(string(res.Stdout)) != sha {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// UndoRun is undo.run's own executor. It validates first — the record is only Taken (so a replayed
+// undo cannot be replayed twice, and a stale/already-superseded id answers NotFound) once the
+// recovery sha still exists (§7.12's "so the user can recover manually even after the slot is
+// cleared" only holds if a stale sha is refused rather than replayed against something else) and
+// no ref the op moved has moved again. A transient check error therefore leaves the record armed.
+// The replay then runs as one write list, the same read-back/error-mapping shape as RunOp.
 func (e *RepoEntry) UndoRun(ctx context.Context, connLabel, id string) (result OpResult, runErr error) {
 	logOp := e.startOp("undo", connLabel)
 	defer func() { finishOpResult(logOp, result, runErr) }()
 	ctx = withOp(ctx, logOp)
 
-	record := e.undo.Take(id)
-	if record == nil {
+	record := e.undo.Peek()
+	if record == nil || record.ID != id {
 		return e.undoRunFailure(ctx, "NotFound", "This undo is no longer available.")
 	}
 
@@ -1297,6 +1380,16 @@ func (e *RepoEntry) UndoRun(ctx context.Context, connLabel, id string) (result O
 		}
 		return OpResult{}, err
 	}
+	moved, err := e.tipsMoved(ctx, record.ExpectedTips)
+	if err != nil {
+		return OpResult{}, err
+	}
+	if moved {
+		return e.undoRunFailure(ctx, "Unknown", "The repository changed since this operation, so the undo was refused.")
+	}
+	if e.undo.Take(id) == nil {
+		return e.undoRunFailure(ctx, "NotFound", "This undo is no longer available.")
+	}
 
 	// G30 round-1 functional-correctness review, finding #5: RunOp drops the shared caches on
 	// EVERY write it attempts (D7's own defer, above) specifically because "the watcher's own
@@ -1308,26 +1401,11 @@ func (e *RepoEntry) UndoRun(ctx context.Context, connLabel, id string) (result O
 	// second-line-of-defence exists at all).
 	defer e.invalidateAfterWrite()
 
-	var opErr *OpError
-	for _, argv := range record.Replay {
-		oe, werr := e.runWriteArgv(ctx, argv)
-		if werr != nil {
-			return OpResult{}, werr
-		}
-		if oe != nil {
-			opErr = oe
-			break
-		}
+	opErr, _, werr := e.runWriteArgvList(ctx, record.Replay)
+	if werr != nil {
+		return OpResult{}, werr
 	}
-
-	_, inProgress, serr := e.statusAndInProgress(ctx)
-	if serr != nil {
-		return OpResult{}, serr
-	}
-	head, herr := e.Head(ctx)
-	if herr != nil {
-		return OpResult{}, herr
-	}
+	_, inProgress, head, _ := e.readBackAfterWrite(ctx)
 
 	return OpResult{OK: opErr == nil, Error: opErr, Undo: nil, Head: head, InProgress: inProgress}, nil
 }

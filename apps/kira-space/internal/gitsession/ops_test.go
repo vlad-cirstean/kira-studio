@@ -706,10 +706,14 @@ func TestCaptureBranchDeleteUndo_PipeInBranchNameDoesNotOverCaptureUnrelatedConf
 
 	sawOwnConfig := false
 	for _, argv := range undo.Replay {
-		if len(argv) >= 2 && argv[0] == "config" && strings.HasPrefix(argv[1], "branch.y.") {
+		if len(argv) < 3 || argv[0] != "config" {
+			continue
+		}
+		key := argv[len(argv)-2]
+		if strings.HasPrefix(key, "branch.y.") {
 			t.Fatalf("undo replay for deleting %q captured unrelated branch %q's own config (%v)", "x|y", "y", argv)
 		}
-		if len(argv) >= 2 && argv[0] == "config" && strings.HasPrefix(argv[1], "branch.x|y.") {
+		if strings.HasPrefix(key, "branch.x|y.") {
 			sawOwnConfig = true
 		}
 	}

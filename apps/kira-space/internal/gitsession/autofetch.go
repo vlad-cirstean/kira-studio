@@ -137,10 +137,7 @@ func (e *RepoEntry) pauseAutoFetch() {
 // of this entry's life, logged once by the caller... no caller logs it today; disabling IS the
 // user-visible signal (G8's own open item: no toolbar marker exists yet to surface it further).
 func (e *RepoEntry) autoFetchTick() {
-	e.autoFetch.mu.Lock()
-	disabled := e.autoFetch.disabled
-	e.autoFetch.mu.Unlock()
-	if disabled {
+	if e.autoFetchDisabled() {
 		return
 	}
 
@@ -160,6 +157,9 @@ func (e *RepoEntry) autoFetchTick() {
 		return
 	}
 
+	if e.autoFetchDisabled() { // teardown may have stopped auto-fetch while the remote was picked.
+		return
+	}
 	result, err := e.RunRemote(context.WithoutCancel(context.Background()), nil, RemoteOpParams{
 		Kind: "fetch", Remote: remote, Prune: true,
 	}, RemoteDeps{})
@@ -176,6 +176,12 @@ func (e *RepoEntry) autoFetchTick() {
 		return
 	}
 	e.rescheduleAutoFetch(minutes)
+}
+
+func (e *RepoEntry) autoFetchDisabled() bool {
+	e.autoFetch.mu.Lock()
+	defer e.autoFetch.mu.Unlock()
+	return e.autoFetch.disabled
 }
 
 // pickAutoFetchRemote is D23's own rule: "origin" if it exists, else the sole remote if there is

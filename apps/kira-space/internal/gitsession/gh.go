@@ -533,6 +533,9 @@ func (e *RepoEntry) eagerResolveClosedBranches() {
 	}
 	branches, err := e.review.Branches(ctx, e.Summary.RepoID)
 	if err != nil {
+		if ctx.Err() != nil {
+			return
+		}
 		slog.Warn("ghclient: list review branches for eager re-resolve", "repo", e.Summary.RepoID, "err", err)
 		return
 	}

@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
@@ -641,6 +642,15 @@ func (e *RepoEntry) runRestackSpawn(ctx context.Context, argv []string) (gitclie
 	return res, err
 }
 
+// restackTipRefs lists the full ref of every planned branch.
+func restackTipRefs(plan []gitpreflight.RestackPlanEntry) []string {
+	refs := make([]string, len(plan))
+	for i, entry := range plan {
+		refs[i] = "refs/heads/" + entry.Branch
+	}
+	return refs
+}
+
 // branchNames extracts the plan's own branch names, in order — Restacked/Remaining are always this
 // shape, never the full RestackPlanEntry (the wire result only needs the names, D17).
 func branchNames(entries []gitpreflight.RestackPlanEntry) []string {
@@ -721,21 +731,24 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 		return res, err
 	}
 
-	e.undo.Set(prep.undo)
-	freshHead, herr := e.Head(ctx)
-	if herr != nil {
-		return RestackResult{}, herr
+	// Pinned to the post-restack tips so an undo never drops commits made outside the app; a
+	// record that cannot be pinned is withheld.
+	armed := true
+	if err := e.stampExpectedTips(ctx, prep.undo, restackTipRefs(prep.pf.Plan)); err != nil {
+		slog.Warn("gitsession: pin restack undo tips failed; undo withheld", "repo", e.Summary.RepoID, "err", err)
+		armed = false
 	}
-	_, inProgress, serr := e.statusAndInProgress(ctx)
-	if serr != nil {
-		return RestackResult{}, serr
+	if armed {
+		e.undo.Set(prep.undo)
 	}
+	_, inProgress, freshHead, _ := e.readBackAfterWrite(ctx)
 	var undoSnapshot *gitpreflight.UndoSlotSnapshot
-	if conn != nil {
-		snap := prep.undo.SnapshotFor(string(e.connIDOf(conn)))
-		undoSnapshot = &snap
-	} else {
-		snap := prep.undo.SnapshotFor("")
+	if armed {
+		connID := ""
+		if conn != nil {
+			connID = string(e.connIDOf(conn))
+		}
+		snap := prep.undo.SnapshotFor(connID)
 		undoSnapshot = &snap
 	}
 	return RestackResult{

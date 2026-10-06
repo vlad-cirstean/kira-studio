@@ -16,9 +16,27 @@ type UndoRecord struct {
 	CreatedAt   int64 // unix millis.
 	// Replay is the argv sequence that undoes it, applied in order — a list because restoring a
 	// branch is a ref write plus zero or more config writes (probe P4).
-	Replay      [][]string
-	OriginConn  string
-	OriginLabel string
+	Replay [][]string
+	// ExpectedTips maps a ref ("HEAD" or a full ref name) to the sha the op left it at. UndoRun
+	// refuses to replay when any ref has moved since, so a commit made outside the app is never
+	// dropped by an absolute-position replay.
+	ExpectedTips map[string]string
+	OriginConn   string
+	OriginLabel  string
+}
+
+// ExpectTips records the post-op tips and pins every two-argument `update-ref <ref> <sha>` replay
+// whose ref has a recorded tip to that tip as the expected old value.
+func (r *UndoRecord) ExpectTips(tips map[string]string) {
+	r.ExpectedTips = tips
+	for i, argv := range r.Replay {
+		if len(argv) != 3 || argv[0] != "update-ref" {
+			continue
+		}
+		if tip, ok := tips[argv[1]]; ok {
+			r.Replay[i] = append(append([]string{}, argv...), tip)
+		}
+	}
 }
 
 // UndoSlotSnapshot mirrors @kira/git-ipc's own UndoSlotSnapshot field for field.
