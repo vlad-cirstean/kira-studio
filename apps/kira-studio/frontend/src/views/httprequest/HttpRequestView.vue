@@ -31,10 +31,10 @@ import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from 
 import { connColorVar } from '@theme/connColor';
 import { methodTextClass } from '@theme/methodColor';
 import RunState from '@theme/RunState.vue';
-import { useDebounceFn } from '@vueuse/core';
+import { refDebounced } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
 import { useSavedRequest, useVariableRows } from '../../api/state/apiQueries';
@@ -59,13 +59,13 @@ import ResponseFindBar, {
 import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
 import CookiesPane from './CookiesPane.vue';
-import { useCookiesStore } from './cookies';
+import { useJarCookies } from './cookies';
 import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import RequestSettingsPane from './RequestSettingsPane.vue';
 import ResponsePane from './ResponsePane.vue';
-import { onSendCompleted, resolveForExport, resolveTabState, useHttpRequestViewStore } from './state';
+import { resolveForExport, resolveTabState, useHttpRequestViewStore } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
@@ -74,7 +74,6 @@ const editRawStore = useEditRawStore();
 const collectionsStore = useCollectionsStore();
 const saveRequestDialogStore = useSaveRequestDialogStore();
 const copyAsCurlStore = useCopyAsCurlStore();
-const cookiesStore = useCookiesStore();
 const settingsStore = useSettingsStore();
 const httpRequestViewStore = useHttpRequestViewStore();
 
@@ -322,11 +321,8 @@ const settingsOverrideCount = computed(
   () => Object.values(props.tab.state.settings).filter((v) => v !== null).length,
 );
 
-// P90 §3.1: the Cookies segment's own count badge — populated by cookies.ts's shared runtime, kept
-// fresh by the watcher below regardless of which pane is currently showing.
-const requestCookiesCount = computed(
-  () => cookiesStore.cookiesRuntime[props.tab.id]?.cookies.length ?? 0,
-);
+// P90 §3.1: the Cookies segment's own count badge — reads the same jar query CookiesPane gets.
+const requestCookiesCount = computed(() => jarCookies.data.value?.length ?? 0);
 
 // D12: a count badge per segment — SegmentedControl has no dedicated count slot, so it is baked
 // into the label text instead of widening that shared primitive for one caller.
@@ -394,9 +390,9 @@ const effectiveSslVerify = computed(
   () => props.tab.state.settings.sslVerify ?? settingsStore.api.sslVerify,
 );
 
-// P90 §3.1: keeps cookiesRuntime fresh for this tab's current URL — on mount, on the URL changing
-// (debounced), and after every send completes — but never while the effective cookie jar is off,
-// since a jar-off request has nothing to fetch (§3.1's own rule).
+// P90 §3.1: the jar query for this tab's current URL — fetched while the effective cookie jar is
+// on (§3.1's own rule: a jar-off request has nothing to fetch), debounced on the URL changing, and
+// refreshed after every send by state.ts (invalidateJarCookies).
 const effectiveDisableCookieJar = computed(
   () => props.tab.state.settings.disableCookieJar ?? settingsStore.api.disableCookieJar,
 );
@@ -405,7 +401,7 @@ const effectiveDisableCookieJar = computed(
 // them from the resolved send. Same resolution as `unresolvedRefs` above (stage 1, no dynamic-name
 // generation — a live host preview must stay a pure function of the tab's text, P6 F2/D8's own
 // rule) — a URL whose host is still a deferred secret resolves to the unresolved template, which
-// cookies.ts's own fetchCookiesNow already treats as "nothing to fetch yet", not an error.
+// useJarCookies treats as "nothing to fetch yet", not an error.
 const resolvedCookiesUrl = computed(() => {
   const { values, secretNames } = mergeVariableRows(
     colRows.data.value ?? [],
@@ -413,30 +409,9 @@ const resolvedCookiesUrl = computed(() => {
   );
   return resolveTabState(props.tab.state, values, secretNames).url;
 });
-// P108 F7: this view's own debounce now, not a raw per-tab `setTimeout` the store used to keep
-// (GrpcRequestView.vue's schema-load debounce is the in-repo shape this copies) — one instance per
-// mounted view needs no cross-tab timer keying, and `.cancel()` on unmount (below) means a pending
-// fetch never fires for a tab that's already gone, closing the hole a bare timer left open.
 const COOKIES_FETCH_DEBOUNCE_MS = 300;
-const fetchCookiesDebounced = useDebounceFn((url: string) => {
-  void cookiesStore.fetchCookiesNow(props.tab.id, url);
-}, COOKIES_FETCH_DEBOUNCE_MS);
-watch(
-  resolvedCookiesUrl,
-  (url) => {
-    if (effectiveDisableCookieJar.value) return;
-    void fetchCookiesDebounced(url);
-  },
-  { immediate: true },
-);
-const unsubscribeSendCompleted = onSendCompleted((tabId) => {
-  if (tabId !== props.tab.id || effectiveDisableCookieJar.value) return;
-  void fetchCookiesDebounced(resolvedCookiesUrl.value);
-});
-onUnmounted(() => {
-  fetchCookiesDebounced.cancel();
-  unsubscribeSendCompleted();
-});
+const cookiesUrl = refDebounced(resolvedCookiesUrl, COOKIES_FETCH_DEBOUNCE_MS);
+const jarCookies = useJarCookies(cookiesUrl, () => !effectiveDisableCookieJar.value);
 function toggleFieldFilter(): void {
   fieldFilterOpen.value = !fieldFilterOpen.value;
   // D13's own rule: closing the row must restore every hidden row.
@@ -758,9 +733,11 @@ onUnmounted(() => {
         <CookiesPane
           v-else-if="tab.state.requestPane === 'cookies'"
           mode="request"
-          :tab-id="tab.id"
-          :url="resolvedCookiesUrl"
+          :url="cookiesUrl"
+          :cookies="jarCookies.data.value"
+          :error="jarCookies.error.value"
           :disable-cookie-jar="effectiveDisableCookieJar"
+          @refresh="jarCookies.refetch()"
         />
         <RequestBodyPane
           v-else

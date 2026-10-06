@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
+import { useMutation } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -12,24 +13,26 @@ import {
   InputGroupInput,
 } from '@theme/components/ui/input-group';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '../../state/settings';
-import { useCookiesStore } from './cookies';
+import { clearJarCookies, deleteJarCookie } from './cookies';
 
 // P90 item 2 (§3): one component, two hosts — HttpRequestView.vue's request segment (what the
 // jar would send next) and ResponsePane.vue's response segment (what one exchange actually sent
 // and received), same list shape either way (§3's own reasoning for keeping this one component).
 const props = defineProps<{
   mode: 'request' | 'response';
-  /** request mode only. */
-  tabId?: string;
+  /** request mode only — the jar listing for `url` (HttpRequestView.vue owns the query, so the
+   *  debounced key is computed once and the segment badge reads the same result). */
   url?: string;
+  cookies?: HttpCookieWire[];
+  error?: Error | null;
   disableCookieJar?: boolean;
   /** response mode only — null when there is no response to show cookies for yet. */
   response?: HttpResponseWire | null;
 }>();
 
-const cookiesStore = useCookiesStore();
 const settingsStore = useSettingsStore();
 const confirmDialogStore = useConfirmDialogStore();
 
@@ -55,26 +58,39 @@ function attributeLine(c: HttpCookieWire): string {
 
 // --- request mode ---
 
-const rt = computed(() => (props.tabId ? cookiesStore.cookiesRuntime[props.tabId] : undefined));
-const requestCookies = computed(() => rt.value?.cookies ?? []);
+const requestCookies = computed(() => props.cookies ?? []);
 const filteredRequestCookies = computed(() => {
   const q = filter.value.trim().toLowerCase();
   return requestCookies.value.filter((c) => matches(c, q));
 });
 
+const emit = defineEmits<{ refresh: [] }>();
+
+const removeMutation = useMutation(
+  {
+    mutationKey: ['httpJarCookies', 'remove'],
+    mutationFn: (c: HttpCookieWire) => deleteJarCookie(props.url ?? '', c),
+  },
+  queryClient,
+);
+const clearMutation = useMutation(
+  { mutationKey: ['httpJarCookies', 'clear'], mutationFn: clearJarCookies },
+  queryClient,
+);
+const requestError = computed(
+  () => (removeMutation.error.value ?? clearMutation.error.value ?? props.error)?.message ?? null,
+);
+
 async function onRemove(c: HttpCookieWire): Promise<void> {
-  if (!props.tabId || !props.url) return;
-  await cookiesStore.deleteCookie(props.tabId, props.url, c);
+  if (!props.url) return;
+  clearMutation.reset();
+  await removeMutation.mutateAsync(c).catch(() => {});
 }
 async function onClearAll(): Promise<void> {
-  if (!props.tabId) return;
   // Go's jar is process-wide: this empties every host, not just this request's URL.
   if (!(await confirmDialogStore.confirmDialog('Clear all cookies for every host?'))) return;
-  await cookiesStore.clearCookies(props.tabId);
-}
-async function onRetry(): Promise<void> {
-  if (!props.tabId || !props.url) return;
-  await cookiesStore.fetchCookiesNow(props.tabId, props.url);
+  removeMutation.reset();
+  await clearMutation.mutateAsync().catch(() => {});
 }
 
 function onEditGlobalDefaults(): void {
@@ -130,8 +146,8 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       >
         {{ filteredRequestCookies.length }} of {{ requestCookies.length }} cookies
       </span>
-      <Alert v-if="rt?.actionError" variant="destructive" data-testid="http-cookies-error">
-        <AlertDescription>{{ rt.actionError }}</AlertDescription>
+      <Alert v-if="requestError" variant="destructive" data-testid="http-cookies-error">
+        <AlertDescription>{{ requestError }}</AlertDescription>
       </Alert>
       <div v-if="requestCookies.length > 0" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
         <div v-for="(c, i) in filteredRequestCookies" :key="`${c.name}|${c.domain}|${c.path}|${i}`" class="flex text-kira-sm items-start justify-between gap-1">
@@ -152,7 +168,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       <Empty v-else data-testid="http-cookies-empty">
         <EmptyMedia><CodiconIcon name="symbol-key" :size="24" /></EmptyMedia>
         <EmptyTitle>No cookies for this request's URL</EmptyTitle>
-        <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-cookies-retry" @click="onRetry">Refresh</button>
+        <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-cookies-retry" @click="emit('refresh')">Refresh</button>
       </Empty>
     </template>
   </div>

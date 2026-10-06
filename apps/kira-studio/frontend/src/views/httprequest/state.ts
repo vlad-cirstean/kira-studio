@@ -16,6 +16,7 @@ import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { createSubstituter, resolvePairs } from '../shared/request/resolve';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { invalidateJarCookies } from './cookies';
 import { useHttpHistoryStore } from './history';
 
 export type { ResolvedRequest } from '@kira/api-core';
@@ -127,19 +128,6 @@ function buildSettingsWire(s: HttpRequestSettingsState): HttpRequestSettingsWire
   return out;
 }
 
-// P90 item 2: a tiny notifier so CookiesPane.vue's request mode can refetch after a send
-// completes without polling — HttpRequestViewRuntime is keyed by tab and CookiesPane already
-// knows its own tabId, so a plain listener set (mirroring noteSendRecorded's own call site) is
-// simpler than threading a per-tab event through the runtime store.
-const sendCompletedListeners = new Set<(tabId: string) => void>();
-export function onSendCompleted(cb: (tabId: string) => void): () => void {
-  sendCompletedListeners.add(cb);
-  return () => sendCompletedListeners.delete(cb);
-}
-function noteSendCompleted(tabId: string): void {
-  for (const cb of sendCompletedListeners) cb(tabId);
-}
-
 export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
   const { runtime, ensureRuntime } = createRuntimeStore<HttpRequestViewRuntime>(defaultRuntime);
 
@@ -203,7 +191,7 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
       // P108 F8: `rt` is a captured reference to the (possibly already cleaned-up) runtime object
       // — closing the tab mid-send never touched `rt.opId` itself (cleanup only stops the op and
       // deletes `runtime[tabId]`), so the opId check alone still passed for a tab that no longer
-      // exists, and noteSendRecorded/noteSendCompleted below ran for it, recreating a history
+      // exists, and noteSendRecorded/invalidateJarCookies below ran for it, recreating a history
       // runtime and seq entry (api/state/history.ts) nothing ever cleans up again.
       if (!findHttpRequestTab(tabId)) return;
       if (rt.opId !== opId) return; // superseded by a newer send
@@ -213,9 +201,9 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
       // P8 D11: refetches the History pane's list when it's the one showing, otherwise just marks
       // it stale — a user who never opens the pane pays no IPC per send.
       useHttpHistoryStore().noteSendRecorded(tabId);
-      // P90 item 2: lets a mounted CookiesPane (request mode) refetch so a Set-Cookie shows up
-      // without the user re-navigating.
-      noteSendCompleted(tabId);
+      // P90 item 2: the jar is process-wide, so a Set-Cookie can change any URL's list; a mounted
+      // CookiesPane refetches, every other list turns stale.
+      void invalidateJarCookies();
     } catch (err) {
       if (!findHttpRequestTab(tabId)) return; // P108 F8: same guard, the failure path's own half
       if (rt.opId !== opId) return;
