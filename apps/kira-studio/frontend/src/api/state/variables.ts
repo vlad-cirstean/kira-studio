@@ -533,12 +533,14 @@ export const useVariableSetStore = defineStore('variableSet', () => {
       isSecret: boolean;
       description?: string;
     },
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await upsertVariableMutation.mutateAsync({ scope, ownerId, ...args });
       setVariableSetError(tabId, null);
+      return true;
     } catch (err) {
       setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+      return false;
     }
   }
 
@@ -651,6 +653,12 @@ export const useVariableSetStore = defineStore('variableSet', () => {
   function clearRevealed(): void {
     for (const id of Object.keys(revealedValues)) delete revealedValues[id];
     revealedValuesExpiry.clearAll();
+  }
+
+  /** Drops one variable's revealed plaintext, e.g. after its value was replaced. */
+  function forgetRevealed(id: string): void {
+    delete revealedValues[id];
+    revealedValuesExpiry.clear(id);
   }
 
   /** P12 D13: runs over http/reveal.ts's shared recurse-once switch — the pattern used to be
@@ -819,6 +827,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     applyBulkVariables,
     isDuplicateName,
     clearRevealed,
+    forgetRevealed,
     revealVariable,
     openHistoryMenu,
     closeHistoryMenu,

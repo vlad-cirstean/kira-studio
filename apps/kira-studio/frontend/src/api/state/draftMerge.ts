@@ -56,3 +56,22 @@ export function mergeDrafts<TRow, TDraft>(
 
   return { drafts: nextDrafts, seeds: nextSeeds, order: incomingRows.map(rowId) };
 }
+
+/** After this window's own successful commit of `sent`: reseeds that row's draft and seed from the
+ *  refetched `incoming` draft, unless the user has edited the row again since (`equalEdit` over the
+ *  full edit state, flags included). Without it a typed secret stays in the draft as plaintext and
+ *  the row never reseeds again. Returns whether it reseeded. */
+export function reseedCommitted<TDraft>(
+  seeds: Record<string, TDraft>,
+  drafts: Record<string, TDraft>,
+  id: string,
+  sent: TDraft,
+  incoming: TDraft,
+  equalEdit: (a: TDraft, b: TDraft) => boolean,
+): boolean {
+  const draft = drafts[id];
+  if (draft === undefined || !equalEdit(draft, sent)) return false;
+  drafts[id] = incoming;
+  seeds[id] = incoming;
+  return true;
+}

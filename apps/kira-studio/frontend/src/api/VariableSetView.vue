@@ -27,7 +27,7 @@ import type { VariableSetTabRecord } from '../state/tabDomain';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
 import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';
-import { mergeDrafts } from './state/draftMerge';
+import { mergeDrafts, reseedCommitted } from './state/draftMerge';
 import { useVariableSetStore, useVariablesStore } from './state/variables';
 import VariableRow from './VariableRow.vue';
 
@@ -141,6 +141,10 @@ interface Draft {
   valueTouched: boolean;
   isSecret: boolean;
   description: string;
+}
+
+function equalEdit(a: Draft, b: Draft): boolean {
+  return equalDraft(a, b) && a.valueTouched === b.valueTouched;
 }
 
 function equalDraft(a: Draft, b: Draft): boolean {
@@ -347,7 +351,8 @@ async function commitDraft(id: string): Promise<void> {
     draft.name = row.name;
     return;
   }
-  await variableSetStore.upsertVariable(props.tab.id, scope.value, ownerId.value, {
+  const sent = { ...draft };
+  const ok = await variableSetStore.upsertVariable(props.tab.id, scope.value, ownerId.value, {
     id,
     name: draft.name.trim(),
     // F2: null unless this draft's value was actually touched — see Draft's own comment above.
@@ -355,6 +360,12 @@ async function commitDraft(id: string): Promise<void> {
     isSecret: draft.isSecret,
     description: draft.description,
   });
+  if (!ok) return;
+  // A committed secret value must not linger in the draft as plaintext, and the old reveal no
+  // longer matches the stored value.
+  if (sent.isSecret && sent.valueTouched) variableSetStore.forgetRevealed(id);
+  const committed = rows.value.find((r) => r.id === id);
+  if (committed) reseedCommitted(seeds, drafts, id, sent, draftFromRow(committed), equalEdit);
 }
 
 async function onBlur(id: string): Promise<void> {

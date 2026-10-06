@@ -3,7 +3,7 @@
 // this: several interacting rules (dirty-against-seed, still-differs-from-incoming, drop-if-absent)
 // that a plain visual read of the function body doesn't make obvious are all correct at once.
 import { describe, expect, test } from 'bun:test';
-import { mergeDrafts } from '../../frontend/src/api/state/draftMerge';
+import { mergeDrafts, reseedCommitted } from '../../frontend/src/api/state/draftMerge';
 
 interface Row {
   id: string;
@@ -76,5 +76,39 @@ describe('mergeDrafts', () => {
     expect(result.drafts).toEqual({ a: { name: 'Old' } });
     expect(result.seeds).toEqual({ a: { name: 'Old' } });
     expect(result.order).toEqual(['a']);
+  });
+});
+
+// P168 Part 10 F7: a secret row's own commit refetches as value '' while the draft still holds the
+// typed plaintext, so mergeDrafts keeps it (dirty vs seed, differs from incoming) forever.
+describe('reseedCommitted', () => {
+  interface SecretDraft {
+    value: string;
+    touched: boolean;
+  }
+  const equalEdit = (a: SecretDraft, b: SecretDraft) =>
+    a.value === b.value && a.touched === b.touched;
+
+  test('drops the typed plaintext once the commit lands', () => {
+    const sent = { value: 'typed-secret', touched: true };
+    const seeds = { a: { value: '', touched: false } };
+    const drafts: Record<string, SecretDraft> = { a: { ...sent } };
+
+    expect(
+      reseedCommitted(seeds, drafts, 'a', sent, { value: '', touched: false }, equalEdit),
+    ).toBe(true);
+    expect(drafts.a).toEqual({ value: '', touched: false });
+    expect(seeds.a).toEqual({ value: '', touched: false });
+  });
+
+  test('keeps an edit made while the commit was in flight', () => {
+    const sent = { value: 'first', touched: true };
+    const seeds = { a: { value: '', touched: false } };
+    const drafts: Record<string, SecretDraft> = { a: { value: 'second', touched: true } };
+
+    expect(
+      reseedCommitted(seeds, drafts, 'a', sent, { value: '', touched: false }, equalEdit),
+    ).toBe(false);
+    expect(drafts.a).toEqual({ value: 'second', touched: true });
   });
 });
