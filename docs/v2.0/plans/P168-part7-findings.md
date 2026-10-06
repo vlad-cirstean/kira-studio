@@ -340,6 +340,39 @@ No other block 5 finding. Verified:
   noted, not filed (Chrome's Windows "Copy as cURL (cmd)" uses `^` continuations shlex cannot
   parse anyway).
 
+### Block 6: vocabulary and wire parity
+
+#### F18 (low) history elision flags never reach the renderer
+
+- `apps/kira-studio/internal/storage/repos/response_history.go:52`, `:114` (`RequestFieldsElided`
+  set on the stored snapshot) and `:213-220` (`Get` builds `model.ResponseHistorySnapshot`
+  without it); `repos/grpc_history.go:55`, `:127` (`MetadataElided`, same gap);
+  `storage/model/responsehistory.go:44-51`; `packages/shared/domain/response-history.ts:32-47`,
+  `grpc-history.ts` (no field). `git grep -i requestFieldsElided` and `metadataElided` find no
+  TS or renderer reader.
+- Scenario: a send whose urlencoded/form-data fields push the snapshot past half the history
+  budget is stored with its request field values dropped. Opening that history entry shows an
+  empty request body with no note, against the "truncate visibly, never silently" posture
+  `BodyStorageTruncated`/`RequestBodyStorageTruncated` follow. Same for an elided gRPC entry's
+  metadata, header and trailer.
+- Fix: add `RequestFieldsElided` to `model.ResponseHistorySnapshot` and `MetadataElided` to the
+  gRPC snapshot model, copy them in both `Get`s, add the fields to
+  `response-history.ts`/`grpc-history.ts`, and show a note where the pane already shows the
+  body-truncated note. `needs-other-part-file: apps/kira-studio/frontend/src/views/httprequest/{ResponsePane,RawExchangePane}.vue,
+  apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue (Part 10)`; routed. Go,
+  `SD` and `SF/bridge/apiControl.ts` halves are this fixer's.
+
+No other block 6 finding. Verified field for field: `httpclient.Response`/`Header`/`RedirectHop`/
+`Cookie`/`Timeline`/`TimelineHop`/`Phase`/`WireExchange` against `SD/http.ts` (`omitempty` fields
+optional in TS; `Fidelity` three values); `grpcclient.CallResult`/`Message`/`Schema`/`Method`/
+`MetaPair`/`TLSConfig` against `SD/grpc.ts` (Go `mdToPairs` returns nil for empty metadata, so
+`header`/`trailer` can be `null`; `ResponsePane.vue:124-127` already guards with `?? []`);
+`apivars.Outcome*` against `RevealOutcome`; response-history entry and snapshot fields;
+`E_GRPC_CANCELLED` used by `views/grpcrequest/state.ts:186`; `DISCONNECTED_CODES`
+(`E_ENGINE_DOWN`, `E_CONNECT`) shares no code with httpclient's four or grpcclient's four.
+Unpinned vocabulary (not a finding): `HTTP_METHODS` vs Go `validMethods` and
+`postman.builderMethods` agree today but no extractor pins them.
+
 ## Coverage
 
 - Block 1 (HTTP client): done. Reviewed `httpclient/{client,options,body,cookies,timeline,wire,errors}.go`,
@@ -361,5 +394,8 @@ No other block 5 finding. Verified:
   (walk and URL sanitiser); skimmed `curl/detect.ts`, `dynamic/{catalog,generators,fakerEntry}.ts`,
   `grpc/{metadata,saved}.ts`, `http/saved.ts`, `substituteRequest.ts`, `escape.ts`, `index.ts`
   (thin wrappers or tables; covered by the parity specs).
-- Block 6: not reached.
+- Block 6 (parity): done. Reviewed `SD/{http,grpc,response-history,variables}.ts` against the Go
+  structs; skimmed `SD/{collections,grpc-history}.ts` (field lists match `model`);
+  `go-ts-api-parity.spec.ts`, `go-ts-vocabulary-parity.spec.ts` test lists;
+  `SF/bridge/apiControl.ts` cookie and send types.
 - Block 7: not reached.

@@ -79,3 +79,17 @@ Stream A did not edit those files.
 - Fix: in `applyEditRaw`, build the patched `headers` by giving each parsed row the description
   of the first not-yet-used original row with the same name and value, then append the original
   disabled rows in their original order. No api-core change needed.
+
+## P168 Part 7 F18 (low): renderer half of history elision flags
+
+- Owner files: `apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue`,
+  `RawExchangePane.vue`, `apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue`
+  (Part 10, Stream C).
+- Source: `P168-part7-findings.md` F18. The Part 7 fixer adds `requestFieldsElided` to the
+  response-history snapshot and `metadataElided` to the gRPC history snapshot (Go model, `Get`,
+  `SD/response-history.ts`, `SD/grpc-history.ts`).
+- Issue: a stored entry whose request fields (HTTP) or metadata/header/trailer (gRPC) were
+  dropped by the history size backstop renders as empty with no note.
+- Fix: where each pane already shows its body-truncated note for a history entry, show "request
+  field values were not stored (too large)" when `requestFieldsElided`, and the gRPC equivalent
+  for `metadataElided`. Land after the Part 7 Go/SD half; before it the field is absent.
