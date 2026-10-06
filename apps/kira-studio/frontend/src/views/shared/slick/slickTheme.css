@@ -287,6 +287,11 @@
   color: var(--kira-fg);
   font: inherit;
 }
+/* Generated columns are server-computed; their insert input is read-only and muted. */
+.slick-grid-host [data-testid="grid-cell-insert"] .cell-input.cell-generated {
+  color: var(--kira-fg-muted);
+  cursor: default;
+}
 /* The accent ring itself — DataGrid.vue's own `.cell-input` base rule (`:2113-2124`),
    `outline: 1px solid var(--kira-accent); outline-offset: -1px`, ported verbatim. Declared after
    the shared sizing rule above so its `outline: none` doesn't need `!important` to lose the

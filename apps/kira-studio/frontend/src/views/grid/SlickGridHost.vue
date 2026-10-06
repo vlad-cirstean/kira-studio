@@ -206,6 +206,11 @@ function cellFormatter(
     input.className = 'cell-input';
     input.dataset.testid = 'grid-cell-insert-input';
     input.value = view.isNull ? '' : view.text;
+    // The server computes generated columns; the insert paths already skip them (P36 D28).
+    if (isGeneratedColumn(String(columnDef.field))) {
+      input.readOnly = true;
+      input.classList.add('cell-generated');
+    }
     return input;
   }
   // C11/§5 D11c — the *cheap* precheck only (a Set lookup, not the full `cellNavEntry` a click on
@@ -612,7 +617,9 @@ function refreshMaskFolding(): void {
 // tags per page, not per render". Async (resolving the key and signing each distinct value both
 // are); callers re-render once this resolves. A page with nothing to correlate (no key yet, or no
 // correlating rule) clears the cache rather than leaving a prior page's tags behind.
+let maskTagSeq = 0;
 async function refreshMaskTagCache(): Promise<void> {
+  const seq = ++maskTagSeq;
   const connectionId = tab()?.connectionId;
   const p = getPage(props.tabId);
   if (!connectionId || !p || maskRulesByColumn.size === 0) {
@@ -621,7 +628,10 @@ async function refreshMaskTagCache(): Promise<void> {
     return;
   }
   const key = await correlationKeyFor(connectionId);
-  maskTagCache = await buildMaskTagCache(p, maskRulesByColumn, key);
+  const cache = await buildMaskTagCache(p, maskRulesByColumn, key);
+  // A later refresh or page swap owns the cache now; installing this one would show old-page tags.
+  if (seq !== maskTagSeq || getPage(props.tabId) !== p) return;
+  maskTagCache = cache;
   maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 }
 
@@ -976,6 +986,8 @@ function refreshSearchLayer(): void {
 // onGridRendered since it already runs on every grid.onRendered and already reads
 // lastRenderedRowBounds.
 let lastCssLayerBand = { start: 0, end: -1 };
+let lastAppliedPage: ReturnType<typeof getPage> = null;
+let lastAppliedOrderKey = '';
 
 function onGridRendered(): void {
   if (!grid || !dataSource) return;
@@ -1586,9 +1598,20 @@ function insertInputTarget(
   return insertId && column ? { insertId, column, input } : null;
 }
 
+// The dock stages by page-row index; after a reload that index names a different record.
+function dockPageStale(published: ReturnType<typeof getPage>): boolean {
+  if (getPage(props.tabId) === published) return false;
+  gridViewStore.setActionError(props.tabId, 'Edit not staged: the page reloaded');
+  return true;
+}
+
+function isGeneratedColumn(name: string): boolean {
+  return getPage(props.tabId)?.columns.some((c) => c.name === name && c.generated) ?? false;
+}
+
 function onInsertGridInput(e: Event): void {
   const hit = insertInputTarget(e);
-  if (!hit) return;
+  if (!hit || isGeneratedColumn(hit.column)) return;
   pendingChangesStore.stageInsertValue(props.tabId, hit.insertId, hit.column, hit.input.value);
 }
 
@@ -1812,6 +1835,9 @@ async function onPaste(): Promise<void> {
     return;
   }
   if (!clipboardText) return;
+  // The readText await can outlast a reload, selection change, mask toggle or tab close; staging
+  // by the captured page-row indices would then hit the wrong record.
+  if (!grid || getPage(props.tabId) !== p || rt()?.selection !== sel || !canEditTable()) return;
 
   const parsed = parseDelimited(clipboardText);
   const columns = currentOrder();
@@ -1942,6 +1968,8 @@ onMounted(() => {
   const t = tab();
   const p = getPage(props.tabId);
   const order = p ? resolveColumnOrder(p, t?.state.columnOrder ?? null) : [];
+  lastAppliedPage = p;
+  lastAppliedOrderKey = order.join('\u0000');
   formatterCtx.rowNumberBase = t ? t.state.pageIndex * t.state.pageSize : 0;
   // C11/§5 D11c — meta may already be loaded by mount time (a reopened tab); the `rt()?.meta`
   // watch (below) only fires on a *change*, so the first value needs setting here too.
@@ -2235,6 +2263,12 @@ watch(
     const p = getPage(props.tabId);
     const t = tab();
     const order = p ? resolveColumnOrder(p, t?.state.columnOrder ?? null) : [];
+    // pageVersion counts every tab's loads and closes; rebuilding for one that is not ours would
+    // destroy an open inline editor and mis-consume a pending focus request.
+    const orderKey = order.join('\u0000');
+    if (p === lastAppliedPage && orderKey === lastAppliedOrderKey) return;
+    lastAppliedPage = p;
+    lastAppliedOrderKey = orderKey;
     formatterCtx.rowNumberBase = t ? t.state.pageIndex * t.state.pageSize : 0;
     dataSource.setState(dataSourceState(p, order));
     grid.setColumns(buildColumns(p, order, currentWidths(), rt()?.meta ?? null));
@@ -2251,7 +2285,9 @@ watch(
     // — the point a pending focus request (a host that wasn't registered yet, or one that was but
     // had no matching page at request time) can finally be satisfied.
     const pendingFocus = consumeCellFocus(props.tabId);
-    if (pendingFocus) applyCellFocusRequest(pendingFocus);
+    if (pendingFocus && !applyCellFocusRequest(pendingFocus)) {
+      requestCellFocus(props.tabId, pendingFocus);
+    }
 
     // M5 §6.3: "on every pageVersion bump while it is on" — a freshly loaded page has an entirely
     // different set of distinct values, so the previous tag cache no longer applies. The redaction
@@ -2468,12 +2504,17 @@ watch(
       // `isEditable` already blocks this via `readOnlyReasonFor` above, this is defense in depth.
       onEdit:
         canEditTable() && !isDeleted(targetRow) && !column.generated
-          ? (newValue: string) =>
-              pendingChangesStore.stageEdit(props.tabId, targetRow, column.name, newValue)
+          ? (newValue: string) => {
+              if (dockPageStale(p)) return;
+              pendingChangesStore.stageEdit(props.tabId, targetRow, column.name, newValue);
+            }
           : undefined,
       onRevert:
         canEditTable() && !isDeleted(targetRow)
-          ? () => pendingChangesStore.discardCellEdit(props.tabId, targetRow, column.name)
+          ? () => {
+              if (dockPageStale(p)) return;
+              pendingChangesStore.discardCellEdit(props.tabId, targetRow, column.name);
+            }
           : undefined,
     };
     cellSelectionStore.publishSelectedCell(selected);
