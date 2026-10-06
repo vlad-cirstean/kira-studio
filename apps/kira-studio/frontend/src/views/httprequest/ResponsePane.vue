@@ -305,7 +305,7 @@ onUnmounted(() => {
         </Tooltip>
         <span class="text-kira-sm text-subtle" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
         <ToggleGroup
-          v-if="tab.state.responsePane === 'body' && prettyFormat"
+          v-if="tab.state.responsePane === 'body' && prettyFormat !== null"
           type="single"
           size="kira"
           :model-value="tab.state.responseView"
