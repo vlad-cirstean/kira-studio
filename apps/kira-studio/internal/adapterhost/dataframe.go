@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -258,16 +259,31 @@ func (r *Router) respond(session *Session, id int, payload any, err error) {
 func oversizedPagePayload(payload any) bool {
 	switch v := payload.(type) {
 	case ReadResponse:
-		return pageSizeEstimate(v.Page.Size()) > maxResponsePayloadBytes
+		return pageTooLarge(v.Page.Size())
 	case ExecuteResponse:
 		total := 0
 		for _, p := range v.Pages {
 			total += p.Size()
 		}
-		return pageSizeEstimate(total) > maxResponsePayloadBytes
+		return pageTooLarge(total)
 	default:
 		return false
 	}
+}
+
+func pageTooLarge(rawBytes int) bool {
+	return pageSizeEstimate(rawBytes) > maxResponsePayloadBytes
+}
+
+// maxErrorMessageBytes caps an error frame's text: a driver can echo a huge statement back, and an
+// error frame over the Wails frame limit would otherwise kill the writer (F5, P168 Part 5).
+const maxErrorMessageBytes = 64 << 10
+
+func capErrorMessage(msg string) string {
+	if len(msg) <= maxErrorMessageBytes {
+		return msg
+	}
+	return strings.ToValidUTF8(msg[:maxErrorMessageBytes], "") + "…"
 }
 
 func (r *Router) respondError(session *Session, id int, err error) {
@@ -276,7 +292,7 @@ func (r *Router) respondError(session *Session, id int, err error) {
 	if errors.As(err, &ae) {
 		code = string(ae.Code)
 	}
-	session.enqueueResponse(safeEncodeError(id, err.Error(), code))
+	session.enqueueResponse(safeEncodeError(id, capErrorMessage(err.Error()), code))
 }
 
 func (r *Router) respondCacheStats(session *Session, id int) {

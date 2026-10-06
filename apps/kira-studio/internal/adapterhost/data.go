@@ -84,7 +84,10 @@ func (d *Dispatcher) Read(ctx context.Context, req ReadRequestWire) (ReadRespons
 		return ReadResponse{}, err
 	}
 
-	d.cache.StorePageIfCurrent(key, label, cacheReq, p, gen)
+	// F6 (P168 Part 5): a page respond() refuses must not sit in the cache and fail every retry.
+	if !pageTooLarge(p.Size()) {
+		d.cache.StorePageIfCurrent(key, label, cacheReq, p, gen)
+	}
 	return ReadResponse{Page: p, Source: "server"}, nil
 }
 

@@ -192,3 +192,34 @@ func TestRouter_ConcurrentDisconnectAndReconnect_NeverLosesTheNewerAdapter(t *te
 			"Disconnect's own stale teardown must not delete the reconnect's newer adapter", live, ok)
 	}
 }
+
+// F2 (P168 Part 5): a slow Disconnect finishing after a newer Connect must leave that session's
+// throttle in place.
+func TestRouter_SlowDisconnect_KeepsNewerConnectionThrottle(t *testing.T) {
+	const kindB = "test-p168-f2-throttle"
+	slowA := &gatedDisconnectAdapter{started: make(chan struct{}), release: make(chan struct{})}
+	adapters.Register(kindB, func(adapters.Deps) (adapters.Adapter, error) { return &reconnectStubAdapter{}, nil })
+
+	const connID = "conn-p168-f2-throttle"
+	adapters.DeleteLiveAdapter(connID)
+	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
+	adapters.SetLiveAdapter(connID, slowA)
+
+	done := make(chan struct{})
+	go func() {
+		_ = r.Disconnect(context.Background(), connID)
+		close(done)
+	}()
+	<-slowA.started
+
+	r.SetThrottle(connID, 5)
+	if _, err := r.Connect(context.Background(), model.ResolvedConnectionConfig{ID: connID, Kind: kindB}); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	close(slowA.release)
+	<-done
+
+	if r.host.throttles.limiterFor(connID) == nil {
+		t.Fatal("the older Disconnect cleared the newer connection's throttle")
+	}
+}

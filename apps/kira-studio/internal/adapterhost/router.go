@@ -36,6 +36,16 @@ type Router struct {
 	// call or RunOp — those can run for up to disconnectTimeout, and a second caller only needs to
 	// learn "there is nothing left for me to tear down here", not wait that out.
 	teardown *keyedMutex
+
+	// connects tracks per-id Connect activity so a slow Disconnect can tell a newer connection
+	// started while it ran (F2, P168 Part 5), guarded by teardown.lock.
+	connects map[string]*connectState
+}
+
+// connectState: epoch bumps when a Connect begins and ends; active counts Connects in flight.
+type connectState struct {
+	epoch  uint64
+	active int
 }
 
 // NewRouter constructs a Router. deps.Log is normalised (withDefaultLog, P21 round 3 finding 8)
@@ -43,7 +53,7 @@ type Router struct {
 func NewRouter(deps adapters.Deps, cache *enginecache.Cache) *Router {
 	deps = withDefaultLog(deps)
 	host := NewHost(deps, cache)
-	return &Router{deps: deps, host: host, dispatcher: NewDispatcher(host, cache), cache: cache, teardown: newKeyedMutex()}
+	return &Router{deps: deps, host: host, dispatcher: NewDispatcher(host, cache), cache: cache, teardown: newKeyedMutex(), connects: make(map[string]*connectState)}
 }
 
 // keyedMutex is a per-key mutex, used by Router to serialize F2's own check-and-swap step per
@@ -87,18 +97,58 @@ const disconnectTimeout = 10 * time.Second
 // first has already removed it and reports ok=false, the same outcome as if nothing had ever been
 // live. Never returns an adapter a caller does not now exclusively own tearing down.
 func (r *Router) takeLiveAdapterForTeardown(connectionID string) (adapters.Adapter, bool) {
+	adapter, _, ok := r.takeLiveAdapterWithEpoch(connectionID)
+	return adapter, ok
+}
+
+// takeLiveAdapterWithEpoch is takeLiveAdapterForTeardown plus the connect epoch at the moment of
+// winning, for Disconnect's newer-connection check.
+func (r *Router) takeLiveAdapterWithEpoch(connectionID string) (adapters.Adapter, uint64, bool) {
 	unlock := r.teardown.lock(connectionID)
 	defer unlock()
 	existing, ok := adapters.GetLiveAdapter(connectionID)
 	if !ok {
-		return nil, false
+		return nil, 0, false
 	}
 	if !adapters.DeleteLiveAdapterIf(connectionID, existing) {
 		// Raced: another caller already won (and removed) this exact adapter between the Get above
 		// and here, or has since installed a different one — not ours to tear down either way.
-		return nil, false
+		return nil, 0, false
 	}
-	return existing, true
+	return existing, r.connectStateLocked(connectionID).epoch, true
+}
+
+func (r *Router) connectStateLocked(connectionID string) *connectState {
+	st, ok := r.connects[connectionID]
+	if !ok {
+		st = &connectState{}
+		r.connects[connectionID] = st
+	}
+	return st
+}
+
+// beginConnect marks a Connect in flight and returns its end func.
+func (r *Router) beginConnect(connectionID string) func() {
+	unlock := r.teardown.lock(connectionID)
+	st := r.connectStateLocked(connectionID)
+	st.epoch++
+	st.active++
+	unlock()
+	return func() {
+		unlock := r.teardown.lock(connectionID)
+		defer unlock()
+		st.epoch++
+		st.active--
+	}
+}
+
+// supersededSince reports whether a Connect began, ran or ended after epoch was read, or is
+// running now: the old session's cleanup must not touch the newer one's state.
+func (r *Router) supersededSince(connectionID string, epoch uint64) bool {
+	unlock := r.teardown.lock(connectionID)
+	defer unlock()
+	st := r.connectStateLocked(connectionID)
+	return st.epoch != epoch || st.active > 0
 }
 
 // disconnectAdapter runs adapter's own Disconnect inside RunOp (kind "disconnect") — F1: so it is
@@ -146,6 +196,7 @@ func (r *Router) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig
 	// with no bound of their own. Safe to call even when nothing is live for this id (a fresh
 	// connect, not a reconnect) — it simply finds nothing to cancel.
 	r.host.CancelOpsForConnection(cfg.ID, "")
+	defer r.beginConnect(cfg.ID)()
 	// F2: takeLiveAdapterForTeardown is the compare-and-delete that replaces the old bare
 	// GetLiveAdapter+DeleteLiveAdapter pair — a concurrent Disconnect racing this same reconnect
 	// (Router.Disconnect is not serialized against Connect, by connections.Service's own contract)
@@ -154,6 +205,8 @@ func (r *Router) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig
 	// replaced this one with (it cannot: only one of them will ever be live at a time under the
 	// same id, and only one CAS can win it).
 	if existing, ok := r.takeLiveAdapterForTeardown(cfg.ID); ok {
+		// F3 (P168 Part 5): drop before the slow teardown so cache hits stop serving a dying session.
+		r.cache.DropConnection(cfg.ID)
 		r.disconnectAdapter(ctx, cfg.ID, existing)
 		// P2 R1: mirrors Disconnect's own DropConnection call below — a reconnect that races
 		// ahead of onPreconnectExit's own async Disconnect (connections/service.go) lands here,
@@ -233,17 +286,22 @@ func (r *Router) Disconnect(ctx context.Context, connectionID string) error {
 	// failing with E_ENGINE_DOWN). ok is false both when nothing was ever live and when a racing
 	// caller already won teardown of it — either way, fire-and-forget Disconnect has nothing left
 	// to do.
-	adapter, ok := r.takeLiveAdapterForTeardown(connectionID)
+	adapter, epoch, ok := r.takeLiveAdapterWithEpoch(connectionID)
 	if !ok {
 		return nil
 	}
+	// F3 (P168 Part 5): drop before the slow teardown so cache hits stop serving a dying session.
+	r.cache.DropConnection(connectionID)
 	// Always attempted below, even on disconnectAdapter's own internal error (it only logs) — F2:
 	// this call already exclusively owns tearing this adapter down by the time we reach here, so
 	// there is no error path left that could skip the cache/throttle cleanup a partial-then-return
 	// used to risk.
 	r.disconnectAdapter(ctx, connectionID, adapter)
-	// §2.2: disconnecting releases the connection's driver state and all its cached pages.
-	r.cache.DropConnection(connectionID)
+	// F2 (P168 Part 5): a Connect that ran meanwhile owns the throttle and cache now.
+	if r.supersededSince(connectionID, epoch) {
+		return nil
+	}
+	// §2.2: disconnecting releases the connection's driver state; its pages already dropped above.
 	// P28 §5.5: a limiter's lifetime matches the live adapter's — cleared alongside it, covering
 	// every disconnect path (Remove, onPreconnectExit, an explicit Disconnect) with no second call
 	// site needed in the service.

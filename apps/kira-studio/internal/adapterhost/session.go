@@ -120,6 +120,11 @@ func (s *Session) writeLoop() {
 			}
 			if err := s.conn.Send(frame); err != nil {
 				s.Close()
+				// Close the conn too so the renderer sees onclose rather than silent no-answer (F5,
+				// P168 Part 5); *application.StreamConn has Close, the interface stays Wails-free.
+				if c, ok := s.conn.(interface{ Close() error }); ok {
+					_ = c.Close()
+				}
 				return
 			}
 		case <-s.done:

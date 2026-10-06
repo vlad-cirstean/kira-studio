@@ -314,7 +314,10 @@ func (h *Host) CancelOp(ctx context.Context, opID string) (bool, error) {
 
 	if op.connectionID != nil {
 		if adapter, ok := adapters.GetLiveAdapter(*op.connectionID); ok {
-			_, _ = adapter.Cancel(ctx, opID)
+			// F1 (P168 Part 5): a stalled engine must not park the Cancel call forever.
+			cancelCtx, stop := context.WithTimeout(ctx, disconnectTimeout)
+			_, _ = adapter.Cancel(cancelCtx, opID)
+			stop()
 		}
 	}
 	return true, nil
