@@ -41,13 +41,14 @@ type boundedWriter struct {
 }
 
 func (w *boundedWriter) Write(p []byte) (int, error) {
+	n := len(p)
 	room := w.max - w.buf.Len()
-	if room < len(p) {
+	if room < n {
 		w.overflow = true
 		p = p[:max(room, 0)]
 	}
 	w.buf.Write(p)
-	return len(p), nil
+	return n, nil
 }
 
 // ghHygieneEnv is D2's exact table, appended after os.Environ() (later entries win on a duplicate
