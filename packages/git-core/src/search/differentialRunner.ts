@@ -1,6 +1,6 @@
 // G23 D10: the JS half of the Go<->Bun differential fuzz test. Invoked exactly once per
 // `go test -run TestDifferential` run (KIRA_GIT_DIFFERENTIAL=1), from
-// `apps/kira-studio/internal/gitsearch/differential_test.go`, via `bun run` against this file's
+// `apps/kira-space/internal/gitsearch/differential_test.go`, via `bun run` against this file's
 // own absolute path — a relative import of `compileQuery` (not `@kira/git-core`) deliberately,
 // since a workspace package's own name only resolves from inside a package that actually
 // DECLARES it as a dependency (its own node_modules/@kira/* symlink); nothing makes that true for

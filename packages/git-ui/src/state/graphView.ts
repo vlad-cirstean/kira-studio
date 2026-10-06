@@ -163,8 +163,8 @@ export class GraphViewState {
    * UI's side (§5.4). The same default also makes a same-session reconnect (the store already
    * holds N rows) resume from N instead of re-fetching them.
    *
-   * Supersedes any still-open stream on this instance, matching W2's own
-   * supersede-on-reopen rule for the transport underneath.
+   * Supersedes any still-open stream on this instance: aborting the previous
+   * `#abortController` ends it.
    */
   async openStream(
     repoId: string,

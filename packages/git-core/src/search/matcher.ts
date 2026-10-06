@@ -5,7 +5,7 @@
  * W16's semantics table is asserted against.
  *
  * G23: `matchCommitFields` is this feature's own conformance ORACLE for the Go tail scan's twin,
- * `apps/kira-studio/internal/gitsearch`'s `(*Matcher).MatchFields` — both are asserted against
+ * `apps/kira-space/internal/gitsearch`'s `(*Matcher).MatchFields` — both are asserted against
  * the same `packages/git-core/testdata/searchConformance.json` (this file's own
  * `conformance.test.ts`, and that package's `conformance_test.go`), so a change to either
  * matcher's semantics adds rows there first, never edits one side alone.
