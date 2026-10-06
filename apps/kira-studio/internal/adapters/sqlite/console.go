@@ -10,7 +10,7 @@ import (
 
 // ClassifyStatement satisfies adapters.StatementClassifier (M2) over the shared SQL classifier.
 func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
-	return adapters.ClassifySQL(statement), nil
+	return adapters.ClassifySQL(statement, adapters.SQLiteDialect), nil
 }
 
 // columnsFor is console.ts's own — F5: a column's *declared* origin type ('INTEGER', 'TEXT', "" for

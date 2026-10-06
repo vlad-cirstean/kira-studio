@@ -84,11 +84,14 @@ var (
 	// confirmed, against a real Postgres server, to flip that transaction writable and let a
 	// following DELETE succeed, with no "READ WRITE" phrase anywhere in the statement for
 	// sqlReadWrite to catch).
-	sqlReadOnlyVarOff = regexp.MustCompile(`(?i)\b(?:default_transaction_read_only|transaction_read_only|tx_read_only)\b\s*(?:=|TO)\s*'?(?:off|false|0)\b`)
+	//
+	// Matches Postgres's parse_bool prefixes (f/fa/…/n/no/of/off/0), a quoted GUC name and a quoted
+	// value. A cheap first pass only: engines re-verify server state after every statement.
+	sqlReadOnlyVarOff = regexp.MustCompile(`(?i)\b(?:default_transaction_read_only|transaction_read_only|tx_read_only)\b"?\s*(?::=|=|TO)\s*['"]?(?:f(?:a(?:l(?:s(?:e)?)?)?)?|n(?:o)?|of(?:f)?|0)\b`)
 )
 
 // endsTransaction reports whether stmt (already comment-stripped) is a bare statement that ends
-// the current transaction — COMMIT, END (postgres's alias for COMMIT), or ROLLBACK — rather than
+// the current transaction — COMMIT, END (postgres's alias for COMMIT), ABORT (its alias for ROLLBACK), or ROLLBACK — rather than
 // a statement that merely mentions one of those words. A real read-only console session has no
 // legitimate reason to end its own wrapping transaction mid-batch (postgres/mysqlfamily console.go
 // both wrap the whole Execute() batch in one read-only transaction specifically so no statement in
@@ -109,7 +112,7 @@ func endsTransaction(stmt string) bool {
 		return false
 	}
 	switch strings.ToUpper(fields[0]) {
-	case "COMMIT", "END":
+	case "COMMIT", "END", "ABORT":
 		return true
 	case "ROLLBACK":
 		for _, f := range fields[1:] {
@@ -229,6 +232,26 @@ func runesEqual(a, b []rune) bool {
 	return true
 }
 
+// SQLDialect names the comment-lexing differences StripSQLComments must honour. The zero value is
+// Postgres's lexer: nesting block comments, `--` always a comment, no `#`. Every flag deviates in
+// the direction that under-strips for a server that disagrees: a scanner that strips less than the
+// server hides nothing, one that strips more can hide a statement.
+type SQLDialect struct {
+	// HashComments: `#` starts a line comment (MySQL/MariaDB/ClickHouse).
+	HashComments bool
+	// DashNeedsSpace: `--` is a comment only before whitespace/control or end of input (MySQL).
+	DashNeedsSpace bool
+	// FlatBlocks: `/* */` does not nest (everything but Postgres).
+	FlatBlocks bool
+}
+
+var (
+	PostgresDialect   = SQLDialect{}
+	MySQLDialect      = SQLDialect{HashComments: true, DashNeedsSpace: true, FlatBlocks: true}
+	SQLiteDialect     = SQLDialect{FlatBlocks: true}
+	ClickHouseDialect = SQLDialect{HashComments: true, DashNeedsSpace: true, FlatBlocks: true}
+)
+
 // StripSQLComments replaces every SQL comment — a line comment (`--` to end of line) or a block
 // comment (`/* ... */`) — with a single space, preserving token boundaries the same way real SQL
 // treats a comment as lexical whitespace (confirmed against a real server: `READ/*x*/WRITE` parses
@@ -282,7 +305,7 @@ func runesEqual(a, b []rune) bool {
 // nesting being dialect-correct, only on a `;` inside a comment/string never being mistaken for one
 // outside it, which quote-awareness (above) and this scanner's char-by-char scan both already give
 // unconditionally.
-func StripSQLComments(s string) string {
+func StripSQLComments(s string, d SQLDialect) string {
 	r := []rune(s)
 	var out strings.Builder
 	st := commentScanState{}
@@ -296,7 +319,7 @@ func StripSQLComments(s string) string {
 			next, chunk := scanDollarArm(r, i)
 			out.WriteString(chunk)
 			i = next
-		case st.depth == 0 && startsLineComment(r, i):
+		case st.depth == 0 && startsLineComment(r, i, d):
 			next, chunk := scanLineCommentArm(r, i)
 			out.WriteString(chunk)
 			i = next
@@ -305,7 +328,7 @@ func StripSQLComments(s string) string {
 			out.WriteString(chunk)
 			i = next
 			st.execComment = false
-		case startsBlockCommentOpen(r, i):
+		case startsBlockCommentOpen(r, i) && !(d.FlatBlocks && st.depth > 0):
 			next, chunk, next2 := scanBlockCommentOpenArm(r, i, st)
 			out.WriteString(chunk)
 			i = next
@@ -334,8 +357,18 @@ type commentScanState struct {
 
 func isQuoteStart(c rune) bool { return c == '\'' || c == '"' || c == '`' }
 
-func startsLineComment(r []rune, i int) bool {
-	return r[i] == '-' && i+1 < len(r) && r[i+1] == '-'
+func startsLineComment(r []rune, i int, d SQLDialect) bool {
+	if r[i] == '#' {
+		return d.HashComments
+	}
+	if r[i] != '-' || i+1 >= len(r) || r[i+1] != '-' {
+		return false
+	}
+	if !d.DashNeedsSpace || i+2 >= len(r) {
+		return true
+	}
+	c := r[i+2]
+	return unicode.IsSpace(c) || unicode.IsControl(c)
 }
 
 func startsBlockCommentOpen(r []rune, i int) bool {
@@ -430,12 +463,12 @@ func execCommentMarkerLen(r []rune, i int) int {
 // wrapping transaction itself. This function cannot be made complete against every possible
 // escalation a SQL dialect can express — it is a backstop on top of the real enforcement (the
 // session default plus the wrapping transaction), not a substitute for it.
-func AssertNoTransactionEscalation(statements []string) error {
+func AssertNoTransactionEscalation(statements []string, d SQLDialect) error {
 	for _, stmt := range statements {
-		if err := AssertNoHiddenStatement(stmt); err != nil {
+		if err := AssertNoHiddenStatement(stmt, d); err != nil {
 			return err
 		}
-		stripped := StripSQLComments(stmt)
+		stripped := StripSQLComments(stmt, d)
 		if sqlReadWrite.MatchString(stripped) || sqlReadOnlyVarOff.MatchString(stripped) || endsTransaction(stripped) {
 			return New(CodeUnsupported, "connection is read-only", nil)
 		}
@@ -459,11 +492,11 @@ func AssertNoTransactionEscalation(statements []string) error {
 //     a reject, not a guess.
 //   - a `;` that survives in the comment-stripped text after exactly one legitimate trailing
 //     semicolon is removed — a hidden second statement a naive split missed.
-func AssertNoHiddenStatement(s string) error {
+func AssertNoHiddenStatement(s string, d SQLDialect) error {
 	if quoteHasBackslash(s) {
 		return New(CodeUnsupported, "connection is read-only", nil)
 	}
-	stripped := strings.TrimSpace(StripOneTrailingSemicolon(strings.TrimSpace(StripSQLComments(s))))
+	stripped := strings.TrimSpace(StripOneTrailingSemicolon(strings.TrimSpace(StripSQLComments(s, d))))
 	if strings.Contains(stripped, ";") {
 		return New(CodeUnsupported, "connection is read-only", nil)
 	}

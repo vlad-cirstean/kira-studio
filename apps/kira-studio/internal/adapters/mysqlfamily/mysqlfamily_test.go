@@ -1016,6 +1016,16 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			// followed — confirmed against a real server before the fix that this created the table
 			// on both mariadb (tx_read_only) and mysql (transaction_read_only).
 			{"COMMIT", "SET SESSION " + roVarName + " = OFF", "DELETE FROM order_items"},
+			// P168 Part 3 F2: comment-lexer gaps (# comments, `--` arithmetic, non-nesting blocks)
+			// no longer hide the COMMIT or the session flip.
+			{"# x\nCOMMIT", "SET @a = 1--1, SESSION " + roVarName + " = OFF", "DELETE FROM order_items"},
+			{"/* /* */ COMMIT -- */", "SET @a = 1--1, SESSION " + roVarName + " = OFF", "DELETE FROM order_items"},
+			// An implicit commit the text screen cannot name; the per-statement state check
+			// catches it before the session flip, hidden behind a variable, runs.
+			{"LOCK TABLES order_items READ", "SET @v = 0", "SET SESSION " + roVarName + " = @v", "UNLOCK TABLES", "DELETE FROM order_items"},
+			// Flipping only the session default (the wrap itself stays open) must not leave the
+			// pinned connection writable once the wrap ends.
+			{"SET @v = 0", "SET SESSION " + roVarName + " = @v"},
 		}
 		for _, statements := range attempts {
 			_, err := a.Execute(context.Background(), model.ConsoleRequest{

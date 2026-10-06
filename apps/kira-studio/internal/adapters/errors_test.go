@@ -56,7 +56,7 @@ func TestStripSQLComments(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := adapters.StripSQLComments(tt.in); got != tt.want {
+			if got := adapters.StripSQLComments(tt.in, adapters.PostgresDialect); got != tt.want {
 				t.Fatalf("StripSQLComments(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
@@ -104,6 +104,20 @@ func TestAssertNoTransactionEscalation(t *testing.T) {
 		{"tx_read_only off (mariadb spelling)", []string{"SET SESSION tx_read_only = OFF"}, true},
 		{"default_transaction_read_only off", []string{"SET default_transaction_read_only = off"}, true},
 		{"transaction_read_only TO off", []string{"SET transaction_read_only TO off"}, true},
+		// P168 Part 3 F1: Postgres parse_bool accepts any unique prefix; GUC and value may be quoted;
+		// ABORT is ROLLBACK's synonym.
+		{"transaction_read_only no", []string{"SET transaction_read_only = no"}, true},
+		{"transaction_read_only n", []string{"SET transaction_read_only = n"}, true},
+		{"transaction_read_only f", []string{"SET transaction_read_only = f"}, true},
+		{"transaction_read_only fa", []string{"SET transaction_read_only TO fa"}, true},
+		{"transaction_read_only of", []string{"SET transaction_read_only = of"}, true},
+		{"transaction_read_only quoted name", []string{`SET "transaction_read_only" = off`}, true},
+		{"transaction_read_only quoted value", []string{`SET transaction_read_only = 'no'`}, true},
+		{"default_transaction_read_only quoted double value", []string{`SET default_transaction_read_only = "false"`}, true},
+		{"abort ends the transaction", []string{"ABORT"}, true},
+		{"abort work", []string{"abort work"}, true},
+		{"transaction_read_only on is not an escalation", []string{"SET transaction_read_only = on"}, false},
+		{"transaction_read_only yes is not an escalation", []string{"SET transaction_read_only = yes"}, false},
 		{"transaction_read_only set to on is not an escalation", []string{"SET transaction_read_only = on"}, false},
 		{"default_transaction_read_only set to true is not an escalation", []string{"SET default_transaction_read_only = true"}, false},
 		// A bare COMMIT/END/ROLLBACK ends the wrapping read-only transaction itself (review finding,
@@ -148,7 +162,7 @@ func TestAssertNoTransactionEscalation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := adapters.AssertNoTransactionEscalation(tt.statements)
+			err := adapters.AssertNoTransactionEscalation(tt.statements, adapters.PostgresDialect)
 			if tt.wantReject {
 				var ae *adapters.Error
 				if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
@@ -156,6 +170,53 @@ func TestAssertNoTransactionEscalation(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Fatalf("AssertNoTransactionEscalation(%v) = %v, want nil", tt.statements, err)
+			}
+		})
+	}
+}
+
+func TestAssertNoTransactionEscalationMySQLLexer(t *testing.T) {
+	tests := []struct {
+		name       string
+		statements []string
+		wantReject bool
+	}{
+		{"hash comment before commit", []string{"# x\nCOMMIT"}, true},
+		{"commit after non-nested block comment", []string{"/* /* */ COMMIT -- */"}, true},
+		{"dash dash arithmetic does not hide a set", []string{"SET @a = 1--1, SESSION transaction_read_only = OFF"}, true},
+		{"dash dash comment hides nothing live", []string{"SELECT 1 -- COMMIT"}, false},
+		{"hash comment hides nothing live", []string{"SELECT 1 # COMMIT"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := adapters.AssertNoTransactionEscalation(tt.statements, adapters.MySQLDialect)
+			var ae *adapters.Error
+			if got := errors.As(err, &ae) && ae.Code == adapters.CodeUnsupported; got != tt.wantReject {
+				t.Fatalf("AssertNoTransactionEscalation(%v) = %v, wantReject %v", tt.statements, err, tt.wantReject)
+			}
+		})
+	}
+}
+
+func TestStripSQLCommentsDialects(t *testing.T) {
+	tests := []struct {
+		name string
+		d    adapters.SQLDialect
+		in   string
+		want string
+	}{
+		{"mysql hash comment", adapters.MySQLDialect, "a # b\nc", "a  \nc"},
+		{"postgres hash is an operator", adapters.PostgresDialect, "a # b", "a # b"},
+		{"mysql dash needs space", adapters.MySQLDialect, "1--1", "1--1"},
+		{"mysql dash then tab", adapters.MySQLDialect, "1--\tx\ny", "1 \ny"},
+		{"mysql flat block comments", adapters.MySQLDialect, "a /* /* */ b */", "a   b */"},
+		{"sqlite flat block comments", adapters.SQLiteDialect, "a /* /* */ b */", "a   b */"},
+		{"postgres nested block comments", adapters.PostgresDialect, "a /* /* */ b */", "a  "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := adapters.StripSQLComments(tt.in, tt.d); got != tt.want {
+				t.Fatalf("StripSQLComments(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
 	}

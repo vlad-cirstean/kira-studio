@@ -75,12 +75,12 @@ func assertReadOnlyFilterSortSafe(readOnly bool, filter *string, sort *model.Sor
 		return nil
 	}
 	if filter != nil {
-		if err := adapters.AssertNoHiddenStatement(*filter); err != nil {
+		if err := adapters.AssertNoHiddenStatement(*filter, adapters.PostgresDialect); err != nil {
 			return err
 		}
 	}
 	if sort != nil && sort.Kind == "text" {
-		if err := adapters.AssertNoHiddenStatement(sort.Text); err != nil {
+		if err := adapters.AssertNoHiddenStatement(sort.Text, adapters.PostgresDialect); err != nil {
 			return err
 		}
 	}

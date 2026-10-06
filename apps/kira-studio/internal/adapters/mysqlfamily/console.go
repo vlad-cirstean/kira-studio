@@ -3,7 +3,10 @@ package mysqlfamily
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
@@ -17,7 +20,7 @@ const endTransactionTimeout = 5 * time.Second
 // ClassifyStatement satisfies adapters.StatementClassifier (M2) over the shared SQL classifier —
 // serves both mysql and mariadb, since mysqlfamily.Adapter is registered under both kinds.
 func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
-	return adapters.ClassifySQL(statement), nil
+	return adapters.ClassifySQL(statement, adapters.MySQLDialect), nil
 }
 
 // numberDBTypes/temporalDBTypes are console.ts's own NUMBER_TYPES/TEMPORAL_TYPES, spelled in
@@ -143,21 +146,69 @@ func buildPage(rows [][]*string, dbTypes, names []string) page.TabularPage {
 	return builder.Finish(page.UnpagedPosition(len(rows)))
 }
 
+// errTxCharacteristics is MySQL/MariaDB's "Transaction characteristics can't be changed while a
+// transaction is in progress": a bare SET TRANSACTION fails with it only inside an open
+// transaction, so it doubles as an in-transaction probe.
+const errTxCharacteristics = 1568
+
+// verifyReadOnlyWrap re-checks server state after every statement of a read-only batch: the wrap
+// must still be an open transaction and the session default still read-only. Statement-text
+// screening alone cannot be complete (implicit commits, comment-lexer drift, SET SESSION flips that
+// take effect only once the wrap ends). On a violation, roll back and re-assert the session
+// default. A probe that succeeds outside a transaction only arms the next transaction read-only.
+func verifyReadOnlyWrap(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery) error {
+	_, _, _, err := runRaw(ctx, conn, "SET TRANSACTION READ ONLY", op, track)
+	var myErr *mysql.MySQLError
+	inTx := errors.As(err, &myErr) && myErr.Number == errTxCharacteristics
+	if err != nil && !inTx {
+		return err
+	}
+	if inTx {
+		rows, _, _, err := runRaw(ctx, conn, "SHOW SESSION VARIABLES WHERE Variable_name IN ('transaction_read_only', 'tx_read_only')", op, track)
+		if err != nil {
+			return err
+		}
+		if sessionReadOnly(rows) {
+			return nil
+		}
+	}
+	conn.waitInFlight()
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
+	defer cancel()
+	_, _ = conn.ExecContext(cleanupCtx, "ROLLBACK")
+	if _, err := conn.ExecContext(cleanupCtx, "SET SESSION TRANSACTION READ ONLY"); err != nil {
+		return mapError(err)
+	}
+	return adapters.New(adapters.CodeUnsupported, "connection is read-only", nil)
+}
+
+// sessionReadOnly reports whether every variable row (MariaDB lists both spellings) is ON, and at
+// least one exists.
+func sessionReadOnly(rows [][]*string) bool {
+	for _, r := range rows {
+		if len(r) != 2 || r[1] == nil || (*r[1] != "ON" && *r[1] != "1") {
+			return false
+		}
+	}
+	return len(rows) > 0
+}
+
 // execute is console.ts's execute. readOnly closes the gap client.go's own
 // SET SESSION TRANSACTION READ ONLY leaves open (P2 R2): that session default only governs
 // transactions not yet started, so a statement in this batch could flip it back for whatever
 // runs after. Wrapping the batch in an explicit START TRANSACTION READ ONLY is a hard server-side
 // backstop here — confirmed against a real server that, unlike Postgres, MariaDB/MySQL refuse
 // outright ("Transaction characteristics can't be changed while a transaction is in progress") to
-// let any statement flip an already-open transaction's own read-only mode, so no additional
-// per-statement rejection is strictly required on this dialect; AssertNoTransactionEscalation
-// still runs for consistency with postgres and as a cheap first line of defense.
+// let any statement flip an already-open transaction's own read-only mode. A statement can still
+// end the wrap (COMMIT through a comment-lexer gap, an implicit commit) or flip the session default
+// for what follows, so verifyReadOnlyWrap re-checks after every statement;
+// AssertNoTransactionEscalation is the cheap first line of defense.
 func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
 	if readOnly {
-		if err := adapters.AssertNoTransactionEscalation(statements); err != nil {
+		if err := adapters.AssertNoTransactionEscalation(statements, adapters.MySQLDialect); err != nil {
 			return nil, err
 		}
 	}
@@ -187,6 +238,11 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 			return nil, err
 		}
 		pages[i] = buildPage(rows, dbTypes, names)
+		if readOnly {
+			if err := verifyReadOnlyWrap(ctx, conn, op, track); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return pages, nil
 }

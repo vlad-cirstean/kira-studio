@@ -53,7 +53,7 @@ var sqlReadKeywords = map[string]bool{
 // package-level for the same reason as sqlWriteKeywords/sqlDDLKeywords above: a literal
 // map[string]bool{...} at each call site allocated fresh on every ExplainAnalyzeTarget/
 // ClassifySQL call.
-var sqlAnalyzeKeyword = map[string]bool{"ANALYZE": true}
+var sqlAnalyzeKeyword = map[string]bool{"ANALYZE": true, "ANALYSE": true}
 var sqlIntoKeyword = map[string]bool{"INTO": true}
 
 // sqlWordBoundaryContainsAny reports whether any upper-cased word in s (split on non-word runes)
@@ -115,7 +115,7 @@ func ExplainAnalyzeTarget(rest string) (hasAnalyze bool, target string, ok bool)
 		return sqlWordBoundaryContainsAny(options, sqlAnalyzeKeyword), target, true
 	}
 	fields := strings.Fields(rest)
-	if len(fields) > 0 && strings.EqualFold(fields[0], "ANALYZE") {
+	if len(fields) > 0 && sqlAnalyzeKeyword[strings.ToUpper(fields[0])] {
 		return true, strings.TrimSpace(rest[len(fields[0]):]), true
 	}
 	return false, rest, true
@@ -129,8 +129,8 @@ func ExplainAnalyzeTarget(rest string) (hasAnalyze bool, target string, ok bool)
 // path, and the question asked is one bit wide — what the statement's leading verb is. A
 // dialect-bound parser (pg_query_go for Postgres, vitess's sqlparser for MySQL) would add more
 // failure surface than it removes, and still answer nothing for ClickHouse.
-func ClassifySQL(statement string) OpClass {
-	stripped := strings.TrimSpace(StripOneTrailingSemicolon(StripSQLComments(statement)))
+func ClassifySQL(statement string, d SQLDialect) OpClass {
+	stripped := strings.TrimSpace(StripOneTrailingSemicolon(StripSQLComments(statement, d)))
 
 	// Embedded-semicolon guard: a leading keyword says nothing about a second statement smuggled
 	// behind it, and whether a driver executes both is a per-driver DSN detail this classifier must
@@ -166,7 +166,7 @@ func ClassifySQL(statement string) OpClass {
 		if sqlWordBoundaryContainsAny(stripped, sqlDDLKeywords) {
 			return ClassDDL
 		}
-		if sqlWordBoundaryContainsAny(stripped, sqlWriteKeywords) {
+		if sqlWordBoundaryContainsAny(stripped, sqlWriteKeywords) || sqlWordBoundaryContainsAny(stripped, sqlIntoKeyword) {
 			return ClassWrite
 		}
 		return ClassRead
@@ -183,7 +183,7 @@ func ClassifySQL(statement string) OpClass {
 		if hasAnalyze {
 			// EXPLAIN ANALYZE (bare or Postgres's `EXPLAIN (ANALYZE, ...)` form) genuinely runs
 			// the statement — classify what follows.
-			return ClassifySQL(target)
+			return ClassifySQL(target, d)
 		}
 		return ClassRead
 	case sqlWriteKeywords[keyword]:

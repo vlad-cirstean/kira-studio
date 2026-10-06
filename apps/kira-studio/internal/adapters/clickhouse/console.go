@@ -37,7 +37,7 @@ func classifyClickHouseSQL(statement string) adapters.OpClass {
 		return adapters.ClassUnknown
 	}
 
-	stripped := strings.TrimSpace(adapters.StripOneTrailingSemicolon(adapters.StripSQLComments(statement)))
+	stripped := strings.TrimSpace(adapters.StripOneTrailingSemicolon(adapters.StripSQLComments(statement, adapters.ClickHouseDialect)))
 	fields := strings.Fields(stripped)
 	if len(fields) > 0 && strings.EqualFold(fields[0], "EXPLAIN") {
 		rest := strings.TrimSpace(stripped[len(fields[0]):])
@@ -50,10 +50,10 @@ func classifyClickHouseSQL(statement string) adapters.OpClass {
 		// composed explain_query statement failed to classify.
 		rest = stripClickHouseExplainKindAndSettings(rest)
 		if hasAnalyze, target, ok := adapters.ExplainAnalyzeTarget(rest); ok && !hasAnalyze {
-			return adapters.ClassifySQL(target)
+			return adapters.ClassifySQL(target, adapters.ClickHouseDialect)
 		}
 	}
-	return adapters.ClassifySQL(statement)
+	return adapters.ClassifySQL(statement, adapters.ClickHouseDialect)
 }
 
 // chExplainKindRE matches ClickHouse's optional EXPLAIN kind keyword. ANALYZE is deliberately not

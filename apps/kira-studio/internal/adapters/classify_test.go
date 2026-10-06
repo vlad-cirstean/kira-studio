@@ -6,6 +6,33 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 )
 
+func TestClassifySQLMySQLLexer(t *testing.T) {
+	tests := []struct {
+		name      string
+		statement string
+		want      adapters.OpClass
+	}{
+		// `--` without trailing whitespace is arithmetic, not a comment: the INTO stays visible.
+		{"dash dash without space is not a comment", "SELECT 1--1 INTO OUTFILE '/tmp/x'", adapters.ClassWrite},
+		{"dash dash with space is a comment", "SELECT 1 -- INTO OUTFILE '/tmp/x'", adapters.ClassRead},
+		{"dash dash at end of input is a comment", "SELECT 1 --", adapters.ClassRead},
+		// `#` opens a line comment; the following /* does not open a block comment.
+		{"hash comment hides a block opener", "SELECT 1 # /*\nINTO OUTFILE '/tmp/x' -- */", adapters.ClassWrite},
+		{"hash comment hides into", "SELECT 1 # INTO OUTFILE '/tmp/x'", adapters.ClassRead},
+		{"hash comment before a drop", "# c\nDROP TABLE t", adapters.ClassDDL},
+		// Block comments do not nest: the first */ ends the comment, DROP is live.
+		{"block comments do not nest", "/* /* */ DROP TABLE t -- */", adapters.ClassDDL},
+		{"executable comment body is live", "SELECT 1 /*! INTO OUTFILE '/tmp/x' */", adapters.ClassWrite},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := adapters.ClassifySQL(tt.statement, adapters.MySQLDialect); got != tt.want {
+				t.Fatalf("ClassifySQL(%q) = %q, want %q", tt.statement, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestClassifySQL(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -104,10 +131,17 @@ func TestClassifySQL(t *testing.T) {
 		// E-string scanning fix alone would also have exposed the real `;`.
 		{"postgres E-string backslash-escaped quote hides a real semicolon and delete", `SELECT E'\' -- ' ; DELETE FROM t`, adapters.ClassUnknown},
 		{"lowercase e-string backslash-escaped quote hides a real semicolon", `SELECT e'\' -- ' ; DELETE FROM t`, adapters.ClassUnknown},
+
+		// P168 Part 3 F3: ANALYSE executes the target, and WITH ... SELECT INTO creates a table.
+		{"explain analyse delete is a write", "EXPLAIN ANALYSE DELETE FROM t", adapters.ClassWrite},
+		{"explain parenthesized analyse delete is a write", "EXPLAIN (ANALYSE) DELETE FROM t", adapters.ClassWrite},
+		{"explain parenthesized analyse with options", "EXPLAIN (BUFFERS, ANALYSE) DELETE FROM t", adapters.ClassWrite},
+		{"with select into writes", "WITH a AS (SELECT 1) SELECT * INTO newt FROM a", adapters.ClassWrite},
+		{"with select without into reads", "WITH a AS (SELECT 1) SELECT * FROM a", adapters.ClassRead},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := adapters.ClassifySQL(tt.statement); got != tt.want {
+			if got := adapters.ClassifySQL(tt.statement, adapters.PostgresDialect); got != tt.want {
 				t.Fatalf("ClassifySQL(%q) = %q, want %q", tt.statement, got, tt.want)
 			}
 		})

@@ -776,6 +776,17 @@ func TestPostgres_ReadOnlyConnectionExecuteCannotEscapeReadOnlyTransaction(t *te
 		// `READ /* /* */ x */ WRITE` parses identically to `READ WRITE`, which the old non-nesting
 		// regexp missed.
 		{"SET TRANSACTION READ /* /* */ x */ WRITE", "DELETE FROM app.order_items"},
+		// P168 Part 3 F1: spellings the text screen cannot name — boolean prefixes, quoted names,
+		// ABORT then RESET, set_config() — are caught by the per-statement server-state check.
+		{"SET transaction_read_only = no", "DELETE FROM app.order_items"},
+		{`SET "transaction_read_only" = off`, "DELETE FROM app.order_items"},
+		{"ABORT", "RESET default_transaction_read_only", "DELETE FROM app.order_items"},
+		{"SELECT set_config('transaction_read_only', 'off', false)", "DELETE FROM app.order_items"},
+		// Resets to the startup default (writable) without any falsy spelling for a screen to match.
+		{"RESET default_transaction_read_only", "SELECT 1"},
+		{"RESET ALL", "SELECT 1"},
+		{"SET default_transaction_read_only TO DEFAULT", "SELECT 1"},
+		{"SELECT set_config('default_transaction_read_only', 'off', false)", "DELETE FROM app.order_items"},
 	}
 	for _, statements := range attempts {
 		_, err := a.Execute(context.Background(), model.ConsoleRequest{
@@ -818,6 +829,19 @@ func TestPostgres_ReadOnlyConnectionExecuteCannotEscapeReadOnlyTransaction(t *te
 		Statements: []string{"SELECT 1"},
 	}, adapters.NewOpCtx("op-ro-still-usable")); err != nil {
 		t.Fatalf("Execute(SELECT 1) after failed escape attempts: %v", err)
+	}
+
+	// The session default must be read-only again after every attempt (F1: ABORT + RESET and
+	// set_config() otherwise left the pinned connection writable for every later op).
+	pages, err := a.Execute(context.Background(), model.ConsoleRequest{
+		Path:       nodePath(fixture, seg("database", "kira_test")),
+		Statements: []string{"SHOW default_transaction_read_only"},
+	}, adapters.NewOpCtx("op-ro-default"))
+	if err != nil {
+		t.Fatalf("Execute(SHOW): %v", err)
+	}
+	if got := page.CellText(pages[0].(page.TabularPage).Chunks[0], 0); got != "on" {
+		t.Fatalf("default_transaction_read_only = %q after escape attempts, want on", got)
 	}
 }
 

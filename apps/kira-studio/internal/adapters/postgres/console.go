@@ -15,7 +15,7 @@ const endTransactionTimeout = 5 * time.Second
 
 // ClassifyStatement satisfies adapters.StatementClassifier (M2) over the shared SQL classifier.
 func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
-	return adapters.ClassifySQL(statement), nil
+	return adapters.ClassifySQL(statement, adapters.PostgresDialect), nil
 }
 
 // rawField is console.ts's RawField.
@@ -176,6 +176,31 @@ func parseUint32(s string) (uint32, error) {
 	return uint32(n), nil
 }
 
+// verifyReadOnlyWrap re-checks server state after every statement of a read-only batch: the
+// statement-text screen (AssertNoTransactionEscalation) is a spelling blacklist, and Postgres has
+// more spellings than it lists (parse_bool prefixes, quoted names, set_config(), ABORT then RESET).
+// The wrap must still be an open transaction (TxStatus 'T') with both the transaction and the
+// session default read-only. On a violation, roll back and re-assert the session default.
+func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery) error {
+	if conn.PgConn().TxStatus() == 'T' {
+		res, err := runRaw(ctx, conn, "SELECT current_setting('transaction_read_only'), current_setting('default_transaction_read_only')", nil, op, track)
+		if err != nil {
+			return err
+		}
+		if len(res.rows) == 1 && len(res.rows[0]) == 2 && res.rows[0][0] != nil && *res.rows[0][0] == "on" && res.rows[0][1] != nil && *res.rows[0][1] == "on" {
+			return nil
+		}
+	}
+	conn.waitInFlight()
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
+	defer cancel()
+	_, _ = conn.Exec(cleanupCtx, "ROLLBACK")
+	if _, err := conn.Exec(cleanupCtx, "SET default_transaction_read_only = on"); err != nil {
+		return mapError(err)
+	}
+	return adapters.New(adapters.CodeUnsupported, "connection is read-only", nil)
+}
+
 // execute is console.ts's execute. readOnly closes the gap client.go's own
 // SET default_transaction_read_only=on leaves open (P2 R2): that session default only governs
 // transactions *not yet started*, so a statement in this very batch could otherwise flip the
@@ -189,7 +214,7 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
 	if readOnly {
-		if err := adapters.AssertNoTransactionEscalation(statements); err != nil {
+		if err := adapters.AssertNoTransactionEscalation(statements, adapters.PostgresDialect); err != nil {
 			return nil, err
 		}
 	}
@@ -221,6 +246,11 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 			return nil, err
 		}
 		results = append(results, result)
+		if readOnly {
+			if err := verifyReadOnlyWrap(ctx, conn, op, track); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	oidSet := map[uint32]struct{}{}
