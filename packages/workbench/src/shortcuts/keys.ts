@@ -45,21 +45,18 @@ export function formatShortcut(id: ShortcutId): string {
 
 const DOM_KEY: Record<string, string> = { Return: 'Enter' };
 
-// F12: macOS composes Option+letter into the accented/symbol character its keyboard layout maps
-// that combo to (`e.key` for ⌥⌘C, tree.copyUri's mac chord, comes back `"ç"` on a US layout, never
-// `"c"`), so an `e.key` compare never matches an Option-modified binding there. `e.code` reports
-// the physical key regardless of what Option composes it into, so a letter/digit chord matches
-// against that instead — needs a Mac to confirm directly (this sandbox can't), but the mismatch is
-// a documented property of `KeyboardEvent.key` under a Latin/ABC-variant layout, not a guess.
+// Layout-correct match: `e.key` first, so Dvorak/Colemak follow the printed label. Falls back to
+// the physical `e.code` only when `e.key` is not ASCII — macOS composes Option+letter into a symbol
+// (⌥⌘C reports `"ç"`), and a non-Latin layout reports its own script.
 function domCodeForKey(key: string): string | null {
   if (/^[A-Za-z]$/.test(key)) return `Key${key.toUpperCase()}`;
   if (/^[0-9]$/.test(key)) return `Digit${key}`;
   return null;
 }
 
-// `chord.ctrl` (a literal Control, distinct from cmdOrCtrl) only ever appears on the two
-// `global: true` tab-navigation bindings (shared/domain/shortcuts.ts) — an Electron accelerator owns
-// those, never a local keydown handler — so a local match only ever needs cmdOrCtrl/shift/alt.
+// `chord.ctrl` (a literal Control, distinct from cmdOrCtrl) only appears on the two
+// tab-navigation bindings (shared/domain/shortcuts.ts), which the Go menu accelerator owns, never a
+// local keydown handler — so a local match only needs cmdOrCtrl/shift/alt.
 function matchesShortcut(id: ShortcutId, e: KeyboardEvent): boolean {
   const chord = resolveChord(id);
   const cmdOrCtrlPressed = isMac ? e.metaKey : e.ctrlKey;
@@ -69,7 +66,10 @@ function matchesShortcut(id: ShortcutId, e: KeyboardEvent): boolean {
   if (Boolean(chord.shift) !== e.shiftKey) return false;
   if (Boolean(chord.alt) !== e.altKey) return false;
   const domCode = domCodeForKey(chord.key);
-  if (domCode) return e.code === domCode;
+  if (domCode) {
+    if (/^[A-Za-z0-9]$/.test(e.key)) return e.key.toUpperCase() === chord.key.toUpperCase();
+    return e.code === domCode;
+  }
   const domKey = DOM_KEY[chord.key] ?? chord.key;
   return e.key.toUpperCase() === domKey.toUpperCase();
 }

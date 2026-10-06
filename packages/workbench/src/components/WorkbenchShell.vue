@@ -80,6 +80,8 @@ watch(
 );
 
 function onProjectResize(size: number): void {
+  // reka also fires onResize on first layout and on programmatic resize(); neither is a user drag.
+  if (Math.abs(size - props.projectWidth) < 1) return;
   lastEmittedProjectWidth = size;
   emit('resize-project', size);
 }

@@ -32,6 +32,7 @@ const emit = defineEmits<{ select: [mode: M] }>();
       type="button"
       class="wails-no-drag"
       :class="tabChipVariants({ active: active === mode, size: 'wide' })"
+      :aria-pressed="active === mode"
       data-testid="mode-tab"
       :data-mode="mode"
       @click="emit('select', mode)"

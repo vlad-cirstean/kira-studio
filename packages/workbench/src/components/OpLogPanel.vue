@@ -7,7 +7,7 @@ import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../util/virtualRows';
 import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from './opLog';
@@ -118,9 +118,32 @@ function onRowClick(record: R): void {
 // P105 §5.2(c): Enter/Space mirror a single click — the Cancel button nested inside stays its own
 // tab stop, so this handler never claims either key from it.
 function onRowKeydown(e: KeyboardEvent, record: R): void {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    moveRowFocus(record, e.key === 'ArrowDown' ? 1 : -1);
+    return;
+  }
   if (e.key !== 'Enter' && e.key !== ' ') return;
   e.preventDefault();
   onRowClick(record);
+}
+
+// One roving tab stop for the whole list: Tab enters at the current row, arrows move within it.
+const focusedRowId = ref<string | null>(null);
+const tabStopId = computed(() =>
+  props.records.some((r) => r.id === focusedRowId.value)
+    ? focusedRowId.value
+    : (props.records[0]?.id ?? null),
+);
+
+function moveRowFocus(from: R, step: 1 | -1): void {
+  const index = props.records.findIndex((r) => r.id === from.id);
+  const target = props.records[index + step];
+  if (!target) return;
+  focusedRowId.value = target.id;
+  void nextTick(() => {
+    scrollEl.value?.querySelector<HTMLElement>(`[data-op-id="${CSS.escape(target.id)}"]`)?.focus();
+  });
 }
 
 function onRowContextMenu(record: R, event: MouseEvent): void {
@@ -141,6 +164,7 @@ defineSlots<{
         <InputGroupInput
           v-model="filterTextModel"
           placeholder="Filter"
+          aria-label="Filter operations"
           class="h-full p-0 font-data"
           data-testid="ops-filter"
         />
@@ -181,8 +205,6 @@ defineSlots<{
         ref="scrollEl"
         class="flex-1 min-h-0 overflow-auto"
         data-testid="virtual-list"
-        role="listbox"
-        aria-label="Operations"
         @scroll="onScroll"
       >
         <!--
@@ -192,17 +214,18 @@ defineSlots<{
           has to stay numerically equal to --kira-h-xs (18px), which every row below and any #detail
           content's own fixed-height styling must match.
         -->
-        <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+        <ul aria-label="Operations" class="m-0 p-0" :style="{ height: `${totalSize}px`, position: 'relative' }">
           <template v-for="vi in virtualItems" :key="String(vi.key)">
-            <div
+            <li
               v-if="listItems[vi.index].kind === 'op'"
               class="grid items-center gap-2 px-2 cursor-pointer select-text h-4.5 hover:bg-hover"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px`, gridTemplateColumns }"
               :class="[VIRTUAL_ROW_CLASS, { 'text-error': listItems[vi.index].record.status === 'error' }]"
               data-testid="op-row"
               :data-status="listItems[vi.index].record.status"
-              role="option"
-              tabindex="0"
+              :data-op-id="listItems[vi.index].record.id"
+              :tabindex="listItems[vi.index].record.id === tabStopId ? 0 : -1"
+              @focus="focusedRowId = listItems[vi.index].record.id"
               @click="onRowClick(listItems[vi.index].record)"
               @keydown="onRowKeydown($event, listItems[vi.index].record)"
               @contextmenu.prevent="onRowContextMenu(listItems[vi.index].record, $event)"
@@ -249,8 +272,8 @@ defineSlots<{
                 </template>
                 <slot v-else name="cell" :column="column" :record="listItems[vi.index].record" />
               </template>
-            </div>
-            <div
+            </li>
+            <li
               v-else-if="listItems[vi.index].kind === 'detail-command'"
               class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0"
               :class="VIRTUAL_ROW_CLASS"
@@ -259,8 +282,8 @@ defineSlots<{
               <slot name="detail" :record="listItems[vi.index].record" part="command">
                 <span class="font-data px-2 whitespace-nowrap overflow-x-auto">command: {{ listItems[vi.index].record.command }}</span>
               </slot>
-            </div>
-            <div
+            </li>
+            <li
               v-else
               class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0"
               :class="VIRTUAL_ROW_CLASS"
@@ -269,9 +292,9 @@ defineSlots<{
               <slot name="detail" :record="listItems[vi.index].record" part="error">
                 <span class="font-data px-2 whitespace-nowrap overflow-x-auto">error: {{ listItems[vi.index].record.error }}</span>
               </slot>
-            </div>
+            </li>
           </template>
-        </div>
+        </ul>
       </div>
     </template>
   </div>

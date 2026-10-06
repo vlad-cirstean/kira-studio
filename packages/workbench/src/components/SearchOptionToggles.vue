@@ -34,6 +34,7 @@ defineEmits<{
     icon="case-sensitive"
     label="Match case"
     :class="{ 'bg-field text-fg': matchCase }"
+    :aria-pressed="matchCase"
     :data-testid="matchCaseTestId ?? `${testidPrefix ?? ''}match-case`"
     @click="$emit('update:matchCase', !matchCase)"
   />
@@ -41,6 +42,7 @@ defineEmits<{
     icon="whole-word"
     label="Whole word"
     :class="{ 'bg-field text-fg': wholeWord }"
+    :aria-pressed="wholeWord"
     :data-testid="`${testidPrefix ?? ''}whole-word`"
     @click="$emit('update:wholeWord', !wholeWord)"
   />
@@ -48,6 +50,7 @@ defineEmits<{
     icon="regex"
     label="Regular expression"
     :class="{ 'bg-field text-fg': regex }"
+    :aria-pressed="regex"
     :data-testid="`${testidPrefix ?? ''}regex`"
     @click="$emit('update:regex', !regex)"
   />

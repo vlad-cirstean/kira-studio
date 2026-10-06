@@ -49,7 +49,7 @@ defineExpose({ $el: computed(() => buttonRef.value?.$el) });
 <template>
   <Tooltip>
     <TooltipTrigger as-child>
-      <TooltipDisabledTrigger v-if="disabledTrigger">
+      <TooltipDisabledTrigger v-if="disabledTrigger" :disabled="$attrs.disabled !== undefined && $attrs.disabled !== false">
         <Button ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" v-bind="$attrs">
           <CodiconIcon :name="icon" :size="iconSize" />
         </Button>

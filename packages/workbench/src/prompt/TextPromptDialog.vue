@@ -3,7 +3,8 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener } from '@vueuse/core';
-import { nextTick, onMounted, ref, useTemplateRef } from 'vue';
+import { FocusScope } from 'reka-ui';
+import { nextTick, onMounted, ref, useId, useTemplateRef } from 'vue';
 
 // P107 T2-19: deliberately NOT built on shadcn-vue's Dialog (declined, real requirement) — its
 // DialogContent wraps reka-ui's DialogPortal, which teleports to document.body. Two of this
@@ -16,6 +17,7 @@ import { nextTick, onMounted, ref, useTemplateRef } from 'vue';
 // (GitPanel.vue) call site.
 defineProps<{ title: string; modelValue: string }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: []; cancel: [] }>();
+const titleId = useId();
 
 // ui/input's root IS the <input> element itself — no querySelector needed. onMounted fires each
 // time this component is created, i.e. exactly when the caller's prompt state goes non-null.
@@ -43,17 +45,24 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
     class="fixed inset-0 flex items-center justify-center bg-black/50 z-(--kira-z-dialog)"
     data-testid="text-prompt"
   >
-    <div class="w-72 flex flex-col gap-1.5 p-2 bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden">
-      <div class="text-kira-md text-muted-foreground">{{ title }}</div>
+    <FocusScope as-child trapped loop>
+    <div
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      class="w-72 flex flex-col gap-1.5 p-2 bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden"
+    >
+      <div :id="titleId" class="text-kira-md text-muted-foreground">{{ title }}</div>
       <Input
         ref="inputRef"
         :model-value="modelValue"
         class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2"
+        :aria-labelledby="titleId"
         data-testid="text-prompt-input"
         @update:model-value="emit('update:modelValue', String($event))"
         @keydown="wrapSelectionOnType"
-        @keydown.enter="emit('submit')"
-        @keydown.escape="emit('cancel')"
+        @keydown.enter="(e: KeyboardEvent) => !e.isComposing && emit('submit')"
+        @keydown.escape="(e: KeyboardEvent) => !e.isComposing && emit('cancel')"
       />
       <div class="flex justify-end gap-1.5">
         <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="emit('cancel')"
@@ -64,5 +73,6 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
         >
       </div>
     </div>
+    </FocusScope>
   </div>
 </template>

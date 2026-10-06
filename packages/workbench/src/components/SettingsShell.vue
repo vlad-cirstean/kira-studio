@@ -221,6 +221,7 @@ async function onSave(): Promise<void> {
             type="button"
             class="text-left rounded-kira-sm border-none cursor-pointer h-5.5 px-1.5 text-kira-md"
             :class="activeSection === section ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground hover:bg-hover'"
+            :aria-current="activeSection === section ? 'page' : undefined"
             :data-testid="`settings-section-${section}`"
             @click="activeSection = section"
           >
