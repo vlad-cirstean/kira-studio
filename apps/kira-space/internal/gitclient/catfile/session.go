@@ -36,6 +36,10 @@ var ErrTooLarge = errors.New("catfile: blob exceeds the configured size gate")
 // not be retried forever.
 const maxConsecutiveFailures = 3
 
+// ErrInvalidRev rejects a rev the line protocol cannot frame (a newline would read as two
+// requests and desync the stream); such revs use the one-shot path.
+var ErrInvalidRev = errors.New("catfile: rev contains a newline")
+
 var errCircuitOpen = errors.New("catfile: process failed 3 consecutive times, refusing to restart")
 
 // Deps is what a Session needs to spawn its two processes.
@@ -127,6 +131,18 @@ func (p *persistentProcess) drop() {
 	p.proc, p.stdin, p.reader = nil, nil, nil
 }
 
+// failOrCancel handles an I/O error mid-request. A fired watcher means this side killed the child
+// for a cancelled ctx, so the error is the cancel, not a process fault: drop without counting.
+// Caller holds mu.
+func (p *persistentProcess) failOrCancel(ctx context.Context, stop func() bool, err error) error {
+	if stop() {
+		p.drop()
+		return ctx.Err()
+	}
+	p.fail()
+	return err
+}
+
 // request writes line to the child's stdin and hands its stdout reader to readResp — the whole
 // call runs under mu, which is what makes "one request in flight" true regardless of how many
 // goroutines call request concurrently: they queue on the lock, FIFO. readResp must return a
@@ -144,14 +160,10 @@ func (p *persistentProcess) request(ctx context.Context, line string, readResp f
 	}
 	stop := watchCtx(ctx, p.proc)
 	if _, err := io.WriteString(p.stdin, line); err != nil {
-		stop()
-		p.fail()
-		return err
+		return p.failOrCancel(ctx, stop, err)
 	}
 	if err := readResp(p.reader); err != nil {
-		stop()
-		p.fail()
-		return err
+		return p.failOrCancel(ctx, stop, err)
 	}
 	if stop() {
 		p.drop()
@@ -198,16 +210,13 @@ func (p *persistentProcess) requestPipelined(ctx context.Context, lines string, 
 		// blocked writing a response to a reader that just stopped reading, on the very same
 		// batch), so waiting on writeErrCh first, as this used to, could deadlock this call
 		// itself, wedging p.mu — and every later Check/Read queued behind it — forever.
-		stop()
-		p.fail()
+		err := p.failOrCancel(ctx, stop, respErr)
 		<-writeErrCh // drain: the writer goroutine must not leak past this call's own return.
-		return respErr
+		return err
 	}
 	writeErr := <-writeErrCh
 	if writeErr != nil {
-		stop()
-		p.fail()
-		return writeErr
+		return p.failOrCancel(ctx, stop, writeErr)
 	}
 	if stop() {
 		p.drop()
@@ -265,6 +274,9 @@ func NewSession(deps Deps, maxBlobBytes int64) *Session {
 // clone's lazy blob fetch from its promisor remote — without blocking this caller, and every other
 // caller queued behind it on the persistent process's own mutex, forever.
 func (s *Session) Check(ctx context.Context, rev string) (ObjectInfo, error) {
+	if strings.Contains(rev, "\n") {
+		return ObjectInfo{}, ErrInvalidRev
+	}
 	var info ObjectInfo
 	var found bool
 	err := s.check.request(ctx, rev+"\n", func(r *bufio.Reader) error {
@@ -296,6 +308,9 @@ func (s *Session) CheckMany(ctx context.Context, revs []string) ([]ObjectInfo, e
 	}
 	var sb strings.Builder
 	for _, rev := range revs {
+		if strings.Contains(rev, "\n") {
+			return nil, ErrInvalidRev
+		}
 		sb.WriteString(rev)
 		sb.WriteByte('\n')
 	}
@@ -401,6 +416,12 @@ func (s *Session) CheckOneShot(ctx context.Context, rev string) (ObjectInfo, err
 // likely cause is a path that does not resolve at rev, and this package draws no finer distinction
 // than the batch protocol already does.
 func (s *Session) ReadOneShot(ctx context.Context, rev string) (ObjectInfo, []byte, error) {
+	// Pin the OID once: a mutable rev (HEAD:<path>) could resolve differently in each spawn.
+	pinned, err := s.CheckOneShot(ctx, rev)
+	if err != nil {
+		return ObjectInfo{}, nil, err
+	}
+	rev = pinned.OID
 	sizeRes, err := gitclient.Run(ctx, s.runner, s.gitPath, gitclient.Spec{
 		Dir: s.dir, Args: []string{"cat-file", "-s", rev}, ReadOnly: true,
 	})

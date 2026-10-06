@@ -765,3 +765,52 @@ func TestSession_CancelAfterSuccessDoesNotKillProcess(t *testing.T) {
 		t.Fatalf("final read: %v", err)
 	}
 }
+
+type freshStallRunner struct{ starts int }
+
+func (r *freshStallRunner) Start(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
+	r.starts++
+	return &f11Process{stdout: &f11BlockingReadCloser{ch: make(chan struct{})}}, nil
+}
+
+// F5: a cancel mid-read kills the child but is not a process fault; it must return ctx.Err() and
+// never count toward the circuit breaker.
+func TestSession_CancelMidReadDoesNotTripCircuitBreaker(t *testing.T) {
+	runner := &freshStallRunner{}
+	sess := catfile.NewSession(catfile.Deps{Runner: runner, GitPath: "git", Dir: "."}, 0)
+	defer sess.Close()
+
+	for i := 0; i < 6; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+		_, err := sess.Check(ctx, "deadbeef")
+		cancel()
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("call %d: err = %v, want context.DeadlineExceeded", i, err)
+		}
+	}
+	if runner.starts != 6 {
+		t.Fatalf("starts = %d, want 6 (one fresh spawn per call, breaker never open)", runner.starts)
+	}
+}
+
+// F13: a newline in a rev would make git answer twice and leave a stray reply for the next caller.
+func TestSession_NewlineRevRejectedAndStreamStaysInStep(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	s := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer s.Close()
+	ctx := context.Background()
+
+	if _, err := s.Check(ctx, "HEAD\nHEAD"); !errors.Is(err, catfile.ErrInvalidRev) {
+		t.Fatalf("Check newline rev: err = %v, want ErrInvalidRev", err)
+	}
+	if _, err := s.CheckMany(ctx, []string{"HEAD", "HEAD\nHEAD"}); !errors.Is(err, catfile.ErrInvalidRev) {
+		t.Fatalf("CheckMany newline rev: err = %v, want ErrInvalidRev", err)
+	}
+	if _, _, err := s.Read(ctx, "HEAD:hello.txt\nHEAD"); !errors.Is(err, catfile.ErrInvalidRev) {
+		t.Fatalf("Read newline rev: err = %v, want ErrInvalidRev", err)
+	}
+	if _, err := s.Check(ctx, "doesnotexist"); !errors.Is(err, catfile.ErrMissing) {
+		t.Fatalf("Check after rejected revs: err = %v, want ErrMissing", err)
+	}
+}
