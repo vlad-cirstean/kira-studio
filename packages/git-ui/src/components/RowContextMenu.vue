@@ -25,6 +25,9 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'select', id: string): void;
   (e: 'close'): void;
+  /** The invoking element was replaced while the menu was open (a grid re-render), so focus
+   *  cannot return to it; the consumer restores focus to its owner. */
+  (e: 'restoreFocus'): void;
 }>();
 
 // Consumers mount this component with `v-if`, so it always starts open.
@@ -46,7 +49,8 @@ onMounted(() => {
 
 function onCloseAutoFocus(e: Event): void {
   e.preventDefault();
-  invoker?.focus();
+  if (invoker?.isConnected) invoker.focus();
+  else emit('restoreFocus');
 }
 </script>
 

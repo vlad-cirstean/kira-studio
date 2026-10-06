@@ -1937,6 +1937,7 @@ onBeforeUnmount(() => {
           label="Commit actions"
           @select="onCommitMenuSelect"
           @close="contextMenuState = undefined"
+          @restore-focus="commitGridRef?.focusGrid()"
         />
         <RowContextMenu
           v-if="refContextMenuState"
@@ -1947,6 +1948,7 @@ onBeforeUnmount(() => {
           :title="refContextMenuState.name"
           @select="onRefMenuSelect"
           @close="refContextMenuState = undefined"
+          @restore-focus="commitGridRef?.focusGrid()"
         />
         <RowContextMenu
           v-if="stashContextMenuState"
@@ -1956,6 +1958,7 @@ onBeforeUnmount(() => {
           label="Stash actions"
           @select="onStashMenuSelect"
           @close="stashContextMenuState = undefined"
+          @restore-focus="commitGridRef?.focusGrid()"
         />
         <!-- C10 §4.2/§4.3: every dialog below except RepoSettingsDialog exists to confirm one
              write. With every entry point that could open one hidden (the read-only menu
