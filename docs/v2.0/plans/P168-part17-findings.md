@@ -4,7 +4,7 @@ Plan: `P168-part17-git-rpc.md`. Base `30ec62f` (plan survey), HEAD reviewed `0bc
 (`p168-stream-b`). One Opus reviewer, report only. Paths repo-relative; `GR`/`GK`/`GV`/`IPC` as in
 the plan.
 
-Block status: 1, 2 done.
+Block status: 1, 2, 3 done.
 
 ## Block 1: error mapping
 
@@ -106,3 +106,64 @@ Block status: 1, 2 done.
   vscode `connection.ts:36`) agree.
 - `ForConn` settings mailbox and its two goroutines exit on `c.Done()` (`handlers.go:119-132`);
   `GK/server.go` closes `gconn` on every exit path (block 4).
+
+## Block 3: write handlers and validation
+
+### F5 (medium, DESIGN-DECISION) A paired socket client can store and run any shell command; the documented approval gate does not exist
+
+- `GR/settings.go:92-111` (`repoSettings.set` writes `kiraSpace.worktree.prepareScript` for any
+  `repoId`, held or not), `GR/worktree.go:88-105` and `gitsession/worktree.go:461-482`
+  (`RunPrepare` runs the stored script when the caller echoes its sha256), `GR/settings.go:134-153`
+  (`settings.setGitPath` points every future git spawn at any executable).
+- The only gate in `RunPrepare` is "does the client's `scriptSha256` match the stored script",
+  which the same client just wrote. `contract.go:76-81` and `contract.ts:84-91` both describe a
+  "sha256-pinned approval" key `prepareScriptApprovedSha`; `git grep` finds no such key in code
+  (only those two comments plus `bridge/gitstream.go:105-108`, which says it does not exist).
+- Scenario: a VS Code webview (git-ui renders commit subjects, branch names, PR titles, review
+  comments) is made to run script. `proxyHandlers.ts:614` forwards `repoSettings.set` verbatim,
+  incl. both restricted leaves; `:585` forwards `worktree.prepare` with no host check
+  (`runPrepareScript: isWorkspaceTrusted()` at `:242` is a client-side capability flag only). Two
+  requests give a shell as the user, from a workspace VS Code marks untrusted. The Space native
+  surface refuses exactly these fields and methods for this reason (`bridge/gitstream.go:96-108,
+  181-190`); the socket surface does not.
+- Decision needed: is pairing consent to full shell control? Options: (a) refuse
+  `worktreePrepareScript`/`worktreeBasePath` writes and `settings.setGitPath` on the socket except
+  from the extension host (needs a per-request origin the proxy sets, or a host-only method), plus
+  host-side enforcement in `proxyHandlers.ts` (strip both leaves from webview `repoSettings.set`,
+  refuse `worktree.prepare` when the workspace is untrusted); (b) implement the documented
+  approval sha written only by an app-side confirm dialog. Either way, correct the two contract
+  comments now: they claim a control that does not exist. `needs-other-part-file:
+  apps/kira-space-vscode/src/proxyHandlers.ts (Part 23)` for the host-side half.
+
+### F6 (low) `review.snapshot` marshals its result twice; `review.fileDiff` `tooLarge.bytes` reports JSON size
+
+- `GR/incremental.go:127-153`: marshals `res` to measure it, then returns `res` (not
+  `json.RawMessage(raw)`), so `rpcstream` marshals up to 6 MiB again. `commit.fileDiff`/`file.read`
+  return the raw bytes (`detail.go:126,164`).
+- `GR/incremental.go:80-83`: `tooLarge.bytes = len(raw)` (encoded JSON, escapes included) while
+  `commit.fileDiff` sends the raw patch size (`detail.go:119-120`, comment: "never re-derived from
+  the encoded bytes"). One contract field (`contract.ts:192`), two meanings; the UI label
+  "N bytes" differs for the same patch on the two surfaces.
+- Fix: return `json.RawMessage(raw)` from the `review.snapshot` success path; use
+  `result.RawPatchBytes` (or the gitsession equivalent) for `review.fileDiff`.
+
+### Block 3 candidate fates and notes
+
+- §9 #12 reported as F5.
+- Validation map, per client string reaching argv: `validRefArg` on every rev/branch/remote that
+  `GR` passes as a bare token (`commit.detail`, `commit.fileDiff`, `file.read`, `file.goToTarget`,
+  `preflight.{checkout,revert,cherryPick,stashPop}`, `remote.*`, `review.*`, graph `range`).
+  Handlers without a `GR` check are guarded below: `preflight.reset` target
+  (`gitsession/preflight.go:279-282` refuses a leading `-`), `op.run` args (`validOpArg`,
+  Part 16), restack/stash-branch `branch` (lookup keys only, never argv:
+  `gitsession/stack.go:246-290`, `preflight.go:654-700`), `review.resolveBase` `baseCandidates`
+  (matched against the refs snapshot, never spawned). `commit.resolvePr` `sha` is unvalidated but
+  `url.PathEscape`d (`ghclient/pr.go:111-122`); a `..` sha reshapes the GET to `/pulls` of the same
+  repo (read-only, own repo). Not reported.
+- §7 contract checks: `OpResult`/`OpError` json tags unchanged; every Go `OpError.Kind` literal in
+  `gitsession`/`gitpreflight` (`BranchChanged`, `ConfirmationRequired`, `NothingToStash`,
+  `StackCycle`, `WorktreeLocked`, `Unknown`, `DirtyWorktree`, ...) is a member of `contract.ts`
+  `OpErrorKind`. Undo refusal on moved refs (F11) crosses as `OpResult{ok:false, kind:'Unknown'}`;
+  `reset --keep` refusal as `DirtyWorktree` (Part 15 `61774dd`). Both modelled.
+- `repoSettings.set` maps every storage error to `E_BAD_REQUEST` (`settings.go:107-109`): an IO
+  failure reads as a client mistake. Cosmetic, no consumer branches on it. Not reported.
