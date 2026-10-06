@@ -308,3 +308,53 @@ Block 5 otherwise clean:
   decision, sort text round trip, new-document buffer, delete confirm: correct.
 - `KeyValueView.vue` is a thin shell; host key `tab.id` matches `KeyValuePane`'s contract.
 - `SD/queries.ts` (zod schemas) matches its importers; no defect.
+
+### Block 6: stream, browse, definition
+
+**F17. Kafka tombstone (null body) renders, copies and docks as an empty string.** Medium.
+Code-read. Source: Part 4 F12 / Part 5 F4 renderer half (routed to Part 12; must fix).
+`SF/views/stream/page.ts:17-24,40` (`StreamRow.body: string`; `body: cached('body', page.bodies)`
+with no `isNull` check, unlike `key`/`timestamp` above it), `SF/views/stream/StreamView.vue:1191`
+(body cell text), `:215` (`rowAt(i)?.body ?? ''` into the row menu), `:235,244` (dock gets `''`, so
+`?? null` never fires), `SF/views/stream/menu.ts:20-24` (Copy body always offered),
+`SF/views/stream/search.ts:66` (null body decodes to `''`; never matches a non-empty needle, so
+search is already correct). Contract: Part 5 `21c1338` sets the body null bit for a tombstone
+(`SI/page/builder.go:325-353`, `kafka/read.go:116-120`).
+- Scenario: a compacted topic with delete markers. Each tombstone shows a blank body cell, the dock
+  shows an empty value, Copy body copies `''`: indistinguishable from a message whose value is the
+  empty string, which is a different thing in Kafka (compaction deletes the key only for a null).
+- Fix (own files): `StreamRow.body: string | null` with `isNull(page.bodies, row) ? null :
+  cached('body', page.bodies)`. Body cell: when null render `NULL` with the grid's NULL treatment
+  (`text-subtle italic`, the `cell-null` look) and `aria-label="null (tombstone)"`. Dock: pass
+  `row.body` (now `null`) so the cell editor shows its NULL state. Menu: `rowMenu(key, body: string
+  | null)` omits Copy body for null, same as Copy key for a null key. Search: add an explicit
+  `!isNull(page.bodies, row)` guard for clarity. `StreamComposeMessage.vue:30` refuses an empty
+  body, so nothing ever resends a tombstone as `''` (verified). Kafka UI coverage lives in Part 5's
+  `ST/ipc/kafka/kafka.frontend.spec.ts`: route the assertion there
+  (`needs-other-part-file: apps/kira-studio/tests/ipc/kafka/kafka.frontend.spec.ts (Part 5)` for the
+  test only); the renderer fix itself needs no other Part's file. No unit test (single condition).
+
+**F18. Stream search rescans the whole page synchronously on every keystroke.** Low. Code-read.
+`SF/views/stream/StreamSearchToolbar.vue:44-48` (`watch(query, …)` calls `runSearch` per input
+event, no debounce), `SF/views/stream/search.ts:69-82` (decodes and lowercases every key, header,
+attr, timestamp and body of every row in one synchronous loop).
+- Scenario: Kafka page of 5 000 messages with large JSON bodies (up to 64 KiB each, hundreds of
+  MB decoded). Typing "order" runs five full decode-and-lowercase passes on the main thread back to
+  back; each keystroke stalls input. The shared `SearchToolbar` debounces 150 ms and scans in rAF
+  chunks; this view's own copy does neither.
+- Fix: debounce the query watch with `useDebounceFn(…, 150)` (cancel on close/unmount), matching
+  `SearchToolbar.vue:171-175`. Moving onto the shared chunked scanner is a larger refactor, not
+  needed for the fix.
+
+Block 6 otherwise clean:
+- Stream `load`/`poll` (SQS invalidates first, never auto-polls), `reload` for batch tabs drops to
+  the placeholder, `runCount` sends the browse filter, `setPageSize`, `applyStreamFilter` clears
+  count state, SQS delete captures the row before the confirm await: correct. Selection-clear on
+  page change is covered by F9 (counter vs identity).
+- Browse `loadSeq` supersession, windowed and debounced `ensureKeyTypes` with in-flight dedupe,
+  `${tabId}::preview` host registration and unregister on unmount, level-change resets, S3
+  previewable gate, delete with confirm and `setActionError`: correct.
+- Definition: no supersession by design; no concrete wrong-screen race found (mount load and Refresh
+  write the same object; a failed Refresh shows its error above the previous definition, which is
+  the data views' convention). `onCopy` is in F10. Structure filter and Source find bar correct.
+- `SD/streamFilter.ts`, `SD/definition.ts`: correct for their callers.
