@@ -37,6 +37,7 @@ import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
@@ -491,7 +492,6 @@ onBeforeUnmount(() => {
   settingsState.value?.dispose();
   refsState.dispose();
   bridge.dispose();
-  document.removeEventListener('keydown', onDocumentKeydown);
 });
 
 // G12 D13: one panel-level filter/list-mode toolbar, replacing what used to be a separate
@@ -745,9 +745,7 @@ function onDocumentKeydown(event: KeyboardEvent): void {
   if (sha && review.value?.expandedShas.value.has(sha)) review.value.collapse(sha);
 }
 
-onMounted(() => {
-  document.addEventListener('keydown', onDocumentKeydown);
-});
+useEventListener(document, 'keydown', onDocumentKeydown);
 
 // ---------------------------------------------------------------------------------------
 // The one polite live region — the shared per-row announcement (copy/open-in-editor/go-to-file

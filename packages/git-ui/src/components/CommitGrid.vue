@@ -18,6 +18,7 @@
 import type { CommitRecord, RowPlan } from '@kira/git-core';
 import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import { useEventListener, useResizeObserver } from '@vueuse/core';
 import type { Column, OnRenderedEventArgs } from 'slickgrid';
 import { SlickGrid } from 'slickgrid';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -204,7 +205,6 @@ const handleLeftGraph = ref(0);
 
 let unsubscribeLayout: (() => void) | undefined;
 let unsubscribeTokens: (() => void) | undefined;
-let resizeObserver: ResizeObserver | undefined;
 let resizeRaf = 0;
 let scrollRaf = 0;
 let previousSelectedRow = -1;
@@ -845,6 +845,10 @@ function applyInitialScrollRow(row: number): void {
   initialScrollApplied = true;
 }
 
+useEventListener(host, 'contextmenu', handleContextMenu);
+useEventListener(document, 'focusin', handleFocusIn);
+useResizeObserver(host, scheduleResize);
+
 onMounted(() => {
   if (!host.value) return;
   tokenReader.watch();
@@ -967,15 +971,10 @@ onMounted(() => {
     if (handled) event.stopImmediatePropagation();
   });
 
-  host.value.addEventListener('contextmenu', handleContextMenu);
   // `document`, not `host.value`: `focusedRowIndex`'s own doc comment above needs to know when
   // focus lands anywhere that is *not* a row, including this grid's own resize handles (siblings
   // of `host`, not descendants — a plain SVG/DOM-tree ancestor listener would miss those) and
   // every other focusable element in the panel (the toolbar, the detail pane).
-  document.addEventListener('focusin', handleFocusIn);
-
-  resizeObserver = new ResizeObserver(scheduleResize);
-  resizeObserver.observe(host.value);
 
   unsubscribeLayout = props.graphView.onChunkLayout(handleChunkLayout);
 
@@ -1173,14 +1172,11 @@ watch(
   },
 );
 onBeforeUnmount(() => {
-  resizeObserver?.disconnect();
   if (resizeRaf !== 0) cancelAnimationFrame(resizeRaf);
   if (scrollRaf !== 0) cancelAnimationFrame(scrollRaf);
   unsubscribeLayout?.();
   unsubscribeTokens?.();
   tokenReader.dispose();
-  host.value?.removeEventListener('contextmenu', handleContextMenu);
-  document.removeEventListener('focusin', handleFocusIn);
   grid?.destroy();
   grid = undefined;
 });

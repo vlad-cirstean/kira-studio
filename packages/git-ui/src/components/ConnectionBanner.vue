@@ -18,7 +18,8 @@
  * this can stay on screen for a real outage's whole duration, and `alert` would re-announce
  * itself indefinitely rather than announcing once on appearance.
  */
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { useTimeoutFn } from '@vueuse/core';
+import { computed, ref, watch } from 'vue';
 import type { HostConnectionState } from '../bridge/client.ts';
 
 const props = defineProps<{
@@ -33,31 +34,24 @@ const props = defineProps<{
  *  reconnect does. */
 const GRACE_MS = 2000;
 
-let graceTimer: ReturnType<typeof setTimeout> | undefined;
 const graceElapsed = ref(false);
-
-function clearGraceTimer(): void {
-  if (graceTimer !== undefined) {
-    clearTimeout(graceTimer);
-    graceTimer = undefined;
-  }
-}
+const { start: startGrace, stop: stopGrace } = useTimeoutFn(
+  () => {
+    graceElapsed.value = true;
+  },
+  GRACE_MS,
+  { immediate: false },
+);
 
 watch(
   () => props.state?.kind,
   (kind) => {
-    clearGraceTimer();
+    stopGrace();
     graceElapsed.value = false;
-    if (kind === 'connecting') {
-      graceTimer = setTimeout(() => {
-        graceElapsed.value = true;
-      }, GRACE_MS);
-    }
+    if (kind === 'connecting') startGrace();
   },
   { immediate: true },
 );
-
-onUnmounted(clearGraceTimer);
 
 const visible = computed(() => {
   const kind = props.state?.kind;

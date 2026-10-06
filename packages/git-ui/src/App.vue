@@ -19,7 +19,7 @@ import { TransportError } from '@kira/git-ipc';
 import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { onClickOutside } from '@vueuse/core';
+import { onClickOutside, useEventListener, useResizeObserver } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
@@ -1463,7 +1463,6 @@ const rootEl = ref<HTMLDivElement | null>(null);
 const graphVisible = useGraphVisible();
 const overlayDetailRegionEl = ref<HTMLElement | null>(null);
 const breakpoint = ref<Breakpoint>('wide');
-let breakpointObserver: ResizeObserver | undefined;
 let breakpointRaf = 0;
 
 /** §6.3's "collapsed by default" below `wide`, with nothing selected — shared by the mount-time
@@ -1673,18 +1672,14 @@ const hasSelection = computed(
   () => selection.row.value >= 0 || workingState.selected.value || selectionIsStash.value,
 );
 
+useEventListener(document, 'keydown', onDocumentKeydown);
+useResizeObserver(rootEl, scheduleBreakpointUpdate);
+
 onMounted(() => {
-  document.addEventListener('keydown', onDocumentKeydown);
-  if (rootEl.value) {
-    breakpoint.value = breakpointFor(rootEl.value.clientWidth);
-    breakpointObserver = new ResizeObserver(scheduleBreakpointUpdate);
-    breakpointObserver.observe(rootEl.value);
-  }
+  if (rootEl.value) breakpoint.value = breakpointFor(rootEl.value.clientWidth);
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener('keydown', onDocumentKeydown);
-  breakpointObserver?.disconnect();
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
   unsubscribeUiAction();
   unsubscribeReconnect();
