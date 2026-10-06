@@ -5,7 +5,7 @@
  * `FileTree.vue` over this row's own `DetailState` (`ReviewSessionState.expand` fetches
  * `commit.detail` on first expansion and keeps it for the session — this component never fetches
  * anything itself). `→`/`←`/`Enter` toggle expansion (§6.8 step 2); the row's own context menu is
- * copy-sha/copy-message only (`rowMenuModel.ts`'s `buildReviewRowMenu`, not `buildRowMenu` — this
+ * copy-sha/copy-message only (`rowMenuModel.ts`'s `buildReadOnlyRowMenu`, not `buildRowMenu` — this
  * row offers no checkout/branch/tag/revert).
  *
  * G12 D12: opening a file no longer renders an in-webview diff overlay at all — `FileTree`'s
@@ -26,7 +26,7 @@ import { formatRelativeDate } from '../dateFormat.ts';
 import FileTree from '../FileTree.vue';
 import { openAllChangesAnnounced } from '../openAllChangesAnnounced.ts';
 import RowContextMenu from '../RowContextMenu.vue';
-import { buildReviewRowMenu } from '../rowMenuModel.ts';
+import { buildReadOnlyRowMenu } from '../rowMenuModel.ts';
 
 const props = defineProps<{
   sha: string;
@@ -112,7 +112,7 @@ function onContextMenu(event: MouseEvent): void {
 // `expansion?.actions` left Copy SHA/Copy message disabled (or a no-op) on every never-expanded
 // row, the same bug `openAllChanges` above was already fixed for.
 const menuSections = computed(() =>
-  buildReviewRowMenu(props.actions.capabilities.clipboard),
+  buildReadOnlyRowMenu(props.actions.capabilities.clipboard),
 );
 
 function onMenuSelect(id: string): void {
@@ -233,7 +233,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           <span class="kv:overflow-hidden kv:text-ellipsis">{{ dateText }}</span>
           <span class="kv:shrink-0" aria-hidden="true">·</span>
           <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
-               sha renders as plain text; the existing copySha context-menu item (buildReviewRowMenu)
+               sha renders as plain text; the existing copySha context-menu item (buildReadOnlyRowMenu)
                already covers this, and F7 found these two affordances genuinely redundant with it. -->
           <span class="kv:font-data kv:text-inherit kv:shrink-0 kv:bg-transparent kv:border-0 kv:cursor-pointer kv:p-0">{{ shortSha }}</span>
         </span>

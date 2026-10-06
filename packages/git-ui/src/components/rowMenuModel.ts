@@ -114,15 +114,17 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
 }
 
 /**
- * `docs/plans/P7.md` W13 — the review view's own per-commit menu: copy sha and copy message
- * *only* (§6.8's "Read-only" — a review row offers no checkout/branch/tag/revert, and is never
- * gated on `canRunOp`, since none of these items are operations git could refuse mid-op). Kept
+ * `docs/plans/P7.md` W13, C10 §4.3/§6 (S6) — the read-only per-commit menu, shared by the review
+ * view's row and the native read-only graph: copy sha and copy message *only* (§6.8's
+ * "Read-only" — no checkout/branch/tag/revert, never gated on `canRunOp`, since none of these
+ * items are operations git could refuse mid-op; C10 hides the mutating items rather than
+ * disabling them, `docs/v1.5/plans/C10-git-graph-native.md` §4.2 layer 3). Kept
  * separate from `buildRowMenu` rather than that function gated down to nothing by a flag, so a
  * reader never has to check "which of these does the review row actually get" against a table of
  * conditions — there is no table, there is a second, smaller function. Absent (not disabled, same
  * convention `buildRowMenu` already uses) when the host has no clipboard port.
  */
-export function buildReviewRowMenu(clipboardEnabled: boolean): MenuSection[] {
+export function buildReadOnlyRowMenu(clipboardEnabled: boolean): MenuSection[] {
   if (!clipboardEnabled) return [];
   return [
     {
@@ -290,15 +292,6 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
   }
   return sections;
 }
-
-/**
- * C10 §4.3/§6 (S6): the native read-only graph's own per-commit menu — copy sha and copy message
- * only. Every mutating item (checkout/create branch/create tag/revert/reset/cherry-pick) is a
- * write; C10's native surface hides them rather than disabling them
- * (`docs/v1.5/plans/C10-git-graph-native.md` §4.2 layer 3). Identical shape to `buildReviewRowMenu`
- * above — this is App.vue's own name for it at its read-only-graph call site (P115 H9).
- */
-export const buildReadOnlyRowMenu = buildReviewRowMenu;
 
 /**
  * C10 §4.3 (S6), C11 §12 (S12): the native read-only graph's own ref-badge menu (branch,
