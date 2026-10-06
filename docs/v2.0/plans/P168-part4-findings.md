@@ -222,6 +222,56 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   `RedrivePolicy` would count it; or block browse on read-only connections outright and say why.
   Writable connections keep today's behaviour (the delete flow needs the hidden window).
 
+### F16 (medium) s3 edit silently resets the object's ACL
+
+- `apps/kira-studio/internal/adapters/s3/mutate.go:186-232` (`applyUpdate` re-`PutObject`s
+  with `applyPreservedAttributes`, `:111-170`, which carries no ACL; `HeadObject` does not return
+  one).
+- Real run (throwaway `_test.go` on the localstack container, deleted): object written with
+  `ACL: public-read` has 2 grants; one edit through `Adapter.Mutate` (`update`, `$value`) returns
+  success and the object then has 1 grant (owner only). Scenario: a static-site or CDN-origin
+  bucket on a legacy (ACL-enabled) account; fixing a typo in `index.html` through the editor makes
+  the object private and the site returns 403. P108 F5 made the same class of silent attribute
+  loss refuse the edit for tags; ACLs were missed.
+- Fix: `GetObjectAcl` before the put; if it holds any grant beyond the owner's
+  `FULL_CONTROL`, either refuse like the tag case or re-send the grants (`GrantRead`,
+  `GrantReadACP`, `GrantWriteACP`, `GrantFullControl` on `PutObjectInput`). Skip the check when
+  the bucket reports `BucketOwnerEnforced` (ACLs disabled).
+
+### F17 (low) s3 `options.bucket` scope is enforced only on the root listing
+
+- `apps/kira-studio/internal/adapters/s3/catalog.go:22-36` (only `listBuckets` reads
+  `scopedBucket`); `adapter.go:116-148` (`Children`), `:168-185` (`resolveObjectTarget` for
+  `Read`/`Count`/`DownloadObject`), `mutate.go:28-35` (`resolveBucketSegment`) accept any bucket.
+- Real run (same probe): a connection scoped to `zz-acl-probe` lists and reads
+  `zz-other-bucket/secret.txt` when handed a path rooted at the other bucket. Reachable from the
+  MCP agent: `dbmcp` `list_children` passes the agent's encoded path straight to `Children`
+  (`dbmcp/tools.go:96-105`), so an agent on a "one bucket" connection can enumerate every other
+  bucket the credentials can reach. IAM is the real boundary, but the option reads as a scope and
+  the tree honours it, so the agent and crafted paths should too.
+- Fix: when `scopedBucket` is set, reject any path whose bucket segment differs (`E_NOT_FOUND`)
+  in `Children`, `resolveObjectTarget` and `resolveBucketSegment`.
+
+### F18 (low) s3 preview read trusts the HeadObject length; a replaced object is read whole into memory
+
+- `apps/kira-studio/internal/adapters/s3/read.go:108-140` (`HeadObject` size check, then a plain
+  `GetObject` and `io.ReadAll(res.Body)`).
+- Scenario: the object is overwritten between the two calls (a log file rewritten by a job, a
+  build artefact republished). Head said 3 MB, the Get returns the new 4 GB object, and
+  `io.ReadAll` buffers all of it before the page builder truncates the cell. Code-read.
+- Fix: `GetObject` with `IfMatch: head.ETag` (a mismatch becomes "object changed, reload") and
+  read through `io.LimitReader(res.Body, ObjectBodyPreviewBytes+1)`.
+
+### F19 (low) s3 upload accepts non-regular files and can hang outside ctx
+
+- `apps/kira-studio/internal/adapters/s3/transfer.go:103-117` (`openUploadBody` checks size,
+  not `info.Mode().IsRegular()`).
+- Scenario: the chosen source is a named pipe: `os.Open` blocks until a writer appears, with no
+  ctx, so Stop cannot end the op. A character device such as `/dev/zero` stats as 0 bytes and the
+  SDK's checksum pass reads it forever. A directory fails later with a less clear error. Code-read.
+- Fix: refuse anything but a regular file (`!info.Mode().IsRegular()`) with `E_QUERY` before
+  `os.Open`.
+
 ## Coverage
 
 - Block 1 (awscfg, core callee contract): done. `awscfg/config.go`, `awscfg/errors.go` reviewed
@@ -306,5 +356,20 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   `encodeHeaders` base64s binary attributes; `SentTimestamp` parse failure leaves the cell null.
   Every SDK call takes the op ctx; `Connect` returns on ctx cancel through `LoadDefaultConfig(ctx)`
   and `ListQueues(ctx)`. Caps match the unsupported stubs; leaf `Children` returns `[]`.
-- Block 6 (s3): not reached.
+- Block 6 (s3): done. All eight production files read in full: `client`, `adapter`, `catalog`,
+  `read`, `mutate`, `transfer`, `errors`, `caps`. Real probe on localstack for F16/F17 (deleted).
+  Verified, no finding: no presigned URL is generated anywhere (`git grep Presign` empty in
+  `s3`); no bucket delete. `Mutate` checks `AssertWritable`; download is a read by contract.
+  `listPrefixChildren` key edge cases: `a//b` yields an empty-name prefix segment that re-joins
+  to `a//`, a leading `/` yields segment `""` that re-joins to `/`; the object leaf carries the
+  full key, so prefix segments never have to agree with it. 20-round listing cap with a truncated
+  flag. Directory markers are hidden (not deletable from the UI; by design). Insert uses
+  `IfNoneMatch: *`, update uses `IfMatch` with a logged unconditional fallback on
+  `NotImplemented` (P108 F5 holds; tags refused). Delete in a versioned bucket writes a delete
+  marker, the safe outcome; HeadObject-then-Delete TOCTOU is harmless. Download: sibling temp
+  file, removed on every error path, ctx cancel surfaces mid-`io.Copy`, rename last; upload file
+  closed by `defer`, rewound before the fallback put. 5 GiB cap equals AWS's single-PUT limit.
+  `Disconnect` only clears state; an op past `requireClient` finishes on a still-valid client.
+  Caps match the unsupported stubs (`Describe`, `Definition`, `SchemaColumns`, `Execute`,
+  `KeyTypes`); leaf `Children` returns `[]`.
 - Block 7 (tests, real-container runs): not reached.
