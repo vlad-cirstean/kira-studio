@@ -313,6 +313,17 @@ export interface InProgressOperation {
   readonly canSkip: boolean;
 }
 
+/** P173: set only while background auto-fetch is stopped by a permanent failure (auth, missing
+ *  remote, unknown). A successful explicit fetch or pull clears it. `kind` is the classified
+ *  fetch error; `message` is its first stderr line. */
+export interface AutoFetchStatus {
+  readonly state: 'stopped';
+  readonly kind: OpErrorKind;
+  readonly message: string;
+  /** ISO timestamp of the stop. */
+  readonly at: string;
+}
+
 export interface StatusSummary {
   readonly head: HeadState;
   readonly upstream:
@@ -330,6 +341,8 @@ export interface StatusSummary {
   readonly dirtyPaths: readonly string[];
   readonly dirtyTruncated: boolean;
   readonly inProgress: InProgressOperation | null;
+  /** P173: `null` while auto-fetch runs, is paused or was never armed. */
+  readonly autoFetch: AutoFetchStatus | null;
 }
 
 export type CheckoutBlocker =
@@ -1597,6 +1610,13 @@ export type Contract = {
       params: { repoId: string };
       result: { restarted: boolean };
     };
+    /** P173: the client detected an unrecoverable graph stream (a corrupted chunk). Records one
+     *  Operations-log entry server-side; the message is composed there, never taken from the
+     *  client. Writes nothing to git. */
+    'graph.reportFailure': {
+      params: { repoId: string; reason: 'corrupted' };
+      result: Record<string, never>;
+    };
     /**
      * §6.8/D30. Called once when the review view targets a branch (no `base`), and again with
      * an explicit `base` each time the header picker overrides it — the `merge-base` and
@@ -2304,6 +2324,8 @@ export type Contract = {
      *  write triggered the emit; a viewer decides for itself whether that repoId (or, for the
      *  instance-wide `log.level`, any repoId at all) is relevant to what it is showing. */
     'repoSettings.changed': { repoId: string; settings: RepoSettingsSnapshot };
+    /** P173: auto-fetch stopped (non-null) or re-armed (`null`) for a held repository. */
+    'autoFetch.changed': { repoId: string; autoFetch: AutoFetchStatus | null };
     /** Host -> the review webview only: "review this branch instead". Never emitted to the
      *  panel's own server — the two views hold separate `RpcServer`s over separate channels. */
     'review.target': { repoId: string; branch: string };

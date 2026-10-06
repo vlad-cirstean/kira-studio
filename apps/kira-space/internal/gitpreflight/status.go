@@ -50,6 +50,7 @@ type StatusSummary struct {
 	DirtyPaths     []string             `json:"dirtyPaths"`
 	DirtyTruncated bool                 `json:"dirtyTruncated"`
 	InProgress     *InProgressOperation `json:"inProgress"`
+	AutoFetch      *AutoFetchStatus     `json:"autoFetch"`
 }
 
 // HeadStateFromBranch derives HeadState from status --branch's own header — free, since

@@ -285,6 +285,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // dialog's own storage), the exact upgrade D6 describes. Wire shape unchanged.
     'graph.loadMore': forward('graph.loadMore'),
     'graph.refresh': forward('graph.refresh'),
+    'graph.reportFailure': forward('graph.reportFailure'),
     'commit.detail': forward('commit.detail'),
     'commit.fileDiff': forward('commit.fileDiff'),
     // D12: composed from commit.detail (server-cached, D7) rather than a separate fileDiff fetch

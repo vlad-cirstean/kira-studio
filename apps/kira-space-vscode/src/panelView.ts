@@ -77,4 +77,10 @@ export class KiraGraphViewProvider extends WebviewProviderBase {
   notifyWorktreeProgress(payload: EventPayload<'worktree.progress'>): void {
     this.server?.emit('worktree.progress', payload);
   }
+
+  /** P173: forwarded from `ConnectionManager.on('autoFetch.changed', ...)` — the graph provider
+   *  only, the one with the toolbar marker. A no-op when no webview is currently resolved. */
+  notifyAutoFetchChanged(payload: EventPayload<'autoFetch.changed'>): void {
+    this.server?.emit('autoFetch.changed', payload);
+  }
 }

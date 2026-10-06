@@ -74,6 +74,7 @@ func (e *RepoEntry) Status(ctx context.Context) (gitpreflight.StatusSummary, err
 		return gitpreflight.StatusSummary{}, err
 	}
 	summary := gitpreflight.SummarizeStatus(statusResult, inProgress)
+	summary.AutoFetch = e.autoFetchStatus()
 	if len(summary.DirtyPaths) > gitpreflight.DirtyPathsDisplayCap {
 		summary.DirtyPaths = summary.DirtyPaths[:gitpreflight.DirtyPathsDisplayCap]
 		summary.DirtyTruncated = true

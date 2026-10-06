@@ -163,7 +163,10 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'kiraSpace.worktree.prepareScript' patch leaf with E_READ_ONLY ('RepoSettingsPatch' omits it:
 // the prepare script is written only in-process by Kira Space), and 'settings.setGitPath' is
 // removed (the git path is set only in Kira Space's own Settings).
-export const CONTRACT_VERSION = 43;
+// P173: 43 -> 44, one new request ('graph.reportFailure'), one new event ('autoFetch.changed') and
+// one new field on 'StatusSummary' ('autoFetch'): the toolbar's "Auto-fetch stopped" marker and the
+// server-side record of a corrupted graph stream. The frame cap rises 8 -> 32 MiB on both sides.
+export const CONTRACT_VERSION = 44;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -223,6 +226,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'graph.status': true,
   'graph.loadMore': true,
   'graph.refresh': true,
+  'graph.reportFailure': true,
   'commit.detail': true,
   'commit.fileDiff': true,
   'editor.openDiff': true,
@@ -297,6 +301,7 @@ const EVENT_KEY_MAP: Record<EventKey, true> = {
   'credential.request': true,
   'ui.action': true,
   'repoSettings.changed': true,
+  'autoFetch.changed': true,
   'worktree.progress': true,
   'stack.progress': true,
 };

@@ -117,6 +117,7 @@ function stubHandlers(
       'graph.status': notImplemented,
       'graph.loadMore': notImplemented,
       'graph.refresh': notImplemented,
+      'graph.reportFailure': notImplemented,
       'commit.detail': notImplemented,
       'commit.fileDiff': notImplemented,
       'editor.openDiff': notImplemented,

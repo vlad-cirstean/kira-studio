@@ -10,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
 
 // ErrRepoNotHeld is returned by Conn.Walk when this connection has no open hold on repoID —
@@ -19,6 +20,12 @@ var ErrRepoNotHeld = errors.New("gitsession: repository is not open on this conn
 // ConnID identifies one accepted connection — the handshake's own minted session id (gitsock D19),
 // opaque here.
 type ConnID string
+
+// autoFetchEvent is autoFetch.changed's wire payload.
+type autoFetchEvent struct {
+	RepoID    string                        `json:"repoId"`
+	AutoFetch *gitpreflight.AutoFetchStatus `json:"autoFetch"`
+}
 
 // hold is one (connection, repository) pairing: the ref this connection took on the entry, and the
 // subscription that delivers repo.changed to it.
@@ -234,7 +241,7 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 		return existing.Summary, nil
 	}
 
-	unsubscribe := entry.Subscribe(c.ID, func(ev Event) {
+	unsubscribeRepo := entry.Subscribe(c.ID, func(ev Event) {
 		// Mark before emitting (D13): a client that reacts to repo.changed by re-opening its
 		// stream must never be able to observe a walk that has not yet been told refs moved.
 		// Marks BOTH the graph and review walk (D5) — a deliberate departure from upstream, whose
@@ -246,6 +253,13 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 		}
 		c.Emit("repo.changed", ev)
 	})
+	unsubscribeAutoFetch := entry.autoFetch.changed.Subscribe(func(ch AutoFetchChange) {
+		c.Emit("autoFetch.changed", autoFetchEvent{RepoID: repoID, AutoFetch: ch.AutoFetch})
+	})
+	unsubscribe := func() {
+		unsubscribeRepo()
+		unsubscribeAutoFetch()
+	}
 
 	c.mu.Lock()
 	if c.closed {
@@ -294,6 +308,14 @@ func (c *Conn) alreadyHeld(repoID string) (*RepoEntry, bool) {
 		return nil, false
 	}
 	return h.entry, true
+}
+
+// RecordFailure writes one Operations-log record for a failure no running op covers (a graph load
+// that died). It does nothing when this connection does not hold repoID.
+func (c *Conn) RecordFailure(repoID, kind, message string) {
+	if entry, ok := c.alreadyHeld(repoID); ok {
+		entry.recordFailure(kind, c.ClientLabel, message)
+	}
 }
 
 // Entry returns the RepoEntry this connection holds for repoID — the seam every per-repo request

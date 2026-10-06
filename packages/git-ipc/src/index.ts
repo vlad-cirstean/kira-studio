@@ -6,6 +6,7 @@ export {
 export type { BufferEncoding, EncodedMessage } from './codec.ts';
 export { decode, dedupeTransferList, encode, VSCODE_WEBVIEW_BUFFER_ENCODING } from './codec.ts';
 export type {
+  AutoFetchStatus,
   BaseCandidate,
   BaseResolution,
   BaseResolutionReason,

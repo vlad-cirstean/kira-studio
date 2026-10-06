@@ -1853,6 +1853,7 @@ export class OpsState {
           dirtyPaths: [],
           dirtyTruncated: false,
           inProgress: result.inProgress,
+          autoFetch: null,
         };
   }
 
@@ -1930,6 +1931,7 @@ export class OpsState {
           dirtyPaths: [],
           dirtyTruncated: false,
           inProgress: result.inProgress,
+          autoFetch: null,
         };
     this.undoSlot.value = result.undo;
   }

@@ -135,6 +135,11 @@ type GraphRefreshResult struct {
 	Restarted bool `json:"restarted"`
 }
 
+type GraphReportFailureParams struct {
+	RepoID string `json:"repoId"`
+	Reason string `json:"reason"`
+}
+
 type GraphStreamParams struct {
 	RepoID           string             `json:"repoId"`
 	ResumeThroughRow *int               `json:"resumeThroughRow,omitempty"`

@@ -165,7 +165,10 @@ package gitrpc
 // P172: 42 -> 43, two breaking changes. repoSettings.set refuses the kiraSpace.worktree.prepareScript
 // patch leaf with E_READ_ONLY (the prepare script is written only in-process by Kira Space), and
 // settings.setGitPath is removed (the git path is set only in Kira Space's own Settings).
-const ContractVersion = 43
+// P173: 43 -> 44, one new request (graph.reportFailure), one new event (autoFetch.changed) and one
+// new StatusSummary field (autoFetch) -- the toolbar's "Auto-fetch stopped" marker and the
+// server-side record of a corrupted graph stream. The frame cap rises 8 -> 32 MiB on both sides.
+const ContractVersion = 44
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

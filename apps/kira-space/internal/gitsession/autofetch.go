@@ -274,6 +274,13 @@ func (e *RepoEntry) rearmAutoFetch() {
 	e.EnsureAutoFetch()
 }
 
+// autoFetchStatus is the current stop marker, nil while running, paused or never armed.
+func (e *RepoEntry) autoFetchStatus() *gitpreflight.AutoFetchStatus {
+	e.autoFetch.mu.Lock()
+	defer e.autoFetch.mu.Unlock()
+	return e.autoFetch.stopped
+}
+
 func (e *RepoEntry) autoFetchDisabled() bool {
 	e.autoFetch.mu.Lock()
 	defer e.autoFetch.mu.Unlock()

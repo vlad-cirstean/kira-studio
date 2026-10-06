@@ -173,6 +173,9 @@ var requestHandlers = map[string]requestHandler{
 	"graph.refresh": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleGraphRefresh(ctx, c, params)
 	},
+	"graph.reportFailure": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGraphReportFailure(ctx, c, params)
+	},
 	"commit.detail": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleCommitDetail(ctx, c, params)
 	},

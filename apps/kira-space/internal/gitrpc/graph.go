@@ -209,6 +209,23 @@ func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParam
 	return spec, pageSizeFrom(entry, pageSize), precomputedTotal, nil
 }
 
+// handleGraphReportFailure records a client-detected graph failure. The message is composed here,
+// never taken from the client.
+func (r *Router) handleGraphReportFailure(_ context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	var p GraphReportFailureParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, ipcerr.BadRequest("gitrpc: graph.reportFailure: invalid params")
+	}
+	if err := requireNonEmpty("graph.reportFailure", "repoId", p.RepoID); err != nil {
+		return nil, err
+	}
+	if p.Reason != "corrupted" {
+		return nil, ipcerr.BadRequest("gitrpc: graph.reportFailure: unknown reason")
+	}
+	c.RecordFailure(gitpath.CleanNFC(p.RepoID), "graph.load", "graph data stream was corrupted; the graph was reset")
+	return struct{}{}, nil
+}
+
 // handleGraphStream serves graph.stream: upstream's streamGraph, via gitsession.Walk.Stream
 // (D14) — every emitted StreamChunk is packed to a FlatBuffer (gitstore.EncodeChunkFrame) and
 // handed to rpcstream's emit as the chunk envelope's out-of-band blob (D4/D5). `range` present
@@ -249,6 +266,7 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	}
 	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, precomputedTotal)
 	if err != nil {
+		recordGraphFailure(ctx, c, p.RepoID, err)
 		return mapGitError(err)
 	}
 
@@ -261,7 +279,15 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 		return emit(payload, blob)
 	})
 	if err != nil {
+		recordGraphFailure(ctx, c, p.RepoID, err)
 		return mapGitError(err)
 	}
 	return nil
+}
+
+// recordGraphFailure logs a server-side graph load failure; cancellation and teardown log nothing.
+func recordGraphFailure(ctx context.Context, c *gitsession.Conn, repoID string, err error) {
+	if ctx.Err() == nil {
+		c.RecordFailure(repoID, "graph.load", "graph load failed: "+err.Error())
+	}
 }

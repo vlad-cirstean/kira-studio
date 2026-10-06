@@ -87,7 +87,9 @@ func newStreamConnID() gitsession.ConnID {
 var allowedMethods = map[string]struct{}{
 	"app.init": {}, "repo.open": {}, "repo.close": {},
 	"graph.status": {}, "graph.loadMore": {}, "graph.refresh": {},
-	"commit.detail": {}, "commit.fileDiff": {}, "file.read": {}, "file.goToTarget": {},
+	// graph.reportFailure: writes one Operations-log line, nothing in git.
+	"graph.reportFailure": {},
+	"commit.detail":       {}, "commit.fileDiff": {}, "file.read": {}, "file.goToTarget": {},
 	"blame.line": {}, "working.detail": {}, "refs.list": {}, "status.get": {},
 	"stash.list": {}, "stash.show": {}, "globalStash.list": {},
 	"undo.peek": {}, "search.run": {},

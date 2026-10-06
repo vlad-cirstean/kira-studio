@@ -26,6 +26,7 @@ const STATUS: StatusSummary = {
   dirtyPaths: ['untracked.txt'],
   dirtyTruncated: false,
   inProgress: null,
+  autoFetch: null,
 };
 
 const PRE_EXISTING_STASH: StashEntry = {

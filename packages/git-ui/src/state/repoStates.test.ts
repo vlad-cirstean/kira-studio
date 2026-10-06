@@ -21,6 +21,7 @@ const STATUS: StatusSummary = {
   dirtyPaths: ['a.txt'],
   dirtyTruncated: false,
   inProgress: null,
+  autoFetch: null,
 };
 
 const BLOCKED: CheckoutPreflight = {

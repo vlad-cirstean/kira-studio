@@ -590,6 +590,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         graphProvider.notifyRemoteProgress(payload);
       }),
     },
+    // P173: graph provider only, where the toolbar's auto-fetch marker lives.
+    {
+      dispose: manager.on('autoFetch.changed', (payload) => {
+        graphProvider.notifyAutoFetchChanged(payload);
+      }),
+    },
     // G25 D13: the same "graph provider only" forward remote.progress already uses.
     {
       dispose: manager.on('worktree.progress', (payload) => {
