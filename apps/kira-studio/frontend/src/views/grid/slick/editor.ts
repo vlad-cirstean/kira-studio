@@ -8,6 +8,10 @@ import type {
 } from 'slickgrid';
 import type { RowHandle } from './dataSource';
 
+// The editor is a one-row `<textarea>`: a text `<input>` strips line breaks on paste and on
+// `value =`, so a multi-line value would silently flatten and re-stage on leaving the cell.
+// Typing a break stays blocked (see `blockModifiedEnter`); breaks come from a paste or the value.
+//
 // P22 Pass B, C8/§5 D8 — the incumbent's own single overlay `<input>` (`-iter2-pacing` D4:
 // `editingCellRect`/`editingCell`/`editingBuffer`/`isEditing`/`.cell-input-overlay`,
 // `RowSig.editingCol`) goes away entirely. SlickGrid puts the editor *inside* the active cell node
@@ -33,6 +37,10 @@ export const editorCtx: EditorContext = {
   commit: () => {},
 };
 
+function blockModifiedEnter(e: KeyboardEvent): void {
+  if (e.key === 'Enter' && (e.shiftKey || e.altKey)) e.preventDefault();
+}
+
 // Matches slick.editors.ts's own stock editors' generic defaults (Column<T>'s `field` can't be
 // widened otherwise — see KiraColumn's own identical comment in SlickGridHost.vue).
 // biome-ignore lint/suspicious/noExplicitAny: see comment above.
@@ -53,19 +61,20 @@ export class KiraCellEditor<
 > implements Editor
 {
   private readonly args: EditorArguments<TData, C, O>;
-  private readonly input: HTMLInputElement;
+  private readonly input: HTMLTextAreaElement;
   private loaded = '';
 
   constructor(args: EditorArguments<TData, C, O>) {
     this.args = args;
-    this.input = document.createElement('input');
-    this.input.type = 'text';
+    this.input = document.createElement('textarea');
+    this.input.rows = 1;
     this.input.className = 'cell-input';
     this.input.dataset.testid = 'grid-cell-input';
     // The input is a descendant of the grid's own keydown-handling container (`enableCellNavigation`
     // owns Enter-to-commit/Escape-to-cancel for free — see grid options' own comment — so this
     // listener only needs the wrap-on-type behaviour, not a full onEditKeydown port).
     this.input.addEventListener('keydown', wrapSelectionOnType);
+    this.input.addEventListener('keydown', blockModifiedEnter);
     args.container.appendChild(this.input);
     this.input.focus();
     this.input.select();
@@ -118,6 +127,7 @@ export class KiraCellEditor<
 
   destroy(): void {
     this.input.removeEventListener('keydown', wrapSelectionOnType);
+    this.input.removeEventListener('keydown', blockModifiedEnter);
     this.input.remove();
   }
 }

@@ -287,6 +287,13 @@
   color: var(--kira-fg);
   font: inherit;
 }
+/* The inline editor is a one-row textarea (editor.ts): it holds line breaks, shows one line. */
+.slick-grid-host .slick-cell.editable textarea.cell-input {
+  height: auto;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+}
 /* Generated columns are server-computed; their insert input is read-only and muted. */
 .slick-grid-host [data-testid="grid-cell-insert"] .cell-input.cell-generated {
   color: var(--kira-fg-muted);
