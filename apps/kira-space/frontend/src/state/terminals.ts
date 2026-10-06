@@ -1,5 +1,6 @@
 import { createTerminalsStore } from '@workbench/state/createTerminalsStore';
 import { control } from '../bridge/control';
+import { useSettingsStore } from './settings';
 
 // P83 §5: the terminal registry — session state by tab id, plus output routing. Lives in
 // `state/`, not `repo/state/`: biome.json forbids `repo/**` importing `views/**` and `views/**`
@@ -11,4 +12,6 @@ import { control } from '../bridge/control';
 // now lives in packages/workbench/src/state/createTerminalsStore.ts. This file is just the
 // `control` wiring.
 
-export const useTerminalsStore = createTerminalsStore(control);
+export const useTerminalsStore = createTerminalsStore(control, {
+  appearance: () => useSettingsStore().appearance,
+});

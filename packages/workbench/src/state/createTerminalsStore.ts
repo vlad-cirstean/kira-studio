@@ -4,6 +4,7 @@ import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import type { TerminalEvent } from '@shared/protocol/events';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
+import { loadTerminalRenderer } from '../terminal/terminalRendererLoader';
 
 // P103 Part 2 (§5.3): hoisted from both apps' own state/terminals.ts — byte-identical (P83's
 // Kira Studio Terminal module, P83's Kira Space repo-worktree terminal), once each app's own
@@ -24,9 +25,11 @@ export interface TerminalSession {
   shell: string;
 }
 
-// §5.2: output that arrives between openTerminalSession and the view's first mount (in practice
-// one tick) is queued here, bounded per tab so a pathological case cannot grow without limit —
-// oldest dropped past DRAIN_LIMIT_BYTES.
+// §5.2: output that arrives before a sink attaches is queued here: the window between
+// openTerminalSession and the xterm renderer chunk resolving (a headless session, see
+// attachHeadlessTerminal), never the long wait for a view — xterm itself buffers from then on.
+// Bounded per tab so a pathological case cannot grow without limit — oldest dropped past
+// DRAIN_LIMIT_BYTES, but the newest chunk is always kept.
 const DRAIN_LIMIT_BYTES = 256 * 1024;
 interface Drain {
   chunks: Uint8Array[];
@@ -59,7 +62,12 @@ export interface TerminalsControl {
 
 // P99: was module-level reactive()/plain-Map state. Now a Pinia setup store, same
 // single-responsibility module.
-export function createTerminalsStore(control: TerminalsControl) {
+export interface TerminalsStoreOptions {
+  /** The live "Data font" setting, read when a headless session's xterm is created. */
+  appearance(): { fontFamily: string; fontSize: number };
+}
+
+export function createTerminalsStore(control: TerminalsControl, options: TerminalsStoreOptions) {
   return defineStore('terminals', () => {
     // P91 §7: the Terminal module's own unscoped-launch default — the user's home directory,
     // resolved in Go (bridge/terminal.go's DefaultCwd) and hydrated once at boot, beside
@@ -89,7 +97,7 @@ export function createTerminalsStore(control: TerminalsControl) {
       }
       drain.chunks.push(bytes);
       drain.bytes += bytes.byteLength;
-      while (drain.bytes > DRAIN_LIMIT_BYTES && drain.chunks.length > 0) {
+      while (drain.bytes > DRAIN_LIMIT_BYTES && drain.chunks.length > 1) {
         const dropped = drain.chunks.shift();
         if (dropped) drain.bytes -= dropped.byteLength;
       }
@@ -133,6 +141,24 @@ export function createTerminalsStore(control: TerminalsControl) {
       });
     }
 
+    // A session opened with no view mounted (Kira Space's ADE opens them headlessly and shows one
+    // only when the user later opens its pane) gets its xterm created now, so xterm's own parser
+    // keeps terminal modes and its scrollback bounds memory, instead of a byte drain losing the
+    // session's start-up sequences. The renderer stays a lazy chunk: the store never imports xterm.
+    async function attachHeadlessTerminal(tabId: string): Promise<void> {
+      try {
+        const renderer = await loadTerminalRenderer();
+        if (!byTabId.has(tabId) || sinks.has(tabId)) return;
+        renderer.getOrCreateTerminal(tabId, {
+          appearance: options.appearance,
+          onTerminalOutput,
+          writeTerminal,
+        });
+      } catch (err) {
+        console.error(`terminal ${tabId}: renderer load failed`, err);
+      }
+    }
+
     /** Subscribes, then calls TerminalService.Open — terminalId is the tab id, client-supplied, so
      *  ensureSubscribed runs (synchronously) before the bound call ever reaches Go, and no output can
      *  race the subscription (§3.2/§5.2). cwd is canonicalized once here, so every other read in this
@@ -160,6 +186,7 @@ export function createTerminalsStore(control: TerminalsControl) {
         error: null,
         shell: '',
       });
+      if (!sinks.has(tabId)) void attachHeadlessTerminal(tabId);
 
       try {
         const { shell } = await control.terminalOpen(
