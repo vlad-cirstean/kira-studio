@@ -14,6 +14,8 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -69,6 +71,56 @@ var versionRE = regexp.MustCompile(`^SQLite 3\.`)
 func TestSqlite(t *testing.T) {
 	fixture := testsupport.StartSqlite(t)
 	cfg := fixture.Config
+
+	// P168 Part 3 F9: Connect honours its ctx (Part 2's abort of an in-flight Connect depends on it).
+	t.Run("connect: a cancelled ctx aborts with E_CANCELLED and leaves nothing connected", func(t *testing.T) {
+		a := newAdapter(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := a.Connect(ctx, cfg, adapters.NewOpCtx("op-connect-cancelled"))
+		if code, _ := adapters.CodeOf(err); code != adapters.CodeCancelled {
+			t.Fatalf("Connect with a cancelled ctx: err = %v, want E_CANCELLED", err)
+		}
+		_, err = a.Count(context.Background(), adapters.CountRequest{
+			Path: nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
+		}, adapters.NewOpCtx("op-after-cancelled-connect"))
+		if code, _ := adapters.CodeOf(err); code != adapters.CodeConnect {
+			t.Fatalf("op after a cancelled Connect: err = %v, want E_CONNECT", err)
+		}
+	})
+
+	// P168 Part 3 F8: ops racing Disconnect either run or are refused, never Add to a WaitGroup a
+	// Wait is already running on (a panic) or run on a database whose close is pending. Run with -race.
+	t.Run("disconnect racing new ops neither panics nor leaks work onto a closing database", func(t *testing.T) {
+		for i := 0; i < 25; i++ {
+			a := newAdapter(t)
+			if _, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-race-connect")); err != nil {
+				t.Fatalf("Connect: %v", err)
+			}
+			var wg sync.WaitGroup
+			for j := 0; j < 8; j++ {
+				wg.Add(1)
+				go func(j int) {
+					defer wg.Done()
+					_, err := a.Count(context.Background(), adapters.CountRequest{
+						Path: nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
+					}, adapters.NewOpCtx("op-race-"+strconv.Itoa(j)))
+					if err == nil {
+						return
+					}
+					if code, _ := adapters.CodeOf(err); code != adapters.CodeConnect && code != adapters.CodeCancelled && code != adapters.CodeQuery {
+						t.Errorf("Count racing Disconnect: err = %v", err)
+					}
+				}(j)
+			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_ = a.Disconnect(context.Background())
+			}()
+			wg.Wait()
+		}
+	})
 
 	t.Run("connect/disconnect, real server version", func(t *testing.T) {
 		a := newAdapter(t)

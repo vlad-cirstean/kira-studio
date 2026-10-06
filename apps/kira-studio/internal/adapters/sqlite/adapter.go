@@ -40,6 +40,9 @@ type Adapter struct {
 
 	mu          sync.Mutex
 	runningByOp map[string]context.CancelFunc
+	// draining is set by Disconnect under mu: runOnConn refuses to start (and so never Adds to
+	// inFlight) once it is set, since sync.WaitGroup forbids an Add racing a Wait at zero.
+	draining bool
 
 	// inFlight mirrors postgres's and mysqlfamily's own field of the same name: it counts
 	// runOnConn's own background goroutines that are still touching a *sql.Conn after RunWithAbortRace
@@ -54,7 +57,21 @@ func (a *Adapter) Caps() adapters.Caps { return caps }
 
 // setConnected is Connect's own locked write of db/file/readOnly together (F3).
 func (a *Adapter) setConnected(db *sql.DB, file string, readOnly bool) {
+	a.mu.Lock()
+	a.draining = false
+	a.mu.Unlock()
 	a.state.Update(func(s *connState) { s.db = db; s.file = file; s.readOnly = readOnly })
+}
+
+// beginOp registers one runOnConn goroutine against inFlight, or refuses once Disconnect started.
+func (a *Adapter) beginOp() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.draining {
+		return false
+	}
+	a.inFlight.Add(1)
+	return true
 }
 
 // clearConnected is Disconnect's own locked write (F3). readOnly is deliberately left set.
@@ -63,7 +80,7 @@ func (a *Adapter) clearConnected() {
 }
 
 // Connect is index.ts's connect.
-func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig, op *adapters.OpCtx) (adapters.ConnectInfo, error) {
+func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig, op *adapters.OpCtx) (adapters.ConnectInfo, error) {
 	path, err := resolveFilePath(cfg)
 	if err != nil {
 		return adapters.ConnectInfo{}, err
@@ -82,10 +99,10 @@ func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig,
 	// be reachable by Disconnect from the instant sql.Open's own lazy dial could happen.
 	a.setConnected(db, path, cfg.ReadOnly)
 
-	conn, err := db.Conn(context.Background())
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		_ = a.Disconnect(context.Background())
-		return adapters.ConnectInfo{}, mapError(err)
+		return adapters.ConnectInfo{}, connectError(ctx, mapError(err))
 	}
 	defer conn.Close()
 
@@ -94,13 +111,13 @@ func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig,
 	// E_CONNECT during connect(), not later on the first tree expansion.
 	var version string
 	found := false
-	err = runRows(context.Background(), conn, "SELECT sqlite_version() AS version", nil, op, false, func(r *sql.Rows) error {
+	err = runRows(ctx, conn, "SELECT sqlite_version() AS version", nil, op, false, func(r *sql.Rows) error {
 		found = true
 		return r.Scan(&version)
 	})
 	if err != nil {
 		_ = a.Disconnect(context.Background())
-		return adapters.ConnectInfo{}, err
+		return adapters.ConnectInfo{}, connectError(ctx, err)
 	}
 	if !found {
 		_ = a.Disconnect(context.Background())
@@ -109,11 +126,11 @@ func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig,
 
 	// D6: read-only pragma reads for the connection tooltip — never written by this adapter.
 	var journalMode string
-	_ = runRows(context.Background(), conn, "PRAGMA journal_mode", nil, op, false, func(r *sql.Rows) error {
+	_ = runRows(ctx, conn, "PRAGMA journal_mode", nil, op, false, func(r *sql.Rows) error {
 		return r.Scan(&journalMode)
 	})
 	var pageSize int
-	_ = runRows(context.Background(), conn, "PRAGMA page_size", nil, op, false, func(r *sql.Rows) error {
+	_ = runRows(ctx, conn, "PRAGMA page_size", nil, op, false, func(r *sql.Rows) error {
 		return r.Scan(&pageSize)
 	})
 
@@ -122,6 +139,15 @@ func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig,
 		details["pageSize"] = strconv.Itoa(pageSize)
 	}
 	return adapters.ConnectInfo{ServerVersion: "SQLite " + version, Details: details}, nil
+}
+
+// connectError reports a cancelled Connect as E_CANCELLED instead of whatever the interrupted
+// driver call surfaced.
+func connectError(ctx context.Context, err error) error {
+	if cancelErr := adapters.CheckCancelled(ctx); cancelErr != nil {
+		return cancelErr
+	}
+	return err
 }
 
 // Disconnect is index.ts's disconnect.
@@ -137,6 +163,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	// connection is never closed out from under a still-running goroutine even when this call
 	// itself already returned.
 	a.mu.Lock()
+	a.draining = true
 	cancels := make([]context.CancelFunc, 0, len(a.runningByOp))
 	for _, cancel := range a.runningByOp {
 		cancels = append(cancels, cancel)
@@ -180,11 +207,12 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 func runOnConn[T any](ctx context.Context, a *Adapter, opID string, fn func(context.Context, *sql.Conn) (T, error)) (T, error) {
 	var zero T
 	db := a.state.Load().db
-	if db == nil {
+	if db == nil || !a.beginOp() {
 		return zero, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
 	}
 	conn, err := db.Conn(ctx)
 	if err != nil {
+		a.inFlight.Done()
 		// P2 R1: SetMaxOpenConns(1) means a second op can genuinely queue here waiting for the
 		// sole connection — database/sql's own db.conn() returns exactly ctx.Err() when the wait
 		// is cut short by cancellation, and only then, so this can't misfire on a real connect
@@ -198,12 +226,19 @@ func runOnConn[T any](ctx context.Context, a *Adapter, opID string, fn func(cont
 
 	driverCtx, cancel := context.WithCancel(context.Background())
 	a.mu.Lock()
+	if a.draining {
+		// Disconnect started while this op queued for the connection and could not cancel it.
+		a.mu.Unlock()
+		cancel()
+		_ = conn.Close()
+		a.inFlight.Done()
+		return zero, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
+	}
 	if a.runningByOp == nil {
 		a.runningByOp = make(map[string]context.CancelFunc)
 	}
 	a.runningByOp[opID] = cancel
 	a.mu.Unlock()
-	a.inFlight.Add(1)
 
 	return adapters.RunWithAbortRace(ctx, func() {
 		// release: called exactly once, whenever fn actually settles — not merely when ctx fires
