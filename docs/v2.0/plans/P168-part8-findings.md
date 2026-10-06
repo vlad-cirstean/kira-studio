@@ -320,6 +320,88 @@ Block 6 other checks, nothing filed:
   installed by `codegraph-setup.sh`.
 - `codegraph-duplicates.ts` (report tool, `dedup:*`) runs clean against this index.
 
+### Block 7: CI and root configs
+
+#### F13 (medium): `release.yml` grants `contents: write` to every job and exposes it to mutable-tag third-party actions
+
+- `.github/workflows/release.yml:7-8` (workflow-level `permissions: contents: write`),
+  `:57-58` (job-level `env: GH_TOKEN`), `:61-63` (`oven-sh/setup-bun@v2`, `bun-version: latest`);
+  same unpinned shape in `pr.yml` (read-only token there).
+- `test-matrix` and `db-compat` need no write access, yet inherit `contents: write` while they pull
+  public container images and run repo scripts. In the `release` job, `GH_TOKEN` is a job-level
+  env var, so every step sees it, including the third-party `oven-sh/setup-bun` resolved by the
+  mutable `v2` tag, and `bun-version: latest` pulls whatever Bun is newest at tag time.
+- Failure scenario: a compromised `setup-bun` tag (or Bun release) runs in the `release` job with a
+  write token. `contents: write` can upload or replace release assets. `scripts/install.sh`
+  checks the asset digest that the GitHub API reports, and GitHub recomputes that digest for a
+  replaced asset, so every user's next install or in-app Update runs the attacker's DMG. Ad-hoc
+  codesign only detects corruption (`install.sh:288` says so). The self-update trust decision
+  (block 3) rests on control of this repository, so the workflow token is part of that boundary.
+- Fix (workflow edit, so a `docs/pending-changes/.github__workflows__release.yml.patch` plus a
+  one-line why, per `docs/DEV_ENVIRONMENT.md`): top-level `permissions: contents: read`; grant
+  `contents: write` only on the `release` job; move `GH_TOKEN` from job `env` to the one
+  `Create draft release` step's `env`; pin `oven-sh/setup-bun` (and every `actions/*` use) to a
+  full commit SHA with the tag in a comment; pin `bun-version` to the version the repo is tested
+  with (match `package.json`/`bun.lock`'s expectation). Mirror the SHA and Bun pins in a
+  `docs/pending-changes/.github__workflows__pr.yml.patch` (`awalsh128/cache-apt-pkgs-action@v1`
+  is third-party too, read-only token there).
+
+#### F14 (low): `docs/ARCHITECTURE.md` Known open item on `pr.yml` is partly stale
+
+- `docs/ARCHITECTURE.md:4535-4549`.
+- It says the P108 Part 2 F3/F4 patch "sits unapplied" under `docs/pending-changes/`. The patch is
+  applied (`pr.yml:53,229` run `build:space`; `pr.yml:69` tests `apps/kira-space/internal/
+  gitclient`), and `docs/pending-changes/` does not exist. The still-true half: no
+  `build:vscode`, `test:webview` or `test:ui:space` step in CI, and `verify:packaging` in `pr.yml`
+  finds no packaged bundle (artifact checks skip; `release.yml` runs them).
+- Fix: rewrite the entry to the remaining gap only; drop the unapplied-patch sentences.
+
+#### F15 (low): stale `flatbuffers` entry in `knip.json` `ignoreDependencies`
+
+- `knip.json:30-32`.
+- `bun run lint:dead` passes but prints a configuration hint: "flatbuffers ... Remove from
+  ignoreDependencies". The ignore no longer hides anything, so it only adds noise and could mask
+  a future genuinely unused root `flatbuffers`. (The other hints, ".vue ... not registered as a
+  compiler", are benign: a scratch probe showed knip still reports an unused `.vue` file and
+  follows `.vue` imports.)
+- Fix: delete the entry and its comment; re-run `bun run lint:dead`. If knip then reports the
+  root `flatbuffers` devDependency unused, decide whether `tests/support/encodeFrame.ts` needs it
+  declared at root (its comment says Bun's isolated linker needs it) and keep the ignore only with
+  that reason restated.
+
+#### Routed Part 12 F17 (state check, not a Part 8 code finding)
+
+- Renderer half landed: `SF/views/stream/StreamView.vue:1199` (`data-testid="stream-body-null"`).
+  `ST/ipc/kafka/kafka.frontend.spec.ts` has no tombstone assertion; `kafka.fixture.ts` and
+  `SI/ipcfixture/kafka_test.go` hold no tombstone row (`git grep tombstone`: no hit).
+- Docker is unavailable in this sandbox (`docker info` fails), so the fixture cannot be recaptured.
+  Per plan §7 the fixer records the blocker in this file and in `P168-routed-from-streamA.md`
+  (seed a tombstone in `kafka_test.go`, recapture with `KIRA_IPC_FIXTURES=write`, then add the
+  assertion) and the item becomes its own named `SPEC.md` follow-up. Never hand-edit
+  `kafka.fixture.ts`.
+
+Block 7 other checks, nothing filed:
+- `pr.yml`: `contents: read`, triggers `push`/`pull_request`/`workflow_dispatch` only (no
+  `pull_request_target`, no `workflow_run`); no `${{ github.event.* }}` in any `run:`; PR caches
+  are ref-scoped, so a PR cannot poison `main`'s cache. `release.yml` reads the tag through
+  `$GITHUB_REF_NAME` in shell, not `${{ }}` interpolation. `docs/pending-workflows/mutation.yml`
+  read as context (manual dispatch, report-only).
+- `go.mod`: `go mod tidy` leaves no diff; `go 1.27.1` matches `install-golangci-lint.sh`'s
+  `GOVERSION` and `setup-go`'s `go-version-file`; no `replace`; `tool github.com/mibk/dupl` used
+  by `dedup:go`.
+- `package.json`: every workspace glob has a `package.json`; every `scripts/`/`tools/` path a
+  script names exists; `bunfig.toml` `exact = true`; `prepare`'s `|| true` only covers a missing
+  git (e.g. tarball install).
+- `biome.json`: every include path exists (the `../<kind>/**` patterns are relative import
+  restrictions; all nine view dirs exist). `.golangci.yml`: `errcheck`/`staticcheck` declined with
+  a recorded reason (P94, follow-up P95). `.jscpd.json`, root `tsconfig.json`: nothing.
+  `.gitignore` covers both apps' `bindings`, `dist`, `.task`, `bin`, `tools/mutation/{out,bin,
+  node_modules}`, `.codegraph`, `.tools`, Playwright outputs (`git check-ignore`).
+- Licences: every root dependency is MIT, ISC, Apache-2.0, BSD, CC0, CC-BY-4.0 (`@vscode/codicons`
+  font) or LGPL-2.1 (`mariadb`, dev-only test client); no dual-licensed or gated tier.
+  `tools/mutation` deps are not installed here (Stryker core is Apache-2.0; the bun runner's
+  licence was not checked from source: recorded as unverified, not a finding).
+
 ## Coverage
 
 - Block 1 (listeners and RPC): done. Read in full: `localsock/localsock.go`, `agenthooks/{agenthooks,
@@ -353,3 +435,7 @@ Block 6 other checks, nothing filed:
   header and S6/S7/S11), `codegraph-duplicates.ts` (CLI, DB open). Skimmed: `check-ade-colours.sh`
   (`grep -E` only, BSD-safe), `tools/mutation/{package.json,tsconfig.json,.gitignore}`.
   `scripts/install.sh` covered in block 3.
+- Block 7 (CI and root configs): done. Read in full: `.github/workflows/{pr,release}.yml`,
+  `knip.json`, `.golangci.yml`, `.jscpd.json`, `tsconfig.json`, `bunfig.toml`; `biome.json` globs
+  and the views restriction block; `go.mod` header; `package.json` workspaces/scripts/deps;
+  `.gitignore` via `git check-ignore`. Skimmed: `docs/pending-workflows/mutation.yml` (context).
