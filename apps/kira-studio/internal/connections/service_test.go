@@ -1476,3 +1476,44 @@ func TestDuplicateEmitsListChangedEvenWhenMaskRuleCopyFails(t *testing.T) {
 		t.Fatalf("emitted list %+v does not carry the already-committed duplicate row", lastList)
 	}
 }
+
+// TestStartMigratesQueryPasswordIntoSecretStore is P170 S5: a row stored before Create/Update
+// stripped `?password=` keeps no plaintext secret in its URI after boot, and List never returns it.
+func TestStartMigratesQueryPasswordIntoSecretStore(t *testing.T) {
+	h := newHarness(t)
+	fields := fieldsInput("legacy").ConnectionFields
+	fields.Mode = "uri"
+	fields.URI = strPtr("kafka://broker:9092?password=s3cret&x=1")
+	row, err := h.repos.Connections.Insert("legacy-id", fields, "2020-01-01T00:00:00.000Z")
+	if err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	list, err := h.svc.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, c := range list {
+		if c.ID == row.ID && strings.Contains(*c.URI, "s3cret") {
+			t.Fatalf("List returned the plaintext password: %q", *c.URI)
+		}
+	}
+
+	second := connections.New(connections.Deps{
+		Conns: h.repos.Connections, Secrets: h.secrets, Metadata: h.repos.Metadata,
+		Cipher: secrets.New(), Auth: h.auth, Backend: h.backend, Preconnect: preconnect.New(), MaskRules: h.repos.MaskRules,
+	})
+	second.Start()
+	t.Cleanup(second.Shutdown)
+
+	stored, err := h.repos.Connections.Get(row.ID)
+	if err != nil || stored == nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got, want := *stored.URI, "kafka://broker:9092?x=1"; got != want {
+		t.Errorf("stored URI = %q, want %q", got, want)
+	}
+	if enc, err := h.secrets.Get(row.ID); err != nil || enc == nil {
+		t.Errorf("secret after migration = %v, %v, want stored", enc, err)
+	}
+}

@@ -161,6 +161,58 @@ func New(d Deps) *Service {
 // and every test can attach its own listener before the first event).
 func (s *Service) Start() {
 	s.deps.Preconnect.OnExit(s.onPreconnectExit)
+	s.migrateStoredURIPasswords()
+}
+
+// migrateStoredURIPasswords moves a password stored inside a connection's URI (a row saved before
+// Create/Update began stripping it) into the encrypted secret column. An existing secret wins,
+// matching Create/Update. A row whose encryption fails keeps its URI until the next start; List
+// strips it from what it returns meanwhile.
+func (s *Service) migrateStoredURIPasswords() {
+	list, err := s.deps.Conns.List()
+	if err != nil {
+		slog.Warn(fmt.Sprintf("list connections for URI password migration: %s", err), "scope", "connections")
+		return
+	}
+	for _, c := range list {
+		if c.URI == nil {
+			continue
+		}
+		stripped, pw := stripURIPassword(*c.URI)
+		if pw == nil {
+			continue
+		}
+		existing, err := s.deps.Secrets.Get(c.ID)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("read secret of %s for URI password migration: %s", c.ID, err), "scope", "connections")
+			continue
+		}
+		var enc *string
+		if existing == nil {
+			e, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *pw)
+			if err != nil {
+				slog.Warn(fmt.Sprintf("encrypt URI password of %s: %s", c.ID, err), "scope", "connections")
+				continue
+			}
+			enc = &e
+		}
+		fields := c.ConnectionFields
+		fields.URI = &stripped
+		if _, err := s.deps.Conns.UpdateWithSecret(c.ID, fields, kiratime.NowISO(), enc != nil, enc); err != nil {
+			slog.Warn(fmt.Sprintf("migrate URI password of %s: %s", c.ID, err), "scope", "connections")
+		}
+	}
+}
+
+// withoutURIPassword returns list with every URI's password removed, for rows not yet migrated.
+func withoutURIPassword(list []model.ConnectionSummary) []model.ConnectionSummary {
+	for i := range list {
+		if list[i].URI != nil {
+			stripped, _ := stripURIPassword(*list[i].URI)
+			list[i].URI = &stripped
+		}
+	}
+	return list
 }
 
 // Shutdown refuses every Connect from here on, cancels and waits out every attempt already
@@ -259,7 +311,7 @@ func (s *Service) emitListChanged() {
 	if err != nil {
 		return
 	}
-	s.listChanged.Emit(list)
+	s.listChanged.Emit(withoutURIPassword(list))
 }
 
 func (s *Service) List() ([]model.ConnectionSummary, error) {
@@ -267,7 +319,7 @@ func (s *Service) List() ([]model.ConnectionSummary, error) {
 	if err != nil {
 		return nil, ipcerr.Wrap(err)
 	}
-	return list, nil
+	return withoutURIPassword(list), nil
 }
 
 func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
@@ -472,7 +524,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 		created.McpEnabled = true
 	}
 	s.emitListChanged()
-	return created, nil
+	return withoutURIPassword([]model.ConnectionSummary{created})[0], nil
 }
 
 // copyMaskRules copies every mask rule on fromID onto toID — Duplicate's own step (finding #6,
@@ -514,7 +566,7 @@ func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
 		return nil, ipcerr.Wrap(err)
 	}
 	s.emitListChanged()
-	return reordered, nil
+	return withoutURIPassword(reordered), nil
 }
 
 // Reveal never errors (P25 D9): the renderer's edit dialog has no error handling around this
