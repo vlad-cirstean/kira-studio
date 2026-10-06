@@ -1,5 +1,5 @@
 {
-  "_comment": "G23 D9: the shared conformance corpus asserted by BOTH engines -- packages/git-core/src/search/conformance.test.ts (compileQuery + matchCommitFields) and apps/kira-studio/internal/gitsearch/conformance_test.go (Compile + MatchFields). Seeded from matcher.test.ts's own TOGGLE_ROWS table (rows 1-7, 9), extended with probe 10's punctuation-edge rows, the sha-prefix floor, a body-only hit, the empty-body guard, three dialect-rewrite rows (\\s over NBSP, . excluding CR, \\p as an identity escape), a \\u escape row, three unsupported-pattern rows (lookahead/lookbehind/backreference), and D5's regex+wholeWord alternation-backtrack case. A phase touching SearchMatchField or whole-word semantics adds rows HERE first (docs/v1.3/plans/G23-search.md, section 9).",
+  "_comment": "G23 D9: the shared conformance corpus asserted by BOTH engines -- packages/git-core/src/search/conformance.test.ts (compileQuery + matchCommitFields) and apps/kira-space/internal/gitsearch/conformance_test.go (Compile + MatchFields). Seeded from matcher.test.ts's own TOGGLE_ROWS table (rows 1-7, 9), extended with probe 10's punctuation-edge rows, the sha-prefix floor, a body-only hit, the empty-body guard, three dialect-rewrite rows (\\s over NBSP, . excluding CR, \\p as an identity escape), a \\u escape row, three unsupported-pattern rows (lookahead/lookbehind/backreference), and D5's regex+wholeWord alternation-backtrack case. A phase touching SearchMatchField or whole-word semantics adds rows HERE first (docs/v1.3/plans/G23-search.md, section 9).",
   "rows": [
     {
       "name": "row1-default-widget-cache",
@@ -419,6 +419,18 @@
       "name": "unsupported-lookahead",
       "query": { "text": "(?=x)", "caseSensitive": false, "wholeWord": false, "regex": true },
       "subject": "anything",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-space.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-space.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": false, "fields": [] }
+    },
+    {
+      "name": "unsupported-re2-repeat-cap",
+      "query": { "text": "a{1001}", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "aaa",
       "body": "",
       "authorName": "Kira Fixture",
       "authorEmail": "fixture@kira-space.test",

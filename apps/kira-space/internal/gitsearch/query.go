@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"regexp/syntax"
 	"strings"
 )
 
@@ -32,9 +33,9 @@ var ErrUnsupportedPattern = errors.New("gitsearch: pattern uses lookahead/lookbe
 
 // ErrInvalidPattern is unreachable from the webview client (D7): SearchBox.vue's own compileQuery
 // call already proves the pattern compiles as JS before search.run is ever sent, and translate()
-// rejects everything RE2 structurally cannot express as ErrUnsupportedPattern instead. It exists
-// for a raw socket client that sends a pattern neither engine can compile at all (e.g. an
-// unbalanced group) — regexp.Compile's own leftover failure after a clean dialect translation.
+// plus isRE2Limit answer everything RE2 cannot run but JS can as ErrUnsupportedPattern instead. It
+// exists for a raw socket client that sends a pattern neither engine can compile at all (e.g. an
+// unbalanced group) — regexp.Compile's own leftover syntax failure after a clean dialect translation.
 var ErrInvalidPattern = errors.New("gitsearch: invalid pattern")
 
 // Matcher is Compile's own result — the one thing MatchFields runs. An empty-text Query compiles
@@ -53,7 +54,8 @@ type Matcher struct {
 //
 //	literal mode  -> a literalMatcher (D3). Cannot fail.
 //	regex mode    -> dialect.translate + regexp.Compile (D4/D5).
-//	                 ErrUnsupportedPattern for lookaround/backreference/anything translate rejects.
+//	                 ErrUnsupportedPattern for lookaround/backreference/anything translate rejects,
+//	                 and for an RE2 size cap (repeat count, expression size, nesting depth).
 //	                 ErrInvalidPattern for a regexp.Compile failure surviving a clean translation —
 //	                 unreachable from the webview client (see that error's own doc comment).
 func Compile(q Query) (*Matcher, error) {
@@ -86,9 +88,27 @@ func Compile(q Query) (*Matcher, error) {
 	}
 	re, err := regexp.Compile(source)
 	if err != nil {
+		if isRE2Limit(err) {
+			return nil, fmt.Errorf("%w: %v", ErrUnsupportedPattern, err)
+		}
 		return nil, fmt.Errorf("%w: %v", ErrInvalidPattern, err)
 	}
 	return &Matcher{regex: re, shaPrefix: shaPrefix}, nil
+}
+
+// isRE2Limit reports a regexp.Compile failure that is an RE2 size cap, not a syntax error: JS has
+// no repeat-count (1000), expression-size or nesting-depth cap, so the client's own `new RegExp`
+// accepts such a pattern and the honest answer is unsupported, never invalid.
+func isRE2Limit(err error) bool {
+	var se *syntax.Error
+	if !errors.As(err, &se) {
+		return false
+	}
+	switch se.Code {
+	case syntax.ErrInvalidRepeatSize, syntax.ErrLarge, syntax.ErrNestingDepth:
+		return true
+	}
+	return false
 }
 
 // isHexPrefixText mirrors query.ts's HEX_PREFIX test (`^[0-9a-fA-F]{4,40}$`) without a regex
