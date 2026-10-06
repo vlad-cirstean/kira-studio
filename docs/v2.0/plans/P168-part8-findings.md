@@ -152,6 +152,32 @@ Block 2 other checks, nothing filed:
   `realRun` comment says the group is killed after `WaitDelay`; stdlib kills only the child.
   osascript forks nothing, so not filed.
 
+### Block 3: self-update
+
+Nothing real found. Checked:
+- Candidate 9 (script fetched from `main`, no signature) not filed: a recorded decision exists.
+  `internal/appupdate/install.go:59-73` (fresh-fetch decision plus the security note: branch
+  protection on `main` is the boundary), `docs/ARCHITECTURE.md:2565`, P119 plan
+  (`docs/v1.9/plans/P119-space-release-notifier.md:374`).
+- Fetch: `LimitReader(maxScriptBytes+1)` then size check; status 200 required; contract line and
+  shebang checked byte-exact before `sh`. Temp script via `CreateTemp` (0600, per-user
+  `$TMPDIR`), removed on every path. Log file 0600 under a 0700 dir.
+- State machine: `begin`/`finish`/`Cancel` under one mutex; `Cancel` no-op once handed off; a
+  `staged` line racing ctx cancel only kills a script still waiting on `--wait-pid` (nothing
+  swapped yet). `handleCancel` signals the Setsid group (pgid = pid, unreaped until `<-exited`, so
+  no pid reuse). The fd-3 reader ends on EOF or one line; `exited` is buffered (no goroutine leak).
+- Checker: proxy-aware client, `LimitReader` 1 MiB, singleflight, 6 h/30 min cadence, draft and
+  prerelease excluded, `x/mod/semver` compare, dev sentinels never fetch. The singleflight runs
+  with the first caller's ctx, so a cancelled first call costs one 30 min backoff; minor, not
+  filed.
+- `install.sh`: `set -eu` with every global defaulted; `--notify-fd` whitelisted before `eval`;
+  `--wait-pid` digits only; curl `--proto =https --tlsv1.2 -f`, `--speed-limit`; asset URL prefix
+  pinned to the tag; size and sha256 digest required (refuses a release without a digest);
+  `hdiutil -readonly -nobrowse`; `codesign --verify --deep --strict`, bundle id and version
+  checked; swap is two `rename(2)`s on one volume with restore on failure; `cleanup` on EXIT
+  detaches and removes only its own mktemp paths; osascript gets argv, not source. Contract line
+  byte-exact at line 2. Not runnable here (macOS-only tools); read by hand.
+
 ## Coverage
 
 - Block 1 (listeners and RPC): done. Read in full: `localsock/localsock.go`, `agenthooks/{agenthooks,
@@ -162,3 +188,5 @@ Block 2 other checks, nothing filed:
   `keepawake/{keepawake,caffeinate,toggle,driver}.go`, `startupfail/{report,alert,exec,render}.go`,
   `startupfail/classify.go` (collapse and Classify head). `step.go`, `info.go` skimmed (constants and
   path helpers).
+- Block 3 (self-update): done. Read in full: `appupdate/{install,checker,version,app}.go`,
+  `scripts/install.sh`, both `bridge/update.go` callers (read only).
