@@ -3989,3 +3989,139 @@ target. `TestIntegration_recordMerge` rewritten to the new check.
 
 **Not verifiable here:** F4 shutdown race has no dedicated test (race detector passes); combined
 `lint:all` not re-run after the knip fix (`lint:dead`, `lint:go` and pre-commit lint run separately).
+
+## P168 result
+
+Whole-codebase review, one round, 22 chunks (Parts 2-23) in three streams (A: Studio Go and shared
+bases, B: Space, C: Studio frontend and Space ADE frontend). Part 1 is the pre-plan
+(`docs/v2.0/plans/P168-prep-plan.md`, commit `07036af`). Range `f40cd35..af1551a`. Per chunk: one Opus
+reviewer, findings file committed before the Sonnet fixer, fixes committed per related group, findings
+file deleted. Every findings file is deleted; the per-part plans stay as the record.
+
+**Findings: 376 total, 10 high, 101 medium, 265 low** (summed from each file's own counts; Part 20's
+unrated design finding F12 counts as low). Every finding not listed under "Parked" below was fixed in
+its part. Counts per part, high/medium/low:
+
+| Part | Area | Findings | H/M/L |
+|---|---|---|---|
+| 2 | Studio persistence, secrets, connections | 12 | 0/4/8 |
+| 3 | SQL adapters | 13 | 3/3/7 |
+| 4 | Document, key-value, stream, object-store adapters | 21 | 0/6/15 |
+| 5 | Data plane and page wire | 11 | 0/1/10 |
+| 6 | Go shell, bridge, DB MCP | 19 | 2/2/15 |
+| 7 | API client backend | 19 | 0/5/14 |
+| 8 | Shared Go base and tooling | 15 | 0/2/13 |
+| 9 | Shared frontend base | 12 | 0/1/11 |
+| 10 | API client UI | 24 | 0/8/16 |
+| 11 | Grid and view machinery | 17 | 1/7/9 |
+| 12 | Console, editor, per-kind views | 20 | 0/5/15 |
+| 13 | Studio shell, stores, UI harness | 25 | 1/9/15 |
+| 14 | Space git process layer | 16 | 1/1/14 |
+| 15 | Space git ops, review, search | 15 | 0/4/11 |
+| 16 | Space git session | 15 | 0/4/11 |
+| 17 | Git RPC, socket, `git-ipc` | 10 | 0/4/6 |
+| 18 | `git-core` and `git-ui` logic | 18 | 1/5/12 |
+| 19 | `git-ui` components | 29 | 0/13/16 |
+| 20 | Space ADE engine, persistence | 12 | 0/2/10 |
+| 21 | Space ADE frontend | 23 | 1/7/15 |
+| 22 | Space desktop host | 16 | 0/2/14 |
+| 23 | VS Code extension | 14 | 0/6/8 |
+
+Part 1 (pre-plan) has no findings. Part 8 F14, F15, F17 were stale open items, dropped in `1f320ff`.
+
+**Headline highs, all fixed:**
+- Part 6 F9 and F6: masked columns leaked through `dbmcp`. F9, a projection with an unaliased or
+  quoted-alias masked column slipped past the mask (`4037466`, any non-bare projection of a masked
+  column refused). F6, plan metrics on a masked connection (`1f6e069`, now an allowlist).
+- Part 11 F6: Commit could run twice, and edits staged during a commit were dropped (`11ef40e`).
+- Part 18 F13: `OpsState` got no `RepoSettingsState` in `App.vue`, so the `checkout.autoStash` opt-out
+  was ignored and checkout always auto-stashed (`ebe3c02`, regression test through `createRepoStates`).
+- Part 13 F12: the Filters dialog started empty and saving wiped the saved tree filters (`5c9c132`,
+  seeds from the saved set, reports save errors).
+- Part 21 F1: Space panel resize handles snapped to their limit on every drag, and a click persisted a
+  width of 0 (`05b13be`, uses the pointer delta).
+- Part 3 F1-F3: read-only console escapes (Postgres wrap, MySQL/MariaDB comment syntax) and
+  `ClassifySQL` reporting executing writes as `read` (`140b4a7`).
+- Part 14 F5: catfile circuit breaker tripped by context cancels (`7b44882`).
+
+**Fixes by part (commit subjects carry the finding ids; `git log f40cd35..HEAD`):**
+- 2: one-shot script group reap, connect lifecycle (wait out aborted attempts, reconnect on edit),
+  URI query secrets kept out of stored URI, storage UTF-16 counts and rune-safe byte caps, FK child
+  indexes, `Reorder` validation, localauth prompt serialisation.
+- 3: console read-only closure, binary keyset tokens, pinned connection cancel, sqlite `inFlight`,
+  postgres identity DDL, ClickHouse NULL decode and param escaping.
+- 4: mongo literal parser depth and `NumberInt` range, Stop and bare deletes, redis re-send,
+  timeouts and subcommand gate, S3 ACL and bucket scope, kafka count and partial produce, awscfg.
+- 5: adapterhost cancel bound, reconnect races, 64 KiB error cap, null stream bodies for tombstones,
+  dead wire zod schemas removed, engine error codes across Wails, Go-encoded golden frames, e2e-real
+  build target.
+- 6: `dbmcp` masked projection, plan-metric allowlist, tool cancel and approval-queue reporting,
+  `mcpinstall` quoting, `maskrules` cache race, keep-awake serialisation, TS mask whitespace and digit
+  parity, `E_NOT_FOUND` for saved requests, terminal `Shutdown` unbound.
+- 7: `httpclient` URL redaction and redirect and transport hardening, gRPC shared-resolution cancel and
+  stream bounds, postman decode depth and example auth, curl CRLF, dotenv quoting, history elision
+  flags (Go and shared half).
+- 8: `localsock` Close race and token length, `toolexec` SIGTERM-ignoring groups, terminal registry
+  races, keep-awake, startup failure rune cut, window restore off disconnected screens, adapterhost
+  `CancelOp` before `RunOp`, `check-theme-classes` fails on grep errors; `pr.yml` and `release.yml`
+  patches under `docs/pending-changes/`.
+- 9: headless terminal sessions buffer through xterm, tab save retry and strip a11y, subscribe-before-
+  hydrate, quick command panel, shell resize, dead shared code removed.
+- 10: Copy-as-curl reveal loop, send pre-flight inside try, cookie and history supersede guards,
+  variable and bulk-env reconciliation, collections tree keyboard navigation, selects on shadcn
+  `DropdownMenu`.
+- 11: double-commit block, search filter and restart fixes, grid chrome input and host stale-page
+  guards, paste parser quotes, out-of-range BSON dates.
+- 12: parse abort and deep-nesting refusal, per-statement console lint, page identity watches, Kafka
+  tombstone rendering, truncated-document edit refusal, stream search debounce.
+- 13: connection URI decode and save guard, Filters dialog, browse and recents cleanup, DataGrip scan
+  errors, settings numeric fields, tree refresh epoch and keyboard navigation, stale recent guard
+  (`openRecent`), test harness fixes (nearest-rank p95 with 40 samples, frame settles).
+- 14: catfile cancel and newline desync, `ResolveHead` classification, NUL framing for refs, body and
+  signature, `--` rev terminator, blame without line limit, `PullFiles` paging bound, https userinfo
+  strip.
+- 15: `gitprepare` batch after Run, `gitops` branch create argv and guarded undo, preflight rename
+  and stack depth, `gitreview` store state and inflate bound, `gitsearch` JS regex semantics and scan
+  budget.
+- 16: `gitsession` cat-file detach, cache generation guards, diff cache by resolved sha, undo for partial
+  ops, current line count for non-text review records.
+- 17: `gitrpc` error mapping off `E_INTERNAL`, one-pass `review.snapshot`, `search.run` clamp, `git-ipc`
+  error code passthrough, per-method stream supersede removed, socket frame join. F5, F7 parked.
+- 18: `autoStash` wiring, review pending flag, expanded groups kept, op rejection announcements,
+  graph lane gating, search count exactness, corrupted-chunk re-open bound, worker fallback, layout
+  edge index.
+- 19: live-region composable, form dialogs stay open on failure, refresh and load-more errors,
+  persistence watcher in setup, grid keyboard (Tab stop, PR badge, Space on review checkbox), upstream
+  remote for Fetch, Pull and Push, host-neutral copy, VueUse wiring, confirm dialog descriptions.
+- 20: held runs on a missing worktree, `closeMu` tracked launches, setup claim before log reset,
+  over-long launch refusal, single pending launch, per-registration MCP file and token, background
+  callback teardown, `adeflow` single parse, `codeworkspace` conflict dedupe, aborted composed agent
+  launch (`AbortAgent` seam).
+- 21: resize handles, Force push only where offered, drop and queue cycle checks, double-click launch
+  guards, setup log reset, workflow id reuse, Plan model rebuild and rAF cost, ordered workflow saves,
+  review window watched turn, one-concern stores for Workflows, Repos, Add popover.
+- 22: credential prompt identity, pairing socket wording, stream eviction, subscribe-before-snapshot,
+  repo list broadcast to other windows, multi-diff mount guard, tree refresh ordering, dead KeepAlive
+  hooks.
+- 23: stack navigation commands, restored review diffs after reconnect, blame path relative to repo
+  root, secret-storage failure no longer stalls dial loop, credential prompt scoped to its connection,
+  `editor.openWorkingDiff` contained to repo root, stale comments.
+
+**Also landed from this review:** P169 (`gh` response cap, found by Part 14 F16), P171 row (Part 12
+F17, blocked on Docker). Grid perf change `71d7c6a` (header `will-change`, cell borders) was reverted, then adjusted three more
+times; final state `b6843c1` (`b088feb`, `0eeedb6`, `4d65b17`).
+
+**Parked, one `SPEC.md` row each:** P172 (Part 17 F5, F7 security), P173 (Part 17 F4 rest, Part 16 F12,
+Part 18 F12, Part 19 F4), P174 (Part 4 F8, Part 6 F8, Part 4 F15, Part 5 F4 binary, Part 11 F7), P175
+(Part 10 F24, Part 6 F12, Part 7 F15, unlanded renderer halves of Part 6 F13 and Part 7 F17, F18), P176
+(Part 13 F24 strict guard, Part 5 F7 comment, Part 6 F11 and F19 fixtures), P177 (Part 20 F12, Part 21
+two items), P178 (Part 23 F11, F9 server half), P179 (tooling and lint), P180 (capable-machine
+verification). P170 reviews the fixes.
+
+**Not verified:** no Docker (adapter conformance suites, IPC fixture recapture, real-container
+e2e); no macOS (FSEvents, darwin shell, window restore); no real VS Code host (extension and webview
+behaviour proven by unit and fake-host tests only); `ui-timing` not re-run on a quiet machine after
+the nearest-rank p95 change; visual snapshots not regenerated (Part 13 F7, F10 need
+`test:visual:update:studio`). Real `gh` response sizes unmeasured (P169 Known open item). Not recovered
+for this result: a final full-suite run after Part 21's last commit (hooks passed per commit); P170
+re-checks.
