@@ -76,3 +76,73 @@ Block 1 otherwise clean:
   guard hold; cache is bounded (4).
 - `MonacoHost` mount/unmount ordering, provider model scoping, lint timer guard, language/readOnly
   changes during import window: correct. Scoped `<style>` is the named exception.
+
+### Block 2: SQL language
+
+**F4. Mongo console lint flags valid input and ignores every statement after the first.** Medium.
+Verified (scratch probe over `consoleLintSource('mongodb')`).
+`SF/views/console/lint.ts:115-164` (`lintMongoConsole`), `:60-104` (`lintMongoBrackets` skips `//`
+only), `SF/views/console/mongoStatement.ts:4` (`MONGO_STATEMENT_RE` anchored at `^\s*db\.`).
+- Scenario: Go's `mongo/literal.go:95-102` skips `//` and `/* */` comments, and Run all/Format
+  split on `;` (`splitSqlStatements` with `slashSlashComments`). Lint treats the whole document as
+  one statement with no comment handling:
+  - `// users\ndb.users.find({})` runs fine but gets one error over the whole document
+    (`expected db.<collection>.<method>(...)`).
+  - `/* don't */ db.a.find({})` gets `unterminated string literal` (quote inside block comment).
+  - `db.a.find({});\ndb.b.nope({})` and `db.a.find({}); db.b.find({x: })`: no diagnostic; the
+    second statement's unsupported method or bad argument is never reported.
+- Fix: lint per statement over `splitSqlStatements(text, { …lexOptionsFor(undefined),
+  slashSlashComments: true })` (same split as Run all; offsets from `stmt.start`), skip leading
+  `//`/`/* */` comments before `MONGO_STATEMENT_RE`, and skip block comments in
+  `lintMongoBrackets`. Keep `lintMongoBrackets`'s table test current.
+
+**F5. SQLite `[bracket]` identifiers keep their brackets in DDL parse, diagnostics and hover.** Low.
+Verified (scratch probe: `parseDdl('sqlite', 'CREATE TABLE [order items] ([qty] INTEGER)')` yields
+table `[order items]`, column `[qty]`; `SELECT [users].[name] FROM [users]` against
+`CREATE TABLE users (…)` warns `unknown table "[users]"`; `SELECT u.[name] FROM users u` warns
+`"users" has no column "[name]"`).
+`SF/views/console/sqlNodes.ts:37-46` (`unquotedName` strips only `"`/`` ` ``),
+`SF/views/console/sqlDiagnostics.ts:72-75` (own `replace(/^["`]|["`]$/g, '')`).
+- Scenario: any SQLite schema or query using bracket quoting (common in SQLite tooling output)
+  gets false "unknown table/column" warnings, and completion/hover for such tables miss.
+- Fix: in `unquotedName` handle `[`: `raw.slice(1, -1).replaceAll(']]', ']')`; use `unquotedName`
+  (not the ad-hoc regex) in `unknownColumnDiagnostics`. Check `sqlSchemaCompletion.ts`
+  `QUALIFIED_RE` in block 3.
+
+**F6. Format failures outside the formatter are silent, and a failed `sql-formatter` chunk load is
+memoised forever.** Low. Code-read.
+`SF/views/console/format.ts:18-21` (`loadSqlFormatter` caches the rejected promise),
+`SF/views/console/ConsoleView.vue:432-438` (inline path: `await formatConsoleText` inside
+`void (async…)` with no catch; worker path `.catch(() => null)` maps every rejection to "unmounted").
+- Scenario: the lazy `sqlFormatterEntry` chunk fails to load once (asset fetch error in a dev
+  reload, a stale build). The inline press becomes an unhandled rejection with no strip; every later
+  press reuses the rejected promise and fails the same silent way until restart. Above
+  `INLINE_CHARS` the worker posts `ok:false` and the view shows nothing, as if unmounted.
+- Fix: reset `sqlFormatterModule = undefined` on rejection (`.catch((e) => { sqlFormatterModule =
+  undefined; throw e; })`); in `onFormat` catch both paths, treat only `AbortError` as silent, and
+  set `formatError` to the message otherwise.
+
+**F7. Format maps the caret by a different statement rule than Run, and a second press during the
+first reports a phantom edit.** Low. Code-read.
+`SF/views/console/ConsoleView.vue:428-430` (`beforeIndex` uses `cursor >= s.start && cursor <=
+s.end`), `:446-448` (stale check), versus `statementAtOffset` (`SD/sql-split.ts:77-90`, P108 Part
+11 F3 rule used by Run/Explain at `:254`).
+- Scenario A: `SELECT 1;\nSELECT 2;` with the caret right after the first `;` (where typing `;`
+  leaves it). Run would run `SELECT 1`. Format: `s.start` of statement 2 equals the caret, so
+  `beforeIndex` is 1 and the caret lands in `SELECT 2`; the next Run runs `SELECT 2`. A caret on the
+  trailing blank line after the last `;` gives `-1` (no remap at all).
+- Scenario B: first Format press on a cold app awaits the `sql-formatter` import; a second press
+  (key repeat, double click) captures the same `originalText`. The first applies; the second then
+  sees changed text and shows "Text changed while formatting — press Format again." though the user
+  typed nothing.
+- Fix: A: `beforeIndex = before.indexOf(statementAtOffset(before, originalText, cursorPos.value))`.
+  B: a `formatting` flag (component-local) that ignores a press while one is in flight (or disables
+  the button), cleared in `finally`.
+
+Block 2 otherwise clean:
+- Splitter/lexer dialect flags, `statementAtOffset`/`trimmedStatementStart`, `lintSql` stop at the
+  first unterminated span and paren reset at `;`: correct. Compound statement bodies (`BEGIN … END`)
+  are a known open item (`docs/ARCHITECTURE.md`), not re-reported.
+- `formatConsoleText` split options match `ConsoleView.splitOptionsFor`; per-statement verbatim
+  fallback, terminator preservation, trailing-comment join, Mongo trailing-content refusal hold.
+- `sqlHover` fence/escape, `tokenizeSql` memo (2 entries, reference-compared options) correct.
