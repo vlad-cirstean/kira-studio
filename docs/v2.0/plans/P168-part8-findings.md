@@ -178,6 +178,54 @@ Nothing real found. Checked:
   detaches and removes only its own mktemp paths; osascript gets argv, not source. Contract line
   byte-exact at line 2. Not runnable here (macOS-only tools); read by hand.
 
+### Block 4: shell and events
+
+#### F9 (low): `Quitter.app` is a plain field written after `application.New` and read from other goroutines
+
+- `internal/shell/quit.go:29,60-62,81,141`.
+- `Attach` stores the app on main after `application.New` (`apps/kira-studio/main.go:196`,
+  `apps/kira-space/main.go:287`). `RequestQuit` (menu click goroutine) and `flushThenQuit` (its own
+  goroutine) read it. This is the exact class `aa218aa` (Part 6 F17) fixed in `wails.go` with
+  `atomic.Pointer`; `Quitter` was not covered. No nil deref is reachable today (both readers need
+  the run loop, which starts after `Attach`), so this is a formal race for consistency with F17.
+- Fix: `app atomic.Pointer[application.App]`; `Attach` stores, `RequestQuit`/`flushThenQuit` load
+  and no-op on nil (log a warning in `flushThenQuit`, then still `teardown`).
+
+#### F10 (low): restored window bounds are never checked against the current screens
+
+- `internal/shell/window.go:102-109`; `internal/shell/openwindow.go:300-305`.
+- `Options` applies a stored rectangle verbatim with `InitialPosition: WindowXY`. A window last
+  placed on an external display that is now disconnected reopens at those coordinates, off every
+  screen. Dock-click does not help (the window exists and counts as visible), and the app has no
+  "gather windows" command. Common laptop flow: close the app docked, relaunch undocked. Not
+  verified on macOS (unavailable here); AppKit does not constrain a programmatic `setFrame:`
+  origin for an already-titled window in general, so the risk is real.
+- Fix: once screens are known (startup windows open before `app.Run`, so do it from the window's
+  `WindowRuntimeReady` hook or after `ApplicationDidFinishLaunching`), check that `win.Bounds()`
+  intersects some `app.Screen.GetAll()` work area; if not, move it to the primary work area
+  origin (reuse `cascadeRect`'s clamp). Unit-test the pure intersect-and-clamp helper only if it
+  grows past a couple of conditions.
+
+Block 4 other checks, nothing filed:
+- Candidate 3 (`Coalescer.flushLocked` emits under `c.mu`) dropped. `flush` is a base64 encode of
+  at most 16 KiB plus `DispatchWailsEvent`, which hands the JS to the main thread asynchronously.
+  Holding the lock is what keeps batches, and the final exit event, in order; moving the emit out
+  would trade a non-problem for an ordering bug.
+- `aa218aa` new code holds: every reader in `wails.go` goes through `Load`; `Dialogs.attached`
+  returns "no application" before attach. No other plain app holder in `shell` besides F9
+  (`OpenWindow`'s `WindowOpenerDeps.App` is passed by value after New, read on the same paths).
+- Quit: `started` CAS, `done` flag, `Flushed` idempotent for unknown keys, release once. A window
+  opened after the pending set is seeded is not awaited, and a signal-path `Shutdown` during an
+  in-flight flush tears down early; both bounded edge cases, not filed.
+- Close flush: one waiter per key (the `flushing` guard makes the hook one-shot), P108 Part 2 F2
+  reset holds. `debouncer.cancel` cannot stop a persist already running; it takes milliseconds
+  against a 2 s flush window, not filed.
+- `link.go`: `url.Parse` lowercases the scheme; only http(s) with a host pass. `security.go`
+  denies mic/camera/geolocation/notifications and automatic `window.open`.
+- `notify.Emitter` delivers outside its lock; `OrderedEmitter` (P108 Part 2 F7) holds;
+  `PendingQueue` documented caller-locked. `windowsvc` validates `windowKey`; `mode` is normalised
+  in `appstorage.WindowRepo.SetMode`.
+
 ## Coverage
 
 - Block 1 (listeners and RPC): done. Read in full: `localsock/localsock.go`, `agenthooks/{agenthooks,
@@ -190,3 +238,7 @@ Nothing real found. Checked:
   path helpers).
 - Block 3 (self-update): done. Read in full: `appupdate/{install,checker,version,app}.go`,
   `scripts/install.sh`, both `bridge/update.go` callers (read only).
+- Block 4 (shell and events): done. Read in full: `shell/{quit,closeflush,registry,window,openwindow,
+  wails,security,link,debounce,dialogs,accel,menu}.go`, `appevent/{coalescer,appevent}.go`,
+  `notify/{notify,ordered}.go`, `windowsvc/windowsvc.go`. Skimmed: `shell/{menutemplate,deps,wake}.go`
+  (types and one-line event hooks). Both `main.go` wiring read at the Attach/teardown sites.
