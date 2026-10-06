@@ -18,6 +18,7 @@ top). Reviewer reports only; no source edited. Paths as in plan: `GC` = `package
 
 - Block 1 (bridge, Part 17 consumers): done.
 - Block 2 (graph data and layout): done.
+- Block 3 (graph and review session state): done.
 
 ## Findings
 
@@ -97,6 +98,58 @@ Code-read. Fix: delete `stashRows.ts` and its two exports, and `segmentsInWindow
 `frontier` tracking from `createLayoutClient` (keep `reset()` as the stale marker) and rewrite the
 two doc comments to the full-relayout model.
 
+### Block 3: graph and review session state
+
+**F6 (medium): `ReviewCommentsState.pending` latches true when the target changes mid-request.**
+`GU/state/reviewComments.ts:91-110` (`remove`) and `:121-141` (`clear`) clear `pending` only
+when `this.#target === target` still holds; `setTarget` (`:50-57`) never resets it. Scenario:
+user clicks Remove on a comment; before the reply, the session retargets (base override, stale
+banner acknowledged, branch switch, `review.target` push). The reply lands, the guard fails,
+`pending` stays true; `ReviewCommentsPane.vue:95,148` disable Remove and Clear for the rest of the
+view's life. Same defect G30 #6 fixed in `reviewFiles.ts:102-110`. Verified (probe: remove in
+flight, `setTarget` to another branch, resolve: `pending` reads `true`).
+Fix: `this.pending.value = false` in `setTarget`, mirroring `reviewFiles.ts:110`.
+
+**F7 (medium): expanded branch groups re-collapse after every restart-at-zero re-walk.**
+`GU/state/graphOrder.ts:86-96` prunes `#expandedKeys` to keys with at least one row in the plan
+just built. After `graph.refresh` (manual or the auto-refresh every `refsChanged` schedules,
+`graphView.ts:136-141`), the re-opened stream restarts at row 0 (`packedStream.ts:74-77` resets
+the store), and the first `#rebuildLayout` runs with only the first chunk(s) loaded. A group whose
+rows all sit past that point (an older branch) has no row in that plan, so its key is deleted;
+when the rest of the rows land, the group is collapsed again. Scenario: user expands
+`feature/old`, then commits on any branch or a fetch moves a ref; the auto-refresh re-collapses
+`feature/old`. Verified (probe: expand `b`, rebuild on a 4-row partial store, rebuild on the full
+store: plan length 13, not the expanded 15).
+Fix: prune against the tip list, not the loaded rows: keep a key while some `#tips[i].key`
+matches it (or it is the `other` key). That still drops dead branch names (the stated purpose)
+without depending on how much history has streamed in.
+
+**F8 (low): a deterministic corrupt chunk re-opens the stream forever.**
+`GU/state/packedStream.ts:79-88` hands every `appendPacked` failure to `onCorrupted`;
+`graphView.ts:521-527` and `review.ts:404-413` re-open from row 0 with no attempt limit. When the
+server sends the same bad chunk every time (a `dictionaryBase` or row-offset bug, a malformed
+packed buffer), the client loops: each pass re-walks history server-side and nests one more
+`await` inside the previous stream's `onChunk`. A failure of the recovery stream itself rejects
+into the old stream's queue, which is already `done`, so `rpc.ts:224-226` drops it: no error ever
+reaches the user. Verified (probe: transport that always emits a chunk with a wrong
+`dictionaryBase`, delivered by macrotask: 38 re-opens in 50 ms, unbounded; delivered by microtask
+it starves the event loop).
+Fix: count consecutive corruptions per open in `PackedStreamState` (reset on a successful
+`applyChunk`); after one retry, stop re-opening and surface an error state (`GraphViewState`
+announcement / `ReviewSessionState.phase = 'error'` with the assert message). Run the re-open
+outside the old `onChunk` (`queueMicrotask`/`void`) so its failure is not swallowed.
+
+**F9 (low): a second review mark while one is in flight is dropped silently.**
+`GU/state/reviewFiles.ts:250-253` returns at once while `pending` is true. `FileTree.vue:622,750`
+(Part 19) checkboxes are not disabled on `pending`, and the window spans the mark request plus
+the `#loadDiff` re-fetch (`:268`). Scenario: tick file A, then tick file B within that window; B's
+`mark` returns with no request, no `markError`, no announcement; B's checkbox snaps back. The
+`pending` comment (`:67-69`) assumes only the two header buttons call `mark`. Code-read.
+Fix: queue marks instead of dropping them (chain each `mark` onto the previous one's promise,
+dropping only an identical same-path/same-state duplicate), keeping `pending` true until the queue
+drains; or disable the tree checkboxes on `pending` (`needs-other-part-file:
+packages/git-ui/src/components/FileTree.vue (Part 19)`).
+
 ## Candidate fates (plan §9)
 
 1. Dropped. Webview-side cancel is local: the webview's own `createRpcClient` rejects with a
@@ -110,10 +163,23 @@ two doc comments to the full-relayout model.
 2. Dropped as its own finding. No path needs to branch on an `E_*` code: reconnect re-opens via
    `onReconnect`; `E_FRAME_TOO_LARGE` is parked (§6.7). Raw-message exits are covered by the
    OpsState error-exit finding (block 5).
+3. Confirmed stale; grouped into the comments finding (block 7).
+4. Folded into F8. The re-open itself is safe: `openStream` aborts the old controller, and
+   `createRpcClient`'s abort listener marks the old entry `done` and RESOLVES (`rpc.ts:323-333`),
+   so the old credit gate blocks nothing. (Plan §6.3's premise that a superseded `openStream`
+   awaiter gets `TransportError('cancelled')` does not hold: abort resolves; no caller sees a
+   cancel.) Only the swallowed recovery error is real, reported in F8.
 8. Reported as F1.
 9. Confirmed as dead code, reported inside F5. The O(rows) relayout per rebuild is the P93 §5.1
    design (rows scatter into groups), bounded in count by F11 coalescing; not re-reported.
 10. Reported as F2 (probe numbers there).
 11. Reported as F3.
+12. Reported as F8 (verified).
+16. Reported as F9.
+17. Dropped. Both stores persist JSON (VS Code `getState`, Space `viewStateStore.ts`), which cannot
+    carry `NaN`/`Infinity` (they serialize to `null` and fail the `typeof` gate). `loadedRows` is
+    never read on restore (`App.vue:1320-1329` reads `columnWidths`, `detailWidth`, `scrollRow`);
+    rehydration replays the host cache instead. `scrollRow` bounds belong to `CommitGrid.vue`
+    (Part 19).
 18. Dropped. Lanes past 12 clamp to the twelfth column by documented design (`rowSvg.ts:76-83`,
     `hitTest.ts:18-30`); `graphColumnWidth` and `laneAt` agree on the clamp.
