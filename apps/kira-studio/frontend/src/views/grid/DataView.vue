@@ -107,6 +107,7 @@ const pendingCount = computed(() => {
   if (!p) return 0;
   return p.edits.size + p.deletes.size + p.inserts.length;
 });
+const committing = computed(() => pendingChangesStore.isCommitting(props.tab.id));
 const previewOpen = ref(false);
 const previewAnchorRef = ref<HTMLElement | null>(null);
 
@@ -117,9 +118,15 @@ const previewAnchorRef = ref<HTMLElement | null>(null);
 async function onCommit(): Promise<void> {
   if (!props.tab.connectionId) return;
   try {
-    await pendingChangesStore.commitPending(props.tab.connectionId, props.tab.path, props.tab.id);
-    gridViewStore.setActionError(props.tab.id, null);
-    await gridViewStore.reloadAfterMutation(props.tab.id);
+    await pendingChangesStore.commitPending(
+      props.tab.connectionId,
+      props.tab.path,
+      props.tab.id,
+      async () => {
+        gridViewStore.setActionError(props.tab.id, null);
+        await gridViewStore.reloadAfterMutation(props.tab.id);
+      },
+    );
   } catch (err) {
     gridViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
   }
@@ -258,7 +265,7 @@ function onCloseSearch(): void {
                 aria-label="Preview the SQL for pending changes"
                 disabled-trigger
                 data-testid="toolbar-preview-command"
-                :disabled="!isWritable"
+                :disabled="!isWritable || committing"
                 @click="previewOpen = !previewOpen"
               />
               <PopoverAnchor :reference="previewAnchorRef ?? undefined" />
@@ -270,7 +277,7 @@ function onCloseSearch(): void {
             label="Discard pending changes"
             disabled-trigger
             data-testid="toolbar-discard-changes"
-            :disabled="!isWritable"
+            :disabled="!isWritable || committing"
             @click="onDiscard"
           />
           <TooltipIconButton
@@ -279,7 +286,7 @@ function onCloseSearch(): void {
             disabled-trigger
             variant="toolbar-primary"
             data-testid="toolbar-commit-changes"
-            :disabled="!isWritable"
+            :disabled="!isWritable || committing"
             @click="onCommit"
           />
         </template>

@@ -31,6 +31,7 @@ class UnaddressableRowError extends Error {}
 
 export const usePendingChangesStore = defineStore('pendingChanges', () => {
   const pendingState = reactive({} as Record<string, TabPending>);
+  const committingState = reactive({} as Record<string, true>);
 
   function ensure(tabId: string): TabPending {
     if (!pendingState[tabId]) {
@@ -296,28 +297,45 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     connectionId: string,
     path: string,
     tabId: string,
+    afterCommit?: () => Promise<void>,
   ): Promise<MutateResponse | null> {
-    const ops = buildPlan(tabId);
-    if (!ops) return null;
-    const result = await data.mutate({
-      opId: crypto.randomUUID(),
-      tabId,
-      connectionId,
-      path,
-      ops,
-    });
-    clearPending(tabId);
-    return result;
+    // A second click, or an edit staged mid-flight, would resend or drop ops already on the wire.
+    // `afterCommit` runs inside the same window so the reload that replaces the page cannot drop
+    // an edit staged against the old one.
+    if (committingState[tabId]) return null;
+    committingState[tabId] = true;
+    try {
+      const ops = buildPlan(tabId);
+      if (!ops) return null;
+      const result = await data.mutate({
+        opId: crypto.randomUUID(),
+        tabId,
+        connectionId,
+        path,
+        ops,
+      });
+      clearPending(tabId);
+      await afterCommit?.();
+      return result;
+    } finally {
+      delete committingState[tabId];
+    }
   }
 
   function discardPending(tabId: string): void {
+    if (committingState[tabId]) return;
     clearPending(tabId);
+  }
+
+  function isCommitting(tabId: string): boolean {
+    return committingState[tabId] === true;
   }
 
   return {
     pendingFor,
     rawPendingFor,
     hasPending,
+    isCommitting,
     clearPending,
     registerFullPrimaryKeyAccessor,
     isPendingDelete,

@@ -248,7 +248,10 @@ function hasPrimaryKey(): boolean {
 function isWritable(): boolean {
   const t = tab();
   if (!t?.connectionId) return false;
-  return !connectionsStore.connectionRecord(t.connectionId)?.readOnly;
+  return (
+    !connectionsStore.connectionRecord(t.connectionId)?.readOnly &&
+    !pendingChangesStore.isCommitting(props.tabId)
+  );
 }
 function caps() {
   const connectionId = tab()?.connectionId;

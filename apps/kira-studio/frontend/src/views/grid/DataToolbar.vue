@@ -57,7 +57,8 @@ const isWritable = computed(
   () =>
     !!caps.value?.writable &&
     !connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly &&
-    !rt.value?.maskPreview,
+    !rt.value?.maskPreview &&
+    !pendingChangesStore.isCommitting(props.tab.id),
 );
 
 // M5 §6.2: rendered only when this tab's connection has at least one masked column — a
