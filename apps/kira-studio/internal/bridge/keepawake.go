@@ -116,11 +116,12 @@ func (s *KeepAwakeService) recomputeAgentLocked() {
 
 // KeepAwakeAgentSessionsChanged is main.go's own trigger, wired onto terminal.Registry.OnChange —
 // session.go documents OnChange as fired outside the registry mutex, so calling back in here is
-// safe.
-func KeepAwakeAgentSessionsChanged(s *KeepAwakeService, count int) {
+// safe. count is read under mu: callbacks fire on several goroutines, and a count read before
+// the lock could be applied after a newer one.
+func KeepAwakeAgentSessionsChanged(s *KeepAwakeService, count func() int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.agentCount = count
+	s.agentCount = count()
 	s.recomputeAgentLocked()
 }
 

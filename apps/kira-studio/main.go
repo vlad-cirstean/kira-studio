@@ -388,7 +388,7 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	// OpenParams.Agent). AgentSessions() is safe to call from here — session.go documents OnChange
 	// as fired outside the registry mutex for exactly this reason.
 	terminalSvc.Registry.OnChange = func() {
-		bridge.KeepAwakeAgentSessionsChanged(keepAwakeSvc, len(terminalSvc.Registry.AgentSessions()))
+		bridge.KeepAwakeAgentSessionsChanged(keepAwakeSvc, func() int { return len(terminalSvc.Registry.AgentSessions()) })
 	}
 
 	events := bridge.NewEvents(deps.Events)
