@@ -12,7 +12,7 @@ Checks at HEAD: `go vet ./apps/kira-space/internal/gitsession/...` clean;
 - Block 1 lifecycle: done
 - Block 2 walk and reads: done
 - Block 3 ops and undo: done
-- Block 4 stack and worktree: pending
+- Block 4 stack and worktree: done
 - Block 5 remote and auto-fetch: pending
 - Block 6 review: pending
 - Block 7 GitHub and ADE facts: pending
@@ -207,6 +207,31 @@ recreated ref (`reference already exists`) maps to `AlreadyExists`, which is fin
 Fix: add a row before the generic ones: `not uptodate. cannot merge` maps to `DirtyWorktree`. Extend
 `TestUndoRun_HardResetUndoKeepsEditsMadeSince` to assert `undo.Error.Kind`.
 
+### F11 (medium): ref-moving undo replays never check the ref is still where the op left it
+
+`GS/stack.go:592-624` (`buildRestackUndo`), `GS/ops.go:901-911` (cherry-pick undo), `GS/ops.go:847-861`
+(hard-reset undo via `UndoResetArgs`), `GS/ops.go:1281-1321` (`UndoRun`). `needs-other-part-file:
+apps/kira-space/internal/gitpreflight` (`UndoRecord`, Part 15, Stream B, editable by this fixer).
+
+Part 15 made branch/tag-delete undo refuse when the ref was recreated (`RecreateRefArgs`). The other
+ref-moving replays still move unconditionally. The undo slot is cleared only by the next in-app op,
+so a commit made in a terminal or IDE leaves it armed. Scenarios:
+
+- Restack A, B, C (HEAD on A). User runs `git switch C && git commit` in a terminal, then clicks Undo.
+  Replay `update-ref refs/heads/C <oldTipC>` (two-argument form, no expected old value) drops the new
+  commit from C; `reset --keep <oldTipA>` likewise drops any commit made on A since.
+- Cherry-pick, then a terminal commit on the same branch, then Undo: `reset --keep <prev>` with a
+  clean tree moves the branch back past the new commit and rewrites the worktree.
+- Hard reset, then a commit, then Undo: same `--keep` replay.
+
+`RecoverySha` existence is the only pre-check. Commits survive only in the reflog.
+
+Fix: record the post-op tips on the `UndoRecord` (new field, e.g. `ExpectedTips map[ref]sha`, set
+after the op succeeds: HEAD for reset/cherry-pick, every restacked branch for restack). `UndoRun`
+verifies them before replaying and answers `{ok:false}` with a "changed since" message on mismatch,
+like the recreated-ref case. For the restack `update-ref` lines use the three-argument form with the
+post-restack tip as the expected old value.
+
 ## §9 candidates
 
 1. Dropped. `Registry.acquire` after `Close` does build an untracked entry, but only reachable at
@@ -244,3 +269,7 @@ Fix: add a row before the generic ones: `not uptodate. cannot merge` maps to `Di
 22. Dropped. `undo_guard_test.go` runs real git (`initUndoGuardRepo`, `runGitQ`) and asserts the refs
    and worktree after the refused replay, not argv shape. It does not assert `Error.Kind`; F10 adds
    that.
+20. Dropped. `RunPrepare` and `worktreeRemove` of the same worktree are both user actions, the remove
+   needs the typed token once the script dirtied the tree, and the script then fails on a missing
+   directory with no app state left inconsistent. `prepareWorktreeRemove` could refuse while
+   `e.prepare` is running on `target.Path`; noted, not reported.
