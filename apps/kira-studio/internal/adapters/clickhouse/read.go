@@ -173,14 +173,16 @@ func readPage(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx
 	}
 	// A Nullable column also selects isNull(col) after the projected ones: the *Strings format
 	// renders NULL as a sentinel a real string can equal, the flag settles which it is.
-	var nullableCols []int
+	selectItems := make([]string, 0, 2*len(selectNames))
+	selectItems = append(selectItems, selectNames...)
+	nullableCols := make([]int, 0, len(projectedColumns))
 	for i, c := range projectedColumns {
 		if c.Nullable {
 			nullableCols = append(nullableCols, i)
-			selectNames = append(selectNames, "isNull("+quoteIdent(c.Name)+")")
+			selectItems = append(selectItems, "isNull("+quoteIdent(c.Name)+")")
 		}
 	}
-	selectList := strings.Join(selectNames, ", ")
+	selectList := strings.Join(selectItems, ", ")
 	whereSQL := adapters.WhereClause(req.Filter)
 	orderBySQL, err := computeOrderBySql(req.Sort, target)
 	if err != nil {
