@@ -516,3 +516,118 @@ fix, "verified" (scratch probe or run) or "code-read".
   with no `connectionRecord`; `openTrackedTab` returns early (no tab) when the connection record is
   missing.
 - Code-read.
+
+## Block 5: `ui-timing` investigation (raw numbers, round 1)
+
+Method: two scratch worktrees in the session scratchpad, HEAD `62c0fdb` and base `f40cd35`
+(node_modules hard-linked from this worktree, lockfile identical across the range; generated
+bindings copied, no exported bridge signature changed in `f40cd35..62c0fdb`). Each got one scratch
+line logging the raw sorted samples (`RAW ...`); spec files are byte-identical between the two
+trees. `bun run build:test:studio` in each. Runs alternate HEAD/base, project alone:
+`playwright test --config=apps/kira-studio/playwright.config.ts --project=ui-timing --no-deps`.
+A runner waits up to 20 min for 1-min load < 4 with no other test process (any cwd outside the
+scratchpad: Streams A/B and the main checkout ran Go tests, vue-tsc and `bun test` throughout),
+then runs regardless. "max" below is the highest 1-min load sampled every 5 s during the run;
+"foreign" the most foreign test processes seen. A run counts (P139 rule) only at max <= 4 and
+foreign 0. WebKit's `performance.now()` here has 1 ms resolution (every sample is an integer).
+
+Per-run summary (cell -> editor: `percentile(.., 95)` is the max of 20; perf: n = 22 deltas):
+
+    head-1   10:14:24 load0=3.82 maxload=3.82 foreign=0 rc=0 COUNTED | cell p50=17 p95(max)=25 2nd=23 | scroll n=22 p50=35 p95=39 max=46
+    base-1   10:15:19 load0=2.33 maxload=7.39 foreign=0 rc=0 not-counted | cell p50=18 p95(max)=24 2nd=24 | scroll n=22 p50=41 p95=57 max=59
+    head-2   10:18:47 load0=3.99 maxload=3.99 foreign=4 rc=0 not-counted | cell p50=21 p95(max)=25 2nd=24 | scroll n=22 p50=33 p95=40 max=51
+    base-2   10:19:40 load0=3.35 maxload=5.87 foreign=0 rc=0 not-counted | cell p50=16 p95(max)=23 2nd=22 | scroll n=22 p50=36 p95=46 max=54
+    head-3   10:22:10 load0=3.92 maxload=10.71 foreign=0 rc=0 not-counted | cell p50=29 p95(max)=38 2nd=38 | scroll n=22 p50=46 p95=58 max=65
+    base-3   10:26:04 load0=3.89 maxload=3.89 foreign=0 rc=0 COUNTED | cell p50=14 p95(max)=27 2nd=24 | scroll n=22 p50=32 p95=50 max=50
+    head-4   10:36:50 load0=3.77 maxload=12.34 foreign=0 rc=1 not-counted | cell p50=23 p95(max)=42 2nd=37 | scroll n=22 p50=48 p95=57 max=58
+    base-4   10:43:43 load0=3.96 maxload=12.94 foreign=0 rc=1 not-counted | cell p50=21 p95(max)=37 2nd=36 | scroll n=22 p50=49 p95=65 max=85
+    head-5   11:05:03 load0=7.28 maxload=9.31 foreign=0 rc=0 not-counted | cell p50=27 p95(max)=42 2nd=39 | scroll n=22 p50=37 p95=47 max=54
+    base-5   11:07:50 load0=3.99 maxload=7.41 foreign=0 rc=0 not-counted | cell p50=18 p95(max)=26 2nd=23 | scroll n=22 p50=41 p95=56 max=60
+    head-6   11:10:03 load0=3.98 maxload=4.75 foreign=0 rc=0 not-counted | cell p50=18 p95(max)=33 2nd=29 | scroll n=22 p50=46 p95=65 max=94
+    base-6   11:17:05 load0=3.72 maxload=3.98 foreign=0 rc=0 COUNTED | cell p50=19 p95(max)=27 2nd=24 | scroll n=22 p50=37 p95=55 max=64
+    head-7   11:18:00 load0=3.36 maxload=7.97 foreign=0 rc=0 not-counted | cell p50=18 p95(max)=27 2nd=23 | scroll n=22 p50=41 p95=51 max=57
+    base-7   11:19:54 load0=3.80 maxload=4.17 foreign=0 rc=0 not-counted | cell p50=17 p95(max)=41 2nd=25 | scroll n=22 p50=35 p95=41 max=43
+    head-8   11:21:30 load0=3.90 maxload=7.84 foreign=0 rc=0 not-counted | cell p50=21 p95(max)=31 2nd=30 | scroll n=22 p50=50 p95=72 max=82
+    base-8   11:23:13 load0=3.78 maxload=10.53 foreign=3 rc=0 not-counted | cell p50=27 p95(max)=38 2nd=37 | scroll n=22 p50=43 p95=59 max=60
+
+Raw samples (sorted for budgets.spec.ts, arrival order for perf.spec.ts):
+
+- `base-1` 10:15:19, load start 2.33, max 7.39, foreign 0, rc 0
+  - cell -> editor: `[14,15,15,16,17,17,17,17,17,17,18,18,18,18,19,20,21,21,24,24]`
+  - cached tree expand: `[15,16,16,16,16,17,17,18,18,18,19,20,20,21,27,28,33,36,39,43]`
+  - cached tab switch: `[88,89,89,90,90,91,93,96,103,106,112,113,114,116,120,120,121,136,185,193]`
+  - perf scroll deltas: `[5,15,44,46,40,41,43,39,36,41,38,44,43,57,37,36,38,38,47,59,41,30]`
+- `head-1` 10:14:24, load start 3.82, max 3.82, foreign 0, rc 0
+  - cell -> editor: `[14,14,15,16,16,16,17,17,17,17,17,18,18,18,19,20,22,22,23,25]`
+  - cached tree expand: `[15,15,16,16,16,16,18,18,18,18,18,20,22,22,22,23,24,27,28,33]`
+  - cached tab switch: `[89,91,91,91,93,96,96,97,97,112,113,115,117,119,121,128,135,143,147,161]`
+  - perf scroll deltas: `[0,20,38,38,38,39,46,33,38,35,36,34,34,35,35,35,37,31,35,33,32,26]`
+- `base-2` 10:19:40, load start 3.35, max 5.87, foreign 0, rc 0
+  - cell -> editor: `[13,14,14,14,14,15,15,15,15,15,16,16,16,16,17,17,19,19,22,23]`
+  - cached tree expand: `[14,15,15,15,16,16,16,17,17,18,18,18,18,19,19,19,20,20,21,22]`
+  - cached tab switch: `[86,87,88,89,92,92,93,95,97,103,106,113,113,118,122,125,125,127,146,175]`
+  - perf scroll deltas: `[5,21,39,40,46,35,38,35,36,34,35,37,37,42,42,54,43,34,35,34,32,31]`
+- `head-2` 10:18:47, load start 3.99, max 3.99, foreign 4, rc 0
+  - cell -> editor: `[15,16,16,17,17,18,19,20,20,21,21,22,22,23,23,23,24,24,24,25]`
+  - cached tree expand: `[16,16,16,17,17,18,18,18,19,20,20,22,22,23,23,24,25,25,25,26]`
+  - cached tab switch: `[89,89,91,94,97,102,103,106,109,111,115,116,117,117,120,120,124,125,129,191]`
+  - perf scroll deltas: `[5,23,35,36,36,35,38,37,37,33,33,32,31,32,30,33,31,29,31,51,40,25]`
+- `base-3` 10:26:04, load start 3.89, max 3.89, foreign 0, rc 0
+  - cell -> editor: `[10,12,12,13,13,13,14,14,14,14,14,15,15,15,15,15,17,23,24,27]`
+  - cached tree expand: `[14,14,14,15,15,15,15,15,15,16,16,16,17,17,18,18,18,19,26,27]`
+  - cached tab switch: `[78,82,83,85,87,87,89,95,96,98,100,104,105,107,109,111,112,117,152,157]`
+  - perf scroll deltas: `[3,16,33,32,32,31,31,32,32,28,30,30,50,29,33,50,45,32,30,31,33,24]`
+- `head-3` 10:22:10, load start 3.92, max 10.71, foreign 0, rc 0
+  - cell -> editor: `[14,16,19,21,21,21,23,25,27,28,29,29,29,30,31,31,32,33,38,38]`
+  - cached tree expand: `[14,14,15,15,15,16,16,16,16,16,17,18,18,18,20,27,30,35,39,47]`
+  - cached tab switch: `[89,94,102,103,105,109,114,123,123,125,127,127,130,131,133,136,143,160,169,197]`
+  - perf scroll deltas: `[22,46,65,46,51,45,55,41,43,53,48,44,38,48,58,50,43,47,45,50,42,39]`
+- `base-4` 10:43:43, load start 3.96, max 12.94, foreign 0, rc 1, FAIL ['apps/kira-studio/tests/ui/budgets.spec.ts:372'] [('300', '310')]
+  - cell -> editor: `[10,11,11,16,16,18,19,19,19,20,21,21,22,25,26,27,27,29,36,37]`
+  - cached tab switch: `[88,95,100,102,105,109,111,118,127,130,131,137,145,151,156,160,169,180,241,310]`
+  - perf scroll deltas: `[18,25,49,56,51,45,85,50,48,49,55,46,65,54,47,45,47,52,44,45,50,33]`
+- `head-4` 10:36:50, load start 3.77, max 12.34, foreign 0, rc 1, FAIL ['apps/kira-studio/tests/ui/budgets.spec.ts:372'] [('50', '52')]
+  - cell -> editor: `[12,13,14,14,14,16,16,17,17,19,23,23,25,27,29,30,31,36,37,42]`
+  - cached tree expand: `[17,17,17,18,19,20,20,22,22,25,28,30,33,35,37,41,41,46,49,52]`
+  - cached tab switch: `[99,102,104,105,113,120,120,121,126,127,130,132,136,141,175,176,192,193,198,264]`
+  - perf scroll deltas: `[9,28,54,45,51,53,50,48,49,57,50,58,47,50,48,47,54,46,47,43,42,37]`
+- `base-5` 11:07:50, load start 3.99, max 7.41, foreign 0, rc 0
+  - cell -> editor: `[14,14,15,15,16,16,16,16,17,17,18,18,20,20,20,20,20,22,23,26]`
+  - cached tree expand: `[16,17,17,17,18,18,19,19,20,22,27,29,30,31,32,33,34,35,36,40]`
+  - cached tab switch: `[89,89,93,94,103,105,110,111,116,117,117,118,121,122,133,138,142,164,170,202]`
+  - perf scroll deltas: `[3,14,40,36,41,35,34,34,34,35,60,53,46,48,55,56,53,37,46,41,50,46]`
+- `head-5` 11:05:03, load start 7.28, max 9.31, foreign 0, rc 0
+  - cell -> editor: `[19,19,21,22,22,23,24,25,25,25,27,27,27,28,29,31,32,34,39,42]`
+  - cached tree expand: `[14,15,15,16,16,17,18,18,19,19,19,19,19,21,21,22,23,23,24,26]`
+  - cached tab switch: `[92,93,93,94,96,96,111,112,113,114,115,120,121,121,123,131,137,138,170,228]`
+  - perf scroll deltas: `[0,16,38,44,40,38,38,36,38,33,37,41,47,54,33,35,35,31,37,37,35,27]`
+- `base-6` 11:17:05, load start 3.72, max 3.98, foreign 0, rc 0
+  - cell -> editor: `[15,16,16,16,17,17,17,18,18,19,19,19,19,19,20,20,20,22,24,27]`
+  - cached tree expand: `[15,16,16,17,17,17,18,18,18,19,19,19,20,21,21,21,22,22,22,27]`
+  - cached tab switch: `[90,91,94,97,100,101,104,110,111,118,120,120,124,125,126,127,130,146,166,170]`
+  - perf scroll deltas: `[4,14,39,43,41,38,43,34,33,51,55,35,33,33,33,37,35,42,64,41,36,32]`
+- `head-6` 11:10:03, load start 3.98, max 4.75, foreign 0, rc 0
+  - cell -> editor: `[14,14,14,16,16,16,16,16,16,17,18,18,18,18,18,19,21,21,29,33]`
+  - cached tree expand: `[15,16,17,17,18,18,19,19,19,20,20,20,23,24,25,33,33,38,41,50]`
+  - cached tab switch: `[88,90,91,93,97,99,102,106,110,112,114,117,118,120,122,123,125,151,155,169]`
+  - perf scroll deltas: `[9,25,55,45,51,50,47,46,43,51,94,65,43,43,37,47,46,48,43,48,37,32]`
+- `base-7` 11:19:54, load start 3.80, max 4.17, foreign 0, rc 0
+  - cell -> editor: `[12,13,14,15,15,16,16,16,16,16,17,17,18,18,19,19,23,24,25,41]`
+  - cached tree expand: `[15,15,15,16,16,17,17,17,17,17,17,18,19,19,19,19,19,19,20,21]`
+  - cached tab switch: `[88,97,98,98,101,101,103,109,109,116,121,122,125,126,130,132,133,134,136,180]`
+  - perf scroll deltas: `[10,16,38,43,36,32,36,34,34,35,33,37,41,40,34,36,33,35,34,37,35,26]`
+- `head-7` 11:18:00, load start 3.36, max 7.97, foreign 0, rc 0
+  - cell -> editor: `[14,14,15,15,15,15,16,18,18,18,18,19,19,19,19,19,20,22,23,27]`
+  - cached tree expand: `[15,16,16,17,17,18,18,18,19,19,20,20,20,20,22,24,25,25,31,39]`
+  - cached tab switch: `[89,89,90,92,93,95,97,99,102,107,107,115,117,118,122,123,133,133,134,183]`
+  - perf scroll deltas: `[2,17,48,41,42,39,37,49,38,38,38,38,51,40,41,43,41,35,45,45,40,57]`
+- `base-8` 11:23:13, load start 3.78, max 10.53, foreign 3, rc 0
+  - cell -> editor: `[11,15,19,24,25,26,26,26,27,27,27,28,28,29,29,31,35,35,37,38]`
+  - cached tree expand: `[16,17,17,17,18,18,18,18,18,19,19,20,21,24,27,28,30,32,32,43]`
+  - cached tab switch: `[88,95,101,105,112,116,119,124,125,126,128,145,145,173,173,175,175,177,215,239]`
+  - perf scroll deltas: `[2,17,39,40,38,45,45,37,35,46,45,43,59,41,49,43,55,50,41,49,60,39]`
+- `head-8` 11:21:30, load start 3.90, max 7.84, foreign 0, rc 0
+  - cell -> editor: `[17,18,19,20,20,21,21,21,21,21,21,21,22,22,23,23,23,27,30,31]`
+  - cached tree expand: `[15,17,17,18,18,18,18,19,19,20,20,21,22,26,27,29,33,40,41,49]`
+  - cached tab switch: `[101,101,103,111,116,117,119,127,129,130,131,137,144,145,145,156,172,196,203,207]`
+  - perf scroll deltas: `[20,28,52,59,52,48,50,48,50,48,46,51,63,60,50,50,48,56,72,82,54,43]`
