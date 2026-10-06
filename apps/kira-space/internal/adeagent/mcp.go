@@ -31,6 +31,7 @@ const (
 type FinishFunc func(runID, status, summary string)
 
 type runToken struct {
+	id         uint64 // unique per registration: one run id may register again before the first releases
 	runID      string
 	hash, salt []byte
 }
@@ -43,6 +44,7 @@ type Server struct {
 	onFinish FinishFunc
 
 	mu     sync.Mutex
+	seq    uint64
 	tokens []runToken
 	ln     net.Listener
 	srv    *http.Server
@@ -120,7 +122,7 @@ func (s *Server) startLocked() error {
 }
 
 // Register mints a token for runID, writes the run's MCP config file and returns its path. release
-// deletes the file and forgets the token; call it when the process has exited.
+// deletes that registration's file and token only; call it when the process has exited.
 func (s *Server) Register(runID string) (configPath string, release func(), err error) {
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {
@@ -135,19 +137,21 @@ func (s *Server) Register(runID string) (configPath string, release func(), err 
 		return "", nil, err
 	}
 	url := "http://" + s.ln.Addr().String() + mcpPath
-	s.tokens = append(s.tokens, runToken{runID: runID, hash: hash, salt: salt})
+	s.seq++
+	id := s.seq
+	s.tokens = append(s.tokens, runToken{id: id, runID: runID, hash: hash, salt: salt})
 	s.mu.Unlock()
 
 	cfg, err := json.Marshal(map[string]any{"mcpServers": map[string]any{ServerName: map[string]any{
 		"type": "http", "url": url, "headers": map[string]string{"Authorization": "Bearer " + plain},
 	}}})
-	path := filepath.Join(s.dir, runID+".mcp.json")
+	path := filepath.Join(s.dir, fmt.Sprintf("%s-%d.mcp.json", runID, id))
 	if err == nil {
 		err = os.WriteFile(path, cfg, 0o600)
 	}
 	release = func() {
 		_ = os.Remove(path)
-		s.forget(runID)
+		s.forget(id)
 	}
 	if err != nil {
 		release()
@@ -156,12 +160,12 @@ func (s *Server) Register(runID string) (configPath string, release func(), err 
 	return path, release, nil
 }
 
-func (s *Server) forget(runID string) {
+func (s *Server) forget(id uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	kept := s.tokens[:0]
 	for _, t := range s.tokens {
-		if t.runID != runID {
+		if t.id != id {
 			kept = append(kept, t)
 		}
 	}
