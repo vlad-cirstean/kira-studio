@@ -11,12 +11,14 @@ export const STATUS_OPTIONS: readonly Stage['status'][] = [
 ];
 export const FAILURE_OPTIONS: readonly OnFailure[] = ['stop', 'retry 1', 'retry 2'];
 
-/** `prefix-N` with the lowest N not in `taken`. */
+/** `prefix-<8 hex>`, never in `taken`. Runs are keyed by these ids, so a removed id must not come
+ *  back: the lowest free `prefix-N` would hand a new stage or step the old one's runs. */
 function nextId(prefix: 'stage' | 'step', taken: readonly string[]): string {
   const used = new Set(taken);
-  let n = 1;
-  while (used.has(`${prefix}-${n}`)) n++;
-  return `${prefix}-${n}`;
+  let id: string;
+  do id = `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+  while (used.has(id));
+  return id;
 }
 
 /** A copy of `list` with the item at `index` swapped one place `up` or down; unchanged at the ends. */

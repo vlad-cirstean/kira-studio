@@ -77,9 +77,7 @@ test('the form edits save once, debounced, with ids unchanged', async ({ relaunc
   ]);
 });
 
-test('a new step takes the first free id and Allowed tools becomes allowedTools', async ({
-  relaunch,
-}) => {
+test('a new step gets a fresh id and Allowed tools becomes allowedTools', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
   const stage = page.locator(t('ade-wf-stage')).nth(1);
   await stage.locator(t('ade-wf-add-step')).click();
@@ -87,7 +85,7 @@ test('a new step takes the first free id and Allowed tools becomes allowedTools'
   const added = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
     workflow: { stages: { steps: { id: string }[] }[] };
   };
-  expect(added.workflow.stages[1]?.steps.at(-1)?.id).toBe('step-1');
+  expect(added.workflow.stages[1]?.steps.at(-1)?.id).toMatch(/^step-[0-9a-f]{8}$/);
 
   await stage
     .locator(t('ade-wf-step'))
