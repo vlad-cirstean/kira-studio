@@ -8,6 +8,10 @@ no Part 15 file changed). Worktree `p168-stream-b`.
 
 - `go vet` over the seven packages: clean.
 - `go test -race -count=1` over the seven packages: 7 ok, `gitreview/migrations` no tests.
+- `KIRA_GIT_DIFFERENTIAL=1 go test -run Differential ./apps/kira-space/internal/gitsearch/`: ok
+  (500 patterns x 4 toggles x 200 subjects agree; see F13 for what it misses).
+- Throwaway probe tests (stack budget, review.db collision, regex dialect) were created and
+  deleted before each commit; none is in the tree.
 
 ## Block status
 
@@ -18,6 +22,8 @@ no Part 15 file changed). Worktree `p168-stream-b`.
 - Block 5 `gitreview` logic: done (no findings).
 - Block 6 `gitsearch`: done.
 - Block 7 `gitstore` and mirror: done (no findings).
+- Block 8 `oplog`: done (no findings).
+- Block 9 tests and §7: done.
 
 ## Findings
 
@@ -91,6 +97,9 @@ False today:
   `ParsePrepareTimeout` reads a per-repo setting (P145).
 - "At most one prepare run per repository": ADE's `claimSetup` is per branch and independent of
   `gitsession`'s slot, so N branch setups plus a `worktree.prepare` run concurrently.
+- "nothing in the whole feature spawns a real shell during `go test`" (`doc.go:24-26`) and
+  "nothing in this package's own test suite calls it" (`runner.go:61-62`):
+  `runner_test.go` and `runner_internal_test.go` run `NewOSRunner()` against `/bin/sh`.
 No code depends on these claims, but they are the package's stated security argument. Script text
 comes from user-entered app settings and workflows, not repo files, so no trust-boundary breach.
 
@@ -306,13 +315,6 @@ any, else the protocol error.
   run against a downgraded app", which is clear, not opaque. Only a stale comment
   (`migrate.go:17-18` says `startupfail` classifies it; a lazy open never reaches startup). No
   failure. Dropped.
-- 20 (`ProjectRanges` zero-length or deletion-only hunks): every caller's diff uses
-  `--unified=3` (`porcelain/diff.go:17,35`, `review.go:40`), so a hunk with `OldLines == 0` only
-  occurs for an empty old side (`@@ -0,0 +1,N @@`), which has no stored ranges to project.
-  Insertions inside a file always carry context, so `mapWithinHunk` maps them through context
-  lines; deleted lines drop (comment becomes `removed`); ranges past EOF are clamped. A `-U0`
-  caller would break the pure-insertion arm (old line `OldStart` would get the hunk's offset);
-  none exists. Dropped.
 - 7 (`Scan` protocol-error paths skip `Wait`, mask stderr): `Close` kills and reaps
   (`gitclient/runner.go` `killAndWait`), so no zombie; masking is real. Reported F15.
 - 8 (budget only between chunks): reported F14. The reader goroutine does not leak: `Close`
@@ -344,6 +346,18 @@ any, else the protocol error.
   fields are C strings too, so no crafted record can put non-hex bytes in field 0 while keeping
   valid timestamps. A repository has one object format for all `log` output. Unreachable.
   Dropped.
+- 16 (`oplog` out-of-order emits, evicted running op, `Cancel` under lock, secrets in argv):
+  every emit for one op comes from that op's own goroutine (`Start`, `noteWrite`, `SetCancel`/
+  `ClearCancel`, `Finish` in `gitsession/{oplog,ops,remote,stack}.go`), and `notify.Emitter.Emit`
+  is synchronous, so per-op order holds; the TS store's blind replace-by-id
+  (`createOpLogStore.ts:46-54`) therefore never sees a stale `running` after `ok`, including
+  during hydration buffering. An evicted running op's later `Finish` is unshifted as a new row by
+  `applyUpdate` and its `cancels` entry is removed by `Finish`: harmless. `Cancel` funcs are
+  `CancelRemote`/`CancelRestack` (`opSlot.tryCancel`, a context cancel under the slot mutex),
+  which never re-enter the log. Rendered argv carries remote names, never URLs (no
+  `remote add`/`set-url`/`clone` path writes through `noteWrite`); messages are the user's own
+  text; `quoteArg` single-quotes control bytes and newlines; the 16 KiB cut backs up to a rune
+  start. Dropped.
 - 17 (`checkedOutElsewhere` first only): the loop breaks after the first blocked branch; the
   verdict is still `blocked`, and a re-run reports the next one. UX only, no wrong outcome.
   Dropped.
@@ -353,6 +367,13 @@ any, else the protocol error.
 - 19 (multi-sha revert verdict): by contract, prediction covers `Shas[0]` only and
   `PredictedFor` names it on the wire (`gitpreflight/revert.go`), so the client can say so;
   git's own sequencer stops at the conflicting sha and `isSequence` drives Abort. Dropped.
+- 20 (`ProjectRanges` zero-length or deletion-only hunks): every caller's diff uses
+  `--unified=3` (`porcelain/diff.go:17,35`, `review.go:40`), so a hunk with `OldLines == 0` only
+  occurs for an empty old side (`@@ -0,0 +1,N @@`), which has no stored ranges to project.
+  Insertions inside a file always carry context, so `mapWithinHunk` maps them through context
+  lines; deleted lines drop (comment becomes `removed`); ranges past EOF are clamped. A `-U0`
+  caller would break the pure-insertion arm (old line `OldStart` would get the hunk's offset);
+  none exists. Dropped.
 
 ## Coverage
 
@@ -455,3 +476,43 @@ the client already holds; `Clear` resets the interner with the store; `clampTime
 negatives to 0; `estimateChunkSize` is only the builder's initial capacity (flatbuffers grows), so
 an underestimate costs a copy, not correctness. No eviction is by design (a walk is bounded by
 what the client pages in). Nothing real in this block.
+
+### Block 8 `oplog`
+
+Reviewed: `log.go`. Callers: `gitsession/oplog.go` (`startOp`, `withOp`, `opFrom`, `noteWrite`,
+`finishOp`), `gitsession/opslot.go` (`tryCancel`), `remote.go:302,386,518,560`,
+`stack.go:633,690-693`, `ops.go:1121`, `bridge/{events,ops}.go`; `internal/notify` `Emitter`;
+TS `packages/workbench/src/state/createOpLogStore.ts` (`applyUpdate`, hydration buffer). Checked
+and clean: ring insert/evict with `clear` of the tail, `Recent` copies, `Finish` idempotent and
+clears the cancel entry, `SetCancel` refused once finished, nil `*Log`/`*Op` safe. Nothing real
+in this block (lead 16 above).
+
+### Block 9 tests and §7
+
+§7 checks against the current tree:
+- `WalkArgs` ends with `--`; `gitsession/search.go:62` passes `LogScanArgs(spec)` unchanged;
+  `scan_test.go` drives Scan with the real `LogScanArgs` against real git. Holds.
+- `ParseRefRows` NUL framing: `gitreview/resolve.go` and `gitpreflight/stack.go` consume parsed
+  `RefRow`s only (shape unchanged); their tests build `RefRow`/`StackRefInfo` values directly, so
+  no framing assumption to break. Holds.
+- `ParseShowBodyAndSignature`/`ParseInventory`, `catfile` changes, `ResolveHead`: no Part 15
+  package calls them (`git grep` of imports); `gitpreflight/status.go` names `ResolveHead` in a
+  comment only. Nothing to follow.
+- Colour: `-c color.ui=false`/`color.diff=false`/`log.showSignature=false` on every spawn; no
+  `gitops` parser (progress, porcelain, error table) reads coloured output. Holds.
+- `logsession.finishEOFLocked` ordering: `gitsearch.Scan` does the opposite; reported F15.
+Tests: guards cited in findings read (`gitpreflight/stack_test.go` has no >64-chain case, F9;
+`differential_test.go` atoms miss `\x`, F13). No Part 15 test reaches `gitreview.DefaultPath()`
+(`gitreview/main_test.go` uses `testx.RunWithTempHomes`); `gitops`/`gitpreflight`/`gitstore`/
+`oplog` tests are pure; `gitprepare` tests spawn `/bin/sh` with an explicit minimal `Env` and a
+temp `Dir` (F4 notes the stale doc claim); `gitsearch` tests spawn git with the real `HOME`,
+read-only (block 6). `status.go`/`undo.go`/`store.go`/`intern.go`/`sha.go` have no tests; each is
+a fold or a container below `CLAUDE.md`'s unit-test bar, so no missing guard is reported.
+
+## Summary
+
+15 findings: 0 high, 4 medium (F1, F5, F7, F8), 11 low (F2, F3, F4, F6, F9, F10, F11, F12, F13,
+F14, F15). `needs-other-part-file`: F5 and F8 (`gitsession/ops.go`, Part 16), F13
+(`packages/git-core/testdata/searchConformance.json`, Part 18). No coverage gaps: every file of
+the 98-file set was reviewed (tests read where they are the sole guard of a claim); no block
+skimmed or unreached.
