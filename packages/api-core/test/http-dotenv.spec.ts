@@ -96,9 +96,26 @@ describe('parseEnv', () => {
     expect(entries).toEqual([{ name: 'GOOD', value: '1', hasValue: true, description: '' }]);
   });
 
-  test('an unterminated double-quoted value is a parse error naming its line', () => {
-    const { error } = parseEnv('KEY="unterminated');
-    expect(error).toEqual({ line: 1, message: 'line 1: unterminated double-quoted value' });
+  test('an unmatched or junk-trailed quote is an unquoted value, never a parse error', () => {
+    const { entries, error } = parseEnv('A=\'abc\nB="unterminated\nC=\'a\'b\nD="x"y');
+    expect(error).toBeNull();
+    expect(entries.map((e) => e.value)).toEqual(["'abc", '"unterminated', "'a'b", '"x"y']);
+  });
+
+  test('an unquoted value ends at # preceded by whitespace, a bare # inside it stays', () => {
+    const { entries } = parseEnv('A=abc # note\nB=abc#def\nC=#abc\nD=url.com/p#frag # c');
+    expect(entries.map((e) => e.value)).toEqual(['abc', 'abc#def', '#abc', 'url.com/p#frag']);
+  });
+
+  test('a comment may follow a closed quote; # inside the quotes stays', () => {
+    const { entries, error } = parseEnv('A="a b" # note\nB=\'x # y\'   # n\nC="p#q"');
+    expect(error).toBeNull();
+    expect(entries.map((e) => e.value)).toEqual(['a b', 'x # y', 'p#q']);
+  });
+
+  test('an empty value after comment removal is hasValue: false, an empty quoted one is not', () => {
+    const { entries } = parseEnv('A= # x\nB=\nC=""\nD=\'\'');
+    expect(entries.map((e) => e.hasValue)).toEqual([false, false, true, true]);
   });
 
   test('a missing key before = is a parse error', () => {
@@ -173,6 +190,8 @@ describe('serializeEnv -> parseEnv round trip', () => {
       row({ id: '5', name: 'QUOTE', value: 'a "b" c' }),
       row({ id: '7', name: 'WRAPPED', value: "'%Y-%m-%d'" }),
       row({ id: '8', name: 'OPEN', value: "'abc" }),
+      row({ id: '9', name: 'SPACED', value: 'a # b' }),
+      row({ id: '10', name: 'DQ', value: '"x' }),
       row({ id: '6', name: 'PLAIN', value: 'plain-value', description: 'a description' }),
     ];
     const text = serializeEnv(rows);

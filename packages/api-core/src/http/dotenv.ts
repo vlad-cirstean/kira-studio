@@ -120,44 +120,42 @@ export function serializeEnv(rows: readonly EnvRow[]): string {
   return blocks.length === 0 ? '' : `${blocks.join('\n\n')}\n`;
 }
 
-function decodeDoubleQuoted(raw: string): string | null {
-  if (raw.length < 2 || !raw.endsWith('"')) return null;
-  const inner = raw.slice(1, -1);
+/** Scans a double-quoted value starting at `raw[0]`: the decoded text and the index just past the
+ *  closing quote, or null when no unescaped closing quote exists. */
+function scanDoubleQuoted(raw: string): { value: string; end: number } | null {
   let out = '';
-  for (let i = 0; i < inner.length; i++) {
-    const c = inner[i];
-    if (c === '\\') {
-      const next = inner[i + 1];
-      if (next === undefined) return null; // a trailing backslash means the real close is missing
-      switch (next) {
-        case 'n':
-          out += '\n';
-          break;
-        case 't':
-          out += '\t';
-          break;
-        case '\\':
-          out += '\\';
-          break;
-        case '"':
-          out += '"';
-          break;
-        default:
-          out += next; // lenient: an unrecognised escape keeps its literal character
-      }
-      i++;
-    } else if (c === '"') {
-      return null; // an unescaped quote before the end this function was told was the close
-    } else {
+  for (let i = 1; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === '"') return { value: out, end: i + 1 };
+    if (c !== '\\') {
       out += c;
+      continue;
     }
+    const next = raw[i + 1];
+    if (next === undefined) return null;
+    // Lenient: an unrecognised escape keeps its literal character.
+    out += next === 'n' ? '\n' : next === 't' ? '\t' : next;
+    i++;
   }
-  return out;
+  return null;
 }
 
-function decodeSingleQuoted(raw: string): string | null {
-  if (raw.length < 2 || !raw.endsWith("'")) return null;
-  return raw.slice(1, -1);
+/** A quoted value only counts when the closing quote ends the line, or is followed by whitespace
+ *  and an optional `# comment`; anything else (no close, trailing junk) is an unquoted value. */
+function scanQuoted(raw: string): string | null {
+  const quote = raw[0];
+  let scanned: { value: string; end: number } | null;
+  if (quote === '"') {
+    scanned = scanDoubleQuoted(raw);
+  } else if (quote === "'") {
+    const close = raw.indexOf("'", 1);
+    scanned = close === -1 ? null : { value: raw.slice(1, close), end: close + 1 };
+  } else {
+    return null;
+  }
+  if (!scanned) return null;
+  const after = raw.slice(scanned.end);
+  return after.trim() === '' || /^\s+#/.test(after) ? scanned.value : null;
 }
 
 /**
@@ -167,6 +165,11 @@ function decodeSingleQuoted(raw: string): string | null {
  * prefixed pair (the prefix is stripped), an unquoted/double-quoted/single-quoted value, and a
  * bare `KEY=` (`hasValue: false`). Anything else is a parse error carrying its 1-based line
  * number — line-oriented and single-pass, so a caller can stop at the first bad line.
+ *
+ * Value rules follow common dotenv implementations (P175 D3): an unquoted value ends at a `#`
+ * preceded by whitespace (`a#b` keeps its `#`) and is trimmed; a quoted value needs a closing quote
+ * on the same line followed by nothing or a `# comment`, else the whole text is an unquoted value
+ * (`'abc` stays `'abc`, never an error). Single quotes are literal; double quotes decode escapes.
  */
 export function parseEnv(text: string): EnvParseResult {
   const lines = text.split('\n');
@@ -208,33 +211,14 @@ export function parseEnv(text: string): EnvParseResult {
     const description = pendingDescription.join('\n');
     pendingDescription = [];
 
-    if (rawValue === '') {
-      entries.push({ name: key, value: '', hasValue: false, description });
+    const quoted = scanQuoted(rawValue.trimStart());
+    if (quoted !== null) {
+      entries.push({ name: key, value: quoted, hasValue: true, description });
       continue;
     }
-    if (rawValue.startsWith('"')) {
-      const decoded = decodeDoubleQuoted(rawValue);
-      if (decoded === null) {
-        return {
-          entries,
-          error: { line: lineNo, message: `line ${lineNo}: unterminated double-quoted value` },
-        };
-      }
-      entries.push({ name: key, value: decoded, hasValue: true, description });
-      continue;
-    }
-    if (rawValue.startsWith("'")) {
-      const decoded = decodeSingleQuoted(rawValue);
-      if (decoded === null) {
-        return {
-          entries,
-          error: { line: lineNo, message: `line ${lineNo}: unterminated single-quoted value` },
-        };
-      }
-      entries.push({ name: key, value: decoded, hasValue: true, description });
-      continue;
-    }
-    entries.push({ name: key, value: rawValue.trim(), hasValue: true, description });
+    const commentAt = rawValue.search(/\s#/);
+    const value = (commentAt === -1 ? rawValue : rawValue.slice(0, commentAt)).trim();
+    entries.push({ name: key, value, hasValue: value !== '', description });
   }
 
   return { entries, error: null };
