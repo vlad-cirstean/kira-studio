@@ -47,9 +47,7 @@ const props = defineProps<{
   writeCapability: boolean;
 }>();
 
-const emit = defineEmits<{
-  (e: 'close'): void;
-}>();
+const emit = defineEmits<(e: 'close') => void>();
 
 type SelectOption = { readonly value: string; readonly label: string };
 

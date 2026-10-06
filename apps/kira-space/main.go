@@ -318,17 +318,7 @@ func main() {
 	// the ⇧⌘N menu command below ties to.
 	windowsSvc.OpenNewWindow = openNew
 	shell.AttachReopen(app, func() { shell.ReopenWindows(winDeps) })
-	// P178 D4: a prompt raised away from any window. The user started that git op elsewhere and
-	// waits on it, so open a window when none exists, else bring one forward.
-	credentialRelay.SetOnAdded(func() {
-		if windows.Count() == 0 {
-			shell.ReopenWindows(winDeps)
-			return
-		}
-		if keys := windows.Keys(); len(keys) > 0 {
-			windows.Focus(keys[0])
-		}
-	})
+	surfaceCredentialPrompts(credentialRelay, windows, winDeps)
 	// P116 G5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
 	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(keepAwakeSvc) })
 
@@ -462,6 +452,20 @@ func wireReviewWindows(svc *bridge.AdeTaskService, winDeps shell.WindowOpenerDep
 // wireAdeTask builds the v2 task board engine (P144): its own Conn, the
 // workflow reader over <home>/workflows, and the cached git discovery gating merge-tree checks.
 // It recovers rows a restart left running, then starts the board.
+// surfaceCredentialPrompts handles a prompt raised away from any window (P178 D4): the user started
+// that git op elsewhere and waits on it, so open a window when none exists, else bring one forward.
+func surfaceCredentialPrompts(relay *gitcred.Relay, windows *shell.WindowRegistry, winDeps shell.WindowOpenerDeps) {
+	relay.SetOnAdded(func() {
+		if windows.Count() == 0 {
+			shell.ReopenWindows(winDeps)
+			return
+		}
+		if keys := windows.Keys(); len(keys) > 0 {
+			windows.Focus(keys[0])
+		}
+	})
+}
+
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay,

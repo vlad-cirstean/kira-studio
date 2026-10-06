@@ -212,11 +212,11 @@ func (b *TaskBoard) Close() {
 }
 
 func (b *TaskBoard) handleEmit(method string, payload any) {
-	switch method {
-	case "repo.changed":
-		if _, ok := payload.(gitsession.Event); ok {
-			b.scheduleBoard()
-		}
+	if method != "repo.changed" {
+		return
+	}
+	if _, ok := payload.(gitsession.Event); ok {
+		b.scheduleBoard()
 	}
 }
 

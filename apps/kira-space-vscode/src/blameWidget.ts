@@ -49,7 +49,7 @@ export function createBlameWidgetController(deps: BlameWidgetDeps): BlameWidgetC
   // repoId resolution memo: keyed by the workspace folder's own nfcPath-composed fsPath — nothing
   // in the extension host already holds "the repoId for the active editor's workspace folder"
   // (plan §5), so this controller resolves it itself via repo.open, idempotent per (connection,
-  // repoId), the same way migrateLegacySettings/openRepository (extension.ts) already do.
+  // repoId), the same way openRepository (extension.ts) does.
   // Only definitive answers are stored (`ok`, `notARepository`) — never a rejection. `root` is
   // what `blame.line`'s path is relative to (the repo root, which can sit above the folder).
   interface ResolvedRepo {
