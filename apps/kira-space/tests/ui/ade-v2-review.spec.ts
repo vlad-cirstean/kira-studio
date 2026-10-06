@@ -115,6 +115,22 @@ reviewTest('Send is disabled while the agent waits on input', async ({ relaunch 
   await expect(send).toBeDisabled();
 });
 
+reviewTest('a watched turn ends when the agent terminal disappears', async ({ relaunch }) => {
+  const terminalId = agent.session.terminalId;
+  const page = await openReview(relaunch, [
+    { channel: IPC.adeTaskReviewAgent, response: agent },
+    { channel: IPC.adeTaskSend },
+  ]);
+  await emitAgentSessions(page, [terminalId]);
+  await page.locator(t('ade-review-question')).fill('why this change?');
+  await page.locator(t('ade-review-send')).click();
+  await emitAgentEvent(page, terminalId, 'UserPromptSubmit');
+  await expect(page.locator(t('ade-review-status'))).toBeVisible();
+  await emitAgentSessions(page, [terminalId]);
+  await emitAgentSessions(page, []);
+  await expect(page.locator(t('ade-review-status'))).toHaveCount(0);
+});
+
 reviewTest(
   'the sync button lists what it will do and why it skips the rest',
   async ({ relaunch }) => {

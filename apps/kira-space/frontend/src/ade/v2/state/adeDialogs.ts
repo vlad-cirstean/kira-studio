@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
-import { reactive, ref, watch } from 'vue';
+import { reactive, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
-import { useAgentSessionsStore } from '../../state/agentSessions';
 import type { BranchAction } from '../board/actions';
 import {
   type DialogSpec,
@@ -34,7 +33,6 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
   const ctx = useDialogCtx();
   const terminals = useTerminalsStore();
   const adeTerminals = useAdeTerminalsStore();
-  const agent = useAgentSessionsStore();
 
   const spec = ref<DialogSpec | null>(null);
   /** `null` = the unedited template. */
@@ -44,14 +42,6 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
   const error = ref('');
   /** In-flight work: `rebase:<branch>`, `merge:<branch>:<target>`, `archive:<task>`. */
   const pending = reactive(new Set<string>());
-
-  // A launch not yet listed among live terminals is not `ended`: only a terminal seen live and then
-  // gone resolves a watch as ended.
-  watch(
-    () => agent.sessions.map((s) => s.terminalId),
-    (ids) => adeTurns.onLive(ids),
-    { immediate: true },
-  );
 
   const sendM = useSend();
   const startM = useStartBranch();

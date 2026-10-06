@@ -60,7 +60,7 @@ async function mountShell(): Promise<void> {
   // (`kira:adetask:*` channels/agent `Stop`) is missed between mount
   // and this window's first `useAdeSnapshot`/`useAdeSessions` call. No teardown — the window is the
   // lifetime (queries.ts's own doc comment).
-  installAdeSignals(queryClient);
+  installAdeSignals(queryClient, agentSessionsStore);
 
   // Kira Studio's own initAppMetrics precedent: just subscribes, no data dependency — runs
   // synchronously before the Promise.all below rather than joining it.

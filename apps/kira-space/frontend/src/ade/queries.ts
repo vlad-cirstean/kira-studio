@@ -1,7 +1,9 @@
 import type { QueryClient } from '@tanstack/vue-query';
+import { watch } from 'vue';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
+import type { useAgentSessionsStore } from './state/agentSessions';
 import { adeTurns } from './v2/dialog/turnWatch';
 import {
   backlogKey,
@@ -47,7 +49,17 @@ function appendChunks(page: LogPage, chunks: LogPage['chunks']): LogPage {
  *  shared code repo list; a workflows push re-reads the list and any open YAML; a runs push merges
  *  into the cached board; a log push appends to the cached log; a credential prompt joins the
  *  shared queue and is answered through the v2 broker. */
-export function installAdeSignals(queryClient: QueryClient): void {
+export function installAdeSignals(
+  queryClient: QueryClient,
+  agent: Pick<ReturnType<typeof useAgentSessionsStore>, 'sessions'>,
+): void {
+  // A launch not yet listed among live terminals is not `ended`; once per window, so a watch in
+  // the review window resolves when its terminal dies too.
+  watch(
+    () => agent.sessions.map((s) => s.terminalId),
+    (ids) => adeTurns.onLive(ids),
+    { immediate: true },
+  );
   control.onAdeTaskBoard(() => {
     void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
     void queryClient.invalidateQueries({ queryKey: prsKey, exact: true });
