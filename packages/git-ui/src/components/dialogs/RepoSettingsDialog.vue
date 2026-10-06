@@ -47,7 +47,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
-import { computed, reactive, useId, watch } from 'vue';
+import { computed, reactive, ref, useId, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
 import type { DateFormat } from '../../state/viewState.ts';
 
@@ -96,12 +96,18 @@ type RepoSettingsDraft = { -readonly [K in keyof RepoSettingsSnapshot]: RepoSett
  *  another window's own write) — the live snapshot keeps updating underneath; this draft only
  *  catches up with it at open time, not on every tick. */
 const draft = reactive<RepoSettingsDraft>({ ...props.repoSettingsState.settings.value });
+// The snapshot the draft was copied from: `save()` diffs against it, so a field the user did not
+// edit is never written back over a newer value another surface set meanwhile.
+let draftBase: RepoSettingsSnapshot = props.repoSettingsState.settings.value;
+const saveError = ref<string | undefined>(undefined);
 
 watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) return;
-    Object.assign(draft, props.repoSettingsState.settings.value);
+    draftBase = props.repoSettingsState.settings.value;
+    Object.assign(draft, draftBase);
+    saveError.value = undefined;
   },
 );
 
@@ -148,8 +154,15 @@ function onLogLevelChange(value: string): void {
 }
 
 function onPageSizeChange(value: string | number): void {
-  draft['kiraSpace.graph.pageSize'] = Number(value);
+  // An emptied field is NaN, not 0: it fails `pageSizeValid` rather than saving a bogus value.
+  draft['kiraSpace.graph.pageSize'] = value === '' ? Number.NaN : Number(value);
 }
+
+const pageSizeValid = computed(() => {
+  const size = draft['kiraSpace.graph.pageSize'];
+  const { minimum, maximum } = SETTINGS['kiraSpace.graph.pageSize'];
+  return Number.isInteger(size) && size >= minimum && size <= maximum;
+});
 
 const dateFormatId = useId();
 const pageSizeId = useId();
@@ -163,7 +176,8 @@ function close(): void {
 }
 
 async function save(): Promise<void> {
-  const current = props.repoSettingsState.settings.value;
+  if (!pageSizeValid.value) return;
+  const current = draftBase;
   const patch: { -readonly [K in keyof RepoSettingsPatch]: RepoSettingsPatch[K] } = {};
   if (draft['kiraSpace.graph.pageSize'] !== current['kiraSpace.graph.pageSize']) {
     patch['kiraSpace.graph.pageSize'] = draft['kiraSpace.graph.pageSize'];
@@ -198,7 +212,12 @@ async function save(): Promise<void> {
     patch['kiraSpace.github.enabled'] = draft['kiraSpace.github.enabled'];
   }
   if (Object.keys(patch).length > 0) {
-    await props.repoSettingsState.set(patch);
+    try {
+      await props.repoSettingsState.set(patch);
+    } catch (err) {
+      saveError.value = err instanceof Error ? err.message : String(err);
+      return;
+    }
   }
   close();
 }
@@ -250,8 +269,13 @@ async function save(): Promise<void> {
               class="w-24"
               :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
               :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
+              :aria-invalid="!pageSizeValid"
               @update:model-value="onPageSizeChange"
             />
+            <span v-if="!pageSizeValid" class="kv:text-error kv:text-sm" role="alert">
+              Enter a whole number from {{ SETTINGS['kiraSpace.graph.pageSize'].minimum }} to
+              {{ SETTINGS['kiraSpace.graph.pageSize'].maximum }}.
+            </span>
           </label>
           <label :for="graphScopeId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
             Scope
@@ -354,8 +378,14 @@ async function save(): Promise<void> {
         </section>
       </div>
 
+      <p v-if="saveError" class="kv:m-0 kv:mt-1 kv:text-error" role="alert">
+        Couldn't save settings — {{ saveError }}
+      </p>
+
       <DialogFooter class="justify-end gap-1">
-        <Button variant="dialog-primary" size="kira-lg" @click="save">Save</Button>
+        <Button variant="dialog-primary" size="kira-lg" :disabled="!pageSizeValid" @click="save">
+          Save
+        </Button>
         <Button variant="dialog" size="kira-lg" @click="close">Cancel</Button>
       </DialogFooter>
     </DialogContent>
