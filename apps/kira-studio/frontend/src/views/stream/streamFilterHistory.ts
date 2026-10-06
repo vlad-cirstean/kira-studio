@@ -69,8 +69,15 @@ export const useStreamFilterHistoryStore = defineStore('streamFilterHistory', ()
     const existing = store.get(key) ?? [];
     // Re-applying the same filter moves it to the top rather than duplicating it (same rule as the
     // SQL grid's recordFilterUse).
+    const prior = existing.find((e) => sameFilter(filter, e));
     const deduped = existing.filter((e) => !sameFilter(filter, e));
-    deduped.unshift({ id: crypto.randomUUID(), ...filter, pinned: false, usedAt: Date.now() });
+    // Keeps the pin: re-applying a pinned filter must not let it age out of the cap.
+    deduped.unshift({
+      id: crypto.randomUUID(),
+      ...filter,
+      pinned: prior?.pinned ?? false,
+      usedAt: Date.now(),
+    });
 
     const pinned = deduped.filter((e) => e.pinned);
     const rest = deduped

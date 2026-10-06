@@ -13,6 +13,9 @@ import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { MenuItem } from '@workbench/state/contextMenu';
+import { createPinia, setActivePinia } from 'pinia';
+
+setActivePinia(createPinia());
 
 const { rowMenu } = await import('../../frontend/src/views/documents/menu');
 const { rowAsJsonMenu } = await import('../../frontend/src/views/console/resultMenu');

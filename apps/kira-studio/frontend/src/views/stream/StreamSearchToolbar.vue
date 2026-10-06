@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
-import { unrefElement, useEventListener } from '@vueuse/core';
+import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
@@ -42,10 +42,22 @@ const entry = computed(() => streamSearchStore.searchState[props.tabId]);
 // wrapping <span>.
 const searchInput = ref<{ $el: HTMLInputElement } | null>(null);
 
-watch(query, (q) => {
+// Debounced like views/shared/page/SearchToolbar.vue: the scan decodes every cell of the page
+// synchronously, so one per keystroke would stall typing on a large page. Clearing is immediate.
+const SEARCH_DEBOUNCE_MS = 150;
+function searchNow(q: string): void {
   streamSearchStore.runSearch(props.tabId, q);
   const e = streamSearchStore.searchState[props.tabId];
   if (e && e.matches.length > 0) emit('goToMatch', e.matches[0]);
+}
+const searchDebounced = useDebounceFn(searchNow, SEARCH_DEBOUNCE_MS);
+watch(query, (q) => {
+  if (q === '') {
+    searchDebounced.cancel();
+    searchNow(q);
+  } else {
+    void searchDebounced(q);
+  }
 });
 
 // P31 D22/D23/F23: a Fetch more/poll/page change calls setPage and bumps pageVersion.n —
@@ -68,6 +80,7 @@ function prev(): void {
 }
 
 function close(): void {
+  searchDebounced.cancel();
   streamSearchStore.clearSearchState(props.tabId);
   // P24 D7/P31 D18: a closed toolbar must never leave rows hidden with no visible cause.
   pageSearchFilterStore.setSearchFiltering(props.tabId, false);
@@ -96,6 +109,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  searchDebounced.cancel();
   streamSearchStore.clearSearchState(props.tabId);
   // P31 D18: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
   // above — the toggle must reset here too (mirrors views/shared/page/SearchToolbar.vue's own note).
