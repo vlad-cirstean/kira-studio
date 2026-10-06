@@ -2051,7 +2051,8 @@ onMounted(() => {
       // F1 — enables ctrl/shift disjoint *row* selection in SlickHybridSelectionModel's own row
       // branch (handleClick, :539-556) — the grid's own default, stated explicitly.
       multiSelect: true,
-      // §5 item 5 — the sticky row-number gutter, as a real frozen pane rather than one
+      // §5 item 5 — the sticky row-number gutter: SlickGrid's frozen column, whose canvas
+      // KiraSlickGrid re-homes into the scroll viewport as one sticky column (P182) rather than one
       // position:sticky box per mounted row (the per-frame cost P22-…-iter2-rendering.md F12 flagged).
       frozenColumn: 0,
       // F3 addendum (real-Mac finding) — SlickGrid's own wheel handler quantizes every
@@ -2165,7 +2166,7 @@ onMounted(() => {
   // specific hand-ordered position relative to resizeObserver/eventHandler/grid.destroy(). Declined,
   // named per CLAUDE.md's library rule — same reasoning as resizeObserver above.
   if (viewportEl) {
-    scrollTrace.registerGrid(viewportEl, '.slick-row');
+    scrollTrace.registerGrid(viewportEl, '.grid-canvas-right .slick-row');
     viewportEl.addEventListener('scroll', onViewportScroll, { passive: true });
     viewportEl.addEventListener('scroll', onViewportScrollPersist, { passive: true });
   }

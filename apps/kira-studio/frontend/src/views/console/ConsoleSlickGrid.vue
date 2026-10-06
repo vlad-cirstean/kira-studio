@@ -723,8 +723,9 @@ onMounted(() => {
     enableHtmlRendering: false,
     // F1 — this app measures column widths itself (columns.ts's own canvas-based initialWidths).
     autosizeColsMode: 'LegacyOff',
-    // §5 item 5 (SlickGridHost.vue) — the sticky row-number gutter as a real frozen pane, which is
-    // F4's own fix for the incumbent VirtualList's row-number-scrolls-away defect.
+    // §5 item 5 (SlickGridHost.vue) — the sticky row-number gutter: a frozen column whose canvas
+    // KiraSlickGrid re-homes into the scroll viewport as one sticky column (P182), F4's own fix for
+    // the incumbent VirtualList's row-number-scrolls-away defect.
     frozenColumn: 0,
     // F3 addendum — the viewport's native `overflow:auto` plus its native `scroll` listener are
     // sufficient on their own; SlickGrid's own wheel handler would discard native momentum.

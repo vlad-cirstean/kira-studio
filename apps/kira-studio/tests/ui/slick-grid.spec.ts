@@ -1302,6 +1302,111 @@ test('P22b D17 — a staged insert row scrolls into view, and a discard does not
   await expect(viewport.evaluate((el) => el.scrollTop)).resolves.toBe(0);
 });
 
+// P182 stage 2 — the gutter canvas is one sticky column in the same scroller as the rows.
+test('P182 — the gutter moves with the rows in the same task as a scrollTop write and stays pinned when scrolled right', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+  await expect(gutterCell(page, 0)).toBeVisible();
+
+  const lockstep = await viewport.evaluate((el) => {
+    el.scrollTop = 500;
+    // Same task: no scroll event has run, so only one native scroller keeps these equal.
+    const rows = [...el.querySelectorAll<HTMLElement>('.grid-canvas-right .slick-row')];
+    const row = rows.find((r) => r.getBoundingClientRect().top > 0) ?? rows[0];
+    const n = row?.dataset.row;
+    const gutter = el.querySelector(`.grid-canvas-left .slick-row[data-row="${n}"] .slick-cell`);
+    return {
+      gutterTop: gutter?.getBoundingClientRect().top ?? Number.NaN,
+      rowTop: row?.getBoundingClientRect().top ?? Number.NaN,
+    };
+  });
+  expect(Math.abs(lockstep.gutterTop - lockstep.rowTop)).toBeLessThanOrEqual(1);
+
+  await viewport.evaluate((el) => {
+    el.scrollTop = 0;
+    el.scrollLeft = 300;
+  });
+  await page.waitForTimeout(100);
+  const pinned = await viewport.evaluate((el) => {
+    const gutter = el.querySelector('[data-testid="grid-gutter-cell"]');
+    if (!gutter) throw new Error('no gutter cell');
+    const box = gutter.getBoundingClientRect();
+    const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return {
+      gutterLeft: box.left,
+      viewportLeft: Element.prototype.getBoundingClientRect.call(el).left,
+      hit: top === gutter || gutter.contains(top),
+    };
+  });
+  expect(Math.abs(pinned.gutterLeft - pinned.viewportLeft)).toBeLessThanOrEqual(1);
+  expect(pinned.hit).toBe(true);
+});
+
+test('P182 — keyboard navigation past the right edge keeps the active cell clear of the pinned gutter and the edge', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+  await gridCell(page, 0, 'id').click();
+  for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowRight');
+  await expect.poll(() => viewport.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  const fit = await viewport.evaluate((el) => {
+    const active = el.querySelector('.grid-canvas-right .slick-cell.active');
+    if (!active) throw new Error('no active cell');
+    const a = active.getBoundingClientRect();
+    const v = Element.prototype.getBoundingClientRect.call(el);
+    const gutter = el.querySelector('.grid-canvas-left')?.getBoundingClientRect();
+    return {
+      rightGap: v.right - (v.width - el.clientWidth) - a.right,
+      leftGap: a.left - (gutter?.right ?? v.left),
+    };
+  });
+  expect(fit.rightGap).toBeGreaterThanOrEqual(-1);
+  expect(fit.leftGap).toBeGreaterThanOrEqual(-1);
+});
+
+test('P182 — a gutter click or right-click while scrolled right selects the row without scrolling back', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+  await expect(gutterCell(page, 3)).toBeVisible();
+  await viewport.evaluate((el) => {
+    el.scrollLeft = 300;
+  });
+  await page.waitForTimeout(100);
+  await expect(page.locator('[data-testid="grid-header-cell"][data-column="col5"]')).toBeVisible();
+
+  await gutterCell(page, 3).click();
+  await expect(gridCell(page, 3, 'col5')).toHaveClass(/kira-cell-selected/, { timeout: 5_000 });
+  await expect(viewport.evaluate((el) => el.scrollLeft)).resolves.toBe(300);
+
+  await gutterCell(page, 5).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await expect(viewport.evaluate((el) => el.scrollLeft)).resolves.toBe(300);
+});
+
+test('P182 — the wheel over the gutter scrolls the grid', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+  const box = await gutterCell(page, 2).boundingBox();
+  if (!box) throw new Error('gutter cell has no bounding box');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 300);
+  await expect.poll(() => viewport.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+});
+function gutterCell(page: import('@playwright/test').Page, row: number) {
+  return page.locator(
+    `[data-testid="data-grid"] .slick-row[data-row="${row}"] [data-testid="grid-gutter-cell"]`,
+  );
+}
+
 // P22 Pass B, C11/§9.2 T9 — the single host-owned nav button's own DOM invariant: exactly one
 // `[data-testid="cell-nav-button"]` in the whole document at any time (never one-per-cell the way
 // the incumbent's own pure-CSS-hover button was), it sits within the left 24px of whichever cell

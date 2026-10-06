@@ -45,8 +45,9 @@
    `.slick-viewport` only (not `html`/`body`, already `overflow: hidden` in base.css; not
    CodeMirror, the trees, or any panel — the earlier instruction was global). If real hardware
    still shows the asymmetry and the bounce is missed, the revert is one word: `none` -> `contain`.
-   Applied to every real SlickGrid viewport (both frozen-pane panes; `hasFrozenRows` is false here
-   so only the two `-top-` ones exist, but the selector covers all four for free). */
+   Applied to every real SlickGrid viewport (`hasFrozenRows` is false here so only the two `-top-`
+   ones exist, but the selector covers all four for free). P182: the gutter canvas now sits in the
+   data viewport, so the left viewport is empty and hidden and only one scroller is user-visible. */
 .slick-grid-host .slick-viewport {
   overscroll-behavior: none;
 }
@@ -240,6 +241,41 @@
    on every row mount (bisect R2.3: ~30 ms per mutating frame). */
 .slick-grid-host .grid-canvas {
   contain: layout paint;
+}
+
+/* P182 stage 2 — KiraSlickGrid.setPaneFrozenClasses moves the gutter canvas into the scroll
+   viewport beside the data canvas, as one sticky column; the left pane is left empty and hidden. */
+.kira-sticky-gutter .kira-scroll-body {
+  display: flex;
+  align-items: flex-start;
+  width: max-content;
+  min-width: 100%;
+}
+.kira-sticky-gutter .kira-scroll-body > .grid-canvas {
+  flex: none;
+}
+.slick-grid-host .kira-sticky-gutter .grid-canvas-left {
+  position: sticky;
+  left: 0;
+  z-index: 1; /* above the right canvas it overlaps when scrolled right */
+}
+.slick-grid-host .kira-sticky-gutter .slick-pane-top.slick-pane-left {
+  /* biome-ignore lint/complexity/noImportantStyles: SlickGrid re-shows it via inline style */
+  display: none !important;
+}
+.slick-grid-host .kira-sticky-gutter .slick-pane-top.slick-pane-right,
+.slick-grid-host .kira-sticky-gutter .slick-viewport-top.slick-viewport-right {
+  /* biome-ignore lint/complexity/noImportantStyles: inline left/width from updateCanvasWidth */
+  left: 0 !important;
+  /* biome-ignore lint/complexity/noImportantStyles: same */
+  width: 100% !important;
+}
+/* With stage 1's in-viewport header: offset it over the right canvas, keep the corner on top. */
+.slick-grid-host .kira-sticky-gutter .kira-sticky-header {
+  margin-left: var(--sg-pin-w);
+}
+.slick-grid-host .kira-sticky-gutter .slick-pane-header.slick-pane-left {
+  z-index: 3;
 }
 
 /* No zebra striping (GridRow.vue's own precedent) — only the hover state below. */

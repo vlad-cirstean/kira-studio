@@ -471,6 +471,47 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
       }
       if (frozen === i) x = 0;
     }
+    if (frozen !== undefined && frozen !== -1) {
+      style.setProperty('--sg-pin-w', `${this.canvasWidthL}px`);
+    }
+  }
+
+  /** P182 stage 2 — with `frozenColumn: 0` (gutter = column 0), re-homes the gutter canvas
+   *  (`_canvasTopL`) into the scroll viewport beside the data canvas as one sticky column and hides
+   *  the emptied left pane. SlickGrid's frozen-column bookkeeping (row clones, `scrollCellIntoView`,
+   *  always-rendered gutter, range selector offsets) is untouched. Idempotent: `updateColumnsInternal`
+   *  calls this on every `setColumns`. Re-check on a `slickgrid` bump: it still runs from
+   *  `finishInitialization` and `updateColumnsInternal`; `internalScrollColumnIntoView`'s body is
+   *  unchanged. */
+  protected override setPaneFrozenClasses(): void {
+    super.setPaneFrozenClasses();
+    if (this._options.rtl || !this.hasFrozenColumns() || this.hasFrozenRows) return;
+    if (this._container.classList.contains('kira-sticky-gutter')) return;
+    const body = document.createElement('div');
+    body.className = 'kira-scroll-body';
+    this._canvasTopR.before(body);
+    body.append(this._canvasTopL, this._canvasTopR);
+    this._container.classList.add('kira-sticky-gutter');
+  }
+
+  /** P182 stage 2 — the sticky gutter hides the leftmost `canvasWidthL` px of the viewport, so the
+   *  visible data band is that much narrower than stock assumes. */
+  protected override internalScrollColumnIntoView(left: number, right: number): void {
+    if (!this._container.classList.contains('kira-sticky-gutter')) {
+      super.internalScrollColumnIntoView(left, right);
+      return;
+    }
+    const viewport = this._viewportScrollContainerX;
+    const band = viewport.clientWidth - this.canvasWidthL;
+    if (left < this.scrollLeft) {
+      viewport.scrollLeft = left;
+      this.handleScroll();
+      this.render();
+    } else if (right > this.scrollLeft + band) {
+      viewport.scrollLeft = Math.min(left, right - band);
+      this.handleScroll();
+      this.render();
+    }
   }
 
   /** P22 iter2-pacing D4 — SlickGrid's own `destroy()` never clears `this.initialized` and nulls
