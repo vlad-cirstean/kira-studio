@@ -157,3 +157,45 @@ func (r *AdeLogsRepo) Page(kind, id string, afterSeq int) (AdeLogPage, error) {
 	}
 	return page, nil
 }
+
+// PurgeArchived deletes the logs of tasks archived at or before cutoff (Unix ms) and returns how many
+// logs went. Chunks cascade; every other row stays. One task per statement keeps each write short.
+func (r *AdeLogsRepo) PurgeArchived(cutoff int64) (int, error) {
+	rows, err := r.DB.Query(`SELECT id FROM ade_tasks t WHERE archived_at IS NOT NULL AND archived_at <= ?
+		AND EXISTS (SELECT 1 FROM ade_logs l WHERE l.task_id = t.id) ORDER BY id`, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("repos: purge archived ade logs: %w", err)
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return 0, fmt.Errorf("repos: purge archived ade logs: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return 0, fmt.Errorf("repos: purge archived ade logs: %w", err)
+	}
+	_ = rows.Close()
+	removed := 0
+	for _, id := range ids {
+		res, err := r.DB.Exec(`DELETE FROM ade_logs WHERE task_id = ?`, id)
+		if err != nil {
+			return removed, fmt.Errorf("repos: purge ade logs of task %s: %w", id, err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return removed, fmt.Errorf("repos: purge ade logs of task %s: %w", id, err)
+		}
+		removed += int(n)
+	}
+	if removed > 0 {
+		if _, err := r.DB.Exec(`PRAGMA incremental_vacuum`); err != nil {
+			return removed, fmt.Errorf("repos: incremental_vacuum after ade log purge: %w", err)
+		}
+	}
+	return removed, nil
+}
