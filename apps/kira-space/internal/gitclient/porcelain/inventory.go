@@ -1,7 +1,6 @@
 package porcelain
 
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,14 +11,13 @@ import (
 // InventoryFormat is BranchInventory's own for-each-ref format (P129 Part 2 §3): refname, tip,
 // committer date, author identity, worktree path (empty for a review branch that only exists on the
 // remote) and upstream tracking, %00-delimited — RefsFormat's own reasoning applies verbatim (NUL is
-// the one byte git guarantees never appears inside a field value). LF-framed: none of these fields
-// can legally carry a raw newline (a commit's author name/email are single-line by git's own commit
-// grammar, same as %(taggername) elsewhere in this package).
+// the one byte git guarantees never appears inside a field value). NUL-terminated per field and framed
+// by field count (splitNULRecords): %(worktreepath) can carry a raw newline.
 // authoremail uses the :trim modifier -- %(authoremail) alone prints the raw "<addr>" envelope
 // (angle brackets included), which would never match a plain `git config user.email` read and so
 // would silently defeat every isMine comparison this format exists to feed (§0.11).
 const InventoryFormat = "%(refname)%00%(objectname)%00%(committerdate:unix)%00%(authorname)%00" +
-	"%(authoremail:trim)%00%(worktreepath)%00%(upstream)%00%(upstream:track)"
+	"%(authoremail:trim)%00%(worktreepath)%00%(upstream)%00%(upstream:track)%00"
 
 const inventoryFieldCount = 8
 
@@ -96,18 +94,18 @@ func parseInventoryRow(fields [][]byte) (InventoryRef, error) {
 	return ref, nil
 }
 
-// ParseInventory parses InventoryArgs' own LF-framed stream — parseRefRowsLF's identical framing
-// (RefsFormat's own doc comment: NUL cannot appear inside any git field value, so a plain per-line
-// split is exact; empty input is zero rows, not an error).
+// ParseInventory parses InventoryArgs' own NUL-framed stream (splitNULRecords); empty input is zero
+// rows, not an error.
 func ParseInventory(raw []byte) ([]InventoryRef, error) {
-	text := strings.TrimSuffix(string(raw), "\n")
-	if text == "" {
+	records, err := splitNULRecords(raw, inventoryFieldCount)
+	if err != nil {
+		return nil, fmt.Errorf("porcelain: inventory stream: %w", err)
+	}
+	if records == nil {
 		return nil, nil
 	}
-	lines := strings.Split(text, "\n")
-	rows := make([]InventoryRef, 0, len(lines))
-	for _, line := range lines {
-		fields := bytes.Split([]byte(line), []byte{0})
+	rows := make([]InventoryRef, 0, len(records))
+	for _, fields := range records {
 		row, err := parseInventoryRow(fields)
 		if err != nil {
 			return nil, err

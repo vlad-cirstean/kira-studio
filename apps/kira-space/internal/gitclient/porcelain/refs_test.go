@@ -17,7 +17,7 @@ func byRefname(rows []porcelain.RefRow, refname string) *porcelain.RefRow {
 	return nil
 }
 
-// TestParseRefRows_Heads proves the LF-framed eleven-field record (D18): all three
+// TestParseRefRows_Heads proves the NUL-framed eleven-field record (D18): all three
 // %(upstream:track) shapes, the trailing-empty-field case (a branch's own %(taggerdate:unix) is
 // empty and last), isHead, and checkedOutIn for a branch checked out in a linked worktree.
 func TestParseRefRows_Heads(t *testing.T) {
@@ -166,7 +166,7 @@ func TestParseRefRows_NULFramingMalformed(t *testing.T) {
 
 // TestParseRefRows_WorktreePathComposesToNFC is G27 D5c/D12's tier-1 positive: %(worktreepath) is
 // an absolute worktree directory, so a decomposed spelling in git's own output must come back
-// composed. A hand-built LF-framed record (RefsFormat's own eleven \x00-delimited fields, F3), not a
+// composed. A hand-built NUL-framed record (RefsFormat's own eleven \x00-delimited fields, F3), not a
 // testdata fixture (D12 forbids adding a new one this phase has no real macOS output to record).
 func TestParseRefRows_WorktreePathComposesToNFC(t *testing.T) {
 	t.Parallel()
@@ -174,7 +174,7 @@ func TestParseRefRows_WorktreePathComposesToNFC(t *testing.T) {
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
 
 	record := "refs/heads/main\x00" + strings.Repeat("a", 40) + "\x00commit\x00\x00\x000\x00*\x00\x00" +
-		"/repo/caf" + decomposedE + "\x00\x00\n"
+		"/repo/caf" + decomposedE + "\x00\x00\x00\n"
 
 	rows, err := porcelain.ParseRefRows([]byte(record), false)
 	if err != nil {
@@ -231,5 +231,19 @@ func TestLogSessionArgs_ExcludesRemoteHeadDecoration(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "refs/remotes/origin/main") {
 		t.Fatalf("LogSessionArgs output missing the real refs/remotes/origin/main decoration:\n%s", out)
+	}
+}
+
+// A worktree path may contain a raw newline: records are framed by field count, not by line.
+func TestParseRefRows_WorktreePathWithNewline(t *testing.T) {
+	t.Parallel()
+	record := "refs/heads/wt\x00" + strings.Repeat("a", 40) + "\x00commit\x00\x00\x000\x00\x00\x00/tmp/w\nx\x00\x00\x00\n" +
+		"refs/heads/main\x00" + strings.Repeat("b", 40) + "\x00commit\x00\x00\x000\x00*\x00\x00\x00\x00\x00\n"
+	rows, err := porcelain.ParseRefRows([]byte(record), false)
+	if err != nil {
+		t.Fatalf("ParseRefRows: %v", err)
+	}
+	if len(rows) != 2 || rows[0].CheckedOutIn == nil || *rows[0].CheckedOutIn != "/tmp/w\nx" || rows[1].Refname != "refs/heads/main" {
+		t.Fatalf("rows = %+v", rows)
 	}
 }

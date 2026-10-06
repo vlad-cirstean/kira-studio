@@ -15,11 +15,12 @@ import (
 // 0x1f — verified against real git 2.43 — which would silently shift %(taggerdate:unix) and, on
 // TagRefsFormat's own extension, the annotation's subject/body after it. NUL is the one byte git
 // guarantees can never appear inside any of its own field values, so it is the only delimiter safe
-// in a non-last position. Records are delimited by the trailing \n for-each-ref always appends.
+// in any position. Every field, the last included, is NUL-terminated: %(worktreepath) can carry a
+// raw newline, so records are framed by field count, not by the \n for-each-ref appends.
 // Probed against real git 2.43: both %1f and %00 expand under for-each-ref's own %NN escape syntax
 // (distinct from `git log --pretty`'s %x1f/%x00, which LogFormat uses instead).
 const RefsFormat = "%(refname)%00%(objectname)%00%(objecttype)%00%(upstream)%00%(upstream:track)%00" +
-	"%(committerdate:unix)%00%(HEAD)%00%(*objectname)%00%(worktreepath)%00%(taggername)%00%(taggerdate:unix)"
+	"%(committerdate:unix)%00%(HEAD)%00%(*objectname)%00%(worktreepath)%00%(taggername)%00%(taggerdate:unix)%00"
 
 // refsFieldCount is RefsFormat's own field count.
 const refsFieldCount = 11
@@ -29,7 +30,7 @@ const refsFieldCount = 11
 // body legally contains raw newlines, so this one spawn is NUL-framed rather than LF-framed (D10).
 // git still appends its own trailing "\n" after the literal %00, same as before F3 — parseRefRowsNUL's
 // own doc comment covers the resulting byte layout in detail.
-const TagRefsFormat = RefsFormat + "%00%(contents:subject)%00%(contents:body)%00"
+const TagRefsFormat = RefsFormat + "%(contents:subject)%00%(contents:body)%00"
 
 // tagRefsFieldCount is TagRefsFormat's own field count.
 const tagRefsFieldCount = 13
@@ -189,30 +190,24 @@ func parseRefRow(fields [][]byte, withSubject bool) (RefRow, error) {
 	}, nil
 }
 
-// ParseRefRows parses HeadsRefsArgs/SingleRefArgs' own LF-framed stream (withSubject=false) or
-// TagRefsArgs' own NUL-framed one (withSubject=true, probe P1). The two framings differ because an
-// annotation body can contain a raw newline the LF framing cannot carry.
+// ParseRefRows parses HeadsRefsArgs/SingleRefArgs' own stream (withSubject=false) or TagRefsArgs'
+// (withSubject=true). Both are NUL-framed: an annotation body or a worktree path can contain a raw
+// newline.
 func ParseRefRows(raw []byte, withSubject bool) ([]RefRow, error) {
+	n := refsFieldCount
 	if withSubject {
-		return parseRefRowsNUL(raw)
+		n = tagRefsFieldCount
 	}
-	return parseRefRowsLF(raw)
-}
-
-// parseRefRowsLF splits HeadsRefsArgs/SingleRefArgs' own stream by line, then each line's own
-// RefsFormat fields by NUL (F3) — a plain, exact split, no absorb-the-last-field trick needed:
-// NUL cannot appear inside any git field value, so there is never a stray delimiter to worry
-// about, unlike the old %1f design.
-func parseRefRowsLF(raw []byte) ([]RefRow, error) {
-	text := strings.TrimSuffix(string(raw), "\n")
-	if text == "" {
+	records, err := splitNULRecords(raw, n)
+	if err != nil {
+		return nil, fmt.Errorf("porcelain: refs stream: %w", err)
+	}
+	if records == nil {
 		return nil, nil
 	}
-	lines := strings.Split(text, "\n")
-	rows := make([]RefRow, 0, len(lines))
-	for _, line := range lines {
-		fields := bytes.Split([]byte(line), []byte{0})
-		row, err := parseRefRow(fields, false)
+	rows := make([]RefRow, 0, len(records))
+	for _, fields := range records {
+		row, err := parseRefRow(fields, withSubject)
 		if err != nil {
 			return nil, err
 		}
@@ -221,44 +216,36 @@ func parseRefRowsLF(raw []byte) ([]RefRow, error) {
 	return rows, nil
 }
 
-// parseRefRowsNUL parses TagRefsFormat's own byte stream (F3: every field, not just the record
-// terminator, is now %00-delimited — field and record boundaries are the identical byte). git
-// still appends its own automatic "\n" after each formatted record regardless of what --format
-// contains, so the raw stream is `<f1>\0<f2>\0...\0<fN>\0\n<f1>\0...\0<fN>\0\n...`: splitting the
-// WHOLE stream on NUL yields a flat token list where every tagRefsFieldCount-th token (barring the
-// first record) carries a leading "\n" glued on by that automatic terminator, and the very last
-// split part is exactly "\n" with nothing after it. Grouping fixed-size chunks (tagRefsFieldCount
-// fields each) is what finds each record's own boundary, the same principle
-// porcelain.FieldGrouper applies to LogFormat/ScanFormat.
-func parseRefRowsNUL(raw []byte) ([]RefRow, error) {
+// splitNULRecords groups a for-each-ref stream whose format ends every field with %00. git still
+// appends its own "\n" after each formatted record, so the raw stream is
+// `<f1>\0...<fN>\0\n<f1>\0...<fN>\0\n`: splitting the whole stream on NUL yields a flat token list
+// where every n-th token after the first record carries that "\n" glued on its front, and the last
+// split part is exactly "\n". Grouping n tokens per record finds each boundary, the same principle
+// FieldGrouper applies to LogFormat/ScanFormat. Empty input is zero records.
+func splitNULRecords(raw []byte, n int) ([][][]byte, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
 	parts := bytes.Split(raw, []byte{0})
 	last := parts[len(parts)-1]
 	if string(last) != "\n" {
-		return nil, fmt.Errorf("porcelain: tag refs stream has unexpected trailing bytes: %q", last)
+		return nil, fmt.Errorf("unexpected trailing bytes: %q", last)
 	}
 	tokens := parts[:len(parts)-1]
-	if len(tokens)%tagRefsFieldCount != 0 {
-		return nil, fmt.Errorf("porcelain: tag refs stream has %d fields, not a multiple of %d", len(tokens), tagRefsFieldCount)
+	if len(tokens)%n != 0 {
+		return nil, fmt.Errorf("%d fields, not a multiple of %d", len(tokens), n)
 	}
-
-	rows := make([]RefRow, 0, len(tokens)/tagRefsFieldCount)
-	for i := 0; i < len(tokens); i += tagRefsFieldCount {
-		group := make([][]byte, tagRefsFieldCount)
-		copy(group, tokens[i:i+tagRefsFieldCount])
+	records := make([][][]byte, 0, len(tokens)/n)
+	for i := 0; i < len(tokens); i += n {
+		group := make([][]byte, n)
+		copy(group, tokens[i:i+n])
 		if i > 0 {
 			if len(group[0]) == 0 || group[0][0] != '\n' {
-				return nil, fmt.Errorf("porcelain: tag refs record %d missing its leading newline", i/tagRefsFieldCount)
+				return nil, fmt.Errorf("record %d missing its leading newline", i/n)
 			}
 			group[0] = group[0][1:]
 		}
-		row, err := parseRefRow(group, true)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, row)
+		records = append(records, group)
 	}
-	return rows, nil
+	return records, nil
 }

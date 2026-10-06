@@ -8,14 +8,14 @@ import (
 )
 
 // inventoryLine builds one InventoryFormat record's raw NUL-delimited bytes, LF-terminated —
-// hand-built rather than a captured fixture: ParseInventory's own framing (parseRefRowsLF's
-// identical split) needs no real git spawn to exercise, only the eight-field shape itself.
+// hand-built rather than a captured fixture: ParseInventory's own framing (splitNULRecords)
+// needs no real git spawn to exercise, only the eight-field shape itself.
 func inventoryLine(refname, tip, committerUnix, authorName, authorEmail, worktreePath, upstream, track string) []byte {
 	fields := [][]byte{
 		[]byte(refname), []byte(tip), []byte(committerUnix), []byte(authorName),
 		[]byte(authorEmail), []byte(worktreePath), []byte(upstream), []byte(track),
 	}
-	return append(bytes.Join(fields, []byte{0}), '\n')
+	return append(append(bytes.Join(fields, []byte{0}), 0), '\n')
 }
 
 func byShort(rows []porcelain.InventoryRef, short string) *porcelain.InventoryRef {
@@ -124,5 +124,18 @@ func TestParseInventory_WrongFieldCount(t *testing.T) {
 	t.Parallel()
 	if _, err := porcelain.ParseInventory([]byte("refs/heads/main\x00aaa111\n")); err == nil {
 		t.Fatal("expected an error for a record with too few fields")
+	}
+}
+
+func TestParseInventory_WorktreePathWithNewline(t *testing.T) {
+	t.Parallel()
+	raw := append(inventoryLine("refs/heads/wt", "aaa111", "1", "A", "a@x", "/tmp/w\nx", "", ""),
+		inventoryLine("refs/heads/main", "bbb222", "2", "A", "a@x", "", "", "")...)
+	rows, err := porcelain.ParseInventory(raw)
+	if err != nil {
+		t.Fatalf("ParseInventory: %v", err)
+	}
+	if len(rows) != 2 || rows[0].WorktreePath != "/tmp/w\nx" || rows[1].Short != "main" {
+		t.Fatalf("rows = %+v", rows)
 	}
 }
