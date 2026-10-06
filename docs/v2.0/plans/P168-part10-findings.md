@@ -294,6 +294,54 @@ Probes: `bun test` harnesses in session scratchpad (Pinia store, stubbed `contro
   `ResponseDiffDialog.vue` (justified `:deep` Monaco height rule). Header, cookie, status and
   timeline strings render as text.
 
+## Findings (block 4, gRPC view)
+
+### F21 medium, code-read (HTTP twin verified, F15): gRPC `call` and `loadSchema` wedge on a pre-flight load failure
+
+- `SF/views/grpcrequest/state.ts:307-325` (`call`): `status = 'running'`, `opId`, `lastCallId`
+  set, then `await variablesForSend` and `await loadDynamicGenerator()` outside the `try`. A
+  rejection leaves the tab `running` for good (Call disabled, Stop cancels an op Go never saw).
+  A tab closed in that window still issues `control.grpcCall`; there is no `findGrpcRequestTab`
+  check before the call (the HTTP fix of P108 F8 has no gRPC twin here).
+- `:217-227` (`loadSchema`): `status = 'loading'`, then `await apiIdsForTab` outside the `try`. A
+  rejection leaves the schema `loading` and the rejection unhandled from the debounced watcher;
+  Call stays disabled (`methodResolved` false) until another source edit or Reload.
+- Fix: same as F15: move the awaits inside each `try`; re-check
+  `findGrpcRequestTab(tabId) && rt.opId === opId` (and `rt.genId === myGen`) before the bridge
+  call. Extend `grpc-stream-terminal-race` or `grpc-schema-supersession` spec.
+
+### F22 low, code-read: message rows keyed by index; at the 10,000 cap every batch remounts expanded editors
+
+- `SF/views/grpcrequest/ResponsePane.vue:371-373` keys rows `:key="entry.row.index"` while the
+  virtualizer's own `getItemKey` uses `seq`. Past `MAX_LIVE_MESSAGES` each batch splices the head,
+  so every index now holds another message. An expanded row's `MonacoHost` unmounts at its old
+  index and a new Monaco editor mounts at the new one, per batch, losing its scroll and selection;
+  `messageHosts` (keyed by seq) keeps pointing at reused instances.
+- Fix: `:key="entry.m.seq"`.
+
+### F23 low, code-read: gRPC Beautify fails silently
+
+- `SF/views/grpcrequest/GrpcRequestView.vue` `onBeautify`: invalid JSON (`result.ok` false) or a
+  worker failure (`.catch(() => null)`) does nothing and shows nothing. HTTP's
+  `RequestBodyPane.onBeautifyBody` shows `beautifyError` for the same case.
+- Fix: a `beautifyError` ref and inline alert, cleared on message edit, as in `RequestBodyPane`.
+
+### Refuted or clean in block 4
+
+- Closed gRPC tab mid-call: `noteGrpcCallRecorded` reaches `createHistoryStore.noteRecorded`,
+  whose `findTab` guard returns before `ensure`; streaming events for a removed runtime are
+  dropped by the `Object.keys(runtime)` scan. No runtime leak.
+- `applyGrpcEvent` ordering: `lastCallId` match survives the control-plane return landing first;
+  `notifiedCallId` dedupes history notify; a superseded call's events no longer match.
+  `ensureGrpcCallSubscription` subscribes once per store lifetime.
+- Failed unary calls are not recorded by Go (`Partial` is set only for server streams,
+  `SI/grpcclient/errors.go:21-29`), so the catch path not noting history is correct.
+- Live `messages` computed re-spreads up to 10,000 rows per batch: ~0.6 ms per recompute
+  measured in Bun (scratch probe); not reported.
+- Truncated stored messages are never `JSON.parse`d; message JSON goes to a read-only Monaco
+  model as text. Status message, header and trailer values render via interpolation.
+- All 5 components single `<script setup lang="ts">`, no `<style>`.
+
 ## Coverage
 
 - Block 1 reviewed in full: `apiQueries.ts`, `collections.ts`, `variables.ts`, `draftMerge.ts`,
@@ -309,4 +357,7 @@ Probes: `bun test` harnesses in session scratchpad (Pinia store, stubbed `contro
   `FieldRowsTable`, no own logic beyond row patching): `FormDataTable.vue`, `QueryParamsTable.vue`,
   `BinaryBodyPicker.vue`, `RequestHeadersTable.vue`, `UrlEncodedTable.vue`. Contract read:
   `PW/state/createTabsStore.ts` hydrate, `PW/workers` `useParseWorker`, `SI/httpclient/options.go`.
-- Blocks 4-5: pending.
+- Block 4 reviewed in full: `state.ts`, `history.ts`, `GrpcRequestView.vue`, `ResponsePane.vue`,
+  `SchemaBrowser.vue`, `CallHistoryList.vue`, `GrpcMetadataTable.vue` (thin `FieldRowsTable`
+  wrapper). Contract read: `SI/bridge/grpc.go` recording paths, `SI/grpcclient/errors.go`.
+- Block 5: pending.
