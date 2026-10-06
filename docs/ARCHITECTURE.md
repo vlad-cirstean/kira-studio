@@ -1174,6 +1174,25 @@ being clobbered by that refetch. Other `useQuery` consumers (the Database MCP pa
 connection dialog, grid mask-rule/preview state, the console) use the same client with their
 own keys. See Process model's multi-window paragraph for the cross-window contract.
 
+P175 moved three more API-client families onto it. Jar cookies: `['httpJarCookies', url]`
+(`views/httprequest/cookies.ts`), fed by a debounced resolved URL. History lists and snapshots:
+`[domain, itemId, scratchTabId]` and `[domain+'Snapshot', id]` (`api/state/history.ts`'s
+`createHistoryQueries`). gRPC schema: `['grpcSchema', 'proto'|'reflection', ...]`
+(`views/grpcrequest/schemaQuery.ts`), mirroring Go's descriptor `cacheKey`. P8 D11 (refresh lazily
+while the pane is hidden) is each query's `enabled` flag. Pinia stores keep UI state only. Mutations
+call `cancelQueries` after the bridge call, before `setQueryData`, so an in-flight list fetch cannot
+resurrect a deleted row.
+
+**Cookie jar is a fork of Go's `net/http/cookiejar`.** The stdlib jar lists and deletes nothing, so
+`internal/httpclient/cookiejar` copies Go 1.27.1's jar (BSD-3 `LICENSE` kept) and adds
+`Entries`/`Delete` in `entries.go`. `Delete` removes by exact domain, path and name. Upstream files
+differ only by the `ascii` import path. On a Go upgrade, re-copy `jar.go`, `punycode.go` and their
+tests, then reapply that import.
+
+**Dotenv rules (`BulkVariablesEditor`, `dotenv.ts`).** An inline comment starts at whitespace plus
+`#`. A quoted value counts only when the closing quote is followed by nothing or a comment. An
+unmatched quote makes an unquoted value, never an error.
+
 ## UI architecture
 
 Distilled facts about how the workbench is put together — not a restatement of `docs/v1/SPEC.md`
@@ -1480,7 +1499,7 @@ proposed, is declined with a reason.**
 - **F9/F10** (the two protocols' `views/*/history.ts` sharing 100 lines, and their
   `mergedValuesAndSecrets`/`collectionIdFor` duplicated because `views/grpcrequest/**` may not
   import `views/httprequest/**`) are closed the same way: `api/state/history.ts`'s
-  `createHistoryStore` factory (HTTP's compare-selection extra rides in a generic `Extra` type
+  `createHistoryQueries` factory (HTTP's compare-selection extra rides in a generic `Extra` type
   parameter; gRPC passes none), and `mergedValuesAndSecrets`/`collectionIdFor` moved into
   `api/state/{variables,collections}.ts`, which both view directories already imported.
 - **P11 OQ-6** (should the four insert-then-trim capped history tables — `filter_history`,
@@ -1867,7 +1886,7 @@ bytes"*. A restored tab does **not** auto-load its latest entry — it shows the
 with one added line, *"N past responses · View history"* — the same "never imply an exchange
 happened when it did not" reasoning as the banner. The history runtime (`views/httprequest/
 history.ts`'s `useHttpHistoryStore`, a Pinia store built over `api/state/history.ts`'s
-`createHistoryStore` factory) is never persisted for the identical reason (P2 D6): only the pane
+`createHistoryQueries` factory) is never persisted for the identical reason (P2 D6): only the pane
 *choice* persists, a pointer at a response no more than the response itself does. Refresh is eager
 only while the History pane is the one showing (a send elsewhere just flags the list stale) and one
 unconditional fetch happens on every mount regardless of pane or live response — unlike

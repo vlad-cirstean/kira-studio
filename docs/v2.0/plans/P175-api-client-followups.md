@@ -460,4 +460,23 @@ after rebase (or accept the different-hunk overlap, option (b)).
 
 ## Result
 
-(Implementer fills: commits, test runs and outcome, anything left open.)
+Commits 1-11 landed on `p168-stream-c`, one per plan step (`git log ce4f8b6..`). Step 12 is this
+docs commit.
+
+Deviations:
+- `ascii` copy lives in `cookiejar/internal/ascii`, so `jar.go` and `punycode.go` differ from
+  upstream only by the import path. `.golangci.yml` excludes the vendored files from gocognit,
+  gocyclo, gocritic and bodyclose.
+- `deleteJarCookie` and `clearJarCookies` call `cancelQueries` after the bridge call, not first. A
+  spec mutation-test shows cancelling first lets an in-flight list fetch resurrect the row.
+- `resolveGrpcTabState` moved to `views/grpcrequest/resolve.ts` to avoid an import cycle with
+  `schemaQuery.ts`.
+- `grpcSchemaSourceFor` is synchronous and gated by a `ready` flag on the collections tree load.
+- Removed stale `terminalShutdown` mock entries (unbound `TerminalService.Shutdown`) in step 3,
+  fixing a pre-existing `mock-runtime-bindings` failure.
+- Accepted per plan: the viewing flash while a different snapshot loads, and "Method not resolved"
+  for up to 150 ms after a schema-source edit.
+
+Checks: typecheck, lint, lint:go, lint:dead, go build/vet/test (httpclient, bridge), `test:unit`
+(1796 pass), and the full Playwright ui project at phase end. Not run: ui-timing, real-hardware.
+
