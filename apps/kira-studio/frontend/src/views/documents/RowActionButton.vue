@@ -7,15 +7,15 @@ import { Button } from '@theme/components/ui/button';
 // this wrapper through delegated pointer/focus listeners.
 defineOptions({ inheritAttrs: false });
 
-defineProps<{ icon: string; label: string }>();
+defineProps<{ icon: string; label: string; disabled?: boolean }>();
 </script>
 
 <template>
   <!-- Focusable wrapper, same shape as TooltipDisabledTrigger: Blink dispatches no pointer event on
        a disabled control, so the tip needs a live ancestor to hang off. -->
-  <!-- biome-ignore lint/a11y/noNoninteractiveTabindex: see comment above -->
-  <span tabindex="0" class="inline-flex" :data-tip="label">
-    <Button variant="toolbar" size="kira-icon" :aria-label="label" v-bind="$attrs">
+  <!-- Only a disabled button needs the wrapper as its tab stop; an enabled one is its own. -->
+  <span :tabindex="disabled ? 0 : undefined" class="inline-flex" :data-tip="label">
+    <Button variant="toolbar" size="kira-icon" :aria-label="label" :disabled="disabled" v-bind="$attrs">
       <CodiconIcon :name="icon" :size="13" />
     </Button>
   </span>

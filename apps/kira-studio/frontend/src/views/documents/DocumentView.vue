@@ -48,7 +48,7 @@ import { useEditBuffer } from '../shared/useEditBuffer';
 import { rowMenu } from './menu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
 import ProjectionMenu from './ProjectionMenu.vue';
-import { documentRow, fieldNamesOnPage, pageVersion, setVisibleWindow } from './page';
+import { documentRow, fieldNamesOnPage, getPage, pageVersion, setVisibleWindow } from './page';
 import RowActionButton from './RowActionButton.vue';
 import {
   searchState as docSearchState,
@@ -125,12 +125,18 @@ const targetTail = computed(() => pathTail(props.tab.path));
 // it would silently drop every field the projection hid. Editing is refused outright rather than
 // attempting a partial merge, since "which fields the user meant to keep" isn't recoverable from
 // a projected body alone; the fix is clearing the projection first.
-const editGate = computed<{ editable: boolean; label: string }>(() => {
+// A truncated body is a prefix of the document: a hand-closed buffer would replace the whole
+// document with it, so truncated rows are never editable.
+function editGateFor(row: number): { editable: boolean; label: string } {
   if (!caps.value?.canUpdate) {
     return { editable: false, label: 'Connection does not support update' };
   }
   if (connRecord.value?.readOnly) {
     return { editable: false, label: 'Connection is read-only' };
+  }
+  void pageVersion.n;
+  if (documentRow(props.tab.id, row)?.isTruncated) {
+    return { editable: false, label: 'Document truncated at 64 KB — not editable' };
   }
   if (props.tab.state.projection !== null) {
     return {
@@ -140,7 +146,7 @@ const editGate = computed<{ editable: boolean; label: string }>(() => {
     };
   }
   return { editable: true, label: 'Edit' };
-});
+}
 
 // P16 design system LAW: the connection colour reaches a view as a 2px rail (here: the
 // toolbar cap and the view-head dot) — never a tint or a full border on the panel itself.
@@ -583,7 +589,7 @@ function onGoToMatch(match: Match): void {
 }
 
 function startEdit(row: number, id: string, body: string): void {
-  if (!editGate.value.editable) return;
+  if (!editGateFor(row).editable) return;
   editingRow.value = row;
   editingId.value = id;
   editOriginal.value = toShellText(body);
@@ -594,6 +600,24 @@ function cancelEdit(): void {
   editingRow.value = null;
   editingId.value = null;
 }
+
+// A new page (paging, a delete's reload, filter) moves or removes the edited document: re-find it
+// by id so the editor stays under its own document, and drop the edit when it left the page.
+const currentPage = computed(() => {
+  void pageVersion.n;
+  return getPage(props.tab.id);
+});
+watch(currentPage, (page) => {
+    const id = editingId.value;
+    if (id === null || !page) return;
+    for (let i = 0; i < page.rowCount; i++) {
+      if (documentRow(props.tab.id, i)?.id === id) {
+        editingRow.value = i;
+        return;
+      }
+    }
+    cancelEdit();
+});
 
 async function commitEdit(): Promise<void> {
   const id = editingId.value;
@@ -620,7 +644,7 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
       entry.body,
       () => idsOf(rows.value),
       () => startEdit(row, entry.view.id, entry.body),
-      editGate.value,
+      editGateFor(row),
       { deletable: canDelete.value, label: deleteTitle.value },
     ),
   );
@@ -1085,10 +1109,10 @@ onUnmounted(() => {
                   <Badge v-if="editingRow === rows[vi.index]" variant="warn">editing</Badge>
                   <RowActionButton
                     icon="edit"
-                    :label="editGate.editable ? 'Edit' : editGate.label"
+                    :label="editGateFor(rows[vi.index]).label"
                     aria-label="Edit"
                     :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
-                    :disabled="!editGate.editable"
+                    :disabled="!editGateFor(rows[vi.index]).editable"
                     data-testid="document-edit"
                     @click.stop="startEdit(rows[vi.index], rowAt(rows[vi.index])!.view.id, rowAt(rows[vi.index])!.body)"
                   />
