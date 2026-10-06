@@ -463,4 +463,25 @@ P174 (Stream A): no shared source file. `docs/ARCHITECTURE.md` only; resolve as 
 
 ## Result
 
-(Filled in by the implementer.)
+Commits (branch `p168-stream-c`): `24d8f86` frame cap, `b595308` auto-fetch backoff and stop,
+`1c3f0d4` wire (contract 43 to 44), `e82700d` marker, `9bcc03a` banner, `2319b7f` e2e, plus the
+docs commit.
+
+Checks run: `typecheck`, `lint`, `lint:dead`, `go build`, `go vet`; `go test -race` on gitsession,
+gitsock, gitrpc, bridge, oplog, gitpreflight; `bun test` for git-core, git-ipc, git-ui, kira-space-vscode;
+Kira Space UI tier (171 tests, WebKit); extension interaction and layout projects (64 tests,
+Chromium).
+
+Deviations:
+- `oplog.Log.Record` returns nothing.
+- Go `AutoFetchStatus` lives in `gitpreflight`.
+- Component and `App` prop is `showOperations`, not `onShowOperations` (Vue treats `on*` as a
+  listener); `MountOptions.onShowOperations` keeps the plan's name.
+- A user cancel (kind `Cancelled`) announces but raises no banner.
+- `reportAsyncError` skips its generic banner while a stream failure is shown.
+- The VS Code webview is read-only, so its e2e failure source is a corrupted graph stream, not a
+  failed remote op; the remote-op banner is covered in Kira Space only.
+- Found and fixed: the webview bundle put preflight above every unprefixed Tailwind utility
+  (layer order by first import); `main.ts` now imports `tailwind.css` first.
+
+Not verified: a real VS Code host, macOS, a real 32 MiB result through Wails.

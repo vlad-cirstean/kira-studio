@@ -1340,7 +1340,7 @@ own prop shape, not either app's own tab-record type.
 
 **The Operations panel is a shared component now, not a Kira-Studio-only one (P132 Part 1 §2).** `packages/workbench/src/components/OpLogPanel.vue` (generic over `R extends OpLogRecord`) and `packages/workbench/src/state/createOpLogStore.ts`'s `createOpLogStore<R>({ control, searchText? })` are the panel shell and Pinia store factory; `packages/shared/domain/ops.ts`'s `opLogRecordSchema`/`OpLogRecord` (id, startedAt, durationMs, kind as a plain `z.string()`, status, command, error) is the base contract a consumer's own record extends — Kira Studio's `OpRecord` (`opLogRecordSchema.extend({ connectionId, tabId, kind: opKindSchema, rows, commandTruncated, path })`) is the first of two consumers (Kira Space's `SpaceOpRecord` is the second, P132 Part 2, below). `apps/kira-studio/frontend/src/workbench/panels/OperationsPanel.vue` wraps `OpLogPanel` with its own `columns` array and `#cell`/`#detail` slots (connection chip, tab, rows, the `MonacoHost` command detail) and a `menuFor` prop building its five-item context menu (`opLogMenuItems` supplies the generic copy-command/copy-error/cancel three, in a fixed order so a consumer can destructure them) around Studio-only actions (reveal tab, re-run). `toggleOperationsPanel`/`setOperationsHeight` moved from Kira Studio's own `state/layout.ts` into the shared `createLayoutStore.ts` core (both apps use them). No Kira-Studio import (`MonacoHost`, a connections store, `kira-studio`) reaches the shared package — verified, not assumed (P132 Part 1 §7's own closing-audit grep).
 
-**Kira Space mounts the same dock over an in-memory op log (P132 Part 2).** `WorkbenchShell.vue` (shared) always mounts `#dock`; `hasDock` is gone, `opsVisible`/`opsHeight` are required props, status bar always `mt-1`. Space's dock shows in `ade` full layout too, gated only by `panel.operations.visible`. Go side: `apps/kira-space/internal/oplog` is a 500-record ring, process-global, lost on quit, app-local (Studio's op log is SQLite-backed and shares nothing). Producer is `gitsession`: `RunOp`, `UndoRun` (takes `connLabel`), `RunRemote` with a non-nil conn and `RunRestack` start an op; four write-spawn sites record argv through `noteWrite` (`runWriteArgvList`, `runRemoteSpawn`, pull integrate, `runRestackSpawn`). Auto-fetch (nil conn), `RunPrepare` and every read are not logged. Command comes from argv only, so the askpass token in env is never recorded. Cancel registers for fetch, pull's fetch stage and restack (`CancelRemote`/`CancelRestack`); push family is never cancellable. Each op unregisters its cancel before releasing its `opSlot`, and `Log.Cancel` calls the func under the log lock, so a late cancel never hits the next op. `Registry.OpLog` is set in `wireGit` before `gitSock.Start()`: a paired VS Code client can write before the emitter exists. `OpsService` (`Recent`, `Cancel`) plus `kira:op:update` broadcast to every window; `Clear` is per window, renderer-only. `source` is `Conn.ClientLabel`: `"Kira Space"` (native conn, renamed from `"This window"`, which was false in other windows), `"Kira Space ade"`, or a VS Code client label. `ChannelOpUpdate`/`ChannelToggleOperationsPanel` live in `internal/appevent`; `onToggleOperationsPanel` lives in `createCoreControl`. Cmd+J reaches the renderer only through the Go menu item (`Toggle Operations Panel`), never a keydown.
+**Kira Space mounts the same dock over an in-memory op log (P132 Part 2).** `WorkbenchShell.vue` (shared) always mounts `#dock`; `hasDock` is gone, `opsVisible`/`opsHeight` are required props, status bar always `mt-1`. Space's dock shows in `ade` full layout too, gated only by `panel.operations.visible`. Go side: `apps/kira-space/internal/oplog` is a 500-record ring, process-global, lost on quit, app-local (Studio's op log is SQLite-backed and shares nothing). Producer is `gitsession`: `RunOp`, `UndoRun` (takes `connLabel`), `RunRemote` with a non-nil conn and `RunRestack` start an op; four write-spawn sites record argv through `noteWrite` (`runWriteArgvList`, `runRemoteSpawn`, pull integrate, `runRestackSpawn`). Auto-fetch ticks (nil conn), `RunPrepare` and every read are not logged; an auto-fetch stop and a failed graph load are recorded once each (P173, `Log.Record`). Command comes from argv only, so the askpass token in env is never recorded. Cancel registers for fetch, pull's fetch stage and restack (`CancelRemote`/`CancelRestack`); push family is never cancellable. Each op unregisters its cancel before releasing its `opSlot`, and `Log.Cancel` calls the func under the log lock, so a late cancel never hits the next op. `Registry.OpLog` is set in `wireGit` before `gitSock.Start()`: a paired VS Code client can write before the emitter exists. `OpsService` (`Recent`, `Cancel`) plus `kira:op:update` broadcast to every window; `Clear` is per window, renderer-only. `source` is `Conn.ClientLabel`: `"Kira Space"` (native conn, renamed from `"This window"`, which was false in other windows), `"Kira Space ade"`, or a VS Code client label. `ChannelOpUpdate`/`ChannelToggleOperationsPanel` live in `internal/appevent`; `onToggleOperationsPanel` lives in `createCoreControl`. Cmd+J reaches the renderer only through the Go menu item (`Toggle Operations Panel`), never a keydown.
 
 **C5 widened this from "per mode" to "per workspace"** (see "Native code workspace (C5)" in the Git
 module section) — `packages/shared/domain/tabs.ts`'s `TabScope = AppMode | 'repo'` is each
@@ -2761,11 +2761,23 @@ human approval always re-admits.
 
 **Version compatibility is hard lockstep, negotiated in that same handshake.**
 `gitrpc.ContractVersion` and `packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are one number
-(**43** today, since P172 refused prepare-script writes from `repoSettings.set` and removed `settings.setGitPath`), asserted equal by tests
+(**44** today, since P173 added `StatusSummary.autoFetch`, the `autoFetch.changed` event and `graph.reportFailure`; 43 was P172's refusal of prepare-script writes from `repoSettings.set` and removal of `settings.setGitPath`), asserted equal by tests
 on both sides, and it is the *sole* compatibility authority — not the
 app version, not a side file. A mismatch is a blocking panel in the extension naming both versions,
 never a degraded mode: the app's own P119 update never touches the separately-installed extension,
 so "run an older method set" has no honest meaning here.
+
+**Frame cap is 32 MiB, and an unauthenticated peer gets 64 KiB (P173).** `gitsock.maxFrameBytes`,
+`bridge.maxGitStreamFrameBytes` and `socketChannel.ts`'s `MAX_FRAME_BYTES` are one number; 8 MiB failed
+the graph and commit detail on large repositories. `conn` carries a per-connection atomic read limit
+that starts at `handshakeMaxFrameBytes` (64 KiB, the hello is a label and an id) and rises to the full
+cap only after `runHandshake` succeeds, so a connection that never pairs can allocate 64 KiB, not 32
+MiB. Accepted memory costs, with no byte budget (a budget is new infrastructure for a trusted peer):
+Go allocates the declared size once per inbound frame and holds two copies of an outgoing body
+transiently (64 MiB for one max frame); a session's `sendCh` holds up to 16 frames, so the worst case
+is 512 MiB, reached only by a paired client issuing 16 concurrent near-cap requests; Wails admits one
+oversize frame into an empty per-window queue under its 256 MiB global budget; the JS side joins the
+frame once, decodes, parses and structured-clones it to the webview, about 4-5x frame size, transient.
 
 **Two frame shapes over that one socket — the same split the `studio` data plane already uses, not
 a second design.** Control frames (the whole `rpcstream` envelope, every request, and every small
@@ -2909,7 +2921,7 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (**56 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**41**, P111), and the wire types |
+| `gitrpc` | The method table (**57 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**44**, P173), and the wire types |
 | `gitsock` | The Unix listener, length-prefixed framing, the handshake, the pairing broker, the trust store and stale-socket recovery |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
@@ -2947,6 +2959,35 @@ own enable flag already had. `gh` stdout is capped at 64 MiB while reading, deri
 case of a 100-item open-PR page. Overflow reports `forbidden` with a too-large reason, never
 "unreadable response".
 
+**Auto-fetch retries transient failures with backoff and stops on permanent ones (P173).**
+`autoFetchOutcome(kind)` in `gitsession/autofetch.go` classifies each tick: `busy`
+(`OperationInProgress`, `Cancelled`) reschedules at the normal interval and counts nothing;
+`transient` (`NetworkFailed`, `LockHeld`) reschedules at `min(interval << failures, max(interval,
+60 min))` with the shift clamped at 16 and no attempt limit, so an offline night never stops it, and
+a success resets the count; `permanent` (every other kind, including `AuthFailed`, `RemoteNotFound`
+and `Unknown`) stops it. `NetworkFailed` includes a catch-all that sometimes hides a permanent cause
+(403, TLS); that costs one fetch per hour, cheaper than a stop that needs user action after every
+laptop sleep. `Unknown` stops because silent endless retry would hide a real problem. A stop sets a
+`stopped` marker, writes one op-log record (source `Auto-fetch`, kind `autoFetch`, status `error`),
+and emits `autoFetch.changed`; retries are never logged. `StatusSummary.autoFetch` carries the state
+for cold start and reconnect, the event carries the change. A successful explicit fetch or pull with a
+conn re-arms; a settings interval change does not, since the stop is about the remote. The toolbar
+shows an `Auto-fetch stopped` marker (`autofetch-stopped`) in both hosts, even with write controls
+hidden; clicking runs Fetch when Fetch is enabled.
+
+**Failures are visible in an inline banner, not a toast (P173).** `FailureBanner.vue` (shadcn
+`Alert`, `role="region"` so the live region stays the one announcer) mounts under `ConnectionBanner` in
+`App.vue` for failed ops, async errors and graph-stream failures. A toast would need a toast host in
+both apps, would cover grid rows, and would vanish before it is read; the banner stays until dismissed
+or superseded and carries a retry hint per error kind (`failureNotice.ts`). Graph failures add Retry
+(`graph.refresh`); Kira Space adds "Show in Operations", the VS Code webview a text pointer since it
+has no dock. A corrupted graph stream is also reported with `graph.reportFailure`, so Go records it in
+the op log; `{reason: 'corrupted'}` is the only reason and Go composes the message. The op log
+records user-initiated git writes, plus auto-fetch stops and graph-load failures. Failures before an
+op starts, and anything while the transport is down, are banner-only. The webview bundle imports its
+own Tailwind root first: CSS layers order by first appearance, and git-ui's `kv:` root declares
+`utilities` without `base`, so any later import put preflight above every unprefixed utility.
+
 **Search reconciles Go's RE2 against JavaScript's `RegExp` explicitly rather than approximating
 it**, because the server-side tail scan and the client-side scan of already-loaded rows must agree
 exactly — otherwise a hit's presence depends on which page happens to be loaded, a bug the
@@ -2974,7 +3015,7 @@ hidden**: regex-mode case folding is RE2's own `(?i)` rather than ECMA-262's `Ca
 Kelvin-sign class of difference can in principle disagree in regex mode only (literal mode stays
 exact regardless of case sensitivity); and `\S` *inside* an already-open character class falls back
 to RE2's ASCII-only `\S`, since negating a sub-portion of an open class is not expressible by the
-insertion that the out-of-class form uses.
+insertion that the out-of-class form uses. P173: the remaining RE2-versus-`RegExp` gap is accepted as is; no in-UI note, no Go-side shim (user decision).
 
 **Unicode path normalization is provenance-based, and getting the direction wrong breaks git
 outright.** APFS returns filenames from the filesystem in NFD; git stores paths as whatever bytes
@@ -3389,8 +3430,8 @@ what layer one admits, not the shape of the boundary itself.** `allowedMethods` 
 (`readOnlyMethods` before P67e) is a default-deny **allowlist**, not a denylist: a method the
 allowlist has not named is refused with `E_READ_ONLY` before the shared router handler is ever
 called, so a future contract addition is refused by construction rather than admitted by omission.
-Of the 57 methods `internal/gitrpc`'s `Router.ForConn` dispatches (56 requests plus the one
-`graph.stream` stream method), the allowlist now admits 55 (54 requests plus `graph.stream`) —
+Of the 58 methods `internal/gitrpc`'s `Router.ForConn` dispatches (57 requests plus the one
+`graph.stream` stream method), the allowlist now admits 56 (55 requests plus `graph.stream`) —
 every operation that writes through git itself (`op.run`'s kinds, the five `remote.run` kinds,
 every `preflight.*`/`remote.*Preflight`, `undo.run`, `stack.restack`/`cancelRestack`,
 `credential.provide`) alongside every pre-existing read and the nine `review.*` methods (below).
@@ -4376,6 +4417,7 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **P173 failure banner and auto-fetch marker are unobserved in a real VS Code host.** Verified only in the interaction harness (Chromium, fake host) and Kira Space's WebKit UI tier; a real 32 MiB result through Wails is also unexercised. Delete once checked in a real VS Code window against a running Kira Space.
 - **A paired git socket token is a bearer secret, not bound to the peer (P172).** Any same-user process holding the token connects. Pairing shows the kernel-reported process, but reconnects do not re-check it. Options: pin the pairing-time executable or code signature, or accept the same-user threat model. Open user decision; delete when resolved.
 - **Console reads on PostgreSQL and MySQL/MariaDB drain past the cap (P174).** At the cap `rows.Close()` discards the remaining rows off the wire: memory is bounded, server and network time are not. The Stop button ends a long drain. Delete once a driver offers a cheap server-side stop that keeps later statements in the batch intact.
 - **Some Redis console commands are read whole before the cap (P174).** `SUNION`, `SINTER`, `SDIFF`, `EVAL`/`FCALL`, module commands and `GET` of a huge string have no bounded form; go-redis reads the reply whole, then the page is capped. Delete once those commands get bounded rewrites or a streaming reader.

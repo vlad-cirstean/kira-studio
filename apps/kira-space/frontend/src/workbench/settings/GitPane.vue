@@ -140,9 +140,9 @@ const graphFontSizeId = useId();
         {{ fetchAutoIntervalError }}
       </FieldError>
       <FieldDescription v-else
-        >0 disables background fetching. Never prompts for a credential — a remote that
-        needs one simply fails silently and disables the timer until the next explicit
-        fetch.</FieldDescription
+        >0 disables background fetching. Never prompts for a credential — it stops after a
+        credential or remote error until the next explicit fetch; network errors retry with
+        backoff.</FieldDescription
       >
     </Field>
     <Field>
