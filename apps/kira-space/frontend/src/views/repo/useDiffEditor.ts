@@ -156,6 +156,9 @@ export interface DiffEditorParams {
   /** The reviewed branch of a review diff; the left side then comes from `review.snapshot` when
    *  it stored this revision's text. */
   reviewBranch?: string;
+  /** Checked right before the widget is created; a superseded mount (a section collapsed and
+   *  re-expanded mid-read) returns false and leaves nothing to dispose. */
+  isCurrent?: () => boolean;
 }
 
 export interface DiffEditorHandle {
@@ -213,7 +216,7 @@ export function useDiffEditor(
     const mod = await loadMonaco();
     // Unmounted (tab closed/switched away, or the section collapsed) while the read/import above
     // was in flight.
-    if (!container.value) return;
+    if (!container.value || params.isCurrent?.() === false) return;
 
     let headUri: import('monaco-editor').Uri;
     let worktreeUri: import('monaco-editor').Uri;

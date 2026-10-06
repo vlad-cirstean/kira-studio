@@ -69,7 +69,8 @@ async function mountSection(path: string): Promise<void> {
   await nextTick();
   const meta = sections.find((s) => s.path === path);
   if (!meta?.expanded || !containerRef(path).value) return; // Collapsed again before the DOM caught up.
-  const handle = useDiffEditor(containerRef(path), {
+  const handle: ReturnType<typeof useDiffEditor> = useDiffEditor(containerRef(path), {
+    isCurrent: () => diffEditors.get(path) === handle,
     editorKey: `${props.tab.id}:${path}`,
     repoId,
     path,
@@ -79,6 +80,7 @@ async function mountSection(path: string): Promise<void> {
   });
   diffEditors.set(path, handle);
   await handle.mount();
+  if (diffEditors.get(path) !== handle) return;
   sectionState[path] = handle.state.value;
   sectionError[path] = handle.errorMessage.value;
 }
