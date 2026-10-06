@@ -370,3 +370,80 @@ fix, "verified" (scratch probe or run) or "code-read".
   each scan.
 - `SchemaDialog.vue` save catches; `filterTree.ts`/`grouping.ts`: no defect found.
 - No drag-and-drop in the project tree (git grep).
+
+## Block 4: configs and UI-test harness
+
+### F20 (medium, routed Part 11 F17, decided: worth it): `data-view.spec.ts` Stop step proves no cancellation
+
+- `ST/ui/data-view.spec.ts:1520-1571` (Stop step), `:976-991` (the `E_CANCELLED` port snapshot,
+  `delayMs: 5000`); `ST/ui/support/mockStreamBrowser.js` (`onSend`: `setTimeout(reply, delayMs)`);
+  `ST/ui/support/mockRuntime.ts` (`opsCancel` answered by the wildcard `null`).
+- The canned `E_CANCELLED` arrives 5 s after the request whether or not Stop was pressed or
+  `opsCancel` was sent. A regression where Stop sends no `opsCancel`, or the wrong op id, still
+  passes: the button disables when the reply lands either way. The step also costs a fixed 5 s.
+- Decision: worth it. Two parts, all in own files plus the Part 11 spec (Stream C may edit):
+  1. Core (must): after the Stop click, assert `control.log()` holds one `opsCancel` whose `id`
+     equals the `opId` of the in-flight data request (`stream.ops()` exposes the request payloads;
+     keep `opId` in `SeenPortRequest` for this).
+  2. Gate (should): a Studio-local `untilCancel?: true` on the snapshot (a wrapper type in
+     `mockStream.ts`, so Part 5's `PortSnapshot` stays unchanged). `mockStreamBrowser.js` holds the
+     reply in a `Map<opId, reply>` instead of scheduling it, and exposes
+     `globalThis.__kiraReleaseCancelled(opId)`. Studio's `installControlMocks` passes a
+     `resolveMissingBody` that, for `IPC.opsCancel`, fires `void page.evaluate(release, args.id)`
+     and returns `'null'` (the hook already exists and is Studio-owned; `PW` needs no change).
+     A safety timeout (10 s) still replies so a broken gate fails on the log assertion, not a hang.
+  Then the spec proves "Stop sends the cancel, and the view recovers only because of it", and drops
+  the fixed 5 s wait.
+- Code-read.
+
+### F21 (low): control-mock FQN table has gaps and cites a guard that does not exist
+
+- `ST/ui/support/mockRuntime.ts:20-170` (`FQN_SUFFIX_BY_IPC_KEY`), doc comment at `:172-178`
+  ("§5.5's `mockRuntime.spec.ts` guards both directions").
+- Verified (diff of the generated bindings' `$Call.ByName` literals against the table): 122 bound
+  methods, 120 mapped. Missing: `LifecycleService.WindowFlushed` and `TerminalService.Shutdown`.
+  `WindowFlushed` is the ack `createTabsStore`'s close-time flush sends
+  (`PW/state/createTabsStore.ts:250`), so no UI spec can drive the window-close flush (the 1000 ms
+  debounced-save window, §5.2) without hitting `E_FIXTURE_MISS`. No UI spec covers that flush today
+  (git grep: no `FlushBeforeClose` emit in `ST/ui`).
+- No `mockRuntime.spec.ts` exists anywhere (git ls-files); nothing guards the table against the
+  bindings.
+- `ST/ui/support/ipcChannels.ts:15-16` keeps `port` and `engineState`, both dead channels
+  (`SP/events.ts:7`; Go `ChannelEngineState` is never emitted, `SI/bridge/events.go:81`); no spec
+  reads either (git grep).
+- Fix: add the two entries (`windowFlushed` in `ipcChannels.ts` too); add an own unit spec that
+  reads `frontend/bindings/**` `$Call.ByName` literals and asserts set equality with the table's
+  values (the bindings exist wherever `typecheck:web:studio` runs); fix the comment to name it.
+  Drop the two dead `IPC` keys. Optional, worth one UI spec: emit the window flush event inside the
+  debounce window and assert one `tabsSave` with the new state, then `windowFlushed`.
+
+### F22 (low): `openRowMenu` waits a blind 400 ms on every call
+
+- `ST/ui/support/tree.ts:154-160`. 95 call sites (git grep) pay `waitForTimeout(400)` after
+  `scrollIntoViewIfNeeded`: about 38 s of fixed sleep per full `ui` run, and still a guess under
+  load, the exact pattern the file's own header (`:16-24`) rejects for `scrollAndSettle`.
+- Same class, smaller: `ST/ui/tree.spec.ts:386-590` (12 sites of `waitForTimeout(100)`) where the
+  next line is a non-retrying `boundingBox()` read (`:404-410`, `:417-422`); a slow frame reads
+  stale geometry.
+- Fix: in `openRowMenu`, record `scrollTop` before and after `scrollIntoViewIfNeeded` (one
+  `evaluate`) and await the `scroll` event only when it moved (reuse `scrollAndSettle`'s promise
+  shape); then wait two rAFs. In `tree.spec.ts`, replace each sleep before a geometry read with an
+  `expect.poll` on the measured value, or a two-rAF settle.
+- Code-read.
+
+### Block 4: checked, nothing to report
+
+- `vite.config.ts` delegates to `PW/viteAppConfig.ts`; `index.html` CSP (`default-src 'self'`,
+  no `unsafe-eval`); `tsconfig*.json` cover `fonts.ts` and every own `src/**`.
+- `playwright.config.ts`: `ui-timing` serial after `ui` (decided, P27); `retries: CI ? 1 : 0`;
+  `perf.spec.ts:196-206`'s "35 ms/frame at idle" note still matches this sandbox (block 5:
+  p50 33-41 ms).
+- `mockStreamBrowser.js`: a miss frame exists for every `DATA_OP` (`mockStream.ts:159-171`), so a
+  missing stream fixture fails loudly, not as a hang.
+- `WILDCARD_DEFAULTS`/`inferredBootMode`/`CANONICAL_OPTIONS`: each default is a benign empty
+  answer; a spec that needs a real shape supplies a snapshot, and an unmapped call fails with
+  `E_FIXTURE_MISS`. No masking found beyond F20's `opsCancel`.
+- `clock.ts`, `clipboard.ts`, `connect.ts`, `grid.ts`, `editor*.ts`, `measure.ts` (except the
+  percentile question, block 5), `bootSnapshots.ts`, `fixtures.ts`, `global.d.ts`: no defect.
+- `ST/perf/perfProbe.ts` vs `PW/testing/ui/perfProbe.ts`: different measures (process-tree RSS vs
+  WebKit RSS, frame lists vs live rAF capture); overlap is names, not logic. Not reported.
