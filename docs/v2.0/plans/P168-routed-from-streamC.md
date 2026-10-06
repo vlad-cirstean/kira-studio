@@ -43,3 +43,5 @@ Fixes need files owned by another Part. Stream C did not edit them.
   it as a NULL marker, omits Copy body, and docks a null value. No own spec covers the stream view.
 - Fix: add one assertion that a tombstone row's `stream-body` cell shows the NULL marker (not empty
   text) and its row menu has no `copy-body` item.
+- Hook for the assertion: the marker is `[data-testid="stream-body-null"]` inside `stream-body`
+  (the cell also carries `aria-label="null (tombstone)"`).
