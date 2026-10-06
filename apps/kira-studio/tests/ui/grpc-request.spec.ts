@@ -846,6 +846,7 @@ test('gRPC request — a stored streaming history entry with elided messages sho
       truncated: false,
     })),
     messagesElided: true,
+    metadataElided: true,
     header: [],
     trailer: [],
   };
@@ -866,6 +867,9 @@ test('gRPC request — a stored streaming history entry with elided messages sho
   await expect(page.locator('[data-testid="grpc-history-band"]')).toBeVisible();
   await expect(page.locator('[data-testid="grpc-history-messages-elided"]')).toHaveText(
     'Showing the first 100 of 137 messages.',
+  );
+  await expect(page.locator('[data-testid="grpc-history-metadata-elided"]')).toHaveText(
+    'Metadata, headers and trailers were not stored — too large for history.',
   );
   await page.click('[data-testid="grpc-response-pane-messages"]');
   // The message list is virtualized (finding 11) — only the visible window actually renders, so

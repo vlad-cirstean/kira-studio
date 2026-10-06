@@ -94,6 +94,7 @@ const messages = computed(() =>
 const requestMessageTruncated = computed(
   () => viewing.value?.snapshot.requestMessageTruncated ?? false,
 );
+const metadataElided = computed(() => viewing.value?.snapshot.metadataElided ?? false);
 // Round-2 review finding 10: the summary line used to read messages.length — capped at
 // MAX_LIVE_MESSAGES for a live call (state.ts) and at maxGrpcStoredMessages for a stored entry
 // (finding 8) — right next to a separate elided-messages strip stating the true, uncapped total,
@@ -362,6 +363,12 @@ onUnmounted(() => {
     >
       <AlertDescription>
         The stored request message was cut at 256 KB and is not shown.
+      </AlertDescription>
+    </Alert>
+
+    <Alert v-if="metadataElided" variant="note" data-testid="grpc-history-metadata-elided">
+      <AlertDescription>
+        Metadata, headers and trailers were not stored — too large for history.
       </AlertDescription>
     </Alert>
 

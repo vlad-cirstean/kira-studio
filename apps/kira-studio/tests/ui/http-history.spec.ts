@@ -216,6 +216,7 @@ test('Http history — restore, and the storage notices', async ({ relaunch }) =
     bodyStored: true,
     bodyStorageTruncated: true,
     requestBodyStorageTruncated: false,
+    requestFieldsElided: true,
   };
   const BINARY_SNAPSHOT = {
     entry: BINARY,
@@ -262,6 +263,7 @@ test('Http history — restore, and the storage notices', async ({ relaunch }) =
   // View the binary entry: the dedicated note renders, and no editor is mounted for it.
   await rows.nth(1).click();
   await expect(page.locator('[data-testid="http-history-binary-note"]')).toBeVisible();
+  await expect(page.locator('[data-testid="http-history-fields-elided"]')).toHaveCount(0);
   await expect(
     page.locator('[data-testid="http-response-pane"] .response-body .monaco-host'),
   ).toHaveCount(0);
@@ -271,6 +273,9 @@ test('Http history — restore, and the storage notices', async ({ relaunch }) =
   await rows.nth(0).click();
   await expect(page.locator('[data-testid="http-history-truncated"]')).toBeVisible();
   await expect(page.locator('[data-testid="http-body-truncated"]')).toBeVisible();
+  await expect(page.locator('[data-testid="http-history-fields-elided"]')).toHaveText(
+    'Request field values were not stored — too large for history.',
+  );
 });
 
 test('Http history — compare two responses', async ({ relaunch }) => {
@@ -646,6 +651,7 @@ test('Http history — a stored entry’s Raw view shows what was sent (P18 D8)'
     bodyStored: true,
     bodyStorageTruncated: false,
     requestBodyStorageTruncated: true,
+    requestFieldsElided: true,
   };
 
   const CONTROL: ControlSnapshot[] = [
@@ -662,6 +668,7 @@ test('Http history — a stored entry’s Raw view shows what was sent (P18 D8)'
 
   await expect(page.locator('[data-testid="http-raw-reconstructed"]')).toBeVisible();
   await expect(page.locator('[data-testid="http-history-request-truncated"]')).toBeVisible();
+  await expect(page.locator('[data-testid="http-history-request-fields-elided"]')).toBeVisible();
 
   const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
   await expect(requestEditor).toBeVisible();

@@ -75,6 +75,9 @@ const storedResponseText = computed(() => {
 const requestBodyStorageTruncated = computed(
   () => viewingStored.value?.snapshot.requestBodyStorageTruncated ?? false,
 );
+const requestFieldsElided = computed(
+  () => viewingStored.value?.snapshot.requestFieldsElided ?? false,
+);
 
 const FIDELITY_TEXT: Readonly<Record<HttpWireFidelity, string>> = {
   exact: 'These are the exact bytes this app wrote to the connection.',
@@ -228,6 +231,11 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
         <Alert v-if="requestBodyStorageTruncated" variant="note" data-testid="http-history-request-truncated">
           <AlertDescription>
             Only the first 256 KB of this request's body was kept in history.
+          </AlertDescription>
+        </Alert>
+        <Alert v-if="requestFieldsElided" variant="note" data-testid="http-history-request-fields-elided">
+          <AlertDescription>
+            Request field values were not stored — too large for history.
           </AlertDescription>
         </Alert>
       </template>

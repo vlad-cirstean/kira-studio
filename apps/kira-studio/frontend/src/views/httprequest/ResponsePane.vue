@@ -152,6 +152,7 @@ const redirectCaption = computed(() => {
 // response carries neither flag). Separate from, and additional to, bodyTruncated's own transfer
 // message (F9) — one is about the transfer, the other about what history chose to keep.
 const bodyStorageTruncated = computed(() => viewing.value?.snapshot.bodyStorageTruncated ?? false);
+const requestFieldsElided = computed(() => viewing.value?.snapshot.requestFieldsElided ?? false);
 const bodyNotStored = computed(() => (viewing.value ? !viewing.value.snapshot.bodyStored : false));
 
 const viewingTime = computed(() => {
@@ -369,6 +370,11 @@ onUnmounted(() => {
     <Alert v-if="bodyStorageTruncated" variant="note" data-testid="http-history-truncated">
       <AlertDescription>
         Only the first 256 KB of this response was kept in history.
+      </AlertDescription>
+    </Alert>
+    <Alert v-if="requestFieldsElided" variant="note" data-testid="http-history-fields-elided">
+      <AlertDescription>
+        Request field values were not stored — too large for history.
       </AlertDescription>
     </Alert>
     <Alert v-if="bodyNotStored" variant="note" data-testid="http-history-binary-note">
