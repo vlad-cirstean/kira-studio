@@ -9,7 +9,7 @@ import '@workbench/testing/unit/window';
 
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { HttpResponseWire } from '@shared/domain/http';
-import { deferred } from '@workbench/testing/unit/async';
+import { deferred, sleep } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -17,6 +17,7 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
+const { queryClient } = await import('@workbench/state/queryClient');
 restoreAfterEach(control);
 // P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
@@ -25,6 +26,13 @@ restoreAfterEach(control);
 // benign default.
 beforeEach(() => {
   (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+  // send()'s pre-flight loads the tree and environments; unstubbed they never settle in this harness.
+  void queryClient.invalidateQueries({ refetchType: 'none' });
+  (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
+    async () => ({ collections: [], items: [] });
+  (
+    control as unknown as { variablesListEnvironments: typeof control.variablesListEnvironments }
+  ).variablesListEnvironments = async () => [];
 });
 const { openApiRequestTab } = await import('../../frontend/src/api/tabs');
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
@@ -58,7 +66,7 @@ describe('closing an HTTP tab mid-send stops the op and leaks no history runtime
 
     const httpRequestViewStore = useHttpRequestViewStore();
     const sendPromise = httpRequestViewStore.send(tabId);
-    await Promise.resolve(); // let send() reach and issue the await
+    await sleep(); // let pre-flight finish so httpSend is in flight
 
     const opId = httpRequestViewStore.runtime[tabId]?.opId ?? undefined;
     expect(opId).toBeTruthy();
@@ -75,5 +83,67 @@ describe('closing an HTTP tab mid-send stops the op and leaks no history runtime
     // Neither runtime was resurrected by the post-await path.
     expect(httpRequestViewStore.runtime[tabId]).toBeUndefined();
     expect(useHttpHistoryStore().runtime[tabId]).toBeUndefined();
+  });
+});
+
+// P168 Part 10 F15: the variable/tree load ran outside send()'s try, so a rejection wedged the tab
+// in 'running', Stop cancelled an op Go never saw, and a tab closed mid-load still sent.
+describe('send() pre-flight (P168 Part 10 F15)', () => {
+  function stubSend() {
+    const sent: string[] = [];
+    (control as unknown as { httpSend: typeof control.httpSend }).httpSend = async (args) => {
+      sent.push(args.opId);
+      return response();
+    };
+    return sent;
+  }
+
+  test('a failed pre-flight load surfaces as an error and a retry can send', async () => {
+    const tabId = openApiRequestTab();
+    const sent = stubSend();
+    let failing = true;
+    (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
+      async () => {
+        if (failing) throw new Error('bridge down');
+        return { collections: [], items: [] };
+      };
+    const store = useHttpRequestViewStore();
+
+    await store.send(tabId);
+    expect(store.runtime[tabId]?.status).toBe('error');
+    expect(store.runtime[tabId]?.opId).toBeNull();
+    expect(sent).toEqual([]);
+
+    failing = false;
+    await store.send(tabId);
+    expect(sent).toHaveLength(1);
+    expect(store.runtime[tabId]?.status).toBe('idle');
+  });
+
+  test('closing the tab or pressing Stop during pre-flight sends nothing', async () => {
+    const sent = stubSend();
+    const gate = deferred<Awaited<ReturnType<typeof control.collectionsList>>>();
+    (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
+      () => gate.promise;
+    const store = useHttpRequestViewStore();
+
+    const closedTab = openApiRequestTab();
+    const stoppedTab = openApiRequestTab();
+    const closedSend = store.send(closedTab);
+    const stoppedSend = store.send(stoppedTab);
+    await Promise.resolve();
+
+    useTabsStore().closeTab(closedTab);
+    store.stop(stoppedTab);
+    expect(store.runtime[stoppedTab]?.status).toBe('cancelled');
+
+    gate.resolve({ collections: [], items: [] } as Awaited<
+      ReturnType<typeof control.collectionsList>
+    >);
+    await Promise.all([closedSend, stoppedSend]);
+
+    expect(sent).toEqual([]);
+    expect(store.runtime[closedTab]).toBeUndefined();
+    expect(store.runtime[stoppedTab]?.status).toBe('cancelled');
   });
 });

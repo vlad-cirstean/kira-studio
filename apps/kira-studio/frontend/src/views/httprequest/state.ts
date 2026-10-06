@@ -102,6 +102,8 @@ export function resolveTabState(
 interface HttpRequestViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   opId: string | null;
+  /** True while send() resolves variables, before Go knows the op: Stop cancels locally. */
+  preflight: boolean;
   // P10 D15/C5: timeline is the failed send's own partial timeline (ipcerr.Error.Details,
   // mapHttpError) — undefined for every failure that isn't an HTTP send's own transport/body-read
   // error (classifySendErr is the only producer), so TimelinePane.vue's failure branch has
@@ -111,7 +113,7 @@ interface HttpRequestViewRuntime {
 }
 
 function defaultRuntime(): HttpRequestViewRuntime {
-  return { status: 'idle', opId: null, error: null, response: null };
+  return { status: 'idle', opId: null, preflight: false, error: null, response: null };
 }
 
 // P90 §2.8: drops every null (inherit) leaf, so Go's Options only ever sees what this request
@@ -164,25 +166,25 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
     const opId = crypto.randomUUID();
     rt.status = 'running';
     rt.opId = opId;
+    rt.preflight = true;
     rt.error = null;
 
-    // P112: variablesForSend awaits the tree/environments/variable-row queries (cache-first;
-    // refetches only when a broadcast invalidated them) instead of reading a sync in-store cache.
-    const { collectionId, environmentId, values, secretNames } = await variablesForSend(
-      tabId,
-      tab.state.itemId,
-    );
-    // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour
-    // past this point: no await, no dynamic-generators chunk fetched or parsed. Only a request that
-    // actually references a dynamic value pays for a second pass (over a handful of short strings —
-    // the identical computation the live-preview chip already runs on every keystroke, F2) and the
-    // one memoised chunk load (paid once per session, views/grid/fakeData/generate.ts's own technique).
-    const first = resolveTabState(tab.state, values, secretNames);
-    const resolved = first.refs.some((r) => r.kind === 'dynamic')
-      ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())
-      : first;
-
     try {
+      // P112: variablesForSend awaits the tree/environments/variable-row queries (cache-first;
+      // refetches only when a broadcast invalidated them) instead of reading a sync-in-store cache.
+      const { collectionId, environmentId, values, secretNames } = await variablesForSend(
+        tabId,
+        tab.state.itemId,
+      );
+      // P6 D7: no {{$...}} reference means no await and no dynamic-generators chunk fetch.
+      const first = resolveTabState(tab.state, values, secretNames);
+      const resolved = first.refs.some((r) => r.kind === 'dynamic')
+        ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())
+        : first;
+      // Tab closed or Stop pressed during pre-flight: Go never saw this op, so never send it.
+      if (!findHttpRequestTab(tabId) || rt.opId !== opId) return;
+      rt.preflight = false;
+
       const response = await control.httpSend({
         opId,
         tabId,
@@ -218,6 +220,7 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
       if (!findHttpRequestTab(tabId)) return; // P108 F8: same guard, the failure path's own half
       if (rt.opId !== opId) return;
       rt.opId = null;
+      rt.preflight = false;
       const failure = classifyLoadError(err);
       if (failure.kind === 'cancelled') {
         rt.status = 'cancelled';
@@ -227,6 +230,7 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
       // never actually 'disconnected' — but even if it were, applyLoadFailure/unmarkHydrated are
       // deliberately not called here: a Reconnect gate has nothing to gate on a connectionless tab.
       rt.status = 'error';
+      rt.response = null;
       // P10 D15: classifyLoadError (viewOp.ts) is shared by every view's own load path and stays at
       // {kind, code, message} — widening it app-wide for one HTTP-only field would reach five other
       // views that have no use for it. `err.details` is control.ts's own unwrap() addition, read
@@ -241,7 +245,14 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
   }
 
   function stop(tabId: string): void {
-    stopOp(runtime[tabId]);
+    const rt = runtime[tabId];
+    if (rt?.preflight) {
+      rt.preflight = false;
+      rt.opId = null;
+      rt.status = 'cancelled';
+      return;
+    }
+    stopOp(rt);
   }
 
   return { runtime, send, stop };

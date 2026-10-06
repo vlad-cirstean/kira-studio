@@ -67,6 +67,8 @@ const MAX_LIVE_MESSAGES = 10_000;
 interface GrpcRequestViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   opId: string | null;
+  /** True while call() resolves variables, before Go knows the op: Stop cancels locally. */
+  preflight: boolean;
   /** F5/P21 round 1: the streaming event subscriber's own key, set alongside `opId` when a call
    *  starts and never cleared early the way `opId` is. Messages arrive over the event channel
    *  while the call's own CallResult returns over the control plane — a separate HTTP request —
@@ -106,6 +108,7 @@ function defaultRuntime(): GrpcRequestViewRuntime {
   return {
     status: 'idle',
     opId: null,
+    preflight: false,
     lastCallId: null,
     notifiedCallId: null,
     streaming: false,
@@ -222,15 +225,15 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
     // otherwise land after a newer one and clobber it.
     const myGen = ++rt.genId;
 
-    // P112: this call needs only the two owner ids (GrpcService.Describe resolves values itself),
-    // never a variable value — apiIdsForTab is variablesForSend's ids-only half.
-    const { collectionId, environmentId } = await apiIdsForTab(tabId, tab.state.itemId);
     try {
+      // P112: this call needs only the two owner ids (GrpcService.Describe resolves values itself),
+      // never a variable value — apiIdsForTab is variablesForSend's ids-only half.
+      const { collectionId, environmentId } = await apiIdsForTab(tabId, tab.state.itemId);
       let target = tab.state.target;
       let metadata: { name: string; value: string }[] = [];
       if (tab.state.descriptorMode === 'reflection') {
         const resolved = await resolveForDescribe(tabId);
-        if (!resolved) return;
+        if (!resolved || rt.genId !== myGen) return;
         target = resolved.target;
         metadata = resolved.metadata;
       }
@@ -315,16 +318,21 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
     rt.messageBytes = 0;
     rt.streaming = streaming;
 
-    const { collectionId, environmentId, values, secretNames } = await variablesForSend(
-      tabId,
-      tab.state.itemId,
-    );
-    const first = resolveGrpcTabState(tab.state, values, secretNames);
-    const resolved = first.refs.some((r) => r.kind === 'dynamic')
-      ? resolveGrpcTabState(tab.state, values, secretNames, await loadDynamicGenerator())
-      : first;
+    rt.preflight = true;
 
     try {
+      const { collectionId, environmentId, values, secretNames } = await variablesForSend(
+        tabId,
+        tab.state.itemId,
+      );
+      const first = resolveGrpcTabState(tab.state, values, secretNames);
+      const resolved = first.refs.some((r) => r.kind === 'dynamic')
+        ? resolveGrpcTabState(tab.state, values, secretNames, await loadDynamicGenerator())
+        : first;
+      // Tab closed or Stop pressed during pre-flight: Go never saw this op, so never call it.
+      if (!findGrpcRequestTab(tabId) || rt.opId !== opId) return;
+      rt.preflight = false;
+
       const result = await control.grpcCall({
         opId,
         tabId,
@@ -363,8 +371,9 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
         useGrpcCallHistoryStore().noteGrpcCallRecorded(tabId);
       }
     } catch (err) {
-      if (rt.opId !== opId) return;
+      if (!findGrpcRequestTab(tabId) || rt.opId !== opId) return;
       rt.opId = null;
+      rt.preflight = false;
       const failure = classifyLoadError(err);
       if (failure.kind === 'cancelled') {
         rt.status = 'cancelled';
@@ -376,7 +385,14 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
   }
 
   function stop(tabId: string): void {
-    stopOp(runtime[tabId]);
+    const rt = runtime[tabId];
+    if (rt?.preflight) {
+      rt.preflight = false;
+      rt.opId = null;
+      rt.status = 'cancelled';
+      return;
+    }
+    stopOp(rt);
   }
 
   return { runtime, schemaRuntime, loadSchema, call, stop };

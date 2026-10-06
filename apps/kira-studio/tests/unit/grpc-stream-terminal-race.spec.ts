@@ -32,6 +32,13 @@ const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
 const { useGrpcRequestViewStore } = await import('../../frontend/src/views/grpcrequest/state');
 const grpcRequestViewStore = useGrpcRequestViewStore();
 
+// call()'s pre-flight loads the tree and environments; unstubbed they never settle in this harness.
+(
+  control as unknown as { variablesListEnvironments: typeof control.variablesListEnvironments }
+).variablesListEnvironments = async () => [];
+(control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
+  async () => ({ collections: [], items: [] });
+
 const originalGrpcCall = control.grpcCall;
 const originalGrpcHistoryList = control.grpcHistoryList;
 afterEach(() => {
@@ -261,5 +268,72 @@ describe('live-stream message buffer (P21 round 2 performance finding 6)', () =>
 
     grpcCallDeferred.resolve(terminalResult());
     await callPromise;
+  });
+});
+
+// P168 Part 10 F21: the variable load ran outside call()'s try, so a rejection wedged the tab in
+// 'running', Stop cancelled an op Go never saw, and a tab closed mid-load still called.
+describe('call() pre-flight (P168 Part 10 F21)', () => {
+  test('a closed tab or a Stop during pre-flight issues no call', async () => {
+    const gate = deferred<Awaited<ReturnType<typeof control.variablesListEnvironments>>>();
+    const original = control.variablesListEnvironments;
+    (
+      control as unknown as { variablesListEnvironments: typeof control.variablesListEnvironments }
+    ).variablesListEnvironments = () => gate.promise;
+    const { queryClient } = await import('@workbench/state/queryClient');
+    void queryClient.invalidateQueries({ refetchType: 'none' });
+    let called = 0;
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+    (control as any).grpcCall = async () => {
+      called++;
+      return terminalResult();
+    };
+
+    try {
+      const closedTab = setUpStreamingTab();
+      const stoppedTab = setUpStreamingTab();
+      const closed = grpcRequestViewStore.call(closedTab);
+      const stopped = grpcRequestViewStore.call(stoppedTab);
+      await Promise.resolve();
+
+      const { useTabsStore } = await import('../../frontend/src/state/tabs');
+      useTabsStore().closeTab(closedTab);
+      grpcRequestViewStore.stop(stoppedTab);
+      expect(grpcRequestViewStore.runtime[stoppedTab]?.status).toBe('cancelled');
+
+      gate.resolve([]);
+      await Promise.all([closed, stopped]);
+      expect(called).toBe(0);
+      expect(grpcRequestViewStore.runtime[closedTab]).toBeUndefined();
+    } finally {
+      (
+        control as unknown as {
+          variablesListEnvironments: typeof control.variablesListEnvironments;
+        }
+      ).variablesListEnvironments = original;
+    }
+  });
+
+  test('a failed pre-flight load surfaces as an error and a retry can call', async () => {
+    const { queryClient } = await import('@workbench/state/queryClient');
+    void queryClient.invalidateQueries({ refetchType: 'none' });
+    const id = setUpStreamingTab();
+    let failing = true;
+    (
+      control as unknown as { variablesListEnvironments: typeof control.variablesListEnvironments }
+    ).variablesListEnvironments = async () => {
+      if (failing) throw new Error('bridge down');
+      return [];
+    };
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+    (control as any).grpcCall = async () => terminalResult();
+
+    await grpcRequestViewStore.call(id);
+    expect(grpcRequestViewStore.runtime[id]?.status).toBe('error');
+    expect(grpcRequestViewStore.runtime[id]?.opId).toBeNull();
+
+    failing = false;
+    await grpcRequestViewStore.call(id);
+    expect(grpcRequestViewStore.runtime[id]?.status).toBe('idle');
   });
 });
