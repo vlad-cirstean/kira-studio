@@ -161,9 +161,22 @@ var classifyOpErrorRules = []classifyRule{
 	}},
 }
 
+// withoutPathListLines drops tab-indented lines, where git lists affected paths (a path may spell
+// any pattern in the table).
+func withoutPathListLines(stderr string) string {
+	lines := strings.Split(stderr, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if !strings.HasPrefix(line, "\t") {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
+}
+
 func ClassifyOpError(stderr string, exitCode int) (kind, message string) {
 	_ = exitCode // reserved for a future row that needs it; no row in this table does yet.
-	lower := strings.ToLower(stderr)
+	lower := strings.ToLower(withoutPathListLines(stderr))
 	message = strings.TrimSpace(stderr)
 
 	for _, rule := range classifyOpErrorRules {

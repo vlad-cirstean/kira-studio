@@ -432,10 +432,16 @@ func prepareBranchCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op
 	if err := validOpArg("startPoint", op.StartPoint); err != nil {
 		return prepared{}, err
 	}
-	if !op.Checkout {
-		return prepared{argvList: [][]string{gitops.BranchCreateArgs(op.Name, op.StartPoint, op.Track)}}, nil
+	if op.Track != nil {
+		if err := validOpArg("track", *op.Track); err != nil {
+			return prepared{}, err
+		}
 	}
-	argvList := [][]string{gitops.BranchCreateAndSwitchArgs(op.Name, op.StartPoint)}
+	create := gitops.BranchCreateArgs(op.Name, op.StartPoint)
+	if op.Checkout {
+		create = gitops.BranchCreateAndSwitchArgs(op.Name, op.StartPoint)
+	}
+	argvList := [][]string{create}
 	if op.Track != nil {
 		argvList = append(argvList, gitops.BranchSetUpstreamArgs(op.Name, *op.Track))
 	}
@@ -849,7 +855,7 @@ func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel stri
 			Label:       fmt.Sprintf("Reset (%s) to %s", op.Mode, labelTarget), // F9: byte-identical, guarded by a test.
 			RecoverySha: statusResult.Branch.OID,
 			CreatedAt:   time.Now().UnixMilli(),
-			Replay:      [][]string{gitops.ResetArgs(op.Mode, statusResult.Branch.OID)}, // MODE-MATCHED.
+			Replay:      [][]string{gitops.UndoResetArgs(op.Mode, statusResult.Branch.OID)}, // hard replays as --keep.
 			OriginConn:  string(conn), OriginLabel: connLabel,
 		}
 	}
@@ -1008,7 +1014,7 @@ func (e *RepoEntry) captureBranchDeleteUndo(ctx context.Context, conn ConnID, co
 		}
 	}
 
-	replay := [][]string{{"update-ref", "refs/heads/" + name, sha}}
+	replay := [][]string{gitops.RecreateRefArgs("refs/heads/"+name, sha)}
 	for _, line := range configLines {
 		if idx := strings.IndexByte(line, ' '); idx != -1 {
 			replay = append(replay, []string{"config", line[:idx], line[idx+1:]})

@@ -27,5 +27,5 @@ func TagDeleteArgs(name string) []string {
 // upstream's two (undoAnnotatedTagArgs/undoLightweightTagArgs) — their bodies are identical, and
 // what differs is only which sha the caller captured, which is the caller's own decision.
 func UndoTagArgs(name, sha string) []string {
-	return []string{"update-ref", "refs/tags/" + name, sha}
+	return RecreateRefArgs("refs/tags/"+name, sha)
 }

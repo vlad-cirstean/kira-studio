@@ -13,3 +13,12 @@ func ResetArgs(mode, target string) []string {
 func ResetKeepArgs(target string) []string {
 	return []string{"reset", "--keep", target}
 }
+
+// UndoResetArgs builds the replay of a reset back to target. A hard reset replays as --keep: the
+// user may have edited since, and --keep refuses rather than destroy those edits.
+func UndoResetArgs(mode, target string) []string {
+	if mode == "hard" {
+		return ResetKeepArgs(target)
+	}
+	return ResetArgs(mode, target)
+}

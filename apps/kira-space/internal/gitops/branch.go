@@ -2,13 +2,16 @@ package gitops
 
 import "regexp"
 
-// BranchCreateArgs builds `git branch <name> <startPoint> [-t <track>]`.
-func BranchCreateArgs(name, startPoint string, track *string) []string {
-	argv := []string{"branch", name, startPoint}
-	if track != nil {
-		argv = append(argv, "-t", *track)
-	}
-	return argv
+// BranchCreateArgs builds `git branch <name> <startPoint>`. An explicit upstream goes through
+// BranchSetUpstreamArgs: `git branch` has no `-t <upstream>` form, `-t` is a bare flag.
+func BranchCreateArgs(name, startPoint string) []string {
+	return []string{"branch", name, startPoint}
+}
+
+// RecreateRefArgs builds `git update-ref <ref> <sha> ""`: the empty old value makes git refuse
+// when the ref exists again, so an undo never moves a ref recreated outside the app.
+func RecreateRefArgs(ref, sha string) []string {
+	return []string{"update-ref", ref, sha, ""}
 }
 
 // BranchCreateAndSwitchArgs builds `git switch -c <name> <startPoint>`.

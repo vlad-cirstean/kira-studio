@@ -346,3 +346,12 @@ func TestClassifyRemoteError_EmptyPorcelainFallsThroughToStderr(t *testing.T) {
 		t.Fatalf("got %q, want RemoteRefMissing", kind)
 	}
 }
+
+func TestClassifyOpError_PathListLinesDoNotClassify(t *testing.T) {
+	t.Parallel()
+	stderr := "error: Your local changes to the following files would be overwritten by checkout:\n" +
+		"\tdocs/errors/already exists.md\nPlease commit your changes or stash them before you switch branches.\nAborting\n"
+	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "DirtyWorktree" {
+		t.Fatalf("kind = %q, want DirtyWorktree", kind)
+	}
+}
