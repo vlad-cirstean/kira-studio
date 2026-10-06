@@ -3,6 +3,42 @@
 Plan: `P168-part8-go-base.md`. Base `af3bd8c`; HEAD reviewed `b421550` (plan commit on `820d476`).
 Reviewer reports only. Fixer rules: plan §8.
 
+## Summary
+
+15 findings: 0 high, 2 medium (F12, F13), 13 low. Routed items owned here: F1
+(Part 14 F4), F2 (Part 17 F2), F11 (Part 12 F12); Part 12 F17 state recorded in block 7 (blocked on
+Docker). Nothing routed out to Stream B or C (no fix needs a Space or Stream C file; every
+signature touched stays stable). Workflow fixes: F13 (patch files under `docs/pending-changes/`).
+No finding needs a design decision (none tagged DESIGN-DECISION).
+
+## Checks run (HEAD of this review)
+
+- `go build ./...`: pass. `go vet ./internal/...`: clean.
+- `go test -race -count=1 ./internal/...`: pass (`localsock` has no tests; F1 adds one).
+- `go test -race` over Studio one-hop callers (`storage/...`, `bridge`, `dbmcp/...`,
+  `connections/...`, `adapterhost/...`, `oplog/...`, `preconnect/...`, `mcpinstall/...`,
+  `mcpauth/...`, root `layering_test.go`): pass. Container-gated cases skip (no Docker).
+- `go test` over Space callers, read only (`gitaskpass`, `gitsock`, `ade`, `adeagent`, `ghclient`,
+  `gitclient`, `gitprepare`, `codeworkspace`): pass.
+- `bun run lint` and `bun run typecheck`: pass (pre-commit, every block commit). `bun run lint:go`:
+  0 issues. `bun run lint:dead`: pass with warnings (7 duplicate exports at `warn` by design;
+  configuration hints, F15).
+- `sh scripts/verify-packaging.sh`: first run failed S6 because this worktree's
+  `frontend/dist` was a test build (environment state, not a defect); after `bun run build:studio`
+  all checks pass. Skipped off darwin: A1/A3/A5/A6/N2 and A4/N3 for both apps (no bundle), and
+  shellcheck on `install.sh` (not installed).
+- `sh -n` on every owned `.sh`, both hooks and the Claude hook: clean.
+- Mutation smoke: `sh scripts/mutation/run.sh go internal/notify`: 6 mutants (2 killed, 2 survived,
+  2 not covered), summary written. `bun tools/mutation/summarize.ts` on a hand-made run dir with a
+  Stryker-shaped TS report and a red Go unit: both parsed.
+- Scratch probes (all deleted, none committed): `localsock` dial loop racing `Close` under `-race`
+  (F1); `RandHex(0)` (F3); `toolexec` SIGTERM-ignoring grandchild (F4); `sqlitex.Open` sidecar
+  modes under umask 022 (candidate 6 dropped); knip with an unused `.vue` file (F15 hint check);
+  `areas.json` glob check.
+- Not available here: Docker (`docker info` fails), `shellcheck`, `actionlint`, macOS. Workflows,
+  `install.sh`, darwin cgo probes and every macOS-only claim were read by hand; F7, F10 and F12 are
+  marked unverified on macOS.
+
 ## Findings
 
 ### Block 1: listeners and RPC
@@ -78,7 +114,9 @@ Block 1 other checks, nothing filed:
   `PI/gitvsix/install.go:215-232` (`code --install-extension`, `open -R`).
 - `PI/gitprepare/runner.go:138-150` and `PI/adeagent/process.go:138` already fixed this shape
   (P108 Part 15 F8: immediate group SIGKILL after `Wait` on timeout/cancel). `toolexec` lacks it.
-  Confirmed by reading; stdlib `WaitDelay` kills `cmd.Process` only.
+  Confirmed by scratch probe (deleted): a script forking `(trap '' TERM; exec sleep 30) &` under a
+  200 ms ctx; the grandchild is still alive 1.5 s after `Run` returns (`GracefulStopDelay` 300 ms).
+  The existing `TestRun_CancelKillsGrandchild` passes only because its grandchild honours SIGTERM.
 - Fix: in `Run`, after `cmd.Run` returns, if `ctx.Err() != nil` and `cmd.Process != nil`, call
   `killGroup(cmd.Process.Pid, syscall.SIGKILL)` before `stopEscalate()` (same reasoning as
   gitprepare's comment). Optionally move that into `procgroup` as a `stop(cancelled bool)` helper so
@@ -287,8 +325,7 @@ Block 5 other checks, nothing filed:
 - Fix: stop swallowing errors. Distinguish grep's exit 1 (no match) from 2 (error) and fail the
   script on 2. Then either (a) require GNU grep explicitly (`ggrep` on macOS, a `require_cmd`
   check that `grep -P '' </dev/null` works, and `brew install grep` on the CI runner via
-  `docs/pending-changes/`), or (b) port the checks to `rg` (PCRE2 via `rg -P`, already used by
-  agents here) or to a small bun script, matching `check-class-conflicts.ts`. (b) removes the
+  `docs/pending-changes/`), or (b) port the checks to a small bun script, matching `check-class-conflicts.ts`. (b) removes the
   platform dependency; prefer it.
 
 Block 6 other checks, nothing filed:
@@ -358,7 +395,7 @@ Block 6 other checks, nothing filed:
 
 #### F15 (low): stale `flatbuffers` entry in `knip.json` `ignoreDependencies`
 
-- `knip.json:30-32`.
+- `knip.json:29-31`.
 - `bun run lint:dead` passes but prints a configuration hint: "flatbuffers ... Remove from
   ignoreDependencies". The ignore no longer hides anything, so it only adds noise and could mask
   a future genuinely unused root `flatbuffers`. (The other hints, ".vue ... not registered as a
@@ -402,6 +439,24 @@ Block 7 other checks, nothing filed:
   `tools/mutation` deps are not installed here (Stryker core is Apache-2.0; the bun runner's
   licence was not checked from source: recorded as unverified, not a finding).
 
+### Block 8: tests and checks
+
+Checks and probes: see "Checks run" above. Every Part 8 `_test.go` was listed and read at least to
+its test names and setup; the ones guarding a claim in this file were read in full
+(`toolexec/exec_test.go`, `notify/notify_test.go`, `logging/log_test.go`,
+`shell/{closedecision,security}_test.go`). Nothing real filed:
+- Concurrency and protocol tests (`rpcstream/session_test.go`, `notify/ordered_test.go`,
+  `shell/quit_test.go`, `terminal/session_test.go`, `keepawake/*_test.go`,
+  `appupdate/install_test.go`, `startupfail/*_test.go`, `metrics/sampler_test.go`) clear the
+  `CLAUDE.md` bar.
+- `shell/closedecision_test.go` `TestCloseDecision` and `shell/security_test.go` restate short
+  bodies (a four-line decision; a literal options struct), and `logging/log_test.go` tests a
+  five-case switch. Below today's bar, but `CLAUDE.md` says the bar "applies going forward, not
+  as a retroactive cleanup", and none is a true duplicate of another test. Not filed.
+- Coverage gaps worth a test land with their fixes: `localsock` (F1), `terminal.Registry` close
+  race (F5), `adapterhost` cancel-before-run (F11), `toolexec` SIGTERM-ignoring grandchild (F4:
+  extend `TestRun_CancelKillsGrandchild` with a `trap '' TERM` grandchild).
+
 ## Coverage
 
 - Block 1 (listeners and RPC): done. Read in full: `localsock/localsock.go`, `agenthooks/{agenthooks,
@@ -439,3 +494,12 @@ Block 7 other checks, nothing filed:
   `knip.json`, `.golangci.yml`, `.jscpd.json`, `tsconfig.json`, `bunfig.toml`; `biome.json` globs
   and the views restriction block; `go.mod` header; `package.json` workspaces/scripts/deps;
   `.gitignore` via `git check-ignore`. Skimmed: `docs/pending-workflows/mutation.yml` (context).
+- Block 8 (tests and checks): done. All 29 Part 8 test files listed (names and setup); seven read
+  in full (named above). `metrics/probe_darwin_calibration_test.go` not runnable here (darwin cgo).
+
+Coverage statement: all 156 owned files reviewed. Read in full or in the relevant part per block
+above; skimmed with a stated reason: `shell/{menutemplate,deps,wake}.go`, `kirapaths/{env,prod}.go`,
+`appstorage/appstorage.go`, `startupfail/{step,info}.go`, `metrics/{responsible_*,processlist_other,
+probe_other}.go`, `check-ade-colours.sh`, `tools/mutation/{package.json,tsconfig.json,.gitignore}`,
+`docs/pending-workflows/mutation.yml` (context). Not runnable here: Docker-gated tests, darwin cgo
+code, macOS-only scripts and the packaged-bundle checks. Not reached: none.
