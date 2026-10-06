@@ -2,6 +2,7 @@ import { defaultLayout, type Layout, type LayoutPatch } from '@shared/domain/lay
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
+import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
 // P103 Part 2 (§5.3): hoisted from Kira Studio's own state/layout.ts (P100 Part 2's comment on
 // Kira Space's copy: "ported unchanged"). The two apps' cores were already identical — `Layout`
@@ -66,10 +67,13 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
     let unsubscribeChanged: (() => void) | null = null;
 
     async function hydrateLayout(): Promise<void> {
-      applyRemote(await control.layoutGetAll());
-
       unsubscribeChanged?.();
-      unsubscribeChanged = control.onLayoutChanged(applyRemote);
+      unsubscribeChanged = null;
+      unsubscribeChanged = await hydrateThenSubscribe({
+        snapshot: () => control.layoutGetAll(),
+        subscribe: (cb) => control.onLayoutChanged(cb),
+        apply: applyRemote,
+      });
     }
 
     function mergePatch(a: LayoutPatch, b: LayoutPatch): LayoutPatch {

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import type { KeepAwakeStatus } from '../bridge/createCoreControl';
+import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
 // P116 H6: hoisted from Kira Studio's own state/keepAwake.ts — the shared half (hydrate, subscribe,
 // the manual toggle). Kira Studio's own agent-aware Settings leaf (setKeepAwakeAgentAware) is not
@@ -37,10 +38,14 @@ export function createKeepAwakeStore<E extends Record<string, unknown> = Record<
     // initKeepAwake both hydrates and subscribes — a window opened after another window toggled
     // keep-awake must not render stale (SetManual is process-wide, not window-scoped).
     async function initKeepAwake(): Promise<void> {
-      state.status = await control.keepAwakeStatus();
       unsubscribeKeepAwake?.();
-      unsubscribeKeepAwake = control.onKeepAwakeChanged((status) => {
-        state.status = status;
+      unsubscribeKeepAwake = null;
+      unsubscribeKeepAwake = await hydrateThenSubscribe({
+        snapshot: () => control.keepAwakeStatus(),
+        subscribe: (cb) => control.onKeepAwakeChanged(cb),
+        apply: (status) => {
+          state.status = status;
+        },
       });
     }
 

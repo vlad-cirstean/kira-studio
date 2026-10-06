@@ -1,6 +1,7 @@
 import type { AppearanceSettings } from '@shared/domain/settings';
 import { defineStore } from 'pinia';
 import { reactive, ref, toRefs } from 'vue';
+import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
 // P103 Part 2 (§5.3): hoisted from Kira Studio's own state/settings.ts (P100 Part 2's comment on
 // Kira Space's copy: "ported"). `sections`/`Section` stay per-app (each dialog surfaces a
@@ -102,13 +103,16 @@ export function createSettingsStore<S extends string, Se extends SettingsShape, 
       }
 
       async function hydrateSettings(): Promise<void> {
-        applySettings(await control.settingsGetAll());
-
         // Covers a settings change made through any path other than this module's own
         // patchSettings() below (e.g. a direct IPC call) — the same gap connections.ts's
         // onConnectionsChanged closes for the connections list.
         unsubscribeChanged?.();
-        unsubscribeChanged = control.onSettingsChanged(applySettings);
+        unsubscribeChanged = null;
+        unsubscribeChanged = await hydrateThenSubscribe({
+          snapshot: () => control.settingsGetAll(),
+          subscribe: (cb) => control.onSettingsChanged(cb),
+          apply: applySettings,
+        });
       }
 
       // P12 round 1 finding #9: applies `patch` only once the backend confirms it (settingsSet's

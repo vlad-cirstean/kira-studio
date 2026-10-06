@@ -7,6 +7,7 @@ import type {
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { reduceAgentActivity } from './agentActivity';
+import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
 // P127 §2.2: the control seam a host implements over its own bound terminal/agent-hooks surface —
 // method names match Kira Studio's existing bridge/control.ts members, so a host's control object
@@ -69,10 +70,15 @@ export function createAgentSessionsStore(control: AgentSessionsControl) {
     // runtime-only, and a session already in progress simply renders with no activity until its
     // next hook fires.
     async function initAgentSessions(): Promise<void> {
-      applySessions(await control.terminalAgentSessions());
       unsubscribeSessions?.();
       unsubscribeEvent?.();
-      unsubscribeSessions = control.onAgentSessions(applySessions);
+      unsubscribeSessions = null;
+      unsubscribeEvent = null;
+      unsubscribeSessions = await hydrateThenSubscribe({
+        snapshot: () => control.terminalAgentSessions(),
+        subscribe: (cb) => control.onAgentSessions(cb),
+        apply: applySessions,
+      });
       unsubscribeEvent = control.onAgentEvent(applyEvent);
     }
 
