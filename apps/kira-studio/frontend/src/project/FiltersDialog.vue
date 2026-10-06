@@ -206,8 +206,8 @@ const connectionName = computed(
         <div class="flex items-center justify-between">
           <span class="font-semibold text-kira-lg text-fg">Object types</span>
           <span class="flex gap-1">
-            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-md text-primary hover:underline" @click="allKinds">All</button>
-            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-md text-primary hover:underline" @click="noneKinds">None</button>
+            <Button variant="link" size="xs" class="h-auto p-0" @click="allKinds">All</Button>
+            <Button variant="link" size="xs" class="h-auto p-0" @click="noneKinds">None</Button>
           </span>
         </div>
         <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-kind-list">
@@ -236,8 +236,8 @@ const connectionName = computed(
         <div class="flex items-center justify-between">
           <span class="font-semibold text-kira-lg text-fg">Objects</span>
           <span class="flex gap-1">
-            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-md text-primary hover:underline" @click="allObjects">All</button>
-            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-md text-primary hover:underline" @click="noneObjects">None</button>
+            <Button variant="link" size="xs" class="h-auto p-0" @click="allObjects">All</Button>
+            <Button variant="link" size="xs" class="h-auto p-0" @click="noneObjects">None</Button>
           </span>
         </div>
         <div class="w-full">

@@ -330,15 +330,17 @@ function onSequenceStartChange(index: number, start: number): void {
       </Alert>
 
       <div class="preview-section">
-        <button
+        <Button
           type="button"
-          class="bg-none border-none cursor-pointer p-0 text-primary disabled:cursor-not-allowed disabled:text-muted-foreground text-kira-md"
+          variant="link"
+          size="xs"
+          class="h-auto p-0 disabled:text-muted-foreground"
           data-testid="generate-data-preview-toggle"
           :disabled="noUsableColumns"
           @click="onTogglePreview"
         >
           {{ previewOpen ? 'Hide preview' : 'Preview SQL' }}
-        </button>
+        </Button>
         <div v-if="previewOpen" class="h-52 mt-1" data-testid="generate-data-preview">
           <div v-if="previewLoading" class="text-muted-foreground text-kira-sm">Loading…</div>
           <div v-else-if="previewError" class="text-kira-sm" data-testid="generate-data-preview-error">
