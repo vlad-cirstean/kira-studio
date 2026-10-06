@@ -47,6 +47,7 @@ import StashDialog from './components/dialogs/StashDialog.vue';
 import TagDialog from './components/dialogs/TagDialog.vue';
 import WorktreeDialog from './components/dialogs/WorktreeDialog.vue';
 import EmptyRepositoryPanel from './components/EmptyRepositoryPanel.vue';
+import FailureBanner from './components/FailureBanner.vue';
 import GitBlockedPanel from './components/GitBlockedPanel.vue';
 import LoadMoreButton from './components/LoadMoreButton.vue';
 import NoRepositoryPanel from './components/NoRepositoryPanel.vue';
@@ -75,6 +76,7 @@ import { useGraphVisible } from './graphVisibility.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
+import { composeAsyncFailureNotice, type FailureNotice } from './state/failureNotice.ts';
 import { GraphOrderState } from './state/graphOrder.ts';
 import { GraphViewState } from './state/graphView.ts';
 import {
@@ -122,6 +124,8 @@ const props = defineProps<{
    *  `undefined` under `'vscode'`/`'harness'`, where `PersistedViewState.dateFormat` stays the
    *  only source). Preferred over the persisted value below whenever present. */
   dateFormat?: DateFormat;
+  /** P173: opens the host's Operations log (`MountOptions.onShowOperations`); absent in VS Code. */
+  showOperations?: () => void;
 }>();
 
 const bridge = new BridgeClient(props.transport, props.hostConnectionState);
@@ -259,6 +263,7 @@ async function handleRepoOpened(repoId: string): Promise<void> {
   revealController?.abort();
   graphView.reset();
   graphOrder.reset();
+  clearFailure();
   await graphView.openStream(repoId);
   // An open that succeeded disproves a boot-failure banner (a reconnect or a manual pick).
   bootError.value = undefined;
@@ -299,6 +304,38 @@ const { text: liveAnnouncement, announce } = useLiveRegion();
 function reportAsyncError(err: unknown, prefix: string): void {
   if (err instanceof TransportError && err.code === 'transport-closed') return;
   announce(`${prefix} — ${err instanceof Error ? err.message : String(err)}`);
+  // A cancel announces but never raises the banner; a graph stream failure already has its own
+  // (with Retry) that this generic one would replace.
+  if (err instanceof TransportError && err.code === 'cancelled') return;
+  if (graphView.streamFailure.value !== undefined) return;
+  showFailure(composeAsyncFailureNotice(prefix, err), 'async');
+}
+
+// P173: the visible banner. One notice, latest wins; history lives in Kira Space's Operations log.
+const failure = shallowRef<FailureNotice | undefined>(undefined);
+let failureSource: 'ops' | 'stream' | 'async' | undefined;
+
+function showFailure(notice: FailureNotice, source: 'ops' | 'stream' | 'async'): void {
+  failure.value = notice;
+  failureSource = source;
+}
+
+function clearFailure(source?: 'ops' | 'stream'): void {
+  if (source !== undefined && failureSource !== source) return;
+  failure.value = undefined;
+  failureSource = undefined;
+}
+
+watch(opsState.lastFailure, (notice) =>
+  notice ? showFailure(notice, 'ops') : clearFailure('ops'),
+);
+watch(graphView.streamFailure, (notice) =>
+  notice ? showFailure(notice, 'stream') : clearFailure('stream'),
+);
+
+function retryGraph(): void {
+  clearFailure();
+  graphView.refresh().catch((err: unknown) => reportAsyncError(err, "Couldn't reload the graph"));
 }
 
 watch(graphView.loadedRows, () => {
@@ -1728,6 +1765,15 @@ onBeforeUnmount(() => {
          those the rest of the panel is currently showing, and each of them fully replaces the
          panel's own content, which would otherwise hide this exactly when it matters most. -->
     <ConnectionBanner :state="bridge.hostConnection.value" />
+    <!-- P173: the visible half of every failure the live region announces — outside the v-if chain
+         below, same host-agnostic slot as the banners around it. -->
+    <FailureBanner
+      v-if="failure"
+      :notice="failure"
+      :show-operations="props.showOperations"
+      @dismiss="clearFailure()"
+      @retry="retryGraph"
+    />
     <!-- G12 D6: outside the v-if="repoState" gate below, since bootError means bootstrap() never
          got that far — a blank panel is never an acceptable rendering of a failure. -->
     <div

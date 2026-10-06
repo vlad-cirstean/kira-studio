@@ -222,24 +222,33 @@ const OP_ERROR_TEXT: Record<OpErrorKind, string> = {
  *  didn't happen. A silent failure is the clipboard's own failure mode (§6.4), applied here. */
 export function composeOpFailureAnnouncement(
   action: string,
-  error:
-    | {
-        readonly kind: OpErrorKind;
-        readonly message: string;
-        readonly remoteMessage?: string | undefined;
-      }
-    | undefined,
+  error: OpFailureError | undefined,
 ): string {
-  if (!error) return `${action} failed.`;
-  const base = `${action} failed — ${OP_ERROR_TEXT[error.kind]}.`;
+  const { title, detail } = composeOpFailureParts(action, error);
+  return detail === undefined ? title : `${title} ${detail}`;
+}
+
+export interface OpFailureError {
+  readonly kind: OpErrorKind;
+  readonly message: string;
+  readonly remoteMessage?: string | undefined;
+}
+
+/** The announcement split into its sentence and the optional first server line, so the visible
+ *  failure banner and the live region read from one composition. */
+export function composeOpFailureParts(
+  action: string,
+  error: OpFailureError | undefined,
+): { readonly title: string; readonly detail: string | undefined } {
+  if (!error) return { title: `${action} failed.`, detail: undefined };
+  const title = `${action} failed — ${OP_ERROR_TEXT[error.kind]}.`;
   const detail =
     error.kind === 'HookRejected'
       ? error.remoteMessage
       : error.kind === 'Unknown'
         ? error.message
         : undefined;
-  const line = firstLine(detail);
-  return line === undefined ? base : `${base} ${line}`;
+  return { title, detail: firstLine(detail) };
 }
 
 /** Why auto-fetch stopped, in the same wording the failure announcements use. */

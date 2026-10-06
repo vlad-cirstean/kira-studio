@@ -73,6 +73,9 @@ export interface MountOptions {
    *  remount (a closed tab, or a KeepAlive `:max` eviction, `RepoGraphView.vue`), not while it
    *  stays cached. */
   readonly dateFormat?: DateFormat;
+  /** P173: only meaningful when `view === "graph"` — opens the host's Operations log. Absent where
+   *  the host has none (the VS Code webview); the failure banner then names it in text instead. */
+  readonly onShowOperations?: () => void;
 }
 
 /**
@@ -101,6 +104,7 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     onReviewMarked,
     pendingUiAction,
     dateFormat,
+    onShowOperations,
     ...rest
   } = opts;
   // P131 Part 2 §3.5: MountRoot wraps whichever root this mounts in the one TooltipProvider every
@@ -114,7 +118,7 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
         })
       : createApp(MountRoot, {
           root: AppRoot,
-          rootProps: { ...rest, pendingUiAction, dateFormat },
+          rootProps: { ...rest, pendingUiAction, dateFormat, showOperations: onShowOperations },
         });
   // P79 review fix: scoped to this one app instance, not module-level — several repo workspaces'
   // graphs can be mounted (and independently backgrounded) at once. A no-op provide for a

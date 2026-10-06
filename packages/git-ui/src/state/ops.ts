@@ -33,6 +33,7 @@ import { TransportError } from '@kira/git-ipc';
 import { type Ref, type ShallowRef, shallowRef, triggerRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { stashLabel } from '../components/stashListModel.ts';
+import { composeFailureNotice, type FailureNotice } from './failureNotice.ts';
 import { createLatestRequest } from './latestRequest.ts';
 import {
   type CherryPickPredictionMismatch,
@@ -50,6 +51,7 @@ import {
   composeStashPushAnnouncement,
   composeUndoAnnouncement,
   createAnnouncementRef,
+  type OpFailureError,
   type StashPredictionMismatch,
 } from './liveAnnouncements.ts';
 import { createPendingSlot, type PendingSlot } from './pendingSlot.ts';
@@ -203,6 +205,9 @@ export class OpsState {
   /** P173: why background auto-fetch stopped; `null` while it runs. Fed by `status.get` (cold
    *  start, reconnect) and the `autoFetch.changed` event. */
   readonly autoFetch: ShallowRef<AutoFetchStatus | null> = shallowRef(null);
+  /** The latest failure, for the visible banner (`FailureBanner.vue`); the live region keeps
+   *  announcing through `announcement` unchanged. Cleared when a later op settles OK. */
+  readonly lastFailure: ShallowRef<FailureNotice | undefined> = shallowRef(undefined);
   readonly undoSlot: ShallowRef<UndoSlotSnapshot | null> = shallowRef(null);
   /** Set after every action, success or failure — `App.vue` forwards it to the one live region,
    *  the same way it already does for `DetailState.announcement` (P5 W11). */
@@ -383,6 +388,7 @@ export class OpsState {
     // its own `finally` clears `busy` the same way a real cancel would.
     this.#abandonPending();
     this.autoFetch.value = null;
+    this.lastFailure.value = undefined;
     if (repoId === undefined) {
       this.statusSummary.value = undefined;
       this.undoSlot.value = null;
@@ -540,7 +546,7 @@ export class OpsState {
         });
         this.#applyResult(repoId, result);
         if (!result.ok) {
-          this.announcement.value = composeOpFailureAnnouncement('Checkout', result.error);
+          this.#fail('Checkout', result.error, true);
           return;
         }
         landedOnBranch = auto.mode === 'switch';
@@ -605,9 +611,8 @@ export class OpsState {
         op: { kind: 'checkout', target, mode, discardLocalChanges, autoStash: false },
       });
       this.#applyResult(repoId, result);
-      this.announcement.value = result.ok
-        ? composeCheckoutAnnouncement(preflight, target)
-        : composeOpFailureAnnouncement('Checkout', result.error);
+      if (result.ok) this.announcement.value = composeCheckoutAnnouncement(preflight, target);
+      else this.#fail('Checkout', result.error, true);
       landedOnBranch = result.ok && mode === 'switch';
     } catch (error) {
       this.#announceRejection('Checkout', error);
@@ -694,8 +699,10 @@ export class OpsState {
     needsDialog: (preflight: TPreflight) => boolean;
     slot: PendingSlot<TPreflight, TRoute | null>;
     cancelText: string;
+    action: string;
     buildOp: (mainline: number | undefined, noCommit: boolean) => OpRequest;
-    announce: (result: OpResult, noCommit: boolean) => string;
+    /** `undefined` for a plain failure, which `#fail` composes. */
+    announce: (result: OpResult, noCommit: boolean) => string | undefined;
   }): Promise<void> {
     const { repoId } = opts;
     let mainline: number | undefined;
@@ -717,7 +724,11 @@ export class OpsState {
       op: opts.buildOp(mainline, noCommit),
     });
     this.#applyResult(repoId, result);
-    this.announcement.value = opts.announce(result, noCommit);
+    const text = opts.announce(result, noCommit);
+    if (text !== undefined) this.announcement.value = text;
+    if (result.ok) return;
+    if (text === undefined) this.#fail(opts.action, result.error, true);
+    else this.#noteFailure(opts.action, result.error, true);
   }
 
   async runRevert(shas: readonly string[]): Promise<void> {
@@ -732,11 +743,10 @@ export class OpsState {
         needsDialog: (p) => p.verdict !== 'clean' || p.mainlineRequired.length > 0,
         slot: this.#revertSlot,
         cancelText: 'Revert cancelled.',
+        action: 'Revert',
         buildOp: (mainline, noCommit) => ({ kind: 'revert', shas, mainline, noCommit }),
         announce: (result, noCommit) =>
-          result.ok
-            ? composeRevertAnnouncement(shas, noCommit)
-            : composeOpFailureAnnouncement('Revert', result.error),
+          result.ok ? composeRevertAnnouncement(shas, noCommit) : undefined,
       });
     } catch (error) {
       this.#announceRejection('Revert', error);
@@ -808,7 +818,7 @@ export class OpsState {
         });
         this.#applyResult(repoId, push);
         if (!push.ok) {
-          this.announcement.value = composeOpFailureAnnouncement('Stash', push.error);
+          this.#fail('Stash', push.error, true);
           return;
         }
         stashedFirst = true;
@@ -825,9 +835,8 @@ export class OpsState {
         },
       });
       this.#applyResult(repoId, result);
-      this.announcement.value = result.ok
-        ? composeResetAnnouncement(route.mode, target)
-        : `${composeOpFailureAnnouncement('Reset', result.error)}${stashedFirst ? STASHED_NOTE : ''}`;
+      if (result.ok) this.announcement.value = composeResetAnnouncement(route.mode, target);
+      else this.#fail('Reset', result.error, true, stashedFirst ? STASHED_NOTE : '');
     } catch (error) {
       this.#announceRejection('Reset', error, stashedFirst ? STASHED_NOTE : '');
     } finally {
@@ -890,6 +899,7 @@ export class OpsState {
           p.verdict !== 'clean' || p.mainlineRequired.length > 0 || p.alreadyApplied,
         slot: this.#cherryPickSlot,
         cancelText: 'Cherry-pick cancelled.',
+        action: 'Cherry-pick',
         buildOp: (mainline, noCommit) => ({ kind: 'cherryPick', sha, mainline, noCommit }),
         announce: (result, noCommit) => {
           const mismatch = this.#reconcileCherryPick(preflight.prediction, result);
@@ -897,7 +907,7 @@ export class OpsState {
             ? composeCherryPickMismatchAnnouncement(mismatch)
             : result.ok
               ? composeCherryPickAnnouncement(sha, noCommit)
-              : composeOpFailureAnnouncement('Cherry-pick', result.error);
+              : undefined;
         },
       });
     } catch (error) {
@@ -982,9 +992,8 @@ export class OpsState {
         const after = await this.#bridge.request('stash.list', { repoId });
         pushed = after.entries.length > before.entries.length;
       }
-      this.announcement.value = result.ok
-        ? composeStashPushAnnouncement(pushed)
-        : composeOpFailureAnnouncement('Stash', result.error);
+      if (result.ok) this.announcement.value = composeStashPushAnnouncement(pushed);
+      else this.#fail('Stash', result.error, true);
       return result;
     } catch (error) {
       this.#announceRejection('Stash', error);
@@ -1052,6 +1061,7 @@ export class OpsState {
         mismatch,
         this.#refs.currentBranchName.value ?? null,
       );
+      if (!result.ok) this.#noteFailure(`Stash ${verb}`, result.error, true);
       return result;
     } catch (error) {
       this.#announceRejection(`Stash ${verb}`, error);
@@ -1301,6 +1311,7 @@ export class OpsState {
         this.announcement.value = result.ok
           ? composeRestackAnnouncement(result.restacked, undefined, [])
           : composeRestackAnnouncement(result.restacked, result.stoppedAt, result.remaining);
+        if (!result.ok && result.error) this.#noteFailure('Restack', result.error, true);
       }
       return result;
     } catch (error) {
@@ -1390,7 +1401,7 @@ export class OpsState {
     });
     this.#applyResult(repoId, pushResult);
     if (!pushResult.ok) {
-      this.announcement.value = composeOpFailureAnnouncement('Stash', pushResult.error);
+      this.#fail('Stash', pushResult.error, true);
       return;
     }
 
@@ -1411,7 +1422,7 @@ export class OpsState {
         this.statusSummary.value = { ...current, head: middle.head, inProgress: middle.inProgress };
     }
     if (!middle.ok) {
-      this.announcement.value = `${composeOpFailureAnnouncement(actionLabel, middle.error)}${STASHED_NOTE}`;
+      this.#fail(actionLabel, middle.error, true, STASHED_NOTE);
       return;
     }
 
@@ -1443,11 +1454,11 @@ export class OpsState {
     });
     this.#applyResult(repoId, popResult);
     const mismatch = this.#reconcileStashPop('pop', preflight.prediction, popResult);
-    this.announcement.value = mismatch
-      ? composeStashAnnouncement('pop', top, popResult, mismatch)
-      : popResult.ok
-        ? announceMiddleOk()
-        : composeOpFailureAnnouncement('Stash pop', popResult.error);
+    if (mismatch) {
+      this.announcement.value = composeStashAnnouncement('pop', top, popResult, mismatch);
+      if (!popResult.ok) this.#noteFailure('Stash pop', popResult.error, true);
+    } else if (popResult.ok) this.announcement.value = announceMiddleOk();
+    else this.#fail('Stash pop', popResult.error, true);
   }
 
   // -------------------------------------------------------------------------------------
@@ -1552,9 +1563,8 @@ export class OpsState {
     try {
       const result = await this.#bridge.request('undo.run', { repoId, id: slot.id });
       this.#applyResult(repoId, result);
-      this.announcement.value = result.ok
-        ? composeUndoAnnouncement(slot.label)
-        : composeOpFailureAnnouncement('Undo', result.error);
+      if (result.ok) this.announcement.value = composeUndoAnnouncement(slot.label);
+      else this.#fail('Undo', result.error, true);
       return result;
     } catch (error) {
       this.#announceRejection('Undo', error);
@@ -1843,9 +1853,8 @@ export class OpsState {
       const result = await this.#bridge.request('remote.run', { repoId, ...op });
       if (this.#repo.repoId !== repoId) return result;
       this.#applyRemoteResult(result);
-      this.announcement.value = result.ok
-        ? (announceOk(result) ?? `${actionLabel} succeeded`)
-        : composeOpFailureAnnouncement(actionLabel, result.error);
+      if (result.ok) this.announcement.value = announceOk(result) ?? `${actionLabel} succeeded`;
+      else this.#fail(actionLabel, result.error, true);
       return result;
     } catch (error) {
       this.#announceRejection(actionLabel, error);
@@ -1863,6 +1872,7 @@ export class OpsState {
    *  `undo` field at all, by construction (D51); this method's whole reason to exist separately
    *  is that OQ6's answer must be structurally impossible to get wrong, not merely remembered. */
   #applyRemoteResult(result: RemoteOpResult): void {
+    if (result.ok) this.lastFailure.value = undefined;
     this.#refs.applyHead(result.head);
     const current = this.statusSummary.value;
     this.statusSummary.value = current
@@ -1885,7 +1895,21 @@ export class OpsState {
   #announceRejection(action: string, error: unknown, suffix = ''): void {
     if (error instanceof TransportError && error.code === 'cancelled') return;
     const message = error instanceof Error ? error.message : String(error);
-    this.announcement.value = `${composeOpFailureAnnouncement(action, { kind: 'Unknown', message })}${suffix}`;
+    this.#fail(action, { kind: 'Unknown', message }, false, suffix);
+  }
+
+  /** Every failure the user should see: the live-region text (unchanged wording) plus the visible
+   *  banner notice. `logged` says whether the Operations log recorded it. A user cancel announces
+   *  but never raises the banner. */
+  #fail(action: string, error: OpFailureError | undefined, logged: boolean, suffix = ''): void {
+    this.announcement.value = `${composeOpFailureAnnouncement(action, error)}${suffix}`;
+    this.#noteFailure(action, error, logged);
+  }
+
+  /** The banner half of `#fail`, for outcomes whose announcement text is composed elsewhere. */
+  #noteFailure(action: string, error: OpFailureError | undefined, logged: boolean): void {
+    if (error?.kind === 'Cancelled') return;
+    this.lastFailure.value = composeFailureNotice(action, error, logged);
   }
 
   /** The `OpResult` a caller that reads `.ok` sees when no request completed. Never applied to
@@ -1915,9 +1939,8 @@ export class OpsState {
     try {
       const result = await this.#bridge.request('op.run', { repoId, op });
       this.#applyResult(repoId, result);
-      this.announcement.value = result.ok
-        ? (announceOk(true) ?? `${actionLabel} succeeded`)
-        : composeOpFailureAnnouncement(actionLabel, result.error);
+      if (result.ok) this.announcement.value = announceOk(true) ?? `${actionLabel} succeeded`;
+      else this.#fail(actionLabel, result.error, true);
       return result;
     } catch (error) {
       this.#announceRejection(actionLabel, error);
@@ -1941,6 +1964,7 @@ export class OpsState {
    *  `runWorktreePrepare` already apply to their own writes. */
   #applyResult(repoId: string, result: OpResult): void {
     if (this.#repo.repoId !== repoId) return;
+    if (result.ok) this.lastFailure.value = undefined;
     this.#refs.applyHead(result.head);
     const current = this.statusSummary.value;
     this.statusSummary.value = current

@@ -17,6 +17,7 @@ import { loadGitUi } from '../../repo/git/gitUiModule';
 import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { TabViewStateStore } from '../../repo/git/viewStateStore';
+import { useLayoutStore } from '../../state/layout';
 import { useSettingsStore } from '../../state/settings';
 import type { RepoGraphTabRecord } from '../../state/tabDomain';
 import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
@@ -29,6 +30,7 @@ let handle: MountHandle | null = null;
 
 async function mountGraph(): Promise<void> {
   const settingsStore = useSettingsStore();
+  const layoutStore = useLayoutStore();
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
     errorMessage.value = NO_REPOSITORY_MESSAGE;
@@ -59,6 +61,10 @@ async function mountGraph(): Promise<void> {
     // regardless, so there is no lesser-failure state worth inventing a synthetic event for.
     // Left unconditionally 'connected' rather than wired to nothing.
     hostConnectionState: { kind: 'connected' },
+    // P173: the failure banner's "Show in Operations" button.
+    onShowOperations: () => {
+      if (!layoutStore.panel.operations.visible) layoutStore.toggleOperationsPanel();
+    },
   });
 }
 

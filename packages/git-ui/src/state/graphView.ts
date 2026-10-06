@@ -10,6 +10,7 @@ import {
   LayoutClientStaleError,
 } from '../graph/layoutClient.ts';
 import { LayoutStore } from '../graph/layoutStore.ts';
+import { composeGraphFailureNotice, type FailureNotice } from './failureNotice.ts';
 import type { GraphOrderState } from './graphOrder.ts';
 import { composeRevealSearchHitAnnouncement, createAnnouncementRef } from './liveAnnouncements.ts';
 import { type ChunkSource, PackedStreamState } from './packedStream.ts';
@@ -86,6 +87,9 @@ export class GraphViewState {
   /** W13's `revealSha` own live-region text — `App.vue` forwards it into the shared region
    *  exactly as it already does for `DetailState.announcement`/`OpsState.announcement`. */
   readonly announcement: Ref<string> = createAnnouncementRef();
+  /** The latest stream failure, for the visible banner (`FailureBanner.vue`); the live region
+   *  keeps announcing through `announcement`. Cleared by the next good chunk and on `reset()`. */
+  readonly streamFailure: ShallowRef<FailureNotice | undefined> = shallowRef(undefined);
   /** True for exactly the duration of an auto-triggered `refresh()` — `App.vue`'s viewport
    *  capture/restore and its refresh announcement are both gated on this (D10): a background
    *  refresh must neither move the user's scroll position nor speak on every commit. */
@@ -316,6 +320,22 @@ export class GraphViewState {
    *  cancellation, where the resync is what turns "rows already read are kept" into the client
    *  actually seeing them. */
   async #runLoad(state: LoadingState, request: () => Promise<unknown>): Promise<void> {
+    try {
+      await this.#runLoadSteps(state, request);
+    } catch (error) {
+      if (!(error instanceof TransportError && error.code === 'cancelled')) {
+        const detail = error instanceof Error ? error.message : String(error);
+        this.streamFailure.value = composeGraphFailureNotice(
+          'Graph failed to load.',
+          detail,
+          false,
+        );
+      }
+      throw error;
+    }
+  }
+
+  async #runLoadSteps(state: LoadingState, request: () => Promise<unknown>): Promise<void> {
     const repoId = this.#repoId;
     if (!repoId) return;
     const generation = this.#loadGeneration;
@@ -385,6 +405,7 @@ export class GraphViewState {
     this.#loadController = undefined;
     this.#loadGeneration++;
     this.loading.value = 'idle';
+    this.streamFailure.value = undefined;
     // F11: an old repo's own not-yet-applied merged range must never reach a listener after this
     // point — `#resetLayout()`'s own `#layoutClient.reset()` below already turns any relayout
     // still in flight into a no-op `LayoutClientStaleError` (`#rebuildLayout`'s own catch), so a
@@ -394,6 +415,21 @@ export class GraphViewState {
     this.#resetLayout();
     this.#packed.reset();
     this.#cancelAutoRefresh();
+  }
+
+  /** The stream can no longer be trusted: announce, show the banner, and ask the host to log it
+   *  (fire-and-forget; a failed report must never mask the failure itself). */
+  #failCorrupted(): void {
+    this.announcement.value = CORRUPTED_ANNOUNCEMENT;
+    this.streamFailure.value = composeGraphFailureNotice(
+      'Graph history could not be read.',
+      'The data stream was corrupted.',
+      true,
+    );
+    const repoId = this.#repoId;
+    if (repoId) {
+      this.#bridge.request('graph.reportFailure', { repoId, reason: 'corrupted' }).catch(() => {});
+    }
   }
 
   /** Coalesces arrivals within `AUTO_REFRESH_COALESCE_MS` into one run, and enforces
@@ -541,14 +577,13 @@ export class GraphViewState {
         this.openStream(repoId, 0).catch((error: unknown) => {
           if (error instanceof TransportError && error.code === 'cancelled') return;
           console.error('graphView: re-open after a corrupted chunk failed', error);
-          this.announcement.value = CORRUPTED_ANNOUNCEMENT;
+          this.#failCorrupted();
         });
       },
-      onUnrecoverable: () => {
-        this.announcement.value = CORRUPTED_ANNOUNCEMENT;
-      },
+      onUnrecoverable: () => this.#failCorrupted(),
     });
     if (!range) return; // corrupted — already re-opening from row 0, nothing to lay out
+    this.streamFailure.value = undefined;
 
     // F11: folds `range` in and returns WITHOUT awaiting its own relayout — `rpc.ts`'s per-chunk
     // credit gate (`INITIAL_STREAM_CREDIT`) waits on this method's own promise before letting the
