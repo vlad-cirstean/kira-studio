@@ -627,6 +627,11 @@ func TestPostgres_ReadKeysetForwardBackward(t *testing.T) {
 	}
 }
 
+func TestPostgres_ConnectionLifecycle(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	testsupport.ConnectionLifecycleScenarios(t, fixture.Config, newAdapter)
+}
+
 // P168 Part 3 F4: a binary key's token must bind as raw bytes, not its 0x<hex> display text.
 func TestPostgres_ReadKeysetBinaryPrimaryKey(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)

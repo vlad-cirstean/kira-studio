@@ -384,11 +384,20 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 
 // Cancel is index.ts's cancel.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
-	running, ok := a.tracker.PopRunning(opID)
+	running, ok := a.tracker.PopRunningWith(opID, func(q RunningQuery) {
+		if q.Guard != nil {
+			q.Guard.BeginCancel()
+		}
+	})
+	if ok && running.Guard != nil {
+		defer running.Guard.EndCancel()
+	}
 	cfg := a.state.Load().Cfg
 	if !ok || cfg == nil {
 		return false, nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, cancelTimeout)
+	defer cancel()
 
 	connConfig, err := buildConfig(*cfg, "", a.deps.Log)
 	if err != nil {

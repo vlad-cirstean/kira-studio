@@ -371,11 +371,20 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 // pg_cancel_backend path (D26). Killing your own query needs no PROCESS/SUPER privilege — only
 // killing someone else's does.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
-	running, ok := a.tracker.PopRunning(opID)
+	running, ok := a.tracker.PopRunningWith(opID, func(q RunningQuery) {
+		if q.Guard != nil {
+			q.Guard.BeginCancel()
+		}
+	})
+	if ok && running.Guard != nil {
+		defer running.Guard.EndCancel()
+	}
 	cfg := a.state.Load().Cfg
 	if !ok || cfg == nil {
 		return false, nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, cancelTimeout)
+	defer cancel()
 
 	mc, err := BuildConfig(*cfg, "", a.profile, a.deps.Log)
 	if err != nil {

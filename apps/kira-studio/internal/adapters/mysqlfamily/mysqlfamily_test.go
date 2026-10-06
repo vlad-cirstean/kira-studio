@@ -133,6 +133,10 @@ var bigRowsDetail = regexp.MustCompile(`^~[\d.]+[A-Za-z]* rows$`)
 
 // runFamilySuite is the ~27 scenarios packages/db-fixtures/mariadb.spec.ts and packages/db-fixtures/mysql.spec.ts share.
 func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfig, versionRE *regexp.Regexp) {
+	t.Run("pinned connection lifecycle", func(t *testing.T) {
+		testsupport.ConnectionLifecycleScenarios(t, cfg, func(t *testing.T) adapters.Adapter { return newAdapter(t, kind) })
+	})
+
 	t.Run("connect/disconnect, real server version", func(t *testing.T) {
 		a := newAdapter(t, kind)
 		info, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-1"))

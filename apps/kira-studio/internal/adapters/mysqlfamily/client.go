@@ -4,11 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"database/sql"
+	"database/sql/driver"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -20,6 +20,12 @@ import (
 const (
 	connectTimeout = 10 * time.Second
 	maxConns       = 8
+	// closeGrace bounds how long a Close waits for an op still holding the connection before it
+	// closes the socket under that op.
+	closeGrace = 10 * time.Second
+	// cancelTimeout bounds one server-side cancel (side dial plus KILL QUERY): the op's connection
+	// waits on it before release.
+	cancelTimeout = 10 * time.Second
 	// primaryKey is a key no real database name can collide with.
 	primaryKey = "\x00primary"
 )
@@ -236,8 +242,24 @@ type connEntry struct {
 	db       *sql.DB
 	conn     *sql.Conn
 	threadID uint32
-	mu       sync.Mutex
-	inFlight sync.WaitGroup
+	// netConn is the socket under conn, captured at dial so Close can unblock a stuck reader.
+	netConn net.Conn
+	guard   adapters.ConnGuard
+}
+
+// alive reports whether the driver still considers the pinned connection usable. A test entry with
+// no connection counts as alive.
+func (e *connEntry) alive() bool {
+	if e.conn == nil {
+		return true
+	}
+	err := e.conn.Raw(func(dc any) error {
+		if v, ok := dc.(driver.Validator); ok && !v.IsValid() {
+			return driver.ErrBadConn
+		}
+		return nil
+	})
+	return err == nil
 }
 
 // ConnSet is client.ts's ConnectionSet (B5, mirrors postgres/client.go's ConnSet): one *sql.DB per
@@ -267,11 +289,17 @@ func NewConnSet(cfg model.ResolvedConnectionConfig, profile Profile, log LogFunc
 			}
 			return s.dial(ctx, database)
 		},
-		Close: func(_ context.Context, e *connEntry) {
-			e.mu.Lock()
-			_ = e.conn.Close()
-			_ = e.db.Close()
-			e.mu.Unlock()
+		// F6: the wait for an op still holding the connection is bounded; a holder stuck on a
+		// dead socket gets the socket closed under it instead.
+		Close: func(ctx context.Context, e *connEntry) {
+			e.guard.CloseWithin(ctx, closeGrace, func() {
+				_ = e.conn.Close()
+				_ = e.db.Close()
+			}, func() {
+				if e.netConn != nil {
+					_ = e.netConn.Close()
+				}
+			})
 		},
 		Max:     maxConns,
 		Primary: primaryKey,
@@ -294,8 +322,12 @@ type Entry struct {
 // adapters.RunWithAbortRace's own goroutine starts — and compose the returned done into whatever
 // release RunWithAbortRace already calls once that goroutine actually finishes.
 func (e Entry) track() (done func()) {
-	e.entry.inFlight.Add(1)
-	return e.entry.inFlight.Done
+	return e.entry.guard.Track()
+}
+
+// running is the RunningQuery to track for a statement run on this connection.
+func (e Entry) running() RunningQuery {
+	return RunningQuery{ThreadID: e.ThreadID, Guard: &e.entry.guard}
 }
 
 // waitInFlight blocks until every RunWithAbortRace goroutine track() has registered against this
@@ -304,7 +336,7 @@ func (e Entry) track() (done func()) {
 // conn.ExecContext, so it never races — or queues, on this dialect, possibly past its own 5s
 // deadline — a just-aborted op's background goroutine still using the same *sql.Conn (F2).
 func (e Entry) waitInFlight() {
-	e.entry.inFlight.Wait()
+	e.entry.guard.WaitInFlight()
 }
 
 // mysqlNewConnector — the exact function dial calls to produce the driver.Connector db.Conn then
@@ -321,6 +353,16 @@ func (s *ConnSet) dial(ctx context.Context, database string) (*connEntry, error)
 	mc, err := BuildConfig(s.cfg, database, s.profile, s.log)
 	if err != nil {
 		return nil, err
+	}
+	// The driver's own dial, wrapped only to keep the socket for Close's force path.
+	var captured net.Conn
+	var dialer net.Dialer
+	mc.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		c, err := dialer.DialContext(ctx, network, addr)
+		if err == nil {
+			captured = c
+		}
+		return c, err
 	}
 	connector, err := mysqlNewConnector(mc)
 	if err != nil {
@@ -353,7 +395,7 @@ func (s *ConnSet) dial(ctx context.Context, database string) (*connEntry, error)
 		}
 	}
 
-	return &connEntry{db: db, conn: conn, threadID: threadID}, nil
+	return &connEntry{db: db, conn: conn, threadID: threadID, netConn: captured}, nil
 }
 
 // Acquire returns database's connection (empty string means the primary) together with a release
@@ -373,20 +415,29 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (Entry, func(), 
 		if err != nil {
 			return Entry{}, nil, err
 		}
-		entry.mu.Lock()
+		if err := entry.guard.Lock(ctx); err != nil {
+			return Entry{}, nil, err
+		}
 		// F3: an LRU eviction's own Close (adapters.ConnSet.Get's own doc comment) contends for this
 		// same entry.mu, so it may already have closed entry.conn by the time this Lock succeeds.
 		// Re-check that entry is still the set's own live entry for key before trusting it — retry
 		// from the top rather than hand back a connection that was just closed out from under it.
 		if current, ok := s.inner.Current(key); !ok || current != entry {
-			entry.mu.Unlock()
+			entry.guard.Unlock()
+			continue
+		}
+		// F5: a dead connection (the driver closed it after a cancelled or broken query) stays this
+		// key's entry forever otherwise; drop it and dial a fresh one.
+		if !entry.alive() {
+			entry.guard.Unlock()
+			s.inner.Drop(ctx, key, entry)
 			continue
 		}
 		return Entry{Conn: entry.conn, ThreadID: entry.threadID, entry: entry}, func() {
 			// F2: hold this connection's lock until every RunWithAbortRace goroutine started under this
-			// acquisition has actually finished touching entry.conn.
-			entry.inFlight.Wait()
-			entry.mu.Unlock()
+			// acquisition has actually finished touching entry.conn, and a Cancel aimed at it has been
+			// delivered (F7).
+			entry.guard.Release()
 		}, nil
 	}
 }

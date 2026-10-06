@@ -61,10 +61,20 @@ func (t *QueryTracker[Q]) TrackerFor(opID string) func(q Q) (release func()) {
 // the map in the same locked step so a racing release can never re-delete a different (later)
 // query's own registration for the same opID.
 func (t *QueryTracker[Q]) PopRunning(opID string) (q Q, ok bool) {
+	return t.PopRunningWith(opID, nil)
+}
+
+// PopRunningWith is PopRunning that also runs onPop, under the tracker lock, for a popped query.
+// A query's release takes the same lock, so whatever onPop registers (a pending cancel against
+// the query's connection) is visible before the query's op can release that connection.
+func (t *QueryTracker[Q]) PopRunningWith(opID string, onPop func(Q)) (q Q, ok bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	q, ok = t.runningByOp[opID]
 	delete(t.runningByOp, opID)
+	if ok && onPop != nil {
+		onPop(q)
+	}
 	return q, ok
 }
 

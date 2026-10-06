@@ -11,6 +11,9 @@ import (
 // RunningQuery is query.ts's RunningQuery.
 type RunningQuery struct {
 	BackendPID uint32
+	// Guard is the connection the query runs on: Cancel registers its pending cancel there so the
+	// connection is not handed to the next op while the cancel can still reach its backend.
+	Guard *adapters.ConnGuard
 }
 
 // TrackQuery is query.ts's TrackQuery: registers a running query and returns its own release,
@@ -48,7 +51,7 @@ func runArrayQuery(ctx context.Context, conn *trackedConn, sql string, params []
 		return nil, err
 	}
 
-	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
+	release := track(conn.running())
 	done := conn.track()
 
 	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) ([][]*string, error) {
@@ -89,7 +92,7 @@ func streamArrayQuery(ctx context.Context, conn *trackedConn, sql string, params
 		return err
 	}
 
-	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
+	release := track(conn.running())
 	done := conn.track()
 
 	_, err := adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (struct{}, error) {
@@ -138,7 +141,7 @@ func runCommand(ctx context.Context, conn *trackedConn, sql string, params []any
 		return 0, err
 	}
 
-	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
+	release := track(conn.running())
 	done := conn.track()
 
 	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (int64, error) {

@@ -64,7 +64,7 @@ func runRaw(ctx context.Context, conn Entry, query string, op *adapters.OpCtx, t
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return nil, nil, nil, err
 	}
-	release := track(RunningQuery{ThreadID: conn.ThreadID})
+	release := track(conn.running())
 	done := conn.track()
 
 	type result struct {

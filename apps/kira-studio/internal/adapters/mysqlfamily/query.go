@@ -10,6 +10,9 @@ import (
 // RunningQuery is query.ts's RunningQuery.
 type RunningQuery struct {
 	ThreadID uint32
+	// Guard is the connection the query runs on: Cancel registers its pending cancel there so the
+	// connection is not handed to the next op while the cancel can still reach its thread.
+	Guard *adapters.ConnGuard
 }
 
 // TrackQuery is query.ts's TrackQuery: registers a running query and returns its own release,
@@ -37,7 +40,7 @@ func runArrayQuery(ctx context.Context, conn Entry, query string, params []any, 
 		return nil, err
 	}
 
-	release := track(RunningQuery{ThreadID: conn.ThreadID})
+	release := track(conn.running())
 	done := conn.track()
 
 	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) ([][]*string, error) {
@@ -97,7 +100,7 @@ func streamArrayQuery(ctx context.Context, conn Entry, query string, params []an
 		return err
 	}
 
-	release := track(RunningQuery{ThreadID: conn.ThreadID})
+	release := track(conn.running())
 	done := conn.track()
 
 	_, err := adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (struct{}, error) {
@@ -164,7 +167,7 @@ func runCommand(ctx context.Context, conn Entry, query string, params []any, op 
 		return 0, err
 	}
 
-	release := track(RunningQuery{ThreadID: conn.ThreadID})
+	release := track(conn.running())
 	done := conn.track()
 
 	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (int64, error) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -16,6 +15,12 @@ import (
 const (
 	connectTimeout = 10 * time.Second
 	maxConns       = 8
+	// closeGrace bounds how long a Close waits for an op still holding the connection before it
+	// closes the socket under that op.
+	closeGrace = 10 * time.Second
+	// cancelTimeout bounds one server-side cancel (side dial plus the cancel call): the op's
+	// connection waits on it before release.
+	cancelTimeout = 10 * time.Second
 	// primaryKey is a key no real database name can collide with — NUL can't appear in a
 	// Postgres identifier.
 	primaryKey = "\x00primary"
@@ -145,9 +150,8 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 // silently swallowed by cleanup's own `_, _ =` and leaving the connection wedged in an aborted or
 // unexpectedly-open transaction for whatever op ran next.
 type connEntry struct {
-	conn     *pgx.Conn
-	mu       sync.Mutex
-	inFlight sync.WaitGroup
+	conn  *pgx.Conn
+	guard adapters.ConnGuard
 }
 
 // trackedConn is Acquire's own handle over one connEntry: embedding *pgx.Conn keeps every existing
@@ -164,8 +168,12 @@ type trackedConn struct {
 // release RunWithAbortRace already calls once that goroutine actually finishes (never only on the
 // caller's own ctx.Done()).
 func (c *trackedConn) track() (done func()) {
-	c.entry.inFlight.Add(1)
-	return c.entry.inFlight.Done
+	return c.entry.guard.Track()
+}
+
+// running is the RunningQuery to track for a statement run on this connection.
+func (c *trackedConn) running() RunningQuery {
+	return RunningQuery{BackendPID: c.PgConn().PID(), Guard: &c.entry.guard}
 }
 
 // waitInFlight blocks until every RunWithAbortRace goroutine track() has registered against this
@@ -173,7 +181,7 @@ func (c *trackedConn) track() (done func()) {
 // ROLLBACK, console's read-only-wrap COMMIT) calls this immediately before its own conn.Exec, so it
 // never races a just-aborted op's background goroutine still using the same *pgx.Conn (F2).
 func (c *trackedConn) waitInFlight() {
-	c.entry.inFlight.Wait()
+	c.entry.guard.WaitInFlight()
 }
 
 // verifyChainSkipHostname is sslmode=verify-ca's certificate check, split out of buildConfig so
@@ -228,11 +236,10 @@ func NewConnSet(cfg model.ResolvedConnectionConfig, log func(level, message stri
 		},
 		// P2 R2: the victim's own per-connection lock (held for its entire in-flight op) is taken
 		// here, not inside adapters.ConnSet — the pool's own mu is already released by the time
-		// Close runs (see adapters.ConnSet.Get's own doc comment).
+		// Close runs (see adapters.ConnSet.Get's own doc comment). F6: the wait is bounded; a
+		// holder stuck on a dead socket gets the socket closed under it instead.
 		Close: func(ctx context.Context, e *connEntry) {
-			e.mu.Lock()
-			_ = e.conn.Close(ctx)
-			e.mu.Unlock()
+			e.guard.CloseWithin(ctx, closeGrace, func() { _ = e.conn.Close(ctx) }, func() { _ = e.conn.PgConn().Conn().Close() })
 		},
 		Max:     maxConns,
 		Primary: primaryKey,
@@ -290,23 +297,30 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (*trackedConn, f
 		if err != nil {
 			return nil, nil, err
 		}
-		entry.mu.Lock()
+		if err := entry.guard.Lock(ctx); err != nil {
+			return nil, nil, err
+		}
 		// F3: an LRU eviction's own Close (adapters.ConnSet.Get's own doc comment) contends for this
 		// same entry.mu, so it may already have closed entry.conn by the time this Lock succeeds.
 		// Re-check that entry is still the set's own live entry for key before trusting it — retry
 		// from the top (a fresh Get, dialing again if nothing else raced in first) rather than hand
 		// back a connection that was just closed out from under it.
 		if current, ok := s.inner.Current(key); !ok || current != entry {
-			entry.mu.Unlock()
+			entry.guard.Unlock()
+			continue
+		}
+		// F5: a dead connection (a cancelled or broken query closed it) stays this key's entry
+		// forever otherwise; drop it and dial a fresh one.
+		if entry.conn.IsClosed() {
+			entry.guard.Unlock()
+			s.inner.Drop(ctx, key, entry)
 			continue
 		}
 		return &trackedConn{Conn: entry.conn, entry: entry}, func() {
 			// F2: hold this connection's lock (and so keep the next Acquire waiting) until every
 			// RunWithAbortRace goroutine started under this acquisition has actually finished
-			// touching entry.conn — the server-side cancel adapter.go's Cancel already sends keeps
-			// this wait short in practice, but it must never be skipped.
-			entry.inFlight.Wait()
-			entry.mu.Unlock()
+			// touching entry.conn, and a Cancel aimed at it has been delivered (F7).
+			entry.guard.Release()
 		}, nil
 	}
 }

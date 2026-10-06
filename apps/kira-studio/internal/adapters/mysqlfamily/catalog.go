@@ -3,6 +3,7 @@ package mysqlfamily
 import (
 	"context"
 	"database/sql"
+	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -12,34 +13,48 @@ import (
 // cancellable and command-logged like any other query. scan is called once per row.
 type queryExec func(ctx context.Context, query string, params []any, scan func(*sql.Rows) error) error
 
-// execFor is adapter.go's own execFor, binding one conn/op/track triple. Catalog queries run
-// directly on the op's own ctx (no adapters.RunWithAbortRace), so they never spawn the kind of
-// stray background goroutine F2's own Entry.track()/waitInFlight() exist to guard against; conn
-// only needs to be an Entry here so every catalog call site can keep sharing one connEntry with
-// the rest of the package.
+// execFor is adapter.go's own execFor, binding one conn/op/track triple. Like every other query it
+// runs through adapters.RunWithAbortRace on a ctx detached from the op's own: handing the op's ctx
+// to go-sql-driver made a cancel close the pinned connection under every later op (F5). The
+// server-side cancel stays Cancel's KILL QUERY. scan runs on the query's own goroutine, and never after execFor has returned.
 func execFor(conn Entry, op *adapters.OpCtx, track TrackQuery) queryExec {
 	return func(ctx context.Context, query string, params []any, scan func(*sql.Rows) error) error {
 		op.SetCommand(query)
 		if err := adapters.CheckNotStarted(ctx); err != nil {
 			return err
 		}
-		release := track(RunningQuery{ThreadID: conn.ThreadID})
-		defer release()
+		release := track(conn.running())
+		done := conn.track()
 
-		rows, err := conn.QueryContext(ctx, query, params...)
-		if err != nil {
-			return mapError(err)
-		}
-		defer rows.Close()
-		for rows.Next() {
-			if err := scan(rows); err != nil {
-				return mapError(err)
+		var mu sync.Mutex
+		abandoned := false
+		_, err := adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (struct{}, error) {
+			rows, err := conn.QueryContext(queryCtx, query, params...)
+			if err != nil {
+				return struct{}{}, mapError(err)
 			}
-		}
-		if err := rows.Err(); err != nil {
-			return mapError(err)
-		}
-		return nil
+			defer rows.Close()
+			for rows.Next() {
+				mu.Lock()
+				if abandoned {
+					mu.Unlock()
+					return struct{}{}, adapters.CheckCancelled(ctx)
+				}
+				err := scan(rows)
+				mu.Unlock()
+				if err != nil {
+					return struct{}{}, mapError(err)
+				}
+			}
+			if err := rows.Err(); err != nil {
+				return struct{}{}, mapError(err)
+			}
+			return struct{}{}, nil
+		})
+		mu.Lock()
+		abandoned = true
+		mu.Unlock()
+		return err
 	}
 }
 

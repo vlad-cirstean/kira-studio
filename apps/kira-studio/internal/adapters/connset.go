@@ -201,6 +201,26 @@ func (s *ConnSet[K, C]) detachLRULocked() (victim C, hasVictim bool) {
 	return victim, true
 }
 
+// Drop removes key's entry when it is still entry and closes it — for an entry found unusable (a
+// dead connection) rather than evicted. A no-op when key already maps to something else.
+func (s *ConnSet[K, C]) Drop(ctx context.Context, key K, entry C) {
+	s.mu.Lock()
+	current, ok := s.conns[key]
+	if !ok || any(current) != any(entry) {
+		s.mu.Unlock()
+		return
+	}
+	delete(s.conns, key)
+	for i, k := range s.lru {
+		if k == key {
+			s.lru = append(s.lru[:i], s.lru[i+1:]...)
+			break
+		}
+	}
+	s.mu.Unlock()
+	s.opts.Close(ctx, current)
+}
+
 // CloseAll closes every open entry, releasing mu before any of them (P2 R2 — see Get's own eviction
 // comment: the same reasoning applies to shutdown, not just eviction).
 func (s *ConnSet[K, C]) CloseAll(ctx context.Context) {
