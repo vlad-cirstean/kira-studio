@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -37,6 +38,14 @@ func httpStatusFromStderr(stderr string) (int, bool) {
 	return code, true
 }
 
+// reasonUnreadable is reported when untruncated exit-0 output is not the JSON the caller needs.
+const reasonUnreadable = "GitHub returned an unreadable response"
+
+// A func, not a const: the cap is a var a test lowers, and the message must stay true.
+func tooLargeReason() string {
+	return fmt.Sprintf("GitHub's response was over %d MiB, too large to read", maxStdoutBytes>>20)
+}
+
 // classify is D5's full table, the ONE place an HTTP status or a gh exit code is interpreted
 // anywhere in this package. res/runErr are Client.get's own raw outcome (a successful `gh api`
 // invocation with a non-2xx HTTP status still exits gh 1 with a JSON body on stdout — decoding it
@@ -52,6 +61,9 @@ func classify(host string, res Result, runErr, ctxErr error) Status {
 	}
 	if runErr != nil {
 		return Status{Kind: KindNotFound, Host: host, Reason: "gh could not be started: " + runErr.Error()}
+	}
+	if res.StdoutTruncated {
+		return Status{Kind: KindForbidden, Host: host, Reason: tooLargeReason()}
 	}
 	if res.ExitCode == 0 {
 		return Status{Kind: KindOK, Host: host}

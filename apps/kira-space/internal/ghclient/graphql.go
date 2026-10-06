@@ -64,7 +64,8 @@ func (c *Client) graphql(ctx context.Context, repo Repo, query string, vars []Gr
 		return classify(repo.Host, res, runErr, ctx.Err()), nil
 	}
 	var env graphqlEnvelope
-	if json.Unmarshal(res.Stdout, &env) == nil && len(env.Errors) > 0 {
+	decoded := json.Unmarshal(res.Stdout, &env) == nil
+	if decoded && len(env.Errors) > 0 {
 		hasData := len(env.Data) > 0 && string(env.Data) != "null"
 		if !hasData {
 			msg := env.Errors[0].Message
@@ -75,10 +76,12 @@ func (c *Client) graphql(ctx context.Context, repo Repo, query string, vars []Gr
 		}
 	} else if status := classify(repo.Host, res, nil, nil); !status.OK() {
 		return status, nil
+	} else if !decoded {
+		return Status{Kind: KindForbidden, Host: repo.Host, Reason: reasonUnreadable}, nil
 	}
 	if out != nil && len(env.Data) > 0 {
 		if err := json.Unmarshal(env.Data, out); err != nil {
-			return Status{Kind: KindForbidden, Host: repo.Host, Reason: "GitHub returned an unreadable response"}, nil
+			return Status{Kind: KindForbidden, Host: repo.Host, Reason: reasonUnreadable}, nil
 		}
 	}
 	return Status{Kind: KindOK, Host: repo.Host}, env.Errors
@@ -157,7 +160,7 @@ func (c *Client) PullFiles(ctx context.Context, repo Repo, number int) (PullFile
 			return PullFiles{}, Status{Kind: KindForbidden, Host: repo.Host, Reason: "not found, or you cannot see it"}
 		}
 		if !validObjectID(pr.HeadRefOid) {
-			return PullFiles{}, Status{Kind: KindForbidden, Host: repo.Host, Reason: "GitHub returned an unreadable response"}
+			return PullFiles{}, Status{Kind: KindForbidden, Host: repo.Host, Reason: reasonUnreadable}
 		}
 		out.NodeID, out.HeadSha, out.State = pr.ID, pr.HeadRefOid, pr.State
 		for _, n := range pr.Files.Nodes {

@@ -119,3 +119,23 @@ func TestPullFiles_RejectsMalformedHeadOid(t *testing.T) {
 		t.Fatal("want a non-OK status for a malformed head oid")
 	}
 }
+
+func TestPullFiles_TooLargeAndUnreadable(t *testing.T) {
+	cases := []struct {
+		name       string
+		res        Result
+		wantReason string
+	}{
+		{"truncated", Result{StdoutTruncated: true, Stdout: []byte(`{"data":{"repos`)}, tooLargeReason()},
+		{"non-JSON exit 0", Result{Stdout: []byte("not json")}, reasonUnreadable},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, _ := scriptedClient(tc.res)
+			_, status := c.PullFiles(context.Background(), testRepo, 1)
+			if status.Kind != KindForbidden || status.Reason != tc.wantReason {
+				t.Fatalf("status = %+v, want forbidden %q", status, tc.wantReason)
+			}
+		})
+	}
+}

@@ -32,6 +32,9 @@ func TestClientGet_UndecodableBodyIsForbidden(t *testing.T) {
 	if status.Kind != KindForbidden {
 		t.Fatalf("status.Kind = %q, want forbidden for an undecodable body", status.Kind)
 	}
+	if status.Reason != reasonUnreadable {
+		t.Fatalf("status.Reason = %q, want %q", status.Reason, reasonUnreadable)
+	}
 }
 
 func TestClientGet_NonOKPropagatesClassifiedStatus(t *testing.T) {

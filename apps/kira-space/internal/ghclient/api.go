@@ -68,7 +68,7 @@ func (c *Client) get(ctx context.Context, repo Repo, path string, out any) Statu
 
 	if out != nil {
 		if err := json.Unmarshal(res.Stdout, out); err != nil {
-			return Status{Kind: KindForbidden, Host: repo.Host, Reason: "GitHub returned an unreadable response"}
+			return Status{Kind: KindForbidden, Host: repo.Host, Reason: reasonUnreadable}
 		}
 	}
 	return status

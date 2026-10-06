@@ -22,14 +22,33 @@ const (
 	apiTimeout          = 10 * time.Second
 )
 
-// maxStdoutBytes/maxStderrBytes bound how much of a child's output this package retains (D2) —
-// stdout is a JSON body from GitHub itself, capped generously since a real answer is never anywhere
-// near this large; stderr is `gh`'s own diagnostic text, capped the same as gitclient's own stderr
-// cap.
-const (
-	maxStdoutBytes = 4 << 20
+// maxStdoutBytes/maxStderrBytes bound how much of a child's output this package retains (D2).
+// Stdout is a JSON body from GitHub itself: 64 MiB is derived from the OpenPulls worst case (a
+// 100-item page of ~450 KiB items), not a guess at "never this large". Vars, not consts: a test
+// lowers the stdout cap. Stderr is `gh`'s own diagnostic text, capped like gitclient's.
+var (
+	maxStdoutBytes = 64 << 20
 	maxStderrBytes = 1 << 20
 )
+
+// boundedWriter retains at most max bytes and records that more arrived. Write always reports a
+// full write: an error would end os/exec's copy, close the pipe and SIGPIPE `gh`, which would then
+// look like a failed exit instead of an oversize body.
+type boundedWriter struct {
+	buf      bytes.Buffer
+	max      int
+	overflow bool
+}
+
+func (w *boundedWriter) Write(p []byte) (int, error) {
+	room := w.max - w.buf.Len()
+	if room < len(p) {
+		w.overflow = true
+		p = p[:max(room, 0)]
+	}
+	w.buf.Write(p)
+	return len(p), nil
+}
 
 // ghHygieneEnv is D2's exact table, appended after os.Environ() (later entries win on a duplicate
 // key):
@@ -78,11 +97,13 @@ type Result struct {
 	Stdout   []byte
 	Stderr   []byte
 	ExitCode int
+	// StdoutTruncated is true when stdout exceeded maxStdoutBytes; Stdout then holds only the prefix.
+	StdoutTruncated bool
 }
 
 // Runner is the spawn seam — one buffered method, unlike gitclient.Runner's own streaming
 // Start/Process split: every `gh` call this package makes is small (a version string, an auth
-// status line, a JSON body under a few MiB) and none is long-running, so there is no case here that
+// status line, a JSON body, bounded by maxStdoutBytes) and none is long-running, so there is no case here that
 // needs a streaming Process the way gitclient's `log`/`diff` walks do.
 type Runner interface {
 	Run(ctx context.Context, ghPath string, spec Spec) (Result, error)
@@ -129,9 +150,10 @@ func (execRunner) Run(ctx context.Context, ghPath string, spec Spec) (Result, er
 	// happens-before this needs.
 	stopEscalate := procgroup.GracefulCancel(cmd, gracefulStopDelay, killGroup)
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	stdout := &boundedWriter{max: maxStdoutBytes}
+	stderr := &boundedWriter{max: maxStderrBytes}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	runErr := cmd.Run()
 	stopEscalate()
@@ -144,22 +166,13 @@ func (execRunner) Run(ctx context.Context, ghPath string, spec Spec) (Result, er
 		return Result{}, runCtx.Err()
 	}
 
-	stdoutBytes := stdout.Bytes()
-	if len(stdoutBytes) > maxStdoutBytes {
-		stdoutBytes = stdoutBytes[:maxStdoutBytes]
-	}
-	stderrBytes := stderr.Bytes()
-	if len(stderrBytes) > maxStderrBytes {
-		stderrBytes = stderrBytes[:maxStderrBytes]
-	}
-
 	if runErr != nil {
 		var exitErr *exec.ExitError
 		if errors.As(runErr, &exitErr) {
-			return Result{Stdout: stdoutBytes, Stderr: stderrBytes, ExitCode: exitErr.ExitCode()}, nil
+			return Result{Stdout: stdout.buf.Bytes(), Stderr: stderr.buf.Bytes(), ExitCode: exitErr.ExitCode(), StdoutTruncated: stdout.overflow}, nil
 		}
 		// Could not even start, or a genuine reap failure — no exit code to report.
 		return Result{}, runErr
 	}
-	return Result{Stdout: stdoutBytes, Stderr: stderrBytes, ExitCode: 0}, nil
+	return Result{Stdout: stdout.buf.Bytes(), Stderr: stderr.buf.Bytes(), StdoutTruncated: stdout.overflow}, nil
 }
