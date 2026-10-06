@@ -103,7 +103,13 @@ test('mode switch — three mode tabs, an empty Http mode, and Studio state that
     .poll(() =>
       control
         .log()
-        .some((entry) => entry.channel === IPC.tabsSave && JSON.stringify(entry).includes('1000')),
+        .some(
+          (entry) =>
+            entry.channel === IPC.tabsSave &&
+            (entry.args as { tabs: { state: { pageSize?: number } }[] }).tabs.some(
+              (t) => t.state.pageSize === 1000,
+            ),
+        ),
     )
     .toBe(true);
 

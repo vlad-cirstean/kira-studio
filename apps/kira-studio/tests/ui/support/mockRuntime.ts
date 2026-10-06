@@ -45,6 +45,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   layoutGetAll: 'LayoutService.GetAll',
   layoutSet: 'LayoutService.Set',
   appFlushed: 'LifecycleService.Flushed',
+  windowFlushed: 'LifecycleService.WindowFlushed',
   filesChooseSave: 'FilesService.ChooseSave',
   filesChooseOpen: 'FilesService.ChooseOpen',
   filesChooseFolder: 'FilesService.ChooseFolder',
@@ -157,6 +158,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   terminalResize: 'TerminalService.Resize',
   terminalClose: 'TerminalService.Close',
   terminalDefaultCwd: 'TerminalService.DefaultCwd',
+  terminalShutdown: 'TerminalService.Shutdown',
 
   customScriptsList: 'CustomScriptsService.List',
   customScriptsCreate: 'CustomScriptsService.Create',
@@ -170,10 +172,9 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
  *  P50 D5/D15) mapped onto the FQN `$Call.ByName` actually sends over the wire today. This table
- *  is the one piece of new coupling P57's bridge rewrite introduces (§4.10) — §5.5's
- *  `mockRuntime.spec.ts` guards both directions: every value here must appear in the generated
- *  bindings' own `$Call.ByName("…")` literals, and every channel any committed fixture uses must
- *  have an entry. */
+ *  is the one piece of new coupling P57's bridge rewrite introduces (§4.10) —
+ *  tests/unit/mock-runtime-bindings.spec.ts asserts its values equal the generated bindings' own
+ *  `$Call.ByName("…")` literals. */
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
   IPC,
   FQN_SUFFIX_BY_IPC_KEY,

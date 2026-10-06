@@ -12,8 +12,6 @@ export const IPC = {
   settingsSet: 'kira:settings:set',
   layoutGetAll: 'kira:layout:getAll',
   layoutSet: 'kira:layout:set',
-  port: 'kira:port',
-  engineState: 'kira:engine:state',
   openSettings: 'kira:open-settings',
   newConnection: 'kira:menu:new-connection',
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
@@ -28,6 +26,7 @@ export const IPC = {
   viewRunAll: 'kira:menu:view-run-all',
   appFlushBeforeClose: 'kira:app:flush-before-close',
   appFlushed: 'kira:app:flushed',
+  windowFlushed: 'kira:window:flushed',
 
   filesChooseSave: 'kira:files:chooseSave',
   filesChooseOpen: 'kira:files:chooseOpen',
@@ -152,6 +151,7 @@ export const IPC = {
   terminalClose: 'kira:terminal:close',
   // P91 §7: the Terminal module's own unscoped-launch default (the user's home directory).
   terminalDefaultCwd: 'kira:terminal:defaultCwd',
+  terminalShutdown: 'kira:terminal:shutdown',
 
   // P85 §9.2: the custom-scripts CRUD surface.
   customScriptsList: 'kira:customScripts:list',
