@@ -7,6 +7,9 @@ Base commit `088fd66`; HEAD reviewed `78539f6` (plan commit only on top). `PI` =
 Checks at HEAD: `go vet ./apps/kira-space/internal/gitsession/...` clean;
 `go test -race -count=1 ./apps/kira-space/internal/gitsession/...` `ok` (27.3 s).
 
+Summary: 15 findings. Medium 4 (F6, F7, F11, F14); low 11 (F1-F5, F8-F10, F12, F13, F15). One
+design-decision (F12). No high.
+
 ## Block status
 
 - Block 1 lifecycle: done
@@ -15,8 +18,8 @@ Checks at HEAD: `go vet ./apps/kira-space/internal/gitsession/...` clean;
 - Block 4 stack and worktree: done
 - Block 5 remote and auto-fetch: done
 - Block 6 review: done
-- Block 7 GitHub and ADE facts: pending
-- Block 8 tests and §7: pending
+- Block 7 GitHub and ADE facts: done (no new finding)
+- Block 8 tests and §7: done
 
 ## Findings
 
@@ -60,9 +63,9 @@ The per-signal cost is D8 behaviour; leave as is unless the fixer adds a negativ
 
 ### F3 (low): `refsSnapshot` and `Head` write the live head with no `cacheGen` check
 
-`GS/refs.go:100-109`, `GS/entry.go:317-336`. Owner: Stream B (`GS`).
+`GS/refs.go:46-101`, `GS/entry.go:317-336`. Owner: Stream B (`GS`).
 
-F10 (P108) guards `statusAndInProgress`'s `setHead` (`status.go:131`) but two other writers skip it.
+F10 (P108) guards `statusAndInProgress`'s `setHead` (`status.go:61-63`) but two other writers skip it.
 `refsSnapshot` calls `e.setHead` unconditionally when `%(HEAD)` names a branch, and `Head`'s lazy path
 calls `setHead` after `ResolveHead` without re-checking. Scenario: `refs.list` spawns `for-each-ref`
 (HEAD on `main`); a terminal `git switch feature` lands; `note` bumps `cacheGen` and sets
@@ -73,7 +76,7 @@ Self-heals on the client's own `refs.list` refetch only when that refetch reache
 
 Fix: capture `gen := e.cacheGeneration()` before the spawns in `refsSnapshot` and before `ResolveHead`
 in `Head`; call `setHead` only when the generation still matches (`Head` still returns the value it
-resolved). Same shape as `status.go:106-133`. `ResolveReviewBase` (`GS/review.go:157-214`) has the same
+resolved). Same shape as `status.go:36-63`. `ResolveReviewBase` (`GS/review.go:157-214`) has the same
 gap for `RememberRangeCount`: a count computed before a refsChanged is stored after `note` dropped the
 slot and seeds the next ranged walk's `PrecomputedTotal`; guard it the same way.
 
@@ -237,7 +240,7 @@ post-restack tip as the expected old value.
 
 ### F12 (low, design-decision): auto-fetch disables itself for the entry's life on any failure
 
-`GS/autofetch.go:414-428` (`autoFetchTick`).
+`GS/autofetch.go:163-177` (`autoFetchTick`).
 
 Every non-OK result except `OperationInProgress`, and every Go error, calls `disableAutoFetch`,
 which only teardown resets. The doc names AuthFailed as the case; `NetworkFailed` (laptop asleep,
@@ -250,7 +253,7 @@ on D23. Not proposed as a fix.
 
 ### F13 (low): auto-fetch tick racing teardown runs an uncancellable fetch on a dead entry
 
-`GS/autofetch.go:390-416`, `GS/entry.go:434-437`, `GS/remote.go:293-299`. Owner: Stream B (`GS`).
+`GS/autofetch.go:139-165`, `GS/entry.go:434-437`, `GS/remote.go:293-299`. Owner: Stream B (`GS`).
 
 `autoFetchTick` reads `disabled` once, then calls `pickAutoFetchRemote` and `RunRemote`. `teardown`
 can run in between: `stopAutoFetch` cannot stop a timer that already fired, and `remoteOp.forceCancel`
@@ -288,6 +291,21 @@ directly (`readCurrentContent` plus `countLines`, as the slow path does) in tier
 hunk arithmetic only for a text record. Add a real-git test: mark a >1 MiB file, shrink it below the
 cap, mark a range, assert the stored range and `LineCount`.
 
+### F15 (low): `gitsession` real-git tests inherit the developer's global git config
+
+`GS/main_test.go:10`, helpers `GS/queries_test.go:21-32,84-93` (`runGitQ`, `runOutput`). Owner: Stream B
+(`GS`).
+
+`testx.RunWithTempHomes` isolates only `KIRA_HOME`/`KIRA_SPACE_HOME` (P154). `runGitQ` and the
+production runner (`gitclient` `hygieneEnv` appends to `os.Environ()`) still read `~/.gitconfig` and
+`/etc/gitconfig`. A developer with `commit.gpgsign=true`, `core.hooksPath`, `pull.rebase` or
+`rebase.autoStash` set gets failing or different results (signing prompt during `runGitQ commit`,
+hooks firing in temp repos, undo and restack tests seeing non-default behaviour). The plan's own probes
+needed `GIT_CONFIG_GLOBAL` pointed at a scratch file for this reason.
+
+Fix: in `GS/main_test.go`, set `GIT_CONFIG_GLOBAL` to an empty temp file and `GIT_CONFIG_NOSYSTEM=1`
+before `m.Run()` (the same for `gitrpc`/`gitsock` `main_test.go` is Part 17's call).
+
 ## §9 candidates
 
 1. Dropped. `Registry.acquire` after `Close` does build an untracked entry, but only reachable at
@@ -311,6 +329,14 @@ cap, mark a range, assert the stored range and `LineCount`.
    is set, and a running tick's fired timer stays in the field until the tick itself reschedules,
    pauses or disables. No path arms a second timer. A setting flip 0 to positive racing a tick's
    `pauseAutoFetch` can lose one arming until the next `Conn.Open`; negligible.
+13. Dropped. `ensureSnapshot`'s only caller is `ResolveBranchPr` (`gh.go:424`), which falls through to
+   `branchCache`/`PullsForBranch` on any non-OK snapshot status, so a cancelled leader costs followers
+   one per-branch query each, never a wrong answer. `OpenPulls` returns a `Status`, never panics by
+   contract.
+14. Dropped. The copy goroutine ends when `src` hits EOF (success path: `sink` only exits after stdin
+   closes) or when the deferred `src.Close()` kills `src` (any error path), so it never outlives the
+   call by more than that. Real git 2.43: `patch-id --stable` on empty input exits 0 with no output,
+   which `DiffPatchID` maps to `""`.
 15. Dropped. `rpcstream.Session.close` (deferred inside `Serve`) cancels every active stream ctx and
    closes `done` before `handleConn`/`ServeGitStream` run their deferred `gconn.Close`, so a stream
    blocked in `creditGate.acquire` or `sendChunk` returns first and `dispose` gets `w.mu`. A wedged
@@ -323,12 +349,85 @@ cap, mark a range, assert the stored range and `LineCount`.
 18. Reported as F3 (head writers). `ghState` fills (`snapshotPut`, `branchCachePut`, `githubRepo`) also
    lack a generation check, but a ref move does not change open-PR state and `.git/config` edits fire
    refsChanged again; dropped for those.
-22. Dropped. `undo_guard_test.go` runs real git (`initUndoGuardRepo`, `runGitQ`) and asserts the refs
-   and worktree after the refused replay, not argv shape. It does not assert `Error.Kind`; F10 adds
-   that.
+19. Dropped. A clobbered `reviewRangeCountSlot` makes the other window's `TakeRangeCount` miss and
+   logsession count itself (`review.go:31-42`, D9 fallback). Cost only, never wrong data.
 20. Dropped. `RunPrepare` and `worktreeRemove` of the same worktree are both user actions, the remove
    needs the typed token once the script dirtied the tree, and the script then fails on a missing
    directory with no app state left inconsistent. `prepareWorktreeRemove` could refuse while
    `e.prepare` is running on `target.Path`; noted, not reported.
-19. Dropped. A clobbered `reviewRangeCountSlot` makes the other window's `TakeRangeCount` miss and
-   logsession count itself (`review.go:31-42`, D9 fallback). Cost only, never wrong data.
+21. Dropped. Plan reloads are user-driven (focus, mark, apply, popover); each costs one `Account`
+   (discovery-cached) plus one GraphQL query per 100 PR files. Reaching GitHub's 5,000-point hourly
+   budget needs thousands of interactions per hour; no measurement would change that.
+22. Dropped. `undo_guard_test.go` runs real git (`initUndoGuardRepo`, `runGitQ`) and asserts the refs
+   and worktree after the refused replay, not argv shape. It does not assert `Error.Kind`; F10 adds
+   that.
+
+## §7 contract checks
+
+- `gitprepare`: `RunPrepare` builds env with `gitprepare.BuildEnv(os.Environ(), …)`
+  (`worktree.go:503`). Holds. Batches go out through `conn.Emit` before `runner.Run` returns, and
+  `rpcstream` queues `Emit` and the result frame on the same `sendCh` in call order, so the result is
+  ordered after the last batch.
+- `gitsearch`: `Walk.Search` passes `Result.Complete`/`Truncated` through (`gitrpc/search.go:93-96`);
+  supersede (`searchGen`) and `dispose`/`resetLocked` cancel hold. Error mapping gap is F5.
+- `catfile.ErrInvalidRev`: every rev that can carry a newline routes to `*OneShot` (`Blob`,
+  `blobOID`, `blobOIDs`, `readCurrentContent`, `commitResolves`). Remaining `Check`/`CheckMany` inputs
+  are git-produced (`UndoRun` `RecoverySha`; `stashDrop`'s client sha is matched against `StashList`
+  first) or validated (`GhSyncPlan` head oid, Part 14 `3a8d3c7`). No reachable `ErrInvalidRev`.
+- `ResolveHead` stricter exit handling: consequences reported as F9.
+- `gitops.UndoTagArgs`/`RecreateRefArgs`: probe confirms `update-ref <ref> <sha> ""` refuses an
+  existing ref (`reference already exists`, exit 128), classified `AlreadyExists`. Holds; other
+  ref-moving replays are F11.
+- `gitops.ClassifyOpError` path-line change: messages keep full stderr (`ops.go:1137-1138`). Holds.
+  `reset --keep` refusal kind is F10.
+- `gitreview.ErrStoreClosed`: the store closes only in `Registry.Close` (`registry.go:308-310`), at
+  quit; no earlier close and no reuse of a closed `Registry`. Late callers cross as `E_INTERNAL` (F5).
+- NUL framing and `--` endings: `walk.go`, `working.go`, `search.go` append nothing after the
+  porcelain builders' `--`. Holds.
+- `gitpreflight` staged-rename and stack-depth changes: consumed unchanged by `stack.go`,
+  `preflight.go`, `worktree.go`. Holds.
+- `ghclient` host lowercasing: `IsGitHubHost` compares the lowercased parsed host to `github.com`
+  and uses `EqualFold` for discovered hosts. Holds. `PullFiles` state is GraphQL `OPEN`, matching
+  `ghsync.go:121`.
+
+## Routing
+
+No finding needs a Stream A or Stream C file, so `P168-routed-from-streamB.md` is not created. Stream B
+files outside `GS` named by findings: `PI/gitrpc/{graph,search,handlers}.go` (F5, Part 17),
+`PI/gitops/errors.go` (F10, Part 15), `PI/gitpreflight` `UndoRecord` (F11, Part 15).
+
+## Coverage
+
+All 52 owned files reviewed.
+
+- Block 1 (lifecycle): `registry.go`, `entry.go`, `conn.go` (non-walk), `subscriber.go`, `opslot.go`,
+  `cache.go` read whole. Callers read: `gitsock/server.go` (`handleConn`, `Close`),
+  `bridge/gitstream.go` (`ServeGitStream`), `ade/board.go` (`NewTaskBoard`, `openRepo`, `Close`,
+  `handleEmit`), `main.go` shutdown and `wireGit`. `internal/rpcstream/session.go` and `credit.go` read
+  for the emit/close contract only (Part 8).
+- Block 2 (walk and reads): `conn.go` walk parts, `walk.go`, `search.go`, `queries.go`, `refs.go`,
+  `status.go`, `working.go` whole; `gitrpc/{graph,search,detail}.go` handlers and `handlers.go`
+  `mapGitError` read. `gitrpc/refs.go` skimmed (thin pass-through to `Refs`).
+- Block 3 (ops and undo): `ops.go`, `oplog.go`, `stash.go`, `undo_guard_test.go`, `undo_test.go` whole;
+  `preflight.go` read from `stashPopPrediction` to `PreflightCherryPick` and the function index (rest is
+  read-only classification glue over `gitpreflight`, no write path). Callers `gitrpc/ops.go`
+  (detach) and `ade/setup.go:224` read; `gitrpc/{reset,stash}.go` skimmed (validation already covered
+  by `validOpArg`/`ErrInvalidResetMode` here).
+- Block 4 (stack and worktree): `stack.go`, `worktree.go` whole (`worktree.go:1-120` types and
+  `rawWorktreeList` skimmed). `gitrpc/{stack,worktree}.go` skimmed.
+- Block 5 (remote): `remote.go`, `autofetch.go` whole; `gitrpc/remote.go` validation read;
+  `gitops.Throttle` read (no trailing timer, so no progress after the result).
+- Block 6 (review): `review.go`, `incremental.go`, `comments.go` whole; `gitrpc/{comments,incremental}.go`
+  validation read; `gitreview.Touch`/`Branches`/`ProjectRanges` read for contracts.
+- Block 7 (GitHub and ADE facts): `gh.go`, `ghsync.go`, `queuefacts.go` whole; `ade/ghsync.go:40-100`,
+  `ghclient` `Account`/`PullFiles` state read. Other `ade` callers (`gitfacts`, `board_facts`,
+  `integration`, `rebasecheck`, `archive`) and `bridge/github.go` skimmed: thin calls into the reviewed
+  methods, logic is Part 20/22.
+- Block 8 (tests): all 26 `_test.go` files listed by name; read in full where cited
+  (`undo_guard_test.go`, `main_test.go`, `queries_test.go` helpers). Other test files skimmed by test
+  names against the claims above; no test found that no longer guards its named behaviour.
+  `ade`/`gitrpc`/`gitsock` tests use `testx.RunWithTempHomes` (P154 holds).
+
+Not reached: nothing. Concurrency probes were not written: every race claim above (F1, F3, F13) is a
+narrow interleaving that a code read pins down exactly and a probe could hit only with injected hooks;
+real-git probes covered every git-behaviour claim (F6, F7, F10, §7 `update-ref`, `patch-id`).
