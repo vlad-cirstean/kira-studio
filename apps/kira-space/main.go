@@ -575,10 +575,6 @@ func wireGit(repositories *repos.Repos) gitWired {
 	gitRouter := gitrpc.New(gitrpc.Deps{
 		Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
 		Askpass: askpassBroker,
-		SetGitPath: func(gitPath string) error {
-			_, err := repositories.Settings.Set(model.SettingsPatch{Git: &model.GitPatch{GitPath: &gitPath}})
-			return err
-		},
 	})
 	gitSock := gitsock.New(gitsock.Deps{
 		SocketPath:    filepath.Join(config.KiraSpaceHome(), "git.sock"),

@@ -27,17 +27,15 @@ func (s *spyRequest) fn(_ context.Context, method string, _ json.RawMessage) (an
 // TestGitrpcDispatch_EveryMethodIsClassified (gitrpc_dispatch_coverage_test.go, C13-11) can check
 // its own derived method set against the exact same two lists, with nothing to fall out of sync.
 //
-// P67e shrank this to the four methods that genuinely stay refused (docs/v1.6/plans/
-// P67e-git-relax-read-only.md D1): worktree.prepare/worktree.cancelPrepare (arbitrary shell
-// execution with no approval gate anywhere in this codebase) and settings.setGitPath (owned by
-// this app's own Settings dialog) are dispatched by Router.ForConn but excluded from
-// allowedMethods on purpose; editor.resolveConflict is refused here too even though Router.ForConn
+// P67e shrank this to the methods that genuinely stay refused (docs/v1.6/plans/
+// P67e-git-relax-read-only.md D1): worktree.prepare/worktree.cancelPrepare (shell execution) are
+// dispatched by Router.ForConn but excluded from allowedMethods on purpose; editor.resolveConflict is refused here too even though Router.ForConn
 // has no case for it at all — this app has no merge editor, the user's own stated carve-out, and
 // pinning the refusal at this layer is defence in depth beside hostHandlers.ts's own throw.
 // worktree.openWindow stays refused only at layer two (gitstream_test.go has never listed it —
 // hostHandlers.ts throws locally and Router.ForConn never sees it either way).
 var writeMethods = []string{
-	"worktree.prepare", "worktree.cancelPrepare", "settings.setGitPath", "editor.resolveConflict",
+	"worktree.prepare", "worktree.cancelPrepare", "editor.resolveConflict",
 }
 
 var hostAnsweredMethods = []string{

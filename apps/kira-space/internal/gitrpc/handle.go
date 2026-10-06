@@ -43,10 +43,9 @@ func handleRepoCall[P, R any](
 }
 
 // handleCall is handleRepoCall's own sibling for a handler with no repo to resolve (P107 I2-13) —
-// credential.provide and settings.* (repoSettings.get/set, settings.setGitPath) validate params
-// and call straight through, with no RepoEntry lookup in between. validate may be nil for a
-// handler with no required-field check of its own (settings.setGitPath: "" is a valid, meaningful
-// value — clear the override).
+// credential.provide and settings.* (repoSettings.get/set) validate params and call straight
+// through, with no RepoEntry lookup in between. validate may be nil for a handler with no
+// required-field check of its own.
 func handleCall[P, R any](
 	op string,
 	params json.RawMessage,

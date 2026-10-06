@@ -476,10 +476,6 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       'editor.resolveConflict',
       'needs a merge editor this window does not have; resolve the files in your own editor, then Continue',
     ),
-    'settings.setGitPath': refuseLocally(
-      'settings.setGitPath',
-      "writes the global git path, which this app's own Settings dialog already owns",
-    ),
     'worktree.openWindow': refuseLocally(
       'worktree.openWindow',
       'has no native meaning: there is no second window to open a worktree into',

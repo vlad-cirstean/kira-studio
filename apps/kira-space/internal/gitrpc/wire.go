@@ -619,12 +619,6 @@ type RepoSettingsChangedPayload struct {
 	Settings RepoSettingsSnapshot `json:"settings"`
 }
 
-// SettingsSetGitPathParams is settings.setGitPath's own request (D11's own migration leg, D15) —
-// extension-only, never called by the webview.
-type SettingsSetGitPathParams struct {
-	GitPath string `json:"gitPath"`
-}
-
 // ---------------------------------------------------------------------------------------
 // G24 — commit.resolvePr / branch.resolvePr (D9/D14). GhStatus/PrRecord/PrLookupResult are direct
 // structural copies of @kira/git-ipc's own types of the same name, kept honest by hand (this repo

@@ -384,40 +384,15 @@ func TestRepoSettings_WedgedConnectionDoesNotBlockOthers(t *testing.T) {
 	}
 }
 
-// TestHandleSettingsSetGitPath is G18 D11's own migration-leg guard: settings.setGitPath must
-// reach Deps.SetGitPath with the exact value the caller sent — the write path
-// storage/repos.SettingsRepo.Set(SettingsPatch{Git: &GitPatch{GitPath: ...}}) itself is proven at
-// the storage layer (storage/repos/settings_test.go-equivalent coverage does not exist for this
-// leaf specifically, so this is the one place the plumbing is exercised end to end at the RPC
-// layer with a fake).
-func TestHandleSettingsSetGitPath(t *testing.T) {
-	var got string
-	var calls int
-	router := New(Deps{SetGitPath: func(gitPath string) error {
-		got = gitPath
-		calls++
-		return nil
-	}})
-
-	result, err := router.handleSettingsSetGitPath(context.Background(), []byte(`{"gitPath":"/opt/git/bin/git"}`))
-	if err != nil {
-		t.Fatalf("settings.setGitPath: %v", err)
-	}
-	if _, ok := result.(struct{}); !ok {
-		t.Fatalf("settings.setGitPath result = %T, want struct{}{}", result)
-	}
-	if calls != 1 || got != "/opt/git/bin/git" {
-		t.Fatalf("SetGitPath called %d time(s) with %q, want once with \"/opt/git/bin/git\"", calls, got)
-	}
-}
-
-// TestHandleSettingsSetGitPath_NotWired proves the nil-Deps.SetGitPath case fails loudly rather
-// than silently doing nothing — a Router constructed without this closure wired (a programming
-// error, never main.go's own real wiring) must never look like a successful migration.
-func TestHandleSettingsSetGitPath_NotWired(t *testing.T) {
-	router := New(Deps{})
-	if _, err := router.handleSettingsSetGitPath(context.Background(), []byte(`{"gitPath":"/usr/bin/git"}`)); err == nil {
-		t.Fatal("settings.setGitPath with no Deps.SetGitPath wired: want an error, got nil")
+// P172: no connection can set the git path over the wire.
+func TestSettingsSetGitPath_IsNotAMethod(t *testing.T) {
+	router, _ := newTestRouter()
+	conn := gitsession.NewConn("conn-a", "client-a", "label-a", nil)
+	t.Cleanup(conn.Close)
+	_, err := router.ForConn(conn).Request(context.Background(), "settings.setGitPath", []byte(`{"gitPath":"/x"}`))
+	var ie *ipcerr.Error
+	if !errors.As(err, &ie) || ie.Code != "E_UNKNOWN_METHOD" {
+		t.Fatalf("err = %v, want E_UNKNOWN_METHOD", err)
 	}
 }
 

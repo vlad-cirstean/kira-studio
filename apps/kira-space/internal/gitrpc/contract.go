@@ -162,7 +162,10 @@ package gitrpc
 // P150: 41 -> 42, one new request (review.snapshot) -- the stored text a file had when it was last
 // reviewed, so a review window's since-review left side survives a rewritten branch. No new
 // event, no SQL migration beyond review.db's own pinned column.
-const ContractVersion = 42
+// P172: 42 -> 43, two breaking changes. repoSettings.set refuses the kiraSpace.worktree.prepareScript
+// patch leaf with E_READ_ONLY (the prepare script is written only in-process by Kira Space), and
+// settings.setGitPath is removed (the git path is set only in Kira Space's own Settings).
+const ContractVersion = 43
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

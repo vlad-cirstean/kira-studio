@@ -163,7 +163,6 @@ function stubHandlers(
       'editor.openWorkingDiff': notImplemented,
       'repoSettings.get': notImplemented,
       'repoSettings.set': notImplemented,
-      'settings.setGitPath': notImplemented,
       'review.session.save': notImplemented,
       'review.session.load': notImplemented,
       'commit.resolvePr': notImplemented,

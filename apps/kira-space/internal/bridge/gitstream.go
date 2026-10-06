@@ -47,18 +47,15 @@ func newStreamConnID() gitsession.ConnID {
 // P67e relaxed this stream's own posture from refusing every repository write to admitting every
 // operation that writes through git itself — the native window is a writing git client (fetch/
 // pull/push/force-push, merge and rebase as pull strategies, undo, restack, stash, worktree add/
-// remove, and the sequencer verbs a conflict needs to carry on). Of the 55 methods
-// internal/gitrpc's Router.ForConn dispatches, exactly three stay refused here, each for a reason
+// remove, and the sequencer verbs a conflict needs to carry on). Of the 56 request
+// methods internal/gitrpc's Router.ForConn dispatches, exactly two stay refused here, for a reason
 // this allowlist cannot admit around:
 //
-//   - worktree.prepare/worktree.cancelPrepare — RunPrepare executes a user-stored shell command
-//     with no human-approval gate anywhere in this codebase (its only check is "does this match
-//     what's currently stored"); a security boundary, not a file-editing one. Gated client-side by
+//   - worktree.prepare/worktree.cancelPrepare — RunPrepare executes the Space-stored shell command
+//     (written only by Kira Space, P172); running it is a security boundary, not a file-editing
+//     one, and nothing here has asked to admit it. Gated client-side by
 //     capabilities.runPrepareScript: false (hostHandlers.ts) — the flow stays reachable, WorktreeDialog
 //     just refuses to run the script while the flag is false, rather than hiding the affordance.
-//   - settings.setGitPath — writes the global git path, which this app's own Settings dialog
-//     already owns; no git-ui affordance calls it at all (it is the VS Code extension's own
-//     one-time migration routine).
 //
 // Two more methods stay refused at layer two (repo/git/hostHandlers.ts) as defence in depth even
 // though Router.ForConn has no case for either, so they never reach this file's own check:

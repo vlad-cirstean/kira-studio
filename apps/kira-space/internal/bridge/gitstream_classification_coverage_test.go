@@ -47,7 +47,7 @@ func TestGitrpcDispatch_EveryMethodIsClassified(t *testing.T) {
 	// package would still leave len(dispatched) > 0 (the other shape alone) — silently finding
 	// FEWER methods, with every one of a moved/added switch's or table's own methods then
 	// unclassified with zero test signal, exactly the gap this test exists to close. 50 sits
-	// comfortably under the ~55 methods Router.ForConn dispatches today (gitstream.go's own doc
+	// comfortably under the ~56 methods Router.ForConn dispatches today (gitstream.go's own doc
 	// comment), so a genuine drop below it fails loudly instead of passing vacuously.
 	const minDispatchedMethods = 50
 	if len(dispatched) < minDispatchedMethods {

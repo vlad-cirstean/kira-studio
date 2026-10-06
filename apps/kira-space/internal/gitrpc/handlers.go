@@ -26,11 +26,6 @@ type Deps struct {
 	// Askpass is G7's credential broker — nil when it failed to start (main.go's own D8 posture:
 	// every remote op then runs with no askpass interposition at all, never a fatal boot error).
 	Askpass *gitaskpass.Broker
-	// SetGitPath is G18 D11's own migration leg for kiraSpace.git.path: a plain func, not an
-	// interface (the same seam gitsession.Registry.Settings already is), writing straight through
-	// to storage/repos.SettingsRepo.Set — never repoSettings.set, since git.path never lived in
-	// the per-repo store (D15). Extension-only; nil-safe (see settings.go's handleSettingsSetGitPath).
-	SetGitPath func(gitPath string) error
 }
 
 // Handlers is gitrpc's own two-function method table — deliberately not rpcstream.Handlers: gitrpc
@@ -154,7 +149,7 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 
 // requestHandler is one requestHandlers entry's own shape — uniform across every RPC method even
 // though the underlying handleXxx methods are not (handleAppInit takes no c/params,
-// handleSettingsSetGitPath takes no c, handleRepoClose is a package func rather than a method) —
+// handleRepoClose is a package func rather than a method) —
 // each entry adapts its own handler to this one signature.
 type requestHandler func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error)
 
@@ -288,9 +283,6 @@ var requestHandlers = map[string]requestHandler{
 	},
 	"repoSettings.set": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleRepoSettingsSet(ctx, c, params)
-	},
-	"settings.setGitPath": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handleSettingsSetGitPath(ctx, params)
 	},
 	"search.run": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleSearchRun(ctx, c, params)

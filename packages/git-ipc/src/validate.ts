@@ -159,7 +159,11 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // P150: 41 -> 42, one new request (review.snapshot) -- the stored text a file had when it was last
 // reviewed, so a review window's since-review left side survives a rewritten branch. No new
 // event, no SQL migration beyond review.db's own pinned column.
-export const CONTRACT_VERSION = 42;
+// P172: 42 -> 43, two breaking changes. 'repoSettings.set' refuses the
+// 'kiraSpace.worktree.prepareScript' patch leaf with E_READ_ONLY ('RepoSettingsPatch' omits it:
+// the prepare script is written only in-process by Kira Space), and 'settings.setGitPath' is
+// removed (the git path is set only in Kira Space's own Settings).
+export const CONTRACT_VERSION = 43;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -265,7 +269,6 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'editor.openWorkingDiff': true,
   'repoSettings.get': true,
   'repoSettings.set': true,
-  'settings.setGitPath': true,
   'review.session.save': true,
   'review.session.load': true,
   'commit.resolvePr': true,

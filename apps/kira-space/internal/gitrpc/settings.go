@@ -130,29 +130,3 @@ func (r *Router) SetRepoSettings(repoID string, patch model.GitRepoSettingsPatch
 	_, err := r.setRepoSettings(gitpath.CleanNFC(repoID), patch)
 	return err
 }
-
-// handleSettingsSetGitPath is G18 D11's own migration leg: writes kiraSpace.git.path's migrated
-// value through Kira Space's own server-owned settings surface (storage/repos.SettingsRepo, via
-// r.deps.SetGitPath) rather than repoSettings.set, since git.path never lived in the per-repo
-// store (D15). Extension-only — proxyHandlers.ts never forwards a webview call here (the same
-// posture credential.provide's own doc comment states for a different reason).
-func (r *Router) handleSettingsSetGitPath(_ context.Context, params json.RawMessage) (any, error) {
-	return handleCall("settings.setGitPath", params, nil,
-		func(p SettingsSetGitPathParams) (struct{}, error) {
-			if r.deps.SetGitPath == nil {
-				return struct{}{}, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: not wired")
-			}
-			// G27 D5d: a client-supplied directory parameter (D2 tier 1) -- normalized when
-			// non-empty; "" (clear the override, fall back to auto-discovery) stays "" rather than
-			// becoming ".".
-			gitPath := p.GitPath
-			if gitPath != "" {
-				gitPath = gitpath.CleanNFC(gitPath)
-			}
-			if err := r.deps.SetGitPath(gitPath); err != nil {
-				return struct{}{}, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: "+err.Error())
-			}
-			return struct{}{}, nil
-		},
-	)
-}

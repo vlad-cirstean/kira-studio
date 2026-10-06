@@ -123,11 +123,11 @@ function inspectedValue(config: vscode.WorkspaceConfiguration, key: string): unk
  *  to"); a repo-scoped value is written via `repoSettings.set` against the first workspace
  *  folder's own repo (opened here specifically to learn its repoId, the same `repo.open` every
  *  other caller uses — idempotent per (connection, repoId), so this never disturbs the panel's
- *  own later open of the same repo); `git.path`'s value, if any, goes through
- *  `settings.setGitPath` instead (D15 — it was never part of the per-repo store). A session with
- *  no workspace folder open yet, or a request that fails, is retried on the next activation
- *  rather than marked done — the one-shot flag is only set after every applicable write actually
- *  lands. */
+ *  own later open of the same repo). `git.path` is not migrated: only Kira Space sets the git
+ *  path (P172), so a legacy value gets a one-time message pointing at Kira Space Settings → Git.
+ *  A session with no workspace folder open yet, or a request that fails, is retried on the next
+ *  activation rather than marked done — the one-shot flag is only set after every applicable
+ *  write actually lands. */
 async function migrateLegacySettings(
   context: vscode.ExtensionContext,
   manager: ConnectionManager,
@@ -145,9 +145,18 @@ async function migrateLegacySettings(
   }
   const gitPathValue = inspectedValue(config, LEGACY_GIT_PATH_KEY);
 
-  if (Object.keys(rawRepoValues).length === 0 && gitPathValue === undefined) {
-    // Nothing to migrate, ever, for this installation — nothing left to retry either.
+  const notifyGitPath = (): void => {
+    if (typeof gitPathValue === 'string' && gitPathValue !== '') {
+      void vscode.window.showInformationMessage(
+        `Kira Space no longer reads kiraSpace.git.path ("${gitPathValue}"). Set the Git path in Kira Space, Settings, Git.`,
+      );
+    }
+  };
+
+  if (Object.keys(rawRepoValues).length === 0) {
+    // Nothing per-repo to migrate, ever, for this installation — nothing left to retry either.
     await context.globalState.update(SETTINGS_MIGRATED_KEY, true);
+    notifyGitPath();
     return;
   }
 
@@ -169,30 +178,25 @@ async function migrateLegacySettings(
   try {
     await manager.whenConnected();
 
-    if (Object.keys(rawRepoValues).length > 0) {
-      const opened = await manager.request('repo.open', { path: folder });
-      if (opened.kind === 'ok') {
-        const patch: Record<string, unknown> = {};
-        for (const key of Object.keys(rawRepoValues)) {
-          patch[key] = coerced[key as SettingKey];
-        }
-        await manager.request('repoSettings.set', {
-          repoId: opened.repo.repoId,
-          patch: patch as RepoSettingsPatch,
-        });
-      } else {
-        logger.log('warn', 'settings migration: repo.open did not resolve to ok, will retry', {
-          kind: opened.kind,
-        });
-        return;
+    const opened = await manager.request('repo.open', { path: folder });
+    if (opened.kind === 'ok') {
+      const patch: Record<string, unknown> = {};
+      for (const key of Object.keys(rawRepoValues)) {
+        patch[key] = coerced[key as SettingKey];
       }
-    }
-
-    if (typeof gitPathValue === 'string') {
-      await manager.request('settings.setGitPath', { gitPath: gitPathValue });
+      await manager.request('repoSettings.set', {
+        repoId: opened.repo.repoId,
+        patch: patch as RepoSettingsPatch,
+      });
+    } else {
+      logger.log('warn', 'settings migration: repo.open did not resolve to ok, will retry', {
+        kind: opened.kind,
+      });
+      return;
     }
 
     await context.globalState.update(SETTINGS_MIGRATED_KEY, true);
+    notifyGitPath();
     logger.log('info', 'settings migration complete', {
       repoKeys: Object.keys(rawRepoValues),
       gitPath: typeof gitPathValue === 'string',
