@@ -1,5 +1,5 @@
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/util/clipboard';
 import { useModeStore } from '../../state/mode';
 import { useTabsStore } from '../../state/tabs';
 import { dataQueryCommands } from '../../state/viewCommands';
@@ -43,6 +43,7 @@ export function columnsSectionMenu(
   connectionId: string,
   tablePath: string,
   columnName: string,
+  onCopyError: (message: string) => void,
 ): MenuItem[] {
   return [
     {
@@ -50,7 +51,7 @@ export function columnsSectionMenu(
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
-      run: () => copyText(columnName),
+      run: () => copyOrReportError(columnName, onCopyError),
     },
     {
       type: 'item',

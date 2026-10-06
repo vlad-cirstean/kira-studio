@@ -14,7 +14,7 @@ import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/util/clipboard';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -64,8 +64,18 @@ function onOpenConsole(): void {
   if (props.tab.connectionId) tabsStore.openConsoleTab(props.tab.connectionId, props.tab.path);
 }
 
+const copyError = ref<string | null>(null);
 function onCopy(): void {
-  if (definition.value) copyText(definitionText(definition.value));
+  if (!definition.value) return;
+  void copyOrReportError(
+    definitionText(definition.value),
+    (m) => {
+      copyError.value = m;
+    },
+    () => {
+      copyError.value = null;
+    },
+  );
 }
 
 let unregisterCommands: Array<() => void> = [];
@@ -299,6 +309,9 @@ const breadcrumb = computed(() => {
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="definition-error">
       <AlertDescription><span class="whitespace-pre-wrap font-data">{{ rt.error }}</span></AlertDescription>
     </Alert>
+    <Alert v-if="copyError" variant="destructive" data-testid="definition-copy-error">
+      <AlertDescription>{{ copyError }}</AlertDescription>
+    </Alert>
     <Alert
       v-if="pane === 'source' && definition && definition.notes.length > 0"
       variant="note"
@@ -360,6 +373,7 @@ const breadcrumb = computed(() => {
           :foreign-key-column-names="foreignKeyColumnNames"
           :connection-id="tab.connectionId ?? ''"
           :table-path="tab.path"
+          @copy-error="(m: string) => (copyError = m)"
         />
         <IndexesSection :indexes="filteredIndexes" />
         <ConstraintsSection

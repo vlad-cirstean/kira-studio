@@ -63,7 +63,10 @@ export const useStreamSearchStore = defineStore('streamSearch', () => {
     ) {
       return true;
     }
-    return cellText(page.bodies, row, decoder).toLowerCase().includes(needle);
+    return (
+      !isNull(page.bodies, row) &&
+      cellText(page.bodies, row, decoder).toLowerCase().includes(needle)
+    );
   }
 
   function runSearch(tabId: string, query: string): void {

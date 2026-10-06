@@ -143,9 +143,12 @@ function rowAt(i: number) {
 // (and the deleted DataGrid.vue) already use rather than inventing a fourth number.
 const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 
-function onRowContextMenu(e: MouseEvent, key: string | null, body: string): void {
+function onRowContextMenu(e: MouseEvent, key: string | null, body: string | null): void {
   e.preventDefault();
-  contextMenuStore.openContextMenu(e, rowMenu(key, body));
+  contextMenuStore.openContextMenu(
+    e,
+    rowMenu(key, body, (m) => streamViewStore.setActionError(props.tab.id, m)),
+  );
 }
 
 // Row click alone (gutter, empty row background) just selects the row for highlighting/delete-
@@ -212,7 +215,7 @@ function onRowKeydownFromEvent(e: KeyboardEvent): void {
 function onRowContextMenuFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.target, 'rowIndex');
   if (i === null) return;
-  onRowContextMenu(e, rowAt(i)?.key ?? null, rowAt(i)?.body ?? '');
+  onRowContextMenu(e, rowAt(i)?.key ?? null, rowAt(i)?.body ?? null);
 }
 function onKeyCellClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
@@ -250,7 +253,7 @@ function onCellKeydownFromEvent(e: KeyboardEvent, column: 'key' | 'timestamp' | 
 // cell is the other half of the same idea and was left out of it, so a Poll cleared the row
 // highlight while the dock kept showing the previous batch's message body.
 watch(
-  () => pageVersion.n,
+  page,
   () => cellSelectionStore.clearSelectedCellFor(props.tab.id),
 );
 
@@ -1183,12 +1186,20 @@ onUnmounted(() => {
                   class="flex items-center px-2 border-r border-b border-border font-data truncate flex-1 text-muted-foreground text-kira-sm"
                   data-testid="stream-body"
                   role="option"
+                  :aria-label="rowAt(rowIndices[vi.index])?.body === null ? 'null (tombstone)' : undefined"
                   tabindex="0"
                   :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
                   @click="onBodyCellClickFromEvent"
                   @keydown="onCellKeydownFromEvent($event, 'body')"
                 >
-                  {{ rowAt(rowIndices[vi.index])?.body }}
+                  <span
+                    v-if="rowAt(rowIndices[vi.index])?.body === null"
+                    class="text-subtle italic"
+                    title="null (tombstone)"
+                    data-testid="stream-body-null"
+                    >NULL</span
+                  >
+                  <template v-else>{{ rowAt(rowIndices[vi.index])?.body }}</template>
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
                     <TooltipTrigger as-child>
                       <span class="text-kira-xs text-muted-foreground">(truncated)</span>

@@ -18,10 +18,11 @@ const streamSearchStore = useStreamSearchStore();
 // README's own "search walks the loaded rows only and never issues a query" wording, borrowed
 // verbatim from views/shared/page/SearchToolbar.vue's precedent — applies here too (item 5).
 // P31 D22/F24: pageVersion.n is the explicit dependency — getPage reads a plain, non-reactive Map.
-const loadedRowCount = computed(() => {
+const page = computed(() => {
   void pageVersion.n;
-  return getPage(props.tabId)?.rowCount ?? 0;
+  return getPage(props.tabId);
 });
+const loadedRowCount = computed(() => page.value?.rowCount ?? 0);
 
 // P31 D17: the same filter-mode toggle views/shared/page/SearchToolbar.vue has (P24 D1/D9).
 const filtering = computed(() => pageSearchFilterStore.isSearchFiltering(props.tabId));
@@ -51,7 +52,7 @@ watch(query, (q) => {
 // re-scan against the new page (runSearch already resets index to the first match, or -1,
 // per D23) without auto-scrolling; a background poll must not move the viewport under the user.
 watch(
-  () => pageVersion.n,
+  page,
   () => {
     if (query.value !== '') streamSearchStore.runSearch(props.tabId, query.value);
   },

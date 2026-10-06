@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TabularPage } from '@shared/protocol/page';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError } from '@workbench/util/clipboard';
 import type {
   Column,
   CustomDataView,
@@ -102,6 +102,8 @@ const props = defineProps<{
   connectionId: string | null;
   path: string;
 }>();
+const emit = defineEmits<{ copyError: [message: string] }>();
+const onCopyError = (message: string): void => emit('copyError', message);
 
 // Column<T>'s own `field` type can't be satisfied by RowHandle's shape (arbitrary db column
 // names) — same escape hatch kiraSlickGrid.ts/SlickGridHost.vue already use.
@@ -519,19 +521,19 @@ function onCopy(): void {
   if (!sel || !page) return;
   if (sel.kind === 'cell') {
     const dc = cellAt(sel.row, sel.col);
-    void copyText(dc.isNull ? '' : dc.text);
+    void copyOrReportError(dc.isNull ? '' : dc.text, onCopyError);
     return;
   }
   if (sel.kind === 'range') {
     const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
-    void copyText(columnsToTsv(visibleRowsInSpan(sel.anchorRow, sel.row), cols, cellAt));
+    void copyOrReportError(columnsToTsv(visibleRowsInSpan(sel.anchorRow, sel.row), cols, cellAt), onCopyError);
     return;
   }
   if (sel.kind === 'row') {
-    void copyText(rowsToTsv(sel.rows.map(rowSnapshotFor)));
+    void copyOrReportError(rowsToTsv(sel.rows.map(rowSnapshotFor)), onCopyError);
     return;
   }
-  void copyText(columnsToTsv(rowsForColumnOps(), sel.cols, cellAt));
+  void copyOrReportError(columnsToTsv(rowsForColumnOps(), sel.cols, cellAt), onCopyError);
 }
 
 // D9: right-click opens the menu that matches whatever's currently selected (a range/column
@@ -554,7 +556,7 @@ function onGridContextMenu(e: SlickEventData): void {
     let cachedSnapshots: RowSnapshot[] | null = null;
     contextMenuStore.openContextMenu(
       nativeLike,
-      tabularRowMenu({ snapshots: () => (cachedSnapshots ??= rows.map(rowSnapshotFor)) }),
+      tabularRowMenu({ onError: onCopyError, snapshots: () => (cachedSnapshots ??= rows.map(rowSnapshotFor)) }),
     );
     return;
   }
@@ -578,6 +580,7 @@ function onGridContextMenu(e: SlickEventData): void {
     contextMenuStore.openContextMenu(
       nativeLike,
       tabularRangeMenu({
+        onError: onCopyError,
         rows: visibleRowsInSpan(sel.anchorRow, sel.row),
         cols,
         columnNames: cols.map((c) => page?.columns[c]?.name ?? ''),
@@ -590,6 +593,7 @@ function onGridContextMenu(e: SlickEventData): void {
     contextMenuStore.openContextMenu(
       nativeLike,
       tabularColumnMenu({
+        onError: onCopyError,
         columnName: column.name,
         rows: rowsForColumnOps(),
         col: displayCol,
@@ -602,7 +606,7 @@ function onGridContextMenu(e: SlickEventData): void {
   const dc = cellAt(pageRow, pageCol);
   contextMenuStore.openContextMenu(
     nativeLike,
-    tabularCellMenu({ columnName: column.name, isNull: dc.isNull, text: dc.text }),
+    tabularCellMenu({ onError: onCopyError, columnName: column.name, isNull: dc.isNull, text: dc.text }),
   );
 }
 
@@ -622,6 +626,7 @@ function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }
   contextMenuStore.openContextMenu(
     e as unknown as MouseEvent,
     tabularColumnMenu({
+        onError: onCopyError,
       columnName: column.name,
       rows: rowsForColumnOps(),
       col: displayCol,

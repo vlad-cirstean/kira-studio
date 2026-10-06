@@ -188,7 +188,8 @@ function isSelected(row: number, col: number): boolean {
 // finding, or the same result reloading) identifies nothing. Clearing rather than republishing is
 // the honest operation: there is no persistent selection concept here to republish against a new
 // page in the first place.
-watch([() => props.pageKey, () => pageVersion.n], () => {
+// Page identity, not the counter every console tab's load/close bumps.
+watch([() => props.pageKey, page], () => {
   selected.value = null;
   cellSelectionStore.clearSelectedCellFor(props.tabId);
 });
@@ -354,6 +355,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       :connection-id="connectionId"
       :path="path"
       class="flex-1 min-h-0"
+      @copy-error="onCopyError"
     />
     <div
       v-else-if="page.kind === 'document'"

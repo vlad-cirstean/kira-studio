@@ -19,7 +19,8 @@ export interface StreamRow {
   headers: string;
   attrs: string;
   timestamp: string | null;
-  body: string;
+  /** `null` is a Kafka tombstone: distinct from the empty string. */
+  body: string | null;
   isTruncated: boolean;
 }
 
@@ -37,7 +38,7 @@ export function streamRow(tabId: string, row: number): StreamRow | null {
       headers: cached('headers', page.headers),
       attrs: cached('attrs', page.attrs),
       timestamp: isNull(page.timestamps, row) ? null : cached('timestamp', page.timestamps),
-      body: cached('body', page.bodies),
+      body: isNull(page.bodies, row) ? null : cached('body', page.bodies),
       isTruncated: isTruncated(page.bodies, row),
     };
   });

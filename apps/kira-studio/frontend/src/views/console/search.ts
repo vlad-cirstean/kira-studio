@@ -113,6 +113,8 @@ const {
   runSearch,
   pageVersion,
   loadedRowCount: (tabId) => useConsoleViewStore().activePage(tabId)?.rowCount ?? 0,
+  // Page identity, not the counter every console tab's load/close bumps (Part 11 F4 pattern).
+  pageOf: (tabId) => useConsoleViewStore().activePage(tabId),
 });
 
 export { matchedRows, pageSearchApi, searchState };

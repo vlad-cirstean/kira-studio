@@ -27,6 +27,7 @@ const props = defineProps<{
   connectionId: string;
   tablePath: string;
 }>();
+const emit = defineEmits<{ copyError: [message: string] }>();
 
 function keyLabel(col: ColumnMeta): 'PK' | 'FK' | null {
   if (col.isPrimaryKey) return 'PK';
@@ -38,7 +39,10 @@ function keyLabel(col: ColumnMeta): 'PK' | 'FK' | null {
 // relocated here — the table path is `tablePath` directly, not derived from a tree row's path.
 function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
   ev.preventDefault();
-  contextMenuStore.openContextMenu(ev, columnsSectionMenu(props.connectionId, props.tablePath, col.name));
+  contextMenuStore.openContextMenu(
+    ev,
+    columnsSectionMenu(props.connectionId, props.tablePath, col.name, (m) => emit('copyError', m)),
+  );
 }
 </script>
 
