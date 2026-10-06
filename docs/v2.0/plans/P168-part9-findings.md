@@ -56,7 +56,7 @@ Part 9 file (every item there targets Go, Stream C views, or Part 8).
 #### F3 (low, a11y): `TooltipDisabledTrigger` adds a second tab stop when the button is enabled
 
 - `packages/theme/src/components/ui/tooltip/TooltipDisabledTrigger.vue:9`,
-  `packages/theme/src/components/TooltipIconButton.vue:187-191`.
+  `packages/theme/src/components/TooltipIconButton.vue:52-56`.
 - The wrapper `<span tabindex="0">` is focusable regardless of the button's state. Callers pass a
   static `disabled-trigger` with a dynamic `:disabled` (`views/shared/page/PagerControls.vue:70,78,
   109,118`, `views/shared/EditBufferActions.vue:62,73,83`, `views/shared/keyvalue/KeyValuePane.vue:
@@ -112,8 +112,8 @@ Part 9 file (every item there targets Go, Stream C views, or Part 8).
 
 #### F7 (low): hydrate-then-subscribe gap in four store factories
 
-- `packages/workbench/src/state/createSettingsStore.ts:136-144`, `createLayoutStore.ts:204-209`,
-  `createKeepAwakeStore.ts:251-257`, `createAgentSessionsStore.ts:71-77`.
+- `packages/workbench/src/state/createSettingsStore.ts:104-112`, `createLayoutStore.ts:68-73`,
+  `createKeepAwakeStore.ts:39-45`, `createAgentSessionsStore.ts:71-77`.
 - Each awaits its snapshot, then subscribes. A broadcast landing during the await is lost.
   `createOpLogStore` already fixed this exact shape (P108 Part 12 F7: subscribe first, buffer).
 - Scenario: window B boots while window A changes a setting, the layout or keep-awake. B renders
@@ -141,3 +141,84 @@ Block 1 other checks, nothing filed:
   failure model. `refetchOnReconnect` default left alone: no network dependency to react to.
 - `terminalWrite`/`terminalResize` rejections (`void`ed) after a session exits: console noise only;
   the footer already shows the exit. Dropped.
+
+### Block 2: shortcuts, dialogs, a11y, dead code
+
+#### F8 (low): local shortcuts match letters by `e.code`, so non-QWERTY layouts fire the wrong key
+
+- `packages/workbench/src/shortcuts/keys.ts:48-75`.
+- `matchesShortcut` compares every letter/digit chord against the physical key (`KeyC`, `KeyD`) on
+  every platform, not only for macOS Option-composed input (the case F12 targeted).
+- Scenario (Dvorak, any OS): the user presses Ctrl+D (label D, physical `KeyH`) in the project tree;
+  nothing happens. Ctrl+E (physical `KeyD`) duplicates the connection (`tree.duplicate`,
+  `ProjectTree.vue:170`, `CollectionsTree.vue:164`); in the grid it stages duplicate rows
+  (`SlickGridHost.vue:1906`). Colemak moves D too. Ctrl+C in the tree (`tree.copyName`) follows the
+  physical key, not the label.
+- Fix: match `e.key` first (case-insensitive) when it is a single ASCII letter/digit; fall back to
+  `e.code` only when `e.key` is not ASCII (Option-composed `ç` on macOS, a Cyrillic layout). Keeps
+  F12's macOS fix and restores layout-correct matching.
+
+#### F9 (low): text prompt submits on the IME-confirming Enter
+
+- `packages/workbench/src/prompt/TextPromptDialog.vue:55-56`.
+- `@keydown.enter="emit('submit')"` fires during IME composition. A user naming a saved query or
+  filter in Japanese/Chinese presses Enter to commit the composition; the prompt submits the
+  half-composed text (or the text before the composed segment). `autoClosePairsOnType` in the same
+  package already guards `e.isComposing`.
+- Fix: `@keydown.enter="(e) => !e.isComposing && emit('submit')"` (and the same guard on Escape).
+
+#### F10 (low): confirm dialog labels every destructive confirm "Delete"
+
+- `packages/workbench/src/components/ConfirmDialog.vue:61`, `state/confirmDialog.ts:18-23`.
+- `danger` defaults to `true` and the confirm button reads "Delete" whenever `danger` is set.
+- Scenario: "Regenerating the correlation key…" (`project/ConnectionDialog.vue:568`), "Revoke access
+  for …" (`kira-space/.../ConnectedEditorsPane.vue:24`), "Remove "x"? It will no longer appear in
+  Quick commands." (`terminal/scriptActions.ts:14`), "Remove variables …"
+  (`api/BulkVariablesEditor.vue:117`) all show a "Delete" button for an action that is not a delete.
+- Fix: add `confirmLabel?: string` to `confirmDialog` options (default "Delete" when `danger`,
+  "Continue" otherwise) and render it. Pass "Remove" from `scriptActions.ts` (owned). Caller labels
+  outside Part 9 ("Regenerate", "Revoke", "Remove") go to their owning chunks; routed in
+  `P168-routed-from-streamA.md`.
+
+#### F11 (low, a11y): shared chrome exposes no state to assistive tech
+
+- `packages/workbench/src/components/TabStrip.vue:220-353`: tabs are plain buttons in plain divs;
+  no `role="tablist"`/`tab`, no `aria-selected`; active state is `data-active` only. Every close
+  button is named "Close tab" (no title) and sits at `opacity-0` while still focusable, so keyboard
+  focus lands on an invisible control.
+- `ModeSwitcher.vue:29-47`: the active mode has no `aria-pressed`/`aria-current`.
+- `SearchOptionToggles.vue:33-53`: match-case/whole-word/regex toggles show state by colour only;
+  no `aria-pressed`.
+- `OpLogPanel.vue:180-232`: `role="listbox"` with every `role="option"` row in the tab order, no
+  `aria-selected`, and a Cancel button nested inside an option. The filter input has a placeholder
+  but no label.
+- `TextPromptDialog.vue:41-67`: no `role="dialog"`/`aria-modal`, title not tied to the input, no
+  focus containment.
+- `SettingsShell.vue:217-229`: section nav buttons carry no `aria-current` for the active section.
+- Fix: per item: `aria-selected`/`role="tab"` with `role="tablist"` on the strip row (or
+  `aria-current="page"` if tab roles fight the drag library); close button `:aria-label="`Close
+  ${title}`"` plus `focus-visible:opacity-100`; `aria-pressed` on mode and option toggles; OpLog rows
+  as a plain list (`role="list"`/`listitem`) with one roving tab stop, filter `aria-label="Filter
+  operations"`; prompt `role="dialog" aria-modal="true" aria-labelledby`; nav `aria-current`.
+
+#### F12 (low): dead code and stale references in owned files
+
+- `packages/shared/domain/shortcuts.ts:16-22,73-87`: `accelerator()`/`chordToAccelerator` have no
+  caller (Go builds menus from its own copy, `internal/shell/accel.go`); `Binding.global` is read by
+  nothing. Header still describes `main/menu.ts` Electron accelerators.
+- `shortcuts.ts:31` `view.quickOpen` and `protocol/events.ts:17-18` `CHANNEL.quickOpen`: no TS
+  reader, no Go emitter, no Go accelerator (`accel.go` has no `view.quickOpen`).
+- `packages/shared/domain/repo.ts:16-20`: `repoImportResultSchema`/`RepoImportResult` unused
+  (knip also flags the duplicate export).
+- `packages/workbench/src/util/floatingPosition.ts:19-23`: `FLOAT_MAX_WIDTH_VAR`/`FLOAT_MAX_HEIGHT_VAR`
+  unused (consumers spell the CSS var literally).
+- `packages/workbench/src/host.ts:53,84,94` and `TabStrip.vue:28-32,50-52,156,227-248`: `pinnedTitle`,
+  `extraTabMenu`, `tabAttention` (+ `ATTENTION_CLASS`) have no producer in either app; the whole
+  `pinnedTitle` template branch is unreachable. `createTabsStore.ts:123-126,175` `onCleanup` has no
+  producer.
+- `packages/kira-ui/src/KuiColumnResizeHandle.vue:124`: class `kui-column-resize-handle` matches no
+  CSS anywhere.
+- Stale comments describing Electron or CodeMirror as live: `state/confirmDialog.ts:3-8`,
+  `prompt/useTextPrompt.ts:9-10`, `shared/domain/settings.ts:37-39`, `shared/domain/shortcuts.ts:1-7,20`, `theme/src/wrapSelection.ts:1-5`.
+- Fix: delete each unused symbol/branch and its comment; reword stale comments to the current stack
+  (Wails, Monaco) or drop them. `CHANNEL.quickOpen` removal is TS-only (no Go constant exists).
