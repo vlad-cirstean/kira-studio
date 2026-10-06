@@ -117,7 +117,8 @@ CREATE INDEX ade_tasks_archived ON ade_tasks (archived_at) WHERE archived_at IS 
 - Chunk cascade uses `ade_log_chunks` PK `(kind, id, seq)` prefix; no index needed there.
 - Add a `0016` line to `docs/ARCHITECTURE.md` ADE Storage list.
 - Numbering: `0015` is current top. If another stream lands a Kira Space migration first, rename
-  this file to the next free number at rebase and update the ARCHITECTURE.md line.
+  this file and its `embed.go` entry to the next free number at rebase and update the
+  ARCHITECTURE.md line.
 
 ### Engine loop
 
@@ -183,7 +184,9 @@ One commit per step. Run `go build ./apps/kira-space/...`, `go vet`, lint and ty
 ### Step 1: migration
 
 - Add `apps/kira-space/internal/storage/migrations/0016_p177_ade_logs_purge.sql` (content above).
-  Confirm `embed.go` picks it up by glob (no list to edit; check).
+- Append `{Version: 16, Name: "p177_ade_logs_purge", File: "0016_p177_ade_logs_purge.sql"}` to
+  `names` in `apps/kira-space/internal/storage/migrations/embed.go` (explicit ordered list; the
+  `//go:embed *.sql` glob alone does not apply it).
 - Commit: `feat(space): index ade log purge lookups`.
 
 ### Step 2: repo purge + boundary test
@@ -260,6 +263,7 @@ One commit per step. Run `go build ./apps/kira-space/...`, `go vet`, lint and ty
 | File | Change |
 |---|---|
 | `apps/kira-space/internal/storage/migrations/0016_p177_ade_logs_purge.sql` | new |
+| `apps/kira-space/internal/storage/migrations/embed.go` | `names` entry 16 |
 | `apps/kira-space/internal/storage/repos/adelogs.go` | `PurgeArchived` |
 | `apps/kira-space/internal/storage/repos/adelogs_test.go` | new |
 | `apps/kira-space/internal/ade/logpurge.go` | new |
