@@ -722,12 +722,25 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
   // tab stop into the grid — the ARIA grid pattern's own answer to "what receives focus before
   // anything has been chosen" (a plain `Tab` must land somewhere real, never nothing at all, once
   // `_focusSink`/`_focusSink2` below are taken out of the tab order).
-  const tabbableRow = selectedRow >= 0 ? selectedRow : 0;
-
   const from = Math.max(0, range.startRow);
   const to = Math.min(range.endRow, totalRows - 1);
+  const rowNodeAt = (row: number): HTMLElement | null =>
+    container.querySelector<HTMLElement>(`.slick-row[data-row="${row}"]`);
+  // When that row is scrolled out of the rendered range (or hidden in a collapsed group), the
+  // first rendered row takes the tab stop instead, so a keyboard user can always reach the grid.
+  let tabbableRow = selectedRow >= 0 ? selectedRow : 0;
+  if (tabbableRow < from || tabbableRow > to || rowNodeAt(tabbableRow) === null) {
+    tabbableRow = -1;
+    for (let row = from; row <= to; row++) {
+      if (rowNodeAt(row) !== null) {
+        tabbableRow = row;
+        break;
+      }
+    }
+  }
+
   for (let row = from; row <= to; row++) {
-    const rowNode = container.querySelector<HTMLElement>(`.slick-row[data-row="${row}"]`);
+    const rowNode = rowNodeAt(row);
     if (!rowNode) continue;
 
     rowNode.setAttribute('aria-rowindex', String(row + 1));

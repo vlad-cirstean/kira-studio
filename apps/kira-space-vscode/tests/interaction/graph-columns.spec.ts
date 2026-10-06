@@ -529,6 +529,37 @@ test.describe('graph grid columns', () => {
     });
   });
 
+  // The grid keeps exactly one rendered row tabbable. With the roving row scrolled out of the
+  // rendered range, Tab used to skip every row and land on the column resize handles instead.
+  test.describe('keyboard tab stop (P168 Part 19 F8)', () => {
+    test('a rendered row stays tabbable after the selected row scrolls out of range', async ({
+      page,
+    }) => {
+      await page.addInitScript(buildFakeGraphHostInitScript({ streamMode: 'manyRows' }));
+      await page.goto(`${server.url}/graph`);
+      const rows = page.locator('[data-testid="commit-grid"] .slick-row');
+      await expect(rows.first()).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-testid="detail-region"]')).toHaveCount(0);
+
+      const viewport = page.locator('[data-testid="commit-grid"] .slick-viewport').first();
+      await expect
+        .poll(() => viewport.evaluate((el) => el.scrollHeight > el.clientHeight * 4))
+        .toBe(true);
+      await page.locator('[data-testid="commit-grid"] .slick-row[data-row="2"]').click();
+      await viewport.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[data-row="2"]'),
+      ).toHaveCount(0);
+
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[tabindex="0"]'),
+      ).toHaveCount(1);
+    });
+  });
+
   // P92 §12.2 item 4: SlickGrid's row-position index only rebuilds inside updateRowCount() — a
   // row whose height flipped after it was already rendered (a badge landing after first paint)
   // left every row below it at a stale transform, painting two rows into one band.
