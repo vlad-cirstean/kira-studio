@@ -64,8 +64,101 @@ Block 1 other checks, nothing filed:
 - `rpcstream` session: `Emit`/`send` after `close` return via `done`; duplicate id refused; unknown
   cancel no-op; identity-keyed cleanup (P108 Part 2 F8) holds.
 
+### Block 2: processes
+
+#### F4 (low): `toolexec.Run` cancel path can leave SIGTERM-ignoring group members alive
+
+- `internal/toolexec/exec.go:114-119`; `internal/procgroup/procgroup.go:34-48`.
+- On ctx timeout `Cancel` SIGTERMs the group and arms a `delay` SIGKILL timer. Run calls
+  `stopEscalate()` as soon as `cmd.Run` returns. Two paths stop the timer before it fires:
+  (a) the direct child exits promptly on SIGTERM while a grandchild ignores it; (b) os/exec's own
+  `WaitDelay` (same `delay`) fires first and `Process.Kill`s only the direct child. Either way the
+  group SIGKILL never lands and the grandchild survives the hard timeout. Callers:
+  `SI/mcpinstall/install.go:241-259` (`claude mcp add`/`remove`, `spawnTimeout`),
+  `PI/gitvsix/install.go:215-232` (`code --install-extension`, `open -R`).
+- `PI/gitprepare/runner.go:138-150` and `PI/adeagent/process.go:138` already fixed this shape
+  (P108 Part 15 F8: immediate group SIGKILL after `Wait` on timeout/cancel). `toolexec` lacks it.
+  Confirmed by reading; stdlib `WaitDelay` kills `cmd.Process` only.
+- Fix: in `Run`, after `cmd.Run` returns, if `ctx.Err() != nil` and `cmd.Process != nil`, call
+  `killGroup(cmd.Process.Pid, syscall.SIGKILL)` before `stopEscalate()` (same reasoning as
+  gitprepare's comment). Optionally move that into `procgroup` as a `stop(cancelled bool)` helper so
+  ghclient/gitclient can adopt it later; their runners are Space files, so leave them (route only
+  if the helper signature changes).
+
+#### F5 (low): `terminal.Registry` has no closed state; an Open racing `CloseWindow`/`CloseAll` registers an orphan PTY
+
+- `internal/terminal/session.go:345-377,466-502`.
+- `Open` reserves `sessions[id] = nil` and adds the id to `byWindow` only after spawn. `CloseWindow`
+  snapshots `byWindow[key]`; `CloseAll` skips nil entries. Sequence: renderer calls Open (window W)
+  and the user closes W while `newSession` runs. `CloseWindow(W)` finds nothing; Open then
+  registers a live shell under a closed window's key. It runs until app quit, emits to a dead
+  window, and an agent launch keeps `AgentSessions` (Space ADE count, keep-awake reason) non-zero.
+  Same after `ShutdownBound` (both `main.go` teardowns): nothing stops a later `BoundService.Open`
+  from spawning while teardown continues to `db.Close()`; in Space its exit then fires
+  `Registry.OnChange` into `ade.Tracker.Reconcile` on a closed DB. Confirmed by reading (no seam to
+  delay `newSession` in a probe).
+- Fix: give `Registry` a `closed bool` (set by `CloseAll`) and a per-window generation counter
+  (bumped by `CloseWindow`). `Open` records the generation at reservation; at registration, if
+  `closed` or the generation moved, it deletes the reservation, closes the new session and returns
+  an error (`ErrRegistryClosed`, mapped to `E_INVALID` in `BoundService.Open`). Add a race test
+  (concurrent Open and CloseWindow with a fake spawn seam, or a real `/bin/sh`), which clears the
+  bar (concurrency).
+
+#### F6 (low): `keepawake.Toggle.SetManual` updates `manual` and the controller under different locks
+
+- `internal/keepawake/toggle.go:41-47`.
+- Two windows toggle at once: A sets `manual=true`, B sets `manual=false`, B calls
+  `Ctl.Set(false)`, A calls `Ctl.Set(true)`. Result: `manual=false` (button shows off) while
+  `ReasonManual` holds the assertion and the Mac stays awake. Wails runs each bound call on its own
+  goroutine, so the interleaving is reachable; narrow window.
+- Fix: hold `t.mu` across both writes (`t.manual = on; t.Ctl.Set(ReasonManual, on)`), then release
+  before `State()`. No lock-order risk: `Controller` never calls back into `Toggle`.
+
+#### F7 (low): `startupfail.collapse` byte-truncates and can split a UTF-8 rune in the alert body
+
+- `internal/startupfail/classify.go:45-54` (`s[:max]`, `detailCap` 500).
+- An error text with a non-ASCII byte straddling byte 500 (a localized OS message, a user path such
+  as `~/Projets/données`) yields invalid UTF-8 in `Message.Detail`, which goes to osascript as argv
+  (`alert.go:57-68`). osascript builds `argv` items via UTF-8 decoding; an invalid sequence can
+  leave the item unconvertible, so the alert shows garbage or fails (then `showAlert` treats it as
+  dismissed, and a Finder-launched user sees nothing). Not verified on macOS (unavailable here).
+- Fix: back off to a rune boundary after slicing (reuse the `agenthooks.truncateMessage` loop, or
+  `strings.ToValidUTF8(s[:max], "")`). Extend `classify_test.go`'s cap case with a multi-byte rune
+  at the boundary.
+
+#### F8 (low): dead `terminal.Service.Shutdown` and a stale comment after `07e7387`
+
+- `internal/terminal/service.go:64-65`; `internal/terminal/session.go:36`.
+- `07e7387` replaced the bound method with `ShutdownBound`. `Service.Shutdown` now has no caller
+  (`git grep`). `closeKillWait`'s comment still names "both apps' TerminalService.Shutdown".
+  `Service` is not Wails-bound (only `BoundService` is embedded), so this is cleanup, not exposure.
+- Fix: delete `Service.Shutdown`; reword the comment to `terminal.ShutdownBound`.
+
+Block 2 other checks, nothing filed:
+- Candidate 7 (`toolexec` unbounded stderr) dropped: callers run fixed local tools
+  (`claude mcp add`, `code --install-extension`, `open -R`) under `spawnTimeout`; none streams
+  enough stderr to matter.
+- `07e7387` new code holds: `BoundService` exports only `DefaultCwd`/`Open`/`Write`/`Resize`/`Close`;
+  `Registry`/`Emit`/`ComposeAgent` are fields, not promoted methods; `Service` is not embedded.
+- `procgroup.GracefulCancel`: `escalate` written in `Cancel`, read in `stop` after `Wait`; the
+  happens-before holds for every caller that calls stop after Wait.
+- `terminal.Session`: Close/readLoop ordering, bounded Close (P108 Part 2 F1) holds. A `Write`
+  during the 200 ms `exitDrain` after the master is force-closed returns `file already closed` as
+  `E_INTERNAL` instead of a silent no-op; harmless (renderer logs), not filed.
+- `ValidateOpen` bounds and the `ComposeAgent` recheck hold. `windowKey` is renderer-supplied by the
+  first-party trust model.
+- `keepawake` reap race (P108 Part 7 F12) holds: report decided under `d.cmd == cmd`.
+- `startupfail`: argv-only osascript, `--` before data, `alertOnce`, `KIRA_NO_STARTUP_ALERT` hold.
+  `realRun` comment says the group is killed after `WaitDelay`; stdlib kills only the child.
+  osascript forks nothing, so not filed.
+
 ## Coverage
 
 - Block 1 (listeners and RPC): done. Read in full: `localsock/localsock.go`, `agenthooks/{agenthooks,
   http,manager,config,shim}.go`, `tokenauth/tokenauth.go`, `rpcstream/{frame,credit,session}.go`.
   Tests deferred to block 8.
+- Block 2 (processes): done. Read in full: `procgroup/procgroup.go`, `toolexec/exec.go`,
+  `terminal/{session,service,bound,shell,validate,ptmx_linux,ptmx_other}.go`,
+  `keepawake/{keepawake,caffeinate,toggle,driver}.go`, `startupfail/{report,alert,exec,render}.go`,
+  `startupfail/classify.go` (collapse and Classify head). `step.go`, `info.go` skimmed (constants and
+  path helpers).
