@@ -198,6 +198,10 @@ const (
 type resolvedNode struct {
 	state resolveState
 	base  string
+	// depth is the number of stacked hops from the node to base. A chain deeper than
+	// MaxStackedBranches is orphaned by the caller from this value, never by a per-walk budget,
+	// so a node's verdict does not depend on which candidate reached it first.
+	depth int
 }
 
 // DetectCycleFrom walks parent pointers up from start (D10's own stackSet cycle check, and this
@@ -231,9 +235,9 @@ type existsAsRef func(name string) bool
 
 // resolveStackBase is BuildStacks' own per-branch memoized walk: returns the ultimate resolvable
 // base name for branch, or resolveBroken when the chain hits a dangling parent, a cycle, or the
-// iteration budget (MaxStackedBranches) first. Memoized so a forest of depth d costs O(n) total,
+// chain exceeding MaxStackedBranches hops (checked by the caller from depth). Memoized so a forest of depth d costs O(n) total,
 // not O(n*d).
-func resolveStackBase(branch string, config map[string]StackConfigEntry, exists existsAsRef, memo map[string]resolvedNode, budget *int) resolvedNode {
+func resolveStackBase(branch string, config map[string]StackConfigEntry, exists existsAsRef, memo map[string]resolvedNode) resolvedNode {
 	if n, ok := memo[branch]; ok && n.state != resolveInProgress {
 		return n
 	}
@@ -250,13 +254,6 @@ func resolveStackBase(branch string, config map[string]StackConfigEntry, exists 
 		return n
 	}
 
-	*budget--
-	if *budget < 0 {
-		n := resolvedNode{state: resolveBroken}
-		memo[branch] = n
-		return n
-	}
-
 	parentEntry, parentHasEntry := config[parent]
 	parentIsStacked := parentHasEntry && parentEntry.Parent != ""
 	if !parentIsStacked {
@@ -265,7 +262,7 @@ func resolveStackBase(branch string, config map[string]StackConfigEntry, exists 
 			memo[branch] = n
 			return n
 		}
-		n := resolvedNode{state: resolveOK, base: parent}
+		n := resolvedNode{state: resolveOK, base: parent, depth: 1}
 		memo[branch] = n
 		return n
 	}
@@ -290,7 +287,10 @@ func resolveStackBase(branch string, config map[string]StackConfigEntry, exists 
 		memo[branch] = n
 		return n
 	}
-	resolved := resolveStackBase(parent, config, exists, memo, budget)
+	resolved := resolveStackBase(parent, config, exists, memo)
+	if resolved.state == resolveOK {
+		resolved.depth++
+	}
 	memo[branch] = resolved
 	return resolved
 }
@@ -373,13 +373,12 @@ func BuildStacks(in BuildStacksInput) StackListResult {
 	orphans := []StackBranch{}
 
 	for _, name := range candidateNames {
-		budget := MaxStackedBranches
-		resolved := resolveStackBase(name, in.Config, exists, memo, &budget)
-		if resolved.state == resolveOK {
+		resolved := resolveStackBase(name, in.Config, exists, memo)
+		if resolved.state == resolveOK && resolved.depth <= MaxStackedBranches {
 			baseGroups[resolved.base] = append(baseGroups[resolved.base], name)
 			continue
 		}
-		// Broken: a dangling parent, a cycle, or a budget exhaustion. Orphaned, never dropped.
+		// Broken: a dangling parent, a cycle, or a chain past MaxStackedBranches. Orphaned, never dropped.
 		parent := in.Config[name].Parent
 		orphans = append(orphans, buildOrphanRow(name, parent, in))
 	}

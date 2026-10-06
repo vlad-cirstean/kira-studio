@@ -122,6 +122,10 @@ func DirtyPaths(result porcelain.StatusResult) []DirtyPath {
 		switch e.Kind {
 		case "ordinary", "renamed", "unmerged":
 			out = append(out, DirtyPath{Path: e.Path, Tracked: true})
+			// A rename's source is dirty too: git refuses a checkout that rewrites it.
+			if e.Kind == "renamed" && e.OriginalPath != "" {
+				out = append(out, DirtyPath{Path: e.OriginalPath, Tracked: true})
+			}
 		case "untracked":
 			out = append(out, DirtyPath{Path: e.Path, Tracked: false})
 		case "ignored":
@@ -158,6 +162,9 @@ func DirtySplit(result porcelain.StatusResult) ResetDirty {
 		case "ordinary", "renamed":
 			if e.Staged != '.' {
 				staged = append(staged, e.Path)
+				if e.Kind == "renamed" && e.OriginalPath != "" {
+					staged = append(staged, e.OriginalPath)
+				}
 			}
 			if e.Unstaged != '.' {
 				unstaged = append(unstaged, e.Path)

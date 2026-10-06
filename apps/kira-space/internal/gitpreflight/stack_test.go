@@ -1,6 +1,7 @@
 package gitpreflight_test
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -516,5 +517,43 @@ func TestClassifyRestack_NeedsForcePush(t *testing.T) {
 	pf := gitpreflight.ClassifyRestack(in)
 	if !reflect.DeepEqual(pf.NeedsForcePush, []string{"feat2"}) {
 		t.Fatalf("needsForcePush = %v", pf.NeedsForcePush)
+	}
+}
+
+// A chain past MaxStackedBranches orphans exactly its deepest nodes whatever the branch names
+// sort like.
+func TestBuildStacks_OverlongChainVerdictIndependentOfNameOrder(t *testing.T) {
+	t.Parallel()
+	const n = gitpreflight.MaxStackedBranches + 6
+	for _, name := range map[string]func(i int) string{
+		"ascending":  func(i int) string { return fmt.Sprintf("b%03d", i) },
+		"descending": func(i int) string { return fmt.Sprintf("b%03d", n-i) },
+	} {
+		in := gitpreflight.BuildStacksInput{
+			Config:    map[string]gitpreflight.StackConfigEntry{},
+			LocalRefs: map[string]gitpreflight.StackRefInfo{"main": ref("m")},
+			BaseTips:  map[string]string{"main": "m"},
+		}
+		for i := 0; i < n; i++ {
+			parent := "main"
+			if i > 0 {
+				parent = name(i - 1)
+			}
+			in.Config[name(i)] = gitpreflight.StackConfigEntry{Branch: name(i), Parent: parent}
+			in.LocalRefs[name(i)] = ref("x")
+		}
+		result := gitpreflight.BuildStacks(in)
+		if len(result.Stacks) != 1 || len(result.Stacks[0].Branches) != gitpreflight.MaxStackedBranches {
+			t.Fatalf("stacked = %+v, want %d", result.Stacks, gitpreflight.MaxStackedBranches)
+		}
+		orphaned := map[string]bool{}
+		for _, o := range result.Orphans {
+			orphaned[o.Name] = true
+		}
+		for i := 0; i < n; i++ {
+			if want := i >= gitpreflight.MaxStackedBranches; orphaned[name(i)] != want {
+				t.Fatalf("depth %d (%s) orphaned=%v, want %v", i, name(i), orphaned[name(i)], want)
+			}
+		}
 	}
 }
