@@ -263,7 +263,7 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 		return mapConnError(err)
 	}
 
-	return w.Stream(ctx, p.ResumeThroughRow, ChunkRows, func(chunk gitsession.StreamChunk) error {
+	err = w.Stream(ctx, p.ResumeThroughRow, ChunkRows, func(chunk gitsession.StreamChunk) error {
 		blob := gitstore.EncodeChunkFrame(chunk.Packed)
 		payload := graphChunk{
 			RepoID: p.RepoID, Seq: chunk.Seq, From: chunk.From, To: chunk.To,
@@ -271,4 +271,8 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 		}
 		return emit(payload, blob)
 	})
+	if err != nil {
+		return mapGitError(err)
+	}
+	return nil
 }

@@ -3,11 +3,14 @@ package gitrpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/notify"
@@ -403,6 +406,16 @@ func handleRepoClose(c *gitsession.Conn, params json.RawMessage) (any, error) {
 // E_INTERNAL (bridge/rpcstream/frame.go), which is the whole reason this exists — a git failure
 // must cross as E_GIT_<KIND>, never as an anonymous internal error.
 func mapGitError(err error) error {
+	switch {
+	case errors.Is(err, gitsession.ErrRepoNotHeld), errors.Is(err, gitsession.ErrRepoTornDown):
+		// Ordinary under concurrency: a request racing repo.close, teardown or a walk replaced by
+		// another graph.loadMore. The client must tell this from a server fault.
+		return ipcerr.BadRequest("gitrpc: repository is not open on this connection")
+	case errors.Is(err, catfile.ErrInvalidRev):
+		return ipcerr.BadRequest(err.Error())
+	case errors.Is(err, gitreview.ErrStoreClosed):
+		return ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: review store is closed (shutting down)")
+	}
 	kind, ok := gitclient.KindOf(err)
 	if !ok {
 		return err
