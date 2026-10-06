@@ -105,6 +105,59 @@ overstates the renderer's exposure and misleads a reviewer of the pane.
 Fix: say `command` is the copy-paste registration text naming the headersHelper script; it holds
 no secret.
 
+### F6 (high) `explain_query` leaks real row values through MySQL/MariaDB `index_condition` on a masked connection
+
+`SI/dbmcp/explain.go:87-107` (`maskPlanNode`), `SI/queryplan/mysql.go:56-71`
+(`mysqlTableMetrics`), `SI/queryplan/mariadb.go:45-51` (`collectMetrics` over
+`mariadbTableTypedKeys`). Both parsers emit every untyped table key as a `Metric`, including
+`index_condition`. P108 F5's mask strips `Node.Detail` (`attached_condition`) and metrics whose
+label ends in `" condition"` (with a space, ClickHouse's spelling). `index_condition` ends in
+`_condition` and survives.
+
+Probe (live `mysql:8.4` and `mariadb:11.4` containers, throwaway, removed): `u(id PK, email)`,
+`o(cust_id, status, KEY(cust_id, status))`, `u` row `(1, 'alice@secret.example')`.
+`EXPLAIN FORMAT=JSON SELECT o.note FROM u JOIN o ON o.cust_id = u.id AND o.status > u.email WHERE
+u.id = 1` returns, for table `o`:
+- MySQL: `"index_condition": "((`d`.`o`.`cust_id` = 1) and (`d`.`o`.`status` > 'alice@secret.example'))"`
+- MariaDB: `"index_condition": "o.cust_id = 1 and o.`status` > 'alice@secret.example'"`
+
+`u` is a const table, so the server substitutes the real `u.email` into `o`'s pushed-down
+condition. Scenario: `email` has a mask rule; the agent calls `explain_query` with the statement
+above, varying `u.id`, and reads every real email from the metric list, one row per call. Same
+bypass F5 closed for `attached_condition`.
+
+Fix: on a masked connection keep only an allowlist of metric labels known to carry no row data
+(`cost_info.*`, `rows*`, `filtered`, `key`, `key_length`, `used_key_parts`, `access_type`,
+`possible_keys`, `used_columns`, ClickHouse ` keys`/` parts`/` granules`/` search`). A blocklist
+by suffix already missed one spelling. Extend `explain_test.go` with an `index_condition` metric
+(MySQL and MariaDB shapes) asserting it is dropped.
+
+### F7 (low) A full approval queue answers "denied by the user"
+
+`SI/dbmcp/approval.go:143-145`, `SI/dbmcp/tools.go:375-377,473-474`. `Request` returns
+`ApprovalDenied` when 50 requests are already queued. Both callers render that as
+`query against %q was denied by the user`. No user saw it.
+
+Scenario: an agent loops `run_query` on a prompt-mode connection. Call 51 gets "denied by the
+user". The agent reports a human refusal that never happened, or rephrases and retries.
+
+Fix: add `ApprovalQueueFull` and map it to "too many queries are already waiting for approval;
+retry after the user answers them".
+
+### F8 (low, design-decision) `run_query` reaches Part 4 F8's unbounded console materialisation
+
+`SI/dbmcp/tools.go:200-220` calls `Router.Execute` (the console path) and caps rows only in
+`renderPage` (`maxRows` at most 2000). Reachable: `SELECT * FROM big_table` on any SQL kind,
+`db.c.find()` on Mongo, `KEYS *`/`HGETALL` on Redis. The whole result is materialised in Go
+first; the tool description says so ("the query itself still runs in full"). `planFor`'s EXPLAIN
+pages are one row (one JSON cell capped at `page.MaxCellBytes`) or a few dozen (SQLite), so the
+explain path is not a practical reach. An MCP client loop multiplies the cost, gated only by the
+connection's read mode.
+
+Same decision as P168 Part 4 F8 (console row/byte cap, shared with SQL consoles; not yet its own
+`SPEC.md` phase). Not a second phase: when F8's cap lands, `run_query` should pass
+`maxRows` (plus one, for the truncation flag) as the console cap. No fix proposed here.
+
 ## Coverage
 
 - Block 1 (auth and install): done. Reviewed `SI/mcpauth/token.go`, `SI/mcpinstall/install.go`,
@@ -126,3 +179,26 @@ no secret.
     the helper on the old plaintext: consistent until restart, then remint. No finding.
   - `Check` hashes before expiry; `TokenVerifier` reads under `tokenMu`; `SetToken` races are
     safe. `atomicWrite0600` removes its temp file on every failure path (`defer os.Remove`).
+- Block 2 (tools and gates): done. Reviewed `SI/dbmcp/{access,permissions,tools,explain,
+  approval}.go`, `SI/queryplan/statements.go`; read `adapters/classify.go` (Part 3) and
+  `adapters/sqs/adapter.go` (Part 4) for reachability.
+  - Every tool calls `resolveEnabled` before any backend touch. Only `run_query` and
+    `explain_query` call `connectForQuery`; schema tools on a disconnected connection go to
+    `tree.Service`, which does not connect. `listConnections` alone is ungated by read mode, by
+    design (M7 #8).
+  - Gate order matches M3 §5.2/§4.3. `explainQuery`: resolve, kind, explainable, read deny,
+    connect, assert composed reads, verdict, one approval with re-resolve (P108 F6 holds), mask
+    set, execute. No dialect composes `ANALYZE`. `Explainable` and TS `isExplainable` match
+    (only difference: Go RE2 `\s` and `TrimLeft` are ASCII, JS is Unicode; Go is stricter, never
+    looser). Postgres `WITH d AS (DELETE ...) SELECT` is explainable without execution, and
+    `ClassifySQL` scans the whole `WITH` body, so `run_query` still classifies it as write.
+  - `maybeExplain` runs the EXPLAIN before a read-prompt approval: M3 design (heavy check needs
+    the plan), and EXPLAIN is a read. No finding.
+  - Plan §9 #9 dropped: `planFor` errors on a masked connection reach only the local log;
+    `explainQuery` returns `maskedToolError` for execute errors and a generic parse error when
+    masked. `assertComposedStatementsAreReads` errors carry class names, no values.
+  - Approval comment `approval.go:102-104` ("a disconnected client stops the query") is false
+    in practice; covered by F2.
+  - Part 4 F8: reachable, F8 above. Part 4 F15: not reachable through dbmcp. `sqs` `Execute`
+    returns `NoQueryConsole` (`sqs/adapter.go:239-241`); `Children` calls `ListQueues` only;
+    `Describe`/`SchemaColumns` return `E_UNSUPPORTED`. No path reaches `ReceiveMessage`.
