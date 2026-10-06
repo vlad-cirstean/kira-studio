@@ -11,7 +11,7 @@ import (
 )
 
 const connectionSelectColumns = `
-	id, name, kind, color, mode, read_only, host, port, database, username, uri,
+	id, name, kind, color, mode, read_only, host, port, database, username,
 	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
 	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain,
 	sort_order, created_at, updated_at
@@ -21,30 +21,31 @@ type ConnectionsRepo struct {
 	DB *sql.DB
 }
 
-// connectionColumns is the connections table's 21 config columns, shared by every write below
-// (P107 I2-9) — id/created_at/updated_at/sort_order/password sit outside it since which of those a
+// connectionColumns is the connections table's 20 config columns, shared by every write below
+// (P107 I2-9) — id/created_at/updated_at/sort_order/password/uri sit outside it since which of those a
 // statement needs (and how) is exactly what differs between Insert/InsertWithSecret/
 // InsertDuplicateWithSecret and Update/UpdateWithSecret; connectionSetColumns is the same list as
 // an UPDATE "col = ?" clause.
-const connectionColumns = `name, kind, color, mode, read_only, host, port, database, username, uri,
+const connectionColumns = `name, kind, color, mode, read_only, host, port, database, username,
 	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
 	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain`
 
 const connectionSetColumns = `name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
-	database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
+	database = ?, username = ?, options_json = ?, preconnect = ?,
 	preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
 	mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
 	mcp_auto_explain = ?`
 
-// connectionArgs is connectionColumns's own 21 values off f, in the same order — every write that
-// binds the full column set (Insert, InsertWithSecret, Update, both UpdateWithSecret branches)
-// uses this. InsertDuplicateWithSecret does not: it forces mcp_enabled to a SQL literal 0
-// regardless of f.McpEnabled (see its own doc comment), so one of these 21 values would never
-// actually be bound there — it builds its own arg list by hand instead of trimming this one.
+// connectionArgs is connectionColumns's own 20 values off f, in the same order — every write that
+// binds the full column set (Insert, InsertWithSecret, Update, UpdateWithSecret) uses this. It
+// never binds f.URI: the column is ciphertext the caller seals (SecretWrite / uriEnc).
+// InsertDuplicateWithSecret does not use it: it forces mcp_enabled to a SQL literal 0 regardless
+// of f.McpEnabled (see its own doc comment), so one of these 20 values would never actually be
+// bound there — it builds its own arg list by hand instead of trimming this one.
 func connectionArgs(f model.ConnectionFields, optionsJSON string) []any {
 	return []any{
 		f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
-		f.Username, f.URI, optionsJSON, f.Preconnect, boolToInt(f.PreconnectSidecar),
+		f.Username, optionsJSON, f.Preconnect, boolToInt(f.PreconnectSidecar),
 		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
 		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
 	}
@@ -56,13 +57,14 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-// scanConnectionRow scans one row in connectionSelectColumns's order and validates it the same
+// scanConnectionRow never reads uri (P181): the column is ciphertext only SecretsRepo.GetURI opens,
+// so every summary the repo returns has URI == nil. It scans one row in connectionSelectColumns's order and validates it the same
 // way connections.ts's parseRow does: a hand-mangled row is dropped (nil, nil), not propagated —
 // unlike settings/layout, a bad connection row must not make the whole app unlaunchable.
 func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	var (
 		c                                                          model.ConnectionSummary
-		host, database, username, uri                              sql.NullString
+		host, database, username                                   sql.NullString
 		port                                                       sql.NullInt64
 		options                                                    sql.NullString
 		preconnect                                                 sql.NullString
@@ -70,7 +72,7 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	)
 	if err := row.Scan(
 		&c.ID, &c.Name, &c.Kind, &c.Color, &c.Mode, &readOnly, &host, &port, &database,
-		&username, &uri, &options, &preconnect, &sidecar, &autoExplain, &c.ThrottlePerSec,
+		&username, &options, &preconnect, &sidecar, &autoExplain, &c.ThrottlePerSec,
 		&mcpEnabled, &c.McpDescription, &c.McpReadMode, &c.McpWriteMode, &c.McpDdlMode, &mcpAutoExplain,
 		&c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
 	); err != nil {
@@ -122,9 +124,6 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	}
 	if username.Valid {
 		c.Username = &username.String
-	}
-	if uri.Valid {
-		c.URI = &uri.String
 	}
 	if preconnect.Valid {
 		c.Preconnect = &preconnect.String
@@ -224,10 +223,10 @@ func (r *ConnectionsRepo) insertTx(connID string, insert func(tx *sql.Tx, sortOr
 	return *created, nil
 }
 
-// Insert is InsertWithSecret with no password — kept for ipcfixture/harness.go's own test-support
+// Insert is InsertWithSecret with no password or URI — kept for ipcfixture/harness.go's own test-support
 // caller, which never needs one.
 func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, createdAt string) (model.ConnectionSummary, error) {
-	return r.InsertWithSecret(connID, f, createdAt, nil)
+	return r.InsertWithSecret(connID, f, createdAt, nil, nil)
 }
 
 func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, updatedAt string) (model.ConnectionSummary, error) {
@@ -262,9 +261,9 @@ func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, update
 // unavailable", which is pre-validated by the caller before either write) left a passwordless
 // connection row committed and visible in the list, with the caller told the create had failed.
 // secretEnc is the already-encrypted ciphertext (or nil for "no password"); this method never
-// touches the cipher itself, mirroring SecretsRepo's own "one file touches connections.password"
+// touches the cipher itself; uriEnc is the sealed connection URI, bound the same way. Mirrors SecretsRepo's own "one file touches connections.password"
 // discipline as closely as a single combined statement allows.
-func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFields, createdAt string, secretEnc *string) (model.ConnectionSummary, error) {
+func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFields, createdAt string, secretEnc, uriEnc *string) (model.ConnectionSummary, error) {
 	optionsJSON, err := json.Marshal(f.Options)
 	if err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
@@ -272,10 +271,10 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 	return r.insertTx(connID, func(tx *sql.Tx, sortOrder int) error {
 		if _, err := tx.Exec(`
 			INSERT INTO connections (
-				id, `+connectionColumns+`, created_at, updated_at, sort_order, password
+				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
-			append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder, secretEnc)...,
+			append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder, secretEnc, uriEnc)...,
 		); err != nil {
 			return fmt.Errorf("repos/connections: insert %s: %w", connID, err)
 		}
@@ -313,15 +312,16 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 	return r.insertTx(toConnectionID, func(tx *sql.Tx, sortOrder int) error {
 		if _, err := tx.Exec(`
 			INSERT INTO connections (
-				id, `+connectionColumns+`, created_at, updated_at, sort_order, password
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-				(SELECT password FROM connections WHERE id = ?))
+				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+				(SELECT password FROM connections WHERE id = ?),
+				(SELECT uri FROM connections WHERE id = ?))
 		`,
 			toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
-			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
+			f.Username, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
 			boolToInt(f.AutoExplain), f.ThrottlePerSec,
 			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
-			createdAt, createdAt, sortOrder, fromConnectionID,
+			createdAt, createdAt, sortOrder, fromConnectionID, fromConnectionID,
 		); err != nil {
 			return fmt.Errorf("repos/connections: insert duplicate %s: %w", toConnectionID, err)
 		}
@@ -352,41 +352,37 @@ func (r *ConnectionsRepo) SetMcpEnabled(connID string, enabled bool, updatedAt s
 	return nil
 }
 
-// UpdateWithSecret is Update plus, in the same UPDATE statement, the row's password column —
-// P21 round 3 finding 4: connections.Service.Update used to Secrets.Set the password and then
-// Conns.Update the rest of the row as two separate statements (in that order, specifically so a
-// cipher failure leaves the row untouched) — but a Conns.Update failure *after* a successful
-// Secrets.Set left the new password stored against the old host/port/database, exactly the
-// "old destination's password on a new destination" state round 2's destinationUnchanged gating
-// exists to prevent, just reached by a different path. hasSecret distinguishes "leave the stored
-// password exactly as it is" (false — the three-state Input.Password contract's nil case) from
-// "set it to secretEnc, which may itself be nil to clear it" (true).
-func (r *ConnectionsRepo) UpdateWithSecret(connID string, f model.ConnectionFields, updatedAt string, hasSecret bool, secretEnc *string) (model.ConnectionSummary, error) {
+// SecretWrite is one ciphertext column's write intent: Set false leaves the column as it is,
+// Set true writes Value (nil clears). Value is already sealed by the caller.
+type SecretWrite struct {
+	Set   bool
+	Value *string
+}
+
+// UpdateWithSecret is Update plus, in the same UPDATE statement, the row's password and uri
+// columns — P21 round 3 finding 4: connections.Service.Update used to Secrets.Set the password and
+// then Conns.Update the rest of the row as two separate statements, so a Conns.Update failure
+// after a successful Secrets.Set left the new password stored against the old destination, the
+// state destinationUnchanged exists to prevent. Each SecretWrite distinguishes "leave the stored
+// column exactly as it is" (Set false) from "write Value, which may itself be nil to clear it".
+func (r *ConnectionsRepo) UpdateWithSecret(connID string, f model.ConnectionFields, updatedAt string, password, uri SecretWrite) (model.ConnectionSummary, error) {
 	optionsJSON, err := json.Marshal(f.Options)
 	if err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
 	}
 
-	var execErr error
-	if hasSecret {
-		_, execErr = r.DB.Exec(`
-			UPDATE connections
-			   SET `+connectionSetColumns+`, updated_at = ?, password = ?
-			 WHERE id = ?
-		`,
-			append(append(connectionArgs(f, string(optionsJSON)), updatedAt, secretEnc), connID)...,
-		)
-	} else {
-		_, execErr = r.DB.Exec(`
-			UPDATE connections
-			   SET `+connectionSetColumns+`, updated_at = ?
-			 WHERE id = ?
-		`,
-			append(append(connectionArgs(f, string(optionsJSON)), updatedAt), connID)...,
-		)
+	set := connectionSetColumns + `, updated_at = ?`
+	args := append(connectionArgs(f, string(optionsJSON)), updatedAt)
+	if password.Set {
+		set += `, password = ?`
+		args = append(args, password.Value)
 	}
-	if execErr != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, execErr)
+	if uri.Set {
+		set += `, uri = ?`
+		args = append(args, uri.Value)
+	}
+	if _, err := r.DB.Exec(`UPDATE connections SET `+set+` WHERE id = ?`, append(args, connID)...); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, err)
 	}
 
 	updated, err := r.Get(connID)

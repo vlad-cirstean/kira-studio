@@ -102,7 +102,7 @@ func TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey(t *testing.T) {
 
 	fromID := uuid.NewString()
 	fields := model.ConnectionFields{Name: "src", Kind: "postgres", Color: "blue", Mode: "fields"}
-	if _, err := conns.InsertWithSecret(fromID, fields, kiratime.NowISO(), nil); err != nil {
+	if _, err := conns.InsertWithSecret(fromID, fields, kiratime.NowISO(), nil, nil); err != nil {
 		t.Fatalf("InsertWithSecret: %v", err)
 	}
 
@@ -153,7 +153,7 @@ func TestInsertDuplicateWithSecretAlwaysStartsMcpDisabled(t *testing.T) {
 		Name: "src", Kind: "postgres", Color: "blue", Mode: "fields",
 		McpEnabled: true, McpReadMode: "allow", McpWriteMode: "deny", McpDdlMode: "deny",
 	}
-	if _, err := conns.InsertWithSecret(fromID, fields, kiratime.NowISO(), nil); err != nil {
+	if _, err := conns.InsertWithSecret(fromID, fields, kiratime.NowISO(), nil, nil); err != nil {
 		t.Fatalf("InsertWithSecret: %v", err)
 	}
 
@@ -189,7 +189,7 @@ func TestSetMcpEnabledFlipsFlagAndRejectsMissingID(t *testing.T) {
 
 	connID := uuid.NewString()
 	fields := model.ConnectionFields{Name: "conn", Kind: "postgres", Color: "blue", Mode: "fields"}
-	if _, err := conns.InsertWithSecret(connID, fields, kiratime.NowISO(), nil); err != nil {
+	if _, err := conns.InsertWithSecret(connID, fields, kiratime.NowISO(), nil, nil); err != nil {
 		t.Fatalf("InsertWithSecret: %v", err)
 	}
 

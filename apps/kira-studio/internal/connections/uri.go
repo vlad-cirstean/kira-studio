@@ -2,56 +2,45 @@ package connections
 
 import (
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// stripURIPassword removes the userinfo password from uri and returns it decoded. A string with
-// no "://" (or no userinfo, or no password in the userinfo) is returned unchanged with a nil
-// password — deliberate string surgery on the userinfo segment only, not a round trip through
-// WHATWG URL (P55 §2 D10: net/url's own serialisation does not match it byte for byte).
+// userinfoPassword returns the userinfo password of uri, decoded; nil when uri has no "://", no
+// userinfo, or no ':' in it. Deliberate string surgery on the userinfo segment only, not a round
+// trip through WHATWG URL (P55 §2 D10: net/url's own serialisation does not match it byte for byte).
 //
 // Algorithm: locate "://"; the authority runs to the first /, ? or # after it; if it contains @,
 // split at the last @ (a password can itself contain an encoded @); the userinfo's password is
-// everything after its first : (a username can itself contain an encoded :). Stripping rebuilds
-// the authority as user@host when the username is non-empty and as host when it is not (WHATWG
-// drops the @ when both halves are empty). Nothing else in the string is touched.
-//
-// A libpq-style `password` query parameter (pgx honours it) is removed the same way and wins only
-// when the userinfo carries no password.
-func stripURIPassword(uri string) (stripped string, password *string) {
-	stripped, password = stripUserinfoPassword(uri)
-	stripped, queryPassword := stripQueryPassword(stripped)
-	if password == nil {
-		password = queryPassword
-	}
-	return stripped, password
-}
-
-func stripUserinfoPassword(uri string) (stripped string, password *string) {
+// everything after its first : (a username can itself contain an encoded :).
+func userinfoPassword(uri string) *string {
 	authorityStart, end, ok := findAuthority(uri)
 	if !ok {
-		return uri, nil
+		return nil
 	}
 	authority := uri[authorityStart:end]
 	at := strings.LastIndex(authority, "@")
 	if at < 0 {
-		return uri, nil
+		return nil
 	}
-	userinfo, host := authority[:at], authority[at+1:]
+	userinfo := authority[:at]
 	colon := strings.IndexByte(userinfo, ':')
 	if colon < 0 {
-		return uri, nil
+		return nil
 	}
-	user := userinfo[:colon]
 	plain := model.DecodeURIComponent(userinfo[colon+1:])
+	return &plain
+}
 
-	newAuthority := host
-	if user != "" {
-		newAuthority = user + "@" + host
+// foldPassword is the URI-mode single-source-of-truth rule (P181): password goes into uri's
+// userinfo unless the URI already carries a non-empty one, which is the freshest signal.
+func foldPassword(uri string, password *string) string {
+	if pw := userinfoPassword(uri); pw != nil && *pw != "" {
+		return uri
 	}
-	return uri[:authorityStart] + newAuthority + uri[end:], &plain
+	return injectURIPassword(uri, password)
 }
 
 // queryRange returns the bounds of uri's query string (after the "?", before any "#"); ok is
@@ -73,71 +62,53 @@ func queryRange(uri string) (start, end int, ok bool) {
 	return start, end, true
 }
 
-// queryKey returns pair's key, decoded.
-func queryKey(pair string) string {
-	key, _, _ := strings.Cut(pair, "=")
-	decoded, err := url.QueryUnescape(key)
-	if err != nil {
-		return key
-	}
-	return decoded
+// secretOptionKeys are query parameters whose value is a secret a driver honours: pgx's password
+// and key passphrase, Mongo's key-file passphrase and proxy password. A URI keeps them inside its
+// encrypted blob; fields mode has no slot for them, so an Options key in this set is refused.
+var secretOptionKeys = map[string]bool{
+	"password": true, "sslpassword": true, "tlscertificatekeyfilepassword": true, "proxypassword": true,
 }
 
-// stripQueryPassword removes every `password` query pair from uri and returns the first one's
-// value decoded as the driver would (url.QueryUnescape). Other pairs keep their exact spelling.
-func stripQueryPassword(uri string) (stripped string, password *string) {
-	start, end, ok := queryRange(uri)
-	if !ok {
-		return uri, nil
-	}
-	var kept []string
-	for _, pair := range strings.Split(uri[start:end], "&") {
-		if !strings.EqualFold(queryKey(pair), "password") {
-			kept = append(kept, pair)
-			continue
-		}
-		if password == nil {
-			_, raw, _ := strings.Cut(pair, "=")
-			value, err := url.QueryUnescape(raw)
-			if err != nil {
-				value = raw
-			}
-			password = &value
+// secretOptionKey returns the first (sorted) key of options that is in secretOptionKeys.
+func secretOptionKey(options map[string]any) (string, bool) {
+	var found []string
+	for k := range options {
+		if secretOptionKeys[strings.ToLower(k)] {
+			found = append(found, k)
 		}
 	}
-	if password == nil {
-		return uri, nil
-	}
-	rest := strings.Join(kept, "&")
-	if rest == "" {
-		return uri[:start-1] + uri[end:], password
-	}
-	return uri[:start] + rest + uri[end:], password
-}
-
-// credentialQueryKeys are query parameters, other than `password`, that carry a secret a driver
-// honours: pgx's key passphrase, Mongo's key-file passphrase and proxy password. They have no slot
-// in the encrypted secret store, so a URI carrying one is refused rather than stored in plaintext.
-var credentialQueryKeys = []string{"sslpassword", "tlscertificatekeyfilepassword", "proxypassword"}
-
-// uriHasCredentialQuery reports whether uri's query carries a non-empty credentialQueryKeys pair.
-func uriHasCredentialQuery(uri string) (key string, found bool) {
-	start, end, ok := queryRange(uri)
-	if !ok {
+	if len(found) == 0 {
 		return "", false
 	}
+	sort.Strings(found)
+	return found[0], true
+}
+
+// uriQueryOptions returns uri's query pairs as options, decoded like the renderer's
+// URLSearchParams loop (raw fallback on a bad escape, last value wins). Adapters read endpoint,
+// bucket and sslmode from Options even in URI mode.
+func uriQueryOptions(uri string) map[string]any {
+	out := map[string]any{}
+	start, end, ok := queryRange(uri)
+	if !ok {
+		return out
+	}
 	for _, pair := range strings.Split(uri[start:end], "&") {
-		name := queryKey(pair)
-		if _, value, hasValue := strings.Cut(pair, "="); !hasValue || value == "" {
+		if pair == "" {
 			continue
 		}
-		for _, k := range credentialQueryKeys {
-			if strings.EqualFold(name, k) {
-				return name, true
-			}
+		key, raw, _ := strings.Cut(pair, "=")
+		value, err := url.QueryUnescape(raw)
+		if err != nil {
+			value = raw
 		}
+		k, err := url.QueryUnescape(key)
+		if err != nil {
+			k = key
+		}
+		out[k] = value
 	}
-	return "", false
+	return out
 }
 
 // injectURIPassword puts password back into uri's userinfo, encodeURIComponent-encoded. A nil or
@@ -187,9 +158,8 @@ func findAuthority(uri string) (start, end int, ok bool) {
 // uriHasAmbiguousPassword detects a URI-mode password containing a raw (unencoded) /, ? or # —
 // F3, P108 Part 3. findAuthority ends the authority at the first such character after "://", so
 // e.g. "postgres://u:pa/ss@h/db" detects an authority of "u:pa" (no '@' in it, so
-// stripURIPassword returns a nil password) while the URI's real '@' sits past that point — the
-// full URI, raw password included, then gets stored as-is in connections.uri and returned by
-// List, breaking the no-password-in-List guarantee.
+// userinfoPassword returns nil) while the URI's real '@' sits past that point — foldPassword would
+// then inject a second password next to the raw one (P181).
 //
 // Heuristic: an '@' exists after the first /, ? or # following "://", AND the segment before
 // that delimiter (what findAuthority mistook for the whole authority) has no '@' of its own (one

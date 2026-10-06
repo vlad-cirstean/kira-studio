@@ -25,15 +25,14 @@ func TestResolveFromInputPrefersURIEmbeddedPassword(t *testing.T) {
 	if r.config.URI == nil || *r.config.URI != "postgresql://u:newpass@new-host:5432/db" {
 		t.Fatalf("resolved uri = %v, want the URI's own inline password preserved", r.config.URI)
 	}
-	if r.config.Password == nil || *r.config.Password != "newpass" {
-		t.Fatalf("resolved password = %v, want newpass", derefOrNil(r.config.Password))
+	if r.config.Password != nil {
+		t.Fatalf("resolved password = %v, want nil: the URI is the single source in URI mode", derefOrNil(r.config.Password))
 	}
 }
 
 // TestResolveFromInputFallsBackToInputPasswordWhenURIHasNone is the companion case: a URI with no
-// userinfo password at all (the normal shape once D7 strips one out for display) still falls back
-// to in.Password, so an edit that never touches the URI's credentials keeps testing with whatever
-// password the dialog already knows about.
+// userinfo password at all still folds in.Password (P181), so an edit that never touches the URI's
+// credentials keeps testing with whatever password the dialog already knows about.
 func TestResolveFromInputFallsBackToInputPasswordWhenURIHasNone(t *testing.T) {
 	known := "known-password"
 	in := Input{
@@ -47,8 +46,8 @@ func TestResolveFromInputFallsBackToInputPasswordWhenURIHasNone(t *testing.T) {
 	if r.config.URI == nil || *r.config.URI != "postgresql://u:known-password@h:5432/db" {
 		t.Fatalf("resolved uri = %v, want in.Password injected", r.config.URI)
 	}
-	if r.config.Password == nil || *r.config.Password != known {
-		t.Fatalf("resolved password = %v, want %q", derefOrNil(r.config.Password), known)
+	if r.config.Password != nil {
+		t.Fatalf("resolved password = %v, want nil: the URI is the single source in URI mode", derefOrNil(r.config.Password))
 	}
 }
 

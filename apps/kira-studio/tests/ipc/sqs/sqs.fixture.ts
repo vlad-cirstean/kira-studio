@@ -24,7 +24,7 @@ export const controlSnapshots: ControlSnapshot[] = [
         port: 0,
         database: null,
         username: null,
-        uri: 'sqs://test:test@us-east-1',
+        uri: null,
         options: {
           endpoint: 'http://fixture-host:0',
         },

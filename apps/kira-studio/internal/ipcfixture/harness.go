@@ -35,6 +35,7 @@ const cacheBudgetBytes = 64 << 20
 type App struct {
 	Repos       *repos.Repos
 	Secrets     *repos.SecretsRepo
+	Cipher      *secrets.Cipher
 	Connections *connections.Service
 	Tree        *tree.Service
 	Router      *adapterhost.Router
@@ -125,7 +126,7 @@ func NewApp(t *testing.T) *App {
 	}
 
 	app := &App{
-		Repos: r, Secrets: secretsRepo, Connections: connectionsSvc, Tree: treeSvc, Router: router, Dispatcher: dispatcher,
+		Repos: r, Secrets: secretsRepo, Cipher: cipher, Connections: connectionsSvc, Tree: treeSvc, Router: router, Dispatcher: dispatcher,
 		ConnectionsSvc: &bridge.ConnectionsService{Deps: appDeps},
 		TreeSvc:        &bridge.TreeService{Deps: appDeps},
 		OpsSvc:         &bridge.OpsService{Deps: appDeps, Canceller: router},
@@ -145,10 +146,18 @@ func NewApp(t *testing.T) *App {
 // connections.Service.Create's own random uuid.NewString() assignment, so the fixture's connection id is
 // the fixed literal every committed fixture already carries — a harness-only deviation, the same
 // one internal/tree's and internal/connections' own fake-backend tests already make) and stores its
-// password through the real secrets repo.
+// password through the real secrets repo and its URI sealed under ScopeConnectionURI (P181).
 func (a *App) SeedConnection(t *testing.T, id string, fields model.ConnectionFields, password *string) model.ConnectionSummary {
 	t.Helper()
-	created, err := a.Repos.Connections.Insert(id, fields, kiratime.NowISO())
+	var uriEnc *string
+	if fields.URI != nil {
+		enc, err := a.Cipher.Encrypt(secrets.ScopeConnectionURI, *fields.URI)
+		if err != nil {
+			t.Fatalf("ipcfixture: seal uri %s: %v", id, err)
+		}
+		uriEnc = &enc
+	}
+	created, err := a.Repos.Connections.InsertWithSecret(id, fields, kiratime.NowISO(), nil, uriEnc)
 	if err != nil {
 		t.Fatalf("ipcfixture: seed connection %s: %v", id, err)
 	}

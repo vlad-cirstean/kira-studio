@@ -2,6 +2,7 @@ package connections_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"math"
 	"os"
@@ -326,104 +327,6 @@ func TestPasswordThreeStateConvention(t *testing.T) {
 	}
 	if v := get(); v == nil || *v != "secret2" {
 		t.Errorf("after replacing, secret = %v, want secret2", v)
-	}
-}
-
-// TestUriPasswordStripAndInject is the end-to-end statement of the URI secret rule: the password
-// is stripped out of the URI before the row is written (so it is never persisted in cleartext)
-// and re-injected only into the config handed to the engine.
-func TestUriPasswordStripAndInject(t *testing.T) {
-	h := newHarness(t)
-	in := connections.Input{
-		ConnectionFields: model.ConnectionFields{
-			Name: "uri-conn", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
-		},
-	}
-	created := mustCreate(t, h.svc, in)
-
-	if created.URI == nil || *created.URI != "postgresql://u@h:5432/db" {
-		t.Fatalf("stored URI = %v, want a passwordless postgresql://u@h:5432/db", created.URI)
-	}
-	secret, err := h.secrets.Get(created.ID)
-	if err != nil {
-		t.Fatalf("Secrets.Get: %v", err)
-	}
-	if secret == nil || *secret != "p" {
-		t.Fatalf("stored secret = %v, want p", secret)
-	}
-
-	if _, err := h.svc.Connect(created.ID); err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	if got := h.backend.lastConnectConfig().URI; got == nil || *got != "postgresql://u:p@h:5432/db" {
-		t.Errorf("backend-bound uri = %v, want the password re-injected", got)
-	}
-}
-
-// TestUriModeUpdateHonorsExplicitPasswordClear pins P2 R2's fix: a URI-mode Update whose typed URI
-// carries no password of its own (the normal shape — D7 always strips one out before ever showing
-// it back to the user) must still honor an explicit "" clear signal in in.Password, rather than
-// silently discarding it in favor of "unchanged" just because the URI itself said nothing. Without
-// the fix, the only way this scenario arises in the real dialog (toggle to fields mode, clear the
-// password there, toggle back to URI mode, save) always left the old secret in place.
-func TestUriModeUpdateHonorsExplicitPasswordClear(t *testing.T) {
-	h := newHarness(t)
-	created := mustCreate(t, h.svc, connections.Input{
-		ConnectionFields: model.ConnectionFields{
-			Name: "uri-clear", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
-		},
-	})
-
-	cleared := strPtr("")
-	if _, err := h.svc.Update(created.ID, connections.Input{
-		ConnectionFields: model.ConnectionFields{
-			Name: "uri-clear", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
-		},
-		Password: cleared,
-	}); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-
-	secret, err := h.secrets.Get(created.ID)
-	if err != nil {
-		t.Fatalf("Secrets.Get: %v", err)
-	}
-	if secret != nil {
-		t.Fatalf("secret = %v, want nil (cleared)", *secret)
-	}
-}
-
-// TestUriModeUpdateWithNoPasswordSignalLeavesSecretUnchanged is the companion case: a URI-mode
-// Update whose URI has no password and whose in.Password is nil (never touched — the ordinary
-// shape of an edit that doesn't concern itself with credentials at all) must still leave the
-// existing secret alone.
-func TestUriModeUpdateWithNoPasswordSignalLeavesSecretUnchanged(t *testing.T) {
-	h := newHarness(t)
-	created := mustCreate(t, h.svc, connections.Input{
-		ConnectionFields: model.ConnectionFields{
-			Name: "uri-untouched", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
-		},
-	})
-
-	if _, err := h.svc.Update(created.ID, connections.Input{
-		ConnectionFields: model.ConnectionFields{
-			Name: "uri-untouched-renamed", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
-		},
-	}); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-
-	secret, err := h.secrets.Get(created.ID)
-	if err != nil {
-		t.Fatalf("Secrets.Get: %v", err)
-	}
-	if secret == nil || *secret != "p" {
-		t.Fatalf("secret = %v, want unchanged p", secret)
 	}
 }
 
@@ -1477,43 +1380,191 @@ func TestDuplicateEmitsListChangedEvenWhenMaskRuleCopyFails(t *testing.T) {
 	}
 }
 
-// TestStartMigratesQueryPasswordIntoSecretStore is P170 S5: a row stored before Create/Update
-// stripped `?password=` keeps no plaintext secret in its URI after boot, and List never returns it.
-func TestStartMigratesQueryPasswordIntoSecretStore(t *testing.T) {
-	h := newHarness(t)
-	fields := fieldsInput("legacy").ConnectionFields
-	fields.Mode = "uri"
-	fields.URI = strPtr("kafka://broker:9092?password=s3cret&x=1")
-	row, err := h.repos.Connections.Insert("legacy-id", fields, "2020-01-01T00:00:00.000Z")
-	if err != nil {
-		t.Fatalf("Insert: %v", err)
-	}
+func uriInput(name string, uri *string) connections.Input {
+	in := fieldsInput(name)
+	in.Mode, in.URI, in.Host, in.Port = "uri", uri, nil, nil
+	return in
+}
 
-	list, err := h.svc.List()
+func (h *harness) rawColumns(t *testing.T, id string) (uri, options string, password *string) {
+	t.Helper()
+	var pw sql.NullString
+	if err := h.repos.Connections.DB.QueryRow(`SELECT uri, options_json, password FROM connections WHERE id = ?`, id).
+		Scan(&uri, &options, &pw); err != nil {
+		t.Fatalf("raw select: %v", err)
+	}
+	if pw.Valid {
+		password = &pw.String
+	}
+	return uri, options, password
+}
+
+// TestListNeverCarriesTheURI pins P181's one invariant across every exit: whatever secrets a URI
+// holds (userinfo and all four query secrets), no summary, List result or list-changed event
+// carries it, the row stores only ciphertext, and Connect still hands the backend the exact URI.
+func TestListNeverCarriesTheURI(t *testing.T) {
+	h := newHarness(t)
+	const full = "postgresql://u:pw1@h:5432/db?password=pw2&sslpassword=pw3&tlsCertificateKeyFilePassword=pw4&proxyPassword=pw5&sslmode=require"
+	secretValues := []string{"pw1", "pw2", "pw3", "pw4", "pw5"}
+
+	var emitted [][]model.ConnectionSummary
+	unsubscribe := h.svc.OnListChanged(func(list []model.ConnectionSummary) { emitted = append(emitted, list) })
+	defer unsubscribe()
+
+	created := mustCreate(t, h.svc, uriInput("uri-conn", strPtr(full)))
+	updated, err := h.svc.Update(created.ID, uriInput("uri-conn-renamed", strPtr(full)))
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	dup, err := h.svc.Duplicate(created.ID)
+	if err != nil {
+		t.Fatalf("Duplicate: %v", err)
+	}
+	reordered, err := h.svc.Reorder([]string{dup.ID, created.ID})
+	if err != nil {
+		t.Fatalf("Reorder: %v", err)
+	}
+	listed, err := h.svc.List()
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	for _, c := range list {
-		if c.ID == row.ID && strings.Contains(*c.URI, "s3cret") {
-			t.Fatalf("List returned the plaintext password: %q", *c.URI)
+
+	check := func(where string, c model.ConnectionSummary) {
+		t.Helper()
+		if c.URI != nil {
+			t.Errorf("%s: URI = %q, want nil", where, *c.URI)
+		}
+		for k := range c.Options {
+			if strings.EqualFold(k, "password") || strings.HasSuffix(strings.ToLower(k), "password") {
+				t.Errorf("%s: options carry %q", where, k)
+			}
+		}
+	}
+	check("Create", created)
+	check("Update", updated)
+	check("Duplicate", dup)
+	for _, c := range reordered {
+		check("Reorder", c)
+	}
+	for _, c := range listed {
+		check("List", c)
+	}
+	if len(emitted) == 0 {
+		t.Fatal("no list-changed emission observed")
+	}
+	for _, list := range emitted {
+		for _, c := range list {
+			check("list-changed", c)
 		}
 	}
 
-	second := connections.New(connections.Deps{
-		Conns: h.repos.Connections, Secrets: h.secrets, Metadata: h.repos.Metadata,
-		Cipher: secrets.New(), Auth: h.auth, Backend: h.backend, Preconnect: preconnect.New(), MaskRules: h.repos.MaskRules,
-	})
-	second.Start()
-	t.Cleanup(second.Shutdown)
+	for _, id := range []string{created.ID, dup.ID} {
+		uri, options, password := h.rawColumns(t, id)
+		if !strings.HasPrefix(uri, "kira:v3:") {
+			t.Errorf("stored uri = %q, want a kira:v3: envelope", uri)
+		}
+		for _, v := range secretValues {
+			if strings.Contains(uri, v) || strings.Contains(options, v) {
+				t.Errorf("stored columns contain %q", v)
+			}
+		}
+		if password != nil {
+			t.Errorf("password column = %q, want NULL", *password)
+		}
+		if _, err := h.svc.Connect(id); err != nil {
+			t.Fatalf("Connect %s: %v", id, err)
+		}
+		if got := h.backend.lastConnectConfig().URI; got == nil || *got != full {
+			t.Errorf("backend-bound uri = %v, want the exact original", got)
+		}
+	}
+}
 
-	stored, err := h.repos.Connections.Get(row.ID)
-	if err != nil || stored == nil {
-		t.Fatalf("Get: %v", err)
+// TestURIModeUpdateRules pins the three-state URI x three-state password x stored-mode interplay,
+// where a wrong cell silently loses a stored password.
+func TestURIModeUpdateRules(t *testing.T) {
+	fieldsRow := func(h *harness) string {
+		in := fieldsInput("row")
+		in.Password = strPtr("stored")
+		return mustCreate(t, h.svc, in).ID
 	}
-	if got, want := *stored.URI, "kafka://broker:9092?x=1"; got != want {
-		t.Errorf("stored URI = %q, want %q", got, want)
+	uriRow := func(h *harness) string {
+		return mustCreate(t, h.svc, uriInput("row", strPtr("postgresql://u:orig@h/db"))).ID
 	}
-	if enc, err := h.secrets.Get(row.ID); err != nil || enc == nil {
-		t.Errorf("secret after migration = %v, %v, want stored", enc, err)
+	tests := []struct {
+		name         string
+		setup        func(h *harness) string
+		uri          *string
+		password     *string
+		wantCode     string
+		wantURI      string
+		wantPassword *string
+	}{
+		{name: "nil URI keeps both columns", setup: uriRow, wantURI: "postgresql://u:orig@h/db"},
+		{name: "fields row flipped folds the stored password", setup: fieldsRow, uri: strPtr("postgresql://u@h/db"), wantURI: "postgresql://u:stored@h/db"},
+		{name: "explicit empty password does not fold", setup: fieldsRow, uri: strPtr("postgresql://u@h/db"), password: strPtr(""), wantURI: "postgresql://u@h/db"},
+		{name: "URI own password beats the stored one", setup: fieldsRow, uri: strPtr("postgresql://u:own@h/db"), wantURI: "postgresql://u:own@h/db"},
+		{name: "nil URI on a fields row is refused", setup: fieldsRow, wantCode: "E_BAD_REQUEST", wantPassword: strPtr("stored")},
+		{name: "nil URI with a password is refused", setup: uriRow, password: strPtr("x"), wantCode: "E_BAD_REQUEST", wantURI: "postgresql://u:orig@h/db"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			id := tt.setup(h)
+			in := uriInput("row", tt.uri)
+			in.Password = tt.password
+			_, err := h.svc.Update(id, in)
+			if tt.wantCode != "" {
+				if err == nil || asIpcErr(t, err).Code != tt.wantCode {
+					t.Fatalf("Update err = %v, want %s", err, tt.wantCode)
+				}
+			} else if err != nil {
+				t.Fatalf("Update: %v", err)
+			}
+			gotURI, err := h.secrets.GetURI(id)
+			if err != nil {
+				t.Fatalf("GetURI: %v", err)
+			}
+			if tt.wantURI == "" && gotURI != nil || tt.wantURI != "" && (gotURI == nil || *gotURI != tt.wantURI) {
+				t.Errorf("URI = %v, want %q", gotURI, tt.wantURI)
+			}
+			gotPw, err := h.secrets.Get(id)
+			if err != nil {
+				t.Fatalf("Get: %v", err)
+			}
+			if (gotPw == nil) != (tt.wantPassword == nil) || gotPw != nil && *gotPw != *tt.wantPassword {
+				t.Errorf("password = %v, want %v", gotPw, tt.wantPassword)
+			}
+		})
+	}
+}
+
+// TestLegacyPlaintextURIFailsLoudly: a pre-P181 plaintext uri stays listed, fails every read with
+// the envelope error (no silent success, no data deleted), and a typed replacement fixes it.
+func TestLegacyPlaintextURIFailsLoudly(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, uriInput("legacy", strPtr("postgresql://u:p@h/db")))
+	if _, err := h.repos.Connections.DB.Exec(`UPDATE connections SET uri = ? WHERE id = ?`,
+		"postgresql://u@h/db", created.ID); err != nil {
+		t.Fatalf("raw plaintext uri: %v", err)
+	}
+
+	list, err := h.svc.List()
+	if err != nil || len(list) != 1 || list[0].URI != nil {
+		t.Fatalf("List = %+v, %v, want the row listed with no URI", list, err)
+	}
+	state, _ := h.svc.Connect(created.ID)
+	if state.Status != "error" || state.Error == nil || !strings.Contains(*state.Error, "envelope") {
+		t.Fatalf("Connect state = %+v, want an error naming the envelope", state)
+	}
+	if res := h.svc.Reveal(created.ID, false); res.Outcome != "error" || res.Error == nil {
+		t.Fatalf("Reveal = %+v, want the error outcome", res)
+	}
+
+	if _, err := h.svc.Update(created.ID, uriInput("legacy", strPtr("postgresql://u:new@h/db"))); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if state, err := h.svc.Connect(created.ID); err != nil || state.Status != "connected" {
+		t.Fatalf("Connect after fix = %+v, %v, want connected", state, err)
 	}
 }

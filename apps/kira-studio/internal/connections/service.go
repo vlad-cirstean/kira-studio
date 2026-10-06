@@ -71,8 +71,10 @@ type TestResult struct {
 // it rather than inferring the case from which of Password/Error is set.
 type RevealResult struct {
 	Password *string `json:"password"`
-	Error    *string `json:"error"`
-	Outcome  string  `json:"outcome"`
+	// URI is the decrypted connection URI of a URI-mode connection (P181); Password is nil then.
+	URI     *string `json:"uri"`
+	Error   *string `json:"error"`
+	Outcome string  `json:"outcome"`
 }
 
 const (
@@ -85,7 +87,10 @@ const (
 // revealReason is LAContext.evaluatePolicy's localizedReason (P14 D11) — macOS prefixes it with
 // "Kira Studio is trying to …" inside its own sheet, so this reads as a sentence fragment, not a
 // standalone label.
-const revealReason = "reveal a saved connection password."
+const (
+	revealReason    = "reveal a saved connection password."
+	revealURIReason = "reveal a saved connection URI."
+)
 
 // Authorizer is P14's reveal gate (internal/localauth.Authorizer satisfies this) — an interface
 // here, not the concrete type, so tests can inject a fake outcome sequence without a real clock or
@@ -161,58 +166,6 @@ func New(d Deps) *Service {
 // and every test can attach its own listener before the first event).
 func (s *Service) Start() {
 	s.deps.Preconnect.OnExit(s.onPreconnectExit)
-	s.migrateStoredURIPasswords()
-}
-
-// migrateStoredURIPasswords moves a password stored inside a connection's URI (a row saved before
-// Create/Update began stripping it) into the encrypted secret column. An existing secret wins,
-// matching Create/Update. A row whose encryption fails keeps its URI until the next start; List
-// strips it from what it returns meanwhile.
-func (s *Service) migrateStoredURIPasswords() {
-	list, err := s.deps.Conns.List()
-	if err != nil {
-		slog.Warn(fmt.Sprintf("list connections for URI password migration: %s", err), "scope", "connections")
-		return
-	}
-	for _, c := range list {
-		if c.URI == nil {
-			continue
-		}
-		stripped, pw := stripURIPassword(*c.URI)
-		if pw == nil {
-			continue
-		}
-		existing, err := s.deps.Secrets.Get(c.ID)
-		if err != nil {
-			slog.Warn(fmt.Sprintf("read secret of %s for URI password migration: %s", c.ID, err), "scope", "connections")
-			continue
-		}
-		var enc *string
-		if existing == nil {
-			e, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *pw)
-			if err != nil {
-				slog.Warn(fmt.Sprintf("encrypt URI password of %s: %s", c.ID, err), "scope", "connections")
-				continue
-			}
-			enc = &e
-		}
-		fields := c.ConnectionFields
-		fields.URI = &stripped
-		if _, err := s.deps.Conns.UpdateWithSecret(c.ID, fields, kiratime.NowISO(), enc != nil, enc); err != nil {
-			slog.Warn(fmt.Sprintf("migrate URI password of %s: %s", c.ID, err), "scope", "connections")
-		}
-	}
-}
-
-// withoutURIPassword returns list with every URI's password removed, for rows not yet migrated.
-func withoutURIPassword(list []model.ConnectionSummary) []model.ConnectionSummary {
-	for i := range list {
-		if list[i].URI != nil {
-			stripped, _ := stripURIPassword(*list[i].URI)
-			list[i].URI = &stripped
-		}
-	}
-	return list
 }
 
 // Shutdown refuses every Connect from here on, cancels and waits out every attempt already
@@ -311,7 +264,7 @@ func (s *Service) emitListChanged() {
 	if err != nil {
 		return
 	}
-	s.listChanged.Emit(withoutURIPassword(list))
+	s.listChanged.Emit(list)
 }
 
 func (s *Service) List() ([]model.ConnectionSummary, error) {
@@ -319,58 +272,98 @@ func (s *Service) List() ([]model.ConnectionSummary, error) {
 	if err != nil {
 		return nil, ipcerr.Wrap(err)
 	}
-	return withoutURIPassword(list), nil
+	return list, nil
 }
 
 func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
+	in = in.normalized()
 	if err := in.Validate(); err != nil {
 		return model.ConnectionSummary{}, err
 	}
-
-	// In fields mode `uri` is not authoritative — never store or return it, even if the draft
-	// still carries a stale value (D9's guarantee that List never leaks a password must hold
-	// regardless of what the caller sends).
-	var uri *string
-	if in.Mode == "uri" {
-		uri = in.URI
-	}
-	password := in.Password
-	if in.Mode == "uri" && uri != nil && *uri != "" {
-		stripped, pw := stripURIPassword(*uri)
-		uri = &stripped
-		// P2 R2: only a password actually typed into the URI's own userinfo overrides whatever
-		// the caller sent — a passwordless URI (the common case: D7 always strips one out before
-		// ever showing it back to the user) says nothing about the password, so in.Password's own
-		// three-state value (nil/""/replace) must stand, not be silently discarded in its favor.
-		if pw != nil {
-			password = pw
-		}
+	if in.Mode == "uri" && in.URI == nil {
+		return model.ConnectionSummary{}, ipcerr.BadRequest(uriRequiredMessage)
 	}
 
 	// P25 D6: encrypt the secret before writing anything — a failure here (cipher unavailable)
-	// leaves no row behind at all. P21 round 3 finding 4: the row and its password are now written
-	// by the same INSERT statement (InsertWithSecret) rather than as two separate writes, so a
-	// failure that used to land *between* them — leaving a passwordless connection row committed
-	// while the caller was told the create had failed — can no longer happen.
-	var storedSecret *string
-	if password != nil {
-		encrypted, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *password)
-		if err != nil {
-			return model.ConnectionSummary{}, err
-		}
-		storedSecret = &encrypted
+	// leaves no row behind at all. P21 round 3 finding 4: the row and its secrets are written by
+	// the same INSERT statement (InsertWithSecret), never as separate writes.
+	var storedSecret, storedURI *string
+	var err error
+	if in.Mode == "uri" {
+		storedURI, err = s.sealURI(*in.URI, in.Password)
+	} else if in.Password != nil {
+		storedSecret, err = s.sealString(secrets.ScopeConnection, *in.Password)
+	}
+	if err != nil {
+		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 
 	fields := in.ConnectionFields
-	fields.URI = uri
 	fields.Name = strings.TrimSpace(fields.Name)
 	id := uuid.NewString()
-	created, err := s.deps.Conns.InsertWithSecret(id, fields, kiratime.NowISO(), storedSecret)
+	created, err := s.deps.Conns.InsertWithSecret(id, fields, kiratime.NowISO(), storedSecret, storedURI)
 	if err != nil {
 		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 	s.emitListChanged()
 	return created, nil
+}
+
+const uriRequiredMessage = "A connection URI is required."
+
+// sealString encrypts plain under scope into a column value.
+func (s *Service) sealString(scope secrets.Scope, plain string) (*string, error) {
+	enc, err := s.deps.Cipher.Encrypt(scope, plain)
+	if err != nil {
+		return nil, err
+	}
+	return &enc, nil
+}
+
+// sealURI folds password into uri (foldPassword) and encrypts the result — the only form in which
+// a URI is ever stored (P181).
+func (s *Service) sealURI(uri string, password *string) (*string, error) {
+	return s.sealString(secrets.ScopeConnectionURI, foldPassword(uri, password))
+}
+
+// secretWrites computes Update's two ciphertext writes (P181). Fields mode: password three-state
+// (nil = unchanged, "" = clear, else replace), uri cleared. URI mode with a URI: sealed fold, the
+// password column cleared. URI mode without one means "unchanged" and is only valid on a URI row.
+func (s *Service) secretWrites(id string, existing *model.ConnectionSummary, in Input) (password, uri repos.SecretWrite, err error) {
+	if in.Mode != "uri" {
+		if in.Password != nil && *in.Password != "" {
+			enc, err := s.sealString(secrets.ScopeConnection, *in.Password)
+			if err != nil {
+				return password, uri, err
+			}
+			password = repos.SecretWrite{Set: true, Value: enc}
+		} else if in.Password != nil {
+			password = repos.SecretWrite{Set: true}
+		}
+		return password, repos.SecretWrite{Set: true}, nil
+	}
+	if in.URI == nil {
+		if existing.Mode != "uri" {
+			return password, uri, ipcerr.BadRequest(uriRequiredMessage)
+		}
+		if in.Password != nil {
+			return password, uri, ipcerr.BadRequest("Change the password inside the URI.")
+		}
+		return password, uri, nil
+	}
+	// Fold the stored password only when nothing else supplies one: a fields-mode connection
+	// flipped to URI without revealing its password must not lose it silently.
+	effective := in.Password
+	if pw := userinfoPassword(*in.URI); effective == nil && (pw == nil || *pw == "") {
+		if effective, err = s.deps.Secrets.Get(id); err != nil {
+			return password, uri, err
+		}
+	}
+	enc, err := s.sealURI(*in.URI, effective)
+	if err != nil {
+		return password, uri, err
+	}
+	return repos.SecretWrite{Set: true}, repos.SecretWrite{Set: true, Value: enc}, nil
 }
 
 func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
@@ -391,49 +384,20 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
 	}
 
-	var uri *string
-	if in.Mode == "uri" {
-		uri = in.URI
-	}
-	// Three-state convention: nil = unchanged, "" = clear, non-empty = replace.
-	password := in.Password
-	if in.Mode == "uri" && uri != nil && *uri != "" {
-		stripped, pw := stripURIPassword(*uri)
-		uri = &stripped
-		// P2 R2: only a password actually typed into the URI's own userinfo overrides whatever
-		// the caller sent — a passwordless URI (the common case: D7 always strips one out before
-		// ever showing it back to the user) says nothing about the password, so in.Password's own
-		// three-state value (nil/""/replace) must stand. The old unconditional override silently
-		// discarded an explicit "" clear the moment the URI itself had no password to report,
-		// which is every URI-mode save that doesn't retype credentials by hand.
-		if pw != nil {
-			password = pw
-		}
-	}
-
 	// P25 D6: encrypt before writing anything — a failure here (cipher unavailable) means Update
 	// never runs, leaving every other field exactly as it was rather than a half-applied edit.
-	// P21 round 3 finding 4: the row and its password are now written by the same UPDATE statement
-	// (UpdateWithSecret) rather than as two separate writes in opposite orders — writing the secret
-	// first and the rest of the row second (the old order) meant a Conns.Update failure left the
-	// *new* password stored against the *old* host/port/database, the same "old destination's
-	// password on a new destination" state destinationUnchanged below exists to prevent, just
-	// reached by a different path. hasSecret carries the three-state Input.Password contract
-	// through to the single combined statement: false leaves the stored password untouched.
-	hasSecret := password != nil
-	var storedSecret *string
-	if hasSecret && *password != "" {
-		encrypted, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *password)
-		if err != nil {
-			return model.ConnectionSummary{}, ipcerr.Wrap(err)
-		}
-		storedSecret = &encrypted
+	// P21 round 3 finding 4: the row and its secrets are written by the same UPDATE statement
+	// (UpdateWithSecret), so a failed write cannot leave a new secret against the old destination.
+	password, uri, err := s.secretWrites(id, existing, in)
+	if err != nil {
+		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
+	// Read before the write below replaces the stored URI.
+	unchanged := s.destinationUnchangedFor(id, in, existing)
 
 	fields := in.ConnectionFields
-	fields.URI = uri
 	fields.Name = strings.TrimSpace(fields.Name)
-	updated, err := s.deps.Conns.UpdateWithSecret(id, fields, kiratime.NowISO(), hasSecret, storedSecret)
+	updated, err := s.deps.Conns.UpdateWithSecret(id, fields, kiratime.NowISO(), password, uri)
 	if err != nil {
 		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
@@ -448,7 +412,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	// P168 Part 2 F3: an in-flight attempt resolved its config before this edit, so it counts as
 	// live — Disconnect aborts and waits it out, then Connect starts fresh on the new config.
 	if (s.StateOf(id).Status == "connected" || s.connecting(id)) &&
-		(!destinationUnchanged(in, existing.ConnectionFields) || in.ReadOnly != existing.ReadOnly) {
+		(!unchanged || in.ReadOnly != existing.ReadOnly) {
 		// Disconnect (which already drops the enginecache's pages/counts for this connection,
 		// adapterhost/router.go's own DropConnection) then reconnect — attemptConnect moves the
 		// connection's metadata_cache epoch forward (P24 D6) and emits the invalidation on its own,
@@ -524,7 +488,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 		created.McpEnabled = true
 	}
 	s.emitListChanged()
-	return withoutURIPassword([]model.ConnectionSummary{created})[0], nil
+	return created, nil
 }
 
 // copyMaskRules copies every mask rule on fromID onto toID — Duplicate's own step (finding #6,
@@ -566,7 +530,7 @@ func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
 		return nil, ipcerr.Wrap(err)
 	}
 	s.emitListChanged()
-	return withoutURIPassword(reordered), nil
+	return reordered, nil
 }
 
 // Reveal never errors (P25 D9): the renderer's edit dialog has no error handling around this
@@ -577,9 +541,20 @@ func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
 // Authorizer.Authorize enforces that (it ignores confirmed whenever it can actually evaluate), so
 // this method never has to re-check which branch produced a grant.
 func (s *Service) Reveal(id string, confirmed bool) RevealResult {
-	outcome, password, err := localauth.Gated(s.deps.Auth.Authorize, revealReason, confirmed, func() (*string, error) {
-		return s.deps.Secrets.Get(id)
-	})
+	existing, err := s.deps.Conns.Get(id)
+	if err == nil && existing == nil {
+		err = fmt.Errorf("connection %s not found", id)
+	}
+	if err != nil {
+		msg := errorMessage(err)
+		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
+	}
+	uriMode := existing.Mode == "uri"
+	reason, fetch := revealReason, func() (*string, error) { return s.deps.Secrets.Get(id) }
+	if uriMode {
+		reason, fetch = revealURIReason, func() (*string, error) { return s.deps.Secrets.GetURI(id) }
+	}
+	outcome, value, err := localauth.Gated(s.deps.Auth.Authorize, reason, confirmed, fetch)
 	switch outcome {
 	case localauth.GateAuthError:
 		msg := errorMessage(err)
@@ -596,7 +571,10 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
 	}
 	slog.Info(fmt.Sprintf("secret revealed for %s", id), "scope", "connections")
-	return RevealResult{Outcome: revealOutcomeRevealed, Password: password}
+	if uriMode {
+		return RevealResult{Outcome: revealOutcomeRevealed, URI: value}
+	}
+	return RevealResult{Outcome: revealOutcomeRevealed, Password: value}
 }
 
 // destinationUnchanged reports whether the draft still points at the same place, over the same
@@ -615,6 +593,21 @@ func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
 	zeroExemptFields(&a)
 	zeroExemptFields(&b)
 	return reflect.DeepEqual(a, b)
+}
+
+// destinationUnchangedFor is destinationUnchanged against the stored row, with the stored URI
+// decrypted into the comparison copy when the draft carries one (P181: the repo never returns it).
+// A draft with no URI compares nil to nil; a decrypt failure counts as changed.
+func (s *Service) destinationUnchangedFor(id string, in Input, stored *model.ConnectionSummary) bool {
+	fields := stored.ConnectionFields
+	if in.URI != nil && stored.Mode == "uri" {
+		uri, err := s.deps.Secrets.GetURI(id)
+		if err != nil || uri == nil {
+			return false
+		}
+		fields.URI = uri
+	}
+	return destinationUnchanged(in, fields)
 }
 
 // zeroExemptFields clears every ConnectionFields member that is genuinely safe to change without
@@ -665,15 +658,19 @@ func zeroExemptFields(f *model.ConnectionFields) {
 // (Test is deliberately not auth-gated, see above). An edited destination instead tests with no
 // password, same as a brand-new draft.
 func (s *Service) Test(in Input, existingID string) TestResult {
-	if in.Password == nil && existingID != "" {
-		if existing, err := s.deps.Conns.Get(existingID); err == nil && existing != nil &&
-			destinationUnchanged(in, existing.ConnectionFields) {
-			if pw, err := s.deps.Secrets.Get(existingID); err == nil {
-				in.Password = pw
-			}
+	in = in.normalized()
+	if existingID != "" {
+		var err error
+		if in, err = s.fillFromStored(in, existingID); err != nil {
+			msg := errorMessage(err)
+			return TestResult{OK: false, Error: &msg}
 		}
 	}
-	if err := in.Validate(); err != nil {
+	err := in.Validate()
+	if err == nil && in.Mode == "uri" && in.URI == nil {
+		err = ipcerr.BadRequest(uriRequiredMessage)
+	}
+	if err != nil {
 		msg := errorMessage(err)
 		return TestResult{OK: false, Error: &msg}
 	}
@@ -694,6 +691,33 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 		return TestResult{OK: false, Error: &msg}
 	}
 	return TestResult{OK: true, ServerVersion: &serverVersion}
+}
+
+// fillFromStored supplies what a draft leaves to the stored row (Test, P14 D3/P181): a fields-mode
+// draft with no password gets the stored one, a URI-mode draft with no URI (masked, never
+// revealed) gets the stored decrypted URI — both only while destinationUnchanged holds. A URI
+// decrypt failure is returned: there is nothing else to test.
+func (s *Service) fillFromStored(in Input, existingID string) (Input, error) {
+	existing, err := s.deps.Conns.Get(existingID)
+	if err != nil || existing == nil {
+		return in, nil
+	}
+	switch {
+	case in.Mode == "uri" && in.URI == nil:
+		if existing.Mode != "uri" || !s.destinationUnchangedFor(existingID, in, existing) {
+			return in, nil
+		}
+		uri, err := s.deps.Secrets.GetURI(existingID)
+		if err != nil {
+			return in, err
+		}
+		in.URI = uri
+	case in.Mode != "uri" && in.Password == nil && destinationUnchanged(in, existing.ConnectionFields):
+		if pw, err := s.deps.Secrets.Get(existingID); err == nil {
+			in.Password = pw
+		}
+	}
+	return in, nil
 }
 
 // Connect deduplicates concurrent calls for the same id (D11): every caller that arrives while an

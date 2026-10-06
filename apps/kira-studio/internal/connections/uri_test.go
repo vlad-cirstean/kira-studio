@@ -8,48 +8,14 @@ import (
 
 func strPtr(s string) *string { return &s }
 
-// TestStripURIPassword covers the userinfo surgery's interacting rules: find the authority (which
-// ends at the first /, ? or #), split at the LAST '@' and the FIRST ':' inside it, percent-decode
-// what is left, and drop the '@' entirely when the username is empty — all without touching a
-// byte outside the authority.
-func TestStripURIPassword(t *testing.T) {
-	tests := []struct {
-		name     string
-		uri      string
-		wantURI  string
-		wantPass *string
-	}{
-		{"userinfo with port", "postgresql://u:p@h:5432/db", "postgresql://u@h:5432/db", strPtr("p")},
-		{"no password", "postgresql://u@h/db", "postgresql://u@h/db", nil},
-		{"empty username", "postgresql://:p@h/db", "postgresql://h/db", strPtr("p")},
-		{"percent-encoded password", "postgres://u:p%40x@h/db", "postgres://u@h/db", strPtr("p@x")},
-		{"not a uri", "not a uri", "not a uri", nil},
-		{"password query param", "postgres://u@h/db?password=s%2Bx&sslmode=require", "postgres://u@h/db?sslmode=require", strPtr("s+x")},
-		{"only query param removes the ?", "postgres://u@h/db?password=s3cret", "postgres://u@h/db", strPtr("s3cret")},
-		{"userinfo wins over query", "postgres://u:a@h/db?password=b&x=1", "postgres://u@h/db?x=1", strPtr("a")},
-		{"query and fragment untouched", "postgresql://u:p@h/db?a=b#f", "postgresql://u@h/db?a=b#f", strPtr("p")},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotURI, gotPass := stripURIPassword(tt.uri)
-			if gotURI != tt.wantURI {
-				t.Errorf("uri = %q, want %q", gotURI, tt.wantURI)
-			}
-			if (gotPass == nil) != (tt.wantPass == nil) || (gotPass != nil && *gotPass != *tt.wantPass) {
-				t.Errorf("password = %v, want %v", derefOrNil(gotPass), derefOrNil(tt.wantPass))
-			}
-		})
-	}
-}
-
 // derefOrNil is testx.DerefOrNil (P107 I2-28).
 var derefOrNil = testx.DerefOrNil
 
 // TestURIHasAmbiguousPassword is F3 (P108 Part 3): findAuthority ends the authority at the first
 // /, ? or # after "://", so an unencoded one of those inside a password truncates the detected
-// authority before the real '@' — stripURIPassword then reports no password at all, and the raw
-// URI (password included) would be stored and returned as-is. This is the guard that rejects
-// that shape at validateMode instead.
+// authority before the real '@' — userinfoPassword then reports no password at all, and
+// foldPassword would inject a second one. This is the guard that rejects that shape at
+// validateMode instead.
 func TestURIHasAmbiguousPassword(t *testing.T) {
 	tests := []struct {
 		name string
@@ -80,15 +46,12 @@ func TestURIHasAmbiguousPassword(t *testing.T) {
 }
 
 func TestURIPasswordRoundTripSurvivesSpecialCharacters(t *testing.T) {
-	// A password containing '@' and ':' must survive an inject-then-strip round trip: inject
+	// A password containing '@' and ':' must survive an inject-then-read round trip: inject
 	// percent-encodes it, so the '@'/':' inside it never gets mistaken for userinfo/authority
-	// delimiters when stripped back out.
+	// delimiters when read back.
 	const original = "p@ss:w0rd"
 	uri := injectURIPassword("postgresql://u@h/db", strPtr(original))
-	strippedURI, got := stripURIPassword(uri)
-	if strippedURI != "postgresql://u@h/db" {
-		t.Errorf("stripped uri = %q, want postgresql://u@h/db", strippedURI)
-	}
+	got := userinfoPassword(uri)
 	if got == nil || *got != original {
 		t.Errorf("round-tripped password = %v, want %q", derefOrNil(got), original)
 	}

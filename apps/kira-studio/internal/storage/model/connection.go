@@ -5,15 +5,17 @@ package model
 // password field anywhere in this package, enforced by the type itself, same as the TS build's
 // `.omit({password: true})`).
 type ConnectionFields struct {
-	Name              string         `json:"name"`
-	Kind              string         `json:"kind"`
-	Color             string         `json:"color"`
-	Mode              string         `json:"mode"`
-	ReadOnly          bool           `json:"readOnly"`
-	Host              *string        `json:"host"`
-	Port              *int           `json:"port"`
-	Database          *string        `json:"database"`
-	Username          *string        `json:"username"`
+	Name     string  `json:"name"`
+	Kind     string  `json:"kind"`
+	Color    string  `json:"color"`
+	Mode     string  `json:"mode"`
+	ReadOnly bool    `json:"readOnly"`
+	Host     *string `json:"host"`
+	Port     *int    `json:"port"`
+	Database *string `json:"database"`
+	Username *string `json:"username"`
+	// URI is input-only (P181): the column holds ciphertext ConnectionsRepo never selects, so it is
+	// always nil on output. SecretsRepo.GetURI and Service.Reveal are the only ways to read it.
 	URI               *string        `json:"uri"`
 	Options           map[string]any `json:"options"`
 	Preconnect        *string        `json:"preconnect"`

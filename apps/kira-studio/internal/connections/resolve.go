@@ -20,8 +20,9 @@ type resolved struct {
 	throttlePerSec float64
 }
 
-// resolve reads the row, reads the secret through SecretsRepo.Get, and injects the password into
-// URI when URI is non-nil. Never returned over IPC (D9 — the engine channel is the only consumer).
+// resolve reads the row and its secret: fields mode reads the password column, URI mode decrypts
+// the whole URI (P181) and derives Options from its query on top of the stored ones. Never returned
+// over IPC (D9 — the engine channel is the only consumer).
 func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string) (resolved, error) {
 	summary, err := conns.Get(id)
 	if err != nil {
@@ -30,22 +31,30 @@ func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string
 	if summary == nil {
 		return resolved{}, fmt.Errorf("connection %s not found", id)
 	}
-	password, err := secrets.Get(id)
-	if err != nil {
-		return resolved{}, fmt.Errorf("connections: resolve %s: %w", id, err)
-	}
 
-	uri := summary.URI
-	if uri != nil {
-		injected := injectURIPassword(*uri, password)
-		uri = &injected
+	var password, uri *string
+	options := summary.Options
+	if summary.Mode == "uri" {
+		uri, err = secrets.GetURI(id)
+		if err != nil {
+			return resolved{}, fmt.Errorf("connections: resolve %s: %w", id, err)
+		}
+		if uri == nil {
+			return resolved{}, fmt.Errorf("connection %s has no stored URI", id)
+		}
+		options = mergeOptions(options, uriQueryOptions(*uri))
+	} else {
+		password, err = secrets.Get(id)
+		if err != nil {
+			return resolved{}, fmt.Errorf("connections: resolve %s: %w", id, err)
+		}
 	}
 
 	return resolved{
 		config: model.ResolvedConnectionConfig{
 			ID: summary.ID, Name: summary.Name, Kind: summary.Kind, Color: summary.Color,
 			Mode: summary.Mode, ReadOnly: summary.ReadOnly, Host: summary.Host, Port: summary.Port,
-			Database: summary.Database, Username: summary.Username, URI: uri, Options: summary.Options,
+			Database: summary.Database, Username: summary.Username, URI: uri, Options: options,
 			SortOrder: summary.SortOrder, CreatedAt: summary.CreatedAt, UpdatedAt: summary.UpdatedAt,
 			Password: password,
 		},
@@ -53,6 +62,18 @@ func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string
 		preconnectSidecar: summary.PreconnectSidecar,
 		throttlePerSec:    summary.ThrottlePerSec,
 	}, nil
+}
+
+// mergeOptions overlays over onto a copy of base.
+func mergeOptions(base, over map[string]any) map[string]any {
+	out := make(map[string]any, len(base)+len(over))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range over {
+		out[k] = v
+	}
+	return out
 }
 
 // resolveFromInput builds the same shape as resolve, but from an unsaved draft (the dialog's
@@ -69,28 +90,20 @@ func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string
 // A fresh id per call (nothing downstream depends on the literal) makes two concurrent Test calls
 // independent, the same way two real connections never collide on Preconnect's key.
 func resolveFromInput(in Input) resolved {
-	uri := in.URI
-	password := in.Password
-	if uri != nil {
-		// P2 R2: a password typed directly into the URI's own userinfo is the freshest signal of
-		// what the user actually wants tested — mirrors Create/Update's own rule below. Without
-		// this, retyping the whole URI for a different host with its own new inline credentials
-		// still silently tested with in.Password, a stale echo of whatever this connection's
-		// secret happened to be before the edit (nil for a brand-new draft, so this only bit an
-		// edit in progress).
-		stripped, pw := stripURIPassword(*uri)
-		if pw != nil {
-			password = pw
-		}
-		uri = &stripped
-		injected := injectURIPassword(*uri, password)
-		uri = &injected
+	var uri, password *string
+	options := in.Options
+	if in.Mode == "uri" && in.URI != nil {
+		folded := foldPassword(*in.URI, in.Password)
+		uri = &folded
+		options = mergeOptions(options, uriQueryOptions(folded))
+	} else {
+		password = in.Password
 	}
 	return resolved{
 		config: model.ResolvedConnectionConfig{
 			ID: "test:" + uuid.NewString(), Name: in.Name, Kind: in.Kind, Color: in.Color, Mode: in.Mode,
 			ReadOnly: in.ReadOnly, Host: in.Host, Port: in.Port, Database: in.Database,
-			Username: in.Username, URI: uri, Options: in.Options,
+			Username: in.Username, URI: uri, Options: options,
 			SortOrder: 0, CreatedAt: "", UpdatedAt: "",
 			Password: password,
 		},

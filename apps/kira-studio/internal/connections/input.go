@@ -103,45 +103,68 @@ func (in Input) validateMcp() error {
 }
 
 // validateMode checks the fields-vs-URI shape: fields mode requires a database file (fileKinds) or
-// host/port (unless an AWS-style kind), URI mode requires a non-empty URI.
+// host/port (unless an AWS-style kind) and no secret option; URI mode refuses a blank URI. A nil
+// URI passes: on Update and Test it means "unchanged" (P181), and Create refuses it itself.
 func (in Input) validateMode() error {
 	if in.Mode == "fields" {
-		if fileKinds[in.Kind] {
-			path := ""
-			if in.Database != nil {
-				path = strings.TrimSpace(*in.Database)
-			}
-			if path == "" {
-				return ipcerr.BadRequest("A database file is required.")
-			}
-			if !strings.HasPrefix(path, "/") {
-				return ipcerr.BadRequest("The database file must be an absolute path.")
-			}
-		} else {
-			if !awsStyleKinds[in.Kind] && (in.Host == nil || *in.Host == "") {
-				return ipcerr.BadRequest("Host is required.")
-			}
-			if !awsStyleKinds[in.Kind] && in.Port == nil {
-				return ipcerr.BadRequest("Port is required.")
-			}
+		return in.validateFields()
+	}
+	return in.validateURI()
+}
+
+func (in Input) validateFields() error {
+	if fileKinds[in.Kind] {
+		path := ""
+		if in.Database != nil {
+			path = strings.TrimSpace(*in.Database)
+		}
+		if path == "" {
+			return ipcerr.BadRequest("A database file is required.")
+		}
+		if !strings.HasPrefix(path, "/") {
+			return ipcerr.BadRequest("The database file must be an absolute path.")
 		}
 	} else {
-		if in.URI == nil || strings.TrimSpace(*in.URI) == "" {
-			return ipcerr.BadRequest("A connection URI is required.")
+		if !awsStyleKinds[in.Kind] && (in.Host == nil || *in.Host == "") {
+			return ipcerr.BadRequest("Host is required.")
 		}
-		// F3 (P108 Part 3): a password containing a raw '/', '?' or '#' defeats findAuthority's
-		// own delimiter scan, so the detected password is nil and the whole URI — real password
-		// included — is stored and returned unencrypted. Reject rather than silently store it.
-		if uriHasAmbiguousPassword(*in.URI) {
-			return ipcerr.BadRequest("The URI's password contains a character (/, ? or #) that " +
-				"makes it ambiguous — percent-encode special characters in the password.")
-		}
-		if key, found := uriHasCredentialQuery(*in.URI); found {
-			return ipcerr.BadRequest("The URI's \"" + key + "\" parameter holds a secret that cannot be " +
-				"stored safely — remove it from the URI.")
+		if !awsStyleKinds[in.Kind] && in.Port == nil {
+			return ipcerr.BadRequest("Port is required.")
 		}
 	}
+	if key, found := secretOptionKey(in.Options); found {
+		return ipcerr.BadRequest("The \"" + key + "\" option holds a secret that fields mode cannot " +
+			"store — use URI mode.")
+	}
 	return nil
+}
+
+func (in Input) validateURI() error {
+	if in.URI == nil {
+		return nil
+	}
+	if strings.TrimSpace(*in.URI) == "" {
+		return ipcerr.BadRequest("A connection URI is required.")
+	}
+	// F3 (P108 Part 3): a password containing a raw '/', '?' or '#' defeats findAuthority's own
+	// delimiter scan, so foldPassword would misplace the password. Reject rather than corrupt it.
+	if uriHasAmbiguousPassword(*in.URI) {
+		return ipcerr.BadRequest("The URI's password contains a character (/, ? or #) that " +
+			"makes it ambiguous — percent-encode special characters in the password.")
+	}
+	return nil
+}
+
+// normalized drops what the mode does not own (P181): fields mode never carries a URI, URI mode
+// derives its options from the URI in Go, so a stale draft leftover cannot reach storage or flag
+// destinationUnchanged.
+func (in Input) normalized() Input {
+	if in.Mode == "uri" {
+		in.Options = map[string]any{}
+	} else {
+		in.URI = nil
+	}
+	return in
 }
 
 // copySuffix is Service.Duplicate's own generated-name suffix.
