@@ -20,6 +20,7 @@ top). Reviewer reports only; no source edited. Paths as in plan: `GC` = `package
 - Block 2 (graph data and layout): done.
 - Block 3 (graph and review session state): done.
 - Block 4 (search): done.
+- Block 5 (ops and side state): done.
 
 ## Findings
 
@@ -199,6 +200,74 @@ inputs. Decision needed: emulate JS canonicalization in the translator (expand l
 class ranges into explicit JS-equivalence classes and drop `(?i)`), or accept and document the
 gap (the corpus would then need a per-engine expectation, which its schema lacks today).
 
+### Block 5: ops and side state
+
+**F13 (high): the `kiraSpace.checkout.autoStash` setting is never honored; checkout always
+auto-stashes.** `OpsState` reads the setting only through its optional `#repoSettings`
+(`GU/state/ops.ts:293,310,464-466`, `?? true`). The only production construction,
+`App.vue:163` (`new OpsState(bridge, refsState, stackState)`), passes no `RepoSettingsState`
+(`git grep 'new OpsState('`: one non-test hit). So `#resolveAutoCheckoutRoute` always sees `true`.
+Scenario: user turns the setting off (its description, `GC/settings/schema.ts:171-180`: "Off
+restores the old dialog"), then switches branch with a dirty tree: the client still re-issues the
+checkout with `autoStash: true` and stashes the changes without asking. The user's explicit
+opt-out of an automatic repository write is ignored. The comment at `ops.ts:289-292` calls the
+`true` fallback "the fail-safe direction ... never an unexpected write", which is the reverse of
+what `true` does. `ops.test.ts` passes a `RepoSettingsState` explicitly, so tests stay green.
+Code-read (construction site and fallback are both unambiguous).
+Fix: make `repoSettings` a required constructor parameter (drop `| undefined` and the `?? true`
+fallback to the schema default read from the live snapshot), and pass `repoSettingsState` at
+`App.vue:163`, constructing `RepoSettingsState` first (`needs-other-part-file:
+packages/git-ui/src/App.vue (Part 19)`, Stream B, editable). Fix the `:289-292` comment.
+
+**F14 (medium): an `OpsState` request that throws is never announced, and every caller drops the
+rejection.** Each op announces only `OpResult`/`RemoteOpResult` failures. A rejected request
+(preflight or `op.run`/`remote.run`/`undo.run`: `E_GIT_UNAVAILABLE`, `E_BAD_REQUEST` after a
+reconnect race, socket drop) propagates out of `runCheckout`/`runRevert`/`runReset`/
+`runCherryPick`/`#runStashPopLike`/`#runSimple`/`#runRemote`/`runPull`/`runPush`/`runForcePush`/
+`undo` with `busy` cleared but `announcement` untouched; `#runSimple` also throws "another operation
+is already running" (`ops.ts:1801`). Part 19 callers do not catch: `App.vue:1132-1214` call
+`void opsState.runRevert(...)`, `continueOp`, `abortOp`, `skipOp`, `undo`, `runReset`,
+`runCherryPick`, `runCheckout` bare; `AppToolbar.vue:184-204`, `BranchPicker.vue`, `TagList.vue`,
+`StashList.vue`, `ConflictBanner.vue` `await` them in click handlers; `main.ts` sets no
+`errorHandler` (`App.vue:304-309` says so). Result: the click does nothing visible; the error is an
+unhandled rejection. Two stash routes make it worse:
+- `#stashAndCarry` (`ops.ts:1346`): if `runMiddle` (checkout/pull) throws after the stash push
+  succeeded, the user's changes are now in the stash with no announcement at all; the
+  `!middle.ok` branch (`:1356-1358`) tells the user "Your changes are stashed", the throw path
+  does not.
+- `runReset` with `stashFirst` (`ops.ts:770-801`): if the reset itself fails (`!result.ok`), the
+  announcement is only "Reset failed — ..."; the tree is now clean and the changes sit in a
+  stash nobody mentioned.
+Code-read. Fix: one `try/catch` per public op (or in a shared wrapper around each method body)
+that sets `announcement` to `${action} failed — ${message}` for a non-cancel rejection and does
+not rethrow (callers already treat these as fire-and-forget); in `#stashAndCarry` catch the
+`runMiddle` throw and append the "Your changes are stashed" sentence; in `runReset` append the
+same sentence when `route.stashFirst` ran and the reset failed. Make `#runSimple`'s busy case an
+announcement instead of a throw.
+
+**F15 (medium): op failure text drops the server's message, including a push hook's own
+explanation.** `composeOpFailureAnnouncement` (`GU/state/liveAnnouncements.ts:205-211`) maps
+`error.kind` to fixed text and discards `error.message`; `RemoteOpResult.error.remoteMessage`
+(`IPC/contract.ts:882-887`, "the hook's own remote:-prefixed output") is read nowhere in `GU`
+(`git grep remoteMessage packages/git-ui/src`: no hit). Scenario: a pre-receive hook rejects a
+push with "commit message must reference a ticket"; the user hears/sees only "Push failed — a
+hook rejected it." `Unknown` likewise reduces every unclassified git failure to "an unexpected
+error occurred", with the only diagnostic dropped. Code-read.
+Fix: append `remoteMessage` for `HookRejected` and `message` for `Unknown` (trimmed, first line or
+a length cap) in `composeOpFailureAnnouncement`, taking the error shape as
+`{kind, message, remoteMessage?}`; `#runRemote` passes `result.error` through unchanged.
+
+**F16 (low): a repeated identical announcement is not re-announced.** `OpsState.announcement`,
+`DetailState.announcement`, `GraphViewState.announcement` are plain `shallowRef<string>`;
+assigning the same text again does not trigger, so `App.vue:545-551` never forwards it, and the
+`role="status"` region keeps unchanged text. Scenario: Fetch fails with "Fetch failed — a network
+error occurred.", user retries, it fails the same way: the screen reader hears nothing the second
+time. Same for "Checkout cancelled." twice. Code-read.
+Fix: announce through a helper that sets the text and calls `triggerRef` (or carry a sequence
+number), and in `App.vue` clear `liveAnnouncement` before setting it on the next tick so the DOM
+text actually changes (`needs-other-part-file: packages/git-ui/src/App.vue (Part 19)`, Stream B,
+editable).
+
 ## Candidate fates (plan §9)
 
 1. Dropped. Webview-side cancel is local: the webview's own `createRpcClient` rejects with a
@@ -218,6 +287,15 @@ gap (the corpus would then need a per-engine expectation, which its schema lacks
    so the old credit gate blocks nothing. (Plan §6.3's premise that a superseded `openStream`
    awaiter gets `TransportError('cancelled')` does not hold: abort resolves; no caller sees a
    cancel.) Only the swallowed recovery error is real, reported in F8.
+5. Dropped. `undo()` routes through `#applyResult` (`ops.ts:1497`), whose first line is the repo
+   guard (`:1828`). Only the announcement is unguarded, same as every other op; not worth a finding.
+6. Confirmed and widened into F14: the preflight rejection propagates (busy is not yet set, so it
+   cannot stick), but no caller catches it and nothing is announced. During `runPull`'s blocker
+   dialog `busy` is deliberately unset (`ops.ts:1582-1592`), so no stuck state either.
+7. Dropped. Every class that subscribes (`bridge.on`, `watch`, timers) has `dispose()`, and
+   `App.vue:1695-1714` / `ReviewView.vue:176-179,483-488` call each of them. `DetailState`
+   (`App.vue:147`) is not disposed but holds only an abortable request; `SelectionState` and
+   `GraphOrderState` hold no subscription.
 8. Reported as F1.
 9. Confirmed as dead code, reported inside F5. The O(rows) relayout per rebuild is the P93 §5.1
    design (rows scatter into groups), bounded in count by F11 coalescing; not re-reported.
