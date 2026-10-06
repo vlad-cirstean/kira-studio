@@ -15,6 +15,7 @@ no Part 15 file changed). Worktree `p168-stream-b`.
 - Block 2 `gitops`: done.
 - Block 3 `gitpreflight`: done.
 - Block 4 `gitreview` store: done.
+- Block 5 `gitreview` logic: done (no findings).
 
 ## Findings
 
@@ -249,6 +250,13 @@ Fix: `io.ReadAll(io.LimitReader(r, int64(want)+1))`, and reject `want > MaxSnaps
   run against a downgraded app", which is clear, not opaque. Only a stale comment
   (`migrate.go:17-18` says `startupfail` classifies it; a lazy open never reaches startup). No
   failure. Dropped.
+- 20 (`ProjectRanges` zero-length or deletion-only hunks): every caller's diff uses
+  `--unified=3` (`porcelain/diff.go:17,35`, `review.go:40`), so a hunk with `OldLines == 0` only
+  occurs for an empty old side (`@@ -0,0 +1,N @@`), which has no stored ranges to project.
+  Insertions inside a file always carry context, so `mapWithinHunk` maps them through context
+  lines; deleted lines drop (comment becomes `removed`); ranges past EOF are clamped. A `-U0`
+  caller would break the pure-insertion arm (old line `OldStart` would get the hunk's offset);
+  none exists. Dropped.
 - 9 (tick after flush): reported F1 (mechanism differs: the late tick wins the last batch, so
   `flush` has nothing to wait on).
 - 10 (nil `Env`, scrub gaps): every production caller passes `BuildEnv` output
@@ -339,3 +347,14 @@ deletes, `keyedMutex` refcount (release via `sync.Once`), `RemoveComment` scoped
 subquery (no cross-session delete), `ClearComments`, `SortAnchored` total order,
 `FormatComments` (body is the user's own text; no app data injected). G32 round-3 #6 holds (paths
 never NFC-rewritten).
+
+### Block 5 `gitreview` logic
+
+Reviewed: `ranges.go`, `project.go`, `resolve.go`. Blast radius read: `gitsession/incremental.go`
+(`ProjectRanges` at 670, 735; line-count note at 406-412), `gitsession/comments.go:195-246`.
+Checked and clean: `Normalize` drops inverted ranges and merges adjacent/overlapping, `Subtract`
+splits and consumes correctly, `Expand(0)` is nil, `CountLines` normalizes first, projection
+offset bookkeeping across multiple hunks, clamp with `newLineCount` 0. `resolve.go`: `findRef`
+prefers a local branch over a remote one with the same short name (a local branch literally named
+`origin/x`); git's own rev resolution prefers `refs/heads/` the same way, so the chosen base
+names the same object git would use. Not a finding. Nothing real in this block.
