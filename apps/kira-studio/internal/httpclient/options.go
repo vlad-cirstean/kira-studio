@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -189,31 +190,36 @@ func checkRedirectFor(r resolved) func(*http.Request, []*http.Request) error {
 		// comparing every hop against via[0] here is both correct and sufficient — no separate
 		// "stay stripped once crossed" state needed.
 		if len(via) > 0 {
-			origin := via[0].URL
-			crossHost := !sameRedirectHost(origin, req.URL)
-			portChange := isPortChange(origin, req.URL)
-			downgrade := isSchemeDowngrade(origin, req.URL)
-			if crossHost || portChange || downgrade {
-				if names, ok := req.Context().Value(redirectHeaderNamesCtxKey{}).([]string); ok {
-					for _, name := range names {
-						req.Header.Del(name)
-					}
-				}
-			}
-			if portChange {
-				// Same hostname, other service: net/http keeps the credential headers.
-				for _, h := range []string{"Authorization", "WWW-Authenticate", "Cookie", "Cookie2"} {
-					req.Header.Del(h)
-				}
-			}
-			if downgrade {
-				// F3: an https -> http downgrade on the same host passes net/http's own
-				// isDomainOrSubdomain check (it never looks at scheme), so Authorization and
-				// Cookie survive onto the plaintext hop unless stripped here explicitly.
-				req.Header.Del("Authorization")
-				req.Header.Del("Cookie")
-			}
+			stripOnOriginChange(req, via[0].URL)
 		}
 		return nil
+	}
+}
+
+// stripOnOriginChange drops what must not follow a redirect that leaves origin's host, port or
+// scheme security level.
+func stripOnOriginChange(req *http.Request, origin *url.URL) {
+	crossHost := !sameRedirectHost(origin, req.URL)
+	portChange := isPortChange(origin, req.URL)
+	downgrade := isSchemeDowngrade(origin, req.URL)
+	if crossHost || portChange || downgrade {
+		if names, ok := req.Context().Value(redirectHeaderNamesCtxKey{}).([]string); ok {
+			for _, name := range names {
+				req.Header.Del(name)
+			}
+		}
+	}
+	if portChange {
+		// Same hostname, other service: net/http keeps the credential headers.
+		for _, h := range []string{"Authorization", "WWW-Authenticate", "Cookie", "Cookie2"} {
+			req.Header.Del(h)
+		}
+	}
+	if downgrade {
+		// F3: an https -> http downgrade on the same host passes net/http's own
+		// isDomainOrSubdomain check (it never looks at scheme), so Authorization and
+		// Cookie survive onto the plaintext hop unless stripped here explicitly.
+		req.Header.Del("Authorization")
+		req.Header.Del("Cookie")
 	}
 }

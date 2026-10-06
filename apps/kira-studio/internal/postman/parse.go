@@ -166,57 +166,71 @@ func decodeItems(dec *json.Decoder, depth int) ([]itemNode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("postman: decode items: %w", err)
 		}
-		if d, ok := tok.(json.Delim); !ok || d != '{' {
-			if ok {
-				if err := skipNested(dec); err != nil {
-					return nil, err
-				}
-			}
-			nodes = append(nodes, itemNode{malformed: true})
-			continue
-		}
-		node := itemNode{members: map[string]json.RawMessage{}}
-		for dec.More() {
-			keyTok, err := dec.Token()
-			if err != nil {
-				return nil, fmt.Errorf("postman: decode items: %w", err)
-			}
-			key, _ := keyTok.(string)
-			if key != "item" {
-				var raw json.RawMessage
-				if err := dec.Decode(&raw); err != nil {
-					return nil, fmt.Errorf("postman: decode items: %w", err)
-				}
-				node.members[key] = raw
-				continue
-			}
-			node.hasItem, node.children = true, nil
-			valTok, err := dec.Token()
-			if err != nil {
-				return nil, fmt.Errorf("postman: decode items: %w", err)
-			}
-			d, isDelim := valTok.(json.Delim)
-			switch {
-			case isDelim && d == '[':
-				if node.children, err = decodeItems(dec, depth+1); err != nil {
-					return nil, err
-				}
-			case isDelim:
-				err = skipNested(dec)
-			}
+		d, isDelim := tok.(json.Delim)
+		if isDelim && d == '{' {
+			node, err := decodeItemObject(dec, depth)
 			if err != nil {
 				return nil, err
 			}
+			nodes = append(nodes, node)
+			continue
 		}
-		if _, err := dec.Token(); err != nil { // closing '}'
-			return nil, fmt.Errorf("postman: decode items: %w", err)
+		if isDelim {
+			if err := skipNested(dec); err != nil {
+				return nil, err
+			}
 		}
-		nodes = append(nodes, node)
+		nodes = append(nodes, itemNode{malformed: true})
 	}
 	if _, err := dec.Token(); err != nil { // closing ']'
 		return nil, fmt.Errorf("postman: decode items: %w", err)
 	}
 	return nodes, nil
+}
+
+// decodeItemObject reads one item's members (its '{' already consumed).
+func decodeItemObject(dec *json.Decoder, depth int) (itemNode, error) {
+	node := itemNode{members: map[string]json.RawMessage{}}
+	for dec.More() {
+		keyTok, err := dec.Token()
+		if err != nil {
+			return node, fmt.Errorf("postman: decode items: %w", err)
+		}
+		key, _ := keyTok.(string)
+		if key != "item" {
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return node, fmt.Errorf("postman: decode items: %w", err)
+			}
+			node.members[key] = raw
+			continue
+		}
+		node.hasItem, node.children = true, nil
+		if node.children, err = decodeItemMember(dec, depth); err != nil {
+			return node, err
+		}
+	}
+	if _, err := dec.Token(); err != nil { // closing '}'
+		return node, fmt.Errorf("postman: decode items: %w", err)
+	}
+	return node, nil
+}
+
+// decodeItemMember reads an `item` member's value: an array becomes children, anything else is
+// consumed and dropped (the folder keeps no children).
+func decodeItemMember(dec *json.Decoder, depth int) ([]itemNode, error) {
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("postman: decode items: %w", err)
+	}
+	d, isDelim := tok.(json.Delim)
+	switch {
+	case isDelim && d == '[':
+		return decodeItems(dec, depth+1)
+	case isDelim:
+		return nil, skipNested(dec)
+	}
+	return nil, nil
 }
 
 // skipNested consumes tokens up to the close of the container whose opener was just read.
