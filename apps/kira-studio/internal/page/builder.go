@@ -327,6 +327,12 @@ func (b *KeyValuePageBuilder) SetFieldsAreColumns(v bool) *KeyValuePageBuilder {
 	return b
 }
 
+// RowCount is the number of entries pushed so far.
+func (b *KeyValuePageBuilder) RowCount() int { return b.rowCount }
+
+// Bytes is the cell text bytes held so far.
+func (b *KeyValuePageBuilder) Bytes() int { return b.fields.used + b.values.used }
+
 func (b *KeyValuePageBuilder) Push(field, value string) {
 	row := b.rowCount
 	b.fields.appendValue(&field, row, MaxCellBytes)

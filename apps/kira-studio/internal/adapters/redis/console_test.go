@@ -150,7 +150,7 @@ func kvEntry(t *testing.T, pg page.KeyValuePage, i int) (field, value string) {
 // list_connections reported the connection as protected. HGET's own field name comes from the
 // command's own argument, not the reply.
 func TestResultToPage_HGETCarriesRealFieldName(t *testing.T) {
-	pg := resultToPage("HGET", []string{"email"}, "person@example.com")
+	pg := resultToPage("HGET", []string{"email"}, "person@example.com", page.ResultCap{})
 	if !pg.FieldsAreColumns {
 		t.Fatal("FieldsAreColumns = false, want true — HGET's field name is real")
 	}
@@ -163,7 +163,7 @@ func TestResultToPage_HGETCarriesRealFieldName(t *testing.T) {
 // TestResultToPage_HMGETCarriesRealFieldNamesPositionally confirms each reply element is paired
 // with the field name at the same position in the request, not a bare index.
 func TestResultToPage_HMGETCarriesRealFieldNamesPositionally(t *testing.T) {
-	pg := resultToPage("HMGET", []string{"email", "plan"}, []any{"person@example.com", "premium"})
+	pg := resultToPage("HMGET", []string{"email", "plan"}, []any{"person@example.com", "premium"}, page.ResultCap{})
 	if !pg.FieldsAreColumns {
 		t.Fatal("FieldsAreColumns = false, want true — HMGET's field names are real")
 	}
@@ -185,7 +185,7 @@ func TestResultToPage_HMGETCarriesRealFieldNamesPositionally(t *testing.T) {
 // values are the real hash field names (from the RESP2 flat field/value reply), so
 // renderKeyValuePage's ApplyColumn(field, value) actually has something to match against.
 func TestResultToPage_HGETALLCarriesRealFieldNames(t *testing.T) {
-	pg := resultToPage("HGETALL", nil, []any{"email", "person@example.com", "plan", "premium"})
+	pg := resultToPage("HGETALL", nil, []any{"email", "person@example.com", "plan", "premium"}, page.ResultCap{})
 	if !pg.FieldsAreColumns {
 		t.Fatal("FieldsAreColumns = false, want true — HGETALL's field names are real")
 	}
@@ -207,12 +207,12 @@ func TestResultToPage_HGETALLCarriesRealFieldNames(t *testing.T) {
 // display artifact, not a column), so dbmcp's renderPage must refuse to mask this page rather than
 // silently pass a value through under a Field nothing could ever match.
 func TestResultToPage_GenericReplyIsNotFieldsAreColumns(t *testing.T) {
-	pg := resultToPage("GET", []string{"user:1:email"}, "person@example.com")
+	pg := resultToPage("GET", []string{"user:1:email"}, "person@example.com", page.ResultCap{})
 	if pg.FieldsAreColumns {
 		t.Fatal("FieldsAreColumns = true, want false — GET's reply has no real field name")
 	}
 
-	arr := resultToPage("SMEMBERS", nil, []any{"a", "b"})
+	arr := resultToPage("SMEMBERS", nil, []any{"a", "b"}, page.ResultCap{})
 	if arr.FieldsAreColumns {
 		t.Fatal("FieldsAreColumns = true, want false — an array reply's index is not a real field name")
 	}

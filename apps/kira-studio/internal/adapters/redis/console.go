@@ -168,11 +168,12 @@ var hashReadCommands = map[string]bool{"HGET": true, "HMGET": true, "HGETALL": t
 
 // resultToPage is console.ts's own: any RESP reply is formatted generically (P9's D11) — no
 // per-command result shape, unlike Mongo's console — except for hashReadCommands above. A scalar's
-// field name is the upper-cased command; an array's are the indices.
-func resultToPage(command string, args []string, reply any) page.KeyValuePage {
+// field name is the upper-cased command; an array's are the indices. The page stops at limit and
+// reports Truncated when another entry existed.
+func resultToPage(command string, args []string, reply any, limit page.ResultCap) page.KeyValuePage {
 	upper := strings.ToUpper(command)
 	if hashReadCommands[upper] {
-		if pg, ok := hashReadPage(upper, args, reply); ok {
+		if pg, ok := hashReadPage(upper, args, reply, limit); ok {
 			return pg
 		}
 		// Reply didn't match the shape this command is supposed to return (a protocol surprise, or
@@ -181,21 +182,40 @@ func resultToPage(command string, args []string, reply any) page.KeyValuePage {
 	}
 	builder := page.NewKeyValuePageBuilder("string", nil, nil, false)
 	builder.SetFieldsAreColumns(false)
-	pageSize := 1
+	truncated := false
 	if arr, ok := reply.([]any); ok {
 		for i, item := range arr {
+			if limit.Reached(builder.RowCount(), builder.Bytes()) {
+				truncated = true
+				break
+			}
 			builder.Push(strconv.Itoa(i), formatReplyItem(item))
 		}
-		pageSize = len(arr)
 	} else {
 		builder.Push(strings.ToUpper(command), formatReplyItem(reply))
 	}
-	return builder.Finish(page.UnpagedPosition(pageSize))
+	pageSize := builder.RowCount()
+	if _, isArray := reply.([]any); !isArray {
+		pageSize = 1
+	}
+	return builder.Finish(page.CappedPosition(pageSize, truncated))
+}
+
+// pushCapped pushes count entries, stopping early at limit; it reports whether an entry was left out.
+func pushCapped(builder *page.KeyValuePageBuilder, limit page.ResultCap, count int, entry func(i int) (field, value string)) (truncated bool) {
+	for i := 0; i < count; i++ {
+		if limit.Reached(builder.RowCount(), builder.Bytes()) {
+			return true
+		}
+		field, value := entry(i)
+		builder.Push(field, value)
+	}
+	return false
 }
 
 // hashReadPage builds hashReadCommands' own real-field-name page, ok=false when reply isn't the
 // shape that command is documented to return.
-func hashReadPage(upper string, args []string, reply any) (page.KeyValuePage, bool) {
+func hashReadPage(upper string, args []string, reply any, limit page.ResultCap) (page.KeyValuePage, bool) {
 	switch upper {
 	case "HGET":
 		if len(args) == 0 {
@@ -210,14 +230,14 @@ func hashReadPage(upper string, args []string, reply any) (page.KeyValuePage, bo
 			return page.KeyValuePage{}, false
 		}
 		builder := page.NewKeyValuePageBuilder("hash", nil, nil, false)
-		for i, item := range arr {
+		truncated := pushCapped(builder, limit, len(arr), func(i int) (string, string) {
 			field := strconv.Itoa(i)
 			if i < len(args) {
 				field = args[i]
 			}
-			builder.Push(field, formatReplyItem(item))
-		}
-		return builder.Finish(page.UnpagedPosition(len(arr))), true
+			return field, formatReplyItem(arr[i])
+		})
+		return builder.Finish(page.CappedPosition(builder.RowCount(), truncated)), true
 	case "HGETALL":
 		builder := page.NewKeyValuePageBuilder("hash", nil, nil, false)
 		switch v := reply.(type) {
@@ -225,20 +245,20 @@ func hashReadPage(upper string, args []string, reply any) (page.KeyValuePage, bo
 			if len(v)%2 != 0 {
 				return page.KeyValuePage{}, false
 			}
-			for i := 0; i+1 < len(v); i += 2 {
-				builder.Push(formatReplyItem(v[i]), formatReplyItem(v[i+1]))
-			}
-			return builder.Finish(page.UnpagedPosition(len(v) / 2)), true
+			truncated := pushCapped(builder, limit, len(v)/2, func(i int) (string, string) {
+				return formatReplyItem(v[2*i]), formatReplyItem(v[2*i+1])
+			})
+			return builder.Finish(page.CappedPosition(builder.RowCount(), truncated)), true
 		case map[string]any: // RESP3: a real map reply
 			keys := make([]string, 0, len(v))
 			for k := range v {
 				keys = append(keys, k)
 			}
 			sort.Strings(keys) // deterministic order — the wire map has none
-			for _, k := range keys {
-				builder.Push(k, formatReplyItem(v[k]))
-			}
-			return builder.Finish(page.UnpagedPosition(len(v))), true
+			truncated := pushCapped(builder, limit, len(keys), func(i int) (string, string) {
+				return keys[i], formatReplyItem(v[keys[i]])
+			})
+			return builder.Finish(page.CappedPosition(builder.RowCount(), truncated)), true
 		default:
 			return page.KeyValuePage{}, false
 		}
@@ -426,7 +446,7 @@ func runConsoleCommand(ctx context.Context, conn *goredis.Client, argv []any, ti
 // of them runs against the connection. The previous shape parsed statement N only after 1..N-1 had
 // already executed, so a typo further down a batch discarded the already-committed earlier writes
 // with no rollback path; re-running after fixing the typo then double-applied them.
-func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bool, op *adapters.OpCtx, statements []string) ([]page.Page, error) {
+func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bool, op *adapters.OpCtx, statements []string, limit page.ResultCap) ([]page.Page, error) {
 	var lines []string
 	for _, s := range statements {
 		if trimmed := strings.TrimSpace(s); trimmed != "" {
@@ -480,11 +500,11 @@ func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bo
 		for _, a := range c.args {
 			argv = append(argv, a)
 		}
-		reply, err := runConsoleCommand(ctx, conn, argv, c.readTimeout)
+		reply, err := runBoundedCommand(ctx, conn, c, argv, limit)
 		if err != nil {
 			return nil, err
 		}
-		pages = append(pages, resultToPage(c.command, c.args, reply))
+		pages = append(pages, resultToPage(c.command, c.args, reply, limit))
 	}
 	return pages, nil
 }

@@ -261,7 +261,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		}
 		dbIndex = idx
 	}
-	return execute(ctx, set, dbIndex, a.state.Load().readOnly, op, req.Statements)
+	return execute(ctx, set, dbIndex, a.state.Load().readOnly, op, req.Statements, adapters.ConsoleCapFor(req))
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false; never reached.

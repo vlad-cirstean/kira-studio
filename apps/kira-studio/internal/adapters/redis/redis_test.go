@@ -670,6 +670,40 @@ func TestRedis_Console_Execute(t *testing.T) {
 	}
 }
 
+// P174: collection reads stop at the cap through their bounded forms (SCAN, HSCAN, clamped LRANGE).
+func TestRedis_Console_CollectionReadsStopAtResultCap(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	a := connectedAdapter(t, fixture)
+	path := nodePath(fixture, seg("database", "db1"))
+	if _, err := a.Execute(context.Background(), model.ConsoleRequest{
+		Path: path,
+		Statements: []string{
+			"RPUSH cap:list 1 2 3 4 5 6", "HSET cap:hash a 1 b 2 c 3 d 4 e 5 f 6",
+			"SET cap:k1 x", "SET cap:k2 x", "SET cap:k3 x", "SET cap:k4 x", "SET cap:k5 x", "SET cap:k6 x",
+		},
+	}, adapters.NewOpCtx("op-cap-seed")); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	for _, stmt := range []string{"LRANGE cap:list 0 -1", "HGETALL cap:hash", "KEYS cap:k*"} {
+		for _, tc := range []struct {
+			limit     int
+			rows      int
+			truncated bool
+		}{{5, 5, true}, {6, 6, false}} {
+			pages, err := a.Execute(context.Background(), model.ConsoleRequest{
+				Path: path, Statements: []string{stmt}, Cap: page.ResultCap{Rows: tc.limit},
+			}, adapters.NewOpCtx("op-cap"))
+			if err != nil {
+				t.Fatalf("%s: %v", stmt, err)
+			}
+			p := pages[0].(page.KeyValuePage)
+			if p.RowCount != tc.rows || p.Position.Truncated != tc.truncated {
+				t.Errorf("%s cap %d: RowCount = %d, Truncated = %v, want %d, %v", stmt, tc.limit, p.RowCount, p.Position.Truncated, tc.rows, tc.truncated)
+			}
+		}
+	}
+}
+
 // P26 §3.6(1): Redis is the only adapter whose read-only enforcement is per-command, resolved
 // against the server's own COMMAND table (client.go's isReadOnlyCommand, console.go:132) — a
 // genuinely non-obvious mechanism with no container-backed test at all before this (console_test.go
