@@ -128,3 +128,119 @@ fix, "verified" (scratch probe or run) or "code-read".
 - TanStack Query rule: `customScripts`/`dbmcp`/`datagripImport`/`objectStore` are push-updated or
   command-shaped (no cached fetch with loading/error state to own); `schemas` and `maskRules`
   already use `queryClient`. No migration finding.
+
+## Block 2: shell, workbench, settings, shortcuts, theme
+
+### F5 (medium): DataGrip scan failure is silent
+
+- `state/datagripImport.ts:321-338`, `App.vue:78-81`, `workbench/panels/StudioStart.vue:80-89`,
+  `project/DataGripImportDialog.vue:174`.
+- `scanDataGripProject` sets `state.error` on a rejected `datagripScan` and returns `false`, but
+  `state.open` flips only on success. The only render of `error` is the Alert inside the dialog,
+  which is `v-if="datagripImportStore.open"` (`App.vue:111`). A rejected `filesChooseFolder` is a
+  floating rejection (`void` at both call sites).
+- Scenario: menu Import from DataGrip, pick a folder that is not a DataGrip project (no
+  `.idea/dataSources.xml`) or is unreadable. Go rejects the scan; nothing appears. The user cannot
+  tell a failed scan from a cancelled picker. `datagrip-import.spec.ts` has no failed-scan case.
+- Fix: open the dialog on scan failure too (`state.open = true`, `preview = null`) and let it render
+  the Alert plus a "Choose another folder" action when `preview` is null; catch the picker
+  rejection into `state.error` the same way. Guard re-entry with `busy` (StudioStart's button has
+  no busy state, so a double click opens two pickers). Add the failed-scan case to
+  `datagrip-import.spec.ts`.
+- Code-read.
+
+### F6 (medium): Settings numeric fields turn an empty field into `0` and accept fractions
+
+- `workbench/settings/ApiPane.vue:26-31,38-40,45-73`, `CachePane.vue:21-33`,
+  `AdvancedPane.vue:18-44`.
+- Every handler writes `Number(input.value)`. A cleared `type="number"` input (or one holding text
+  the browser rejects) has `value === ''`, and `Number('') === 0`, not `NaN`, so the
+  `Number.isFinite` guard never fires. For `requestTimeoutMs` (0 = no timeout), `maxResponseMb`
+  (0 = unlimited) and `maxRedirects`, 0 is in range: Save succeeds and silently writes a different
+  setting. For `l2BudgetMb`/`opLogRetentionDays`/`expensiveQueryRows` the user sees a range error
+  ("8–1024 MB") instead of "Enter a number".
+- Fractions: `1.5` passes every renderer check; Go decodes the leaf into `*int`
+  (`SI/storage/model/settings.go:109-123`), so Save fails with a raw JSON decode message in the
+  footer instead of a field error.
+- Scenario: user selects the Max response size text to retype it, clicks Save before typing (or
+  types a letter WebKit drops): the 5 MB cap P160 added to stop viewer freezes becomes unlimited.
+- Fix: one own helper (e.g. `settings/types.ts` `parseIntField(raw): number` returning `NaN` for
+  `''` or a non-integer) used by the six handlers; validators check `Number.isInteger(v)` with
+  "Enter a whole number." Extend `settings-apply-on-save.spec.ts` with the cleared-field case.
+- Verified by language semantics (`Number('') === 0`); UI not run.
+
+### F7 (low): Settings footer names the wrong database file
+
+- `workbench/SettingsDialog.vue:115` prints `~/.kira-studio/kira.sqlite`. Go stores `kira.db`
+  (`SI/config/paths.go:16-24`, which says a `kira.sqlite` mention "is the doc drifting") and
+  honours `KIRA_HOME`.
+- Fix: change the literal to `kira.db`; better, show `config.DbPath()` from an existing control
+  call if one exposes it (none found; a new bridge field would be Part 5/6, so keep the literal).
+  Re-check `ST/visual/settings.spec.ts` snapshots for the footer text; a snapshot change cannot be
+  regenerated in this sandbox (`docs/DEV_ENVIRONMENT.md` font drift): route the baseline update.
+- Also stale: `state/settingsDomain.ts:138` "an older kira.sqlite".
+- Code-read.
+
+### F8 (low): Operations panel "Reveal originating tab" does nothing from another mode
+
+- `workbench/panels/OperationsPanel.vue` `revealTab` (`activateTab` only). The dock shows every
+  mode's ops; `activateTab` sets the tab active in its own workspace but never switches
+  `modeStore.active`.
+- Scenario: in Api mode, the op log lists a Studio data-tab query; Reveal activates it inside the
+  hidden Studio workspace. Nothing visible changes.
+- Fix: `modeStore.setMode(workspaceKeyOf(tab))` before `activateTab` (both already exported from
+  `state/mode.ts`). Same check for the terminal workspace.
+- Code-read.
+
+### F9 (low): instant-action settings report no failure
+
+- `workbench/settings/DatabaseMcpPane.vue` (`onToggleDbMcpEnabled`, `onRegenerateDbMcpToken`,
+  `onInstallDbMcpClaudeCode`, `onToggleConnectionMcpEnabled`), `ClaudeCodePane.vue`
+  (`onToggleKeepAwakeAgentAware`). `useBusyAction` (`PW/util/useBusyAction.ts`) has no catch; the
+  template calls drop the promise.
+- Scenario: `dbMcpSetEnabled` rejects (port in use, DB busy). The checkbox snaps back to the store
+  value; the only trace is an unhandled rejection in the webview console. Same for the per-connection
+  MCP checkbox and the keep-awake leaf.
+- Fix: catch in each pane into a local `actionError` ref rendered with `FieldError` (the pane
+  already has the slot pattern), cleared on the next attempt.
+- Code-read.
+
+### F10 (low): native controls where a shadcn-vue primitive exists
+
+- `workbench/GenerateDataDialog.vue:333` and `project/FiltersDialog.vue:180-181,210-211`: link-style
+  `<button>`s restyled by hand; `Button variant="link"` exists (`PT/components/ui/button`).
+- `project/ConnectionDialog.vue:684`: hand-built radio cards over a hidden `<input type="radio">`;
+  `PT/components/ui/radio-group` exists (reka `RadioGroupItem` supports `as-child` cards).
+- Kept as fine: `StudioStart.vue:104` recent-table rows, `ErrorPopover.vue:76` trigger,
+  `FiltersDialog.vue:232` tree twisty (list-row semantics, no primitive fits).
+- Fix: swap the four link buttons to `Button variant="link" size="..."`; the radio cards to
+  `RadioGroup`, keeping `data-testid="connection-kind-<kind>"` on the item.
+- Code-read.
+
+### F11 (low): comments that now state wrong facts
+
+- `fonts.ts:64` "CodeMirror editor" (Monaco since P60b).
+- `theme/icons.ts:44-48`: cites `engine/adapters/*/read.ts` and `packages/db-fixtures/*.spec.ts`,
+  both deleted (Go adapters' `typeClassFor` and `SI/adapters/*/*_test.go` now).
+  `theme/icons.ts:196` "CodeMirror's own VS Code Dark Modern syntax colours".
+- `state/schemaColumns.ts:177-178` "lang-sql's schemaCompletionSource" (lang-sql removed).
+- Fix: reword each to the current fact.
+- Code-read.
+
+### Block 2: checked, nothing to report
+
+- `mountShell` retry (`PW/bootstrapShell.ts`): every `init*`/`hydrate*` is idempotent
+  (unsubscribe-then-resubscribe or an `if (unsubscribe) return` guard); `hydrateOps` buffers
+  before its snapshot (P108 F7). No hydrate in the `Promise.all` needs another's result except a
+  corrupt-row reset reading `defaultPageSize` before settings land (falls back to 100; harmless).
+- `__KIRA_DEBUG_HOOKS__`: every `window.__kira*` assignment sits inside the gate (`main.ts:247-292`).
+- `App.vue` subscriptions released in `onUnmounted`; `closeActiveTab` on a pinned kind is guarded in
+  `closeTabInternal`; no Studio kind is pinned.
+- `TAB_VIEWS`/`TAB_KINDS`/`MODES` total over their unions (typed records).
+- `StatusBar.vue`: no dead store reads after P164.
+- `DbMcpApprovalDialog.vue`: the header X fires `denyQuery` twice (button click plus
+  `DialogClose` -> `update:open`); Go `Deny` on a resolved id is a no-op
+  (`SI/dbmcp/approval.go:181-193`). Harmless, not reported.
+- `EngineIcon.vue` covers all 10 `ConnectionKind`s; `shortcuts/state.ts` commands all reachable.
+- One `<script setup lang="ts">` per own `.vue` file (grep); no `<TooltipTrigger>` wraps a
+  disabled control without `TooltipDisabledTrigger`.
