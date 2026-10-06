@@ -58,6 +58,10 @@ type ReviewFileDiffResult struct {
 	ReviewedRanges []gitreview.LineRange  `json:"reviewedRanges"`
 	LineCount      int                    `json:"lineCount"`
 	ReviewedAtSHA  *string                `json:"reviewedAtSha"`
+
+	// RawPatchBytes is the raw patch size behind Body, never marshaled: gitrpc reports it in a
+	// tooLarge body, as commit.fileDiff does, instead of the encoded JSON size.
+	RawPatchBytes int64 `json:"-"`
 }
 
 // reviewFileStatus folds a stored record (or its absence) into the wire's ReviewFileStatus — a
@@ -345,6 +349,7 @@ type deltaResult struct {
 	Body             porcelain.FileDiffBody
 	CurrentOID       string
 	CurrentLineCount int
+	RawBytes         int64 // raw patch size behind Body; 0 when no diff ran
 }
 
 // parseAndResolve is FileDiff's own marshal-once shape, reused: MaxPatchBytes first (never handed
@@ -433,7 +438,7 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 		}
 		return deltaResult{
 			Source: "fast", Hunks: parsed.Hunks, Body: body, CurrentOID: currentOID,
-			CurrentLineCount: currentLineCount,
+			CurrentLineCount: currentLineCount, RawBytes: int64(len(raw)),
 		}, nil
 	}
 
@@ -486,7 +491,7 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 	}
 	return deltaResult{
 		Source: "slow", Hunks: parsed.Hunks, Body: body, CurrentOID: currentOID,
-		CurrentLineCount: countLines(currentContent),
+		CurrentLineCount: countLines(currentContent), RawBytes: int64(len(res.Stdout)),
 	}, nil
 }
 
@@ -502,20 +507,20 @@ func recordRanges(rec gitreview.FileRecord) []gitreview.LineRange {
 // rangeFileDiffBody is the <mergeBase>..<branchTip> patch for one file — D13's "mode: range" body,
 // through the EXISTING RepoEntry.diff cache (keyed (mergeBase, tip, path), F2): two tree oids and
 // a path determine a patch forever, so this is the same cache commit.fileDiff already warms.
-func (e *RepoEntry) rangeFileDiffBody(ctx context.Context, mergeBase, tip, path string) (porcelain.FileDiffBody, error) {
-	if body, _, ok := e.diff.get(mergeBase, tip, path); ok {
-		return body, nil
+func (e *RepoEntry) rangeFileDiffBody(ctx context.Context, mergeBase, tip, path string) (porcelain.FileDiffBody, int64, error) {
+	if body, rawBytes, ok := e.diff.get(mergeBase, tip, path); ok {
+		return body, rawBytes, nil
 	}
 	raw, err := e.runOne(ctx, porcelain.FileDiffArgs(&mergeBase, tip, path, nil))
 	if err != nil {
-		return porcelain.FileDiffBody{}, err
+		return porcelain.FileDiffBody{}, 0, err
 	}
 	_, body, err := e.parseAndResolve(ctx, raw)
 	if err != nil {
-		return porcelain.FileDiffBody{}, err
+		return porcelain.FileDiffBody{}, 0, err
 	}
 	e.diff.set(mergeBase, tip, path, body, int64(len(raw)))
-	return body, nil
+	return body, int64(len(raw)), nil
 }
 
 // RangeFiles is review.files' own orchestration (D6): the range's file list — the exact pair
@@ -666,7 +671,7 @@ func (e *RepoEntry) ReviewFileDiff(ctx context.Context, base, branch, path, mode
 	if !found {
 		// noSnapshot: "what changed since you last reviewed" when you never reviewed it IS the
 		// whole range diff — returning an empty body here would be a lie dressed as a degradation.
-		rangeBody, err := e.rangeFileDiffBody(ctx, mb, tip, path)
+		rangeBody, rangeBytes, err := e.rangeFileDiffBody(ctx, mb, tip, path)
 		if err != nil {
 			return ReviewFileDiffResult{}, err
 		}
@@ -677,6 +682,7 @@ func (e *RepoEntry) ReviewFileDiff(ctx context.Context, base, branch, path, mode
 		return ReviewFileDiffResult{
 			Path: path, DeltaSource: "noSnapshot", Body: rangeBody,
 			ReviewedRanges: []gitreview.LineRange{}, LineCount: lineCount, ReviewedAtSHA: nil,
+			RawPatchBytes: rangeBytes,
 		}, nil
 	}
 
@@ -686,19 +692,20 @@ func (e *RepoEntry) ReviewFileDiff(ctx context.Context, base, branch, path, mode
 	}
 	reviewedRanges := nonNil(gitreview.ProjectRanges(recordRanges(rec), delta.Hunks, delta.CurrentLineCount))
 
-	body := delta.Body
+	body, rawBytes := delta.Body, delta.RawBytes
 	if mode == "range" {
-		rangeBody, err := e.rangeFileDiffBody(ctx, mb, tip, path)
+		rangeBody, rangeBytes, err := e.rangeFileDiffBody(ctx, mb, tip, path)
 		if err != nil {
 			return ReviewFileDiffResult{}, err
 		}
-		body = rangeBody
+		body, rawBytes = rangeBody, rangeBytes
 	}
 
 	sha := rec.ReviewedAtSHA
 	return ReviewFileDiffResult{
 		Path: path, DeltaSource: delta.Source, Body: body,
 		ReviewedRanges: reviewedRanges, LineCount: delta.CurrentLineCount, ReviewedAtSHA: &sha,
+		RawPatchBytes: rawBytes,
 	}, nil
 }
 

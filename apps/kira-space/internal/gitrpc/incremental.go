@@ -81,7 +81,7 @@ func (r *Router) handleReviewFileDiff(ctx context.Context, c *gitsession.Conn, p
 				return nil, ipcerr.Internal(merr.Error())
 			}
 			if len(raw) > MaxResultBytes {
-				result.Body = porcelain.FileDiffBody{Kind: porcelain.BodyTooLarge, Bytes: int64(len(raw)), LimitBytes: MaxResultBytes}
+				result.Body = porcelain.FileDiffBody{Kind: porcelain.BodyTooLarge, Bytes: result.RawPatchBytes, LimitBytes: MaxResultBytes}
 				raw, merr = json.Marshal(result)
 				if merr != nil {
 					return nil, ipcerr.Internal(merr.Error())
@@ -135,19 +135,22 @@ func (r *Router) handleReviewSnapshot(ctx context.Context, c *gitsession.Conn, p
 			}
 			return p.RepoID, nil
 		},
-		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewSnapshotParams) (ReviewSnapshotResult, error) {
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewSnapshotParams) (json.RawMessage, error) {
 			res, err := entry.ReviewSnapshot(ctx, p.Branch, p.Path)
 			if err != nil {
-				return ReviewSnapshotResult{}, mapDetailError(err)
+				return nil, mapDetailError(err)
 			}
 			raw, merr := json.Marshal(res)
 			if merr != nil {
-				return ReviewSnapshotResult{}, ipcerr.Internal(merr.Error())
+				return nil, ipcerr.Internal(merr.Error())
 			}
 			if len(raw) > MaxResultBytes {
-				return ReviewSnapshotResult{Kind: "tooLarge", ReviewedAtSHA: res.ReviewedAtSHA}, nil
+				raw, merr = json.Marshal(ReviewSnapshotResult{Kind: "tooLarge", ReviewedAtSHA: res.ReviewedAtSHA})
+				if merr != nil {
+					return nil, ipcerr.Internal(merr.Error())
+				}
 			}
-			return res, nil
+			return json.RawMessage(raw), nil
 		},
 	)
 }
