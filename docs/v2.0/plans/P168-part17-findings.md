@@ -4,7 +4,7 @@ Plan: `P168-part17-git-rpc.md`. Base `30ec62f` (plan survey), HEAD reviewed `0bc
 (`p168-stream-b`). One Opus reviewer, report only. Paths repo-relative; `GR`/`GK`/`GV`/`IPC` as in
 the plan.
 
-Block status: 1, 2, 3, 4 done.
+Block status: 1-5 done.
 
 ## Block 1: error mapping
 
@@ -220,3 +220,60 @@ Block status: 1, 2, 3, 4 done.
 - `Close` versus mid-handshake conns (G32 r3 #1), `trackConn` after close (F4(a)), broker
   `Shutdown` racing `Request` (F4(b)), disconnect watcher (F12): each holds on a read of the code
   and its cited test.
+
+## Block 5: TS transport
+
+### F8 (medium) One open stream per method per transport: the Space review panel and graph tab cancel each other's `graph.stream`
+
+- `packages/git-ipc/src/rpc.ts:300-311` (`stream`: any prior open stream of the same method is
+  finished, sent `cancel`, and **resolved**, not rejected), `:183,337` (`openStreamIdByMethod`
+  keyed by method only). Guarded as intended behaviour by `rpc.test.ts:370`.
+- Space shares one `createRpcClient` per repo workspace (`repo/git/transport.ts:46-51`,
+  `gitTransportFor`), used by both `views/repo/RepoGraphView.vue:68` (git-ui `GraphViewState`,
+  plain `graph.stream`) and `repo/RepoReviewView.vue:38` (git-ui `ReviewSessionState.#open`,
+  ranged `graph.stream`, `review.ts:372-391`). GitPanel keeps the review view mounted once
+  activated (`GitPanel.vue:589-598`, `v-show`), so both coexist.
+- Scenario: graph tab open on a large repo, first stream in progress (one 5,000-row page in 500-row
+  chunks at credit 2). User opens the Review tab for a branch. `ReviewSessionState` opens a ranged
+  `graph.stream`; the client cancels the graph's stream and resolves its promise.
+  `GraphViewState.openStream`'s `finally` sets `loading` to `idle` with a partial row set and no
+  error (`graphView.ts:179-184`). The reverse also happens: a graph `loadMore` (which re-opens
+  `graph.stream`, `graphView.ts:186-196`) or a `repo.changed` re-stream silently truncates a review
+  list mid-load. Both callers already abort their own previous stream via `AbortController`, so
+  the per-method rule only ever bites the other caller. The Go side keeps the two walks in separate
+  slots (`gitsession/conn.go:404-407`), so the server is fine; only the client cross-cancels.
+- Fix: drop the per-method supersede from `createRpcClient` (callers own supersession through
+  `signal`), or key it by caller-supplied identity (`method` + `repoId` + `range`). Update
+  `rpc.test.ts:370` to the new rule and add a case for two concurrent `graph.stream`s on one
+  client completing independently.
+
+### F9 (low) `socketChannel` re-copies the receive buffer on every chunk of a large frame
+
+- `packages/git-ipc/src/socketChannel.ts:190-196`: `Buffer.concat([recvBuffer, chunk])` per
+  `'data'` event, so a frame of N bytes in k chunks costs O(N*k/2) copying.
+- Probe (throwaway bun test over a fake socket, deleted): one 6 MiB JSON frame delivered whole:
+  11.4 ms; in 64 KiB chunks: 72.4 ms; in 16 KiB chunks: 173.5 ms (JSON.parse included in all).
+  The extension host pays this on every large `commit.fileDiff`/`file.read` result (up to
+  `MaxResultBytes` 6 MiB).
+- Fix: once the header is known, preallocate `Buffer.allocUnsafe(declaredLength)` and copy chunks
+  into it at an offset (or keep a chunk list and concat once when the frame completes).
+
+### Block 5 candidate fates and notes
+
+- §9 #9: concat half reported as F9. Back-pressure half dropped: client to server frames are
+  requests, credits and cancels (bytes each); `socket.write` buffering them cannot grow.
+- §9 #10 dropped: `streamChannel`'s peer is this process's own Go stream, capped at 8 MiB per frame
+  by `rpcstream` (`bridge/gitstream.go:30,224`); Wails delivers whole messages.
+- §9 #16 dropped: a throw inside a channel handler (incl. `ContractVersionMismatchError`) is
+  caught and destroys the connection in `socketChannel` (`deliverFrame`, `:117-128`) and
+  `streamChannel` (`:113-126`), rejecting every pending request via the owner's `onClose`. The
+  webview pair (`vscode/src/transport.ts`, `webview/main.ts:94-98`) has no catch, but both halves
+  ship in one VSIX and share one `CONTRACT_VERSION`, and the socket half is gated by the
+  handshake's contract check (`handshake.go:103-108`).
+- §9 #17 reported as F8.
+- Blob frames: `substituteBlobRoot` rejects zero and multiple `$blob` markers; header length past
+  the end throws (`blobFrame.ts:52-89`). Non-blob frames are never substituted, so a user string
+  cannot become a marker. `codec.ts` base64 marker `$buf:'b64'` could only collide with a record
+  keyed by user data whose value is the string `'b64'`; no such contract shape exists.
+- F2/F3 comments in `rpc.ts` (chunk queue never rejects), `streamChannel.ts` (decode and delivery
+  share one try), `socketChannel.ts` (delivery errors destroy, pending queue capped at 64) hold.
