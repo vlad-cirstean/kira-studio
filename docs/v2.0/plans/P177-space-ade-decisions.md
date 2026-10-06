@@ -281,7 +281,8 @@ Not touched: `SPEC.md` (orchestrator owns row status), `AdeBacklogRow.vue`, `Ade
 
 - P173 (Space git contract: `gitsock`, `gitrpc`, `packages/git-ui`, `apps/kira-space-vscode`):
   no overlap with the files above. P177 touches no git package. Only possible collision: a new
-  Kira Space migration from P173. If so, the later lander renumbers its file (see Indexes).
+  Kira Space migration from P173 (`migrations/embed.go` would then overlap too). If so, the later
+  lander renumbers its file and `embed.go` entry (see Indexes).
 - P176 (Studio frontend, `apps/kira-studio/frontend/**`): no overlap. P177 touches no Studio file
   and no `packages/workbench` file (it only imports `useConfirmDialogStore`). If P176 changes the
   workbench `ConfirmDialog` testids or store signature, the backlog spec breaks; flag at rebase.
