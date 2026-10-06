@@ -127,6 +127,11 @@ var classifyOpErrorRules = []classifyRule{
 		// uncommitted work in the way", and the client already renders one remedy story for it.
 		return strings.Contains(lower, "contains modified or untracked files")
 	}},
+	{kind: "DirtyWorktree", match: func(lower string) bool {
+		// `reset --keep` onto a commit touching a file edited since: "error: Entry '<f>' not
+		// uptodate. Cannot merge." — the hard-reset undo's replay, refused to protect those edits.
+		return strings.Contains(lower, "not uptodate. cannot merge")
+	}},
 	{kind: "WorktreeLocked", match: func(lower string) bool {
 		// G25 D15/probe M5: `worktree remove` on a locked worktree — "fatal: cannot remove a locked
 		// working tree, lock reason: <reason>". A dedicated kind, not folded into LockHeld (which

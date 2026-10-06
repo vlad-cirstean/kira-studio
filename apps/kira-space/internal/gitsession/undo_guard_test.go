@@ -86,6 +86,9 @@ func TestUndoRun_HardResetUndoKeepsEditsMadeSince(t *testing.T) {
 	if undo.OK {
 		t.Fatal("hard-reset undo overwrote local edits")
 	}
+	if undo.Error == nil || undo.Error.Kind != "DirtyWorktree" {
+		t.Fatalf("undo.Error = %+v, want Kind DirtyWorktree", undo.Error)
+	}
 	if got, _ := os.ReadFile(filepath.Join(dir, "f.txt")); !bytes.Equal(got, edit) {
 		t.Fatalf("f.txt = %q, want edits kept", got)
 	}
