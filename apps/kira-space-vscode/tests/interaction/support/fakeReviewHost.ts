@@ -27,6 +27,8 @@ export interface FakeReviewHostWindow {
   __resolveRepoList?: (activeRepoId: string | null) => void;
   __emitReviewTarget: (repoId: string, branch: string) => void;
   __refsListCalls: ReadonlyArray<{ repoId: string }>;
+  /** `review.mark` request params, in arrival order (recorded, never answered). */
+  __reviewMarkCalls: ReadonlyArray<{ path: string }>;
 }
 
 export const FAKE_REPO_ID = '/fake/repo';
@@ -354,6 +356,7 @@ export function buildFakeHostInitScript(options?: {
       // workspace's own default repo" (review.branch.value alone can't: this fixture's own
       // resolveBase response ignores which branch was actually asked for).
       window.__refsListCalls = [];
+      window.__reviewMarkCalls = [];
 
       window.acquireVsCodeApi = () => ({
         postMessage(message) {
@@ -414,6 +417,11 @@ export function buildFakeHostInitScript(options?: {
           if (body.t === 'req' && body.method === 'refs.list') {
             window.__refsListCalls.push(body.params);
             dispatch(withId(FIXTURES.refsListEmpty, body.id));
+            return;
+          }
+          if (body.t === 'req' && body.method === 'review.mark') {
+            // Recorded only: the answer is irrelevant to the keyboard case that reads it.
+            window.__reviewMarkCalls.push(body.params);
             return;
           }
           if (body.t === 'req' && body.method === 'review.session.load') {

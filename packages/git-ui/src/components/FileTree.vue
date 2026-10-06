@@ -295,6 +295,14 @@ function onRowClick(index: number): void {
   selectRow(index);
 }
 
+/** Space selects the row only when the row itself has focus: from the review checkbox (or any
+ *  inner control) it must reach the control, or `preventDefault` cancels the activation. */
+function onRowSpace(event: KeyboardEvent, index: number): void {
+  if (event.target !== event.currentTarget) return;
+  event.preventDefault();
+  onRowClick(index);
+}
+
 /** G21 D13: the explicit "keep this" gesture — pins a real, permanent tab. Deliberately relies on
  *  the browser firing `click` first (`selectRow` above, via `onRowClick`): a double click opens
  *  the preview and then immediately re-opens the same diff pinned, and VS Code converts the
@@ -583,7 +591,7 @@ const parentSelectId = useId();
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
-        @keydown.space.prevent="onRowClick(index)"
+        @keydown.space="onRowSpace($event, index)"
       >
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
@@ -711,7 +719,7 @@ const parentSelectId = useId();
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
-        @keydown.space.prevent="onRowClick(index)"
+        @keydown.space="onRowSpace($event, index)"
       >
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file

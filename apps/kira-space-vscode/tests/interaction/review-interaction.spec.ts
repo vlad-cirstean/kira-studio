@@ -8,6 +8,7 @@ import {
   FAKE_REVIEW_FILE_NONE,
   FAKE_REVIEW_FILE_PARTIAL,
   FAKE_SHA,
+  type FakeReviewHostWindow,
 } from './support/fakeReviewHost.ts';
 import { type InteractionServer, startInteractionServer } from './support/server.ts';
 
@@ -139,6 +140,28 @@ test.describe('review sidebar interaction', () => {
 
     await expect(fullBox).toBeChecked();
     await expect(fullBox).toHaveAttribute('aria-checked', 'true');
+  });
+
+  // Space on a focused checkbox must reach the checkbox: the row's own Space handler used to
+  // `preventDefault` it, so keyboard users could not mark a file reviewed at all.
+  test('Space on the focused reviewed checkbox marks the file', async ({ page }) => {
+    await bootReview(page);
+
+    await page.locator('.kv-review-toolbar [aria-label^="Files"]').click();
+    const noneRow = page.locator('.kv-review-files-tree .kv-file-tree-row', {
+      hasText: FAKE_REVIEW_FILE_NONE.split('/').pop(),
+    });
+    const box = noneRow.locator('[role="checkbox"]');
+    await box.focus();
+    await page.keyboard.press('Space');
+
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (window as unknown as FakeReviewHostWindow).__reviewMarkCalls.map((call) => call.path),
+        ),
+      )
+      .toEqual([FAKE_REVIEW_FILE_NONE]);
   });
 
   // D11a (item 11): the corrected, single-step "back to branch selection" — reach the listing
