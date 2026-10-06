@@ -281,13 +281,21 @@ export function useValidateWorkflowYaml() {
   });
 }
 
+/** Saves run one at a time, in call order: a debounce, a blur and an unmount can overlap, and an
+ *  older text landing last would be pushed back into the editor. */
+const workflowSaveScope = { id: 'ade-workflow-save' } as const;
+
 export function useSaveWorkflow() {
-  return useMutation({ mutationFn: (args: SaveWorkflowArgs) => control.adeTaskSaveWorkflow(args) });
+  return useMutation({
+    mutationFn: (args: SaveWorkflowArgs) => control.adeTaskSaveWorkflow(args),
+    scope: workflowSaveScope,
+  });
 }
 
 export function useSaveWorkflowYaml() {
   return useMutation({
     mutationFn: (args: SaveWorkflowYamlArgs) => control.adeTaskSaveWorkflowYaml(args),
+    scope: workflowSaveScope,
   });
 }
 

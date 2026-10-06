@@ -25,13 +25,13 @@ export const useAdeTerminalsStore = defineStore('adeTerminals', () => {
           .filter((s) => s.state === 'running')
           .map((s) => s.terminalId),
       ),
-      ids: [...tracked],
+      // Read here so a local exit after the sessions push re-runs the reap.
+      ids: [...tracked].map((id) => ({ id, local: terminalsStore.terminalSession(id)?.status })),
     }),
     ({ running, ids }) => {
-      for (const id of ids) {
+      for (const { id, local } of ids) {
         if (running.has(id)) continue;
-        const local = terminalsStore.terminalSession(id);
-        if (local && local.status !== 'exited' && local.status !== 'failed') continue;
+        if (local && local !== 'exited' && local !== 'failed') continue;
         terminalsStore.closeTerminalSession(id);
         cleanupTabRuntime(id);
         tracked.delete(id);
