@@ -21,3 +21,18 @@ Stream A did not edit those files.
   - mongo tree "collection (+ indexes)" vs a leaf collection (indexes moved to the definition view, P19 D5).
   - kafka `exactCount`: Go now reports `ExactCount: false` (P168 Part 4 F13 fix: offset span over-counts compacted and transactional topics).
 - Suggested fix: update the table to the Go values, or replace it with a pointer to the `caps.go` files.
+
+## P168 Part 5 F4 (low): renderer half of Part 4 F12 (stream null body)
+
+- Owner file: `apps/kira-studio/frontend/src/views/stream/page.ts` (Part 12, Stream C).
+- Source: `P168-part5-findings.md` F4. Part 5 makes `page.StreamRow.Body` a `*string`; kafka then
+  writes the per-row null bit in `bodies` for a tombstone (no `wire.fbs` change; `frame.ts`
+  decodes the bit as-is).
+- Issue: `streamRow` (`page.ts:40`) reads `body: cached('body', page.bodies)` and never checks
+  `isNull(page.bodies, row)`, so a null body still renders as `''`, same as an empty value.
+- Fix: `StreamRow.body: string | null`; `body: isNull(page.bodies, row) ? null : cached('body',
+  page.bodies)` (same shape as `key`/`timestamp` above it). Show a null marker (the grid's NULL
+  styling) in the stream row and detail views that read `body`. Safe to land after Part 5's Go
+  half; before it, no row has the bit set.
+- Binary payloads: held as Part 5 F4's `design-decision` (encoding flag vs marker); no renderer
+  change until that decision lands.

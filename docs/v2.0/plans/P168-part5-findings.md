@@ -118,6 +118,28 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
   `pageSizeEstimate(p.Size()) > maxResponsePayloadBytes` (share one helper with
   `oversizedPagePayload`).
 
+### F7 (low) Wire zod schemas in `SP/data-ops.ts` and `SP/page.ts` are dead and already drifted
+
+- `packages/shared/protocol/data-ops.ts:38-42,64-74,86-93,104-108,129-133,147-153,167-173,
+  187-193` (`pageCursorSchema` and the seven `*RequestWireSchema`); `packages/shared/protocol/
+  page.ts:7-15,31-38,72-79,575-618` (`typeClassSchema`, `columnDescriptorSchema`,
+  `pagePositionSchema`, the four `*PageEnvelopeSchema`, `pageEnvelopeSchema`).
+- `git grep` outside the defining file finds no runtime caller of any of them (only docs and one
+  comment in `views/grid/fkPreview.ts:63`). `data.ts` sends requests unvalidated; Go `Validate`
+  (`adapterhost/wire.go`) is the only gate. `cacheStatsSchema` is used only as a `z.infer` type
+  source.
+- Drift already present: filter cap counts UTF-16 units in zod (`max(4096)`) and runes in Go
+  (`wire.go:19`), against the Part 2 `model.UTF16Len` rule; zod accepts `opId: ""`, Go rejects
+  it. `page.ts:58-64` and `fkPreview.ts:63` describe "this validated wire schema" and an
+  `E_BAD_REQUEST` that Go never sends: Go validation errors leave with no code at all
+  (`dataframe.go:137-139` plus `respondError` taking a plain `fmt` error).
+- Scenario: a maintainer tightens `readRequestWireSchema` believing it guards the wire; nothing
+  changes. A renderer bug sending a 4,100-char astral filter passes Go's rune count. Code read.
+- Fix: delete the unused schemas (keep the TS interfaces; derive `CacheStats` as a plain
+  interface); correct the `page.ts` and `fkPreview.ts` comments (`fkPreview.ts` is Stream C:
+  comment-only, route with F4's note or leave). In Go: count the filter with `model.UTF16Len`, and
+  wrap `decodeAndValidate` failures in `adapters.New(adapters.CodeQuery, ...)` so they carry a code.
+
 ## Suspects (plan §9)
 
 1. Concurrent `Router.Connect` on one id: dropped. `Router.Connect`'s only caller is
@@ -127,7 +149,10 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
 2. `CancelOp` ctx: confirmed as F1. Forwarding to the newer adapter is harmless: engines pop by
    opId from their own tracker (unknown id is a no-op); mongo matches `command.comment == opId`,
    a UUID, so no collision.
-4. Validation errors carry no code: open until block 5 (renderer handling).
+4. Validation errors carry no code: confirmed, folded into F7. Impact is cosmetic: the renderer
+   treats a missing code as a generic error (`views/shared/viewOp.ts:21` gates only
+   `E_ENGINE_DOWN`/`E_CONNECT`).
+5. Filter rune vs UTF-16 count: confirmed, folded into F7 (the zod side is dead code).
 6. Oversized page cached: confirmed as F6 (only above a 130 MB budget; default 64 MB refuses any
    page over 32 MB).
 7. Projection order on a sorted L2 key: dropped. Every SQL adapter's `ResolveProjection`
@@ -135,6 +160,8 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
    order; the grid maps by name (`views/shared/page/columns.ts` `resolveColumnOrder`).
 8. `generationTracker` growth: dropped. One small map entry per distinct path ever invalidated by a
    user action; bounded by objects touched in one app run. Not worth pruning logic.
+9. `port.ts` recovery and `nextId`: dropped (block 5 coverage). The real stranding path is
+   F5, where Go stops answering without closing the conn.
 10. `enqueueResponse` frame size: confirmed as F5 (error frames only; responses are pre-checked).
 12. Encode panics: dropped. `encodeSource`/`EncodePage`/`encodeTypeClass`/`encodeStrategy`/
     `encodeRedisType` panics are reached only from `encodeResponse` inside `HandleDataFrame`'s
@@ -169,3 +196,22 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
   and invalidation matches on connection/path meta for all filter variants. Stats timer firing after
   `detach` enqueues into a dead session's buffered channel: harmless. `Update` keeps LRU position
   (intended). Generation guard holds for every drop path.
+- Block 5 (TS wire half and bridge): done. `SP/{frame,page,data-ops,port,wire}.ts`,
+  `SD/{connection,tree,mutations,object-store}.ts`, `SF/bridge/{port,data,index,control}.ts` read
+  in full; `apiControl.ts` read for `trust` uses. Field-by-field mirror against `wire.fbs` and
+  `page/encode.go`: optional scalars (`ttl_ms`, `memory_bytes`, `visibility_timeout_seconds`,
+  `offset`) written only when non-nil and decoded as null when absent; tokens absent means null;
+  `Strategy`/`RedisType` (incl. `object`)/`Source`/`TypeClass` enums map 1:1 both ways; `generated`
+  and `is_primary_key` both carried. No field present on one side only (except Go-only
+  `FieldsAreColumns`, by design). F12 claims confirmed: `frame.ts` passes the `nulls` buffer through
+  untouched; `views/stream/page.ts:40` ignores it and shows `''`. Renderer half appended to
+  `P168-routed-from-streamA.md`. `assertPageStructure` runs only on `read`/`execute` (events and
+  cache stats carry no chunks); it does not check offset monotonicity, but frames come only from
+  this process and out-of-range offsets clamp in `subarray` (no crash). `port.ts`: requests before
+  open wait on `ready`; `onclose` rejects every pending entry and sets `closed` before
+  `rejectAllPending`, so no entry leaks; a timed-out control request leaves its server work
+  running (only `ping`/`cache:*`/`invalidate` carry timeouts: cheap). No reconnect after `onclose`
+  is by design (Wails supersedes per page load). `nextId` past int32 needs 2^31 requests:
+  theoretical. Every array-typed `trust` in `index.ts`/`apiControl.ts` has `?? []`. `control.ts`
+  shim still imported by 47 files: not dead. `SD` path codec mirrors `model.EncodePath`/
+  `DecodePath`.
