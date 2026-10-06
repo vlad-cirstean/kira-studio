@@ -12,9 +12,14 @@ import (
 // than RE2's native \s ([\t\n\f\r ]).
 const jsWhitespaceClassMembers = `\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}`
 
+// jsNonWhitespaceClassMembers is the complement of jsWhitespaceClassMembers over U+0000-U+10FFFF,
+// for a `\S` inside an already-open class where a negated bracket cannot be nested.
+const jsNonWhitespaceClassMembers = `\x{0}-\x{8}\x{e}-\x{1f}\x{21}-\x{9f}\x{a1}-\x{167f}\x{1681}-\x{1fff}` +
+	`\x{200b}-\x{2027}\x{202a}-\x{202e}\x{2030}-\x{205e}\x{2060}-\x{2fff}\x{3001}-\x{fefe}\x{ff00}-\x{10ffff}`
+
 // passthroughEscapeChars are backslash+X pairs that mean the same thing in a non-`u`-flag JS
 // RegExp and in RE2, so translate copies them through unchanged rather than rewriting them.
-const passthroughEscapeChars = `dDwWbBnrtfv\.*+?()[]{}|^$/-`
+const passthroughEscapeChars = `dDwWnrtfv\.*+?()[]{}|^$/-`
 
 // translate is D4's single left-to-right JS -> RE2 source rewrite. It rejects (ErrUnsupported
 // Pattern) the two constructs RE2 cannot express at all — lookaround and a backreference — before
@@ -76,15 +81,28 @@ func translateEscape(out *strings.Builder, pattern string, i int, inClass bool) 
 		return i + 2, nil
 	case next == 'S':
 		if inClass {
-			// Documented gap (§10.3/doc.go): negating a sub-portion of an already-open
-			// class is not expressible by insertion the way \s's own member list is, so
-			// this falls back to RE2's native (ASCII-only) \S rather than a true negation
-			// of jsWhitespaceClassMembers. `[\S]` in a user's own pattern is rare; the
-			// out-of-class form immediately below stays exact.
-			out.WriteString(`\S`)
+			out.WriteString(jsNonWhitespaceClassMembers)
 		} else {
 			out.WriteString("[^" + jsWhitespaceClassMembers + "]")
 		}
+		return i + 2, nil
+	case next == 'b' || next == 'B':
+		switch {
+		case !inClass:
+			out.WriteByte('\\')
+			out.WriteByte(next)
+		case next == 'b':
+			out.WriteString(`\x{08}`) // class escape: backspace, not a word boundary.
+		default:
+			out.WriteByte('B') // Annex B identity escape.
+		}
+		return i + 2, nil
+	case next == 'x':
+		if i+4 <= n && isHexDigits(pattern[i+2:i+4]) {
+			out.WriteString(`\x{` + pattern[i+2:i+4] + `}`)
+			return i + 4, nil
+		}
+		out.WriteByte('x') // malformed \x -> identity escape, JS's own Annex B rule.
 		return i + 2, nil
 	case next == 'p':
 		out.WriteByte('p') // identity escape without the `u` flag (D4 table), not a class.
@@ -182,23 +200,11 @@ func isLookaroundAt(pattern string, i int) bool {
 	return strings.HasPrefix(rest, "(?<=") || strings.HasPrefix(rest, "(?<!")
 }
 
-// translateUnicodeEscape handles \uXXXX (exactly four hex digits) and \u{H+} (one or more),
-// rewriting either into RE2's own \x{...} hex-escape spelling — the same braced form, so only the
-// letter (and, for the fixed-width case, the braces) actually change. ok is false for a malformed
-// \u, which the caller identity-escapes to a literal 'u' instead (JS's own Annex B behaviour).
+// translateUnicodeEscape handles \uXXXX (exactly four hex digits). Without the `u` flag JS has no
+// \u{...} form: ok is false for it and for any malformed \u, and the caller identity-escapes to a
+// literal 'u', leaving `{41}` to read as a quantifier or literal braces exactly as JS does (Annex B).
 func translateUnicodeEscape(s string) (string, int, bool) {
 	// s[0] == '\\', s[1] == 'u'.
-	if len(s) >= 3 && s[2] == '{' {
-		close := strings.IndexByte(s[3:], '}')
-		if close < 0 {
-			return "", 0, false
-		}
-		hex := s[3 : 3+close]
-		if hex == "" || !isHexDigits(hex) {
-			return "", 0, false
-		}
-		return `\x{` + hex + `}`, 3 + close + 1, true
-	}
 	if len(s) >= 6 && isHexDigits(s[2:6]) {
 		return `\x{` + s[2:6] + `}`, 6, true
 	}

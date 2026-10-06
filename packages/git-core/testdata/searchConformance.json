@@ -450,6 +450,78 @@
       "committerEmail": "fixture@kira-space.test",
       "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "expect": { "supported": false, "fields": [] }
+    },
+    {
+      "name": "regex-hex-escape-2digit",
+      "query": { "text": "\\x41", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "contains A here",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-space.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-space.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "regex-hex-escape-is-not-literal-x41",
+      "query": { "text": "\\x41", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "the x41 token",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-space.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-space.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
+    },
+    {
+      "name": "regex-braced-unicode-is-uu-quantifier",
+      "query": { "text": "\\u{3}", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "a uuu b",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-space.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-space.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "regex-braced-unicode-is-not-code-point",
+      "query": { "text": "\\u{41}", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "contains A here",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-space.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-space.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
+    },
+    {
+      "name": "regex-class-backspace-escape",
+      "query": { "text": "[\\b]", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "a\bb",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-space.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-space.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "regex-class-non-whitespace-excludes-nbsp",
+      "query": { "text": "[\\S]", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "\u00a0",
+      "body": "",
+      "authorName": "\u00a0",
+      "authorEmail": "\u00a0",
+      "committerName": "\u00a0",
+      "committerEmail": "\u00a0",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
     }
   ]
 }

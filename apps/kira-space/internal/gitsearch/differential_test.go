@@ -36,12 +36,13 @@ var diffAtoms = []string{
 	"[a-z]", "[0-9]+", "[A-Za-z_]+", "[^0-9]", "a+", "b*", "c?", "d{2,3}",
 	"(foo|bar)", "(cat|dog|bird)", "(x|y|z)+",
 	".", `\s`, `\S`, `\p{L}`, `\P{N}`, `\u0041`, `\u{1F600}`, `\cA`, `\0`, `\q`,
+	`\x41`, `\xZ`, `\u{3}`, `[\b]`, `[\S]`, `[^\S]`, `[\B]`,
 	`\d`, `\D`, `\w`, `\W`, `\b`, `\B`, "^", "$", "-", "_", "#",
 }
 
 var diffWords = []string{
 	"the", "widget", "cache", "fix", "add", "remove", "Zebra", "module", "v1.2.0", "#123",
-	"node_modules", "readme", "index", "test", "config", "",
+	"node_modules", "readme", "index", "test", "config", "", "A", "uuu", "x41", "B", "\b", "\u00a0",
 }
 
 // diffSeparators deliberately includes the exact characters the dialect rewrite table treats

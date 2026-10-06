@@ -3,6 +3,7 @@ package gitsearch
 import (
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -75,8 +76,8 @@ func TestTranslate_UnicodeEscapes(t *testing.T) {
 		want    rune
 	}{
 		{`A`, 'A'},
-		{`\u{41}`, 'A'},
-		{`\u{1F600}`, '\U0001F600'},
+		{`\u0041`, 'A'},
+		{`\x41`, 'A'},
 	}
 	for _, tc := range cases {
 		source, err := translate(tc.pattern)
@@ -86,6 +87,44 @@ func TestTranslate_UnicodeEscapes(t *testing.T) {
 		re := regexp.MustCompile(source)
 		if !re.MatchString(string(tc.want)) {
 			t.Fatalf("translate(%q) = %q, want a pattern matching %q", tc.pattern, source, string(tc.want))
+		}
+	}
+}
+
+// Without the `u` flag JS reads \u{3} as 'u' repeated three times and \u{41}, \u{1F600} as
+// 'u' then literal braces; [\b] is backspace; [\S] excludes NBSP.
+func TestTranslate_NonUnicodeFlagCorners(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		pattern string
+		match   []string
+		noMatch []string
+	}{
+		{`\u{3}`, []string{"uuu"}, []string{"uu", "\x03"}},
+		{`\u{41}`, []string{strings.Repeat("u", 41)}, []string{"A"}},
+		{`\u{1F600}`, []string{"u{1F600}"}, []string{"\U0001F600"}},
+		{`\x41`, []string{"A"}, []string{"x41"}},
+		{`\xZ`, []string{"xZ"}, nil},
+		{`[\b]`, []string{"\x08"}, []string{"b"}},
+		{`[\B]`, []string{"B"}, []string{"b"}},
+		{`[\S]`, []string{"a", "\u00e9", "\U0001F600"}, []string{"\u00a0", " ", "\u2028", "\ufeff"}},
+		{`[^\S]`, []string{"\u00a0", " "}, []string{"a", "\u00e9"}},
+	}
+	for _, tc := range cases {
+		source, err := translate(tc.pattern)
+		if err != nil {
+			t.Fatalf("translate(%q): %v", tc.pattern, err)
+		}
+		re := regexp.MustCompile(source)
+		for _, s := range tc.match {
+			if !re.MatchString(s) {
+				t.Errorf("%q -> %q: want match on %q", tc.pattern, source, s)
+			}
+		}
+		for _, s := range tc.noMatch {
+			if re.MatchString(s) {
+				t.Errorf("%q -> %q: want no match on %q", tc.pattern, source, s)
+			}
 		}
 	}
 }

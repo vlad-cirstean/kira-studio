@@ -22,8 +22,9 @@
 //     "some occurrence of needle has an acceptable word boundary on each side", computed directly
 //     by occurrence enumeration plus a byte-level boundary post-check. This is byte-exact to JS by
 //     construction, not by coincidence.
-//  2. Regex mode (dialect.go) translates the seven rewritable constructs F15 names (`.`, `\s`/
-//     `\S`, `\p`/`\P`, `\uXXXX`/`\u{...}`, `\cA`-`\cZ`, a bare `\0`, an unknown identity escape)
+//  2. Regex mode (dialect.go) translates the rewritable constructs F15 names (`.`, `\s`/
+//     `\S` in and out of a class, `\p`/`\P`, `\uXXXX`, `\xHH`, `\b`/`\B` in a class, `\cA`-`\cZ`, a bare
+//     `\0`, an unknown identity escape; `\u{...}` stays `u` plus a quantifier, as in a non-`u` JS RegExp)
 //     into their RE2 equivalents, then wraps whole-word as a CONSUMING rewrite (D5) rather than a
 //     naive post-check — a post-check disagrees with JS's own backtracking-into-a-different-
 //     alternative behaviour on a pattern like `foo|foobar`.
