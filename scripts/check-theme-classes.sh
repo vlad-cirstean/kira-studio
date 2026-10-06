@@ -25,6 +25,33 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Every check needs GNU grep's -P (BSD/macOS grep has none): prefer ggrep (`brew install grep`), then
+# grep, and refuse to run on one without PCRE rather than pass vacuously.
+GNU_GREP=""
+for candidate in ggrep grep; do
+  if command -v "$candidate" >/dev/null 2>&1 && echo x | "$candidate" -qP 'x' 2>/dev/null; then
+    GNU_GREP=$candidate
+    break
+  fi
+done
+if [ -z "$GNU_GREP" ]; then
+  echo "check-theme-classes: GNU grep with -P is required (macOS: brew install grep, provides ggrep)." >&2
+  exit 1
+fi
+
+# grep exits 1 for "no match" and >1 for an error; the checks below swallow the status (|| true,
+# 2>/dev/null) inside command substitutions, so an error is recorded here and fails the run at the end.
+GREP_ERRORS=$(mktemp)
+trap 'rm -f "$GREP_ERRORS"' EXIT
+grep() {
+  command "$GNU_GREP" "$@"
+  grep_rc=$?
+  if [ "$grep_rc" -gt 1 ]; then
+    echo "grep exited $grep_rc: $*" >>"$GREP_ERRORS"
+  fi
+  return "$grep_rc"
+}
+
 FRONTEND_SRC=apps/kira-studio/frontend/src
 SPACE_SRC=apps/kira-space/frontend/src
 THEME_SRC=packages/theme/src
@@ -691,6 +718,12 @@ check_toggle_radius
 # Tailwind size or the retired xs step reaching chrome is always a regression, never a legitimate
 # alternative. Data-view sites keep their own sizes via the exemptions inside check_font_scale.
 check_font_scale
+
+if [ -s "$GREP_ERRORS" ]; then
+  echo "check-theme-classes: grep failed, results are unreliable:" >&2
+  cat "$GREP_ERRORS" >&2
+  exit 2
+fi
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
