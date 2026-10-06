@@ -407,3 +407,27 @@ Paste the section 4 `kiraAB` helper first, then toggle on the shipped build:
 Per toggle, run section 4 protocol: Layers tab count, Activity Monitor footprint over 10 s of
 scroll, `__kiraScrollTrace` `gapFrames`/`uncoveredMax`/`frameP95` over one hard flick. Report
 layer count, plateau, gap frames, p95. Graph: check seams, HEAD ring, badges, hover, menu.
+
+## Result: header will-change and cell borders removed
+
+Changes, `slickTheme.css`:
+
+- Removed `will-change: transform` on `.slick-header-columns`. Comment now one line. P22 horizontal
+  header flicker needs a Mac check via `ab-hdr-wc` if it returns.
+- Removed `border-right` and `border-bottom` from `.slick-cell`. Header column separators kept.
+- No row-level `border-bottom` added. Rows stay separable by 28px/22px height, hover fill and
+  selection fill, no zebra (same as before this phase). Not measured; adding one stays open if rows
+  read poorly.
+- Git graph `CommitGrid.vue`: no cell borders (`.slick-row` has `border: 0`). Untouched.
+
+Visual change: the data grid loses all hairlines between cells, vertical and horizontal.
+`data-view` baseline `data-grid-visual-linux.png` regenerated. Only that spec differed; other 13
+visual specs pass.
+
+Test fix: `tooltips.spec.ts` injected trigger compensated for `will-change` making the header a
+containing block for `position: fixed`. Compensation removed; trigger now viewport-fixed.
+
+Checks: lint, typecheck clean. ui slick-grid, scroll-trace, tooltips: 19 passed.
+Perf `NCOLS=20 grid-scroll` headless WebKit: 50-53 fps avg, p95 27-31 ms, 0 frames over 100 ms.
+
+Mac A/B for flicker and smoothness remains the user's.
