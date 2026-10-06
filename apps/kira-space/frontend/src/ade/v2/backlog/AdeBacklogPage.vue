@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Input } from '@theme/components/ui/input';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
 import { backlogPatch } from '../board/panelFacts';
 import {
@@ -16,6 +17,7 @@ import AdeBacklogRow from './AdeBacklogRow.vue';
 
 // The backlog: a prioritised list (top is most important) with a detail panel beside it.
 const ui = useAdeBoardUiStore();
+const confirmDialogStore = useConfirmDialogStore();
 const backlog = useBacklog();
 const add = useAddBacklogItem();
 const move = useMoveBacklogItem();
@@ -62,8 +64,11 @@ async function onPromote(id: string): Promise<void> {
     ui.openTask(taskId);
 }
 
-function onRemove(id: string): void {
-  void run(() => remove.mutateAsync({ id }));
+async function onRemove(id: string): Promise<void> {
+  const item = items.value.find((i) => i.id === id);
+  if (!item) return;
+  if (!(await confirmDialogStore.confirmDialog(`Delete this backlog item?\n\n${item.text}`))) return;
+  await run(() => remove.mutateAsync({ id }));
 }
 
 function onEdit(id: string, value: string): void {

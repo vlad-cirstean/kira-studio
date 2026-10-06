@@ -46,6 +46,7 @@ func TestWorkflows_writesAndExternalEdits(t *testing.T) {
 	var emitted atomic.Int32
 	b := NewTaskBoard(TaskBoardDeps{
 		Tasks: r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
+		Logs:   r.AdeLogs,
 		Runner: gitclient.NewExecRunner(), Registry: registry, GitPath: func() string { return "git" },
 		GitStatus: func(context.Context) gitclient.GitStatus { return gitclient.GitStatus{Kind: "ok", Path: "git"} },
 		Workflows: &adeflow.Reader{Dir: dir, Store: r.AdeTasks}, OnWorkflows: func() { emitted.Add(1) },

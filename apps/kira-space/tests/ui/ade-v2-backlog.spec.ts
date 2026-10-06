@@ -126,11 +126,30 @@ test('Plan as task promotes, opens the Plan and selects the task', async ({ rela
   await expect(page.locator('[data-testid="ade-panel"]')).toBeVisible();
 });
 
-test('delete removes the item without a prompt', async ({ relaunch }) => {
+test('delete asks to confirm before removing', async ({ relaunch }) => {
   const { window: page, control } = await openBacklog(relaunch);
-  await rows(page).nth(3).locator('[data-testid="ade-backlog-delete"]').click();
+  const dialog = page.locator('[data-testid="confirm-dialog"]');
+  const del = rows(page).nth(3).locator('[data-testid="ade-backlog-delete"]');
+  await del.click();
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText(items()[3]?.text ?? '');
+  expect(calls(control, IPC.adeTaskDeleteBacklogItem)).toHaveLength(0);
+  await page.locator('[data-testid="confirm-dialog-cancel"]').click();
+  await expect(dialog).toBeHidden();
+  expect(calls(control, IPC.adeTaskDeleteBacklogItem)).toHaveLength(0);
+
+  await del.click();
+  await page.locator('[data-testid="confirm-dialog-confirm"]').click();
   await expect.poll(() => calls(control, IPC.adeTaskDeleteBacklogItem)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskDeleteBacklogItem)[0]?.args).toEqual({ id: 'i4' });
+});
+
+test('panel delete opens the same confirm', async ({ relaunch }) => {
+  const { window: page, control } = await openBacklog(relaunch);
+  await page.locator('[data-testid="ade-backlog-panel-delete"]').click();
+  await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible();
+  await page.locator('[data-testid="confirm-dialog-cancel"]').click();
+  expect(calls(control, IPC.adeTaskDeleteBacklogItem)).toHaveLength(0);
 });
 
 test('an empty backlog says so and the panel asks to select', async ({ relaunch }) => {
