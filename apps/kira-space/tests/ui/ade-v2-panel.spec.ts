@@ -26,6 +26,14 @@ function updates(control: { log(): { channel: string; args?: unknown }[] }) {
   return control.log().filter((e) => e.channel === IPC.adeTaskUpdateTask);
 }
 
+test('Space on a focused card head selects the task', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await card(page, 'T_bill').focus();
+  await page.keyboard.press('Space');
+  await expect(page.locator('[data-testid="ade-panel"]')).toBeVisible();
+  await expect(page.locator('[data-testid="ade-panel-title"]')).toContainText('PAY-102');
+});
+
 test('selecting a task shows its facts; status is read-only', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await openTask(page, 'T_bill');

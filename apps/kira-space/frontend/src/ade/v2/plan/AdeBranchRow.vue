@@ -117,7 +117,8 @@ const elbowColor = computed(() =>
     :data-branch-id="row.id"
     @click="pick"
     @contextmenu="onMenu"
-    @keydown.enter="pick"
+    @keydown.enter.self="pick"
+    @keydown.space.self.prevent="pick"
   >
     <span class="relative shrink-0 self-stretch" :style="{ width: `${row.depth * 16}px` }">
       <span

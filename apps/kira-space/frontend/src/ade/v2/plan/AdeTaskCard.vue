@@ -97,7 +97,8 @@ const headStyle = computed(() => ({
         tabindex="0"
         data-testid="ade-card-head"
         @click="emit('select')"
-        @keydown.enter="emit('select')"
+        @keydown.enter.self="emit('select')"
+        @keydown.space.self.prevent="emit('select')"
       >
         <div class="flex h-[18px] min-w-0 items-center gap-[7px]">
           <span
