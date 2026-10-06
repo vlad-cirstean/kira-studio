@@ -310,3 +310,38 @@ real run) or "code-read". `DESIGN-DECISION` marks one needing a product call (no
   `viewOp.ts`, `typeGlossary.ts`, `targetPath.ts`, `eventCoords.ts`, `mongo*.ts`: no defect.
 - Native buttons in `DateTimePicker.vue`, `SavedListMenu.vue`, `DocumentRow.vue`,
   `DocumentTree.vue` carry `type="button"`.
+
+## Block 5: document and key-value
+
+### F16. medium. A BSON date outside JS `Date` range throws in render and in every copy format (verified)
+
+- `apps/kira-studio/frontend/src/views/shared/document/ejson.ts:77-91` (`dateMillis`), throw
+  sites `:116-120` (tree render), `:409-411` (relaxed), `:456-458` (plain), reached from
+  `views/shared/document/rows.ts:126-128` (`parseRow`).
+- BSON dates are int64 milliseconds; JS `Date` holds only ±8.64e15. A "never expires" sentinel
+  (`{"$date":{"$numberLong":"9223372036854775807"}}`) passes `Number.isFinite`, then
+  `new Date(millis).toISOString()` throws `RangeError: Invalid Date`. Probe (`bun`, scratchpad):
+  `parseDocument`, `toShellText`, `toRelaxedText`, `toPlainJson` all throw on such a document.
+  `parseRow` runs inside the documents view's row rendering, so one such document breaks the row
+  (and the virtual list's render pass); Copy as JSON/shell/relaxed fails; Edit (`DocumentView.vue:589`
+  seeds from `toShellText`) throws. A date `_id` hits `parseIdLabel` too.
+- Fix: `dateMillis` returns `null` when `Math.abs(n) > 8.64e15`. The render wrapper then returns
+  `null` (raw fallback) and relaxed/plain keep the canonical wrapper. Relaxed EJSON v2 also says
+  ISO strings only for years 1970-9999; keep canonical outside that range. Add the sentinel case
+  to `ejson.spec.ts`.
+
+### Block 5 notes (checked, nothing real)
+
+- `keyvalue/state.ts`: superseded load cancelled server-side (`stopOp`) and dropped client-side;
+  cursor-paged keys reset to page one on a cursor-less reload (documented). Tab-close cleanup drops
+  `${tabId}::preview`.
+- `keyvalue/mutations.ts`: sentinels only used for string-key ops (hash/list/set edits address by
+  path); `addKey` returns without opening a tab only when no `database` segment exists, and S3
+  pages route Add to the upload dialog first, so that path is unreachable for Redis.
+- `KeyValuePane.vue`: S3 object draft cleared on page identity change (`watch(page)` keyed on the
+  page object, not the store counter); edit/add popovers guard `saving`; delete confirmed.
+  `useVirtualizer` rows keyed by index over a frozen page.
+- `document/rows.ts`: `resetRows` on page load; parse cache pruned to the visible window.
+  `rawTree.ts`, `DocumentTree.vue`, `DocumentRow.vue`: no defect found.
+- `ejson.ts` `$numberLong` beyond 2^53 stays wrapped in relaxed mode (F9 P108 Part 10); plain mode
+  rounds by design (documented).
