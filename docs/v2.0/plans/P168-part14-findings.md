@@ -8,6 +8,27 @@ no Part 14 code change between them).
 
 - `go vet ./apps/kira-space/internal/{gitclient,ghclient,gitpath,gitaskpass}/...`: clean.
 - `go test -race -count=1` same packages: 7 packages ok.
+- `CGO_ENABLED=0 GOOS=darwin go vet ./apps/kira-space/internal/gitclient/`: clean (fsnotify
+  path). The cgo `watcher_fsevents_darwin.go` cannot be cross-vetted here (clang lacks the darwin
+  target); reviewed by reading only.
+- Scratch probes (real git 2.43.0, throwaway `_test.go` files) were deleted before each commit;
+  `git status` clean in the owned packages.
+
+## Ranked summary
+
+16 findings: 1 high, 1 medium, 14 low.
+
+- High: F5 (catfile breaker tripped by ctx cancels).
+- Medium: F8 (`color.diff=always` breaks patch-id containment).
+- Low: F13 (catfile newline desync), F16 (gh 4 MiB truncation), F15 (https userinfo/case host),
+  F1 (`ResolveHead` cancel as unborn), F3 (`coreAskPass` caches failure), F7 (logsession EOF
+  error path), F14 (`PullFiles` page bound), F9 (LF-framed refs vs newline worktree path), F10
+  (`HEAD` file ambiguity), F11 (0x1f in trailers), F12 (blame 1 MiB line), F6 (`ReadOneShot`
+  TOCTOU), F4 (`localsock` WaitGroup race), F2 (`Error.Command` drops `rev-parse`).
+- `needs-stream-A-file`: F4 only (`internal/localsock/localsock.go`). Every other fix sits in a
+  Part 14 file or a Stream B one-hop caller (F3: `gitsession/remote.go`; F13 optional half:
+  `gitsession/ghsync.go` is not required if the catfile guard lands).
+- No `design-decision` findings.
 
 ## Block status
 
@@ -16,6 +37,8 @@ no Part 14 code change between them).
 - Block 3 (catfile, logsession): done.
 - Block 4 (porcelain): done.
 - Block 5 (gh client): done.
+- Block 6 (watchers): done.
+- Block 7 (tests): done.
 
 ## Findings
 
@@ -419,3 +442,41 @@ Verified, no finding:
   pass through by design and no log, `Status.Reason` or error echoes them.
 - Discovery: per-host cache, caller-cancel not cached (G31 #5 holds), `notOKTTL` asymmetric.
   `classify`'s timeout text says "10s" also for the 30 s GraphQL timeout: cosmetic, not reported.
+
+### Block 6: watchers
+
+Reviewed in full: `GC/watcher.go`, `watcher_fsnotify.go`, `watcher_fsevents_darwin.go` (by
+reading; see Checks).
+
+Verified, no finding:
+- `Close` ordering: `RepoWatcher.Close` closes `stop` (unblocks `emit` and the select), joins
+  `run`, then closes the backend; the backend's own `stop` unblocks a parked forward, so no
+  goroutine outlives `Close`. `emit` after close cannot happen (`run` has returned).
+- Leading-window debounce cannot be starved; `out` buffer of 2 matches one of each signal.
+- fsnotify: refs tree walked recursively at start and on each new directory under `refs/`;
+  `worktrees/` added when it appears; `.lock` stripped before classification; packed-refs and
+  per-worktree HEAD/index covered via commonDir/gitDir watches. kqueue fd-per-file cost applies
+  only to a non-cgo darwin build, which production (Wails, cgo) never uses.
+- fsevents: recursive on commonDir; linked gitDir under commonDir not double-watched; dropped/
+  overflow flags become Rescan; stop sequence drains before `es.Stop()` (D10 holds).
+- NFC applied to both sides of every classification comparison (G27 D5b holds).
+
+### Block 7: tests
+
+Tests read only where they guard a claim above.
+
+- `catfile_test.go:723` `TestSession_Check_CtxCancellationUnblocksAStalledReply` asserts only
+  `err != nil`; nothing guards that a cancel does not count toward the breaker. F5's fix should add
+  "three cancels mid-read, then a read succeeds" (cancellation/concurrency logic, inside the
+  `CLAUDE.md` unit-test bar). `TestSession_CancelAfterSuccessDoesNotKillProcess` (`:751`) covers
+  only the cancel-after-success path, which is correct today.
+- `runner_test.go:72,89` argv goldens pin `configOverrides`; F8's fix updates them.
+- No test found that no longer guards what its name says. Missing guards for genuinely complex
+  rules are limited to F5 above; the other findings are small enough to need no dedicated test
+  under the unit-test bar, except F13 (protocol framing, worth one guard) and F9 (framing parser,
+  extend `refs_test.go`/`inventory_test.go` tables).
+
+### Not reached
+
+None. Every file in plan §3 was read; testdata `.bin` captures were not re-derived byte by byte
+(their parsers pass and the shapes were re-probed live where a claim depended on them).
