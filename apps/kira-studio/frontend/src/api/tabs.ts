@@ -109,6 +109,23 @@ export function renameApiRequestTabs(itemId: string, name: string): void {
   }
 }
 
+/** Brings every bound request tab's name in line with the tree (a rename in another window only
+ *  refreshes the tree there). A tab whose row is gone (orphan) keeps its last known name. */
+export function syncRequestTabNames(items: readonly { id: string; name: string }[]): void {
+  const nameById = new Map(items.map((item) => [item.id, item.name]));
+  for (const tab of useTabsStore().tabs) {
+    if (tab.kind === 'http-request') {
+      const { itemId, name } = (tab as HttpRequestTabRecord).state;
+      const next = itemId ? nameById.get(itemId) : undefined;
+      if (next !== undefined && next !== name) patchHttpRequestTabState(tab.id, { name: next });
+    } else if (tab.kind === 'grpc-request') {
+      const { itemId, name } = (tab as GrpcRequestTabRecord).state;
+      const next = itemId ? nameById.get(itemId) : undefined;
+      if (next !== undefined && next !== name) patchGrpcRequestTabState(tab.id, { name: next });
+    }
+  }
+}
+
 // P11 D2: 'grpc-request''s own sibling of the four openApiRequestTab-family functions above —
 // identical reasoning throughout (always fresh, no target to reuse by; a saved request opens the
 // existing kind with state sourced from the collection row instead of the default).

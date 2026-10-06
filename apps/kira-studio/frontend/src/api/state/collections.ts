@@ -11,7 +11,7 @@ import { useMutation, useQuery } from '@tanstack/vue-query';
 import { refDebounced } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
 import { defineStore } from 'pinia';
-import { computed, reactive, toRef, toRefs } from 'vue';
+import { computed, reactive, toRef, toRefs, watch } from 'vue';
 import { control } from '../../bridge/control';
 import {
   closeVariableSetTabsForOwner,
@@ -20,6 +20,7 @@ import {
   renameApiRequestTabs,
   renameGrpcRequestTabs,
   renameVariableSetTabs,
+  syncRequestTabNames,
 } from '../tabs';
 import {
   type ApiCollectionsTree,
@@ -134,6 +135,9 @@ export const useCollectionsStore = defineStore('collections', () => {
   const collections = computed<CollectionSummary[]>(() => treeQuery.data.value?.collections ?? []);
   const items = computed<CollectionItemSummary[]>(() => treeQuery.data.value?.items ?? []);
   const loaded = computed(() => treeQuery.data.value !== undefined);
+  // A rename made in another window reaches this one only as a tree refresh: bound tabs follow it
+  // here, or Save in this window would write the old name back.
+  watch(items, (list) => syncRequestTabNames(list));
   /** P108 F10's successor for the read side: a failed initial/refetch List used to reject into a
    *  void'd promise with nothing shown — this surfaces it the same way state.error does for a
    *  mutation's own failure (rendered in ImportReportStrip.vue). */
@@ -539,15 +543,16 @@ export const useCollectionsStore = defineStore('collections', () => {
     state.renamingKey = null;
   }
 
-  /** Creates the row, caches it as the tab's saved side, and binds the tab to it. */
+  /** Creates the row, caches it as the tab's saved side, and binds the tab to it. Resolves to the
+   *  failure message (also set on `state.error`) so the dialog can show it itself, null on success. */
   async function submitSaveDialog(
     collectionId: string,
     parentId: string | null,
     name: string,
-  ): Promise<void> {
+  ): Promise<string | null> {
     const saveDialogStore = useSaveRequestDialogStore();
     const { tabId, payload } = saveDialogStore;
-    if (!tabId || !payload) return;
+    if (!tabId || !payload) return null;
 
     try {
       if (payload.protocol === 'grpc') {
@@ -568,7 +573,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         revealItem(collectionId, parentId);
         saveDialogStore.closeSaveDialog();
         state.error = null;
-        return;
+        return null;
       }
 
       const item = await control.collectionsCreateItem({
@@ -597,8 +602,10 @@ export const useCollectionsStore = defineStore('collections', () => {
       revealItem(collectionId, parentId);
       saveDialogStore.closeSaveDialog();
       state.error = null;
+      return null;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
+      return state.error;
     }
   }
 
@@ -698,6 +705,8 @@ export const useCollectionsStore = defineStore('collections', () => {
    *  to read secretCount only, silently dropping the skipped-request half of the same report the
    *  Go side already produces. */
   async function exportCollection(collectionId: string, name: string): Promise<boolean> {
+    // Same re-entry guard as import: this `finally` would otherwise clear a running import's busy.
+    if (state.busy) return false;
     // The extension Postman's own exporter writes, so the file is recognisable on disk and
     // re-importable without renaming.
     const chosen = await control.filesChooseSave(`${name}.postman_collection.json`);

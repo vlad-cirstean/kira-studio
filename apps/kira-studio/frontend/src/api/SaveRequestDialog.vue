@@ -50,15 +50,15 @@ watch(
 );
 
 async function onSave(): Promise<void> {
+  if (saving.value) return;
   const trimmed = name.value.trim();
   if (!trimmed || !target.value) return;
   const [collectionId, parentId] = splitTarget(target.value);
   saving.value = true;
   error.value = null;
-  try {
-    await collectionsStore.submitSaveDialog(collectionId, parentId, trimmed);
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+  const failure = await collectionsStore.submitSaveDialog(collectionId, parentId, trimmed);
+  if (failure !== null) {
+    error.value = failure;
     saving.value = false;
   }
 }
