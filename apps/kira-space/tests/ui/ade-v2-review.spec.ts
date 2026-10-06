@@ -158,3 +158,16 @@ reviewTest(
     await expect.poll(stored).toBe(String(Math.round(start + 60)));
   },
 );
+
+reviewTest(
+  'the sync button stays visible and disabled when its plan fails to load',
+  async ({ relaunch }) => {
+    const page = await openReview(relaunch, [
+      { channel: IPC.adeTaskGitHubSyncPlan, error: { code: 'invalid', message: 'gh exploded' } },
+    ]);
+    const button = page.locator(t('ade-review-sync'));
+    await expect(button).toBeDisabled();
+    await button.locator('xpath=..').hover();
+    await expect(page.getByText('Could not load the sync plan: gh exploded').first()).toBeVisible();
+  },
+);

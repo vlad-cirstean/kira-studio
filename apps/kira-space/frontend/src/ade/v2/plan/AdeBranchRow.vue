@@ -55,6 +55,7 @@ function onMenu(ev: MouseEvent): void {
           { branchId: id },
           {
             onError: (err) => {
+              ui.select(props.row.branch.taskId);
               ui.actionError[props.row.branch.taskId] = err instanceof Error ? err.message : String(err);
             },
           },

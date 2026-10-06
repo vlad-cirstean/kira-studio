@@ -54,12 +54,16 @@ describe('dropVerdict', () => {
     entries: new Map([
       ['a', { day: 0, kind: 'task' as const }],
       ['r', { day: 0, kind: 'review' as const }],
+      ['p', { day: -1, kind: 'task' as const }],
+      ['o', { day: 1, kind: 'task' as const }],
     ]),
   };
-  test('refuses itself, review cards, past and day-off bands', () => {
+  test('refuses itself, review cards, cards and bands that are past or a day off', () => {
     for (const target of [
       { kind: 'card', taskId: 'a' },
       { kind: 'card', taskId: 'r' },
+      { kind: 'card', taskId: 'p' },
+      { kind: 'card', taskId: 'o' },
       { kind: 'band', day: -1 },
       { kind: 'band', day: 1 },
       null,

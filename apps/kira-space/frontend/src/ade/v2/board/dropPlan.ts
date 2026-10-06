@@ -63,6 +63,8 @@ export function dropVerdict(
   if (target.kind === 'card') {
     const entry = view.entries.get(target.taskId);
     if (!entry || target.taskId === draggedId || entry.kind === 'review') return { kind: 'refuse' };
+    const cardBand = view.bands.find((b) => b.key === entry.day);
+    if (cardBand && (cardBand.isPast || cardBand.dayOff)) return { kind: 'refuse' };
     return {
       kind: 'move',
       args: movePlanArgs(plan, today, draggedId, target.taskId, entry.day),

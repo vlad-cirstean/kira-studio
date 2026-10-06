@@ -219,7 +219,7 @@ function deployNote(d: Deployment): string {
         >
           Retry setup
         </button>
-        <AdeTip text="git push --force-with-lease">
+        <AdeTip v-if="canForcePush" text="git push --force-with-lease">
           <button
             type="button"
             class="h-[26px] cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold"

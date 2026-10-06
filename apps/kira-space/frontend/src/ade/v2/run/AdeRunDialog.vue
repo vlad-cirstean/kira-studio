@@ -35,12 +35,15 @@ const message = ref('');
 const names = ref<Record<string, string>>({});
 const error = ref('');
 const busy = ref(false);
-const edited = computed(() => message.value !== initial.value);
+// Snapshot at open: a board push that renames the task must not make an untouched message read as edited.
+const opening = ref('');
+const edited = computed(() => message.value !== opening.value);
 
 watch(
   open,
   (o) => {
     if (!o) return;
+    opening.value = initial.value;
     message.value = initial.value;
     names.value = {};
     error.value = '';

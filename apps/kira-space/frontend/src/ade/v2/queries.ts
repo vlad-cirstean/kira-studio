@@ -202,9 +202,11 @@ export function useMoveBacklogItem() {
       if (prev) {
         const items = [...prev.items];
         const from = items.findIndex((i) => i.id === args.id);
-        const [moved] = items.splice(from, 1);
-        if (moved) items.splice(args.toIndex, 0, moved);
-        queryClient.setQueryData<BacklogResult>(backlogKey, { items });
+        if (from >= 0) {
+          const [moved] = items.splice(from, 1);
+          if (moved) items.splice(args.toIndex, 0, moved);
+          queryClient.setQueryData<BacklogResult>(backlogKey, { items });
+        }
       }
       return { prev };
     },

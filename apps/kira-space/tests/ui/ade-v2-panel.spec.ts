@@ -220,6 +220,14 @@ test('Force push in the branch header asks first and sends the branch', async ({
   });
 });
 
+test('a pushed branch offers no Force push', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await openTask(page, 'T_deps');
+  await page.locator('[data-testid="ade-task-branch"]').first().click();
+  await expect(page.locator('[data-testid="ade-branch-details"]')).toBeVisible();
+  await expect(page.locator('[data-testid="ade-panel-force-push"]')).toHaveCount(0);
+});
+
 test('dragging the handle persists the dragged width; a click persists nothing', async ({
   relaunch,
 }) => {

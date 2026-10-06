@@ -29,7 +29,10 @@ const REASON: Record<string, string> = {
 
 const data = computed(() => plan.data.value);
 const status = computed(() => data.value?.status);
-const visible = computed(() => !!data.value && status.value !== 'disabled' && status.value !== 'noPr');
+const loadFailed = computed(() => plan.isError.value && !data.value);
+const visible = computed(
+  () => loadFailed.value || (!!data.value && status.value !== 'disabled' && status.value !== 'noPr'),
+);
 const marks = computed(() => data.value?.files.filter((f) => f.action === 'mark') ?? []);
 const unmarks = computed(() => data.value?.files.filter((f) => f.action === 'unmark') ?? []);
 const skipped = computed(() => data.value?.files.filter((f) => f.action === 'skip') ?? []);
@@ -37,6 +40,10 @@ const count = computed(() => marks.value.length + unmarks.value.length);
 const prNumber = computed(() => data.value?.pr?.number ?? 0);
 
 const blockedMessage = computed(() => {
+  if (loadFailed.value) {
+    const e = plan.error.value;
+    return `Could not load the sync plan: ${e instanceof Error ? e.message : String(e)}`;
+  }
   switch (status.value) {
     case 'prClosed':
       return data.value?.message ?? `PR #${prNumber.value} is closed`;
@@ -100,7 +107,7 @@ function short(sha: string): string {
         <span>
           <PopoverTrigger as-child>
             <Button variant="dialog" size="xs" :disabled="blocked" data-testid="ade-review-sync">
-              Sync to GitHub · {{ count }}
+              Sync to GitHub{{ loadFailed ? '' : ` · ${count}` }}
             </Button>
           </PopoverTrigger>
         </span>
