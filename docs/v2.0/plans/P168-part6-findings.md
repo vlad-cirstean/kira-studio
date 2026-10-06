@@ -375,6 +375,28 @@ Fix: under the lock, check `server != nil` and `helperTokenValid`, copy `server.
 release before calling `Installer.Install`. The registration names a fixed URL and helper path,
 so nothing needs the lock during the spawn.
 
+### F19 (low) `formatJSNumber` does not match JS `String(number)` for large or tiny metric values
+
+`SI/queryplan/metrics.go` (`formatJSNumber`), against `SF/views/console/planParsers/mysql.ts:66,70`
+(`String(v)`; Part 12, read only). Go prints an integer-valued float via `int64` (wraps or loses
+the value past 2^63) and anything else via `FormatFloat(n, 'g', -1, 64)`, which switches to
+exponent form at 1e6 and below 1e-4. JS switches only at 1e21 and below 1e-6. Scratch probe:
+
+- `1234567.5`: Go `1.2345675e+06`, JS `1234567.5`.
+- `0.00001`: Go `1e-05`, JS `0.00001`.
+- `2e20`: Go `2e+20` (`int64` overflow fails the integer check), JS `200000000000000000000`.
+
+Scenario: an untyped numeric plan key (a MariaDB/Postgres metric with a large row or byte count)
+renders differently in `explain_query` output than in the console's plan view for the same plan.
+No shared fixture holds such a value, so the parity suite does not catch it. Cosmetic; both
+sides stay readable.
+
+Fix: port JS `Number.prototype.toString`: fixed notation (`'f'`, -1) for `1e-6 <= |n| < 1e21`,
+otherwise exponent notation in JS shape (`1e+21`, `1.5e-7`); drop the `int64` round trip. Add
+the three values above to `parse_test.go`'s metric-format cases. Fixture side, if a shared
+fixture is wanted: `needs-other-part-file: apps/kira-studio/tests/fixtures/explain-plans/
+(Part 12, Stream C)`.
+
 ## Coverage
 
 - Block 1 (auth and install): done. Reviewed `SI/mcpauth/token.go`, `SI/mcpinstall/install.go`,
@@ -477,3 +499,21 @@ so nothing needs the lock during the spawn.
     four. `g1measure`: dev tool, no defect.
   - Minor, not filed: `dbmcp.serverVersion` is the constant `"0.0.0"` while `buildinfo.Version`
     now exists; harmless for the MCP handshake.
+- Block 6 (queryplan parsers): done. Reviewed `SI/queryplan/{parse,postgres,mysql,mariadb,
+  sqlite,clickhouse,issues,metrics,plan}.go` against `SF/views/console/planParsers/*.ts` and
+  `explain.ts` (Part 12, read).
+  - `ErrTruncated` is checked on the first cell for every JSON dialect before parsing. Row and
+    cost numbers decode as `*float64` (JSON numbers); MySQL's string costs go through
+    `parseFloatCell`. `OverThreshold` with a nil estimate is false (`isOverThreshold`).
+  - Recursion (`pgBuildNode`, `chBuildNode`, `mysqlBlockNodes`, `mariadbEntryNode`) follows the
+    server's own plan nesting; `encoding/json` caps nesting depth, so no unbounded stack from
+    this input.
+  - SQLite: a `parent` naming an unknown id attaches to the root. A self- or mutually-referencing
+    `parent` would recurse forever in `finalizeSqliteNode`, but the input is SQLite's own
+    `EXPLAIN QUERY PLAN` output from the in-process driver, never caller-controlled; not filed.
+  - Masking interaction: Postgres `EXPLAIN` without `ANALYZE` reads no table data, so its
+    `Filter`/`Index Cond` text holds only query literals (and is stripped anyway). MariaDB's
+    `block-nl-join` conditions are not parsed into the plan at all. MySQL/MariaDB
+    `index_condition` is F6.
+  - Issue rules (`full-scan`, `unused-index`, `filesort`, `temp-table`, `wide-scan`,
+    `pk-not-narrowed`, `all-parts-read`, `nested-loop-wide-inner`) match the TS parsers.
