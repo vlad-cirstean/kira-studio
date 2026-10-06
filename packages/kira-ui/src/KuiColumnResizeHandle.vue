@@ -121,7 +121,6 @@ function onKeydown(e: KeyboardEvent): void {
        useSemanticElements' preferred native element (<hr>) can carry. -->
   <!-- biome-ignore lint/a11y/useSemanticElements: ARIA separator widget — <hr> can't carry aria-valuenow/tabindex/keydown -->
   <div
-    class="kui-column-resize-handle"
     role="separator"
     aria-orientation="vertical"
     :aria-label="label"

@@ -6,8 +6,7 @@ interface TextPromptState {
   resolve: (v: string | null) => void;
 }
 
-/** P107 T2-19: the in-app substitute for window.prompt() (Electron's renderer implements
- *  alert/confirm natively but not prompt) — was hand-copied across GitPanel.vue,
+/** P107 T2-19: the in-app substitute for window.prompt() (the webview has no native prompt) — was hand-copied across GitPanel.vue,
  *  FilterHistoryMenu.vue and ConsoleSavedMenu.vue. `open` resolves the awaited Promise a caller's
  *  own trim/empty-check already expects (`const name = await open(...); if (!name...) return;`),
  *  so every call site keeps that exact shape. Pair with TextPromptDialog.vue, which renders

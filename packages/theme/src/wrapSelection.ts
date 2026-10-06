@@ -1,8 +1,6 @@
-// Item 5 (task batch P46-2): editor/wrapSelection.ts gives every CodeMirror-backed surface
-// (console, cell editor, document editor) "type a bracket/quote over a selection to wrap it, not
-// replace it" already. TextField.vue and AutocompleteField.vue's own real <input> (item 2's design
-// keeps that element plain and native, never CodeMirror — see its own doc comment) need the same
-// behavior spelled out by hand, since there is no CodeMirror instance underneath to do it.
+// "Type a bracket/quote over a selection to wrap it, not replace it" for a plain <input>
+// (TextField.vue, AutocompleteField.vue): Monaco does this in the editors, but a native input has
+// no editor underneath to do it.
 const WRAP_PAIRS: Record<string, string> = {
   '(': ')',
   '[': ']',

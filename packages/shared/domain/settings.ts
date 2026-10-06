@@ -34,10 +34,9 @@ export const appearanceSettingsSchema = /*#__PURE__*/ z.object({
   // hydrate.
   fontSize: z.number(),
   rowDensity: rowDensitySchema,
-  // P42 D14: word wrap in every CodeMirror surface (query console, Mongo console, cell editor,
-  // definition view, ...). `.default(true)` is today's hard-coded behavior
-  // (CodeMirrorHost.vue's own unconditional EditorView.lineWrapping, F11), so a settings row
-  // saved before this field existed parses and behaves identically.
+  // P42 D14: word wrap in every Monaco surface (query console, Mongo console, cell editor,
+  // definition view, ...). `.default(true)` keeps a settings row saved before this field existed
+  // wrapping as it always did.
   wordWrap: z.boolean().default(true),
   // P9: colour grid cell text by the column's data type. `.default(true)` keeps a pre-P9 stored
   // shape parsing to today's behavior (colouring on).

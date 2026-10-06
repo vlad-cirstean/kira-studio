@@ -16,12 +16,6 @@ export type FloatOptions = Omit<KuiFloatOptions, 'maxVarPrefix'>;
 export type { ReferenceElement };
 export { autoUpdate, pointReference };
 
-/** P28 D17(a): the CSS custom properties `computeFloatPosition` writes onto the floating element
- *  — a consumer opts in by reading them (`max-height: var(--kira-float-max-h)`); a surface that
- *  already fits is unaffected, since these are only ever a maximum. */
-export const FLOAT_MAX_WIDTH_VAR = '--kira-float-max-w';
-export const FLOAT_MAX_HEIGHT_VAR = '--kira-float-max-h';
-
 // P23: this file replaces the previous anchoredPosition.ts (P49 D12's own consolidation of three
 // hand-rolled flip/clamp implementations into one pure-arithmetic function, two named
 // "strategies") and ContextMenu.vue's still-separate hand-rolled clamp (menu) plus its entirely

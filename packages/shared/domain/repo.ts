@@ -13,12 +13,6 @@ export const repoSummarySchema = /*#__PURE__*/ z.object({
 });
 export type RepoSummary = z.infer<typeof repoSummarySchema>;
 
-// bridge.CodeWorkspaceService.ImportRepo's own result — a plain RepoSummary today (no import-time
-// warning to surface), kept as its own named type so a later phase can widen it without touching
-// every call site's return type.
-export const repoImportResultSchema = repoSummarySchema;
-export type RepoImportResult = RepoSummary;
-
 // C5 §7.1: one `git status --porcelain=v2` snapshot taken alongside the listing, collapsed to the
 // four-value glyph the tree renders — 'M' modified, 'A' added, 'D' deleted, '?' untracked. A path
 // absent from `status` is unchanged.

@@ -48,8 +48,7 @@ import { connectionRow, findRow, openRowMenu } from './support/tree';
 //    Palette, Window ▸ Next/Previous/Close Tab, View ▸ Find/Refresh/Run Statement/Run All. Unlike
 //    `console.spec.ts`'s Undo/Redo (which keeps its keyboard half because CodeMirror's own
 //    `history()`/`historyKeymap` is a real, independent, renderer-owned keydown handler), every one
-//    of these is a `global: true` binding (`shared/domain/shortcuts.ts`) — by that file's own
-//    comment, a `global` binding's accelerator is owned *exclusively* by the native menu
+//    of these is a native-menu accelerator binding (`shared/domain/shortcuts.ts`) — its accelerator is owned *exclusively* by the native menu
 //    (`main/menu.ts` pre-cutover, the Go-side Wails menu post-cutover) and "never a local keydown
 //    handler". Confirmed by reading `App.vue`: every one of `onCommandPalette`/`onTabNext`/
 //    `onTabPrev`/`onTabClose`/`onViewFind`/`onViewRefresh`/`onViewRun`/`onViewRunAll` is wired to a

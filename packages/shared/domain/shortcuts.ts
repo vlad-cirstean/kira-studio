@@ -1,10 +1,9 @@
-// P21 §8.16's "single data file" promise, finally true: the one table every consumer derives
-// from — main/menu.ts's native accelerators, the context menu's displayed shortcut text
-// (renderer/shortcuts/keys.ts's formatShortcut), and the local DOM-scoped keydown handlers
-// (matchesShortcut) that own every `global: false` row. A displayed shortcut and the shortcut
-// that actually runs can no longer drift, because both read the same entry by id.
+// The one table the context menu's displayed shortcut text (formatShortcut) and the local
+// DOM-scoped keydown handlers (matchesShortcut) both read by id, so a displayed shortcut and the
+// one that runs cannot drift. The native menu accelerators are Go's own copy
+// (apps/*/internal/shell/accel.go).
 export interface Chord {
-  /** Electron accelerator key name: 'C', 'F2', 'Return', 'Delete', 'Backspace', 'Tab', ','. */
+  /** Key name: 'C', 'F2', 'Return', 'Delete', 'Backspace', 'Tab', ','. */
   key: string;
   cmdOrCtrl?: true;
   /** Literal Control on every platform, unlike cmdOrCtrl — what Control+Tab needs. */
@@ -15,73 +14,50 @@ export interface Chord {
 
 export interface Binding {
   chord: Chord;
-  /** Platform override. Only ever set on global: false bindings — accelerator() never needs it. */
+  /** Platform override, read by the local keydown matcher. */
   mac?: Chord;
-  /** true => main/menu.ts emits it as an Electron accelerator; false => a local keydown owns it. */
-  global: boolean;
 }
 
 export const SHORTCUTS = {
-  'app.settings': { chord: { key: ',', cmdOrCtrl: true }, global: true },
-  'app.newConnection': { chord: { key: 'N', cmdOrCtrl: true }, global: true },
-  'view.toggleProjectPanel': { chord: { key: 'B', cmdOrCtrl: true }, global: true },
-  'view.toggleOperationsPanel': { chord: { key: 'J', cmdOrCtrl: true }, global: true },
-  'view.commandPalette': { chord: { key: 'P', cmdOrCtrl: true, shift: true }, global: true },
-  // C9 D5: VS Code's own ⌘P/⌘⇧P split — files vs commands. Free: no existing binding used ⌘P.
-  'view.quickOpen': { chord: { key: 'P', cmdOrCtrl: true }, global: true },
-  'view.find': { chord: { key: 'F', cmdOrCtrl: true }, global: true },
-  'view.refresh': { chord: { key: 'F5' }, global: true },
-  'view.run': { chord: { key: 'Return', cmdOrCtrl: true }, global: true },
-  'view.runAll': { chord: { key: 'Return', cmdOrCtrl: true, shift: true }, global: true },
+  'app.settings': { chord: { key: ',', cmdOrCtrl: true } },
+  'app.newConnection': { chord: { key: 'N', cmdOrCtrl: true } },
+  'view.toggleProjectPanel': { chord: { key: 'B', cmdOrCtrl: true } },
+  'view.toggleOperationsPanel': { chord: { key: 'J', cmdOrCtrl: true } },
+  'view.commandPalette': { chord: { key: 'P', cmdOrCtrl: true, shift: true } },
+  'view.find': { chord: { key: 'F', cmdOrCtrl: true } },
+  'view.refresh': { chord: { key: 'F5' } },
+  'view.run': { chord: { key: 'Return', cmdOrCtrl: true } },
+  'view.runAll': { chord: { key: 'Return', cmdOrCtrl: true, shift: true } },
   // P13 D7: VS Code's own Format Document chord — ⌥⇧F on macOS — so it's the one a user already
   // has in their fingers.
-  'view.format': { chord: { key: 'F', shift: true, alt: true }, global: true },
-  'tab.next': { chord: { key: 'Tab', ctrl: true }, global: true },
-  'tab.prev': { chord: { key: 'Tab', ctrl: true, shift: true }, global: true },
-  'tab.close': { chord: { key: 'W', cmdOrCtrl: true }, global: true },
-  'window.new': { chord: { key: 'N', cmdOrCtrl: true, shift: true }, global: true },
-  'window.close': { chord: { key: 'W', cmdOrCtrl: true, shift: true }, global: true },
+  'view.format': { chord: { key: 'F', shift: true, alt: true } },
+  'tab.next': { chord: { key: 'Tab', ctrl: true } },
+  'tab.prev': { chord: { key: 'Tab', ctrl: true, shift: true } },
+  'tab.close': { chord: { key: 'W', cmdOrCtrl: true } },
+  'window.new': { chord: { key: 'N', cmdOrCtrl: true, shift: true } },
+  'window.close': { chord: { key: 'W', cmdOrCtrl: true, shift: true } },
 
-  'grid.copy': { chord: { key: 'C', cmdOrCtrl: true }, global: false },
-  'grid.paste': { chord: { key: 'V', cmdOrCtrl: true }, global: false },
-  'grid.edit': { chord: { key: 'Return' }, global: false },
-  'grid.duplicateRows': { chord: { key: 'D', cmdOrCtrl: true }, global: false },
+  'grid.copy': { chord: { key: 'C', cmdOrCtrl: true } },
+  'grid.paste': { chord: { key: 'V', cmdOrCtrl: true } },
+  'grid.edit': { chord: { key: 'Return' } },
+  'grid.duplicateRows': { chord: { key: 'D', cmdOrCtrl: true } },
   'grid.deleteRows': {
     chord: { key: 'Delete' },
     mac: { key: 'Backspace', cmdOrCtrl: true },
-    global: false,
   },
 
-  'tree.open': { chord: { key: 'Return' }, global: false },
-  'tree.copyName': { chord: { key: 'C', cmdOrCtrl: true }, global: false },
+  'tree.open': { chord: { key: 'Return' } },
+  'tree.copyName': { chord: { key: 'C', cmdOrCtrl: true } },
   'tree.copyUri': {
     chord: { key: 'C', shift: true, alt: true },
     mac: { key: 'C', alt: true, cmdOrCtrl: true },
-    global: false,
   },
-  'tree.rename': { chord: { key: 'F2' }, global: false },
-  'tree.duplicate': { chord: { key: 'D', cmdOrCtrl: true }, global: false },
+  'tree.rename': { chord: { key: 'F2' } },
+  'tree.duplicate': { chord: { key: 'D', cmdOrCtrl: true } },
   'tree.delete': {
     chord: { key: 'Delete' },
     mac: { key: 'Backspace', cmdOrCtrl: true },
-    global: false,
   },
 } satisfies Record<string, Binding>;
 
 export type ShortcutId = keyof typeof SHORTCUTS;
-
-function chordToAccelerator(chord: Chord): string {
-  const parts: string[] = [];
-  if (chord.cmdOrCtrl) parts.push('CmdOrCtrl');
-  if (chord.ctrl) parts.push('Control');
-  if (chord.shift) parts.push('Shift');
-  if (chord.alt) parts.push('Alt');
-  parts.push(chord.key);
-  return parts.join('+');
-}
-
-/** 'CmdOrCtrl+Shift+P'. Called only by main/menu.ts, only over global bindings. */
-export function accelerator(id: ShortcutId): string {
-  const binding: Binding = SHORTCUTS[id];
-  return chordToAccelerator(binding.chord);
-}

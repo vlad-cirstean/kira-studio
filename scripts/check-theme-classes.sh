@@ -102,9 +102,7 @@ check_class_in_attrs() {
 
 # check_no_kui_class
 # P131 Part 3 §6.3: every `kui-*` class the C1-era `check_kui_class` guarded one name at a time is
-# gone from GU/KU along with the `Kui*` components that carried them -- `kira-ui/src` keeps only
-# `KuiColumnResizeHandle.vue` (its own literal `kui-column-resize-handle` hook class, the sole
-# surviving exception) and `floatingPosition.ts`, neither Tailwind-scanned. One guard replaces the
+# gone from GU/KU along with the `Kui*` components that carried them. One guard replaces the
 # 30 individual `check_kui_class` calls: any `kui-[a-z-]+` token in a `class="..."`/`:class="..."`
 # value is a regression, full stop. Same attribute scope and comment-line exclusion as the retired
 # per-name checks it replaces.
@@ -112,8 +110,7 @@ check_no_kui_class() {
   hits=$(grep -rnP --include='*.vue' --include='*.ts' \
     -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
-    grep -P '(?<![-\w])kui-[a-z-]+(?![-\w])' |
-    grep -vP '(?<![-\w])kui-column-resize-handle(?![-\w])' || true)
+    grep -P '(?<![-\w])kui-[a-z-]+(?![-\w])' || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: retired kui-* class still used -- replace with a shadcn-vue component from @theme/components/ui:" >&2
     echo "$hits" >&2
