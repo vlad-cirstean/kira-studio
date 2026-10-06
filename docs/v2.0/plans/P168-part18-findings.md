@@ -22,6 +22,7 @@ top). Reviewer reports only; no source edited. Paths as in plan: `GC` = `package
 - Block 4 (search): done.
 - Block 5 (ops and side state): done.
 - Block 6 (`git-core` models, preflight, settings, util, ports): done.
+- Block 7 (tests and conventions): done. Review complete.
 
 ## Findings
 
@@ -299,6 +300,39 @@ design; `coerceSettings` reports unknown keys and type failures without throwing
 `parentIndex` mapping to `null`; `testing/packedChunk.ts` has no production importer (only
 `apps/kira-space/tsconfig.tests.json` and test files).
 
+### Block 7: tests and conventions
+
+**F18 (low): stale comments.** Each describes code or layout that has changed:
+- `GU/state/graphView.ts:161-162` ("matching W2's own supersede-on-reopen rule for the transport
+  underneath") and `:522-523` ("W2's supersede-on-reopen rule"): Part 17 `c83845d` removed the
+  per-method supersede; the instance's own `#abortController` is what supersedes.
+- `GC/search/conformance.test.ts:10`, `GC/search/differentialRunner.ts:3`,
+  `GC/search/matcher.ts:8`, `packages/git-core/testdata/searchConformance.json:2` (`_comment`):
+  name `apps/kira-studio/internal/gitsearch`; the package is `apps/kira-space/internal/gitsearch`.
+- `GC/model/operation.ts:119-121`: "Part 17's own boundary, not yet reviewed"; Part 17 is reviewed
+  and closed.
+- `GC/model/reviewRanges.ts:3`: "Imports only types from `@kira/git-ipc`"; it imports only
+  `./diff.ts` and `./review.ts` (B3 forbids the wire package here).
+(F5, F10, F13 and F17 each fix their own stale comment.) Code-read. Fix: reword each to the
+current fact or delete it.
+
+Tests against the `CLAUDE.md` bar. Qualifying specs still drive current code (`lanes.test`,
+`rowPlan.test`, `layoutStore.test`, `reviewRanges.test`, `buildCommitHits.test`, `stack.test`,
+`pr.test`, `ops.test`, `refs.test`/`repo.test` reply-ordering races, `reviewFiles.test`
+supersede). `tag.test.ts` (restates two one-line functions) and most of `working.test.ts`
+(CRUD-shaped select/refresh) sit below the bar; `CLAUDE.md` makes the bar forward-only, so they are
+not reported. Guards a fix should add: F7 (prune-on-partial-store sequence, `graphView.test.ts` or
+a `graphOrder` case), F8 (bounded retry, `graphView.test.ts` has the scriptable transport), F1
+(plan/layout identity, pure `readSlice` check); F11 adds a corpus row, not a test file. F6, F13,
+F16 are single-condition fixes: no test.
+
+Conventions: no `.vue` file is owned. `GU` state uses plain classes, not Pinia/TanStack Query
+(P99 scoped `packages/git-ui` out); F6, F9 and F10's tail-error case are hand-rolled
+request-lifecycle defects of the kind TanStack Query would own, but each has a local fix, so no
+library migration is proposed here. No finding needs a Stream A or Stream C file, so nothing goes
+to `P168-routed-from-streamB.md`; every `needs-other-part-file` tag names a Stream B file
+(Part 15 or Part 19).
+
 ## Candidate fates (plan §9)
 
 1. Dropped. Webview-side cancel is local: the webview's own `createRpcClient` rejects with a
@@ -312,7 +346,7 @@ design; `coerceSettings` reports unknown keys and type failures without throwing
 2. Dropped as its own finding. No path needs to branch on an `E_*` code: reconnect re-opens via
    `onReconnect`; `E_FRAME_TOO_LARGE` is parked (§6.7). Raw-message exits are covered by the
    OpsState error-exit finding (block 5).
-3. Confirmed stale; grouped into the comments finding (block 7).
+3. Reported in F18.
 4. Folded into F8. The re-open itself is safe: `openStream` aborts the old controller, and
    `createRpcClient`'s abort listener marks the old entry `done` and RESOLVES (`rpc.ts:323-333`),
    so the old credit gate blocks nothing. (Plan §6.3's premise that a superseded `openStream`
@@ -335,7 +369,7 @@ design; `coerceSettings` reports unknown keys and type failures without throwing
 12. Reported as F8 (verified).
 13. Reported as F12 (DESIGN-DECISION) plus F11 (repeat-count cap). `\w`, `\b`, `\d` agree (ASCII in
     both); `.` vs line terminators is already rewritten (`dialect.go:147-150`) and pinned by a corpus row.
-14. Confirmed stale; grouped into the comments finding (block 7).
+14. Reported in F18.
 15. Dropped, verified. A throwaway type probe in `GU` asserted mutual assignability of all 48 type
     names exported by both `@kira/git-core` and `@kira/git-ipc/contract.ts` (incl. `OpRequest`,
     `OpResult`, `OpErrorKind`, `RemoteOpResult`, `InProgressOperation`, `HostKind`, `LineRange`,
@@ -348,5 +382,47 @@ design; `coerceSettings` reports unknown keys and type failures without throwing
     never read on restore (`App.vue:1320-1329` reads `columnWidths`, `detailWidth`, `scrollRow`);
     rehydration replays the host cache instead. `scrollRow` bounds belong to `CommitGrid.vue`
     (Part 19).
+19. Reported in F18 (both comments confirmed stale).
 18. Dropped. Lanes past 12 clamp to the twelfth column by documented design (`rowSvg.ts:76-83`,
     `hitTest.ts:18-30`); `graphColumnWidth` and `laneAt` agree on the clamp.
+
+## Summary
+
+18 findings: 1 high (F13), 5 medium (F1, F6, F7, F14, F15), 12 low (F2, F3, F4, F5, F8, F9,
+F10, F11, F12, F16, F17, F18). F12 is DESIGN-DECISION.
+
+## Coverage (126 owned files)
+
+- Block 1, reviewed: `GU/bridge/client.ts`, `GU/state/{latestRequest,repoScopedReload,pendingSlot,
+  bootstrap}.ts`; every `TransportError` check in `GU` (own and Part 19, read); `IPC/rpc.ts`
+  client/server (read); Space `transport.ts` stream wrapper (read).
+- Block 2, reviewed: `GC/graph/{rowPlan,edges,layout,stashRows,colors,types}.ts`,
+  `GC/store/{commitStore,shaTable}.ts`, `GC/testing/packedChunk.ts`,
+  `GU/graph/{layoutClient,layout.worker,layoutStore,graphColumn,rowSvg,geometry,hitTest}.ts`,
+  `GU/graphVisibility.ts`. Skimmed: `GC/graph/lanes.ts` and `GC/store/intern.ts` (algorithm and
+  interner covered by `lanes.test`/`intern.test`; read for the frontier/patch contract only),
+  `GU/graph/palette.ts` (class-name table).
+- Block 3, reviewed: `GU/state/{graphView,packedStream,graphOrder,selection,review,reviewFiles,
+  reviewComments,viewState}.ts`, `GC/model/review.ts`. Skimmed: `GC/model/reviewRanges.ts`
+  (296-line spec drives it; checked imports and exports).
+- Block 4, reviewed: `GC/search/{query,matcher,differentialRunner,conformance.test}.ts`,
+  `testdata/searchConformance.json` (comment and coverage), `GU/state/search.ts`; Go
+  `gitsearch/{query,dialect,literal}.go` (read, plus a throwaway probe).
+- Block 5, reviewed: `GU/state/{ops,refs,stack,stash,worktrees,pr,repoSettings,repo,settings,
+  detail,detailActions,working,fileListCursor,clipboardActions}.ts`,
+  `GU/state/liveAnnouncements.ts` (failure text, stash and op sentences; other compose helpers
+  skimmed as string builders).
+- Block 6, reviewed: `GC/model/{operation,remote,stash,ref,commit,conflict,repo,tag}.ts` (types
+  checked by the assignability probe), `GC/settings/schema.ts`, `GC/util/{dateFormat,assert,
+  nfcPath,typed}.ts`, `GC/detail/find.ts`, `GC/worktree/label.ts`, `GC/index.ts`, `GU/index.ts`.
+  Skimmed: `GC/model/{status,diff}.ts` (parsers no longer on a production path except
+  `mapLineAcrossDiff`, which `diff.test` drives), `GC/util/nulSplit.ts` (dead, F17),
+  `GC/preflight/{reset,tag,types}.ts` (decision tables pinned by `reset.test`/`tag.test`; Go
+  `gitpreflight` owns the live preflight), `GC/ports/*` (interfaces only),
+  `GU/shims-vue.d.ts`, `GC/../package.json`, `GC/../tsconfig.json`.
+- Block 7: all 33 spec files read for what they guard (names and assertions); judged above.
+- Not reached: none. Parked items (plan §6.7): `DetailState` and `RefsState` would need a
+  `truncated` path; `SearchState`'s ref arm reads `RefsState`. Today an `E_FRAME_TOO_LARGE` on
+  `commit.detail` lands in `DetailState.error` as the raw message; on `refs.list` it is logged by
+  `fireAndForget` and the lists stay empty with nothing shown (same silent-reload shape as the
+  other `RepoScopedReload` classes).
