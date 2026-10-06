@@ -346,6 +346,9 @@ func metaPairsToSavedRows(pairs []grpcclient.MetaPair) []model.SavedGrpcMetaRow 
 const (
 	grpcCoalesceInterval = 60 * time.Millisecond
 	grpcCoalesceMaxBatch = 64
+	// grpcCoalesceMaxBytes bounds one batch's JSON so a stream of large messages (up to 16 MiB
+	// each) flushes per message instead of piling 64 into one Wails event.
+	grpcCoalesceMaxBytes = 4 << 20
 )
 
 // GrpcCallEvent is ChannelGrpcCall's own payload (packages/shared/domain/grpc.ts's GrpcCallEvent,
@@ -386,9 +389,15 @@ type grpcCoalescer struct {
 	gen       *appevent.Coalescer[grpcclient.Message, grpcCoalescerFinal]
 }
 
+// grpcMessageWeight counts a message by its JSON size, floored so grpcCoalesceMaxBatch small
+// messages still fill a batch.
+func grpcMessageWeight(m grpcclient.Message) int {
+	return max(len(m.JSON), grpcCoalesceMaxBytes/grpcCoalesceMaxBatch)
+}
+
 func newGrpcCoalescer(emit appcore.Emitter, windowKey, callID string) *grpcCoalescer {
 	c := &grpcCoalescer{emit: emit, windowKey: windowKey, callID: callID}
-	c.gen = appevent.NewCoalescer(grpcCoalesceInterval, grpcCoalesceMaxBatch, func(grpcclient.Message) int { return 1 }, c.flush)
+	c.gen = appevent.NewCoalescer(grpcCoalesceInterval, grpcCoalesceMaxBytes, grpcMessageWeight, c.flush)
 	return c
 }
 

@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"testing"
@@ -113,5 +114,42 @@ func TestResolveReflection_UnresponsiveServer_TimesOutBounded(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("resolveReflection did not return — it is not bounded by defaultReflectionTimeout")
+	}
+}
+
+// TestResolveSource_CancelOnlyAffectsOwnCaller is P168 Part 7 F10: one caller pressing Stop during
+// a shared reflection resolution returns Cancelled for that caller only; the other waiter still
+// gets the resolution's own outcome.
+func TestResolveSource_CancelOnlyAffectsOwnCaller(t *testing.T) {
+	old := defaultReflectionTimeout
+	defaultReflectionTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { defaultReflectionTimeout = old })
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("net.Listen: %v", err)
+	}
+	srv := grpc.NewServer()
+	blocker := &blockingReflectionServer{unblock: make(chan struct{})}
+	defer close(blocker.unblock)
+	grpc_reflection_v1.RegisterServerReflectionServer(srv, blocker)
+	go func() { _ = srv.Serve(lis) }()
+	defer srv.Stop()
+
+	src := Source{Mode: SourceReflection, Target: lis.Addr().String()}
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	cancelled := make(chan error, 1)
+	other := make(chan error, 1)
+	go func() { _, err := resolveSource(cancelCtx, src); cancelled <- err }()
+	go func() { _, err := resolveSource(context.Background(), src); other <- err }()
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	var ge *Error
+	if err := <-cancelled; !errors.As(err, &ge) || ge.Code != CodeCancelled {
+		t.Fatalf("cancelled caller err = %v, want %s", err, CodeCancelled)
+	}
+	if err := <-other; !errors.As(err, &ge) || ge.Code != CodeTransport {
+		t.Fatalf("other caller err = %v, want %s (the shared timeout), not a cancellation", err, CodeTransport)
 	}
 }

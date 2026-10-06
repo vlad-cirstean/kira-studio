@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -272,6 +273,9 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 			// times — surfacing the bare "EOF" negotiateAndListServices returns here is not
 			// legible on its own, so name what actually happened instead.
 			return nil, Transport("the reflection request ended the connection unexpectedly (" + err.Error() + ") after retrying")
+		}
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, Transport("reflection timed out")
 		}
 		return nil, Transport(err.Error())
 	}

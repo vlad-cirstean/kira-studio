@@ -296,7 +296,12 @@ func resolveSource(ctx context.Context, src Source) (*resolved, error) {
 	// F11: singleflight collapses concurrent resolveSource calls sharing key into the one call
 	// below, so two Calls (or a Call racing a Describe) against the same not-yet-cached Source
 	// only ever pay for one reflection round trip or .proto parse.
-	v, err, _ := resolveGroup.Do(key, func() (any, error) {
+	//
+	// The shared work runs detached from any one caller's ctx: the leader pressing Stop must not
+	// fail every other waiter. It stays bounded (reflection and .proto timeouts); each caller
+	// still returns on its own ctx.
+	workCtx := context.WithoutCancel(ctx)
+	ch := resolveGroup.DoChan(key, func() (any, error) {
 		// Re-check: another goroutine may have already resolved and cached key while this one
 		// waited to become the singleflight leader.
 		if r, ok := descriptorCacheGet(key); ok {
@@ -311,9 +316,9 @@ func resolveSource(ctx context.Context, src Source) (*resolved, error) {
 		var err error
 		switch src.Mode {
 		case SourceReflection:
-			r, err = resolveReflection(ctx, src)
+			r, err = resolveReflection(workCtx, src)
 		case SourceProto:
-			r, err = resolveProto(ctx, src)
+			r, err = resolveProto(workCtx, src)
 		default:
 			return nil, BadRequest(fmt.Sprintf("unrecognised descriptor source %q", src.Mode))
 		}
@@ -324,10 +329,15 @@ func resolveSource(ctx context.Context, src Source) (*resolved, error) {
 		descriptorCachePut(key, gen, r)
 		return r, nil
 	})
-	if err != nil {
-		return nil, err
+	select {
+	case <-ctx.Done():
+		return nil, Cancelled("request was cancelled")
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		return res.Val.(*resolved), nil
 	}
-	return v.(*resolved), nil
 }
 
 // InvalidateCache drops one Source's cached descriptors — the UI's explicit Reload action (D4).

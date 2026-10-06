@@ -18,6 +18,9 @@ func resolveProto(ctx context.Context, src Source) (*resolved, error) {
 		return nil, BadRequest("a .proto file is required")
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, defaultReflectionTimeout)
+	defer cancel()
+
 	// D4: import paths default to the chosen file's own directory, and the user can add more —
 	// the file's own directory always goes first so its own basename is always resolvable.
 	dir := filepath.Dir(src.ProtoPath)
