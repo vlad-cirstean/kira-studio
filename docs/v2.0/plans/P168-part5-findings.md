@@ -140,6 +140,25 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
   comment-only, route with F4's note or leave). In Go: count the filter with `model.UTF16Len`, and
   wrap `decodeAndValidate` failures in `adapters.New(adapters.CodeQuery, ...)` so they carry a code.
 
+### F8 (low) Tree service leaks raw `*adapters.Error` to Wails: every engine code arrives as `E_INTERNAL`
+
+- `apps/kira-studio/internal/tree/service.go:220-222,245-251,264-270,286-299,319-322` return the
+  backend error unchanged; `:77` cites a `wrapErr` helper that does not exist; `:155,315` map a
+  path decode failure to `ipcerr.Internal`.
+- The renderer reads codes only from `ipcerr.Error`'s JSON `Error()` string
+  (`packages/workbench/src/bridge/rpc.ts:28-55`, default `E_INTERNAL`). `adapters.Error.Error()`
+  is the bare message (`adapters/errors.go:39`). So `E_ENGINE_DOWN` (adapter gone while the service
+  still says connected, the F2/F3 teardown window), `E_CANCELLED` (user stopped the op in the
+  Operations panel), `E_TIMEOUT` (throttle wait) and `E_QUERY` all reach the renderer as
+  `E_INTERNAL`. A malformed path is reported as an internal fault, not bad input.
+- Scenario: user cancels a slow `Describe` from the Operations panel; the definition tab shows
+  "operation was cancelled" as an error with code `E_INTERNAL`. Today no tree caller branches on
+  the code (`views/definition/state.ts:69-77`, `views/grid/state.ts:113-118`), so impact is
+  wrong codes plus a broken P55 D5 contract, not a visible misroute. Code read.
+- Fix: add the missing helper in `tree/service.go`: map `*adapters.Error` to
+  `ipcerr.New(string(ae.Code), ae.Message)`, pass `*ipcerr.Error` through, wrap the rest with
+  `ipcerr.Wrap`; apply it to every backend return. Use `ipcerr.BadRequest` for path decode errors.
+
 ## Suspects (plan §9)
 
 1. Concurrent `Router.Connect` on one id: dropped. `Router.Connect`'s only caller is
@@ -153,6 +172,12 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
    treats a missing code as a generic error (`views/shared/viewOp.ts:21` gates only
    `E_ENGINE_DOWN`/`E_CONNECT`).
 5. Filter rune vs UTF-16 count: confirmed, folded into F7 (the zod side is dead code).
+3. Tree ops on `context.Background()`: dropped as a finding. Each runs inside `Host.RunOp` with a
+   minted opId, so the Operations panel can cancel it (`CancelOp`), and `Router.Disconnect`/
+   reconnect cancels it (`CancelOpsForConnection`). Only an abandoned renderer call keeps it
+   running, which matches the data-op contract (stop button, never a timeout). `KeyTypes` path
+   count is unbounded server-side (renderer caps 200, `BrowseView.vue`); a cap needs a renderer bug
+   to matter, and the op is throttled (`keyTypes` in `throttledKinds`). Path decode code: F8.
 6. Oversized page cached: confirmed as F6 (only above a 130 MB budget; default 64 MB refuses any
    page over 32 MB).
 7. Projection order on a sorted L2 key: dropped. Every SQL adapter's `ResolveProjection`
@@ -162,6 +187,11 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
    user action; bounded by objects touched in one app run. Not worth pruning logic.
 9. `port.ts` recovery and `nextId`: dropped (block 5 coverage). The real stranding path is
    F5, where Go stops answering without closing the conn.
+11. `emitJSON` back-pressure: dropped. `eventSub` (`host.go:59-122`) queues without bound and
+    without blocking the producer; `drain` is the only sender; `close` drains before closing the
+    channel. No `op:end` is dropped; ops still running at `Stop` are finished as "app exited" by
+    `finishInFlight`. Queue growth only if the SQLite write wedges, which `Stop`'s `stopWait`
+    already bounds at quit.
 10. `enqueueResponse` frame size: confirmed as F5 (error frames only; responses are pre-checked).
 12. Encode panics: dropped. `encodeSource`/`EncodePage`/`encodeTypeClass`/`encodeStrategy`/
     `encodeRedisType` panics are reached only from `encodeResponse` inside `HandleDataFrame`'s
@@ -215,3 +245,12 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
   theoretical. Every array-typed `trust` in `index.ts`/`apiControl.ts` has `?? []`. `control.ts`
   shim still imported by 47 files: not dead. `SD` path codec mirrors `model.EncodePath`/
   `DecodePath`.
+- Block 6 (tree, oplog): done. `tree/service.go`, `oplog/wire.go` read in full;
+  `bridge/tree.go` read as caller. Cache hit served before `requireConnected` is P24 D5 by design.
+  `putIfSinceUnchanged` guards a reconnect between fetch start and store. Truncated listings never
+  cached. `Invalidate(nil)` drops the connection's rows. oplog: `op:start`/`op:end` pair by opId;
+  `op:end` always follows `op:start` (`safeRun` recovers); an unmatched `op:end` falls back to kind
+  `test` as designed; incognito ops never touch `OpsRepo` but still emit live; prune every 500
+  completions plus at start; `ReconcileInterrupted` at start covers hard kills. `Command` text is
+  stored as the engine set it (redaction is the engine's job; nothing here re-expands it). No oplog
+  finding.
