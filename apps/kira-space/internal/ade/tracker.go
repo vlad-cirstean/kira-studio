@@ -24,6 +24,9 @@ import (
 const (
 	defaultGrace      = 30 * time.Second
 	defaultPendingTTL = 2 * time.Minute
+	// launchGuardWindow bounds how long an uncomposed intent blocks a repeat launch: it covers the
+	// double-click and the terminal mount round trip, not an abandoned launch.
+	launchGuardWindow = 10 * time.Second
 	defaultClaudeBin  = "claude"
 )
 
@@ -289,14 +292,15 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
 }
 
-// hasPending reports whether a prepared launch matching the filter still awaits its Compose; a
-// launch past PendingTTL no longer counts.
+// hasPending reports whether a launch matching the filter was prepared within launchGuardWindow and
+// still awaits its Compose; an older one is presumed abandoned and lets a retry through.
 func (t *Tracker) hasPending(match func(pendingIntent) bool) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.pruneExpiredPendingLocked(t.deps.Now())
+	now := t.deps.Now()
+	t.pruneExpiredPendingLocked(now)
 	for _, p := range t.pending {
-		if match(p) {
+		if now.Sub(p.CreatedAt) <= launchGuardWindow && match(p) {
 			return true
 		}
 	}

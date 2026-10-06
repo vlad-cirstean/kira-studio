@@ -168,8 +168,11 @@ func (b *TaskBoard) ensureNotOpen(tr *Tracker, rec *model.AdeSession) error {
 	if err != nil {
 		return err
 	}
-	if open != nil || tr.hasPending(func(p pendingIntent) bool { return p.ClaudeSessionID == rec.ClaudeSessionID }) {
+	if open != nil {
 		return invalid("the conversation is already open")
+	}
+	if tr.hasPending(func(p pendingIntent) bool { return p.ClaudeSessionID == rec.ClaudeSessionID }) {
+		return invalid("a launch of the conversation is already starting")
 	}
 	return nil
 }
@@ -361,7 +364,7 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 		return adewire.Launch{}, invalid("a %s session is already running", stage.Name)
 	}
 	if tr.hasPending(func(p pendingIntent) bool { return p.TaskID == tc.task.ID && p.StageID == stage.ID && p.Purpose == "" }) {
-		return adewire.Launch{}, invalid("a %s session is already starting", stage.Name)
+		return adewire.Launch{}, invalid("a %s launch is already starting", stage.Name)
 	}
 
 	lines, cwd, extra, err := b.launchDirs(ctx, tc)
@@ -456,7 +459,7 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 		return adewire.Launch{}, invalid("a session is already open on %s", sb.Name)
 	}
 	if tr.hasPending(func(p pendingIntent) bool { return p.BranchID == sb.ID }) {
-		return adewire.Launch{}, invalid("a session is already starting on %s", sb.Name)
+		return adewire.Launch{}, invalid("a launch is already starting on %s", sb.Name)
 	}
 	if has, err := b.deps.Tasks.HasRunningOn(sb.ID); err != nil {
 		return adewire.Launch{}, err

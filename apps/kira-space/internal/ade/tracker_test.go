@@ -551,3 +551,18 @@ func TestTracker_AbortDeletesFreshAndStopsResumed(t *testing.T) {
 	}
 	tr.Abort("unknown")
 }
+
+func TestTracker_HasPendingIgnoresAbandonedLaunch(t *testing.T) {
+	tr, _, _, clock := newTestTracker(t)
+	if _, err := tr.Prepare(PrepareArgs{TaskID: "t1", BranchID: "b1", Cwd: t.TempDir()}); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	onBranch := func(p pendingIntent) bool { return p.BranchID == "b1" }
+	if !tr.hasPending(onBranch) {
+		t.Fatal("fresh intent not reported pending")
+	}
+	clock.advance(launchGuardWindow + time.Second)
+	if tr.hasPending(onBranch) {
+		t.Fatal("abandoned intent still blocks a retry")
+	}
+}
