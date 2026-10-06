@@ -157,14 +157,90 @@ a non-http(s) URL is a silent no-op (F4). UI copy ("Remove") promises no more th
 delete. Gaps: F3, F4. Exact-cookie half stays parked. No Part 7 path depends on the old
 `getRequestBody` error text (`git grep getRequestBody` hits `repos/collections.go` only).
 
+### Block 2: variables and secrets
+
+#### F9 (low) `apivars.Deps.Cipher` is carried but never read
+
+- `apps/kira-studio/internal/apivars/vars.go:26-33`, `:46-47`; callers `main.go:95`,
+  `apivars/resolve_test.go:107`, `bridge/grpc_test.go:161`.
+- Scenario: `git grep "deps.Cipher"` finds no reader; the field comment says every secret path goes
+  through `Repo`'s own cipher. A second key handle in a secret-handling service invites a future
+  caller to decrypt outside the repo's scope rules. Maintainability only.
+- Fix: drop `Deps.Cipher` and the `cipher` parameter from `apivars.New`; update the three callers.
+
+No other block 2 finding. Verified:
+- Corpus (`apivars/testdata/substitution.json`) covers unbalanced braces, empty span, nested
+  `{{a{{b}}}}`, whitespace, `|` names, unknown transform, dynamic and deferred spans, base64decode
+  padding, urldecode, `ß` upper. Probe: Go `cases.Upper/Lower(language.Und)` and Bun
+  `toUpperCase/toLowerCase` agree on `ß`, `İ`, final sigma, `ŉ`, `ﬁ`, `ǅ` (candidate 9 dropped).
+- Candidate 10 dropped: a resolved value is inserted raw by design in both stages (TS stage 1
+  does the same for plain values); only unresolved spans are sanitised. A CRLF value in a header
+  fails in `net/http` with the header name only; in a URL it fails `url.Parse`, whose quoted echo
+  is F1.
+- `reveal.go:63`/`:72` log the id and the authorizer or repo error text; `RevealValue` errors are
+  repo/cipher errors (no plaintext). Confirmation honoured only on `Unavailable` (`localauth.Gated`).
+- P108 F5/F6 hold (`nestedDeferredSecretRefs`, undecryptable secret left verbatim).
+
+### Block 3: gRPC client
+
+#### F10 (low) a stopped reflection resolution reports `E_GRPC_TRANSPORT` and fails every singleflight waiter
+
+- `apps/kira-studio/internal/grpcclient/descriptors.go:299-326` (`resolveGroup.Do` runs the
+  leader's `ctx`), `reflect.go:263-277`, `:288-299` (every non-Unimplemented failure becomes
+  `Transport(err.Error())`, including a context cancel), `proto.go:35-39` (a cancelled compile
+  becomes `SchemaError`).
+- Scenario: tab A and tab B call methods on the same not-yet-cached reflection Source. Tab A's
+  Call is the singleflight leader; the user presses Stop on tab A during reflection (`Host.RunOp`
+  cancels `runCtx`). `negotiateAndListServices` fails with `codes.Canceled`; `resolveReflection`
+  returns `E_GRPC_TRANSPORT "context canceled"`. Tab A shows a transport failure instead of a
+  cancellation (`terminalOutcome`'s Canceled mapping is never reached on this path), and tab B,
+  whose own context is live, receives the same shared error and fails too. Read-through of
+  `singleflight.Group.Do` semantics; no probe (needs a stalled reflection server).
+- Fix: in `resolveSource` use `resolveGroup.DoChan` with the shared work running under
+  `context.WithoutCancel(ctx)` (already bounded by `defaultReflectionTimeout` inside
+  `resolveReflection`; add the same bound for `resolveProto`), and `select` on the caller's own
+  `ctx.Done()` to return `Cancelled(...)` for that caller only. In `resolveReflection`, map a
+  failure while `ctx.Err() != nil` to `Cancelled` (or `Transport("reflection timed out")` for
+  the deadline) rather than `Transport(err.Error())`.
+
+#### F11 (low) stream event coalescer batches by count only
+
+- `apps/kira-studio/internal/bridge/grpc.go:346-349`, `:391` (`appevent.NewCoalescer(...,
+  grpcCoalesceMaxBatch, func(grpcclient.Message) int { return 1 }, ...)`); per-message cap
+  `grpcclient/call.go` `maxRecvMsgSize` 16 MiB.
+- Scenario: a server stream of large messages (each up to 16 MiB on the wire, larger as
+  protojson). Up to 64 messages accumulate in one batch before a flush, so one Wails event can
+  carry about 1 GiB of JSON; the renderer parses it in one go and the Go side holds the batch plus
+  the 100 stored messages (`maxStoredMessages`) at once. The coalescer's size callback already
+  exists for weighting; it is set to a constant.
+- Fix: weight by `len(m.JSON)` and give the coalescer a byte budget (e.g. 4 MiB per batch), so a
+  single large message flushes alone; keep the 64-message count cap for small messages.
+
+No other block 3 finding. Verified:
+- Candidate 7 dropped: each reflection response is bounded by grpc-go's default 4 MiB receive
+  cap on the reflection stream, and the whole resolution by `defaultReflectionTimeout` (30 s);
+  `linker.link` recursion depth is the dependency chain length (Go stacks grow), cycle guard holds.
+- Candidate 8: confirmed only as F11; stored messages are capped at 100 and history at 64 KiB
+  per message (`repos/grpc_history.go:16-17`).
+- Candidate 11 dropped: `unix://`/`passthrough://` targets and `CAFile` come only from the
+  first-party renderer; Postman import skips gRPC items and no other input path writes a saved
+  gRPC request.
+- Every `ClientConn` is closed on all paths (`Unary` defer, `openStream` returns conn on later
+  errors, reflection defer). Metadata keys validated and lowercased; `-bin` values are encoded by
+  grpc-go. `maskGrpcError`/`maskGrpcResult` run before the terminal event and history. P108 F1,
+  F4, F11, F13 hold.
+
 ## Coverage
 
 - Block 1 (HTTP client): done. Reviewed `httpclient/{client,options,body,cookies,timeline,wire,errors}.go`,
   `cookies_test.go`, `bridge/http.go` (Send, resolveSendOptions, secretReplacer, maskSecrets,
   maskSendErrTimeline, mapHttpError, cookie methods), `repos/response_history.go` Record,
   `repos/history.go` Record.
-- Block 2: not reached.
-- Block 3: not reached.
+- Block 2 (variables and secrets): done. Reviewed `apivars/{resolve,transforms,reveal,vars}.go`,
+  the corpus, `bridge/variables.go`, `localauth.Gated`, `repos.VariablesRepo.ApplyBulk`.
+- Block 3 (gRPC client): done. Reviewed `grpcclient/{target,call,descriptors,reflect,proto,errors}.go`,
+  `bridge/grpc.go` (Describe, Call, runServerStream, coalescer, recordGrpcHistory, masking,
+  mapGrpcError), `repos/grpc_history.go` caps.
 - Block 4: not reached.
 - Block 5: not reached.
 - Block 6: not reached.
