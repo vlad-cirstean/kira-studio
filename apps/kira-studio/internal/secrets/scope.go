@@ -15,11 +15,14 @@ const (
 	// ScopeMaskKey is M5's own per-connection correlation key (plan §2.5) — connections.
 	// mask_correlation_key, read and written only by repos.MaskKeysRepo.
 	ScopeMaskKey Scope = "mask-key"
+	// ScopeConnectionURI seals the whole connection URI (P181) — connections.uri, read and written
+	// only by repos.SecretsRepo.
+	ScopeConnectionURI Scope = "connection-uri"
 )
 
 func (s Scope) valid() bool {
 	switch s {
-	case ScopeConnection, ScopeVariable, ScopeVariableHistory, ScopeMaskKey:
+	case ScopeConnection, ScopeVariable, ScopeVariableHistory, ScopeMaskKey, ScopeConnectionURI:
 		return true
 	}
 	return false

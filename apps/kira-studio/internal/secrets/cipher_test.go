@@ -233,7 +233,7 @@ func TestAnUnknownScopeIsRefusedByBothDirections(t *testing.T) {
 	}
 }
 
-// TestScopeStringsAndEnvelopePrefixAreFrozen guards the storage format itself: each of these four
+// TestScopeStringsAndEnvelopePrefixAreFrozen guards the storage format itself: each of these five
 // literals is load-bearing for every secret already on disk under it, so a rename here must be a
 // deliberate, visible diff — not an accidental refactor slipping through.
 func TestScopeStringsAndEnvelopePrefixAreFrozen(t *testing.T) {
@@ -251,5 +251,8 @@ func TestScopeStringsAndEnvelopePrefixAreFrozen(t *testing.T) {
 	}
 	if ScopeMaskKey != "mask-key" {
 		t.Errorf("ScopeMaskKey = %q, want %q", ScopeMaskKey, "mask-key")
+	}
+	if ScopeConnectionURI != "connection-uri" {
+		t.Errorf("ScopeConnectionURI = %q, want %q", ScopeConnectionURI, "connection-uri")
 	}
 }
