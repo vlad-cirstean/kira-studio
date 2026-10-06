@@ -5,14 +5,14 @@ import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { cloneWorkflow, moved, newStage } from '../board/workflowForm';
 import { useRepos, useSaveWorkflow } from '../queries';
-import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { Stage, Workflow, WorkflowEntry } from '../wire';
 import AdeStageCard from './AdeStageCard.vue';
 
 // Form mode (R26): edits a local copy of the last valid workflow and saves it whole, 500 ms after
 // the last edit and on leaving. A push never replaces a copy that has unsaved edits.
 const props = defineProps<{ entry: WorkflowEntry }>();
-const ui = useAdeBoardUiStore();
+const wfUi = useAdeWorkflowsUiStore();
 const repos = useRepos();
 const save = useSaveWorkflow();
 
@@ -104,7 +104,7 @@ onBeforeUnmount(() => {
         type="button"
         class="cursor-pointer border-0 bg-transparent p-0 text-kira-sm text-info underline"
         data-testid="ade-wf-switch-yaml"
-        @click="ui.workflowMode = 'yaml'"
+        @click="wfUi.workflowMode = 'yaml'"
       >
         Switch to YAML
       </button>
@@ -115,7 +115,7 @@ onBeforeUnmount(() => {
     <button
       type="button"
       class="cursor-pointer border-0 bg-transparent p-0 text-kira-md text-info underline"
-      @click="ui.workflowMode = 'yaml'"
+      @click="wfUi.workflowMode = 'yaml'"
     >
       Fix it in YAML
     </button>

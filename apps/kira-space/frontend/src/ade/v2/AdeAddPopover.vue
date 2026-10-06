@@ -10,18 +10,20 @@ import AdeCandidateRow from './AdeCandidateRow.vue';
 import { parseJira } from './jira';
 import { repoColor } from './palette';
 import { useAddExistingBranch, useCandidates, useCreateTask, useRepos } from './queries';
+import { useAdeAddUiStore } from './state/adeAddUi';
 import { useAdeBoardUiStore } from './state/adeBoardUi';
 import type { CandidateBranch } from './wire';
 
 // Add: a new task (lands in Later, branchless) or an existing branch of any repo.
 const ui = useAdeBoardUiStore();
+const addUi = useAdeAddUiStore();
 const open = computed({
-  get: () => ui.addOpen,
+  get: () => addUi.addOpen,
   set: (v) => {
-    ui.addOpen = v;
+    addUi.addOpen = v;
   },
 });
-const attachTo = computed(() => ui.attachTo);
+const attachTo = computed(() => addUi.attachTo);
 const tab = ref('new');
 const error = ref('');
 
@@ -39,11 +41,11 @@ const createTask = useCreateTask();
 
 watch(open, (o) => {
   if (!o) {
-    ui.attachTo = null;
+    addUi.attachTo = null;
     return;
   }
   error.value = '';
-  if (ui.attachTo) tab.value = 'branch';
+  if (addUi.attachTo) tab.value = 'branch';
   if (picked.value.length === 0) {
     const first = repos.data.value?.repos[0];
     if (first) picked.value = [first.codeRepoId];

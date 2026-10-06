@@ -3,7 +3,8 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { OpenSessionEvent } from '../wire';
 
-// Board view state: which page is open and what the panel shows. The three Plan toggles persist
+// Board view state: which page is open and what the panel shows. Workflows, Repos and the Add
+// popover keep their own state in `adeWorkflowsUi`, `adeReposUi` and `adeAddUi`. The three Plan toggles persist
 // per window profile; selection and the last refresh summaries are in memory only.
 export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const view = ref<'plan' | 'backlog' | 'needs' | 'workflows' | 'repos'>('plan');
@@ -14,16 +15,8 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const branchTab = ref('details');
   /** Session selected in the Sessions tab (`null` = first listed). */
   const sessionId = ref<string | null>(null);
-  /** Workflows page: selected file name (`null` = first listed) and editor mode. */
-  const workflowFile = ref<string | null>(null);
-  const workflowMode = ref<'form' | 'yaml'>('form');
-  /** Repos page: selected repo (`null` = first listed). */
-  const repoId = ref<string | null>(null);
   /** Days of history shown beyond the settings window after a Go to; in memory only. */
   const historyReach = ref<number | null>(null);
-  /** The Add popover: open state, and the task it attaches an existing branch to (else a new task). */
-  const addOpen = ref(false);
-  const attachTo = ref<{ taskId: string; title: string } | null>(null);
   /** A See error click asked the open branch panel to scroll to its Worktree setup block. */
   const focusSetup = ref(false);
   /** Task whose agent Run dialog is open. */
@@ -62,17 +55,6 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     sessionId.value = e.sessionId;
   }
 
-  /** Opens the Workflows page on `fileName`. */
-  function openWorkflow(fileName: string | null): void {
-    workflowFile.value = fileName;
-    view.value = 'workflows';
-  }
-
-  function openAttach(taskId: string, title: string): void {
-    attachTo.value = { taskId, title };
-    addOpen.value = true;
-  }
-
   function toggleRepo(codeRepoId: string): void {
     hiddenRepoIds.value = hiddenRepoIds.value.includes(codeRepoId)
       ? hiddenRepoIds.value.filter((id) => id !== codeRepoId)
@@ -86,12 +68,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     taskTab,
     branchTab,
     sessionId,
-    workflowFile,
-    workflowMode,
-    repoId,
     historyReach,
-    addOpen,
-    attachTo,
     runTaskId,
     focusSetup,
     actionError,
@@ -103,8 +80,6 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     selectBranch,
     openTask,
     openSession,
-    openWorkflow,
-    openAttach,
     toggleRepo,
   };
 });

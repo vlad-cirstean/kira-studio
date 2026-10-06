@@ -4,19 +4,19 @@ import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group'
 import { useClipboard } from '@vueuse/core';
 import AdeTip from '../AdeTip.vue';
 import { useWorkflowYaml } from '../queries';
-import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { WorkflowEntry } from '../wire';
 import AdeWorkflowForm from './AdeWorkflowForm.vue';
 import AdeWorkflowYaml from './AdeWorkflowYaml.vue';
 
 // One workflow: mode toggle, file path, Copy YAML, then the Form or YAML pane.
 const props = defineProps<{ entry: WorkflowEntry }>();
-const ui = useAdeBoardUiStore();
+const wfUi = useAdeWorkflowsUiStore();
 const yaml = useWorkflowYaml(() => props.entry.fileName);
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
 
 function setMode(v: unknown): void {
-  if (v === 'form' || v === 'yaml') ui.workflowMode = v;
+  if (v === 'form' || v === 'yaml') wfUi.workflowMode = v;
 }
 </script>
 
@@ -27,7 +27,7 @@ function setMode(v: unknown): void {
         type="single"
         variant="outline"
         size="sm"
-        :model-value="ui.workflowMode"
+        :model-value="wfUi.workflowMode"
         aria-label="Editor mode"
         data-testid="ade-wf-mode"
         @update:model-value="setMode"
@@ -51,7 +51,7 @@ function setMode(v: unknown): void {
         {{ copied ? 'Copied' : 'Copy YAML' }}
       </Button>
     </div>
-    <AdeWorkflowYaml v-if="ui.workflowMode === 'yaml'" :entry="entry" />
+    <AdeWorkflowYaml v-if="wfUi.workflowMode === 'yaml'" :entry="entry" />
     <AdeWorkflowForm v-else :entry="entry" />
   </div>
 </template>

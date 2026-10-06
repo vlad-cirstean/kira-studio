@@ -5,12 +5,12 @@ import { computed, ref } from 'vue';
 import type { CardModel } from '../plan/usePlanModel';
 import { useSetTaskWorkflow, useWorkflows } from '../queries';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
-import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import AdeStageBlock from './AdeStageBlock.vue';
 
 // Task tab Workflow section (SPEC2 section 7): the workflow picker, then one block per stage.
 const props = defineProps<{ card: CardModel }>();
-const ui = useAdeBoardUiStore();
+const wfUi = useAdeWorkflowsUiStore();
 const workflows = useWorkflows();
 const setWorkflow = useSetTaskWorkflow();
 const error = ref('');
@@ -30,7 +30,7 @@ async function pick(value: unknown): Promise<void> {
 
 function edit(): void {
   const hit = valid.value.find((v) => v.wf.id === props.card.task.workflowId);
-  ui.openWorkflow(hit?.file ?? null);
+  wfUi.openWorkflow(hit?.file ?? null);
 }
 </script>
 

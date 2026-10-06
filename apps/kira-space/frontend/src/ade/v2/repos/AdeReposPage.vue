@@ -5,12 +5,12 @@ import { Switch } from '@theme/components/ui/switch';
 import { computed, ref } from 'vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import { useAddFolder, useImportRepo, useRemoveFolder, useRepos, useSetFolderWatch } from '../queries';
-import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeReposUiStore } from '../state/adeReposUi';
 import { TONE } from '../tones';
 import AdeRepoDetail from './AdeRepoDetail.vue';
 
 // Repos page (SPEC2 section 6.3): imported folders and repos on the left, the picked repo's settings right.
-const ui = useAdeBoardUiStore();
+const reposUi = useAdeReposUiStore();
 const repos = useRepos();
 const addFolder = useAddFolder();
 const watchFolder = useSetFolderWatch();
@@ -19,7 +19,7 @@ const importRepo = useImportRepo();
 
 const list = computed(() => repos.data.value?.repos ?? []);
 const folders = computed(() => repos.data.value?.folders ?? []);
-const current = computed(() => list.value.find((r) => r.codeRepoId === ui.repoId) ?? list.value[0] ?? null);
+const current = computed(() => list.value.find((r) => r.codeRepoId === reposUi.repoId) ?? list.value[0] ?? null);
 
 const newFolder = ref('');
 const newRepo = ref('');
@@ -69,7 +69,7 @@ async function onAddRepo(): Promise<void> {
   repoError.value = '';
   try {
     const repo = await importRepo.mutateAsync(path);
-    ui.repoId = repo.id;
+    reposUi.repoId = repo.id;
     newRepo.value = '';
   } catch (err) {
     repoError.value = message(err);
@@ -145,7 +145,7 @@ async function onAddRepo(): Promise<void> {
         :style="{ borderLeftColor: current?.codeRepoId === r.codeRepoId ? TONE.amber[2] : 'transparent' }"
         data-testid="ade-repo-row"
         :data-repo-id="r.codeRepoId"
-        @click="ui.repoId = r.codeRepoId"
+        @click="reposUi.repoId = r.codeRepoId"
       >
         <AdeRepoTag :code-repo-id="r.codeRepoId" :label="r.nickname || r.name" class="px-2 py-0.5 text-kira-lg" />
         <span class="max-w-full truncate font-data text-kira-sm text-fg" :title="r.name">{{ r.name }}</span>

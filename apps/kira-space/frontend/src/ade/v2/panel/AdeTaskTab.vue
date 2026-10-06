@@ -12,6 +12,7 @@ import { statusWhy, taskPatch } from '../board/panelFacts';
 import { repoColor } from '../palette';
 import { type CardModel, usePlanModel } from '../plan/usePlanModel';
 import { useAddTaskRepo, useRepos, useUpdateTask } from '../queries';
+import { useAdeAddUiStore } from '../state/adeAddUi';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE } from '../tones';
 import type { TaskPatch } from '../wire';
@@ -25,6 +26,7 @@ const props = defineProps<{ card: CardModel }>();
 const { liveNow } = usePlanModel();
 
 const ui = useAdeBoardUiStore();
+const addUi = useAdeAddUiStore();
 const update = useUpdateTask();
 const addRepo = useAddTaskRepo();
 const repos = useRepos();
@@ -198,7 +200,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           size="xs"
           class="h-[22px] text-kira-sm"
           data-testid="ade-add-branch"
-          @click="ui.openAttach(task.id, card.title)"
+          @click="addUi.openAttach(task.id, card.title)"
         >
           + Add branch
         </Button>

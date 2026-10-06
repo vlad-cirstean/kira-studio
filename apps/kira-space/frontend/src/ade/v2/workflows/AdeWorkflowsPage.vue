@@ -4,13 +4,13 @@ import { Input } from '@theme/components/ui/input';
 import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { useImportWorkflow, useNewWorkflow, useWorkflows } from '../queries';
-import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import { TONE } from '../tones';
 import type { WorkflowEntry } from '../wire';
 import AdeWorkflowEditor from './AdeWorkflowEditor.vue';
 
 // Workflows page (SPEC2 section 5.1): the list of workflow files beside the editor for the picked one.
-const ui = useAdeBoardUiStore();
+const wfUi = useAdeWorkflowsUiStore();
 const workflows = useWorkflows();
 const importWf = useImportWorkflow();
 const newWf = useNewWorkflow();
@@ -18,14 +18,14 @@ const newWf = useNewWorkflow();
 const entries = computed(() => workflows.data.value?.workflows ?? []);
 const dir = computed(() => workflows.data.value?.dir ?? '');
 const current = computed(
-  () => entries.value.find((e) => e.fileName === ui.workflowFile) ?? entries.value[0] ?? null,
+  () => entries.value.find((e) => e.fileName === wfUi.workflowFile) ?? entries.value[0] ?? null,
 );
 
 // A file that is broken on disk has no form to show: open it in YAML mode.
 watch(
   () => current.value?.fileName,
   () => {
-    if (current.value?.error) ui.workflowMode = 'yaml';
+    if (current.value?.error) wfUi.workflowMode = 'yaml';
   },
   { immediate: true },
 );
@@ -44,8 +44,8 @@ async function runImport(): Promise<void> {
   listError.value = '';
   try {
     const entry = await importWf.mutateAsync({ path });
-    ui.workflowFile = entry.fileName;
-    ui.workflowMode = 'yaml';
+    wfUi.workflowFile = entry.fileName;
+    wfUi.workflowMode = 'yaml';
     importPath.value = '';
     importOpen.value = false;
   } catch (err) {
@@ -57,8 +57,8 @@ async function createNew(): Promise<void> {
   listError.value = '';
   try {
     const entry = await newWf.mutateAsync({ name: 'New workflow' });
-    ui.workflowFile = entry.fileName;
-    ui.workflowMode = 'form';
+    wfUi.workflowFile = entry.fileName;
+    wfUi.workflowMode = 'form';
   } catch (err) {
     listError.value = err instanceof Error ? err.message : String(err);
   }
@@ -126,7 +126,7 @@ async function createNew(): Promise<void> {
         :style="{ borderLeftColor: current?.fileName === e.fileName ? TONE.amber[2] : 'transparent' }"
         data-testid="ade-wf-row"
         :data-file="e.fileName"
-        @click="ui.workflowFile = e.fileName"
+        @click="wfUi.workflowFile = e.fileName"
       >
         <span class="flex w-full items-center gap-1.5">
           <span class="min-w-0 flex-1 truncate text-kira-lg font-semibold" data-testid="ade-wf-row-name">{{
