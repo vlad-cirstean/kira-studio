@@ -103,8 +103,7 @@ function hoverMessage(
     `**${rangeLabel(block)}** · ${isReviewed ? 'reviewed' : 'not reviewed'}\n\n` +
       `[${actionLabel}](command:${command}?${args})`,
   );
-  // D2b: an allow-list of exactly these two commands, never a blanket `true` — house-consistent
-  // with reviewView.ts's own enableCommandUris discipline.
+  // D2b: an allow-list of exactly these two commands, never a blanket `true`.
   md.isTrusted = { enabledCommands: [MARK_REVIEWED_COMMAND, MARK_UNREVIEWED_COMMAND] };
   return md;
 }

@@ -81,8 +81,8 @@ export function buildWebviewDocument(opts: WebviewDocumentOptions): string {
   // strings (a branch name, reachable through `review.open`) into this island, and
   // `JSON.stringify` does not escape "<" — `git check-ref-format` permits it, so a branch named
   // e.g. `a</script><script>…` closes this JSON island early and injects arbitrary markup into the
-  // document. Escaping "<" to its JSON-safe `<` unicode escape is the standard fix (the
-  // resulting text is still valid, identical JSON — `<` decodes back to "<"), and is why the
+  // document. Escaping "<" to its JSON-safe `\u003c` unicode escape is the standard fix (the
+  // resulting text is still valid, identical JSON — `\u003c` decodes back to "<"), and is why the
   // CSP nonce above is a real, load-bearing second line of defence rather than decoration.
   const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
 

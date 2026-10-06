@@ -1,6 +1,6 @@
 /**
  * The extension-host half of the postMessage channel (P3 W10) — the "~ten lines of channel
- * adapter" `packages/ipc/src/rpc.ts` leaves to each host. `webview.postMessage` takes no
+ * adapter" `@kira/git-ipc`'s `createRpcClient`/`createRpcServer` leave to each host. `webview.postMessage` takes no
  * transfer list at all (confirmed against `@types/vscode`'s own signature — `transfer` is
  * accepted here only for interface parity with `MessageChannelLike` and otherwise ignored), so
  * every buffer structured-clones rather than transfers — the design does not change, W17
@@ -19,7 +19,7 @@
  *
  * The webview's own half (running inside the iframe, never importing `vscode`) is
  * `src/webview/main.ts` — a separate, browser-only entry point built and loaded like any other
- * host's UI bootstrap (`apps/harness/src/main.ts`'s precedent), implementing this same
+ * host's UI bootstrap, implementing this same
  * `MessageChannelLike` shape against `window.addEventListener("message")` /
  * `acquireVsCodeApi().postMessage`, declaring the exact same constant — a mismatch between the
  * two is not a type error, it is a webview that silently renders an empty graph (P15's W5).

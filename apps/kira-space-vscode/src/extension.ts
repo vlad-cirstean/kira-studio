@@ -389,10 +389,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.registerFileDecorationProvider(virtualFileDecoration),
   );
 
-  // D17/D18: the graph webview view is registered as this phase's own first step -- the graph
-  // renders end to end from here on, with refs.list/status.get/undo.peek/stash.list rejecting
-  // E_UNKNOWN_METHOD on every repo open until G5/G8 close them (documented, not a regression).
-  //
   // G6/D15: `createProxyHandlers` needs `revealReview`, and `revealReview` needs the review
   // provider, which needs `handlers` — the smallest honest break in that cycle is a `let` binding
   // assigned on the next line, read only inside the closure (never before it is set: `review.open`
@@ -447,7 +443,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   reviewProvider = new KiraReviewViewProvider({
     extensionUri: context.extensionUri,
     handlers,
-    context,
     connection: manager,
   });
 

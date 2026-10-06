@@ -19,31 +19,15 @@ import * as vscode from 'vscode';
 import { toWireConnectionState } from './connection.ts';
 import type { ReviewTarget } from './html.ts';
 import { renderHtml } from './html.ts';
-import { WebviewProviderBase, type WebviewProviderBaseDeps } from './webviewProviderBase.ts';
+import { WebviewProviderBase } from './webviewProviderBase.ts';
 
 const REVIEW_FOCUS_COMMAND = 'kiraSpace.review.focus';
-
-export interface KiraReviewViewProviderDeps extends WebviewProviderBaseDeps {
-  // G19 D11b: not read by this class directly (review.session.save/.load's own handler lives in
-  // proxyHandlers.ts, already closed over context.workspaceState there) — threaded here only so
-  // this provider's own deps stay a complete, self-contained bundle, the same shape its
-  // constructor already takes everything else through. A small, mechanical addition, not new
-  // state: extension.ts's own activate() already holds this.
-  readonly context: vscode.ExtensionContext;
-}
 
 export class KiraReviewViewProvider extends WebviewProviderBase {
   /** The target a cold `resolveWebviewView` should seed into the bootstrap island — set by
    *  `reviewBranch` before the view is revealed, read (and left in place, so a subsequent hide/
    *  reveal without an intervening `reviewBranch` call still repaints the same review) here. */
   #pendingTarget: ReviewTarget | null = null;
-
-  // Narrows the base constructor's `WebviewProviderBaseDeps` to `KiraReviewViewProviderDeps` so
-  // `context` stays required at every call site — `context` itself is never read here (see the
-  // interface's own doc comment).
-  constructor(deps: KiraReviewViewProviderDeps) {
-    super(deps);
-  }
 
   protected bootstrap(webviewView: vscode.WebviewView): string {
     const { extensionUri, connection } = this.deps;

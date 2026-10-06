@@ -22,11 +22,7 @@
  * "Open in graph" needs no G4 capability at all: it only names a commit, so it goes straight to
  * `KiraGraphViewProvider.runUiAction('revealCommit', {repoId, sha})` (D10) — the extension's own
  * route into an already-mounted (or cold) graph webview, the same one every palette command uses.
- * It also accepts an explicit `{repoId, sha}` argument, bypassing tab resolution entirely — this
- * is what lets `ReviewCommitRow.vue`'s own "Open in graph" hover action (D8 row 2) reach this same
- * command through a `command:` URI (`reviewView.ts`'s `enableCommandUris`) without a new bridge
- * request: VS Code's command-URI mechanism is not part of the RPC contract, so D8 stays true to
- * its own "no RPC changes" fence while still routing through this one real implementation.
+ * It also accepts an explicit `{repoId, sha}` argument, bypassing tab resolution entirely.
  */
 import type { EditorIntegration } from '@kira/git-core';
 import * as vscode from 'vscode';
