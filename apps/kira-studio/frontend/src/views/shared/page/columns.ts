@@ -201,8 +201,9 @@ export function initialWidthsByIndex(page: TabularPage): number[] {
 // scroll's velocity (the plan's F5) — these are a defensible first guess, to be re-set once
 // window.__kiraScrollTrace (D2) reports one from real hardware. Extra runway costs compositing
 // memory while flinging only (WEBVIEW-SCROLL-MEMORY.md §6) — accepted (F7) as a trade, not free.
-export const BASE_LEAD_PX = OVERSCAN_PX;
-export const BASE_TRAIL_PX = OVERSCAN_PX;
+// Row-axis runway, tuned independently of OVERSCAN_PX (column-axis clamp); defaulted equal.
+export const BASE_LEAD_PX = 560;
+export const BASE_TRAIL_PX = 560;
 /** Provisional (see above): extra lead px granted per px/frame of measured velocity. */
 export const LEAD_FRAMES = 6;
 /** Provisional (see above): hard ceiling on the lead side regardless of velocity. */
@@ -232,12 +233,12 @@ export const MAX_NEW_CELLS_PER_RENDER = 600;
 // ceiling and the step-6 floor short-circuit unchanged. Lowering this makes the runway grow in
 // small even steps instead of one large step followed by a cliff (a variance reduction, not a
 // total-work reduction), and it trades directly against how fast the runway converges
-// (uncoveredPx). Defaulted EQUAL to MAX_NEW_CELLS_PER_RENDER — i.e. behaviourally neutral, byte-
+// (uncoveredPx). Literal matches MAX_NEW_CELLS_PER_RENDER on purpose — i.e. behaviourally neutral, byte-
 // identical to today's emitted range — because nobody has a real-hardware number for it yet;
 // docs/PERF.md §2.1c step 4 is the A/B that sets it. Same precedent as forceSyncScrollingOverride
 // (main.ts): a dial with a documented default, not a silent behaviour change. Consumed by
 // views/shared/slick/kiraSlickGrid.ts's own getRenderedRange override, step 7.
-export const MAX_NEW_LEAD_CELLS_PER_RENDER = MAX_NEW_CELLS_PER_RENDER;
+export const MAX_NEW_LEAD_CELLS_PER_RENDER = 600;
 
 // P22 iter2-pacing D1. Provisional, same epistemic status as LEAD_FRAMES/MAX_LEAD_PX/
 // MAX_NEW_CELLS_PER_RENDER: how long the viewport must go without a native scroll event before a
