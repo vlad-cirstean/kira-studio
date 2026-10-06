@@ -2778,7 +2778,7 @@ human approval always re-admits.
 
 **Version compatibility is hard lockstep, negotiated in that same handshake.**
 `gitrpc.ContractVersion` and `packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are one number
-(**44** today, since P173 added `StatusSummary.autoFetch`, the `autoFetch.changed` event and `graph.reportFailure`; 43 was P172's refusal of prepare-script writes from `repoSettings.set` and removal of `settings.setGitPath`), asserted equal by tests
+(**45** today, since P178 stopped sending `credential.request` to socket clients, refused `credential.provide` and `repoSettings.set` on `git.sock`, added `capabilities.editRepoSettings` and `app.init.dateFormat`, and dropped the `kiraSpace.log.level` leaf; 44 was P173's `StatusSummary.autoFetch`, the `autoFetch.changed` event and `graph.reportFailure`; 43 was P172's refusal of prepare-script writes from `repoSettings.set` and removal of `settings.setGitPath`), asserted equal by tests
 on both sides, and it is the *sole* compatibility authority — not the
 app version, not a side file. A mismatch is a blocking panel in the extension naming both versions,
 never a degraded mode: the app's own P119 update never touches the separately-installed extension,
@@ -2882,11 +2882,19 @@ GitServer (internal/gitsock)
 - **The undo slot is one per repository**, not per connection, and names the originating client in
   its own label, so a second window reads "Undo reset of `main` (window: repo-review)" rather than
   an anonymous or misattributed action.
-- **Credential prompts go to whichever connection owns the in-flight remote op; pairing prompts
-  always stay in Kira Space.** The split is deliberate and the two questions are genuinely
-  different: "what is the password for this one push" is about an action the user just took in
-  *that* window, while "should this window ever talk to me at all" is a trust decision belonging to
-  the trust authority. `internal/gitaskpass` brokers the first over its own private socket behind a
+- **Credential prompts for a socket client's op and for ADE open in Kira Space, as pairing prompts
+  do (P178).** Config and Space-held prompts live in Space; the extension keeps only VS Code-owned
+  UI. A VS Code window never shows a credential prompt: `git.sock` sends it no `credential.request`
+  and refuses its `credential.provide` with `E_READ_ONLY`. A relay (`internal/gitcred.Relay`)
+  holds each prompt, labelled `<source> · <repo folder>`, and pushes the full pending list on
+  `kira:git:credential`. The `gitCredential` Pinia store queues them behind the native stream's
+  own prompts in the one dialog. When the relay withdraws a prompt (answered elsewhere, op
+  cancelled, 120 s timeout), the next snapshot closes the stale dialog. With no Space window open,
+  an arriving prompt opens one as a Dock click would (U1); otherwise it focuses the first window.
+  ADE's board connection uses the same relay; the `kira:adetask:credential` channel is gone.
+  `internal/gitaskpass` still brokers the prompt over its own private socket behind a
+  `GIT_ASKPASS` shim, relaying to whichever `gitsession.Conn` owns the op — routed to the relay for
+  socket and ADE connections, to the native stream's own dialog for the native window's op (P67e). `internal/gitaskpass` brokers the first over its own private socket behind a
   `GIT_ASKPASS` shim, relaying to whichever `gitsession.Conn` owns the op — an external, paired VS
   Code extension window for its own op, or (as of P67e) Kira Space's own native window for the
   native stream's own op, since that stream now has real writes to prompt for. If that connection
@@ -2938,7 +2946,7 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (**57 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**44**, P173), and the wire types |
+| `gitrpc` | The method table (**57 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**45**, P178), and the wire types |
 | `gitsock` | The Unix listener, length-prefixed framing, the handshake, the pairing broker, the trust store and stale-socket recovery |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
@@ -3093,9 +3101,17 @@ keybindings and colors, and — as above — **no configuration properties**. It
 `packages/git-ipc`'s `socketChannel.ts`: `net.connect` plus length-prefixed framing behind the same
 `MessageChannelLike` seam a `webview.postMessage` channel satisfies, which is why swapping the
 transport was a channel change rather than a rewrite. A handful of host-capability calls — dialogs,
-clipboard, "open externally", editor integration, workspace roots, storage, logger, theme, windows,
-credential prompt — are answered **locally** by the extension's own ports rather than round-tripped
-to Go.
+clipboard, "open externally", editor integration, workspace roots, storage, logger, theme, windows
+— are answered **locally** by the extension's own ports rather than round-tripped to Go. The
+criterion (P178): config and Space-held prompts live in Space; the extension keeps VS Code-owned UI.
+The manifest sets `capabilities.untrustedWorkspaces.supported: false`, so the extension runs only in
+a trusted workspace and the prepare-script capability is always `true` from VS Code; Space runs only
+the script it stores. The extension logs through a `LogOutputChannel` (VS Code owns the level).
+Repository settings are edited in Kira Space only: `git.sock` refuses `repoSettings.set` with
+`E_READ_ONLY`, `app.init` reports `capabilities.editRepoSettings` (Space native `true`, VS Code
+`false`), and the settings dialog is hidden under VS Code. The per-repo `kiraSpace.log.level` leaf
+is gone (it was never read). The VS Code graph follows Space's app-wide `appearance.dateFormat`,
+carried in `app.init.dateFormat` and read at each `app.init`.
 
 | Package | Holds |
 |---|---|
@@ -3801,7 +3817,7 @@ and `docs/v2.0/plans/`.
   `board.OnTUIStopped` as the tracker's stopped handler.
 - `bridge.AdeTaskService` binds 53 methods (`grep -c '^func (s \*AdeTaskService)'`; 53 `adeTask*` entries
   in `frontend/src/bridge/index.ts`). Push channels (`bridge/adewire/channels.go`): `kira:adetask:` +
-  `board`, `backlog`, `workflows`, `repos`, `runs`, `log`, `sessions`, `credential` (focused window)
+  `board`, `backlog`, `workflows`, `repos`, `runs`, `log`, `sessions`
   and `open-session` (`EmitTo` one window).
 - `bridge/adewire` is the frozen wire contract; `tests/fixtures/ade-v2/` holds 28 fixtures decoded by
   `adewire/wire_test.go` and the mock runtime. `layeringtest.RunAllowing` admits `adewire`.
@@ -3844,7 +3860,8 @@ and `docs/v2.0/plans/`.
   on env change and on each repo refresh; failure reports `unknown`. The stale note counts commits
   (`1 commit ... is missing`, `N commits ... are missing`).
 - `ForcePush` runs `--force-with-lease --force-if-includes`. Credential prompts route through the git
-  module's askpass broker as `kira:adetask:credential`, answered by `ProvideCredential`.
+  module's askpass broker to the Space credential relay (`kira:git:credential`), answered in the
+  shared dialog.
 - `Archive` is `ArchiveRisk` (dirty and unmerged work per worktree) then `ArchiveTask`: it stops the
   task's runs and prepare scripts, closes its terminals, removes worktrees, moves the task to history.
   No discard flag in the engine; "Delete anyway" is the dialog's own choice.
@@ -4434,6 +4451,7 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **P178 behaviours are unverified in a real VS Code host and on macOS.** Restricted Mode (`untrustedWorkspaces.supported: false`), the Space window opening or focusing over VS Code on a relay prompt (macOS activation), and `LogOutputChannel` level handling ran only in the harness and Kira Space UI tier. Delete once checked on a Mac with a real VS Code window (P180).
 - **P173 failure banner and auto-fetch marker are unobserved in a real VS Code host.** Verified only in the interaction harness (Chromium, fake host) and Kira Space's WebKit UI tier; a real 32 MiB result through Wails is also unexercised. Delete once checked in a real VS Code window against a running Kira Space.
 - **A paired git socket token is a bearer secret, not bound to the peer (P172).** Any same-user process holding the token connects. Pairing shows the kernel-reported process, but reconnects do not re-check it. Options: pin the pairing-time executable or code signature, or accept the same-user threat model. Open user decision; delete when resolved.
 - **Console reads on PostgreSQL and MySQL/MariaDB drain past the cap (P174).** At the cap `rows.Close()` discards the remaining rows off the wire: memory is bounded, server and network time are not. The Stop button ends a long drain. Delete once a driver offers a cheap server-side stop that keeps later statements in the batch intact.
