@@ -5,7 +5,7 @@ import type { Environment } from '../wire';
 import { useCommitField } from './useCommitField';
 
 // One environment of a repo: its name and the script that prints the deployed SHA.
-const props = defineProps<{ env: Environment; index: number; save: (env: Environment) => Promise<void> }>();
+const props = defineProps<{ env: Environment; index: number; busy?: boolean; save: (env: Environment) => Promise<void> }>();
 const emit = defineEmits<{ remove: [] }>();
 
 const name = useCommitField(
@@ -47,6 +47,7 @@ const script = useCommitField(
         size="icon-xs"
         class="size-7 text-error"
         aria-label="Remove environment"
+        :disabled="busy"
         data-testid="ade-env-remove"
         @click="emit('remove')"
       >

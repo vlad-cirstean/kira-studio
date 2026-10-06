@@ -2,7 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useUpdateRepo } from '../queries';
 import type { Environment, Repo, RepoPatch } from '../wire';
 import AdeRepoEnvRow from './AdeRepoEnvRow.vue';
@@ -65,11 +65,28 @@ async function writeEnvs(envs: Environment[]): Promise<void> {
 function saveEnv(i: number, env: Environment): Promise<void> {
   return writeEnvs(props.repo.environments.map((e, k) => (k === i ? env : e)));
 }
+
+// Rows are keyed by a client id that follows the env through add and remove, so a row's uncommitted
+// text stays with it. Writes send the whole list, so Add and Remove wait for the one in flight.
+const keys = ref<string[]>([]);
+watch(
+  () => props.repo.environments.length,
+  (n) => {
+    while (keys.value.length < n) keys.value.push(crypto.randomUUID());
+    keys.value.length = n;
+  },
+  { immediate: true },
+);
+function resetKeys(): void {
+  keys.value = props.repo.environments.map(() => crypto.randomUUID());
+}
 function removeEnv(i: number): void {
-  void writeEnvs(props.repo.environments.filter((_, k) => k !== i)).catch(() => undefined);
+  keys.value.splice(i, 1);
+  writeEnvs(props.repo.environments.filter((_, k) => k !== i)).catch(resetKeys);
 }
 function addEnv(): void {
-  void writeEnvs([...props.repo.environments, { name: 'new-env', deployedShaScript: '' }]).catch(() => undefined);
+  keys.value.push(crypto.randomUUID());
+  writeEnvs([...props.repo.environments, { name: 'new-env', deployedShaScript: '' }]).catch(resetKeys);
 }
 </script>
 
@@ -160,10 +177,11 @@ function addEnv(): void {
       </div>
       <AdeRepoEnvRow
         v-for="(e, i) in repo.environments"
-        :key="i"
+        :key="keys[i] ?? i"
         :env="e"
         :index="i"
         :save="(env) => saveEnv(i, env)"
+        :busy="update.isPending.value"
         @remove="removeEnv(i)"
       />
       <span v-if="envError" class="text-kira-sm text-error" data-testid="ade-repo-env-error">{{ envError }}</span>
@@ -171,6 +189,7 @@ function addEnv(): void {
         variant="dialog"
         size="sm"
         class="h-7 self-start border-dashed bg-transparent px-3 text-kira-md"
+        :disabled="update.isPending.value"
         data-testid="ade-repo-add-env"
         @click="addEnv"
       >
