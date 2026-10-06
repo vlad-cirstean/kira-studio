@@ -394,6 +394,38 @@ Status: blocks 1-6 done.
   `layoutCurrent`, and pass the grid's `columnWidths.graph` in as the gutter width (or drop the
   claim from the comment).
 
+### F24. Repository settings: unvalidated page size, silent failed save, stale draft reverts
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/dialogs/RepoSettingsDialog.vue` `onPageSizeChange`
+  (`Number(value)`: an emptied field is `0`, `min`/`max` on the `<Input type="number">` are not
+  enforced outside a form submit), `save()` (awaits `repoSettingsState.set`, which rethrows the
+  `repoSettings.set` rejection, `state/repoSettings.ts:105-112`; no catch, no error text), and
+  the `open` watch (draft copied once at open; `repoSettings.changed` while open does not refresh
+  it).
+- Scenario: (a) Clear the page-size field and Save: `0` is sent; a server-side rejection leaves
+  the dialog open with no message and an unhandled rejection. (b) Dialog open in VS Code; the
+  same repo's stash default is changed from Space; the user changes only the date format and
+  saves: `draft['kiraSpace.stash.includeUntracked']` (old) differs from `current` (new), so the
+  patch silently writes the old value back.
+- Fix: clamp/validate page size against `SETTINGS[...].minimum/maximum` and disable Save on an
+  invalid value; catch in `save()` and render the error in the dialog; build the patch against
+  the snapshot the draft was taken from (keep `draftBase`), so only fields the user edited are
+  sent.
+
+### F25. Confirm dialogs opt out of a description, so destructive advisories are not announced
+
+- Severity: low. Code-read.
+- Where: every `components/dialogs/*.vue` passes `:aria-describedby="undefined"` to
+  `DialogContent` (e.g. `ResetDialog.vue:82`, `ForcePushDialog.vue:87`, `CheckoutDialog.vue:75`,
+  `StashDialog.vue:267`); `@theme/components/ui/dialog` exports `DialogDescription`.
+- Scenario: screen-reader user opens Reset (hard) or Force push. Focus moves into the dialog and
+  only the title ("Move main to abc1234 — …") is announced; "3 commits will leave main" or the
+  overwrite warning is read only if the user explores the body.
+- Fix: wrap each dialog's first advisory paragraph in `DialogDescription` (drop the explicit
+  `undefined`) for the confirm dialogs (Checkout, Revert, Reset, Cherry-pick, Force push, Pull,
+  Post-checkout pull, Stash pop).
+
 ## Candidate fates (§9)
 
 - 1 (lanes blank after layout lands): dropped. Probe passed for expand, toggle and refresh;
@@ -433,6 +465,9 @@ Status: blocks 1-6 done.
 - 13 (`linkify.ts`): dropped. Only `https?://` matches, segments become a `<button>` calling the
   host's `onOpenExternal` or inert text, never an `<a href>`; it runs in Vue-rendered
   `CommitMeta`, not a SlickGrid formatter, so listeners die with their nodes.
+- 16 (`crypto.subtle` outside a secure context): dropped. Every real origin is a secure context:
+  `vscode-webview://` (VS Code), Wails' localhost origin (Space), `http://127.0.0.1` (Playwright
+  harnesses) and `http://localhost` (Vite dev) are all potentially trustworthy.
 - 18 (comment over 100 columns, `searchResultsModel.ts:52-53`): held for grouping with a comment
   finding.
 
@@ -484,4 +519,14 @@ holds; dispose checked in block 2.
   `icons/setiFileIcon.ts` (tested; mask URLs, no `v-html`), `icons/index.ts` (constants),
   `icons/codicon.css` (font import). `FILE_TREE_ROW_CAP` plus "Show all" bounds a 50k-file
   commit; the cap announcement fires once per boundary crossing.
-- Blocks 6-8: not reached yet.
+- Block 6: done. Reviewed `ForcePushDialog`, `RepoSettingsDialog`, `TagDialog`,
+  `tagDialogModel.ts` (annotated-preserve rule correct; message newlines pass through), `ResetDialog`
+  (template head), the submit/close paths of all 16 dialogs (grep plus read), `PendingSlot` use:
+  every op that sets `busy` does so before `ask()` (checkout, reset, revert, cherry-pick, stash
+  pop), so a second invocation returns early; `#runForcePush` does not set `busy` during the
+  dialog, but a second `ask()` there only orphans the first Promise (no state latched). Skimmed with
+  reason (same `v-if`/`:open` shell and preflight rendering as the read ones, no new logic):
+  `CheckoutDialog`, `RevertDialog`, `CherryPickDialog`, `PullDialog`, `PostCheckoutPullDialog`,
+  `BranchDialog`, `RenameRefDialog`, `StackDialog`, `WorktreeDialog` (beyond the result check and
+  digest), `StashDialog` preview tokens, `PreflightPrediction`.
+- Blocks 7-8: not reached yet.
