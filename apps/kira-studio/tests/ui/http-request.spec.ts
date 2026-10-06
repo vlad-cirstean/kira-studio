@@ -479,6 +479,17 @@ test('Http request — an incognito tab sends with incognito:true and is never i
   // Everything up to here is ordinary, persisted tab activity — the assertion below is scoped to
   // what happens *after* the toggle (the phase's own "prospective, not retroactive" rule, §3.1),
   // not to the tab's whole history in this test.
+  // Wait out the URL edit's debounced save so it cannot land after the toggle and count as one.
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.tabsSave && JSON.stringify(e.args).includes('api.example.com/ping'),
+        ),
+    )
+    .toBe(true);
   const savesBeforeToggle = control.log().filter((e) => e.channel === IPC.tabsSave).length;
 
   await page.click('[data-testid="http-incognito-toggle"]');
