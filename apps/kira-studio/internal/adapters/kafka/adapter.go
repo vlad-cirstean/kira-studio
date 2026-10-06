@@ -75,9 +75,6 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		return err
 	})
 	if err != nil {
-		if code, _ := adapters.CodeOf(err); code == adapters.CodeCancelled {
-			return adapters.ConnectInfo{}, err
-		}
 		return adapters.ConnectInfo{}, mapError(err)
 	}
 	a.setConnected(cl, adm, opts, cfg.ReadOnly)

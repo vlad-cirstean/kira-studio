@@ -157,9 +157,6 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		return nil, nil, nil, mapError(err)
 	}
 	if err := closeOnError(ctx, cl, func() error { return cl.Ping(ctx) }); err != nil {
-		if code, _ := adapters.CodeOf(err); code == adapters.CodeCancelled {
-			return nil, nil, nil, err
-		}
 		// Only when the anonymous dial fails the specific way a SASL-requiring broker's own
 		// missing-credential refusal does — franz-go's own *kgo.ErrFirstReadEOF, its "is SASL
 		// missing?" diagnosis (confirmed against a real SASL_PLAINTEXT broker: an anonymous dial

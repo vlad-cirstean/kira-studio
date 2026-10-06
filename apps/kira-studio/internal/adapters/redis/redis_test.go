@@ -834,14 +834,13 @@ func TestRedis_Console_SlowCommandTimesOutWithoutResend(t *testing.T) {
 	if code, _ := adapters.CodeOf(err); code != adapters.CodeTimeout {
 		t.Fatalf("err = %v, want E_TIMEOUT", err)
 	}
-	var n int
 	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
-		if n, err = root.Get(context.Background(), key).Int(); err == nil {
+		if root.Exists(context.Background(), key).Val() == 1 {
 			break
 		}
 	}
 	time.Sleep(3 * time.Second) // a re-sent script would land a second INCR
-	if n, err = root.Get(context.Background(), key).Int(); err != nil || n != 1 {
+	if n, err := root.Get(context.Background(), key).Int(); err != nil || n != 1 {
 		t.Fatalf("script ran %d times (err %v), want exactly once", n, err)
 	}
 }
