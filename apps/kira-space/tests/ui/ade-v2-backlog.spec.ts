@@ -132,7 +132,9 @@ test('delete asks to confirm before removing', async ({ relaunch }) => {
   const del = rows(page).nth(3).locator('[data-testid="ade-backlog-delete"]');
   await del.click();
   await expect(dialog).toBeVisible();
-  await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText(items()[3]?.text ?? '');
+  await expect(page.locator('[data-testid="confirm-dialog-message"]')).toContainText(
+    items()[3]?.text ?? '',
+  );
   expect(calls(control, IPC.adeTaskDeleteBacklogItem)).toHaveLength(0);
   await page.locator('[data-testid="confirm-dialog-cancel"]').click();
   await expect(dialog).toBeHidden();
