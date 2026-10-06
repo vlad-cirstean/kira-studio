@@ -1159,12 +1159,13 @@ func (e *RepoEntry) runWriteArgvList(ctx context.Context, argvList [][]string) (
 //  3. Each argv is written in order through e.Repo.Write (F12: cross-connection serial) — the
 //     first classified failure stops the remaining argv (there is at most one entry beyond the
 //     first for any kind this phase serves, so this only matters for branchCreate+track).
-//  4. Read back head + in-progress state, ALWAYS — success or failure (a conflicting revert fails
-//     with Conflict and LEAVES REVERT_HEAD; this is what surfaces it here rather than a watcher
-//     tick).
-//  5. slot.Set(record) iff the write succeeded AND opTable[kind].Undo is undoable — consulting the
-//     table, not merely whether Prepare happened to build a record, is what keeps the policy in one
-//     place (D6).
+//  4. Arm the undo slot iff the write succeeded (or an earlier argv already landed) AND
+//     opTable[kind].Undo is undoable — consulting the table, not merely whether Prepare happened to
+//     build a record, keeps the policy in one place (D6). Armed before the read-back so a read
+//     failure never drops the record of a write that landed.
+//  5. Read back head + in-progress state, ALWAYS (a conflicting revert fails with Conflict and
+//     LEAVES REVERT_HEAD; this is what surfaces it here rather than a watcher tick). A read error
+//     degrades to the last known head; the write is still reported.
 //  6. Return OpResult{ok, error, undo (attributed for conn), head, inProgress}.
 func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op OpRequest) (result OpResult, runErr error) {
 	spec, ok := opTable[op.Kind]
@@ -1218,11 +1219,12 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 	if opErr != nil && failedAt > 0 {
 		// An earlier argv already wrote for real: the user must hear it, and the prepared undo
 		// record (captured before any write) still restores it.
-		if prep.autoStashApplied {
+		switch {
+		case prep.autoStashApplied:
 			opErr.Message += e.autoStashFailureNote(ctx)
-		} else if prep.partialNote != "" {
+		case prep.partialNote != "":
 			opErr.Message += " " + prep.partialNote
-		} else {
+		default:
 			opErr.Message += " Earlier steps of this operation were already applied."
 		}
 	}
