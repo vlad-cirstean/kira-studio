@@ -1,4 +1,4 @@
-Why (P168 Part 8 F13): read-only default token, contents: write only on the release job and the one step using GH_TOKEN, third-party actions pinned to full SHAs, Bun pinned (was latest).
+Why (P168 Part 8 F12/F13): brew install grep so check-theme-classes.sh has GNU grep -P on macOS; read-only default token, contents: write only on the release job and the one step using GH_TOKEN, third-party actions pinned to full SHAs, Bun pinned (was latest).
 
 diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
 index cd3c1b4..36c43fc 100644
@@ -74,7 +74,16 @@ index cd3c1b4..36c43fc 100644
          with:
            path: |
              apps/kira-studio/frontend/bindings
-@@ -180,6 +180,8 @@ jobs:
+@@ -108,6 +108,8 @@ jobs:
+       - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
+         run: sh scripts/setup.sh
+ 
++      - name: GNU grep for scripts/check-theme-classes.sh (macOS grep has no -P)
++        run: brew install grep
+       - run: bun run lint
+       - run: bun run typecheck
+ 
+@@ -180,6 +182,8 @@ jobs:
            EOF
  
        - name: Create draft release
@@ -83,7 +92,7 @@ index cd3c1b4..36c43fc 100644
          run: |
            gh release create "$GITHUB_REF_NAME" \
              --draft \
-@@ -188,12 +190,12 @@ jobs:
+@@ -188,12 +192,12 @@ jobs:
              kira-studio-macos-arm64.dmg \
              kira-space-macos-arm64.dmg
  
