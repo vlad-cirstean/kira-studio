@@ -988,7 +988,7 @@ const PORT: PortSnapshot[] = [
       cursor: { mode: 'offset', offset: 0 },
     },
     error: CANCEL_ERROR,
-    delayMs: 300,
+    delayMs: 5000,
   },
   {
     op: DATA_OP.read,
@@ -1519,9 +1519,6 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
 
   // --- stop: a real mid-flight cancellation, previous page stays on screen -------------------
   const firstBeforeStop = await firstGutterNumber(page);
-  await page.fill('[data-testid="filter-where-input"]', '(SELECT pg_sleep(2)) IS NULL OR id > 0');
-  await page.press('[data-testid="filter-where-input"]', 'Enter');
-  await expect(page.locator('[data-testid="toolbar-stop"]')).toBeEnabled();
   // P110 I2-4: RunState.vue's TONE lookup — while running, the label reads --kira-info (#3794ff),
   // not the idle text-subtle colour. `toolbar-stop`'s enabled state is a local, optimistic flag
   // independent of opsStore, and this mocked `ui` tier never fires real control.onOpUpdate pushes
@@ -1563,6 +1560,9 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
     command: null,
     error: null,
   });
+  await page.fill('[data-testid="filter-where-input"]', '(SELECT pg_sleep(2)) IS NULL OR id > 0');
+  await page.press('[data-testid="filter-where-input"]', 'Enter');
+  await expect(page.locator('[data-testid="toolbar-stop"]')).toBeEnabled();
   await page.click('[data-testid="toolbar-stop"]');
   // applyLoadFailure's cancelled branch clears rt.opId once the (real, captured) E_CANCELLED
   // error lands — the same flip that re-enables Refresh and disables Stop, with no op-log status
