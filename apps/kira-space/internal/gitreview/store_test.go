@@ -3,8 +3,10 @@ package gitreview
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -379,5 +381,44 @@ func TestPinnedSessionSurvivesSweepAndPurge(t *testing.T) {
 	}
 	if got, _ := s.Records(ctx, "r", "pinned"); len(got) != 0 {
 		t.Fatalf("unpinned purge kept %d records", len(got))
+	}
+}
+
+func TestStoreClose_ConcurrentCloseIsSafeAndStoreStaysClosed(t *testing.T) {
+	ctx := context.Background()
+	s := NewStore(filepath.Join(t.TempDir(), "review.db"))
+	if _, err := s.Branches(ctx, "r"); err != nil {
+		t.Fatalf("Branches: %v", err)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.Close(); err != nil {
+				t.Errorf("Close: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	if _, err := s.Branches(ctx, "r"); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("Branches after Close = %v, want ErrStoreClosed", err)
+	}
+	if s.reapStop != nil || s.sqlDB != nil {
+		t.Fatal("closed store reopened or leaked a reaper")
+	}
+}
+
+func TestDecompress_RejectsOversizedStreamWithoutFullInflate(t *testing.T) {
+	big := make([]byte, 4<<20)
+	comp, err := Compress(big)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Decompress(comp, 10); err == nil {
+		t.Fatal("want length mismatch error")
+	}
+	if _, err := Decompress(comp, MaxSnapshotBytes+1); err == nil {
+		t.Fatal("want error for want past MaxSnapshotBytes")
 	}
 }

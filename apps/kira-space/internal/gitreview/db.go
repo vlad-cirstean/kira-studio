@@ -2,6 +2,7 @@ package gitreview
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -18,6 +19,9 @@ func DefaultPath() string {
 	return filepath.Join(config.KiraSpaceHome(), "review.db")
 }
 
+// ErrStoreClosed is returned by every store call made after Close.
+var ErrStoreClosed = errors.New("gitreview: store closed")
+
 // ensureOpen is the lazy-open guard (D3): a Store that never serves a review request never opens
 // review.db, never migrates it, and never starts the reaper. A failure here is returned to the
 // caller and NOT memoised — the next request retries, since the common failure (a full or
@@ -25,6 +29,9 @@ func DefaultPath() string {
 func (s *Store) ensureOpen() error {
 	s.openMu.Lock()
 	defer s.openMu.Unlock()
+	if s.closed {
+		return ErrStoreClosed
+	}
 	if s.sqlDB != nil {
 		return nil
 	}
@@ -71,5 +78,8 @@ func (s *Store) conn() (*sql.DB, error) {
 	s.openMu.Lock()
 	db := s.sqlDB
 	s.openMu.Unlock()
+	if db == nil {
+		return nil, ErrStoreClosed
+	}
 	return db, nil
 }

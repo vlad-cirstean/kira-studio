@@ -60,12 +60,9 @@ func normalizeStoredPaths(db *sql.DB) error {
 // path, F5). review_file/review_range/review_comment reference a session by its surrogate integer
 // id, never by repo_id, so this rename touches no foreign key at all.
 //
-// UPDATE OR REPLACE's own conflict resolution is what collapses a collision (an NFD-keyed session
-// and an already-NFC-keyed session for the same (repo_id, branch)) down to one row: the colliding
-// existing row is deleted (cascading away ITS OWN review_file/range/comment children, D4's FK) and
-// the renamed row takes its place — the documented, accepted cost of a genuine collision, which
-// requires the same repository to have been reviewed under two different byte spellings of its own
-// path, a narrow case.
+// A collision (an NFD-keyed session and an NFC-keyed session for the same (repo_id, branch))
+// keeps the NFC row, which the current build writes to, and deletes the NFD row (cascading away
+// its own children, D4's FK). The NFD row's pin carries over to the survivor.
 func normalizeSessionRepoIDs(tx *sql.Tx) error {
 	rows, err := tx.Query(`SELECT DISTINCT repo_id FROM review_session WHERE repo_id GLOB ?`, nonASCIIGlob)
 	if err != nil {
@@ -92,7 +89,15 @@ func normalizeSessionRepoIDs(tx *sql.Tx) error {
 		if normalized == repoID {
 			continue
 		}
-		if _, err := tx.Exec(`UPDATE OR REPLACE review_session SET repo_id = ? WHERE repo_id = ?`, normalized, repoID); err != nil {
+		if _, err := tx.Exec(`UPDATE review_session SET pinned = 1 WHERE repo_id = ? AND branch IN
+			(SELECT branch FROM review_session WHERE repo_id = ? AND pinned = 1)`, normalized, repoID); err != nil {
+			return fmt.Errorf("gitreview: normalize: carry pin over collision: %w", err)
+		}
+		if _, err := tx.Exec(`DELETE FROM review_session WHERE repo_id = ? AND branch IN
+			(SELECT branch FROM review_session WHERE repo_id = ?)`, repoID, normalized); err != nil {
+			return fmt.Errorf("gitreview: normalize: drop colliding session: %w", err)
+		}
+		if _, err := tx.Exec(`UPDATE review_session SET repo_id = ? WHERE repo_id = ?`, normalized, repoID); err != nil {
 			return fmt.Errorf("gitreview: normalize: rekey session repo_id: %w", err)
 		}
 	}

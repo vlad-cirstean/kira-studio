@@ -21,6 +21,10 @@ type Store struct {
 
 	reapStop chan struct{}
 	reapDone chan struct{}
+	closed   bool
+
+	closeOnce sync.Once
+	closeErr  error
 
 	locks *keyedMutex
 
@@ -82,26 +86,32 @@ func NewStore(path string) *Store {
 	return &Store{path: path, locks: newKeyedMutex()}
 }
 
-// Close stops the reaper, joins its goroutine, and closes the underlying *sql.DB — idempotent,
-// and safe to call when the store was never opened.
+// Close stops the reaper, joins its goroutine, and closes the underlying *sql.DB. Idempotent and
+// safe to call concurrently (later callers wait for the first and share its result), and safe when
+// the store was never opened. Once closed, the store never reopens: conn returns ErrStoreClosed.
 func (s *Store) Close() error {
+	s.closeOnce.Do(func() { s.closeErr = s.close() })
+	return s.closeErr
+}
+
+func (s *Store) close() error {
 	s.openMu.Lock()
-	if s.reapStop != nil {
-		close(s.reapStop)
-		done := s.reapDone
-		s.openMu.Unlock()
+	s.closed = true
+	stop, done := s.reapStop, s.reapDone
+	s.reapStop, s.reapDone = nil, nil
+	s.openMu.Unlock()
+	if stop != nil {
+		close(stop)
 		<-done
-		s.openMu.Lock()
-		s.reapStop = nil
-		s.reapDone = nil
 	}
-	defer s.openMu.Unlock()
-	if s.sqlDB == nil {
+	s.openMu.Lock()
+	db := s.sqlDB
+	s.sqlDB = nil
+	s.openMu.Unlock()
+	if db == nil {
 		return nil
 	}
-	err := s.sqlDB.Close()
-	s.sqlDB = nil
-	return err
+	return db.Close()
 }
 
 // Lock takes the per-(repoID, branch, path) mutex D12 requires review.mark to hold for the whole

@@ -50,9 +50,12 @@ func Compress(raw []byte) ([]byte, error) {
 // content_bytes column) — a corrupt or truncated BLOB is detected here (length mismatch) rather
 // than silently producing a shorter file (D9).
 func Decompress(compressed []byte, want int) ([]byte, error) {
+	if want < 0 || want > MaxSnapshotBytes {
+		return nil, fmt.Errorf("gitreview: stored length %d outside 0..%d", want, MaxSnapshotBytes)
+	}
 	r := flate.NewReader(bytes.NewReader(compressed))
 	defer r.Close()
-	raw, err := io.ReadAll(r)
+	raw, err := io.ReadAll(io.LimitReader(r, int64(want)+1))
 	if err != nil {
 		return nil, fmt.Errorf("gitreview: flate decode: %w", err)
 	}

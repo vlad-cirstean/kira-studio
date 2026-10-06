@@ -238,3 +238,38 @@ func dumpNormalizeTables(t *testing.T, db *sql.DB) string {
 
 	return b.String()
 }
+
+// A collision keeps the NFC row (the one the current build writes to), its children and the
+// NFD row's pin.
+func TestNormalizeStoredPaths_CollisionKeepsNFCSessionAndCarriesPin(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	nfd := "/repo/caf" + normalizeDecomposedE
+	nfc := "/repo/caf" + normalizeComposedE
+	rec := FileRecord{Path: "a.txt", State: "full", ReviewedAtSHA: "s", ReviewedAt: time.UnixMilli(1), ContentKind: ContentBinary}
+	for _, id := range []string{nfc, nfd} {
+		if err := s.Put(ctx, id, "main", rec, nil); err != nil {
+			t.Fatalf("Put: %v", err)
+		}
+	}
+	if err := s.SetPinned(ctx, nfd, "main", true); err != nil {
+		t.Fatalf("SetPinned: %v", err)
+	}
+	db, err := s.conn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := normalizeStoredPaths(db); err != nil {
+		t.Fatalf("normalizeStoredPaths: %v", err)
+	}
+	var sessions, files, pinned int
+	if err := db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(pinned), 0) FROM review_session WHERE repo_id = ?`, nfc).Scan(&sessions, &pinned); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM review_file`).Scan(&files); err != nil {
+		t.Fatal(err)
+	}
+	if sessions != 1 || files != 1 || pinned != 1 {
+		t.Fatalf("sessions=%d files=%d pinned=%d, want 1 1 1", sessions, files, pinned)
+	}
+}
