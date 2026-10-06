@@ -260,6 +260,8 @@ async function handleRepoOpened(repoId: string): Promise<void> {
   graphView.reset();
   graphOrder.reset();
   await graphView.openStream(repoId);
+  // An open that succeeded disproves a boot-failure banner (a reconnect or a manual pick).
+  bootError.value = undefined;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1274,6 +1276,67 @@ let lastPersisted: PersistedViewState = {
   collapseBranches: true,
 };
 
+// Registered synchronously in setup so it is bound to the component scope and stopped on unmount;
+// `bootstrap()` arms it once the persisted state is loaded.
+let persistenceArmed = false;
+watch(
+  [
+    () => repoState.value?.activeRepo.value?.repoId ?? null,
+    graphView.loadedRows,
+    detailOpen,
+    scrollRow,
+    () => selection.sha.value,
+    columnWidths,
+    dateFormat,
+    detailWidth,
+    detailState.listMode,
+    searchState.caseSensitive,
+    searchState.wholeWord,
+    searchState.regex,
+    searchState.scope,
+    searchOpen,
+    collapseBranches,
+  ],
+  ([
+    repoId,
+    loadedRows,
+    isDetailOpen,
+    row,
+    selectedSha,
+    widths,
+    format,
+    dWidth,
+    listMode,
+    searchCaseSensitive,
+    searchWholeWord,
+    searchRegex,
+    searchScope,
+    isSearchOpen,
+    isCollapseBranches,
+  ]) => {
+    if (!persistenceArmed) return;
+    lastPersisted = {
+      ...lastPersisted,
+      repoId,
+      loadedRows,
+      detailOpen: isDetailOpen,
+      scrollRow: row,
+      selectedSha,
+      columnWidths: widths,
+      dateFormat: format,
+      detailWidth: dWidth,
+      fileListMode: listMode,
+      searchCaseSensitive,
+      searchWholeWord,
+      searchRegex,
+      searchScope,
+      searchOpen: isSearchOpen,
+      collapseBranches: isCollapseBranches,
+    };
+    props.viewState.write(lastPersisted);
+  },
+);
+
 async function bootstrap(): Promise<void> {
   // P108 F7: a retry re-enters here after an earlier run already got this far — dispose that
   // run's own `SettingsState`/`RepoState` (each holds a live `bridge.on(...)` subscription) before
@@ -1294,140 +1357,89 @@ async function bootstrap(): Promise<void> {
   );
 
   const persisted = props.viewState.read();
-  let openedFromPersisted = false;
-  if (persisted) {
-    lastPersisted = persisted;
-    detailOpen.value = persisted.detailOpen;
-    columnWidths.value = persisted.columnWidths;
-    // P72 §9.1: Kira Space's own app-wide appearance.dateFormat mount option wins over whatever
-    // this webview last persisted for itself — 'vscode'/'harness' never pass one, so persisted
-    // stays the only source there, unchanged.
-    dateFormat.value = props.dateFormat ?? persisted.dateFormat;
-    detailWidth.value = persisted.detailWidth;
-    initialScrollRow.value = persisted.scrollRow;
-    detailState.setListMode(persisted.fileListMode);
-    // G23 D12/F11: the four search toggles/scope are carried through unchanged since P11 W7
-    // (this file's own comment above `lastPersisted`'s literal), but nothing read them into
-    // `searchState` until now. The query TEXT itself is deliberately never persisted (judgment
-    // call 7) -- only the widget state, same as `dateFormat`.
-    searchState.caseSensitive.value = persisted.searchCaseSensitive;
-    searchState.wholeWord.value = persisted.searchWholeWord;
-    searchState.regex.value = persisted.searchRegex;
-    searchState.scope.value = persisted.searchScope;
-    searchOpen.value = persisted.searchOpen;
-    // P93 §4.4: pushed straight to graphOrder, not through setCollapseBranches — that function
-    // also asks for a relayout, and the graphView.openStream(...) call below already produces the
-    // first one once the persisted repo's rows arrive; a relayout against the still-empty store
-    // here would just be redone.
-    collapseBranches.value = persisted.collapseBranches;
-    graphOrder.setCollapseEnabled(persisted.collapseBranches);
+  // A failure below must not leave persistence off: the persisted state is loaded, so later user
+  // changes still write.
+  try {
+    let openedFromPersisted = false;
+    if (persisted) {
+      lastPersisted = persisted;
+      detailOpen.value = persisted.detailOpen;
+      columnWidths.value = persisted.columnWidths;
+      // P72 §9.1: Kira Space's own app-wide appearance.dateFormat mount option wins over whatever
+      // this webview last persisted for itself — 'vscode'/'harness' never pass one, so persisted
+      // stays the only source there, unchanged.
+      dateFormat.value = props.dateFormat ?? persisted.dateFormat;
+      detailWidth.value = persisted.detailWidth;
+      initialScrollRow.value = persisted.scrollRow;
+      detailState.setListMode(persisted.fileListMode);
+      // G23 D12/F11: the four search toggles/scope are carried through unchanged since P11 W7
+      // (this file's own comment above `lastPersisted`'s literal), but nothing read them into
+      // `searchState` until now. The query TEXT itself is deliberately never persisted (judgment
+      // call 7) -- only the widget state, same as `dateFormat`.
+      searchState.caseSensitive.value = persisted.searchCaseSensitive;
+      searchState.wholeWord.value = persisted.searchWholeWord;
+      searchState.regex.value = persisted.searchRegex;
+      searchState.scope.value = persisted.searchScope;
+      searchOpen.value = persisted.searchOpen;
+      // P93 §4.4: pushed straight to graphOrder, not through setCollapseBranches — that function
+      // also asks for a relayout, and the graphView.openStream(...) call below already produces the
+      // first one once the persisted repo's rows arrive; a relayout against the still-empty store
+      // here would just be redone.
+      collapseBranches.value = persisted.collapseBranches;
+      graphOrder.setCollapseEnabled(persisted.collapseBranches);
 
-    // §6.3's "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
-    // wider session must not reopen the pane/drawer over a mount that starts narrower — without
-    // this, the line above would silently clobber the collapse the mount-time `breakpoint` watch
-    // (below) already applied moments earlier, since that watch runs synchronously during mount
-    // while this restore only lands later, after `bridge.init()`'s own await. Not gated on
-    // `breakpoint`'s *previous* value the way that watch is (there is no real "previous" at boot,
-    // only that watch's own initial-ref placeholder) — mounting directly into a narrow layout is
-    // exactly the case §6.3 describes, not merely a special case of resizing into one. A real
-    // selection still reopens it once `pendingSelectionSha` resolves, via the selection watch
-    // below — nothing here treats a boot with a pending selection any differently.
-    collapseIfNarrowWithNoSelection();
+      // §6.3's "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
+      // wider session must not reopen the pane/drawer over a mount that starts narrower — without
+      // this, the line above would silently clobber the collapse the mount-time `breakpoint` watch
+      // (below) already applied moments earlier, since that watch runs synchronously during mount
+      // while this restore only lands later, after `bridge.init()`'s own await. Not gated on
+      // `breakpoint`'s *previous* value the way that watch is (there is no real "previous" at boot,
+      // only that watch's own initial-ref placeholder) — mounting directly into a narrow layout is
+      // exactly the case §6.3 describes, not merely a special case of resizing into one. A real
+      // selection still reopens it once `pendingSelectionSha` resolves, via the selection watch
+      // below — nothing here treats a boot with a pending selection any differently.
+      collapseIfNarrowWithNoSelection();
 
-    if (persisted.repoId) {
-      const outcome = await repo.open(persisted.repoId);
-      if (outcome.kind === 'ok') {
-        openedFromPersisted = true;
-        if (persisted.selectedSha) pendingSelectionSha.value = persisted.selectedSha;
-        // §5.4: a freshly (re)mounted GraphViewState's own `loadedRows` starts at 0, so the
-        // default `resumeThroughRow` asks the host to replay every row it still has cached —
-        // that single round trip is the whole of "rehydrates without re-running git".
-        await graphView.openStream(outcome.repo.repoId);
+      if (persisted.repoId) {
+        const outcome = await repo.open(persisted.repoId);
+        if (outcome.kind === 'ok') {
+          openedFromPersisted = true;
+          if (persisted.selectedSha) pendingSelectionSha.value = persisted.selectedSha;
+          // §5.4: a freshly (re)mounted GraphViewState's own `loadedRows` starts at 0, so the
+          // default `resumeThroughRow` asks the host to replay every row it still has cached —
+          // that single round trip is the whole of "rehydrates without re-running git".
+          await graphView.openStream(outcome.repo.repoId);
+        }
       }
     }
-  }
 
-  // G12 D7/item 6: falls back to the workspace's own repository, multi-root aware, only when
-  // nothing persisted actually opened one — a persisted repo B must win over workspace folder A
-  // (the one ordering this must not get wrong), and NoRepositoryPanel still owns the case where
-  // no candidate is a repository at all. Mirrors extension.ts's own palette-command default
-  // rather than inventing a second policy.
-  if (!openedFromPersisted) {
-    await repo.refreshList();
-    // P108 F4: `NoRepositoryPanel.vue`'s own onMounted already calls `refreshList()` and can
-    // render candidates a user clicks while this loop is still awaiting an earlier one —
-    // `repo.activeRepo.value` is the one shared signal that a pick already won, checked before
-    // every candidate `open()` this loop is about to make, not just relied on via the sequence
-    // token inside `open()` itself.
-    for (const candidate of repo.candidates.value) {
-      if (repo.activeRepo.value) break;
-      const outcome = await repo.open(candidate.path);
-      if (outcome.kind === 'ok') {
-        await handleRepoOpened(outcome.repo.repoId);
-        break;
+    // G12 D7/item 6: falls back to the workspace's own repository, multi-root aware, only when
+    // nothing persisted actually opened one — a persisted repo B must win over workspace folder A
+    // (the one ordering this must not get wrong), and NoRepositoryPanel still owns the case where
+    // no candidate is a repository at all. Mirrors extension.ts's own palette-command default
+    // rather than inventing a second policy.
+    if (!openedFromPersisted) {
+      await repo.refreshList();
+      // P108 F4: `NoRepositoryPanel.vue`'s own onMounted already calls `refreshList()` and can
+      // render candidates a user clicks while this loop is still awaiting an earlier one —
+      // `repo.activeRepo.value` is the one shared signal that a pick already won, checked before
+      // every candidate `open()` this loop is about to make, not just relied on via the sequence
+      // token inside `open()` itself.
+      for (const candidate of repo.candidates.value) {
+        if (repo.activeRepo.value) break;
+        const outcome = await repo.open(candidate.path);
+        if (outcome.kind === 'ok') {
+          await handleRepoOpened(outcome.repo.repoId);
+          break;
+        }
+        if (outcome.kind === 'gitUnavailable') break; // git itself is blocked; GitBlockedPanel owns it.
+        if (outcome.kind === 'superseded') break; // a newer open (a user's pick) already won.
+        // 'notARepository' — a workspace folder that simply is not a repo; try the next one.
       }
-      if (outcome.kind === 'gitUnavailable') break; // git itself is blocked; GitBlockedPanel owns it.
-      if (outcome.kind === 'superseded') break; // a newer open (a user's pick) already won.
-      // 'notARepository' — a workspace folder that simply is not a repo; try the next one.
     }
+  } finally {
+    persistenceArmed = true;
   }
-
-  watch(
-    [
-      () => repoState.value?.activeRepo.value?.repoId ?? null,
-      graphView.loadedRows,
-      detailOpen,
-      scrollRow,
-      () => selection.sha.value,
-      columnWidths,
-      dateFormat,
-      detailWidth,
-      detailState.listMode,
-      searchState.caseSensitive,
-      searchState.wholeWord,
-      searchState.regex,
-      searchState.scope,
-      searchOpen,
-      collapseBranches,
-    ],
-    ([
-      repoId,
-      loadedRows,
-      isDetailOpen,
-      row,
-      selectedSha,
-      widths,
-      format,
-      dWidth,
-      listMode,
-      searchCaseSensitive,
-      searchWholeWord,
-      searchRegex,
-      searchScope,
-      isSearchOpen,
-      isCollapseBranches,
-    ]) => {
-      lastPersisted = {
-        ...lastPersisted,
-        repoId,
-        loadedRows,
-        detailOpen: isDetailOpen,
-        scrollRow: row,
-        selectedSha,
-        columnWidths: widths,
-        dateFormat: format,
-        detailWidth: dWidth,
-        fileListMode: listMode,
-        searchCaseSensitive,
-        searchWholeWord,
-        searchRegex,
-        searchScope,
-        searchOpen: isSearchOpen,
-        collapseBranches: isCollapseBranches,
-      };
-      props.viewState.write(lastPersisted);
-    },
-  );
 }
 
 // ---------------------------------------------------------------------------------------
