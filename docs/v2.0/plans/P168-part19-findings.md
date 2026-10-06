@@ -3,7 +3,7 @@
 Plan: `P168-part19-git-ui-components.md`. Base `1e2b327`; plan commit `d9d3b35`; HEAD reviewed
 `d9d3b35` (branch `p168-stream-b`). Reviewer reports only; fixes nothing.
 
-Status: blocks 1-5 done.
+Status: blocks 1-6 done.
 
 ## Checks (block 1, §1.1)
 
@@ -59,18 +59,22 @@ Status: blocks 1-5 done.
   delay with VueUse `useTimeoutFn` (about 100 ms), cancelled on unmount. Put it in F1's shared
   composable.
 
-### F3. `StashDialog` branch and save modes close after a failed op and lose the input
+### F3. Five form dialogs (seven submit paths) close after a failed op and lose the input
 
-- Severity: low. Code-read.
-- Where: `packages/git-ui/src/components/dialogs/StashDialog.vue:175-181` (`submitBranch`),
-  `:220-225` (`submitSave`). Contrast `WorktreeDialog.vue:157-163`, which stays open on
+- Severity: medium (raised from low in block 6, when the pattern turned out to span every
+  form dialog but one). Code-read.
+- Where: each awaits an `OpResult` and emits close regardless:
+  `components/dialogs/StashDialog.vue:105-117` (create), `:175-181` (`submitBranch`), `:220-225`
+  (`submitSave`); `BranchDialog.vue:52-58`; `RenameRefDialog.vue:51-52`; `TagDialog.vue:59-65`;
+  `StackDialog.vue:67-68` (set parent). Only `WorktreeDialog.vue:157-163` stays open on
   `!result.ok`.
-- Scenario: Space graph tab. "Create branch from stash", type a name another surface created a
-  moment ago (preflight raced), submit. `runStashBranch` resolves `{ ok: false }` (since Part 18
-  `4b4b5a0` it also resolves on busy/no repo/transport rejection). The dialog emits
-  `close-branch` anyway; the typed name is gone and a sighted user sees no failure (F4).
-- Fix: `const result = await props.ops.runStashBranch(...); if (!result.ok) return;` before the
-  emit, same for `runGlobalStashSave`, matching `WorktreeDialog`.
+- Scenario: Space graph tab. "Create branch from stash" (or New branch, Rename, New tag), type a
+  name that another surface created a moment ago, or submit while another op holds `busy`. The
+  op resolves `{ ok: false }` (since Part 18 `4b4b5a0` it also resolves on busy, no repo and
+  transport rejection). The dialog closes anyway, the typed name or tag message is gone, and a
+  sighted user sees no failure (F4).
+- Fix: `const result = await props.ops.<op>(...); if (!result.ok) return;` before each close
+  emit, matching `WorktreeDialog`. Optionally show the failure text inline in the dialog.
 
 ### F4. Op failures and an unrecoverable graph stream reach only an `sr-only` region
 
