@@ -106,7 +106,7 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	if err != nil {
 		return adewire.Launch{}, err
 	}
-	rec, err := b.takeOverSession(args)
+	rec, err := b.takeOverSession(tr, args)
 	if err != nil {
 		return adewire.Launch{}, err
 	}
@@ -114,6 +114,10 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	mu := b.taskMu(rec.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
+	// The check in takeOverSession ran before the lock, so a concurrent call may have opened it since.
+	if err := b.ensureNotOpen(tr, rec); err != nil {
+		return adewire.Launch{}, err
+	}
 	tc, err := b.loadTaskCtx(rec.TaskID)
 	if err != nil {
 		return adewire.Launch{}, err
@@ -154,9 +158,25 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	return launchOf(res), nil
 }
 
+// ensureNotOpen rejects a session whose conversation runs in a TUI or has one prepared and not yet
+// composed.
+func (b *TaskBoard) ensureNotOpen(tr *Tracker, rec *model.AdeSession) error {
+	if rec.Mode == model.AdeSessionModeTUI && rec.State == model.AdeSessionStateRunning {
+		return invalid("the session is already open")
+	}
+	open, err := b.runningTUI(func(s model.AdeSession) bool { return s.ClaudeSessionID == rec.ClaudeSessionID })
+	if err != nil {
+		return err
+	}
+	if open != nil || tr.hasPending(func(p pendingIntent) bool { return p.ClaudeSessionID == rec.ClaudeSessionID }) {
+		return invalid("the conversation is already open")
+	}
+	return nil
+}
+
 // takeOverSession loads the row and rejects one that is not takeable; a running headless run is
 // stopped when args allow.
-func (b *TaskBoard) takeOverSession(args adewire.TakeOverArgs) (*model.AdeSession, error) {
+func (b *TaskBoard) takeOverSession(tr *Tracker, args adewire.TakeOverArgs) (*model.AdeSession, error) {
 	rec, err := b.deps.Sessions.Get(args.SessionID)
 	if err != nil {
 		return nil, err
@@ -164,13 +184,8 @@ func (b *TaskBoard) takeOverSession(args adewire.TakeOverArgs) (*model.AdeSessio
 	if rec == nil || rec.TaskID == "" {
 		return nil, invalid("session %s is not a task session", args.SessionID)
 	}
-	if rec.Mode == model.AdeSessionModeTUI && rec.State == model.AdeSessionStateRunning {
-		return nil, invalid("the session is already open")
-	}
-	if open, err := b.runningTUI(func(s model.AdeSession) bool { return s.ClaudeSessionID == rec.ClaudeSessionID }); err != nil {
+	if err := b.ensureNotOpen(tr, rec); err != nil {
 		return nil, err
-	} else if open != nil {
-		return nil, invalid("the conversation is already open")
 	}
 	if rec.Mode == model.AdeSessionModeHeadless {
 		if err := b.stopForTakeOver(rec, args.StopIfRunning); err != nil {

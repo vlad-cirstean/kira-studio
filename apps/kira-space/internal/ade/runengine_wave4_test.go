@@ -592,3 +592,33 @@ func TestRunEngine_addExistingBranchWorktree(t *testing.T) {
 		t.Fatalf("review branch got a worktree: %s", path)
 	}
 }
+
+func TestRunEngine_takeOverConcurrentOpensOnce(t *testing.T) {
+	ctx := context.Background()
+	e := newEngine(t, map[string][]string{"*": {"sleep", "done"}})
+	e.repo("api")
+	e.workflow(flowYAML(agentStage("build", agentStep("first", "")+agentStep("second", ""))))
+	id := e.task("api")
+	e.start(id)
+	run := e.waitRun(id, "first/api", model.AdeRunRunning)
+	head, _ := e.repos.AdeSessions.Get(run.SessionID)
+	waitUntil(t, "fake claude started", func() bool { _, err := os.Stat(filepath.Join(e.fake, "api.count")); return err == nil })
+
+	const callers = 4
+	errs := make(chan error, callers)
+	for range callers {
+		go func() {
+			_, err := e.board.TakeOver(ctx, adewire.TakeOverArgs{SessionID: head.ID, StopIfRunning: true})
+			errs <- err
+		}()
+	}
+	opened := 0
+	for range callers {
+		if err := <-errs; err == nil {
+			opened++
+		}
+	}
+	if opened != 1 {
+		t.Fatalf("%d concurrent take overs opened the conversation, want 1", opened)
+	}
+}

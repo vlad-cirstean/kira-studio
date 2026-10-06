@@ -430,11 +430,8 @@ func (b *TaskBoard) SetQueuedAfter(_ context.Context, args adewire.SetQueuedAfte
 		case after.CodeRepoID != self.CodeRepoID:
 			return invalid("a branch can only be queued after a branch of the same repo")
 		}
-		for cur, hops := after, 0; cur.QueuedAfter != ""; hops++ {
-			if cur.QueuedAfter == self.ID || hops > len(byID) {
-				return invalid("queuing after that branch would form a cycle")
-			}
-			cur = byID[cur.QueuedAfter]
+		if queueCycle(byID, self.ID, after) {
+			return invalid("queuing after that branch would form a cycle")
 		}
 	}
 	if err := b.deps.Tasks.SetQueuedAfter(args.BranchID, args.AfterBranchID); err != nil {
@@ -607,4 +604,34 @@ func (b *TaskBoard) Repos(_ context.Context) (adewire.ReposResult, error) {
 		out.Folders = append(out.Folders, adewire.Folder{Path: f.Path, Watch: f.Watch, RepoCount: f.RepoCount})
 	}
 	return out, nil
+}
+
+// queueCycle reports whether walking parents from start reaches selfID. The Plan orders a branch
+// by its queue link, else by the live branch of its repo that its base names (resolveBase).
+func queueCycle(byID map[string]model.AdeTaskBranch, selfID string, start model.AdeTaskBranch) bool {
+	byName := make(map[[2]string]string, len(byID))
+	for _, br := range byID {
+		if br.Name != "" {
+			byName[[2]string{br.CodeRepoID, br.Name}] = br.ID
+		}
+	}
+	cur := start
+	for range len(byID) + 1 {
+		parent := cur.QueuedAfter
+		if parent == "" && cur.Base != "" {
+			parent = byName[[2]string{cur.CodeRepoID, cur.Base}]
+		}
+		if parent == "" || parent == cur.ID {
+			return false
+		}
+		if parent == selfID {
+			return true
+		}
+		next, ok := byID[parent]
+		if !ok {
+			return false
+		}
+		cur = next
+	}
+	return true
 }
