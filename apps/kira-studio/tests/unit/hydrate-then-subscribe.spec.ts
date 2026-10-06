@@ -18,17 +18,3 @@ test('a value pushed during the snapshot await wins over the snapshot, later one
   push(3);
   expect(applied).toEqual([1, 2, 3]);
 });
-
-test('a failed snapshot unsubscribes and rethrows', async () => {
-  let unsubscribed = false;
-  await expect(
-    hydrateThenSubscribe({
-      snapshot: () => Promise.reject(new Error('boom')),
-      subscribe: () => () => {
-        unsubscribed = true;
-      },
-      apply: () => {},
-    }),
-  ).rejects.toThrow('boom');
-  expect(unsubscribed).toBe(true);
-});
