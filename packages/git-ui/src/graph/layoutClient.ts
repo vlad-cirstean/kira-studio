@@ -1,11 +1,10 @@
 /**
  * P4 W4: the main-thread side of layout (§3.2 puts lane layout in a worker). Constructs
- * `layout.worker.ts`, tracks the request sequence and the `LayoutFrontier` between calls, and
- * exposes a promise-based `submit`. The worker itself is deliberately thin and stateless per
- * message (see its own doc comment); this file is where the state that makes incremental
- * layout possible actually lives, since `LayoutClient.submit`'s public signature hides the
- * frontier from its caller entirely — a page's layout resumes because *this* file threads the
- * previous response's frontier into the next request, not because the worker remembers it.
+ * `layout.worker.ts`, tracks the request sequence, and exposes a promise-based `submit`. The
+ * worker itself is deliberately thin and stateless per message (see its own doc comment).
+ * `GraphViewState` relays out the whole visible list on every plan change (P93 §5.3), so every
+ * request starts a fresh pass: no frontier is threaded between calls. `layoutAppend`'s own
+ * incremental contract (a frontier in, a frontier out) stays covered by `lanes.test.ts`.
  *
  * **The direction of copying is the decision here.** `LayoutInput` carries `parentOffsets` and
  * `parentRows` — views over the *whole* `CommitStore`'s parent columns, absolute-indexed,
@@ -37,20 +36,13 @@
  * is already written against a promise, unaffected either way.
  */
 
-import type {
-  LayoutChunk,
-  LayoutFrontier,
-  LayoutInput,
-  LayoutRequest,
-  LayoutResponse,
-} from '@kira/git-core';
+import type { LayoutChunk, LayoutInput, LayoutRequest, LayoutResponse } from '@kira/git-core';
 import { layoutAppend } from '@kira/git-core';
 
 export interface LayoutClient {
   submit(input: LayoutInput): Promise<LayoutChunk>;
-  /** Discards the tracked frontier and marks every not-yet-answered `submit()` stale — a
-   *  refresh or a repo switch, where the next `submit()` must start a fresh pass at row 0
-   *  rather than resume whatever the worker was mid-way through for a different repo. */
+  /** Marks every not-yet-answered `submit()` stale — a refresh, a repo switch or a newer
+   *  relayout, whose own result is the one that should land. */
   reset(): void;
   dispose(): void;
 }
@@ -112,6 +104,7 @@ function createWorker(): WorkerLike {
 }
 
 interface PendingSubmit {
+  readonly request: LayoutRequest;
   readonly resolve: (chunk: LayoutChunk) => void;
   readonly reject: (error: Error) => void;
 }
@@ -128,14 +121,17 @@ export class LayoutClientStaleError extends Error {
 }
 
 export function createLayoutClient(workerFactory: () => WorkerLike = createWorker): LayoutClient {
-  const worker = workerFactory();
+  let worker = workerFactory();
   const pending = new Map<number, PendingSubmit>();
   let nextSequence = 0;
   /** Any request whose `sequence` is strictly less than this was issued before the most recent
    *  `reset()` — its eventual response, however it turns out, must not be applied. */
   let staleBelow = 0;
-  let frontier: LayoutFrontier | undefined;
   let disposed = false;
+  /** True once any worker answered: a later `onerror` is then a per-request failure, not a
+   *  worker that never loaded. */
+  let answered = false;
+  let usingFallback = false;
 
   function settleAllPending(error: Error): void {
     for (const [sequence, request] of pending) {
@@ -144,7 +140,13 @@ export function createLayoutClient(workerFactory: () => WorkerLike = createWorke
     }
   }
 
-  worker.onmessage = (event) => {
+  function attach(target: WorkerLike): void {
+    target.onmessage = onMessage;
+    target.onerror = onError;
+  }
+
+  function onMessage(event: MessageEvent<LayoutResponse>): void {
+    answered = true;
     const response = event.data;
     const request = pending.get(response.sequence);
     if (!request) return; // no longer tracked — a duplicate delivery, which never happens, or
@@ -154,13 +156,27 @@ export function createLayoutClient(workerFactory: () => WorkerLike = createWorke
       request.reject(new LayoutClientStaleError(response.sequence));
       return;
     }
-    frontier = response.frontier;
     request.resolve(response.chunk);
-  };
+  }
 
-  worker.onerror = (event) => {
+  function onError(event: ErrorEvent): void {
+    // A module worker whose script fails to load (CSP `worker-src`, a 404 chunk after an update)
+    // is dead for good and never answers: move to the main-thread layout and replay what is
+    // pending instead of leaving every later `submit()` hanging.
+    if (!answered && !usingFallback) {
+      usingFallback = true;
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.terminate();
+      worker = createMainThreadWorker();
+      attach(worker);
+      for (const { request } of pending.values()) worker.postMessage(request);
+      return;
+    }
     settleAllPending(new Error(`layoutClient: worker error — ${event.message}`));
-  };
+  }
+
+  attach(worker);
 
   return {
     submit(input: LayoutInput): Promise<LayoutChunk> {
@@ -168,15 +184,14 @@ export function createLayoutClient(workerFactory: () => WorkerLike = createWorke
         return Promise.reject(new Error('layoutClient: submit() called after dispose()'));
       }
       const sequence = nextSequence++;
-      const request: LayoutRequest = { sequence, input, frontier };
+      const request: LayoutRequest = { sequence, input, frontier: undefined };
       return new Promise((resolve, reject) => {
-        pending.set(sequence, { resolve, reject });
+        pending.set(sequence, { request, resolve, reject });
         worker.postMessage(request); // no transfer list — see this file's own doc comment
       });
     },
     reset(): void {
       staleBelow = nextSequence;
-      frontier = undefined;
     },
     dispose(): void {
       disposed = true;
