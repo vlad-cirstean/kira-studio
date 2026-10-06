@@ -1,3 +1,4 @@
+import { ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
 import type { NeedsItem } from '../board/needsYou';
 import { useApprove, useFocusSession, useRetryRun } from '../queries';
@@ -31,7 +32,7 @@ export function useNeedsAction() {
     if (!shown) ui.openSession(local);
   }
 
-  async function perform(n: NeedsItem): Promise<void> {
+  async function run(n: NeedsItem): Promise<void> {
     delete ui.actionError[n.taskId];
     try {
       if (n.action === 'Take over') await takeOver.request(n.sessionId);
@@ -52,5 +53,17 @@ export function useNeedsAction() {
     }
   }
 
-  return { perform, openSession };
+  /** True while an action is in flight: a repeat click must not run it twice. */
+  const busy = ref(false);
+  async function perform(n: NeedsItem): Promise<void> {
+    if (busy.value) return;
+    busy.value = true;
+    try {
+      await run(n);
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  return { perform, openSession, busy };
 }

@@ -10,7 +10,7 @@ import { useNeedsAction } from './useNeedsAction';
 // One needs-you item (mockup `needs`): kind chip, age, its one action, scope, what, over the task.
 const props = defineProps<{ item: NeedsItem; taskTitle: string; taskColor: string }>();
 
-const { perform } = useNeedsAction();
+const { perform, busy } = useNeedsAction();
 const logOpen = ref(false);
 const hasLog = computed(
   () => (props.item.kind === 'stuck run' || props.item.kind === 'failed') && props.item.runIds.length > 0,
@@ -44,6 +44,7 @@ const rowBackground = computed(() => {
         size="xs"
         class="h-[26px] rounded-kira text-kira-md font-semibold"
         :style="buttonStyle"
+        :disabled="busy"
         data-testid="ade-needs-action"
         @click="perform(item)"
       >

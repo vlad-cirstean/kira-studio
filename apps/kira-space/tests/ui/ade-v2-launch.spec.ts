@@ -105,6 +105,15 @@ test('a stuck step puts Take over on the task, taken over directly', async ({ re
   expect(calls(control, IPC.adeTaskTakeOver)[0]?.args).toMatchObject({ stopIfRunning: true });
 });
 
+test('a double click on Take over launches once', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: stuckBoard() },
+  ]);
+  await page.locator(`${taskEl('T_bill')} ${t('ade-task-action-takeOver')}`).dblclick();
+  await expect.poll(() => calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
+});
+
 test('the ! circle on a stuck branch takes the run over', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskBoard, response: stuckBoard() },

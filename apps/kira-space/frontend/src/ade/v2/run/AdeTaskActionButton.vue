@@ -8,7 +8,7 @@ import { useTaskAction } from './useTaskAction';
 // The task's stage action: `▶ Run`, `▶ <Stage>`, `Take over`, `Approve`, `Retry`, `Done ›`, `Finish ✓`,
 // `Archive`; nothing otherwise.
 const props = defineProps<{ card: CardModel }>();
-const { action, perform } = useTaskAction(() => props.card);
+const { action, perform, busy } = useTaskAction(() => props.card);
 </script>
 
 <template>
@@ -17,6 +17,7 @@ const { action, perform } = useTaskAction(() => props.card);
       size="xs"
       class="h-[22px] shrink-0 rounded-kira-sm px-[9px] text-kira-sm font-semibold"
       :style="actionStyle(action.tone)"
+      :disabled="busy"
       :data-testid="`ade-task-action-${action.kind}`"
       @click.stop="perform"
     >

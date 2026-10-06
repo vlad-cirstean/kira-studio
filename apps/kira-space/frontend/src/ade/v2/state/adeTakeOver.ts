@@ -31,6 +31,7 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
 
   /** Launches the take over. Resolves with an error message, `null` on success. */
   async function launch(sessionId: string): Promise<string | null> {
+    if (pending.has(sessionId)) return null;
     const s = sessions.value.find((x) => x.id === sessionId);
     pending.add(sessionId);
     try {
