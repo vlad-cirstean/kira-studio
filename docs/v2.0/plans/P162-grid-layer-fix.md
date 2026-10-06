@@ -422,13 +422,13 @@ section 4 `kiraAB` helper, then:
 
 Compare gutter and header lag with it on and off.
 
-## Result: Mac report, contain dropped on Studio grids
+## Result: Mac report, border removal only
 
 - Mac report after the border/header commits: white dotted cell borders, header and gutter lag.
 - White dotted borders: removing `.slick-cell` border rules left a stock border with no colour, so it
-  fell back to the text colour. Fix: `border-color: transparent` plus `var(--kira-bg)` behind cells.
-  Sandbox: borders solid 51.4 fps, transparent 54.3, `border: 0` 54.5 (headless WPE, 20 columns).
-- Header `will-change` restored (reverted `d8b920b87`).
-- `contain: layout paint` on `.slick-grid-host .grid-canvas` dropped, to test if it causes the gutter
-  lag. Git graph keeps its own `contain` (no header, not reported). If lag persists on the Mac,
-  the cause is the JS pane sync, not `contain`; fix needs sticky header/gutter in one scroller.
+  fell back to the text colour. Fix: `border-color: transparent`.
+- Everything else from that day reverted: header `will-change` and `contain: layout paint` on
+  `.grid-canvas` are back as shipped 10-05; no extra background fills (wrong colour on the Mac).
+- Sandbox, 20 columns: solid borders 51.4 fps, transparent 54.3, `border: 0` 54.5.
+- Gutter/header lag cause still open: Mac A/B `ab-canvas-off`; else JS pane sync, fix needs sticky
+  header/gutter in one scroller.

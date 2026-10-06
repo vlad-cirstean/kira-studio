@@ -213,14 +213,11 @@
   contain: layout;
 }
 
-/* P162: `contain: layout paint` on `.grid-canvas` removed after a Mac report of gutter/header lag
-   (see P162-grid-layer-fix.md). Layer-bug fix candidates: it, or header `will-change: auto`. */
-
-/* Cells carry no borders: fill every layer behind them so sub-pixel seams show the grid colour. */
-.slick-grid-host .slick-viewport,
-.slick-grid-host .slick-pane,
+/* P162: one stacking context and paint boundary for every row. Without it, runway rows that
+   overlap the header strip's `will-change` layer each get a compositing layer in WebKit, rebuilt
+   on every row mount (bisect R2.3: ~30 ms per mutating frame). */
 .slick-grid-host .grid-canvas {
-  background: var(--kira-bg);
+  contain: layout paint;
 }
 
 /* No zebra striping (GridRow.vue's own precedent) — only the hover state below. */
