@@ -45,21 +45,3 @@ Fixes need files owned by another Part. Stream C did not edit them.
   text) and its row menu has no `copy-body` item.
 - Hook for the assertion: the marker is `[data-testid="stream-body-null"]` inside `stream-body`
   (the cell also carries `aria-label="null (tombstone)"`).
-
-## From Part 21 F15 (Part 9, Stream A: `packages/theme/src/components/ui/tooltip/TooltipContent.vue`)
-
-- Id: P168 Part 21 F15 / R1, low.
-- Issue: see `P168-part21-findings.md` F15 for the probe evidence and the mechanism behind the
-  flaky `ade-v2-plan` tooltip spec. The fix lands in the theme tooltip, not in Part 21's files.
-- Fix: add `pointer-events-none` to `TooltipContent`'s classes (tooltips are non-hoverable app-wide, `disable-hoverable-content` in both apps' `App.vue`). Then Part 21 drops the `toPass` hover retry in `ade-v2-dialogs.spec.ts:169-173`.
-
-## From Part 21 F4 and F5 (Part 20 owner, Go: `apps/kira-space/internal/ade`)
-
-- Id: P168 Part 21 R2, low (renderer halves are Part 21 F4 and F5).
-- `board_writes.go:433-438` `SetQueuedAfter`: the cycle check follows only `QueuedAfter` links.
-  The renderer's branch graph takes `queuedAfter`, else `baseBranchId`, as a branch's parent. A
-  branch created from B can be queued after, and B queued after it, forming a cycle the check
-  misses. Fix: walk the same parent rule (`QueuedAfter`, else a live `BaseBranchID`) when checking.
-- `launches.go:104-116` `TakeOver`: `takeOverSession` checks "already open" / "conversation already
-  open" before `taskMu` is taken, so two concurrent calls both pass and both `Prepare` a TUI on one
-  conversation. Fix: take `taskMu` before `takeOverSession`, or re-check `runningTUI` under it.
