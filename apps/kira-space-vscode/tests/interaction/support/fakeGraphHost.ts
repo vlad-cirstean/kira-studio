@@ -253,6 +253,7 @@ function buildResponses(): {
   repoList: (id: number) => unknown;
   repoOpen: (id: number) => unknown;
   streamChunkThenEnd: (id: number) => readonly [unknown, unknown];
+  streamCorrupted: (id: number) => readonly [unknown, unknown];
   streamTwoChunksThenEnd: (id: number) => readonly [unknown, unknown, unknown];
   streamOneDecoratedOneNot: (id: number) => readonly [unknown, unknown, unknown];
   streamManyRows: (id: number) => readonly unknown[];
@@ -267,6 +268,8 @@ function buildResponses(): {
   globalStashList: (id: number) => unknown;
   worktreeList: (id: number) => unknown;
   stackList: (id: number) => unknown;
+  statusGet: (id: number) => unknown;
+  autoFetchStopped: () => unknown;
 } {
   return {
     appInit: (id) =>
@@ -325,6 +328,19 @@ function buildResponses(): {
         remaining: 0,
         exhausted: true,
         commits: buildPackedChunk(),
+      });
+      return [wrap({ t: 'chunk', id, chunk }), wrap({ t: 'end', id })] as const;
+    },
+    streamCorrupted: (id) => {
+      const chunk = encodeStreamPayload('graph.stream', {
+        repoId: FAKE_REPO_ID,
+        seq: 0,
+        from: 0,
+        to: 1,
+        source: 'git',
+        remaining: 0,
+        exhausted: true,
+        commits: buildPackedChunkAt(FAKE_SHA, FAKE_SUBJECT, 5),
       });
       return [wrap({ t: 'chunk', id, chunk }), wrap({ t: 'end', id })] as const;
     },
@@ -506,6 +522,27 @@ function buildResponses(): {
         },
       }),
     branchOrderRefsList,
+    statusGet: (id) =>
+      wrap({
+        t: 'res',
+        id,
+        ok: true,
+        result: {
+          head: { kind: 'branch', name: 'main' },
+          inProgress: null,
+          counts: { staged: 0, unstaged: 0, untracked: 0, conflicted: 0 },
+          autoFetch: null,
+        },
+      }),
+    autoFetchStopped: () =>
+      wrap({
+        t: 'evt',
+        method: 'autoFetch.changed',
+        payload: {
+          repoId: FAKE_REPO_ID,
+          autoFetch: { state: 'stopped', kind: 'AuthFailed', message: 'denied', at: 1 },
+        },
+      }),
     stashList: (id) =>
       wrap({
         t: 'res',
@@ -656,17 +693,22 @@ export function buildFakeGraphHostInitScript(options?: {
     | 'oneDecoratedOneNot'
     | 'manyRows'
     | 'twoChunksSecondDecorated'
-    | 'branchOrder';
+    | 'branchOrder'
+    // P173: the one chunk claims row 5 into an empty store, so `appendPacked` throws.
+    | 'corrupted';
   readonly withPickerData?: boolean;
   /** P108 F1: seeds `getState()` with a persisted `FAKE_REPO_ID`/`scrollRow` view state, so
    *  `App.vue`'s cold-bootstrap `persisted.repoId` branch reopens it (and mounts `CommitGrid.vue`
    *  with `initialScrollRow` set) instead of every other fixture's own `getState()` returning
    *  `undefined`. Omit for the ordinary "nothing persisted" boot every other spec here uses. */
   readonly persistedScrollRow?: number;
+  /** P173: answers `status.get` and exposes `window.__emitAutoFetchStopped()`. */
+  readonly withFailures?: boolean;
 }): string {
   const responses = buildResponses();
   const streamMode = options?.streamMode ?? 'oneChunk';
   const withPickerData = options?.withPickerData ?? false;
+  const withFailures = options?.withFailures ?? false;
   const persistedViewState =
     options?.persistedScrollRow === undefined
       ? null
@@ -686,7 +728,9 @@ export function buildFakeGraphHostInitScript(options?: {
               ? responses.streamTwoChunksSecondDecorated(0)
               : streamMode === 'branchOrder'
                 ? responses.streamBranchOrder(0)
-                : responses.streamChunkThenEnd(0),
+                : streamMode === 'corrupted'
+                  ? responses.streamCorrupted(0)
+                  : responses.streamChunkThenEnd(0),
     graphRefresh: responses.graphRefresh(0),
     graphStatus: responses.graphStatus(0),
     repoChangedRefs: responses.repoChanged('refsChanged', FAKE_REPO_ID),
@@ -715,6 +759,12 @@ export function buildFakeGraphHostInitScript(options?: {
     // not gated on `withPickerData`'s own picker-tab concept), and `App.vue`'s own branch-ordering
     // needs its real branches/committerDates, not the two-branch picker seed above.
     ...(streamMode === 'branchOrder' ? { refsList: responses.branchOrderRefsList(0) } : {}),
+    ...(withFailures
+      ? {
+          statusGet: responses.statusGet(0),
+          autoFetchStopped: responses.autoFetchStopped(),
+        }
+      : {}),
   };
   const fixtureJson = JSON.stringify(data);
 
@@ -768,6 +818,8 @@ export function buildFakeGraphHostInitScript(options?: {
         if (!key) throw new Error('fakeGraphHost: unknown connection.changed kind ' + kind);
         dispatch(FIXTURES[key]);
       };
+
+      window.__emitAutoFetchStopped = () => dispatch(FIXTURES.autoFetchStopped);
 
       window.acquireVsCodeApi = () => ({
         postMessage(message) {
@@ -841,6 +893,10 @@ export function buildFakeGraphHostInitScript(options?: {
           }
           if (WITH_PICKER_DATA && body.t === 'req' && body.method === 'stack.list') {
             dispatch(withId(FIXTURES.stackList, body.id));
+            return;
+          }
+          if (FIXTURES.statusGet && body.t === 'req' && body.method === 'status.get') {
+            dispatch(withId(FIXTURES.statusGet, body.id));
             return;
           }
           // Every other method is deliberately left unanswered — see this file's own doc comment.

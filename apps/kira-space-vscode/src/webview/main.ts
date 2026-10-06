@@ -9,6 +9,12 @@
  * type="module">` tag) and hands it nothing at runtime beyond the DOM — `#kira-bootstrap`'s
  * JSON island is this file's only input, read below.
  */
+// P131 Part 1 §3.3: this webview's own unprefixed Tailwind root (preflight + the shared @theme
+// core, imported theme(inline), plus the --kira-*-from-`--kv-*` bridge). Must stay the first
+// import: CSS cascade layers order by first appearance, and git-ui's own `kv:` root declares
+// `utilities` without `base`, so importing it first puts preflight above every unprefixed
+// utility (padding/border/margin reset to 0).
+import './tailwind.css';
 import type { EventPayload, MessageChannelLike, UiActionKind } from '@kira/git-ipc';
 import { createRpcClient, VSCODE_WEBVIEW_BUFFER_ENCODING } from '@kira/git-ipc';
 import type { ReviewTarget, ViewStateStore } from '@kira/git-ui';
@@ -20,10 +26,6 @@ import {
   type PersistedViewState,
   parsePersistedViewState,
 } from '@kira/git-ui';
-// P131 Part 1 §3.3: this webview's own unprefixed Tailwind root (preflight + the shared @theme
-// core, imported theme(inline), plus the --kira-*-from-`--kv-*` bridge) -- imported first, before
-// `mount()` renders anything, so every migrated dialog's shadcn classes resolve from first paint.
-import './tailwind.css';
 
 declare function acquireVsCodeApi<T = unknown>(): {
   getState(): T | undefined;
