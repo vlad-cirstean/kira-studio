@@ -340,6 +340,7 @@ function resetStalePreviewState(): void {
   formatWarning.value = null;
   formatNote.value = null;
   explainError.value = null;
+  connectError.value = null;
   // D19: the auto-explain strip clears on the next document edit, same as the two above.
   consoleViewStore.clearAutoExplain(props.tab.id);
 }
@@ -369,8 +370,21 @@ watch(
 // its own two start verbs (see the #toolbar comment above) — so they're what now carries the
 // gate's own job: pressing either on a restored/disconnected tab reconnects first, exactly what
 // the removed "Reconnect & load" gate used to require a separate press for.
-async function ensureConnectedForRun(): Promise<void> {
-  if (needsReconnect.value) await onReconnectAndLoad();
+// Resolves false (and shows the connection's own error) when the reconnect did not land: running
+// anyway would only fail E_ENGINE_DOWN with nothing on screen.
+const connectError = ref<string | null>(null);
+async function ensureConnectedForRun(): Promise<boolean> {
+  connectError.value = null;
+  if (!needsReconnect.value) return true;
+  try {
+    if (await onReconnectAndLoad()) return true;
+    const id = props.tab.connectionId;
+    connectError.value =
+      (id ? connectionsStore.states[id]?.error : undefined) ?? 'Could not connect.';
+  } catch (e) {
+    connectError.value = e instanceof Error ? e.message : String(e);
+  }
+  return false;
 }
 
 function runStatement(): void {
@@ -386,11 +400,13 @@ function runStatement(): void {
   if (!stmt) return;
   void (async () => {
     starting.value = true;
+    let connected = false;
     try {
-      await ensureConnectedForRun();
+      connected = await ensureConnectedForRun();
     } finally {
       starting.value = false;
     }
+    if (!connected) return;
     await consoleViewStore.run(props.tab.id, [stmt.text]);
   })();
 }
@@ -403,11 +419,13 @@ function runAll(): void {
   if (statements.length === 0) return;
   void (async () => {
     starting.value = true;
+    let connected = false;
     try {
-      await ensureConnectedForRun();
+      connected = await ensureConnectedForRun();
     } finally {
       starting.value = false;
     }
+    if (!connected) return;
     await consoleViewStore.run(props.tab.id, statements);
   })();
 }
@@ -522,11 +540,13 @@ function onExplain(): void {
   if (!kind || !stmt || !canExplain.value || starting.value) return;
   void (async () => {
     starting.value = true;
+    let connected = false;
     try {
-      await ensureConnectedForRun();
+      connected = await ensureConnectedForRun();
     } finally {
       starting.value = false;
     }
+    if (!connected) return;
     const result = await consoleViewStore.explain(props.tab.id, kind, stmt);
     explainError.value = result.ok ? null : result.reason;
   })();
@@ -841,6 +861,9 @@ const statusLine = computed(() => {
     </Alert>
     <Alert v-if="formatNote" variant="note" data-testid="console-format-note">
       <AlertDescription>{{ formatNote }}</AlertDescription>
+    </Alert>
+    <Alert v-if="connectError" variant="destructive" data-testid="console-connect-error">
+      <AlertDescription>{{ connectError }}</AlertDescription>
     </Alert>
     <Alert v-if="explainError" variant="destructive" data-testid="console-explain-error">
       <AlertDescription>{{ explainError }}</AlertDescription>

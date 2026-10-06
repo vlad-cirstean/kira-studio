@@ -2,6 +2,7 @@
 import type { SavedConsoleQuery } from '@shared/domain/queries';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
@@ -28,48 +29,66 @@ const saved = ref<SavedConsoleQuery[]>([]);
 // packages/workbench/src/prompt/useTextPrompt.ts (same one FilterHistoryMenu.vue uses).
 const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: cancelPrompt } = useTextPrompt();
 
-async function reload(): Promise<void> {
+// Every action runs through `attempt`: a storage failure shows in the footer, never as an
+// unhandled rejection with nothing on screen.
+const error = ref<string | null>(null);
+async function attempt(action: () => Promise<void>): Promise<void> {
+  error.value = null;
+  try {
+    await action();
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
+async function load(): Promise<void> {
   const t = tab();
   if (!t?.connectionId) return;
   saved.value = await control.queriesListConsole(t.connectionId, t.path);
 }
+const reload = (): Promise<void> => attempt(load);
 onMounted(reload);
 
 function apply(entry: SavedConsoleQuery): void {
   setText(props.tabId, entry.body.text);
-  void control.queriesTouch(entry.id);
+  // Recency only: a failed touch changes nothing the user sees.
+  control.queriesTouch(entry.id).catch(() => undefined);
   emit('close');
 }
 
-async function togglePin(entry: SavedConsoleQuery): Promise<void> {
-  await control.queriesUpdate(entry.id, { pinned: !entry.pinned });
-  await reload();
-}
-async function rename(entry: SavedConsoleQuery): Promise<void> {
-  const name = await promptText('Rename saved query', entry.name);
-  if (!name || name.trim() === '') return;
-  await control.queriesUpdate(entry.id, { name: name.trim() });
-  await reload();
-}
-async function remove(entry: SavedConsoleQuery): Promise<void> {
-  await control.queriesDelete(entry.id);
-  await reload();
-}
-
-async function saveCurrent(): Promise<void> {
-  const t = tab();
-  if (!t?.connectionId) return;
-  const name = await promptText('Name this query', '');
-  if (!name || name.trim() === '') return;
-  await control.queriesSaveConsole({
-    connectionId: t.connectionId,
-    path: t.path,
-    name: name.trim(),
-    body: { text: t.state.text },
-    pinned: false,
+const togglePin = (entry: SavedConsoleQuery): Promise<void> =>
+  attempt(async () => {
+    await control.queriesUpdate(entry.id, { pinned: !entry.pinned });
+    await load();
   });
-  await reload();
-}
+const rename = (entry: SavedConsoleQuery): Promise<void> =>
+  attempt(async () => {
+    const name = await promptText('Rename saved query', entry.name);
+    if (!name || name.trim() === '') return;
+    await control.queriesUpdate(entry.id, { name: name.trim() });
+    await load();
+  });
+const remove = (entry: SavedConsoleQuery): Promise<void> =>
+  attempt(async () => {
+    await control.queriesDelete(entry.id);
+    await load();
+  });
+
+const saveCurrent = (): Promise<void> =>
+  attempt(async () => {
+    const t = tab();
+    if (!t?.connectionId) return;
+    const name = await promptText('Name this query', '');
+    if (!name || name.trim() === '') return;
+    await control.queriesSaveConsole({
+      connectionId: t.connectionId,
+      path: t.path,
+      name: name.trim(),
+      body: { text: t.state.text },
+      pinned: false,
+    });
+    await load();
+  });
 </script>
 
 <template>
@@ -104,6 +123,9 @@ async function saveCurrent(): Promise<void> {
     </template>
     <template #footer>
       <Separator class="my-1" />
+      <Alert v-if="error" variant="destructive" data-testid="console-saved-error">
+        <AlertDescription>{{ error }}</AlertDescription>
+      </Alert>
       <!-- text-primary not text-hover: hover reads --kira-hover (grey); --primary maps to
            --kira-accent, same workaround as api/CollectionRow.vue's rename-input (Part 3). P110
            I2-37 retired the shadcn accent alias this comment used to warn against; hover is its
