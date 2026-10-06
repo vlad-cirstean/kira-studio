@@ -41,22 +41,30 @@ export const useGitClientsStore = defineStore('gitClients', () => {
   let unsubscribePairing: (() => void) | null = null;
   let unsubscribeClients: (() => void) | null = null;
 
+  // Subscribe before fetching: a push that lands during the fetch is newer than the snapshot, so
+  // the snapshot is applied only for a feed that has not pushed yet.
   async function hydrateGitClients(): Promise<void> {
+    let pairingPushed = false;
+    let clientsPushed = false;
+    unsubscribePairing?.();
+    unsubscribePairing = control.onGitPairingChanged((snap) => {
+      pairingPushed = true;
+      applySnapshot(snap);
+    });
+    unsubscribeClients?.();
+    unsubscribeClients = control.onGitClientsChanged((clients) => {
+      clientsPushed = true;
+      state.clients = clients;
+    });
+
     const [clients, pending, vsix] = await Promise.all([
       control.gitClientsList(),
       control.gitPairingPending(),
       control.gitVsixStatus(),
     ]);
-    state.clients = clients;
-    applySnapshot(pending);
+    if (!clientsPushed) state.clients = clients;
+    if (!pairingPushed) applySnapshot(pending);
     state.vsix = vsix;
-
-    unsubscribePairing?.();
-    unsubscribePairing = control.onGitPairingChanged(applySnapshot);
-    unsubscribeClients?.();
-    unsubscribeClients = control.onGitClientsChanged((clients) => {
-      state.clients = clients;
-    });
   }
 
   // approve/deny let the emitted kira:git:pairing event drive the re-render (D9: an
