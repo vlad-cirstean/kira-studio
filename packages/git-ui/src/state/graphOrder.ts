@@ -2,6 +2,7 @@ import {
   buildRowPlan,
   type CommitStore,
   identityRowPlan,
+  OTHER_GROUP_KEY,
   type RowPlan,
   type TipRef,
 } from '@kira/git-core';
@@ -83,13 +84,12 @@ export class GraphOrderState {
       revision,
     });
     this.plan.value = plan;
-    // P93 §4.4: "pruned on every rebuild to keys that still match a group" — a checkout or ref
-    // change re-partitions every group, so an expanded entry naming a group the new plan has no
-    // row for is both meaningless (never read again by `buildRowPlan`) and, left alone, a session-
-    // long accumulation of dead branch names. Cheap next to `buildRowPlan`'s own O(rows) pass.
+    // P93 §4.4: prune keys naming no current tip. Matched against the tip list, never the loaded
+    // rows: a restart-at-zero re-walk rebuilds on a partial store, and a group whose rows have not
+    // streamed in yet must keep its expansion.
     if (this.#expandedKeys.size > 0) {
-      const liveKeys = new Set<string>();
-      for (let row = 0; row < plan.length; row++) liveKeys.add(plan.groupKeyAt(row));
+      const liveKeys = new Set<string>([OTHER_GROUP_KEY]);
+      for (const tip of this.#tips) liveKeys.add(tip.key);
       for (const key of this.#expandedKeys) {
         if (!liveKeys.has(key)) this.#expandedKeys.delete(key);
       }

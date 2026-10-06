@@ -14,7 +14,12 @@ export type {
   RowPlanOptions,
   TipRef,
 } from './graph/rowPlan.ts';
-export { buildRowPlan, identityRowPlan, projectLayoutInput } from './graph/rowPlan.ts';
+export {
+  buildRowPlan,
+  identityRowPlan,
+  OTHER_GROUP_KEY,
+  projectLayoutInput,
+} from './graph/rowPlan.ts';
 export type { StashRowFilter } from './graph/stashRows.ts';
 export { applyStashRowFilter, buildStashRowFilter } from './graph/stashRows.ts';
 export type {
