@@ -63,6 +63,7 @@ const {
 } = createPageSearch<Match>({
   runSearch,
   pageVersion,
+  pageOf: getPage,
   loadedRowCount: (tabId) => getPage(tabId)?.rowCount ?? 0,
 });
 

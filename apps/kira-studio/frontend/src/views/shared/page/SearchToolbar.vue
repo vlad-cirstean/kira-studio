@@ -183,7 +183,12 @@ watch([matchCase, wholeWord, regex], () => {
 // rows from the page that's gone. Restarting the scan is the only way back to a consistent match
 // list; not auto-scrolling matches a fresh scan's own initial state (D23).
 watch(
-  () => props.api.pageVersion.n,
+  () => {
+    const n = props.api.pageVersion.n;
+    // Other tabs' loads and closes bump the shared counter; follow this tab's page identity when
+    // the view supplies it.
+    return props.api.pageOf ? props.api.pageOf(props.tabId) : n;
+  },
   () => {
     if (query.value !== '') startSearch(false);
   },

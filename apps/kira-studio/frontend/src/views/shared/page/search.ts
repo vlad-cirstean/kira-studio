@@ -30,6 +30,8 @@ export interface PageSearchApi<M extends { row: number }> {
   >;
   matchedRows(tabId: string): number[] | null;
   pageVersion: { n: number };
+  /** This tab's own page object; lets the toolbar ignore `pageVersion` bumps from other tabs. */
+  pageOf?(tabId: string): unknown;
   loadedRowCount(tabId: string): number;
 }
 
@@ -78,6 +80,7 @@ function createSearchState<M extends { row: number }>(): {
 export function createPageSearch<M extends { row: number }>(opts: {
   runSearch: PageSearchApi<M>['runSearch'];
   pageVersion: { n: number };
+  pageOf?: PageSearchApi<M>['pageOf'];
   loadedRowCount(tabId: string): number;
 }): {
   searchState: PageSearchApi<M>['searchState'];
@@ -96,6 +99,7 @@ export function createPageSearch<M extends { row: number }>(opts: {
       searchState,
       matchedRows,
       pageVersion: opts.pageVersion,
+      pageOf: opts.pageOf,
       loadedRowCount: opts.loadedRowCount,
     },
   };
