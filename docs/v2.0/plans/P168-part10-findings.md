@@ -42,8 +42,11 @@ Probes: `bun test` harnesses in session scratchpad (Pinia store, stubbed `contro
 - `SF/api/state/history.ts:508-522`. After `await opts.remove/clear`, both call `load(tabId)`,
   which calls `ensure(tabId)` and `bumpSeq` before any `findTab` check. Tab closed during the
   await: runtime and `latestSeq` entry recreated, never cleaned (cleanup already ran).
+- Callers `ResponseHistoryList.vue` (`onDelete` via `void`, `onClear`) and the gRPC
+  `CallHistoryList.vue` never catch: a failed `remove`/`clear` is an unhandled rejection with no
+  message, though `rt.error` exists for exactly this.
 - Fix: `if (!opts.findTab(tabId)) return;` after the await in both, or move `ensure`/`bumpSeq`
-  in `load` behind a `findTab` check.
+  in `load` behind a `findTab` check; catch in `del`/`clearAll` and set `rt.error`.
 
 ### F4 low, code-read: `openHistoryMenu` failure unhandled and silent
 
@@ -69,6 +72,9 @@ Probes: `bun test` harnesses in session scratchpad (Pinia store, stubbed `contro
   error state and retries on next read. Needs Go to return a typed not-found from
   `GetRequest`/`GetGrpcRequest` (today `ipcerr.InternalResult` wraps all errors alike).
   `needs-other-part-file: apps/kira-studio/internal/bridge/collections.go (Part 6)`.
+- Consequence in this chunk: `CollectionsTree.vue:291,295` opens a `null` read as
+  `default*SavedRequest()` bound to the row id, so a transient read failure opens an empty request
+  for a row that has content (Save then routes to Save as, so no overwrite).
 
 ### Refuted in block 1
 
@@ -195,6 +201,99 @@ Probes: `bun test` harnesses in session scratchpad (Pinia store, stubbed `contro
 - `ImportCurlDialog`/`EditRawRequestDialog` debounce parsing (400 ms, `refDebounced`/
   `useDebounceFn`, cancelled on unmount).
 
+## Findings (block 3, HTTP view)
+
+### F15 medium, verified: a failed variable or tree load wedges the tab in "running"; Stop is a no-op; a closed tab still sends
+
+- `SF/views/httprequest/state.ts:158-184` (`send`): `status = 'running'` and `opId` are set, then
+  `await variablesForSend(...)` and `await loadDynamicGenerator()` run before the `try`. Same
+  shape in `SF/views/grpcrequest/state.ts` `call` (block 4, F21).
+- Probe: `control.collectionsList` rejects. `send` rejects (unhandled from the `void` call
+  site), runtime left `status: running`, `opId` set, `httpSend` never called. Retry after the
+  bridge recovers: `send` returns at the `running` guard; status still `running`. Send stays
+  disabled (`:disabled="running"`) for the life of the tab.
+- Stop during that window calls `opsCancel` for an op Go never saw (no-op), then `httpSend` still
+  runs. A tab closed during the await: cleanup deletes the runtime, then `httpSend` still goes
+  out and Go records history for a dead tab (the post-await guard only stops the bookkeeping).
+- Fix: move the variable/generator awaits inside the `try` (its `catch` already restores state);
+  after them, return early if `!findHttpRequestTab(tabId) || rt.opId !== opId` before calling
+  `control.httpSend`. Stop while pre-flight: clear `opId` and set `cancelled` locally. Extend
+  `http-send-tab-close-leak` spec with the pre-flight close and the load-failure case.
+
+### F16 medium, verified: Settings pane accepts values that make the persisted tab unparseable; restart resets the whole request
+
+- `SF/views/httprequest/RequestSettingsPane.vue:41-71` patch `Number(input.value)` unchecked.
+  `min`/`max` attributes do not stop typing `-5` or `1.5`. Schema `httpRequestSettingsSchema`
+  (`packages/shared/domain/http.ts:339-343`) is `int().min(0)`.
+- Probe: tab state with `settings.maxRedirects` `-5` or `1.5` fails
+  `httpRequestTabStateSchema.safeParse`; `7` passes. On the next launch `createTabsStore.hydrateTabs`
+  (`PW/state/createTabsStore.ts:252-264`) resets a failed tab to `defaultState()`: URL, headers,
+  body and `itemId` are gone. Before restart, `1.5` also fails Go's JSON decode into `*int`
+  (`SI/httpclient/options.go:19-23`), so every send errors.
+- Fix: normalise in the handlers: empty/NaN means keep previous value or `null`, `Math.trunc`,
+  clamp to the `*_RANGE` constants already imported. No schema change needed.
+
+### F17 medium, code-read: a rename in another window is reverted by Save in this window
+
+- `SF/api/state/collections.ts:397-412` renames bound tabs only in the window that renamed
+  (`renameApiRequestTabs`/`renameGrpcRequestTabs`). The `tree` broadcast refreshes the tree in
+  other windows but never touches tab names. `HttpRequestView.vue:206` saves with
+  `name: props.tab.state.name || title`; Go `SaveRequest` writes that name
+  (`SI/bridge/collections.go:82-94`).
+- Scenario: request open in windows A and B. Rename in A. Edit and Save in B: the row's name
+  reverts to the old one. Same for gRPC (`GrpcRequestView` save).
+- Fix: after every tree refresh (local or broadcast), sync bound tab names from the tree
+  (a watch on `items` in `useCollectionsStore` calling the two rename helpers for mismatches,
+  skipping orphans); or have Save send the tree's current name for a bound row.
+
+### F18 low, code-read: cookie list races: clear does not bump `fetchSeq`; delete has no sequence check
+
+- `SF/views/httprequest/cookies.ts:77-91`. A fetch in flight when `clearCookies` resolves lands
+  afterwards (its `mySeq` still current) and repopulates the list with cookies the jar no longer
+  holds. `deleteCookie` writes Go's reply with no `fetchSeq` bump, so an older in-flight fetch
+  resolving after it re-shows the deleted cookie. Both rejections are unhandled
+  (`CookiesPane.vue:58-65`).
+- `CookiesPane.vue:121` keys rows by `c.name`: two cookies with one name on different paths or
+  domains (common) duplicate the key, and Remove-by-name is ambiguous.
+- "Clear all" (`CookiesPane.vue:103-111`) empties the process-wide jar for every host with no
+  confirmation, from a pane scoped to one request URL.
+- Fix: bump `fetchSeq` for every tab in `clearCookies` and for the tab in `deleteCookie`; catch
+  and surface errors; key by `name+domain+path`; confirm "Clear all cookies for every host?".
+
+### F19 low, code-read: Raw toggle hidden while Pretty formatting is pending
+
+- `SF/views/httprequest/ResponsePane.vue:302-312` renders the Pretty/Raw toggle only
+  `v-if="prettyFormat"`; `format` is `undefined` for the whole worker pass. With a persisted
+  `responseView: 'pretty'` and a multi-MB body, the user sees only "Formatting response…" and has
+  no way to switch to Raw until the pass ends.
+- Fix: show the toggle while `prettyFormat === undefined` too (pending), hide only when `null`.
+
+### F20 low, code-read: after a failed send the previous response and timeline stay on screen
+
+- `SF/views/httprequest/state.ts:217-240` keeps `rt.response` from the last success on error.
+  `ResponsePane` shows the old status badge, body and size under the error strip;
+  `TimelinePane.vue:26-30` shows the failure's partial timeline only when there is no response, so
+  after any earlier success the P10 D15 failure timeline is unreachable.
+- Fix: clear `rt.response` when a send fails (or have both panes prefer the error state when
+  `status === 'error'`).
+
+### Refuted or clean in block 3
+
+- `useResponseBody`: `seq` plus `runLatest` per component instance; a superseded worker pass is
+  discarded; inline path bypasses the worker; caption timer is `useTimeoutFn` (scope-disposed).
+  View switch drops and re-requests text as designed (P21 F7).
+- Beautify (`RequestBodyPane.onBeautifyBody`): source-equality guard holds; repeated clicks queue
+  duplicate worker jobs but only the first can patch.
+- `ResponseDiffDialog` beautifies on the main thread, but history bodies are capped at 256 KB
+  (stored snapshot); P163 inventory does not route it to the worker. Not reported.
+  Monaco diff models disposed on unmount; a late `loadMonaco` after unmount returns early.
+- Stored request in history is pre-resolution (`response-history.ts:34`), so the Raw pane's
+  reconstructed request holds no secret plaintext.
+- `sendCompletedListeners` unsubscribed on unmount; `fetchCookiesDebounced.cancel()` on unmount.
+- All 14 components single `<script setup lang="ts">`; one `<style scoped>` in
+  `ResponseDiffDialog.vue` (justified `:deep` Monaco height rule). Header, cookie, status and
+  timeline strings render as text.
+
 ## Coverage
 
 - Block 1 reviewed in full: `apiQueries.ts`, `collections.ts`, `variables.ts`, `draftMerge.ts`,
@@ -203,4 +302,11 @@ Probes: `bun test` harnesses in session scratchpad (Pinia store, stubbed `contro
   `SI/bridge/{apidata,collections,variables}.go` emission sites.
 - Block 2 reviewed in full: all 19 `SF/api/*.vue`. Contract read: `PW/util/useSortableReorder.ts`,
   `PW/util/clipboard.ts`, `SI/storage/repos/variables.go` (`Upsert`, `ApplyBulk`).
-- Blocks 3-5: pending.
+- Block 3 reviewed in full: `state.ts`, `cookies.ts`, `history.ts`, `files.ts`,
+  `useResponseBody.ts`, `HttpRequestView.vue`, `ResponsePane.vue`, `ResponseDiffDialog.vue`,
+  `TimelinePane.vue`, `RequestSettingsPane.vue`, `RawExchangePane.vue`, `RequestBodyPane.vue`,
+  `ResponseHistoryList.vue`, `CookiesPane.vue`. Skimmed (thin wrappers over Part 11's
+  `FieldRowsTable`, no own logic beyond row patching): `FormDataTable.vue`, `QueryParamsTable.vue`,
+  `BinaryBodyPicker.vue`, `RequestHeadersTable.vue`, `UrlEncodedTable.vue`. Contract read:
+  `PW/state/createTabsStore.ts` hydrate, `PW/workers` `useParseWorker`, `SI/httpclient/options.go`.
+- Blocks 4-5: pending.
