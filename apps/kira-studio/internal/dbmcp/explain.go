@@ -72,9 +72,9 @@ func summaryOf(plan *queryplan.Plan, thresholdRows int) *planSummary {
 
 // maskPlanForMaskedConnection strips whatever an EXPLAIN plan can carry of real row data when the
 // connection has active mask rules (F5): MySQL/MariaDB substitute real column values from a
-// const-evaluated table into another table's own attached_condition (surfaced as Node.Detail), and
-// ClickHouse's index metrics carry the same kind of evaluated condition text (Metric.Label ending
-// " condition"). Column-name masking cannot see through either — they are plan prose, not a result
+// const-evaluated table into another table's own attached_condition (surfaced as Node.Detail) and
+// index_condition (a metric), and ClickHouse's index metrics carry the same kind of evaluated
+// condition text (" condition"); only allowlisted metric labels survive. Column-name masking cannot see through either — they are plan prose, not a result
 // set row — so both are blanked outright rather than filtered by column name. Raw is dropped
 // unconditionally too, regardless of IncludeRaw: it is the server's own EXPLAIN text verbatim, the
 // same data by construction.
@@ -84,15 +84,38 @@ func maskPlanForMaskedConnection(plan queryplan.Plan) queryplan.Plan {
 	return plan
 }
 
+// planMetricLabels are metric labels known to hold no evaluated row data. An allowlist, not a
+// blocklist: a suffix match already missed MySQL/MariaDB's `index_condition` (P168 Part 6 F6),
+// which holds the same const-table-substituted values as `attached_condition`.
+var planMetricLabels = map[string]bool{
+	"filtered": true, "key": true, "key_length": true, "used_key_parts": true, "access_type": true,
+	"possible_keys": true, "used_columns": true,
+	"Join Type": true, "Index Name": true, "Scan Direction": true, "Parallel Aware": true,
+	"Async Capable": true, "Plan Width": true, "Strategy": true, "Parent Relationship": true,
+	"Alias": true, "Schema": true,
+}
+
+func planMetricCarriesNoRowData(label string) bool {
+	if planMetricLabels[label] || strings.HasPrefix(label, "cost_info.") ||
+		strings.HasPrefix(label, "rows") || strings.HasPrefix(label, "using_") {
+		return true
+	}
+	for _, suffix := range []string{" keys", " parts", " granules", " search"} {
+		if strings.HasSuffix(label, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
 func maskPlanNode(n queryplan.Node) queryplan.Node {
 	n.Detail = ""
 	if len(n.Metrics) > 0 {
 		kept := make([]queryplan.Metric, 0, len(n.Metrics))
 		for _, m := range n.Metrics {
-			if strings.HasSuffix(m.Label, " condition") {
-				continue
+			if planMetricCarriesNoRowData(m.Label) {
+				kept = append(kept, m)
 			}
-			kept = append(kept, m)
 		}
 		n.Metrics = kept
 	}

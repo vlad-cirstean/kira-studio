@@ -20,6 +20,8 @@ func TestMaskPlanForMaskedConnectionStripsRealValues(t *testing.T) {
 			Metrics: []queryplan.Metric{
 				{Label: "primary key condition", Value: "email = 'real@example.com'"},
 				{Label: "rows_examined_per_scan", Value: "10"},
+				{Label: "index_condition", Value: "((`d`.`o`.`status` > 'alice@secret.example'))"},
+				{Label: "index_condition", Value: "o.status > 'alice@secret.example'"},
 			},
 			Children: []queryplan.Node{
 				{
@@ -46,7 +48,7 @@ func TestMaskPlanForMaskedConnectionStripsRealValues(t *testing.T) {
 		t.Fatalf("Children[0].Detail = %q, want empty", masked.Root.Children[0].Detail)
 	}
 	for _, m := range masked.Root.Metrics {
-		if strings.HasSuffix(m.Label, " condition") {
+		if strings.HasSuffix(m.Label, "condition") {
 			t.Fatalf("Root.Metrics still carries a condition metric: %+v", m)
 		}
 	}
