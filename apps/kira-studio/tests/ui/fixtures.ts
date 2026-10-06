@@ -5,10 +5,14 @@ import {
   type Relaunch as RelaunchOf,
   type UiFixturesOptions,
 } from '@workbench/testing/ui/fixtures';
-import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
+import type { ControlSnapshot } from '../ipc/support/types';
 import { mergeBootSnapshots } from './support/bootSnapshots';
 import { type ControlMockHandle, installControlMocks } from './support/mockRuntime';
-import { installMockStream, type MockStreamHandle } from './support/mockStream';
+import {
+  installMockStream,
+  type MockStreamHandle,
+  type StudioPortSnapshot,
+} from './support/mockStream';
 
 // P103 Part 4 (closing audit, §10): tests/ui/support/server.ts hoisted to
 // @workbench/testing/ui/server — see that file's own doc comment for why it now takes `distDir`.
@@ -23,7 +27,7 @@ export type KiraApp = { window: Page } & KiraAppExtra;
 
 export interface RelaunchOptions extends UiFixturesOptions {
   control?: readonly ControlSnapshot[];
-  stream?: readonly PortSnapshot[];
+  stream?: readonly StudioPortSnapshot[];
   /** Playwright's own `BrowserContextOptions.timezoneId` (e.g. `'America/New_York'`) — this
    *  sandbox's own system timezone is UTC (P57 M5 finding, porting cell-editor.spec.ts), which
    *  silently makes any "local time differs from UTC" assertion vacuously true-or-false depending

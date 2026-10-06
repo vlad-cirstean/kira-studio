@@ -16,7 +16,14 @@ import { type EncodedFrame, encodeFrame, type FramePayload } from '../../support
 export interface SeenPortRequest {
   op: string;
   payload: unknown;
+  /** The request's own `opId` (the id the renderer would pass to `opsCancel`), when it has one. */
+  opId?: string;
 }
+
+/** `PortSnapshot` plus a Studio-local gate (Part 5's type stays unchanged): the reply is held
+ *  until the renderer sends `opsCancel`, so a spec proves the view recovered because of the
+ *  cancel, not because a canned reply timed out. */
+export type StudioPortSnapshot = PortSnapshot & { untilCancel?: true };
 
 export interface MockStreamHandle {
   /** Every `PortRequest` the UI actually issued, in order — ported from
@@ -42,6 +49,7 @@ interface PreparedPortSnapshot {
    *  knowledge of its own). */
   frame: EncodedFrameJSON;
   delayMs?: number;
+  untilCancel?: true;
 }
 
 function toBase64(bytes: Uint8Array): string {
@@ -120,7 +128,7 @@ function buildFramePayload(response: LogicalPortResponse): FramePayload {
   return { type: 'empty' };
 }
 
-function prepareSnapshot(snap: PortSnapshot): PreparedPortSnapshot {
+function prepareSnapshot(snap: StudioPortSnapshot): PreparedPortSnapshot {
   const frame = snap.error
     ? encodeFrame({ kind: 'res', id: 0, ok: false, error: snap.error, forceDefaults: true })
     : encodeFrame({
@@ -135,6 +143,7 @@ function prepareSnapshot(snap: PortSnapshot): PreparedPortSnapshot {
     payload: snap.payload,
     frame: toJSON(frame),
     delayMs: snap.delayMs,
+    untilCancel: snap.untilCancel,
   };
 }
 
@@ -201,7 +210,7 @@ const BROWSER_SCRIPT = readFileSync(resolve(__dirname, 'mockStreamBrowser.js'), 
  */
 export async function installMockStream(
   page: Page,
-  snapshots: readonly PortSnapshot[],
+  snapshots: readonly StudioPortSnapshot[],
 ): Promise<MockStreamHandle> {
   const init = {
     snapshots: snapshots.map(prepareSnapshot),

@@ -124,11 +124,16 @@
   });
   var cursors = new Map();
   var seen = [];
+  var held = [];
   var socket;
 
   function onSend(raw) {
     var req = JSON.parse(raw);
-    seen.push({ op: req.op, payload: req.payload });
+    seen.push({
+      op: req.op,
+      payload: req.payload,
+      opId: req.payload && typeof req.payload === 'object' ? req.payload.opId : undefined,
+    });
     function respond(buf) {
       socket.dispatchEvent(new MessageEvent('message', { data: buf }));
     }
@@ -153,8 +158,19 @@
     var at = cursors.get(key) || 0;
     cursors.set(key, at + 1);
     var snap = group[Math.min(at, group.length - 1)];
+    var replied = false;
     function reply() {
+      if (replied) return;
+      replied = true;
       respond(patchedCopy(snap.template, req.id));
+    }
+    // Studio-only (mockStream.ts's StudioPortSnapshot.untilCancel): the reply waits for
+    // `__kiraReleaseCancelled`, which mockRuntime.ts fires when the renderer sends opsCancel. The
+    // timeout is a safety net: a missing cancel then fails on the spec's log assertion, not a hang.
+    if (snap.untilCancel) {
+      held.push(reply);
+      setTimeout(reply, 10000);
+      return;
     }
     // Frontend-only (types.ts's PortSnapshot.delayMs) — see mockPort.ts's own comment.
     if (snap.delayMs) setTimeout(reply, snap.delayMs);
@@ -176,4 +192,9 @@
     return socket;
   };
   g.__kiraStreamSeen = seen;
+  g.__kiraReleaseCancelled = () => {
+    held.splice(0).forEach((reply) => {
+      reply();
+    });
+  };
 };

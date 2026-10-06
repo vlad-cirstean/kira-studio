@@ -395,10 +395,24 @@ export async function installControlMocks(
       return undefined;
     },
     // See `inferredBootMode`'s own doc comment above.
-    resolveMissingBody: (channel, byChannel) =>
-      channel === IPC.windowsEnsure
+    // opsCancel (never snapshotted) releases the stream replies held by `untilCancel` snapshots.
+    // The hook gets no args, so every held reply is released; a spec asserts the cancelled op id
+    // from `control.log()`.
+    resolveMissingBody: (channel, byChannel) => {
+      if (channel === IPC.opsCancel) {
+        void page
+          .evaluate(() =>
+            (
+              globalThis as unknown as { __kiraReleaseCancelled?: () => void }
+            ).__kiraReleaseCancelled?.(),
+          )
+          .catch(() => {});
+        return 'null';
+      }
+      return channel === IPC.windowsEnsure
         ? JSON.stringify({ mode: inferredBootMode(byChannel) })
-        : undefined,
+        : undefined;
+    },
   });
 }
 

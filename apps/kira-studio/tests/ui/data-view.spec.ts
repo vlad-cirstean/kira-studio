@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
-import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
+import type { ControlSnapshot, LogicalPage } from '../ipc/support/types';
 import { MD5_ROWS } from '../support/seeds/md5Rows';
 import { expect, test } from './fixtures';
 import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
@@ -16,6 +16,7 @@ import {
 } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
+import type { StudioPortSnapshot } from './support/mockStream';
 import {
   BIG_ROWS_COLUMNS,
   BIG_ROWS_PATH,
@@ -751,7 +752,7 @@ const CONTROL: ControlSnapshot[] = [
   },
 ];
 
-const PORT: PortSnapshot[] = [
+const PORT: StudioPortSnapshot[] = [
   ...FIXTURE.port, // pageSize 100, offset 0 (real capture, step 1 below)
   {
     op: DATA_OP.read,
@@ -988,7 +989,7 @@ const PORT: PortSnapshot[] = [
       cursor: { mode: 'offset', offset: 0 },
     },
     error: CANCEL_ERROR,
-    delayMs: 5000,
+    untilCancel: true,
   },
   {
     op: DATA_OP.read,
@@ -1048,7 +1049,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   consoleErrors,
 }) => {
   test.setTimeout(120_000);
-  const { window: page, stream } = await relaunch({ control: CONTROL, stream: PORT });
+  const { window: page, stream, control } = await relaunch({ control: CONTROL, stream: PORT });
   await installClipboardSpy(page);
   await connectAndExpand(page, 'Data View DB', 'green');
 
@@ -1564,6 +1565,22 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await page.press('[data-testid="filter-where-input"]', 'Enter');
   await expect(page.locator('[data-testid="toolbar-stop"]')).toBeEnabled();
   await page.click('[data-testid="toolbar-stop"]');
+  // The reply is held until opsCancel arrives, so the recovery below proves Stop sent it — and
+  // for the in-flight read's own op id.
+  const inFlightRead = (await stream.ops()).find(
+    (o) =>
+      o.op === DATA_OP.read &&
+      (o.payload as { filter?: string }).filter === '(SELECT pg_sleep(2)) IS NULL OR id > 0',
+  );
+  expect(inFlightRead?.opId).toBeTruthy();
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .filter((e) => e.channel === IPC.opsCancel)
+        .map((e) => e.args),
+    )
+    .toEqual([{ opId: inFlightRead?.opId }]);
   // applyLoadFailure's cancelled branch clears rt.opId once the (real, captured) E_CANCELLED
   // error lands — the same flip that re-enables Refresh and disables Stop, with no op-log status
   // to read any more (see the header comment).
