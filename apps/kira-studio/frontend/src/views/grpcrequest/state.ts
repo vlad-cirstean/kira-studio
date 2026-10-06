@@ -1,56 +1,22 @@
-import { loadDynamicGenerator, type Reference } from '@kira/api-core';
+import { loadDynamicGenerator } from '@kira/api-core';
 import type {
   GrpcCallEvent,
   GrpcCallResultWire,
   GrpcMessageWire,
-  GrpcMetaPairWire,
-  GrpcRequestTabState,
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
+import { queryClient } from '@workbench/state/queryClient';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
-import { apiIdsForTab, variablesForSend } from '../../api/state/variables';
+import { variablesForSend } from '../../api/state/variables';
 import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import { createSubstituter, resolvePairs } from '../shared/request/resolve';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { useGrpcCallHistoryStore } from './history';
-
-// D9: {{name}} substitution is reused exactly — the same two-token grammar @kira/api-core's
-// resolve() already implements, over gRPC's own three substitutable fields (target, metadata,
-// message). Deliberately NOT protoPath/importPaths/caFile (picker-supplied local paths, P5 D7's
-// own rule). P12 D9/F10: mergedValuesAndSecrets/collectionIdFor used to be hand-copied here from
-// views/httprequest/state.ts, because views/grpcrequest/** may not import views/httprequest/**
-// (biome.json, F18) — now both live in http/state/{variables,collections}.ts, which both view
-// directories already import, so this is a move rather than an abstraction.
-
-export interface ResolvedGrpcRequest {
-  target: string;
-  metadata: GrpcMetaPairWire[];
-  message: string;
-  refs: Reference[];
-}
-
-/** D9 stage 1: resolves every non-secret {{name}} (and {{$dynamic}}, when `dynamic` is supplied)
- *  reference across target/metadata/message — a secret name is left verbatim and classified
- *  'deferred' (Go finishes it, strictly after op.SetCommand). Only enabled, named metadata rows
- *  cross the wire — mirrors buildBodyWire's own header filter (views/httprequest/state.ts). */
-export function resolveGrpcTabState(
-  state: GrpcRequestTabState,
-  values: Readonly<Record<string, string>>,
-  secretNames: readonly string[],
-  dynamic?: (name: string) => string | null,
-): ResolvedGrpcRequest {
-  const { sub, refs } = createSubstituter(values, secretNames, dynamic);
-
-  const target = sub(state.target);
-  const metadata = resolvePairs(state.metadata, sub);
-  const message = sub(state.message);
-
-  return { target, metadata, message, refs };
-}
+import { resolveGrpcTabState } from './resolve';
+import { grpcSchemaKey, grpcSchemaSourceFor } from './schemaQuery';
 
 // D15: the live view's own ceiling — an infinite stream must not grow the renderer without bound.
 // The oldest messages are dropped once this is exceeded; trueMessageCount (below) keeps the real
@@ -120,37 +86,6 @@ function defaultRuntime(): GrpcRequestViewRuntime {
   };
 }
 
-// ---- D4: the schema browser's own runtime ----
-
-interface GrpcSchemaRuntime {
-  status: 'idle' | 'loading' | 'error';
-  schema: GrpcSchemaWire | null;
-  error: string | null;
-  /** Finding 13: bumped on every loadSchema call, mirroring call()'s own opId guard — a response
-   *  for a stale (superseded) load is dropped rather than applied, the same "the most recent call
-   *  wins" rule opId already gives call()'s own terminal event/return race. */
-  genId: number;
-}
-
-function defaultSchemaRuntime(): GrpcSchemaRuntime {
-  return { status: 'idle', schema: null, error: null, genId: 0 };
-}
-
-/** Resolves stage 1 over target/metadata only (Describe has no message field) — the same
- *  short-circuit shape send() uses below. */
-async function resolveForDescribe(
-  tabId: string,
-): Promise<{ target: string; metadata: { name: string; value: string }[] } | null> {
-  const tab = findGrpcRequestTab(tabId);
-  if (!tab) return null;
-  const { values, secretNames } = await variablesForSend(tabId, tab.state.itemId);
-  const first = resolveGrpcTabState(tab.state, values, secretNames);
-  const resolved = first.refs.some((r) => r.kind === 'dynamic')
-    ? resolveGrpcTabState(tab.state, values, secretNames, await loadDynamicGenerator())
-    : first;
-  return { target: resolved.target, metadata: resolved.metadata };
-}
-
 /** Finds one method in a loaded schema by "Service/Method" full name. */
 export function findMethod(
   schema: GrpcSchemaWire | null,
@@ -201,8 +136,6 @@ function applyGrpcEvent(tabId: string, rt: GrpcRequestViewRuntime, event: GrpcCa
 
 export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
   const { runtime, ensureRuntime } = createRuntimeStore<GrpcRequestViewRuntime>(defaultRuntime);
-  const { runtime: schemaRuntime, ensureRuntime: ensureSchemaRuntime } =
-    createRuntimeStore<GrpcSchemaRuntime>(defaultSchemaRuntime);
 
   // D2: dropResources is noDrop (the registry entry) — the runtime lives here, and a still-running
   // call must be cancelled through this hook rather than through dropResources (registerTabRuntimeCleanup
@@ -210,57 +143,7 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
   registerTabRuntimeCleanup((tabId) => {
     stopOp(runtime[tabId]);
     delete runtime[tabId];
-    delete schemaRuntime[tabId];
   });
-
-  /** D4: fetches (or refetches, `reload`) the schema for the tab's current source. */
-  async function loadSchema(tabId: string, reload = false): Promise<void> {
-    const tab = findGrpcRequestTab(tabId);
-    if (!tab) return;
-    const rt = ensureSchemaRuntime(tabId);
-    rt.status = 'loading';
-    rt.error = null;
-    // Finding 13: mirrors call()'s own opId guard — a debounced watcher still fires one loadSchema
-    // per settled keystroke, and a slow response for an earlier (now-stale) target string could
-    // otherwise land after a newer one and clobber it.
-    const myGen = ++rt.genId;
-
-    try {
-      // P112: this call needs only the two owner ids (GrpcService.Describe resolves values itself),
-      // never a variable value — apiIdsForTab is variablesForSend's ids-only half.
-      const { collectionId, environmentId } = await apiIdsForTab(tabId, tab.state.itemId);
-      let target = tab.state.target;
-      let metadata: { name: string; value: string }[] = [];
-      if (tab.state.descriptorMode === 'reflection') {
-        const resolved = await resolveForDescribe(tabId);
-        if (!resolved || rt.genId !== myGen) return;
-        target = resolved.target;
-        metadata = resolved.metadata;
-      }
-      const schema = await control.grpcDescribe({
-        descriptorMode: tab.state.descriptorMode,
-        target,
-        tls: {
-          enabled: tab.state.tlsMode === 'tls',
-          caFile: tab.state.caFile,
-          serverName: tab.state.serverName,
-        },
-        metadata,
-        protoPath: tab.state.protoPath,
-        importPaths: tab.state.importPaths,
-        collectionId,
-        environmentId,
-        reload,
-      });
-      if (!findGrpcRequestTab(tabId) || rt.genId !== myGen) return;
-      rt.status = 'idle';
-      rt.schema = schema;
-    } catch (err) {
-      if (!findGrpcRequestTab(tabId) || rt.genId !== myGen) return;
-      rt.status = 'error';
-      rt.error = err instanceof Error ? err.message : String(err);
-    }
-  }
 
   // ---- D7/D8: the call itself ----
 
@@ -288,11 +171,12 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
     if (rt.status === 'running') return;
     ensureGrpcCallSubscription();
 
-    const schema = schemaRuntime[tabId]?.schema ?? null;
+    const schema =
+      queryClient.getQueryData<GrpcSchemaWire>(grpcSchemaKey(grpcSchemaSourceFor(tab))) ?? null;
     const method = findMethod(schema, tab.state.service, tab.state.method);
     // P108 F14: this used to default `streaming` to false whenever the schema simply wasn't loaded
     // yet (a Call issued right after mount, or right after switching method, before its own
-    // loadSchema/loadSchemaDebounced round trip resolved) — a genuinely server-streaming method
+    // schema query round trip resolved) — a genuinely server-streaming method
     // then went out over the wire as a one-shot unary call, silently wrong rather than merely
     // delayed. GrpcRequestView.vue's own Call button now disables until findMethod can resolve
     // too, but Enter/the command palette reach this function directly, so the real guard belongs
@@ -395,5 +279,5 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
     stopOp(rt);
   }
 
-  return { runtime, schemaRuntime, loadSchema, call, stop };
+  return { runtime, call, stop };
 });

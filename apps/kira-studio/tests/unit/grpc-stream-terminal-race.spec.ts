@@ -6,7 +6,7 @@
 // terminal event — carrying the trailing message batch and the terminal status — had been
 // delivered, and the event handler's own `rt.opId !== event.callId` check then dropped it outright.
 // This drives both orderings directly, the exact interleaving no Playwright test can force (the
-// same technique grpc-schema-supersession.spec.ts already established for loadSchema's own race).
+// same driven-deferred technique api-server-state-refresh.spec.ts uses).
 import '@workbench/testing/unit/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
@@ -32,6 +32,10 @@ const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
 const { useGrpcRequestViewStore } = await import('../../frontend/src/views/grpcrequest/state');
 const { useGrpcHistoryList } = await import('../../frontend/src/views/grpcrequest/history');
 const { findGrpcRequestTab } = await import('../../frontend/src/api/tabs');
+const { grpcSchemaKey, grpcSchemaSourceFor } = await import(
+  '../../frontend/src/views/grpcrequest/schemaQuery'
+);
+const { queryClient } = await import('@workbench/state/queryClient');
 const grpcRequestViewStore = useGrpcRequestViewStore();
 
 // call()'s pre-flight loads the tree and environments; unstubbed they never settle in this harness.
@@ -115,12 +119,7 @@ function setUpStreamingTab(): string {
   patchGrpcRequestTabState(id, { service: 'Svc', method: 'Stream', responsePane: 'history' });
   const tab = findGrpcRequestTab(id) as NonNullable<ReturnType<typeof findGrpcRequestTab>>;
   effectScope().run(() => useGrpcHistoryList(() => tab));
-  grpcRequestViewStore.schemaRuntime[id] = {
-    status: 'idle',
-    schema: streamingSchema(),
-    error: null,
-    genId: 0,
-  };
+  queryClient.setQueryData(grpcSchemaKey(grpcSchemaSourceFor(tab)), streamingSchema());
   historyListCalls = 0;
   return id;
 }

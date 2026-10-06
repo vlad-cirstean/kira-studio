@@ -14,10 +14,9 @@ import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
-import { useDebounceFn } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import { useSavedGrpcRequest, useVariableRows } from '../../api/state/apiQueries';
 import { useCollectionsStore } from '../../api/state/collections';
@@ -41,8 +40,10 @@ import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
 import GrpcMetadataTable from './GrpcMetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
+import { resolveGrpcTabState } from './resolve';
 import SchemaBrowser from './SchemaBrowser.vue';
-import { findMethod, resolveGrpcTabState, useGrpcRequestViewStore } from './state';
+import { useGrpcSchema } from './schemaQuery';
+import { findMethod, useGrpcRequestViewStore } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
@@ -56,14 +57,13 @@ const running = computed(() => rt.value?.status === 'running');
 const title = computed(() => grpcRequestTitle(props.tab.state));
 
 // P108 F14: state.ts's own call() reads `method?.serverStreaming ?? false` from findMethod against
-// whatever schema happens to be in schemaRuntime at that instant — a Call issued before the schema
+// whatever schema the schema query holds at that instant — a Call issued before the schema
 // (re)load in flight resolves finds no method at all and silently defaults to unary, so a genuinely
 // server-streaming method got called as one-shot instead. Rather than have call() await a load
 // (a user-visible delay on every single Call, not just the rare early one), Call disables until
 // findMethod can actually resolve the tab's own service+method against the current schema.
 const methodResolved = computed(() => {
-  const schema = grpcRequestViewStore.schemaRuntime[props.tab.id]?.schema ?? null;
-  return !!findMethod(schema, props.tab.state.service, props.tab.state.method);
+  return !!findMethod(schema.value, props.tab.state.service, props.tab.state.method);
 });
 
 // P71 §5/§3.1: HttpRequestView.vue's own pair — this view's incognito state and the per-tab
@@ -89,10 +89,9 @@ function onTargetInput(value: string): void {
 // needed for a value list this shape). The full browsable list with per-service grouping lives in
 // the Schema pane (SchemaBrowser.vue) — this is the fast path once a schema is already loaded.
 const methodOptions = computed(() => {
-  const schema = grpcRequestViewStore.schemaRuntime[props.tab.id]?.schema;
-  if (!schema) return [];
+  if (!schema.value) return [];
   const out: { value: string; label: string }[] = [];
-  for (const svc of schema.services) {
+  for (const svc of schema.value.services) {
     for (const m of svc.methods) {
       const badge = m.serverStreaming || m.clientStreaming ? ' (stream)' : '';
       out.push({ value: `${svc.name}|${m.name}`, label: `${svc.name}/${m.name}${badge}` });
@@ -103,8 +102,7 @@ const methodOptions = computed(() => {
 const selectedMethodValue = computed(() => `${props.tab.state.service}|${props.tab.state.method}`);
 function onMethodSelect(rawValue: unknown): void {
   const [service, method] = String(rawValue).split('|');
-  const schema = grpcRequestViewStore.schemaRuntime[props.tab.id]?.schema ?? null;
-  const m = findMethod(schema, service, method);
+  const m = findMethod(schema.value, service, method);
   patchGrpcRequestTabState(props.tab.id, {
     service,
     method,
@@ -112,28 +110,10 @@ function onMethodSelect(rawValue: unknown): void {
   });
 }
 
-// D4: the schema is fetched once a reflection target (or a .proto path) exists — mirrors
-// views/httprequest/HttpRequestView.vue's own ensureVariablesLoaded watch shape.
-//
-// Finding 13: debounced the same 150ms this app already uses for a fast typist
-// (project/state/tree.ts's own SEARCH_DEBOUNCE_MS) — without it, every keystroke of a live
-// target/protoPath fired its own Describe round trip, most of them against a partial, not-yet-
-// finished string. loadSchema's own generation-id guard (state.ts) is still what makes a stale
-// response harmless if one lands late regardless.
-const SCHEMA_LOAD_DEBOUNCE_MS = 150;
-const loadSchemaDebounced = useDebounceFn(() => {
-  void grpcRequestViewStore.loadSchema(props.tab.id);
-}, SCHEMA_LOAD_DEBOUNCE_MS);
-watch(
-  () =>
-    [props.tab.state.descriptorMode, props.tab.state.target, props.tab.state.protoPath] as const,
-  ([mode, target, protoPath]) => {
-    loadSchemaDebounced.cancel();
-    if (mode === 'reflection' && !target) return;
-    if (mode === 'proto' && !protoPath) return;
-    void loadSchemaDebounced();
-  },
-  { immediate: true },
+// D4/P175: the schema is fetched once a reflection target (or a .proto path) exists, debounced like
+// a fast typist (150ms) — see schemaQuery.ts.
+const { schema, loading: schemaLoading, error: schemaError, reload: reloadSchema } = useGrpcSchema(
+  () => props.tab,
 );
 
 // P112: HttpRequestView.vue's own useSavedRequest rewrite, mirrored — see its comment for the full
@@ -287,7 +267,6 @@ onMounted(() => {
 });
 onUnmounted(() => {
   for (const off of unregisterCommands) off();
-  loadSchemaDebounced.cancel();
 });
 </script>
 
@@ -536,7 +515,7 @@ onUnmounted(() => {
             :show-descriptions="tab.state.fieldDescriptions"
           />
         </template>
-        <SchemaBrowser v-else :tab="tab" />
+        <SchemaBrowser v-else :tab="tab" :schema="schema" :loading="schemaLoading" :error="schemaError" @reload="reloadSchema" />
       </ResizablePanel>
 
       <ResizableHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />

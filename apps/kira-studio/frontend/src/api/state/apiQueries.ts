@@ -1,4 +1,6 @@
-// P112: the one module owning every API-client server-state cache — keys, query options, the
+// P112: the module owning the collections and variables server-state caches (jar cookies, history
+// and gRPC schema live in views/httprequest/cookies.ts, api/state/history.ts and
+// views/grpcrequest/schemaQuery.ts) — keys, query options, the
 // imperative loaders non-component code uses, the one invalidation helper (refreshApiQuery,
 // F2's successor) and the boot-time listener that turns a Go `kira:api:dataChanged` broadcast
 // into cache invalidation (initApiDataSync). Precedents: state/schemas.ts (options object,

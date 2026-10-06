@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { GrpcSchemaWire } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -18,15 +19,17 @@ import { computed, ref } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
-import { useGrpcRequestViewStore } from './state';
 
 // D13's Schema pane: the source selector (Reflection / .proto file + import paths + Reload) above
 // a service→method list — inside the tab, not the left panel (D13's own reasoning: a schema is a
 // property of one request's target, not of the workspace).
-const props = defineProps<{ tab: GrpcRequestTabRecord }>();
-const grpcRequestViewStore = useGrpcRequestViewStore();
-
-const rt = computed(() => grpcRequestViewStore.schemaRuntime[props.tab.id]);
+const props = defineProps<{
+  tab: GrpcRequestTabRecord;
+  schema: GrpcSchemaWire | null;
+  loading: boolean;
+  error: string | null;
+}>();
+const emit = defineEmits<{ reload: [] }>();
 
 const SOURCE_OPTIONS = [
   { value: 'reflection' as const, label: 'Reflection', testid: 'grpc-source-reflection' },
@@ -69,9 +72,6 @@ function removeImportPath(i: number): void {
   });
 }
 
-function onReload(): void {
-  void grpcRequestViewStore.loadSchema(props.tab.id, true);
-}
 
 // P16 D15: matches service name or method name — a service whose own name matches shows all its
 // methods; otherwise only the methods that themselves match, and a service with no match at all
@@ -79,7 +79,7 @@ function onReload(): void {
 const filterQuery = ref('');
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredServices = computed(() => {
-  const services = rt.value?.schema?.services ?? [];
+  const services = props.schema?.services ?? [];
   const q = filterQuery.value.trim().toLowerCase();
   if (!q) return services;
   return services.flatMap((svc) => {
@@ -92,7 +92,7 @@ const filteredServices = computed(() => {
 });
 
 function selectMethod(service: string, method: string): void {
-  const m = rt.value?.schema?.services
+  const m = props.schema?.services
     .find((s) => s.name === service)
     ?.methods.find((mm) => mm.name === method);
   patchGrpcRequestTabState(props.tab.id, {
@@ -150,8 +150,8 @@ function selectMethod(service: string, method: string): void {
         variant="toolbar"
         size="kira"
         data-testid="grpc-schema-reload"
-        :disabled="rt?.status === 'loading'"
-        @click="onReload"
+        :disabled="loading"
+        @click="emit('reload')"
       >
         <CodiconIcon name="refresh" :size="13" />
         Reload
@@ -195,11 +195,11 @@ function selectMethod(service: string, method: string): void {
       </div>
     </div>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="grpc-schema-error">
-      <AlertDescription>{{ rt.error }}</AlertDescription>
+    <Alert v-if="error" variant="destructive" data-testid="grpc-schema-error">
+      <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
 
-    <InputGroup v-if="rt?.schema && rt.schema.services.length > 0">
+    <InputGroup v-if="schema && schema.services.length > 0">
       <InputGroupAddon>
         <CodiconIcon name="search" :size="13" />
       </InputGroupAddon>
@@ -215,7 +215,7 @@ function selectMethod(service: string, method: string): void {
       </InputGroupAddon>
     </InputGroup>
     <div class="flex-1 min-h-0 overflow-auto px-1.5 py-1" data-testid="grpc-service-list">
-      <template v-if="rt?.schema && filteredServices.length > 0">
+      <template v-if="schema && filteredServices.length > 0">
         <div v-for="svc in filteredServices" :key="svc.name" class="mb-1.5">
           <div class="text-kira-sm text-muted-foreground uppercase tracking-wider py-0.5" data-testid="grpc-service-name">{{ svc.name }}</div>
           <!-- The row's own template class list (P110 B29) supplies height/display/align-items/
@@ -243,13 +243,13 @@ function selectMethod(service: string, method: string): void {
         </div>
       </template>
       <Empty
-        v-else-if="isFiltered && rt?.schema && rt.schema.services.length > 0"
+        v-else-if="isFiltered && schema && schema.services.length > 0"
         data-testid="grpc-schema-filter-empty"
       >
         <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
         <EmptyTitle>No matches</EmptyTitle>
       </Empty>
-      <Empty v-else-if="rt?.status !== 'loading'">
+      <Empty v-else-if="!loading">
         <EmptyMedia><CodiconIcon name="symbol-interface" :size="24" /></EmptyMedia>
         <EmptyTitle>Choose a source above to browse this server's services</EmptyTitle>
       </Empty>

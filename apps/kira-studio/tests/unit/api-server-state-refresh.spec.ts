@@ -40,8 +40,10 @@ function observe(fn: () => unknown): void {
   scopes.push(scope);
   scope.run(fn);
 }
+// Not queryClient.clear(): other specs' stores keep permanent observers on unrelated queries.
 beforeEach(() => {
-  queryClient.clear();
+  queryClient.removeQueries({ queryKey: ['httpHistory'] });
+  queryClient.removeQueries({ queryKey: ['httpJarCookies'] });
 });
 afterEach(() => {
   for (const scope of scopes.splice(0)) scope.stop();

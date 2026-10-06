@@ -424,9 +424,8 @@ export function overviewRowsOf(
   ];
 }
 
-/** variablesForSend's own ids-only half — grpcrequest/state.ts's loadSchema needs the two owner
- *  ids for GrpcService.Describe but never touches a variable's value. */
-export async function apiIdsForTab(
+/** variablesForSend's own ids-only half. */
+async function apiIdsForTab(
   tabId: string,
   itemId: string | null,
 ): Promise<{ collectionId: string; environmentId: string }> {
