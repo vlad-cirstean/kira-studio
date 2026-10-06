@@ -58,7 +58,7 @@ func (r *Router) handleSearchRun(ctx context.Context, c *gitsession.Conn, params
 	}
 	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, precomputedTotal)
 	if err != nil {
-		return nil, mapConnError(err)
+		return nil, mapGitError(err)
 	}
 
 	q := gitsearch.Query{

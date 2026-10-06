@@ -3,7 +3,6 @@ package gitrpc
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/logsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
@@ -80,16 +79,6 @@ func rangedWalkSpecFrom(rng *CommitRangeParams) (porcelain.WalkSpec, error) {
 	return porcelain.WalkSpec{Range: &porcelain.RangeSpec{Base: rng.Base, Branch: rng.Branch}}, nil
 }
 
-// mapConnError turns gitsession's own closed error vocabulary into an ipcerr — today just
-// ErrRepoNotHeld (repo.open must precede any graph.* call, exactly as it must for every other
-// per-repo request).
-func mapConnError(err error) error {
-	if errors.Is(err, gitsession.ErrRepoNotHeld) {
-		return ipcerr.BadRequest("gitrpc: repository is not open on this connection")
-	}
-	return err
-}
-
 // graph.status/graph.loadMore/graph.refresh/graph.stream stay on their own hand-rolled dispatch
 // (P107 I2-13): they resolve through c.Walk/c.WalkFor/c.ReviewWalkFor, not entryFor, and
 // deliberately tolerate an unheld repo (an unopened walk answers a zero-value result, never
@@ -163,7 +152,7 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 	}
 	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, precomputedTotal)
 	if err != nil {
-		return nil, mapConnError(err)
+		return nil, mapGitError(err)
 	}
 
 	pages := 1
@@ -260,7 +249,7 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	}
 	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, precomputedTotal)
 	if err != nil {
-		return mapConnError(err)
+		return mapGitError(err)
 	}
 
 	err = w.Stream(ctx, p.ResumeThroughRow, ChunkRows, func(chunk gitsession.StreamChunk) error {

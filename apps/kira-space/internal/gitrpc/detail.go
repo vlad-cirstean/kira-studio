@@ -47,7 +47,7 @@ func mapDetailError(err error) error {
 func entryFor(c *gitsession.Conn, repoID string) (*gitsession.RepoEntry, error) {
 	entry, ok := c.Entry(gitpath.CleanNFC(repoID)) // G27 D6
 	if !ok {
-		return nil, mapConnError(gitsession.ErrRepoNotHeld)
+		return nil, mapGitError(gitsession.ErrRepoNotHeld)
 	}
 	return entry, nil
 }

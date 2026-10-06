@@ -18,8 +18,8 @@ import (
 // ErrRepoTornDown is returned by whatever still reaches a RepoEntry after its own teardown() ran
 // (F2/F3) — Registry.Close() tears entries down regardless of refcount (D14), so a request still
 // in flight at process shutdown can observe this instead of a nil-map panic or a double-close.
-// gitrpc's default mapGitError arm maps it to E_INTERNAL like any other unrecognised error; the
-// response is delivered nowhere anyway, since the socket is already closing.
+// gitrpc's mapGitError maps it to E_BAD_REQUEST, same as ErrRepoNotHeld; the response is
+// delivered nowhere anyway, since the socket is already closing.
 var ErrRepoTornDown = errors.New("gitsession: repository entry has been torn down")
 
 // Watcher is the minimal seam RepoEntry needs from a repo watcher — gitclient.RepoWatcher
