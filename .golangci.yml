@@ -33,6 +33,9 @@ linters:
     rules:
       - path: _test\.go
         linters: [gocognit, gocyclo, prealloc]
+      # Vendored Go stdlib net/http/cookiejar, kept verbatim for resync (see cookiejar/jar.go).
+      - path: internal/httpclient/cookiejar/(jar|punycode|example_test)\.go
+        linters: [gocognit, gocyclo, gocritic, bodyclose]
 
 # Guard for P139: gofmt drift landed silently until pre-push began running this.
 formatters:
