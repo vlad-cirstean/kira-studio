@@ -15,6 +15,7 @@ no Part 14 code change between them).
 - Block 2 (askpass): done.
 - Block 3 (catfile, logsession): done.
 - Block 4 (porcelain): done.
+- Block 5 (gh client): done.
 
 ## Findings
 
@@ -216,6 +217,67 @@ long`. Only the content line can be that long, and the parser never uses its tex
 Fix: walk `raw` with `bytes.IndexByte(raw, '\n')` and stop at the first line starting with a tab,
 without a token limit (the whole output is already in memory).
 
+### F13 (low) A revision containing a newline desyncs the persistent catfile stream for every later caller
+
+`apps/kira-space/internal/gitclient/catfile/session.go:270,303,342` (`Check`, `CheckMany`, `Read`
+append `rev+"\n"` unvalidated). Callers that build `<rev>:<path>` route newline revs to the
+one-shot path, but `gitsession/ghsync.go:129` passes `files.HeadSha` straight from
+`ghclient.PullFiles` (`graphql.go`, `pr.HeadRefOid`, unvalidated GitHub JSON). A newline in the
+rev makes git answer twice; the second answer stays in the pipe and is read by the next, unrelated
+request on that persistent process.
+
+Reproduced (throwaway test, deleted) on a scratch repo: `Check("HEAD\nHEAD~1")` returns HEAD's
+info; the next `Check("doesnotexist")` returns `{OID: <HEAD~1>, Type: commit}, nil` instead of
+`ErrMissing`. Every request after that is off by one until the process fails.
+
+Scenario: a GHES host the user is logged in to (or a compromised one) returns
+`headRefOid: "<sha>\nHEAD"`. Afterwards blob reads, diffs and size lookups in that repo silently
+return the previous request's object: wrong file content shown or written into review state.
+Needs a hostile GitHub host, hence low; the defect is that the line protocol trusts its callers.
+
+Fix: in `request`/`requestPipelined` (or `Check`/`CheckMany`/`Read`), reject any rev containing
+`\n` with an error (callers needing such revs already use the one-shot path). Also validate
+`HeadRefOid` as 40 or 64 hex in `PullFiles`.
+
+### F14 (low) `PullFiles` pagination has no page bound
+
+`apps/kira-space/internal/ghclient/graphql.go:126-158`. The loop stops only at 3,000 files, at
+`hasNextPage == false`, or at an empty `endCursor`. A response with `hasNextPage: true`, a
+non-empty `endCursor` and zero nodes (GitHub incident, GHES bug, or a cursor that does not advance)
+loops forever, one `gh` spawn per iteration (each up to 30 s), bounded only by the caller's ctx.
+A repeated cursor with nodes fills the result with duplicates until 3,000.
+
+Fix: cap iterations at `maxPullFiles/pullFilesPageSize + 1` and stop (as truncated) when a page has
+no nodes or returns the same cursor as the previous one.
+
+### F15 (low) `https://` remotes with userinfo, a port or an uppercase host are never recognised as GitHub
+
+`apps/kira-space/internal/ghclient/remote.go:62-73`. `parseURLForm` takes everything before the
+first `/` as the host, so `https://vlad@github.com/o/r.git` yields host `vlad@github.com`,
+`https://x-access-token:TOKEN@github.com/o/r` yields `x-access-token:TOKEN@github.com`, and
+`https://GitHub.com/o/r` yields `GitHub.com`. `parseSSHURLForm` already strips userinfo and port.
+`gitsession/gh.go:259` `IsGitHubHost` compares to `"github.com"` case-sensitively first, so these
+repos silently get no PR status, sync or badges. No `gh` call is made for such a host (it is
+never in `Hosts()`), so the embedded token does not reach a `gh` argv today; it is kept in
+`RepoEntry.gh.repo.Host` only.
+
+Fix: in `parseURLForm`, cut userinfo at the last `@` and lowercase the host (keep the port only if
+GHES support needs it); add the three shapes to `remote_test.go`'s table.
+
+### F16 (low) `gh` REST responses over 4 MiB are truncated into "unreadable response"
+
+`apps/kira-space/internal/ghclient/runner.go:132-154`, consumer `pr.go:160` (`OpenPulls`,
+`per_page=100`). Stdout is buffered whole in an unbounded `bytes.Buffer`, then cut at 4 MiB, and
+`get` reports the cut JSON as `GitHub returned an unreadable response`. The cap bounds retention,
+not memory, and turns a large valid answer into a hard failure. The REST pull list returns full
+`head.repo`/`base.repo`/`user` objects and the PR `body` for each of 100 items. Estimate, not
+measured (no authenticated `gh` here): about 15-25 KiB per item before the body, so a page of
+bot PRs with long bodies (Dependabot release notes) can exceed 4 MiB. Page 1 failing fails the
+whole snapshot (`OpenPulls` returns the error for page 1).
+
+Fix: add `--jq` projecting only the fields `rawPull` reads (about 200 bytes per PR), and replace
+the post-hoc cut with a bounded writer that reports "response too large" distinctly.
+
 ## Coverage
 
 ### Block 1: spawn seam and gate
@@ -333,3 +395,27 @@ Verified, no finding:
   ADE tips (shas). No unguarded client string reaches a dash-sensitive position.
 - `SHA-256`: `isHexObjectID` and `IsUncommittedBlameSHA` accept 40 or 64 hex; empty tree derived
   via `hash-object` (F18 holds).
+
+### Block 5: gh client
+
+Reviewed in full: `PI/ghclient/{api,discovery,doc,errors,graphql,pr,remote,runner,status}.go`;
+callers `gitsession/gh.go` (`IsGitHubHost`, `githubRepo`), `gitsession/ghsync.go:120-135`.
+
+Verified, no finding:
+- GraphQL argv: every string variable (`owner`, `name`, `cursor`, `pr`, `p<n>` paths) goes via
+  `-f` (no `@file` read); only ints use `-F`. Paths travel as variables, never in the query text.
+  `--hostname <host>`: pflag takes the next token as the value even when it starts with `-`, and
+  the host comes from a parsed remote gated by `IsGitHubHost`.
+- REST paths: owner/name `url.PathEscape`d, sha `PathEscape`d, branch and owner `QueryEscape`d.
+- Rate limits: GraphQL `errors[]` without data matched on "rate limit"; REST 403 with "rate
+  limit" and 429 classified; secondary limits carry "rate limit" in stderr. `gh` exits 1 on
+  GraphQL errors; `graphql()` inspects the body regardless of exit code, so per-alias errors beside
+  data reach `SetFilesViewed`.
+- `SetFilesViewed`: 50-alias chunks; alias index bounds-checked; a whole-chunk failure marks that
+  chunk and all later paths failed. `Truncated` at exactly 3,000 is correct (`hasNextPage` or
+  over-count).
+- Env: `GH_REPO=` cleared; inherited `GIT_DIR` is irrelevant because every call passes
+  `--hostname` and an explicit path, never a `{owner}` placeholder; `GH_TOKEN`/`GITHUB_TOKEN`
+  pass through by design and no log, `Status.Reason` or error echoes them.
+- Discovery: per-host cache, caller-cancel not cached (G31 #5 holds), `notOKTTL` asymmetric.
+  `classify`'s timeout text says "10s" also for the 30 s GraphQL timeout: cosmetic, not reported.
