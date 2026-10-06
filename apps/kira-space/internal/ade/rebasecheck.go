@@ -70,6 +70,8 @@ type rebaseChecker struct {
 	mu       sync.Mutex
 	inflight map[jobID]chan struct{}
 	failed   map[jobID]string
+	closed   bool
+	wg       sync.WaitGroup // running checks; close waits for them
 }
 
 func newRebaseChecker(ctx context.Context, gitStatus func(context.Context) gitclient.GitStatus, onDone func()) *rebaseChecker {
@@ -127,11 +129,18 @@ func (c *rebaseChecker) request(j rebaseJob) <-chan struct{} {
 		return done
 	}
 	done := make(chan struct{})
+	if c.closed {
+		c.mu.Unlock()
+		close(done)
+		return done
+	}
 	c.inflight[id] = done
 	delete(c.failed, id)
+	c.wg.Add(1)
 	c.mu.Unlock()
 
 	go func() {
+		defer c.wg.Done()
 		paths, err := c.execute(j)
 		c.mu.Lock()
 		delete(c.inflight, id)
@@ -152,6 +161,14 @@ func (c *rebaseChecker) request(j rebaseJob) <-chan struct{} {
 		}
 	}()
 	return done
+}
+
+// close refuses new checks and waits for the running ones; cancel the checker's ctx first.
+func (c *rebaseChecker) close() {
+	c.mu.Lock()
+	c.closed = true
+	c.mu.Unlock()
+	c.wg.Wait()
 }
 
 // mergeTreeRun binds a job's run func to the repo entry: the one `git merge-tree` caller.

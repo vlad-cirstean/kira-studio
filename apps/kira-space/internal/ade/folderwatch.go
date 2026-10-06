@@ -76,6 +76,7 @@ type folderWatcher struct {
 	mu      sync.Mutex
 	timer   *time.Timer
 	stopped bool
+	rescans sync.WaitGroup // in-flight rescan; stop waits for it
 	done    chan struct{}
 }
 
@@ -132,11 +133,13 @@ func (f *folderWatcher) schedule() {
 
 func (f *folderWatcher) rescan() {
 	f.mu.Lock()
-	stopped := f.stopped
-	f.mu.Unlock()
-	if stopped {
+	if f.stopped {
+		f.mu.Unlock()
 		return
 	}
+	f.rescans.Add(1)
+	f.mu.Unlock()
+	defer f.rescans.Done()
 	scan := scanFolder(f.path)
 	f.addDirs(scan.dirs)
 	imported, err := f.board.importFolder(f.board.ctx, f.path)
@@ -178,4 +181,5 @@ func (f *folderWatcher) stop() {
 	f.mu.Unlock()
 	f.w.Close()
 	<-f.done
+	f.rescans.Wait()
 }

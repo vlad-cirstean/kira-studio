@@ -55,9 +55,11 @@ func (b *TaskBoard) scheduleWorkflows() {
 		b.wfTimer.Stop()
 	}
 	b.wfTimer = time.AfterFunc(workflowsEmitDelay, func() {
-		if b.deps.OnWorkflows != nil {
-			b.deps.OnWorkflows()
-		}
+		b.runTracked(func() {
+			if b.deps.OnWorkflows != nil {
+				b.deps.OnWorkflows()
+			}
+		})
 	})
 }
 

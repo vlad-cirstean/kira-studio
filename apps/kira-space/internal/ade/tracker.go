@@ -138,11 +138,16 @@ type Tracker struct {
 	claudeSessionID map[string]string
 
 	hooks func(terminalID, command string) (string, []string)
+
+	// graceTimers are Compose's pending Reconcile timers, stopped by Close; graceWG waits for a
+	// callback already running.
+	graceTimers map[string]*time.Timer
+	graceWG     sync.WaitGroup
+	closed      bool
 }
 
-// NewTracker applies TrackerDeps' own defaults and constructs a Tracker with empty state — call
-// Recover once at boot, before any window exists, to reconcile state left by a previous process
-// life.
+// NewTracker applies TrackerDeps' own defaults and constructs a Tracker with empty state.
+// TaskBoard.Recover reconciles rows left by a previous process life.
 func NewTracker(deps TrackerDeps) *Tracker {
 	if deps.Grace <= 0 {
 		deps.Grace = defaultGrace
@@ -161,6 +166,7 @@ func NewTracker(deps TrackerDeps) *Tracker {
 		spawnedAt:       map[string]time.Time{},
 		lastActive:      map[string]int64{},
 		claudeSessionID: map[string]string{},
+		graceTimers:     map[string]*time.Timer{},
 	}
 }
 
@@ -368,18 +374,40 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 	t.byRecord[intent.RecordID] = terminalID
 	t.spawnedAt[intent.RecordID] = now
 	t.claudeSessionID[intent.RecordID] = intent.ClaudeSessionID
+	t.armGraceLocked(intent.RecordID)
 	t.mu.Unlock()
 
 	// The grace window exists because Compose runs before the PTY is registered with Registry: a
 	// Reconcile racing the spawn (Registry.OnChange fires on both open and exit) must not stop a
 	// record that only just started (§4.4).
-	time.AfterFunc(t.deps.Grace, t.Reconcile)
 
 	if t.deps.OnChange != nil {
 		t.deps.OnChange()
 	}
 
 	return composed, env, nil
+}
+
+// armGraceLocked schedules the Reconcile that follows a record's grace window; mu is held.
+func (t *Tracker) armGraceLocked(recordID string) {
+	if t.closed {
+		return
+	}
+	if old := t.graceTimers[recordID]; old != nil {
+		old.Stop()
+	}
+	t.graceTimers[recordID] = time.AfterFunc(t.deps.Grace, func() {
+		t.mu.Lock()
+		if t.closed {
+			t.mu.Unlock()
+			return
+		}
+		delete(t.graceTimers, recordID)
+		t.graceWG.Add(1)
+		t.mu.Unlock()
+		defer t.graceWG.Done()
+		t.Reconcile()
+	})
 }
 
 // Reconcile reads the live agent set and stops every tracked record whose terminal is gone and
@@ -517,6 +545,15 @@ func (t *Tracker) Get(id string) (*model.AdeSession, error) {
 // after TerminalService.Shutdown has already closed every PTY (whose own exit notifications may
 // still be racing Reconcile) but before the database closes.
 func (t *Tracker) Close() error {
+	t.mu.Lock()
+	t.closed = true
+	for _, timer := range t.graceTimers {
+		timer.Stop()
+	}
+	t.graceTimers = map[string]*time.Timer{}
+	t.mu.Unlock()
+	t.graceWG.Wait()
+
 	t.mu.Lock()
 	toFlush := make(map[string]int64, len(t.lastActive))
 	for id, v := range t.lastActive {

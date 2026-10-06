@@ -78,6 +78,7 @@ type debouncer struct {
 	mu      sync.Mutex
 	timer   *time.Timer
 	stopped bool
+	running sync.WaitGroup // in-flight fn calls; stop waits for them
 }
 
 func (d *debouncer) schedule() {
@@ -94,11 +95,14 @@ func (d *debouncer) schedule() {
 
 func (d *debouncer) fire() {
 	d.mu.Lock()
-	stopped := d.stopped
-	d.mu.Unlock()
-	if !stopped {
-		d.fn()
+	if d.stopped {
+		d.mu.Unlock()
+		return
 	}
+	d.running.Add(1)
+	d.mu.Unlock()
+	defer d.running.Done()
+	d.fn()
 }
 
 func (d *debouncer) stop() {
@@ -108,4 +112,5 @@ func (d *debouncer) stop() {
 		d.timer.Stop()
 	}
 	d.mu.Unlock()
+	d.running.Wait()
 }

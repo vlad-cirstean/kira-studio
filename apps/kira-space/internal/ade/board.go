@@ -162,6 +162,15 @@ func (b *TaskBoard) track() bool {
 	return true
 }
 
+// runTracked runs fn on the caller's goroutine unless Close ran; Close waits for it.
+func (b *TaskBoard) runTracked(fn func()) {
+	if !b.track() {
+		return
+	}
+	defer b.wg.Done()
+	fn()
+}
+
 // goTracked runs fn in the background; Close waits for it.
 func (b *TaskBoard) goTracked(fn func()) {
 	if !b.track() {
@@ -192,6 +201,7 @@ func (b *TaskBoard) Close() {
 	}
 	b.mu.Unlock()
 	b.stopWatchers()
+	b.checker.close()
 	b.wg.Wait()
 	b.conn.Close()
 }
@@ -233,7 +243,7 @@ func (b *TaskBoard) scheduleBoard() {
 	if b.boardTimer != nil {
 		b.boardTimer.Stop()
 	}
-	b.boardTimer = time.AfterFunc(adeRepoChangedDebounce, b.notifyBoard)
+	b.boardTimer = time.AfterFunc(adeRepoChangedDebounce, func() { b.runTracked(b.notifyBoard) })
 }
 
 func (b *TaskBoard) notifyBoard() {
