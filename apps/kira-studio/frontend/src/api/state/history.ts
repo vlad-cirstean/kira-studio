@@ -55,6 +55,14 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
     latestSeq.set(tabId, next);
     return next;
   }
+  // Per-tab: view() commits only if no newer view/backToLatest/noteRecorded started since, so a
+  // slow snapshot never lands over a newer selection or a fresh response.
+  const viewSeq = new Map<string, number>();
+  function bumpView(tabId: string): number {
+    const next = (viewSeq.get(tabId) ?? 0) + 1;
+    viewSeq.set(tabId, next);
+    return next;
+  }
   const staleSeq = new Map<string, number>();
   function bumpStale(tabId: string): void {
     staleSeq.set(tabId, (staleSeq.get(tabId) ?? 0) + 1);
@@ -83,6 +91,7 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
     delete runtime[tabId];
     latestSeq.delete(tabId);
     staleSeq.delete(tabId);
+    viewSeq.delete(tabId);
   });
 
   function scopeIdsFor(tabId: string): { itemId: string; tabId: string } {
@@ -164,6 +173,7 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
     // deleted both of, and nothing closes that gap again.
     if (!tab) return;
     const rt = ensure(tabId);
+    bumpView(tabId);
     rt.viewing = null;
     if (tab?.state.responsePane === 'history') {
       void load(tabId);
@@ -182,12 +192,13 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
   /** Selects one entry to view — the full snapshot, not the list row alone. */
   async function view(tabId: string, id: string): Promise<void> {
     const rt = ensure(tabId);
+    const mySeq = bumpView(tabId);
     try {
       const snapshot = await opts.get(id);
-      if (!opts.findTab(tabId)) return;
+      if (!opts.findTab(tabId) || viewSeq.get(tabId) !== mySeq) return;
       rt.viewing = { id, snapshot };
     } catch (err) {
-      if (!opts.findTab(tabId)) return;
+      if (!opts.findTab(tabId) || viewSeq.get(tabId) !== mySeq) return;
       rt.error = err instanceof Error ? err.message : String(err);
     }
   }
@@ -195,22 +206,46 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
   /** The viewing band's "Back to latest" / "Close" action. */
   function backToLatest(tabId: string): void {
     const rt = runtime[tabId];
-    if (rt) rt.viewing = null;
+    if (!rt) return;
+    bumpView(tabId);
+    rt.viewing = null;
   }
 
+  // A tab closed during the remove/clear await must not get its runtime recreated by load();
+  // a failed remove/clear lands in rt.error, which the list already renders.
   async function del(tabId: string, id: string): Promise<void> {
-    await opts.remove(id);
+    try {
+      await opts.remove(id);
+    } catch (err) {
+      const rt = opts.findTab(tabId) ? ensure(tabId) : undefined;
+      if (rt) rt.error = err instanceof Error ? err.message : String(err);
+      return;
+    }
+    if (!opts.findTab(tabId)) return;
     const rt = runtime[tabId];
-    if (rt?.viewing?.id === id) rt.viewing = null;
+    if (rt?.viewing?.id === id) {
+      bumpView(tabId);
+      rt.viewing = null;
+    }
     await load(tabId);
   }
 
   /** The destructive, unrecoverable action — the caller gates this behind confirmDialog(). */
   async function clearAll(tabId: string): Promise<void> {
     const { itemId, tabId: tid } = scopeIdsFor(tabId);
-    await opts.clear(itemId, tid);
+    try {
+      await opts.clear(itemId, tid);
+    } catch (err) {
+      const rt = opts.findTab(tabId) ? ensure(tabId) : undefined;
+      if (rt) rt.error = err instanceof Error ? err.message : String(err);
+      return;
+    }
+    if (!opts.findTab(tabId)) return;
     const rt = runtime[tabId];
-    if (rt) rt.viewing = null;
+    if (rt) {
+      bumpView(tabId);
+      rt.viewing = null;
+    }
     await load(tabId);
   }
 

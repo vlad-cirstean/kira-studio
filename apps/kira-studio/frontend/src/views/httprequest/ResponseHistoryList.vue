@@ -6,6 +6,7 @@ import {
 } from '@shared/domain/response-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -139,6 +140,9 @@ async function onClear(): Promise<void> {
         Clear history
       </Button>
     </div>
+    <Alert v-if="rt?.error" variant="destructive" data-testid="http-history-error">
+      <AlertDescription>{{ rt.error }}</AlertDescription>
+    </Alert>
 
     <Empty v-if="entries.length === 0" data-testid="http-history-empty">
       <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
