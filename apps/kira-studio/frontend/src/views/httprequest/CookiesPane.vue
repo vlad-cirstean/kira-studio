@@ -41,8 +41,7 @@ function matches(c: HttpCookieWire, q: string): boolean {
 }
 
 // §3: "Domain=… Path=… Expires=… Secure HttpOnly SameSite=Lax" — attributes with nothing to show
-// (an empty Domain/Path from the request-mode jar listing, §2.4's own stated limitation) are
-// skipped rather than printed empty.
+// are skipped rather than printed empty.
 function attributeLine(c: HttpCookieWire): string {
   const parts: string[] = [];
   if (c.domain) parts.push(`Domain=${c.domain}`);
@@ -63,9 +62,9 @@ const filteredRequestCookies = computed(() => {
   return requestCookies.value.filter((c) => matches(c, q));
 });
 
-async function onRemove(name: string): Promise<void> {
+async function onRemove(c: HttpCookieWire): Promise<void> {
   if (!props.tabId || !props.url) return;
-  await cookiesStore.deleteCookie(props.tabId, props.url, name);
+  await cookiesStore.deleteCookie(props.tabId, props.url, c);
 }
 async function onClearAll(): Promise<void> {
   if (!props.tabId) return;
@@ -145,8 +144,8 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
             icon="close"
             label="Remove"
             aria-label="Remove cookie"
-            :data-testid="`http-cookies-remove-${c.name}`"
-            @click="onRemove(c.name)"
+            :data-testid="`http-cookies-remove-${c.name}-${c.domain}${c.path}`"
+            @click="onRemove(c)"
           />
         </div>
       </div>

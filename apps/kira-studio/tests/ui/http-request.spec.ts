@@ -666,6 +666,72 @@ test('Http request — the request Cookies tab shows the jar-off state by defaul
   expect(control.log().some((e) => e.channel === IPC.httpCookies)).toBe(false);
 });
 
+// P175 D2 (P168 F12): Remove deletes by the exact domain and path, so two same-name cookies on one
+// URL are removed independently.
+test('Http request — Remove sends the exact domain and path of the cookie', async ({
+  relaunch,
+}) => {
+  const RESTORED_TAB = {
+    id: 'tab-cookie-remove',
+    connectionId: null,
+    path: 'request',
+    kind: 'http-request',
+    order: 0,
+    active: true,
+    state: {
+      method: 'GET',
+      url: 'https://api.example.com/a/b',
+      headers: [],
+      bodyMode: 'none',
+      body: '',
+      requestPane: 'cookies',
+      responsePane: 'body',
+      responseView: 'pretty',
+      requestPaneHeight: 0,
+      settings: {
+        httpVersion: null,
+        requestTimeoutMs: null,
+        maxResponseMb: null,
+        sslVerify: null,
+        followRedirects: null,
+        maxRedirects: null,
+        disableCookieJar: false,
+      },
+    },
+  };
+  const cookie = (path: string, value: string) => ({
+    name: 'sid',
+    value,
+    domain: 'api.example.com',
+    path,
+    expires: '',
+    maxAge: 0,
+    secure: false,
+    httpOnly: false,
+    sameSite: '',
+    hop: 0,
+  });
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [RESTORED_TAB] },
+    { channel: IPC.httpCookies, response: [cookie('/a', 'deep'), cookie('/', 'root')] },
+    { channel: IPC.httpDeleteCookie, response: [cookie('/', 'root')] },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await expect(
+    page.locator('[data-testid="http-cookies-remove-sid-api.example.com/a"]'),
+  ).toBeVisible();
+  await page.click('[data-testid="http-cookies-remove-sid-api.example.com/a"]');
+
+  const calls = control.log().filter((e) => e.channel === IPC.httpDeleteCookie);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].args).toMatchObject({ name: 'sid', domain: 'api.example.com', path: '/a' });
+  await expect(page.locator('[data-testid^="http-cookies-remove-"]')).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid="http-cookies-remove-sid-api.example.com/"]'),
+  ).toBeVisible();
+});
+
 // The overlay's own Range client rects give exact per-character line boundaries, with no font
 // metric hard-coded — reused both to size the fixture text (stay within the 4-row clamp) and to
 // drive the click assertion below.

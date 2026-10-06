@@ -198,10 +198,13 @@ type HttpCookiesArgs struct {
 	URL string `json:"url"`
 }
 
-// HttpCookieDeleteArgs names one cookie to expire from the shared jar.
+// HttpCookieDeleteArgs names one jar entry by the domain, path and name HttpService.Cookies
+// reported; URL is only the list to return afterwards.
 type HttpCookieDeleteArgs struct {
-	URL  string `json:"url"`
-	Name string `json:"name"`
+	URL    string `json:"url"`
+	Name   string `json:"name"`
+	Domain string `json:"domain"`
+	Path   string `json:"path"`
 }
 
 // Cookies/DeleteCookie/ClearCookies are P90 item 2's three thin bound methods. None of these go
@@ -216,9 +219,10 @@ func (s *HttpService) Cookies(args HttpCookiesArgs) ([]httpclient.Cookie, error)
 }
 
 func (s *HttpService) DeleteCookie(args HttpCookieDeleteArgs) ([]httpclient.Cookie, error) {
-	if err := httpclient.DeleteJarCookie(args.URL, args.Name); err != nil {
-		return nil, mapHttpError(err)
+	if args.Name == "" || args.Domain == "" || args.Path == "" {
+		return nil, ipcerr.BadRequest("cookie name, domain and path are required")
 	}
+	httpclient.DeleteJarCookie(args.Domain, args.Path, args.Name)
 	return s.Cookies(HttpCookiesArgs{URL: args.URL})
 }
 

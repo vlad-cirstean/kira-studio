@@ -6,68 +6,50 @@ import (
 	"testing"
 )
 
-// TestDeleteJarCookieRemovesPathAndDomainScopedCookies guards P168 Part 6 F12: a bare expiring Set
-// keys on the URL's host and directory and silently misses Path=/ and parent-Domain cookies.
-func TestDeleteJarCookieRemovesPathAndDomainScopedCookies(t *testing.T) {
-	cases := []struct {
-		name   string
-		setURL string
-		cookie http.Cookie
-	}{
-		{"root path from deep url", "https://api.example.com/login", http.Cookie{Name: "sid", Value: "1", Path: "/"}},
-		{"parent domain", "https://api.example.com/login", http.Cookie{Name: "sid", Value: "1", Domain: "example.com", Path: "/"}},
-		{"intermediate path", "https://api.example.com/api/x", http.Cookie{Name: "sid", Value: "1", Path: "/api"}},
-		{"host only default path", "https://api.example.com/api/v1/users", http.Cookie{Name: "sid", Value: "1"}},
+func freshJar(t *testing.T) {
+	t.Helper()
+	old := currentJar()
+	ClearJar()
+	t.Cleanup(func() { jarMu.Lock(); sharedJar = old; jarMu.Unlock() })
+}
+
+// TestJarCookiesCarriesDomainPathAndAttributes guards P175 D2: the listing reports each entry's
+// own domain, path and attributes, the ids DeleteJarCookie takes.
+func TestJarCookiesCarriesDomainPathAndAttributes(t *testing.T) {
+	freshJar(t)
+	setU, _ := url.Parse("https://api.example.com/login")
+	currentJar().SetCookies(setU, []*http.Cookie{
+		{Name: "sid", Value: "1", Domain: "example.com", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 3600},
+	})
+	got, err := JarCookies("https://api.example.com/x")
+	if err != nil || len(got) != 1 {
+		t.Fatalf("JarCookies = %+v, %v", got, err)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			old := currentJar()
-			ClearJar()
-			t.Cleanup(func() { jarMu.Lock(); sharedJar = old; jarMu.Unlock() })
-
-			setU, _ := url.Parse(tc.setURL)
-			c := tc.cookie
-			currentJar().SetCookies(setU, []*http.Cookie{&c, {Name: "keep", Value: "2", Path: "/"}})
-
-			target := "https://api.example.com/api/v1/users"
-			if err := DeleteJarCookie(target, "sid"); err != nil {
-				t.Fatalf("DeleteJarCookie: %v", err)
-			}
-			got, _ := JarCookies(target)
-			if len(got) != 1 || got[0].Name != "keep" {
-				t.Fatalf("cookies after delete = %+v, want only keep", got)
-			}
-		})
+	c := got[0]
+	if c.Domain != "example.com" || c.Path != "/" || !c.Secure || !c.HttpOnly || c.SameSite != "lax" || c.Expires == "" {
+		t.Fatalf("cookie = %+v", c)
 	}
 }
 
-// TestDeleteJarCookieCanonicalisesHost guards P168 Part 7 F3/F4: the jar rejects a non-canonical
-// Domain attribute, and Send defaults a scheme-less URL to https.
-func TestDeleteJarCookieCanonicalisesHost(t *testing.T) {
-	cases := []struct {
-		name, setURL, domain, target string
-	}{
-		{"idn host", "https://a.xn--bcher-kva.example/x", "xn--bcher-kva.example", "https://a.bücher.example/x"},
-		{"trailing dot", "https://a.example.com/x", "example.com", "https://a.example.com./x"},
-		{"scheme-less", "https://a.example.com/x", "example.com", "a.example.com/x"},
+// TestDeleteJarCookieIsExact guards P168 Part 6 F12: two same-name cookies matching one URL are
+// removed independently, and a parent-domain cookie goes by its own domain.
+func TestDeleteJarCookieIsExact(t *testing.T) {
+	freshJar(t)
+	setU, _ := url.Parse("https://api.example.com/a/b")
+	currentJar().SetCookies(setU, []*http.Cookie{
+		{Name: "sid", Value: "root", Path: "/"},
+		{Name: "sid", Value: "deep", Path: "/a"},
+		{Name: "sid", Value: "parent", Domain: "example.com", Path: "/"},
+	})
+	target := "https://api.example.com/a/b"
+	DeleteJarCookie("api.example.com", "/a", "sid")
+	got, _ := JarCookies(target)
+	if len(got) != 2 {
+		t.Fatalf("after deleting /a: %+v", got)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			old := currentJar()
-			ClearJar()
-			t.Cleanup(func() { jarMu.Lock(); sharedJar = old; jarMu.Unlock() })
-
-			setU, _ := url.Parse(tc.setURL)
-			currentJar().SetCookies(setU, []*http.Cookie{{Name: "sid", Value: "1", Domain: tc.domain, Path: "/"}})
-			if got, _ := JarCookies(tc.target); len(got) != 1 {
-				t.Fatalf("cookies before delete = %+v, want sid", got)
-			}
-			if err := DeleteJarCookie(tc.target, "sid"); err != nil {
-				t.Fatalf("DeleteJarCookie: %v", err)
-			}
-			if got, _ := JarCookies(tc.target); len(got) != 0 {
-				t.Fatalf("cookies after delete = %+v, want none", got)
-			}
-		})
+	DeleteJarCookie("example.com", "/", "sid")
+	got, _ = JarCookies(target)
+	if len(got) != 1 || got[0].Value != "root" {
+		t.Fatalf("after deleting parent domain: %+v", got)
 	}
 }

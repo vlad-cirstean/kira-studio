@@ -101,8 +101,13 @@ export const apiControl = {
   // (HttpService.Cookies/DeleteCookie/ClearCookies, bridge/http.go), so no opId/tabId.
   httpCookies: (url: string): Promise<HttpCookieWire[]> =>
     unwrap(HttpService.Cookies({ url })).then((r) => trust<HttpCookieWire[]>(r ?? [])),
-  httpDeleteCookie: (url: string, name: string): Promise<HttpCookieWire[]> =>
-    unwrap(HttpService.DeleteCookie({ url, name })).then((r) => trust<HttpCookieWire[]>(r ?? [])),
+  httpDeleteCookie: (
+    url: string,
+    cookie: { name: string; domain: string; path: string },
+  ): Promise<HttpCookieWire[]> =>
+    unwrap(HttpService.DeleteCookie({ url, ...cookie })).then((r) =>
+      trust<HttpCookieWire[]>(r ?? []),
+    ),
   httpClearCookies: (): Promise<void> => unwrap(HttpService.ClearCookies()),
 
   // P11 D3/D4: resolves a target's (or a .proto's) services and methods — reflection.Register's

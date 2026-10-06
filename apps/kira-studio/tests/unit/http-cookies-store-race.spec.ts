@@ -138,7 +138,7 @@ describe('cookies store ordering and lifecycle (P108 F7)', () => {
     expect(cookiesStore.cookiesRuntime[tabId].loading).toBe(false);
 
     const fetchB = cookiesStore.fetchCookiesNow(tabId, 'https://a.example.com');
-    await cookiesStore.deleteCookie(tabId, 'https://a.example.com', 'session');
+    await cookiesStore.deleteCookie(tabId, 'https://a.example.com', cookie('session', 'stale'));
     replies[1]?.([cookie('session', 'stale')]);
     await fetchB;
     expect(cookiesStore.cookiesRuntime[tabId].cookies).toEqual([]);

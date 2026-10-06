@@ -2,14 +2,12 @@ package httpclient
 
 import (
 	"fmt"
-	"net"
 	"net/http"
-	"net/http/cookiejar"
-	"strings"
 	"sync"
 
-	"golang.org/x/net/idna"
 	"golang.org/x/net/publicsuffix"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient/cookiejar"
 )
 
 // Cookie is one cookie, sent or received (P90 item 1/2). Expires is RFC3339 or "" for a session
@@ -76,95 +74,52 @@ func jarFor(r resolved) http.CookieJar {
 }
 
 // JarCookies lists what the shared jar would send to rawURL right now — Cookies tab, request
-// mode (P90 item 2). jar.Cookies(u) returns []*http.Cookie carrying name/value only (the jar
-// does not expose domain/path/expiry to a caller), so every other field is left zero here. That
-// is a real limitation of net/http/cookiejar, not a shortcut: the alternative is vendoring a jar
-// implementation, which is not worth it for a display column — the response-side cookie list
-// (client.go's SentCookies/ReceivedCookies) is the one that carries the full attribute set.
+// mode (P90 item 2), each entry with its own domain, path and attributes. Hop and MaxAge stay
+// zero: the jar stores neither.
 func JarCookies(rawURL string) ([]Cookie, error) {
 	u, err := resolveURL(rawURL)
 	if err != nil {
 		return nil, err
 	}
-	raw := currentJar().Cookies(u)
-	out := make([]Cookie, 0, len(raw))
-	for _, c := range raw {
-		out = append(out, Cookie{Name: c.Name, Value: c.Value})
+	entries := currentJar().Entries(u)
+	out := make([]Cookie, 0, len(entries))
+	for _, e := range entries {
+		c := Cookie{
+			Name:     e.Name,
+			Value:    e.Value,
+			Domain:   e.Domain,
+			Path:     e.Path,
+			Secure:   e.Secure,
+			HttpOnly: e.HttpOnly,
+			SameSite: entrySameSite(e.SameSite),
+		}
+		if e.Persistent {
+			c.Expires = e.Expires.UTC().Format("2006-01-02T15:04:05Z07:00")
+		}
+		out = append(out, c)
 	}
 	return out, nil
 }
 
-// DeleteJarCookie removes every cookie named name that the jar would send to rawURL. cookiejar has
-// no delete API and no entry listing, only an expiring Set (SetCookies with MaxAge -1) that matches
-// an entry by exactly name, domain and path. A bare expiry would key on the URL's host and
-// directory, missing a cookie set with Path=/ or a parent Domain, so this expires the name under
-// every domain (host, then each parent down to the registrable domain) and path (/, and each
-// prefix of the URL path) a sent cookie could carry. Two same-name cookies that both match the URL
-// are removed together: the jar reports no domain or path, so one cannot be singled out.
-func DeleteJarCookie(rawURL, name string) error {
-	u, err := resolveURL(rawURL)
-	if err != nil {
-		return err
+// entrySameSite maps the jar's stored attribute ("SameSite=Lax" etc.) to Cookie.SameSite.
+func entrySameSite(s string) string {
+	switch s {
+	case "SameSite=Strict":
+		return "strict"
+	case "SameSite=Lax":
+		return "lax"
+	case "SameSite=None":
+		return "none"
+	default:
+		return ""
 	}
-	jar := currentJar()
-	for _, domain := range cookieDomainCandidates(u.Hostname()) {
-		for _, path := range cookiePathCandidates(u.Path) {
-			jar.SetCookies(u, []*http.Cookie{{Name: name, Domain: domain, Path: path, MaxAge: -1}})
-		}
-	}
-	return nil
 }
 
-// cookieDomainCandidates returns the Domain attributes to expire under: "" (host-only, which
-// shares an entry key with Domain=host) then each parent domain down to the registrable one. An IP
-// address or a public suffix has no parents.
-func cookieDomainCandidates(host string) []string {
-	out := []string{""}
-	// The jar canonicalises (lowercase, no trailing dot, IDNA ASCII) before it matches and rejects
-	// a non-canonical Domain attribute, so the candidates must be canonical too.
-	host = strings.ToLower(strings.TrimSuffix(host, "."))
-	if ascii, err := idna.Lookup.ToASCII(host); err == nil {
-		host = ascii
-	}
-	if net.ParseIP(host) != nil {
-		return out
-	}
-	base, err := publicsuffix.EffectiveTLDPlusOne(host)
-	if err != nil {
-		return out
-	}
-	for d := host; d != base; {
-		_, rest, ok := strings.Cut(d, ".")
-		if !ok {
-			break
-		}
-		d = rest
-		out = append(out, d)
-	}
-	return out
-}
-
-// cookiePathCandidates returns "/" and every prefix of path at a slash boundary, with and without
-// the trailing slash, plus path itself: the Path attributes a cookie sent to path can carry.
-func cookiePathCandidates(path string) []string {
-	seen := map[string]bool{"/": true}
-	out := []string{"/"}
-	add := func(p string) {
-		if p != "" && !seen[p] {
-			seen[p] = true
-			out = append(out, p)
-		}
-	}
-	for i := 1; i < len(path); i++ {
-		if path[i] == '/' {
-			add(path[:i])
-			add(path[:i+1])
-		}
-	}
-	if strings.HasPrefix(path, "/") {
-		add(path)
-	}
-	return out
+// DeleteJarCookie removes the one jar entry with exactly this domain, path and name — the three
+// fields JarCookies reported, so two same-name cookies on one URL are removed independently. A
+// miss (already gone) is not an error.
+func DeleteJarCookie(domain, path, name string) {
+	currentJar().Delete(domain, path, name)
 }
 
 // ClearJar replaces the shared jar wholesale — cookiejar has no Clear.

@@ -86,10 +86,14 @@ export const useCookiesStore = defineStore('cookies', () => {
     if (rt) rt.loading = false;
   }
 
-  async function deleteCookie(tabId: string, url: string, name: string): Promise<void> {
+  async function deleteCookie(tabId: string, url: string, cookie: HttpCookieWire): Promise<void> {
     const rt = ensure(tabId);
     try {
-      const cookies = await control.httpDeleteCookie(url, name);
+      const cookies = await control.httpDeleteCookie(url, {
+        name: cookie.name,
+        domain: cookie.domain,
+        path: cookie.path,
+      });
       if (!findHttpRequestTab(tabId)) return;
       supersede(tabId);
       rt.cookies = cookies;
