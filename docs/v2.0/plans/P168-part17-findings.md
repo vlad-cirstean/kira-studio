@@ -4,7 +4,7 @@ Plan: `P168-part17-git-rpc.md`. Base `30ec62f` (plan survey), HEAD reviewed `0bc
 (`p168-stream-b`). One Opus reviewer, report only. Paths repo-relative; `GR`/`GK`/`GV`/`IPC` as in
 the plan.
 
-Block status: 1-7 done.
+Block status: 1-8 done. Review complete.
 
 ## Block 1: error mapping
 
@@ -36,7 +36,8 @@ Block status: 1-7 done.
 - Fix: drop `kind` from `WireError`/`RpcError` and the rpcstream struct comment, or set it in
   `wireErrorFrom`; add an exported `WireErrorCode` union in `contract.ts` listing the codes above,
   with a Go-side comment pointing at it. `needs-other-part-file: internal/rpcstream/frame.go
-  (Part 8)` only if the Go struct field is removed.
+  (Part 8)` only if the Go struct field is removed; routed in `P168-routed-from-streamB.md`.
+  Also add `E_TOO_LARGE` (`GR/comments.go`, `incremental.go`) to that list.
 
 ### F3 (low) Stale doc: `ErrRepoTornDown` comment says it maps to `E_INTERNAL`
 
@@ -311,3 +312,90 @@ Nothing real found in this block.
   SIGTERM-then-SIGKILL (`toolexec.Run`). `detailFor` returns the first stderr line, bounded 4 KiB.
 - On Linux `vsixPath` is absent (no `Resources/`), so `Install` answers `notBundled` before
   `open -R`: the macOS-only reveal path is unreachable there.
+
+## Block 8: tests and §7
+
+### F10 (medium) `gitrpc`/`gitsock` tests read the developer's global git config
+
+- `GR/main_test.go:10` and `GK/main_test.go:15` call only `testx.RunWithTempHomes` (sets
+  `KIRA_HOME`, `KIRA_SPACE_HOME`). Neither sets `GIT_CONFIG_GLOBAL` or `GIT_CONFIG_NOSYSTEM`. Many
+  fixture helpers do not pass `GIT_CONFIG_GLOBAL=/dev/null` either (e.g.
+  `GK/integration_test.go:392`, `graphstream_test.go:59`, `GR/worktree_test.go:53`), and the
+  server under test spawns git with the process env.
+- Probe (§6.8, required): scratch `HOME` and `GIT_CONFIG_GLOBAL` pointing at a config with
+  `commit.gpgsign=true` (`gpg.program=/bin/false`), `core.hooksPath` to hooks that `exit 1`,
+  `pull.rebase=true`, `init.defaultBranch=trunk`; `go test -count=1` over both packages:
+  **gitrpc 26 FAIL, gitsock 65 FAIL** (both clean without it). Causes span fixture commits
+  ("git [commit -q -m initial commit]: exit status 1"), server-side ops
+  (`GK/stack_test.go:283`: "The pre-rebase hook refused to rebase."; `GK/stash_test.go:94`
+  `stashPush failed`), and reference-transaction hooks ("ref updates aborted by hook",
+  `matrix_test.go:127`, `graphstream_test.go:302`). A developer with signing or a global hooks
+  path sees a red suite unrelated to any change, and a passing suite can depend on local config.
+- Fix: copy `gitsession/main_test.go` (`60901a8`) into both `TestMain`s: temp
+  `GIT_CONFIG_GLOBAL` holding only a test `user.name`/`user.email`, `GIT_CONFIG_NOSYSTEM=1`, then
+  `testx.RunWithTempHomes`. Re-run the probe above to confirm 0 failures.
+
+### Block 8 notes
+
+- §9 #15 reported as F10.
+- `GK` `isolatedRegistry` keeps `review.db` under the temp home; `GR` tests use plain
+  `gitsession.NewRegistry`, whose `gitreview.DefaultPath()` resolves under the temp
+  `KIRA_SPACE_HOME` set by `RunWithTempHomes`. Neither reaches the developer's real `review.db`.
+- `rpc.test.ts:370` pins the cross-caller supersede rule F8 reports; the fixer rewrites it.
+- The four new `mapGitError` arms (`11f097d`) have no direct test; a four-arm switch does not meet
+  the `CLAUDE.md` unit-test bar. Not reported.
+- §7 checks done in blocks 1 and 3: mapping completeness (every repo handler exits through
+  `mapGitError`, a wrapper of it, `ipcerr`, or a typed result), `OpResult` semantics after Part 16
+  F6/F8/F11, `reset --keep` as `DirtyWorktree`, `remote.run` on a torn-down entry
+  (`ErrRepoTornDown` maps to `E_BAD_REQUEST`).
+
+## Checks run
+
+- `go vet` over `gitrpc`, `gitsock`, `gitvsix`: exit 0.
+- `go test -race -count=1` over the same: gitrpc ok 12.0 s, gitsock ok 153.2 s, gitvsix ok 1.1 s.
+- Pre-commit hook on each findings commit (biome, token/theme/class checks, every `typecheck:*`
+  incl. `typecheck:git`): green.
+- `bun test packages/git-ipc/src` not run as its own step; the throwaway F9 probe ran under
+  `bun test` and passed; the fixer re-runs the full suite.
+- Regeneration diff: clean (block 6).
+- §6.8 isolation probe: 91 failures (F10).
+
+## Severity counts
+
+- High: 0.
+- Medium: 4 (F5 DESIGN-DECISION, F7 DESIGN-DECISION, F8, F10).
+- Low: 6 (F1, F2, F3, F4, F6, F9).
+
+## §9 candidate fates
+
+1 dropped (block 1). 2 folded into F3. 3 dropped (block 1). 4 F2. 5 F1. 6 dropped (block 2).
+7 dropped, no drift (block 6). 8 dropped (block 4). 9 F9 (concat half). 10 dropped (block 5).
+11 F4. 12 F5. 13 folded into F7. 14 dropped (block 4). 15 F10. 16 dropped (block 5). 17 F8.
+18 dropped (block 7).
+
+## Coverage
+
+- `GR` (19 prod): all read in full or via CodeGraph verbatim source: `handlers`, `handle`,
+  `graph`, `detail`, `refs`, `search`, `gh`, `ops`, `reset`, `review`, `stash`, `stack`,
+  `worktree`, `comments`, `incremental`, `settings`, `remote`. `wire.go` (806) and `contract.go`
+  (172) skimmed: tags, `omitempty`, marshalers and the version constants read; the long history
+  comments not read line by line (no code).
+- `GR` tests (13): `main_test` read; others consulted only where a claim depended on them, and
+  all executed under `-race` and under the §6.8 probe.
+- `GK` (7 prod): `server`, `handshake`, `pairing`, `frame`, `lock`, `token`, `clients` read in full.
+  `GK` tests (23): `main_test`, `pairing_test` index read; all executed under `-race` and the probe.
+  `testdata/keys/fixtureSigningKey`: not read (test key, non-code).
+- `GV` (2 prod, 1 test): `install.go`, `exec.go` read in full; `install_test.go` executed, not read.
+- `IPC` (11 prod): `rpc.ts`, `socketChannel.ts`, `streamChannel.ts`, `blobFrame.ts`, `codec.ts`,
+  `validate.ts` (version, key maps, `assertContractShape`) read; `transport.ts` read via the
+  `TransportError` grep only (50 lines, error type); `index.ts` (re-exports) not read;
+  `graphChunkCodec.ts` not read line by line (guarded by the fixture mirror test, Go half Part 15);
+  `contract.ts` read only where a parity claim needed it (`tooLarge`, `OpErrorKind`,
+  `review.snapshot`, `kiraSpace.*`, prepare-script comment); `schema/gitwire.fbs` and generated
+  trees covered by the regeneration diff. `IPC` tests: `rpc.test.ts` supersede case read; others
+  not read. `package.json`/`tsconfig.json`: not read (non-code, typecheck green).
+- Callers read as far as a contract claim needed: `bridge/gitstream.go`, `appshell/stream.go`,
+  `main.go:205-240,586-595`, Space `repo/git/transport.ts`, `GitPanel.vue`, vscode
+  `connection.ts`, `transport.ts`, `webview/main.ts`, `proxyHandlers.ts`; callees `rpcstream`
+  (`frame.go`, `session.go`, `credit.go`), `ipcerr`, `tokenauth`, `toolexec`, `gitclient/errors.go`,
+  `ghclient/pr.go`, and the gitsession functions cited.
