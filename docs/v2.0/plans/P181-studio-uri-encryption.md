@@ -394,3 +394,24 @@ password plus the value of each `secretOptionKeys` query pair (decoded). The exi
   No ordering dependency.
 - P181 can run in parallel with both. Rebase onto the chapter branch before landing; the only
   expected conflict surface is `docs/ARCHITECTURE.md`, if any.
+
+## Result
+
+Landed in 5 commits on `p168-stream-a`:
+
+1. `fcec93c` feat(secrets): `ScopeConnectionURI`.
+2. `571db43` feat(studio): whole URI encrypted at rest. Repo never selects `uri`; `SecretsRepo.GetURI`; `SecretWrite`; fold/derive/normalize per D2; D3 refusal; `Reveal` returns `uri`; harness `SeedConnection` seals the URI. New `TestListNeverCarriesTheURI`, `TestURIModeUpdateRules`, `TestLegacyPlaintextURIFailsLoudly`; old strip/migrate tests deleted.
+3. `f52f648` feat(studio): masked URI with Show; Copy URI gated (`project/state/connectionReveal.ts`); `uri: z.null()` on summaries; `SECRET_OPTION_KEYS`.
+4. `cb79066` test(adapters): `secretsFromURI` in the matrix leak check.
+5. Docs: `docs/ARCHITECTURE.md`, this section.
+
+Deviations:
+
+- `queryKey` deleted, not kept: nothing calls it after `uriHasCredentialQuery` and `stripQueryPassword` went (`unused` lint).
+- `Test` with a typed URI no longer injects the stored password column in URI mode (only fields mode does). A fields row flipped to URI is `destinationUnchanged == false` anyway, so no prior behavior is lost.
+- ipcfixture `sqs.fixture.json` and `tests/ipc/sqs/sqs.fixture.ts`: `uri` hand-edited to `null` in both. LocalStack not available; not regenerated.
+- Confirm text in the dialog follows the draft's mode, so an unsaved fields-to-URI flip on a fields row says "URI" while the reveal returns the password.
+
+Checks: `bun run typecheck`, `bun run lint`, `bun run lint:go` (0 issues), `bun run lint:dead` (no new findings), `go build ./... && go vet ./...`, `go test ./apps/kira-studio/...`, `go test -race` for connections, storage/repos, adapterhost, ipcfixture, secrets, `bun test apps/kira-studio/tests/unit packages/api-core/test` (1061 pass), full `test:ui:studio` (315 pass on rerun; the first run flaked once in the slick-grid pacing test while Go tests ran concurrently).
+
+Not verified: macOS Keychain, Touch ID prompt text for the URI reason, Docker-backed complete suite (D8 leak check compiles only), ipcfixture regeneration.

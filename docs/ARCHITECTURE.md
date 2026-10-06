@@ -565,6 +565,21 @@ shipped" reasoning the keychain-item rename above already leans on — with **no
 dual-read path**: every `kira:v2:` (and `kira:v1:`) value is refused on first read after this ships,
 and the user re-enters it once.
 
+**The whole connection URI is ciphertext (P181).** `connections.uri` holds a `kira:v3:` envelope
+under scope `"connection-uri"`, one scope per ciphertext column (P29). Query secrets (`password`,
+`sslpassword`, `tlsCertificateKeyFilePassword`, `proxyPassword`) stay inside the blob; no separate
+slot. `SecretsRepo` owns both ciphertext columns (`Get`, `GetURI`). `ConnectionsRepo` never selects
+`uri`, so every summary, `List` result, `connections:list-changed` event and IPC fixture carries
+`uri: null`; `connectionSummarySchema` types it `z.null()`. URI mode is the single source of truth:
+Create/Update fold the draft password into the URI's userinfo unless the URI has its own, seal the
+result and clear the `password` column. Update with `uri: null` means unchanged. `Options` derive
+from the URI query in Go (`uriQueryOptions`), stored as `{}`. Fields mode refuses an `Options` key
+that holds a secret (`secretOptionKeys`). The dialog shows the URI fully masked; nothing derives
+display from it. No migration: a pre-P181 plaintext `uri` fails to decrypt with the envelope error on
+Connect, Test and Reveal, stays listed, loses no data, and Edit then typing a new URI fixes it. URI
+mode now needs secret storage (Linux dev: `KIRA_INSECURE_SECRETS=1`), even for a URI with no secret.
+*Show URI* and *Copy URI* go through the P14 reveal gate.
+
 The connection dialog's credential note reflects the platform's actual backend rather than a fixed
 warning; the probed `{available, backend, insecureFallback, reason}` status resolves once at
 startup and never changes for the life of the process. Linux — development/CI only, v1 targets macOS
@@ -573,9 +588,9 @@ back to obfuscation under a hardcoded compile-time key (the same threat model an
 as Chromium's `basic_text`, whose backend name is kept); without it, secret storage is unavailable
 and a write carrying a password is refused rather than silently stored in the clear.
 
-Decrypting a stored credential for **display** — the connection edit dialog's password field —
-is gated separately from every other use of it (P14): pressing *Show password* triggers
-the reveal, not opening the dialog, and the backend (`internal/localauth`) confirms the device
+Decrypting a stored credential for **display** — the connection edit dialog's password field, or
+in URI mode its URI field (P181) — is gated separately from every other use of it (P14): pressing
+*Show password* (*Show URI*) triggers the reveal, not opening the dialog, and the backend (`internal/localauth`) confirms the device
 owner before it decrypts, via macOS's own `LAContext.evaluatePolicy(.deviceOwnerAuthentication)`
 (Touch ID with the account password as its own fallback). A successful confirmation grants a
 5-minute, process-wide, non-persisted grace window, so re-opening the same or a different
@@ -631,7 +646,9 @@ connections(id, name, kind, color, mode, read_only, host, port, database, userna
                                                        -- ('', 0023) is a kira:v3 envelope under the
                                                        -- mask-key secret scope, read/written only by
                                                        -- MaskKeysRepo, deliberately absent from
-                                                       -- ConnectionFields (0023's own header comment)
+                                                       -- ConnectionFields (0023's own header comment);
+                                                       -- uri is a kira:v3 envelope, connection-uri
+                                                       -- scope (P181), read only by SecretsRepo
 connection_tree_filters(connection_id, scope, value)    -- hide/show rules; a set, no id/ordering
                                                        -- (P28 D12) — no per-row size cap: a person
                                                        -- picks these from the tree, doesn't type them
@@ -1002,7 +1019,7 @@ shipped.
 S3 connections reuse the existing `connections` columns, mirroring SQS's own fields-mode
 repurposing exactly: `host`/`port` are unused, `database` holds the **AWS region**, the AWS
 **named profile** goes in `username`, and static keys (accepted only in URI mode, per the SQS
-read policy in the per-engine mapping table above) go in `uri`. `options_json` holds two
+read policy in the per-engine mapping table above) go in `uri`, encrypted (P181). `options_json` holds two
 independent overrides: `endpoint` (a non-AWS S3-compatible target — LocalStack, MinIO) and
 `bucket` (scopes the whole tree to one bucket via `HeadBucketCommand` instead of
 `ListBucketsCommand`, for IAM credentials that can only ever see that one bucket and commonly
