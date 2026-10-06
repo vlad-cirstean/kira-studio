@@ -100,6 +100,24 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
   `ErrStreamClosed`. Optionally give `StreamSession` a `Close()` so a dead writer closes the conn
   and the renderer sees `onclose`.
 
+### F6 (low) An oversized page is cached in L2 and then refused from cache on every read
+
+- `apps/kira-studio/internal/adapterhost/data.go:87` (`StorePageIfCurrent` before `respond`),
+  `dataframe.go:235-239` (`oversizedPagePayload` refuses it), `enginecache/lru.go:86`
+  (half-budget refusal is the only size gate).
+- `cache.l2BudgetMb` accepts 8-1024 (`storage/model/settings.go:171`). At a budget of 130 MB or
+  more, half the budget exceeds `maxResponsePayloadBytes` (64 MiB - 4 KiB). A page between those
+  sizes is stored, then answered `E_QUERY` "too large". Each retry hits the cache and fails the same
+  way without touching the server, while the dead entry holds up to half the budget and evicts
+  useful pages.
+- Scenario: budget 512 MB, 10,000-row page of a wide text table at ~80 MB. First read fails
+  "too large" and caches 80 MB; the grid's retry and every reopen of that page repeat it.
+  Code read. Not a restatement of Part 4 F8 (console materialisation): this is the grid `Read` path
+  and the cache.
+- Fix: in `Dispatcher.Read`, skip `StorePageIfCurrent` when
+  `pageSizeEstimate(p.Size()) > maxResponsePayloadBytes` (share one helper with
+  `oversizedPagePayload`).
+
 ## Suspects (plan §9)
 
 1. Concurrent `Router.Connect` on one id: dropped. `Router.Connect`'s only caller is
@@ -110,6 +128,13 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
    opId from their own tracker (unknown id is a no-op); mongo matches `command.comment == opId`,
    a UUID, so no collision.
 4. Validation errors carry no code: open until block 5 (renderer handling).
+6. Oversized page cached: confirmed as F6 (only above a 130 MB budget; default 64 MB refuses any
+   page over 32 MB).
+7. Projection order on a sorted L2 key: dropped. Every SQL adapter's `ResolveProjection`
+   (`adapters/sqltext.go:253`) orders by ordinal position, so column order never depends on request
+   order; the grid maps by name (`views/shared/page/columns.ts` `resolveColumnOrder`).
+8. `generationTracker` growth: dropped. One small map entry per distinct path ever invalidated by a
+   user action; bounded by objects touched in one app run. Not worth pruning logic.
 10. `enqueueResponse` frame size: confirmed as F5 (error frames only; responses are pre-checked).
 12. Encode panics: dropped. `encodeSource`/`EncodePage`/`encodeTypeClass`/`encodeStrategy`/
     `encodeRedisType` panics are reached only from `encodeResponse` inside `HandleDataFrame`'s
@@ -138,3 +163,9 @@ Plan: `P168-part5-data-plane.md`. Base commit `de8ec4c` (plan survey); HEAD revi
   Ignored `AppendRow` errors (`clickhouse/console.go:119`, `read.go:228`, `postgres`/`mysqlfamily`
   `console.go:144`, `sqltext.go:447`) are width-safe by construction (row built from the same
   header). `FieldsAreColumns` is Go-only by design (`dbmcp` masking); no renderer path reads it.
+- Block 4 (enginecache): done. `cache.go`, `pages.go`, `counts.go`, `lru.go`, `generation.go`
+  read in full. L2 key trims the filter, L3 key does not: only a cache-efficiency difference, since
+  every engine trims before use (`adapters.WhereClause`, mongo `literal.go:701`, kafka JSON filter)
+  and invalidation matches on connection/path meta for all filter variants. Stats timer firing after
+  `detach` enqueues into a dead session's buffered channel: harmless. `Update` keeps LRU position
+  (intended). Generation guard holds for every drop path.
