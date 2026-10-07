@@ -27,7 +27,7 @@ const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
 const { sessions } = useSessionViews();
 const sessionCount = computed(
-  () => sessions.value.filter((x) => x.taskId === props.card.task.id).length,
+  () => sessions.value.filter((x) => x.taskId === props.card.task.id && x.state === 'running').length,
 );
 const update = useUpdateTask();
 const taskMenu = useTaskMenu(() => props.card);

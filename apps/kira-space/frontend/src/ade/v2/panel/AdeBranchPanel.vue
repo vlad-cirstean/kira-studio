@@ -29,7 +29,7 @@ const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
 const { sessions } = usePlanModel();
 const sessionCount = computed(
-  () => sessions.value.filter((x) => x.branchId === props.row.id).length,
+  () => sessions.value.filter((x) => x.branchId === props.row.id && x.state === 'running').length,
 );
 const prs = usePrs();
 const repos = useRepos();
