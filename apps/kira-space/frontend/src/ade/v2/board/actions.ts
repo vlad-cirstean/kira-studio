@@ -274,7 +274,7 @@ const preparing: Rule = (i) => {
 
 const setupFailed: Rule = (i) =>
   i.branch.setup?.state === 'failed'
-    ? tag('✕ setup failed', 'red', 'the prepare-worktree script failed', [
+    ? tag('✕ setup failed', 'red', i.branch.setup.note || 'the prepare-worktree script failed', [
         { kind: 'seeError', label: 'See error', tip: 'open the setup log' },
       ])
     : null;

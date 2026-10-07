@@ -8,6 +8,7 @@ import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import { integrationChips } from '../board/labels';
 import type { StepRun } from '../board/progress';
+import { WAITING_SETUP_NOTES } from '../board/setupGate';
 import { nextStageId, type StageBlock } from '../board/stageBlocks';
 import type { CardModel } from '../plan/usePlanModel';
 import { useApprove, useOpenReviewWindow, useRetryRun, useSetTaskStage } from '../queries';
@@ -15,6 +16,7 @@ import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { actionStyle, solidStyle, TONE, tagStyle } from '../tones';
 import AdeRunLog from './AdeRunLog.vue';
+import AdeSetupProgress from './AdeSetupProgress.vue';
 
 // One stage of the Workflow block: header (state chip, action slot, name, count, mode), then its
 // steps with their per-repo run lines, or the branches of the Release stage.
@@ -77,6 +79,9 @@ const boxStyle = computed(() =>
       }
     : undefined,
 );
+/** The row of a run line held back by its branch's prepare script. */
+const heldRow = (rl: { run: { branchId: string }; note: string }) =>
+  WAITING_SETUP_NOTES.includes(rl.note) ? props.card.rows.find((r) => r.id === rl.run.branchId) : undefined;
 const stateLabel = (s: StageBlock['state']): string => (s === 'now' ? 'now' : s);
 
 const GLYPH_BOX: Record<string, { bg: string; ink: string; ring: string }> = {
@@ -241,6 +246,13 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
             <span class="min-w-0 truncate text-kira-sm text-muted-foreground" data-testid="ade-run-note">{{ rl.note }}</span>
           </AdeTip>
         </div>
+        <AdeSetupProgress
+          v-if="heldRow(rl)?.branch.setup"
+          class="my-0.5 ml-6"
+          compact
+          :branch="heldRow(rl)!.branch"
+          :repo="heldRow(rl)!.repo"
+        />
         <div v-if="openLog === rl.run.runId && rl.run.runId" class="my-0.5 ml-6">
           <AdeRunLog kind="run" :id="rl.run.runId" max-height="140px" />
         </div>

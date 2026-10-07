@@ -9,6 +9,7 @@ import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
+import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { actionStyle, TONE } from '../tones';
 import { composeDialog } from './compose';
@@ -26,6 +27,26 @@ const view = computed(() => {
   const s = dialogs.spec;
   if (!c || !s) return null;
   return composeDialog(c, s, { msg: dialogs.msg, push: dialogs.push, override: dialogs.override });
+});
+
+// The launch waits behind a prepare script: show each branch's, and why it is held or refused.
+// A stage launch covers the whole task; the other kinds cover their targets.
+const setups = computed(() => {
+  const c = dialogs.ctx;
+  const v = view.value;
+  const spec = dialogs.spec;
+  if (!c || !v || !spec || v.isArchive) return [];
+  const ids =
+    spec.kind === 'stage'
+      ? [...c.graph.byBranch.values()].filter((b) => b.taskId === spec.taskId).map((b) => b.id)
+      : v.targets.map((tg) => tg.branchId);
+  return ids.flatMap((id) => {
+    const b = c.graph.byBranch.get(id);
+    const state = b?.setup?.state;
+    return b && b.kind === 'mine' && b.name !== '' && (state === 'running' || state === 'failed')
+      ? [{ branch: b, repo: c.repo(b.codeRepoId).nick }]
+      : [];
+  });
 });
 
 async function send(): Promise<void> {
@@ -96,6 +117,15 @@ async function discard(): Promise<void> {
             </div>
           </AlertDescription>
         </Alert>
+
+        <AdeSetupProgress
+          v-for="s in setups"
+          :key="s.branch.id"
+          :branch="s.branch"
+          :repo="s.repo"
+          :compact="setups.length > 1"
+          data-testid="ade-dialog-setup"
+        />
 
         <div v-if="view.isArchive" class="text-kira-md" :style="{ color: TONE.amber[1] }" data-testid="ade-dialog-risk">
           {{ view.riskText }}. Tell Claude what to do with it, or delete the worktrees anyway.
@@ -180,11 +210,11 @@ async function discard(): Promise<void> {
           variant="dialog-primary"
           size="kira-lg"
           :style="actionStyle(view.overridden ? 'red' : 'claude')"
-          :disabled="view.blocked || view.sendDisabled || sending"
+          :disabled="view.blocked || view.sendDisabled || sending || dialogs.waitingSetup"
           data-testid="ade-dialog-send"
           @click="send"
         >
-          {{ view.sendLabel }}
+          {{ dialogs.waitingSetup ? 'Starts when ready…' : view.sendLabel }}
         </Button>
       </DialogFooter>
     </DialogContent>

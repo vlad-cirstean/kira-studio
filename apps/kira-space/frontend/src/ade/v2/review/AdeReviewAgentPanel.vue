@@ -5,11 +5,14 @@ import { computed, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
 import { useAgentSessionsStore } from '../../state/agentSessions';
 import { withTuiActivity } from '../activity';
+import { blockingSetups } from '../board/setupGate';
 import { openLaunch } from '../dialog/deliver';
-import { useFocusSession, useLaunchReviewAgent, useReviewAgent } from '../queries';
+import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
+import { useBoard, useFocusSession, useLaunchReviewAgent, useReviewAgent } from '../queries';
 import AdeTuiPane from '../sessions/AdeTuiPane.vue';
 import { type SessionLookup, sessionView } from '../sessions/sessionView';
 import { useAdeTerminalsStore } from '../state/adeTerminals';
+import { isPreparing, useSetupWait } from '../state/useSetupWait';
 import type { ReviewWindowTarget } from '../wire';
 import AdeReviewCompose from './AdeReviewCompose.vue';
 
@@ -23,6 +26,12 @@ const agentStore = useAgentSessionsStore();
 const agent = useReviewAgent(() => props.target.taskId);
 const launchM = useLaunchReviewAgent();
 const focusM = useFocusSession();
+
+const board = useBoard();
+// The review window's worktree may still be preparing: Start waits for it instead of failing.
+const setups = computed(() => blockingSetups(board.data.value, props.target.taskId, [props.target.branchId]));
+const setupWait = useSetupWait(() => start());
+const waitingSetup = setupWait.waiting;
 
 const note = ref('');
 const error = ref('');
@@ -50,6 +59,7 @@ async function start(): Promise<void> {
   note.value = '';
   try {
     const result = await launchM.mutateAsync({ taskId: props.target.taskId });
+    setupWait.stop();
     note.value = result.note;
     await openLaunch(
       {
@@ -62,7 +72,12 @@ async function start(): Promise<void> {
       result.launch,
     );
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    if (isPreparing(err)) {
+      setupWait.start();
+    } else {
+      setupWait.stop();
+      error.value = err instanceof Error ? err.message : String(err);
+    }
   } finally {
     await agent.refetch();
   }
@@ -94,8 +109,22 @@ async function focus(): Promise<void> {
     </template>
     <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-review-start-box">
       <p class="m-0 text-muted-foreground">Ask questions about this branch in a Claude Code session.</p>
-      <Button variant="dialog" size="xs" :disabled="launchM.isPending.value" data-testid="ade-review-start" @click="start">
-        {{ session ? 'Resume review agent' : 'Start review agent' }}
+      <AdeSetupProgress
+        v-for="b in setups"
+        :key="b.id"
+        class="w-full"
+        :branch="b"
+        :repo="repoLabel"
+        data-testid="ade-review-setup"
+      />
+      <Button
+        variant="dialog"
+        size="xs"
+        :disabled="launchM.isPending.value || waitingSetup"
+        data-testid="ade-review-start"
+        @click="start"
+      >
+        {{ waitingSetup ? 'Starts when ready…' : session ? 'Resume review agent' : 'Start review agent' }}
       </Button>
     </div>
     <p v-if="error" class="m-0 px-3 pb-2 text-kira-sm text-error" data-testid="ade-review-start-error">{{ error }}</p>

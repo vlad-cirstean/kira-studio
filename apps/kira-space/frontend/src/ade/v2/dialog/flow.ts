@@ -1,3 +1,4 @@
+import { isPreparing } from '../state/useSetupWait';
 import type {
   ArchiveRisk,
   Launch,
@@ -33,6 +34,8 @@ export interface FlowDeps {
   pending: { add: (key: string) => void; remove: (key: string) => void };
   /** A failure while the dialog is open. */
   setError: (message: string) => void;
+  /** The launch hit a worktree still being prepared: hold the dialog open and retry when ready. */
+  waitForSetup: () => void;
   /** A failure after the dialog closed, shown in the task's panel header. */
   setActionError: (taskId: string, message: string) => void;
   closeDialog: () => void;
@@ -50,6 +53,12 @@ const BLOCKED_REASON: Record<string, string> = {
 };
 
 const errMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+/** A launch failure shown in the dialog; a worktree still being prepared holds it open instead. */
+function failInDialog(deps: FlowDeps, err: unknown): void {
+  if (isPreparing(err)) deps.waitForSetup();
+  else deps.setError(errMessage(err));
+}
 
 function messageOf(deps: FlowDeps, spec: DialogSpec, state: DialogState): string {
   return state.msg ?? templateFor(deps.ctx, spec, state);
@@ -113,7 +122,7 @@ async function sendRebase(deps: FlowDeps, spec: DialogSpec, state: DialogState):
     delivered = await deliverToBranch(deps, spec, messageOf(deps, spec, state));
   } catch (err) {
     deps.pending.remove(key);
-    deps.setError(errMessage(err));
+    failInDialog(deps, err);
     return;
   }
   // Claude already has the prompt: a failure from here on must not leave Send armed to repeat it.
@@ -164,7 +173,7 @@ async function sendMerge(deps: FlowDeps, spec: DialogSpec, state: DialogState): 
     });
   } catch (err) {
     deps.pending.remove(key);
-    deps.setError(errMessage(err));
+    failInDialog(deps, err);
   }
 }
 
@@ -188,7 +197,7 @@ async function sendLaunch(deps: FlowDeps, spec: DialogSpec, state: DialogState):
     else announce(deps, launch, taskOfBranch(deps, spec.branchId ?? ''), spec.branchId ?? '');
     deps.closeDialog();
   } catch (err) {
-    deps.setError(errMessage(err));
+    failInDialog(deps, err);
   }
 }
 
@@ -239,7 +248,7 @@ async function sendArchive(deps: FlowDeps, spec: DialogSpec, state: DialogState)
     for (const w of watches) w.cancel();
     deps.pending.remove(key);
     if (sent === 0) {
-      deps.setError(errMessage(err));
+      failInDialog(deps, err);
       return;
     }
     // Some branches already have the prompt: close, so Send cannot repeat it to them.

@@ -24,6 +24,7 @@ import {
 } from '../queries';
 import { useAdeBoardUiStore } from './adeBoardUi';
 import { useAdeTerminalsStore } from './adeTerminals';
+import { useSetupWait } from './useSetupWait';
 
 // The Claude dialog: which one is open, its edits and the work in flight behind it. One concern:
 // the dialog flow. Every opener (action cell, branch header, fix menu, Details, Needs you) goes
@@ -51,7 +52,12 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
   const riskM = useArchiveRisk();
   const archiveM = useArchiveTask();
 
+  // A launch refused behind a running prepare script retries by itself until the worktree is ready.
+  const setupWait = useSetupWait(() => send());
+  const waitingSetup = setupWait.waiting;
+
   function open(next: DialogSpec): void {
+    setupWait.stop();
     spec.value = next;
     msg.value = null;
     push.value = false;
@@ -60,6 +66,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
   }
 
   function close(): void {
+    setupWait.stop();
     spec.value = null;
   }
 
@@ -85,7 +92,12 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
       archiveRisk: (a) => riskM.mutateAsync(a),
       pending: { add: (k) => pending.add(k), remove: (k) => pending.delete(k) },
       setError: (m) => {
+        setupWait.stop();
         error.value = m;
+      },
+      waitForSetup: () => {
+        error.value = '';
+        setupWait.start();
       },
       setActionError: (taskId, m) => {
         ui.actionError[taskId] = m;
@@ -161,6 +173,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
     push,
     override,
     error,
+    waitingSetup,
     pending,
     ctx,
     close,

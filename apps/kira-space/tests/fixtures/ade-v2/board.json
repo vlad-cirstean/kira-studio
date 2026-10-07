@@ -2349,7 +2349,7 @@
         "startedAt": 1790067000000,
         "finishedAt": 1790067072000,
         "exitCode": 1,
-        "note": ""
+        "note": "exited with status 1"
       },
       "integration": [
         {

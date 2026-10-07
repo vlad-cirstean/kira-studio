@@ -200,9 +200,11 @@ function branchItems(c: Ctx): NeedsItem[] {
           branchId: b.id,
           scope: c.nick(b.id),
           what: `Worktree setup failed for ${c.nameOf(b.id)}`,
-          detail: b.setup.finishedAt
-            ? `took ${formatElapsed(b.setup.finishedAt - b.setup.startedAt)}`
-            : '',
+          detail:
+            b.setup.note ||
+            (b.setup.finishedAt
+              ? `took ${formatElapsed(b.setup.finishedAt - b.setup.startedAt)}`
+              : ''),
           ageMs: c.age(b.setup.finishedAt),
         }),
       );

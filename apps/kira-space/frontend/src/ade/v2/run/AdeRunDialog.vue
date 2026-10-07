@@ -7,6 +7,7 @@ import { Textarea } from '@theme/components/ui/textarea';
 import { computed, ref, watch } from 'vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import { branchSlug, defaultRunMessage, FINISH_STEP_SUFFIX } from '../board/runMessage';
+import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
@@ -30,6 +31,13 @@ const initial = computed(() =>
 );
 const pending = computed(() => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? []);
 const slug = computed(() => `feat/${branchSlug(card.value?.title ?? '')}`);
+
+// Setups of the task's branches still running or failed: the runs queue behind them after Start.
+const setups = computed(() =>
+  (card.value?.rows ?? []).filter(
+    (r) => r.branch.kind === 'mine' && r.branch.name !== '' && ['running', 'failed'].includes(r.branch.setup?.state ?? ''),
+  ),
+);
 
 const message = ref('');
 const names = ref<Record<string, string>>({});
@@ -107,6 +115,13 @@ async function send(): Promise<void> {
             />
           </div>
         </div>
+        <AdeSetupProgress
+          v-for="r in setups"
+          :key="r.id"
+          :branch="r.branch"
+          :repo="r.repo"
+          data-testid="ade-run-setup"
+        />
         <div class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
             <label for="ade-run-message" class="flex-1 text-muted-foreground">Message to Claude</label>

@@ -6,6 +6,7 @@ import { useTakeOver } from '../queries';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from './adeBoardUi';
 import { useAdeTerminalsStore } from './adeTerminals';
+import { isPreparing, useSetupWait } from './useSetupWait';
 
 export interface TakeOverConfirm {
   sessionId: string;
@@ -29,7 +30,26 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
   /** Session ids with a take over in flight. */
   const pending = reactive(new Set<string>());
 
-  /** Launches the take over. Resolves with an error message, `null` on success. */
+  /** The session whose take over waits for its worktree's prepare script, if any. */
+  const waitingSession = ref<string | null>(null);
+  const setupWait = useSetupWait(async () => {
+    const id = waitingSession.value;
+    if (!id) return setupWait.stop();
+    const err = await launch(id);
+    if (waitingSession.value !== id) return;
+    if (err !== null) {
+      const taskId = sessions.value.find((x) => x.id === id)?.taskId ?? '';
+      if (taskId) ui.actionError[taskId] = err;
+    }
+    if (err !== null || !setupWait.waiting.value) cancelWait();
+  });
+
+  function cancelWait(): void {
+    waitingSession.value = null;
+    setupWait.stop();
+  }
+
+  /** Launches the take over. Resolves with an error message, `null` on success or while it waits. */
   async function launch(sessionId: string): Promise<string | null> {
     if (pending.has(sessionId)) return null;
     const s = sessions.value.find((x) => x.id === sessionId);
@@ -51,8 +71,14 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
         branchId: s?.branchId ?? '',
         sessionId: l.sessionId,
       });
+      if (waitingSession.value === sessionId) cancelWait();
       return null;
     } catch (err) {
+      if (isPreparing(err)) {
+        waitingSession.value = sessionId;
+        setupWait.start();
+        return null;
+      }
       return errMessage(err);
     } finally {
       pending.delete(sessionId);
@@ -84,7 +110,8 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
 
   function cancel(): void {
     confirm.value = null;
+    cancelWait();
   }
 
-  return { confirm, pending, request, confirmYes, cancel };
+  return { confirm, pending, waitingSession, request, confirmYes, cancel };
 });

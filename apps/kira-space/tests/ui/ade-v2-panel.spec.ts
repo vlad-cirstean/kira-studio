@@ -329,7 +329,9 @@ test('See error opens the branch with the failed setup log, Retry setup sends th
   const setup = page.locator('[data-testid="ade-worktree-setup"]');
   await expect(setup).toBeVisible();
   await expect(setup).toContainText('failed');
-  await expect(setup).toContainText('prepare-worktree script of');
+  await expect(setup.locator('[data-testid="script-progress-reason"]')).toHaveText(
+    'exited with status 1',
+  );
   await expect(setup.locator('[data-testid="ade-run-log"]')).toContainText('ERR_PNPM_FETCH_404');
 
   await page.locator('[data-testid="ade-setup-retry"]').click();

@@ -122,3 +122,66 @@ test('the ! circle on a stuck branch takes the run over', async ({ relaunch }) =
   await expect.poll(() => calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskTakeOver)[0]?.args).toMatchObject({ sessionId: 'b1c2' });
 });
+
+const setupOf = (state: string, note = '') => ({
+  state,
+  startedAt: 1_790_069_900_000,
+  finishedAt: state === 'running' ? null : 1_790_069_990_000,
+  exitCode: state === 'running' ? null : 1,
+  note,
+});
+
+function authBoard(state: string, note = '') {
+  return adeBoard((b) => {
+    for (const br of b.branches as unknown as {
+      taskId: string;
+      kind: string;
+      name: string;
+      setup: unknown;
+    }[]) {
+      if (br.taskId === 'T_auth' && br.kind === 'mine' && br.name !== '')
+        br.setup = setupOf(state, note);
+    }
+  });
+}
+
+test('a launch behind a running prepare script shows its progress and waits', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: authBoard('running') },
+    { channel: IPC.adeTaskSessions, response: sessionsWithout(['9ab0']) },
+    {
+      channel: IPC.adeTaskLaunchStage,
+      error: {
+        code: 'E_PREPARING',
+        message: 'preparing the worktree of feat/oauth-login; try again when it is ready',
+      },
+    },
+  ]);
+  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-stage')}`).click();
+  await expect(page.locator(t('ade-dialog-setup')).first()).toContainText('Preparing worktree');
+  await page.locator(t('ade-dialog-send')).click();
+  await expect(page.locator(t('ade-dialog-send'))).toHaveText('Starts when ready…');
+  await expect(page.locator(t('ade-dialog-send'))).toBeDisabled();
+  await expect(page.locator(t('ade-dialog-error'))).toHaveCount(0);
+  await expect.poll(() => calls(control, IPC.adeTaskLaunchStage).length).toBeGreaterThan(1);
+  await page.locator(t('ade-dialog-cancel')).click();
+  await expect(page.locator(t('ade-dialog'))).toBeHidden();
+  const sent = calls(control, IPC.adeTaskLaunchStage).length;
+  await page.waitForTimeout(2600);
+  expect(calls(control, IPC.adeTaskLaunchStage)).toHaveLength(sent);
+});
+
+test('a launch behind a failed prepare script shows why and Retry setup', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: authBoard('failed', 'exited with status 1') },
+    { channel: IPC.adeTaskSessions, response: sessionsWithout(['9ab0']) },
+  ]);
+  await page.locator(`${taskEl('T_auth')} ${t('ade-task-action-stage')}`).click();
+  const block = page.locator(t('ade-dialog-setup')).first();
+  await expect(block).toContainText('Worktree setup failed');
+  await expect(block.locator(t('script-progress-reason'))).toHaveText('exited with status 1');
+  await block.locator(t('ade-setup-retry')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskRetrySetup)).toHaveLength(1);
+});
