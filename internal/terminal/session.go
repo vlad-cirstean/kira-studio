@@ -30,9 +30,9 @@ const readBufSize = 32 * 1024
 const closeGracePeriod = 2 * time.Second
 
 // closeKillWait bounds how long Close waits, after SIGKILL, for readLoop's blocked ptmx.Read to
-// actually return (F1/P108 Part 2). On Linux readLoop closes the master exitDrain after the shell
-// exits, so a surviving job no longer stalls Close; this bound remains for a shell that survives
-// SIGKILL and for darwin, where the blocking master cannot be interrupted. Close's own callers —
+// actually return (F1/P108 Part 2). readLoop closes the master exitDrain after the shell exits
+// (both platforms share pollablePtmx since P180), so a surviving job no longer stalls Close; this
+// bound remains for a shell that somehow survives SIGKILL regardless. Close's own callers —
 // Registry.CloseAll/CloseWindow, in turn ShutdownBound (on the app-quit
 // teardown path, before db.Close()) and shell.OpenWindow's own per-window close — must never hang
 // on one stuck session, so this is a second, independent bound, not a substitute for the SIGKILL
@@ -270,12 +270,11 @@ func (s *Session) Close() {
 	case <-time.After(closeKillWait):
 	}
 
-	// Still not done: the shell survived SIGKILL, or readLoop is stuck in a blocked read. On Linux the
-	// master is non-blocking and netpoller-registered (pollablePtmx), so Close interrupts the
-	// pending Read. Elsewhere (darwin) the fd stays blocking, Close does not interrupt a blocked
-	// read(2), and the wait below is the bound: a logged, permanent leak of this one
-	// goroutine/process beats every caller of Close (app-quit teardown, a single window's own
-	// close) hanging forever on it.
+	// Still not done: the shell survived SIGKILL, or readLoop is stuck in a blocked read. The
+	// master is non-blocking and netpoller-registered (pollablePtmx, both platforms since P180),
+	// so Close interrupts the pending Read; the wait below is the bound for the case it somehow
+	// doesn't: a logged, permanent leak of this one goroutine/process beats every caller of Close
+	// (app-quit teardown, a single window's own close) hanging forever on it.
 	_ = s.ptmx.Close()
 
 	select {
