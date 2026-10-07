@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -103,9 +104,9 @@ function removeStep(i: number): void {
       >
         <option v-for="o in STATUS_OPTIONS" :key="o" :value="o">{{ o }}</option>
       </NativeSelect>
-      <Button variant="dialog" size="kira-icon" aria-label="Move stage up" :disabled="first" data-testid="ade-wf-stage-up" @click="emit('up')">↑</Button>
-      <Button variant="dialog" size="kira-icon" aria-label="Move stage down" :disabled="last" data-testid="ade-wf-stage-down" @click="emit('down')">↓</Button>
-      <Button variant="dialog" size="kira-icon" class="text-error" aria-label="Remove stage" data-testid="ade-wf-stage-remove" @click="emit('remove')">✕</Button>
+      <TooltipIconButton icon="arrow-up" label="Move stage up" :disabled="first" data-testid="ade-wf-stage-up" @click="emit('up')" />
+      <TooltipIconButton icon="arrow-down" label="Move stage down" :disabled="last" data-testid="ade-wf-stage-down" @click="emit('down')" />
+      <TooltipIconButton icon="close" label="Remove stage" class="text-error" data-testid="ade-wf-stage-remove" @click="emit('remove')" />
     </div>
 
     <template v-if="stage.kind === 'user'">
@@ -181,6 +182,7 @@ function removeStep(i: number): void {
     </div>
 
     <div v-else class="flex flex-col gap-1.5 pl-8">
+      <div class="flex flex-col divide-y divide-border">
       <AdeStepCard
         v-for="(s, i) in stage.steps"
         :key="s.id"
@@ -196,6 +198,7 @@ function removeStep(i: number): void {
         @down="moveStep(i, 'down')"
         @remove="removeStep(i)"
       />
+      </div>
       <Button
         variant="dialog"
         size="kira-lg"

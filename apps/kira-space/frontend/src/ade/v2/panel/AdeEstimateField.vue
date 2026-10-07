@@ -71,7 +71,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         min="0.5"
         step="0.5"
         size="kira-lg"
-        class="w-14"
+        class="w-20"
         data-testid="ade-estimate-extend"
       />
       <span class="text-kira-sm text-muted-foreground">{{ parsed.unit === 'd' ? 'days' : 'hours' }}</span>
@@ -95,7 +95,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         min="0"
         step="0.5"
         size="kira-lg"
-        class="w-14"
+        class="w-20"
         data-testid="ade-estimate-num"
         @change="commit"
       />

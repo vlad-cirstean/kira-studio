@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -47,7 +47,7 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
 
 <template>
   <div
-    class="flex flex-col gap-1.5 rounded-kira border border-border-strong bg-bg px-2.5 py-2"
+    class="flex flex-col gap-1.5 py-2.5"
     data-testid="ade-wf-step"
     :data-step-id="step.id"
   >
@@ -61,9 +61,9 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
         data-testid="ade-wf-step-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
-      <Button variant="dialog" size="kira-icon" aria-label="Move step up" :disabled="first" data-testid="ade-wf-step-up" @click="emit('up')">↑</Button>
-      <Button variant="dialog" size="kira-icon" aria-label="Move step down" :disabled="last" data-testid="ade-wf-step-down" @click="emit('down')">↓</Button>
-      <Button variant="dialog" size="kira-icon" class="text-error" aria-label="Remove step" data-testid="ade-wf-step-remove" @click="emit('remove')">✕</Button>
+      <TooltipIconButton icon="arrow-up" label="Move step up" :disabled="first" data-testid="ade-wf-step-up" @click="emit('up')" />
+      <TooltipIconButton icon="arrow-down" label="Move step down" :disabled="last" data-testid="ade-wf-step-down" @click="emit('down')" />
+      <TooltipIconButton icon="close" label="Remove step" class="text-error" data-testid="ade-wf-step-remove" @click="emit('remove')" />
     </div>
     <div class="flex flex-wrap items-center gap-3 pl-9.5 text-kira-sm text-muted-foreground">
       <label :for="id('scope')">Runs on</label>

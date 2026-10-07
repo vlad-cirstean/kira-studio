@@ -75,7 +75,7 @@ function openLink(e: MouseEvent): void {
           v-model="draft"
           :placeholder="placeholder"
           size="kira-lg"
-          class="min-w-0 flex-1 border-dashed font-data"
+          class="min-w-0 flex-1"
           :data-testid="`${id}-input`"
           @keydown.enter="onSave"
         />
