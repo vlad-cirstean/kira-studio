@@ -113,7 +113,7 @@ func (b *TaskBoard) taskCandidates(tc *taskCtx, cfgs []model.AdeRepoConfig) []re
 	for _, c := range cfgs {
 		byID[c.CodeRepoID] = c
 	}
-	var out []repoCandidate
+	out := make([]repoCandidate, 0, len(tc.branches))
 	for _, br := range tc.branches {
 		c := byID[br.CodeRepoID]
 		out = append(out, repoCandidate{id: br.CodeRepoID, name: c.Name, nickname: c.Nickname})
