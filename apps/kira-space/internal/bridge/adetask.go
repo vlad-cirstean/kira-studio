@@ -77,6 +77,8 @@ func adeTaskError(err error) error {
 	switch {
 	case err == nil:
 		return nil
+	case errors.Is(err, ade.ErrSetupPending):
+		return ipcerr.New("E_PREPARING", err.Error())
 	case errors.Is(err, ade.ErrInvalidInput), errors.Is(err, repos.ErrEstimateShrink),
 		errors.Is(err, repos.ErrBranchOnTask), errors.Is(err, repos.ErrRepoOnTask),
 		errors.Is(err, repos.ErrReviewKind):

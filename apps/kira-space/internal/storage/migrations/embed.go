@@ -34,6 +34,7 @@ var names = []sqlitex.MigrationSource{
 	{Version: 16, Name: "p177_ade_logs_purge", File: "0016_p177_ade_logs_purge.sql"},
 	{Version: 17, Name: "p196_ade_task_workflow_snapshot", File: "0017_p196_ade_task_workflow_snapshot.sql"},
 	{Version: 18, Name: "p199_ade_branch_origin", File: "0018_p199_ade_branch_origin.sql"},
+	{Version: 19, Name: "p202_ade_setup_note", File: "0019_p202_ade_setup_note.sql"},
 	{Version: 20, Name: "p204_custom_scripts", File: "0020_p204_custom_scripts.sql"},
 }
 

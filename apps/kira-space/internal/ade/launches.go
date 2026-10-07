@@ -2,6 +2,8 @@ package ade
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -36,7 +38,7 @@ func (b *TaskBoard) launchGate(ctx context.Context, tc *taskCtx, sb model.AdeTas
 		return "", err
 	}
 	if s, ok := setups[sb.ID]; ok && s.State != model.AdeSetupReady {
-		return "", invalid("the worktree setup of %s is %s", sb.Name, s.State)
+		return "", setupGateError(sb, s)
 	}
 	path, err := b.worktreeOf(ctx, sb)
 	if err != nil {
@@ -63,12 +65,33 @@ func (b *TaskBoard) launchGate(ctx context.Context, tc *taskCtx, sb model.AdeTas
 		if s, err := b.deps.Tasks.GetSetup(sb.ID); err != nil {
 			return "", err
 		} else if s != nil && s.State != model.AdeSetupReady {
-			return "", invalid("preparing the worktree of %s; try again when it is ready", sb.Name)
+			return "", setupGateError(sb, *s)
 		}
 		// Ready at once (no prepare script): no onReady fires, so release runs held as "worktree missing".
 		b.launchHeldLocked(sb)
 	}
 	return res.Path, nil
+}
+
+// ErrSetupPending marks a launch refused because a worktree's prepare script still runs; the bridge
+// maps it to E_PREPARING so a dialog can wait for the setup instead of showing an error.
+var ErrSetupPending = errors.New("ade: worktree setup pending")
+
+type setupPendingError struct{ msg string }
+
+func (e setupPendingError) Error() string        { return e.msg }
+func (e setupPendingError) Is(target error) bool { return target == ErrSetupPending }
+
+// setupGateError is the refusal for a branch whose setup is not ready.
+func setupGateError(sb model.AdeTaskBranch, s model.AdeWorktreeSetup) error {
+	if s.State == model.AdeSetupRunning {
+		return setupPendingError{fmt.Sprintf("preparing the worktree of %s; try again when it is ready", sb.Name)}
+	}
+	reason := s.Note
+	if reason == "" {
+		reason = "see its log"
+	}
+	return invalid("the worktree setup of %s failed: %s", sb.Name, reason)
 }
 
 func (b *TaskBoard) repoNick(tc *taskCtx, sb model.AdeTaskBranch) string {

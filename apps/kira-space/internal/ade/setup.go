@@ -341,27 +341,27 @@ func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.A
 			}
 		},
 	})
-	state, exit := model.AdeSetupReady, res.ExitCode
+	state, exit, note := model.AdeSetupReady, res.ExitCode, ""
+	fail := func(text string) {
+		state, note = model.AdeSetupFailed, text
+		sink.add(logEvent, text)
+	}
 	switch {
 	case res.Cancelled && err == nil && b.ctx.Err() != nil:
 		sink.flush()
 		return // app quit: the row stays running (R18)
 	case res.Cancelled && err == nil:
-		state = model.AdeSetupFailed
-		sink.add(logEvent, "cancelled: "+context.Cause(ctx).Error())
+		fail("cancelled: " + context.Cause(ctx).Error())
 	case err != nil:
-		state = model.AdeSetupFailed
-		sink.add(logEvent, "could not start: "+err.Error())
+		fail("could not start: " + err.Error())
 	case res.TimedOut:
-		state = model.AdeSetupFailed
-		sink.add(logEvent, "timed out after "+timeoutText)
+		fail("timed out after " + timeoutText)
 	case res.ExitCode != 0:
-		state = model.AdeSetupFailed
-		sink.add(logEvent, fmt.Sprintf("exited with status %d", res.ExitCode))
+		fail(fmt.Sprintf("exited with status %d", res.ExitCode))
 	}
 	sink.flush()
 	finished := b.deps.Now().UnixMilli()
-	row := model.AdeWorktreeSetup{BranchID: sb.ID, State: state, StartedAt: startedAt, FinishedAt: &finished, ExitCode: &exit}
+	row := model.AdeWorktreeSetup{BranchID: sb.ID, State: state, StartedAt: startedAt, FinishedAt: &finished, ExitCode: &exit, Note: note}
 	if err := b.deps.Tasks.UpsertSetup(row); err != nil {
 		slog.Warn("ade: record setup", "scope", "ade", "branch", sb.ID, "err", err)
 		return
@@ -373,4 +373,22 @@ func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.A
 	if state == model.AdeSetupReady && onReady != nil {
 		onReady(sb.ID)
 	}
+}
+
+// recordSetupFailure stores a failed setup that never reached the script (the worktree could not be
+// created), so the card, the panel and Needs you show why.
+func (b *TaskBoard) recordSetupFailure(sb model.AdeTaskBranch, note string) {
+	if err := b.deps.Logs.Reset(repos.AdeLogSetup, sb.ID, sb.TaskID); err != nil {
+		slog.Warn("ade: reset setup log", "scope", "ade", "branch", sb.ID, "err", err)
+	}
+	sink := b.newLogSink(repos.AdeLogSetup, sb.ID, sb.TaskID)
+	sink.add(logEvent, note)
+	sink.flush()
+	now := b.deps.Now().UnixMilli()
+	if err := b.deps.Tasks.UpsertSetup(model.AdeWorktreeSetup{BranchID: sb.ID, State: model.AdeSetupFailed, StartedAt: now, FinishedAt: &now, Note: note}); err != nil {
+		slog.Warn("ade: record setup failure", "scope", "ade", "branch", sb.ID, "err", err)
+		return
+	}
+	b.setPendingNote(sb.ID, noteSetupFailed)
+	b.notifyBoard()
 }

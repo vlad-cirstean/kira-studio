@@ -2,6 +2,7 @@ package ade
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -478,7 +479,7 @@ func TestRunEngine_startBranch(t *testing.T) {
 		id := e.task("api")
 		e.start(id)
 		_, err := e.board.StartBranch(ctx, adewire.StartBranchArgs{BranchID: branchOf(t, e, id, "api")})
-		if err == nil || !strings.Contains(err.Error(), "setup") || !strings.Contains(err.Error(), "running") {
+		if !errors.Is(err, ErrSetupPending) {
 			t.Fatalf("StartBranch during setup: %v", err)
 		}
 		_ = os.WriteFile(gate, nil, 0o644)

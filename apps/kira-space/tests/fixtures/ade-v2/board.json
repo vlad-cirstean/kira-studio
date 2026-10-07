@@ -1449,7 +1449,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -1525,7 +1526,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -1603,7 +1605,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -1670,7 +1673,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -1753,7 +1757,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -1843,7 +1848,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -1905,7 +1911,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -1987,7 +1994,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -2070,7 +2078,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -2138,7 +2147,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -2201,7 +2211,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -2258,7 +2269,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -2336,7 +2348,8 @@
         "state": "failed",
         "startedAt": 1790067000000,
         "finishedAt": 1790067072000,
-        "exitCode": 1
+        "exitCode": 1,
+        "note": ""
       },
       "integration": [
         {
@@ -2388,7 +2401,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -2451,7 +2465,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -2508,7 +2523,8 @@
         "state": "running",
         "startedAt": 1790067000000,
         "finishedAt": null,
-        "exitCode": null
+        "exitCode": null,
+        "note": ""
       },
       "integration": [],
       "deployments": [],
@@ -2558,7 +2574,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {
@@ -2621,7 +2638,8 @@
         "state": "ready",
         "startedAt": 1789894800000,
         "finishedAt": 1789894890000,
-        "exitCode": 0
+        "exitCode": 0,
+        "note": ""
       },
       "integration": [
         {

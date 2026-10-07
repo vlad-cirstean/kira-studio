@@ -152,6 +152,7 @@ type WorktreeSetup struct {
 	StartedAt  int64  `json:"startedAt"`
 	FinishedAt *int64 `json:"finishedAt"`
 	ExitCode   *int   `json:"exitCode"`
+	Note       string `json:"note"` // why it failed, '' otherwise
 }
 
 type Deployment struct {

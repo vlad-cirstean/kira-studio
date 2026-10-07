@@ -574,7 +574,7 @@ func (r *AdeTaskRepo) queryRunsByTask(where string, args ...any) (map[string][]m
 
 // SetupByBranch returns every worktree-setup row keyed by branch id.
 func (r *AdeTaskRepo) SetupByBranch() (map[string]model.AdeWorktreeSetup, error) {
-	rows, err := r.DB.Query(`SELECT branch_id, state, started_at, finished_at, exit_code FROM ade_worktree_setup`)
+	rows, err := r.DB.Query(`SELECT branch_id, state, started_at, finished_at, exit_code, note FROM ade_worktree_setup`)
 	if err != nil {
 		return nil, fmt.Errorf("repos: query ade worktree setup: %w", err)
 	}
@@ -583,7 +583,7 @@ func (r *AdeTaskRepo) SetupByBranch() (map[string]model.AdeWorktreeSetup, error)
 	for rows.Next() {
 		var s model.AdeWorktreeSetup
 		var finished, exit sql.NullInt64
-		if err := rows.Scan(&s.BranchID, &s.State, &s.StartedAt, &finished, &exit); err != nil {
+		if err := rows.Scan(&s.BranchID, &s.State, &s.StartedAt, &finished, &exit, &s.Note); err != nil {
 			return nil, fmt.Errorf("repos: scan ade worktree setup: %w", err)
 		}
 		s.FinishedAt, s.ExitCode = nullInt64Ptr(finished), nullIntPtr(exit)
@@ -842,10 +842,11 @@ func (r *AdeTaskRepo) LatestRuns(taskID string) ([]model.AdeRun, error) {
 
 // UpsertSetup writes a branch's worktree-setup row.
 func (r *AdeTaskRepo) UpsertSetup(s model.AdeWorktreeSetup) error {
-	if _, err := r.DB.Exec(`INSERT INTO ade_worktree_setup (branch_id, state, started_at, finished_at, exit_code)
-		VALUES (?, ?, ?, ?, ?) ON CONFLICT(branch_id) DO UPDATE SET state = excluded.state,
-		started_at = excluded.started_at, finished_at = excluded.finished_at, exit_code = excluded.exit_code`,
-		s.BranchID, s.State, s.StartedAt, s.FinishedAt, s.ExitCode); err != nil {
+	if _, err := r.DB.Exec(`INSERT INTO ade_worktree_setup (branch_id, state, started_at, finished_at, exit_code, note)
+		VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(branch_id) DO UPDATE SET state = excluded.state,
+		started_at = excluded.started_at, finished_at = excluded.finished_at, exit_code = excluded.exit_code,
+		note = excluded.note`,
+		s.BranchID, s.State, s.StartedAt, s.FinishedAt, s.ExitCode, s.Note); err != nil {
 		return fmt.Errorf("repos: upsert ade worktree setup %s: %w", s.BranchID, err)
 	}
 	return nil
@@ -855,8 +856,8 @@ func (r *AdeTaskRepo) UpsertSetup(s model.AdeWorktreeSetup) error {
 func (r *AdeTaskRepo) GetSetup(branchID string) (*model.AdeWorktreeSetup, error) {
 	var s model.AdeWorktreeSetup
 	var finished, exit sql.NullInt64
-	err := r.DB.QueryRow(`SELECT branch_id, state, started_at, finished_at, exit_code FROM ade_worktree_setup WHERE branch_id = ?`,
-		branchID).Scan(&s.BranchID, &s.State, &s.StartedAt, &finished, &exit)
+	err := r.DB.QueryRow(`SELECT branch_id, state, started_at, finished_at, exit_code, note FROM ade_worktree_setup WHERE branch_id = ?`,
+		branchID).Scan(&s.BranchID, &s.State, &s.StartedAt, &finished, &exit, &s.Note)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -925,8 +926,8 @@ func (r *AdeTaskRepo) FailRunningSetups(now int64) ([]model.AdeTaskBranch, error
 	if err != nil {
 		return nil, fmt.Errorf("repos: select running ade setups: %w", err)
 	}
-	if _, err := tx.Exec(`UPDATE ade_worktree_setup SET state = ?, finished_at = ? WHERE state = 'running'`,
-		model.AdeSetupFailed, now); err != nil {
+	if _, err := tx.Exec(`UPDATE ade_worktree_setup SET state = ?, finished_at = ?, note = ? WHERE state = 'running'`,
+		model.AdeSetupFailed, now, "interrupted by restart"); err != nil {
 		return nil, fmt.Errorf("repos: recover ade setups: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

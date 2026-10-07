@@ -165,6 +165,8 @@ type AdeWorktreeSetup struct {
 	StartedAt  int64
 	FinishedAt *int64
 	ExitCode   *int
+	// Note is why the setup failed ("" otherwise).
+	Note string
 }
 
 // AdeBacklogItem is one row of ade_backlog.

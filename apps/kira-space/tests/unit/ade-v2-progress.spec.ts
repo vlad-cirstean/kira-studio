@@ -259,7 +259,7 @@ describe('derived status', () => {
         mkBranch({
           id: 'b_api',
           taskId: 'T',
-          setup: { state: 'failed', startedAt: 0, finishedAt: 1, exitCode: 1 },
+          setup: { state: 'failed', startedAt: 0, finishedAt: 1, exitCode: 1, note: '' },
         }),
       ]),
     ).toBe('Blocked');

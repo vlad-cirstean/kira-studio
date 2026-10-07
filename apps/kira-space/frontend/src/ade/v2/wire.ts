@@ -128,6 +128,8 @@ export interface WorktreeSetup {
   startedAt: number;
   finishedAt: number | null;
   exitCode: number | null;
+  /** Why it failed, '' otherwise. */
+  note: string;
 }
 export interface Deployment {
   env: string;

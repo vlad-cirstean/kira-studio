@@ -939,12 +939,8 @@ func (b *TaskBoard) RetrySetup(ctx context.Context, branchID string) error {
 	if setup == nil || setup.State != model.AdeSetupFailed {
 		return invalid("only a failed worktree setup can be retried")
 	}
-	path, err := b.worktreeOf(ctx, sb)
-	if err != nil {
-		return err
-	}
-	if path == "" {
-		return invalid("the branch has no worktree")
+	if sb.Name == "" {
+		return invalid("the branch is not created yet")
 	}
 	rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
 	if err != nil {
@@ -952,6 +948,17 @@ func (b *TaskBoard) RetrySetup(ctx context.Context, branchID string) error {
 	}
 	if rec == nil {
 		return invalid("code repo %s not found", sb.CodeRepoID)
+	}
+	path, err := b.worktreeOf(ctx, sb)
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		res, err := b.ensureWorktree(ctx, "", *rec, sb, "")
+		if err != nil {
+			return err
+		}
+		path = res.Path
 	}
 	if err := b.startSetup(*rec, sb, sb.Name, path, b.onSetupReady); err != nil {
 		return err

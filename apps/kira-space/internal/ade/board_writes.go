@@ -25,6 +25,11 @@ func invalid(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidInput, fmt.Sprintf(format, args...))
 }
 
+// trimInvalid is err's text without the ErrInvalidInput prefix.
+func trimInvalid(err error) string {
+	return strings.TrimPrefix(err.Error(), ErrInvalidInput.Error()+": ")
+}
+
 func (b *TaskBoard) newID() string { return uuid.NewString() }
 
 // --- helpers -----------------------------------------------------------------------------------
@@ -296,6 +301,7 @@ func (b *TaskBoard) prepareAttached(ctx context.Context, sb model.AdeTaskBranch)
 	res, err := b.ensureWorktree(ctx, "", *rec, sb, "")
 	if err != nil {
 		slog.Warn("ade: attached branch worktree", "scope", "ade", "branch", sb.ID, "err", err)
+		b.recordSetupFailure(sb, "could not create the worktree: "+trimInvalid(err))
 		return
 	}
 	if !res.Fresh {
@@ -303,6 +309,7 @@ func (b *TaskBoard) prepareAttached(ctx context.Context, sb model.AdeTaskBranch)
 	}
 	if err := b.startSetup(*rec, sb, res.Name, res.Path, b.onSetupReady); err != nil {
 		slog.Warn("ade: attached branch setup", "scope", "ade", "branch", sb.ID, "err", err)
+		b.recordSetupFailure(sb, "could not start the prepare script: "+trimInvalid(err))
 	}
 	b.notifyBoard()
 }

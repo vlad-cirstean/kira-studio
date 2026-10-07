@@ -37,7 +37,7 @@ func zeroBranch(sb model.AdeTaskBranch, base string, setup *adewire.WorktreeSetu
 }
 
 func toWireSetup(s model.AdeWorktreeSetup) *adewire.WorktreeSetup {
-	return &adewire.WorktreeSetup{State: s.State, StartedAt: s.StartedAt, FinishedAt: s.FinishedAt, ExitCode: s.ExitCode}
+	return &adewire.WorktreeSetup{State: s.State, StartedAt: s.StartedAt, FinishedAt: s.FinishedAt, ExitCode: s.ExitCode, Note: s.Note}
 }
 
 // boardCtx holds one repo's git inputs shared by every branch computation.
