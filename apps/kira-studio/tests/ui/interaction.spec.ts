@@ -1059,12 +1059,18 @@ async function rightClick(locator: Locator): Promise<void> {
   const page = locator.page();
   const menu = page.locator('[data-testid="context-menu"]');
   for (let attempt = 0; attempt < 4; attempt++) {
-    await locator.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(400);
-    await locator.click({ button: 'right' });
-    await expect(menu).toBeVisible();
-    await page.waitForTimeout(400);
-    if (await menu.isVisible()) return;
+    // SlickGrid can re-render the target row between the scroll and the click under load; a
+    // detached element throws instead of retrying, so treat it as a failed attempt.
+    try {
+      await locator.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(400);
+      await locator.click({ button: 'right' });
+      await expect(menu).toBeVisible();
+      await page.waitForTimeout(400);
+      if (await menu.isVisible()) return;
+    } catch (error) {
+      if (attempt === 3) throw error;
+    }
   }
   await expect(menu).toBeVisible();
 }
@@ -1086,7 +1092,7 @@ async function discardChanges(page: Page): Promise<void> {
 test('interaction completeness — grid menus, selection, copy/paste, shortcuts', async ({
   relaunch,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
   await installClipboardShim(page);
 

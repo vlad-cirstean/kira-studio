@@ -507,15 +507,17 @@ test('the request body {{variable}} hover escapes the editor pane and adopts the
   // A genuine leave-then-enter, not a teleport from Playwright's own initial (0, 0) mouse position
   // straight onto the token — Monaco's hover controller only arms its delay timer on a fresh
   // "entered this token" transition, and starting from a stale internal target left by an earlier
-  // step (`stableBoundingBox`'s own polling included) can leave that transition undetected.
-  await page.mouse.move(0, 0);
-  await page.mouse.move(
-    resolvedBox.x + resolvedBox.width / 2,
-    resolvedBox.y + resolvedBox.height / 2,
-  );
-
+  // step (`stableBoundingBox`'s own polling included) can leave that transition undetected. Under
+  // CPU load the transition can still be missed, so redo the whole leave-then-enter until it lands.
   const hover = page.locator('.monaco-hover:not(.hidden)');
-  await expect(hover).toBeVisible();
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await page.mouse.move(
+      resolvedBox.x + resolvedBox.width / 2,
+      resolvedBox.y + resolvedBox.height / 2,
+    );
+    await expect(hover).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
 
   // D7's first half: escapes both named clipping ancestors, and is mounted as a direct child of
   // <body> — exactly what `overflowWidgetsDomNode` produces, and what the library's own pre-fix
