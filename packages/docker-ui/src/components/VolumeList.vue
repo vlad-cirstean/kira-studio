@@ -4,6 +4,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { computed } from 'vue';
 import { useVolumes } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
+import ListState from './ListState.vue';
 import VirtualList from './VirtualList.vue';
 
 const ui = useDockerUiStore();
@@ -19,11 +20,20 @@ const rows = computed(() => {
 </script>
 
 <template>
-  <VirtualList :rows="rows" testid="docker-volume-list">
+  <ListState
+    v-if="volumes.isPending.value || volumes.isError.value || rows.length === 0"
+    :loading="volumes.isPending.value"
+    :error="volumes.isError.value"
+    icon="database"
+    :empty-title="ui.search.trim() ? 'No matches' : 'No volumes'"
+    :empty-hint="ui.search.trim() ? 'No volume matches the search.' : 'Containers create volumes for persistent data.'"
+    @retry="volumes.refetch()"
+  />
+  <VirtualList v-else :rows="rows" testid="docker-volume-list">
     <template #row="{ row }">
       <div
-        class="flex h-full items-center gap-1 px-1.5 cursor-default select-none"
-        :class="ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name ? 'bg-select' : 'hover:bg-hover'"
+        class="group/row flex h-full cursor-default select-none items-center gap-1.5 px-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
+        :class="ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name ? 'bg-select shadow-[inset_2px_0_0_var(--color-focus)]' : 'hover:bg-hover'"
         data-testid="docker-row"
         :data-id="row.volume.name"
         role="option"
@@ -34,8 +44,8 @@ const rows = computed(() => {
       >
         <CodiconIcon name="database" :size="13" class="shrink-0 text-muted-foreground" />
         <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ row.volume.name }}</span>
-        <Badge v-if="row.volume.usedBy.length > 0" variant="count">{{ row.volume.usedBy.length }}</Badge>
-        <span class="shrink-0 text-kira-sm text-muted-foreground">{{ row.volume.driver }}</span>
+        <span class="flex w-6 shrink-0 justify-center"><Badge v-if="row.volume.usedBy.length > 0" variant="count">{{ row.volume.usedBy.length }}</Badge></span>
+        <span class="w-14 shrink-0 truncate text-right text-kira-sm text-muted-foreground">{{ row.volume.driver }}</span>
       </div>
     </template>
   </VirtualList>

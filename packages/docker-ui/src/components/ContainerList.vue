@@ -4,14 +4,18 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
-import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
-import { formatPercent, isActiveState, stateDotClass } from '../lib/format';
+import { formatPercent, formatSize, isActiveState, publishedPorts, stateDotClass } from '../lib/format';
 import { useContainerAction, useContainers } from '../queries';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { DockerContainer } from '../wire';
+import ListState from './ListState.vue';
+import UsageBar from './UsageBar.vue';
 import VirtualList from './VirtualList.vue';
+
+const GROUP_ROW_HEIGHT = 28;
+const CONTAINER_ROW_HEIGHT = 44;
 
 interface GroupRow {
   kind: 'group';
@@ -69,6 +73,21 @@ const rows = computed<Row[]>(() => {
   return out;
 });
 
+const rowHeights = computed(() => rows.value.map((r) => (r.kind === 'group' ? GROUP_ROW_HEIGHT : CONTAINER_ROW_HEIGHT)));
+
+const emptyCopy = computed(() => {
+  if (searching.value) return { title: 'No matches', hint: 'No container matches the search.' };
+  if ((containers.data.value ?? []).length > 0 && !ui.showStopped) {
+    return { title: 'No running containers', hint: 'Turn on Show stopped to list exited ones.' };
+  }
+  return { title: 'No containers', hint: 'Start one with docker run or docker compose up.' };
+});
+
+function portLabel(c: DockerContainer): string {
+  const ports = publishedPorts(c.ports);
+  return ports.length > 1 ? `${ports[0]} +${ports.length - 1}` : (ports[0] ?? '');
+}
+
 function isOpen(name: string): boolean {
   return searching.value || !ui.collapsedGroups.includes(name);
 }
@@ -108,11 +127,20 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
 </script>
 
 <template>
-  <VirtualList :rows="rows" testid="docker-container-list">
+  <ListState
+    v-if="containers.isPending.value || containers.isError.value || rows.length === 0"
+    :loading="containers.isPending.value"
+    :error="containers.isError.value"
+    icon="server"
+    :empty-title="emptyCopy.title"
+    :empty-hint="emptyCopy.hint"
+    @retry="containers.refetch()"
+  />
+  <VirtualList v-else :rows="rows" :row-heights="rowHeights" testid="docker-container-list">
     <template #row="{ row }">
       <div
         v-if="row.kind === 'group'"
-        class="flex h-full items-center gap-1 px-1.5 cursor-default select-none hover:bg-hover group/row"
+        class="group/row flex h-full cursor-default select-none items-center gap-1 px-1.5 hover:bg-hover"
         data-testid="docker-group"
         :data-project="row.name"
       >
@@ -131,8 +159,11 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
       </div>
       <div
         v-else
-        class="group/row flex h-full items-center gap-1 pr-1.5 cursor-default select-none"
-        :class="[row.grouped ? 'pl-5' : 'pl-1.5', isSelected(row.container) ? 'bg-select' : 'hover:bg-hover']"
+        class="group/row grid h-full cursor-default select-none grid-cols-[0.5rem_minmax(0,1fr)_2.75rem_3.5rem_1.25rem] grid-rows-[auto_auto] items-center gap-x-1.5 gap-y-0.5 py-1 pr-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
+        :class="[
+          row.grouped ? 'pl-5' : 'pl-1.5',
+          isSelected(row.container) ? 'bg-select shadow-[inset_2px_0_0_var(--color-focus)]' : 'hover:bg-hover',
+        ]"
         data-testid="docker-row"
         :data-id="row.container.id"
         :data-name="row.container.name"
@@ -145,22 +176,20 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         @keydown.enter="ui.select({ kind: 'container', id: row.container.id })"
         @contextmenu.prevent="onContextMenu($event, row.container)"
       >
-        <span class="size-1.5 shrink-0 rounded-full" :class="stateDotClass(row.container.state)" data-testid="docker-state-dot" />
-        <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-          {{ row.container.name }}
-          <span class="text-kira-sm text-muted-foreground">{{ row.container.image }}</span>
-        </span>
+        <span class="row-span-1 size-1.5 rounded-full" :class="stateDotClass(row.container.state)" data-testid="docker-state-dot" />
         <span
-          v-if="row.container.state === 'running' && stats.latest.get(row.container.id)"
-          class="shrink-0 font-data text-kira-sm text-muted-foreground group-hover/row:hidden"
-          data-testid="docker-row-stats"
-        >
-          <span data-testid="docker-row-cpu">{{ formatPercent(stats.latest.get(row.container.id)!.cpuPercent) }}</span>
-          <span class="ml-1" data-testid="docker-row-mem">{{ formatBytes(stats.latest.get(row.container.id)!.memUsage) }}</span>
-        </span>
-        <span class="hidden shrink-0 items-center group-hover/row:flex">
+          class="truncate"
+          :class="row.container.state === 'running' ? '' : 'text-muted-foreground'"
+          data-testid="docker-row-name"
+        >{{ row.container.name }}</span>
+        <template v-if="row.container.state === 'running' && stats.latest.get(row.container.id)">
+          <span class="text-right font-data text-kira-sm" data-testid="docker-row-cpu">{{ formatPercent(stats.latest.get(row.container.id)!.cpuPercent) }}</span>
+          <span class="text-right font-data text-kira-sm text-muted-foreground" data-testid="docker-row-mem">{{ formatSize(stats.latest.get(row.container.id)!.memUsage) }}</span>
+        </template>
+        <span v-else class="col-span-2 text-right text-kira-sm text-muted-foreground" data-testid="docker-row-state">{{ row.container.state }}</span>
+        <span class="row-span-2 flex items-center justify-end">
           <CodiconIcon v-if="actions.isBusy(row.container.id)" name="loading" :size="12" class="codicon-modifier-spin" />
-          <template v-else>
+          <span v-else class="hidden group-hover/row:flex group-focus-within/row:flex">
             <TooltipIconButton
               v-if="row.container.state !== 'running'"
               icon="play"
@@ -175,8 +204,17 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
               data-testid="docker-row-stop"
               @click.stop="act(row.container, 'stop')"
             />
-          </template>
+          </span>
         </span>
+        <span />
+        <span class="flex min-w-0 items-baseline gap-1.5 text-kira-sm text-muted-foreground">
+          <span class="truncate" data-testid="docker-row-image">{{ row.container.image }}</span>
+          <span v-if="portLabel(row.container)" class="max-w-[40%] shrink-0 truncate font-data" data-testid="docker-row-ports">{{ portLabel(row.container) }}</span>
+        </span>
+        <template v-if="row.container.state === 'running' && stats.latest.get(row.container.id)">
+          <UsageBar :percent="stats.latest.get(row.container.id)!.cpuPercent" />
+          <UsageBar :percent="stats.latest.get(row.container.id)!.memPercent" />
+        </template>
       </div>
     </template>
   </VirtualList>

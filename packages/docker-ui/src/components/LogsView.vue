@@ -199,6 +199,13 @@ function clear(): void {
           </div>
         </div>
       </div>
+      <p
+        v-if="visible.length === 0"
+        class="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"
+        data-testid="docker-logs-empty"
+      >
+        {{ needle ? 'No lines match the filter.' : ended ? 'No log output.' : 'Waiting for output…' }}
+      </p>
       <Button
         v-if="!atBottom && !follow"
         size="kira"

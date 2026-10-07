@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
-import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
-import { shortId } from '../lib/format';
+import { formatSize, shortId } from '../lib/format';
 import { useImages } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
+import ListState from './ListState.vue';
 import VirtualList from './VirtualList.vue';
 
 const ui = useDockerUiStore();
@@ -21,11 +21,20 @@ const rows = computed(() => {
 </script>
 
 <template>
-  <VirtualList :rows="rows" testid="docker-image-list">
+  <ListState
+    v-if="images.isPending.value || images.isError.value || rows.length === 0"
+    :loading="images.isPending.value"
+    :error="images.isError.value"
+    icon="package"
+    :empty-title="ui.search.trim() ? 'No matches' : 'No images'"
+    :empty-hint="ui.search.trim() ? 'No image matches the search.' : 'Pull one with docker pull.'"
+    @retry="images.refetch()"
+  />
+  <VirtualList v-else :rows="rows" testid="docker-image-list">
     <template #row="{ row }">
       <div
-        class="flex h-full items-center gap-1 px-1.5 cursor-default select-none"
-        :class="ui.selection?.kind === 'image' && ui.selection.id === row.image.id ? 'bg-select' : 'hover:bg-hover'"
+        class="group/row flex h-full cursor-default select-none items-center gap-1.5 px-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
+        :class="ui.selection?.kind === 'image' && ui.selection.id === row.image.id ? 'bg-select shadow-[inset_2px_0_0_var(--color-focus)]' : 'hover:bg-hover'"
         data-testid="docker-row"
         :data-id="row.image.id"
         role="option"
@@ -40,8 +49,8 @@ const rows = computed(() => {
           <span v-if="row.image.tags.length > 1" class="text-kira-sm text-muted-foreground">+{{ row.image.tags.length - 1 }}</span>
           <span v-if="row.image.dangling" class="font-data text-kira-sm text-muted-foreground">{{ shortId(row.image.id) }}</span>
         </span>
-        <Badge v-if="row.image.containers > 0" variant="count">{{ row.image.containers }}</Badge>
-        <span class="shrink-0 text-kira-sm text-muted-foreground">{{ formatBytes(row.image.size) }}</span>
+        <span class="flex w-6 shrink-0 justify-center"><Badge v-if="row.image.containers > 0" variant="count">{{ row.image.containers }}</Badge></span>
+        <span class="w-14 shrink-0 text-right font-data text-kira-sm text-muted-foreground">{{ formatSize(row.image.size) }}</span>
       </div>
     </template>
   </VirtualList>

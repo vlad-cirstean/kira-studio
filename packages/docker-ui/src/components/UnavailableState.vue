@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { computed, ref } from 'vue';
-import { useDocker } from '../context';
+import { computed } from 'vue';
+import { useRetryStatus } from '../queries';
 import type { DockerStatus, UnavailableReason } from '../wire';
 import EndpointChip from './EndpointChip.vue';
 
 const props = defineProps<{ status: DockerStatus }>();
 
-const { control } = useDocker();
-const qc = useQueryClient();
-const retrying = ref(false);
+const { retrying, retry } = useRetryStatus();
 
 const COPY: Record<UnavailableReason, { title: string; hint: string }> = {
   'not-installed': {
@@ -39,21 +36,12 @@ const COPY: Record<UnavailableReason, { title: string; hint: string }> = {
 };
 
 const copy = computed(() => COPY[props.status.reason ?? 'error']);
-
-async function retry(): Promise<void> {
-  retrying.value = true;
-  try {
-    qc.setQueryData<DockerStatus>(['docker', 'status'], await control.status(true));
-  } finally {
-    retrying.value = false;
-  }
-}
 </script>
 
 <template>
   <Empty class="h-full" data-testid="docker-unavailable">
     <EmptyHeader>
-      <EmptyMedia variant="icon"><CodiconIcon name="vm" :size="20" /></EmptyMedia>
+      <EmptyMedia variant="icon"><CodiconIcon name="debug-disconnect" :size="20" class="text-error" /></EmptyMedia>
       <EmptyTitle data-testid="docker-unavailable-title">{{ copy.title }}</EmptyTitle>
       <EmptyDescription data-testid="docker-unavailable-hint">{{ copy.hint }}</EmptyDescription>
     </EmptyHeader>
@@ -61,9 +49,12 @@ async function retry(): Promise<void> {
       <code class="font-data text-kira-sm text-muted-foreground" data-testid="docker-unavailable-endpoint">{{ status.endpoint.host }}</code>
       <p v-if="status.message" class="max-w-md text-kira-sm text-muted-foreground">{{ status.message }}</p>
       <div class="flex items-center gap-2">
-        <Button size="kira" variant="secondary" :disabled="retrying" data-testid="docker-retry" @click="retry">Retry</Button>
+        <Button size="kira" variant="secondary" :disabled="retrying" data-testid="docker-retry" @click="retry">
+          <CodiconIcon :name="retrying ? 'loading' : 'refresh'" :size="12" :class="retrying ? 'codicon-modifier-spin' : ''" />Retry
+        </Button>
         <EndpointChip />
       </div>
+      <p class="text-kira-sm text-muted-foreground">Checking again every 5 seconds.</p>
     </EmptyContent>
   </Empty>
 </template>

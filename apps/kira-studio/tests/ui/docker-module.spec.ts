@@ -349,3 +349,50 @@ test('the tab strip is hidden in Docker mode and back elsewhere', async ({ relau
   await modeTab(page, 'studio').click();
   await expect(page.locator('[data-testid="tab-strip"]')).toBeVisible();
 });
+
+test('engine overview tabulates containers with humanized stats; section tabs share one row', async ({
+  relaunch,
+}) => {
+  const { page } = await setup(relaunch);
+  await openDocker(page);
+
+  const tabs = page.locator('[data-testid^="docker-section-"][role="tab"]');
+  await expect(tabs).toHaveCount(4);
+  const tops = await tabs.evaluateAll((els) =>
+    els.map((el) => Math.round(el.getBoundingClientRect().top)),
+  );
+  expect(new Set(tops).size).toBe(1);
+
+  await expect(page.locator('[data-testid="docker-engine-overview"]')).toBeVisible();
+  await expect(page.locator('[data-testid="docker-engine-mem"]')).toHaveText('0 B');
+  await expect(page.locator('[data-testid="docker-table-row"]')).toHaveCount(4);
+
+  await emitWailsEvent(page, 'kira:docker:stats', {
+    samples: [
+      {
+        id: 'c-db',
+        cpuPercent: 3.2,
+        memUsage: 1.5 * 1024 ** 3,
+        memLimit: 16 * 1024 ** 3,
+        memPercent: 9.4,
+        netRx: 0,
+        netTx: 0,
+        blockRead: 0,
+        blockWrite: 0,
+        pids: 1,
+        at: 1,
+      },
+    ],
+  });
+  await expect(page.locator('[data-testid="docker-engine-mem"]')).toHaveText('1.5 GB');
+  await expect(
+    page.locator(
+      '[data-testid="docker-row"][data-name="shop-db-1"] [data-testid="docker-row-mem"]',
+    ),
+  ).toHaveText('1.5 GB');
+
+  await page.locator('[data-testid="docker-table-row"][data-name="solo"]').click();
+  await expect(page.locator('[data-testid="docker-detail-name"]')).toHaveText('solo');
+  await page.locator('[data-testid="docker-overview-home"]').click();
+  await expect(page.locator('[data-testid="docker-engine-overview"]')).toBeVisible();
+});

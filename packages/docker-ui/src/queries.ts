@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { useDocumentVisibility } from '@vueuse/core';
-import { computed, onScopeDispose, type Ref, reactive, watch } from 'vue';
+import { computed, onScopeDispose, type Ref, reactive, ref, watch } from 'vue';
 import { useDocker } from './context';
 import type { DockerStatus, InspectKind, ResourceKind } from './wire';
 
@@ -15,6 +15,22 @@ export function useDockerStatus() {
     refetchInterval: (query) => (query.state.data?.state === 'ok' ? false : UNAVAILABLE_POLL_MS),
     staleTime: 0,
   });
+}
+
+/** Forces a fresh engine probe and publishes the result to the status cache. */
+export function useRetryStatus() {
+  const { control } = useDocker();
+  const qc = useQueryClient();
+  const retrying = ref(false);
+  async function retry(): Promise<void> {
+    retrying.value = true;
+    try {
+      qc.setQueryData<DockerStatus>(STATUS_KEY, await control.status(true));
+    } finally {
+      retrying.value = false;
+    }
+  }
+  return { retrying, retry };
 }
 
 /** Scope for every resource query: a context switch must not serve the old engine's cache. */

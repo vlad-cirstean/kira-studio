@@ -2,7 +2,7 @@
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { ref } from 'vue';
 
-const props = withDefaults(defineProps<{ rows: readonly T[]; rowHeight?: number; testid?: string }>(), {
+const props = withDefaults(defineProps<{ rows: readonly T[]; rowHeight?: number; rowHeights?: readonly number[]; testid?: string }>(), {
   rowHeight: 28,
   testid: 'docker-list',
 });
@@ -13,6 +13,7 @@ const scrollEl = ref<HTMLElement | null>(null);
 const { virtualItems, totalSize, onScroll } = useVirtualRows({
   count: () => props.rows.length,
   rowHeight: () => props.rowHeight,
+  rowHeights: () => props.rowHeights,
   scrollElement: scrollEl,
 });
 </script>
