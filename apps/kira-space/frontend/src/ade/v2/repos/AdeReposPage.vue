@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed } from 'vue';
 import { useReposDialogStore } from '../../../repo/state/reposDialog';
 import AdeRepoTag from '../AdeRepoTag.vue';
@@ -18,9 +19,10 @@ const current = computed(() => list.value.find((r) => r.codeRepoId === reposUi.r
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1" data-testid="ade-repos">
-    <div class="flex w-[320px] shrink-0 flex-col gap-1 overflow-auto border-r border-border px-3 py-4">
-      <h2 class="m-0 px-1 pb-1.5 text-kira-lg font-semibold">Repos</h2>
+  <div class="flex min-h-0 min-w-0 flex-1 gap-0.5" data-testid="ade-repos">
+    <div class="flex w-80 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg">
+      <PanelHeader>Repos</PanelHeader>
+      <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-auto p-2">
       <button
         v-for="r in list"
         :key="r.codeRepoId"
@@ -44,8 +46,9 @@ const current = computed(() => list.value.find((r) => r.codeRepoId === reposUi.r
           Manage repositories…
         </Button>
       </div>
+      </div>
     </div>
-    <div class="min-w-0 flex-1 overflow-auto px-6 pb-6 pt-4">
+    <div class="min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg px-6 pb-6 pt-4">
       <AdeRepoDetail v-if="current" :key="current.codeRepoId" :repo="current" />
     </div>
   </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { TONE } from '../tones';
@@ -19,14 +20,16 @@ function taskOf(taskId: string): { title: string; color: string } {
 </script>
 
 <template>
-  <div class="min-h-0 flex-1 overflow-auto px-7 pb-7 pt-[18px]" data-testid="ade-needs-page">
-    <div class="flex max-w-[1080px] flex-col gap-3.5">
-      <div class="flex items-baseline gap-2.5">
-        <h2 class="m-0 text-kira-xl font-bold">Needs you</h2>
-        <span v-if="needs && !needs.empty" class="text-kira-md text-muted-foreground" data-testid="ade-needs-summary"
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg" data-testid="ade-needs-page">
+    <PanelHeader>
+      Needs you
+      <template v-if="needs && !needs.empty" #actions>
+        <span class="normal-case tracking-normal" data-testid="ade-needs-summary"
           >{{ needs.items.length }} items · oldest first, most urgent on top</span
         >
-      </div>
+      </template>
+    </PanelHeader>
+    <div class="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto p-3">
       <template v-if="needs">
         <AdeNeedsRow
           v-for="n in needs.items"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Input } from '@theme/components/ui/input';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
 import { backlogPatch } from '../board/panelFacts';
@@ -77,12 +78,11 @@ function onEdit(id: string, value: string): void {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1" data-testid="ade-backlog">
-    <div class="flex min-w-0 flex-1 flex-col gap-2.5 overflow-auto px-6 pb-7 pt-[18px]">
-      <div class="flex items-baseline gap-2.5">
-        <h2 class="m-0 text-kira-lg font-bold">Backlog</h2>
-        <span class="text-kira-md text-muted-foreground">Get it out of your head. Order it later: top is most important. Not on the plan yet.</span>
-      </div>
+  <div class="flex min-h-0 min-w-0 flex-1 gap-0.5" data-testid="ade-backlog">
+    <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg">
+      <PanelHeader>Backlog</PanelHeader>
+      <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto p-3">
+      <span class="text-kira-md text-muted-foreground">Get it out of your head. Order it later: top is most important. Not on the plan yet.</span>
       <label for="ade-backlog-add" class="sr-only">Add to backlog</label>
       <Input
         id="ade-backlog-add"
@@ -105,8 +105,9 @@ function onEdit(id: string, value: string): void {
         @edit="(v) => onEdit(item.id, v)"
       />
       <div v-if="!items.length" class="px-3 py-6 text-kira-lg text-subtle">Backlog is empty.</div>
+      </div>
     </div>
-    <aside class="flex min-h-0 w-[520px] shrink-0 flex-col border-l border-border bg-chrome">
+    <aside class="flex min-h-0 w-130 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg">
       <AdeBacklogPanel
         v-if="selected"
         :key="selected.id"

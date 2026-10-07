@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { useImportWorkflow, useNewWorkflow, useWorkflows } from '../queries';
@@ -66,13 +67,14 @@ async function createNew(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1" data-testid="ade-workflows">
+  <div class="flex min-h-0 min-w-0 flex-1 gap-0.5" data-testid="ade-workflows">
     <div
-      class="flex w-[300px] shrink-0 flex-col gap-1 overflow-auto border-r border-border px-3 py-4"
+      class="flex w-75 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg"
       data-testid="ade-wf-list"
     >
-      <div class="flex items-center gap-2 px-1 pb-2">
-        <h2 class="m-0 flex-1 text-kira-lg font-semibold">Workflows</h2>
+      <PanelHeader>
+        Workflows
+        <template #actions>
         <Button
           variant="dialog"
           size="xs"
@@ -85,7 +87,9 @@ async function createNew(): Promise<void> {
         <Button variant="dialog" size="xs" class="h-6 text-kira-sm" data-testid="ade-wf-new" @click="createNew">
           + New
         </Button>
-      </div>
+        </template>
+      </PanelHeader>
+      <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-auto p-2">
       <div v-if="importOpen" class="flex flex-col gap-1 pb-2" data-testid="ade-wf-import-row">
         <div class="flex gap-1.5">
           <label for="ade-wf-import-path" class="sr-only">Workflow YAML path</label>
@@ -145,8 +149,9 @@ async function createNew(): Promise<void> {
         <span class="font-data">claude -p</span>. Script stages run a command. Each stage sets the task
         status.
       </div>
+      </div>
     </div>
-    <div class="min-w-0 flex-1 overflow-auto px-6 pb-6 pt-4">
+    <div class="min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg px-6 pb-6 pt-4">
       <AdeWorkflowEditor v-if="current" :key="current.fileName" :entry="current" />
     </div>
   </div>
