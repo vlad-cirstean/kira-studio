@@ -30,6 +30,7 @@ const p = computed(() => props.card.progress);
 const segColor = (state: string): string => {
   if (state === 'done') return TONE.green[2];
   if (state === 'todo') return 'var(--kira-border-strong)';
+  if (state === 'skipped') return 'var(--kira-border)';
   return p.value.bad ? TONE.red[2] : TONE.amber[2];
 };
 const labelStyle = computed(() => {

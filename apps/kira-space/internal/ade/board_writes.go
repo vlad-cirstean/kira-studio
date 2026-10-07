@@ -49,16 +49,17 @@ func (b *TaskBoard) wireTask(t model.AdeTask) (adewire.Task, error) {
 	return out, nil
 }
 
-// stageSnapshot is the JSON of a workflow's first stage, the task's currentStage on creation.
+// stageSnapshot is the JSON of a workflow's first runnable stage, the task's currentStage on creation.
 func stageSnapshot(wf adewire.Workflow) (stageID, stageJSON string, err error) {
-	if len(wf.Stages) == 0 {
+	first, ok := firstRunnable(wf)
+	if !ok {
 		return "", "", nil
 	}
-	raw, err := json.Marshal(wf.Stages[0])
+	raw, err := json.Marshal(first)
 	if err != nil {
 		return "", "", err
 	}
-	return wf.Stages[0].ID, string(raw), nil
+	return first.ID, string(raw), nil
 }
 
 func (b *TaskBoard) requireRepos(ids []string) error {

@@ -241,3 +241,27 @@ test('Ctrl+S saves the open editor', async ({ relaunch }) => {
   await name.press('Control+s');
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
 });
+
+test('right-clicking a stage skips it, and the last runnable stage cannot be skipped', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  const stages = page.locator(t('ade-wf-stage'));
+  const skipItem = page.locator(t('menu-item-ade-wf-stage-skip'));
+  await stages.nth(1).click({ button: 'right', position: { x: 10, y: 10 } });
+  await skipItem.click();
+  await expect(stages.nth(1).locator(t('ade-wf-stage-skipped'))).toBeVisible();
+  await page.locator(t('ade-wf-save')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
+  const saved = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
+    workflow: { stages: { id: string; skip: boolean }[] };
+  };
+  expect(saved.workflow.stages.map((s) => s.skip)).toEqual([false, true, false, false]);
+
+  for (const i of [0, 2]) {
+    await stages.nth(i).click({ button: 'right', position: { x: 10, y: 10 } });
+    await skipItem.click();
+  }
+  await stages.nth(3).click({ button: 'right', position: { x: 10, y: 10 } });
+  await expect(skipItem).toHaveAttribute('data-disabled', '');
+});

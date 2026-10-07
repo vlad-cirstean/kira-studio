@@ -269,6 +269,7 @@ describe('stage and start mirror the server defaults', () => {
     name: 'Spec',
     kind: 'user',
     status: 'In progress',
+    skip: false,
     session: true,
     prompt: 'Ask me questions until the spec is clear about {task} in {repo}.',
     steps: [],

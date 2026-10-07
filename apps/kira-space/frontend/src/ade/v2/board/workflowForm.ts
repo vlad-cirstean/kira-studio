@@ -74,6 +74,7 @@ export function newStage(stages: readonly Stage[]): Stage {
     name: 'New stage',
     kind: 'user',
     status: 'In progress',
+    skip: false,
     session: false,
     prompt: '',
     steps: [],
@@ -83,6 +84,10 @@ export function newStage(stages: readonly Stage[]): Stage {
     timeout: '',
   };
   return stage;
+}
+
+export function runnableCount(stages: readonly Stage[]): number {
+  return stages.filter((s) => !s.skip).length;
 }
 
 /** Steps a `back:` can point at from position `index`: the earlier ones. */

@@ -280,7 +280,7 @@ const (
 
 var (
 	topOrder   = []string{"id", "name", "stages"}
-	stageOrder = []string{"id", "name", "kind", "status", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
+	stageOrder = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
 	stepOrder  = []string{"id", "name", "runs_on", "before", "on_failure", "timeout", "prompt", "allowed_tools"}
 )
 
@@ -460,6 +460,10 @@ func applyStage(m *yaml.Node, st adewire.Stage) {
 	}
 	setScalar(m, "status", kText, st.Status, true, stageOrder)
 	keep := map[string]bool{"id": true, "name": true, "kind": true, "status": true}
+	if st.Skip {
+		keep["skip"] = true
+		setScalar(m, "skip", kBool, "true", true, stageOrder)
+	}
 	switch st.Kind {
 	case "user":
 		keep["session"] = true

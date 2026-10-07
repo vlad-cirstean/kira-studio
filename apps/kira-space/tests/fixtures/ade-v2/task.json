@@ -15,6 +15,7 @@
     "name": "Spec",
     "kind": "user",
     "status": "In progress",
+    "skip": false,
     "session": true,
     "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
     "steps": [],

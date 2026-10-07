@@ -100,6 +100,7 @@ type Stage struct {
 	Name      string         `json:"name"`
 	Kind      StageKind      `json:"kind"`
 	Status    TaskStatus     `json:"status"`
+	Skip      bool           `json:"skip"`
 	Session   bool           `json:"session"`
 	Prompt    string         `json:"prompt"`
 	Steps     []PipelineStep `json:"steps"`

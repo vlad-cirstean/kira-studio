@@ -4,6 +4,7 @@ import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import { Textarea } from '@theme/components/ui/textarea';
+import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import AdeChip from '../AdeChip.vue';
 import type { Tone } from '../board/actions';
 import { FAILURE_OPTIONS, moved, newStep, STATUS_OPTIONS, withKind, withValidBacks } from '../board/workflowForm';
@@ -12,7 +13,8 @@ import type { OnFailure, Stage, StageKind } from '../wire';
 import AdeStepCard from './AdeStepCard.vue';
 
 // One stage of the form: header (name, type, task status, order), then the fields of its kind.
-const props = defineProps<{ index: number; scopes: string[]; first: boolean; last: boolean }>();
+const props = defineProps<{ index: number; scopes: string[]; first: boolean; last: boolean; canSkip: boolean }>();
+const contextMenu = useContextMenuStore();
 const sessionOn = { background: actionStyle('claude').background, borderColor: actionStyle('claude').background };
 const stage = defineModel<Stage>('stage', { required: true });
 const emit = defineEmits<{ up: []; down: []; remove: [] }>();
@@ -20,6 +22,27 @@ const emit = defineEmits<{ up: []; down: []; remove: [] }>();
 const KIND_TONE: Record<StageKind, Tone> = { user: 'blue', agent: 'amber', script: 'green' };
 const n = (k: string): string => `ade-wf-stage-${k}-${props.index}`;
 
+const NATIVE_MENU = 'input, textarea, select, [contenteditable]';
+function onMenu(ev: MouseEvent): void {
+  if (ev.target instanceof Element && ev.target.closest(NATIVE_MENU)) return;
+  ev.preventDefault();
+  const items: MenuItem[] = [
+    { type: 'label', label: stage.value.name },
+    {
+      type: 'item',
+      id: 'ade-wf-stage-skip',
+      label: stage.value.skip ? "Don't skip stage" : 'Skip stage',
+      disabled: !stage.value.skip && !props.canSkip,
+      hint: !stage.value.skip && !props.canSkip ? 'At least one stage must run' : undefined,
+      run: () => patch({ skip: !stage.value.skip }),
+    },
+    { type: 'separator' },
+    { type: 'item', id: 'ade-wf-stage-menu-up', label: 'Move up', disabled: props.first, run: () => emit('up') },
+    { type: 'item', id: 'ade-wf-stage-menu-down', label: 'Move down', disabled: props.last, run: () => emit('down') },
+    { type: 'item', id: 'ade-wf-stage-menu-remove', label: 'Remove stage', danger: true, run: () => emit('remove') },
+  ];
+  contextMenu.openContextMenu(ev, items);
+}
 function patch(p: Partial<Stage>): void {
   stage.value = { ...stage.value, ...p };
 }
@@ -35,14 +58,19 @@ function removeStep(i: number): void {
 </script>
 
 <template>
+  <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the card holds nested interactive fields. -->
   <div
     class="flex flex-col gap-2 rounded-[10px] border border-l-4 border-border-strong bg-elevated px-3 py-2.5"
+    :class="stage.skip ? 'opacity-60' : ''"
     data-testid="ade-wf-stage"
     :data-stage-id="stage.id"
+    :data-skipped="stage.skip"
+    @contextmenu="onMenu"
   >
     <div class="flex items-center gap-2">
-      <span class="w-6 shrink-0 font-data text-kira-lg font-bold">{{ index + 1 }}.</span>
+      <span class="w-6 shrink-0 font-data text-kira-lg font-bold" :class="stage.skip ? 'line-through' : ''">{{ index + 1 }}.</span>
       <AdeChip :label="stage.kind" :tone="KIND_TONE[stage.kind]" />
+      <AdeChip v-if="stage.skip" label="skipped" tone="grey" data-testid="ade-wf-stage-skipped" />
       <label :for="n('name')" class="sr-only">Stage name</label>
       <Input
         :id="n('name')"

@@ -38,7 +38,7 @@ interface StageSegment {
   kind: Stage['kind'];
   /** Agent stages draw wider. */
   wide: boolean;
-  state: 'done' | 'current' | 'blocked' | 'todo';
+  state: 'done' | 'current' | 'blocked' | 'todo' | 'skipped';
 }
 
 type ProgressTone = 'green' | 'red' | 'amber';
@@ -202,7 +202,8 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
   const frac = steps.length ? steps.reduce((acc, s) => acc + s.frac, 0) / steps.length : 0;
   const segments = stages.map((s, k): StageSegment => {
     let state: StageSegment['state'] = 'todo';
-    if (k < idx) state = 'done';
+    if (s.skip && k !== idx) state = 'skipped';
+    else if (k < idx) state = 'done';
     else if (k === idx) state = bad ? 'blocked' : 'current';
     return { id: s.id, name: s.name, kind: s.kind, wide: s.kind === 'agent', state };
   });

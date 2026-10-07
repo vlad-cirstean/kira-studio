@@ -36,7 +36,7 @@ interface StepView {
 
 export interface StageBlock {
   stage: Stage;
-  state: 'done' | 'now' | 'next';
+  state: 'done' | 'now' | 'next' | 'skipped';
   steps: StepView[];
   /** `2/5` for an agent stage, else ''. */
   count: string;
@@ -119,10 +119,10 @@ export function buildStageBlocks(
   const idx = finished ? stages.length : workflow ? stageIndex : 0;
   return stages.map((stage, k): StageBlock => {
     const script = stage.kind === 'script';
-    const steps = stage.kind === 'user' ? [] : buildSteps(i, stage);
+    const steps = stage.kind === 'user' || (stage.skip && k !== idx) ? [] : buildSteps(i, stage);
     return {
       stage,
-      state: k < idx ? 'done' : k === idx ? 'now' : 'next',
+      state: stage.skip && k !== idx ? 'skipped' : k < idx ? 'done' : k === idx ? 'now' : 'next',
       steps: steps.map(
         (s): StepView => ({
           step: s,
@@ -142,4 +142,10 @@ export function buildStageBlocks(
       release: stage.id === 'release' && k <= idx,
     };
   });
+}
+
+/** Stage a skip or Next from `fromId` lands on: the next stage not skipped, else `done`. */
+export function nextStageId(blocks: readonly StageBlock[], fromId: string): string {
+  const at = blocks.findIndex((b) => b.stage.id === fromId);
+  return blocks.slice(at + 1).find((b) => !b.stage.skip)?.stage.id ?? 'done';
 }

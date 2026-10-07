@@ -87,6 +87,7 @@ export function mkStage(over: Partial<Stage> & Pick<Stage, 'id'>): Stage {
     name: over.id,
     kind: 'user',
     status: 'In progress',
+    skip: false,
     session: false,
     prompt: '',
     steps: [],

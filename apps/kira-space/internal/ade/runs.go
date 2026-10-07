@@ -836,10 +836,9 @@ func (b *TaskBoard) StageDone(_ context.Context, taskID string) (adewire.Task, e
 	if at < 0 {
 		return adewire.Task{}, invalid("stage %q is no longer in workflow %q", tc.stage.Name, wf.Name)
 	}
-	if at == len(wf.Stages)-1 {
+	if next, more := nextRunnable(wf, at); !more {
 		err = b.deps.Tasks.SetStage(taskID, "done", "")
 	} else {
-		next := wf.Stages[at+1]
 		var raw []byte
 		if raw, err = json.Marshal(next); err == nil {
 			err = b.deps.Tasks.SetStage(taskID, next.ID, string(raw))
@@ -884,6 +883,9 @@ func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID string) (ade
 		at := slices.IndexFunc(wf.Stages, func(st adewire.Stage) bool { return st.ID == stageID })
 		if at < 0 {
 			return adewire.Task{}, invalid("workflow %q has no stage %q", wf.Name, stageID)
+		}
+		if wf.Stages[at].Skip {
+			return adewire.Task{}, invalid("stage %q is skipped in workflow %q", stageID, wf.Name)
 		}
 		enc, err := json.Marshal(wf.Stages[at])
 		if err != nil {

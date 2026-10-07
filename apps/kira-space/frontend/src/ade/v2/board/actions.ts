@@ -58,10 +58,11 @@ export const ARCHIVE_TIP =
   'Stop its agents, delete its worktrees and hide it. Branches, notes and links are kept; it stays in history.';
 
 function doneAction(p: TaskProgress): TaskAction {
-  const last = p.stageIndex >= 0 && p.stageIndex === p.segments.length - 1;
+  const rest = p.segments.slice(p.stageIndex + 1).filter((s) => s.state !== 'skipped');
+  const last = p.stageIndex >= 0 && rest.length === 0;
   const stage = p.stage?.name ?? '';
   if (last) return { kind: 'finish', label: 'Finish ✓', tip: 'finish the workflow', tone: 'green' };
-  const next = p.segments[p.stageIndex + 1]?.name;
+  const next = rest[0]?.name;
   return {
     kind: 'done',
     label: 'Done ›',

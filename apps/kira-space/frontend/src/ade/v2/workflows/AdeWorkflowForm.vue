@@ -2,7 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
-import { cloneWorkflow, moved, newStage } from '../board/workflowForm';
+import { cloneWorkflow, moved, newStage, runnableCount } from '../board/workflowForm';
 import { useRepos, useSaveWorkflow } from '../queries';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { Stage, Workflow, WorkflowEntry } from '../wire';
@@ -102,6 +102,7 @@ onBeforeUnmount(() => {
       :scopes="scopes"
       :first="i === 0"
       :last="i === wf.stages.length - 1"
+      :can-skip="runnableCount(wf.stages) > 1"
       @update:stage="(v) => setStages((wf as Workflow).stages.map((x, k) => (k === i ? v : x)))"
       @up="setStages(moved((wf as Workflow).stages, i, 'up'))"
       @down="setStages(moved((wf as Workflow).stages, i, 'down'))"

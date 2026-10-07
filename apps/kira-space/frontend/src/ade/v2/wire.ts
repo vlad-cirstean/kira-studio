@@ -81,6 +81,7 @@ export interface Stage {
   name: string;
   kind: StageKind;
   status: TaskStatus;
+  skip: boolean; // no task enters it by moving forward
   session: boolean;
   prompt: string; // user ('' / false otherwise)
   steps: PipelineStep[]; // agent ([] otherwise)

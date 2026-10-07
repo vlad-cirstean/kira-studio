@@ -6,6 +6,7 @@ package adeflow
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -172,13 +173,16 @@ func (v *validator) workflow(root *yaml.Node) adewire.Workflow {
 		seen[st.ID] = true
 		wf.Stages = append(wf.Stages, st)
 	}
+	if !slices.ContainsFunc(wf.Stages, func(s adewire.Stage) bool { return !s.Skip }) {
+		v.fail(list, "", "at least one stage must not be skipped")
+	}
 	return wf
 }
 
 func (v *validator) stage(sn *yaml.Node, num int) adewire.Stage {
 	prefix := fmt.Sprintf("stage %d: ", num)
 	st := adewire.Stage{Steps: make([]adewire.PipelineStep, 0)}
-	m := v.fields(sn, prefix, "id", "name", "kind", "status", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout")
+	m := v.fields(sn, prefix, "id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout")
 	if v.err != nil {
 		return st
 	}
@@ -201,6 +205,7 @@ func (v *validator) stage(sn *yaml.Node, num int) adewire.Stage {
 	if v.err == nil && !contains(taskStatuses, st.Status) {
 		v.fail(m["status"], prefix, "status must be To do, In progress, In review or Done")
 	}
+	st.Skip = v.boolean(m, prefix, "skip")
 	if v.err != nil {
 		return st
 	}

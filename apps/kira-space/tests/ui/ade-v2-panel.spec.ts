@@ -391,3 +391,32 @@ test('a started task on an older workflow version says so', async ({ relaunch })
   await openTask(page, 'T_auth');
   await expect(page.locator('[data-testid="ade-workflow-outdated"]')).toHaveCount(0);
 });
+
+test('a skipped stage is dimmed, cannot be entered, and Skip this stage jumps past it', async ({
+  relaunch,
+}) => {
+  const workflows = adeFixture<{ workflows: { workflow: { stages: { id: string; skip: boolean }[] } | null }[] }>(
+    'workflows',
+  );
+  for (const s of workflows.workflows[0]?.workflow?.stages ?? []) s.skip = s.id === 'impl';
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskWorkflows, response: workflows },
+  ]);
+  const moves = () => control.log().filter((e) => e.channel === IPC.adeTaskSetTaskStage);
+
+  await openTask(page, 'T_alerts');
+  const skipped = page.locator('[data-testid="ade-stage-block"][data-stage-id="impl"]');
+  await expect(skipped).toHaveAttribute('data-state', 'skipped');
+  await expect(skipped).toContainText('skipped');
+
+  await page.locator('[data-testid="ade-stage-pick"]').click();
+  await expect(page.locator('[data-testid="ade-stage-option-impl"]')).toHaveAttribute('data-disabled', '');
+  await page.keyboard.press('Escape');
+
+  await page
+    .locator('[data-testid="ade-stage-block"][data-stage-id="spec"] [data-testid="ade-stage-block-head"]')
+    .click({ button: 'right', position: { x: 200, y: 8 } });
+  await page.locator('[data-testid="menu-item-ade-stage-skip-this"]').click();
+  await expect.poll(moves).toHaveLength(1);
+  expect(moves()[0]?.args).toEqual({ taskId: 'T_alerts', stageId: 'review' });
+});

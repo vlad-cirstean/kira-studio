@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
@@ -7,9 +8,9 @@ import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import { integrationChips } from '../board/labels';
 import type { StepRun } from '../board/progress';
-import type { StageBlock } from '../board/stageBlocks';
+import { nextStageId, type StageBlock } from '../board/stageBlocks';
 import type { CardModel } from '../plan/usePlanModel';
-import { useApprove, useOpenReviewWindow, useRetryRun } from '../queries';
+import { useApprove, useOpenReviewWindow, useRetryRun, useSetTaskStage } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { actionStyle, solidStyle, TONE, tagStyle } from '../tones';
@@ -22,13 +23,52 @@ const ui = useAdeBoardUiStore();
 const takeOver = useAdeTakeOverStore();
 const approve = useApprove();
 const retry = useRetryRun();
+const setStage = useSetTaskStage();
+const contextMenu = useContextMenuStore();
 const openReview = useOpenReviewWindow();
 
 const error = ref('');
 const openLog = ref<string | null>(null);
 
-const STATE_TONE: Record<StageBlock['state'], Tone> = { done: 'green', now: 'amber', next: 'grey' };
+const STATE_TONE: Record<StageBlock['state'], Tone> = { done: 'green', now: 'amber', next: 'grey', skipped: 'grey' };
 const current = computed(() => props.block.state === 'now');
+const skipped = computed(() => props.block.state === 'skipped');
+
+function moveTo(stageId: string): void {
+  const taskId = props.card.task.id;
+  delete ui.actionError[taskId];
+  setStage.mutate(
+    { taskId, stageId },
+    { onError: (err) => (ui.actionError[taskId] = err instanceof Error ? err.message : String(err)) },
+  );
+}
+function onMenu(ev: MouseEvent): void {
+  ev.preventDefault();
+  const live = props.card.task.runs.some((r) => r.state === 'running');
+  const hint = live ? 'Stop its running agents first' : undefined;
+  const items: MenuItem[] = [
+    { type: 'label', label: props.block.stage.name },
+    {
+      type: 'item',
+      id: 'ade-stage-move-here',
+      label: 'Move task here',
+      disabled: current.value || skipped.value || live,
+      hint: current.value || skipped.value ? undefined : hint,
+      run: () => moveTo(props.block.stage.id),
+    },
+  ];
+  if (current.value) {
+    items.push({
+      type: 'item',
+      id: 'ade-stage-skip-this',
+      label: 'Skip this stage',
+      disabled: live,
+      hint,
+      run: () => moveTo(nextStageId(props.card.blocks, props.block.stage.id)),
+    });
+  }
+  contextMenu.openContextMenu(ev, items);
+}
 const boxStyle = computed(() =>
   current.value
     ? {
@@ -99,12 +139,14 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
 <template>
   <div
     class="flex flex-col gap-1 rounded-kira border border-border bg-elevated px-2.5 py-2"
+    :class="skipped ? 'opacity-60' : ''"
     :style="boxStyle"
     data-testid="ade-stage-block"
     :data-stage-id="block.stage.id"
     :data-state="block.state"
   >
-    <div class="flex min-h-6 items-center gap-2">
+    <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header holds nested interactive controls. -->
+    <div class="flex min-h-6 items-center gap-2" data-testid="ade-stage-block-head" @contextmenu="onMenu">
       <AdeChip :label="stateLabel(block.state)" :tone="STATE_TONE[block.state]" class="min-w-10 text-center" />
       <slot name="action" />
       <span class="text-kira-lg font-bold" data-testid="ade-stage-block-name">{{ block.stage.name }}</span>
