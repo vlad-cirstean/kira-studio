@@ -11,6 +11,7 @@ import { adeAgoOptions } from '../ago';
 import { useFocusSession } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE } from '../tones';
+import AdeSessionId from './AdeSessionId.vue';
 import type { SessionView } from './sessionView';
 
 // An interactive session: the terminal when this window holds it, else a Show button that raises
@@ -55,6 +56,7 @@ async function show(): Promise<void> {
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
       <span class="truncate" data-testid="ade-tui-label">interactive · {{ ACTIVITY_LABEL[view.kind] }} · {{ ago }}</span>
+      <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
     </div>
     <TerminalHostView v-if="held" :key="view.session.terminalId" class="min-h-0 flex-1" :tab="tab" :deps="terminal.host" />
     <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-tui-elsewhere">

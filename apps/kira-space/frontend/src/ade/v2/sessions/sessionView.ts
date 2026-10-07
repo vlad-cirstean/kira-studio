@@ -23,7 +23,7 @@ export interface SessionView {
   worktree: string;
   step: string;
   run: Run | null;
-  /** Strip tab: `repo · claude 9ab0` / `run · Implement · repo`. */
+  /** Strip tab: `Implement · repo` / `Implement · Create PR · repo`; `Review agent` for the review agent. */
   tabName: string;
   badge: 'TUI' | 'claude -p';
   /** Finished / stopped row: `run · Create PR · repo · branch · c81a` / `TUI · spec · 3c3c`. */
@@ -41,6 +41,18 @@ function stepNameOf(workflow: Workflow | undefined, stepId: string): string {
   return stepId;
 }
 
+/** The session's own stage, by name: the task's workflow first, then its current-stage snapshot. */
+function stageNameOf(
+  workflow: Workflow | undefined,
+  task: Task | undefined,
+  stageId: string,
+): string {
+  if (!stageId) return '';
+  const hit = workflow?.stages.find((st) => st.id === stageId);
+  if (hit) return hit.name;
+  return task?.currentStage?.id === stageId ? task.currentStage.name : stageId;
+}
+
 export function sessionView(s: Session, look: SessionLookup): SessionView {
   const task = look.task(s.taskId);
   const branch = s.branchId ? look.branch(s.branchId) : undefined;
@@ -52,11 +64,13 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
   const scope = branch ? `${repo} · ${branchName}` : s.branchId ? basename(s.cwd) : 'spec';
   const id = shortId(s.id);
   const review = s.purpose === 'review';
+  const stage = stageNameOf(look.workflow(task?.workflowId ?? ''), task, s.stageId);
+  const named = (...parts: string[]): string => parts.filter(Boolean).join(' · ');
   const tabName = review
     ? 'Review agent'
     : headless
-      ? `run · ${step}${repo ? ` · ${repo}` : ''}`
-      : `${repo || 'spec'} · claude ${id}${s.resumes ? ' (resumed)' : ''}`;
+      ? named(stage, step, repo)
+      : named(stage || `claude ${id}`, repo || 'spec') + (s.resumes ? ' (resumed)' : '');
   return {
     session: s,
     kind: activityKind(s),
@@ -70,14 +84,14 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
     badge: headless ? 'claude -p' : 'TUI',
     stoppedLabel: review
       ? `TUI · review agent · ${id}`
-      : `${headless ? `run · ${step}` : 'TUI'} · ${scope} · ${id}`,
+      : `${headless ? named(stage, step) : named('TUI', stage)} · ${scope} · ${id}`,
     allLabel: review
       ? 'TUI · review agent'
       : headless
-        ? `claude -p · ${step}`
+        ? named('claude -p', stage, step)
         : s.branchId
-          ? 'TUI · interactive'
-          : 'TUI · spec session',
+          ? named('TUI', stage, 'interactive')
+          : named('TUI', stage, 'spec session'),
   };
 }
 

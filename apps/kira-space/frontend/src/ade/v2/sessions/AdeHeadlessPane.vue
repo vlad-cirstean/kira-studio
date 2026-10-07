@@ -9,6 +9,7 @@ import AdeRunLog from '../panel/AdeRunLog.vue';
 import { useStopRun } from '../queries';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { actionStyle, TONE } from '../tones';
+import AdeSessionId from './AdeSessionId.vue';
 import type { SessionView } from './sessionView';
 
 // A running background run: status bar (step, run state, age) with Take over and Stop, then its
@@ -72,6 +73,7 @@ async function onStop(): Promise<void> {
         </Button>
       </AdeTip>
       <span class="min-w-0 truncate" data-testid="ade-headless-label">{{ status }}</span>
+      <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
     </div>
     <p v-if="error" class="m-0 px-3 py-1 text-kira-sm text-error" data-testid="ade-session-error">{{ error }}</p>
     <div class="min-h-0 flex-1 overflow-auto p-2">

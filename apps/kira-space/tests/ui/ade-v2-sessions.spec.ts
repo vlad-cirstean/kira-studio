@@ -38,6 +38,29 @@ test('the task strip lists interactive sessions first, then the most recent runs
   await expect(page.locator(t('ade-stopped-row'))).toHaveCount(2);
 });
 
+test('tabs are named after the stage; the pane shows the full Claude session id with a copy button', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  await openSessions(page, 'T_bill');
+  await expect(page.locator(t('ade-session-tab-tk01'))).toContainText('Implement · ');
+  await expect(page.locator(t('ade-session-tab-b1c2'))).toContainText('Implement · Implement · ');
+  await expect(page.locator(t('ade-session-tab-tk01'))).not.toContainText('claude ');
+
+  await page.evaluate(() => {
+    const w = window as unknown as { __clipboard: string[] };
+    w.__clipboard = [];
+    navigator.clipboard.write = async (items: ClipboardItem[]) => {
+      for (const item of items) w.__clipboard.push(await (await item.getType('text/plain')).text());
+    };
+  });
+  await expect(page.locator(t('ade-session-id-text'))).toHaveText('claude-tk01');
+  await page.locator(t('ade-session-id-copy')).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard))
+    .toEqual(['claude-tk01']);
+});
+
 test('a branch scope shows only that branch', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await page.locator(row('b_billdash')).click();
