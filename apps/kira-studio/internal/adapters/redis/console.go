@@ -504,7 +504,9 @@ func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bo
 		if err != nil {
 			return nil, err
 		}
-		pages = append(pages, resultToPage(c.command, c.args, reply, limit))
+		p := resultToPage(c.command, c.args, reply, limit)
+		pages = append(pages, p)
+		limit = adapters.RemainingCap(limit, p.Size())
 	}
 	return pages, nil
 }

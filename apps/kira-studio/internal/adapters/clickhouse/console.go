@@ -159,6 +159,7 @@ func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuer
 				return nil, err
 			}
 			pages[i] = p
+			limit = adapters.RemainingCap(limit, p.Size())
 		} else {
 			written, err := RunCommand(ctx, h, nextQueryID(), sql, op, track)
 			if err != nil {

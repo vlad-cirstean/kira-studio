@@ -593,7 +593,6 @@ func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *a
 		if readOnly && isWriteStatement(stmt) {
 			return nil, adapters.AssertWritable(true)
 		}
-		stmt.limit = limit
 		parsed[i] = stmt
 	}
 
@@ -602,11 +601,13 @@ func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *a
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return nil, err
 		}
+		stmt.limit = limit
 		p, err := runStatement(ctx, db, stmt, op, track)
 		if err != nil {
 			return nil, err
 		}
 		pages = append(pages, p)
+		limit = adapters.RemainingCap(limit, p.Size())
 	}
 	return pages, nil
 }

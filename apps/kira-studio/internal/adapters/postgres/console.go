@@ -32,6 +32,8 @@ type rawResult struct {
 	command string
 	// truncated: the row cap stopped the read with at least one more row available.
 	truncated bool
+	// bytes is the cell text held, charged against the batch's shared byte budget.
+	bytes int
 }
 
 // runRaw is console.ts's runRaw: §8.14's own low-level runner, deliberately separate from
@@ -104,7 +106,7 @@ func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op
 		// status cell's text for a statement with no output columns (buildPage, below), which is at
 		// least as faithful as console.ts's own documented approximation (`${command} ${rowCount}`),
 		// closer in fact since it is the server's own tag rather than a reconstruction of it.
-		return rawResult{rows: out, fields: fields, command: rows.CommandTag().String(), truncated: truncated}, nil
+		return rawResult{rows: out, fields: fields, command: rows.CommandTag().String(), truncated: truncated, bytes: held}, nil
 	})
 }
 
@@ -272,6 +274,7 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 			return nil, err
 		}
 		results = append(results, result)
+		limit = adapters.RemainingCap(limit, result.bytes)
 		if readOnly {
 			if err := verifyReadOnlyWrap(ctx, conn, op, track); err != nil {
 				return nil, err

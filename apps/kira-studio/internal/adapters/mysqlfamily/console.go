@@ -243,6 +243,7 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 			return nil, err
 		}
 		pages[i] = p
+		limit = adapters.RemainingCap(limit, p.Size())
 		if readOnly {
 			if err := verifyReadOnlyWrap(ctx, conn, op, track); err != nil {
 				return nil, err

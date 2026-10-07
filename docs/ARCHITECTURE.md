@@ -139,7 +139,9 @@ not; only a stale comment survives it
 (`apps/kira-studio/internal/storage/repos/connections.go:172`).
 
 **Console results are capped, not buffered (P174).** `adapters.DefaultConsoleCap` is 10,000 rows and
-64 MiB of held cell text; `model.ConsoleRequest.Cap` (Go callers only, never on the renderer wire)
+56 MiB of held cell text, a budget shared by every statement of a batch (`adapters.RemainingCap`; an
+exhausted budget admits one row, then reports `truncated`), sized so a full batch fits the data-frame
+response limit; `model.ConsoleRequest.Cap` (Go callers only, never on the renderer wire)
 lowers it, and `adapters.ConsoleCapFor` clamps anything above it. An engine checks the cap after
 `Next()` and before appending, so `PagePosition.Truncated` means at least one more row existed and an
 exactly-cap result reports `false`. The flag is a `truncated` field on `PagePosition` (wire and TS).

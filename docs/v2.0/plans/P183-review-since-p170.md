@@ -9,7 +9,7 @@ functional correctness, performance.
   P177, P178, P179, P181, P182. Fixer commits in these files count as unreviewed.
 - Discovery used `codegraph_explore` for owned files and one-hop callers per area.
 
-Open: F1 (medium), F8 (low). Parked for user input: D1, D2.
+Open: F8 (low). Parked: D2 (user wants it configurable in the UI; tracked as a SPEC row).
 
 ## Clean areas
 
@@ -47,26 +47,6 @@ Checked against current source, nothing real found:
 - Standing rules: every new/changed SFC is `<script setup lang="ts">`, no `<style>` block, no
   `defineComponent`. New Pinia stores stay one concern.
 
-## Data plane and console (P174)
-
-### F1. Console byte cap equals the data-frame cap, so a byte-capped result can never be shown
-
-- File: `apps/kira-studio/internal/adapters/consolecap.go:10`,
-  `apps/kira-studio/internal/adapterhost/dataframe.go:205`, `:262-279`.
-- Severity: medium.
-- Summary: `DefaultConsoleCap.Bytes` is 64 MiB of cell text per statement. The response refusal
-  threshold is `maxResponsePayloadBytes = 64 MiB - 4096`, compared against
-  `pageSizeEstimate(raw) = raw + raw/16 + 512` summed over every page in the batch.
-- Failure scenario: a `SELECT` of wide text columns fills ~61 MiB of cells before 10,000 rows. Go
-  holds it, stops correctly with `truncated`, then `oversizedPagePayload` refuses the whole response:
-  "the response was too large to return". The user never sees the truncated result P174 promises.
-  Same for a three-statement batch of 25 MiB each (sum 75 MiB): the whole batch is refused although
-  each statement is under its own cap. Go also holds up to N x 64 MiB before refusing.
-- Suggested fix: make the byte budget leave room for encoding overhead (e.g. budget =
-  `maxResponsePayloadBytes / (1 + 1/16)` minus envelope) and apply it across the batch, not per
-  statement (thread a shared remaining-bytes counter through `execute`). The batch-wide choice is
-  parked as D1 below.
-
 ## Tests against the unit-test bar
 
 ### F8. `gitcred/relay_test.go` keeps tests that restate short function bodies
@@ -82,13 +62,6 @@ Checked against current source, nothing real found:
 - Suggested fix: delete the five; keep the two concurrency tests.
 
 ## Parked: DESIGN-DECISION, needs user input
-
-### D1. Console byte budget: per statement or per batch
-
-F1's fix needs a choice. Per batch keeps every response deliverable over one 64 MiB data frame but
-lets an early statement starve later ones (later results show as empty-and-truncated). Per
-statement keeps today's semantics but needs a lower per-statement budget (e.g. 64 MiB / statement
-count) or a multi-frame response. Recommend per batch with the budget below the frame cap.
 
 ### D2. Read-only SQS visibility timeout
 

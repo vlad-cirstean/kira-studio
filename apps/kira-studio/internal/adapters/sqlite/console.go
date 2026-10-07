@@ -112,6 +112,7 @@ func execute(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, statements
 			return nil, err
 		}
 		pages[i] = p
+		limit = adapters.RemainingCap(limit, p.Size())
 	}
 	return pages, nil
 }
