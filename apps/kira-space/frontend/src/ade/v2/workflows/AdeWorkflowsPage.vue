@@ -83,13 +83,13 @@ async function createNew(): Promise<void> {
         <template #actions>
         <Button
           variant="dialog"
-          size="xs"
+          size="kira-lg"
           data-testid="ade-wf-import"
           @click="importOpen = !importOpen"
         >
           Import YAML
         </Button>
-        <Button variant="dialog" size="xs" data-testid="ade-wf-new" @click="createNew">
+        <Button variant="dialog" size="kira-lg" data-testid="ade-wf-new" @click="createNew">
           + New
         </Button>
         </template>
@@ -102,13 +102,14 @@ async function createNew(): Promise<void> {
             id="ade-wf-import-path"
             v-model="importPath"
             placeholder="~/…/workflow.yaml"
-            class="min-w-0 flex-1 border-dashed bg-transparent font-data"
+            size="kira-lg"
+            class="min-w-0 flex-1 font-data"
             data-testid="ade-wf-import-path"
             @keydown.enter="runImport"
           />
           <Button
             variant="dialog"
-            size="xs"
+            size="kira-lg"
             :disabled="importWf.isPending.value"
             data-testid="ade-wf-import-go"
             @click="runImport"
@@ -125,12 +126,12 @@ async function createNew(): Promise<void> {
       >
         No workflows yet. Workflows are YAML files in {{ dir }}.
       </p>
-      <button
+      <Button
         v-for="e in entries"
         :key="e.fileName"
-        type="button"
-        class="box-border flex w-full cursor-pointer flex-col gap-0.5 rounded-kira border-0 border-l-[3px] px-2.5 py-2 text-left text-fg"
-        :class="current?.fileName === e.fileName ? 'bg-hover' : 'bg-transparent'"
+        variant="ghost"
+        class="box-border h-auto w-full flex-col items-stretch justify-start gap-0.5 whitespace-normal rounded-kira border-l-3 px-2.5 py-2 text-left text-fg"
+        :class="current?.fileName === e.fileName ? 'bg-select' : ''"
         :style="{ borderLeftColor: current?.fileName === e.fileName ? TONE.amber[2] : 'transparent' }"
         data-testid="ade-wf-row"
         :data-file="e.fileName"
@@ -146,7 +147,7 @@ async function createNew(): Promise<void> {
         </span>
         <span class="max-w-full truncate text-kira-sm text-muted-foreground" data-testid="ade-wf-row-stages">{{ stages(e) }}</span>
         <span class="text-kira-sm text-subtle" data-testid="ade-wf-row-used">used by {{ e.usedBy }}</span>
-      </button>
+      </Button>
       <div class="px-1 pt-3 text-kira-sm leading-normal text-subtle">
         A workflow is the list of stages a task goes through. User stages are yours (optionally with an
         interactive Claude Code session). Agent stages run AI steps in the background with
@@ -155,8 +156,11 @@ async function createNew(): Promise<void> {
       </div>
       </div>
     </div>
-    <div class="min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg px-6 pb-6 pt-4">
-      <AdeWorkflowEditor v-if="current" :key="current.fileName" :entry="current" />
+    <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg">
+      <PanelHeader>{{ current?.workflow?.name ?? current?.fileName ?? 'Workflow' }}</PanelHeader>
+      <div class="min-h-0 flex-1 overflow-auto p-4">
+        <AdeWorkflowEditor v-if="current" :key="current.fileName" :entry="current" />
+      </div>
     </div>
   </div>
 </template>

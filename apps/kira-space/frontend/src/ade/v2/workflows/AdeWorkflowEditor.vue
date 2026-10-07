@@ -22,29 +22,28 @@ async function setMode(v: unknown): Promise<void> {
 </script>
 
 <template>
-  <div class="flex max-w-[900px] flex-col gap-3" data-testid="ade-wf-editor">
+  <div class="flex max-w-4xl flex-col gap-3" data-testid="ade-wf-editor">
     <div class="flex flex-wrap items-center gap-2.5">
       <ToggleGroup
         type="single"
         variant="outline"
-        size="sm"
+        size="kira-lg"
         :model-value="wfUi.workflowMode"
         aria-label="Editor mode"
         data-testid="ade-wf-mode"
         @update:model-value="setMode"
       >
-        <ToggleGroupItem value="form" class="px-2.5 text-kira-md" data-testid="ade-wf-mode-form">Form</ToggleGroupItem>
-        <ToggleGroupItem value="yaml" class="px-2.5 text-kira-md" data-testid="ade-wf-mode-yaml">YAML</ToggleGroupItem>
+        <ToggleGroupItem value="form" data-testid="ade-wf-mode-form">Form</ToggleGroupItem>
+        <ToggleGroupItem value="yaml" data-testid="ade-wf-mode-yaml">YAML</ToggleGroupItem>
       </ToggleGroup>
       <AdeTip :text="entry.path">
-        <span class="min-w-0 flex-[1_1_200px] truncate font-data text-kira-sm text-subtle" data-testid="ade-wf-path">{{
+        <span class="min-w-0 flex-1 truncate font-data text-kira-sm text-subtle" data-testid="ade-wf-path">{{
           entry.path
         }}</span>
       </AdeTip>
       <Button
         variant="dialog"
-        size="xs"
-        class="px-2.5"
+        size="kira-lg"
         :disabled="!yaml.data.value"
         data-testid="ade-wf-copy"
         @click="yaml.data.value && copy(yaml.data.value.yaml)"

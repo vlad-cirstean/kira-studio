@@ -12,7 +12,7 @@ const style = computed(() => {
 
 <template>
   <span
-    class="shrink-0 rounded-kira-xs px-[5px] py-px font-data text-kira-sm font-semibold"
+    class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-semibold"
     :style="style"
     data-testid="ade-repo-tag"
     >{{ label }}</span

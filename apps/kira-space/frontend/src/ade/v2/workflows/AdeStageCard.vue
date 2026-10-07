@@ -60,7 +60,7 @@ function removeStep(i: number): void {
 <template>
   <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the card holds nested interactive fields. -->
   <div
-    class="flex flex-col gap-2 rounded-[10px] border border-l-4 border-border-strong bg-elevated px-3 py-2.5"
+    class="flex flex-col gap-2 rounded-kira-pill border border-l-4 border-border-strong bg-elevated px-3 py-2.5"
     :class="stage.skip ? 'opacity-60' : ''"
     data-testid="ade-wf-stage"
     :data-stage-id="stage.id"
@@ -68,14 +68,14 @@ function removeStep(i: number): void {
     @contextmenu="onMenu"
   >
     <div class="flex items-center gap-2">
-      <span class="w-6 shrink-0 font-data text-kira-lg font-bold" :class="stage.skip ? 'line-through' : ''">{{ index + 1 }}.</span>
+      <span class="w-6 shrink-0 text-kira-lg font-bold" :class="stage.skip ? 'line-through' : ''">{{ index + 1 }}.</span>
       <AdeChip :label="stage.kind" :tone="KIND_TONE[stage.kind]" />
       <AdeChip v-if="stage.skip" label="skipped" tone="grey" data-testid="ade-wf-stage-skipped" />
       <label :for="n('name')" class="sr-only">Stage name</label>
       <Input
         :id="n('name')"
         :model-value="stage.name"
-        class="min-w-0 flex-1 bg-field font-bold"
+        size="kira" class="min-w-0 flex-1 font-bold"
         data-testid="ade-wf-stage-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
@@ -103,9 +103,9 @@ function removeStep(i: number): void {
       >
         <option v-for="o in STATUS_OPTIONS" :key="o" :value="o">{{ o }}</option>
       </NativeSelect>
-      <Button variant="dialog" size="icon-xs" aria-label="Move stage up" :disabled="first" data-testid="ade-wf-stage-up" @click="emit('up')">↑</Button>
-      <Button variant="dialog" size="icon-xs" aria-label="Move stage down" :disabled="last" data-testid="ade-wf-stage-down" @click="emit('down')">↓</Button>
-      <Button variant="dialog" size="icon-xs" class="text-error" aria-label="Remove stage" data-testid="ade-wf-stage-remove" @click="emit('remove')">✕</Button>
+      <Button variant="dialog" size="kira-icon" aria-label="Move stage up" :disabled="first" data-testid="ade-wf-stage-up" @click="emit('up')">↑</Button>
+      <Button variant="dialog" size="kira-icon" aria-label="Move stage down" :disabled="last" data-testid="ade-wf-stage-down" @click="emit('down')">↓</Button>
+      <Button variant="dialog" size="kira-icon" class="text-error" aria-label="Remove stage" data-testid="ade-wf-stage-remove" @click="emit('remove')">✕</Button>
     </div>
 
     <template v-if="stage.kind === 'user'">
@@ -125,7 +125,7 @@ function removeStep(i: number): void {
           :id="n('prompt')"
           :model-value="stage.prompt"
           placeholder="First message for the session (optional)"
-          class="ml-8 min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data leading-normal"
+          class="ml-8 min-h-12 w-auto resize-y bg-bg px-2 py-1.5 leading-normal"
           data-testid="ade-wf-stage-prompt"
           @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
         />
@@ -144,7 +144,7 @@ function removeStep(i: number): void {
         :id="n('command')"
         :model-value="stage.command"
         placeholder="./scripts/release.sh --branch {branch}"
-        class="min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data leading-normal"
+        class="min-h-12 w-auto resize-y bg-bg px-2 py-1.5 font-data leading-normal"
         data-testid="ade-wf-stage-command"
         @update:model-value="(v: string | number) => patch({ command: String(v) })"
       />
@@ -173,7 +173,7 @@ function removeStep(i: number): void {
         <Input
           :id="n('timeout')"
           :model-value="stage.timeout"
-          class="w-14 bg-field px-1.5 font-data"
+          size="kira" class="w-14 px-1.5"
           data-testid="ade-wf-stage-timeout"
           @update:model-value="(v: string | number) => patch({ timeout: String(v) })"
         />
@@ -198,8 +198,8 @@ function removeStep(i: number): void {
       />
       <Button
         variant="dialog"
-        size="xs"
-        class="self-start border-dashed bg-transparent px-2.5"
+        size="kira-lg"
+        class="self-start border-dashed bg-transparent"
         data-testid="ade-wf-add-step"
         @click="setSteps([...stage.steps, newStep(stage.steps)])"
       >

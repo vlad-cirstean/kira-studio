@@ -117,7 +117,7 @@ function short(sha: string): string {
       </TooltipTrigger>
       <TooltipContent>{{ blockedMessage }}</TooltipContent>
     </Tooltip>
-    <PopoverContent class="w-[380px] text-kira-md" align="end" data-testid="ade-review-sync-popover">
+    <PopoverContent class="w-95 text-kira-md" align="end" data-testid="ade-review-sync-popover">
       <div class="flex flex-col gap-2">
         <p v-if="data?.account" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-review-sync-account">
           Syncing as {{ data.account }}

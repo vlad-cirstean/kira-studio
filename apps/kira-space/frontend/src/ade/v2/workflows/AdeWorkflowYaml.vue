@@ -99,7 +99,7 @@ onBeforeUnmount(() => {
       id="ade-wf-yaml"
       :model-value="draft"
       spellcheck="false"
-      class="resize-y bg-bg px-3.5 py-3 font-data leading-[1.6] [tab-size:2]"
+      class="resize-y bg-bg px-3 py-3 font-data leading-relaxed [tab-size:2]"
       data-testid="ade-wf-yaml"
       @update:model-value="onInput"
     />

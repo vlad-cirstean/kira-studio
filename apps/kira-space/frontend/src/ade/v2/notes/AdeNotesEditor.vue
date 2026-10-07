@@ -40,9 +40,9 @@ const PROSE = [
   '[&_ul]:mb-[0.6em] [&_ul]:list-disc [&_ul]:pl-[1.4em] [&_ol]:mb-[0.6em] [&_ol]:list-decimal [&_ol]:pl-[1.4em]',
   "[&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:pl-[0.2em]",
   "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:items-start [&_ul[data-type='taskList']_li]:gap-[0.4em]",
-  "[&_input[type='checkbox']]:cursor-pointer [&_input[type='checkbox']]:accent-[#6cc58a]",
+  "[&_input[type='checkbox']]:cursor-pointer [&_input[type='checkbox']]:accent-ok",
   "[&_li[data-checked='true']>div]:text-subtle [&_li[data-checked='true']>div]:line-through",
-  '[&_code]:rounded-[3px] [&_code]:bg-field [&_code]:px-[0.3em] [&_code]:py-[0.1em] [&_code]:font-data [&_code]:text-kira-sm',
+  '[&_code]:rounded-kira-xs [&_code]:bg-field [&_code]:px-[0.3em] [&_code]:py-[0.1em] [&_code]:font-data [&_code]:text-kira-sm',
   '[&_a]:text-info',
   "[&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-subtle [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
 ].join(' ');
@@ -198,12 +198,12 @@ function keepFocus(e: MouseEvent): void {
       class="flex shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1.5 py-1"
     >
       <span class="px-1.5 text-kira-sm text-muted-foreground">Notes</span>
-      <button
+      <Button
         v-for="btn in toolbar"
         :key="btn.label"
-        type="button"
-        class="flex h-6 min-w-[26px] items-center justify-center rounded px-1 text-kira-sm"
-        :class="btn.active ? 'bg-field text-fg' : 'text-fg'"
+        :variant="btn.active ? 'dialog' : 'toolbar'"
+        size="kira-icon"
+        class="text-kira-sm"
         :aria-label="btn.label"
         :aria-pressed="btn.active"
         :title="btn.label"
@@ -213,17 +213,18 @@ function keepFocus(e: MouseEvent): void {
       >
         <CodiconIcon v-if="btn.icon" :name="btn.icon" :size="12" />
         <span v-else>{{ btn.glyph }}</span>
-      </button>
+      </Button>
       <template v-if="linkOpen">
         <label for="ade-notes-link" class="sr-only">Link URL</label>
         <Input
           id="ade-notes-link"
           v-model="linkUrl"
           placeholder="https://"
-          class="ml-1 w-[170px] border-dashed font-data"
+          size="kira"
+          class="ml-1 w-42.5 border-dashed font-data"
           @keydown="onLinkKey"
         />
-        <Button variant="dialog" size="sm" class="shrink-0 px-2" @mousedown="keepFocus" @click="applyLink"
+        <Button variant="dialog" size="kira" class="shrink-0" @mousedown="keepFocus" @click="applyLink"
           >Add</Button
         >
       </template>

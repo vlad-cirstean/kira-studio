@@ -88,7 +88,7 @@ onBeforeUnmount(() => {
       <Input
         id="ade-wf-form-name"
         :model-value="wf.name"
-        class="w-80 bg-field font-semibold"
+        size="kira-lg" class="w-80 font-semibold"
         data-testid="ade-wf-form-name"
         @update:model-value="(v: string | number) => edit({ ...wf as Workflow, name: String(v) })"
       />
@@ -106,7 +106,7 @@ onBeforeUnmount(() => {
         />
         <label for="ade-wf-form-space">Kira Space tools for agents</label>
       </div>
-      <p class="m-0 pl-[calc(var(--spacing)*10)] text-kira-sm text-subtle">
+      <p class="m-0 pl-10 text-kira-sm text-subtle">
         Agent steps can declare repos on the task and request branches and worktrees through Kira Space.
       </p>
     </div>
@@ -126,8 +126,8 @@ onBeforeUnmount(() => {
     />
     <Button
       variant="dialog"
-      size="sm"
-      class="self-start border-dashed bg-transparent px-3"
+      size="kira-lg"
+      class="self-start border-dashed bg-transparent"
       data-testid="ade-wf-add-stage"
       @click="setStages([...wf.stages, newStage(wf.stages)])"
     >
@@ -135,24 +135,26 @@ onBeforeUnmount(() => {
     </Button>
     <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-wf-save-error">
       {{ error }}
-      <button
-        type="button"
-        class="cursor-pointer border-0 bg-transparent p-0 text-kira-sm text-info underline"
+      <Button
+        variant="link"
+        size="kira"
+        class="px-1 text-kira-sm text-info"
         data-testid="ade-wf-switch-yaml"
         @click="wfUi.workflowMode = 'yaml'"
       >
         Switch to YAML
-      </button>
+      </Button>
     </p>
   </div>
   <p v-else class="m-0 text-kira-md text-muted-foreground" data-testid="ade-wf-no-valid">
     This file has no valid version yet.
-    <button
-      type="button"
-      class="cursor-pointer border-0 bg-transparent p-0 text-kira-md text-info underline"
+    <Button
+      variant="link"
+      size="kira"
+      class="px-1 text-kira-md text-info"
       @click="wfUi.workflowMode = 'yaml'"
     >
       Fix it in YAML
-    </button>
+    </Button>
   </p>
 </template>

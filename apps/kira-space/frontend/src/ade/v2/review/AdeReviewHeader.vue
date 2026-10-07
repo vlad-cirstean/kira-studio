@@ -18,7 +18,7 @@ const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
   <header class="flex flex-none flex-col border-b border-border bg-chrome" data-testid="ade-review-header">
     <div class="flex items-center gap-2 px-3 py-1.5">
       <span
-        class="inline-block size-2.5 shrink-0 rounded-[2px]"
+        class="inline-block size-2.5 shrink-0 rounded-kira-xs"
         :style="{ background: taskColor(task?.color ?? 0) }"
         data-testid="ade-review-task-colour"
       />

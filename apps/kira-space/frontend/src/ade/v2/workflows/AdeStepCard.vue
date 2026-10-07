@@ -52,20 +52,20 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
     :data-step-id="step.id"
   >
     <div class="flex items-center gap-2">
-      <span class="w-[30px] shrink-0 font-data text-kira-md font-bold text-warn-text">{{ label }}</span>
+      <span class="w-7.5 shrink-0 text-kira-md font-bold text-warn-text">{{ label }}</span>
       <label :for="id('name')" class="sr-only">Step name</label>
       <Input
         :id="id('name')"
         :model-value="step.name"
-        class="min-w-0 flex-1 bg-field font-semibold"
+        size="kira" class="min-w-0 flex-1 font-semibold"
         data-testid="ade-wf-step-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
-      <Button variant="dialog" size="icon-xs" class="size-6" aria-label="Move step up" :disabled="first" data-testid="ade-wf-step-up" @click="emit('up')">↑</Button>
-      <Button variant="dialog" size="icon-xs" class="size-6" aria-label="Move step down" :disabled="last" data-testid="ade-wf-step-down" @click="emit('down')">↓</Button>
-      <Button variant="dialog" size="icon-xs" class="size-6 text-error" aria-label="Remove step" data-testid="ade-wf-step-remove" @click="emit('remove')">✕</Button>
+      <Button variant="dialog" size="kira-icon" aria-label="Move step up" :disabled="first" data-testid="ade-wf-step-up" @click="emit('up')">↑</Button>
+      <Button variant="dialog" size="kira-icon" aria-label="Move step down" :disabled="last" data-testid="ade-wf-step-down" @click="emit('down')">↓</Button>
+      <Button variant="dialog" size="kira-icon" class="text-error" aria-label="Remove step" data-testid="ade-wf-step-remove" @click="emit('remove')">✕</Button>
     </div>
-    <div class="flex flex-wrap items-center gap-3 pl-[38px] text-kira-sm text-muted-foreground">
+    <div class="flex flex-wrap items-center gap-3 pl-9.5 text-kira-sm text-muted-foreground">
       <label :for="id('scope')">Runs on</label>
       <NativeSelect
         :id="id('scope')"
@@ -101,12 +101,12 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       <Input
         :id="id('timeout')"
         :model-value="step.timeout"
-        class="w-14 bg-field px-1.5 font-data"
+        size="kira" class="w-14 px-1.5"
         data-testid="ade-wf-step-timeout"
         @update:model-value="(v: string | number) => patch({ timeout: String(v) })"
       />
     </div>
-    <div class="flex flex-col gap-1 pl-[38px]">
+    <div class="flex flex-col gap-1 pl-9.5">
       <label :for="id('tools')" class="text-kira-sm text-muted-foreground"
         >Allowed tools
         <span class="text-subtle">Passed as --allowedTools; deny rules still win.</span></label
@@ -115,6 +115,8 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
         :id="id('tools')"
         :model-value="toolsText"
         placeholder="Bash(git *), Edit"
+       
+        size="kira"
         class="bg-bg font-data"
         data-testid="ade-wf-step-tools"
         @update:model-value="onTools"
@@ -125,12 +127,12 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       :id="id('prompt')"
       :model-value="step.prompt"
       placeholder="Prompt"
-      class="ml-[38px] min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data leading-normal"
+      class="ml-9.5 min-h-12 w-auto resize-y bg-bg px-2 py-1.5 leading-normal"
       data-testid="ade-wf-step-prompt"
       @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
     />
     <AdeTip :text="FINISH_NOTE">
-      <div class="ml-[38px] cursor-help text-kira-sm text-subtle" data-testid="ade-wf-finish-note">
+      <div class="ml-9.5 cursor-help text-kira-sm text-subtle" data-testid="ade-wf-finish-note">
         <span class="text-info">+ finish_step instruction</span> is added to this prompt automatically (hover to read it)
       </div>
     </AdeTip>

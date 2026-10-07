@@ -38,6 +38,6 @@ const dot = computed(() => (big.value ? 'size-2.5' : 'size-2'));
       >z</span
     >
     <span v-else-if="kind === 'idle'" :class="dot" class="m-0.5 inline-block rounded-full border-[1.5px] border-subtle" />
-    <span v-else class="m-[3px] inline-block size-1.5 rounded-[2px] bg-disabled" />
+    <span v-else class="m-0.75 inline-block size-1.5 rounded-kira-xs bg-disabled" />
   </span>
 </template>

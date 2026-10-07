@@ -100,7 +100,7 @@ async function discard(): Promise<void> {
             <div class="flex items-start gap-2.5">
               <div class="flex min-w-0 flex-1 flex-col gap-1">
                 <span class="font-bold">{{ view.busyTitle }}</span>
-                <div v-for="row in view.busy" :key="row.text" class="flex items-center gap-1.5 font-data text-kira-sm" data-testid="ade-dialog-busy-row">
+                <div v-for="row in view.busy" :key="row.text" class="flex items-center gap-1.5 text-kira-sm" data-testid="ade-dialog-busy-row">
                   <AdeActivityIcon :kind="row.kind" />
                   <span>{{ row.text }}</span>
                 </div>
@@ -138,7 +138,7 @@ async function discard(): Promise<void> {
           </div>
           <ToggleGroup
             type="single"
-            size="kira"
+            size="kira-lg"
             class="flex-wrap justify-start gap-1.5"
             :model-value="tg.options.find((o) => o.on)?.value"
             :data-testid="`ade-dialog-target-${i}`"
@@ -148,7 +148,7 @@ async function discard(): Promise<void> {
               v-for="opt in tg.options"
               :key="opt.value"
               :value="opt.value"
-              class="h-control-lg border px-2.5 font-data text-kira-sm"
+              class="border font-data text-kira-sm"
               :style="opt.on ? chipOn : undefined"
             >
               {{ opt.label }}
@@ -181,7 +181,7 @@ async function discard(): Promise<void> {
           <Textarea
             id="ade-dialog-message"
             :model-value="view.message"
-            class="max-h-90 resize-y font-data"
+            class="max-h-90 resize-y"
             data-testid="ade-dialog-message"
             @update:model-value="(v) => (dialogs.msg = String(v))"
           />

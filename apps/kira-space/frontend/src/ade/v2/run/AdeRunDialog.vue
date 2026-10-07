@@ -140,11 +140,11 @@ async function send(): Promise<void> {
             <Textarea
               id="ade-run-message"
               v-model="message"
-              class="max-h-90 resize-y rounded-none border-0 font-data"
+              class="max-h-90 resize-y rounded-none border-0"
               data-testid="ade-run-message"
             />
             <p
-              class="m-0 border-t border-border px-3 py-2 font-data text-kira-sm text-subtle"
+              class="m-0 border-t border-border px-3 py-2 text-kira-sm text-subtle"
               data-testid="ade-run-suffix"
             >
               {{ FINISH_STEP_SUFFIX }}
