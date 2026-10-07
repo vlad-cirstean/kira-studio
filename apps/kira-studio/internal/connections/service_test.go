@@ -1513,6 +1513,7 @@ func TestURIModeUpdateRules(t *testing.T) {
 			id := tt.setup(h)
 			in := uriInput("row", tt.uri)
 			in.Password = tt.password
+			in.Options = map[string]any{"sslmode": "require"}
 			_, err := h.svc.Update(id, in)
 			if tt.wantCode != "" {
 				if err == nil || asIpcErr(t, err).Code != tt.wantCode {
@@ -1520,6 +1521,13 @@ func TestURIModeUpdateRules(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Fatalf("Update: %v", err)
+			}
+			var opts string
+			if err := h.repos.Connections.DB.QueryRow(`SELECT options_json FROM connections WHERE id = ?`, id).Scan(&opts); err != nil {
+				t.Fatalf("options select: %v", err)
+			}
+			if opts != "{}" {
+				t.Errorf("options_json = %s, want {} in URI mode", opts)
 			}
 			gotURI, err := h.secrets.GetURI(id)
 			if err != nil {

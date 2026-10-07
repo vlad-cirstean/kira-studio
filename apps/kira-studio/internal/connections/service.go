@@ -367,6 +367,7 @@ func (s *Service) secretWrites(id string, existing *model.ConnectionSummary, in 
 }
 
 func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
+	in = in.normalized()
 	if err := in.Validate(); err != nil {
 		return model.ConnectionSummary{}, err
 	}
