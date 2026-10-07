@@ -1,0 +1,183 @@
+<script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
+import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
+import { formatBytes } from '@workbench/util/format';
+import { computed } from 'vue';
+import { formatPercent, isActiveState, stateDotClass } from '../lib/format';
+import { useContainerAction, useContainers } from '../queries';
+import { useDockerStatsStore } from '../state/dockerStats';
+import { useDockerUiStore } from '../state/dockerUi';
+import type { DockerContainer } from '../wire';
+import VirtualList from './VirtualList.vue';
+
+interface GroupRow {
+  kind: 'group';
+  key: string;
+  name: string;
+  members: DockerContainer[];
+}
+interface ContainerRow {
+  kind: 'container';
+  key: string;
+  container: DockerContainer;
+  grouped: boolean;
+}
+type Row = GroupRow | ContainerRow;
+
+const ui = useDockerUiStore();
+const stats = useDockerStatsStore();
+const containers = useContainers();
+const actions = useContainerAction();
+const contextMenu = useContextMenuStore();
+
+const searching = computed(() => ui.search.trim() !== '');
+
+const visible = computed(() => {
+  const q = ui.search.trim().toLowerCase();
+  return (containers.data.value ?? []).filter((c) => {
+    if (!ui.showStopped && !isActiveState(c.state)) return false;
+    if (q === '') return true;
+    return [c.name, c.image, c.composeProject, c.composeService].some((v) => v.toLowerCase().includes(q));
+  });
+});
+
+const rows = computed<Row[]>(() => {
+  const byProject = new Map<string, DockerContainer[]>();
+  for (const c of visible.value) {
+    const list = byProject.get(c.composeProject) ?? [];
+    list.push(c);
+    byProject.set(c.composeProject, list);
+  }
+  const byName = (a: DockerContainer, b: DockerContainer) => a.name.localeCompare(b.name);
+  const out: Row[] = [];
+  const projects = [...byProject.keys()].filter((p) => p !== '').sort((a, b) => a.localeCompare(b));
+  for (const project of projects) {
+    const members = (byProject.get(project) ?? []).sort(byName);
+    out.push({ kind: 'group', key: `g:${project}`, name: project, members });
+    if (searching.value || !ui.collapsedGroups.includes(project)) {
+      for (const container of members) {
+        out.push({ kind: 'container', key: container.id, container, grouped: true });
+      }
+    }
+  }
+  for (const container of (byProject.get('') ?? []).sort(byName)) {
+    out.push({ kind: 'container', key: container.id, container, grouped: false });
+  }
+  return out;
+});
+
+function isOpen(name: string): boolean {
+  return searching.value || !ui.collapsedGroups.includes(name);
+}
+
+function isSelected(c: DockerContainer): boolean {
+  return ui.selection?.kind === 'container' && ui.selection.id === c.id;
+}
+
+function runningCount(g: GroupRow): number {
+  return g.members.filter((c) => c.state === 'running').length;
+}
+
+function act(c: DockerContainer, action: 'start' | 'stop' | 'restart'): void {
+  void actions.run(c.id, action).catch(() => undefined);
+}
+
+function groupAction(g: GroupRow, action: 'start' | 'stop'): void {
+  const targets = g.members.filter((c) => (action === 'start' ? c.state !== 'running' : isActiveState(c.state)));
+  for (const c of targets) act(c, action);
+}
+
+function onContextMenu(e: MouseEvent, c: DockerContainer): void {
+  const running = c.state === 'running';
+  const items: MenuItem[] = [
+    { type: 'item', id: 'start', label: 'Start', icon: 'play', disabled: running, run: () => act(c, 'start') },
+    { type: 'item', id: 'stop', label: 'Stop', icon: 'debug-stop', disabled: !isActiveState(c.state), run: () => act(c, 'stop') },
+    { type: 'item', id: 'restart', label: 'Restart', icon: 'debug-restart', disabled: !running, run: () => act(c, 'restart') },
+    { type: 'separator' },
+    { type: 'item', id: 'logs', label: 'Logs', icon: 'output', run: () => ui.select({ kind: 'container', id: c.id }, 'logs') },
+    { type: 'item', id: 'terminal', label: 'Open terminal', icon: 'terminal', disabled: !running, run: () => ui.select({ kind: 'container', id: c.id }, 'terminal') },
+    { type: 'separator' },
+    { type: 'item', id: 'copy-id', label: 'Copy ID', icon: 'copy', run: () => copyText(c.id) },
+    { type: 'item', id: 'copy-name', label: 'Copy name', icon: 'copy', run: () => copyText(c.name) },
+  ];
+  contextMenu.openContextMenu(e, items);
+}
+</script>
+
+<template>
+  <VirtualList :rows="rows" testid="docker-container-list">
+    <template #row="{ row }">
+      <div
+        v-if="row.kind === 'group'"
+        class="flex h-full items-center gap-1 px-1.5 cursor-default select-none hover:bg-hover group/row"
+        data-testid="docker-group"
+        :data-project="row.name"
+      >
+        <TreeTwisty :expanded="isOpen(row.name)" :has-children="true" @toggle="ui.toggleGroup(row.name)" />
+        <button
+          type="button"
+          class="min-w-0 flex-1 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-semibold text-inherit"
+          :aria-expanded="isOpen(row.name)"
+          @click="ui.toggleGroup(row.name)"
+        >{{ row.name }}</button>
+        <span class="text-kira-sm text-muted-foreground group-hover/row:hidden">{{ runningCount(row) }}/{{ row.members.length }}</span>
+        <span class="hidden items-center group-hover/row:flex">
+          <TooltipIconButton icon="play" label="Start all" data-testid="docker-group-start" @click="groupAction(row, 'start')" />
+          <TooltipIconButton icon="debug-stop" label="Stop all" data-testid="docker-group-stop" @click="groupAction(row, 'stop')" />
+        </span>
+      </div>
+      <div
+        v-else
+        class="group/row flex h-full items-center gap-1 pr-1.5 cursor-default select-none"
+        :class="[row.grouped ? 'pl-5' : 'pl-1.5', isSelected(row.container) ? 'bg-select' : 'hover:bg-hover']"
+        data-testid="docker-row"
+        :data-id="row.container.id"
+        :data-name="row.container.name"
+        :data-state="row.container.state"
+        role="option"
+        :aria-selected="isSelected(row.container)"
+        tabindex="0"
+        @click="ui.select({ kind: 'container', id: row.container.id })"
+        @dblclick="ui.select({ kind: 'container', id: row.container.id }, 'logs')"
+        @keydown.enter="ui.select({ kind: 'container', id: row.container.id })"
+        @contextmenu.prevent="onContextMenu($event, row.container)"
+      >
+        <span class="size-1.5 shrink-0 rounded-full" :class="stateDotClass(row.container.state)" data-testid="docker-state-dot" />
+        <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+          {{ row.container.name }}
+          <span class="text-kira-sm text-muted-foreground">{{ row.container.image }}</span>
+        </span>
+        <span
+          v-if="row.container.state === 'running' && stats.latest.get(row.container.id)"
+          class="shrink-0 font-data text-kira-sm text-muted-foreground group-hover/row:hidden"
+          data-testid="docker-row-stats"
+        >
+          <span data-testid="docker-row-cpu">{{ formatPercent(stats.latest.get(row.container.id)!.cpuPercent) }}</span>
+          <span class="ml-1" data-testid="docker-row-mem">{{ formatBytes(stats.latest.get(row.container.id)!.memUsage) }}</span>
+        </span>
+        <span class="hidden shrink-0 items-center group-hover/row:flex">
+          <CodiconIcon v-if="actions.isBusy(row.container.id)" name="loading" :size="12" class="codicon-modifier-spin" />
+          <template v-else>
+            <TooltipIconButton
+              v-if="row.container.state !== 'running'"
+              icon="play"
+              label="Start"
+              data-testid="docker-row-start"
+              @click.stop="act(row.container, 'start')"
+            />
+            <TooltipIconButton
+              v-else
+              icon="debug-stop"
+              label="Stop"
+              data-testid="docker-row-stop"
+              @click.stop="act(row.container, 'stop')"
+            />
+          </template>
+        </span>
+      </div>
+    </template>
+  </VirtualList>
+</template>
