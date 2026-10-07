@@ -455,7 +455,10 @@ func wireReviewWindows(svc *bridge.AdeTaskService, winDeps shell.WindowOpenerDep
 // surfaceCredentialPrompts handles a prompt raised away from any window (P178 D4): the user started
 // that git op elsewhere and waits on it, so open a window when none exists, else bring one forward.
 func surfaceCredentialPrompts(relay *gitcred.Relay, windows *shell.WindowRegistry, winDeps shell.WindowOpenerDeps) {
+	var mu sync.Mutex // count-then-open must not interleave: two concurrent prompts would open two windows
 	relay.SetOnAdded(func() {
+		mu.Lock()
+		defer mu.Unlock()
 		if windows.Count() == 0 {
 			shell.ReopenWindows(winDeps)
 			return

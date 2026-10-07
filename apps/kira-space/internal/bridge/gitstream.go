@@ -100,9 +100,8 @@ var allowedMethods = map[string]struct{}{
 	"worktree.list": {}, "stack.list": {},
 	// repoSettings.set: §4.4 says it only ever writes Kira's own SQLite, never the repository — true,
 	// but two of its patch fields are refused at the FIELD level (guardRepoSettingsSet below):
-	// WorktreePrepareScript/WorktreeBasePath. gitrpc's Router already refuses the prepare script on
-	// every connection (P172); this guard keeps that as defence in depth and also covers
-	// WorktreeBasePath, which the socket still accepts. PullStrategy/CheckoutAutoStash are now ordinary settings for operations this
+	// WorktreePrepareScript/WorktreeBasePath. Defence in depth: git.sock refuses repoSettings.set
+	// outright (P178). PullStrategy/CheckoutAutoStash are now ordinary settings for operations this
 	// stream admits (P67e) and are no longer restricted. GraphPageSize/GraphScope/StashShowInGraph/
 	// StashIncludeUntracked/ReviewBaseCandidates/GithubEnabled stay allowed, as before.
 	"repoSettings.get": {}, "repoSettings.set": {},
