@@ -16,6 +16,8 @@ export const customScriptFieldsSchema = /*#__PURE__*/ z.object({
   // custom-scripts feature.
   workingDir: z.string(),
   color: paletteColorSchema,
+  // '' = ungrouped; the panel groups rows under their collection name.
+  collection: z.string(),
 });
 export type CustomScriptFields = z.infer<typeof customScriptFieldsSchema>;
 

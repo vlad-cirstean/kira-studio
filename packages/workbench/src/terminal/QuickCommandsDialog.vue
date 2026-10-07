@@ -27,22 +27,32 @@ const removeScript = useRemoveScript();
 
 const scriptColors = PALETTE_COLOR_CHOICES;
 
+const collectionNames = computed(() => [
+  ...new Set(props.scripts.records().map((s) => s.collection).filter((c) => c !== '')),
+]);
+
 const error = ref<string | null>(null);
 
 interface ScriptDraft {
   name: string;
   command: string;
   workingDir: string;
+  collection: string;
 }
 const scriptDrafts = reactive<Record<string, ScriptDraft>>({});
-const FIELDS = ['name', 'command', 'workingDir'] as const;
+const FIELDS = ['name', 'command', 'workingDir', 'collection'] as const;
 // Last-seen records: a broadcast overwrites only the draft fields the user has not touched, so a
 // round trip landing mid-typing (or another window's edit) never erases the text being typed.
 let seen = new Map<string, ScriptDraft>();
 function syncScriptDrafts(): void {
   const next = new Map<string, ScriptDraft>();
   for (const script of props.scripts.records()) {
-    const record = { name: script.name, command: script.command, workingDir: script.workingDir };
+    const record = {
+      name: script.name,
+      command: script.command,
+      workingDir: script.workingDir,
+      collection: script.collection,
+    };
     next.set(script.id, record);
     const draft = scriptDrafts[script.id];
     const prev = seen.get(script.id);
@@ -74,12 +84,14 @@ async function onScriptFieldBlur(script: CustomScript): Promise<void> {
     draft.name = script.name;
     draft.command = script.command;
     draft.workingDir = script.workingDir;
+    draft.collection = script.collection;
     return;
   }
   if (
     name === script.name &&
     command === script.command &&
-    draft.workingDir === script.workingDir
+    draft.workingDir === script.workingDir &&
+    draft.collection.trim() === script.collection
   ) {
     return;
   }
@@ -90,6 +102,7 @@ async function onScriptFieldBlur(script: CustomScript): Promise<void> {
       command,
       workingDir: draft.workingDir,
       color: script.color,
+      collection: draft.collection,
     });
   } catch (err) {
     // A rejected edit (e.g. a non-absolute workingDir) never arrives via the broadcast to
@@ -98,6 +111,7 @@ async function onScriptFieldBlur(script: CustomScript): Promise<void> {
     draft.name = script.name;
     draft.command = script.command;
     draft.workingDir = script.workingDir;
+    draft.collection = script.collection;
     error.value = err instanceof Error ? err.message : String(err);
   }
 }
@@ -112,6 +126,7 @@ async function onScriptColorChange(script: CustomScript, color: PaletteColor): P
       command: script.command,
       workingDir: script.workingDir,
       color,
+      collection: script.collection,
     });
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
@@ -131,6 +146,7 @@ async function onRemoveScript(script: CustomScript): Promise<void> {
 const newScriptName = ref('');
 const newScriptCommand = ref('');
 const newScriptWorkingDir = ref('');
+const newScriptCollection = ref('');
 const newScriptColor = ref<PaletteColor>('none');
 
 // The dialog's own affordance — disables Add before a round trip rather than duplicating
@@ -147,12 +163,14 @@ async function onAddScript(): Promise<void> {
     command: newScriptCommand.value.trim(),
     workingDir: newScriptWorkingDir.value.trim(),
     color: newScriptColor.value,
+    collection: newScriptCollection.value.trim(),
   };
   try {
     await props.scripts.create(fields);
     newScriptName.value = '';
     newScriptCommand.value = '';
     newScriptWorkingDir.value = '';
+    newScriptCollection.value = '';
     newScriptColor.value = 'none';
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
@@ -272,6 +290,18 @@ function onOpenAutoFocus(e: Event): void {
                 @blur="onScriptFieldBlur(script)"
               />
             </div>
+            <div class="flex flex-col w-full">
+              <Input
+                v-model="scriptDrafts[script.id].collection"
+                list="quick-command-collections"
+                placeholder="Collection (optional)"
+                aria-label="Collection"
+                maxlength="64"
+                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                data-testid="custom-script-collection"
+                @blur="onScriptFieldBlur(script)"
+              />
+            </div>
           </div>
         </div>
         <FieldDescription v-else>No quick commands yet.</FieldDescription>
@@ -334,7 +364,21 @@ function onOpenAutoFocus(e: Event): void {
               data-testid="custom-script-add-workingdir"
             />
           </div>
+          <div class="flex flex-col w-full">
+            <Input
+              v-model="newScriptCollection"
+              list="quick-command-collections"
+              placeholder="Collection (optional)"
+              aria-label="Collection"
+              maxlength="64"
+              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+              data-testid="custom-script-add-collection"
+            />
+          </div>
         </div>
+        <datalist id="quick-command-collections">
+          <option v-for="name in collectionNames" :key="name" :value="name" />
+        </datalist>
         <FieldError v-if="error" data-testid="custom-script-error">{{ error }}</FieldError>
       </div>
     </DialogContent>

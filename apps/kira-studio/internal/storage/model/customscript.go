@@ -3,7 +3,11 @@ package model
 import (
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
+
+// MaxCollectionRunes caps a quick-command collection name.
+const MaxCollectionRunes = 64
 
 // CustomScript mirrors packages/shared/domain/scripts.ts's customScriptSchema — one custom_scripts
 // row (P85 §8.1): a user-configured launch target, listed in the Terminal module's Quick commands
@@ -14,6 +18,7 @@ type CustomScript struct {
 	Command    string `json:"command"`
 	WorkingDir string `json:"workingDir"`
 	Color      string `json:"color"`
+	Collection string `json:"collection"`
 	SortOrder  int    `json:"sortOrder"`
 	CreatedAt  string `json:"createdAt"`
 	UpdatedAt  string `json:"updatedAt"`
@@ -27,6 +32,8 @@ type CustomScriptFields struct {
 	Command    string `json:"command"`
 	WorkingDir string `json:"workingDir"`
 	Color      string `json:"color"`
+	// Collection groups quick commands in the panel; "" means ungrouped.
+	Collection string `json:"collection"`
 }
 
 // Validate is P85 §10.3's complete rule set — the Go check is the authority, the mirrored zod
@@ -36,6 +43,7 @@ type CustomScriptFields struct {
 func (f *CustomScriptFields) Validate() error {
 	f.Name = strings.TrimSpace(f.Name)
 	f.Command = strings.TrimSpace(f.Command)
+	f.Collection = strings.TrimSpace(f.Collection)
 	if f.Name == "" {
 		return Invalid("model: custom script: name is required")
 	}
@@ -44,6 +52,9 @@ func (f *CustomScriptFields) Validate() error {
 	}
 	if f.WorkingDir != "" && !filepath.IsAbs(f.WorkingDir) {
 		return Invalid("model: custom script: working directory must be an absolute path")
+	}
+	if utf8.RuneCountInString(f.Collection) > MaxCollectionRunes {
+		return Invalid("model: custom script: collection is too long")
 	}
 	if !ValidPaletteColor(f.Color) {
 		return Invalid("model: custom script: invalid colour")
