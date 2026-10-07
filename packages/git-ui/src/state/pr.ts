@@ -109,6 +109,8 @@ export class PrState {
    *  rather than one debounced no-op per row. */
   #disabledForRepo = false;
   readonly #unsubscribe: () => void;
+  #headIndex: ReadonlyMap<string, readonly PrRecord[]> = new Map();
+  #headIndexGeneration = -1;
   /** Last-known facts of repos switched away from, oldest first. */
   readonly #repoFacts = new Map<string, RepoFacts>();
   /** F9: bumped by every `#clear()` — `setRepoId` (a repo switch) AND the `refsChanged` handler
@@ -492,6 +494,24 @@ export class PrState {
     if (direct !== undefined) return direct;
     const derived = this.prByAncestry.value.get(sha);
     return derived === undefined ? undefined : [derived];
+  }
+
+  /** The graph badge's lookup: only PRs whose head is exactly `sha` — from `byBranch` and from
+   *  `bySha` entries whose `headSha` matches. Never ancestry: a branch's non-tip commits get none. */
+  prsHeadedAt(sha: string): readonly PrRecord[] | undefined {
+    if (this.#headIndexGeneration !== this.generation.value) {
+      const index = new Map<string, PrRecord[]>();
+      const add = (record: PrRecord): void => {
+        const list = index.get(record.headSha);
+        if (list === undefined) index.set(record.headSha, [record]);
+        else if (!list.some((r) => r.number === record.number)) list.push(record);
+      };
+      for (const record of this.byBranch.value.values()) add(record);
+      for (const records of this.bySha.value.values()) for (const record of records) add(record);
+      this.#headIndex = index;
+      this.#headIndexGeneration = this.generation.value;
+    }
+    return this.#headIndex.get(sha);
   }
 
   dispose(): void {

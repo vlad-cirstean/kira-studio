@@ -207,6 +207,22 @@ describe('PrState — refsChanged keeps facts and revalidates', () => {
   });
 });
 
+describe('PrState — prsHeadedAt badges only a PR head', () => {
+  test('a selected non-head commit gets no badge; the head does', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', prs: [PR_ONE] });
+    pr.select('other');
+    await sleep(350);
+    expect(pr.prForCommit('other')?.[0]?.number).toBe(1);
+    expect(pr.prsHeadedAt('other')).toBeUndefined();
+    expect(pr.prsHeadedAt('sha1')?.[0]?.number).toBe(1);
+    pr.dispose();
+  });
+});
+
 describe('PrState — a disabled repo never re-requests', () => {
   test('once a lookup answers "disabled", every later selection/branch resolve skips the network entirely', async () => {
     const transport = new FakeTransport();

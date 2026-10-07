@@ -346,10 +346,8 @@ function currentColumns(): Column<CommitRecord>[] {
     {
       // G24 D9: `undefined` (not an empty array) is "nothing resolved yet" vs. "resolved, no PR"
       // — `columns.ts`'s own `messageFormatter` already treats both as "render nothing".
-      // P74 §4.3: `prForCommit` answers for any commit on a PR branch, not only a selected one —
-      // `bySha` alone (this accessor's pre-P74 shape) answered only for whatever sha `select()`
-      // was last called with.
-      prsFor: (sha) => props.pr?.prForCommit(sha),
+      // Badge only the commit a PR's head points at; the detail pane keeps the ancestry answer.
+      prsFor: (sha) => props.pr?.prsHeadedAt(sha),
       openExternalCapability: props.openExternalCapability,
     },
     { stackInfoFor },
@@ -628,9 +626,7 @@ function scheduleAncestryRebuild(): void {
   ancestryRebuildPending = true;
   void nextTick(() => {
     ancestryRebuildPending = false;
-    // P74 §4.2/§4.3: rebuilds the ancestry derivation `prsFor` (currentColumns/createCommitDataView
-    // above) now reads, BEFORE invalidateRowHeights below — a row's own expanded/compact height
-    // must never be computed against a stale ancestry map.
+    // P74 §4.2/§4.3: rebuilds the ancestry derivation the detail pane's `prForCommit` reads.
     if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
     // P72 §5.1: `rowMetadata` (columns.ts) derives a row's `height` from `rowHasBadges`, which
     // reads `prsFor` — a PR resolution can flip a row between the compact and expanded height
@@ -882,7 +878,7 @@ onMounted(() => {
     // P7 (item 1): a row with a ref/PR badge gets the taller, expanded height —
     // `rowMetadata`/`rowHasBadges` (columns.ts) are what actually decide "does this row have one".
     expandedRowHeight: () => rowHeightPx(tokenReader),
-    prsFor: (sha) => props.pr?.prForCommit(sha),
+    prsFor: (sha) => props.pr?.prsHeadedAt(sha),
   });
 
   const instance = new SlickGrid<CommitRecord>(host.value, dataView, currentColumns(), {
