@@ -65,6 +65,7 @@ type Repo struct {
 	IntegrationBranches []string      `json:"integrationBranches"`
 	PrepareScript       string        `json:"prepareScript"`
 	PrepareTimeout      string        `json:"prepareTimeout"`
+	WorktreeBasePath    string        `json:"worktreeBasePath"`
 	Environments        []Environment `json:"environments"`
 }
 
@@ -546,6 +547,7 @@ type RepoPatch struct {
 	IntegrationBranches *[]string      `json:"integrationBranches"`
 	PrepareScript       *string        `json:"prepareScript"`
 	PrepareTimeout      *string        `json:"prepareTimeout"`
+	WorktreeBasePath    *string        `json:"worktreeBasePath"`
 	Environments        *[]Environment `json:"environments"`
 }
 

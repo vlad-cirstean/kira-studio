@@ -12,6 +12,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 )
@@ -59,7 +60,7 @@ func (b *TaskBoard) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs)
 	}
 	// The settings write goes first: the config row was just read, so Upsert is the write that
 	// cannot plausibly fail after it.
-	if (settings.WorktreePrepareScript != nil || settings.WorktreePrepareTimeout != nil) && b.deps.SetRepoSettings != nil {
+	if (settings.WorktreePrepareScript != nil || settings.WorktreePrepareTimeout != nil || settings.WorktreeBasePath != nil) && b.deps.SetRepoSettings != nil {
 		if err := b.deps.SetRepoSettings(cfg.RepoID, settings); err != nil {
 			return adewire.Repo{}, err
 		}
@@ -117,6 +118,13 @@ func (b *TaskBoard) validatePatch(ctx context.Context, cfg model.AdeRepoConfig, 
 			return model.AdeRepoConfigPatch{}, model.GitRepoSettingsPatch{}, invalid("prepareTimeout must be a duration such as 15m, above 0 and at most %s", model.MaxPrepareTimeout)
 		}
 		settings.WorktreePrepareTimeout = p.PrepareTimeout
+	}
+	if p.WorktreeBasePath != nil {
+		base := *p.WorktreeBasePath
+		if base != "" {
+			base = gitpath.CleanNFC(base)
+		}
+		settings.WorktreeBasePath = &base
 	}
 	return patch, settings, nil
 }

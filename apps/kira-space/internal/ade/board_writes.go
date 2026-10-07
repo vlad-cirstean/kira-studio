@@ -594,16 +594,16 @@ func (b *TaskBoard) Repos(_ context.Context) (adewire.ReposResult, error) {
 	}
 	out := adewire.ReposResult{Repos: make([]adewire.Repo, 0, len(configs)), Folders: make([]adewire.Folder, 0, len(folders))}
 	for _, c := range configs {
-		prepare, timeout := "", model.DefaultPrepareTimeout
+		prepare, timeout, basePath := "", model.DefaultPrepareTimeout, ""
 		if b.deps.GitRepoSettings != nil {
 			if s, err := b.deps.GitRepoSettings(c.RepoID); err == nil {
-				prepare, timeout = s.WorktreePrepareScript, s.WorktreePrepareTimeout
+				prepare, timeout, basePath = s.WorktreePrepareScript, s.WorktreePrepareTimeout, s.WorktreeBasePath
 			}
 		}
 		r := adewire.Repo{
 			CodeRepoID: c.CodeRepoID, Name: c.Name, Nickname: c.Nickname, Path: c.Root, Source: c.Source,
 			UsedByTasks: used[c.CodeRepoID], IntegrationBranches: nonNil(c.IntegrationBranches),
-			PrepareScript: prepare, PrepareTimeout: timeout, Environments: make([]adewire.Environment, len(c.Environments)),
+			PrepareScript: prepare, PrepareTimeout: timeout, WorktreeBasePath: basePath, Environments: make([]adewire.Environment, len(c.Environments)),
 		}
 		for i, e := range c.Environments {
 			r.Environments[i] = adewire.Environment{Name: e.Name, DeployedShaScript: e.DeployedShaScript}
