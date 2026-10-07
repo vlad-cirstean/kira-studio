@@ -90,24 +90,10 @@ const (
 	OutcomeInstallFailed = "installFailed"
 )
 
-// claudeCandidates is §7.2's own probe order after the PATH step (locateClaude runs LookPath
-// first): the well-known absolute paths a Finder-launched app's launchd-inherited PATH
-// (/usr/bin:/bin:/usr/sbin:/sbin) never includes.
-func claudeCandidates() []string {
-	candidates := []string{"/usr/local/bin/claude", "/opt/homebrew/bin/claude"}
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		candidates = append([]string{
-			filepath.Join(home, ".claude", "local", "claude"),
-			filepath.Join(home, ".local", "bin", "claude"),
-		}, candidates...)
-	}
-	return candidates
-}
-
 // locateClaude checks PATH first, then every absolute candidate in order, every path considered
 // recorded in probed regardless of outcome.
 func (i *Installer) locateClaude() (path string, probed []string, found bool) {
-	return toolexec.Locate(i.lookPath, i.stat, "claude", claudeCandidates())
+	return toolexec.Locate(i.lookPath, i.stat, "claude", toolexec.ClaudeCandidates())
 }
 
 // Status is the pane's own pre-click read.

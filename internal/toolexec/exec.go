@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -105,16 +106,59 @@ var killGroup = procgroup.Kill
 // SIGKILL fired after the full delay could land on an unrelated group that has since reused the
 // same pid.
 func Run(ctx context.Context, path string, args []string) error {
-	cmd := exec.CommandContext(ctx, path, args...)
+	_, err := spawn(ctx, spec{path: path, args: args, env: os.Environ()})
+	return err
+}
+
+// MaxStdoutBytes bounds RunIO's captured stdout.
+const MaxStdoutBytes = 1 << 20
+
+// ErrOutputTooLarge is RunIO's refusal when a child writes more than MaxStdoutBytes.
+var ErrOutputTooLarge = errors.New("toolexec: child output exceeds limit")
+
+// RunIO is Run with an explicit working directory, environment and stdin, returning the child's
+// bounded stdout (also alongside an *ExecError, so a caller can read a structured failure). An empty dir keeps the caller's own; env is used as given.
+func RunIO(ctx context.Context, path string, args []string, dir string, env []string, stdin []byte) ([]byte, error) {
+	return spawn(ctx, spec{path: path, args: args, dir: dir, env: env, stdin: stdin, capture: true})
+}
+
+type spec struct {
+	path, dir string
+	args, env []string
+	stdin     []byte
+	capture   bool
+}
+
+type boundedBuffer struct {
+	buf      bytes.Buffer
+	overflow bool
+}
+
+func (b *boundedBuffer) Write(p []byte) (int, error) {
+	if b.buf.Len()+len(p) > MaxStdoutBytes {
+		b.overflow = true
+		return 0, ErrOutputTooLarge
+	}
+	return b.buf.Write(p)
+}
+
+func spawn(ctx context.Context, sp spec) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, sp.path, sp.args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// Unmodified: a local tool needs the user's own HOME/PATH to find its own config/install,
-	// unlike a spawn this app has already fully resolved and can run against a scrubbed
-	// environment.
-	cmd.Env = os.Environ()
+	// Run passes the environment unmodified: a local tool needs the user's own HOME/PATH to find
+	// its own config/install, unlike a spawn this app has already fully resolved and can run
+	// against a scrubbed environment (RunIO's callers).
+	cmd.Env = sp.env
+	cmd.Dir = sp.dir
 	stopEscalate := procgroup.GracefulCancel(cmd, GracefulStopDelay, killGroup)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	var stdout boundedBuffer
+	if sp.capture {
+		cmd.Stdout = &stdout
+		cmd.Stdin = bytes.NewReader(sp.stdin)
+	}
 	err := cmd.Run()
 	// On timeout/cancel a SIGTERM-ignoring group member can outlive the direct child; stopEscalate
 	// would disarm the SIGKILL that targets it, so kill the group outright first.
@@ -122,12 +166,29 @@ func Run(ctx context.Context, path string, args []string) error {
 		_ = procgroup.Kill(cmd.Process.Pid, syscall.SIGKILL)
 	}
 	stopEscalate()
+	if stdout.overflow {
+		return nil, ErrOutputTooLarge
+	}
 	if err == nil {
-		return nil
+		return stdout.buf.Bytes(), nil
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		return &ExecError{ExitCode: exitErr.ExitCode(), Stderr: FirstLineBounded(stderr.String(), MaxDetailBytes)}
+		return stdout.buf.Bytes(), &ExecError{ExitCode: exitErr.ExitCode(), Stderr: FirstLineBounded(stderr.String(), MaxDetailBytes)}
 	}
-	return err
+	return nil, err
+}
+
+// ClaudeCandidates is the probe order after PATH for the `claude` CLI: the well-known absolute
+// paths a Finder-launched app's launchd-inherited PATH (/usr/bin:/bin:/usr/sbin:/sbin) never
+// includes.
+func ClaudeCandidates() []string {
+	candidates := []string{"/usr/local/bin/claude", "/opt/homebrew/bin/claude"}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidates = append([]string{
+			filepath.Join(home, ".claude", "local", "claude"),
+			filepath.Join(home, ".local", "bin", "claude"),
+		}, candidates...)
+	}
+	return candidates
 }
