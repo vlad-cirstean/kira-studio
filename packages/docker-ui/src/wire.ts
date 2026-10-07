@@ -57,7 +57,7 @@ export interface DockerStatus {
   engine?: EngineInfo;
 }
 
-interface DockerPort {
+export interface DockerPort {
   ip: string;
   privatePort: number;
   publicPort: number;
