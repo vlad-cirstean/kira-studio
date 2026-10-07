@@ -23,9 +23,11 @@ import { repoIdOfWorkspace, repoWorkspaceKey, useWorkspaceStore } from '../state
 import RepoFileTree from './RepoFileTree.vue';
 import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
+import ReposDialog from './ReposDialog.vue';
 import { useFileTreeStore } from './state/fileTree';
 import { useRepoHeadsStore } from './state/repoHeads';
 import { useRepoLinksStore } from './state/repoLinks';
+import { useReposDialogStore } from './state/reposDialog';
 import { useRepoPanelTabStore, useRepoSearchStore } from './state/search';
 import { useWorktreesStore, worktreeLabel } from './state/worktrees';
 
@@ -41,6 +43,7 @@ const repoLinksStore = useRepoLinksStore();
 const repoPanelTabStore = useRepoPanelTabStore();
 const repoSearchStore = useRepoSearchStore();
 const terminalsStore = useTerminalsStore();
+const reposDialog = useReposDialogStore();
 
 // P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
 // repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
@@ -114,10 +117,6 @@ const filteredRepos = computed<RepoSummary[]>(() => {
   if (!query) return topLevel;
   return topLevel.filter((r) => r.name.toLowerCase().includes(query));
 });
-
-async function onImport(): Promise<void> {
-  await codeReposStore.importRepoViaDialog();
-}
 
 // P107 T2-19: shared in-app substitute for window.prompt() (Electron's renderer doesn't implement
 // it) — see packages/workbench/src/prompt/useTextPrompt.ts.
@@ -353,14 +352,12 @@ onUnmounted(() => {
         data-testid="toggle-search"
         @click="toggleSearch"
       />
-      <!-- C5 §3.3/§3.4: no new dialog, no new native picker — reuses FilesService.ChooseFolder. -->
       <TooltipIconButton
         v-if="tab === 'repos'"
         icon="repo"
-        label="Import repository…"
-        aria-label="Import repository"
-        data-testid="import-repo"
-        @click="onImport"
+        label="Manage repositories…"
+        data-testid="manage-repos"
+        @click="reposDialog.show()"
       />
       <!-- Files mode only: in Search mode the panel's own tree filter is meaningless, and a tree
            refresh has nothing to do with a search result list. -->
@@ -627,6 +624,7 @@ onUnmounted(() => {
     @submit="submitPrompt"
     @cancel="cancelPrompt"
   />
+  <ReposDialog />
   <!-- P110 I2-19: `.repo-row`/`.worktree-row`'s own hover/active/open/current rules folded into
        `:class` ternaries above -- pre-phase cascade order (both `:hover` and the state class at
        equal 0,2,0 specificity) meant the later-declared rule won on a tie: `.active`/`.bg-select`

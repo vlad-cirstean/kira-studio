@@ -79,7 +79,7 @@ async function mountShell(): Promise<void> {
   await Promise.all([
     layoutStore.hydrateLayout(),
     settingsStore.hydrateSettings(),
-    codeReposStore.hydrateCodeRepos(),
+    codeReposStore.initCodeRepos(),
     tabsStore.hydrateTabs(),
   ]);
 

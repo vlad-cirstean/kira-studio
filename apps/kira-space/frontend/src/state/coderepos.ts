@@ -44,6 +44,16 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     }
   }
 
+  let unsubscribeRepos: (() => void) | null = null;
+  /** Boot: subscribes before the first read so a push landing mid-await is not lost, and keeps the
+   *  list live in every module and window. The push is payload-free, so each one re-reads. */
+  async function initCodeRepos(): Promise<void> {
+    unsubscribeRepos ??= control.onAdeTaskRepos(() => {
+      void hydrateCodeRepos();
+    });
+    await hydrateCodeRepos();
+  }
+
   /** Opens the native folder picker and imports the chosen directory — undefined when cancelled or
    *  the folder wasn't a usable repository (the dialog itself surfaces the rejection). */
   async function importRepoViaDialog(): Promise<RepoSummary | undefined> {
@@ -128,6 +138,7 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     ...toRefs(state),
     codeRepoRecord,
     hydrateCodeRepos,
+    initCodeRepos,
     importRepoViaDialog,
     renameCodeRepo,
     reorderCodeRepos,
