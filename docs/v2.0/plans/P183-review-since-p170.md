@@ -9,7 +9,7 @@ functional correctness, performance.
   P177, P178, P179, P181, P182. Fixer commits in these files count as unreviewed.
 - Discovery used `codegraph_explore` for owned files and one-hop callers per area.
 
-Open: F8 (low). Parked: D2 (user wants it configurable in the UI; tracked as a SPEC row).
+Parked: D2 (user wants it configurable in the UI; tracked as a SPEC row).
 
 ## Clean areas
 
@@ -46,20 +46,6 @@ Checked against current source, nothing real found:
   SlickGrid's resize/drag measurements.
 - Standing rules: every new/changed SFC is `<script setup lang="ts">`, no `<style>` block, no
   `defineComponent`. New Pinia stores stay one concern.
-
-## Tests against the unit-test bar
-
-### F8. `gitcred/relay_test.go` keeps tests that restate short function bodies
-
-- File: `apps/kira-space/internal/gitcred/relay_test.go:50` (`TestAnswerReachesAsk`), `:66`
-  (`TestDismissalReturnsFalse`), `:102` (`TestDoubleProvideIsNoOp`), `:121`
-  (`TestSnapshotOrderIsFIFO`), `:164` (`TestOnAddedFiresOncePerEntry`).
-- Severity: low.
-- Summary: CLAUDE.md's bar keeps tests only for genuinely hard logic. These five each restate a
-  few-line branch of `Ask`/`Provide` or `PendingQueue`'s FIFO (already covered by `notify`).
-  `TestCtxCancelWithdrawsAndEmits` and `TestConcurrentAsksAllResolve` guard real concurrency and stay.
-- Failure scenario: none at runtime; maintenance cost and a precedent against the standing rule.
-- Suggested fix: delete the five; keep the two concurrency tests.
 
 ## Parked: DESIGN-DECISION, needs user input
 
