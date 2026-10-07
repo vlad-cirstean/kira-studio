@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useNow } from '@vueuse/core';
-import { computed, watch } from 'vue';
+import { useIntervalFn } from '@vueuse/core';
+import { computed, ref, watch } from 'vue';
 
 // One status block for a worktree prepare script, shared by Kira Space's ADE and the git UI so a
 // running, ready or failed script reads the same wherever it was started. The output (log lines)
@@ -18,7 +18,11 @@ const props = defineProps<{
   note?: string;
 }>();
 
-const { now, pause, resume } = useNow({ interval: 1000, controls: true, immediate: props.state === 'running' });
+const now = ref(Date.now());
+const { pause, resume } = useIntervalFn(() => (now.value = Date.now()), 1000, {
+  immediate: props.state === 'running',
+  immediateCallback: true,
+});
 watch(
   () => props.state,
   (s) => (s === 'running' ? resume() : pause()),
@@ -33,7 +37,7 @@ function format(ms: number): string {
 }
 
 const elapsed = computed(() => {
-  if (props.state === 'running') return format(now.value.getTime() - props.startedAt);
+  if (props.state === 'running') return format(now.value - props.startedAt);
   return props.finishedAt == null ? '' : format(props.finishedAt - props.startedAt);
 });
 </script>
