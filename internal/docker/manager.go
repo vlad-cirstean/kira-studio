@@ -71,6 +71,8 @@ type Manager struct {
 
 	events *eventsWatcher
 	stats  *statsHub
+	logs   *logRegistry
+	execs  *execRegistry
 }
 
 // NewManager builds a Manager reading the real process environment.
@@ -81,6 +83,8 @@ func NewManager(emit appevent.Emitter) *Manager {
 func newManager(emit appevent.Emitter, env resolveEnv) *Manager {
 	m := &Manager{Emit: emit, env: env}
 	m.events = newEventsWatcher(m)
+	m.logs = newLogRegistry()
+	m.execs = newExecRegistry()
 	m.stats = newStatsHub(engineStats{m}, func(windowKey string, ev StatsEvent) { emit.EmitTo(windowKey, ChannelStats, ev) }, statsEmitInterval)
 	return m
 }
@@ -103,12 +107,16 @@ func (m *Manager) useContext(ctx context.Context, name string) Status {
 // stopStreams ends every stream that belongs to the current engine.
 func (m *Manager) stopStreams() {
 	m.stats.reset()
+	m.logs.closeAll()
+	m.execs.closeAll()
 }
 
 // closeWindow ends everything windowKey started.
 func (m *Manager) closeWindow(windowKey string) {
 	m.events.unwatch(windowKey)
 	m.stats.unsubscribe(windowKey)
+	m.logs.closeWindow(windowKey)
+	m.execs.closeWindow(windowKey)
 }
 
 // shutdown ends every stream and drops the client.
