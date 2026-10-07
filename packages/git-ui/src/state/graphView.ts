@@ -567,7 +567,10 @@ export class GraphViewState {
 
   async #applyChunk(chunk: StreamChunkOf<'graph.stream'>): Promise<void> {
     const range = await this.#packed.applyChunk(chunk, {
-      onReset: () => this.#layoutClient.reset(),
+      onReset: () => {
+        this.#pendingLayoutRange = undefined;
+        this.#resetLayout();
+      },
       onCorrupted: () => {
         // The re-open aborts this stream's own controller (`openStream`), so nothing else from
         // the corrupted sequence is applied. It runs detached: awaited here, its failure would

@@ -14,6 +14,7 @@ import type {
 } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { sleep } from '@workbench/testing/unit/async';
+import { watch } from 'vue';
 import { BridgeClient } from '../bridge/client.ts';
 import type { LayoutClient } from '../graph/layoutClient.ts';
 import { GraphViewState } from './graphView.ts';
@@ -279,5 +280,44 @@ describe('GraphViewState — corrupted chunk recovery is bounded', () => {
     expect(graphView.announcement.value).toContain('corrupted');
     transport.streamOpens[1]?.end();
     await open;
+  });
+});
+
+describe('GraphViewState — restart from row 0', () => {
+  test('the plan never outlives the store rows it describes', async () => {
+    const transport = new RaceTransport();
+    const graphView = new GraphViewState(new BridgeClient(transport), fakeLayoutClient());
+    const sha = (n: number) => n.toString(16).padStart(2, '0').repeat(20);
+    const chunk = (count: number, base: number): GraphStreamChunk => ({
+      ...chunkFor(REPO_A, sha(base)),
+      to: count,
+      commits: buildPackedChunk(
+        Array.from({ length: count }, (_, i) => ({ sha: sha(base + i), subject: `c${base + i}` })),
+      ),
+    });
+    const open = graphView.openStream(REPO_A);
+    await sleep();
+    transport.streamOpens[0]?.push(chunk(10, 1));
+    await sleep();
+    expect(graphView.plan.value.length).toBe(10);
+
+    const overruns: number[] = [];
+    watch(
+      graphView.generation,
+      () => {
+        if (graphView.plan.value.length > graphView.store.rowCount) {
+          overruns.push(graphView.plan.value.length);
+        }
+      },
+      { flush: 'sync' },
+    );
+    transport.streamOpens[0]?.push(chunk(3, 50));
+    await sleep();
+    expect(overruns).toEqual([]);
+    expect(graphView.plan.value.length).toBe(3);
+
+    transport.streamOpens[0]?.end();
+    await open;
+    graphView.dispose();
   });
 });
