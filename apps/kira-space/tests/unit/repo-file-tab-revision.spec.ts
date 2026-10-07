@@ -5,7 +5,7 @@
 // distinguishing such tabs in the strip.
 import '@workbench/testing/unit/window';
 
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -13,14 +13,17 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-restoreAfterEach(control);
 // P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — restoreAfterEach restores control back to its real (never-settling in this
 // harness) tabsSave after every test, so a one-time override here only covered this file's first
-// test; beforeEach reapplies the benign stub before each one, same fix as consoleHarness.ts.
-beforeEach(() => {
-  (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
-});
+// test. The override is set *before* restoreAfterEach snapshots control, not in beforeEach: the
+// enqueued save this triggers can settle on a tick past this file's own afterEach (confirmed via
+// stream-count-honors-filter.spec.ts's identical hazard — only reproduces with ~90+ other spec
+// files loaded, never in isolation), so a beforeEach/afterEach-scoped override races the chain
+// back onto the hanging default and wedges it permanently for every later spec in the process —
+// same fix as consoleHarness.ts.
+(control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+restoreAfterEach(control);
 
 const { asRepoFileTab } = await import('../../frontend/src/state/tabDomain');
 const { repoWorkspaceKey } = await import('../../frontend/src/state/workspace');

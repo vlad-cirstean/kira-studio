@@ -4,7 +4,7 @@
 // a lookup table get nothing; this is the one thing in the plan that does).
 import '@workbench/testing/unit/window';
 
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { deferred } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
@@ -13,15 +13,18 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-restoreAfterEach(control);
 // P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a
-// benign default.
-beforeEach(() => {
-  (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
-});
+// benign default -- set *before* restoreAfterEach snapshots control, not in beforeEach: the
+// enqueued save this triggers can settle on a tick past this file's own afterEach (confirmed
+// via stream-count-honors-filter.spec.ts's identical hazard: only reproduces with ~90+ other
+// spec files loaded, never in isolation), so a beforeEach/afterEach-scoped override races the
+// chain back onto the hanging default and wedges it permanently for every later spec in the
+// process.
+(control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+restoreAfterEach(control);
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { useBrowseViewStore } = await import('../../frontend/src/views/browse/state');

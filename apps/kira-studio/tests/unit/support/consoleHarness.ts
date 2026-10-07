@@ -1,4 +1,3 @@
-import { beforeEach } from 'bun:test';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../../frontend/src/state/pinia';
@@ -20,18 +19,17 @@ export async function bootstrapConsole(opts: { control?: boolean } = {}) {
   // Call() stub (wailsRuntime.ts) deliberately never settles for a call nobody here awaits. Before
   // this fix, that was harmless — an independent, forgotten promise. Now it would permanently wedge
   // the shared chain, starving every later spec's own tabsSave assertions for the rest of the run.
-  // restoreAfterEach snapshots control BEFORE this file ever touches tabsSave, so its real
-  // implementation (whatever an earlier file already left it as) comes back after every test here —
-  // never leaking this harness's own stub into bridge-unwrap.spec.ts's generic "every control method
-  // rejects" sweep, the exact hazard restoreAfterEach's own comment already documents for this
-  // singleton. beforeEach re-applies the benign stub before each test in this file, since
-  // bootstrapConsole itself only runs once per file, not once per test.
+  // The benign override is set *before* restoreAfterEach snapshots control, not in beforeEach: the
+  // enqueued save this triggers can settle on a tick past this file's own afterEach (confirmed via
+  // stream-count-honors-filter.spec.ts's identical hazard — only reproduces with ~90+ other spec
+  // files loaded, never in isolation), so a beforeEach/afterEach-scoped override races the chain
+  // back onto the hanging default and wedges it permanently for every later spec in the process —
+  // worse than the leak restoreAfterEach's own comment warns about, since that leak is confined to
+  // one spec file and this one is permanent for the rest of the run.
   const controlMod = await import('../../../frontend/src/bridge/control');
+  (controlMod.control as unknown as { tabsSave: () => Promise<void> }).tabsSave = () =>
+    Promise.resolve();
   restoreAfterEach(controlMod.control);
-  beforeEach(() => {
-    (controlMod.control as unknown as { tabsSave: () => Promise<void> }).tabsSave = () =>
-      Promise.resolve();
-  });
 
   let control: typeof import('../../../frontend/src/bridge/control').control | undefined;
   if (opts.control) {

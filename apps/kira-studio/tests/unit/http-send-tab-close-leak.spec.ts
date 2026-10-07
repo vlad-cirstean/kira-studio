@@ -18,14 +18,19 @@ setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 const { queryClient } = await import('@workbench/state/queryClient');
-restoreAfterEach(control);
 // P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a
-// benign default.
+// benign default -- set *before* restoreAfterEach snapshots control, not in beforeEach: the
+// enqueued save this triggers can settle on a tick past this file's own afterEach (confirmed
+// via stream-count-honors-filter.spec.ts's identical hazard: only reproduces with ~90+ other
+// spec files loaded, never in isolation), so a beforeEach/afterEach-scoped override races the
+// chain back onto the hanging default and wedges it permanently for every later spec in the
+// process.
+(control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+restoreAfterEach(control);
 beforeEach(() => {
-  (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
   // send()'s pre-flight loads the tree and environments; unstubbed they never settle in this harness.
   void queryClient.invalidateQueries({ refetchType: 'none' });
   (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
