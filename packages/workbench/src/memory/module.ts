@@ -1,0 +1,40 @@
+import type {
+  Memory,
+  MemoryClarification,
+  MemoryHistory,
+  MemoryInstallResult,
+  MemoryItem,
+  MemoryMcpStatus,
+  MemoryStoreResult,
+} from '@shared/domain/memory';
+import { type InjectionKey, inject } from 'vue';
+
+// P201: the Memory module's injected context, the shared terminal module's shape — the same
+// components mount in any app that provides a control.
+
+export interface MemoryControl {
+  memorySearch(query: string, includeHistory: boolean): Promise<Memory[]>;
+  memoryRecent(): Promise<Memory[]>;
+  memoryHistory(id: string): Promise<MemoryHistory>;
+  /** Aborting `signal` cancels the in-flight store. */
+  memoryStore(
+    items: MemoryItem[],
+    clarifications: MemoryClarification[],
+    signal?: AbortSignal,
+  ): Promise<MemoryStoreResult>;
+  memoryMcpStatus(): Promise<MemoryMcpStatus>;
+  memoryMcpInstall(): Promise<MemoryInstallResult>;
+  onMemoryChanged(cb: () => void): () => void;
+}
+
+export interface MemoryModuleContext {
+  control: MemoryControl;
+}
+
+export const memoryModuleKey: InjectionKey<MemoryModuleContext> = Symbol('memoryModule');
+
+export function useMemoryModule(): MemoryModuleContext {
+  const ctx = inject(memoryModuleKey);
+  if (!ctx) throw new Error('useMemoryModule: no MemoryModuleContext provided');
+  return ctx;
+}
