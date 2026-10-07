@@ -46,6 +46,9 @@ type WindowOpenerDeps struct {
 	// Ephemeral reports windows that are never restored on relaunch and never count as the last
 	// window (P150 review windows). nil = none.
 	Ephemeral func(key string) bool
+	// OnWindowClosing runs once per closing window, after its terminals close — for modules that own
+	// window-scoped streams (Docker). nil = none.
+	OnWindowClosing []func(key string)
 }
 
 // OpenWindow opens one workbench from an already-persisted record and registers it — the one path
@@ -103,6 +106,9 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 		// P83 §4's teardown table: a terminal never outlives the window that opened it, even when
 		// the renderer never gets to ack.
 		d.Terminal.CloseWindow(rec.Key)
+		for _, fn := range d.OnWindowClosing {
+			fn(rec.Key)
+		}
 		if d.Windows.RowDecision(rec.Key) {
 			if err := d.Repo.Delete(rec.Key); err != nil {
 				slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
