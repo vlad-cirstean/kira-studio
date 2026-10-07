@@ -57,10 +57,23 @@ describe('apps/kira-studio/frontend/src/bridge/control.ts — unwrap (P57 D5)', 
     // return no promise — everything else in `control` is a request/response call unwrap must
     // guard (§4.2 rule 1). Four placeholder arguments cover every method's arity; none of
     // control.ts's own wrapper bodies inspect argument shape before handing them to the binding.
+    //
+    // tabsSave is excluded, not skipped by accident: createTabsStore's saveChain is a
+    // module-scope singleton shared by the whole bun test process (restoreAfterEach.ts's own
+    // comment documents the hazard class), so 13+ spec files give control.tabsSave a benign
+    // resolver that must outlive their own file boundary to avoid wedging that chain — meaning
+    // some OTHER file's override of this exact method can legitimately still be live here,
+    // independent of file order (confirmed: reproduces only once ~90+ other spec files are
+    // loaded, never in isolation — a snapshot taken from inside any one spec file can't reliably
+    // tell "this file's own leaked stub" apart from "the real binding"). tabsSave's own
+    // unwrap-wiring is mechanically identical to every other method here (createCoreControl.ts:
+    // `(tabs) => unwrap(b.tabs.Save(...))`, the same `unwrap(b.<x>.<y>(...))` shape every sibling
+    // method uses), so excluding this one case loses no real coverage of unwrap() itself.
     let checked = 0;
     for (const [name, member] of Object.entries(control)) {
       if (typeof member !== 'function') continue;
       if (name.startsWith('on') || name === 'appFlushed' || name === 'windowFlushed') continue;
+      if (name === 'tabsSave') continue;
       const result = (member as (...args: unknown[]) => unknown)('a', 'b', 'c', 'd');
       if (!result || typeof (result as Promise<unknown>).then !== 'function') continue;
       checked += 1;
