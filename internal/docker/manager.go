@@ -68,6 +68,9 @@ type Manager struct {
 	cli      *client.Client
 	endpoint Endpoint
 	selected string
+
+	events *eventsWatcher
+	stats  *statsHub
 }
 
 // NewManager builds a Manager reading the real process environment.
@@ -76,7 +79,45 @@ func NewManager(emit appevent.Emitter) *Manager {
 }
 
 func newManager(emit appevent.Emitter, env resolveEnv) *Manager {
-	return &Manager{Emit: emit, env: env}
+	m := &Manager{Emit: emit, env: env}
+	m.events = newEventsWatcher(m)
+	m.stats = newStatsHub(engineStats{m}, func(windowKey string, ev StatsEvent) { emit.EmitTo(windowKey, ChannelStats, ev) }, statsEmitInterval)
+	return m
+}
+
+// useContext switches the engine for every window ("" = automatic resolution): all streams end,
+// the client is rebuilt, and windows are told to refetch everything.
+func (m *Manager) useContext(ctx context.Context, name string) Status {
+	m.mu.Lock()
+	m.selected = name
+	m.resetLocked()
+	m.mu.Unlock()
+	m.stopStreams()
+	m.events.restart()
+	st := m.status(ctx, false)
+	m.Emit.Emit(ChannelStatus, st)
+	m.Emit.Emit(ChannelChanged, ChangedEvent{Kinds: allKinds})
+	return st
+}
+
+// stopStreams ends every stream that belongs to the current engine.
+func (m *Manager) stopStreams() {
+	m.stats.reset()
+}
+
+// closeWindow ends everything windowKey started.
+func (m *Manager) closeWindow(windowKey string) {
+	m.events.unwatch(windowKey)
+	m.stats.unsubscribe(windowKey)
+}
+
+// shutdown ends every stream and drops the client.
+func (m *Manager) shutdown() {
+	m.events.shutdown()
+	m.stopStreams()
+	m.mu.Lock()
+	m.resetLocked()
+	m.mu.Unlock()
 }
 
 // client returns the cached client, building it from the resolved endpoint on first use.
