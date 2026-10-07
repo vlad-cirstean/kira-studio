@@ -601,8 +601,8 @@ suites). Tooling lives in `scripts/mutation/` and `tools/mutation/` (own `packag
 - **TS limits**: no type checker (bun strips types, so some survivors are type-invalid code), `.vue`
   files are not mutated, static mutants are ignored, `packages/theme` and `packages/kira-ui` have no
   unit suite.
-- **CI**: `docs/pending-workflows/mutation.yml` (manual dispatch only, `continue-on-error`, never
-  a required check) waits to be applied per the "Git push" section above (delete it once applied).
+- **CI**: none, by user decision (2026-10-07) — not worth the investment yet. Run manually only,
+  via `scripts/mutation/run.sh` below.
 - **Risks**: gremlins and `@hughescr/stryker-bun-runner` are single-maintainer, slow-moving tools.
   Fallbacks if either breaks: `avito-tech/go-mutesting` (about 5x slower, no coverage split),
   Stryker's `command` runner with `coverageAnalysis: 'off'` (10-30x slower).
