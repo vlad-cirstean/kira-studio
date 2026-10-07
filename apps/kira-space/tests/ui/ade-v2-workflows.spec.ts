@@ -54,11 +54,14 @@ test('the list shows each file with its stages and flags a broken one', async ({
   await expect(page.locator(t('ade-wf-yaml'))).toBeVisible();
 });
 
-test('the form edits save once, debounced, with ids unchanged', async ({ relaunch }) => {
+test('the form saves on Save, never on its own, with ids unchanged', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
   await expect(page.locator(t('ade-wf-form'))).toBeVisible();
   const name = page.locator(t('ade-wf-form-name'));
   await name.fill('Standard feature v2');
+  await page.waitForTimeout(1200);
+  expect(calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(0);
+  await page.locator(t('ade-wf-save')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
   const args = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
     fileName: string;
@@ -81,6 +84,7 @@ test('a new step gets a fresh id and Allowed tools becomes allowedTools', async 
   const { window: page, control } = await openWorkflows(relaunch);
   const stage = page.locator(t('ade-wf-stage')).nth(1);
   await stage.locator(t('ade-wf-add-step')).click();
+  await page.locator(t('ade-wf-save')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
   const added = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
     workflow: { stages: { steps: { id: string }[] }[] };
@@ -92,6 +96,7 @@ test('a new step gets a fresh id and Allowed tools becomes allowedTools', async 
     .first()
     .locator(t('ade-wf-step-tools'))
     .fill('Read, Grep, Bash(git diff:*)');
+  await page.locator(t('ade-wf-save')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(2);
   const tools = calls(control, IPC.adeTaskSaveWorkflow)[1]?.args as {
     workflow: { stages: { steps: { allowedTools: string[] }[] }[] };
@@ -107,6 +112,7 @@ test('a later step can send back to an earlier one', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
   const steps = page.locator(t('ade-wf-stage')).nth(1).locator(t('ade-wf-step'));
   await steps.nth(4).locator(t('ade-wf-step-fail')).selectOption('back:plan');
+  await page.locator(t('ade-wf-save')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
   const saved = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
     workflow: { stages: { steps: { id: string; onFailure: string }[] }[] };
@@ -122,12 +128,13 @@ test('a refused save shows the error and a Switch to YAML link', async ({ relaun
     },
   ]);
   await page.locator(t('ade-wf-form-name')).fill('Renamed');
+  await page.locator(t('ade-wf-save')).click();
   await expect(page.locator(t('ade-wf-save-error'))).toContainText('edit it in YAML');
   await page.locator(t('ade-wf-switch-yaml')).click();
   await expect(page.locator(t('ade-wf-yaml'))).toBeVisible();
 });
 
-test('YAML mode validates while typing and saves the last text', async ({ relaunch }) => {
+test('YAML mode validates while typing and saves the text on Save', async ({ relaunch }) => {
   const fx = adeFixture<WorkflowsFx>('workflows');
   const { window: page, control } = await openWorkflows(relaunch, [
     {
@@ -141,6 +148,8 @@ test('YAML mode validates while typing and saves the last text', async ({ relaun
   await expect(page.locator(t('ade-wf-yaml-msg'))).toContainText(
     '✓ valid · the form and the plan use this file',
   );
+  expect(calls(control, IPC.adeTaskSaveWorkflowYaml)).toHaveLength(0);
+  await page.locator(t('ade-wf-save')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflowYaml)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskSaveWorkflowYaml)[0]?.args).toMatchObject({
     fileName: 'standard.yaml',
@@ -200,4 +209,35 @@ test('+ New creates a workflow and opens its form', async ({ relaunch }) => {
   await expect.poll(() => calls(control, IPC.adeTaskNewWorkflow)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskNewWorkflow)[0]?.args).toEqual({ name: 'New workflow' });
   await expect(page.locator(t('ade-wf-form'))).toBeVisible();
+});
+
+test('Discard restores the saved form, and leaving with edits asks first', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  const name = page.locator(t('ade-wf-form-name'));
+  const saved = await name.inputValue();
+  await expect(page.locator(t('ade-wf-save'))).toBeDisabled();
+  await name.fill('Edited');
+  await expect(page.locator(t('ade-wf-save'))).toBeEnabled();
+  await page.locator(t('ade-wf-discard')).click();
+  await expect(name).toHaveValue(saved);
+  await expect(page.locator(t('ade-wf-save'))).toBeDisabled();
+
+  await name.fill('Edited again');
+  await page.locator(t('ade-tab-plan')).click();
+  await expect(page.locator(t('confirm-dialog'))).toBeVisible();
+  await page.locator(t('confirm-dialog-cancel')).click();
+  await expect(page.locator(t('ade-workflows'))).toBeVisible();
+  await expect(name).toHaveValue('Edited again');
+  await page.locator(t('ade-tab-plan')).click();
+  await page.locator(t('confirm-dialog-confirm')).click();
+  await expect(page.locator(t('ade-plan'))).toBeVisible();
+  expect(calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(0);
+});
+
+test('Ctrl+S saves the open editor', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  const name = page.locator(t('ade-wf-form-name'));
+  await name.fill('Via shortcut');
+  await name.press('Control+s');
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
 });

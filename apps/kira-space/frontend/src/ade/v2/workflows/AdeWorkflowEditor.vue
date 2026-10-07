@@ -15,8 +15,9 @@ const wfUi = useAdeWorkflowsUiStore();
 const yaml = useWorkflowYaml(() => props.entry.fileName);
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
 
-function setMode(v: unknown): void {
-  if (v === 'form' || v === 'yaml') wfUi.workflowMode = v;
+async function setMode(v: unknown): Promise<void> {
+  if ((v !== 'form' && v !== 'yaml') || v === wfUi.workflowMode) return;
+  if (await wfUi.leave()) wfUi.workflowMode = v;
 }
 </script>
 

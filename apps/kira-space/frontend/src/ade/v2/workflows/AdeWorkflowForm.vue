@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
-import { useDebounceFn } from '@vueuse/core';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { cloneWorkflow, moved, newStage } from '../board/workflowForm';
 import { useRepos, useSaveWorkflow } from '../queries';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { Stage, Workflow, WorkflowEntry } from '../wire';
 import AdeStageCard from './AdeStageCard.vue';
+import AdeWorkflowSaveBar from './AdeWorkflowSaveBar.vue';
+import { useSaveShortcut } from './useSaveShortcut';
 
-// Form mode (R26): edits a local copy of the last valid workflow and saves it whole, 500 ms after
-// the last edit and on leaving. A push never replaces a copy that has unsaved edits.
+// Form mode (R26): edits a local copy of the last valid workflow; Save writes it whole, Discard drops
+// the edits. A push never replaces a copy that has unsaved edits.
 const props = defineProps<{ entry: WorkflowEntry }>();
 const wfUi = useAdeWorkflowsUiStore();
 const repos = useRepos();
@@ -33,7 +34,11 @@ const scopes = computed(() => [
   ...(repos.data.value?.repos ?? []).map((r) => `only ${r.nickname || r.name}`),
 ]);
 
-async function flush(): Promise<void> {
+watch(dirty, (v) => {
+  wfUi.dirty = v;
+});
+
+async function saveNow(): Promise<void> {
   const current = wf.value;
   if (!dirty.value || !current) return;
   const sent = JSON.stringify(current);
@@ -45,24 +50,37 @@ async function flush(): Promise<void> {
     error.value = err instanceof Error ? err.message : String(err);
   }
 }
-const scheduleSave = useDebounceFn(flush, 500);
+
+function discard(): void {
+  if (props.entry.workflow) wf.value = cloneWorkflow(props.entry.workflow);
+  dirty.value = false;
+  error.value = '';
+}
 
 function edit(next: Workflow): void {
   wf.value = next;
   dirty.value = true;
-  void scheduleSave();
 }
 function setStages(stages: Stage[]): void {
   if (wf.value) edit({ ...wf.value, stages });
 }
 
+const root = useTemplateRef<HTMLElement>('root');
+useSaveShortcut(root, () => void saveNow());
+
 onBeforeUnmount(() => {
-  void flush();
+  wfUi.dirty = false;
 });
 </script>
 
 <template>
-  <div v-if="wf" class="flex flex-col gap-3" data-testid="ade-wf-form">
+  <div
+    v-if="wf"
+    class="flex flex-col gap-3"
+    ref="root"
+    data-testid="ade-wf-form"
+  >
+    <AdeWorkflowSaveBar :dirty="dirty" :saving="save.isPending.value" @save="saveNow" @discard="discard" />
     <div class="flex flex-wrap items-center gap-2.5">
       <label for="ade-wf-form-name" class="text-kira-sm text-muted-foreground">Name</label>
       <Input

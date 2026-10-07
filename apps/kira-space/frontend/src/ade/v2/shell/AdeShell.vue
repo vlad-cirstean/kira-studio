@@ -13,12 +13,19 @@ import AdeReposPage from '../repos/AdeReposPage.vue';
 import AdeRunDialog from '../run/AdeRunDialog.vue';
 import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import { tagStyle } from '../tones';
 import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
 import AdeCaptureBox from './AdeCaptureBox.vue';
 
 // Top bar (tabs, capture box, Add) over the active tab; the Plan opens the panel beside it.
 const ui = useAdeBoardUiStore();
+const wfUi = useAdeWorkflowsUiStore();
+
+async function onView(view: unknown): Promise<void> {
+  if (view === ui.view || (ui.view === 'workflows' && !(await wfUi.leave()))) return;
+  ui.view = view as typeof ui.view;
+}
 const backlog = useBacklog();
 const count = computed(() => backlog.data.value?.items.length ?? 0);
 const { model } = usePlanModel();
@@ -26,7 +33,7 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
 </script>
 
 <template>
-  <Tabs v-model="ui.view" class="flex min-h-0 flex-1 flex-col gap-0.5 bg-chrome" data-testid="ade-shell">
+  <Tabs :model-value="ui.view" class="flex min-h-0 flex-1 flex-col gap-0.5 bg-chrome" data-testid="ade-shell" @update:model-value="onView">
     <nav class="flex h-tabbar shrink-0 items-center gap-2 border-b border-border bg-chrome px-1.5">
       <TabsList>
         <TabsTrigger

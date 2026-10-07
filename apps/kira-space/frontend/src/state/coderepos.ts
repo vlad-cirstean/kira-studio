@@ -44,13 +44,17 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     }
   }
 
-  let unsubscribeRepos: (() => void) | null = null;
+  let subscribed = false;
   /** Boot: subscribes before the first read so a push landing mid-await is not lost, and keeps the
-   *  list live in every module and window. The push is payload-free, so each one re-reads. */
+   *  list live in every module and window for the window's lifetime. The push is payload-free, so
+   *  each one re-reads. */
   async function initCodeRepos(): Promise<void> {
-    unsubscribeRepos ??= control.onAdeTaskRepos(() => {
-      void hydrateCodeRepos();
-    });
+    if (!subscribed) {
+      subscribed = true;
+      control.onAdeTaskRepos(() => {
+        void hydrateCodeRepos();
+      });
+    }
     await hydrateCodeRepos();
   }
 

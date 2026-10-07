@@ -39,9 +39,14 @@ function stages(e: WorkflowEntry): string {
   return e.workflow ? e.workflow.stages.map((s) => s.name).join(' › ') : '';
 }
 
+async function pick(fileName: string): Promise<void> {
+  if (fileName !== current.value?.fileName && !(await wfUi.leave())) return;
+  wfUi.workflowFile = fileName;
+}
+
 async function runImport(): Promise<void> {
   const path = importPath.value.trim();
-  if (!path) return;
+  if (!path || !(await wfUi.leave())) return;
   listError.value = '';
   try {
     const entry = await importWf.mutateAsync({ path });
@@ -55,6 +60,7 @@ async function runImport(): Promise<void> {
 }
 
 async function createNew(): Promise<void> {
+  if (!(await wfUi.leave())) return;
   listError.value = '';
   try {
     const entry = await newWf.mutateAsync({ name: 'New workflow' });
@@ -128,7 +134,7 @@ async function createNew(): Promise<void> {
         :style="{ borderLeftColor: current?.fileName === e.fileName ? TONE.amber[2] : 'transparent' }"
         data-testid="ade-wf-row"
         :data-file="e.fileName"
-        @click="wfUi.workflowFile = e.fileName"
+        @click="pick(e.fileName)"
       >
         <span class="flex w-full items-center gap-1.5">
           <span class="min-w-0 flex-1 truncate text-kira-lg font-semibold" data-testid="ade-wf-row-name">{{
