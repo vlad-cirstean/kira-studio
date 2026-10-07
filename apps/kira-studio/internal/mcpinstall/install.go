@@ -219,6 +219,38 @@ func (i *Installer) Install(ctx context.Context, name, url, helperPath string) R
 		return Result{Outcome: OutcomeInstallFailed, Detail: "internal error: header helper path is not absolute"}
 	}
 
+	// F10: Claude Code runs the stored headersHelper string through a shell of its own at
+	// connection time — an unquoted path containing a space (or any other shell metacharacter)
+	// splits into more than one word there, so no Authorization header is ever sent and every call
+	// gets a 401 with no hint why. Single-quoting here is the fix; EnsureHeaderHelperScript already
+	// quotes the token path the same way for the same reason, one level down.
+	return i.register(ctx, name, serverJSON{Type: "http", URL: url, HeadersHelper: shellSingleQuote(helperPath)})
+}
+
+// stdioServerJSON is add-json's shape for a stdio server: a command and its argv.
+type stdioServerJSON struct {
+	Type    string   `json:"type"`
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+}
+
+// StdioCommand renders the same remove-then-add-json pair for a stdio server, as copy-paste text.
+func StdioCommand(name, command string, args []string) string {
+	payload, _ := json.Marshal(stdioServerJSON{Type: "stdio", Command: command, Args: args})
+	return "claude mcp remove --scope user " + shellSingleQuote(name) + " 2>/dev/null; claude mcp add-json --scope user " +
+		shellSingleQuote(name) + " " + shellSingleQuote(string(payload))
+}
+
+// InstallStdio registers a stdio MCP server with Claude Code, replacing any registration of name.
+func (i *Installer) InstallStdio(ctx context.Context, name, command string, args []string) Result {
+	if !filepath.IsAbs(command) {
+		return Result{Outcome: OutcomeInstallFailed, Detail: "internal error: server command path is not absolute"}
+	}
+	return i.register(ctx, name, stdioServerJSON{Type: "stdio", Command: command, Args: args})
+}
+
+// register is the shared remove-then-add-json path.
+func (i *Installer) register(ctx context.Context, name string, server any) Result {
 	claudePath, probed, found := i.locateClaude()
 	if !found {
 		return Result{Outcome: OutcomeNotFound, Probed: probed}
@@ -232,12 +264,7 @@ func (i *Installer) Install(ctx context.Context, name, url, helperPath string) R
 		return Result{Outcome: OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
 	}
 
-	// F10: Claude Code runs the stored headersHelper string through a shell of its own at
-	// connection time — an unquoted path containing a space (or any other shell metacharacter)
-	// splits into more than one word there, so no Authorization header is ever sent and every call
-	// gets a 401 with no hint why. Single-quoting here is the fix; EnsureHeaderHelperScript already
-	// quotes the token path the same way for the same reason, one level down.
-	payload, err := json.Marshal(serverJSON{Type: "http", URL: url, HeadersHelper: shellSingleQuote(helperPath)})
+	payload, err := json.Marshal(server)
 	if err != nil {
 		return Result{Outcome: OutcomeInstallFailed, Detail: err.Error(), Probed: probed}
 	}
