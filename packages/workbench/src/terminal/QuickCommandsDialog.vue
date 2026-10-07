@@ -7,6 +7,7 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
+import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { computed, reactive, ref, useTemplateRef, watch } from 'vue';
@@ -158,14 +159,14 @@ async function onAddScript(): Promise<void> {
   }
 }
 
-// §2.2's own focus rule: an "Edit…" click's row gets focused once the dialog paints, instead of
-// reka's default (the dialog's own first focusable element).
+// §2.2's own focus rule: an "Edit…" click's row gets focused once the dialog paints, any other
+// open focuses the add form, instead of reka's default (the dialog's own first focusable element).
 const bodyEl = useTemplateRef<HTMLElement>('bodyEl');
 function onOpenAutoFocus(e: Event): void {
-  if (!props.focusId) return;
-  const target = bodyEl.value?.querySelector<HTMLElement>(
-    `[data-script-id="${props.focusId}"] [data-testid="custom-script-name"]`,
-  );
+  const selector = props.focusId
+    ? `[data-script-id="${props.focusId}"] [data-testid="custom-script-name"]`
+    : '[data-testid="custom-script-add-name"]';
+  const target = bodyEl.value?.querySelector<HTMLElement>(selector);
   if (!target) return; // removed in another window — fall back to default focus
   e.preventDefault();
   target.scrollIntoView({ block: 'nearest' });
@@ -251,11 +252,12 @@ function onOpenAutoFocus(e: Event): void {
               />
             </div>
             <div class="flex flex-col w-full">
-              <Input
+              <Textarea
                 v-model="scriptDrafts[script.id].command"
+                rows="2"
                 placeholder="Command"
                 aria-label="Command"
-                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                class="min-h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 py-1 font-data leading-normal"
                 data-testid="custom-script-command"
                 @blur="onScriptFieldBlur(script)"
               />
@@ -312,12 +314,15 @@ function onOpenAutoFocus(e: Event): void {
             >
           </div>
           <div class="flex flex-col w-full">
-            <Input
+            <Textarea
               v-model="newScriptCommand"
+              rows="2"
               placeholder="Command"
               aria-label="Command"
-              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+              class="min-h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 py-1 font-data leading-normal"
               data-testid="custom-script-add-command"
+              @keydown.meta.enter.prevent="onAddScript"
+              @keydown.ctrl.enter.prevent="onAddScript"
             />
           </div>
           <div class="flex flex-col w-full">

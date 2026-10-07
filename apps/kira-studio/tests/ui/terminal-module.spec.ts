@@ -118,45 +118,59 @@ test('running a quick command opens a terminal titled with its name, at its own 
     .toBe(true);
 });
 
-test('adding a quick command calls customScriptsCreate with the trimmed fields, and Add stays disabled while either field is empty', async ({
+test('one header button opens the dialog with the add form focused; the inline add row is gone', async ({
   relaunch,
 }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.customScriptsList, response: [SCRIPT] }],
+  });
+
+  await openTerminalModule(page);
+  await expect(page.locator('[data-testid="quick-command-add"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="quick-commands-manage"]')).toHaveCount(1);
+  await page.locator('[data-testid="quick-commands-manage"]').click();
+  await expect(dialog(page)).toBeVisible();
+  await expect(dialog(page).locator('[data-testid="custom-script-add-name"]')).toBeFocused();
+});
+
+test('the empty-state button opens the same dialog', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.customScriptsList, response: [] }],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="quick-command-empty-add"]').click();
+  await expect(dialog(page)).toBeVisible();
+});
+
+test('a multiline command is saved as written; the panel row shows its first line', async ({
+  relaunch,
+}) => {
+  const MULTI = 'echo one\necho two';
   const { window: page, control } = await relaunch({
     control: [
-      { channel: IPC.customScriptsList, response: [] },
+      { channel: IPC.customScriptsList, response: [{ ...SCRIPT, command: MULTI }] },
       { channel: IPC.customScriptsCreate, response: SCRIPT },
     ],
   });
 
   await openTerminalModule(page);
-  await page.locator('[data-testid="quick-command-add"]').click();
+  const row = page.locator(`[data-testid="quick-command-${SCRIPT.id}"]`);
+  await expect(row).toContainText('echo one…');
+  await expect(row).not.toContainText('echo two');
+  await expect(row).toHaveAttribute('title', MULTI);
 
-  const addButton = page.locator('[data-testid="quick-command-add-confirm"]');
-  await expect(addButton).toBeDisabled();
-
-  await page.locator('[data-testid="quick-command-add-name"]').fill(`  ${SCRIPT.name}  `);
-  await expect(addButton).toBeDisabled(); // command still empty
-
-  await page.locator('[data-testid="quick-command-add-command"]').fill(`  ${SCRIPT.command}  `);
-  await expect(addButton).toBeEnabled();
-  await addButton.click();
-
+  await page.locator('[data-testid="quick-commands-manage"]').click();
+  await dialog(page).locator('[data-testid="custom-script-add-name"]').fill('Two lines');
+  await dialog(page).locator('[data-testid="custom-script-add-command"]').fill(MULTI);
+  await dialog(page).locator('[data-testid="custom-script-add"]').click();
   await expect
-    .poll(() => control.log().some((entry) => entry.channel === IPC.customScriptsCreate))
-    .toBe(true);
-  const call = control.log().find((entry) => entry.channel === IPC.customScriptsCreate);
-  expect(call?.args).toEqual({
-    fields: {
-      name: SCRIPT.name,
-      command: SCRIPT.command,
-      workingDir: '',
-      color: 'none',
-    },
-  });
+    .poll(() => control.log().find((entry) => entry.channel === IPC.customScriptsCreate)?.args)
+    .toEqual({ fields: { name: 'Two lines', command: MULTI, workingDir: '', color: 'none' } });
 });
 
 // P133 §5.1 test 1: moved from settings-scripts.spec.ts's tests 1 and 2, merged the way the
-// inline-add test above already merges "Add stays disabled" with a successful add.
+// add-form test already merges "Add stays disabled" with a successful add.
 test('Manage opens the quick commands dialog; add sends the trimmed fields', async ({
   relaunch,
 }) => {
