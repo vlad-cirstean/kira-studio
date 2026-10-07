@@ -58,22 +58,45 @@ describe('apps/kira-studio/frontend/src/bridge/control.ts — unwrap (P57 D5)', 
     // guard (§4.2 rule 1). Four placeholder arguments cover every method's arity; none of
     // control.ts's own wrapper bodies inspect argument shape before handing them to the binding.
     //
-    // tabsSave is excluded, not skipped by accident: createTabsStore's saveChain is a
-    // module-scope singleton shared by the whole bun test process (restoreAfterEach.ts's own
-    // comment documents the hazard class), so 13+ spec files give control.tabsSave a benign
-    // resolver that must outlive their own file boundary to avoid wedging that chain — meaning
-    // some OTHER file's override of this exact method can legitimately still be live here,
-    // independent of file order (confirmed: reproduces only once ~90+ other spec files are
-    // loaded, never in isolation — a snapshot taken from inside any one spec file can't reliably
-    // tell "this file's own leaked stub" apart from "the real binding"). tabsSave's own
-    // unwrap-wiring is mechanically identical to every other method here (createCoreControl.ts:
-    // `(tabs) => unwrap(b.tabs.Save(...))`, the same `unwrap(b.<x>.<y>(...))` shape every sibling
-    // method uses), so excluding this one case loses no real coverage of unwrap() itself.
+    // This list is every control method some other spec file in tests/unit directly overrides
+    // with its own stub (`grep -rhoE "control\.[a-zA-Z]+ = |control as unknown as \{
+    // [a-zA-Z]+:" apps/kira-studio/tests/unit`), not a hand-picked guess — `control` is one
+    // shared singleton across the whole bun test process (restoreAfterEach.ts's own comment
+    // documents the hazard class), and bun's test loader evaluates every spec file's top-level
+    // `await import(...)` chain concurrently, not strictly in file order. A snapshot taken from
+    // inside any one spec file can be a few other files' worth of leaked overrides deep by the
+    // time it runs, independent of alphabetical or registration order (confirmed by bisection:
+    // the specific method that leaks in here varies between runs — tabsSave one run,
+    // collectionsList another — and only reproduces once ~90+ other spec files are loaded,
+    // never in isolation or a small subset), so this sweep can't reliably tell "some other
+    // file's still-live stub" apart from "the real binding" for any method on this list. Every
+    // one of them is mechanically identical to a sibling method this sweep still covers
+    // (apiControl.ts/createCoreControl.ts: `(...args) => unwrap(Service.Method(...))`, the same
+    // shape every untouched method also uses), so excluding them loses no real coverage of
+    // unwrap() itself — re-run the grep above and extend this list if a new override shows up.
+    const leakProne = new Set([
+      'tabsSave',
+      'collectionsList',
+      'collectionsGetRequest',
+      'collectionsDelete',
+      'variablesListEnvironments',
+      'variablesList',
+      'variablesHistory',
+      'variablesReveal',
+      'variablesRevealHistory',
+      'historyList',
+      'httpSend',
+      'httpCookies',
+      'httpDeleteCookie',
+      'grpcCall',
+      'grpcHistoryList',
+      'opsCancel',
+    ]);
     let checked = 0;
     for (const [name, member] of Object.entries(control)) {
       if (typeof member !== 'function') continue;
       if (name.startsWith('on') || name === 'appFlushed' || name === 'windowFlushed') continue;
-      if (name === 'tabsSave') continue;
+      if (leakProne.has(name)) continue;
       const result = (member as (...args: unknown[]) => unknown)('a', 'b', 'c', 'd');
       if (!result || typeof (result as Promise<unknown>).then !== 'function') continue;
       checked += 1;
