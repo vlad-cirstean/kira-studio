@@ -522,6 +522,81 @@ func TestSqs_Read_ReadOnlyPollKeepsMessagesVisible(t *testing.T) {
 	}
 }
 
+// P184: a bad filter is a query error before any connection use, so no Docker is needed.
+func TestSqs_Read_RejectsInvalidVisibilityTimeout(t *testing.T) {
+	a := newAdapter(t)
+	for _, filter := range []string{
+		`0`, `43201`, `1.5`, `"30"`, `{"visibilityTimeoutSeconds":0}`, `{"visibilityTimeoutSeconds":43201}`,
+		`{"visibilityTimeoutSeconds":1.5}`, `{"visibilityTimeoutSeconds":"30"}`,
+		`{"visibilityTimeoutSeconds":30,"x":1}`, `{`,
+	} {
+		req := testsupport.OffsetRead(model.NodePath{}, 10)
+		req.Filter = &filter
+		_, err := a.Read(context.Background(), req, adapters.NewOpCtx("op-p184-bad"))
+		if err == nil {
+			t.Errorf("filter %s: want an error", filter)
+			continue
+		}
+		if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
+			t.Errorf("filter %s: code = %v, want E_QUERY", filter, code)
+		}
+	}
+}
+
+// P184: a read-only poll hides messages for the filter's timeout, not the queue's own 60 s.
+func TestSqs_Read_ReadOnlyPollUsesChosenVisibilityTimeout(t *testing.T) {
+	fixture := testsupport.StartSqs(t)
+	ctx := context.Background()
+
+	queueName := "test-p184-hide"
+	q, err := fixture.Client.CreateQueue(ctx, &awssqs.CreateQueueInput{
+		QueueName:  aws.String(queueName),
+		Attributes: map[string]string{"VisibilityTimeout": "60"},
+	})
+	if err != nil {
+		t.Fatalf("CreateQueue: %v", err)
+	}
+	for i := 0; i < 3; i++ {
+		if _, err := fixture.Client.SendMessage(ctx, &awssqs.SendMessageInput{QueueUrl: q.QueueUrl, MessageBody: aws.String("m")}); err != nil {
+			t.Fatalf("SendMessage: %v", err)
+		}
+	}
+
+	cfg := fixture.Config
+	cfg.ReadOnly = true
+	a := newAdapter(t)
+	if _, err := a.Connect(ctx, cfg, adapters.NewOpCtx("connect-ro")); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Disconnect(ctx) })
+
+	filter := `{"visibilityTimeoutSeconds":4}`
+	poll := func() (page.StreamPage, string) {
+		req := offsetRead(queuePath(fixture, queueName), 10)
+		req.Filter = &filter
+		op := adapters.NewOpCtx("op-p184")
+		p, err := a.Read(ctx, req, op)
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		return p.(page.StreamPage), op.Command()
+	}
+	first, command := poll()
+	if first.RowCount != 3 {
+		t.Fatalf("first poll RowCount = %d, want 3", first.RowCount)
+	}
+	if !strings.Contains(command, "VisibilityTimeout=4") {
+		t.Errorf("command = %q, want VisibilityTimeout=4", command)
+	}
+	if second, _ := poll(); second.RowCount != 0 {
+		t.Errorf("second poll RowCount = %d, want 0 (still hidden)", second.RowCount)
+	}
+	time.Sleep(5 * time.Second)
+	if third, _ := poll(); third.RowCount != 3 {
+		t.Errorf("third poll RowCount = %d, want 3 (released before the queue's 60 s)", third.RowCount)
+	}
+}
+
 // 17. mutate: sending then deleting a message round-trips through the queue. P58d D23: its own
 // fresh queue, not one of the three shared fixtures.
 func TestSqs_Mutate_SendThenDeleteRoundTrips(t *testing.T) {

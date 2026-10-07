@@ -177,6 +177,10 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 
 // Read is index.ts's read.
 func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
+	browseSeconds, err := parseStreamFilter(req.Filter)
+	if err != nil {
+		return nil, err
+	}
 	client, err := a.requireClient()
 	if err != nil {
 		return nil, err
@@ -189,7 +193,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	return pollQueue(ctx, client, url, req, op, a.state.Load().receiptHandles, a.state.Load().readOnly)
+	return pollQueue(ctx, client, url, req, op, a.state.Load().receiptHandles, a.state.Load().readOnly, browseSeconds)
 }
 
 // Count is index.ts's count.

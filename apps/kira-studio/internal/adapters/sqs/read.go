@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -239,10 +240,44 @@ func fetchQueueAttributes(ctx context.Context, client *sqs.Client, queueURL stri
 	return out
 }
 
-// browseVisibilityTimeout is the hide time a read-only poll asks for. SQS has no peek, and the
-// SDK omits a zero VisibilityTimeout from the request (indistinguishable from unset), so 0 would
+// A read-only poll hides received messages for a user-set time. SQS allows 0 to 12 h, but the SDK
+// omits a zero VisibilityTimeout from the request (indistinguishable from unset), so 0 would
 // silently keep the queue's own timeout; 1 second is the shortest value that takes effect.
-const browseVisibilityTimeout = 1
+const (
+	minBrowseVisibilityTimeout     = 1
+	maxVisibilityTimeout           = 43200
+	defaultBrowseVisibilityTimeout = 1
+)
+
+// sqsStreamFilter is the request filter's SQS shape; only a read-only poll applies it.
+type sqsStreamFilter struct {
+	VisibilityTimeoutSeconds *int `json:"visibilityTimeoutSeconds"`
+}
+
+// parseStreamFilter returns the hide seconds a read-only poll asks for. A nil filter or missing
+// field gives the default; unknown fields, non-integers and out-of-range values are query errors.
+func parseStreamFilter(raw *string) (int, error) {
+	if raw == nil {
+		return defaultBrowseVisibilityTimeout, nil
+	}
+	var f sqsStreamFilter
+	dec := json.NewDecoder(strings.NewReader(*raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&f); err != nil {
+		return 0, adapters.New(adapters.CodeQuery, "malformed stream filter", err)
+	}
+	if dec.More() {
+		return 0, adapters.New(adapters.CodeQuery, "malformed stream filter", nil)
+	}
+	if f.VisibilityTimeoutSeconds == nil {
+		return defaultBrowseVisibilityTimeout, nil
+	}
+	n := *f.VisibilityTimeoutSeconds
+	if n < minBrowseVisibilityTimeout || n > maxVisibilityTimeout {
+		return 0, adapters.New(adapters.CodeQuery, "visibility timeout must be a whole number of seconds from 1 to 43200", nil)
+	}
+	return n, nil
+}
 
 // pollQueue is read.ts's pollQueue. Never called automatically — always an explicit user-
 // initiated poll. Loops ReceiveMessage (hard-capped at 10 messages per call) up to
@@ -251,13 +286,13 @@ const browseVisibilityTimeout = 1
 // visibilityTimeoutSeconds and countQueue's approximate count. Every SDK call takes ctx directly
 // (P58d D3): SQS has no server-side kill mechanism, so the op's own context is the entire
 // cancellation story.
-func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req adapters.ReadRequest, op *adapters.OpCtx, handles *receiptHandles, readOnly bool) (page.StreamPage, error) {
+func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req adapters.ReadRequest, op *adapters.OpCtx, handles *receiptHandles, readOnly bool, browseSeconds int) (page.StreamPage, error) {
 	attrs := fetchQueueAttributes(ctx, client, queueURL)
 	visibilityTimeoutSeconds := attrs.visibilityTimeoutSeconds
 	builder := page.NewStreamPageBuilder(visibilityTimeoutSeconds)
 	builder.SetMaxReceiveCount(attrs.maxReceiveCount)
 	collected := 0
-	// A read-only poll hides messages for only browseVisibilityTimeout, so a later batch of the same
+	// A read-only poll hides messages for only browseSeconds, so a later batch of the same
 	// poll can receive them again; seen keeps each message once and ends the poll at the first batch holding a repeat.
 	seen := map[string]struct{}{}
 
@@ -268,7 +303,11 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 		visibilityTimeout = time.Duration(*visibilityTimeoutSeconds) * time.Second
 	}
 
-	op.SetCommand("ReceiveMessage " + queueURL)
+	command := "ReceiveMessage " + queueURL
+	if readOnly {
+		command += " VisibilityTimeout=" + strconv.Itoa(browseSeconds)
+	}
+	op.SetCommand(command)
 	for collected < req.PageSize {
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return page.StreamPage{}, err
@@ -277,7 +316,7 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 		if remaining := req.PageSize - collected; remaining < batchLimit {
 			batchLimit = remaining
 		}
-		input := receiveInput(queueURL, batchLimit, readOnly)
+		input := receiveInput(queueURL, batchLimit, readOnly, browseSeconds)
 		result, err := client.ReceiveMessage(ctx, input)
 		if err != nil {
 			return page.StreamPage{}, mapError(err)
@@ -288,7 +327,7 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 		}
 		collected += added
 		if readOnly && (added == 0 || sawDup) {
-			break // a repeat means the short visibility window lapsed: stop before raising receive counts again
+			break // a repeat means the visibility window lapsed: stop before raising receive counts again
 		}
 		if len(result.Messages) < batchLimit {
 			break // short of a full batch — queue is likely drained
@@ -298,8 +337,8 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 	return builder.Finish(position(req.PageSize)), nil
 }
 
-// receiveInput builds one ReceiveMessage request; a read-only poll hides messages only briefly.
-func receiveInput(queueURL string, batchLimit int, readOnly bool) *sqs.ReceiveMessageInput {
+// receiveInput builds one ReceiveMessage request; a read-only poll hides messages for browseSeconds.
+func receiveInput(queueURL string, batchLimit int, readOnly bool, browseSeconds int) *sqs.ReceiveMessageInput {
 	input := &sqs.ReceiveMessageInput{
 		QueueUrl:                    aws.String(queueURL),
 		MaxNumberOfMessages:         int32(batchLimit),
@@ -308,7 +347,7 @@ func receiveInput(queueURL string, batchLimit int, readOnly bool) *sqs.ReceiveMe
 		MessageSystemAttributeNames: []types.MessageSystemAttributeName{types.MessageSystemAttributeNameAll},
 	}
 	if readOnly {
-		input.VisibilityTimeout = browseVisibilityTimeout
+		input.VisibilityTimeout = int32(browseSeconds)
 	}
 	return input
 }
