@@ -253,3 +253,24 @@ step 4; fixes land as follow-up commits before step 5.
 - Writable connections' timeout (stays the queue's own; receipt handles depend on it).
 - Releasing hidden messages on Stop (`ChangeMessageVisibility`), see D4.
 - Kafka filter, count path, `dbmcp` (cannot reach SQS).
+
+## Result
+
+Five commits on `p168-stream-a`, in plan order:
+
+1. `900ca3b` Go adapter: `parseStreamFilter`, `receiveInput` takes the hide seconds, read-only command text shows `VisibilityTimeout=N`, `Read` parses the filter first; two conformance tests.
+2. `c598b5a` Shared encoder and constants, tab state field, `readFilter`, `setPollVisibilityTimeout`, `fetchRedriveLimit` tri-state. `StreamView.vue` got a type-only tweak to `redriveSentence` so the hook typecheck stayed green; step 3 rewrote it.
+3. `2eb5033` UI: field, error, tooltips, warning text, confirm text, badge label. First attempt failed the `lint` hook (`text-destructive` retired alias); fixed to `text-error`, committed normally.
+4. `d8baad4` UI spec and `tests/ui/support/sqsFixture.ts`.
+5. This docs commit.
+
+Checks run, all pass:
+
+- `bun run typecheck`, `bun run lint`, `bun run lint:dead` (exit 0, no hints), `bun run lint:go`, `go build ./...`, `go vet` on the sqs package.
+- Docker started (`dockerd`, `localstack/localstack:4` mirrored). `go test -race -count=1` on `adapters/sqs` (incl. both new tests and the existing nil-filter test), `adapterhost`, and `ipcfixture` (`-run 'Sqs|SQS'`).
+- `bun test` for `sqs-mutation-never-polls.spec.ts` and `go-ts-vocabulary-parity.spec.ts` (the only unit spec referencing tab domain). Zod check (scratch, not committed): `.catch` alone covers a missing key and a corrupt value.
+- Playwright after `bun run build:test:studio`: `ui` project in full (320 passed, includes `sqs-poll-visibility`), `ipc-frontend sqs` (1 passed).
+
+Not run: none of the plan's checks skipped.
+
+Deviations: none in design. `.default()` dropped from the schema; `.catch` alone suffices (plan allowed this). Poll disabled-state tooltip reuses the range hint text. No `StreamTabState` literal call sites needed fixing beyond `defaultStreamTabState`.

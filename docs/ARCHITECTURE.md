@@ -184,13 +184,21 @@ The stream view marks a binary cell with a `base64` badge; copy and search use t
 consumers for the visibility timeout. Nothing is fetched on tab open, on refresh, or on a timer.
 SQS has no peek API: every receive raises `ApproximateReceiveCount`, and a message past the redrive
 policy's `maxReceiveCount` moves to its dead-letter queue. A **read-only** connection therefore
-hides messages for 1 second instead of the queue's timeout (the SDK omits `VisibilityTimeout: 0`
-from the request, so 1 s is the smallest hide it can send), dedupes by `MessageId` across the
-receives of one poll, and stores no receipt handles. The warning on that connection says each poll
-still raises the receive count, names the dead-letter threshold when the queue has one
-(`StreamPage.max_receive_count`), and the first Poll or Refresh per tab asks for confirmation
-(`rt.receiveAcknowledged`, in-memory). Writable connections keep the queue's own timeout and keep
-receipt handles for Delete.
+hides messages for a user-set time instead of the queue's timeout: 1 s to 12 h, default 1 s (the
+SDK omits `VisibilityTimeout: 0` from the request, so 1 s is the smallest hide it can send). The
+value is per tab (`StreamTabState.sqsVisibilityTimeoutSeconds`), set in the toolbar, and sent as
+`{"visibilityTimeoutSeconds":N}` in the read request's `filter` (no wire change). The adapter
+rejects a malformed or out-of-range filter before touching the connection. The ops log command
+shows the applied value (`ReceiveMessage <url> VisibilityTimeout=N`). Stop cannot unhide messages
+early: a read-only poll keeps no receipt handles, and `ChangeMessageVisibility` is a write call a
+least-privilege principal may lack. A read-only poll also dedupes by `MessageId` across the
+receives of one poll, and stores no receipt handles. The warning on that connection states the hide
+trade-off (longer avoids a repeat in one poll but keeps messages from consumers that long, shorter
+can end a poll early) and says each poll raises the receive count. The first Poll per tab and per
+hide time asks for confirmation naming the hide time and the dead-letter threshold, or its absence
+(`StreamPage.max_receive_count`, else the queue definition's `RedrivePolicy`;
+`rt.receiveAcknowledged`, in-memory). Writable connections ignore the filter value, keep the
+queue's own timeout, and keep receipt handles for Delete.
 SQS's authentication is by **named AWS profile** (static keys accepted only in URI mode).
 
 Cancellation is never "stop showing the result" — always forwarded to the server. If a driver
@@ -370,7 +378,7 @@ original relied on single-threadedness and `Map` insertion order, neither of whi
 translation). No `canUpdate`: a delivered message can't be edited in place, only replaced by
 delete + resend.
 
-A read-only connection's poll never locks messages for real consumers and keeps no receipt handles
+A read-only connection's poll hides messages only for its chosen time and keeps no receipt handles
 (read policy, above). `fetchQueueAttributes` reads `VisibilityTimeout` and `RedrivePolicy` in one
 `GetQueueAttributes` call; `maxReceiveCount` comes from the redrive JSON.
 
