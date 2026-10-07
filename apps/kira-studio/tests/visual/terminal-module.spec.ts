@@ -7,7 +7,7 @@ import { modeTab } from '../ui/support/apiMode';
 test('quick commands dialog, empty state (P133)', async ({ kira }) => {
   const { window } = kira;
   await modeTab(window, 'terminal').click();
-  await window.click('[data-testid="quick-commands-manage"]');
+  await window.click('[data-testid="quick-commands-add"]');
   await expect(window.locator('[data-testid="quick-commands-dialog"]')).toBeVisible();
   await expect(window.locator('[data-testid="quick-commands-dialog"]')).toHaveScreenshot(
     'quick-commands-dialog.png',

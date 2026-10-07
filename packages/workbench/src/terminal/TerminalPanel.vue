@@ -2,8 +2,7 @@
 import type { CustomScript } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertAction, AlertTitle } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { connColorVar } from '@theme/connColor';
 import { useLocalStorage } from '@vueuse/core';
@@ -11,33 +10,28 @@ import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
-import { useNewTerminal, useTerminalModule } from './module';
+import { useTerminalModule } from './module';
 import QuickCommandsDialog from './QuickCommandsDialog.vue';
 import { useRemoveScript } from './scriptActions';
 
 const contextMenuStore = useContextMenuStore();
 const ctx = useTerminalModule();
-const { open: openNewTerminal } = useNewTerminal();
 const removeScript = useRemoveScript();
 
-// P91 §11: the Terminal module's own left panel — a second *view* over P85's custom_scripts store
-// (§10, decided against a second, module-scoped list), not a second data store. Adding and
-// editing (rename, re-command, working directory, colour) both open `QuickCommandsDialog.vue`
-// (P133 §2.2, P186), the shared module's own manager dialog. P128 §2.4: moved
-// to the shared terminal module — `ctx.scripts` (module.ts) is the optional custom-scripts seam;
-// Kira Space injects none, so its panel below shows only a header and one "New terminal" action.
-const scripts = computed(() => ctx.scripts);
+// The Terminal module's own left panel: a view over the custom_scripts store through the
+// `ctx.scripts` seam, both apps. The header `+` is the one way to add a command; a row's context
+// menu edits it. Both open `QuickCommandsDialog.vue`.
+const scripts = ctx.scripts;
 
-// P133 §2.4: dialog visibility is this one component's own local state, not a Pinia store —
-// CLAUDE.md's Pinia rule is for *shared* client state, and nothing else reads this.
-const editor = ref<{ focusId: string | null } | null>(null);
+// Dialog visibility is this component's own local state: nothing else reads it.
+const editor = ref<{ script: CustomScript | null } | null>(null);
 
 const search = ref('');
 const removeError = ref<string | null>(null);
 
 // §11.1: panel search filters rows by name and command.
 const filteredRecords = computed(() => {
-  const records = scripts.value?.records() ?? [];
+  const records = scripts.records();
   const q = search.value.trim().toLowerCase();
   if (q === '') return records;
   return records.filter(
@@ -76,7 +70,7 @@ function toggleGroup(name: string): void {
     : [...collapsed.value, name];
 }
 
-const empty = computed(() => (scripts.value?.records().length ?? 0) === 0);
+const empty = computed(() => scripts.records().length === 0);
 
 // P104 §3: PanelShell's own header/search-reveal/type-ahead-redirect logic, inlined via the
 // shared usePanelHeaderSearch composable -- this panel is always searchable (PanelShell's own
@@ -113,10 +107,9 @@ function runScript(script: CustomScript): void {
 
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
 async function onRemove(script: CustomScript): Promise<void> {
-  if (!scripts.value) return;
   removeError.value = null;
   try {
-    await removeScript(scripts.value, script);
+    await removeScript(scripts, script);
   } catch (err) {
     removeError.value = err instanceof Error ? err.message : String(err);
   }
@@ -138,7 +131,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       label: 'Edit…',
       icon: 'edit',
       run: () => {
-        editor.value = { focusId: script.id };
+        editor.value = { script };
       },
     },
     { type: 'separator' },
@@ -157,7 +150,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 
 <template>
   <div data-testid="terminal-panel">
-    <div v-if="scripts" ref="rootEl" class="flex h-full flex-col">
+    <div ref="rootEl" class="flex h-full flex-col">
       <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
         <span class="font-semibold">Quick commands</span>
         <TooltipIconButton
@@ -170,10 +163,10 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
         />
         <TooltipIconButton
           icon="add"
-          label="Add or edit quick commands…"
-          aria-label="Add or edit quick commands"
-          data-testid="quick-commands-manage"
-          @click="editor = { focusId: null }"
+          label="Add quick command…"
+          aria-label="Add quick command"
+          data-testid="quick-commands-add"
+          @click="editor = { script: null }"
         />
       </div>
       <template v-if="!empty">
@@ -249,47 +242,17 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
         <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
           <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
           <AlertTitle class="text-kira-md font-normal text-muted-foreground">No quick commands</AlertTitle>
-          <AlertAction class="static mt-1">
-            <Button
-              variant="dialog-primary"
-              size="kira-lg"
-              data-testid="quick-command-empty-add"
-              @click="editor = { focusId: null }"
-            >
-              Add a quick command
-            </Button>
-          </AlertAction>
+          <AlertDescription class="text-kira-sm text-muted-foreground">
+            Add one with + above.
+          </AlertDescription>
         </Alert>
       </div>
       <QuickCommandsDialog
         v-if="editor"
         :scripts="scripts"
-        :focus-id="editor.focusId"
+        :script="editor.script"
         @close="editor = null"
       />
-    </div>
-    <!-- P128 §2.4: no scripts seam (Kira Space) — just a header and one "New terminal" action,
-         the same one the tab strip's own "+" menu opens (useNewTerminal). -->
-    <div v-else class="flex h-full flex-col">
-      <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
-        <span class="font-semibold">Terminal</span>
-      </div>
-      <div class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center">
-        <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
-          <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted-foreground">No terminal open</AlertTitle>
-          <AlertAction class="static mt-1">
-            <Button
-              variant="dialog-primary"
-              size="kira-lg"
-              data-testid="terminal-panel-new"
-              @click="openNewTerminal"
-            >
-              New terminal
-            </Button>
-          </AlertAction>
-        </Alert>
-      </div>
     </div>
   </div>
 </template>
