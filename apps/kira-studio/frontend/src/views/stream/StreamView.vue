@@ -105,8 +105,8 @@ const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord
 
 const isReadOnlyBatch = computed(() => isBatch.value && (connRecord.value?.readOnly ?? false));
 const redriveLimit = computed(() => page.value?.maxReceiveCount ?? null);
-function redriveSentence(limit: number | null): string {
-  return limit === null
+function redriveSentence(limit: number | 'none' | null): string {
+  return limit === null || limit === 'none'
     ? '. '
     : `. This queue moves a message to its dead-letter queue after ${limit} receives. `;
 }

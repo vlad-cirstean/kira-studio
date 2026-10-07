@@ -1,6 +1,11 @@
 import { grpcRequestTabStateSchema } from '@shared/domain/grpc';
 import { httpRequestTabStateSchema } from '@shared/domain/http';
 import {
+  SQS_DEFAULT_VISIBILITY_TIMEOUT_SECONDS,
+  SQS_MAX_VISIBILITY_TIMEOUT_SECONDS,
+  SQS_MIN_VISIBILITY_TIMEOUT_SECONDS,
+} from '@shared/domain/streamFilter';
+import {
   type PageSize,
   pageSizeSchema,
   sortSpecSchema,
@@ -137,6 +142,13 @@ export const streamTabStateSchema = /*#__PURE__*/ z.object({
   partitions: /*#__PURE__*/ z.array(z.number().int()).default([]),
   timestampFilter: z.string().nullable().default(null),
   columnWidths: /*#__PURE__*/ z.record(z.string(), z.number()).default({}),
+  // Read-only SQS poll hide time; unused by Kafka tabs (shared schema).
+  sqsVisibilityTimeoutSeconds: z
+    .number()
+    .int()
+    .min(SQS_MIN_VISIBILITY_TIMEOUT_SECONDS)
+    .max(SQS_MAX_VISIBILITY_TIMEOUT_SECONDS)
+    .catch(SQS_DEFAULT_VISIBILITY_TIMEOUT_SECONDS),
 });
 export type StreamTabState = z.infer<typeof streamTabStateSchema>;
 
@@ -304,6 +316,7 @@ export function defaultStreamTabState(pageSize: PageSize = 100): StreamTabState 
     partitions: [],
     timestampFilter: null,
     columnWidths: {},
+    sqsVisibilityTimeoutSeconds: SQS_DEFAULT_VISIBILITY_TIMEOUT_SECONDS,
   };
 }
 

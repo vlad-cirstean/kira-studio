@@ -1,4 +1,4 @@
-import { encodeKafkaStreamFilter } from '@shared/domain/streamFilter';
+import { encodeKafkaStreamFilter, encodeSqsStreamFilter } from '@shared/domain/streamFilter';
 import type { PageSize } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
@@ -78,6 +78,22 @@ function currentStreamFilter(tab: StreamTabRecord): string | null {
   });
 }
 
+// A read-only batch (SQS) poll carries its hide time in the filter; every other read keeps the
+// Kafka-only encoding. Reads caps and the record's readOnly, never the connection kind.
+function readFilter(tab: StreamTabRecord): string | null {
+  const connectionId = tab.connectionId;
+  if (
+    connectionId &&
+    isBatchPagination(connectionId) &&
+    useConnectionsStore().connectionRecord(connectionId)?.readOnly
+  ) {
+    return encodeSqsStreamFilter({
+      visibilityTimeoutSeconds: tab.state.sqsVisibilityTimeoutSeconds,
+    });
+  }
+  return currentStreamFilter(tab);
+}
+
 export interface StreamFilterInput {
   offset: string | null;
   partitions: number[];
@@ -105,7 +121,7 @@ export const useStreamViewStore = defineStore('streamView', () => {
     const opId = beginOp(rt);
     rt.polled = true;
 
-    const filter = currentStreamFilter(tab);
+    const filter = readFilter(tab);
     const connectionId = tab.connectionId;
 
     await runPagedLoad({
@@ -205,9 +221,16 @@ export const useStreamViewStore = defineStore('streamView', () => {
     ensureRuntime(tabId).receiveAcknowledged = true;
   }
 
+  // A new hide time changes what the confirm names, so the next Poll asks again.
+  function setPollVisibilityTimeout(tabId: string, seconds: number): void {
+    useTabsStore().patchStreamTabState(tabId, { sqsVisibilityTimeoutSeconds: seconds });
+    ensureRuntime(tabId).receiveAcknowledged = false;
+  }
+
   // The first confirm runs before any page exists, so read the redrive limit off the queue's
-  // attributes (the same Definition call the definition tab makes). Best effort: null on failure.
-  async function fetchRedriveLimit(tabId: string): Promise<number | null> {
+  // attributes (the same Definition call the definition tab makes). 'none' means the definition
+  // loaded with no RedrivePolicy; null means it could not be read.
+  async function fetchRedriveLimit(tabId: string): Promise<number | 'none' | null> {
     const tab = useTabsStore().findStreamTab(tabId);
     if (!tab?.connectionId) return null;
     try {
@@ -215,7 +238,8 @@ export const useStreamViewStore = defineStore('streamView', () => {
       const row = definition.sections
         .flatMap((section) => section.rows)
         .find((r) => r.name === 'RedrivePolicy');
-      const limit = row ? Number(JSON.parse(row.value).maxReceiveCount) : Number.NaN;
+      if (!row) return 'none';
+      const limit = Number(JSON.parse(row.value).maxReceiveCount);
       return Number.isInteger(limit) ? limit : null;
     } catch {
       return null;
@@ -303,6 +327,7 @@ export const useStreamViewStore = defineStore('streamView', () => {
     poll,
     fetchRedriveLimit,
     acknowledgeReceive,
+    setPollVisibilityTimeout,
     goNext,
     setPageSize,
     applyStreamFilter,

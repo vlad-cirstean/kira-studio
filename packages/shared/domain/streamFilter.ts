@@ -2,9 +2,9 @@
 // through ReadRequestWire's existing generic `filter: string | null` field (data-ops.ts) as a
 // JSON-encoded string — deliberately not a wire schema change, since that field already exists
 // for every engine and Kafka has no WHERE-style predicate language to justify widening it.
-// SQS never produces or parses one of these: it has no topic/partition/offset concept at all
-// (queue-based, `batch` pagination — kafkaCaps.pagination === 'offsetWindow' is what gates the
-// filter row's visibility in StreamView.vue), so sqs/read.ts never looks at `filter`.
+// SQS carries one knob there too (read-only polls only, see SqsStreamFilter); it has no topic/
+// partition/offset concept (queue-based, `batch` pagination — kafkaCaps.pagination ===
+// 'offsetWindow' is what gates the filter row's visibility in StreamView.vue).
 export interface KafkaStreamFilter {
   /** Decimal string — Kafka offsets are int64, too large for a JS `number`. Starting offset for
    *  a *fresh* browse (a token-continued page ignores this — the windows it resumes were already
@@ -27,4 +27,17 @@ export function isEmptyKafkaStreamFilter(filter: KafkaStreamFilter): boolean {
 /** `null` when every field is `null`/empty — mirrors P2's "a no-op filter is dropped" discipline. */
 export function encodeKafkaStreamFilter(filter: KafkaStreamFilter): string | null {
   return isEmptyKafkaStreamFilter(filter) ? null : JSON.stringify(filter);
+}
+
+export const SQS_MIN_VISIBILITY_TIMEOUT_SECONDS = 1;
+export const SQS_MAX_VISIBILITY_TIMEOUT_SECONDS = 43200;
+export const SQS_DEFAULT_VISIBILITY_TIMEOUT_SECONDS = 1;
+
+/** How long a read-only SQS poll hides each received message from other consumers. */
+export interface SqsStreamFilter {
+  visibilityTimeoutSeconds: number;
+}
+
+export function encodeSqsStreamFilter(filter: SqsStreamFilter): string {
+  return JSON.stringify(filter);
 }
