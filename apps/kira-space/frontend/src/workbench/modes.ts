@@ -41,5 +41,6 @@ export const MODES: ModeRegistry<SpaceMode> = {
     icon: 'lightbulb',
     panel: defineAsyncComponent(() => import('@workbench/memory/MemoryPanel.vue')),
     start: defineAsyncComponent(() => import('@workbench/memory/MemoryStart.vue')),
+    tabStrip: false,
   },
 };

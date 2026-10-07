@@ -37,6 +37,7 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
 // never has its (non-existent) `.panel`/`.start`/`.newTab` accessed.
 const def = computed(() => MODES[modeStore.active]);
 const isFull = computed(() => def.value.layout === 'full');
+const hasTabStrip = computed(() => def.value.layout !== 'full' && def.value.tabStrip !== false);
 // P1 D6/C6 (Kira Studio's own pattern): the left panel mounts whichever module is active's own
 // self-contained panel component.
 const activeModePanel = computed(() => (def.value.layout === 'full' ? undefined : def.value.panel));
@@ -52,7 +53,7 @@ const fullView = computed(() => (def.value.layout === 'full' ? def.value.view : 
   <WorkbenchShellBase
     :project-visible="!isFull && layoutStore.panel.project.visible"
     :project-width="layoutStore.panel.project.width"
-    :tab-strip-visible="!isFull"
+    :tab-strip-visible="hasTabStrip"
     :main-framed="!isFull"
     :ops-visible="layoutStore.panel.operations.visible"
     :ops-height="layoutStore.panel.operations.height"

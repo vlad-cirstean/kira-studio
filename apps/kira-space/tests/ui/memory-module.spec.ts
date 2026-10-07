@@ -96,6 +96,7 @@ async function openMemory(page: Page): Promise<void> {
   await modeTab(page, 'memory').click();
   await expect(modeTab(page, 'memory')).toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="memory-panel"]')).toBeVisible();
+  await expect(page.locator('[data-testid="tab-strip"]')).toHaveCount(0);
 }
 
 test('Memory mode lists recent memories, searches, and flags history', async ({ relaunch }) => {
