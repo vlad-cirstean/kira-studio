@@ -28,6 +28,7 @@
  */
 import { validateRefName } from '@kira/git-core';
 import type { WorktreeAddPreflight } from '@kira/git-ipc';
+import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -38,6 +39,7 @@ import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../../state/worktrees.ts';
+import PrepareOutput from '../PrepareOutput.vue';
 
 const props = defineProps<{
   worktrees: WorktreeState;
@@ -231,6 +233,24 @@ const preparing = computed(
 );
 const prepareResult = computed(() => props.ops.worktreePrepareResult.value);
 
+const prepareState = computed<'running' | 'ready' | 'failed'>(() => {
+  if (preparing.value) return 'running';
+  return prepareResult.value?.ok === true ? 'ready' : 'failed';
+});
+const prepareTitle = computed(() => {
+  const r = prepareResult.value;
+  if (preparing.value) return 'Running prepare script';
+  if (r?.ok) return 'Prepare script finished';
+  if (r?.cancelled) return 'Prepare script cancelled';
+  return 'Prepare script failed';
+});
+const prepareNote = computed(() => {
+  const r = prepareResult.value;
+  if (r === undefined || r.ok || r.cancelled) return undefined;
+  if (r.timedOut) return 'Timed out';
+  return r.error?.message || `Exited with status ${r.exitCode}`;
+});
+
 async function startPrepare(): Promise<void> {
   const createdPath = worktreeCreated.value;
   const hash = scriptHash.value;
@@ -249,6 +269,7 @@ function skipPrepare(): void {
 }
 
 function finishPrepare(): void {
+  props.ops.dismissWorktreePrepareResult();
   emit('close-create');
 }
 
@@ -396,18 +417,15 @@ function onClose(): void {
             </Label>
           </template>
           <template v-else>
-            <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-sm kv:whitespace-pre-wrap kv:break-all"><span
-              v-for="(line, i) in ops.worktreePrepareOutput.value"
-              :key="i"
-              :class="line.stream === 'stderr' ? 'kv:text-diff-deleted' : ''"
-            >{{ line.text }}
-</span></pre>
-            <p v-if="prepareResult && !preparing">
-              <template v-if="prepareResult.ok">Finished successfully.</template>
-              <template v-else-if="prepareResult.cancelled">Cancelled.</template>
-              <template v-else-if="prepareResult.timedOut">Timed out.</template>
-              <template v-else>Exited with status {{ prepareResult.exitCode }}.</template>
-            </p>
+            <ScriptProgress
+              :state="prepareState"
+              :title="prepareTitle"
+              :started-at="ops.worktreePrepareStartedAt.value ?? 0"
+              :finished-at="ops.worktreePrepareFinishedAt.value"
+              :note="prepareNote"
+            >
+              <PrepareOutput :lines="ops.worktreePrepareOutput.value" />
+            </ScriptProgress>
           </template>
         </template>
       </div>

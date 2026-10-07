@@ -30,7 +30,7 @@ import type {
   WorktreePrepareResult,
 } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import { type Ref, type ShallowRef, shallowRef, triggerRef } from 'vue';
+import { computed, type Ref, type ShallowRef, shallowRef, triggerRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { stashLabel } from '../components/stashListModel.ts';
 import { composeFailureNotice, type FailureNotice } from './failureNotice.ts';
@@ -286,6 +286,19 @@ export class OpsState {
   readonly worktreePrepareOutput: ShallowRef<readonly WorktreePrepareLine[]> = shallowRef([]);
   readonly worktreePrepareResult: ShallowRef<WorktreePrepareResult | undefined> =
     shallowRef(undefined);
+  /** Epoch ms the latest run started and ended; the toolbar strip and dialog show elapsed time
+   *  from these. The path outlives `activeWorktreePreparePath` so the strip can name the folder. */
+  readonly worktreePrepareStartedAt: ShallowRef<number | undefined> = shallowRef(undefined);
+  readonly worktreePrepareFinishedAt: ShallowRef<number | undefined> = shallowRef(undefined);
+  readonly worktreePrepareLastPath: ShallowRef<string | undefined> = shallowRef(undefined);
+  /** `running` while a run is active; `ready` or `failed` once it ends. A user cancel and a
+   *  dismissed result read `undefined`. */
+  readonly worktreePrepareStatus = computed<'running' | 'ready' | 'failed' | undefined>(() => {
+    if (this.activeWorktreePreparePath.value !== undefined) return 'running';
+    const result = this.worktreePrepareResult.value;
+    if (result === undefined || result.cancelled) return undefined;
+    return result.ok ? 'ready' : 'failed';
+  });
   /** F7: the SAME array `worktreePrepareOutput.value` currently points to — appended into and
    *  trimmed in place (`#setWorktreePrepareOutput`/the `worktree.progress` handler below), so a
    *  batch never re-copies everything seen so far the way `[...prev, ...batch]` did. */
@@ -379,6 +392,9 @@ export class OpsState {
     this.activeWorktreePreparePath.value = undefined;
     this.#setWorktreePrepareOutput([]);
     this.worktreePrepareResult.value = undefined;
+    this.worktreePrepareStartedAt.value = undefined;
+    this.worktreePrepareFinishedAt.value = undefined;
+    this.worktreePrepareLastPath.value = undefined;
     // F6: every `run*` method that opens a confirm dialog sets `busy = true` then awaits its own
     // slot's `ask()` — nothing else ever settles that Promise. Without abandoning it here, a repo
     // switch mid-dialog leaves the OLD repo's dialog open over the new repo, and `busy` stuck true
@@ -1232,6 +1248,9 @@ export class OpsState {
       return undefined;
     }
     this.activeWorktreePreparePath.value = path;
+    this.worktreePrepareLastPath.value = path;
+    this.worktreePrepareStartedAt.value = Date.now();
+    this.worktreePrepareFinishedAt.value = undefined;
     this.#setWorktreePrepareOutput([]);
     this.worktreePrepareResult.value = undefined;
     try {
@@ -1250,8 +1269,14 @@ export class OpsState {
       this.#announceRejection('Worktree setup', error);
       return undefined;
     } finally {
+      this.worktreePrepareFinishedAt.value = Date.now();
       this.activeWorktreePreparePath.value = undefined;
     }
+  }
+
+  /** Hides a finished run's toolbar strip; the next run or a repo switch also clears it. */
+  dismissWorktreePrepareResult(): void {
+    this.worktreePrepareResult.value = undefined;
   }
 
   // -------------------------------------------------------------------------------------

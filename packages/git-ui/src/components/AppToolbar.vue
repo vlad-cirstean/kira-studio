@@ -28,6 +28,7 @@
  */
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -35,8 +36,10 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed, ref } from 'vue';
+import { useTimeoutFn } from '@vueuse/core';
+import { computed, ref, watch } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
@@ -59,6 +62,7 @@ import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 // caller.
 import BranchPicker from './BranchPicker.vue';
 import MenuSections from './MenuSections.vue';
+import PrepareOutput from './PrepareOutput.vue';
 import PullStrategyPicker from './PullStrategyPicker.vue';
 import type { PickerTab } from './pickerModel.ts';
 import RefreshButton from './RefreshButton.vue';
@@ -265,6 +269,47 @@ const cancellable = computed(() => cancelDisabledReason.value === undefined);
 async function doCancel(): Promise<void> {
   await props.opsState.cancelRemote();
 }
+
+const prepareStatus = computed(() => props.opsState.worktreePrepareStatus.value);
+const readyFading = ref(false);
+const { start: startReadyFade, stop: stopReadyFade } = useTimeoutFn(
+  () => {
+    readyFading.value = true;
+  },
+  5000,
+  { immediate: false },
+);
+watch(prepareStatus, (status) => {
+  readyFading.value = false;
+  stopReadyFade();
+  if (status === 'ready') startReadyFade();
+});
+const prepareVisible = computed(
+  () => prepareStatus.value !== undefined && !(prepareStatus.value === 'ready' && readyFading.value),
+);
+const prepareFolder = computed(() => {
+  const path = props.opsState.worktreePrepareLastPath.value ?? '';
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+});
+const prepareNote = computed(() => {
+  const r = props.opsState.worktreePrepareResult.value;
+  if (r === undefined || r.ok || r.cancelled) return undefined;
+  if (r.timedOut) return 'Timed out';
+  return r.error?.message || `Exited with status ${r.exitCode}`;
+});
+const prepareTitle = computed(() => {
+  if (prepareStatus.value === 'running') return `Preparing ${prepareFolder.value}`;
+  return prepareStatus.value === 'ready' ? 'Worktree ready' : 'Prepare script failed';
+});
+const prepareText = computed(() => {
+  if (prepareStatus.value === 'running') {
+    const lines = props.opsState.worktreePrepareOutput.value;
+    const last = lines[lines.length - 1]?.text.trim();
+    return last ? `Preparing ${prepareFolder.value}: ${last}` : `Preparing ${prepareFolder.value}…`;
+  }
+  if (prepareStatus.value === 'ready') return 'Worktree ready';
+  return `Prepare script failed: ${prepareNote.value ?? 'see output'}`;
+});
 
 async function doCancelWorktreePrepare(): Promise<void> {
   await props.opsState.cancelWorktreePrepare();
@@ -513,24 +558,53 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       />
     </div>
 
-    <!-- G25 D13: the same status-strip shape the remote-progress div above uses — visible once the
-         dialog that started a prepare run is dismissed (WorktreeDialog.vue's own doc comment:
-         dismissing never cancels the run), which is exactly when this strip becomes the only visible
-         indicator that one is still going. -->
-    <div
-      v-if="write && opsState.activeWorktreePreparePath.value !== undefined"
-      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted-foreground kv:text-sm"
-      data-testid="worktree-prepare-progress"
-    >
-      <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>
-      <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-65">Preparing worktree…</span>
-      <TooltipIconButton
-        icon="close"
-        label="Cancel"
-        data-testid="worktree-prepare-cancel"
-        @click="doCancelWorktreePrepare"
-      />
-    </div>
+    <!-- G25 D13: visible once the dialog that started a prepare run is dismissed (dismissing never
+         cancels the run). A failed run stays until dismissed; a finished one fades after 5 s. -->
+    <Popover v-if="write && prepareVisible">
+      <div
+        class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-sm"
+        :class="prepareStatus === 'failed' ? 'kv:text-diff-deleted' : 'kv:text-muted-foreground'"
+        :data-state="prepareStatus"
+        data-testid="worktree-prepare-progress"
+      >
+        <span
+          v-if="prepareStatus === 'running'"
+          class="codicon codicon-loading kv:inline-block kv:animate-spin"
+          aria-hidden="true"
+        ></span>
+        <span v-else-if="prepareStatus === 'ready'" class="codicon codicon-check" aria-hidden="true"></span>
+        <span v-else class="codicon codicon-error" aria-hidden="true"></span>
+        <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-65" data-testid="worktree-prepare-text">{{ prepareText }}</span>
+        <PopoverTrigger as-child>
+          <Button variant="ghost" size="xs" data-testid="worktree-prepare-output">Output</Button>
+        </PopoverTrigger>
+        <TooltipIconButton
+          v-if="prepareStatus === 'running'"
+          icon="close"
+          label="Cancel"
+          data-testid="worktree-prepare-cancel"
+          @click="doCancelWorktreePrepare"
+        />
+        <TooltipIconButton
+          v-else
+          icon="close"
+          label="Dismiss"
+          data-testid="worktree-prepare-dismiss"
+          @click="opsState.dismissWorktreePrepareResult()"
+        />
+      </div>
+      <PopoverContent class="w-96" align="start">
+        <ScriptProgress
+          :state="prepareStatus ?? 'ready'"
+          :title="prepareTitle"
+          :started-at="opsState.worktreePrepareStartedAt.value ?? 0"
+          :finished-at="opsState.worktreePrepareFinishedAt.value"
+          :note="prepareNote"
+        >
+          <PrepareOutput :lines="opsState.worktreePrepareOutput.value" />
+        </ScriptProgress>
+      </PopoverContent>
+    </Popover>
 
     <UndoButton
       :ops="opsState"
