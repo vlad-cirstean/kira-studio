@@ -157,9 +157,17 @@ reviewTest('a failed fetch from the sync popover shows its error', async ({ rela
       },
     ],
   };
-  const page = await openReview(relaunch, [{ channel: IPC.adeTaskRefresh, response: failed }]);
+  const plan = {
+    ...adeFixture<object>('gh-sync-plan'),
+    status: 'headNotFetched',
+    message: 'PR head not fetched',
+  };
+  const page = await openReview(relaunch, [
+    { channel: IPC.adeTaskRefresh, response: failed },
+    { channel: IPC.adeTaskGitHubSyncPlan, response: plan },
+  ]);
   await page.locator(t('ade-review-sync')).click();
-  await page.locator(t('ade-review-sync-refresh')).click();
+  await page.locator(t('ade-review-sync-refresh')).dispatchEvent('click');
   await expect(page.locator(t('ade-review-sync-error'))).toHaveText('Could not fetch origin');
 });
 
