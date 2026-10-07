@@ -50,6 +50,9 @@ needs.
   running and there's no systemd. Start it directly, as root: `nohup dockerd > /tmp/dockerd.log 2>&1 &
   disown`, then check `docker info` / `/tmp/dockerd.log` for `"API listen on
   /var/run/docker.sock"`. Once per fresh container.
+- **The Docker module's real-engine test needs the daemon up** (P200): `go test -race -v
+  ./internal/docker/... ./internal/shell/...`; `TestEngine` skips without `dockerd`, so confirm it
+  shows `--- PASS`, not `SKIP`.
 - **The other dev environment (macOS) uses Colima** (`colima start`) — not `dockerd` directly, and
   no systemd there either.
 - **Docker Hub blob downloads are blocked here.** `production.cloudfront.docker.com` (the CDN every
@@ -362,11 +365,17 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
   `false`, so real git features never come up in this recipe as shipped. Exercising them needs a
   throwaway local patch to `Locate` returning a real `git` binary path — **never commit that
   patch**; revert it before finishing the session, same as any other sandbox-only workaround.
+- **A fresh or reused worktree needs `bun run setup` before typecheck, unit tests, knip or a push.**
+  Bindings are gitignored; a stale set (e.g. a removed `SetAgentAware`, a new `DockerService`) breaks
+  `typecheck`, `test:unit` and the pre-push `lint:dead` (knip). Run it in the worktree you push from,
+  then push again if the hook failed on missing bindings.
 - **The ADE v2 flows need no `Locate` patch** (P148 live run): seed `code_repos`, `windows('main')` and
   `git.path` rows, and the board, runs, Take over, archive and dialogs all work.
 - **`claude -p` blocks a standalone `sleep N` and backgrounds it**, so the run ends `ended without
   finish_step`. A live-run step that must stay running prompts `until [ -f <flag> ]; do sleep 2; done`.
   Kill leftover `claude` TUI processes after a run.
+- **A reused server-tag harness home keeps persisted tabs.** A stale repo-graph tab in `tabs` makes a
+  fresh run open the old graph; delete the row before reuse (P203).
 - **An interactive `claude` cannot sign in here** (P149, 2.1.289): a fresh TUI stops at the theme picker,
   then the login menu. `claude -p` works. To exercise the Stop hook path, read the launched process's
   `/proc/<pid>/environ` (`KIRA_AGENT_HOOK_TOKEN`, `KIRA_TERMINAL_ID`) and argv (`--settings <hooks.json>`),
@@ -396,6 +405,19 @@ automatically: idempotent, skips when the browser and all five packages are pres
 `KIRA_SKIP_WEBKIT=1` to skip. Failure (offline, apt error) warns with the manual commands and
 exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install only.
 
+## Memory MCP and the `claude` CLI (P201)
+
+- `KIRA_MEMORY_HOME` scopes `memory.db` (default `~/.kira-memory`). `testx.RunWithTempHomes` sets it
+  for test binaries.
+- Smoke against the real CLI, not in CI: `go test -tags claudesmoke ./internal/memory/ -run Smoke -v`.
+  Needs an authenticated `claude` on `PATH` (`claude -p` works here, CLI 2.1.292; ~14 s, a few cents).
+  The gate uses `--safe-mode --setting-sources "" --strict-mcp-config --tools "" --no-session-persistence`;
+  never `--bare`, it forces API-key auth.
+- MCP path: `go build -tags server ./apps/kira-space`, then `claude -p --mcp-config <file>
+  --strict-mcp-config` with a `stdio` server `{command: <binary>, args: ["memory-mcp"], env:
+  {KIRA_MEMORY_HOME: <tmp>}}`. `printf '' | <binary> memory-mcp` exits 0. The macOS app-bundle binary
+  is unchecked (Known open items).
+
 ## `tests/visual/*` pixel diffs — a sandbox font-package mismatch, not a code regression
 
 The `visual` Playwright project's baselines are captured on a specific CI Ubuntu image (P6 plan
@@ -410,7 +432,9 @@ failure is a real regression: check whether the diff is this uniform text-render
 (every glyph on the page, not one specific element) rather than an element moving/resizing/changing
 color — the former is this sandbox's font drift, not a bug, and `--update-snapshots` run from here
 would corrupt the real CI baseline with this container's non-canonical rendering rather than fix
-anything. Confirmed 2026-09-22 (v1.9 P104 Stream A verification).
+anything. Confirmed 2026-09-22 (v1.9 P104 Stream A verification). v2.1 added real content changes on
+top of the drift (fourth Studio mode tab, Space Claude Code settings item, quick-commands dialog), so
+those baselines need one regeneration on the CI-Linux setup, not just a drift dismissal.
 
 ## `golangci-lint` / `knip` — code-quality tooling in this environment (P94)
 
@@ -510,7 +534,8 @@ It installs `@colbymchenry/codegraph` globally via `npm` if missing, then `codeg
 `scripts/prepare-worktree.sh` — or both in one call via `scripts/prepare-dev-environment.sh`. The
 index lives in `.codegraph/` (gitignored). `.mcp.json` registers
 `codegraph serve --mcp`; its one tool is
-`codegraph_explore`, deferred until `ToolSearch` loads it. A `UserPromptSubmit` hook
+`codegraph_explore`, deferred until `ToolSearch` loads it. Each stream worktree (`/home/user/kira-v21-X`)
+needs its own run of `scripts/codegraph-setup.sh`; a `.codegraph/` missing there means a cold index. A `UserPromptSubmit` hook
 (`codegraph prompt-hook`) injects matching symbols into every prompt — this hook still fires
 per-message regardless of how the index got built. If a worktree was never provisioned with
 `scripts/codegraph-setup.sh` (a manual clone, say), run it by hand once before relying on the index.
