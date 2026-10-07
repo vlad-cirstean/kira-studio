@@ -116,7 +116,7 @@ const tabClass =
 <template>
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
-      <Button variant="dialog" size="xs" class="h-[26px] gap-1.5 rounded-kira px-2.5 text-kira-md" data-testid="ade-add">
+      <Button variant="dialog" size="xs" class="gap-1.5 rounded-kira px-2.5" data-testid="ade-add">
         <CodiconIcon name="add" :size="12" />
         Add task
       </Button>
@@ -130,13 +130,13 @@ const tabClass =
       </Tabs>
       <div v-if="tab === 'new'" class="grid grid-cols-[78px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-2 p-3 text-kira-md">
         <label for="ade-nw-title" class="text-muted-foreground">Title</label>
-        <Input id="ade-nw-title" v-model="title" placeholder="What needs doing" class="h-7" data-testid="ade-nw-title" />
+        <Input id="ade-nw-title" v-model="title" placeholder="What needs doing" data-testid="ade-nw-title" />
         <label for="ade-nw-jira" class="text-muted-foreground">Jira</label>
         <Input
           id="ade-nw-jira"
           v-model="jira"
           placeholder="paste link or key (optional)"
-          class="h-7 font-data text-kira-sm"
+          class="font-data"
           data-testid="ade-nw-jira"
         />
         <span class="text-muted-foreground">Repos</span>
@@ -164,12 +164,12 @@ const tabClass =
           id="ade-nw-notes"
           v-model="notes"
           placeholder="Context for Claude (optional)"
-          class="min-h-[54px] resize-y text-kira-md"
+          class="resize-y"
           data-testid="ade-nw-notes"
         />
         <span />
         <div class="flex items-center gap-2.5">
-          <Button variant="dialog-primary" size="xs" class="h-7 px-3" :disabled="cantAdd" data-testid="ade-nw-add" @click="addNew">
+          <Button variant="dialog-primary" size="xs" class="px-3" :disabled="cantAdd" data-testid="ade-nw-add" @click="addNew">
             Add to Later
           </Button>
           <span class="text-kira-sm text-subtle">No branches yet. Claude creates one per repo on Start.</span>

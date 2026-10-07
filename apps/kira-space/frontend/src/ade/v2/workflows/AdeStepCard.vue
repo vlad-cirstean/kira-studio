@@ -57,7 +57,7 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       <Input
         :id="id('name')"
         :model-value="step.name"
-        class="h-[26px] min-w-0 flex-1 bg-field text-kira-md font-semibold"
+        class="min-w-0 flex-1 bg-field font-semibold"
         data-testid="ade-wf-step-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
@@ -70,7 +70,6 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       <NativeSelect
         :id="id('scope')"
         variant="bordered"
-        class="h-[26px] text-kira-md"
         :model-value="step.runsOn"
         data-testid="ade-wf-step-scope"
         @update:model-value="(v) => patch({ runsOn: String(v) as PipelineStep['runsOn'] })"
@@ -81,7 +80,6 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       <NativeSelect
         :id="id('gate')"
         variant="bordered"
-        class="h-[26px] text-kira-md"
         :model-value="step.before"
         data-testid="ade-wf-step-gate"
         @update:model-value="(v) => patch({ before: v === 'approval' ? 'approval' : 'auto' })"
@@ -93,7 +91,6 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       <NativeSelect
         :id="id('fail')"
         variant="bordered"
-        class="h-[26px] text-kira-md"
         :model-value="step.onFailure"
         data-testid="ade-wf-step-fail"
         @update:model-value="(v) => patch({ onFailure: String(v) as OnFailure })"
@@ -104,7 +101,7 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       <Input
         :id="id('timeout')"
         :model-value="step.timeout"
-        class="h-[26px] w-14 bg-field px-1.5 font-data text-kira-md"
+        class="w-14 bg-field px-1.5 font-data"
         data-testid="ade-wf-step-timeout"
         @update:model-value="(v: string | number) => patch({ timeout: String(v) })"
       />
@@ -118,7 +115,7 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
         :id="id('tools')"
         :model-value="toolsText"
         placeholder="Bash(git *), Edit"
-        class="h-[26px] bg-bg font-data text-kira-md"
+        class="bg-bg font-data"
         data-testid="ade-wf-step-tools"
         @update:model-value="onTools"
       />
@@ -128,7 +125,7 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       :id="id('prompt')"
       :model-value="step.prompt"
       placeholder="Prompt"
-      class="ml-[38px] min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data text-kira-md leading-normal"
+      class="ml-[38px] min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data leading-normal"
       data-testid="ade-wf-step-prompt"
       @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
     />

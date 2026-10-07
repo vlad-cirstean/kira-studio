@@ -215,7 +215,7 @@ function deployNote(d: Deployment): string {
         <button
           v-if="setupFailed"
           type="button"
-          class="h-[26px] cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold"
+          class="h-control-lg cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold"
           :style="solidStyle('amber')"
           data-testid="ade-panel-retry-setup"
           @click="onRetrySetup"
@@ -225,7 +225,7 @@ function deployNote(d: Deployment): string {
         <AdeTip v-if="canForcePush" text="git push --force-with-lease">
           <button
             type="button"
-            class="h-[26px] cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold"
+            class="h-control-lg cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold"
             :style="solidStyle('amber')"
             data-testid="ade-panel-force-push"
             @click="forcePush = true"
@@ -237,7 +237,7 @@ function deployNote(d: Deployment): string {
           v-for="a in actions"
           :key="a.kind + a.label"
           type="button"
-          class="h-[26px] cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold disabled:cursor-default disabled:opacity-60"
+          class="h-control-lg cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold disabled:cursor-default disabled:opacity-60"
           :style="actionTone(a)"
           :disabled="a.kind === 'created' || rebasing(a)"
           :data-testid="`ade-panel-action-${a.kind}`"
@@ -269,7 +269,7 @@ function deployNote(d: Deployment): string {
             <span class="flex-1" />
             <button
               type="button"
-              class="size-[22px] shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-muted-foreground"
+              class="size-control shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-muted-foreground"
               aria-label="Copy Branch link"
               title="Copy link"
               @click="copyLink('branch', branchUrl || branch.name)"
@@ -291,7 +291,7 @@ function deployNote(d: Deployment): string {
             <span class="min-w-0 flex-1 truncate text-kira-md">{{ pr.title }}</span>
             <button
               type="button"
-              class="size-[22px] shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-muted-foreground"
+              class="size-control shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-muted-foreground"
               aria-label="Copy PR link"
               title="Copy link"
               @click="copyLink('pr', pr.url)"
@@ -309,7 +309,7 @@ function deployNote(d: Deployment): string {
         <div
           v-for="i in intoRows"
           :key="i.target"
-          class="flex h-[30px] items-center gap-2 rounded-kira bg-elevated px-1.5"
+          class="flex h-8 items-center gap-2 rounded-kira bg-elevated px-1.5"
           data-testid="ade-branch-into"
           :data-target="i.target"
         >
@@ -319,7 +319,7 @@ function deployNote(d: Deployment): string {
           <button
             v-if="canMerge && i.status !== 'merged'"
             type="button"
-            class="h-[22px] shrink-0 cursor-pointer rounded-kira-sm border-0 px-2 text-kira-sm font-semibold"
+            class="h-control shrink-0 cursor-pointer rounded-kira-sm border-0 px-2 text-kira-sm font-semibold"
             :style="actionStyle(i.status === 'stale' ? 'amber' : 'claude')"
             :disabled="dialogs.pending.has(`merge:${branch.id}:${i.target}`)"
             data-testid="ade-branch-merge"
@@ -338,7 +338,7 @@ function deployNote(d: Deployment): string {
         <div
           v-for="d in deployRows"
           :key="d.env"
-          class="flex h-[30px] items-center gap-2 rounded-kira bg-elevated px-1.5"
+          class="flex h-8 items-center gap-2 rounded-kira bg-elevated px-1.5"
           data-testid="ade-branch-deploy"
           :data-env="d.env"
         >

@@ -88,7 +88,7 @@ function onEdit(id: string, value: string): void {
         id="ade-backlog-add"
         v-model="text"
         placeholder="Type a thought and press Enter"
-        class="h-[34px] rounded-kira-lg bg-field px-3 text-kira-lg"
+        class="rounded-kira-lg bg-field px-3"
         data-testid="ade-backlog-add"
         @keydown.enter="capture"
       />

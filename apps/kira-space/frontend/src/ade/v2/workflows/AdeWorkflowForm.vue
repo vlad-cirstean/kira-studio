@@ -68,7 +68,7 @@ onBeforeUnmount(() => {
       <Input
         id="ade-wf-form-name"
         :model-value="wf.name"
-        class="h-[30px] w-80 bg-field text-kira-lg font-semibold"
+        class="w-80 bg-field font-semibold"
         data-testid="ade-wf-form-name"
         @update:model-value="(v: string | number) => edit({ ...wf as Workflow, name: String(v) })"
       />
@@ -92,7 +92,7 @@ onBeforeUnmount(() => {
     <Button
       variant="dialog"
       size="sm"
-      class="h-7 self-start border-dashed bg-transparent px-3 text-kira-lg"
+      class="self-start border-dashed bg-transparent px-3"
       data-testid="ade-wf-add-stage"
       @click="setStages([...wf.stages, newStage(wf.stages)])"
     >

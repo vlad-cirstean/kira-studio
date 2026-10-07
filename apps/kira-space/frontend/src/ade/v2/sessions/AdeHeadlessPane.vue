@@ -51,7 +51,7 @@ async function onStop(): Promise<void> {
       <Button
         v-if="!archived"
         size="xs"
-        class="h-[22px] shrink-0 rounded-kira-sm px-2.5 text-kira-sm font-semibold"
+        class="shrink-0 rounded-kira-sm px-2.5 font-semibold"
         :style="actionStyle('claude')"
         :disabled="takeOver.pending.has(view.session.id)"
         title="Continue this run yourself in an interactive Claude Code session"
@@ -64,7 +64,7 @@ async function onStop(): Promise<void> {
         <Button
           variant="dialog"
           size="xs"
-          class="h-[22px] shrink-0 rounded-kira-sm px-2.5 text-kira-sm"
+          class="shrink-0 rounded-kira-sm px-2.5"
           :disabled="stop.isPending.value"
           data-testid="ade-session-stop"
           @click="onStop"

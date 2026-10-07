@@ -43,7 +43,6 @@ function edit(): void {
       <NativeSelect
         id="ade-workflow-select"
         variant="bordered"
-        class="h-6 text-kira-md"
         :model-value="card.task.workflowId"
         data-testid="ade-workflow-select"
         @update:model-value="pick"
@@ -54,7 +53,7 @@ function edit(): void {
       <Button
         variant="link"
         size="xs"
-        class="h-[22px] px-2 text-kira-sm text-info"
+        class="px-2 text-info"
         data-testid="ade-edit-workflows"
         @click="edit"
       >

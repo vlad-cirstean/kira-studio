@@ -42,7 +42,7 @@ const rowBackground = computed(() => {
       <span class="text-kira-md text-muted-foreground" data-testid="ade-needs-age">{{ shortAge(item.ageMs) }}</span>
       <Button
         size="xs"
-        class="h-[26px] rounded-kira text-kira-md font-semibold"
+        class="rounded-kira font-semibold"
         :style="buttonStyle"
         :disabled="busy"
         data-testid="ade-needs-action"

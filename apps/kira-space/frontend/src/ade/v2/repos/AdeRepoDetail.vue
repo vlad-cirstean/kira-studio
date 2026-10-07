@@ -99,7 +99,7 @@ function addEnv(): void {
           <Input
             id="ade-repo-nick"
             :model-value="nick.text.value"
-            class="h-[30px] w-[200px] bg-field font-data text-kira-lg font-semibold"
+            class="w-50 bg-field font-data font-semibold"
             data-testid="ade-repo-nick"
             @update:model-value="nick.onInput"
             @blur="nick.onCommit"
@@ -130,7 +130,7 @@ function addEnv(): void {
       <Textarea
         id="ade-repo-prepare"
         :model-value="prepare.text.value"
-        class="min-h-[72px] resize-y bg-bg px-2.5 py-2 font-data text-kira-md leading-normal"
+        class="resize-y bg-bg px-2.5 py-2 font-data leading-normal"
         data-testid="ade-repo-prepare"
         @update:model-value="prepare.onInput"
         @blur="prepare.onCommit"
@@ -141,7 +141,7 @@ function addEnv(): void {
         <Input
           id="ade-repo-timeout"
           :model-value="timeout.text.value"
-          class="h-6 w-[60px] bg-field px-1.5 font-data text-kira-md"
+          class="w-15 bg-field px-1.5 font-data"
           data-testid="ade-repo-timeout"
           @update:model-value="timeout.onInput"
           @blur="timeout.onCommit"
@@ -161,7 +161,7 @@ function addEnv(): void {
         id="ade-repo-targets"
         :model-value="targets.text.value"
         placeholder="develop, staging"
-        class="h-[30px] bg-field font-data text-kira-md"
+        class="bg-field font-data"
         data-testid="ade-repo-targets"
         @update:model-value="targets.onInput"
         @blur="targets.onCommit"
@@ -188,7 +188,7 @@ function addEnv(): void {
       <Button
         variant="dialog"
         size="sm"
-        class="h-7 self-start border-dashed bg-transparent px-3 text-kira-md"
+        class="self-start border-dashed bg-transparent px-3"
         :disabled="update.isPending.value"
         data-testid="ade-repo-add-env"
         @click="addEnv"

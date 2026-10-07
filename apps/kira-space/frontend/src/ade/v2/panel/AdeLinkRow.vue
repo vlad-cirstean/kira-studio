@@ -54,7 +54,7 @@ function openLink(e: MouseEvent): void {
         <span class="min-w-0 flex-1" />
         <button
           type="button"
-          class="size-[22px] shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-kira-md text-muted-foreground"
+          class="size-control shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-kira-md text-muted-foreground"
           :aria-label="`Copy ${label} link`"
           title="Copy link"
           :data-testid="`${id}-copy`"
@@ -64,7 +64,7 @@ function openLink(e: MouseEvent): void {
         </button>
         <button
           type="button"
-          class="size-[22px] shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-kira-md text-muted-foreground"
+          class="size-control shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-kira-md text-muted-foreground"
           :aria-label="`Remove ${label} link`"
           title="Remove"
           :data-testid="`${id}-clear`"
@@ -79,14 +79,14 @@ function openLink(e: MouseEvent): void {
           :id="id"
           v-model="draft"
           :placeholder="placeholder"
-          class="h-6 min-w-0 flex-1 border-dashed font-data text-kira-sm"
+          class="min-w-0 flex-1 border-dashed font-data"
           :data-testid="`${id}-input`"
           @keydown.enter="onSave"
         />
         <Button
           variant="dialog"
           size="xs"
-          class="h-6 shrink-0"
+          class="shrink-0"
           :data-testid="`${id}-save`"
           @click="onSave"
         >

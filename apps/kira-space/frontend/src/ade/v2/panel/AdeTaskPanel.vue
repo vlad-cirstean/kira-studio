@@ -94,7 +94,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         <AdeTip v-if="quietArchive" :text="ARCHIVE_TIP">
           <button
             type="button"
-            class="h-[22px] shrink-0 cursor-pointer rounded-kira-sm border-0 px-[9px] text-kira-sm font-semibold"
+            class="h-control shrink-0 cursor-pointer rounded-kira-sm border-0 px-[9px] text-kira-sm font-semibold"
             :style="solidStyle('grey')"
             :disabled="dialogs.pending.has(`archive:${card.task.id}`)"
             data-testid="ade-panel-archive"

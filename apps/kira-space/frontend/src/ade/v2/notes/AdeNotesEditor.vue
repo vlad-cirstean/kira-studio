@@ -220,10 +220,10 @@ function keepFocus(e: MouseEvent): void {
           id="ade-notes-link"
           v-model="linkUrl"
           placeholder="https://"
-          class="ml-1 h-6 w-[170px] border-dashed font-data text-kira-sm"
+          class="ml-1 w-[170px] border-dashed font-data"
           @keydown="onLinkKey"
         />
-        <Button variant="dialog" size="sm" class="h-6 shrink-0 px-2" @mousedown="keepFocus" @click="applyLink"
+        <Button variant="dialog" size="sm" class="shrink-0 px-2" @mousedown="keepFocus" @click="applyLink"
           >Add</Button
         >
       </template>

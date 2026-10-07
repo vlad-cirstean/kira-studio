@@ -124,7 +124,7 @@ const solidBorder = computed(
     <div
       class="box-border flex min-w-0 flex-1 flex-col gap-2.5 rounded-kira"
       :class="[
-        empty ? (greyed ? 'min-h-4' : 'min-h-[22px]') : 'pb-2.5 pl-2 pt-2',
+        empty ? (greyed ? 'min-h-4' : 'min-h-control') : 'pb-2.5 pl-2 pt-2',
         highlight ? 'outline outline-1 outline-dashed outline-focus' : '',
       ]"
       :style="highlight ? { background: 'color-mix(in srgb, var(--kira-focus) 10%, transparent)' } : undefined"
@@ -135,7 +135,7 @@ const solidBorder = computed(
         v-for="h in history"
         :key="h.key"
         type="button"
-        class="ml-[218px] flex h-[30px] w-full max-w-140 cursor-pointer items-center gap-2 border-0 text-left rounded-kira-sm px-2.5 text-kira-md text-muted-foreground"
+        class="ml-[218px] flex h-8 w-full max-w-140 cursor-pointer items-center gap-2 border-0 text-left rounded-kira-sm px-2.5 text-kira-md text-muted-foreground"
         :style="{ background: `color-mix(in srgb, ${TONE.purple[2]} 6%, transparent)` }"
         :data-selected="ui.selectedTaskId === h.key || undefined"
         data-testid="ade-history-row"
@@ -154,7 +154,7 @@ const solidBorder = computed(
         <span>{{ overdueNote }}</span>
         <button
           type="button"
-          class="h-[22px] whitespace-nowrap rounded-kira-sm border-0 px-[9px] text-kira-sm font-semibold"
+          class="h-control whitespace-nowrap rounded-kira-sm border-0 px-[9px] text-kira-sm font-semibold"
           :style="{ background: TONE.amber[2], color: TONE_INK.amber }"
           data-testid="ade-band-rollover"
           @click="emit('rollover')"
@@ -166,7 +166,7 @@ const solidBorder = computed(
         <span>{{ overflowNote }}</span>
         <button
           type="button"
-          class="h-[22px] max-w-90 truncate whitespace-nowrap rounded-kira-sm border bg-transparent px-[9px] text-kira-sm font-semibold"
+          class="h-control max-w-90 truncate whitespace-nowrap rounded-kira-sm border bg-transparent px-[9px] text-kira-sm font-semibold"
           :style="{ borderColor: TONE.red[2], color: TONE.red[1] }"
           data-testid="ade-band-overflow-move"
           @click="emit('overflowMove')"

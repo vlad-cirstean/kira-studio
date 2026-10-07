@@ -70,7 +70,7 @@ function saveNotes(_id: string, value: string): void {
       <div class="flex gap-2">
         <Button
           size="xs"
-          class="h-[26px] border-0 px-2.5 font-semibold"
+          class="border-0 px-2.5 font-semibold"
           :style="solidStyle('amber')"
           title="Turn into a task in the Spec phase, unscheduled (Later)"
           data-testid="ade-backlog-panel-promote"
@@ -81,7 +81,7 @@ function saveNotes(_id: string, value: string): void {
         <Button
           variant="dialog"
           size="xs"
-          class="h-[26px] px-2.5"
+          class="px-2.5"
           data-testid="ade-backlog-panel-delete"
           @click="emit('remove')"
         >
@@ -94,7 +94,7 @@ function saveNotes(_id: string, value: string): void {
       <Input
         id="ade-backlog-title-input"
         v-model="title"
-        class="h-7 bg-field text-kira-lg font-semibold"
+        class="bg-field font-semibold"
         data-testid="ade-backlog-title-input"
         @blur="commitTitle"
         @keydown.enter="commitTitle"

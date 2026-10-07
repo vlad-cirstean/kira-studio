@@ -62,7 +62,7 @@ const nameStyle = computed(() => {
     <AdeTip :text="`Fetch ${label}`">
       <button
         type="button"
-        class="flex size-[22px] items-center justify-center rounded-kira-sm border-0 bg-transparent p-0 text-fg disabled:opacity-50"
+        class="flex size-control items-center justify-center rounded-kira-sm border-0 bg-transparent p-0 text-fg disabled:opacity-50"
         :disabled="busy"
         :aria-label="`Refresh ${label}`"
         data-testid="ade-repo-refresh"

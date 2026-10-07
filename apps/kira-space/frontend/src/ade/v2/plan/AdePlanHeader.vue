@@ -25,7 +25,7 @@ const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; tog
     <div class="flex flex-wrap items-center gap-2">
       <Button
         size="xs"
-        class="h-7 gap-1.5 rounded-kira bg-fg px-2.5 text-kira-md font-semibold text-bg hover:bg-fg/90"
+        class="gap-1.5 rounded-kira bg-fg px-2.5 font-semibold text-bg hover:bg-fg/90"
         :disabled="allBusy"
         data-testid="ade-refresh-all"
         @click="emit('refreshAll')"

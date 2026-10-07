@@ -119,7 +119,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       data-testid="ade-step"
       :data-step-id="sv.step.id"
     >
-      <div class="flex min-h-[22px] items-center gap-2">
+      <div class="flex min-h-control items-center gap-2">
         <span
           class="box-border flex size-4 shrink-0 items-center justify-center rounded-[4px] text-kira-sm font-extrabold"
           :style="boxStyleOf(sv.step.state)"
@@ -131,7 +131,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         <Button
           v-if="sv.step.approval"
           size="xs"
-          class="h-5 shrink-0 rounded-kira-xs px-2 text-kira-sm font-semibold"
+          class="shrink-0 rounded-kira-xs px-2 font-semibold"
           :style="solidStyle('amber')"
           data-testid="ade-step-approve"
           @click="onApprove(sv.step.id)"
@@ -157,7 +157,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         </AdeTip>
       </div>
       <template v-for="rl in sv.runs" :key="rl.run.branchId">
-        <div class="flex min-h-[22px] items-center gap-[7px] pl-6" data-testid="ade-run-line" :data-branch-id="rl.run.branchId">
+        <div class="flex min-h-control items-center gap-[7px] pl-6" data-testid="ade-run-line" :data-branch-id="rl.run.branchId">
           <span class="w-3.5 shrink-0 text-center text-kira-sm font-extrabold" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-glyph">{{ rl.glyph }}</span>
           <AdeRepoTag
             :code-repo-id="card.rows.find((r) => r.id === rl.run.branchId)?.branch.codeRepoId ?? ''"
@@ -168,7 +168,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
             v-if="rl.hasLog"
             variant="dialog"
             size="xs"
-            class="h-[18px] shrink-0 rounded-kira-xs px-[7px] text-kira-sm"
+            class="shrink-0 rounded-kira-xs px-[7px]"
             data-testid="ade-run-log-toggle"
             @click="openLog = openLog === rl.run.runId ? null : rl.run.runId"
           >
@@ -177,7 +177,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           <Button
             v-if="canTakeOver(rl.run)"
             size="xs"
-            class="h-[18px] shrink-0 rounded-kira-xs px-[7px] text-kira-sm font-semibold"
+            class="shrink-0 rounded-kira-xs px-[7px] font-semibold"
             :style="actionStyle('claude')"
             :disabled="takeOver.pending.has(rl.run.sessionId)"
             data-testid="ade-run-takeover"
@@ -188,7 +188,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           <Button
             v-if="rl.canRetry"
             size="xs"
-            class="h-[18px] shrink-0 rounded-kira-xs px-[7px] text-kira-sm font-semibold"
+            class="shrink-0 rounded-kira-xs px-[7px] font-semibold"
             :style="solidStyle('red')"
             data-testid="ade-run-retry"
             @click="onRetry(rl.run.runId)"
@@ -236,7 +236,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         <Button
           variant="dialog"
           size="xs"
-          class="h-[18px] shrink-0 rounded-kira-xs px-[7px] text-kira-sm"
+          class="shrink-0 rounded-kira-xs px-[7px]"
           :disabled="row.branch.name === ''"
           data-testid="ade-review-code"
           @click="onReview(row.id)"

@@ -15,7 +15,7 @@ const { action, perform, busy } = useTaskAction(() => props.card);
   <AdeTip v-if="action" :text="action.tip">
     <Button
       size="xs"
-      class="h-[22px] shrink-0 rounded-kira-sm px-[9px] text-kira-sm font-semibold"
+      class="shrink-0 rounded-kira-sm px-[9px] font-semibold"
       :style="actionStyle(action.tone)"
       :disabled="busy"
       :data-testid="`ade-task-action-${action.kind}`"

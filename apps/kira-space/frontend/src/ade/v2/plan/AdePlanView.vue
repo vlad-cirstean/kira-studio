@@ -334,7 +334,7 @@ function onForcePush(row: BranchRowModel): void {
       <button
         v-if="model.view.hiddenCount > 0"
         type="button"
-        class="ml-15 mt-2.5 flex h-[30px] w-[calc(100%-60px)] items-center justify-center gap-2 rounded-kira border border-dashed border-border-strong bg-transparent text-kira-md font-semibold text-fg"
+        class="ml-15 mt-2.5 flex h-8 w-[calc(100%-60px)] items-center justify-center gap-2 rounded-kira border border-dashed border-border-strong bg-transparent text-kira-md font-semibold text-fg"
         data-testid="ade-load-all"
         @click="ui.showAllItems = true"
       >
@@ -343,7 +343,7 @@ function onForcePush(row: BranchRowModel): void {
       <button
         v-if="model.view.canCollapse"
         type="button"
-        class="ml-15 mt-2.5 block h-[26px] rounded-kira border-0 bg-transparent px-2.5 text-kira-sm text-muted-foreground"
+        class="ml-15 mt-2.5 block h-control-lg rounded-kira border-0 bg-transparent px-2.5 text-kira-sm text-muted-foreground"
         data-testid="ade-collapse"
         @click="ui.showAllItems = false"
       >

@@ -47,7 +47,7 @@ function removeStep(i: number): void {
       <Input
         :id="n('name')"
         :model-value="stage.name"
-        class="h-7 min-w-0 flex-1 bg-field text-kira-lg font-bold"
+        class="min-w-0 flex-1 bg-field font-bold"
         data-testid="ade-wf-stage-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
@@ -55,7 +55,7 @@ function removeStep(i: number): void {
       <NativeSelect
         :id="n('kind')"
         variant="bordered"
-        class="h-[26px] min-w-[124px] text-kira-md"
+        class="min-w-31"
         :model-value="stage.kind"
         data-testid="ade-wf-stage-kind"
         @update:model-value="(v) => (stage = withKind(stage, String(v) as StageKind))"
@@ -68,7 +68,6 @@ function removeStep(i: number): void {
       <NativeSelect
         :id="n('status')"
         variant="bordered"
-        class="h-[26px] text-kira-md"
         title="Task status while in this stage"
         :model-value="stage.status"
         data-testid="ade-wf-stage-status"
@@ -76,9 +75,9 @@ function removeStep(i: number): void {
       >
         <option v-for="o in STATUS_OPTIONS" :key="o" :value="o">{{ o }}</option>
       </NativeSelect>
-      <Button variant="dialog" size="icon-xs" class="size-[26px]" aria-label="Move stage up" :disabled="first" data-testid="ade-wf-stage-up" @click="emit('up')">↑</Button>
-      <Button variant="dialog" size="icon-xs" class="size-[26px]" aria-label="Move stage down" :disabled="last" data-testid="ade-wf-stage-down" @click="emit('down')">↓</Button>
-      <Button variant="dialog" size="icon-xs" class="size-[26px] text-error" aria-label="Remove stage" data-testid="ade-wf-stage-remove" @click="emit('remove')">✕</Button>
+      <Button variant="dialog" size="icon-xs" aria-label="Move stage up" :disabled="first" data-testid="ade-wf-stage-up" @click="emit('up')">↑</Button>
+      <Button variant="dialog" size="icon-xs" aria-label="Move stage down" :disabled="last" data-testid="ade-wf-stage-down" @click="emit('down')">↓</Button>
+      <Button variant="dialog" size="icon-xs" class="text-error" aria-label="Remove stage" data-testid="ade-wf-stage-remove" @click="emit('remove')">✕</Button>
     </div>
 
     <template v-if="stage.kind === 'user'">
@@ -98,7 +97,7 @@ function removeStep(i: number): void {
           :id="n('prompt')"
           :model-value="stage.prompt"
           placeholder="First message for the session (optional)"
-          class="ml-8 min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data text-kira-md leading-normal"
+          class="ml-8 min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data leading-normal"
           data-testid="ade-wf-stage-prompt"
           @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
         />
@@ -117,7 +116,7 @@ function removeStep(i: number): void {
         :id="n('command')"
         :model-value="stage.command"
         placeholder="./scripts/release.sh --branch {branch}"
-        class="min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data text-kira-md leading-normal"
+        class="min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data leading-normal"
         data-testid="ade-wf-stage-command"
         @update:model-value="(v: string | number) => patch({ command: String(v) })"
       />
@@ -126,7 +125,6 @@ function removeStep(i: number): void {
         <NativeSelect
           :id="n('scope')"
           variant="bordered"
-          class="h-[26px] text-kira-md"
           :model-value="stage.runsOn"
           data-testid="ade-wf-stage-scope"
           @update:model-value="(v) => patch({ runsOn: String(v) as Stage['runsOn'] })"
@@ -137,7 +135,6 @@ function removeStep(i: number): void {
         <NativeSelect
           :id="n('fail')"
           variant="bordered"
-          class="h-[26px] text-kira-md"
           :model-value="stage.onFailure"
           data-testid="ade-wf-stage-fail"
           @update:model-value="(v) => patch({ onFailure: String(v) as OnFailure })"
@@ -148,7 +145,7 @@ function removeStep(i: number): void {
         <Input
           :id="n('timeout')"
           :model-value="stage.timeout"
-          class="h-[26px] w-14 bg-field px-1.5 font-data text-kira-md"
+          class="w-14 bg-field px-1.5 font-data"
           data-testid="ade-wf-stage-timeout"
           @update:model-value="(v: string | number) => patch({ timeout: String(v) })"
         />
@@ -174,7 +171,7 @@ function removeStep(i: number): void {
       <Button
         variant="dialog"
         size="xs"
-        class="h-[26px] self-start border-dashed bg-transparent px-2.5 text-kira-md"
+        class="self-start border-dashed bg-transparent px-2.5"
         data-testid="ade-wf-add-step"
         @click="setSteps([...stage.steps, newStep(stage.steps)])"
       >

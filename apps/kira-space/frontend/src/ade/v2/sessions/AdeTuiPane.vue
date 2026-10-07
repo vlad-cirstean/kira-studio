@@ -60,7 +60,7 @@ async function show(): Promise<void> {
     </div>
     <TerminalHostView v-if="held" :key="view.session.terminalId" class="min-h-0 flex-1" :tab="tab" :deps="terminal.host" />
     <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-tui-elsewhere">
-      <Button variant="dialog" size="xs" class="h-[22px] px-2.5 text-kira-sm" data-testid="ade-tui-show" @click="show">
+      <Button variant="dialog" size="xs" class="px-2.5" data-testid="ade-tui-show" @click="show">
         Show
       </Button>
       <p v-if="missing" class="m-0 text-muted-foreground" data-testid="ade-tui-missing">

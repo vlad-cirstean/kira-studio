@@ -25,7 +25,7 @@ const script = useCommitField(
       <Input
         :id="`ade-env-name-${index}`"
         :model-value="name.text.value"
-        class="h-7 w-[110px] shrink-0 bg-field px-2 font-data text-kira-md font-semibold"
+        class="w-[110px] shrink-0 bg-field px-2 font-data font-semibold"
         data-testid="ade-env-name"
         @update:model-value="name.onInput"
         @blur="name.onCommit"
@@ -36,7 +36,7 @@ const script = useCommitField(
         :id="`ade-env-script-${index}`"
         :model-value="script.text.value"
         placeholder="prints the deployed SHA"
-        class="h-7 min-w-0 flex-1 bg-bg px-2 font-data text-kira-md"
+        class="min-w-0 flex-1 bg-bg px-2 font-data"
         data-testid="ade-env-script"
         @update:model-value="script.onInput"
         @blur="script.onCommit"

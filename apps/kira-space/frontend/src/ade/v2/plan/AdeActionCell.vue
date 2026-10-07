@@ -51,7 +51,7 @@ const TESTID: Record<BranchAction['kind'], string> = {
     <AdeTip v-for="a in actions" :key="a.kind" :text="a.tip">
       <Button
         size="xs"
-        class="h-[22px] shrink-0 rounded-kira-sm px-[9px] text-kira-sm font-semibold"
+        class="shrink-0 rounded-kira-sm px-[9px] font-semibold"
         :style="STYLE[a.kind]()"
         :disabled="a.kind === 'rebase' && rebasing"
         :data-testid="TESTID[a.kind]"

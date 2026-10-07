@@ -70,7 +70,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         type="number"
         min="0.5"
         step="0.5"
-        class="h-6 w-14 font-data text-kira-sm"
+        class="w-14 font-data"
         data-testid="ade-estimate-extend"
       />
       <span class="text-kira-sm text-muted-foreground">{{ parsed.unit === 'd' ? 'days' : 'hours' }}</span>
@@ -78,7 +78,6 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         type="button"
         variant="dialog"
         size="xs"
-        class="h-6"
         :disabled="!canExtend"
         data-testid="ade-estimate-extend-submit"
         @click="extend"
@@ -95,7 +94,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         type="number"
         min="0"
         step="0.5"
-        class="h-6 w-14 font-data text-kira-sm"
+        class="w-14 font-data"
         data-testid="ade-estimate-num"
         @change="commit"
       />

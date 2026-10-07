@@ -43,7 +43,7 @@ function setMode(v: unknown): void {
       <Button
         variant="dialog"
         size="xs"
-        class="h-[26px] px-2.5 text-kira-sm"
+        class="px-2.5"
         :disabled="!yaml.data.value"
         data-testid="ade-wf-copy"
         @click="yaml.data.value && copy(yaml.data.value.yaml)"

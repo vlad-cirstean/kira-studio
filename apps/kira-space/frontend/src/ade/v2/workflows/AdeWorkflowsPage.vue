@@ -78,13 +78,12 @@ async function createNew(): Promise<void> {
         <Button
           variant="dialog"
           size="xs"
-          class="h-6 text-kira-sm"
           data-testid="ade-wf-import"
           @click="importOpen = !importOpen"
         >
           Import YAML
         </Button>
-        <Button variant="dialog" size="xs" class="h-6 text-kira-sm" data-testid="ade-wf-new" @click="createNew">
+        <Button variant="dialog" size="xs" data-testid="ade-wf-new" @click="createNew">
           + New
         </Button>
         </template>
@@ -97,14 +96,13 @@ async function createNew(): Promise<void> {
             id="ade-wf-import-path"
             v-model="importPath"
             placeholder="~/…/workflow.yaml"
-            class="h-[26px] min-w-0 flex-1 border-dashed bg-transparent font-data text-kira-sm"
+            class="min-w-0 flex-1 border-dashed bg-transparent font-data"
             data-testid="ade-wf-import-path"
             @keydown.enter="runImport"
           />
           <Button
             variant="dialog"
             size="xs"
-            class="h-[26px] text-kira-sm"
             :disabled="importWf.isPending.value"
             data-testid="ade-wf-import-go"
             @click="runImport"

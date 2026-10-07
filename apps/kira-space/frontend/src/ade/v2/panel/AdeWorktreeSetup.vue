@@ -83,12 +83,12 @@ watch(
 <template>
   <div v-if="setup" ref="root" class="flex flex-col gap-0.5" data-testid="ade-worktree-setup">
     <div class="pb-0.5 text-kira-sm text-muted-foreground">Worktree setup</div>
-    <div class="flex h-[30px] items-center gap-2 rounded-kira bg-elevated px-1.5">
+    <div class="flex h-8 items-center gap-2 rounded-kira bg-elevated px-1.5">
       <AdeChip :label="LABEL[setup.state] ?? setup.state" :tone="TONE_OF[setup.state] ?? 'grey'" wide />
       <Button
         v-if="setup.state === 'failed'"
         size="xs"
-        class="h-5 shrink-0 rounded-kira-xs px-2 text-kira-sm font-semibold"
+        class="shrink-0 rounded-kira-xs px-2 font-semibold"
         :style="solidStyle('amber')"
         data-testid="ade-setup-retry"
         @click="onRetry"

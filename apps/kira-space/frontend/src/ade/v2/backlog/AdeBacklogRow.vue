@@ -115,7 +115,7 @@ const ICON_BTN =
     <Input
       :id="`ade-backlog-${item.id}`"
       v-model="draft"
-      class="h-[30px] min-w-0 flex-1 border-transparent bg-transparent px-2 text-kira-lg focus-visible:border-focus dark:bg-transparent"
+      class="min-w-0 flex-1 border-transparent bg-transparent px-2 focus-visible:border-focus dark:bg-transparent"
       data-testid="ade-backlog-text"
       @blur="commit"
       @keydown.enter="commit"

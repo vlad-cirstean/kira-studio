@@ -43,7 +43,7 @@ function taskOf(taskId: string): { title: string; color: string } {
         </div>
         <div class="flex items-center gap-2.5 border-t border-border px-3 py-2.5 text-kira-md text-muted-foreground">
           <span class="flex-1" data-testid="ade-needs-footer">{{ needs.footer }}</span>
-          <Button variant="dialog" size="xs" class="h-6 px-2.5 text-kira-sm" data-testid="ade-needs-all" @click="showAll = !showAll">
+          <Button variant="dialog" size="xs" class="px-2.5" data-testid="ade-needs-all" @click="showAll = !showAll">
             {{ showAll ? 'Hide all sessions' : 'All sessions' }}
           </Button>
         </div>

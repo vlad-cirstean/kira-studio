@@ -15,7 +15,7 @@ function onDate(e: Event): void {
     <div class="flex items-center gap-2 pb-2 pl-2 pt-1">
       <button
         type="button"
-        class="h-[22px] rounded-kira-sm border border-dashed border-border-strong bg-transparent px-2 text-kira-sm text-muted-foreground"
+        class="h-control rounded-kira-sm border border-dashed border-border-strong bg-transparent px-2 text-kira-sm text-muted-foreground"
         data-testid="ade-more-week"
         @click="emit('moreWeek')"
       >
@@ -26,7 +26,7 @@ function onDate(e: Event): void {
         id="ade-add-day"
         type="date"
         :min="minDate"
-        class="box-border h-[22px] rounded-kira-sm border border-dashed border-border-strong bg-transparent px-1.5 text-kira-sm text-fg [color-scheme:dark]"
+        class="box-border h-control rounded-kira-sm border border-dashed border-border-strong bg-transparent px-1.5 text-kira-sm text-fg [color-scheme:dark]"
         data-testid="ade-add-day"
         @input="onDate"
       />

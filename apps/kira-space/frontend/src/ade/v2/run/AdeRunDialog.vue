@@ -101,7 +101,7 @@ async function send(): Promise<void> {
             <Input
               :id="`ade-run-branch-${r.id}`"
               v-model="names[r.id]"
-              class="h-7 flex-1 font-data"
+              class="flex-1 font-data"
               :placeholder="slug"
               data-testid="ade-run-branch"
             />
@@ -114,7 +114,7 @@ async function send(): Promise<void> {
               v-if="edited"
               variant="ghost"
               size="xs"
-              class="h-[22px] px-2 text-kira-sm text-muted-foreground"
+              class="px-2 text-muted-foreground"
               data-testid="ade-run-reset"
               @click="message = initial"
             >
@@ -125,7 +125,7 @@ async function send(): Promise<void> {
             <Textarea
               id="ade-run-message"
               v-model="message"
-              class="max-h-90 min-h-[170px] resize-y rounded-none border-0 font-data text-kira-md"
+              class="max-h-90 resize-y rounded-none border-0 font-data"
               data-testid="ade-run-message"
             />
             <p

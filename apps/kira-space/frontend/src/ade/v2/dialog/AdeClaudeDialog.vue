@@ -118,7 +118,7 @@ async function discard(): Promise<void> {
               v-for="opt in tg.options"
               :key="opt.value"
               :value="opt.value"
-              class="h-[26px] border px-2.5 font-data text-kira-sm"
+              class="h-control-lg border px-2.5 font-data text-kira-sm"
               :style="opt.on ? chipOn : undefined"
             >
               {{ opt.label }}
@@ -141,7 +141,7 @@ async function discard(): Promise<void> {
               v-if="view.edited"
               variant="ghost"
               size="xs"
-              class="h-[22px] px-2 text-kira-sm text-muted-foreground"
+              class="px-2 text-muted-foreground"
               data-testid="ade-dialog-reset"
               @click="dialogs.msg = null"
             >
@@ -151,7 +151,7 @@ async function discard(): Promise<void> {
           <Textarea
             id="ade-dialog-message"
             :model-value="view.message"
-            class="max-h-90 min-h-[170px] resize-y font-data text-kira-md"
+            class="max-h-90 resize-y font-data"
             data-testid="ade-dialog-message"
             @update:model-value="(v) => (dialogs.msg = String(v))"
           />
