@@ -1714,6 +1714,80 @@ test('P22 Pass B follow-up — a column-resize drag does not force a full grid r
   ).toHaveCount(1);
 });
 
+test('P195 — a reload with very different data keeps the settled column widths', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-slick-settled-widths';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Settled Widths DB', 'cyan');
+  const fixture = orderItemsFixture(CONNECTION_ID);
+  // The 1k page carries same-column rows ~100x wider than the 100-row page the tab opens with.
+  const wide = fixture.port.find(
+    (snap) => (snap.payload as { pageSize: number }).pageSize === 1000,
+  );
+  if (!wide) throw new Error('fixture has no 1000-row read');
+  const widePage = (wide.response as { page: { rows: (string | null)[][] } }).page;
+  widePage.rows = widePage.rows.map((r) => r.map((v) => `${v}-${'w'.repeat(120)}`));
+  const control: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Settled Widths DB',
+        kind: 'postgres',
+        color: 'cyan',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+        throttlePerSec: 0,
+      },
+      response: CONNECTION_SUMMARY,
+    },
+    ...fixture.control,
+  ];
+  const { window: page } = await relaunch({ control, stream: fixture.port });
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Settled Widths DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-cyan"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const row = await findRow(page, ORDER_ITEMS_PATH);
+  await row.dblclick();
+
+  const header = page.locator('[data-testid="grid-header-cell"][data-column="product_id"]');
+  await expect(header).toBeVisible();
+  const widthBefore = await header.evaluate((el) => el.getBoundingClientRect().width);
+
+  await page.click('[data-testid="page-size-1000"]');
+  await expect(page.locator('[data-testid="data-grid"]')).toContainText('www');
+  const widthAfter = await header.evaluate((el) => el.getBoundingClientRect().width);
+
+  expect(widthAfter).toBe(widthBefore);
+});
+
 // Finding 1 (round 2) — `selectedCellCssClass: 'kira-cell-selected'` makes SlickGrid itself paint
 // the highlight off `selectionModel`'s own DISPLAY-POSITION ranges, which the filter-toggle watch
 // used to never re-push: click id=2 (page row 1) while unfiltered (display position 1 == page row

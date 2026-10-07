@@ -43,6 +43,9 @@ interface DataViewRuntime extends PagedViewRuntime {
    *  numbers tomorrow). A preview convenience, not a security boundary (§6.1) — the MCP path is
    *  the real one. */
   maskPreview: boolean;
+  /** Widths measured for the column set `key` names; reused across reloads while that set is
+   *  unchanged. Session-only, dropped with the tab's runtime. */
+  settledWidths: { key: string; widths: Record<string, number> } | null;
 }
 
 function defaultRuntime(): DataViewRuntime {
@@ -53,6 +56,7 @@ function defaultRuntime(): DataViewRuntime {
     prevToken: null,
     selection: null,
     maskPreview: false,
+    settledWidths: null,
   };
 }
 
@@ -292,8 +296,18 @@ export const useGridViewStore = defineStore('gridView', () => {
     useTabsStore().patchDataTabState(tabId, { columnOrder });
   }
 
+  function settledWidthsFor(tabId: string): DataViewRuntime['settledWidths'] {
+    return runtime[tabId]?.settledWidths ?? null;
+  }
+
+  function setSettledWidths(tabId: string, key: string, widths: Record<string, number>): void {
+    ensureRuntime(tabId).settledWidths = { key, widths };
+  }
+
   return {
     runtime,
+    settledWidthsFor,
+    setSettledWidths,
     load,
     reload,
     reloadAfterMutation,

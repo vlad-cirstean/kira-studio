@@ -483,6 +483,7 @@ function buildColumns(
   page: ReturnType<typeof getPage>,
   order: string[],
   storedWidths: Record<string, number>,
+  settledWidths: Record<string, number>,
   meta: ObjectMeta | null,
 ): KiraColumn[] {
   // D2 — changed from Pass A's false/false: F1's row-select-on-gutter (§5 D4, C4) requires
@@ -502,7 +503,6 @@ function buildColumns(
     }),
   ];
   if (!page) return cols;
-  const measured = initialWidths(page);
   const byName = new Map(page.columns.map((c) => [c.name, c]));
   const metaByName = new Map(meta?.columns.map((c) => [c.name, c]) ?? []);
   const fkNames = foreignKeyNamesFor(meta);
@@ -533,7 +533,7 @@ function buildColumns(
       // back from a prior resize/session was never re-clamped, only an interactive drag was, so
       // a column persisted at a pre-floor width — as narrow as one character for something as
       // short as "id" — forever, across every reload, until manually widened again).
-      width: Math.max(floor, storedWidths[name] ?? measured[name] ?? DEFAULT_COLUMN_WIDTH),
+      width: Math.max(floor, storedWidths[name] ?? settledWidths[name] ?? DEFAULT_COLUMN_WIDTH),
       // F9 — the app's own resize floor; onColumnsResized persists the drag (below). Header-aware
       // (D4) rather than the flat columns.ts MIN_WIDTH — the mismatch between a flat floor and a
       // header's real furniture was what let a manual drag crop the header text again.
@@ -1162,11 +1162,24 @@ function currentWidths(): Record<string, number> {
   return tab()?.state.columnWidths ?? {};
 }
 
+// Re-measuring on every reload resized columns the user never dragged; measure only when the
+// page's column set changes.
+function settledWidthsFor(page: ReturnType<typeof getPage>): Record<string, number> {
+  if (!page) return {};
+  const key = page.columns.map((c) => c.name).join('\u0000');
+  const settled = gridViewStore.settledWidthsFor(props.tabId);
+  if (settled?.key === key) return settled.widths;
+  const measured = initialWidths(page);
+  // An empty page measures headers only; settling on that would pin later data to it.
+  if (page.rowCount > 0) gridViewStore.setSettledWidths(props.tabId, key, measured);
+  return measured;
+}
+
 function rebuildAndSetColumns(): void {
   if (!grid) return;
   const p = getPage(props.tabId);
   const order = p ? resolveColumnOrder(p, tab()?.state.columnOrder ?? null) : [];
-  grid.setColumns(buildColumns(p, order, currentWidths(), rt()?.meta ?? null));
+  grid.setColumns(buildColumns(p, order, currentWidths(), settledWidthsFor(p), rt()?.meta ?? null));
   // setColumns rebuilds every header from scratch (F8's own indicator divs included) — restore
   // the sort chevrons the fresh headers just lost.
   syncSortIndicators();
@@ -2025,7 +2038,7 @@ onMounted(() => {
   grid = new KiraSlickGrid(
     el,
     dataSource as CustomDataView<RowHandle>,
-    buildColumns(p, order, currentWidths(), rt()?.meta ?? null),
+    buildColumns(p, order, currentWidths(), settledWidthsFor(p), rt()?.meta ?? null),
     {
       rowHeight: rowHeight.value,
       // F8 — tristateMultiColumnSort + multiColumnSort: false is exactly this app's own header
@@ -2283,7 +2296,7 @@ watch(
     lastAppliedOrderKey = orderKey;
     formatterCtx.rowNumberBase = t ? t.state.pageIndex * t.state.pageSize : 0;
     dataSource.setState(dataSourceState(p, order));
-    grid.setColumns(buildColumns(p, order, currentWidths(), rt()?.meta ?? null));
+    grid.setColumns(buildColumns(p, order, currentWidths(), settledWidthsFor(p), rt()?.meta ?? null));
     grid.updateRowCount();
     grid.invalidateAllRows();
     // C5 — the rendered band's own numbers can coincidentally match the pre-reload band (a page
