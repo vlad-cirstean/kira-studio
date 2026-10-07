@@ -214,6 +214,8 @@ export interface Task {
   workflowId: string /* '' = none */;
   stageId: string /* stage id | 'done' | '' */;
   currentStage: Stage | null /* W13 */;
+  workflow: Workflow | null /* the version a started task runs; null until it starts */;
+  workflowOutdated: boolean /* the live file differs from `workflow` */;
   est: string /* '' none; extend-only, D16 */;
   notes: string /* Markdown */;
   color: number;

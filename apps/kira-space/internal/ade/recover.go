@@ -42,6 +42,7 @@ func (b *TaskBoard) Recover() error {
 			}
 		}
 	}
+	b.snapshotStartedTasks()
 	b.emitRuns(runs...)
 	b.notifySessions()
 	b.notifyBoard()

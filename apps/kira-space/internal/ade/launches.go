@@ -128,6 +128,9 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 		l, _, _, err := b.launchReviewAgent(ctx, tc, tr, "", nil)
 		return l, err
 	}
+	if err := b.snapshotWorkflow(&tc.task); err != nil {
+		return adewire.Launch{}, err
+	}
 	cwd, moved, err := b.takeOverCwd(ctx, tc, rec)
 	if err != nil {
 		return adewire.Launch{}, err
@@ -369,6 +372,9 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 		return adewire.Launch{}, invalid("a %s launch is already starting", stage.Name)
 	}
 
+	if err := b.snapshotWorkflow(&tc.task); err != nil {
+		return adewire.Launch{}, err
+	}
 	lines, cwd, extra, err := b.launchDirs(ctx, tc)
 	if err != nil {
 		return adewire.Launch{}, err
@@ -467,6 +473,9 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 		return adewire.Launch{}, err
 	} else if has {
 		return adewire.Launch{}, invalid("a background run is working on %s", sb.Name)
+	}
+	if err := b.snapshotWorkflow(&tc.task); err != nil {
+		return adewire.Launch{}, err
 	}
 	path, err := b.launchGate(ctx, tc, sb)
 	if err != nil {

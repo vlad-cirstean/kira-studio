@@ -48,6 +48,8 @@ export function mkTask(over: Partial<Task> & Pick<Task, 'id'>): Task {
     workflowId: '',
     stageId: '',
     currentStage: null,
+    workflow: null,
+    workflowOutdated: false,
     est: '',
     notes: '',
     color: 0,

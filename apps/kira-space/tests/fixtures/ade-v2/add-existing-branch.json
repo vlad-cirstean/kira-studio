@@ -9,6 +9,8 @@
     "workflowId": "",
     "stageId": "",
     "currentStage": null,
+    "workflow": null,
+    "workflowOutdated": false,
     "est": "",
     "notes": "",
     "color": 13,

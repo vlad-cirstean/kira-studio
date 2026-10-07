@@ -416,8 +416,11 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	}
 
 	tasks := make([]adewire.Task, 0, len(d.tasks))
+	liveHash := b.liveHasher()
 	for _, t := range d.tasks {
-		tasks = append(tasks, toWireTask(t, branchByTask[t.ID], d.runs[t.ID]))
+		wt := toWireTask(t, branchByTask[t.ID], d.runs[t.ID])
+		decorateTask(&wt, t, liveHash)
+		tasks = append(tasks, wt)
 	}
 
 	plan := adewire.Plan{Day: map[string]string{}, Order: make([]string, 0, len(d.tasks)), QueuedAfter: map[string]string{}, Unpushed: map[string]bool{}}

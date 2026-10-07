@@ -23,6 +23,8 @@
     "onFailure": "",
     "timeout": ""
   },
+  "workflow": null,
+  "workflowOutdated": false,
   "est": "4h",
   "notes": "Reuse the invoice line items from usage billing.",
   "color": 9,

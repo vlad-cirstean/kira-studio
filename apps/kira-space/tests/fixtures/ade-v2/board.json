@@ -25,6 +25,8 @@
         "onFailure": "stop",
         "timeout": "15m"
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "1h",
       "notes": "",
       "color": 0,
@@ -189,6 +191,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "2d",
       "notes": "## Q4 pricing launch\n- [x] Usage metering in api\n- [ ] Invoice lines **before** Oct 1\n- [ ] Align with *Sara* on merge timing\n\nTotals live in `invoice.ts` for now.",
       "color": 1,
@@ -286,6 +290,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "5h",
       "notes": "",
       "color": 2,
@@ -578,6 +584,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "3h",
       "notes": "",
       "color": 3,
@@ -806,6 +814,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "3d",
       "notes": "",
       "color": 4,
@@ -973,6 +983,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "2h",
       "notes": "",
       "color": 5,
@@ -1056,6 +1068,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "1h",
       "notes": "",
       "color": 6,
@@ -1172,6 +1186,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "2h",
       "notes": "",
       "color": 7,
@@ -1285,6 +1301,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "1d",
       "notes": "",
       "color": 8,
@@ -1317,6 +1335,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "4h",
       "notes": "Reuse the invoice line items from usage billing.",
       "color": 9,
@@ -1334,6 +1354,8 @@
       "workflowId": "",
       "stageId": "",
       "currentStage": null,
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "",
       "notes": "",
       "color": 10,
@@ -1351,6 +1373,8 @@
       "workflowId": "",
       "stageId": "",
       "currentStage": null,
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "",
       "notes": "",
       "color": 11,
@@ -1380,6 +1404,8 @@
         "onFailure": "",
         "timeout": ""
       },
+      "workflow": null,
+      "workflowOutdated": false,
       "est": "1d",
       "notes": "",
       "color": 12,

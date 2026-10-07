@@ -67,7 +67,7 @@ func checkEstExtends(old, next string) error {
 	return nil
 }
 
-const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, est, notes, color, created_at, archived_at`
+const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
 const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, queued_after, position, had_commits, added_at, merged_at, archived_at`
 const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
@@ -95,13 +95,14 @@ func nullIntPtr(n sql.NullInt64) *int {
 
 func scanAdeTask(row rowScanner) (model.AdeTask, error) {
 	var t model.AdeTask
-	var stage sql.NullString
+	var stage, workflow sql.NullString
 	var archived sql.NullInt64
 	if err := row.Scan(&t.ID, &t.Kind, &t.Title, &t.Owner, &t.JiraKey, &t.JiraURL, &t.GithubURL, &t.WorkflowID,
-		&t.StageID, &stage, &t.Est, &t.Notes, &t.Color, &t.CreatedAt, &archived); err != nil {
+		&t.StageID, &stage, &workflow, &t.WorkflowHash, &t.Est, &t.Notes, &t.Color, &t.CreatedAt, &archived); err != nil {
 		return model.AdeTask{}, err
 	}
 	t.CurrentStageJSON = stage.String
+	t.WorkflowJSON = workflow.String
 	t.ArchivedAt = nullInt64Ptr(archived)
 	return t, nil
 }
@@ -143,7 +144,7 @@ func (r *AdeTaskRepo) queryTasks(query string, args ...any) ([]model.AdeTask, er
 // ListLive returns non-archived tasks in plan order (a task with no plan row sorts last).
 func (r *AdeTaskRepo) ListLive() ([]model.AdeTask, error) {
 	return r.queryTasks(`SELECT t.id, t.kind, t.title, t.owner, t.jira_key, t.jira_url, t.github_url, t.workflow_id,
-		t.stage_id, t.current_stage_json, t.est, t.notes, t.color, t.created_at, t.archived_at
+		t.stage_id, t.current_stage_json, t.workflow_json, t.workflow_hash, t.est, t.notes, t.color, t.created_at, t.archived_at
 		FROM ade_tasks t LEFT JOIN ade_task_plan p ON p.task_id = t.id
 		WHERE t.archived_at IS NULL ORDER BY p.position IS NULL, p.position, t.created_at, t.id`)
 }
@@ -200,7 +201,7 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch) (mo
 	if t.CurrentStageJSON != "" {
 		stage = t.CurrentStageJSON
 	}
-	if _, err := tx.Exec(`INSERT INTO ade_tasks (`+adeTaskColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+	if _, err := tx.Exec(`INSERT INTO ade_tasks (id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, est, notes, color, created_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
 		t.ID, t.Kind, t.Title, t.Owner, t.JiraKey, t.JiraURL, t.GithubURL, t.WorkflowID, t.StageID, stage, t.Est,
 		t.Notes, t.Color, t.CreatedAt); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: insert ade task %s: %w", t.ID, err)
@@ -680,7 +681,7 @@ func (r *AdeTaskRepo) ResetWorkflow(taskID, workflowID, stageID, stageJSON strin
 	if _, err := tx.Exec(`DELETE FROM ade_runs WHERE task_id = ?`, taskID); err != nil {
 		return fmt.Errorf("repos: delete ade runs %s: %w", taskID, err)
 	}
-	res, err := tx.Exec(`UPDATE ade_tasks SET workflow_id = ?, stage_id = ?, current_stage_json = ? WHERE id = ?`,
+	res, err := tx.Exec(`UPDATE ade_tasks SET workflow_id = ?, stage_id = ?, current_stage_json = ?, workflow_json = NULL, workflow_hash = '' WHERE id = ?`,
 		workflowID, stageID, stage, taskID)
 	if err != nil {
 		return fmt.Errorf("repos: reset ade task workflow %s: %w", taskID, err)
@@ -701,6 +702,16 @@ func (r *AdeTaskRepo) HasRunning(taskID string) (bool, error) {
 		return false, fmt.Errorf("repos: count running ade runs %s: %w", taskID, err)
 	}
 	return n > 0, nil
+}
+
+// SetWorkflowSnapshot stores the whole workflow a task began with. A task that already has one keeps
+// it: the first snapshot wins.
+func (r *AdeTaskRepo) SetWorkflowSnapshot(taskID, workflowJSON, hash string) error {
+	if _, err := r.DB.Exec(`UPDATE ade_tasks SET workflow_json = ?, workflow_hash = ? WHERE id = ? AND workflow_json IS NULL`,
+		workflowJSON, hash, taskID); err != nil {
+		return fmt.Errorf("repos: set ade task workflow snapshot %s: %w", taskID, err)
+	}
+	return nil
 }
 
 // SetSnapshot rewrites only the stage snapshot, keeping the stage id.

@@ -130,13 +130,14 @@ func cmpNonEmpty(a, b string) string {
 	return b
 }
 
-// refreshSnapshot applies workflow edits to the task's stage from the next step on (R13): the live
-// definition replaces the snapshot when the stage still exists with the same kind.
+// refreshSnapshot applies workflow edits to the task's stage from the next step on (R13): the task's
+// workflow (the live file until the task starts, then its own snapshot) replaces the stage snapshot
+// when the stage still exists with the same kind.
 func (b *TaskBoard) refreshSnapshot(tc *taskCtx) {
-	if tc.stage == nil || b.deps.Workflows == nil {
+	if tc.stage == nil {
 		return
 	}
-	wf, ok := b.deps.Workflows.Get(tc.task.WorkflowID)
+	wf, ok := b.taskWorkflow(tc.task)
 	if !ok {
 		return
 	}
@@ -224,6 +225,9 @@ func (b *TaskBoard) StartRun(ctx context.Context, args adewire.StartRunArgs) (ad
 	}
 	if tc.stage == nil || tc.stage.Kind == "user" {
 		return adewire.StartRunResult{}, invalid("the current stage is not an automated stage")
+	}
+	if err := b.snapshotWorkflow(&tc.task); err != nil {
+		return adewire.StartRunResult{}, err
 	}
 	plan, err := b.plan(tc)
 	if err != nil {
@@ -821,10 +825,10 @@ func (b *TaskBoard) StageDone(_ context.Context, taskID string) (adewire.Task, e
 			return adewire.Task{}, invalid("stage %q has steps that are not done", tc.stage.Name)
 		}
 	}
-	if b.deps.Workflows == nil {
-		return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
+	if err := b.snapshotWorkflow(&tc.task); err != nil {
+		return adewire.Task{}, err
 	}
-	wf, ok := b.deps.Workflows.Get(tc.task.WorkflowID)
+	wf, ok := b.taskWorkflow(tc.task)
 	if !ok {
 		return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
 	}
@@ -868,12 +872,12 @@ func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID string) (ade
 	if stageID == tc.task.StageID {
 		return b.wireTask(tc.task)
 	}
+	if err := b.snapshotWorkflow(&tc.task); err != nil {
+		return adewire.Task{}, err
+	}
 	var raw string
 	if stageID != "done" {
-		if b.deps.Workflows == nil {
-			return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
-		}
-		wf, ok := b.deps.Workflows.Get(tc.task.WorkflowID)
+		wf, ok := b.taskWorkflow(tc.task)
 		if !ok {
 			return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
 		}

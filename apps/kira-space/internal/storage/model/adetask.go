@@ -22,7 +22,8 @@ const (
 )
 
 // AdeTask is one row of ade_tasks. CurrentStageJSON is the stage snapshot taken on stage entry;
-// "" stores NULL.
+// "" stores NULL. WorkflowJSON is the whole workflow the task began with ("" = not started, follows
+// the live file) and WorkflowHash its content hash.
 type AdeTask struct {
 	ID               string
 	Kind             string
@@ -34,6 +35,8 @@ type AdeTask struct {
 	WorkflowID       string
 	StageID          string
 	CurrentStageJSON string
+	WorkflowJSON     string
+	WorkflowHash     string
 	Est              string
 	Notes            string
 	Color            int

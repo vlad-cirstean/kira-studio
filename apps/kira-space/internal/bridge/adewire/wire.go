@@ -242,6 +242,10 @@ type Task struct {
 	WorkflowID   string   `json:"workflowId"`
 	StageID      string   `json:"stageId"`
 	CurrentStage *Stage   `json:"currentStage"`
+	// Workflow is the version a started task runs; nil until it starts. WorkflowOutdated: the live
+	// file differs from it.
+	Workflow         *Workflow `json:"workflow"`
+	WorkflowOutdated bool      `json:"workflowOutdated"`
 	Est          string   `json:"est"`
 	Notes        string   `json:"notes"`
 	Color        int      `json:"color"`
