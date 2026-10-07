@@ -66,7 +66,7 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
   await expect(view).toBeVisible();
   await expect(view.locator('[data-testid="stream-target"]')).toHaveText('orders');
   await expect(view.locator('[data-testid="stream-poll"]')).toHaveCount(0);
-  await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(6, { timeout: 15_000 });
+  await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(7, { timeout: 15_000 });
   await expect(view.locator('[data-testid="stream-next"]')).toBeDisabled();
 
   // kafkaCaps has no maxPageSize — all four page-size choices stay present (P43 iter3 D46/F29).
@@ -76,9 +76,21 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
   await expect(view.locator('[data-testid="stream-page-size-10000"]')).toBeVisible();
 
   const firstRow = view.locator('[data-testid="stream-row"]').first();
-  await expect(firstRow.locator('[data-testid="stream-key"]')).toHaveText(/^key-\d$/);
+  // toHaveText with a RegExp matches raw textContent, unlike a string (no whitespace
+  // normalization) — the cell's conditional Badge (v-if, hidden here) still leaves Vue's own
+  // inter-element whitespace before the key text, confirmed pre-existing (P180, unrelated to this
+  // phase's own tombstone addition below).
+  await expect(firstRow.locator('[data-testid="stream-key"]')).toHaveText(/^\s*key-\d\s*$/);
   await expect(firstRow.locator('[data-testid="stream-headers"]')).toContainText('seed');
   await expect(firstRow.locator('[data-testid="stream-body"]')).toContainText('seq');
+
+  // --- a tombstone (nil Value) renders the NULL marker, not an empty body (P168 Part 12 F17) ---
+  const tombstoneRow = view.locator('[data-testid="stream-row"]').last();
+  await expect(tombstoneRow.locator('[data-testid="stream-key"]')).toHaveText('key-6');
+  await expect(tombstoneRow.locator('[data-testid="stream-body"]')).toHaveAttribute(
+    'aria-label',
+    'null (tombstone)',
+  );
 
   // --- the stream view's cell editor dock is a read-only viewer, no write affordances ---------
   await firstRow.locator('[data-testid="stream-body"]').click();

@@ -100,7 +100,11 @@ function buildPage(logical: LogicalPage): WirePage {
       headers: logical.headers[i] ?? '',
       attrs: logical.attrs[i] ?? '',
       timestamp: logical.timestamps[i],
-      body: logical.bodies[i] ?? '',
+      // No `?? ''`, unlike headers/attrs above: body is `string | null` (a Kafka tombstone is a
+      // real null, distinct from empty string), same as timestamp just above — coalescing it here
+      // silently turned every mocked tombstone into an empty body (P180, found adding the first
+      // one ever captured).
+      body: logical.bodies[i],
     });
   }
   return builder.finish(logical.position);

@@ -5,6 +5,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/twmb/franz-go/pkg/kgo"
+
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/kafka"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/testsupport"
@@ -12,6 +14,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 )
+
+// kafkaTombstoneKey is this test's own extra message (P168 Part 12 F17, run in P180): a record
+// with a nil Value, Kafka's tombstone convention. Produced here rather than in testsupport's
+// shared seed so it stays scoped to this one read assertion instead of shifting
+// testsupport.KafkaOrdersMessageCount for every other Kafka test.
+const kafkaTombstoneKey = "key-6"
 
 // sortStreamByKey is kafka.backend.spec.ts's own sortStreamByKey, ported: the Kafka client's own
 // read fans across both partitions and interleaves them by arrival, not by any key/offset order —
@@ -102,6 +110,18 @@ func TestFixture_Kafka(t *testing.T) {
 		t.Fatalf("orders topic partitions = %d, want %d", len(partitions.Nodes), testsupport.KafkaOrdersPartitionCount)
 	}
 
+	// --- a tombstone: a Value of nil, Kafka's own null-value convention, distinct from "" ---------
+	tombstone := &kgo.Record{
+		Topic:   testsupport.KafkaOrdersTopic,
+		Key:     []byte(kafkaTombstoneKey),
+		Value:   nil,
+		Headers: []kgo.RecordHeader{{Key: "source", Value: []byte("seed")}},
+	}
+	if err := fixture.Client.ProduceSync(context.Background(), tombstone).FirstErr(); err != nil {
+		t.Fatalf("produce tombstone: %v", err)
+	}
+	wantOrdersMessageCount := testsupport.KafkaOrdersMessageCount + 1
+
 	// --- open the orders topic: offsetWindow auto-loads on mount --------------------------------
 	readReq := adapterhost.ReadRequestWire{
 		OpID: "be-read-orders", ConnectionID: cfg.ID, Path: ordersTopicNode.Path,
@@ -116,8 +136,8 @@ func TestFixture_Kafka(t *testing.T) {
 		t.Fatalf("decode orders page: %v", err)
 	}
 	readStream, ok := readLogical.(LogicalStreamPage)
-	if !ok || len(readStream.Keys) != testsupport.KafkaOrdersMessageCount || readStream.Position.HasMore {
-		t.Fatalf("orders page = %+v, want %d keys, hasMore=false", readLogical, testsupport.KafkaOrdersMessageCount)
+	if !ok || len(readStream.Keys) != wantOrdersMessageCount || readStream.Position.HasMore {
+		t.Fatalf("orders page = %+v, want %d keys, hasMore=false", readLogical, wantOrdersMessageCount)
 	}
 	// The seed publishes these messages at container-start time (real wall-clock), so their
 	// timestamps differ run to run — frozen for the fixture; then reordered deterministically

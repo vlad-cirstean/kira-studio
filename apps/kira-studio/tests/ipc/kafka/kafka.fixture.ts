@@ -446,8 +446,9 @@ export const portSnapshots: PortSnapshot[] = [
       kind: 'read',
       page: {
         kind: 'stream',
-        keys: ['key-0', 'key-1', 'key-2', 'key-3', 'key-4', 'key-5'],
+        keys: ['key-0', 'key-1', 'key-2', 'key-3', 'key-4', 'key-5', 'key-6'],
         headers: [
+          '{"source":"seed"}',
           '{"source":"seed"}',
           '{"source":"seed"}',
           '{"source":"seed"}',
@@ -462,6 +463,7 @@ export const portSnapshots: PortSnapshot[] = [
           '{"offset":"1","partition":1}',
           '{"offset":"2","partition":1}',
           '{"offset":"2","partition":0}',
+          '{"offset":"3","partition":0}',
         ],
         timestamps: [
           '2024-01-01T00:00:00.000Z',
@@ -470,8 +472,17 @@ export const portSnapshots: PortSnapshot[] = [
           '2024-01-01T00:00:00.000Z',
           '2024-01-01T00:00:00.000Z',
           '2024-01-01T00:00:00.000Z',
+          '2024-01-01T00:00:00.000Z',
         ],
-        bodies: ['{"seq":0}', '{"seq":1}', '{"seq":2}', '{"seq":3}', '{"seq":4}', '{"seq":5}'],
+        bodies: [
+          '{"seq":0}',
+          '{"seq":1}',
+          '{"seq":2}',
+          '{"seq":3}',
+          '{"seq":4}',
+          '{"seq":5}',
+          null,
+        ],
         position: {
           offset: null,
           pageSize: 100,

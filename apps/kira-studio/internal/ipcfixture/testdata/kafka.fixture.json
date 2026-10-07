@@ -438,8 +438,9 @@
         "kind": "read",
         "page": {
           "kind": "stream",
-          "keys": ["key-0", "key-1", "key-2", "key-3", "key-4", "key-5"],
+          "keys": ["key-0", "key-1", "key-2", "key-3", "key-4", "key-5", "key-6"],
           "headers": [
+            "{\"source\":\"seed\"}",
             "{\"source\":\"seed\"}",
             "{\"source\":\"seed\"}",
             "{\"source\":\"seed\"}",
@@ -453,9 +454,11 @@
             "{\"offset\":\"1\",\"partition\":0}",
             "{\"offset\":\"1\",\"partition\":1}",
             "{\"offset\":\"2\",\"partition\":1}",
-            "{\"offset\":\"2\",\"partition\":0}"
+            "{\"offset\":\"2\",\"partition\":0}",
+            "{\"offset\":\"3\",\"partition\":0}"
           ],
           "timestamps": [
+            "2024-01-01T00:00:00.000Z",
             "2024-01-01T00:00:00.000Z",
             "2024-01-01T00:00:00.000Z",
             "2024-01-01T00:00:00.000Z",
@@ -469,7 +472,8 @@
             "{\"seq\":2}",
             "{\"seq\":3}",
             "{\"seq\":4}",
-            "{\"seq\":5}"
+            "{\"seq\":5}",
+            null
           ],
           "position": {
             "offset": null,
