@@ -181,6 +181,13 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       icon: 'terminal-bash',
       run: () => void openRepoTerminalTab(repo.id, repo.root),
     },
+    {
+      type: 'item' as const,
+      id: 'configure',
+      label: 'Configure repository…',
+      icon: 'settings-gear',
+      run: () => reposDialog.show({ repoId: repo.id }),
+    },
     { type: 'separator' as const },
     ...recordMenuItems(repo, {
       rename: () => onRenameRepo(repo.id, repo.name),

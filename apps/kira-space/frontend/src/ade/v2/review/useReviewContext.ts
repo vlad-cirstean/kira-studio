@@ -1,5 +1,6 @@
 import { computed } from 'vue';
-import { useBoard, useRepos } from '../queries';
+import { useRepos } from '../../../repo/state/reposQueries';
+import { useBoard } from '../queries';
 import type { ReviewWindowTarget } from '../wire';
 
 /** The board facts a review window shows about its target: task, branch, repo nickname. */

@@ -10,6 +10,7 @@
       "integrationBranches": ["develop"],
       "prepareScript": "pnpm install --frozen-lockfile\ncp .env.example .env.local",
       "prepareTimeout": "10m",
+      "worktreeBasePath": "",
       "environments": [
         {
           "name": "preview",
@@ -35,6 +36,7 @@
       "integrationBranches": ["develop", "staging"],
       "prepareScript": "go mod download\nmake db-local",
       "prepareTimeout": "15m",
+      "worktreeBasePath": "",
       "environments": [
         {
           "name": "staging",
@@ -56,6 +58,7 @@
       "integrationBranches": [],
       "prepareScript": "yarn install --immutable\nnpx pod-install",
       "prepareTimeout": "20m",
+      "worktreeBasePath": "",
       "environments": []
     },
     {
@@ -68,6 +71,7 @@
       "integrationBranches": [],
       "prepareScript": "",
       "prepareTimeout": "10m",
+      "worktreeBasePath": "",
       "environments": []
     },
     {
@@ -80,6 +84,7 @@
       "integrationBranches": [],
       "prepareScript": "",
       "prepareTimeout": "10m",
+      "worktreeBasePath": "",
       "environments": []
     },
     {
@@ -92,6 +97,7 @@
       "integrationBranches": [],
       "prepareScript": "",
       "prepareTimeout": "10m",
+      "worktreeBasePath": "",
       "environments": []
     }
   ],

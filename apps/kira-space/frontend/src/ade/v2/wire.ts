@@ -41,6 +41,7 @@ export interface Repo {
   integrationBranches: string[] /* besides main */;
   prepareScript: string;
   prepareTimeout: string;
+  worktreeBasePath: string /* '' = the default */;
   environments: Environment[];
 }
 export interface Folder {
@@ -543,6 +544,7 @@ export interface RepoPatch {
   integrationBranches: string[] | null;
   prepareScript: string | null;
   prepareTimeout: string | null;
+  worktreeBasePath: string | null;
   environments: Environment[] | null;
 }
 export interface UpdateRepoArgs {

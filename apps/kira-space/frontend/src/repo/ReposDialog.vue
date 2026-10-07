@@ -12,21 +12,30 @@ import {
 } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
-import { useRepos } from '../ade/v2/queries';
+import AdeRepoTag from '../ade/v2/AdeRepoTag.vue';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
-import { useReposDialogStore } from './state/reposDialog';
-import { useAddFolder, useRemoveFolder, useSetFolderWatch } from './state/reposQueries';
+import RepoConfigForm from './RepoConfigForm.vue';
+import { type ReposDialogTab, useReposDialogStore } from './state/reposDialog';
+import { useAddFolder, useRemoveFolder, useRepos, useSetFolderWatch } from './state/reposQueries';
 
 const dialog = useReposDialogStore();
 const codeRepos = useCodeReposStore();
+const confirmDialogStore = useConfirmDialogStore();
 const repos = useRepos();
 const addFolder = useAddFolder();
 const watchFolder = useSetFolderWatch();
 const removeFolder = useRemoveFolder();
 
 const folders = computed(() => repos.data.value?.folders ?? []);
+const configs = computed(() => repos.data.value?.repos ?? []);
+const selected = computed(
+  () => codeRepos.records.find((r) => r.id === dialog.selectedRepoId) ?? codeRepos.records[0] ?? null,
+);
+const selectedConfig = computed(() => configs.value.find((c) => c.codeRepoId === selected.value?.id) ?? null);
 const error = ref('');
 const note = ref('');
 
@@ -60,49 +69,102 @@ const onWatch = (path: string, watch: boolean) =>
 const onRemoveFolder = (path: string) =>
   run(async () => void (await removeFolder.mutateAsync({ path })));
 
-const onRemoveRepo = (id: string) => run(() => codeRepos.removeCodeRepo(id));
+const onRemoveRepo = (id: string, name: string) =>
+  run(async () => {
+    const ok = await confirmDialogStore.confirmDialog(`Remove repository "${name}" from Kira Space? Files on disk stay.`, {
+      confirmLabel: 'Remove',
+    });
+    if (ok) await codeRepos.removeCodeRepo(id);
+  });
 </script>
 
 <template>
   <Dialog v-model:open="dialog.open">
-    <DialogContent class="w-140" data-testid="repos-dialog">
-      <DialogHeader>
+    <DialogContent :show-close-button="true" class="flex h-4/5 w-full max-w-5xl flex-col gap-0 overflow-hidden p-0" data-testid="repos-dialog">
+      <DialogHeader class="border-b-0 pb-0">
         <DialogTitle>Repositories</DialogTitle>
-        <DialogDescription class="sr-only">Import repositories and manage scan folders.</DialogDescription>
+        <DialogDescription class="sr-only">Import repositories, configure them and manage scan folders.</DialogDescription>
       </DialogHeader>
-      <div class="flex max-h-[60vh] flex-col gap-3 overflow-auto px-3 py-2 text-kira-md">
-        <Alert v-if="error" variant="destructive" data-testid="repos-dialog-error">
+      <Tabs
+        :model-value="dialog.tab"
+        class="min-h-0 flex-1 gap-0"
+        @update:model-value="(v) => (dialog.tab = v as ReposDialogTab)"
+      >
+        <TabsList class="px-3 py-2">
+          <TabsTrigger
+            value="repos"
+            :class="tabChipVariants({ active: dialog.tab === 'repos', size: 'wide' })"
+            data-testid="repos-dialog-tab-repos"
+          >
+            Repositories
+          </TabsTrigger>
+          <TabsTrigger
+            value="folders"
+            :class="tabChipVariants({ active: dialog.tab === 'folders', size: 'wide' })"
+            data-testid="repos-dialog-tab-folders"
+          >
+            Scan folders
+          </TabsTrigger>
+        </TabsList>
+        <Alert v-if="error" variant="destructive" class="mx-3 mb-2 w-auto" data-testid="repos-dialog-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
-        <section class="flex flex-col gap-1" data-testid="repos-dialog-repos">
-          <div class="flex items-center gap-1">
-            <h3 class="m-0 flex-1 text-kira-sm uppercase tracking-wider text-muted-foreground">Repositories</h3>
-            <Button variant="dialog" size="kira-lg" data-testid="repos-dialog-import" @click="onImport">
-              <CodiconIcon name="repo" :size="13" />
-              Import repository…
-            </Button>
+        <TabsContent value="repos" class="flex min-h-0 flex-1 border-t border-border" data-testid="repos-dialog-repos">
+          <div class="flex w-72 shrink-0 flex-col border-r border-border">
+            <div class="flex h-bar shrink-0 items-center border-b border-border px-1.5">
+              <Button variant="dialog" size="kira-lg" class="w-full" data-testid="repos-dialog-import" @click="onImport">
+                <CodiconIcon name="repo" :size="13" />
+                Import repository…
+              </Button>
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto" role="listbox" aria-label="Repositories">
+              <p v-if="codeRepos.records.length === 0" class="m-0 px-3 py-2 text-muted-foreground">No repositories imported.</p>
+              <div
+                v-for="r in codeRepos.records"
+                :key="r.id"
+                class="flex h-row cursor-default select-none items-center gap-1.5 px-1.5"
+                :class="selected?.id === r.id ? 'bg-select' : 'hover:bg-hover'"
+                role="option"
+                tabindex="0"
+                :aria-selected="selected?.id === r.id"
+                data-testid="repos-dialog-repo"
+                :data-repo-id="r.id"
+                @click="dialog.selectedRepoId = r.id"
+                @keydown.enter.prevent="dialog.selectedRepoId = r.id"
+                @keydown.space.prevent="dialog.selectedRepoId = r.id"
+              >
+                <AdeRepoTag
+                  v-if="configs.find((c) => c.codeRepoId === r.id)?.nickname"
+                  :code-repo-id="r.id"
+                  :label="configs.find((c) => c.codeRepoId === r.id)?.nickname ?? ''"
+                />
+                <span class="min-w-0 flex-1 truncate" :title="r.root">{{ r.name }}</span>
+              </div>
+            </div>
           </div>
-          <p v-if="codeRepos.records.length === 0" class="m-0 text-muted-foreground">No repositories imported.</p>
-          <div
-            v-for="r in codeRepos.records"
-            :key="r.id"
-            class="flex items-center gap-2 rounded-kira bg-elevated px-2 py-1"
-            data-testid="repos-dialog-repo"
-            :data-repo-id="r.id"
-          >
-            <span class="shrink-0">{{ r.name }}</span>
-            <span class="min-w-0 flex-1 truncate font-data text-kira-sm text-muted-foreground" :title="r.root">{{ r.root }}</span>
-            <TooltipIconButton
-              icon="close"
-              label="Remove repository"
-              data-testid="repos-dialog-repo-remove"
-              @click="onRemoveRepo(r.id)"
-            />
+          <div class="flex min-w-0 flex-1 flex-col">
+            <template v-if="selected">
+              <div class="flex h-bar shrink-0 items-center gap-1.5 border-b border-border px-3">
+                <span class="min-w-0 flex-1 truncate font-semibold" data-testid="repos-dialog-selected">{{ selected.name }}</span>
+                <Button
+                  variant="dialog-danger"
+                  size="kira-lg"
+                  data-testid="repos-dialog-repo-remove"
+                  @click="onRemoveRepo(selected.id, selected.name)"
+                >
+                  Remove repository
+                </Button>
+              </div>
+              <div class="min-h-0 flex-1 overflow-y-auto p-4">
+                <RepoConfigForm v-if="selectedConfig" :key="selectedConfig.codeRepoId" :repo="selectedConfig" />
+              </div>
+            </template>
+            <p v-else class="m-0 p-4 text-muted-foreground">Import a repository to configure it.</p>
           </div>
-        </section>
-        <section class="flex flex-col gap-1" data-testid="repos-dialog-folders">
-          <div class="flex items-center gap-1">
-            <h3 class="m-0 flex-1 text-kira-sm uppercase tracking-wider text-muted-foreground">Scan folders</h3>
+        </TabsContent>
+        <TabsContent value="folders" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto border-t border-border p-4" data-testid="repos-dialog-folders">
+          <div class="flex items-center gap-2">
+            <p class="m-0 flex-1 text-muted-foreground">Every git repository inside a scan folder is imported.</p>
             <Button
               variant="dialog"
               size="kira-lg"
@@ -114,12 +176,12 @@ const onRemoveRepo = (id: string) => run(() => codeRepos.removeCodeRepo(id));
               Add folder…
             </Button>
           </div>
-          <p class="m-0 text-kira-sm text-muted-foreground">Every git repository inside a scan folder is imported.</p>
           <p v-if="note" class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{ note }}</p>
+          <p v-if="folders.length === 0" class="m-0 text-muted-foreground">No scan folders.</p>
           <div
             v-for="(f, i) in folders"
             :key="f.path"
-            class="flex items-center gap-2 rounded-kira bg-elevated px-2 py-1"
+            class="flex items-center gap-2 rounded-kira bg-field px-2 py-1"
             data-testid="repos-dialog-folder"
             :data-path="f.path"
           >
@@ -141,8 +203,8 @@ const onRemoveRepo = (id: string) => run(() => codeRepos.removeCodeRepo(id));
               @click="onRemoveFolder(f.path)"
             />
           </div>
-        </section>
-      </div>
+        </TabsContent>
+      </Tabs>
     </DialogContent>
   </Dialog>
 </template>

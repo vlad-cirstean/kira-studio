@@ -1,6 +1,7 @@
 import type { AgentActivity } from '@shared/domain/agent';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
+import { useRepos } from '../../../repo/state/reposQueries';
 import { useCodeReposStore } from '../../../state/coderepos';
 import { useSettingsStore } from '../../../state/settings';
 import { useAgentSessionsStore } from '../../state/agentSessions';
@@ -29,7 +30,7 @@ import {
 } from '../board/timeline';
 import { localIso, localIsoOfMs } from '../localDay';
 import { taskColor } from '../palette';
-import { useBoard, usePrs, useRepos, useSessions, useWorkflows } from '../queries';
+import { useBoard, usePrs, useSessions, useWorkflows } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import type { Board, Branch, Session, Task, Workflow } from '../wire';
 

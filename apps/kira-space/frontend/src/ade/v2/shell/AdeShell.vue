@@ -9,7 +9,6 @@ import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useBacklog } from '../queries';
-import AdeReposPage from '../repos/AdeReposPage.vue';
 import AdeRunDialog from '../run/AdeRunDialog.vue';
 import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
@@ -84,20 +83,12 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
         >
           Workflows
         </TabsTrigger>
-        <TabsTrigger
-          value="repos"
-          :class="tabChipVariants({ active: ui.view === 'repos', size: 'wide' })"
-          data-testid="ade-tab-repos"
-        >
-          Repos
-        </TabsTrigger>
       </TabsList>
     </nav>
     <div class="flex min-h-0 flex-1 gap-0.5 px-0.5 pb-0.5">
       <AdeBacklogPage v-if="ui.view === 'backlog'" />
       <AdeNeedsPage v-else-if="ui.view === 'needs'" />
       <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
-      <AdeReposPage v-else-if="ui.view === 'repos'" />
       <template v-else>
         <AdePlanView />
         <AdePanel v-if="ui.selectedTaskId" />

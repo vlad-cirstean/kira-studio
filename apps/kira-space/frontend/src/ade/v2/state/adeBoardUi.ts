@@ -3,11 +3,11 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { OpenSessionEvent } from '../wire';
 
-// Board view state: which page is open and what the panel shows. Workflows, Repos and the Add
-// popover keep their own state in `adeWorkflowsUi`, `adeReposUi` and `adeAddUi`. The three Plan toggles persist
+// Board view state: which page is open and what the panel shows. Workflows and the Add
+// popover keep their own state in `adeWorkflowsUi` and `adeAddUi`. The three Plan toggles persist
 // per window profile; selection and the last refresh summaries are in memory only.
 export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
-  const view = ref<'plan' | 'backlog' | 'needs' | 'workflows' | 'repos'>('plan');
+  const view = ref<'plan' | 'backlog' | 'needs' | 'workflows'>('plan');
   const selectedTaskId = ref<string | null>(null);
   const selectedBranchId = ref<string | null>(null);
   /** Active tab of the task panel and of the branch panel; Sessions is reachable from anywhere. */

@@ -1,8 +1,21 @@
-import { useMutation } from '@tanstack/vue-query';
+import { useMutation, useQuery } from '@tanstack/vue-query';
 import { queryClient } from '@workbench/state/queryClient';
-import { reposKey } from '../../ade/v2/queries';
-import type { FolderArgs, PathArgs } from '../../ade/v2/wire';
+import type { FolderArgs, PathArgs, UpdateRepoArgs } from '../../ade/v2/wire';
 import { control } from '../../bridge/control';
+
+export const reposKey = ['adetask', 'repos'] as const;
+
+export function useRepos() {
+  return useQuery({
+    queryKey: reposKey,
+    queryFn: () => control.adeTaskRepos(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
+export function useUpdateRepo() {
+  return useMutation({ mutationFn: (args: UpdateRepoArgs) => control.adeTaskUpdateRepo(args) });
+}
 
 function invalidateRepos(): Promise<void> {
   return queryClient.invalidateQueries({ queryKey: reposKey, exact: true });

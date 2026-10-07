@@ -38,7 +38,6 @@ import type {
   Task,
   TaskArgs,
   UpdateBacklogItemArgs,
-  UpdateRepoArgs,
   UpdateTaskArgs,
   ValidateWorkflowYamlArgs,
 } from './wire';
@@ -54,7 +53,6 @@ export const workflowsKey = ['adetask', 'workflows'] as const;
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
 export const logKey = (kind: LogKind, id: string) => ['adetask', 'log', kind, id] as const;
 export const backlogKey = ['adetask', 'backlog'] as const;
-export const reposKey = ['adetask', 'repos'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
 export const ghSyncPlanPrefix = ['adetask', 'ghSyncPlan'] as const;
@@ -81,14 +79,6 @@ export function useWorkflows() {
   return useQuery({
     queryKey: workflowsKey,
     queryFn: () => control.adeTaskWorkflows(),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-}
-
-export function useRepos() {
-  return useQuery({
-    queryKey: reposKey,
-    queryFn: () => control.adeTaskRepos(),
     staleTime: Number.POSITIVE_INFINITY,
   });
 }
@@ -305,10 +295,6 @@ export function useImportWorkflow() {
 
 export function useNewWorkflow() {
   return useMutation({ mutationFn: (args: NewWorkflowArgs) => control.adeTaskNewWorkflow(args) });
-}
-
-export function useUpdateRepo() {
-  return useMutation({ mutationFn: (args: UpdateRepoArgs) => control.adeTaskUpdateRepo(args) });
 }
 
 export function useSetTaskWorkflow() {

@@ -2,8 +2,9 @@
 import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
+import { useRepos } from '../../../repo/state/reposQueries';
 import { setupStatus } from '../board/setupStatus';
-import { useRepos, useRetrySetup } from '../queries';
+import { useRetrySetup } from '../queries';
 import { solidStyle } from '../tones';
 import type { Branch } from '../wire';
 import AdeRunLog from './AdeRunLog.vue';

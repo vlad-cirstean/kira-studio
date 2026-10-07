@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/vue-query';
 import { watch } from 'vue';
 import { control } from '../bridge/control';
+import { reposKey } from '../repo/state/reposQueries';
 import type { useAgentSessionsStore } from './state/agentSessions';
 import { adeTurns } from './v2/dialog/turnWatch';
 import {
@@ -8,7 +9,6 @@ import {
   boardKey,
   logKey,
   prsKey,
-  reposKey,
   sessionsKey,
   workflowsKey,
   workflowYamlKey,

@@ -6,10 +6,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/po
 import { Tabs, TabsList, TabsTrigger } from '@theme/components/ui/tabs';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed, ref, watch } from 'vue';
+import { useRepos } from '../../repo/state/reposQueries';
 import AdeCandidateRow from './AdeCandidateRow.vue';
 import { parseJira } from './jira';
 import { repoColor } from './palette';
-import { useAddExistingBranch, useCandidates, useCreateTask, useRepos } from './queries';
+import { useAddExistingBranch, useCandidates, useCreateTask } from './queries';
 import { useAdeAddUiStore } from './state/adeAddUi';
 import { useAdeBoardUiStore } from './state/adeBoardUi';
 import type { CandidateBranch } from './wire';

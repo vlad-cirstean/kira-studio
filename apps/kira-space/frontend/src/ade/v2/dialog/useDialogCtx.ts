@@ -1,7 +1,7 @@
 import { computed } from 'vue';
+import { useRepos } from '../../../repo/state/reposQueries';
 import { useCodeReposStore } from '../../../state/coderepos';
 import { usePlanModel } from '../plan/usePlanModel';
-import { useRepos } from '../queries';
 import type { RepoState } from '../wire';
 import type { DialogCtx } from './compose';
 

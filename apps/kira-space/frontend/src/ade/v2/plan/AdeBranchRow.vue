@@ -2,10 +2,11 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed } from 'vue';
+import { useRepos } from '../../../repo/state/reposQueries';
 import AdeTip from '../AdeTip.vue';
 import { fixItems } from '../board/fixMenu';
 import { repoColor } from '../palette';
-import { useOpenReviewWindow, useRepos } from '../queries';
+import { useOpenReviewWindow } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { TONE } from '../tones';
