@@ -14,6 +14,14 @@ function modeTab(page: Page, mode: 'git' | 'terminal' | 'ade') {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
+test('the title bar lists Git, Agents, Terminal, then Memory', async ({ relaunch }) => {
+  const { window: page } = await relaunch();
+  const modes = await page
+    .locator('[data-testid="mode-tab"]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-mode')));
+  expect(modes).toEqual(['git', 'ade', 'terminal', 'memory']);
+});
+
 test('a window boots into whatever mode windowsEnsure answers with, with no Git panel mounted alongside it', async ({
   relaunch,
 }) => {
