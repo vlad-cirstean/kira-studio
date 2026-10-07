@@ -722,3 +722,220 @@ No tests for the bridge pass-throughs, `memorycli`, zod schemas or the Pinia sto
 - **Kira Space** does not host the module or the subcommand in this phase (stream C owns its
   frontend and `main.go` work right now); adoption later is a `MODES` entry, a provide and one
   `main.go` branch, with the same `memory.db`.
+
+---
+
+# P201 Part 2 plan: move the Memory module to Kira Space
+
+Source: user, after Part 1 landed: "The memory module should be in space not studio. Move it."
+Split per `CLAUDE.md` (same number, `Part 2`). Base: `05fa04c` (`v2.1-stream-D` tip, already on
+v2.0 head `1721559`, so Studio seams hold docker and memory entries side by side). No rebase step.
+Discovery used `codegraph_explore` on Kira Space's `main` (askpass branch, Services list, teardown),
+`modes.ts` `MODE_ORDER`/`MODES`, `SpaceMode`, `WorkbenchShell.vue`, `visibleWorkspace`,
+`WindowsRepo.GetMode`/`SetMode`, `appstorage.WindowModes`, `windowsvc.Service`, `createCoreControl`,
+`terminalModuleKey`, Studio's `bridge/memory.go` and `mcpinstall`.
+
+Rules for the implementer: same as Part 1 (header of this file), worktree `/home/user/kira-v21-D`,
+branch `v2.1-stream-D`. Stage only files named here. Record results in `P201-notes.md` (Part 2
+section). Supersedes Part 1 decisions D1 (host binary), D10 (where Connect lives: unchanged
+component, new host) and D11 (no split) where they conflict.
+
+## P2.1 What moves, what stays
+
+Stays shared, unchanged: `internal/memory/**` (store, pipeline, `mcpserver`, `memorycli`),
+`internal/toolexec`, `internal/sqlitex`, `internal/testx` (`KIRA_MEMORY_HOME`),
+`packages/shared/domain/memory.ts`, `packages/workbench/src/memory/**` (verified: imports only
+`@shared`, `@theme`, `@workbench`, `@tanstack/vue-query`, `@vueuse/core`; nothing under `apps/`),
+`packages/shared/protocol/events.ts` `CHANNEL.memoryChanged` (Space reads `@shared/protocol/events`
+too). `memory.db` stays at `$KIRA_MEMORY_HOME` / `~/.kira-memory`, independent of both apps' homes.
+Only doc comments naming Studio change (`internal/memory/paths.go` L1, `service.go` L67).
+
+Moves to Kira Space: the Go bridge service, the `memory-mcp` subcommand, mode registration, provide,
+bridge control, UI mocks and UI spec.
+
+Removed from Kira Studio, back to its v2.0 (`1721559`) content: everything Part 1 added under
+`apps/kira-studio/**` except the `mcpinstall` hoist below.
+
+## P2.2 Decisions
+
+- **E1 `mcpinstall` hoists to repo-root `internal/mcpinstall`.** Kira Space cannot import
+  `apps/kira-studio/internal/mcpinstall` (Go `internal/` rule) and needs `Status`, `StdioCommand`,
+  `InstallStdio`. Studio's DB MCP keeps using it (`Command`, `Install`). The package imports Studio's
+  `mcpauth` only for the DB MCP header-helper script (`EnsureHeaderHelperScript`,
+  `HeaderHelperScriptPath`, `headerHelperScriptName`, all DB-MCP-auth specific): those three move to
+  `apps/kira-studio/internal/mcpauth/helperscript.go` (next to `AtomicWriteFile`, which they use).
+  The quoting they need becomes exported `mcpinstall.ShellQuote` (rename of `shellSingleQuote`; one
+  implementation, no copy). Root `mcpinstall` then imports only `internal/toolexec` and std lib.
+  Package doc rewritten app-neutral ("registers MCP servers with the Claude Code CLI").
+  Declined: a Space-local installer (duplicate of `register`/`locateClaude`), hoisting `mcpauth`
+  (bearer-token minting is Studio-only).
+- **E2 Space Go bridge = Part 1's `bridge/memory.go`, moved.** `git mv` to
+  `apps/kira-space/internal/bridge/memory.go`; imports become Space's `appcore`
+  (`appcore.Emitter`, same type `KeepAwakeService.Emit` takes) and root `mcpinstall`. Body unchanged:
+  lazy open, 2 s `data_version` watcher, `ChannelMemoryChanged` const in this file (not
+  `events.go`, which stream F edits), package-level `CloseMemory`. No shared `BoundService`
+  (`terminal.BoundService` shape): one host app, so it buys nothing.
+- **E3 `memory-mcp` subcommand in Space `main.go`**, right after the `askpass` branch (L62-64), so it
+  runs before `startupfail`, `config.EnsureLayout`, logging and **before `acquireSingleInstance`**:
+  Claude Code must be able to spawn it while the Space window is open. The server now runs as
+  `"<Kira Space executable>" memory-mcp`. Registration name stays `kira-memory`. Part 1 never
+  shipped, so no stale registration to migrate.
+- **E4 Mode order: memory last.** Base `MODE_ORDER` here is `['git', 'terminal', 'ade']`; this part
+  makes it `['git', 'terminal', 'ade', 'memory']`. Stream F's P206 makes it `git, ade, terminal`;
+  the union on landing is `['git', 'ade', 'terminal', 'memory']`. New modules join last (Studio's
+  terminal, docker, memory precedent); nothing in Space ranks it higher.
+- **E5 Same module shape as Studio's.** Panel mode (`panel` = `MemoryPanel`, `start` =
+  `MemoryStart`, lazy via `defineAsyncComponent`, icon `lightbulb`), no `newTab`, no `layout:
+  'full'`. Space's `WorkbenchShell.vue` already renders a panel mode (git, terminal); no shell edit.
+  `visibleWorkspace()` returns `'memory'` for the mode, a workspace with no tabs, so `MainView`
+  shows `MemoryStart` (same as Studio Part 1, where the tab strip also stayed visible and empty).
+  No `tabStrip` flag: Space's shell does not read it, and wiring it would touch the file stream F's
+  P207 restyles.
+- **E6 Window-mode persistence: vocabulary only.** Space persists `windows.mode` (migration
+  `0003_p128_window_mode.sql`: `TEXT NOT NULL DEFAULT 'git'`, no CHECK). `model.WindowModes.Valid`
+  gains `"memory"`; without it `Normalize` drops a saved `memory` mode to `git`. No Space migration.
+  Studio's list drops `"memory"`; a Studio window saved in `memory` mode normalises to `studio`
+  (`Normalize`'s documented posture for a removed module; Part 1 never shipped anyway).
+- **E7 Connect dialog text.** `ConnectClaudeDialog.vue` stays app-neutral; add one sentence after
+  the command: "The server runs this app's executable with `memory-mcp`. Install again if the app
+  moves." (Space now; no app name hard-coded in shared UI.) `executable` is already in
+  `memoryMcpStatusSchema`; no wire change.
+- **E8 The move is one commit.** Wails bindings are generated and gitignored
+  (`apps/*/frontend/bindings`), so a commit where Studio's Go service is gone but its
+  `memoryControl.ts` still imports `@bindings/memoryservice.js` fails `typecheck` on a fresh
+  checkout; the reverse split leaves `knip` or both apps half-wired. So the Space adds and the Studio
+  removals (Go, TS, tests) land together, with `git mv` for every moved file. The `mcpinstall` hoist
+  before it and the notes after it are separate commits.
+
+## P2.3 Kira Space seams (line numbers at `05fa04c`)
+
+Edits are additive; every Space file stream E or F also touches is listed with its overlap.
+
+| File | Edit | Overlap |
+|---|---|---|
+| `apps/kira-space/main.go` L33-43 imports | `+ internal/mcpinstall`, `+ internal/memory/memorycli` | none |
+| `apps/kira-space/main.go` after L64 | `if len(os.Args) > 1 && os.Args[1] == "memory-mcp" { os.Exit(memorycli.Run(os.Args[2:])) }` with a one-line comment; L52-57 startup-order comment gains "the memory-mcp stdio shim" beside "the askpass argv shim" | none |
+| `apps/kira-space/main.go` after L164 | `memorySvc := bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}))` (comment: memory.db opens on first call) | none |
+| `apps/kira-space/main.go` teardown, after L242 | `bridge.CloseMemory(memorySvc)` (before `repositories.Close()`) | none |
+| `apps/kira-space/main.go` Services, after L269 `NewService(keepAwakeSvc)` | `application.NewService(memorySvc),` | **F** P204 inserts `CustomScriptsService` after L264 `tabsSvc`: different line, union |
+| `apps/kira-space/frontend/src/state/modeDomain.ts` L10 | `SpaceMode` gains `'memory'`; L8-9 comment gains "`memory` at P201 Part 2" | none known |
+| `apps/kira-space/frontend/src/workbench/modes.ts` L12, L37 | `MODE_ORDER` appends `'memory'`; `MODES.memory` entry after `ade` (comment: P201 Part 2, panel module, no tabs) | **F** P206 rewrites L12 order: resolve to `['git', 'ade', 'terminal', 'memory']` |
+| `apps/kira-space/internal/storage/model/window.go` L28 | `Valid` appends `"memory"` | none known |
+| `apps/kira-space/frontend/src/App.vue` L9, L21, L29 | import `memoryModuleKey` and `createMemoryModule`; `provide(memoryModuleKey, createMemoryModule());` after L29 | none known |
+| `apps/kira-space/frontend/src/bridge/index.ts` L43, L294 | `import { memoryControl } from './memoryControl';` after L43; `...memoryControl,` before `...spaceControl` | **F** P204 adds an import at L3/L36 and methods inside `spaceControl` (L57+): different lines, union |
+| `apps/kira-space/tests/ui/support/ipcChannels.ts` | memory IPC keys (6 calls + `memoryChanged` push) appended at the **end** of `IPC` | **F** adds `customScripts*` after L37: keep both |
+| `apps/kira-space/tests/ui/support/mockRuntime.ts` | `MemoryService.*` FQN entries appended at the **end** of `FQN_SUFFIX_BY_IPC_KEY`; `[IPC.memoryRecent]: '[]'` at the end of `WILDCARD_DEFAULTS` | **F** adds `customScripts*` after L71: keep both |
+
+New Space files (owned by D): `apps/kira-space/internal/bridge/memory.go` (moved),
+`apps/kira-space/frontend/src/bridge/memoryControl.ts` (Studio's file, `git mv`; imports
+`@bindings/memoryservice.js`, which Space's binding generator produces for the newly registered
+service), `apps/kira-space/frontend/src/workbench/memoryModule.ts` (`git mv`; Space's `control`
+from `../bridge/control`), `apps/kira-space/tests/ui/memory-module.spec.ts` (`git mv` from Studio,
+adapted: local `modeTab(page, mode: 'git' | 'terminal' | 'ade' | 'memory')` as `modules.spec.ts`
+does, Space `fixtures`/`support/types` imports, Space control snapshots).
+
+Stream E touches none of these files (its diff is ADE specs and `SPEC.md`). No Space migration.
+
+## P2.4 Kira Studio removals
+
+Result after P2-C2: `git diff 1721559 -- apps/kira-studio packages/shared/domain/mode.ts` shows
+only the E1 hoist (removed `internal/mcpinstall/`, new `internal/mcpauth/helperscript.go`, import
+paths in `main.go` and `bridge/dbmcp.go`). Concretely:
+
+- `apps/kira-studio/main.go`: drop the `memory-mcp` branch, `os` and `memorycli` imports,
+  `memorySvc` (embeddedWired field, construction, return, `wireLifecycle` param, teardown
+  `CloseMemory`, `NewService(memorySvc)`). Docker wiring stays.
+- `apps/kira-studio/internal/bridge/memory.go`: moved to Space (E2).
+- `apps/kira-studio/internal/storage/model/window.go` L32: `Valid` back to `studio, api, terminal,
+  docker`.
+- `packages/shared/domain/mode.ts` L18: `AppMode` back to `'studio' | 'api' | 'terminal' |
+  'docker'` (Studio-only type; Space has `SpaceMode`).
+- `apps/kira-studio/frontend/src/workbench/modes.ts`: drop `'memory'` and `MODES.memory`.
+- `apps/kira-studio/frontend/src/App.vue`, `bridge/index.ts`: drop the provide/import and spread.
+- `apps/kira-studio/frontend/src/bridge/memoryControl.ts`, `workbench/memoryModule.ts`: moved to
+  Space.
+- Tests: `memory-module.spec.ts` moved to Space; `mode-switch.spec.ts` (title "four mode tabs",
+  comment names Docker as fourth, count 4), `terminal-module.spec.ts` (count 4),
+  `support/apiMode.ts` (union without `'memory'`), `support/ipcChannels.ts`, `support/mockRuntime.ts`
+  back to v2.0 content (`git checkout 1721559 -- <file>` for each of these five, then re-check
+  `mode-switch.spec.ts`'s title says four, since v2.0's title still says "three" — fix it to
+  "four" while there, its count is 4).
+
+Dead-code check: after P2-C2, `knip` must report nothing new; `grep -rnE
+"memory-mcp|MemoryService|memoryModule|memoryControl|memoryModuleKey|'memory'" apps/kira-studio`
+returns nothing.
+
+## P2.5 Commits
+
+`P2-C<n>` below = commit n of this list. One sequential Sonnet implementer. Fast checks per commit:
+`go build`/`go vet` on touched packages,
+then the hook (`bun run lint`, `bun run typecheck`). Regenerate bindings for **both** apps before
+committing P2-C2 (`cd apps/kira-space && wails3 task common:generate:bindings`, same in
+`apps/kira-studio`), so typecheck runs against what a fresh checkout generates: Space gains
+`memoryservice.js`, Studio loses it.
+
+1. `refactor(mcpinstall): hoist to repo-root internal/mcpinstall` — `git mv
+   apps/kira-studio/internal/mcpinstall internal/mcpinstall`; header-helper trio to
+   `apps/kira-studio/internal/mcpauth/helperscript.go`; `ShellQuote` export; Studio importers
+   (`main.go`, `bridge/dbmcp.go`, `bridge/memory.go`) re-pointed. `go test -race
+   ./internal/mcpinstall/ ./apps/kira-studio/internal/mcpauth/ ./apps/kira-studio/internal/bridge/`.
+2. `feat(space)!: move the Memory module from Kira Studio to Kira Space` — body: `memory-mcp` now
+   runs from the Kira Space executable; footer `BREAKING CHANGE: Kira Studio no longer hosts the
+   Memory module or the memory-mcp subcommand.` Content: every P2.3 row, the four `git mv`s
+   (`bridge/memory.go`, `memoryControl.ts`, `memoryModule.ts`, `memory-module.spec.ts`) adapted,
+   every P2.4 removal, the E7 dialog sentence, `internal/memory/paths.go` L1 and `service.go` L67
+   comments naming Kira Space. Order inside the step: Space Go, Space frontend and tests, Studio
+   removals, regenerate both bindings, run the fast checks, commit.
+3. `docs: P201 Part 2 notes` — `P201-notes.md` gains a "Part 2" section: what landed, verification
+   results, the rewritten proposed `ARCHITECTURE.md` text (host is Kira Space: `<Kira Space
+   executable> memory-mcp`, Space `MemoryService`, Space `memory` mode; Studio has none), the
+   updated `DEV_ENVIRONMENT.md` smoke lines (`go build -tags server ./apps/kira-space`), and the
+   Known-open-items line rewritten ("Kira Studio does not host the module" replaces "Kira Space does
+   not host…").
+
+If a verification failure needs a fix after P2-C2, it lands as its own `fix:` commit before P2-C3.
+
+## P2.6 Verification (implementer runs; orchestrator re-checks the greps)
+
+- Build: `go build ./apps/kira-space/... ./apps/kira-studio/... ./internal/...`; `go build -tags
+  server -o <scratch>/kira-space ./apps/kira-space` and the same for Studio.
+- `go test -race ./internal/memory/... ./internal/mcpinstall/... ./internal/toolexec/...
+  ./apps/kira-space/internal/... ./apps/kira-studio/internal/...` (Space layering test included).
+- `bun run lint`, `bun run lint:go`, `bun run lint:dead`, `bun run typecheck`.
+- Space UI: `bun run test:ui:space` (full `ui` project: new `memory-module.spec.ts`, `modules.spec.ts`
+  unchanged and green).
+- Studio UI: `bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts
+  --project=ui mode-switch.spec.ts terminal-module.spec.ts docker` (mode tab count 4, docker specs
+  green), then the full `bun run test:ui:studio` once.
+- Visual: `bun run test:visual:space` and `bun run test:visual:studio`. Studio returns to its v2.0
+  title bar, so its baselines should match. If a Space baseline shows the title bar, the new mode tab
+  is a real element diff: list the spec under "Failing visual baselines" in the notes for CI
+  regeneration; never `--update-snapshots` here (`DEV_ENVIRONMENT.md` CI-Linux-only baseline policy).
+  Font-drift-only diffs are recorded as such.
+- Real MCP path: build `-tags server` Space binary; `claude -p --strict-mcp-config --mcp-config
+  <scratch>/mcp.json` with `{"mcpServers":{"kira-memory":{"type":"stdio","command":"<space
+  binary>","args":["memory-mcp"],"env":{"KIRA_MEMORY_HOME":"<scratch>/mem"}}}}`: one run stores a
+  fact (`store_memory` status `stored`), a second searches it (`search_memories` returns it). Also
+  run it once while a Space `-tags server` instance holds the app lock (proves the branch precedes
+  `acquireSingleInstance`). `printf '' | <space binary> memory-mcp` exits 0. Record in notes.
+- Greps: `grep -rn "memory-mcp" apps/*/main.go` hits only `apps/kira-space/main.go`;
+  `grep -rn "NewMemoryService" apps` hits only Space; `grep -rn "mcpinstall\"" apps internal`
+  shows only `github.com/kirathecat/kira-studio/internal/mcpinstall`; no
+  `apps/kira-studio/internal/mcpinstall` directory; `internal/mcpinstall` imports nothing under
+  `apps/`.
+
+## P2.7 Risks
+
+- **Landing conflicts with stream F:** `modes.ts` L12 (order) and the comment above it,
+  `bridge/index.ts` imports, Space `main.go` Services list, UI support maps. All union edits; the
+  order resolution is fixed in E4. Stream F's P207 restyles `WorkbenchShell.vue`/ADE files: not
+  touched here.
+- **`SPEC.md`**: streams E and F also add rows; the P201 rows are separate lines (union).
+- **Executable path:** registration points at the Space binary path at install time (dev build vs
+  `/Applications/Kira Space.app/...`); the dialog shows the command and E7's sentence tells the user
+  to reinstall after moving the app. Paths with spaces are quoted by `mcpinstall.ShellQuote`.
+- **macOS app-bundle binary as a CLI child:** same exposure Part 1 had for Studio; the branch exits
+  before any Wails/Cocoa init. Verified on Linux only here; note it in the notes as unverified on
+  macOS.
+- **Empty tab strip in the memory mode** (E5): parity with Part 1; if the user wants it hidden, a
+  later change adds `tabStrip` support to Space's shell.
