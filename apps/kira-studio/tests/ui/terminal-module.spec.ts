@@ -18,6 +18,7 @@ const SCRIPT = {
   command: 'npm run dev',
   workingDir: '/tmp/demo-repo/frontend',
   color: 'green',
+  collection: '',
   sortOrder: 0,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -166,7 +167,75 @@ test('a multiline command is saved as written; the panel row shows its first lin
   await dialog(page).locator('[data-testid="custom-script-add"]').click();
   await expect
     .poll(() => control.log().find((entry) => entry.channel === IPC.customScriptsCreate)?.args)
-    .toEqual({ fields: { name: 'Two lines', command: MULTI, workingDir: '', color: 'none' } });
+    .toEqual({
+      fields: { name: 'Two lines', command: MULTI, workingDir: '', color: 'none', collection: '' },
+    });
+});
+
+test('quick commands group under collapsible collections; titles align left', async ({
+  relaunch,
+}) => {
+  const scripts = [
+    { ...SCRIPT, id: 's-free', name: 'Loose', collection: '' },
+    { ...SCRIPT, id: 's-a1', name: 'Build', collection: 'Backend' },
+    { ...SCRIPT, id: 's-a2', name: 'Test', collection: 'Backend' },
+    { ...SCRIPT, id: 's-b1', name: 'Serve', collection: 'Web' },
+  ];
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.customScriptsList, response: scripts }],
+  });
+
+  await openTerminalModule(page);
+  const list = page.locator('[data-testid="quick-command-list"]');
+  await expect(page.locator('[data-testid="quick-command-group-Backend"]')).toContainText('2');
+  await expect(page.locator('[data-testid="quick-command-group-Web"]')).toContainText('1');
+  await expect(list.locator('[data-testid^="quick-command-"][type="button"]')).toHaveCount(4);
+
+  const title = page.locator('[data-testid="quick-command-s-free"]');
+  await expect(title).toHaveCSS('text-align', 'left');
+
+  await page
+    .locator('[data-testid="quick-command-group-Backend"] button:has-text("Backend")')
+    .click();
+  await expect(page.locator('[data-testid="quick-command-s-a1"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="quick-command-s-b1"]')).toBeVisible();
+  await page
+    .locator('[data-testid="quick-command-group-Backend"] button:has-text("Backend")')
+    .click();
+  await expect(page.locator('[data-testid="quick-command-s-a1"]')).toBeVisible();
+
+  await page.locator('[data-testid="toggle-search"]').click();
+  await page.locator('[data-testid="tree-search"]').fill('serve');
+  await expect(page.locator('[data-testid="quick-command-group-Backend"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="quick-command-s-b1"]')).toBeVisible();
+});
+
+test('the dialog adds a quick command into a collection', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: [{ ...SCRIPT, collection: 'Backend' }] },
+      { channel: IPC.customScriptsCreate, response: SCRIPT },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="quick-commands-manage"]').click();
+  await expect(dialog(page).locator('datalist#quick-command-collections option')).toHaveCount(1);
+  await dialog(page).locator('[data-testid="custom-script-add-name"]').fill('Lint');
+  await dialog(page).locator('[data-testid="custom-script-add-command"]').fill('bun run lint');
+  await dialog(page).locator('[data-testid="custom-script-add-collection"]').fill('  Backend ');
+  await dialog(page).locator('[data-testid="custom-script-add"]').click();
+  await expect
+    .poll(() => control.log().find((entry) => entry.channel === IPC.customScriptsCreate)?.args)
+    .toEqual({
+      fields: {
+        name: 'Lint',
+        command: 'bun run lint',
+        workingDir: '',
+        color: 'none',
+        collection: 'Backend',
+      },
+    });
 });
 
 // P133 §5.1 test 1: moved from settings-scripts.spec.ts's tests 1 and 2, merged the way the
@@ -214,6 +283,7 @@ test('Manage opens the quick commands dialog; add sends the trimmed fields', asy
       command: SCRIPT.command,
       workingDir: SCRIPT.workingDir,
       color: 'green',
+      collection: '',
     },
   });
 });
@@ -266,6 +336,7 @@ test('Edit… opens the dialog focused on that row; blur commits; colour applies
             command: SCRIPT.command,
             workingDir: SCRIPT.workingDir,
             color: SCRIPT.color,
+            collection: '',
           },
         },
         response: { ...SCRIPT, name: editedName },
@@ -279,6 +350,7 @@ test('Edit… opens the dialog focused on that row; blur commits; colour applies
             command: SCRIPT.command,
             workingDir: SCRIPT.workingDir,
             color: 'blue',
+            collection: '',
           },
         },
         response: { ...SCRIPT, color: 'blue' },
@@ -308,6 +380,7 @@ test('Edit… opens the dialog focused on that row; blur commits; colour applies
       command: SCRIPT.command,
       workingDir: SCRIPT.workingDir,
       color: SCRIPT.color,
+      collection: '',
     },
   });
 
@@ -322,6 +395,7 @@ test('Edit… opens the dialog focused on that row; blur commits; colour applies
       command: SCRIPT.command,
       workingDir: SCRIPT.workingDir,
       color: 'blue',
+      collection: '',
     },
   });
 });

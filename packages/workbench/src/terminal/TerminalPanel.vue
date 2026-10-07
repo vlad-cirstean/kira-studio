@@ -6,6 +6,8 @@ import { Alert, AlertAction, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { connColorVar } from '@theme/connColor';
+import { useLocalStorage } from '@vueuse/core';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
@@ -42,6 +44,37 @@ const filteredRecords = computed(() => {
     (s) => s.name.toLowerCase().includes(q) || s.command.toLowerCase().includes(q),
   );
 });
+
+interface ScriptGroup {
+  name: string;
+  rows: CustomScript[];
+}
+
+// Ungrouped rows first and unlabelled, then collections by name; each group keeps list order.
+const groups = computed<ScriptGroup[]>(() => {
+  const byName = new Map<string, CustomScript[]>();
+  for (const script of filteredRecords.value) {
+    const rows = byName.get(script.collection) ?? [];
+    rows.push(script);
+    byName.set(script.collection, rows);
+  }
+  return [...byName.entries()]
+    .map(([name, rows]) => ({ name, rows }))
+    .sort((a, b) => (a.name === '' ? -1 : b.name === '' ? 1 : a.name.localeCompare(b.name)));
+});
+
+const collapsed = useLocalStorage<string[]>('kira.quickCommands.collapsed', []);
+
+// A search shows every matching row, collapsed or not.
+function isOpen(name: string): boolean {
+  return name === '' || search.value.trim() !== '' || !collapsed.value.includes(name);
+}
+
+function toggleGroup(name: string): void {
+  collapsed.value = collapsed.value.includes(name)
+    ? collapsed.value.filter((n) => n !== name)
+    : [...collapsed.value, name];
+}
 
 const empty = computed(() => (scripts.value?.records().length ?? 0) === 0);
 
@@ -165,28 +198,46 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
               class="flex flex-col"
               data-testid="quick-command-list"
             >
-              <button
-                v-for="script in filteredRecords"
-                :key="script.id"
-                type="button"
-                :disabled="scriptCwd(script) === ''"
-                class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover disabled:opacity-50"
-                :title="script.command"
-                :data-testid="`quick-command-${script.id}`"
-                @click="runScript(script)"
-                @contextmenu.prevent="onContextMenu($event, script)"
-              >
-                <span
-                  v-if="script.color !== 'none'"
-                  class="w-2.5 h-2.5 rounded-full shrink-0"
-                  :style="{ background: connColorVar(script.color) }"
-                />
-                <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
-                <div class="flex-1 min-w-0 flex flex-col">
-                  <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
-                  <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
+              <template v-for="group in groups" :key="group.name">
+                <div
+                  v-if="group.name !== ''"
+                  class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover"
+                  :data-testid="`quick-command-group-${group.name}`"
+                >
+                  <TreeTwisty :expanded="isOpen(group.name)" :has-children="true" @toggle="toggleGroup(group.name)" />
+                  <button
+                    type="button"
+                    class="flex-1 min-w-0 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-semibold text-inherit"
+                    :aria-expanded="isOpen(group.name)"
+                    @click="toggleGroup(group.name)"
+                  >{{ group.name }}</button>
+                  <span class="text-muted-foreground text-kira-sm">{{ group.rows.length }}</span>
                 </div>
-              </button>
+                <div v-if="isOpen(group.name)" :class="{ 'pl-3.5': group.name !== '' }" class="flex flex-col">
+                  <button
+                    v-for="script in group.rows"
+                    :key="script.id"
+                    type="button"
+                    :disabled="scriptCwd(script) === ''"
+                    class="flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                    :title="script.command"
+                    :data-testid="`quick-command-${script.id}`"
+                    @click="runScript(script)"
+                    @contextmenu.prevent="onContextMenu($event, script)"
+                  >
+                    <span
+                      v-if="script.color !== 'none'"
+                      class="w-2.5 h-2.5 rounded-full shrink-0"
+                      :style="{ background: connColorVar(script.color) }"
+                    />
+                    <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
+                    <div class="flex-1 min-w-0 flex flex-col">
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
+                    </div>
+                  </button>
+                </div>
+              </template>
             </div>
           </div>
         </div>
