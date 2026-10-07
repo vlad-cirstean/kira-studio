@@ -9,5 +9,6 @@ only to work not yet started.
 
 - **`SPEC.md`** — the phases this chapter is built against, one row per phase, plus each phase's
   own result section.
-- **`plans/`** — one plan covering every row (`P185-P196-plan.md`, three parallel streams), plus
-  per-stream notes files the implementers write as they land.
+- **`plans/`** — one plan per stream or phase group (`P185-P196-plan.md`, `P197-P202-plan.md`, `P200-plan.md`,
+  `P201-plan.md`, `P203-P207-plan.md`) and `queued-requests.md` (P208, P209). Implementer notes are
+  folded into `SPEC.md` results and `docs/ARCHITECTURE.md`, then deleted.
