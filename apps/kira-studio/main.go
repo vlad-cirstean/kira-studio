@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -42,6 +43,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
@@ -65,6 +67,12 @@ var assets embed.FS
 // Quitter to the now-real App -> menu -> engine stream -> reopen handler -> the main window ->
 // app.Run() (P56 §4.11). There is no Node engine child to start any more (P58f M10 Phase 4).
 func main() {
+	// P201: Claude Code spawns `<this binary> memory-mcp` as a stdio MCP server — before anything
+	// else, so no window, database or log setup ever runs for it.
+	if len(os.Args) > 1 && os.Args[1] == "memory-mcp" {
+		os.Exit(memorycli.Run(os.Args[2:]))
+	}
+
 	// P100 Part 1: startupfail moved to repo-root internal/ and can no longer read
 	// internal/config/internal/buildinfo itself (Go's internal/ rule — a repo-root package cannot
 	// import anything under apps/kira-studio/internal), so this app constructs its own Reporter,
@@ -135,12 +143,13 @@ func main() {
 
 	embedded := wireEmbeddedServices(deps, connectionsSvc, oplogWiring, metricsTicker)
 	dbMcpSvc := embedded.dbMcpSvc
+	memorySvc := embedded.memorySvc
 	keepAwakeSvc := embedded.keepAwakeSvc
 	windowsSvc, terminalSvc, dockerSvc := embedded.windowsSvc, embedded.terminalSvc, embedded.dockerSvc
 	events, eventsDetach := embedded.events, embedded.eventsDetach
 
 	lifecycle := wireLifecycle(events, eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		dbMcpSvc, keepAwakeSvc, terminalSvc, updateInstaller, repositories, db)
+		dbMcpSvc, memorySvc, keepAwakeSvc, terminalSvc, updateInstaller, repositories, db)
 	windows, closeFlush, quitter := lifecycle.windows, lifecycle.closeFlush, lifecycle.quitter
 
 	app := application.New(application.Options{
@@ -172,6 +181,7 @@ func main() {
 			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
 			application.NewService(&bridge.DataGripService{Deps: deps}),
 			application.NewService(dbMcpSvc),
+			application.NewService(memorySvc),
 			application.NewService(keepAwakeSvc),
 			application.NewService(terminalSvc),
 			application.NewService(&bridge.CustomScriptsService{Deps: deps}),
@@ -344,6 +354,7 @@ func wireAdapters(deps *appcore.Deps, settings model.Settings, repositories *rep
 // function's own return.
 type embeddedWired struct {
 	dbMcpSvc     *bridge.DbMcpService
+	memorySvc    *bridge.MemoryService
 	keepAwakeSvc *bridge.KeepAwakeService
 	windowsSvc   *bridge.WindowsService
 	terminalSvc  *bridge.TerminalService
@@ -368,6 +379,9 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	dbMcpSvc := bridge.NewDbMcpService(deps, mcpinstall.New(mcpinstall.Deps{}), dbMcpApprovals)
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
+	// P201: the Memory module's bridge; memory.db opens on its first call.
+	memorySvc := bridge.NewMemoryService(deps.Events, mcpinstall.New(mcpinstall.Deps{}))
+
 	// P87 §3/§4: one keep-awake assertion for the whole app, driven by the titlebar toggle. The
 	// driver is a runtime.GOOS switch — a real caffeinate child on macOS, a documented no-op
 	// everywhere else.
@@ -389,7 +403,7 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 
 	return embeddedWired{
-		dbMcpSvc: dbMcpSvc, keepAwakeSvc: keepAwakeSvc,
+		dbMcpSvc: dbMcpSvc, memorySvc: memorySvc, keepAwakeSvc: keepAwakeSvc,
 		windowsSvc: windowsSvc, terminalSvc: terminalSvc, dockerSvc: dockerSvc,
 		events: events, eventsDetach: eventsDetach,
 	}
@@ -408,7 +422,7 @@ type lifecycleWired struct {
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
 // which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
 // -> the quitter built over both.
-func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, memorySvc *bridge.MemoryService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
 	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
@@ -437,6 +451,7 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 		// still be mid-flight, dialing a preconnect target on demand, once Shutdown below starts
 		// tearing preconnect down.
 		bridge.StopDbMcp(dbMcpSvc)
+		bridge.CloseMemory(memorySvc)
 		connectionsSvc.Shutdown()
 		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
 		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the

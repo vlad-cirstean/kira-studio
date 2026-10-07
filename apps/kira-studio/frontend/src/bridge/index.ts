@@ -52,6 +52,7 @@ import { on, trust, unwrap } from '@workbench/bridge/rpc';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
+import { memoryControl } from './memoryControl';
 
 // bridge/index.ts is the composition root (round-1 review finding 19): the only file that imports
 // every part of the app's own bound-call surface — the methods §5.6/P119 moved into
@@ -375,5 +376,6 @@ export const control = {
     update: UpdateService,
   }),
   ...apiControl,
+  ...memoryControl,
   ...studioControl,
 };

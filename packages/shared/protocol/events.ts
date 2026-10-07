@@ -64,6 +64,8 @@ export const CHANNEL = {
   // P87 §3.2: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) exactly like
   // agentSessions — one machine, one assertion, so every window's button must agree.
   keepAwake: 'kira:keepAwake:changed',
+  // P201: memory.db changed (this app's writes or the kira-memory MCP server's), Emit'd app-wide.
+  memoryChanged: 'kira:memory:changed',
   // P112: every API-client mutation (collections, saved requests, variables, environments) Emits
   // this with the scopes it touched, so every window's TanStack Query cache invalidates exactly
   // those keys — customScriptsChanged's own shape, generalised to a batch of scopes per event.

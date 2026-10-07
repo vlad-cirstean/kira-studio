@@ -166,6 +166,13 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
 
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
+
+  memorySearch: 'MemoryService.Search',
+  memoryRecent: 'MemoryService.Recent',
+  memoryHistory: 'MemoryService.History',
+  memoryStore: 'MemoryService.Store',
+  memoryMcpStatus: 'MemoryService.McpStatus',
+  memoryMcpInstall: 'MemoryService.InstallClaudeCode',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -328,6 +335,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // cares about keep-awake should still see the titlebar it will ship with. A spec that DOES care
   // (workbench.spec.ts's own keep-awake cases) still wins with its own snapshot.
   [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
+  // P201: the Memory module lists recent memories as soon as its mode opens.
+  [IPC.memoryRecent]: '[]',
 });
 
 // Structured clone (what ipcRenderer.invoke actually used, pre-P57) preserves a key whose value

@@ -163,6 +163,14 @@ export const IPC = {
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
 
+  // P201: the Memory module's bound surface.
+  memorySearch: 'kira:memory:search',
+  memoryRecent: 'kira:memory:recent',
+  memoryHistory: 'kira:memory:history',
+  memoryStore: 'kira:memory:store',
+  memoryMcpStatus: 'kira:memory:mcpStatus',
+  memoryMcpInstall: 'kira:memory:mcpInstall',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
@@ -184,6 +192,8 @@ export const IPC = {
   // (internal/appevent's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never
   // a bound call) — driven by emitWailsEvent(page, IPC.keepAwake, …), terminal's own precedent.
   keepAwake: 'kira:keepAwake:changed',
+  // P201: memory.db changed, Emit'd app-wide — driven by emitWailsEvent(page, IPC.memoryChanged, …).
+  memoryChanged: 'kira:memory:changed',
   // P112: every API-client mutation broadcasts the scopes it touched, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape, driven by emitWailsEvent(page, IPC.apiDataChanged, …).
   apiDataChanged: 'kira:api:dataChanged',
