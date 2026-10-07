@@ -7,7 +7,13 @@ import { defaultSettings, type Settings, type SettingsPatch } from './settingsDo
 // through this store even though SettingsDialog.vue here (a small rewrite, not a port) surfaces
 // only Appearance/Git/Connected editors/Advanced's own gitLogLevel leaf; the sections list below
 // is this app's own dialog surface, not the full Settings shape.
-export const sections = ['Appearance', 'Git', 'Connected editors', 'Advanced'] as const;
+export const sections = [
+  'Appearance',
+  'Git',
+  'Connected editors',
+  'Claude Code',
+  'Advanced',
+] as const;
 export type Section = (typeof sections)[number];
 
 // P103 Part 2 (§5.3): the shared skeleton now lives in

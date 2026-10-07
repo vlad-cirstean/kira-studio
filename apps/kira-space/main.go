@@ -152,10 +152,21 @@ func main() {
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose, AbortAgent: adeTracker.Abort,
 	}}
+	// keepAwakeCtl/keepAwakeSvc: the title bar's keep-awake toggle (P116 G5, internal/keepawake.Toggle)
+	// plus P188's agent reason, the live Claude Code session count — terminal agent tabs and running
+	// headless ade sessions — applied against claudeCode.keepAwakeWithAgents.
+	keepAwakeCtl := keepawake.New(keepawake.NewPlatformDriver())
+	keepAwakeSvc := &bridge.KeepAwakeService{
+		Emit: emitter, Toggle: &keepawake.Toggle{Ctl: keepAwakeCtl},
+		AgentCount: agentSessionCount(repositories, terminalRegistry),
+		Settings:   repositories.Settings.GetAll,
+	}
+	settingsSvc.OnChanged = func(model.Settings) { bridge.KeepAwakeRecompute(keepAwakeSvc) }
+
 	// windows holds every open window; created here so Archive can close a task's review windows.
 	windows := shell.NewWindowRegistry()
 	adeTaskBoard := wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry),
-		closeTaskReviewWindows(repositories, windows), credentialRelay)
+		closeTaskReviewWindows(repositories, windows), credentialRelay, keepAwakeSvc)
 	adeTaskSvc := &bridge.AdeTaskService{Engine: adeTaskBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -163,13 +174,9 @@ func main() {
 	terminalRegistry.OnChange = func() {
 		adeTracker.Reconcile()
 		bridge.AgentSessionsChanged(emitter, terminalRegistry)
+		bridge.KeepAwakeRecompute(keepAwakeSvc)
 	}
-
-	// keepAwakeCtl/keepAwakeSvc are P116 G5's own addition — the title bar's keep-awake toggle,
-	// Kira Studio's own titlebar half (internal/keepawake.Toggle, shared since H3) with no
-	// agent-aware reason of this app's own to layer on top.
-	keepAwakeCtl := keepawake.New(keepawake.NewPlatformDriver())
-	keepAwakeSvc := &bridge.KeepAwakeService{Emit: emitter, Toggle: &keepawake.Toggle{Ctl: keepAwakeCtl}}
+	bridge.KeepAwakeRecompute(keepAwakeSvc)
 
 	// windowsSvc is P116 G6's own addition — OpenNewWindow is assigned once `openNew` exists,
 	// below, the same two-step Kira Studio's own main.go uses (that closure needs `app`). P128
@@ -205,8 +212,7 @@ func main() {
 		detachMetrics()
 		detachOpLog()
 		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
-		// "caffeinate is dead" as short as possible — Kira Studio's own bridge.StopKeepAwake, inlined
-		// here since this app's own KeepAwakeService has no agent-reason recompute to also stop.
+		// "caffeinate is dead" as short as possible — Kira Studio's own bridge.StopKeepAwake, inlined.
 		keepAwakeCtl.Close()
 		// terminal.ShutdownBound(terminalSvc.BoundService) first: every PTY dies, and each one's own exit fires
 		// Registry.OnChange (Reconcile marks its row stopped) while the DB is still open. Then
@@ -418,6 +424,26 @@ func wireTracker(
 	return tracker, hooks
 }
 
+// agentSessionCount is the live Claude Code session count the keep-awake agent reason reads: the
+// terminal registry's agent tabs plus ade headless sessions still running (headless runs have no
+// terminal). A read failure counts the terminal sessions only.
+func agentSessionCount(repositories *repos.Repos, registry *terminal.Registry) func() int {
+	return func() int {
+		n := len(registry.AgentSessions())
+		rows, err := repositories.AdeSessions.ListTask()
+		if err != nil {
+			slog.Warn("keep-awake: list ade sessions", "scope", "keepawake", "err", err)
+			return n
+		}
+		for _, r := range rows {
+			if r.State == model.AdeSessionStateRunning && r.Mode == model.AdeSessionModeHeadless {
+				n++
+			}
+		}
+		return n
+	}
+}
+
 // closeTaskReviewWindows returns the hook that closes every review window of an archived task.
 func closeTaskReviewWindows(repositories *repos.Repos, windows *shell.WindowRegistry) func(taskID string) {
 	return func(taskID string) {
@@ -471,7 +497,7 @@ func surfaceCredentialPrompts(relay *gitcred.Relay, windows *shell.WindowRegistr
 
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
-	closeReviewWindows func(taskID string), credentials *gitcred.Relay,
+	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -501,8 +527,11 @@ func wireAdeTask(
 		CloseReviewWindows: closeReviewWindows,
 		OnRuns:             func(ev adewire.RunsChangedEvent) { bridge.AdeTaskRunsChanged(events, ev) },
 		OnLog:              func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
-		OnSessions:         func() { bridge.AdeTaskSessionsChanged(events) },
-		AgentDir:           filepath.Join(config.KiraSpaceHome(), "ade", "runs"),
+		OnSessions: func() {
+			bridge.AdeTaskSessionsChanged(events)
+			bridge.KeepAwakeRecompute(keepAwake)
+		},
+		AgentDir: filepath.Join(config.KiraSpaceHome(), "ade", "runs"),
 		HeadlessSettingSources: func() string {
 			settings, err := repositories.Settings.GetAll()
 			if err != nil {

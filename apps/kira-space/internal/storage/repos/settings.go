@@ -44,6 +44,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Appearance = readAppearance(stored)
 	result.Git = readGit(stored)
 	result.Ade = readAde(stored)
+	appsettings.Leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	return result, nil
 }
@@ -176,7 +177,13 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertGit(tx, patch.Git); err != nil {
 			return err
 		}
-		return upsertAde(tx, patch.Ade)
+		if err := upsertAde(tx, patch.Ade); err != nil {
+			return err
+		}
+		if patch.ClaudeCode == nil {
+			return nil
+		}
+		return appsettings.UpsertOptional(tx, "claudeCode.keepAwakeWithAgents", patch.ClaudeCode.KeepAwakeWithAgents)
 	})
 	if err != nil {
 		return model.Settings{}, err

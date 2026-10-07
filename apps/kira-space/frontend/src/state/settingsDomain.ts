@@ -123,8 +123,15 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
   headlessSettingSources: z.enum(['user', 'all']).default('all'),
 });
 
+// P188: keep this Mac awake while any Claude Code session runs, independent of the title bar's own
+// keep-awake toggle. Off by default — an OS power assertion is opt-in. Not exported, like the
+// other raw section schemas.
+const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
+  keepAwakeWithAgents: z.boolean().default(false),
+});
+
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
-// with no `advanced`/`git`/`ade` keys, and that row must still parse on next launch.
+// with no `advanced`/`git`/`ade`/`claudeCode` keys, and that row must still parse on next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appSpaceAppearanceSettingsSchema,
   advanced: advancedSettingsSchema.default({ gitLogLevel: 'info' }),
@@ -145,6 +152,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     spanDayShare: 0.5,
     headlessSettingSources: 'all',
   }),
+  claudeCode: claudeCodeSettingsSchema.default({ keepAwakeWithAgents: false }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -153,6 +161,7 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
   ade: adeSettingsSchema.partial().optional(),
+  claudeCode: claudeCodeSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -185,5 +194,8 @@ export const defaultSettings: Settings = {
     workdayHours: 6,
     spanDayShare: 0.5,
     headlessSettingSources: 'all',
+  },
+  claudeCode: {
+    keepAwakeWithAgents: false,
   },
 };

@@ -13,6 +13,8 @@ import (
 // grew a Cache leaf).
 type SettingsService struct {
 	Deps appcore.Deps
+	// OnChanged runs after every successful Set with the merged settings.
+	OnChanged func(model.Settings)
 }
 
 func (s *SettingsService) GetAll() (model.Settings, error) {
@@ -34,5 +36,8 @@ func (s *SettingsService) Set(args SettingsSetArgs) (model.Settings, error) {
 		logging.SetLevel(*args.Patch.Advanced.GitLogLevel)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
+	if s.OnChanged != nil {
+		s.OnChanged(merged)
+	}
 	return merged, nil
 }

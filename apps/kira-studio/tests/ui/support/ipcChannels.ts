@@ -159,7 +159,7 @@ export const IPC = {
   customScriptsUpdate: 'kira:customScripts:update',
   customScriptsRemove: 'kira:customScripts:remove',
 
-  // P87 §10.3: the titlebar keep-awake toggle and the agent-aware Settings leaf.
+  // P87 §10.3: the titlebar keep-awake toggle.
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
 

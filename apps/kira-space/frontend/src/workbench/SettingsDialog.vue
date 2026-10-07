@@ -6,6 +6,7 @@ import { sections, useSettingsStore } from '../state/settings';
 import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
+import ClaudeCodePane from './settings/ClaudeCodePane.vue';
 import ConnectedEditorsPane from './settings/ConnectedEditorsPane.vue';
 import GitPane from './settings/GitPane.vue';
 
@@ -41,12 +42,14 @@ async function save(patch: SettingsPatch): Promise<void> {
       appearance: defaultSettings.appearance,
       advanced: defaultSettings.advanced,
       git: defaultSettings.git,
+      claudeCode: defaultSettings.claudeCode,
       ade: { headlessSettingSources: defaultSettings.ade.headlessSettingSources },
     }"
     :current="{
       appearance: settingsStore.appearance,
       advanced: settingsStore.advanced,
       git: settingsStore.git,
+      claudeCode: settingsStore.claudeCode,
       ade: { headlessSettingSources: settingsStore.ade.headlessSettingSources },
     }"
     :save="save"
@@ -69,6 +72,13 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <ConnectedEditorsPane
         :active="s.activeSection === 'Connected editors'"
+        :draft="s.draft"
+        :is-at-default="s.isAtDefault"
+        :reset-leaf="s.resetLeaf"
+        :register-field-error="s.registerFieldError"
+      />
+      <ClaudeCodePane
+        :active="s.activeSection === 'Claude Code'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"

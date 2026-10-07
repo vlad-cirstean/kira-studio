@@ -7,9 +7,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
-// Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp/ClaudeCode are
-// dropped entirely: all five are DB-client-only concerns (page sizes, the query cache budget, HTTP
-// client tuning, the embedded DB MCP server, Claude Code hooks) Kira Space has no use for.
+// Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp are dropped
+// entirely: all four are DB-client-only concerns (page sizes, the query cache budget, HTTP client
+// tuning, the embedded DB MCP server) Kira Space has no use for. ClaudeCode is P188's own leaf.
 // Appearance/Advanced/Git are this app's own (P120): the only app with a git module, so the two
 // appearance leaves only the git module uses (InlineBlame/DateFormat), its own diagnostic-log leaf
 // (GitLogLevel — Kira Studio's own is a same-shaped but separately named/keyed advanced.logLevel,
@@ -70,11 +70,19 @@ type AdeSettings struct {
 	HeadlessSettingSources string `json:"headlessSettingSources"`
 }
 
+// ClaudeCodeSettings is P188's keep-awake-with-agents leaf: on, this Mac stays awake while any
+// Claude Code session runs (a terminal agent tab or a running headless ade session), independent of
+// the title bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.
+type ClaudeCodeSettings struct {
+	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
+}
+
 type Settings struct {
-	Appearance Appearance       `json:"appearance"`
-	Advanced   AdvancedSettings `json:"advanced"`
-	Git        GitSettings      `json:"git"`
-	Ade        AdeSettings      `json:"ade"`
+	Appearance Appearance         `json:"appearance"`
+	Advanced   AdvancedSettings   `json:"advanced"`
+	Git        GitSettings        `json:"git"`
+	Ade        AdeSettings        `json:"ade"`
+	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
 }
 
 // DefaultGitSettings mirrors docs/v1.3/plans/G7 D16's own default: the same three-pattern default
@@ -113,9 +121,10 @@ func DefaultSettings() Settings {
 			InlineBlame: true,
 			DateFormat:  "relative",
 		},
-		Advanced: AdvancedSettings{GitLogLevel: "info"},
-		Git:      DefaultGitSettings(),
-		Ade:      DefaultAdeSettings(),
+		Advanced:   AdvancedSettings{GitLogLevel: "info"},
+		Git:        DefaultGitSettings(),
+		Ade:        DefaultAdeSettings(),
+		ClaudeCode: ClaudeCodeSettings{KeepAwakeWithAgents: false},
 	}
 }
 
@@ -160,11 +169,17 @@ type AdePatch struct {
 	HeadlessSettingSources *string `json:"headlessSettingSources,omitempty"`
 }
 
+// ClaudeCodePatch mirrors ClaudeCodeSettings' own `.partial()` shape.
+type ClaudeCodePatch struct {
+	KeepAwakeWithAgents *bool `json:"keepAwakeWithAgents,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
 	Git        *GitPatch        `json:"git,omitempty"`
 	Ade        *AdePatch        `json:"ade,omitempty"`
+	ClaudeCode *ClaudeCodePatch `json:"claudeCode,omitempty"`
 }
 
 // validateAppearanceSection mirrors upsertAppearance's own leaf list (repos/settings.go).
