@@ -36,18 +36,6 @@ func (r *recorder) Emit(name string, data any)           { r.add("", name, data)
 func (r *recorder) EmitTo(window, name string, data any) { r.add(window, name, data) }
 func (r *recorder) EmitFocused(name string, data any)    { r.add("", name, data) }
 
-func (r *recorder) count(name string) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	n := 0
-	for _, e := range r.events {
-		if e.name == name {
-			n++
-		}
-	}
-	return n
-}
-
 // waitFor polls pred over the recorded events until it holds or the deadline passes.
 func (r *recorder) waitFor(t *testing.T, what string, pred func(recorded) bool) {
 	t.Helper()
