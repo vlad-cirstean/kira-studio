@@ -10,12 +10,18 @@ import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
 import AdeBranchRow from './AdeBranchRow.vue';
 import type { BranchRowModel, CardModel } from './usePlanModel';
+import { useTaskMenu } from './useTaskMenu';
 
 const props = defineProps<{ card: CardModel }>();
 const emit = defineEmits<{ select: []; forcePush: [row: BranchRowModel] }>();
 
 const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
+const taskMenu = useTaskMenu(() => props.card);
+
+function onMenuKey(ev: KeyboardEvent): void {
+  if (ev.currentTarget instanceof Element) taskMenu.openAt(ev.currentTarget);
+}
 
 function act(row: BranchRowModel, a: BranchAction): void {
   if (a.kind === 'forcePush') emit('forcePush', row);
@@ -70,7 +76,7 @@ const headStyle = computed(() => ({
     :data-selected="card.selected || undefined"
   >
     <div class="flex w-[210px] shrink-0 flex-col pt-px" data-testid="ade-task-cells">
-      <AdeActionCell v-if="card.tag" :tag="card.tag" tall>
+      <AdeActionCell v-if="card.tag" :tag="card.tag" tall @contextmenu="taskMenu.open">
         <AdeTaskActionButton :card="card" />
       </AdeActionCell>
       <AdeActionCell
@@ -80,14 +86,17 @@ const headStyle = computed(() => ({
         :actions="row.tag.actions"
         :rebasing="dialogs.pending.has(`rebase:${row.id}`)"
         @act="(a) => act(row, a)"
+        @contextmenu="(ev: MouseEvent) => card.review && taskMenu.open(ev)"
       />
     </div>
+    <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the keyboard opens the menu from the header. -->
     <div
       :data-task-id="card.task.id"
       class="box-border flex min-w-0 max-w-[600px] flex-1 flex-col rounded-[10px] border border-l-4 border-border-strong bg-elevated shadow-[0_2px_0_color-mix(in_srgb,black_35%,transparent),0_6px_16px_color-mix(in_srgb,black_18%,transparent)]"
       :class="[card.parked ? 'border-dashed' : '', card.review ? 'cursor-default' : 'cursor-grab']"
       :style="boxStyle"
       data-testid="ade-card"
+      @contextmenu="taskMenu.open"
     >
       <!-- biome-ignore lint/a11y/useSemanticElements: the header holds block content a button cannot. -->
       <div
@@ -100,6 +109,8 @@ const headStyle = computed(() => ({
         @click="emit('select')"
         @keydown.enter.self="emit('select')"
         @keydown.space.self.prevent="emit('select')"
+        @keydown.shift.f10.prevent="onMenuKey"
+        @keydown.context-menu.prevent="onMenuKey"
       >
         <div class="flex h-[18px] min-w-0 items-center gap-[7px]">
           <span

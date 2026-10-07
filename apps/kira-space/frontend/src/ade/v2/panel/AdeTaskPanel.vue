@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
@@ -7,6 +8,7 @@ import { dayLabel, LATER } from '../board/calendar';
 import { taskFacts, taskPatch } from '../board/panelFacts';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import type { CardModel, PlanModel } from '../plan/usePlanModel';
+import { useTaskMenu } from '../plan/useTaskMenu';
 import { useUpdateTask } from '../queries';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
@@ -27,6 +29,10 @@ const sessionCount = computed(
   () => sessions.value.filter((x) => x.taskId === props.card.task.id).length,
 );
 const update = useUpdateTask();
+const taskMenu = useTaskMenu(() => props.card);
+function openMore(ev: MouseEvent): void {
+  if (ev.currentTarget instanceof Element) taskMenu.openAt(ev.currentTarget);
+}
 const notesError = ref('');
 
 /** A finished task shows Archive as its stage action; any other task gets the quiet one. */
@@ -103,6 +109,13 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
             Archive
           </button>
         </AdeTip>
+        <TooltipIconButton
+          icon="ellipsis"
+          label="More actions"
+          class="shrink-0"
+          data-testid="ade-panel-more"
+          @click="openMore"
+        />
       </div>
       <div class="truncate font-data text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
       <p v-if="ui.actionError[card.task.id]" class="m-0 text-kira-sm text-error" data-testid="ade-panel-action-error">
