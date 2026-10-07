@@ -81,7 +81,11 @@ type AdeTaskBranch struct {
 	AddedAt     int64
 	MergedAt    *int64
 	ArchivedAt  *int64
+	Origin      string
 }
+
+// AdeBranchOriginAgent marks a branch an agent declared or named.
+const AdeBranchOriginAgent = "agent"
 
 // Validate asserts what no SQL constraint covers.
 func (b AdeTaskBranch) Validate() error {

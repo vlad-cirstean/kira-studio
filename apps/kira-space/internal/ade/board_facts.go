@@ -32,7 +32,7 @@ func zeroBranch(sb model.AdeTaskBranch, base string, setup *adewire.WorktreeSetu
 		ID: sb.ID, TaskID: sb.TaskID, CodeRepoID: sb.CodeRepoID, Name: sb.Name, Kind: sb.Kind, Base: base,
 		Setup: setup, Integration: []adewire.Integration{}, Deployments: []adewire.Deployment{},
 		ConflictsIfRebased: []string{}, ConflictCheck: conflictDone, Files: []adewire.FileChange{},
-		Commits: []adewire.Commit{}, Dirty: []adewire.DirtyEntry{}, AddedAt: sb.AddedAt,
+		Commits: []adewire.Commit{}, Dirty: []adewire.DirtyEntry{}, AddedAt: sb.AddedAt, Origin: sb.Origin,
 	}
 }
 

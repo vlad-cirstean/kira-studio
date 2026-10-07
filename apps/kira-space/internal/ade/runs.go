@@ -455,6 +455,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 			prompt = composePrompt(promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
 				Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID), Extra: spec.Extra,
+				Space: b.spaceEnabled(tc.task),
 			})
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
@@ -512,17 +513,27 @@ func (b *TaskBoard) settingSources() string {
 	return settingSourcesAll
 }
 
-func allowedTools(step []string) []string {
+func allowedTools(step []string, space bool) []string {
 	out := slices.Clone(step)
-	if !slices.Contains(out, adeagent.FinishStepTool) {
-		out = append(out, adeagent.FinishStepTool)
+	want := []string{adeagent.FinishStepTool}
+	if space {
+		want = append(want, adeagent.SpaceToolNames...)
+	}
+	for _, t := range want {
+		if !slices.Contains(out, t) {
+			out = append(out, t)
+		}
 	}
 	return out
 }
 
 func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def stepDef, sessionID, resume, path, prompt string, timeout time.Duration) {
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
-	cfg, release, err := b.agent.Register(run.ID)
+	space := false
+	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil {
+		space = b.spaceEnabled(task)
+	}
+	cfg, release, err := b.agent.Register(adeagent.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space})
 	if err != nil {
 		sink.add(logStderr, "could not start: "+err.Error())
 		sink.flush()
@@ -536,7 +547,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 	cwdEnv := gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: path})
 	exit, runErr := adeagent.Run(ctx, adeagent.Spec{
 		ClaudeBin: bin, Dir: path, Prompt: prompt, SessionID: b.sessionClaudeID(sessionID), Resume: resume, MCPConfigPath: cfg,
-		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools), Timeout: timeout, Env: cwdEnv,
+		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space), Timeout: timeout, Env: cwdEnv,
 	}, adeagent.Handler{
 		OnLine: func(l adeagent.Line) { sink.add(l.Stream, l.Text) },
 	})

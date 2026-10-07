@@ -279,7 +279,7 @@ const (
 )
 
 var (
-	topOrder   = []string{"id", "name", "stages"}
+	topOrder   = []string{"id", "name", "kira_space_mcp", "stages"}
 	stageOrder = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
 	stepOrder  = []string{"id", "name", "runs_on", "before", "on_failure", "timeout", "prompt", "allowed_tools"}
 )
@@ -444,6 +444,11 @@ func syncItems(old *yaml.Node, ids []string, apply func(i int, item *yaml.Node))
 func applyWorkflow(root *yaml.Node, wf adewire.Workflow) {
 	setScalar(root, "id", kText, wf.ID, true, topOrder)
 	setScalar(root, "name", kText, wf.Name, true, topOrder)
+	if wf.KiraSpaceMcp {
+		setScalar(root, "kira_space_mcp", kBool, "true", true, topOrder)
+	} else if i, _ := find(root, "kira_space_mcp"); i >= 0 {
+		root.Content = append(root.Content[:i], root.Content[i+2:]...)
+	}
 	ids := make([]string, len(wf.Stages))
 	for i, s := range wf.Stages {
 		ids[i] = s.ID

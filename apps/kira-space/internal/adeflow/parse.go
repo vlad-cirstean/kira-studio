@@ -142,7 +142,7 @@ func (v *validator) boolean(m map[string]*yaml.Node, prefix, key string) bool {
 
 func (v *validator) workflow(root *yaml.Node) adewire.Workflow {
 	wf := adewire.Workflow{Stages: make([]adewire.Stage, 0)}
-	m := v.fields(root, "", "id", "name", "stages")
+	m := v.fields(root, "", "id", "name", "kira_space_mcp", "stages")
 	if v.err != nil {
 		return wf
 	}
@@ -151,6 +151,10 @@ func (v *validator) workflow(root *yaml.Node) adewire.Workflow {
 		v.fail(m["id"], "", "id must be lowercase letters, digits, - or _")
 	}
 	wf.Name = v.str(m, "", "name", true)
+	wf.KiraSpaceMcp = v.boolean(m, "", "kira_space_mcp")
+	if v.err != nil {
+		return wf
+	}
 	list, ok := m["stages"]
 	if !ok {
 		v.failMissing("", "stages")

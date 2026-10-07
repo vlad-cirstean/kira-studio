@@ -566,3 +566,21 @@ func TestTracker_HasPendingIgnoresAbandonedLaunch(t *testing.T) {
 		t.Fatal("abandoned intent still blocks a retry")
 	}
 }
+
+func TestTracker_ExpiredPendingIntentReleasesItsRecord(t *testing.T) {
+	tr, _, _, clock := newTestTracker(t)
+	var stopped []string
+	tr.SetStoppedHandler(func(id string) { stopped = append(stopped, id) })
+
+	abandoned, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: "/repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock.advance(2 * time.Minute)
+	if _, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: "/repo"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(stopped) != 1 || stopped[0] != abandoned.RecordID {
+		t.Fatalf("OnStopped calls = %v, want only %s", stopped, abandoned.RecordID)
+	}
+}

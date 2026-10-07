@@ -34,6 +34,7 @@ export function mkBranch(over: Partial<Branch> & Pick<Branch, 'id' | 'taskId'>):
     dirty: [],
     lastCommitAt: null,
     addedAt: 0,
+    origin: '',
     ...over,
   };
 }

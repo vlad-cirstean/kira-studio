@@ -39,6 +39,8 @@ type promptInput struct {
 	Message string
 	// Extra, when non-empty, is added after the body (the failure line of a fresh send-back run).
 	Extra string
+	// Space adds the Kira Space tools line after the body.
+	Space bool
 }
 
 // composePrompt builds an agent run's prompt (SPEC2 section 9 "Start step" shape) and always ends
@@ -61,6 +63,9 @@ func composePrompt(in promptInput) string {
 	body = strings.TrimRight(body, "\n")
 	if in.Extra != "" {
 		body += "\n\n" + in.Extra
+	}
+	if in.Space {
+		body += "\n\n" + adeagent.SpaceSuffix
 	}
 	return body + "\n\n" + adeagent.FinishStepSuffix + "\n"
 }

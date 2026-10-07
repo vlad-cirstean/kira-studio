@@ -111,9 +111,11 @@ type Stage struct {
 }
 
 type Workflow struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Stages []Stage `json:"stages"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// KiraSpaceMcp turns on the Kira Space tools (declare repos, request branches) for the work of a task.
+	KiraSpaceMcp bool    `json:"kiraSpaceMcp"`
+	Stages       []Stage `json:"stages"`
 }
 
 type WorkflowError struct {
@@ -207,6 +209,7 @@ type Branch struct {
 	Dirty               []DirtyEntry   `json:"dirty"`
 	LastCommitAt        *int64         `json:"lastCommitAt"`
 	AddedAt             int64          `json:"addedAt"`
+	Origin              string         `json:"origin"` // '' user | 'agent'
 }
 
 type Pair struct {

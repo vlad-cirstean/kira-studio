@@ -68,7 +68,7 @@ func checkEstExtends(old, next string) error {
 }
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
-const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, queued_after, position, had_commits, added_at, merged_at, archived_at`
+const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
 const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
 // AdeTaskRepo reads and writes the v2 task store: tasks, branches, plan, runs, worktree setup and
@@ -112,7 +112,7 @@ func scanAdeTaskBranch(row rowScanner) (model.AdeTaskBranch, error) {
 	var had int
 	var merged, archived sql.NullInt64
 	if err := row.Scan(&b.ID, &b.TaskID, &b.CodeRepoID, &b.Name, &b.Kind, &b.Base, &b.QueuedAfter, &b.Position,
-		&had, &b.AddedAt, &merged, &archived); err != nil {
+		&had, &b.AddedAt, &merged, &archived, &b.Origin); err != nil {
 		return model.AdeTaskBranch{}, err
 	}
 	b.HadCommits = had != 0
@@ -237,8 +237,8 @@ func insertTaskBranch(tx *sql.Tx, b model.AdeTaskBranch) error {
 	if err := b.Validate(); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`INSERT INTO ade_task_branches (`+adeTaskBranchColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
-		b.ID, b.TaskID, b.CodeRepoID, b.Name, b.Kind, b.Base, b.QueuedAfter, b.Position, boolInt(b.HadCommits), b.AddedAt); err != nil {
+	if _, err := tx.Exec(`INSERT INTO ade_task_branches (`+adeTaskBranchColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
+		b.ID, b.TaskID, b.CodeRepoID, b.Name, b.Kind, b.Base, b.QueuedAfter, b.Position, boolInt(b.HadCommits), b.AddedAt, b.Origin); err != nil {
 		if isUniqueViolation(err) {
 			return ErrBranchOnTask
 		}
@@ -375,7 +375,7 @@ func (r *AdeTaskRepo) AddBranch(b model.AdeTaskBranch) (model.AdeTaskBranch, err
 
 func (r *AdeTaskRepo) queryBranches(where string) ([]model.AdeTaskBranch, error) {
 	rows, err := r.DB.Query(`SELECT b.id, b.task_id, b.code_repo_id, b.name, b.kind, b.base, b.queued_after, b.position,
-		b.had_commits, b.added_at, b.merged_at, b.archived_at
+		b.had_commits, b.added_at, b.merged_at, b.archived_at, b.origin
 		FROM ade_task_branches b JOIN ade_tasks t ON t.id = b.task_id WHERE ` + where + ` ORDER BY b.task_id, b.position, b.id`)
 	if err != nil {
 		return nil, fmt.Errorf("repos: query ade task branches: %w", err)
@@ -639,6 +639,22 @@ func (r *AdeTaskRepo) SetBranchName(id, name string) error {
 	n, err := res.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("repos: set ade branch name %s: %w", id, err)
+	}
+	if n == 0 {
+		return ErrBranchMissing
+	}
+	return nil
+}
+
+// SetBranchOrigin marks who made the branch row ("" user, "agent").
+func (r *AdeTaskRepo) SetBranchOrigin(id, origin string) error {
+	res, err := r.DB.Exec(`UPDATE ade_task_branches SET origin = ? WHERE id = ?`, origin, id)
+	if err != nil {
+		return fmt.Errorf("repos: set ade branch origin %s: %w", id, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repos: set ade branch origin %s: %w", id, err)
 	}
 	if n == 0 {
 		return ErrBranchMissing

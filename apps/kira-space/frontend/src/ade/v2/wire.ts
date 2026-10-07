@@ -93,6 +93,8 @@ export interface Stage {
 export interface Workflow {
   id: string;
   name: string;
+  /** Turns on the Kira Space tools (declare repos, request branches) for the work of a task. */
+  kiraSpaceMcp: boolean;
   stages: Stage[];
 }
 export interface WorkflowError {
@@ -179,6 +181,8 @@ export interface Branch {
   dirty: DirtyEntry[];
   lastCommitAt: number | null;
   addedAt: number;
+  /** '' user-made, 'agent' declared or named by an agent through the Kira Space tools. */
+  origin: '' | 'agent';
 }
 export interface Pair {
   a: string;

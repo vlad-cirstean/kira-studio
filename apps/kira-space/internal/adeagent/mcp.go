@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -30,11 +31,21 @@ const (
 // outcome when the process exits.
 type FinishFunc func(runID, status, summary string)
 
-type runToken struct {
+// Grant is what one registration may do. A run grant reports through finish_step; a Space grant
+// adds the task tools, which act on TaskID alone.
+type Grant struct {
+	RunID  string
+	TaskID string
+	Space  bool
+}
+
+type registration struct {
 	id         uint64 // unique per registration: one run id may register again before the first releases
-	runID      string
+	grant      Grant
 	hash, salt []byte
 }
+
+const grantPrefix = "g"
 
 // Server is the loopback MCP server a headless run reports through. It listens on 127.0.0.1 with
 // an OS-assigned port, started by the first Register. Each run gets its own bearer token and a
@@ -42,18 +53,20 @@ type runToken struct {
 type Server struct {
 	dir      string
 	onFinish FinishFunc
+	space    SpaceTools
 
 	mu     sync.Mutex
 	seq    uint64
-	tokens []runToken
+	tokens []registration
 	ln     net.Listener
 	srv    *http.Server
 	closed bool
 }
 
-// NewServer returns a stopped Server; config files go in dir (created 0700).
-func NewServer(dir string, onFinish FinishFunc) *Server {
-	return &Server{dir: dir, onFinish: onFinish}
+// NewServer returns a stopped Server; config files go in dir (created 0700). space may be nil: a
+// Space grant is then refused.
+func NewServer(dir string, onFinish FinishFunc, space SpaceTools) *Server {
+	return &Server{dir: dir, onFinish: onFinish, space: space}
 }
 
 type finishArgs struct {
@@ -61,38 +74,73 @@ type finishArgs struct {
 	Summary string `json:"summary" jsonschema:"One line: what was done, what failed, or the question for the user."`
 }
 
-func (s *Server) buildMCPServer() *mcp.Server {
-	srv := mcp.NewServer(&mcp.Implementation{Name: ServerName, Title: "Kira ADE", Version: "1"}, nil)
-	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "finish_step",
-		Description: "Report how this pipeline step ended. Call it exactly once, as the last action.",
-	}, s.finishStep)
+// buildMCPServer returns the tool set a grant sees: an agent never lists a tool it cannot call.
+func (s *Server) buildMCPServer(finish, space bool) *mcp.Server {
+	opts := &mcp.ServerOptions{}
+	if space {
+		opts.Instructions = spaceInstructions
+	}
+	srv := mcp.NewServer(&mcp.Implementation{Name: ServerName, Title: "Kira ADE", Version: "1"}, opts)
+	if finish {
+		mcp.AddTool(srv, &mcp.Tool{
+			Name:        "finish_step",
+			Description: "Report how this pipeline step ended. Call it exactly once, as the last action.",
+		}, s.finishStep)
+	}
+	if space {
+		s.addSpaceTools(srv)
+	}
 	return srv
+}
+
+// grant resolves the registration behind a request; a released registration fails at once.
+func (s *Server) grant(info *auth.TokenInfo) (Grant, bool) {
+	if info == nil || len(info.UserID) <= len(grantPrefix) {
+		return Grant{}, false
+	}
+	id, err := strconv.ParseUint(info.UserID[len(grantPrefix):], 10, 64)
+	if err != nil {
+		return Grant{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, t := range s.tokens {
+		if t.id == id {
+			return t.grant, true
+		}
+	}
+	return Grant{}, false
+}
+
+func toolError(text string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}, IsError: true}
 }
 
 func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args finishArgs) (*mcp.CallToolResult, any, error) {
 	switch args.Status {
 	case finishStatusDone, finishStatusFail, finishStatusNeed:
 	default:
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: `status must be "done", "failed" or "needs_input"`}},
-			IsError: true,
-		}, nil, nil
+		return toolError(`status must be "done", "failed" or "needs_input"`), nil, nil
 	}
-	if req.Extra == nil || req.Extra.TokenInfo == nil || req.Extra.TokenInfo.UserID == "" {
+	var info *auth.TokenInfo
+	if req.Extra != nil {
+		info = req.Extra.TokenInfo
+	}
+	g, ok := s.grant(info)
+	if !ok || g.RunID == "" {
 		return nil, nil, errors.New("finish_step: no run behind this call")
 	}
-	s.onFinish(req.Extra.TokenInfo.UserID, args.Status, args.Summary)
+	s.onFinish(g.RunID, args.Status, args.Summary)
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Recorded. Stop now."}}}, nil, nil
 }
 
-// verify maps a presented bearer token to the run it was minted for.
+// verify maps a presented bearer token to the registration it was minted for.
 func (s *Server) verify(_ context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, t := range s.tokens {
 		if tokenauth.Verify(token, t.hash, t.salt) {
-			return &auth.TokenInfo{UserID: t.runID, Expiration: time.Now().Add(24 * time.Hour)}, nil
+			return &auth.TokenInfo{UserID: grantPrefix + strconv.FormatUint(t.id, 10), Expiration: time.Now().Add(24 * time.Hour)}, nil
 		}
 	}
 	return nil, auth.ErrInvalidToken
@@ -110,8 +158,18 @@ func (s *Server) startLocked() error {
 	if err != nil {
 		return fmt.Errorf("adeagent: bind: %w", err)
 	}
-	mcpSrv := s.buildMCPServer()
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return mcpSrv }, &mcp.StreamableHTTPOptions{Stateless: true})
+	servers := map[[2]bool]*mcp.Server{
+		{true, false}: s.buildMCPServer(true, false),
+		{false, true}: s.buildMCPServer(false, true),
+		{true, true}:  s.buildMCPServer(true, true),
+	}
+	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		g, ok := s.grant(auth.TokenInfoFromContext(r.Context()))
+		if !ok {
+			return nil
+		}
+		return servers[[2]bool{g.RunID != "", g.Space}]
+	}, &mcp.StreamableHTTPOptions{Stateless: true})
 	protected := auth.RequireBearerToken(s.verify, nil)(handler)
 	mux := http.NewServeMux()
 	mux.Handle(mcpPath, http.NewCrossOriginProtection().Handler(protected))
@@ -121,9 +179,15 @@ func (s *Server) startLocked() error {
 	return nil
 }
 
-// Register mints a token for runID, writes the run's MCP config file and returns its path. release
+// Register mints a token for the grant, writes its MCP config file and returns its path. release
 // deletes that registration's file and token only; call it when the process has exited.
-func (s *Server) Register(runID string) (configPath string, release func(), err error) {
+func (s *Server) Register(g Grant) (configPath string, release func(), err error) {
+	if g.RunID == "" && !g.Space {
+		return "", nil, errors.New("adeagent: grant allows nothing")
+	}
+	if g.Space && (g.TaskID == "" || s.space == nil) {
+		return "", nil, errors.New("adeagent: space grant needs a task and space tools")
+	}
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {
 		return "", nil, err
@@ -139,13 +203,17 @@ func (s *Server) Register(runID string) (configPath string, release func(), err 
 	url := "http://" + s.ln.Addr().String() + mcpPath
 	s.seq++
 	id := s.seq
-	s.tokens = append(s.tokens, runToken{id: id, runID: runID, hash: hash, salt: salt})
+	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt})
 	s.mu.Unlock()
 
 	cfg, err := json.Marshal(map[string]any{"mcpServers": map[string]any{ServerName: map[string]any{
 		"type": "http", "url": url, "headers": map[string]string{"Authorization": "Bearer " + plain},
 	}}})
-	path := filepath.Join(s.dir, fmt.Sprintf("%s-%d.mcp.json", runID, id))
+	name := g.RunID
+	if name == "" {
+		name = "task-" + g.TaskID
+	}
+	path := filepath.Join(s.dir, fmt.Sprintf("%s-%d.mcp.json", name, id))
 	if err == nil {
 		err = os.WriteFile(path, cfg, 0o600)
 	}

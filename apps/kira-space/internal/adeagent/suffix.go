@@ -9,3 +9,6 @@ const FinishStepTool = "mcp__" + ServerName + "__finish_step"
 
 // ServerName is the MCP server name in the run's --mcp-config.
 const ServerName = "kira-ade"
+
+// SpaceSuffix goes before FinishStepSuffix when the workflow turns the Kira Space tools on.
+const SpaceSuffix = `Kira Space tools are available: task_info, declare_repos, request_branch, branch_status. Create branches and worktrees only through request_branch.`

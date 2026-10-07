@@ -37,7 +37,12 @@ const release = mkStage({
   runsOn: 'each repo',
   status: 'In review',
 });
-const workflow: Workflow = { id: 'wf', name: 'Feature', stages: [spec, impl, release] };
+const workflow: Workflow = {
+  id: 'wf',
+  name: 'Feature',
+  kiraSpaceMcp: false,
+  stages: [spec, impl, release],
+};
 
 const NICK: Record<string, string> = { 'repo-api': 'api', 'repo-web': 'web-app' };
 const branches: Branch[] = [

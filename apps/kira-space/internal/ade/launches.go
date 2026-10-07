@@ -15,9 +15,10 @@ import (
 // the interactive stage, and a single branch's Start. The terminal itself is mounted by the UI from
 // the returned Launch; the tracker records the row when the terminal composes its command.
 
-// tuiBinding ties a taken-over run to the TUI record that may finish it (R14).
+// tuiBinding ties a TUI record to the agent MCP grant its launch registered; runID is the taken-over
+// run the record may finish (R14), "" for a Space-only grant.
 type tuiBinding struct {
-	record  string
+	runID   string
 	release func()
 }
 
@@ -143,24 +144,11 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	} else {
 		pa.Resumes = rec.ClaudeSessionID
 	}
-	var release func()
-	var runID string
+	runID := ""
 	if rec.Mode == model.AdeSessionModeHeadless {
-		if pa.ExtraArgs, runID, release, err = b.finishBinding(tc, rec); err != nil {
-			return adewire.Launch{}, err
-		}
+		runID = b.finishableRun(tc, rec)
 	}
-	res, err := tr.Prepare(pa)
-	if err != nil {
-		if release != nil {
-			release()
-		}
-		return adewire.Launch{}, err
-	}
-	if release != nil {
-		b.bindTUIRun(runID, res.RecordID, release)
-	}
-	return launchOf(res), nil
+	return b.prepareWithGrant(tr, tc, pa, runID)
 }
 
 // ensureNotOpen rejects a session whose conversation runs in a TUI or has one prepared and not yet
@@ -238,21 +226,59 @@ func (b *TaskBoard) stopForTakeOver(rec *model.AdeSession, stop bool) error {
 	return b.awaitEnd(done)
 }
 
-// finishBinding registers a finish_step channel for the taken-over run when it is the latest attempt
-// of the current stage and waits for a decision (R14). The args are the TUI's extra flags.
-func (b *TaskBoard) finishBinding(tc *taskCtx, rec *model.AdeSession) (args []string, runID string, release func(), err error) {
+// finishableRun is the taken-over run when it is the latest attempt of the current stage and waits for
+// a decision (R14), else "": its TUI can then report through finish_step.
+func (b *TaskBoard) finishableRun(tc *taskCtx, rec *model.AdeSession) string {
 	run, err := b.deps.Tasks.GetRun(rec.RunID)
 	if err != nil || run.State != model.AdeRunStuck && run.State != model.AdeRunFailed {
-		return nil, "", nil, nil //nolint:nilerr // nothing to bind
+		return ""
 	}
 	if !b.isLatestOfCurrentStage(tc, run) {
-		return nil, "", nil, nil
+		return ""
 	}
-	cfg, release, err := b.agent.Register(run.ID)
+	return run.ID
+}
+
+// spaceEnabled reports whether the task's workflow turns the Kira Space tools on; a started task
+// keeps the flag of its snapshot.
+func (b *TaskBoard) spaceEnabled(task model.AdeTask) bool {
+	wf, ok := b.taskWorkflow(task)
+	return ok && wf.KiraSpaceMcp
+}
+
+// prepareWithGrant registers the agent MCP grant a TUI launch needs (finish_step for a taken-over run,
+// the Space tools when the workflow enables them) and prepares the launch with its flags. The grant
+// lives until the record stops or its launch expires.
+func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, runID string) (adewire.Launch, error) {
+	space := b.spaceEnabled(tc.task)
+	var release func()
+	if runID != "" || space {
+		cfg, rel, err := b.agent.Register(adeagent.Grant{RunID: runID, TaskID: tc.task.ID, Space: space})
+		if err != nil {
+			return adewire.Launch{}, err
+		}
+		release = rel
+		var tools []string
+		if runID != "" {
+			tools = append(tools, adeagent.FinishStepTool)
+		}
+		if space {
+			tools = append(tools, adeagent.SpaceToolNames...)
+		}
+		pa.ExtraArgs = append(pa.ExtraArgs, "--mcp-config", cfg, "--allowedTools")
+		pa.ExtraArgs = append(pa.ExtraArgs, tools...)
+	}
+	res, err := tr.Prepare(pa)
 	if err != nil {
-		return nil, "", nil, err
+		if release != nil {
+			release()
+		}
+		return adewire.Launch{}, err
 	}
-	return []string{"--mcp-config", cfg, "--allowedTools", adeagent.FinishStepTool}, run.ID, release, nil
+	if release != nil {
+		b.bindTUI(res.RecordID, runID, release)
+	}
+	return launchOf(res), nil
 }
 
 func (b *TaskBoard) isLatestOfCurrentStage(tc *taskCtx, run model.AdeRun) bool {
@@ -271,37 +297,36 @@ func (b *TaskBoard) isLatestOfCurrentStage(tc *taskCtx, run model.AdeRun) bool {
 	return ok && latest.ID == run.ID
 }
 
-func (b *TaskBoard) bindTUIRun(runID, record string, release func()) {
+func (b *TaskBoard) bindTUI(record, runID string, release func()) {
 	b.runMu.Lock()
-	prev := b.tuiRuns[runID]
-	b.tuiRuns[runID] = tuiBinding{record: record, release: release}
+	prev := b.tuiGrants[record]
+	b.tuiGrants[record] = tuiBinding{runID: runID, release: release}
 	b.runMu.Unlock()
 	if prev.release != nil {
 		prev.release()
 	}
 }
 
-// OnTUIStopped is Tracker.OnStopped's target: it releases the finish_step channel of a taken-over run.
+// OnTUIStopped is Tracker.OnStopped's target: it releases the agent MCP grant of the record's launch.
 func (b *TaskBoard) OnTUIStopped(recordID string) {
 	b.runMu.Lock()
-	var release func()
-	for runID, bind := range b.tuiRuns {
-		if bind.record == recordID {
-			release = bind.release
-			delete(b.tuiRuns, runID)
-		}
-	}
+	bind, ok := b.tuiGrants[recordID]
+	delete(b.tuiGrants, recordID)
 	b.runMu.Unlock()
-	if release != nil {
-		release()
+	if ok {
+		bind.release()
 	}
 }
 
 func (b *TaskBoard) tuiBound(runID string) bool {
 	b.runMu.Lock()
 	defer b.runMu.Unlock()
-	_, ok := b.tuiRuns[runID]
-	return ok
+	for _, bind := range b.tuiGrants {
+		if bind.runID == runID {
+			return true
+		}
+	}
+	return false
 }
 
 // applyTUIFinish applies a finish_step call of a taken-over run at call time (R14).
@@ -387,11 +412,7 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 	if len(extra) > 0 {
 		pa.ExtraArgs = append([]string{"--add-dir"}, extra...)
 	}
-	res, err := tr.Prepare(pa)
-	if err != nil {
-		return adewire.Launch{}, err
-	}
-	return launchOf(res), nil
+	return b.prepareWithGrant(tr, tc, pa, "")
 }
 
 // launchDirs gathers the repos of a task-level session: the first writable branch's worktree is the
@@ -492,11 +513,7 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 		message = composeStartMessage(taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
 			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc))
 	}
-	res, err := tr.Prepare(PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message})
-	if err != nil {
-		return adewire.Launch{}, err
-	}
-	return launchOf(res), nil
+	return b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message}, "")
 }
 
 // firstOpenStep names the current agent stage's first step that is not done, "" otherwise.

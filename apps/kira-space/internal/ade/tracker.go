@@ -201,12 +201,32 @@ func (t *Tracker) hooksFn() func(string, string) (string, []string) {
 
 // pruneExpiredPendingLocked drops any pending intent older than PendingTTL — called with mu held,
 // from Prepare, so an abandoned PrepareLaunch (the renderer never mounted the terminal) cannot
-// accumulate forever.
-func (t *Tracker) pruneExpiredPendingLocked(now time.Time) {
+// accumulate forever. It returns the dropped intents' record ids for releaseExpired.
+func (t *Tracker) pruneExpiredPendingLocked(now time.Time) []string {
+	var expired []string
 	for id, intent := range t.pending {
 		if now.Sub(intent.CreatedAt) > t.deps.PendingTTL {
 			delete(t.pending, id)
+			expired = append(expired, intent.RecordID)
 		}
+	}
+	return expired
+}
+
+// releaseExpired tells OnStopped about intents that never composed, so per-session state a launch
+// registered (an agent MCP grant) goes with them. mu must not be held.
+func (t *Tracker) releaseExpired(recordIDs []string) {
+	if len(recordIDs) == 0 {
+		return
+	}
+	t.mu.Lock()
+	onStopped := t.deps.OnStopped
+	t.mu.Unlock()
+	if onStopped == nil {
+		return
+	}
+	for _, id := range recordIDs {
+		onStopped(id)
 	}
 }
 
@@ -273,10 +293,11 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	}
 
 	t.mu.Lock()
-	t.pruneExpiredPendingLocked(now)
+	expired := t.pruneExpiredPendingLocked(now)
 	if intent.Resume {
 		if _, held := t.byRecord[recordID]; held {
 			t.mu.Unlock()
+			t.releaseExpired(expired)
 			return PrepareResult{}, ErrSessionRunning
 		}
 		// A retry supersedes an abandoned launch; Compose guards the real double-resume race.
@@ -288,6 +309,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	}
 	t.pending[terminalID] = intent
 	t.mu.Unlock()
+	t.releaseExpired(expired)
 
 	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
 }
@@ -296,15 +318,18 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 // still awaits its Compose; an older one is presumed abandoned and lets a retry through.
 func (t *Tracker) hasPending(match func(pendingIntent) bool) bool {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	now := t.deps.Now()
-	t.pruneExpiredPendingLocked(now)
+	expired := t.pruneExpiredPendingLocked(now)
+	found := false
 	for _, p := range t.pending {
 		if now.Sub(p.CreatedAt) <= launchGuardWindow && match(p) {
-			return true
+			found = true
+			break
 		}
 	}
-	return false
+	t.mu.Unlock()
+	t.releaseExpired(expired)
+	return found
 }
 
 // Compose is BoundService.ComposeAgent's own target (wired in main.go) — internal/terminal.Open
