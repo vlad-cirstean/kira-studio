@@ -4,10 +4,7 @@ import { expect } from '../fixtures';
 // P107 I2-25: modeTab/openHttpModeAndNewRequest/grpcTab/httpResponse were copied, byte-identically
 // or nearly so, across 15/9/2/3 spec files respectively. One copy here, imported everywhere.
 
-export function modeTab(
-  page: Page,
-  mode: 'studio' | 'api' | 'terminal' | 'docker' | 'memory',
-): Locator {
+export function modeTab(page: Page, mode: 'studio' | 'api' | 'terminal' | 'docker'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 

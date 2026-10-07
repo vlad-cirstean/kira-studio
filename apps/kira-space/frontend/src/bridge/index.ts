@@ -43,6 +43,7 @@ import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
+import { memoryControl } from './memoryControl';
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
 // to the 15 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
@@ -303,5 +304,6 @@ export const control = {
     keepAwake: KeepAwakeService,
     update: UpdateService,
   }),
+  ...memoryControl,
   ...spaceControl,
 };

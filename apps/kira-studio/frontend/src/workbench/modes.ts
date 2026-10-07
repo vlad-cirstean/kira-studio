@@ -8,7 +8,7 @@ import StudioStart from './panels/StudioStart.vue';
 
 // P91 OQ-1: Terminal joins Studio/Api last, the plan's own stated default. Hoisted here from
 // TitleBar.vue at P128 §2.3: one file lists a module.
-export const MODE_ORDER: AppMode[] = ['studio', 'api', 'terminal', 'docker', 'memory'];
+export const MODE_ORDER: AppMode[] = ['studio', 'api', 'terminal', 'docker'];
 
 // P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Api's own
 // entries are both EmptyState-based (§0.2) — P1 adds no HTTP functionality, only the seam.
@@ -40,12 +40,5 @@ export const MODES: ModeRegistry<AppMode, PanelModeDef> = {
     tabStrip: false,
     panel: defineAsyncComponent(() => import('../docker/DockerPanel.vue')),
     start: defineAsyncComponent(() => import('../docker/DockerView.vue')),
-  },
-  // P201: a panel module that opens no tabs; the detail view is its main area.
-  memory: {
-    label: 'Memory',
-    icon: 'lightbulb',
-    panel: defineAsyncComponent(() => import('@workbench/memory/MemoryPanel.vue')),
-    start: defineAsyncComponent(() => import('@workbench/memory/MemoryStart.vue')),
   },
 };

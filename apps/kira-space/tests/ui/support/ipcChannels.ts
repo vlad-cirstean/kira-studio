@@ -161,4 +161,13 @@ export const IPC = {
   adeTaskLogChanged: 'kira:adetask:log',
   adeTaskSessionsChanged: 'kira:adetask:sessions',
   adeTaskOpenSession: 'kira:adetask:open-session',
+
+  // P201 Part 2: the Memory module's bound surface; memoryChanged is a push channel, no FQN entry.
+  memorySearch: 'kira:memory:search',
+  memoryRecent: 'kira:memory:recent',
+  memoryHistory: 'kira:memory:history',
+  memoryStore: 'kira:memory:store',
+  memoryMcpStatus: 'kira:memory:mcpStatus',
+  memoryMcpInstall: 'kira:memory:mcpInstall',
+  memoryChanged: 'kira:memory:changed',
 } as const;

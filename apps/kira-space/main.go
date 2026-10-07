@@ -35,6 +35,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
@@ -49,10 +51,10 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// Startup order: the askpass argv shim -> config.EnsureLayout -> logging.Init/Sweep ->
+// Startup order: the askpass and memory-mcp argv shims -> config.EnsureLayout -> logging.Init/Sweep ->
 // storage.Open (migrates) -> repos.New -> wireGit (starts gitsock.Server) -> terminal registry and
 // the ADE tracker (wireTracker, with the Claude Code hooks) -> wireAdeTask -> keep-awake ->
-// application.New (15 bound services plus the git stream registration) -> the menu -> the startup
+// application.New (18 bound services plus the git stream registration) -> the menu -> the startup
 // window list, opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP: not this app's
 // module. gitClientsSvc.AttachPush() wires gitsock's pairing/clients-changed feeds onto the two
 // push channels the pairing prompt and Connected-editors pane read.
@@ -61,6 +63,12 @@ func main() {
 	// window — Kira Studio's own main.go:83, deleted there in this same phase's cleanup commit.
 	if len(os.Args) > 1 && os.Args[1] == "askpass" {
 		os.Exit(gitaskpass.RunHelper(os.Args[2:], os.Environ(), os.Stdout))
+	}
+
+	// Claude Code spawns `<this binary> memory-mcp` as a stdio MCP server: before startupfail and
+	// the single-instance lock, so it runs while the window is open.
+	if len(os.Args) > 1 && os.Args[1] == "memory-mcp" {
+		os.Exit(memorycli.Run(os.Args[2:]))
 	}
 
 	reporter := startupfail.NewReporter(startupfail.Deps{
@@ -162,6 +170,8 @@ func main() {
 		Settings:   repositories.Settings.GetAll,
 	}
 	settingsSvc.OnChanged = func(model.Settings) { bridge.KeepAwakeRecompute(keepAwakeSvc) }
+	// memory.db opens on the Memory module's first call.
+	memorySvc := bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}))
 
 	// windows holds every open window; created here so Archive can close a task's review windows.
 	windows := shell.NewWindowRegistry()
@@ -240,6 +250,7 @@ func main() {
 		// F5: stops every open codeworkspace.Session (cat-file pairs, in-flight searches) — before
 		// repositories.Close(), since a running search still reads settings through Deps.Repos.
 		codeWorkspaceSvc.Shutdown()
+		bridge.CloseMemory(memorySvc)
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)
 		}
@@ -268,6 +279,7 @@ func main() {
 			application.NewService(&bridge.OpsService{Log: git.opLog}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 			application.NewService(keepAwakeSvc),
+			application.NewService(memorySvc),
 			application.NewService(windowsSvc),
 			application.NewService(&bridge.UpdateService{
 				Checker: updateChecker, Installer: updateInstaller, Quit: quitter.RequestQuit,

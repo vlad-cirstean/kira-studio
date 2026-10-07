@@ -74,14 +74,14 @@ async function createAndConnect(page: import('@playwright/test').Page): Promise<
   await expandRow(page, 'database:kira_test/schema:app');
 }
 
-test('mode switch — five mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
+test('mode switch — four mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  // 1. five mode tabs (P91 §2: Terminal joins Studio/Api as a third peer, P200 Docker a fourth,
-  // P201 Memory a fifth), Studio active by default.
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(5);
+  // 1. four mode tabs (P91 §2: Terminal joins Studio/Api as a third peer, P200 Docker a fourth),
+  // Studio active by default.
+  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(4);
   await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'api')).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Connections');

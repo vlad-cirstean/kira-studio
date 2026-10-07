@@ -6,5 +6,5 @@
 // importer keeps reading `SpaceMode` from state/mode.ts unchanged via its re-export below.
 //
 // Widens as each module lands: `git` alone at step 6, `terminal` at step 7, `ade` joins here
-// (step 8) — SPEC.md's own final vocabulary.
-export type SpaceMode = 'git' | 'terminal' | 'ade';
+// (step 8) — SPEC.md's own final vocabulary; `memory` joins at P201 Part 2.
+export type SpaceMode = 'git' | 'terminal' | 'ade' | 'memory';

@@ -6,6 +6,7 @@ import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
+import { memoryModuleKey } from '@workbench/memory/module';
 import { terminalModuleKey } from '@workbench/terminal/module';
 import { onMounted, onUnmounted, provide } from 'vue';
 import AdeReviewWindow from './ade/v2/review/AdeReviewWindow.vue';
@@ -17,6 +18,7 @@ import { useSettingsStore } from './state/settings';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
 import { createWorkbenchHost, useTabsStore } from './workbench/host';
+import { createMemoryModule } from './workbench/memoryModule';
 import TitleBar from './workbench/TitleBar.vue';
 import { createTerminalModule } from './workbench/terminalModule';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
@@ -27,6 +29,7 @@ provide(workbenchHostKey, createWorkbenchHost());
 // P128 §2.4/§2.7: the terminal module's own context, for TerminalPanel.vue/TerminalStart.vue/
 // TerminalNewTab.vue/TerminalTabView.vue (all shared with Kira Studio) to inject.
 provide(terminalModuleKey, createTerminalModule());
+provide(memoryModuleKey, createMemoryModule());
 
 // P100 Part 2: Kira Studio's own App.vue, trimmed to this app's own always-mounted root dialogs —
 // ConfirmDialog (G1 D17's own precedent) and, moved here wholesale from Studio,

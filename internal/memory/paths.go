@@ -1,4 +1,4 @@
-// Package memory is the long-term memory store shared by Kira Studio's Memory module and the
+// Package memory is the long-term memory store shared by Kira Space's Memory module and the
 // kira-memory stdio MCP server: SQLite + FTS5 storage, recall-first search, and the Claude Code
 // gate/reconcile pipeline.
 package memory

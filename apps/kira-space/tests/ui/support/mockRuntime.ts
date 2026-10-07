@@ -147,6 +147,13 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskArchiveTask: 'AdeTaskService.ArchiveTask',
   adeTaskRecordMerge: 'AdeTaskService.RecordMerge',
   adeTaskSetQueuedAfter: 'AdeTaskService.SetQueuedAfter',
+
+  memorySearch: 'MemoryService.Search',
+  memoryRecent: 'MemoryService.Recent',
+  memoryHistory: 'MemoryService.History',
+  memoryStore: 'MemoryService.Store',
+  memoryMcpStatus: 'MemoryService.McpStatus',
+  memoryMcpInstall: 'MemoryService.InstallClaudeCode',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
@@ -216,6 +223,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
   // main.ts asks every window whether it is a review window; none of the specs' windows is one.
   [IPC.adeTaskReviewWindowTarget]: 'null',
+  // P201 Part 2: the Memory module lists recent memories as soon as its mode opens.
+  [IPC.memoryRecent]: '[]',
 });
 
 // `windowKey`/`tabId` are excluded outright — a per-window or per-tab id this app generates at

@@ -1,7 +1,7 @@
-import type { ControlSnapshot } from '../ipc/support/types';
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { modeTab } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
+import type { ControlSnapshot } from './support/types';
 
 // P201: the Memory module against a mocked bridge — search, history flags, the version trail, the
 // Add memory challenge/resubmit flow and the Connect dialog.
@@ -88,7 +88,9 @@ const BASE: ControlSnapshot[] = [
   { channel: IPC.memoryHistory, response: HISTORY },
 ];
 
-type Page = import('@playwright/test').Page;
+function modeTab(page: Page, mode: 'git' | 'terminal' | 'ade' | 'memory') {
+  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
+}
 
 async function openMemory(page: Page): Promise<void> {
   await modeTab(page, 'memory').click();
@@ -202,7 +204,7 @@ test('Connect Claude Code shows the registration command', async ({ relaunch }) 
         channel: IPC.memoryMcpStatus,
         response: {
           command,
-          executable: '/Applications/Kira Studio',
+          executable: '/Applications/Kira Space',
           claudeAvailable: true,
           probed: [],
         },

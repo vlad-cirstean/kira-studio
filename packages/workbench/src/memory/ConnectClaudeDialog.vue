@@ -48,6 +48,9 @@ const message = computed(() => {
           class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-sm leading-normal"
           data-testid="memory-mcp-command"
         >{{ command }}</p>
+        <p v-if="command" class="m-0 text-kira-sm text-muted-foreground">
+          The server runs this app's executable with <code class="font-data">memory-mcp</code>. Install again if the app moves.
+        </p>
         <p v-if="message" class="m-0 text-kira-sm text-muted-foreground" data-testid="memory-mcp-install-outcome">{{ message }}</p>
       </div>
       <DialogFooter>

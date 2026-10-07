@@ -64,7 +64,7 @@ type StoreResult struct {
 	Outcomes   []FactOutcome   `json:"outcomes"`
 }
 
-// Service is the one entry point for both callers: the stdio MCP server and Studio's bridge.
+// Service is the one entry point for both callers: the stdio MCP server and Kira Space's bridge.
 type Service struct {
 	store    *Store
 	runner   Runner
