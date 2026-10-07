@@ -8,22 +8,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@theme/components/ui/empty';
-import { ref } from 'vue';
+import { useReposDialogStore } from '../repo/state/reposDialog';
 import { useCodeReposStore } from '../state/coderepos';
 import AdeShell from './v2/shell/AdeShell.vue';
 
 // The `ade` mode's root: the v2 shell, or the empty state until a repository is imported.
 const codeReposStore = useCodeReposStore();
-const importError = ref<string | null>(null);
-
-async function onImport(): Promise<void> {
-  importError.value = null;
-  try {
-    await codeReposStore.importRepoViaDialog();
-  } catch (err) {
-    importError.value = err instanceof Error ? err.message : String(err);
-  }
-}
+const reposDialog = useReposDialogStore();
 </script>
 
 <template>
@@ -34,12 +25,11 @@ async function onImport(): Promise<void> {
       </EmptyMedia>
       <EmptyContent>
         <EmptyTitle>No repository imported yet</EmptyTitle>
-        <EmptyDescription>Import a repository to start planning agent work.</EmptyDescription>
-        <Button variant="dialog-primary" size="kira-lg" data-testid="ade-import" @click="onImport">
+        <EmptyDescription>Add repositories from the Git module to start planning agent work.</EmptyDescription>
+        <Button variant="dialog-primary" size="kira-lg" data-testid="ade-import" @click="reposDialog.show()">
           <CodiconIcon name="repo" :size="13" />
-          Import repository…
+          Add repositories…
         </Button>
-        <span v-if="importError" class="text-kira-sm text-error">{{ importError }}</span>
       </EmptyContent>
     </Empty>
     <AdeShell v-else />

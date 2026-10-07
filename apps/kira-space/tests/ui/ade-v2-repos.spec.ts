@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures';
-import { adeFixture, openPlan } from './support/adeV2';
+import { adeFixture, adeV2Control, openPlan } from './support/adeV2';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // The Repos page: watched folders, the repo list and the per-repo settings.
 
@@ -22,29 +23,71 @@ function calls(control: { log(): { channel: string; args?: unknown }[] }, channe
   return control.log().filter((e) => e.channel === channel);
 }
 
-test('folders list, add, watch and remove send their args', async ({ relaunch }) => {
-  const fx = adeFixture<ReposFx>('repos');
-  const { window: page, control } = await openRepos(relaunch);
-  await expect(page.locator(t('ade-folder'))).toHaveCount(fx.folders.length);
+test('the repos page has no import inputs and opens the Git module dialog', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openRepos(relaunch);
+  await expect(page.locator(t('ade-add-folder'))).toHaveCount(0);
+  await expect(page.locator(t('ade-add-repo-path'))).toHaveCount(0);
+  await page.locator(t('ade-repos-manage')).click();
+  await expect(page.locator(t('repos-dialog'))).toBeVisible();
+  await expect(page.locator(t('ade-view'))).toHaveCount(0);
+});
 
-  await page.locator(t('ade-add-folder')).fill('~/code/oss');
-  await page.locator(t('ade-add-folder-go')).click();
+const chooseFolder = {
+  channel: IPC.filesChooseFolder,
+  response: { canceled: false, path: '~/code/oss' },
+};
+
+async function openDialog(relaunch: Parameters<typeof openPlan>[0]) {
+  const app = await openPlan(relaunch, [chooseFolder]);
+  await app.window.locator(t('ade-tab-repos')).click();
+  await app.window.locator(t('ade-repos-manage')).click();
+  await app.window.locator(t('repos-dialog')).waitFor();
+  return app;
+}
+
+test('dialog folders list, add, watch and remove send their args', async ({ relaunch }) => {
+  const fx = adeFixture<ReposFx>('repos');
+  const { window: page, control } = await openDialog(relaunch);
+  await expect(page.locator(t('repos-dialog-folder'))).toHaveCount(fx.folders.length);
+
+  await page.locator(t('repos-dialog-add-folder')).click();
   await expect.poll(() => calls(control, IPC.adeTaskAddFolder)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskAddFolder)[0]?.args).toEqual({
     path: '~/code/oss',
     watch: true,
   });
 
-  await page.locator(t('ade-folder-watch')).first().click();
+  await page.locator(t('repos-dialog-folder-watch')).first().click();
   await expect.poll(() => calls(control, IPC.adeTaskSetFolderWatch)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskSetFolderWatch)[0]?.args).toEqual({
     path: fx.folders[0]?.path,
     watch: !fx.folders[0]?.watch,
   });
 
-  await page.locator(t('ade-folder-remove')).first().click();
+  await page.locator(t('repos-dialog-folder-remove')).first().click();
   await expect.poll(() => calls(control, IPC.adeTaskRemoveFolder)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskRemoveFolder)[0]?.args).toEqual({ path: fx.folders[0]?.path });
+});
+
+test('dialog import sends the chosen path', async ({ relaunch }) => {
+  const { window: page, control } = await openDialog(relaunch);
+  await page.locator(t('repos-dialog-import')).click();
+  await expect.poll(() => calls(control, IPC.codeWorkspaceImportRepo)).toHaveLength(1);
+  expect(calls(control, IPC.codeWorkspaceImportRepo)[0]?.args).toEqual({ path: '~/code/oss' });
+});
+
+test('a repos push re-reads the shared list without the ade module open', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({
+    control: adeV2Control([{ channel: IPC.windowsEnsure, response: { mode: 'git' } }]),
+  });
+  await expect(page.locator(t('manage-repos'))).toBeVisible();
+  const before = calls(control, IPC.codeWorkspaceListRepos).length;
+  await emitWailsEvent(page, IPC.adeTaskReposChanged, null);
+  await expect
+    .poll(() => calls(control, IPC.codeWorkspaceListRepos).length)
+    .toBeGreaterThan(before);
 });
 
 test('selecting a repo shows its settings', async ({ relaunch }) => {
@@ -81,12 +124,4 @@ test('nickname, prepare script and timeout edits send one-leaf patches', async (
   expect(calls(control, IPC.adeTaskUpdateRepo)[2]?.args).toMatchObject({
     patch: { prepareTimeout: '45m' },
   });
-});
-
-test('+ Add repo imports the typed path', async ({ relaunch }) => {
-  const { window: page, control } = await openRepos(relaunch);
-  await page.locator(t('ade-add-repo-path')).fill('/tmp/new-repo');
-  await page.locator(t('ade-add-repo-go')).click();
-  await expect.poll(() => calls(control, IPC.codeWorkspaceImportRepo)).toHaveLength(1);
-  expect(calls(control, IPC.codeWorkspaceImportRepo)[0]?.args).toEqual({ path: '/tmp/new-repo' });
 });

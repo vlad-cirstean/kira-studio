@@ -3,7 +3,6 @@ import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
 import { toValue } from 'vue';
 import { control } from '../../bridge/control';
-import { useCodeReposStore } from '../../state/coderepos';
 import type {
   AddBacklogItemArgs,
   AddExistingBranchArgs,
@@ -14,7 +13,6 @@ import type {
   BranchArgs,
   CreateTaskArgs,
   FocusSessionArgs,
-  FolderArgs,
   GhSyncPlan,
   GhSyncResult,
   ImportWorkflowArgs,
@@ -22,7 +20,6 @@ import type {
   LogKind,
   MoveBacklogItemArgs,
   NewWorkflowArgs,
-  PathArgs,
   RecordMergeArgs,
   RefreshArgs,
   ReviewAgentLaunch,
@@ -311,32 +308,6 @@ export function useNewWorkflow() {
 
 export function useUpdateRepo() {
   return useMutation({ mutationFn: (args: UpdateRepoArgs) => control.adeTaskUpdateRepo(args) });
-}
-
-export function useAddFolder() {
-  return useMutation({ mutationFn: (args: FolderArgs) => control.adeTaskAddFolder(args) });
-}
-
-export function useSetFolderWatch() {
-  return useMutation({ mutationFn: (args: FolderArgs) => control.adeTaskSetFolderWatch(args) });
-}
-
-export function useRemoveFolder() {
-  return useMutation({ mutationFn: (args: PathArgs) => control.adeTaskRemoveFolder(args) });
-}
-
-/** Imports one repo by path, then refreshes the settings list and the shared code repo list. */
-export function useImportRepo() {
-  return useMutation({
-    mutationFn: async (path: string) => {
-      const repo = await control.codeWorkspaceImportRepo(path);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: reposKey, exact: true }),
-        useCodeReposStore().hydrateCodeRepos(),
-      ]);
-      return repo;
-    },
-  });
 }
 
 export function useSetTaskWorkflow() {

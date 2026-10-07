@@ -1,7 +1,6 @@
 import type { QueryClient } from '@tanstack/vue-query';
 import { watch } from 'vue';
 import { control } from '../bridge/control';
-import { useCodeReposStore } from '../state/coderepos';
 import type { useAgentSessionsStore } from './state/agentSessions';
 import { adeTurns } from './v2/dialog/turnWatch';
 import {
@@ -44,8 +43,8 @@ function appendChunks(page: LogPage, chunks: LogPage['chunks']): LogPage {
 
 /** Called once from `main.ts`, app lifetime, no teardown. Every board push re-reads the board and
  *  PR facts; a sessions push re-reads the sessions; an open-session push selects that session; an
- *  agent hook event feeds the dialog turn watchers; a backlog push re-reads the backlog; a repos push re-reads the repo settings and the
- *  shared code repo list; a workflows push re-reads the list and any open YAML; a runs push merges
+ *  agent hook event feeds the dialog turn watchers; a backlog push re-reads the backlog; a repos push re-reads the repo settings (the shared code
+ *  repo list re-reads in `state/coderepos.ts`); a workflows push re-reads the list and any open YAML; a runs push merges
  *  into the cached board; a log push appends to the cached log; a credential prompt joins the
  *  shared queue and is answered through the v2 broker. */
 export function installAdeSignals(
@@ -68,7 +67,6 @@ export function installAdeSignals(
   });
   control.onAdeTaskRepos(() => {
     void queryClient.invalidateQueries({ queryKey: reposKey, exact: true });
-    void useCodeReposStore().hydrateCodeRepos();
   });
   control.onAdeTaskWorkflows(() => {
     void queryClient.invalidateQueries({ queryKey: workflowsKey, exact: true });
