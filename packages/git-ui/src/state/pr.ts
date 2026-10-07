@@ -22,6 +22,15 @@ const PR_ENSURE_SNAPSHOT_CONCURRENCY = 6;
  *  against a pathological case, never an ordinary one. */
 const PR_ANCESTRY_WALK_BUDGET = 50_000;
 
+/** Repos whose last-known PR facts are kept for an instant restore on a tab/repo switch. */
+const PR_REPO_CACHE_CAP = 8;
+
+interface RepoFacts {
+  readonly bySha: ReadonlyMap<string, readonly PrRecord[]>;
+  readonly byBranch: ReadonlyMap<string, PrRecord>;
+  readonly noBranchPr: ReadonlySet<string>;
+}
+
 /**
  * G24 D10: the one client-side owner of every GitHub PR fact this app renders — the graph
  * indicator's per-commit lookup, the branch-tip badges/search's per-branch lookup, and the single
@@ -100,6 +109,8 @@ export class PrState {
    *  rather than one debounced no-op per row. */
   #disabledForRepo = false;
   readonly #unsubscribe: () => void;
+  /** Last-known facts of repos switched away from, oldest first. */
+  readonly #repoFacts = new Map<string, RepoFacts>();
   /** F9: bumped by every `#clear()` — `setRepoId` (a repo switch) AND the `refsChanged` handler
    *  (same repo, server caches dropped) alike. `ensureSnapshot`'s worker pool and `resolveBranch`
    *  each capture this alongside `repoId` at their own start: a repo switch alone (`repoId`
@@ -110,34 +121,60 @@ export class PrState {
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
-    // Mirrors RefsState's own three lines (D10): subscribes to repo.changed's refsChanged kind
-    // and clears everything — the server already dropped its own caches for the same signal (D6),
-    // so there is nothing worth eagerly re-fetching here; the next selection/badge render
-    // re-requests lazily, exactly as a first-ever selection would.
+    // Stale-while-revalidate: the server keeps its own PR cache across a refs change and
+    // refreshes it in the background, so the facts shown stay put and the answers swap in when the
+    // re-requests below settle.
     this.#unsubscribe = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
       if (event.kind !== 'refsChanged') return;
-      this.#clear();
+      this.#revalidate();
     });
   }
 
   /** Called whenever the active repo changes — mirrors `RefsState`/`DetailState`'s own
-   *  `setRepoId`: clears every cache (a different repository's PR facts are simply not this
-   *  repository's), and cancels any in-flight/debounced per-commit request. */
+   *  `setRepoId`: cancels any in-flight/debounced request, stashes the outgoing repo's facts and
+   *  shows the incoming repo's last-known ones at once while a background revalidation runs. */
   setRepoId(repoId: string | undefined): void {
+    const previous = this.#repoId;
+    if (previous !== undefined) this.#stashFacts(previous);
     this.#repoId = repoId;
     this.#clear();
+    const facts = repoId === undefined ? undefined : this.#repoFacts.get(repoId);
+    if (facts === undefined) return;
+    this.bySha.value = facts.bySha;
+    this.byBranch.value = facts.byBranch;
+    this.#noBranchPr.clear();
+    for (const name of facts.noBranchPr) this.#noBranchPr.add(name);
+    this.generation.value++;
+    void this.#revalidateBranches();
   }
 
-  #clear(): void {
+  #stashFacts(repoId: string): void {
+    this.#repoFacts.delete(repoId);
+    this.#repoFacts.set(repoId, {
+      bySha: this.bySha.value,
+      byBranch: this.byBranch.value,
+      noBranchPr: new Set(this.#noBranchPr),
+    });
+    for (const oldest of this.#repoFacts.keys()) {
+      if (this.#repoFacts.size <= PR_REPO_CACHE_CAP) break;
+      this.#repoFacts.delete(oldest);
+    }
+  }
+
+  #cancelInFlight(): void {
     this.#clearGeneration++;
     this.#selectController?.abort();
     if (this.#selectTimer !== undefined) {
       clearTimeout(this.#selectTimer);
       this.#selectTimer = undefined;
     }
-    this.#sha = null;
     this.#branchRequests.clear();
+  }
+
+  #clear(): void {
+    this.#cancelInFlight();
+    this.#sha = null;
     this.#noBranchPr.clear();
     this.#disabledForRepo = false;
     this.bySha.value = new Map();
@@ -146,6 +183,36 @@ export class PrState {
     this.selected.value = undefined;
     this.status.value = undefined;
     this.generation.value++;
+  }
+
+  /** Same-repo refs change: keeps every fact on screen, re-asks for the selected commit and every
+   *  known branch, and applies each answer as it lands. */
+  #revalidate(): void {
+    this.#cancelInFlight();
+    this.#disabledForRepo = false;
+    const sha = this.#sha;
+    if (sha !== null) void this.#requestCommit(sha);
+    void this.#revalidateBranches();
+  }
+
+  async #revalidateBranches(): Promise<void> {
+    const repoId = this.#repoId;
+    const generation = this.#clearGeneration;
+    const names = [...this.byBranch.value.keys(), ...this.#noBranchPr].filter(
+      (name) => !this.#branchRequests.has(name),
+    );
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (next < names.length) {
+        if (this.#repoId !== repoId || this.#clearGeneration !== generation) return;
+        if (this.#disabledForRepo) return;
+        const name = names[next];
+        next += 1;
+        if (name !== undefined) await this.#fetchBranch(name, repoId, generation, true);
+      }
+    };
+    const workerCount = Math.min(PR_ENSURE_SNAPSHOT_CONCURRENCY, names.length);
+    await Promise.all(Array.from({ length: workerCount }, worker));
   }
 
   /** Selection changed (`SelectionState`'s own sha, mirrored here by the caller, exactly as
@@ -207,9 +274,16 @@ export class PrState {
     } else if (result.kind === 'unavailable') {
       this.status.value = result.gh;
     } else if (result.kind === 'disabled') {
-      this.#disabledForRepo = true;
+      this.#markDisabled();
     }
     this.generation.value++;
+  }
+
+  #markDisabled(): void {
+    this.#disabledForRepo = true;
+    if (this.bySha.value.size > 0) this.bySha.value = new Map();
+    if (this.byBranch.value.size > 0) this.byBranch.value = new Map();
+    this.#noBranchPr.clear();
   }
 
   /** Warms `byBranch` for every branch in `branchNames` not already cached — see this class's own
@@ -263,27 +337,46 @@ export class PrState {
       this.#branchRequests.has(branch)
     )
       return;
-    // F9: captured alongside `repoId` — a same-repo `refsChanged` clear leaves `repoId` itself
+    // F9: captured alongside `repoId` — a same-repo `refsChanged` leaves `repoId` itself
     // unchanged, so that check alone cannot detect it; `generation` can.
-    const generation = this.#clearGeneration;
+    await this.#fetchBranch(branch, repoId, this.#clearGeneration, false);
+  }
+
+  async #fetchBranch(
+    branch: string,
+    repoId: string | undefined,
+    generation: number,
+    revalidating: boolean,
+  ): Promise<void> {
+    if (repoId === undefined) return;
     this.#branchRequests.add(branch);
     try {
       const result = await this.#bridge.request('branch.resolvePr', { repoId, branch });
       if (this.#repoId !== repoId || this.#clearGeneration !== generation) return;
       if (result.kind === 'ok') {
+        const previous = this.byBranch.value.get(branch);
         const first = result.prs[0];
         if (first !== undefined) {
           const next = new Map(this.byBranch.value);
           next.set(branch, first);
           this.byBranch.value = next;
+          this.#noBranchPr.delete(branch);
         } else {
+          if (previous !== undefined) {
+            const next = new Map(this.byBranch.value);
+            next.delete(branch);
+            this.byBranch.value = next;
+          }
           this.#noBranchPr.add(branch);
         }
-        this.generation.value++;
+        if (!revalidating || JSON.stringify(previous) !== JSON.stringify(first)) {
+          this.generation.value++;
+        }
       } else if (result.kind === 'unavailable') {
         this.status.value = result.gh;
       } else if (result.kind === 'disabled') {
-        this.#disabledForRepo = true;
+        this.#markDisabled();
+        this.generation.value++;
       }
     } catch {
       // Fail-open (D9/§0.4) — same posture as #requestCommit above.

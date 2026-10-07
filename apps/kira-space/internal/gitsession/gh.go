@@ -19,6 +19,17 @@ const (
 	ghBranchTTL      = 5 * time.Minute
 	ghCommitTTL      = 10 * time.Minute
 	ghCommitCacheCap = 512
+	// ghStaleMax bounds how long a stale or expired entry may still be served while it refreshes
+	// in the background; older entries count as a plain miss.
+	ghStaleMax = time.Hour
+)
+
+type cacheState int
+
+const (
+	cacheMiss cacheState = iota
+	cacheFresh
+	cacheStale
 )
 
 // ghBreakerFallback is D7's own "parsed reset, else now + 15 min" — this package always takes the
@@ -69,9 +80,15 @@ type ghState struct {
 	// remoteChecked/repo/isGitHub cache D15's own one-git-spawn "is this a GitHub repository"
 	// detection for this entry's life — dropped on refsChanged (a remote could have been
 	// added/changed/removed).
+	//
+	// refsStaleAt marks every entry cached before it as stale: still served, refreshed in the
+	// background (stale-while-revalidate) instead of dropped. refreshing single-flights those
+	// refreshes by key.
 	remoteChecked bool
 	repo          ghclient.Repo
 	isGitHub      bool
+	refsStaleAt   time.Time
+	refreshing    map[string]bool
 
 	snapshot      []ghclient.PR
 	snapshotAt    time.Time
@@ -99,7 +116,11 @@ type ghState struct {
 }
 
 func newGhState() *ghState {
-	return &ghState{branch: make(map[string]ghBranchEntry), commit: make(map[string]ghCommitEntry)}
+	return &ghState{
+		branch:     make(map[string]ghBranchEntry),
+		commit:     make(map[string]ghCommitEntry),
+		refreshing: make(map[string]bool),
+	}
 }
 
 // snapshotFetch is one in-flight ensureSnapshot call's shared outcome (finding #6, above) — the
@@ -140,17 +161,44 @@ func (s *ghState) finishSnapshotFetch(fetch *snapshotFetch, prs []ghclient.PR, s
 	close(fetch.done)
 }
 
-// drop is the refsChanged handler's own call (D6/D15): the snapshot, per-branch cache, per-commit
-// cache and the GitHub-remote detection are all dropped — the breaker is not (D7).
-func (s *ghState) drop() {
+// markStale is the refsChanged handler's own call (D6/D15): the GitHub-remote detection is dropped
+// (a remote could have changed) and every cached PR fact is marked stale, not dropped — it keeps
+// serving while a background refresh replaces it. The breaker is untouched (D7).
+func (s *ghState) markStale() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.remoteChecked = false
-	s.snapshotValid = false
-	s.snapshot = nil
-	s.branch = make(map[string]ghBranchEntry)
-	s.commit = make(map[string]ghCommitEntry)
-	s.commitLRU = nil
+	s.refsStaleAt = time.Now()
+}
+
+// classify reports how an entry cached at cachedAt may be used: fresh, served-while-refreshing, or
+// a miss. Caller holds s.mu.
+func (s *ghState) classify(cachedAt time.Time, ttl time.Duration) cacheState {
+	age := time.Since(cachedAt)
+	switch {
+	case age >= ghStaleMax:
+		return cacheMiss
+	case age >= ttl || cachedAt.Before(s.refsStaleAt):
+		return cacheStale
+	}
+	return cacheFresh
+}
+
+// claimRefresh reports whether the caller owns the background refresh for key.
+func (s *ghState) claimRefresh(key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.refreshing[key] {
+		return false
+	}
+	s.refreshing[key] = true
+	return true
+}
+
+func (s *ghState) releaseRefresh(key string) {
+	s.mu.Lock()
+	delete(s.refreshing, key)
+	s.mu.Unlock()
 }
 
 func (s *ghState) armBreaker(status ghclient.Status) {
@@ -194,14 +242,14 @@ func (s *ghState) eagerPurgeAllowed() bool {
 	return true
 }
 
-func (s *ghState) commitCacheGet(sha string) ([]ghclient.PR, bool) {
+func (s *ghState) commitCacheGet(sha string) ([]ghclient.PR, cacheState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	entry, ok := s.commit[sha]
-	if !ok || time.Since(entry.cachedAt) >= ghCommitTTL {
-		return nil, false
+	if !ok {
+		return nil, cacheMiss
 	}
-	return entry.prs, true
+	return entry.prs, s.classify(entry.cachedAt, ghCommitTTL)
 }
 
 func (s *ghState) commitCachePut(sha string, prs []ghclient.PR) {
@@ -218,14 +266,14 @@ func (s *ghState) commitCachePut(sha string, prs []ghclient.PR) {
 	s.commit[sha] = ghCommitEntry{prs: prs, cachedAt: time.Now()}
 }
 
-func (s *ghState) branchCacheGet(branch string) (*ghclient.PR, bool) {
+func (s *ghState) branchCacheGet(branch string) (*ghclient.PR, cacheState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	entry, ok := s.branch[branch]
-	if !ok || time.Since(entry.cachedAt) >= ghBranchTTL {
-		return nil, false
+	if !ok {
+		return nil, cacheMiss
 	}
-	return entry.pr, true
+	return entry.pr, s.classify(entry.cachedAt, ghBranchTTL)
 }
 
 func (s *ghState) branchCachePut(branch string, pr *ghclient.PR) {
@@ -234,13 +282,13 @@ func (s *ghState) branchCachePut(branch string, pr *ghclient.PR) {
 	s.branch[branch] = ghBranchEntry{pr: pr, cachedAt: time.Now()}
 }
 
-func (s *ghState) snapshotGet() ([]ghclient.PR, bool) {
+func (s *ghState) snapshotGet() ([]ghclient.PR, cacheState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.snapshotValid || time.Since(s.snapshotAt) >= ghSnapshotTTL {
-		return nil, false
+	if !s.snapshotValid {
+		return nil, cacheMiss
 	}
-	return s.snapshot, true
+	return s.snapshot, s.classify(s.snapshotAt, ghSnapshotTTL)
 }
 
 func (s *ghState) snapshotPut(prs []ghclient.PR) {
@@ -323,9 +371,34 @@ func (e *RepoEntry) githubEnabled() bool {
 // caller (the "leader") actually fetch; every other concurrent caller waits on that same fetch and
 // shares its result.
 func (e *RepoEntry) ensureSnapshot(ctx context.Context) ([]ghclient.PR, ghclient.Status) {
-	if prs, ok := e.gh.snapshotGet(); ok {
+	prs, state := e.gh.snapshotGet()
+	switch state {
+	case cacheFresh:
+		return prs, ghclient.Status{Kind: ghclient.KindOK}
+	case cacheStale:
+		e.refreshInBackground("snapshot", func(ctx context.Context) { e.fetchSnapshot(ctx) })
 		return prs, ghclient.Status{Kind: ghclient.KindOK}
 	}
+	return e.fetchSnapshot(ctx)
+}
+
+// refreshInBackground runs fn once per key in the entry's own lifetime context; concurrent callers
+// for the same key skip.
+func (e *RepoEntry) refreshInBackground(key string, fn func(ctx context.Context)) {
+	if !e.gh.claimRefresh(key) {
+		return
+	}
+	go func() {
+		defer e.gh.releaseRefresh(key)
+		if e.life.Err() != nil {
+			return
+		}
+		fn(e.life)
+	}()
+}
+
+// fetchSnapshot always asks GitHub (single-flighted) and caches a successful answer.
+func (e *RepoEntry) fetchSnapshot(ctx context.Context) ([]ghclient.PR, ghclient.Status) {
 	if status, armed := e.gh.breakerStatus(); armed {
 		return nil, status
 	}
@@ -377,9 +450,18 @@ func (e *RepoEntry) ResolveCommitPr(ctx context.Context, sha string) PrLookupRes
 	if !ok {
 		return disabledResult()
 	}
-	if prs, hit := e.gh.commitCacheGet(sha); hit {
+	prs, state := e.gh.commitCacheGet(sha)
+	switch state {
+	case cacheFresh:
+		return okResult(prs)
+	case cacheStale:
+		e.refreshInBackground("commit:"+sha, func(ctx context.Context) { e.fetchCommitPr(ctx, repo, sha) })
 		return okResult(prs)
 	}
+	return e.fetchCommitPr(ctx, repo, sha)
+}
+
+func (e *RepoEntry) fetchCommitPr(ctx context.Context, repo ghclient.Repo, sha string) PrLookupResult {
 	if status, armed := e.gh.breakerStatus(); armed {
 		return unavailableResult(status)
 	}
@@ -402,6 +484,12 @@ func (e *RepoEntry) ResolveCommitPr(ctx context.Context, sha string) PrLookupRes
 // or adds a second delete path (F6/plan's own explicit prohibition). A purge failure is logged and
 // never turned into an RPC error.
 func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookupResult {
+	return e.resolveBranchPr(ctx, branch, false)
+}
+
+// resolveBranchPr serves stale cached facts while refreshing them, unless fresh is set (the eager
+// purge pass needs the current state to see a closed PR).
+func (e *RepoEntry) resolveBranchPr(ctx context.Context, branch string, fresh bool) PrLookupResult {
 	if !e.githubEnabled() {
 		return disabledResult()
 	}
@@ -421,7 +509,11 @@ func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookup
 	// OpenPulls call and warms the snapshot for every other branch that has an open PR; only a
 	// genuinely non-GitHub-shaped miss (a since-closed PR, or the breaker/a fetch failure) still
 	// falls through to the per-branch query below, exactly as before.
-	if snapshot, status := e.ensureSnapshot(ctx); status.OK() {
+	snapshotFn := e.ensureSnapshot
+	if fresh {
+		snapshotFn = e.fetchSnapshot
+	}
+	if snapshot, status := snapshotFn(ctx); status.OK() {
 		for _, pr := range snapshot {
 			// F11 (P108 Part 16 review): HeadRef alone is not enough — a fork's own PR from a
 			// commonly-named branch ("main", "master", "patch-1") would otherwise badge onto an
@@ -438,12 +530,28 @@ func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookup
 		// state=all query below, the one call that can report a PR that has since closed.
 	}
 
-	if cached, hit := e.gh.branchCacheGet(branch); hit {
-		if cached == nil {
-			return okResult(nil)
-		}
-		return okResult([]ghclient.PR{*cached})
+	cached, state := e.gh.branchCacheGet(branch)
+	if state == cacheStale && fresh {
+		state = cacheMiss
 	}
+	switch state {
+	case cacheFresh:
+		return branchResult(cached)
+	case cacheStale:
+		e.refreshInBackground("branch:"+branch, func(ctx context.Context) { e.fetchBranchPr(ctx, repo, branch) })
+		return branchResult(cached)
+	}
+	return e.fetchBranchPr(ctx, repo, branch)
+}
+
+func branchResult(pr *ghclient.PR) PrLookupResult {
+	if pr == nil {
+		return okResult(nil)
+	}
+	return okResult([]ghclient.PR{*pr})
+}
+
+func (e *RepoEntry) fetchBranchPr(ctx context.Context, repo ghclient.Repo, branch string) PrLookupResult {
 	if status, armed := e.gh.breakerStatus(); armed {
 		return unavailableResult(status)
 	}
@@ -463,10 +571,7 @@ func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookup
 	}
 	e.gh.branchCachePut(branch, latest)
 	e.maybePurgeClosed(ctx, branch, latest)
-	if latest == nil {
-		return okResult(nil)
-	}
-	return okResult([]ghclient.PR{*latest})
+	return branchResult(latest)
 }
 
 // PrBrowserURL is pr.browserUrl's own orchestration (P74 §3.3): composes the PR's own browser URL
@@ -546,7 +651,7 @@ func (e *RepoEntry) eagerResolveClosedBranches() {
 		if ctx.Err() != nil {
 			return
 		}
-		e.ResolveBranchPr(ctx, branch)
+		e.resolveBranchPr(ctx, branch, true)
 	}
 }
 

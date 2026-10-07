@@ -132,40 +132,77 @@ describe('PrState — stale-response drop', () => {
   });
 });
 
-describe('PrState — refsChanged clears everything', () => {
-  test('a repo.changed refsChanged event empties bySha/byBranch/selected/status and bumps generation', async () => {
+const PR_ONE = {
+  number: 1,
+  title: 't',
+  url: 'u',
+  state: 'open',
+  headRef: 'b',
+  headSha: 'sha1',
+  baseRef: 'main',
+  updatedAt: 0,
+};
+
+describe('PrState — refsChanged keeps facts and revalidates', () => {
+  test('facts stay while the re-request runs, then the answer swaps in', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const pr = new PrState(bridge);
     pr.setRepoId(REPO);
 
-    transport.onRequest = () => ({
-      kind: 'ok',
-      prs: [
-        {
-          number: 1,
-          title: 't',
-          url: 'u',
-          state: 'open',
-          headRef: 'b',
-          headSha: 'sha1',
-          baseRef: 'main',
-          updatedAt: 0,
-        },
-      ],
-    });
+    transport.onRequest = () => ({ kind: 'ok', prs: [PR_ONE] });
     pr.select('sha1');
     await sleep(350);
+    await pr.resolveBranch('b');
     expect(pr.bySha.value.size).toBe(1);
-    expect(pr.selected.value?.kind).toBe('ok');
+    expect(pr.byBranch.value.size).toBe(1);
 
+    let release: ((v: unknown) => void) | undefined;
+    transport.onRequest = () =>
+      new Promise((resolve) => {
+        release = resolve;
+      });
     const genBefore = pr.generation.value;
     transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
+    await sleep();
 
-    expect(pr.bySha.value.size).toBe(0);
-    expect(pr.byBranch.value.size).toBe(0);
-    expect(pr.selected.value).toBeUndefined();
+    expect(pr.bySha.value.size).toBe(1);
+    expect(pr.byBranch.value.get('b')?.number).toBe(1);
+    expect(pr.selected.value?.kind).toBe('ok');
+
+    release?.({ kind: 'ok', prs: [{ ...PR_ONE, number: 2 }] });
+    await sleep();
+    expect(pr.byBranch.value.get('b')?.number).toBe(2);
     expect(pr.generation.value).toBeGreaterThan(genBefore);
+    pr.dispose();
+  });
+
+  test('a revalidated branch that lost its PR leaves byBranch', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', prs: [PR_ONE] });
+    await pr.resolveBranch('b');
+    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
+    await sleep();
+    expect(pr.byBranch.value.has('b')).toBe(false);
+    pr.dispose();
+  });
+
+  test('switching back to a repo shows its last-known facts at once', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', prs: [PR_ONE] });
+    await pr.resolveBranch('b');
+
+    pr.setRepoId('/repos/b');
+    expect(pr.byBranch.value.size).toBe(0);
+    pr.setRepoId(REPO);
+    expect(pr.byBranch.value.get('b')?.number).toBe(1);
     pr.dispose();
   });
 });
@@ -535,7 +572,7 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
     pr.dispose();
   });
 
-  test('refsChanged clears prByAncestry, and so does a repo switch', async () => {
+  test('a repo switch clears prByAncestry', async () => {
     const { store, shas } = buildChain(2);
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
@@ -560,13 +597,6 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
     pr.rebuildAncestry(store);
     expect(pr.prByAncestry.value.size).toBe(2);
 
-    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
-    expect(pr.prByAncestry.value.size).toBe(0);
-
-    // Re-populate, then prove a repo switch (not only refsChanged) clears it too.
-    await pr.resolveBranch('main');
-    pr.rebuildAncestry(store);
-    expect(pr.prByAncestry.value.size).toBe(2);
     pr.setRepoId('/repos/b');
     expect(pr.prByAncestry.value.size).toBe(0);
     pr.dispose();

@@ -163,23 +163,62 @@ func TestResolveCommitPr_DifferentShaMisses(t *testing.T) {
 
 // --- drop on refsChanged --------------------------------------------------------------------------
 
-func TestRefsChanged_DropsCommitCache(t *testing.T) {
+func TestRefsChanged_KeepsCommitFactsAndRefreshesInBackground(t *testing.T) {
 	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	f.ghRunner.apiResult = ghclient.Result{ExitCode: 0, Stdout: onePullJSON(1, "open", false, "feature")}
 
+	first := f.entry.ResolveCommitPr(context.Background(), "sha1")
+	before := f.ghRunner.count()
+
+	f.ghRunner.apiResult = ghclient.Result{ExitCode: 0, Stdout: onePullJSON(2, "open", false, "feature")}
+	f.watcher.Fire(gitclient.SignalRefsChanged)
+	time.Sleep(20 * time.Millisecond)
+
+	stale := f.entry.ResolveCommitPr(context.Background(), "sha1")
+	if stale.Kind != "ok" || len(stale.PRs) != 1 || stale.PRs[0].Number != first.PRs[0].Number {
+		t.Fatalf("a stale entry must be served at once, got %+v", stale)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for f.ghRunner.count() == before {
+		if time.Now().After(deadline) {
+			t.Fatal("a stale entry must trigger a background refresh")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	for {
+		got := f.entry.ResolveCommitPr(context.Background(), "sha1")
+		if len(got.PRs) == 1 && got.PRs[0].Number == 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the refreshed answer must replace the stale one")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestRefsChanged_StaleRefreshIsSingleFlight(t *testing.T) {
+	t.Parallel()
+	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
+	f.ghRunner.apiResult = ghclient.Result{ExitCode: 0, Stdout: onePullJSON(1, "open", false, "feature")}
 	f.entry.ResolveCommitPr(context.Background(), "sha1")
 	before := f.ghRunner.count()
 
 	f.watcher.Fire(gitclient.SignalRefsChanged)
-	// note() drops synchronously before returning; the eager re-resolve pass runs in its own
-	// goroutine and touches no state this assertion reads (no stored review session for any
-	// branch in this fixture, so gitreview.Store.Branches returns empty and it does nothing).
 	time.Sleep(20 * time.Millisecond)
-
-	f.entry.ResolveCommitPr(context.Background(), "sha1")
-	if f.ghRunner.count() == before {
-		t.Fatal("refsChanged must drop the per-commit cache — the second resolve should have re-spawned")
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			f.entry.ResolveCommitPr(context.Background(), "sha1")
+		}()
+	}
+	wg.Wait()
+	time.Sleep(200 * time.Millisecond)
+	if got := f.ghRunner.count() - before; got != 1 {
+		t.Fatalf("concurrent stale hits must share one refresh, spawned %d", got)
 	}
 }
 

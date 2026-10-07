@@ -256,11 +256,12 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 		e.headMu.Lock()
 		e.headStale = true
 		e.headMu.Unlock()
-		// G24 D6/D8: the snapshot/per-branch/per-commit gh caches and the GitHub-remote detection
-		// are all dropped here too — the breaker is not (D7: "refsChanged does not clear it"). The
-		// bounded, gated eager re-resolve pass (D8) is scheduled AFTER the drop, in its own
+		// G24 D6/D8: the snapshot/per-branch/per-commit gh caches turn stale (served while a
+		// background refresh runs) and the GitHub-remote detection is dropped — the breaker is
+		// not (D7: "refsChanged does not clear it"). The
+		// bounded, gated eager re-resolve pass (D8) is scheduled AFTER the mark, in its own
 		// goroutine, so it never delays this signal's own fan-out to subscribers.
-		e.gh.drop()
+		e.gh.markStale()
 		go e.eagerResolveClosedBranches()
 	}
 	e.mu.Lock()
