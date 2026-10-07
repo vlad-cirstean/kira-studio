@@ -80,7 +80,18 @@ func escapeDSNPath(path string) string {
 // already exist — Open does not create one, since "where the file lives" is each app's own
 // kirapaths-based concern, not this package's.
 func Open(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", BuildDSN(path))
+	return openDSN(path, BuildDSN(path))
+}
+
+// OpenImmediate is Open for a file two processes write: _txlock=immediate makes every
+// transaction take the write lock at BEGIN, so a second writer waits on busy_timeout instead of
+// failing mid-transaction on a read-to-write upgrade.
+func OpenImmediate(path string) (*sql.DB, error) {
+	return openDSN(path, BuildDSN(path)+"&_txlock=immediate")
+}
+
+func openDSN(path, dsn string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("sqlitex: open %s: %w", path, err)
 	}

@@ -14,8 +14,9 @@ import (
 func RunWithTempHomes(m *testing.M) int {
 	return runWithEnv(m, func(root string) map[string]string {
 		return map[string]string{
-			"KIRA_HOME":       filepath.Join(root, "studio"),
-			"KIRA_SPACE_HOME": filepath.Join(root, "space"),
+			"KIRA_HOME":        filepath.Join(root, "studio"),
+			"KIRA_SPACE_HOME":  filepath.Join(root, "space"),
+			"KIRA_MEMORY_HOME": filepath.Join(root, "memory"),
 		}
 	})
 }
