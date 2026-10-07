@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { KuiColumnResizeHandle } from '@kira/kira-ui';
+import {
+  SQS_MAX_VISIBILITY_TIMEOUT_SECONDS,
+  SQS_MIN_VISIBILITY_TIMEOUT_SECONDS,
+} from '@shared/domain/streamFilter';
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -106,9 +110,38 @@ const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord
 const isReadOnlyBatch = computed(() => isBatch.value && (connRecord.value?.readOnly ?? false));
 const redriveLimit = computed(() => page.value?.maxReceiveCount ?? null);
 function redriveSentence(limit: number | 'none' | null): string {
-  return limit === null || limit === 'none'
-    ? '. '
-    : `. This queue moves a message to its dead-letter queue after ${limit} receives. `;
+  if (limit === null) return 'Its redrive limit could not be read';
+  if (limit === 'none') return 'This queue has no redrive limit';
+  return `This queue moves a message to its dead-letter queue after ${limit} receives`;
+}
+
+function plural(n: number, unit: string): string {
+  return `${n} ${unit}${n === 1 ? '' : 's'}`;
+}
+function formatDuration(seconds: number): string {
+  if (seconds % 3600 === 0) return plural(seconds / 3600, 'hour');
+  if (seconds % 60 === 0) return plural(seconds / 60, 'minute');
+  return plural(seconds, 'second');
+}
+const hideDuration = computed(() => formatDuration(props.tab.state.sqsVisibilityTimeoutSeconds));
+
+const VISIBILITY_RANGE_HINT = `Whole seconds from ${SQS_MIN_VISIBILITY_TIMEOUT_SECONDS} to ${SQS_MAX_VISIBILITY_TIMEOUT_SECONDS} (12 h)`;
+const visibilityText = ref(String(props.tab.state.sqsVisibilityTimeoutSeconds));
+const visibilityValid = computed(() => {
+  const text = visibilityText.value.trim();
+  const n = Number(text);
+  return (
+    /^\d+$/.test(text) &&
+    n >= SQS_MIN_VISIBILITY_TIMEOUT_SECONDS &&
+    n <= SQS_MAX_VISIBILITY_TIMEOUT_SECONDS
+  );
+});
+function commitVisibility(): void {
+  if (!visibilityValid.value) return;
+  const n = Number(visibilityText.value.trim());
+  if (n !== props.tab.state.sqsVisibilityTimeoutSeconds) {
+    streamViewStore.setPollVisibilityTimeout(props.tab.id, n);
+  }
 }
 
 // D10/D12: a batch tab (SQS) never auto-loads on reconnect — only an explicit Poll does,
@@ -285,13 +318,14 @@ function onRefresh(): void {
   refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => streamViewStore.reload(props.tab.id));
 }
 
-// A read-only SQS poll leaves messages visible but still raises their receive count; ask once per
-// tab before the first one.
+// A read-only SQS poll hides messages for the chosen time and raises their receive count; ask
+// once per tab and per hide time before polling.
 async function onPoll(): Promise<void> {
+  if (isReadOnlyBatch.value && !visibilityValid.value) return;
   if (isReadOnlyBatch.value && !rt.value?.receiveAcknowledged) {
     const limit = redriveLimit.value ?? (await streamViewStore.fetchRedriveLimit(props.tab.id));
     const ok = await confirmDialogStore.confirmDialog(
-      `Each poll raises the receive count of every message it receives${redriveSentence(limit)}Poll anyway?`,
+      `Each poll hides received messages from other consumers for ${hideDuration.value} and raises their receive count. ${redriveSentence(limit)}. Poll anyway?`,
     );
     if (!ok) return;
     streamViewStore.acknowledgeReceive(props.tab.id);
@@ -675,7 +709,7 @@ onUnmounted(() => {
           v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
           data-testid="stream-visibility-timeout"
         >
-          visibility {{ page.visibilityTimeoutSeconds }}s
+          {{ isReadOnlyBatch ? 'queue visibility' : 'visibility' }} {{ page.visibilityTimeoutSeconds }}s
         </Badge>
       </span>
     </ViewToolbar>
@@ -730,6 +764,38 @@ onUnmounted(() => {
           }}</TooltipContent>
         </Tooltip>
         <span class="text-kira-sm text-muted-foreground" data-testid="stream-status">{{ statusLine }}</span>
+        <Tooltip v-if="isReadOnlyBatch">
+          <TooltipTrigger as-child>
+            <InputGroup variant="kira" class="flex w-24 shrink-0" :aria-invalid="!visibilityValid">
+              <span class="shrink-0 text-kira-sm text-muted-foreground">hide</span>
+              <InputGroupInput
+                :model-value="visibilityText"
+                type="number"
+                inputmode="numeric"
+                :min="SQS_MIN_VISIBILITY_TIMEOUT_SECONDS"
+                :max="SQS_MAX_VISIBILITY_TIMEOUT_SECONDS"
+                step="1"
+                class="h-full p-0 font-data"
+                data-testid="stream-poll-visibility"
+                @update:model-value="(v: string | number) => (visibilityText = String(v))"
+                @keydown.enter="commitVisibility"
+                @blur="commitVisibility"
+              />
+              <span class="shrink-0 text-kira-sm text-muted-foreground">s</span>
+            </InputGroup>
+          </TooltipTrigger>
+          <TooltipContent class="max-w-72">
+            How long each received message stays hidden from other consumers. Longer avoids
+            receiving a message twice in one poll; shorter keeps messages available to consumers.
+            1 s minimum: the AWS SDK cannot send 0. Stop does not unhide messages early.
+          </TooltipContent>
+        </Tooltip>
+        <span
+          v-if="isReadOnlyBatch && !visibilityValid"
+          class="text-kira-sm text-error"
+          data-testid="stream-poll-visibility-error"
+          >{{ VISIBILITY_RANGE_HINT }}</span
+        >
         <Tooltip v-if="isBatch">
           <TooltipTrigger as-child>
             <Button
@@ -737,13 +803,16 @@ onUnmounted(() => {
               size="kira"
               class="bg-field text-fg"
               data-testid="stream-poll"
+              :disabled="isReadOnlyBatch && !visibilityValid"
               @click="onPoll"
             >
               <CodiconIcon name="arrow-swap" :size="13" />
               Poll
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Poll for messages</TooltipContent>
+          <TooltipContent>{{
+            isReadOnlyBatch && !visibilityValid ? VISIBILITY_RANGE_HINT : "Poll for messages"
+          }}</TooltipContent>
         </Tooltip>
         <TooltipIconButton
           v-else
@@ -987,9 +1056,13 @@ onUnmounted(() => {
     <Alert v-if="isBatch" variant="warn" data-testid="stream-poll-warning">
       <CodiconIcon name="warning" :size="13" class="text-warn-text" />
       <AlertDescription v-if="isReadOnlyBatch">
-        Polling keeps messages visible, but each poll still raises every received message's
-        receive count<template v-if="redriveLimit !== null">. This queue moves a message to its
-        dead-letter queue after {{ redriveLimit }} receives</template>.
+        Each poll hides received messages from other consumers for {{ hideDuration }} and raises
+        their receive count. A longer hide avoids receiving the same message twice in one poll but
+        keeps it from consumers that long; a short hide can end a poll early.<template
+          v-if="redriveLimit !== null"
+        >
+          This queue moves a message to its dead-letter queue after {{ redriveLimit }} receives.</template
+        >
       </AlertDescription>
       <AlertDescription v-else>
         Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
