@@ -316,6 +316,8 @@ const CONTROL: ControlSnapshot[] = [
 ];
 
 test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relaunch }) => {
+  // One long scenario; the 60s default leaves no headroom under CPU contention.
+  test.setTimeout(120_000);
   const { window: page, control } = await relaunch({ control: CONTROL });
   await installClipboardSpy(page);
 

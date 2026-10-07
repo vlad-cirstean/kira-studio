@@ -333,6 +333,8 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   relaunch,
   consoleErrors,
 }) => {
+  // One long scenario (~30s idle); the 60s default leaves no headroom under CPU contention.
+  test.setTimeout(120_000);
   // A fixed, non-UTC zone (see fixtures.ts's own doc comment on `timezoneId`): this scenario's
   // "the local reading is not UTC" assertion needs Local and UTC to genuinely differ, which isn't
   // guaranteed of the host machine's own zone.
@@ -814,6 +816,8 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   relaunch,
   consoleErrors,
 }) => {
+  // One long scenario (~30s idle); the 60s default leaves no headroom under CPU contention.
+  test.setTimeout(120_000);
   const { window: page } = await relaunch({ control: CONTROL_2, stream: PORT_2 });
   await connectAndExpand(page, { name: 'Format Actions DB', color: 'blue' });
 
