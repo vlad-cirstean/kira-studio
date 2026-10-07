@@ -233,25 +233,25 @@ type Run struct {
 }
 
 type Task struct {
-	ID           string   `json:"id"`
-	Kind         string   `json:"kind"` // 'task' | 'review' | 'parked'
-	Title        string   `json:"title"`
-	Owner        string   `json:"owner"`
-	Jira         *Jira    `json:"jira"`
-	GithubURL    string   `json:"githubUrl"`
-	WorkflowID   string   `json:"workflowId"`
-	StageID      string   `json:"stageId"`
-	CurrentStage *Stage   `json:"currentStage"`
+	ID           string `json:"id"`
+	Kind         string `json:"kind"` // 'task' | 'review' | 'parked'
+	Title        string `json:"title"`
+	Owner        string `json:"owner"`
+	Jira         *Jira  `json:"jira"`
+	GithubURL    string `json:"githubUrl"`
+	WorkflowID   string `json:"workflowId"`
+	StageID      string `json:"stageId"`
+	CurrentStage *Stage `json:"currentStage"`
 	// Workflow is the version a started task runs; nil until it starts. WorkflowOutdated: the live
 	// file differs from it.
 	Workflow         *Workflow `json:"workflow"`
 	WorkflowOutdated bool      `json:"workflowOutdated"`
-	Est          string   `json:"est"`
-	Notes        string   `json:"notes"`
-	Color        int      `json:"color"`
-	BranchIDs    []string `json:"branchIds"`
-	Runs         []Run    `json:"runs"`
-	CreatedAt    int64    `json:"createdAt"`
+	Est              string    `json:"est"`
+	Notes            string    `json:"notes"`
+	Color            int       `json:"color"`
+	BranchIDs        []string  `json:"branchIds"`
+	Runs             []Run     `json:"runs"`
+	CreatedAt        int64     `json:"createdAt"`
 }
 
 type Plan struct {
