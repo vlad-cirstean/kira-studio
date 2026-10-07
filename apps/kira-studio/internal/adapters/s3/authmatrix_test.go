@@ -30,13 +30,15 @@ func TestS3_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true},
 		},
 		{
-			Name:      "uri mode, key only, no secret",
-			Principal: seedAmbientAwsEnv,
+			Name: "uri mode, key only, no secret",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.URI = testsupport.Strp("s3://" + testsupport.LocalStackStaticAccessKey + "@" + testsupport.LocalStackRegion)
 				return c
 			},
-			Expect: testsupport.Outcome{Succeed: true},
+			// config.go's both-or-nothing: a lone access key with no secret is refused outright,
+			// before any connection attempt (P168 Part 4 F1) — it no longer falls back to the
+			// ambient credential chain.
+			Expect: testsupport.Outcome{FailWith: adapters.CodeConnect},
 		},
 		{
 			Name: "uri mode, malformed URI",

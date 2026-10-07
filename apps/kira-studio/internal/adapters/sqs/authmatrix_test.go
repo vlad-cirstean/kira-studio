@@ -37,16 +37,15 @@ func TestSqs_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true},
 		},
 		{
-			Name:      "uri mode, key only, no secret",
-			Principal: seedAmbientAwsEnv,
+			Name: "uri mode, key only, no secret",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.URI = testsupport.Strp("sqs://" + testsupport.LocalStackStaticAccessKey + "@" + testsupport.LocalStackRegion)
 				return c
 			},
-			// config.go:45's both-or-nothing: a lone key never becomes a static credential, so this
-			// connects via the ambient chain instead — seedAmbientAwsEnv above guarantees that chain
-			// finds something regardless of the outer environment.
-			Expect: testsupport.Outcome{Succeed: true},
+			// config.go's both-or-nothing: a lone access key with no secret is refused outright,
+			// before any connection attempt (P168 Part 4 F1) — it no longer falls back to the
+			// ambient credential chain.
+			Expect: testsupport.Outcome{FailWith: adapters.CodeConnect},
 		},
 		{
 			Name: "uri mode, malformed URI",
