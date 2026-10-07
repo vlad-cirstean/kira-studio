@@ -852,6 +852,60 @@ func (b *TaskBoard) StageDone(_ context.Context, taskID string) (adewire.Task, e
 	return b.wireTask(task)
 }
 
+// SetTaskStage moves the task to any stage of its workflow, or to "done". Runs are kept: a stage
+// revisited shows its earlier runs as history. Refused while a run of the task is live.
+func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID string) (adewire.Task, error) {
+	mu := b.taskMu(taskID)
+	mu.Lock()
+	defer mu.Unlock()
+	tc, err := b.loadTaskCtx(taskID)
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	if tc.task.WorkflowID == "" {
+		return adewire.Task{}, invalid("the task has no workflow")
+	}
+	if stageID == tc.task.StageID {
+		return b.wireTask(tc.task)
+	}
+	var raw string
+	if stageID != "done" {
+		if b.deps.Workflows == nil {
+			return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
+		}
+		wf, ok := b.deps.Workflows.Get(tc.task.WorkflowID)
+		if !ok {
+			return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
+		}
+		at := slices.IndexFunc(wf.Stages, func(st adewire.Stage) bool { return st.ID == stageID })
+		if at < 0 {
+			return adewire.Task{}, invalid("workflow %q has no stage %q", wf.Name, stageID)
+		}
+		enc, err := json.Marshal(wf.Stages[at])
+		if err != nil {
+			return adewire.Task{}, err
+		}
+		raw = string(enc)
+	}
+	running, err := b.deps.Tasks.HasRunning(taskID)
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	if running {
+		return adewire.Task{}, invalid("stop its running agents first")
+	}
+	if err := b.deps.Tasks.SetStage(taskID, stageID, raw); err != nil {
+		return adewire.Task{}, err
+	}
+	b.clearStepMessages(taskID)
+	b.notifyBoard()
+	task, err := b.deps.Tasks.GetTask(taskID)
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	return b.wireTask(task)
+}
+
 // RetrySetup reruns a failed prepare script.
 func (b *TaskBoard) RetrySetup(ctx context.Context, branchID string) error {
 	sb, err := b.deps.Tasks.GetBranch(branchID)

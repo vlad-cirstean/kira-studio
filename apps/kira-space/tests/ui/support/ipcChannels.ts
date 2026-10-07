@@ -128,6 +128,7 @@ export const IPC = {
   adeTaskApprove: 'kira:adetask:approve',
   adeTaskRetryRun: 'kira:adetask:retryRun',
   adeTaskStageDone: 'kira:adetask:stageDone',
+  adeTaskSetTaskStage: 'kira:adetask:setTaskStage',
   adeTaskRetrySetup: 'kira:adetask:retrySetup',
   adeTaskReadLog: 'kira:adetask:readLog',
   adeTaskSessions: 'kira:adetask:sessions:call',

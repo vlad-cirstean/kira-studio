@@ -588,6 +588,10 @@ export interface SetTaskWorkflowArgs {
   taskId: string;
   workflowId: string;
 }
+export interface SetTaskStageArgs {
+  taskId: string;
+  stageId: string;
+}
 export interface SendArgs {
   sessionId: string;
   message: string;

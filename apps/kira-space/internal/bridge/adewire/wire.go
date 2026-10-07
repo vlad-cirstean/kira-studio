@@ -667,6 +667,11 @@ type SetTaskWorkflowArgs struct {
 	WorkflowID string `json:"workflowId"`
 }
 
+type SetTaskStageArgs struct {
+	TaskID  string `json:"taskId"`
+	StageID string `json:"stageId"`
+}
+
 type SendArgs struct {
 	SessionID string `json:"sessionId"`
 	Message   string `json:"message"`

@@ -29,6 +29,7 @@ import type {
   SendArgs,
   SetPlanArgs,
   SetQueuedAfterArgs,
+  SetTaskStageArgs,
   SetTaskWorkflowArgs,
   StartBranchArgs,
   StartRunArgs,
@@ -330,6 +331,30 @@ export function useRetryRun() {
 
 export function useStageDone() {
   return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskStageDone(args) });
+}
+
+/** Applies a stage move to a board snapshot; the backend's push reconciles the run-derived fields. */
+function withStage(board: Board, args: SetTaskStageArgs): Board {
+  const tasks = board.tasks.map(
+    (t): Task => (t.id === args.taskId ? { ...t, stageId: args.stageId } : t),
+  );
+  return { ...board, tasks };
+}
+
+export function useSetTaskStage() {
+  return useMutation({
+    mutationFn: (args: SetTaskStageArgs) => control.adeTaskSetTaskStage(args),
+    onMutate: async (args) => {
+      await queryClient.cancelQueries({ queryKey: boardKey, exact: true });
+      const prev = queryClient.getQueryData<Board>(boardKey);
+      if (prev) queryClient.setQueryData<Board>(boardKey, withStage(prev, args));
+      return { prev };
+    },
+    onError: (_err, _args, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData<Board>(boardKey, ctx.prev);
+      void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
+    },
+  });
 }
 
 export function useRetrySetup() {

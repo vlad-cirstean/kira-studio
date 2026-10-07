@@ -348,3 +348,28 @@ test('a ready setup shows its status without a log', async ({ relaunch }) => {
   await expect(setup).toContainText('ready');
   await expect(setup.locator('[data-testid="ade-run-log"]')).toHaveCount(0);
 });
+
+test('the stage mover goes back, picks any stage and is off while a run is live', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openPlan(relaunch);
+  const moves = () => control.log().filter((e) => e.channel === IPC.adeTaskSetTaskStage);
+
+  await openTask(page, 'T_auth');
+  await page.locator('[data-testid="ade-stage-back"]').click();
+  await expect.poll(moves).toHaveLength(1);
+  expect(moves()[0]?.args).toEqual({ taskId: 'T_auth', stageId: 'impl' });
+
+  await page.locator('[data-testid="ade-stage-pick"]').click();
+  await page.locator('[data-testid="ade-stage-option-done"]').click();
+  await expect.poll(moves).toHaveLength(2);
+  expect(moves()[1]?.args).toEqual({ taskId: 'T_auth', stageId: 'done' });
+
+  await openTask(page, 'T_alerts');
+  await expect(page.locator('[data-testid="ade-stage-back"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="ade-stage-next"]')).toBeEnabled();
+
+  await openTask(page, 'T_bill');
+  await expect(page.locator('[data-testid="ade-stage-pick"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="ade-stage-next"]')).toBeDisabled();
+});

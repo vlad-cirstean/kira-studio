@@ -99,6 +99,7 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskApprove },
     { channel: IPC.adeTaskRetryRun },
     { channel: IPC.adeTaskStageDone, response: adeFixture('task') },
+    { channel: IPC.adeTaskSetTaskStage, response: adeFixture('task') },
     { channel: IPC.adeTaskRetrySetup },
     { channel: IPC.adeTaskReadLog, response: adeFixture('log-page') },
     { channel: IPC.adeTaskSessions, response: adeFixture('sessions') },

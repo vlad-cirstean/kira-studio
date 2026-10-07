@@ -590,6 +590,17 @@ func (s *AdeTaskService) StageDone(ctx context.Context, args adewire.TaskArgs) (
 	return t, adeTaskError(err)
 }
 
+func (s *AdeTaskService) SetTaskStage(ctx context.Context, args adewire.SetTaskStageArgs) (adewire.Task, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.Task{}, err
+	}
+	if err := validateAdeItemID(args.StageID, "stageId"); err != nil {
+		return adewire.Task{}, err
+	}
+	t, err := s.Engine.SetTaskStage(ctx, args.TaskID, args.StageID)
+	return t, adeTaskError(err)
+}
+
 func (s *AdeTaskService) RetrySetup(ctx context.Context, args adewire.BranchArgs) error {
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
