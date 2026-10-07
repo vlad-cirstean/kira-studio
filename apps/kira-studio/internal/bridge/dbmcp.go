@@ -9,9 +9,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 )
 
 // dbMcpServerName is the one name every Install call registers under — internal/dbmcp's own
@@ -55,7 +55,7 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 			home := config.KiraHome()
 			// The headersHelper script's own content depends only on the token file's path, never
 			// its live value — ensure it once per start (F2), not on every statusFn/Install call.
-			if _, err := mcpinstall.EnsureHeaderHelperScript(home, mcpauth.HelperTokenPathNamed(home, dbMcpTokenName)); err != nil {
+			if _, err := mcpauth.EnsureHeaderHelperScript(home, mcpauth.HelperTokenPathNamed(home, dbMcpTokenName)); err != nil {
 				return nil, err
 			}
 			srv, err := dbmcp.New(dbmcp.Config{
@@ -108,7 +108,7 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 			// TTL even though the helper file (and the record it matches) both survive restarts
 			// and stay valid.
 			if helperTokenValid(srv) {
-				helperPath := mcpinstall.HeaderHelperScriptPath(config.KiraHome())
+				helperPath := mcpauth.HeaderHelperScriptPath(config.KiraHome())
 				st.Command = mcpinstall.Command(dbMcpServerName, srv.URL(), helperPath)
 			}
 			if exp := srv.TokenExpiry(); !exp.IsZero() {
@@ -337,7 +337,7 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 	}
 	url := srv.URL()
 	s.embedded.mu.Unlock()
-	helperPath := mcpinstall.HeaderHelperScriptPath(config.KiraHome())
+	helperPath := mcpauth.HeaderHelperScriptPath(config.KiraHome())
 	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, url, helperPath))
 }
 

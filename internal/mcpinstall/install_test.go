@@ -19,9 +19,9 @@ func TestShellSingleQuoteRoundTrips(t *testing.T) {
 		"/tmp/weird's path/mcp-header-helper.sh",
 	}
 	for _, in := range cases {
-		quoted := shellSingleQuote(in)
+		quoted := ShellQuote(in)
 		if !strings.HasPrefix(quoted, "'") || !strings.HasSuffix(quoted, "'") {
-			t.Fatalf("shellSingleQuote(%q) = %q, want a leading and trailing single quote", in, quoted)
+			t.Fatalf("ShellQuote(%q) = %q, want a leading and trailing single quote", in, quoted)
 		}
 	}
 }
@@ -44,7 +44,7 @@ func TestCommandRoundTripsThroughShell(t *testing.T) {
 		if err != nil {
 			t.Fatalf("sh rejected %q: %v", cmd, err)
 		}
-		payload, _ := json.Marshal(serverJSON{Type: "http", URL: "http://127.0.0.1:8766/mcp", HeadersHelper: shellSingleQuote(helperPath)})
+		payload, _ := json.Marshal(serverJSON{Type: "http", URL: "http://127.0.0.1:8766/mcp", HeadersHelper: ShellQuote(helperPath)})
 		want := "mcp\nremove\n--scope\nuser\nkira-db\nmcp\nadd-json\n--scope\nuser\nkira-db\n" + string(payload) + "\n"
 		if string(out) != want {
 			t.Errorf("helper %q: shell argv = %q, want %q", helperPath, out, want)
@@ -99,7 +99,7 @@ func TestInstallQuotesHeaderHelperPathInPayload(t *testing.T) {
 	if err := json.Unmarshal([]byte(addPayload), &decoded); err != nil {
 		t.Fatalf("captured add-json payload is not valid JSON: %v (%s)", err, addPayload)
 	}
-	want := shellSingleQuote(helperPath)
+	want := ShellQuote(helperPath)
 	if decoded.HeadersHelper != want {
 		t.Fatalf("HeadersHelper = %q, want %q (single-quoted)", decoded.HeadersHelper, want)
 	}
