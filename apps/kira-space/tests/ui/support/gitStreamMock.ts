@@ -43,9 +43,17 @@ export interface GitStreamMockArgs {
   repoId: string;
   extraResults?: Record<string, unknown>;
   graphStreamChunks?: readonly GraphStreamChunkFixture[];
+  /** Per-open chunk lists: open N answers list N, the last list repeats. Wins over
+   *  `graphStreamChunks` when both are given. */
+  graphStreamOpens?: readonly (readonly GraphStreamChunkFixture[])[];
 }
 
-function installInBrowser({ repoId, extraResults, graphStreamChunks }: GitStreamMockArgs): void {
+function installInBrowser({
+  repoId,
+  extraResults,
+  graphStreamChunks,
+  graphStreamOpens,
+}: GitStreamMockArgs): void {
   const w =
     (window as unknown as { _wails?: { streamFactory?: (name: string) => unknown } })._wails ?? {};
   (window as unknown as { _wails: typeof w })._wails = w;
@@ -54,6 +62,8 @@ function installInBrowser({ repoId, extraResults, graphStreamChunks }: GitStream
   // P114 §3.1: every method name seen in a `t: 'req'` frame, answered or not — read back by
   // `gitStreamRequests` below. Reset per install so a fresh `relaunch()` starts a fresh log.
   (window as unknown as { __kiraGitRequests: string[] }).__kiraGitRequests = [];
+
+  let streamOpenCount = 0;
 
   const CONNECTING = 0;
   const OPEN = 1;
@@ -147,9 +157,13 @@ function installInBrowser({ repoId, extraResults, graphStreamChunks }: GitStream
         // shape (rpc.ts's own `Frame` union). Only handled when a caller actually supplied
         // chunks; otherwise this falls through to the `!== 'req'` guard below and hangs,
         // same as every other unlisted method here.
-        if (frame.t === 'open' && frame.method === 'graph.stream' && graphStreamChunks) {
+        const openChunks = graphStreamOpens
+          ? graphStreamOpens[Math.min(streamOpenCount, graphStreamOpens.length - 1)]
+          : graphStreamChunks;
+        if (frame.t === 'open' && frame.method === 'graph.stream' && openChunks) {
           const id = frame.id;
-          for (const chunk of graphStreamChunks) {
+          streamOpenCount++;
+          for (const chunk of openChunks) {
             deliverGraphStreamChunk(socket, envelope.version, id, chunk);
           }
           deliver(socket, { version: envelope.version, body: { t: 'end', id } });
@@ -226,8 +240,14 @@ export async function installGitStreamMock(
   gitRepoId: string,
   extraResults?: Record<string, unknown>,
   graphStreamChunks?: readonly GraphStreamChunkFixture[],
+  graphStreamOpens?: readonly (readonly GraphStreamChunkFixture[])[],
 ): Promise<void> {
-  await page.evaluate(installInBrowser, { repoId: gitRepoId, extraResults, graphStreamChunks });
+  await page.evaluate(installInBrowser, {
+    repoId: gitRepoId,
+    extraResults,
+    graphStreamChunks,
+    graphStreamOpens,
+  });
 }
 
 /**
