@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import type { BranchAction } from '../board/actions';
@@ -159,16 +160,17 @@ const headStyle = computed(() => ({
           </AdeTip>
         </div>
         <AdeTip :text="card.title">
-          <button
+          <Button
             type="button"
-            class="line-clamp-2 break-words border-0 bg-transparent p-0 text-left text-kira-lg font-bold leading-4"
+            variant="link"
+            class="line-clamp-2 block h-auto justify-start whitespace-normal break-words rounded-none border-0 p-0 text-left text-kira-lg font-bold leading-4"
             :class="card.parked ? 'text-muted-foreground' : 'text-fg'"
             :aria-label="`Open ${card.title}`"
             data-testid="ade-card-title"
             @click.stop="emit('select')"
           >
             {{ card.title }}
-          </button>
+          </Button>
         </AdeTip>
       </div>
       <AdeBranchRow v-for="row in card.rows" :key="row.id" :row="row" :merged="row.branch.mergedIntoMain" @force-push="emit('forcePush', row)" />

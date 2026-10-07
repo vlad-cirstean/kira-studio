@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
 import AdeTip from '../AdeTip.vue';
 import type { NeedsItem } from '../board/needsYou';
 import { useNeedsAction } from '../needs/useNeedsAction';
@@ -16,15 +17,16 @@ function onClick(): void {
 
 <template>
   <AdeTip :text="tip">
-    <button
+    <Button
       type="button"
+      variant="ghost"
       aria-label="Needs you"
-      class="inline-flex size-4.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-kira-sm font-extrabold"
+      class="size-4.5 cursor-pointer rounded-full border-0 p-0 text-kira-sm font-extrabold"
       :style="{ ...solidStyle('amber'), boxShadow: `0 0 0 3px ${TONE.amber[0]}` }"
       :disabled="busy"
       data-testid="ade-attention"
       @click.stop="onClick"
-      >!</button
+      >!</Button
     >
   </AdeTip>
 </template>
