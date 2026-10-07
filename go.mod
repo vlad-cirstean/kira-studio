@@ -11,6 +11,7 @@ require (
 	github.com/aws/smithy-go v1.28.1
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/creack/pty v1.1.24
+	github.com/docker/cli v29.8.2+incompatible
 	github.com/fsnotify/fsevents v0.2.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-sql-driver/mysql v1.10.1
@@ -21,6 +22,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/keybase/go-keychain v0.0.1
 	github.com/moby/moby/api v1.56.0
+	github.com/moby/moby/client v0.5.1
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/rivo/uniseg v0.4.7
@@ -96,7 +98,6 @@ require (
 	github.com/mibk/dupl v1.1.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.3 // indirect
-	github.com/moby/moby/client v0.5.1 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
 	github.com/moby/sys/user v0.4.1 // indirect
