@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -150,6 +151,11 @@ const elbowColor = computed(() =>
         data-testid="ade-owner-pill"
         >{{ row.branch.owner }}</span
       >
+    </AdeTip>
+    <AdeTip v-if="row.branch.origin === 'agent'" text="Added or named by the agent">
+      <span class="inline-flex shrink-0 text-subtle" data-testid="ade-branch-agent">
+        <CodiconIcon name="sparkle" :size="13" />
+      </span>
     </AdeTip>
     <div class="flex h-full min-w-0 flex-1 flex-col justify-center text-left">
       <AdeTip :text="row.name">

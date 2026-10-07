@@ -425,3 +425,29 @@ test('a skipped stage is dimmed, cannot be entered, and Skip this stage jumps pa
   await expect.poll(moves).toHaveLength(1);
   expect(moves()[0]?.args).toEqual({ taskId: 'T_alerts', stageId: 'review' });
 });
+
+test('agent-made branches carry a sparkle and the workflow shows its Kira Space tools', async ({
+  relaunch,
+}) => {
+  const wfs = adeFixture<{ workflows: { workflow: { kiraSpaceMcp: boolean } }[] }>('workflows');
+  for (const w of wfs.workflows) if (w.workflow) w.workflow.kiraSpaceMcp = true;
+  const board = adeBoard((b) => {
+    const task = b.tasks.find((x) => x.id === 'T_bill');
+    const branch = b.branches.find((x) => x.taskId === task?.id && x.name !== '');
+    if (branch) branch.origin = 'agent';
+  });
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+    { channel: IPC.adeTaskWorkflows, response: wfs },
+  ]);
+  await openTask(page, 'T_bill');
+  await expect(page.locator('[data-testid="ade-workflow-space"]')).toHaveText('Kira Space tools');
+  const sparkle = page.locator('[data-testid="ade-branch-agent"]');
+  await expect(sparkle).toHaveCount(1);
+  await sparkle.hover();
+  await expect(page.getByText('Added or named by the agent').first()).toBeVisible();
+  await page
+    .locator('[data-testid="ade-branch-row"]:has([data-testid="ade-branch-agent"])')
+    .click();
+  await expect(page.locator('[data-testid="ade-panel-agent"]')).toBeVisible();
+});

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { useClipboard } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { control } from '../../../bridge/control';
@@ -198,6 +199,11 @@ function deployNote(d: Deployment): string {
         />
         <AdeTip :text="row.tag.tip">
           <AdeChip :label="chipLabel" :tone="row.tag.tone" />
+        </AdeTip>
+        <AdeTip v-if="branch.origin === 'agent'" text="Added or named by the agent">
+          <span class="mt-px inline-flex shrink-0 text-subtle" data-testid="ade-panel-agent">
+            <CodiconIcon name="sparkle" :size="14" />
+          </span>
         </AdeTip>
         <h3
           class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-semibold leading-[18px]"

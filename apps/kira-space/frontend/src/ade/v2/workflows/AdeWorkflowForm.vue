@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Switch } from '@theme/components/ui/switch';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { cloneWorkflow, moved, newStage, runnableCount } from '../board/workflowForm';
 import { useRepos, useSaveWorkflow } from '../queries';
@@ -93,6 +94,20 @@ onBeforeUnmount(() => {
       <span class="text-kira-sm text-subtle"
         >Prompt variables: <span class="font-data">{task} {jira} {repo} {branch} {worktree}</span></span
       >
+    </div>
+    <div class="flex flex-col gap-0.5">
+      <div class="flex items-center gap-2.5 text-kira-md">
+        <Switch
+          id="ade-wf-form-space"
+          :model-value="wf.kiraSpaceMcp"
+          data-testid="ade-wf-form-space"
+          @update:model-value="(v: boolean) => edit({ ...(wf as Workflow), kiraSpaceMcp: v })"
+        />
+        <label for="ade-wf-form-space">Kira Space tools for agents</label>
+      </div>
+      <p class="m-0 pl-[calc(var(--spacing)*10)] text-kira-sm text-subtle">
+        Agent steps can declare repos on the task and request branches and worktrees through Kira Space.
+      </p>
     </div>
     <AdeStageCard
       v-for="(s, i) in wf.stages"

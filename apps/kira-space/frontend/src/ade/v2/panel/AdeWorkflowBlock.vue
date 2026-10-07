@@ -21,6 +21,9 @@ const error = ref('');
 const valid = computed(() =>
   (workflows.data.value?.workflows ?? []).flatMap((e) => (e.workflow ? [{ file: e.fileName, wf: e.workflow }] : [])),
 );
+const spaceTools = computed(
+  () => valid.value.find((v) => v.wf.id === props.card.task.workflowId)?.wf.kiraSpaceMcp ?? false,
+);
 
 async function pick(value: unknown): Promise<void> {
   error.value = '';
@@ -57,6 +60,12 @@ function edit(): void {
           <Badge variant="warn" data-testid="ade-workflow-outdated">updated — applies to new work only</Badge>
         </TooltipTrigger>
         <TooltipContent>This task runs the version of the workflow it started with.</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="spaceTools">
+        <TooltipTrigger as-child>
+          <Badge variant="info" data-testid="ade-workflow-space">Kira Space tools</Badge>
+        </TooltipTrigger>
+        <TooltipContent>Agents in this workflow can declare repos and request branches.</TooltipContent>
       </Tooltip>
       <Button
         variant="link"

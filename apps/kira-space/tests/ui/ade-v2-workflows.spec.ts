@@ -265,3 +265,16 @@ test('right-clicking a stage skips it, and the last runnable stage cannot be ski
   await stages.nth(3).click({ button: 'right', position: { x: 10, y: 10 } });
   await expect(skipItem).toHaveAttribute('data-disabled', '');
 });
+
+test('the Kira Space tools switch saves with the workflow', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  const toggle = page.locator(t('ade-wf-form-space'));
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await toggle.click();
+  await page.locator(t('ade-wf-save')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
+  const args = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
+    workflow: { kiraSpaceMcp: boolean };
+  };
+  expect(args.workflow.kiraSpaceMcp).toBe(true);
+});
