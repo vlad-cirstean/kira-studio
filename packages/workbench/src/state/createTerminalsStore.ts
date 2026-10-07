@@ -65,10 +65,12 @@ export interface TerminalsControl {
 export interface TerminalsStoreOptions {
   /** The live "Data font" setting, read when a headless session's xterm is created. */
   appearance(): { fontFamily: string; fontSize: number };
+  /** Pinia store id; a second terminals store (Docker exec) needs its own. Default `terminals`. */
+  storeId?: string;
 }
 
 export function createTerminalsStore(control: TerminalsControl, options: TerminalsStoreOptions) {
-  return defineStore('terminals', () => {
+  return defineStore(options.storeId ?? 'terminals', () => {
     // P91 §7: the Terminal module's own unscoped-launch default — the user's home directory,
     // resolved in Go (bridge/terminal.go's DefaultCwd) and hydrated once at boot, beside
     // hydrateCustomScripts (main.ts). '' means "not yet hydrated, or $HOME could not be resolved" —

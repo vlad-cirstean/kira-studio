@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "bun-types"],
+    "paths": {
+      "@shared/*": ["../shared/*"],
+      "@workbench/*": ["../workbench/src/*"],
+      "@theme/*": ["../theme/src/*"],
+      "/wails/runtime.js": ["../../node_modules/@wailsio/runtime/types/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "../workbench/env.d.ts"]
+}

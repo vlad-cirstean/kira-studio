@@ -119,6 +119,10 @@
       "entry": ["src/**/*.test.ts"],
       "project": ["src/**/*.{ts,vue,css}"]
     },
+    "packages/docker-ui": {
+      "entry": ["src/testing/**/*.ts"],
+      "project": ["src/**/*.{ts,vue}"]
+    },
     "packages/kira-ui": {
       // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
       // entry: src/**/*.test.ts dropped (P131 Part 3 §6.2): tooltip.test.ts, its sole match, is

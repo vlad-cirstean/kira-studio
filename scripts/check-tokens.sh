@@ -51,6 +51,7 @@ SPACE_SRC=apps/kira-space/frontend/src
 THEME_SRC=packages/theme/src
 WORKBENCH_SRC=packages/workbench/src
 GIT_UI_SRC=packages/git-ui/src
+DOCKER_UI_SRC=packages/docker-ui/src
 
 # P103 (byte-identical tier, folded into P100 Part 2): tokens.css/base.css/primitives.css moved
 # out of apps/kira-studio/frontend/src/theme into packages/theme/src, shared verbatim by both
@@ -60,7 +61,7 @@ GIT_UI_SRC=packages/git-ui/src
 #
 # P103 Part 1: packages/workbench/src added to the usage scan too — its own moved ContextMenu.vue/
 # AppTooltip.vue/ConfirmDialog.vue reference --kira-* tokens the same way they did inside each app.
-check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC" \
+check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC $DOCKER_UI_SRC" \
   "$THEME_SRC/tokens.css $THEME_SRC/base.css $THEME_SRC/primitives.css" kira
 check_layer 'kv-' "$GIT_UI_SRC" \
   "$GIT_UI_SRC/theme/vscode-tokens.css $GIT_UI_SRC/theme/density.css $GIT_UI_SRC/theme/kira-structure.css" kv

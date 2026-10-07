@@ -15,6 +15,7 @@
     "packages/git-ipc",
     "packages/git-core",
     "packages/git-ui",
+    "packages/docker-ui",
     "packages/kira-ui"
   ],
   "scripts": {
@@ -42,7 +43,7 @@
     "lint:dead": "knip",
     "lint:all": "bun run lint && bun run lint:go && bun run lint:dead",
     "format": "biome check --write .",
-    "typecheck": "sh -c 'bun run typecheck:tests:studio & p1=$!; bun run typecheck:web:studio & p2=$!; bun run typecheck:space-web & p6=$!; bun run typecheck:unit:studio & p3=$!; bun run typecheck:space-unit & p7=$!; bun run typecheck:api-core:studio & p4=$!; bun run typecheck:git & p5=$!; bun run typecheck:space-tests & p8=$!; bun run typecheck:proto:studio & p9=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p6 || fail=1; wait $p3 || fail=1; wait $p7 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; wait $p8 || fail=1; wait $p9 || fail=1; exit $fail'",
+    "typecheck": "sh -c 'bun run typecheck:tests:studio & p1=$!; bun run typecheck:web:studio & p2=$!; bun run typecheck:space-web & p6=$!; bun run typecheck:unit:studio & p3=$!; bun run typecheck:space-unit & p7=$!; bun run typecheck:api-core:studio & p4=$!; bun run typecheck:git & p5=$!; bun run typecheck:space-tests & p8=$!; bun run typecheck:proto:studio & p9=$!; bun run typecheck:docker & p10=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p6 || fail=1; wait $p3 || fail=1; wait $p7 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; wait $p8 || fail=1; wait $p9 || fail=1; wait $p10 || fail=1; exit $fail'",
     "typecheck:tests:studio": "tsgo --noEmit -p apps/kira-studio/tsconfig.tests.json",
     "typecheck:space-tests": "tsgo --noEmit -p apps/kira-space/tsconfig.tests.json",
     "typecheck:web:studio": "vue-tsc --noEmit -p apps/kira-studio/frontend/tsconfig.json",
@@ -51,6 +52,7 @@
     "typecheck:unit:studio": "tsgo --noEmit -p apps/kira-studio/tests/unit/tsconfig.json",
     "typecheck:space-unit": "tsgo --noEmit -p apps/kira-space/tests/unit/tsconfig.json",
     "typecheck:api-core:studio": "tsgo --noEmit -p packages/api-core/tsconfig.json",
+    "typecheck:docker": "vue-tsc --noEmit -p packages/docker-ui/tsconfig.json",
     "typecheck:git": "tsgo --noEmit -p packages/git-ipc/tsconfig.json && tsgo --noEmit -p packages/git-core/tsconfig.json && tsgo --noEmit -p apps/kira-space-vscode/tsconfig.json && vue-tsc --noEmit -p packages/git-ui/tsconfig.json && vue-tsc --noEmit -p packages/kira-ui/tsconfig.json",
     "perf:http:studio": "bun run build:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=perf http-response",
     "perf:documents:studio": "bun run build:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=perf documents-scroll",

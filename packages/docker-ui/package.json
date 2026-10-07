@@ -1,0 +1,25 @@
+{
+  "name": "@kira/docker-ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing/dockerMock": "./src/testing/ui/dockerMock.ts"
+  },
+  "dependencies": {
+    "@vueuse/core": "15.0.0",
+    "anser": "2.3.5",
+    "vue": "3.5.42"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@vitejs/plugin-vue": "6.0.9",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "8.3.0",
+    "vue-tsc": "3.3.11"
+  }
+}

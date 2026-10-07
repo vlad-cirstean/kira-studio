@@ -326,6 +326,26 @@
       }
     },
     {
+      "includes": ["packages/docker-ui/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/apps/**", "@kira/api-core"],
+                    "message": "The Docker module is a shared package — it must not import app code; each app injects its bindings."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/git-ipc/**", "packages/git-core/**"],
       "linter": {
         "rules": {

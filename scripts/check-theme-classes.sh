@@ -58,8 +58,9 @@ THEME_SRC=packages/theme/src
 WORKBENCH_SRC=packages/workbench/src
 GIT_UI_SRC=packages/git-ui/src
 KIRA_UI_SRC=packages/kira-ui/src
+DOCKER_UI_SRC=packages/docker-ui/src
 
-SCAN_DIRS="$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC"
+SCAN_DIRS="$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC $DOCKER_UI_SRC"
 
 STATUS=0
 

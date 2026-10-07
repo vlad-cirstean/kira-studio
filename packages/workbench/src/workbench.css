@@ -1,5 +1,6 @@
 /* P103 Part 1 set out to fix Tailwind v4's automatic content scan rooting at the consuming app's
- * own Vite project and never reaching a sibling package, with `@source "./";` below plus each
+ * own Vite project and never reaching a sibling package, with `@source "./";
+@source "../../docker-ui/src";` below plus each
  * app's main.ts importing this file as a second, independent stylesheet straight after
  * `@theme/base.css`. P104 found that half didn't actually work: `@tailwindcss/vite` compiles each
  * CSS file Vite imports as its own independent root, and only follows a file's *own* `@import`

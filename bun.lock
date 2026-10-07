@@ -93,6 +93,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@kira/api-core": "workspace:*",
+        "@kira/docker-ui": "workspace:*",
         "@kira/kira-ui": "workspace:*",
         "vue": "3.5.42",
         "zod": "4.6.5",
@@ -108,6 +109,23 @@
       },
       "devDependencies": {
         "bun-types": "1.4.2",
+      },
+    },
+    "packages/docker-ui": {
+      "name": "@kira/docker-ui",
+      "version": "0.0.0",
+      "dependencies": {
+        "@vueuse/core": "15.0.0",
+        "anser": "2.3.5",
+        "vue": "3.5.42",
+      },
+      "devDependencies": {
+        "@tailwindcss/vite": "4.3.3",
+        "@vitejs/plugin-vue": "6.0.9",
+        "tailwindcss": "4.3.3",
+        "typescript": "6.0.3",
+        "vite": "8.3.0",
+        "vue-tsc": "3.3.11",
       },
     },
     "packages/git-core": {
@@ -284,6 +302,8 @@
     "@js-sdsl/ordered-map": ["@js-sdsl/ordered-map@4.4.2", "", {}, "sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw=="],
 
     "@kira/api-core": ["@kira/api-core@workspace:packages/api-core"],
+
+    "@kira/docker-ui": ["@kira/docker-ui@workspace:packages/docker-ui"],
 
     "@kira/git-core": ["@kira/git-core@workspace:packages/git-core"],
 
@@ -714,6 +734,8 @@
     "ajv": ["ajv@8.20.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA=="],
 
     "alien-signals": ["alien-signals@3.2.1", "", {}, "sha512-I8FjmltrfnDFoZedi5CG8DghVYNhzb/Ijluz7tCSJH0xpd0484Kowhbb1XDYOxfJpU1p5wnM2X54dA+IfGyD1g=="],
+
+    "anser": ["anser@2.3.5", "", {}, "sha512-vcZjxvvVoxTeR5XBNJB38oTu/7eDCZlwdz32N1eNgpyPF7j/Z7Idf+CUwQOkKKpJ7RJyjxgLHCM7vdIK0iCNMQ=="],
 
     "ansi-escapes": ["ansi-escapes@7.3.0", "", { "dependencies": { "environment": "^1.0.0" } }, "sha512-BvU8nYgGQBxcmMuEeUEmNTvrMVjJNSH7RgW24vXexN4Ven6qCvy4TntnvlnwnMLTVlcRQQdbRY8NKnaIoeWDNg=="],
 
