@@ -183,7 +183,7 @@ func runBoundedCommand(ctx context.Context, conn *goredis.Client, c consoleComma
 	}
 	switch {
 	case plan.scan != nil:
-		return runScan(ctx, conn, *plan.scan, want, c.readTimeout)
+		return runScan(ctx, conn, *plan.scan, want, limit.Bytes, c.readTimeout)
 	case plan.args != nil:
 		bounded := make([]any, 0, len(plan.args)+1)
 		bounded = append(bounded, c.command)
@@ -197,9 +197,11 @@ func runBoundedCommand(ctx context.Context, conn *goredis.Client, c consoleComma
 }
 
 // runScan walks a SCAN-family cursor until want distinct entries are held or the cursor ends,
-// returning the flat reply the original command would have sent.
-func runScan(ctx context.Context, conn *goredis.Client, sp scanPlan, want int, timeout time.Duration) (any, error) {
+// returning the flat reply the original command would have sent. maxBytes > 0 also stops once
+// emitted items pass it by one entry, so the page builder still sees that more existed.
+func runScan(ctx context.Context, conn *goredis.Client, sp scanPlan, want, maxBytes int, timeout time.Duration) (any, error) {
 	seen := map[string]struct{}{}
+	held, capped := 0, false
 	out := []any{}
 	cursor := "0"
 	for {
@@ -232,10 +234,12 @@ func runScan(ctx context.Context, conn *goredis.Client, sp scanPlan, want int, t
 			seen[id] = struct{}{}
 			for _, k := range sp.emit {
 				out = append(out, items[i+k])
+				held += len(formatReplyItem(items[i+k]))
 			}
-			if len(seen) >= want {
+			if len(seen) >= want || (maxBytes > 0 && capped) {
 				return out, nil
 			}
+			capped = maxBytes > 0 && held >= maxBytes
 		}
 		if next == "0" || next == "" {
 			return out, nil
