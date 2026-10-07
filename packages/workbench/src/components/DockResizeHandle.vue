@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDragReleaseFallback } from '@theme/components/ui/resizable/useDragReleaseFallback';
 import { useDraggable } from '@vueuse/core';
 import { useTemplateRef, watch } from 'vue';
 
@@ -39,6 +40,7 @@ const { isDragging } = useDraggable(handleRef, {
   },
 });
 
+useDragReleaseFallback(isDragging, 'pointerup');
 watch(isDragging, (dragging) => emit('dragging', dragging));
 
 function onKeydown(e: KeyboardEvent): void {

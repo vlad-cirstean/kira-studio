@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDragReleaseFallback } from '@theme/components/ui/resizable/useDragReleaseFallback';
 import { useDebounceFn, useDraggable } from '@vueuse/core';
 import { ref } from 'vue';
 
@@ -40,7 +41,7 @@ const commitDebounced = useDebounceFn((w: number) => emit('commit', w), 400);
 let startX = 0;
 let lastDrag = 0;
 let moved = false;
-useDraggable(handleEl, {
+const { isDragging } = useDraggable(handleEl, {
   axis: 'x',
   preventDefault: true,
   onStart: (_pos, e) => {
@@ -57,6 +58,8 @@ useDraggable(handleEl, {
     if (moved) emit('commit', lastDrag);
   },
 });
+
+useDragReleaseFallback(isDragging, 'pointerup');
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
