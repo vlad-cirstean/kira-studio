@@ -30,3 +30,9 @@ None reported by the space UI suite (215 passed). See final run output for Studi
 - P205: /tmp/claude-0/shots/p205/ (repos dialog 1440/1100, folders tab, repo-row menu, ADE shell, empty dialog)
 - P206: /tmp/claude-0/shots/p206-titlebar.png
 - P207 iteration 1: /tmp/claude-0/shots/a1/; final set: /tmp/claude-0/shots/a2/ (plan, task, branch, sessions, backlog, needs, all sessions, workflows form and YAML, add popover, run dialog, empty, git, terminal at 1440 and 1100)
+
+## Final run results
+- Space UI suite: 215 passed. Studio UI suite: 334 passed; cell-editor, connections and slick-grid pacing timed out under heavy host load; connections and cell-editor pass alone, slick-grid pacing passes on v2.0 head `d32de95af` after rebase.
+- `go test -race` on `ade`, `bridge/...`, `storage/...`: pass (the first `ade` run timed out under host load, rerun clean).
+- `lint`, `typecheck`, `lint:dead` (knip): clean.
+- `test:unit`: 1 failure, pre-existing on v2.0 head and outside this scope: `apps/kira-studio/tests/unit/mock-runtime-bindings.spec.ts` ("every bound method is mapped") lists 24 `DockerService.*` methods bound in Studio but absent from `FQN_SUFFIX_BY_IPC_KEY` in `apps/kira-studio/tests/ui/support/mockRuntime.ts`. Needs its own follow-up phase (Docker subsystem).
