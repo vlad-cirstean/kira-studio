@@ -53,6 +53,7 @@ const fullView = computed(() => (def.value.layout === 'full' ? def.value.view : 
     :project-visible="!isFull && layoutStore.panel.project.visible"
     :project-width="layoutStore.panel.project.width"
     :tab-strip-visible="!isFull"
+    :main-framed="!isFull"
     :ops-visible="layoutStore.panel.operations.visible"
     :ops-height="layoutStore.panel.operations.height"
     @resize-project="layoutStore.setProjectWidth"

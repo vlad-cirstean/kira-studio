@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
@@ -105,7 +106,7 @@ const solidBorder = computed(
     >
       <span
         class="absolute box-border rounded-full border-2"
-        :class="empty ? '-right-[4px] top-[6px] size-1.5' : '-right-[6px] top-2.5 size-2.5'"
+        :class="empty ? '-right-1 top-1.5 size-1.5' : '-right-1.5 top-2.5 size-2.5'"
         :style="{
           background: band.isToday ? TONE.amber[2] : 'var(--kira-bg)',
           borderColor: band.isToday ? TONE.amber[2] : rulerBorder,
@@ -119,7 +120,7 @@ const solidBorder = computed(
       >
         {{ band.label }}
       </div>
-      <div class="font-data text-kira-sm" :style="{ color: subColor }">{{ sub }}</div>
+      <div class="text-kira-sm" :style="{ color: subColor }">{{ sub }}</div>
     </div>
     <div
       class="box-border flex min-w-0 flex-1 flex-col gap-2.5 rounded-kira"
@@ -131,11 +132,11 @@ const solidBorder = computed(
       ref="dropEl"
       data-testid="ade-band-drop"
     >
-      <button
+      <Button
         v-for="h in history"
         :key="h.key"
-        type="button"
-        class="ml-[218px] flex h-8 w-full max-w-140 cursor-pointer items-center gap-2 border-0 text-left rounded-kira-sm px-2.5 text-kira-md text-muted-foreground"
+        variant="ghost"
+        class="ml-54.5 h-row w-auto justify-start gap-2 px-2.5 font-normal text-muted-foreground"
         :style="{ background: `color-mix(in srgb, ${TONE.purple[2]} 6%, transparent)` }"
         :data-selected="ui.selectedTaskId === h.key || undefined"
         data-testid="ade-history-row"
@@ -143,36 +144,37 @@ const solidBorder = computed(
       >
         <span class="font-bold" :style="{ color: TONE.purple[1] }">✓</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE.purple[1] }">{{ h.how }}</span>
-        <span class="shrink-0 whitespace-nowrap font-data text-kira-sm text-muted-foreground">{{ h.repos }}</span>
+        <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{ h.repos }}</span>
         <span class="min-w-0 truncate font-semibold text-fg">{{ h.title }}</span>
-      </button>
+      </Button>
       <div
         v-if="overdue"
-        class="flex items-center gap-2 pl-[218px] text-kira-sm"
+        class="flex items-center gap-2 pl-54.5 text-kira-sm"
         :style="{ color: TONE.amber[1] }"
       >
         <span>{{ overdueNote }}</span>
-        <button
-          type="button"
-          class="h-control whitespace-nowrap rounded-kira-sm border-0 px-[9px] text-kira-sm font-semibold"
+        <Button
+          size="kira"
+          class="font-semibold"
           :style="{ background: TONE.amber[2], color: TONE_INK.amber }"
           data-testid="ade-band-rollover"
           @click="emit('rollover')"
         >
           Move to today
-        </button>
+        </Button>
       </div>
-      <div v-if="over" class="flex items-center gap-2 pl-[218px] text-kira-sm" :style="{ color: TONE.red[1] }">
+      <div v-if="over" class="flex items-center gap-2 pl-54.5 text-kira-sm" :style="{ color: TONE.red[1] }">
         <span>{{ overflowNote }}</span>
-        <button
-          type="button"
-          class="h-control max-w-90 truncate whitespace-nowrap rounded-kira-sm border bg-transparent px-[9px] text-kira-sm font-semibold"
+        <Button
+          variant="dialog"
+          size="kira"
+          class="max-w-90 truncate bg-transparent font-semibold"
           :style="{ borderColor: TONE.red[2], color: TONE.red[1] }"
           data-testid="ade-band-overflow-move"
           @click="emit('overflowMove')"
         >
           {{ overflowLabel }}
-        </button>
+        </Button>
       </div>
       <AdeTaskCard
         v-for="card in cards"
@@ -181,11 +183,11 @@ const solidBorder = computed(
         @select="emit('select', card.task.id)"
         @force-push="(row) => emit('forcePush', row)"
       />
-      <button
+      <Button
         v-for="s in spans"
         :key="s.taskId"
-        type="button"
-        class="ml-[218px] box-border flex h-7 max-w-[600px] items-center gap-2 rounded-kira-sm border border-l-[3px] border-dashed border-border-strong bg-transparent px-2.5 text-left text-kira-md text-muted-foreground"
+        variant="ghost"
+        class="ml-54.5 h-row w-auto justify-start gap-2 border border-l-3 border-dashed border-border-strong px-2.5 font-normal text-muted-foreground"
         :style="{ borderLeftColor: s.color }"
         :title="s.tip"
         data-testid="ade-span-row"
@@ -199,7 +201,7 @@ const solidBorder = computed(
           >{{ s.note }}</span
         >
         <span class="min-w-0 truncate font-semibold text-fg">{{ s.title }}</span>
-      </button>
+      </Button>
     </div>
   </div>
 </template>

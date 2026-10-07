@@ -43,8 +43,11 @@ interface Props {
    *  `ade`, which renders its own view in `#main` instead of tab-scoped `MainView`). Default
    *  `true`: Kira Studio passes nothing, so its own geometry is unchanged. */
   tabStripVisible?: boolean;
+  /** Default `true`. `false` lets `#main` lay out its own framed panes straight on the chrome (a
+   *  full-layout module), so no pane sits inside a second frame. */
+  mainFramed?: boolean;
 }
-const props = withDefaults(defineProps<Props>(), { tabStripVisible: true });
+const props = withDefaults(defineProps<Props>(), { tabStripVisible: true, mainFramed: true });
 const emit = defineEmits<{
   'resize-project': [size: number];
   'resize-ops': [size: number];
@@ -128,7 +131,10 @@ function onOpsResize(px: number): void {
       <!-- Border/rounding stay on the inner div: a border on the panel itself shifts reka's px-to-%
            conversion for the project panel by ~0.4px (visual snapshots caught it). -->
       <ResizablePanel class="min-w-0" data-testid="main-panel" :order="2">
-        <div class="h-full flex flex-col min-w-0 min-h-0 overflow-hidden rounded-kira border border-border bg-bg">
+        <div
+          class="h-full flex flex-col min-w-0 min-h-0 overflow-hidden"
+          :class="{ 'rounded-kira border border-border bg-bg': mainFramed }"
+        >
           <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is
                the tab's own breathing room from this row's border-bottom, not a margin tacked
                on after it. -->

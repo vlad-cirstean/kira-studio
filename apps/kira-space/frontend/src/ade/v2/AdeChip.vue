@@ -8,8 +8,8 @@ defineProps<{ label: string; tone: Tone; wide?: boolean }>();
 
 <template>
   <span
-    class="box-border shrink-0 whitespace-nowrap rounded-kira-sm px-[7px] py-px text-kira-sm font-semibold"
-    :class="wide ? 'min-w-[84px] text-center' : ''"
+    class="box-border shrink-0 whitespace-nowrap rounded-kira-sm px-1.5 py-px text-kira-sm font-semibold"
+    :class="wide ? 'min-w-21 text-center' : ''"
     :style="tagStyle(tone)"
     data-testid="ade-chip"
     >{{ label }}</span

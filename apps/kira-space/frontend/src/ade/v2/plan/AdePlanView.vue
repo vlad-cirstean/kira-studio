@@ -276,15 +276,15 @@ function onForcePush(row: BranchRowModel): void {
 </script>
 
 <template>
-  <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg px-5 pb-5" data-testid="ade-plan">
-    <Alert v-if="boardQuery.isError.value" variant="destructive" class="my-4" data-testid="ade-board-error">
+  <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg" data-testid="ade-plan">
+    <Alert v-if="boardQuery.isError.value" variant="destructive" class="m-3 w-auto" data-testid="ade-board-error">
       <AlertTitle>Couldn't load the board</AlertTitle>
       <AlertDescription>{{ (boardQuery.error.value as Error | null)?.message }}</AlertDescription>
       <Button variant="dialog" size="sm" class="mt-2" @click="() => boardQuery.refetch()">Retry</Button>
     </Alert>
     <p v-else-if="!model" class="p-4 text-muted-foreground" data-testid="ade-plan-loading">Loading…</p>
     <template v-else>
-      <div ref="headerEl" class="sticky top-0 z-10 bg-bg pt-2.5">
+      <div ref="headerEl" class="sticky top-0 z-10 bg-bg">
         <AdePlanHeader
           :repos="chips"
           :all-busy="allBusy"
@@ -295,22 +295,25 @@ function onForcePush(row: BranchRowModel): void {
         />
         <AdeHistoryBar v-if="inHistory" @go-to-date="onGoToDate" @hide="hideHistory" @current="scrollToDay(0)" />
       </div>
-      <Alert v-if="setPlan.isError.value" variant="destructive" class="my-2" data-testid="ade-plan-error">
+      <div class="px-4 pb-4 pt-3">
+      <Alert v-if="setPlan.isError.value" variant="destructive" class="mb-2" data-testid="ade-plan-error">
         <AlertDescription class="flex items-center gap-2">
           <span class="flex-1">{{ (setPlan.error.value as Error | null)?.message }}</span>
           <Button variant="link" size="sm" @click="setPlan.reset()">Dismiss</Button>
         </AlertDescription>
       </Alert>
-      <button
-        v-if="!ui.showHistory"
-        type="button"
-        class="mb-2.5 ml-15 mt-0.5 flex h-7 w-[calc(100%-60px)] items-center justify-center gap-2 rounded-kira border border-dashed border-border-strong bg-transparent text-kira-sm text-muted-foreground"
-        data-testid="ade-load-history"
-        @click="openHistory"
-      >
-        <span>↑</span>
-        <span class="font-semibold text-fg">{{ model.view.historyButtonLabel }}</span>
-      </button>
+      <div v-if="!ui.showHistory" class="mb-2.5 ml-15">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          class="w-full border-dashed bg-transparent text-muted-foreground"
+          data-testid="ade-load-history"
+          @click="openHistory"
+        >
+          <span>↑</span>
+          <span class="font-semibold text-fg">{{ model.view.historyButtonLabel }}</span>
+        </Button>
+      </div>
       <template v-for="band in model.view.bands" :key="band.key">
         <AdeDayControls v-if="band.isLater" :min-date="minExtraDate" @more-week="onMoreWeek" @pick-date="onPickDate" />
         <AdeDayBand
@@ -331,24 +334,28 @@ function onForcePush(row: BranchRowModel): void {
           @drag-end="drag.end"
         />
       </template>
-      <button
-        v-if="model.view.hiddenCount > 0"
-        type="button"
-        class="ml-15 mt-2.5 flex h-8 w-[calc(100%-60px)] items-center justify-center gap-2 rounded-kira border border-dashed border-border-strong bg-transparent text-kira-md font-semibold text-fg"
-        data-testid="ade-load-all"
-        @click="ui.showAllItems = true"
-      >
-        ↓ {{ model.view.moreButtonLabel }}
-      </button>
-      <button
-        v-if="model.view.canCollapse"
-        type="button"
-        class="ml-15 mt-2.5 block h-control-lg rounded-kira border-0 bg-transparent px-2.5 text-kira-sm text-muted-foreground"
-        data-testid="ade-collapse"
-        @click="ui.showAllItems = false"
-      >
-        Show only the first 10 again
-      </button>
+      <div v-if="model.view.hiddenCount > 0" class="ml-15 mt-2.5">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          class="w-full border-dashed bg-transparent font-semibold"
+          data-testid="ade-load-all"
+          @click="ui.showAllItems = true"
+        >
+          ↓ {{ model.view.moreButtonLabel }}
+        </Button>
+      </div>
+      <div v-if="model.view.canCollapse" class="ml-15 mt-2.5">
+        <Button
+          variant="toolbar"
+          size="kira-lg"
+          data-testid="ade-collapse"
+          @click="ui.showAllItems = false"
+        >
+          Show only the first 10 again
+        </Button>
+      </div>
+      </div>
     </template>
     <AdeConfirmDialog
       :open="dayOff !== null"

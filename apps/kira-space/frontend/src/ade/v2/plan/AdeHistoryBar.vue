@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
 
 // Sticky bar while scrolled into the open history region.
 const emit = defineEmits<{ goToDate: [iso: string]; hide: []; current: [] }>();
@@ -12,23 +13,24 @@ function onDate(e: Event): void {
 
 <template>
   <div
-    class="mb-1.5 ml-15 flex items-center gap-2.5 rounded-kira border border-border-strong bg-elevated px-2.5 py-1.5 text-kira-md"
+    class="flex items-center gap-2 border-b border-border bg-elevated px-3 py-1.5 text-kira-md"
     data-testid="ade-history-bar"
   >
     <span class="font-semibold">History</span>
     <label for="ade-go-to-date" class="text-muted-foreground">Go to</label>
-    <input
+    <Input
       id="ade-go-to-date"
       type="date"
-      class="box-border h-6 rounded-kira-sm border border-border-strong bg-transparent px-1.5 text-kira-sm text-fg [color-scheme:dark]"
+      size="kira-lg"
+      class="w-36 scheme-dark"
       data-testid="ade-go-to-date"
       @input="onDate"
     />
     <span class="flex-1" />
-    <Button variant="dialog" size="xs" data-testid="ade-hide-history" @click="emit('hide')">
+    <Button variant="dialog" size="kira-lg" data-testid="ade-hide-history" @click="emit('hide')">
       Hide history
     </Button>
-    <Button variant="dialog-primary" size="xs" data-testid="ade-current-work" @click="emit('current')">
+    <Button variant="dialog-primary" size="kira-lg" data-testid="ade-current-work" @click="emit('current')">
       Current work ↓
     </Button>
   </div>

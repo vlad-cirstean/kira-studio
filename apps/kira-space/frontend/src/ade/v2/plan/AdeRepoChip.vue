@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Toggle } from '@theme/components/ui/toggle';
 import { useTimeAgo } from '@vueuse/core';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -35,22 +37,22 @@ const nameStyle = computed(() => {
 
 <template>
   <span
-    class="box-border inline-flex h-7 max-w-80 items-center gap-1.5 rounded-kira border border-border-strong py-0 pl-1 pr-0.5"
+    class="inline-flex h-control-lg max-w-80 items-center gap-1.5 rounded-kira-sm border border-border-strong pl-0.5 pr-0.5"
     :class="shown ? 'bg-elevated' : 'bg-transparent opacity-50'"
     data-testid="ade-repo-chip"
     :data-repo-id="codeRepoId"
   >
     <AdeTip text="Show or hide this repo">
-      <button
-        type="button"
-        class="h-5 shrink-0 cursor-pointer rounded-kira-xs border-0 px-[5px] py-px font-data text-kira-sm font-semibold"
+      <Toggle
+        size="kira"
+        class="shrink-0 px-1.5 font-semibold"
         :style="nameStyle"
-        :aria-pressed="shown"
+        :model-value="shown"
         data-testid="ade-repo-toggle"
-        @click="emit('toggle')"
+        @update:model-value="emit('toggle')"
       >
         {{ label }}
-      </button>
+      </Toggle>
     </AdeTip>
     <span
       class="min-w-0 truncate text-kira-sm"
@@ -60,16 +62,16 @@ const nameStyle = computed(() => {
       >{{ note }}</span
     >
     <AdeTip :text="`Fetch ${label}`">
-      <button
-        type="button"
-        class="flex size-control items-center justify-center rounded-kira-sm border-0 bg-transparent p-0 text-fg disabled:opacity-50"
+      <Button
+        variant="toolbar"
+        size="kira-icon"
         :disabled="busy"
         :aria-label="`Refresh ${label}`"
         data-testid="ade-repo-refresh"
         @click="emit('refresh')"
       >
         <CodiconIcon name="refresh" :size="12" />
-      </button>
+      </Button>
     </AdeTip>
   </span>
 </template>

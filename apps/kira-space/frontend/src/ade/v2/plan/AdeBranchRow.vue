@@ -105,7 +105,7 @@ const elbowColor = computed(() =>
 <template>
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds block content a button cannot. -->
   <div
-    class="box-border flex h-10 w-full cursor-pointer items-center gap-[7px] border-l-[3px] px-2.5"
+    class="box-border flex h-10 w-full cursor-pointer items-center gap-1.5 border-l-3 px-2.5"
     :class="[
       row.isReview ? 'bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--kira-info)_8%,transparent)_0_8px,color-mix(in_srgb,var(--kira-info)_3%,transparent)_8px_16px)]' : '',
       selected ? 'border-l-focus' : 'border-l-transparent',
@@ -125,19 +125,19 @@ const elbowColor = computed(() =>
     <span class="relative shrink-0 self-stretch" :style="{ width: `${row.depth * 16}px` }">
       <span
         v-if="row.depth"
-        class="absolute -top-1 right-0.5 box-border h-[18px] w-2 rounded-bl-[4px] border-b-2 border-l-2"
+        class="absolute -top-1 right-0.5 box-border h-4.5 w-2 rounded-bl-kira-sm border-b-2 border-l-2"
         :style="{ borderColor: elbowColor }"
       />
     </span>
     <span
-      class="shrink-0 rounded-kira-xs px-[5px] py-px font-data text-kira-sm font-semibold"
+      class="shrink-0 rounded-kira-xs px-1 py-px text-kira-sm font-semibold"
       :style="repoStyle"
       data-testid="ade-branch-repo"
       >{{ row.repo }}</span
     >
     <AdeTip v-if="row.base" :text="row.base.tip">
       <span
-        class="max-w-[110px] shrink-0 truncate rounded-kira-xs px-[5px] py-px font-data text-kira-sm font-semibold"
+        class="max-w-27.5 shrink-0 truncate rounded-kira-xs px-1 py-px font-data text-kira-sm font-semibold"
         :class="row.base.tone === 'blue' ? '' : 'bg-field text-fg'"
         :style="row.base.tone === 'blue' ? { background: TONE.blue[0], color: TONE.blue[1] } : undefined"
         data-testid="ade-base-marker"
@@ -147,7 +147,7 @@ const elbowColor = computed(() =>
     <AdeAttention v-if="row.attention" :tip="row.attention" :item="row.attentionItem" />
     <AdeTip v-if="row.isReview" text="Someone else's branch: read-only here">
       <span
-        class="inline-flex h-5 shrink-0 items-center gap-[5px] rounded-kira-pill px-2 text-kira-sm font-semibold"
+        class="inline-flex h-5 shrink-0 items-center gap-1 rounded-kira-pill px-2 text-kira-sm font-semibold"
         :style="{ background: TONE.blue[0], color: TONE.blue[1] }"
         data-testid="ade-owner-pill"
         >{{ row.branch.owner }}</span
@@ -168,14 +168,14 @@ const elbowColor = computed(() =>
           >{{ row.name }}</span
         >
       </AdeTip>
-      <span v-if="row.context || row.prog || hasChips" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap leading-[14px]">
+      <span v-if="row.context || row.prog || hasChips" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap leading-3.5">
         <AdeTip v-if="row.prog" :text="row.prog.tip">
-          <span class="inline-flex shrink-0 items-center gap-[5px]" data-testid="ade-branch-prog">
+          <span class="inline-flex shrink-0 items-center gap-1" data-testid="ade-branch-prog">
             <span class="inline-flex gap-0.5">
               <span
                 v-for="(seg, i) in row.prog.segs"
                 :key="i"
-                class="h-[5px] w-[7px] rounded-[2px]"
+                class="h-1.25 w-1.75 rounded-kira-xs"
                 :style="{ background: segColor(seg) }"
               />
             </span>
@@ -191,7 +191,7 @@ const elbowColor = computed(() =>
         >
         <AdeTip v-for="c in row.chips.merged" :key="c.label" :text="c.tip">
           <span
-            class="shrink-0 font-data text-kira-sm font-medium"
+            class="shrink-0 text-kira-sm font-medium"
             :class="c.tone === 'stale' ? '' : 'text-subtle'"
             :style="c.tone === 'stale' ? { color: TONE.amber[1] } : undefined"
             data-testid="ade-branch-merged"
@@ -201,7 +201,7 @@ const elbowColor = computed(() =>
         <span v-if="row.chips.divider" class="h-2.5 w-px shrink-0 bg-border-strong" />
         <AdeTip v-for="c in row.chips.deployed" :key="c.label" :text="c.tip">
           <span
-            class="shrink-0 font-data text-kira-sm font-medium"
+            class="shrink-0 text-kira-sm font-medium"
             :class="c.tone === 'stale' ? '' : 'text-subtle'"
             :style="c.tone === 'stale' ? { color: TONE.amber[1] } : undefined"
             data-testid="ade-branch-deployed"

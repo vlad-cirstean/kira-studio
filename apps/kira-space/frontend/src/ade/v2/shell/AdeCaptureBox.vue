@@ -37,7 +37,8 @@ async function onEnter(): Promise<void> {
       id="ade-capture"
       v-model="text"
       placeholder="+ Add to backlog… (Enter)"
-      class="w-70 rounded-kira bg-field px-2.5"
+      size="kira-lg"
+      class="w-72"
       data-testid="ade-capture"
       @keydown.enter="onEnter"
     />

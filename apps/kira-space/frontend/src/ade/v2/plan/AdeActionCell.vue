@@ -37,12 +37,12 @@ const TESTID: Record<BranchAction['kind'], string> = {
 <template>
   <div
     class="flex min-w-0 items-center justify-end gap-1.5"
-    :class="tall ? 'h-[68px]' : 'h-10'"
+    :class="tall ? 'h-17' : 'h-10'"
     data-testid="ade-action-cell"
   >
     <AdeTip :text="tag.tip">
       <span
-        class="box-border max-w-30 shrink truncate rounded-kira-sm px-[7px] py-0.5 text-kira-sm font-semibold"
+        class="box-border max-w-30 shrink truncate rounded-kira-sm px-1.5 py-0.5 text-kira-sm font-semibold"
         :style="tagStyle(tag.tone)"
         data-testid="ade-tag"
         >{{ label }}</span
@@ -50,8 +50,8 @@ const TESTID: Record<BranchAction['kind'], string> = {
     </AdeTip>
     <AdeTip v-for="a in actions" :key="a.kind" :text="a.tip">
       <Button
-        size="xs"
-        class="shrink-0 rounded-kira-sm px-[9px] font-semibold"
+        size="kira-lg"
+        class="shrink-0 font-semibold"
         :style="STYLE[a.kind]()"
         :disabled="a.kind === 'rebase' && rebasing"
         :data-testid="TESTID[a.kind]"

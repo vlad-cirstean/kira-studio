@@ -32,8 +32,8 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
 </script>
 
 <template>
-  <Tabs :model-value="ui.view" class="flex min-h-0 flex-1 flex-col gap-0.5 bg-chrome" data-testid="ade-shell" @update:model-value="onView">
-    <nav class="flex h-tabbar shrink-0 items-center gap-2 border-b border-border bg-chrome px-1.5">
+  <Tabs :model-value="ui.view" class="flex min-h-0 flex-1 flex-col gap-0.5" data-testid="ade-shell" @update:model-value="onView">
+    <nav class="flex h-tabbar shrink-0 items-center gap-2 rounded-kira border border-border bg-bg px-1.5">
       <TabsList>
         <TabsTrigger
           value="backlog"
@@ -85,7 +85,7 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
         </TabsTrigger>
       </TabsList>
     </nav>
-    <div class="flex min-h-0 flex-1 gap-0.5 px-0.5 pb-0.5">
+    <div class="flex min-h-0 flex-1 gap-0.5">
       <AdeBacklogPage v-if="ui.view === 'backlog'" />
       <AdeNeedsPage v-else-if="ui.view === 'needs'" />
       <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />

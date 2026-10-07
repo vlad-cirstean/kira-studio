@@ -19,7 +19,7 @@ function onClick(): void {
     <button
       type="button"
       aria-label="Needs you"
-      class="inline-flex size-[18px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-kira-sm font-extrabold"
+      class="inline-flex size-4.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-kira-sm font-extrabold"
       :style="{ ...solidStyle('amber'), boxShadow: `0 0 0 3px ${TONE.amber[0]}` }"
       :disabled="busy"
       data-testid="ade-attention"
