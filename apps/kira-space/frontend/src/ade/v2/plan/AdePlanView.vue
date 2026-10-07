@@ -46,7 +46,7 @@ async function runRefresh(codeRepoIds: string[], all: boolean): Promise<void> {
   const errs = { ...refreshErrors.value };
   for (const id of ids) delete errs[id];
   try {
-    const res = await refresh.mutateAsync({ codeRepoIds: all ? [] : codeRepoIds });
+    const res = await refresh.mutateAsync({ codeRepoIds: ids });
     const summaries = { ...ui.refreshSummary };
     for (const r of res.repos) {
       if (r.error) errs[r.codeRepoId] = remoteErrorText(r.error);

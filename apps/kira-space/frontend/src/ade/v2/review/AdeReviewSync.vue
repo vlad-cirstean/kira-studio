@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
+import { remoteErrorText } from '../board/panelFacts';
 import { useGhSyncPlan, useGitHubSyncApply, useRefresh } from '../queries';
 import type { GhSyncResult, ReviewWindowTarget } from '../wire';
 
@@ -80,7 +81,9 @@ async function confirm(): Promise<void> {
 async function refreshRepo(): Promise<void> {
   error.value = '';
   try {
-    await refresh.mutateAsync({ codeRepoIds: [props.target.codeRepoId] });
+    const res = await refresh.mutateAsync({ codeRepoIds: [props.target.codeRepoId] });
+    const failed = res.repos.find((r) => r.error)?.error;
+    if (failed) error.value = remoteErrorText(failed);
     await plan.refetch();
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);

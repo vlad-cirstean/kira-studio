@@ -583,7 +583,7 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 	return out, nil
 }
 
-// Refresh fetches the given repos (none = every repo a live task uses), marks PR-merged branches,
+// Refresh fetches the given repos (none = every repo a live task uses; the UI sends the ids it shows), marks PR-merged branches,
 // then runs and awaits the rebase-conflict checks so the board it emits is settled.
 func (b *TaskBoard) Refresh(ctx context.Context, codeRepoIDs []string) (adewire.RefreshResult, error) {
 	if len(codeRepoIDs) == 0 {
@@ -613,10 +613,16 @@ func refreshFailure(id string, err error) adewire.RepoRefresh {
 }
 
 func (b *TaskBoard) refreshRepo(ctx context.Context, id string) adewire.RepoRefresh {
-	// Scripts first and outside the repo mutex: they can be slow and need nothing the fetch brings.
-	if err := b.RunEnvScripts(ctx, id); err != nil {
-		slog.Warn("ade env scripts", "scope", "ade", "repo", id, "err", err)
-	}
+	// Scripts run beside the fetch, outside the repo mutex: they can be slow and need nothing the
+	// fetch brings, so a slow deploy check must not hold the fetch back.
+	scriptsDone := make(chan struct{})
+	go func() {
+		defer close(scriptsDone)
+		if err := b.RunEnvScripts(ctx, id); err != nil {
+			slog.Warn("ade env scripts", "scope", "ade", "repo", id, "err", err)
+		}
+	}()
+	defer func() { <-scriptsDone }()
 	mu := b.repoMutex(id)
 	mu.Lock()
 	defer mu.Unlock()

@@ -146,6 +146,23 @@ reviewTest(
   },
 );
 
+reviewTest('a failed fetch from the sync popover shows its error', async ({ relaunch }) => {
+  const failed = {
+    repos: [
+      {
+        codeRepoId: 'repo-web-app',
+        refsChanged: 0,
+        mergedInto: [],
+        error: { kind: 'network', message: 'Could not fetch origin', remoteMessage: '' },
+      },
+    ],
+  };
+  const page = await openReview(relaunch, [{ channel: IPC.adeTaskRefresh, response: failed }]);
+  await page.locator(t('ade-review-sync')).click();
+  await page.locator(t('ade-review-sync-refresh')).click();
+  await expect(page.locator(t('ade-review-sync-error'))).toHaveText('Could not fetch origin');
+});
+
 reviewTest('the sync button is hidden when the branch has no PR', async ({ relaunch }) => {
   const plan = { ...adeFixture<object>('gh-sync-plan'), status: 'noPr', pr: null, files: [] };
   const page = await openReview(relaunch, [{ channel: IPC.adeTaskGitHubSyncPlan, response: plan }]);

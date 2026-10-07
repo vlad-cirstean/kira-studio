@@ -8,6 +8,7 @@ import { IPC } from './support/ipcChannels';
 interface BoardFx {
   plan: { order: string[]; day: Record<string, string>; unpushed: Record<string, boolean> };
   branches: { id: string; conflictCheck: string; conflictCheckReason: string }[];
+  repos: { codeRepoId: string }[];
 }
 
 const card = (page: Page, taskId: string) =>
@@ -86,14 +87,16 @@ test('a repo chip hides and shows its branches', async ({ relaunch }) => {
   await expect(push).toBeVisible();
 });
 
-test('Refresh all and a repo chip refresh send their repo ids', async ({ relaunch }) => {
+test('Refresh all sends every repo the plan shows; a chip sends its own', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskRefresh, response: adeFixture('refresh') },
   ]);
   const calls = () => control.log().filter((e) => e.channel === IPC.adeTaskRefresh);
   await page.locator('[data-testid="ade-refresh-all"]').click();
   await expect.poll(() => calls().length).toBe(1);
-  expect(calls()[0]?.args).toEqual({ codeRepoIds: [] });
+  expect(calls()[0]?.args).toEqual({
+    codeRepoIds: adeFixture<BoardFx>('board').repos.map((r) => r.codeRepoId),
+  });
   await page
     .locator(
       '[data-testid="ade-repo-chip"][data-repo-id="repo-api"] [data-testid="ade-repo-refresh"]',
