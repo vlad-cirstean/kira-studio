@@ -43,3 +43,101 @@ the two halves would share `ade/v2/queries.ts` and `AdeReposPage.vue` and depend
 | **P205 Repositories: all repository configuration in the one Git-module dialog** | P190's `ReposDialog.vue` holds import and scan folders; per-repo configuration (nickname, prepare-worktree script and timeout, integration branches, environments) still sits on the Agents Repos tab, and the worktree base path has no editor. Move the whole form into the dialog (repo list | config form, Scan folders tab; base path added to the `UpdateRepo` patch); open it from the Git panel header, `GitStart`, a repo-row "Configure repository…" item and the Agents empty state; remove the Agents Repos tab | Stream F, after P204 and after stream E lands (shared `adewire` `Repo`/`RepoPatch`, ADE shell) |
 | **P206 Kira Space: Terminal module after Agents** | `workbench/modes.ts` `MODE_ORDER` becomes `git, ade, terminal`; Studio unchanged | Stream F, after P205 |
 | **P207 Agents module: one visual system with the workbench** | Screenshot audit against the Git and Terminal modules: double frames (shell frame plus ADE panel frames, a third level in editor and rows), uneven nav row, 37 files with arbitrary pixel classes, fixed content widths leaving half a panel empty, mixed button sizes per row, monospace prose, raw `<button>`s, hand-made headers, uneven paddings. Fix: full-layout modules render on chrome with one frame per pane, `PanelHeader` on every pane, shadcn controls at default sizes, tokens only (timeline geometry allowlisted), `font-data` for code-like text only. Before/after screenshots per page beside workbench equivalents | Stream F, last; after stream E lands (E edits the same ADE files) |
+| **P208 Requirements audit** | One pass checks every user request in this chapter against shipped code and tests: the 12 original requests (P185-P196), P197-P199, P200, P201, P202, P203-P207. Findings file under `plans/`; every gap goes back to a Sonnet fixer, same phase number. Details: `plans/queued-requests.md` | Runs after every other v2.1 phase lands. Not started |
+| **P209 Code review** | Per `CLAUDE.md` "Code review": one Opus subagent, three dimensions, scope = everything since the last review session (state base commit). Findings file committed before any fixer starts | Last. Not started |
+
+## P185 result
+
+Cause: reka-ui 2.10.5 re-registers a handle when `hitAreaMargins` changes identity. `WorkbenchShell` passes a literal, so a mid-drag render dropped the handle's registry data and `mouseup` reached no active handle (`data-state` went `inactive` before release, panels kept `pointer-events: none`). Fix in shared `ResizableHandle.vue` (stable margins) plus `useDragReleaseFallback.ts` (release replayed on `window`, reka and `pointerup` modes; also used by `DockResizeHandle`, `AdePanelResizeHandle`). `KuiColumnResizeHandle` untouched. Deviation: no `lostpointercapture` listener (VueUse handles already end on `pointercancel`). Verified: `panel-resize.spec.ts` in each app fails before, passes after. Open: none.
+
+## P186 result
+
+One header `+` (`quick-commands-manage`) opened the dialog; inline add row and gear removed. Command fields are `Textarea`; Cmd/Ctrl+Enter adds; row shows first line plus `…`. Superseded in form by P204 (redo): test id renamed `quick-commands-add`. Open: none.
+
+## P187 result
+
+Migration `0031` (`collection`), model, repo ordering, zod, dialog field with `<datalist>`, collapsible groups (collapsed names in `useLocalStorage`), left-aligned rows. Deviation: no rename/delete UI for collections; edit each command's field. Open: none.
+
+## P188 result
+
+Studio lost the setting, `ClaudeCodePane`, `SetAgentAware`, the registry `OnChange` hook and mock channels; migration `0032` drops the row; title-bar toggle kept. Space gained `claudeCode.keepAwakeWithAgents` (Claude Code pane in Settings) applied by package-level `bridge.KeepAwakeRecompute` (not a method: Wails binds every exported method) from terminal agent sessions plus headless `ade` sessions. Studio `settings.spec.ts` lost its Claude Code entry. Open: visual baselines (Known open items).
+
+## P189 result
+
+`gh.go` serves stale PR entries and refreshes once per key in the background (`markStale()` replaces `drop()`); `pr.ts` keeps last-known facts per repo; `CommitGrid` badges only the commit a PR's head points at (`prsHeadedAt`); details pane keeps ancestry. Deviation: no server push for PR changes exists, so a stale answer corrects on the next request. Verified: `go test -race -count=3` gitsession and gitrpc; `repo-graph-pr-badge.spec.ts`. Open: PR correction not pushed.
+
+## P190 result
+
+Direction check found every Go mutation already fires `kira:adetask:repos`; the defect was list sync living in `ade` code plus duplicate dialogs. `initCodeRepos` subscribes at boot; `ReposDialog.vue` (Git module) holds import and scan folders; `ade` dropped its import UI. Verified: `ade-v2-repos.spec.ts`. Open: none.
+
+## P191 result
+
+Reproduction showed `Refresh(nil)` and `Refresh([ids])` both fetch correctly, so the suspected repo-set mismatch does not occur. Fixed instead: the UI sends explicit ids; env scripts (up to 60 s) run beside the fetch; `AdeReviewSync` shows a per-repo error row. Covered by `board_refresh_test.go` and `ade-v2-plan.spec.ts`. Not reproduced: private remote needing relayed credentials. Open: none.
+
+## P192 result
+
+`SetTaskStage` (Go, service, wire, `useSetTaskStage`, `AdeStageMover.vue` Back/Next plus picker), refused while a run is live. Go test covers both directions, `done`, unknown stage, live-run guard. Open: none.
+
+## P193 result
+
+Tabs named `<stage> · <step> · <repo>` / `<stage> · <repo|spec>` from the session's `stageId`; `AdeSessionId.vue` shows the full Claude session id with copy. Open: none.
+
+## P194 result
+
+Shell, panel tabs, session strip and form controls moved onto shared tokens, `tabChipVariants` and new `PanelHeader.vue`; `check-ade-colours.sh` passes. Superseded in detail by P207. Before/after screenshots not attached (no `ade` visual snapshots). Open: none.
+
+## P195 result
+
+`DataViewRuntime.settledWidths` keyed by the column-name set; `buildColumns` reuses them and re-measures only when the set changes; an empty page does not settle widths. Verified: `slick-grid.spec.ts` case (119 vs 480 without the fix). Deviation: one-line edit in `grid-pending-by-primary-key.spec.ts` for the new required field. Projection-change re-measure is not UI-tested. Open: none.
+
+## P196 result
+
+Migration `0017` (`workflow_json`, `workflow_hash`); `taskWorkflow`/`snapshotWorkflow` at first run, session or stage move; Save/Discard bar and Cmd/Ctrl+S, no autosave; `workflowOutdated` badge. Deviation: `SetTaskWorkflow` stays allowed for a started task (it resets the task and now clears the snapshot); refusing would remove the only restart path. `Recover` backfills snapshots for started tasks. Verified: `go test -race` ade and storage. Open: unsaved edits lost on module switch.
+
+## P197 result
+
+`skip` on `adewire.Stage`, `adeflow`, `ade/stages.go` traversal; stage-card right-click menu through the workbench `ContextMenu.vue` (not a new shadcn `ContextMenu`). Deviations: no mock-runtime change (refusal lives in Go, `stages_test.go`); a skipped stage the task already sits on stays current. Open: none.
+
+## P198 result
+
+`board/taskMenu.ts` descriptors, `useTaskMenu.ts`; right-click, Shift+F10 and a More actions button; review tasks get a read-only subset. Handler sits on the whole card box (review cards have no head). Spec `ade-v2-task-menu.spec.ts`. Open: none.
+
+## P199 result
+
+Four tools gated by `kira_space_mcp`, scoped grants, migration `0018` (`origin`), `agent` chip. Verified: `adeagent` `TestGrantScopes`, `agenttools_test.go`. Not verified: live run against real `claude` and a real board. Open: unnamed branches created before the agent can request one; tools untested live.
+
+## P200 result
+
+Docker module in Studio only: `internal/docker`, `packages/docker-ui`, `DockerService`, 12 commits in plan order. Deviations: Moby client v0.5.1 typed Options/Result API; `InspectView` is a `<pre class="font-data">`; Wrap-on logs render the last 2000 lines unvirtualized; rows are `role="option"` in a listbox; `StatsSparkline.vue` naming; `@source` for docker-ui first landed inside a comment and was fixed in its own commit. Verified: `go test -race` with `dockerd` up (`TestEngine` ran), lint, typecheck, `lint:dead`, `docker-module.spec.ts` 8/8. Visual baselines not regenerated (fourth mode tab). Open: remote `tcp://` without TLS allowed; exec chips persist after container stop.
+
+## P201 Part 1 result
+
+`internal/memory` (store, FTS5 search, gate, reconcile, service), `memorycli`, `mcpserver`, `bridge.MemoryService`, shared `packages/workbench/src/memory/`, `memory-mcp` subcommand. Deviations: `Service.Close` is package-level `bridge.CloseMemory`; `StoreRequest.Progress` forwards MCP progress; `toolexec.RunIO` returns stdout alongside `*ExecError`; `ErrClaudeOutdated` added; `commitFact` returns the post-commit revision. Verified: Go and lint suites, `claudesmoke` against real CLI 2.1.292 (challenge, add, update paths), real MCP path with `claude -p`. Studio hosting was undone by Part 2.
+
+## P201 Part 2 result
+
+Memory moved to Kira Space: `MemoryService`, `memory-mcp` before the single-instance lock (`runArgvShim`), `memory` mode last, `mcpinstall` hoisted to repo-root `internal/mcpinstall`; Studio returned to v2.0 modes plus Docker. Deviation: `gocognit` rejected `main`, so both shims run from `runArgvShim`. Verified: Go race suite, `test:ui:space` 200 passed, real server-tag MCP `store_memory`/`search_memories` (also while an app instance held `app.lock`). Open: macOS bundle binary unverified; empty tab strip in Memory mode.
+
+## P202 result
+
+Migration `0019` (`note`), `E_PREPARING` wait-then-start, shared `ScriptProgress`, git-ui toolbar strip and `Output` popover. Deviations: the strip shows spinner, folder and last output line (elapsed in the popover); dialog Close after a finished run dismisses the result. Space Git window still refuses `worktree.prepare` (user decision). Verified: Go race, `bun test` 382, `test:ui:space` 203. git-ui strip not screenshot-verified. Open: see Known open items.
+
+## P203 result
+
+`onReset` in `graphView.ts` clears the pending layout range and resets the layout with the store. Verified: unit test (`plan.length <= store.rowCount` at reset; failed before with `[10]`); `repo-graph-rewalk.spec.ts` failed on the base tree with `ShaTable: row 3 out of range`; real-backend run on a 1981-commit repo showed no console error across re-walk and Agents round trip. Open: viewport keeps its pre-refresh scroll offset.
+
+## P204 result
+
+New `internal/quickcommands` (Studio's model and repo deleted), Space migration `0020`, `createCustomScriptsStore`, header `+` only, one-command dialog with an 8-row monospace `Textarea`. Deviations: `ValidationError` messages now read `quickcommands: …`; the tab-strip `+` menu does not list scripts today, so nothing changed there. Verified: Studio `terminal-module.spec.ts` 10 pass, Space `terminal-quick-commands.spec.ts` 2 pass, screenshots of both apps. Open: `quick-commands-dialog.png` baseline needs regeneration; Studio `tooltips.spec.ts:408` failed deterministically on the stream branch, unrelated files, unconfirmed on base.
+
+## P205 result
+
+All repository configuration in `ReposDialog.vue` (Repositories and Scan folders tabs), new `worktreeBasePath` through `UpdateRepo`; Agents Repos tab and page removed; opened from four places. Deviation: no Go test for the base path (one-condition validation). Space UI 215 passed. Open: none.
+
+## P206 result
+
+`MODE_ORDER` for Space is `git, ade, terminal, memory`; Studio unchanged. Open: none.
+
+## P207 result
+
+One frame per pane (`mainFramed` prop on `WorkbenchShell`), `PanelHeader` on every pane, shadcn controls at `kira`/`kira-lg`/`kira-icon`, tokens for sizes, `font-data` for code-like text only. Counts: arbitrary pixel classes under `ade/` 2 (both `border-[1.5px]` ring weight); raw `<button` 3 (task card title, attention badge, session tab chips). Verified: Space UI 215 passed, lint, typecheck, `lint:dead`, before/after screenshots at 1440 and 1100 wide. Open: none.
