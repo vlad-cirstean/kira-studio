@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tabChipVariants } from '@theme/components/ui/tabs';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import { actionStyle } from '../tones';
 import type { SessionView } from './sessionView';
@@ -10,13 +11,12 @@ const emit = defineEmits<{ pick: [id: string] }>();
 </script>
 
 <template>
-  <div class="flex shrink-0 overflow-x-auto [scrollbar-width:none] border-b border-border bg-chrome" data-testid="ade-session-strip">
+  <div class="flex shrink-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] border-b border-border bg-chrome px-1.5 py-1" data-testid="ade-session-strip">
     <button
       v-for="v in views"
       :key="v.session.id"
       type="button"
-      class="flex h-[30px] shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-0 border-r border-border px-3 font-data text-kira-sm"
-      :class="v.session.id === selectedId ? 'bg-bg text-fg shadow-[inset_0_2px_0_var(--kira-accent)]' : 'bg-transparent text-muted-foreground'"
+      :class="[tabChipVariants({ active: v.session.id === selectedId }), 'font-data']"
       :data-testid="`ade-session-tab-${v.session.id}`"
       :data-selected="v.session.id === selectedId || undefined"
       :data-mode="v.session.mode"
