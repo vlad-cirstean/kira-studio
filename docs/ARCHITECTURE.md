@@ -693,11 +693,12 @@ op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
                                                        -- op actually ran against, NULL for every
                                                        -- non-console-execute op kind and for every
                                                        -- pre-existing row
-custom_scripts(id, name, command, working_dir, color, sort_order, created_at, updated_at)
-                                                       -- P85, migration 0024; the tab strip's "+"
-                                                       -- dropdown launchable scripts, one row per
-                                                       -- script, user-curated (create/delete, no
-                                                       -- cap)
+custom_scripts(id, name, command, working_dir, color, collection, sort_order, created_at, updated_at)
+                                                       -- P85, migration 0024; quick commands, one row
+                                                       -- per command, user-curated (no cap).
+                                                       -- collection (migration 0031, P187): free-text
+                                                       -- group, '' = ungrouped, trimmed, 64 runes max;
+                                                       -- order is collection, sort_order, name
 ui_layout(key, value)                                   -- panel sizes, visibility (app-wide)
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key, workspace_id)
@@ -769,11 +770,14 @@ sequence (`apps/kira-space/internal/storage/migrations/`) — see the Git module
 `mcp_auto_explain` (auto-force-EXPLAIN on `run_query`); `0023` created `connection_mask_rules` and
 added `connections.mask_correlation_key`. Prior high-water mark: migration **0019** as of P67d
 (`0019_p67d_repo_map_access.sql`) — `code_repos.mcp_enabled` on top of C5's `code_repos` plus
-`tabs.workspace_id` (above). Current high-water mark is **0027** (`0024_p85_custom_scripts.sql`
+`tabs.workspace_id` (above). Current high-water mark is **0032** (`0028_p120_drop_git_settings.sql`, `0029_p127_drop_agent_hooks_settings.sql`,
+`0030_p168_fk_indexes.sql`, `0031_p187_custom_script_collection.sql`, `0032_p188_drop_claude_code_settings.sql`
+come after 0027; `0024_p85_custom_scripts.sql`
 created `custom_scripts`; `0025_p97_drop_repo_map.sql`; `0026_p100_drop_git_tables.sql`;
 `0027_p108part11_op_log_path.sql` added `op_log.path TEXT`, the console path an op actually ran
-against, F5). Kira Space's own `kira.db` runs its own two-migration sequence
-(`apps/kira-space/internal/storage/migrations/`): `0001_init.sql`, `0002_p100_tabs_layout.sql`.
+against, F5). Kira Space's own `kira.db` runs its own sequence
+(`apps/kira-space/internal/storage/migrations/`, high-water **0020**): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
+window mode, the ADE tables (see ADE, Storage) and `0020_p204_custom_scripts.sql` (quick commands).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
 startup. Table access is hand-written `database/sql` in `apps/kira-studio/internal/storage/repos/` — there is
@@ -1336,22 +1340,43 @@ one; Kira Space's own `TitleBar.vue` renders it for the first time.
 
 **The Terminal entry in both apps' `MODES` points at one shared module (P128 §2.4), not two
 hand-kept-identical copies.** `packages/workbench/src/terminal/module.ts` exports
-`TerminalModuleContext{defaultCwd, openTerminalTab, host, scripts?}` (`scripts`'s own
-`TerminalScriptsSeam{records, create, update, remove}`, P133 §2.1), the `terminalModuleKey`
+`TerminalModuleContext{defaultCwd, openTerminalTab, host, scripts}` (`scripts`'s own
+`TerminalScriptsSeam{records, create, update, remove}`, P133 §2.1; required since P204), the `terminalModuleKey`
 injection key, and `useTerminalModule()`/`useNewTerminal()`; each app's own `App.vue` builds one
 context object (its own `workbench/terminalModule.ts`) and `provide()`s it once, at the root, above
-`WorkbenchShell.vue`. `scripts` is the one field that differs by app: Kira Studio wires its own
-custom-scripts store through it (P91's "Quick commands" launch a saved script as a fresh terminal
-tab); Kira Space omits the field entirely — no custom-scripts store exists there, and
-`TerminalPanel.vue`'s own quick-commands panel stays unrendered when `scripts` is absent, rather
-than each app needing its own copy of that conditional. A script's every field (name, command,
-working directory, colour) is configured only from that panel's own `QuickCommandsDialog.vue`
-(P133 §2.2) — its gear button ("Manage quick commands…") and its rows' context-menu "Edit…" both
-open it, focused on the right row for "Edit…"; Settings has no Scripts section any more.
+`WorkbenchShell.vue`. **Quick commands exist in both apps (P204).** Go side: repo-root `internal/quickcommands`
+(`CustomScript`, `CustomScriptFields.Validate`, `ValidationError`, `Repo`, `Service`) holds the
+`custom_scripts` repo, validation and the service logic; each app's bound `bridge.CustomScriptsService`
+keeps its own binding name and delegates to it (windowsvc pattern). Studio's table is migration `0024`
+(+`0031`), Space's is migration `0020`. Frontend side: `createCustomScriptsStore`
+(`packages/workbench/src/terminal`) is the shared store factory over each app's `control`; both apps'
+`state/customScripts.ts` are one-liners. The panel header `+` is the only add control; the empty
+state has none. `QuickCommandsDialog.vue` edits one command (add, or "Edit…" from the row menu):
+Name, Script (`Textarea`, 8 rows, monospace, resizable; a multiline script runs as-is in the user's
+login shell, `shell -c`), Working directory, Collection (`<datalist>` of existing names), colour;
+Cmd/Ctrl+Enter saves. Rows show the first line plus `…`, left-aligned, grouped under collapsible
+collection headers (ungrouped first, collapsed names in `useLocalStorage('kira.quickCommands.collapsed')`,
+search expands matching groups). Collections have no rename/delete UI: edit each command's field.
+Settings has no Scripts section.
 `TerminalPanel.vue`, `TerminalStart.vue`, `TerminalNewTab.vue`, and `QuickCommandsDialog.vue` (the
 module's own registry entries and dialog) and `TerminalTabView.vue`/`TerminalHostView.vue` (the tab
 body, shared with repo terminals below) are the same six files in both apps, imported lazily
 (`defineAsyncComponent`) so a git-only session never pays for the terminal launch chunk.
+
+**Panel resize (P185).** reka-ui 2.10.5 `SplitterResizeHandle` ends a drag only on a `window` `mouseup`
+and re-registers a handle whenever its `hitAreaMargins` prop changes identity; a re-registration
+mid-drag drops the handle's registry data, so the release reaches no active handle, `stopDragging()`
+never runs, the handle stays `data-state="drag"` and panels keep `pointer-events: none`.
+`packages/theme/.../ResizableHandle.vue` therefore keeps the margins in a `shallowRef` rebuilt only
+when coarse/fine change, and `useDragReleaseFallback.ts` replays a lost release on `window` while a
+drag is live (`mouseup` mode for reka; `pointerup` mode for `DockResizeHandle.vue` and
+`AdePanelResizeHandle.vue`, VueUse `useDraggable`). `panel-resize.spec.ts` in each app guards it.
+
+**Module order and tab strip.** Kira Studio `MODE_ORDER`: `studio`, `api`, `terminal`, `docker`.
+Kira Space: `git`, `ade`, `terminal`, `memory`. `ModeDef.tabStrip: false` hides the tab strip for a
+module without tabs (Docker; Space's Memory mode currently shows an empty strip, Known open items).
+`WorkbenchShell` takes `mainFramed` (default keeps the main-panel frame); `ade` passes it off so each
+pane carries its own single frame.
 
 **Kira Space's own repo terminals and the Terminal module's own terminals now render through that
 same `TerminalTabView.vue`/`TerminalHostView.vue`, not two parallel implementations (P128 §2.4).**
@@ -2257,10 +2282,12 @@ Space with the rest of the git module, v1.9 P100 — this binary no longer has i
 keepawake` (repo-root as of v1.9 P116, shared by both apps rather than Kira Studio-only) composes
 independent, level-shaped reasons onto one `Controller`, a set of held reasons rather than a
 refcount (a refcount double-acquires the moment either source re-asserts a level it already holds).
-Kira Studio composes two — the titlebar toggle and `claudeCode.keepAwakeWithAgents` being on while
-at least one Claude Code session is live; Kira Space composes the titlebar toggle alone — it wires
-`internal/agenthooks` itself now (P129 Part 1, below), but has no Settings leaf of its own to hold an
-agent-aware keep-awake toggle, and adding one is out of that phase's own scope. While the set is
+The titlebar toggle is the manual reason in both apps. The agent reason is Kira Space only (P188):
+Settings leaf `claudeCode.keepAwakeWithAgents` (Claude Code pane), applied by the package-level
+`bridge.KeepAwakeRecompute` against the live count of terminal-registry agent sessions plus `ade`
+sessions running headless. It emits `ChannelKeepAwake` only when the agent reason flips. Triggers:
+terminal `Registry.OnChange`, ade board `OnSessions`, `SettingsService.OnChanged`, boot. Kira Studio
+has no agent reason and no such setting (migration `0032` deletes the stored row). While the set is
 non-empty, macOS runs
 `caffeinate -i -s -w <our pid>` as a child process — argv-only, no shell, the only variable in the
 line is this app's own pid; `-w` makes `caffeinate` exit on its own if the app crashes, so a missed
@@ -2273,7 +2300,7 @@ registering the listener is what makes Wails post `events.Mac.ApplicationDidWake
 from both apps' own `main.go` — re-arms the assertion (release, then re-acquire) on every resume, a
 no-op while nothing is held. Every non-darwin build gets a documented no-op driver instead: the
 titlebar hides its button outright rather than offering a control that does nothing, and Kira
-Studio's own agent-aware Settings leaf still persists but never spawns anything.
+Studio's titlebar toggle is its only reason.
 
 **Claude Code hook monitoring is a shared, host-wired package (P127).** What was Kira Studio's own
 `internal/agenthooks` (P86-P126: the local HTTP listener a Claude Code hook shells out to, plus the
@@ -2289,8 +2316,7 @@ on/off setting (if any), the bound service surface a hook's own launch reaches, 
 `Manager.ComposeLaunch`'s result into its own `TerminalService.Open` — never `ComposeLaunch`'s env
 map directly, since `KIRA_AGENT_HOOK_TOKEN` must stay inside Go. **Kira Space is the first, and so
 far only, consumer (P129 Part 1)** — Kira Studio dropped its own bridge/UI/settings leaves at P127
-and kept only the plain registry-count keep-awake reason above (`OpenParams.Agent`, no hook
-dependency); it still wires none of this. Kira Space's own `main.go` starts `agenthooks.Manager`
+and wires none of this; the agent keep-awake reason is Kira Space-only (above, P188). Kira Space's own `main.go` starts `agenthooks.Manager`
 unconditionally, with no on/off setting of its own (P129 Part 1's own posture: a start failure —
 `curl` missing, a bind conflict — is logged, never fatal, and sessions still spawn and track with
 activity icons simply absent). `hookEvents` (`internal/agenthooks/config.go`) now also asks Claude
@@ -2444,7 +2470,7 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options, registering **26** bound services under `apps/kira-studio/internal/bridge/`
+options, registering **27** bound services under `apps/kira-studio/internal/bridge/`
 (`grep -c application.NewService apps/kira-studio/main.go`), grouped by module: six shell/app-wide
 (`AppService`, `SettingsService`, `LayoutService`, `TabsService`, `WindowsService` — P8: a page's
 own boot-time window registration, see Process model's multi-window subsection below —
@@ -2458,7 +2484,8 @@ Stack, above — `GrpcService` (P11), `CollectionsService` and `VariablesService
 import); one Database MCP's (`DbMcpService`, M1); and two the terminal surface's
 (`KeepAwakeService`, `TerminalService`, P83 — `AgentHooksService` left this list at P127, its
 listener moved to a shared package that Kira Space, not Kira Studio, now wires (P129 Part 1; see the
-keep-awake and Claude Code hook monitoring paragraphs above)).
+keep-awake and Claude Code hook monitoring paragraphs above)); one the Docker module's
+(`DockerService`, P200, see "Docker module").
 `UpdateService` (P66) rounds it out. **One used to be the git module's — `GitClientsService`, gone
 as of P100.** It
 was the *Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and
@@ -2466,10 +2493,11 @@ the only bound service the headless git module had, since everything else it did
 socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
 along with the rest of the module (see Git module, above) — Kira Studio's `main.go` binds no
 git-related service of any kind any more, confirmed by the grep above and the phase-closing audit's
-own service-list check, below. Kira Space's own `main.go` binds a separate **15**
+own service-list check, below. Kira Space's own `main.go` binds a separate **18**
 (`grep -c application.NewService apps/kira-space/main.go`; this count already included P116/P119's
 own additions — `KeepAwakeService`, `WindowsService`, `UpdateService` — before P128 touched it, and
-P129 Part 1's own ADE service (now `AdeTaskService`) since) for its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
+P129 Part 1's own ADE service (now `AdeTaskService`) since; P201 added `MemoryService`, P204
+`CustomScriptsService`) for its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
 Go type now, not two hand-kept-identical implementations (P128 §2.1/§2.2):**
 `internal/windowsvc.Service` (`Ensure`/`SetMode`/`OpenNew`) and `internal/terminal.BoundService`
 (`Open`/`Write`/`Resize`/`Close`/`DefaultCwd`) each live once at repo root; both apps'
@@ -3608,6 +3636,18 @@ its document-level height-chain/gutter reset onto `kv:` Tailwind utilities appli
 own `mount()` — is deleted outright, along with its `main.ts` import and the now-unused
 `kv-mount-root` class.
 
+**Graph restart and PR facts (P203, P189).** `PackedStreamState`'s restart-at-zero reset (a re-walk
+from row 0 after `refsChanged` or Refresh) must drop the layout plan in the same synchronous step
+(`GraphViewState.#applyChunk` `onReset` clears `#pendingLayoutRange` and calls `#resetLayout()`).
+The plan never references store rows the store lacks; otherwise `CommitGrid`'s generation watcher
+throws `ShaTable: row N out of range` and SlickGrid half-updates (blank rows, missing commits).
+GitHub PR facts (`gitsession/gh.go`) survive a refs change: `markStale()` drops only GitHub-remote
+detection, stale entries (refs-changed or TTL-expired, up to `ghStaleMax` 1 h) serve at once with one
+background refresh per key (single-flight), and the post-fetch purge reads fresh so closed PRs still
+purge. `pr.ts` keeps last-known facts per repo (cap 8), restores them on `setRepoId` and revalidates.
+`CommitGrid` badges a PR only on the commit its head points at (`PrState.prsHeadedAt(sha)`); the
+details pane keeps the ancestry-derived `prForCommit`.
+
 ### Code review, ported natively (C11)
 
 **As of P100, this section describes Kira Space, not Kira Studio** — same move as C10, above.
@@ -3843,6 +3883,9 @@ and `docs/v2.0/plans/`.
   `0014`: `ade_runs.launch_note`, `launch_resume_id`, `launch_prompt`, `launch_extra` (held run's send-back spec, cleared at launch).
   `0015`: rebuilds `ade_runs` without `todo_done`/`todo_total` (P158).
   `0016`: `ade_logs_task`, partial `ade_tasks_archived` (P177 log purge).
+  `0017`: `ade_tasks.workflow_json`, `workflow_hash` (P196 snapshot). `0018`: `ade_task_branch.origin`
+  (P199; `agent` for branches an agent created). `0019`: `ade_worktree_setup.note` (P202 failure reason).
+  Space's `0020` is quick commands, not ADE.
 - Run and setup logs: tail 2 MiB per log, chunks of at most 8 KiB, `truncated` once head chunks drop,
   writes batched every 250 ms.
 - Log retention (P177): logs of a task archived 90+ days ago are deleted (`AdeLogsRepo.PurgeArchived`,
@@ -3883,6 +3926,22 @@ and `docs/v2.0/plans/`.
   The writer keeps key order and comments. Aliases `manual`/`automated` map to `user`/`agent`.
   Step `allowed_tools` feeds the headless `--allowedTools` list.
 - Sample workflows (`docs/v2.0/design/ade-v2/workflows/`) import and validate in the app.
+- Edits save explicitly (P196): Save and Discard in the form and YAML editors, Cmd/Ctrl+S, no autosave;
+  leaving with unsaved edits (list switch, import/new, mode toggle, shell tab change) asks through
+  `ConfirmDialog`. Validation stays debounced.
+- Task snapshot (P196, `ade/taskwf.go`): a task follows the live file until its first run, session
+  or stage move. Then `snapshotWorkflow` (idempotent, first wins) stores the whole workflow in
+  `ade_tasks.workflow_json` with a sha256 `workflow_hash`, and `StageDone`, `SetTaskStage` and
+  `refreshSnapshot` read that snapshot. Wire: `Task.workflow` (null until started),
+  `Task.workflowOutdated` (drift flag, shown as an "updated, applies to new work only" badge).
+  `SetTaskWorkflow` on a started task with no live run still resets the task and now clears the
+  snapshot. `Recover` backfills a started task that has none from the current live file.
+- Stage `skip: true` (P197; `adeflow` parse/write emits it only when set; `adewire.Stage.Skip`): stage
+  advance (`firstRunnable`, `nextRunnable` in `ade/stages.go`) and `SetTaskStage` pass over or refuse
+  a skipped stage; a workflow needs at least one runnable stage. A skipped stage the task already sits
+  on stays current. `SetTaskStage(taskId, stageId)` (P192) moves a task to any stage or `done` in
+  either direction, refused while a run of the task is live.
+- Workflow flag `kira_space_mcp: true` (wire `kiraSpaceMcp`, P199) enables agent tools, below.
 
 ### Run engine
 
@@ -3902,6 +3961,17 @@ and `docs/v2.0/plans/`.
 - Restart recovery (`recover.go`, D7): `Recover()` runs before `Start()`; running runs become `stuck`
   with note `interrupted by restart`, running setups fail, task sessions stop, stale `*.mcp.json` files
   are removed. Pending runs keep their launch spec and launch when their gate opens. Nothing auto-resumes.
+- Agent tools (P199, `ade/agenttools.go` implements `adeagent.SpaceTools` on `*ade.TaskBoard`): the
+  loopback MCP server issues scoped grants (run, task, Space), one bearer token per launch. A
+  workflow with `kira_space_mcp` gives headless runs and the task's TUI sessions the Space grant:
+  `task_info`, `declare_repos` (registered repos only, additive), `request_branch` (name checked by
+  `git check-ref-format --branch`; `main` and integration branches refused; idempotent; rename and
+  collisions refused; worktree and prepare script through `ensureWorktree`/`startSetup`),
+  `branch_status` (optional wait). Tools act only on the token's task; repo refs resolve by nickname,
+  name, then id; errors come back as actionable `ToolError` text. Branches and repos the agent added
+  carry `origin = 'agent'` and show an `agent` chip.
+- Git refresh (P191): the UI sends the explicit repo ids it shows; `refreshRepo` runs env scripts
+  beside the fetch, not before it; `AdeReviewSync` shows a per-repo fetch error row.
 
 ### Interactive sessions
 
@@ -3926,17 +3996,46 @@ and `docs/v2.0/plans/`.
 - A worktree is created by a run creating branches, Start, Take over in a new worktree or Add existing
   branch. The repo's prepare script then runs with its timeout; states `preparing`, `ready`, `failed`
   (full output stored). Until `ready`, pipeline steps for that branch wait (`waiting for worktree setup`)
-  and Start/Take over are not offered. `Retry setup` reruns it.
+  and Start/Take over are not offered. `Retry setup` reruns it (recreates the worktree).
+- Failure reason (P202): every start path (`StartRun`, `LaunchStage`, `StartBranch`, `TakeOver`, review
+  agent, `AddExistingBranch`, `RetrySetup`, `request_branch`) records it in `ade_worktree_setup.note`
+  (wire `WorktreeSetup.note`, `recordSetupFailure`). A launch blocked by a pending setup returns
+  `E_PREPARING` (`ErrSetupPending`) and the UI waits (`useSetupWait`) and starts when ready.
+- One `ScriptProgress` component (`packages/theme`: running, ready, failed, elapsed, `actions` slot)
+  serves ADE (`AdeSetupProgress`, `AdeWorktreeSetup`: launch dialogs, stage block, needs-you) and
+  git-ui (`WorktreeDialog`, toolbar strip with `Output` popover via `PrepareOutput.vue`, Cancel while
+  running). `OpsState` keeps `worktreePrepareStatus`, `StartedAt`, `FinishedAt`, `LastPath`; a failure
+  stays until `dismissWorktreePrepareResult()`, success fades after 5 s. The Space Git window still
+  refuses `worktree.prepare` by design (Known open items).
 
 ### Frontend
 
 - `frontend/src/ade/AdeView.vue`, `queries.ts`, `state/`, and `ade/v2/`: `backlog board dialog needs
-  notes panel plan repos run sessions shell state workflows`. Pure logic lives in `ade/v2/board/`
+  notes panel plan run sessions shell state workflows` (no `repos`, P205). Pure logic lives in `ade/v2/board/`
   (status, actions, needs-you rank, timeline, drop plan, fix menu); components are `<script setup>`.
 - Pinia stores, one concern each: `adeBoardUi` (selection, tabs), `adeDialogs` (dialog flow and pending
   keys such as `merge:<branch>:<target>`), `adeTakeOver`, `adeTerminals`. Server state goes through
   TanStack Query (`queries.ts`) invalidated by the push channels above.
 - Backlog Delete confirms through the workbench `ConfirmDialog` store (P177); no undo.
+- Repository list (P190): one Pinia store (`state/coderepos.ts`) fed by the boot-time
+  `kira:adetask:repos` subscription (`initCodeRepos`, called from `main.ts`), so every module in every
+  window sees every change. All repository configuration lives in one Git-module dialog,
+  `repo/ReposDialog.vue` (P205): Repositories tab (import, list, per-repo form: nickname, prepare
+  script and timeout, integration branches, environments, `worktreeBasePath` via `UpdateRepo`,
+  remove) and Scan folders tab (add, watch, remove). Opened from the Git panel header, `GitStart.vue`,
+  a repo-row "Configure repository…" item and the Agents empty state. Agents has no Repos tab.
+- Session tabs (P193) are named `<stage> · <step> · <repo>` (headless) or `<stage> · <repo|spec>` (TUI),
+  from the session's own `stageId`; review keeps `Review agent`. `AdeSessionId.vue` shows the full
+  Claude session id with a copy button (VueUse `useClipboard`).
+- Task context menu (P198, `board/taskMenu.ts`, `plan/useTaskMenu.ts`): right-click, Shift+F10 or the
+  panel header's More actions button, built on existing calls. The menu primitive is the workbench
+  singleton `ContextMenu.vue` (shadcn-vue `DropdownMenu`), used by every right-click menu in both apps.
+- Pane convention (P194, P207): one frame per pane (the shell passes `mainFramed` off), `PanelHeader`
+  (`packages/workbench/src/components/PanelHeader.vue`) on every pane, nav and panel tabs on
+  `tabChipVariants`, shadcn-vue controls at `kira`/`kira-lg`/`kira-icon` sizes, tokens instead of
+  arbitrary pixel classes (timeline geometry, glyph ring weight and a few font-relative values are
+  the allowlist), `font-data` only for SHAs, branches, paths, commands, YAML and code. Raw `<button>`
+  remains in three places: the task card title, `AdeAttention` glyph badge, `AdeSessionStrip` chips.
 - Dialogs share `dialog/flow.ts` (target pick: new session via `StartBranch`, or `Send` to a running
   session), `compose.ts` (message templates), `deliver.ts` and `turnWatch.ts`.
 - Plan drag and drop (`plan/usePlanDrag.ts`, `board/dropPlan.ts`) writes the day and position directly
@@ -3971,11 +4070,68 @@ and `docs/v2.0/plans/`.
 
 - Go: `internal/ade` (board, integration, deploy, run engine, steps, tracker), `adeflow`, `adeagent`,
   `bridge/adewire`; `go test -race` on those plus `gitsession`.
+- P199 protocol is covered by `adeagent` `TestGrantScopes` (go-sdk client) and `agenttools_test.go`.
 - `tests/unit/ade-v2-*` (board parity with the mockup's logic, dialog, drop plan, progress, timeline) and
   `ade-notes-markdown`; 13 `tests/ui/ade-v2-*.spec.ts` on the mock runtime; no ADE visual spec.
 - Live smoke (server build, real `claude -p`) covers runs, send-back, restart recovery, Spec/Start/Take
   over sessions, merge, rebase and archive dialogs. The sandbox cannot authenticate an interactive
   `claude`, so a real TUI turn ending (Stop from `claude` itself) is unobserved (Known open items).
+
+## Memory MCP server and module (P201, Kira Space)
+
+- Storage: `$KIRA_MEMORY_HOME/memory.db` (default `~/.kira-memory/memory.db`), its own SQLite file and
+  migration sequence (`internal/memory/migrations`), shared by Kira Space and the stdio server. Opened
+  lazily with `_txlock=immediate`; WAL, `busy_timeout` 5000.
+- Schema: `memories` (immutable versions, `current`/`superseded`; one current row per lineage by partial
+  unique index; update and delete blocked by trigger except `current` to `superseded`), `memories_fts`
+  (FTS5 external content, `porter unicode61 remove_diacritics 2`, prefix 2 3), `memory_revision`
+  (insert counter), `memory_events` (every add/update/noop with author, source, request id, rationale).
+- Search is recall-first: every term a quoted prefix term OR-ed, plus the whole phrase; stopwords
+  dropped; gate-written keywords indexed; bm25 `(10, 2, 4)` orders only; no score cutoff. One builder
+  (`memory.BuildMatch`) serves MCP, module and reconcile candidates. User input never reaches FTS5 as syntax.
+- Pipeline, `Service.Store`: validation, gate (one Sonnet call: splits atomic facts, challenges
+  ambiguity, weak reasons and secrets, adds keywords), reconcile (one call for facts with candidates;
+  hash short-circuit and no-candidate add skip it), commit per fact in one `BEGIN IMMEDIATE`
+  transaction with an optimistic revision check (2 retries). A challenge stores nothing and is
+  stateless: the caller resubmits with `clarifications`. At most 2 pipelines run at once.
+- Claude Code isolation (`memory.CLIRunner`): `claude -p --model sonnet --safe-mode --setting-sources ""
+  --strict-mcp-config --tools "" --disable-slash-commands --no-session-persistence
+  --permission-prompts none --output-format json --json-schema … --system-prompt … --max-budget-usd
+  0.50`; input on stdin; empty temp cwd; session env variables stripped, auth variables kept; 120 s
+  timeout. Not `--bare` (forces API-key auth). `toolexec.RunIO` returns stdout alongside an
+  `*ExecError` since `claude -p` prints its structured error to stdout. Unknown-flag stderr maps to
+  `ErrClaudeOutdated` ("update Claude Code").
+- MCP server: `<Kira Space executable> memory-mcp`, stdio, spawned per session by Claude Code, so it works
+  with the app closed or open. The branch sits in `apps/kira-space/main.go` before `startupfail` and
+  `acquireSingleInstance` (`runArgvShim`). Tools `store_memory` (progress notifications `checking`,
+  `reconciling`, `saving`), `search_memories` (`includeHistory`), `memory_history`; prompt `remember`
+  (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
+  from the Connect dialog (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
+  script lives in Studio's `mcpauth`).
+- Space: `bridge.MemoryService` (`apps/kira-space/internal/bridge/memory.go`; teardown is the
+  package-level `bridge.CloseMemory`) emits `kira:memory:changed` after its own writes and, via a 2 s
+  `PRAGMA data_version` watcher, after the MCP subprocess writes. `memory` is the last mode in
+  `MODE_ORDER` (`windows.mode` vocabulary; no migration). UI lives in shared `packages/workbench/src/memory/`:
+  search panel, detail with version trail, Add memory and Connect dialogs. Kira Studio hosts none of it.
+- Failure modes: no `claude` on `PATH` or not logged in surfaces a typed message in the dialog and as an
+  MCP tool error; the gate can over-challenge; model latency is 5 to 20 s per store.
+
+## Docker module (P200, Kira Studio)
+
+- Registered in Kira Studio only. Go `internal/docker` (Engine API via `github.com/moby/moby/client`
+  v0.5.1, typed Options/Result structs; `ssh://` via `docker/cli` `connhelper`); `DockerService` embeds
+  `*docker.BoundService`. Channels `kira:docker:changed|status|stats|logs|exec`. Frontend package
+  `packages/docker-ui` (`@kira/docker-ui`): containers (grouped by Compose project), images, volumes,
+  networks; start/stop/restart; live logs (follow, filter, timestamps; virtualized unless Wrap is on,
+  which renders the last 2000 filtered lines; buffer cap 20 000); exec through `TerminalHostView`
+  (`storeId: 'docker-exec'`); per-container CPU and RAM in the list and a Stats view; server state on
+  TanStack Query.
+- Endpoint order (`endpoint.go`): selected UI context, `DOCKER_HOST`, `DOCKER_CONTEXT`/`currentContext`
+  (TLS contexts included), default socket, socket probe (Desktop, Colima, OrbStack). Typed
+  not-installed, daemon-down and unreachable states.
+- Streams are per window (`windowKey`); `WindowOpenerDeps.OnWindowClosing`, service shutdown and quit
+  end them; they run only while the module is visible. Stats share one engine stream per container
+  across windows. `ModeDef.tabStrip: false` hides the tab strip.
 
 ## Database MCP server (v1.7)
 
@@ -4692,3 +4848,14 @@ Performance:
 - **Go and TS masks count Indic conjuncts differently (P168 Part 6).** `uniseg` v0.4.7 (latest) counts `क्ष` as 2 graphemes, ICU (Unicode 15.1, rule GB9c) as 1, so a Hindi name masks to a different bullet count in the grid preview than over MCP. The MCP render path (Go) is the boundary; the preview is advisory. No library fix exists.
 
 - **A pending insert row's cell is a single-line `<input>` (P176).** A staged value with a line break (pasted TSV/CSV) shows flattened, and typing in that input restages it without the break. Delete once insert cells move to the inline cell editor's textarea.
+
+- **`memory-mcp` as a macOS app-bundle executable is unverified (P201).** Verified with a `-tags server` Linux binary only. Spawning the bundle's executable as a CLI child of Claude Code on a Mac is unobserved. Delete once checked on a Mac.
+- **Memory has no semantic (embedding) search and no delete (P201).** Search is FTS5 with OR-prefix terms; stored memories are never deletable by design (updates keep a `historical` version). The Memory mode in Kira Space shows an empty tab strip.
+- **The Space Git window refuses `worktree.prepare` by design (P202).** Prepare-script progress shows in ADE paths and the VS Code extension host, not in the Space Git window's own worktree dialog or toolbar. The git-ui toolbar strip is not screenshot-verified (no fake-host scenario drives `worktree.prepare`). Delete when the user lifts the boundary.
+- **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
+- **The agent MCP tools (`task_info`, `declare_repos`, `request_branch`, `branch_status`) are untested against a real board and real `claude` (P199).** Covered by the `adeagent` go-sdk client test and `agenttools_test.go` only. Delete once one live run calls them.
+- **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
+- **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
+- **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
+- **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
+- **Visual baselines need regeneration on the CI-Linux font setup (P188, P200, P201, P204).** Studio about 13 (data-view, connection-dialog, console, http-request-view, schema-dialog, settings panes, workbench at rest, terminal-module quick-commands dialog) and Space about 4 (`settings` panes) fail from glyph-wide anti-aliasing drift plus new content: the fourth Studio mode tab, the Space Claude Code settings item and the new quick-commands dialog. Regenerate once on the baseline environment and check each diff is the expected change only.
