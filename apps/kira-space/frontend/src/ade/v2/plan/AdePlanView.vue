@@ -276,7 +276,7 @@ function onForcePush(row: BranchRowModel): void {
 </script>
 
 <template>
-  <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto px-5 pb-5" data-testid="ade-plan">
+  <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg px-5 pb-5" data-testid="ade-plan">
     <Alert v-if="boardQuery.isError.value" variant="destructive" class="my-4" data-testid="ade-board-error">
       <AlertTitle>Couldn't load the board</AlertTitle>
       <AlertDescription>{{ (boardQuery.error.value as Error | null)?.message }}</AlertDescription>

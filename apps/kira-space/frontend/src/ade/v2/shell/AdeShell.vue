@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Tabs, TabsList, TabsTrigger } from '@theme/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
 import { computed } from 'vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
@@ -13,7 +13,7 @@ import AdeReposPage from '../repos/AdeReposPage.vue';
 import AdeRunDialog from '../run/AdeRunDialog.vue';
 import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { TONE, tagStyle } from '../tones';
+import { tagStyle } from '../tones';
 import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
 import AdeCaptureBox from './AdeCaptureBox.vue';
 
@@ -26,13 +26,12 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
 </script>
 
 <template>
-  <Tabs v-model="ui.view" class="flex min-h-0 flex-1 flex-col gap-0" data-testid="ade-shell">
-    <nav class="flex h-10 shrink-0 items-stretch border-b border-border bg-chrome pl-2">
-      <TabsList class="gap-0">
+  <Tabs v-model="ui.view" class="flex min-h-0 flex-1 flex-col gap-0.5 bg-chrome" data-testid="ade-shell">
+    <nav class="flex h-tabbar shrink-0 items-center gap-2 border-b border-border bg-chrome px-1.5">
+      <TabsList>
         <TabsTrigger
           value="backlog"
-          class="h-full cursor-pointer gap-1.5 border-b-2 border-transparent px-3.5 text-kira-lg text-muted-foreground data-[state=active]:font-semibold data-[state=active]:text-fg"
-          :style="ui.view === 'backlog' ? { borderBottomColor: TONE.amber[2] } : undefined"
+          :class="tabChipVariants({ active: ui.view === 'backlog', size: 'wide' })"
           data-testid="ade-tab-backlog"
         >
           Backlog
@@ -45,8 +44,7 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
         </TabsTrigger>
         <TabsTrigger
           value="needs"
-          class="h-full cursor-pointer gap-1.5 border-b-2 border-transparent px-3.5 text-kira-lg text-muted-foreground data-[state=active]:font-semibold data-[state=active]:text-fg"
-          :style="ui.view === 'needs' ? { borderBottomColor: TONE.amber[2] } : undefined"
+          :class="tabChipVariants({ active: ui.view === 'needs', size: 'wide' })"
           data-testid="ade-tab-needs"
         >
           Needs you
@@ -60,44 +58,43 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
         </TabsTrigger>
         <TabsTrigger
           value="plan"
-          class="h-full cursor-pointer gap-1.5 border-b-2 border-transparent px-3.5 text-kira-lg text-muted-foreground data-[state=active]:font-semibold data-[state=active]:text-fg"
-          :style="ui.view === 'plan' ? { borderBottomColor: TONE.amber[2] } : undefined"
+          :class="tabChipVariants({ active: ui.view === 'plan', size: 'wide' })"
           data-testid="ade-tab-plan"
         >
           Plan
         </TabsTrigger>
       </TabsList>
       <span class="flex-1" />
-      <div class="flex items-center gap-2 px-3">
+      <div class="flex items-center gap-2">
         <AdeCaptureBox />
         <AdeAddPopover />
       </div>
-      <TabsList class="gap-0">
+      <TabsList>
         <TabsTrigger
           value="workflows"
-          class="h-full cursor-pointer gap-1.5 border-b-2 border-transparent px-3.5 text-kira-lg text-muted-foreground data-[state=active]:font-semibold data-[state=active]:text-fg"
-          :style="ui.view === 'workflows' ? { borderBottomColor: TONE.amber[2] } : undefined"
+          :class="tabChipVariants({ active: ui.view === 'workflows', size: 'wide' })"
           data-testid="ade-tab-workflows"
         >
           Workflows
         </TabsTrigger>
         <TabsTrigger
           value="repos"
-          class="h-full cursor-pointer gap-1.5 border-b-2 border-transparent px-3.5 text-kira-lg text-muted-foreground data-[state=active]:font-semibold data-[state=active]:text-fg"
-          :style="ui.view === 'repos' ? { borderBottomColor: TONE.amber[2] } : undefined"
+          :class="tabChipVariants({ active: ui.view === 'repos', size: 'wide' })"
           data-testid="ade-tab-repos"
         >
           Repos
         </TabsTrigger>
       </TabsList>
     </nav>
-    <AdeBacklogPage v-if="ui.view === 'backlog'" />
-    <AdeNeedsPage v-else-if="ui.view === 'needs'" />
-    <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
-    <AdeReposPage v-else-if="ui.view === 'repos'" />
-    <div v-else class="flex min-h-0 flex-1">
-      <AdePlanView />
-      <AdePanel v-if="ui.selectedTaskId" />
+    <div class="flex min-h-0 flex-1 gap-0.5 px-0.5 pb-0.5">
+      <AdeBacklogPage v-if="ui.view === 'backlog'" />
+      <AdeNeedsPage v-else-if="ui.view === 'needs'" />
+      <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
+      <AdeReposPage v-else-if="ui.view === 'repos'" />
+      <template v-else>
+        <AdePlanView />
+        <AdePanel v-if="ui.selectedTaskId" />
+      </template>
     </div>
     <AdeRunDialog />
     <AdeClaudeDialog />

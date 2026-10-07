@@ -45,7 +45,7 @@ const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBran
 <template>
   <AdePanelResizeHandle :value="width" :min="MIN_WIDTH" :max="maxWidth" @resize="(w) => (live = w)" @commit="commit" />
   <aside
-    class="flex min-h-0 shrink-0 flex-col bg-chrome"
+    class="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg"
     :style="{ width: `${width}px` }"
     data-testid="ade-panel"
   >
