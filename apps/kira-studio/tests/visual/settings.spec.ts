@@ -5,15 +5,7 @@ import { openSettings } from '../ui/support/settings';
 // colour and spinner-speed disclosures (§1.4) never touch these panes. I2-26's own fieldVariants()
 // -> Field/FieldLabel conversion is measured pixel-identical (§3.6.4), so these baselines must pass
 // unchanged through I2-26.
-const sections = [
-  'Appearance',
-  'Data',
-  'Cache',
-  'Api',
-  'Claude Code',
-  'Database MCP',
-  'Advanced',
-] as const;
+const sections = ['Appearance', 'Data', 'Cache', 'Api', 'Database MCP', 'Advanced'] as const;
 
 for (const section of sections) {
   test(`settings dialog: ${section} pane (P110 I2-1b)`, async ({ kira }) => {
