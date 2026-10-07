@@ -51,7 +51,23 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// Startup order: the askpass and memory-mcp argv shims -> config.EnsureLayout -> logging.Init/Sweep ->
+// runArgvShim runs the askpass and memory-mcp subcommands, before anything Wails-related, so they
+// never start a window. memory-mcp is Claude Code's stdio MCP server; it runs before startupfail
+// and the single-instance lock, so it works while the window is open.
+func runArgvShim(args []string) (code int, ok bool) {
+	if len(args) < 2 {
+		return 0, false
+	}
+	switch args[1] {
+	case "askpass":
+		return gitaskpass.RunHelper(args[2:], os.Environ(), os.Stdout), true
+	case "memory-mcp":
+		return memorycli.Run(args[2:]), true
+	}
+	return 0, false
+}
+
+// Startup order: the argv shims (askpass, memory-mcp) -> config.EnsureLayout -> logging.Init/Sweep ->
 // storage.Open (migrates) -> repos.New -> wireGit (starts gitsock.Server) -> terminal registry and
 // the ADE tracker (wireTracker, with the Claude Code hooks) -> wireAdeTask -> keep-awake ->
 // application.New (18 bound services plus the git stream registration) -> the menu -> the startup
@@ -59,16 +75,8 @@ var assets embed.FS
 // module. gitClientsSvc.AttachPush() wires gitsock's pairing/clients-changed feeds onto the two
 // push channels the pairing prompt and Connected-editors pane read.
 func main() {
-	// Askpass shim, before anything Wails-related runs, so it can never accidentally start a
-	// window — Kira Studio's own main.go:83, deleted there in this same phase's cleanup commit.
-	if len(os.Args) > 1 && os.Args[1] == "askpass" {
-		os.Exit(gitaskpass.RunHelper(os.Args[2:], os.Environ(), os.Stdout))
-	}
-
-	// Claude Code spawns `<this binary> memory-mcp` as a stdio MCP server: before startupfail and
-	// the single-instance lock, so it runs while the window is open.
-	if len(os.Args) > 1 && os.Args[1] == "memory-mcp" {
-		os.Exit(memorycli.Run(os.Args[2:]))
+	if code, ok := runArgvShim(os.Args); ok {
+		os.Exit(code)
 	}
 
 	reporter := startupfail.NewReporter(startupfail.Deps{
