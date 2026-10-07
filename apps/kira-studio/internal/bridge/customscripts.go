@@ -2,78 +2,43 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/quickcommands"
 )
 
-// CustomScriptsService is P85 §9.1's own bound surface over the `custom_scripts` table —
-// MaskRulesService's own per-method-args-struct shape, reaching s.Deps.Repos.CustomScripts
-// directly rather than through a dedicated Deps field: CollectionsService already establishes
-// that a service wrapping one repo needs none. Every mutation broadcasts the full list on
-// ChannelCustomScriptsChanged (Emit, not EmitTo) so a second window's Quick commands list stays
-// live (state/customScripts.ts's own onCustomScriptsChanged subscription).
+// CustomScriptsService is this app's binding-name shim over internal/quickcommands.Service (the
+// store, validation and the list-changed broadcast live there once, shared with the other app).
+// It reaches s.Deps.Repos.CustomScripts directly, so main.go needs no extra wiring.
 type CustomScriptsService struct {
 	Deps appcore.Deps
 }
 
-func (s *CustomScriptsService) List() ([]model.CustomScript, error) {
-	return ipcerr.InternalResult(s.Deps.Repos.CustomScripts.List())
-}
+type (
+	CustomScriptsCreateArgs = quickcommands.CreateArgs
+	CustomScriptsUpdateArgs = quickcommands.UpdateArgs
+	CustomScriptsRemoveArgs = quickcommands.RemoveArgs
+)
 
-// broadcastList re-lists and emits — called after every mutation below, so a caller never reads a
-// snapshot older than what it just wrote.
-func (s *CustomScriptsService) broadcastList() {
-	rows, err := s.Deps.Repos.CustomScripts.List()
-	if err != nil {
-		return
+func (s *CustomScriptsService) shared() *quickcommands.Service {
+	return &quickcommands.Service{
+		Repo: s.Deps.Repos.CustomScripts,
+		Emit: func(rows []quickcommands.CustomScript) {
+			s.Deps.Events.Emit(ChannelCustomScriptsChanged, rows)
+		},
 	}
-	s.Deps.Events.Emit(ChannelCustomScriptsChanged, rows)
 }
 
-type CustomScriptsCreateArgs struct {
-	Fields model.CustomScriptFields `json:"fields"`
+func (s *CustomScriptsService) List() ([]quickcommands.CustomScript, error) {
+	return s.shared().List()
 }
 
-func (s *CustomScriptsService) Create(args CustomScriptsCreateArgs) (model.CustomScript, error) {
-	rec, err := s.Deps.Repos.CustomScripts.Create(args.Fields)
-	if err != nil {
-		return model.CustomScript{}, writeErr(err)
-	}
-	s.broadcastList()
-	return rec, nil
+func (s *CustomScriptsService) Create(args CustomScriptsCreateArgs) (quickcommands.CustomScript, error) {
+	return s.shared().Create(args)
 }
 
-type CustomScriptsUpdateArgs struct {
-	ID     string                   `json:"id"`
-	Fields model.CustomScriptFields `json:"fields"`
-}
-
-func (s *CustomScriptsService) Update(args CustomScriptsUpdateArgs) (model.CustomScript, error) {
-	if args.ID == "" {
-		return model.CustomScript{}, ipcerr.BadRequest("id is required")
-	}
-	rec, err := s.Deps.Repos.CustomScripts.Update(args.ID, args.Fields)
-	if err != nil {
-		return model.CustomScript{}, writeErr(err)
-	}
-	s.broadcastList()
-	return rec, nil
-}
-
-type CustomScriptsRemoveArgs struct {
-	ID string `json:"id"`
+func (s *CustomScriptsService) Update(args CustomScriptsUpdateArgs) (quickcommands.CustomScript, error) {
+	return s.shared().Update(args)
 }
 
 func (s *CustomScriptsService) Remove(args CustomScriptsRemoveArgs) error {
-	if args.ID == "" {
-		return ipcerr.BadRequest("id is required")
-	}
-	// The only failure mode reaching this layer is an unknown id (sql.ErrNoRows, wrapped) —
-	// idempotent-remove semantics are the Terminal module's own confirm-first UI, not this
-	// layer's job.
-	if err := s.Deps.Repos.CustomScripts.Remove(args.ID); err != nil {
-		return writeErr(err)
-	}
-	s.broadcastList()
-	return nil
+	return s.shared().Remove(args)
 }

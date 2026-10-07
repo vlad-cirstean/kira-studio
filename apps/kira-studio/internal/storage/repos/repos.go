@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/internal/appstorage"
+	"github.com/kirathecat/kira-studio/internal/quickcommands"
 )
 
 // Repos is every storage repo that needs no cipher, constructed once at startup. SecretsRepo is
@@ -32,7 +33,7 @@ type Repos struct {
 	// below, so it belongs in this aggregate the same as every other cipher-free repo.
 	MaskRules *MaskRulesRepo
 	// CustomScripts is P85's own launch-target store (custom_scripts).
-	CustomScripts *CustomScriptsRepo
+	CustomScripts *quickcommands.Repo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -77,7 +78,7 @@ func New(db *sql.DB) (*Repos, error) {
 		ResponseHistory: &ResponseHistoryRepo{DB: db},
 		GrpcHistory:     &GrpcHistoryRepo{DB: db},
 		MaskRules:       &MaskRulesRepo{DB: db},
-		CustomScripts:   &CustomScriptsRepo{DB: db},
+		CustomScripts:   &quickcommands.Repo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll, opsInsert, opsUpdate},
 	}, nil
 }

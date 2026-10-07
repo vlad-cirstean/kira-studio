@@ -1,53 +1,55 @@
-package repos
+package quickcommands
 
 import (
 	"database/sql"
 	"fmt"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 
 	"github.com/google/uuid"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const customScriptsSelectColumns = `id, name, command, working_dir, color, collection, sort_order, created_at, updated_at`
+type rowScanner interface {
+	Scan(dest ...any) error
+}
 
-// CustomScriptsRepo reads and writes the `custom_scripts` table (P85 §8.1) — a plain shape: a
-// selectColumns const, a scan*Row(rowScanner) helper, List ordered deterministically.
-type CustomScriptsRepo struct {
+const selectColumns = `id, name, command, working_dir, color, collection, sort_order, created_at, updated_at`
+
+// Repo reads and writes the `custom_scripts` table, List ordered deterministically.
+type Repo struct {
 	DB *sql.DB
 }
 
-func scanCustomScriptRow(row rowScanner) (model.CustomScript, error) {
-	var s model.CustomScript
+func scanRow(row rowScanner) (CustomScript, error) {
+	var s CustomScript
 	if err := row.Scan(
 		&s.ID, &s.Name, &s.Command, &s.WorkingDir, &s.Color, &s.Collection, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt,
 	); err != nil {
-		return model.CustomScript{}, err
+		return CustomScript{}, err
 	}
 	return s, nil
 }
 
 // List orders by collection, sort_order, name for a stable, deterministic tiebreak.
-func (r *CustomScriptsRepo) List() ([]model.CustomScript, error) {
-	rows, err := r.DB.Query(`SELECT ` + customScriptsSelectColumns + ` FROM custom_scripts ORDER BY collection ASC, sort_order ASC, name ASC`)
-	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.CustomScript, bool, error) {
-		rec, err := scanCustomScriptRow(rows)
+func (r *Repo) List() ([]CustomScript, error) {
+	rows, err := r.DB.Query(`SELECT ` + selectColumns + ` FROM custom_scripts ORDER BY collection ASC, sort_order ASC, name ASC`)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (CustomScript, bool, error) {
+		rec, err := scanRow(rows)
 		return rec, true, err
 	})
 }
 
 // Get reads one row by id, (nil, nil) when not found.
-func (r *CustomScriptsRepo) Get(id string) (*model.CustomScript, error) {
-	rec, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*model.CustomScript, error) {
-		s, err := scanCustomScriptRow(row)
+func (r *Repo) Get(id string) (*CustomScript, error) {
+	rec, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*CustomScript, error) {
+		s, err := scanRow(row)
 		if err != nil {
 			return nil, err
 		}
 		return &s, nil
-	}, `SELECT `+customScriptsSelectColumns+` FROM custom_scripts WHERE id = ?`, id)
+	}, `SELECT `+selectColumns+` FROM custom_scripts WHERE id = ?`, id)
 	if err != nil {
-		return nil, fmt.Errorf("repos/customscripts: get %s: %w", id, err)
+		return nil, fmt.Errorf("quickcommands: get %s: %w", id, err)
 	}
 	return rec, nil
 }
@@ -55,16 +57,16 @@ func (r *CustomScriptsRepo) Get(id string) (*model.CustomScript, error) {
 // Create inserts a new row, sort_order set to one past the current max — sqlitex.NextSortOrder's
 // own append-at-the-end convention. fields is validated (and its name/command trimmed in place)
 // before the insert.
-func (r *CustomScriptsRepo) Create(fields model.CustomScriptFields) (model.CustomScript, error) {
+func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 	if err := fields.Validate(); err != nil {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: %w", err)
+		return CustomScript{}, fmt.Errorf("quickcommands: %w", err)
 	}
 	sortOrder, err := sqlitex.NextSortOrder(r.DB, "custom_scripts", "")
 	if err != nil {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: next sort order: %w", err)
+		return CustomScript{}, fmt.Errorf("quickcommands: next sort order: %w", err)
 	}
 	now := kiratime.NowISO()
-	rec := model.CustomScript{
+	rec := CustomScript{
 		ID:         uuid.NewString(),
 		Name:       fields.Name,
 		Command:    fields.Command,
@@ -80,7 +82,7 @@ func (r *CustomScriptsRepo) Create(fields model.CustomScriptFields) (model.Custo
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.Color, rec.Collection, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
 	); err != nil {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: insert: %w", err)
+		return CustomScript{}, fmt.Errorf("quickcommands: insert: %w", err)
 	}
 	return rec, nil
 }
@@ -88,9 +90,9 @@ func (r *CustomScriptsRepo) Create(fields model.CustomScriptFields) (model.Custo
 // Update writes fields onto id — name/command/workingDir/color/collection only; id, sort_order and
 // created_at are untouched. Returns a wrapped sql.ErrNoRows for an unknown id
 // (ConnectionsRepo.SetMcpEnabled's own recorded fix, applied here from the start).
-func (r *CustomScriptsRepo) Update(id string, fields model.CustomScriptFields) (model.CustomScript, error) {
+func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error) {
 	if err := fields.Validate(); err != nil {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: %w", err)
+		return CustomScript{}, fmt.Errorf("quickcommands: %w", err)
 	}
 	now := kiratime.NowISO()
 	res, err := r.DB.Exec(
@@ -98,38 +100,38 @@ func (r *CustomScriptsRepo) Update(id string, fields model.CustomScriptFields) (
 		fields.Name, fields.Command, fields.WorkingDir, fields.Color, fields.Collection, now, id,
 	)
 	if err != nil {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: update %s: %w", id, err)
+		return CustomScript{}, fmt.Errorf("quickcommands: update %s: %w", id, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: update %s: rows affected: %w", id, err)
+		return CustomScript{}, fmt.Errorf("quickcommands: update %s: rows affected: %w", id, err)
 	}
 	if n == 0 {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: update %s: %w", id, sql.ErrNoRows)
+		return CustomScript{}, fmt.Errorf("quickcommands: update %s: %w", id, sql.ErrNoRows)
 	}
 	rec, err := r.Get(id)
 	if err != nil {
-		return model.CustomScript{}, err
+		return CustomScript{}, err
 	}
 	if rec == nil {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: update %s: %w", id, sql.ErrNoRows)
+		return CustomScript{}, fmt.Errorf("quickcommands: update %s: %w", id, sql.ErrNoRows)
 	}
 	return *rec, nil
 }
 
 // Remove deletes one row by id. Returns a wrapped sql.ErrNoRows for an unknown id, the same rule
 // Update above follows.
-func (r *CustomScriptsRepo) Remove(id string) error {
+func (r *Repo) Remove(id string) error {
 	res, err := r.DB.Exec(`DELETE FROM custom_scripts WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("repos/customscripts: remove %s: %w", id, err)
+		return fmt.Errorf("quickcommands: remove %s: %w", id, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("repos/customscripts: remove %s: rows affected: %w", id, err)
+		return fmt.Errorf("quickcommands: remove %s: rows affected: %w", id, err)
 	}
 	if n == 0 {
-		return fmt.Errorf("repos/customscripts: remove %s: %w", id, sql.ErrNoRows)
+		return fmt.Errorf("quickcommands: remove %s: %w", id, sql.ErrNoRows)
 	}
 	return nil
 }
