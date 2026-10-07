@@ -186,3 +186,19 @@ func (e *engine) branch(t *testing.T, taskID, repo string) model.AdeTaskBranch {
 	}
 	return sb
 }
+
+func TestSpaceTools_startRunCreatesNoBranch(t *testing.T) {
+	e := newEngine(t, map[string][]string{"*": {"done"}})
+	e.repo("api")
+	e.workflow("id: flow\nname: Flow\nkira_space_mcp: true\nstages:\n" + agentStage("build", agentStep("first", "")))
+	id := e.task("api")
+	e.start(id)
+	e.waitRun(id, "first/api", model.AdeRunDone)
+	if sb := e.branch(t, id, "api"); sb.Name != "" {
+		t.Fatalf("StartRun created branch %q; want none", sb.Name)
+	}
+	info, err := e.board.RequestBranch(context.Background(), id, "api", "feat/mine")
+	if err != nil || info.Branch != "feat/mine" {
+		t.Fatalf("request_branch after start: %+v, %v", info, err)
+	}
+}

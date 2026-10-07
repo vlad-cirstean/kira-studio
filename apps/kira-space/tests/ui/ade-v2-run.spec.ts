@@ -89,6 +89,28 @@ test('the Run dialog shows the default message and the read-only suffix', async 
   await expect(dialog).toBeHidden();
 });
 
+test('the Run dialog asks no branch names when the workflow has Kira Space tools', async ({
+  relaunch,
+}) => {
+  const wfs = adeFixture<{ workflows: { workflow: { kiraSpaceMcp: boolean } }[] }>('workflows');
+  for (const w of wfs.workflows) if (w.workflow) w.workflow.kiraSpaceMcp = true;
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: adeBoard(alertsInImpl) },
+    { channel: IPC.adeTaskWorkflows, response: wfs },
+  ]);
+  await page.locator(cellAction('T_alerts', 'run')).click();
+  const dialog = page.locator(t('ade-run-dialog'));
+  await expect(dialog.locator(t('ade-run-message'))).toBeVisible();
+  await expect(dialog.locator(t('ade-run-branch'))).toHaveCount(0);
+  await dialog.locator(t('ade-run-send')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskStartRun)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskStartRun)[0]?.args).toEqual({
+    taskId: 'T_alerts',
+    branchNames: {},
+    message: '',
+  });
+});
+
 test('an edited message is sent and Reset restores the default', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch, boardWith(alertsInImpl));
   await page.locator(cellAction('T_alerts', 'run')).click();

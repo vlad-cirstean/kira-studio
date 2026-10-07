@@ -9,7 +9,7 @@ import AdeRepoTag from '../AdeRepoTag.vue';
 import { branchSlug, defaultRunMessage, FINISH_STEP_SUFFIX } from '../board/runMessage';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { usePlanModel } from '../plan/usePlanModel';
-import { useStartRun } from '../queries';
+import { useSpaceTools, useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { actionStyle } from '../tones';
 
@@ -29,7 +29,10 @@ const initial = computed(() =>
     ? defaultRunMessage({ title: card.value.title, jira: card.value.task.jira, stage: stage.value })
     : '',
 );
+const spaceTools = useSpaceTools(() => card.value?.task.workflowId ?? '');
 const pending = computed(() => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? []);
+// With the Kira Space tools on the agent names its branches (request_branch), so no name is asked.
+const named = computed(() => (spaceTools.value ? [] : pending.value));
 const slug = computed(() => `feat/${branchSlug(card.value?.title ?? '')}`);
 
 // Setups of the task's branches still running or failed: the runs queue behind them after Start.
@@ -64,7 +67,7 @@ async function send(): Promise<void> {
   error.value = '';
   try {
     const branchNames: Record<string, string> = {};
-    for (const r of pending.value) branchNames[r.id] = (names.value[r.id] ?? '').trim();
+    for (const r of named.value) branchNames[r.id] = (names.value[r.id] ?? '').trim();
     await start.mutateAsync({
       taskId: card.value.task.id,
       branchNames,
@@ -102,8 +105,8 @@ async function send(): Promise<void> {
         </DialogTitle>
       </DialogHeader>
       <div class="flex flex-col gap-3 px-3 py-2 text-kira-md">
-        <div v-if="pending.length" class="flex flex-col gap-1.5" data-testid="ade-run-branches">
-          <div v-for="r in pending" :key="r.id" class="flex items-center gap-2.5">
+        <div v-if="named.length" class="flex flex-col gap-1.5" data-testid="ade-run-branches">
+          <div v-for="r in named" :key="r.id" class="flex items-center gap-2.5">
             <AdeRepoTag :code-repo-id="r.branch.codeRepoId" :label="r.repo" />
             <label :for="`ade-run-branch-${r.id}`" class="whitespace-nowrap text-muted-foreground">branch</label>
             <Input

@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
-import { toValue } from 'vue';
+import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
 import type {
   AddBacklogItemArgs,
@@ -81,6 +81,16 @@ export function useWorkflows() {
     queryFn: () => control.adeTaskWorkflows(),
     staleTime: Number.POSITIVE_INFINITY,
   });
+}
+
+/** Whether the workflow turns the Kira Space tools on; the agent then names its own branches. */
+export function useSpaceTools(workflowId: MaybeRefOrGetter<string>) {
+  const workflows = useWorkflows();
+  return computed(
+    () =>
+      workflows.data.value?.workflows.find((e) => e.workflow?.id === toValue(workflowId))?.workflow
+        ?.kiraSpaceMcp ?? false,
+  );
 }
 
 /** Branches that can join the plan; refetched on every open so a just-pushed branch shows. */

@@ -5,7 +5,7 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import type { CardModel } from '../plan/usePlanModel';
-import { useSetTaskWorkflow, useWorkflows } from '../queries';
+import { useSetTaskWorkflow, useSpaceTools, useWorkflows } from '../queries';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import AdeStageBlock from './AdeStageBlock.vue';
@@ -21,9 +21,7 @@ const error = ref('');
 const valid = computed(() =>
   (workflows.data.value?.workflows ?? []).flatMap((e) => (e.workflow ? [{ file: e.fileName, wf: e.workflow }] : [])),
 );
-const spaceTools = computed(
-  () => valid.value.find((v) => v.wf.id === props.card.task.workflowId)?.wf.kiraSpaceMcp ?? false,
-);
+const spaceTools = useSpaceTools(() => props.card.task.workflowId);
 
 async function pick(value: unknown): Promise<void> {
   error.value = '';

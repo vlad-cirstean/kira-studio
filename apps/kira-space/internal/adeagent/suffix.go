@@ -11,4 +11,4 @@ const FinishStepTool = "mcp__" + ServerName + "__finish_step"
 const ServerName = "kira-ade"
 
 // SpaceSuffix goes before FinishStepSuffix when the workflow turns the Kira Space tools on.
-const SpaceSuffix = `Kira Space tools are available: task_info, declare_repos, request_branch, branch_status. Create branches and worktrees only through request_branch.`
+const SpaceSuffix = `Kira Space tools are available: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, but change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.`
