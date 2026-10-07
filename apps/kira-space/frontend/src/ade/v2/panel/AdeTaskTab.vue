@@ -114,16 +114,16 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
 
 <template>
   <div
-    class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3.5 pb-3.5 pt-3 text-kira-md"
+    class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3 pb-3 pt-3 text-kira-md"
     data-testid="ade-task-tab"
   >
-    <div class="grid grid-cols-[56px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
+    <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
       <label for="ade-task-name" class="text-kira-sm text-muted-foreground">Name</label>
       <Input
         id="ade-task-name"
         v-model="name"
         :placeholder="card.defaultTitle"
-        class="bg-field font-semibold"
+        size="kira-lg" class="font-semibold"
         data-testid="ade-task-name"
         @blur="commitName"
         @keydown.enter="commitName"
@@ -198,25 +198,25 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         </template>
         <Button
           variant="dialog"
-          size="xs"
+          size="kira"
           data-testid="ade-add-branch"
           @click="addUi.openAttach(task.id, card.title)"
         >
           + Add branch
         </Button>
       </div>
-      <button
+      <Button
         v-for="row in card.rows"
         :key="row.id"
-        type="button"
-        class="flex h-8 cursor-pointer items-center gap-2 rounded-kira border-0 bg-elevated px-1.5 text-left text-fg"
+        variant="ghost"
+        class="h-8 w-full justify-start gap-2 bg-elevated px-1.5 text-left text-fg"
         data-testid="ade-task-branch"
         :data-branch-id="row.id"
         @click="ui.selectBranch(task.id, row.id)"
       >
         <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
         <span
-          class="shrink-0 rounded-kira-xs px-[5px] py-px font-data text-kira-sm font-semibold"
+          class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-semibold"
           :style="{ background: `${repoColor(row.branch.codeRepoId)}1f`, color: repoColor(row.branch.codeRepoId) }"
           >{{ row.repo }}</span
         >
@@ -228,7 +228,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           :class="row.draft ? 'italic text-muted-foreground' : ''"
           >{{ branchLabel(row) }}</span
         >
-      </button>
+      </Button>
     </div>
   </div>
 </template>

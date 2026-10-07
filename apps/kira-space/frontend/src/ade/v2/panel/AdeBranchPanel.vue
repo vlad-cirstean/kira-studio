@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
 import { useClipboard } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { control } from '../../../bridge/control';
@@ -177,6 +179,7 @@ function deployNote(d: Deployment): string {
 <template>
   <AdePanelFrame
     v-model="ui.branchTab"
+    title="Branch"
     :tabs="[
       { value: 'details', label: 'Details' },
       { value: 'changes', label: 'Changes' },
@@ -184,17 +187,18 @@ function deployNote(d: Deployment): string {
     ]"
   >
     <template #header>
-      <button
-        type="button"
-        class="-ml-1.5 h-5 max-w-full cursor-pointer self-start truncate rounded-kira-xs border-0 bg-transparent px-1.5 text-kira-sm text-muted-foreground"
+      <Button
+        variant="ghost"
+        size="kira"
+        class="-ml-1.5 max-w-full justify-start self-start truncate text-muted-foreground"
         data-testid="ade-panel-back"
         @click="ui.select(card.task.id)"
       >
         ← {{ card.title }}
-      </button>
+      </Button>
       <div class="flex items-start gap-2">
         <span
-          class="mt-[3px] box-border size-3 shrink-0 rounded-[3px] border-2"
+          class="mt-1 box-border size-3 shrink-0 rounded-kira-xs border-2"
           :style="{ borderColor: card.review ? TONE.blue[2] : card.color }"
           data-testid="ade-panel-dot"
         />
@@ -207,51 +211,51 @@ function deployNote(d: Deployment): string {
           </span>
         </AdeTip>
         <h3
-          class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-semibold leading-[18px]"
+          class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-semibold leading-4.5"
           data-testid="ade-panel-title"
         >
           {{ row.draft ? `new branch (${row.repo})` : branch.name }}
         </h3>
       </div>
-      <div class="truncate font-data text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
+      <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
       <p v-if="setupError" class="m-0 text-kira-sm text-error" data-testid="ade-panel-setup-error">{{ setupError }}</p>
       <p v-if="ui.actionError[card.task.id]" class="m-0 text-kira-sm text-error" data-testid="ade-panel-action-error">
         {{ ui.actionError[card.task.id] }}
       </p>
-      <div v-if="canForcePush || setupFailed || actions.length" class="flex flex-wrap gap-1.5 pt-[3px]">
-        <button
+      <div v-if="canForcePush || setupFailed || actions.length" class="flex flex-wrap gap-1.5 pt-1">
+        <Button
           v-if="setupFailed"
-          type="button"
-          class="h-control-lg cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold"
+          size="kira-lg"
+          class="font-semibold"
           :style="solidStyle('amber')"
           data-testid="ade-panel-retry-setup"
           @click="onRetrySetup"
         >
           Retry setup
-        </button>
+        </Button>
         <AdeTip v-if="canForcePush" text="git push --force-with-lease">
-          <button
-            type="button"
-            class="h-control-lg cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold"
+          <Button
+            size="kira-lg"
+            class="font-semibold"
             :style="solidStyle('amber')"
             data-testid="ade-panel-force-push"
             @click="forcePush = true"
           >
             Force push
-          </button>
+          </Button>
         </AdeTip>
-        <button
+        <Button
           v-for="a in actions"
           :key="a.kind + a.label"
-          type="button"
-          class="h-control-lg cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold disabled:cursor-default disabled:opacity-60"
+          size="kira-lg"
+          class="font-semibold"
           :style="actionTone(a)"
           :disabled="a.kind === 'created' || rebasing(a)"
           :data-testid="`ade-panel-action-${a.kind}`"
           @click="run(a)"
         >
           {{ rebasing(a) ? 'Rebasing…' : a.label }}
-        </button>
+        </Button>
       </div>
     </template>
 
@@ -260,7 +264,7 @@ function deployNote(d: Deployment): string {
       class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3.5 pb-3.5 pt-3 text-kira-md"
       data-testid="ade-branch-details"
     >
-      <div class="grid grid-cols-[70px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
+      <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
         <span class="text-kira-sm text-muted-foreground">Branch</span>
         <div class="flex h-7 min-w-0 items-center gap-2">
           <AdeChip :label="chipLabel" :tone="row.tag.tone" wide />
@@ -268,21 +272,18 @@ function deployNote(d: Deployment): string {
             <a
               v-if="branchUrl"
               :href="branchUrl"
-              class="min-w-0 max-w-[55%] truncate font-data text-kira-md text-info"
+              class="min-w-0 max-w-1/2 truncate font-data text-kira-md text-info"
               @click="(e) => open(branchUrl, e)"
               >{{ branch.name }}</a
             >
             <span v-else class="min-w-0 truncate font-data text-kira-md">{{ branch.name }}</span>
             <span class="flex-1" />
-            <button
-              type="button"
-              class="size-control shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-muted-foreground"
-              aria-label="Copy Branch link"
-              title="Copy link"
+            <TooltipIconButton
+              :icon="copied && copiedKey === 'branch' ? 'check' : 'copy'"
+              label="Copy Branch link"
+              class="shrink-0"
               @click="copyLink('branch', branchUrl || branch.name)"
-            >
-              {{ copied && copiedKey === 'branch' ? '✓' : '⧉' }}
-            </button>
+            />
           </template>
         </div>
         <span class="text-kira-sm text-muted-foreground">PR</span>
@@ -291,20 +292,17 @@ function deployNote(d: Deployment): string {
           <template v-if="pr">
             <a
               :href="pr.url"
-              class="max-w-[55%] shrink-0 truncate font-data text-kira-md text-info"
+              class="max-w-1/2 shrink-0 truncate font-data text-kira-md text-info"
               @click="(e) => open(pr!.url, e)"
               >#{{ pr.number }}</a
             >
             <span class="min-w-0 flex-1 truncate text-kira-md">{{ pr.title }}</span>
-            <button
-              type="button"
-              class="size-control shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-muted-foreground"
-              aria-label="Copy PR link"
-              title="Copy link"
+            <TooltipIconButton
+              :icon="copied && copiedKey === 'pr' ? 'check' : 'copy'"
+              label="Copy PR link"
+              class="shrink-0"
               @click="copyLink('pr', pr.url)"
-            >
-              {{ copied && copiedKey === 'pr' ? '✓' : '⧉' }}
-            </button>
+            />
           </template>
         </div>
       </div>
@@ -323,17 +321,17 @@ function deployNote(d: Deployment): string {
           <AdeChip :label="i.status" :tone="INTO_TONE[i.status]" wide />
           <span class="font-data text-kira-md">{{ i.target }}</span>
           <span class="min-w-0 flex-1 truncate text-kira-sm text-muted-foreground">{{ intoNote(i) }}</span>
-          <button
+          <Button
             v-if="canMerge && i.status !== 'merged'"
-            type="button"
-            class="h-control shrink-0 cursor-pointer rounded-kira-sm border-0 px-2 text-kira-sm font-semibold"
+            size="kira"
+            class="shrink-0 font-semibold"
             :style="actionStyle(i.status === 'stale' ? 'amber' : 'claude')"
             :disabled="dialogs.pending.has(`merge:${branch.id}:${i.target}`)"
             data-testid="ade-branch-merge"
             @click="dialogs.merge(branch.id, i.target)"
           >
             {{ i.status === 'stale' ? 'Re-merge' : 'Merge' }}
-          </button>
+          </Button>
         </div>
         <div v-if="intoRows.length === 0" class="text-kira-md text-subtle">
           This repo has no integration branches besides main.

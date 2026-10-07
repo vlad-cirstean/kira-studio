@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { useClipboard } from '@vueuse/core';
@@ -45,33 +46,27 @@ function openLink(e: MouseEvent): void {
         <a
           v-if="url"
           :href="url"
-          class="shrink-0 font-data text-kira-md text-info"
+          class="shrink-0 text-kira-md text-info"
           :data-testid="`${id}-link`"
           @click="openLink"
           >{{ text }}</a
         >
-        <span v-else class="shrink-0 font-data text-kira-md" :data-testid="`${id}-link`">{{ text }}</span>
+        <span v-else class="shrink-0 text-kira-md" :data-testid="`${id}-link`">{{ text }}</span>
         <span class="min-w-0 flex-1" />
-        <button
-          type="button"
-          class="size-control shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-kira-md text-muted-foreground"
-          :aria-label="`Copy ${label} link`"
-          title="Copy link"
+        <TooltipIconButton
+          :icon="copied ? 'check' : 'copy'"
+          :label="`Copy ${label} link`"
+          class="shrink-0"
           :data-testid="`${id}-copy`"
           @click="copy(url || text)"
-        >
-          {{ copied ? '✓' : '⧉' }}
-        </button>
-        <button
-          type="button"
-          class="size-control shrink-0 cursor-pointer rounded-kira-xs border-0 bg-transparent text-kira-md text-muted-foreground"
-          :aria-label="`Remove ${label} link`"
-          title="Remove"
+        />
+        <TooltipIconButton
+          icon="close"
+          :label="`Remove ${label} link`"
+          class="shrink-0"
           :data-testid="`${id}-clear`"
           @click="emit('clear')"
-        >
-          ✕
-        </button>
+        />
       </template>
       <template v-else>
         <label :for="id" class="sr-only">{{ label }} link</label>
@@ -79,13 +74,14 @@ function openLink(e: MouseEvent): void {
           :id="id"
           v-model="draft"
           :placeholder="placeholder"
+          size="kira-lg"
           class="min-w-0 flex-1 border-dashed font-data"
           :data-testid="`${id}-input`"
           @keydown.enter="onSave"
         />
         <Button
           variant="dialog"
-          size="xs"
+          size="kira-lg"
           class="shrink-0"
           :data-testid="`${id}-save`"
           @click="onSave"

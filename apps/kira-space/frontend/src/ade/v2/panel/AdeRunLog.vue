@@ -32,7 +32,7 @@ watch(
 <template>
   <div
     ref="el"
-    class="overflow-auto rounded-kira border border-border bg-bg px-2.5 py-2 font-data text-kira-sm leading-[1.55]"
+    class="overflow-auto rounded-kira border border-border bg-bg px-2.5 py-2 font-data text-kira-sm leading-relaxed"
     :style="{ maxHeight: maxHeight ?? '240px' }"
     data-testid="ade-run-log"
     :data-log-id="id"

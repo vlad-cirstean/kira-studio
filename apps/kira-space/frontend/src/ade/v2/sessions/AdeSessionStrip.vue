@@ -24,7 +24,7 @@ const emit = defineEmits<{ pick: [id: string] }>();
     >
       <AdeActivityIcon :kind="v.kind" />
       <span
-        class="rounded-[3px] px-1 text-kira-sm font-bold"
+        class="rounded-kira-xs px-1 text-kira-sm font-bold"
         :class="v.headless ? 'border border-dashed border-border-strong text-muted-foreground' : ''"
         :style="v.headless ? undefined : actionStyle('claude')"
         data-testid="ade-session-badge"

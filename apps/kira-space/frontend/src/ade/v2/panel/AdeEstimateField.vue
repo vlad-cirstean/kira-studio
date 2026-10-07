@@ -62,7 +62,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
 <template>
   <div class="flex flex-col gap-0.5">
     <div v-if="locked" class="flex h-7 items-center gap-1.5">
-      <span class="font-data text-kira-md text-fg" data-testid="ade-estimate-total">{{ est }}</span>
+      <span class="text-kira-md text-fg" data-testid="ade-estimate-total">{{ est }}</span>
       <label for="ade-estimate-extend" class="sr-only">Extend estimate</label>
       <Input
         id="ade-estimate-extend"
@@ -70,14 +70,14 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         type="number"
         min="0.5"
         step="0.5"
-        class="w-14 font-data"
+        size="kira-lg"
+        class="w-14"
         data-testid="ade-estimate-extend"
       />
       <span class="text-kira-sm text-muted-foreground">{{ parsed.unit === 'd' ? 'days' : 'hours' }}</span>
       <Button
-        type="button"
         variant="dialog"
-        size="xs"
+        size="kira-lg"
         :disabled="!canExtend"
         data-testid="ade-estimate-extend-submit"
         @click="extend"
@@ -94,35 +94,34 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
         type="number"
         min="0"
         step="0.5"
-        class="w-14 font-data"
+        size="kira-lg"
+        class="w-14"
         data-testid="ade-estimate-num"
         @change="commit"
       />
       <fieldset
         aria-label="Estimate unit"
-        class="m-0 flex gap-0.5 rounded-kira-sm border border-border-strong bg-elevated p-0.5"
+        class="m-0 flex gap-0.5 border-0 p-0"
       >
         <!-- mousedown.prevent: a click would otherwise blur the number input first and commit with the stale unit. -->
-        <button
-          type="button"
-          class="rounded px-2 py-0.5 text-kira-sm"
-          :class="unit === 'h' ? 'bg-field text-fg' : 'text-muted-foreground'"
+        <Button
+          :variant="unit === 'h' ? 'dialog' : 'ghost'"
+          size="kira-lg"
           :aria-pressed="unit === 'h'"
           @mousedown.prevent
           @click="pickUnit('h')"
         >
           hours
-        </button>
-        <button
-          type="button"
-          class="rounded px-2 py-0.5 text-kira-sm"
-          :class="unit === 'd' ? 'bg-field text-fg' : 'text-muted-foreground'"
+        </Button>
+        <Button
+          :variant="unit === 'd' ? 'dialog' : 'ghost'"
+          size="kira-lg"
           :aria-pressed="unit === 'd'"
           @mousedown.prevent
           @click="pickUnit('d')"
         >
           days
-        </button>
+        </Button>
       </fieldset>
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>

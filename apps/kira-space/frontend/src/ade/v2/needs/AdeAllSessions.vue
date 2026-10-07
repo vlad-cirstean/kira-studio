@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import { ACTIVITY_LABEL, ACTIVITY_RANK, type ActivityKind } from '../activity';
@@ -63,30 +64,28 @@ const summary = computed(() => {
     .map((k) => ({ kind: k, text: `${counts.get(k)} ${ACTIVITY_LABEL[k]}` }));
 });
 
-const segment = (on: boolean): string =>
-  `h-7 cursor-pointer rounded-kira border-0 px-3 text-kira-md ${on ? 'bg-field font-semibold text-fg' : 'bg-transparent text-muted-foreground'}`;
 </script>
 
 <template>
-  <div class="flex max-w-[1080px] flex-col gap-[18px]" data-testid="ade-all-sessions">
+  <div class="flex flex-col gap-4 p-3" data-testid="ade-all-sessions">
     <div class="flex items-center gap-3.5">
-      <div class="flex rounded-kira border border-border bg-elevated p-[3px]">
-        <button type="button" :class="segment(filter === 'running')" data-testid="ade-all-running" @click="filter = 'running'">
+      <div class="flex gap-1">
+        <Button :variant="filter === 'running' ? 'dialog' : 'ghost'" size="kira-lg" data-testid="ade-all-running" @click="filter = 'running'">
           Running {{ running }}
-        </button>
-        <button type="button" :class="segment(filter === 'stopped')" data-testid="ade-all-stopped" @click="filter = 'stopped'">
+        </Button>
+        <Button :variant="filter === 'stopped' ? 'dialog' : 'ghost'" size="kira-lg" data-testid="ade-all-stopped" @click="filter = 'stopped'">
           Stopped {{ stopped }}
-        </button>
+        </Button>
       </div>
       <div class="flex gap-3">
-        <span v-for="a in summary" :key="a.kind" class="inline-flex items-center gap-[5px] text-kira-md">
+        <span v-for="a in summary" :key="a.kind" class="inline-flex items-center gap-1.25 text-kira-md">
           <AdeActivityIcon :kind="a.kind" />{{ a.text }}
         </span>
       </div>
     </div>
     <section v-for="g in groups" :key="g.taskId" class="flex flex-col gap-0.5" data-testid="ade-all-group">
       <div class="mb-1 flex items-center gap-2 border-b border-border px-3 pb-1.5">
-        <span class="size-2.5 shrink-0 rounded-[3px]" :style="{ background: g.color }" />
+        <span class="size-2.5 shrink-0 rounded-kira-xs" :style="{ background: g.color }" />
         <h3 class="m-0 truncate text-kira-lg font-semibold">{{ g.title }}</h3>
       </div>
       <AdeAllSessionRow v-for="r in g.rows" :key="r.session.id" :view="r" :archived="g.archived" />

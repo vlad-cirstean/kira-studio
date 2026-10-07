@@ -9,7 +9,7 @@ defineProps<{ views: SessionView[]; archived?: boolean }>();
 <template>
   <div
     v-if="views.length"
-    class="flex max-h-[150px] shrink-0 flex-col gap-1 overflow-auto border-t border-border bg-elevated px-3 pb-2.5 pt-2"
+    class="flex max-h-37.5 shrink-0 flex-col gap-1 overflow-auto border-t border-border bg-elevated px-3 pb-2.5 pt-2"
     data-testid="ade-stopped-list"
   >
     <div class="text-kira-sm text-muted-foreground">Finished / stopped</div>

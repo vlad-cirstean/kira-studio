@@ -29,7 +29,7 @@ function taskOf(taskId: string): { title: string; color: string } {
         >
       </template>
     </PanelHeader>
-    <div class="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto p-3">
+    <div class="flex min-h-0 flex-1 flex-col overflow-auto">
       <template v-if="needs">
         <AdeNeedsRow
           v-for="n in needs.items"
@@ -38,12 +38,12 @@ function taskOf(taskId: string): { title: string; color: string } {
           :task-title="taskOf(n.taskId).title"
           :task-color="taskOf(n.taskId).color"
         />
-        <div v-if="needs.empty" class="px-3 py-6 text-kira-lg" :style="{ color: TONE.green[1] }" data-testid="ade-needs-empty">
+        <div v-if="needs.empty" class="border-b border-border px-3 py-6 text-kira-lg" :style="{ color: TONE.green[1] }" data-testid="ade-needs-empty">
           Nothing needs you right now.
         </div>
-        <div class="flex items-center gap-2.5 border-t border-border px-3 py-2.5 text-kira-md text-muted-foreground">
+        <div class="flex items-center gap-2.5 border-b border-border px-3 py-2 text-kira-md text-muted-foreground">
           <span class="flex-1" data-testid="ade-needs-footer">{{ needs.footer }}</span>
-          <Button variant="dialog" size="xs" class="px-2.5" data-testid="ade-needs-all" @click="showAll = !showAll">
+          <Button variant="dialog" size="kira-lg" data-testid="ade-needs-all" @click="showAll = !showAll">
             {{ showAll ? 'Hide all sessions' : 'All sessions' }}
           </Button>
         </div>

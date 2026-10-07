@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { useTimeAgo } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
@@ -46,17 +47,14 @@ function commit(): void {
   }
   if (text !== props.item.text) emit('edit', text);
 }
-
-const ICON_BTN =
-  'size-6 shrink-0 cursor-pointer rounded-kira-sm border border-border-strong bg-transparent p-0 text-kira-md text-fg';
 </script>
 
 <template>
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds inputs and buttons a button cannot. -->
   <div
-    class="box-border flex min-h-10 cursor-pointer items-center gap-2 rounded-kira-lg border px-2 py-1"
-    :class="selected ? 'bg-elevated' : 'border-border bg-chrome'"
-    :style="selected ? { borderColor: TONE.amber[2] } : undefined"
+    class="box-border flex min-h-9 cursor-pointer items-center gap-2 border-b border-border border-l-3 px-3 py-1"
+    :class="selected ? 'bg-select' : 'border-l-transparent hover:bg-hover'"
+    :style="selected ? { borderLeftColor: TONE.amber[2] } : undefined"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"
@@ -67,48 +65,49 @@ const ICON_BTN =
     @keydown.self.space.prevent="emit('pick')"
   >
     <AdeTip text="Higher priority">
-      <button
-        type="button"
-        :class="ICON_BTN"
+      <Button
+        variant="toolbar"
+        size="kira-icon"
         aria-label="Move up"
         data-testid="ade-backlog-up"
         @click.stop="emit('move', -1)"
       >
         ↑
-      </button>
+      </Button>
     </AdeTip>
     <AdeTip text="Lower priority">
-      <button
-        type="button"
-        :class="ICON_BTN"
+      <Button
+        variant="toolbar"
+        size="kira-icon"
         aria-label="Move down"
         data-testid="ade-backlog-down"
         @click.stop="emit('move', 1)"
       >
         ↓
-      </button>
+      </Button>
     </AdeTip>
     <AdeTip text="Turn into a task (lands in Later on the plan)">
-      <button
-        type="button"
-        class="h-6 shrink-0 cursor-pointer rounded-kira-sm border-0 px-[9px] text-kira-sm font-semibold"
+      <Button
+        size="kira"
+        class="shrink-0 font-semibold"
         :style="solidStyle('amber')"
         data-testid="ade-backlog-promote"
         @click.stop="emit('promote')"
       >
         → Task
-      </button>
+      </Button>
     </AdeTip>
     <AdeTip text="Delete">
-      <button
-        type="button"
-        :class="[ICON_BTN, 'text-error']"
+      <Button
+        variant="toolbar"
+        size="kira-icon"
+        class="text-error"
         aria-label="Delete"
         data-testid="ade-backlog-delete"
         @click.stop="emit('remove')"
       >
         ✕
-      </button>
+      </Button>
     </AdeTip>
     <span class="w-16 shrink-0 text-kira-sm text-subtle" data-testid="ade-backlog-ago">{{ ago }}</span>
     <label :for="`ade-backlog-${item.id}`" class="sr-only">Backlog item</label>
@@ -120,6 +119,6 @@ const ICON_BTN =
       @blur="commit"
       @keydown.enter="commit"
     />
-    <span v-if="facts" class="max-w-[40%] shrink-0 truncate font-data text-kira-sm text-subtle" data-testid="ade-backlog-facts">{{ facts }}</span>
+    <span v-if="facts" class="max-w-2/5 shrink-0 truncate text-kira-sm text-subtle" data-testid="ade-backlog-facts">{{ facts }}</span>
   </div>
 </template>

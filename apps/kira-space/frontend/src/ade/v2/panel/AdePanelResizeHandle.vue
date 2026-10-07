@@ -85,6 +85,6 @@ function onKeydown(e: KeyboardEvent): void {
     data-testid="ade-panel-resize-handle"
     @keydown="onKeydown"
   >
-    <span class="h-7 w-0.5 rounded-[1px] bg-border-strong" />
+    <span class="h-7 w-0.5 rounded-kira-xs bg-border-strong" />
   </div>
 </template>

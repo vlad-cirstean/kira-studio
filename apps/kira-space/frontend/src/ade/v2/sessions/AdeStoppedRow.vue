@@ -16,29 +16,30 @@ const open = ref(false);
 
 <template>
   <div class="flex items-center gap-2 text-kira-md" data-testid="ade-stopped-row" :data-session-id="view.session.id">
-    <span class="size-1.5 shrink-0 rounded-[1px] bg-disabled" />
+    <span class="size-1.5 shrink-0 rounded-kira-xs bg-disabled" />
     <span class="w-16 shrink-0 text-kira-sm text-muted-foreground">{{ ago }}</span>
     <Button
       v-if="!archived"
       variant="dialog"
-      size="xs"
-      class="shrink-0 px-2"
+      size="kira"
+      class="shrink-0"
       :disabled="takeOver.pending.has(view.session.id)"
       data-testid="ade-stopped-takeover"
       @click="takeOver.request(view.session.id)"
     >
       Take over
     </Button>
-    <button
+    <Button
       v-if="view.headless && view.session.runId"
-      type="button"
-      class="min-w-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left font-data text-kira-sm text-fg underline decoration-dotted"
+      variant="ghost"
+      size="kira"
+      class="min-w-0 justify-start truncate px-1 text-kira-sm text-fg underline decoration-dotted"
       data-testid="ade-stopped-log-toggle"
       @click="open = !open"
     >
       {{ view.stoppedLabel }}
-    </button>
-    <span v-else class="min-w-0 truncate font-data text-kira-sm">{{ view.stoppedLabel }}</span>
+    </Button>
+    <span v-else class="min-w-0 truncate text-kira-sm">{{ view.stoppedLabel }}</span>
   </div>
   <AdeRunLog v-if="open" kind="run" :id="view.session.runId" max-height="140px" />
 </template>

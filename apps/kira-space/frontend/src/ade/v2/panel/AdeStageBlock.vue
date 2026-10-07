@@ -168,7 +168,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
     >
       <div class="flex min-h-control items-center gap-2">
         <span
-          class="box-border flex size-4 shrink-0 items-center justify-center rounded-[4px] text-kira-sm font-extrabold"
+          class="box-border flex size-4 shrink-0 items-center justify-center rounded-kira-sm text-kira-sm font-extrabold"
           :style="boxStyleOf(sv.step.state)"
           >{{ STEP_GLYPH[sv.step.state] }}</span
         >
@@ -177,15 +177,15 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         }}</span>
         <Button
           v-if="sv.step.approval"
-          size="xs"
-          class="shrink-0 rounded-kira-xs px-2 font-semibold"
+          size="kira"
+          class="shrink-0 font-semibold"
           :style="solidStyle('amber')"
           data-testid="ade-step-approve"
           @click="onApprove(sv.step.id)"
         >
           Approve
         </Button>
-        <span class="shrink-0 font-data text-kira-sm text-subtle">{{ sv.step.n }}.</span>
+        <span class="shrink-0 text-kira-sm text-subtle">{{ sv.step.n }}.</span>
         <span
           class="min-w-0 flex-1 truncate text-kira-md font-semibold"
           :class="sv.step.state === 'done' ? 'text-subtle' : 'text-fg'"
@@ -204,18 +204,18 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         </AdeTip>
       </div>
       <template v-for="rl in sv.runs" :key="rl.run.branchId">
-        <div class="flex min-h-control items-center gap-[7px] pl-6" data-testid="ade-run-line" :data-branch-id="rl.run.branchId">
+        <div class="flex min-h-control items-center gap-1.75 pl-6" data-testid="ade-run-line" :data-branch-id="rl.run.branchId">
           <span class="w-3.5 shrink-0 text-center text-kira-sm font-extrabold" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-glyph">{{ rl.glyph }}</span>
           <AdeRepoTag
             :code-repo-id="card.rows.find((r) => r.id === rl.run.branchId)?.branch.codeRepoId ?? ''"
             :label="card.rows.find((r) => r.id === rl.run.branchId)?.repo ?? ''"
           />
-          <span class="w-16 shrink-0 whitespace-nowrap font-data text-kira-sm" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-status">{{ rl.status }}</span>
+          <span class="w-16 shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-status">{{ rl.status }}</span>
           <Button
             v-if="rl.hasLog"
             variant="dialog"
-            size="xs"
-            class="shrink-0 rounded-kira-xs px-[7px]"
+            size="kira"
+            class="shrink-0"
             data-testid="ade-run-log-toggle"
             @click="openLog = openLog === rl.run.runId ? null : rl.run.runId"
           >
@@ -223,8 +223,8 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           </Button>
           <Button
             v-if="canTakeOver(rl.run)"
-            size="xs"
-            class="shrink-0 rounded-kira-xs px-[7px] font-semibold"
+            size="kira"
+            class="shrink-0 font-semibold"
             :style="actionStyle('claude')"
             :disabled="takeOver.pending.has(rl.run.sessionId)"
             data-testid="ade-run-takeover"
@@ -234,8 +234,8 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           </Button>
           <Button
             v-if="rl.canRetry"
-            size="xs"
-            class="shrink-0 rounded-kira-xs px-[7px] font-semibold"
+            size="kira"
+            class="shrink-0 font-semibold"
             :style="solidStyle('red')"
             data-testid="ade-run-retry"
             @click="onRetry(rl.run.runId)"
@@ -259,16 +259,17 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       </template>
     </div>
 
-    <button
+    <Button
       v-for="row in released"
       :key="row.id"
-      type="button"
-      class="flex h-7 cursor-pointer items-center gap-2 rounded-kira-sm border-0 bg-bg px-1.5 text-left text-fg"
+      variant="ghost"
+      size="kira-lg"
+      class="w-full justify-start gap-2 rounded-kira-sm bg-bg px-1.5 text-left text-fg"
       data-testid="ade-release-row"
       :data-branch-id="row.id"
       @click="ui.selectBranch(card.task.id, row.id)"
     >
-      <span class="shrink-0 rounded-kira-sm px-[7px] py-px text-kira-sm font-semibold" :style="tagStyle(row.branch.mergedIntoMain ? 'purple' : 'grey')">{{
+      <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-semibold" :style="tagStyle(row.branch.mergedIntoMain ? 'purple' : 'grey')">{{
         row.branch.mergedIntoMain ? 'main ✓' : 'main —'
       }}</span>
       <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
@@ -276,7 +277,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       </AdeTip>
       <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
       <span class="min-w-0 truncate font-data text-kira-md">{{ row.name }}</span>
-    </button>
+    </Button>
     <div
       v-for="row in reviewRows"
       :key="`review-${row.id}`"
@@ -289,8 +290,8 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       <AdeTip :text="row.branch.name === '' ? 'Create the branch first' : 'Open the review window'">
         <Button
           variant="dialog"
-          size="xs"
-          class="shrink-0 rounded-kira-xs px-[7px]"
+          size="kira"
+          class="shrink-0"
           :disabled="row.branch.name === ''"
           data-testid="ade-review-code"
           @click="onReview(row.id)"

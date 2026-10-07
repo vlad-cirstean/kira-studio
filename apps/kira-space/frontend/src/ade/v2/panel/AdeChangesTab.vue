@@ -38,10 +38,10 @@ function fileDelta(f: FileChange): string {
 
 <template>
   <div
-    class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3.5 pb-3.5 pt-2.5 text-kira-md"
+    class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3 pb-3 pt-2.5 text-kira-md"
     data-testid="ade-changes-tab"
   >
-    <div class="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1.5">
+    <div class="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1.5">
       <span class="text-muted-foreground">Base</span>
       <span class="font-data text-kira-sm">{{ base }} · ↑{{ branch.ahead }} ↓{{ branch.behind }}</span>
       <span class="text-muted-foreground">Worktree</span>
@@ -78,7 +78,7 @@ function fileDelta(f: FileChange): string {
       </div>
     </div>
 
-    <div class="flex flex-col gap-[3px]">
+    <div class="flex flex-col gap-0.5">
       <div class="text-muted-foreground">Commits</div>
       <div
         v-for="c in branch.commits"
@@ -99,7 +99,7 @@ function fileDelta(f: FileChange): string {
       <div
         v-for="f in branch.files"
         :key="f.path"
-        class="flex justify-between gap-2 rounded px-1.5 py-0.5 font-data text-kira-sm"
+        class="flex justify-between gap-2 rounded-kira-xs px-1.5 py-0.5 font-data text-kira-sm"
         :class="branch.conflictsIfRebased.includes(f.path) ? '' : 'text-fg'"
         :style="
           branch.conflictsIfRebased.includes(f.path) ? { background: TONE.red[0], color: TONE.red[1] } : undefined

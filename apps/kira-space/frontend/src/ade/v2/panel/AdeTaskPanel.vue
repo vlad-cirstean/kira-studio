@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
@@ -15,7 +16,7 @@ import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
-import { solidStyle, TONE } from '../tones';
+import { TONE } from '../tones';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeTaskTab from './AdeTaskTab.vue';
 
@@ -73,16 +74,38 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
 <template>
   <AdePanelFrame
     v-model="ui.taskTab"
+    title="Task"
     :tabs="[
       { value: 'task', label: 'Task' },
       { value: 'notes', label: 'Notes' },
       { value: 'sessions', label: `Sessions ${sessionCount}` },
     ]"
   >
+    <template #actions>
+      <AdeTaskActionButton :card="card" />
+      <AdeTip v-if="quietArchive" :text="ARCHIVE_TIP">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          :disabled="dialogs.pending.has(`archive:${card.task.id}`)"
+          data-testid="ade-panel-archive"
+          @click="dialogs.archive(card.task.id)"
+        >
+          Archive
+        </Button>
+      </AdeTip>
+      <TooltipIconButton
+        icon="ellipsis"
+        label="More actions"
+        class="shrink-0"
+        data-testid="ade-panel-more"
+        @click="openMore"
+      />
+    </template>
     <template #header>
       <div class="flex items-start gap-2">
         <span
-          class="mt-[3px] box-border size-3 shrink-0 rounded-[3px]"
+          class="mt-1 box-border size-3 shrink-0 rounded-kira-xs"
           :class="card.parked ? 'border-2 border-dashed' : ''"
           :style="card.parked ? { borderColor: card.color } : { background: card.color }"
           data-testid="ade-panel-dot"
@@ -90,40 +113,20 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         <AdeChip :label="label" :tone="tone" />
         <AdeTip :text="card.title">
           <h3
-            class="m-0 line-clamp-2 min-w-0 flex-1 break-words text-kira-lg font-bold leading-[18px]"
+            class="m-0 line-clamp-2 min-w-0 flex-1 break-words text-kira-lg font-bold leading-4.5"
             data-testid="ade-panel-title"
           >
             {{ card.title }}
           </h3>
         </AdeTip>
-        <AdeTaskActionButton :card="card" />
-        <AdeTip v-if="quietArchive" :text="ARCHIVE_TIP">
-          <button
-            type="button"
-            class="h-control shrink-0 cursor-pointer rounded-kira-sm border-0 px-[9px] text-kira-sm font-semibold"
-            :style="solidStyle('grey')"
-            :disabled="dialogs.pending.has(`archive:${card.task.id}`)"
-            data-testid="ade-panel-archive"
-            @click="dialogs.archive(card.task.id)"
-          >
-            Archive
-          </button>
-        </AdeTip>
-        <TooltipIconButton
-          icon="ellipsis"
-          label="More actions"
-          class="shrink-0"
-          data-testid="ade-panel-more"
-          @click="openMore"
-        />
       </div>
-      <div class="truncate font-data text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
+      <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
       <p v-if="ui.actionError[card.task.id]" class="m-0 text-kira-sm text-error" data-testid="ade-panel-action-error">
         {{ ui.actionError[card.task.id] }}
       </p>
       <div
         v-if="card.review"
-        class="mt-0.5 flex items-center gap-2 rounded-kira px-2.5 py-[7px] text-kira-md"
+        class="flex items-center gap-2 rounded-kira px-2.5 py-1.5 text-kira-md"
         :style="{ background: TONE.blue[0], color: TONE.blue[1] }"
         data-testid="ade-panel-review-note"
       >
@@ -132,7 +135,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
     </template>
     <AdeTaskTab v-if="ui.taskTab === 'task'" :card="card" />
     <AdeSessionsTab v-else-if="ui.taskTab === 'sessions'" :task-id="card.task.id" />
-    <div v-else class="flex min-h-0 flex-1 flex-col px-3.5 pb-3.5 pt-3" data-testid="ade-notes-tab">
+    <div v-else class="flex min-h-0 flex-1 flex-col p-3" data-testid="ade-notes-tab">
       <AdeNotesEditor :notes="card.task.notes" :item-id="card.task.id" @save="saveNotes" />
       <p v-if="notesError" class="pt-1 text-kira-sm text-error" data-testid="ade-notes-error">{{ notesError }}</p>
     </div>

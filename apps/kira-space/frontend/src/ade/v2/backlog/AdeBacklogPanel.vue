@@ -2,6 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { useTimeAgo } from '@vueuse/core';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import { adeAgoOptions } from '../ago';
@@ -61,7 +62,8 @@ function saveNotes(_id: string, value: string): void {
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col" data-testid="ade-backlog-panel">
-    <header class="flex shrink-0 flex-col gap-1.5 border-b border-border px-3.5 pb-2.5 pt-3">
+    <PanelHeader>Backlog item</PanelHeader>
+    <header class="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2">
       <div class="flex items-center gap-2">
         <AdeChip label="backlog · not planned" tone="grey" />
         <h3 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-bold" data-testid="ade-backlog-title">{{ item.text }}</h3>
@@ -69,8 +71,8 @@ function saveNotes(_id: string, value: string): void {
       <div class="text-kira-sm text-muted-foreground">captured {{ ago }}</div>
       <div class="flex gap-2">
         <Button
-          size="xs"
-          class="border-0 px-2.5 font-semibold"
+          size="kira-lg"
+          class="font-semibold"
           :style="solidStyle('amber')"
           title="Turn into a task in the Spec phase, unscheduled (Later)"
           data-testid="ade-backlog-panel-promote"
@@ -80,8 +82,7 @@ function saveNotes(_id: string, value: string): void {
         </Button>
         <Button
           variant="dialog"
-          size="xs"
-          class="px-2.5"
+          size="kira-lg"
           data-testid="ade-backlog-panel-delete"
           @click="emit('remove')"
         >
@@ -89,7 +90,7 @@ function saveNotes(_id: string, value: string): void {
         </Button>
       </div>
     </header>
-    <div class="grid shrink-0 grid-cols-[56px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3.5 py-3 text-kira-md">
+    <div class="grid shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-3 text-kira-md">
       <label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">Title</label>
       <Input
         id="ade-backlog-title-input"
@@ -123,7 +124,7 @@ function saveNotes(_id: string, value: string): void {
       />
       <span v-if="error" class="col-span-2 text-kira-sm text-error" data-testid="ade-backlog-error">{{ error }}</span>
     </div>
-    <div class="flex min-h-0 flex-1 flex-col px-3.5 pb-3.5">
+    <div class="flex min-h-0 flex-1 flex-col px-3 pb-3">
       <AdeNotesEditor :notes="item.notes" :item-id="item.id" @save="saveNotes" />
     </div>
   </div>

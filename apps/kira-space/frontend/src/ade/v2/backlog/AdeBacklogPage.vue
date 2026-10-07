@@ -81,18 +81,20 @@ function onEdit(id: string, value: string): void {
   <div class="flex min-h-0 min-w-0 flex-1 gap-0.5" data-testid="ade-backlog">
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg">
       <PanelHeader>Backlog</PanelHeader>
-      <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto p-3">
-      <span class="text-kira-md text-muted-foreground">Get it out of your head. Order it later: top is most important. Not on the plan yet.</span>
+      <div class="flex shrink-0 flex-col gap-2 border-b border-border p-3">
+        <span class="text-kira-md text-muted-foreground">Get it out of your head. Order it later: top is most important. Not on the plan yet.</span>
       <label for="ade-backlog-add" class="sr-only">Add to backlog</label>
       <Input
         id="ade-backlog-add"
         v-model="text"
         placeholder="Type a thought and press Enter"
-        class="rounded-kira-lg bg-field px-3"
+        size="kira-lg"
         data-testid="ade-backlog-add"
         @keydown.enter="capture"
       />
       <span v-if="error" class="text-kira-sm text-error" data-testid="ade-backlog-page-error">{{ error }}</span>
+      </div>
+      <div class="flex min-h-0 flex-1 flex-col overflow-auto">
       <AdeBacklogRow
         v-for="(item, i) in items"
         :key="item.id"

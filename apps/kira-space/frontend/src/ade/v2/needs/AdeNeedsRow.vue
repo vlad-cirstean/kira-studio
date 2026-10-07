@@ -28,21 +28,21 @@ const rowBackground = computed(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-1" data-testid="ade-needs-item" :data-kind="item.kind" :data-item-id="item.id">
+  <div class="flex flex-col border-b border-border" data-testid="ade-needs-item" :data-kind="item.kind" :data-item-id="item.id">
     <div
-      class="grid grid-cols-[92px_60px_92px_70px_minmax(0,1fr)] items-center gap-x-3 rounded-kira border border-border px-3 py-2"
+      class="flex items-center gap-3 px-3 py-2"
       :style="{ background: rowBackground }"
     >
       <span
-        class="whitespace-nowrap rounded-kira-sm px-2 py-0.5 text-center text-kira-sm font-bold"
+        class="w-23 shrink-0 whitespace-nowrap rounded-kira-sm px-2 py-0.5 text-center text-kira-sm font-bold"
         :style="tagStyle(item.tone)"
         data-testid="ade-needs-kind"
         >{{ item.kind }}</span
       >
-      <span class="text-kira-md text-muted-foreground" data-testid="ade-needs-age">{{ shortAge(item.ageMs) }}</span>
+      <span class="w-15 shrink-0 text-kira-md text-muted-foreground" data-testid="ade-needs-age">{{ shortAge(item.ageMs) }}</span>
       <Button
-        size="xs"
-        class="rounded-kira font-semibold"
+        size="kira-lg"
+        class="w-23 shrink-0 font-semibold"
         :style="buttonStyle"
         :disabled="busy"
         data-testid="ade-needs-action"
@@ -50,23 +50,24 @@ const rowBackground = computed(() => {
       >
         {{ item.action }}
       </Button>
-      <span class="truncate text-kira-sm text-subtle" data-testid="ade-needs-scope">{{ item.scope }}</span>
-      <div class="flex min-w-0 flex-col">
+      <span class="w-17.5 shrink-0 truncate text-kira-sm text-subtle" data-testid="ade-needs-scope">{{ item.scope }}</span>
+      <div class="flex min-w-0 flex-1 flex-col">
         <span class="flex items-center gap-2">
           <span class="truncate text-kira-md text-fg" data-testid="ade-needs-what">{{ item.what }}</span>
-          <button
+          <Button
             v-if="hasLog"
-            type="button"
-            class="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-kira-sm text-muted-foreground underline"
+            variant="ghost"
+            size="kira"
+            class="shrink-0 text-kira-sm text-muted-foreground underline"
             data-testid="ade-needs-log"
             @click="logOpen = !logOpen"
           >
             {{ logOpen ? 'Hide log' : 'Log' }}
-          </button>
+          </Button>
         </span>
         <span v-if="item.detail" class="truncate text-kira-sm text-muted-foreground" data-testid="ade-needs-detail">{{ item.detail }}</span>
         <span class="flex items-center gap-1 truncate text-kira-sm text-subtle">
-          <span class="inline-block size-2 shrink-0 rounded-[2px]" :style="{ background: taskColor }" />
+          <span class="inline-block size-2 shrink-0 rounded-kira-xs" :style="{ background: taskColor }" />
           {{ taskTitle }}
         </span>
       </div>

@@ -45,7 +45,7 @@ function open(): void {
   <div
     role="button"
     tabindex="0"
-    class="grid cursor-pointer grid-cols-[20px_130px_76px_92px_90px_64px_minmax(0,1fr)] items-center gap-x-3 rounded-kira px-3 py-1.5"
+    class="flex cursor-pointer items-center gap-3 rounded-kira px-3 py-1.5"
     :style="input ? { background: `color-mix(in srgb, ${TONE.amber[2]} 7%, transparent)` } : undefined"
     data-testid="ade-all-session"
     :data-session-id="view.session.id"
@@ -53,14 +53,14 @@ function open(): void {
     @keydown.enter.self="open"
     @keydown.space.self.prevent="open"
   >
-    <AdeActivityIcon :kind="view.kind" :size="14" />
-    <span class="truncate text-kira-md" :style="{ color: stateColor }" data-testid="ade-all-state">{{ state }}</span>
-    <span class="text-kira-md text-muted-foreground">{{ ago }}</span>
+    <AdeActivityIcon :kind="view.kind" :size="14" class="w-5 shrink-0" />
+    <span class="w-32.5 shrink-0 truncate text-kira-md" :style="{ color: stateColor }" data-testid="ade-all-state">{{ state }}</span>
+    <span class="w-19 shrink-0 text-kira-md text-muted-foreground">{{ ago }}</span>
     <Button
       v-if="!archived"
-      size="xs"
+      size="kira-lg"
       :variant="opens ? 'dialog' : undefined"
-      class="rounded-kira font-semibold"
+      class="w-23 shrink-0 font-semibold"
       :style="opens ? undefined : actionStyle('claude')"
       :disabled="takeOver.pending.has(view.session.id)"
       data-testid="ade-all-action"
@@ -68,10 +68,10 @@ function open(): void {
     >
       {{ opens ? 'Open' : 'Take over' }}
     </Button>
-    <span v-else />
-    <span class="font-data text-kira-sm text-muted-foreground">claude {{ shortId(view.session.id) }}</span>
-    <span class="truncate font-data text-kira-sm text-subtle">{{ view.repo || 'spec' }}</span>
-    <div class="flex min-w-0 flex-col">
+    <span v-else class="w-23 shrink-0" />
+    <span class="w-22.5 shrink-0 font-data text-kira-sm text-muted-foreground">claude {{ shortId(view.session.id) }}</span>
+    <span class="w-16 shrink-0 truncate text-kira-sm text-subtle">{{ view.repo || 'spec' }}</span>
+    <div class="flex min-w-0 flex-1 flex-col">
       <span class="truncate text-kira-md">{{ view.allLabel }}</span>
       <span class="truncate font-data text-kira-sm text-subtle">{{ view.branch }} {{ view.worktree }}</span>
     </div>
