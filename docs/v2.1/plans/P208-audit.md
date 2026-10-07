@@ -121,3 +121,12 @@ Verdicts: 18 MET, 3 PARTIAL, 0 NOT MET.
   (`crop-estimate.png`), unlike the Jira row above it; P207 restricts `font-data` to code-like text.
 
 No regressions found in the specs above. No dead code found in the touched areas beyond what `lint:dead` covers.
+
+## Fixes
+
+- R15: `prepareWorktrees` (`runs.go`) skips unnamed `mine` branches when `kira_space_mcp` is on; run starts in repo root. `SpaceSuffix` tells agent to name branch via `request_branch`. Run dialog hides branch inputs (`useSpaceTools`). Go test `TestSpaceTools_startRunCreatesNoBranch`, Run-dialog UI spec.
+- R6: estimate input `w-20`; stage/step move and remove buttons are `TooltipIconButton` codicons; steps are divided rows in the stage card, no own box.
+- Memory empty tab strip: Memory mode def `tabStrip: false`, Space shell honours it.
+- Unsaved workflow edits: title bar mode switch away from Agents confirms via `leave()`.
+- "Sessions N" counts running sessions (task and branch panels); archived panel keeps total.
+- GitHub/Jira link field: standard `Input`, no dashed border or monospace.
