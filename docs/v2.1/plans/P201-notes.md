@@ -105,3 +105,79 @@ Plan: `P201-plan.md`. Branch `v2.1-stream-D`. Eight code commits plus this one.
 ## Failing visual baselines
 
 None.
+
+---
+
+# Part 2 notes: move the Memory module to Kira Space
+
+## What landed
+
+- `5fb98e6` `internal/mcpinstall` hoisted to repo root. Header-helper trio moved to
+  `apps/kira-studio/internal/mcpauth/helperscript.go`. `ShellQuote` exported.
+- `eae7ab3` the move, one commit with `git mv` for `bridge/memory.go`, `memoryControl.ts`,
+  `memoryModule.ts`, `memory-module.spec.ts`. Space: `memory-mcp` branch, `MemoryService`
+  registration and `CloseMemory` teardown, `memory` mode (last), `windows.mode` vocabulary entry,
+  App.vue provide, bridge spread, UI mocks. Studio back to v2.0 content apart from the `mcpinstall`
+  import path. `ConnectClaudeDialog.vue` gained the E7 sentence.
+- `633a8d6` fix: `gocognit` rejected `main` (32 > 30) after the second argv branch. Both shims now
+  run from `runArgvShim`.
+
+## Deviations from the plan
+
+- Base is current v2.0 (`42c6813`, stream F merged), not `1721559`. `git diff v2.0 -- apps/kira-studio`
+  held only Part 1, so Studio files were restored from `v2.0`.
+- `SPEC.md` rebase conflict: the single P201 row (v2.0 side) became the two Part rows, kept
+  before P203.
+- `mode-switch.spec.ts` title and comment say four mode tabs (v2.0 said three, count was 4).
+- Space `main.go` bound-service count in the startup comment updated to 18 (was stale).
+- `memory-module.spec.ts` in Space defines a local `modeTab` (no `support/apiMode` there).
+- Mode order union with stream F's P206 not applied here: base order is still `git, terminal, ade,
+  memory`. P206 resolves to `git, ade, terminal, memory` when it lands.
+
+## Verification
+
+- `go build ./apps/kira-space/... ./apps/kira-studio/... ./internal/...`; `go build -tags server` for
+  both apps. `go test -race ./internal/... ./apps/kira-space/... ./apps/kira-studio/...` green.
+- `bun run lint`, `lint:go` (0 issues), `lint:dead` (knip clean), `typecheck` green via the hook.
+- `bun run test:ui:space`: 200 passed. `bun run test:ui:studio`: 336 passed, 1 failed, 4 did not
+  run. Failure is `slick-grid.spec.ts:1220` (P22 Pass B C9 pacing invariant, renders-per-frame
+  `< 2`). It is flaky on pristine `v2.0` too (1 of 3 runs failed in `/home/user/kira-studio`), so
+  unrelated to this move. Root cause is a timing property of the grid scroll path under sandbox
+  load; fixing it is grid-scroll work outside P201. Proposed follow-up phase for the user to place.
+- Real MCP path: `-tags server` Space binary, `claude -p --strict-mcp-config --mcp-config` with
+  `KIRA_MEMORY_HOME` temp. `store_memory` returned `stored`. `search_memories` returned the fact,
+  also while a Space server instance held `app.lock`. `printf '' | kira-space memory-mcp` exits 0.
+- Visual check: Playwright screenshots of the Memory mode in Space (list, detail with version
+  trail, search with history). Spacing and proportions match the Studio module.
+- Unverified: macOS app-bundle binary spawned as a CLI child.
+- Greps: `memory-mcp` in `apps/*/main.go` only in Space; `NewMemoryService` only in Space; no
+  `apps/kira-studio/internal/mcpinstall`; `internal/mcpinstall` imports nothing under `apps/`.
+
+## Proposed `ARCHITECTURE.md` edits
+
+Replace Studio with Space in the Memory section:
+
+- MCP server: `<Kira Space executable> memory-mcp`, branch in `apps/kira-space/main.go` before
+  `startupfail` and `acquireSingleInstance`, so Claude Code can spawn it while the window is open.
+  Registration name `kira-memory`.
+- Bridge: Space `MemoryService` (`apps/kira-space/internal/bridge/memory.go`), `memory` mode last in
+  `MODE_ORDER`, `windows.mode` vocabulary gains `memory`. Studio hosts no Memory module.
+- `internal/mcpinstall` is repo-root, shared; DB MCP header-helper script lives in Studio's
+  `mcpauth`.
+- Known open items: replace "Kira Space does not host the module or the subcommand" with "Kira
+  Studio does not host the Memory module". Add: the memory mode shows an empty tab strip.
+
+## Proposed `DEV_ENVIRONMENT.md` edits
+
+Memory smoke: build with `go build -tags server ./apps/kira-space`; the stdio server entry uses
+that binary with `args: ["memory-mcp"]`.
+
+## Failing visual baselines
+
+All are the sandbox font-drift signature (1 to 3 percent, glyph-wide, no element moved), not
+regressions. None regenerated.
+
+- Space: `settings.spec.ts` Appearance, Git, Connected editors, Advanced panes.
+- Studio: `connection-dialog`, `console`, `data-view`, `http-request-view`, `schema-dialog`,
+  `terminal-module` (quick commands dialog, empty), `workbench` (shell at rest), and
+  `settings.spec.ts` Appearance, Data, Cache, Api, Database MCP, Advanced panes.
