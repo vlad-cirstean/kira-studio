@@ -59,12 +59,13 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
   const headless = s.mode === 'headless';
   const repo = branch ? look.repoLabel(branch.codeRepoId) : '';
   const branchName = branch?.name ?? '';
-  const step = headless ? stepNameOf(look.workflow(task?.workflowId ?? ''), s.stepId) : '';
+  const workflow = task?.workflow ?? look.workflow(task?.workflowId ?? '');
+  const step = headless ? stepNameOf(workflow, s.stepId) : '';
   const run = task?.runs.find((r) => r.id === s.runId) ?? null;
   const scope = branch ? `${repo} · ${branchName}` : s.branchId ? basename(s.cwd) : 'spec';
   const id = shortId(s.id);
   const review = s.purpose === 'review';
-  const stage = stageNameOf(look.workflow(task?.workflowId ?? ''), task, s.stageId);
+  const stage = stageNameOf(workflow, task, s.stageId);
   const named = (...parts: string[]): string => parts.filter(Boolean).join(' · ');
   const tabName = review
     ? 'Review agent'

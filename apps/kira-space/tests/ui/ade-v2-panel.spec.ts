@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { adeFixture, openPlan } from './support/adeV2';
+import { adeBoard, adeFixture, openPlan } from './support/adeV2';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -372,4 +372,22 @@ test('the stage mover goes back, picks any stage and is off while a run is live'
   await openTask(page, 'T_bill');
   await expect(page.locator('[data-testid="ade-stage-pick"]')).toBeDisabled();
   await expect(page.locator('[data-testid="ade-stage-next"]')).toBeDisabled();
+});
+
+test('a started task on an older workflow version says so', async ({ relaunch }) => {
+  const workflow = adeFixture<{ workflows: { workflow: unknown }[] }>('workflows').workflows[0]
+    ?.workflow;
+  const board = adeBoard((b) => {
+    const task = b.tasks.find((x) => x.id === 'T_bill');
+    if (task) Object.assign(task, { workflow, workflowOutdated: true });
+  });
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+  ]);
+  await openTask(page, 'T_bill');
+  await expect(page.locator('[data-testid="ade-workflow-outdated"]')).toHaveText(
+    'updated — applies to new work only',
+  );
+  await openTask(page, 'T_auth');
+  await expect(page.locator('[data-testid="ade-workflow-outdated"]')).toHaveCount(0);
 });

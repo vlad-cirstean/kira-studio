@@ -171,7 +171,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
   const sessions = c.sessions.filter((x) => x.taskId === id);
   const status = deriveStatus({ task, progress, branches, hasSessions: sessions.length > 0 });
   const cell = taskCell({ task, progress, status, branches, sessions });
-  const workflow = c.workflows.get(task.workflowId) ?? null;
+  const workflow = task.workflow ?? c.workflows.get(task.workflowId) ?? null;
   const hidden = task.kind !== 'task';
   const first = branches[0];
   const mine = branches.filter((br) => br.kind === 'mine');
@@ -305,7 +305,7 @@ function buildPlanModel() {
         t.id,
         buildTaskProgress({
           task: t,
-          workflow: wf.get(t.workflowId) ?? null,
+          workflow: t.workflow ?? wf.get(t.workflowId) ?? null,
           branch: (id) => graph.byBranch.get(id),
           repoNick: repoLabel,
         }),

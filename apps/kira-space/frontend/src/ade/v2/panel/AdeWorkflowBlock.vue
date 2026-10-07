@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import type { CardModel } from '../plan/usePlanModel';
 import { useSetTaskWorkflow, useWorkflows } from '../queries';
@@ -50,6 +52,12 @@ function edit(): void {
         <option v-if="card.task.workflowId === ''" value="">Pick a workflow…</option>
         <option v-for="v in valid" :key="v.wf.id" :value="v.wf.id">{{ v.wf.name }}</option>
       </NativeSelect>
+      <Tooltip v-if="card.task.workflowOutdated">
+        <TooltipTrigger as-child>
+          <Badge variant="warn" data-testid="ade-workflow-outdated">updated — applies to new work only</Badge>
+        </TooltipTrigger>
+        <TooltipContent>This task runs the version of the workflow it started with.</TooltipContent>
+      </Tooltip>
       <Button
         variant="link"
         size="xs"
