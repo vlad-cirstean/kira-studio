@@ -3,7 +3,7 @@ import { z } from 'zod';
 // P103 Part 4 (§7.3): trimmed to the sections genuinely shared between both apps' own
 // settingsSchema — appearance and the logLevel enum (both apps' own `advanced` section embeds it
 // under its own name/key, alongside whatever else is app-only). Everything app-only
-// (data/cache/api/dbMcp/claudeCode, Kira Studio only; git, Kira Space only — P120: Kira Space is
+// (data/cache/api/dbMcp, Kira Studio only; git, Kira Space only — P120: Kira Space is
 // the only app with a git module) moved to each app's own frontend/src/state/settingsDomain.ts,
 // which composes its own settingsSchema/settingsPatchSchema/defaultSettings out of this file's
 // exports plus its own sections — the same split apps/*/internal/storage/model/settings.go already

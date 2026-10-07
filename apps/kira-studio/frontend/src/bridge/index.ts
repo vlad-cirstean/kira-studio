@@ -280,12 +280,6 @@ const studioControl = {
   onDbMcpApprovalChanged: (cb: (snap: DbMcpApprovalSnapshot) => void): (() => void) =>
     on(CHANNEL.dbMcpApproval, cb),
 
-  // P87 §7.2: the agent-aware Settings leaf — the titlebar toggle's own read/write/broadcast moved
-  // to createCoreControl.ts (P116 H5); this one stays app-side since Kira Space has no agent-aware
-  // reason to set.
-  keepAwakeSetAgentAware: (enabled: boolean): Promise<WailsModels.KeepAwakeStatus> =>
-    unwrap(KeepAwakeService.SetAgentAware({ enabled })),
-
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),
   opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),

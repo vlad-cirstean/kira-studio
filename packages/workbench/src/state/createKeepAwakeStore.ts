@@ -4,9 +4,8 @@ import type { KeepAwakeStatus } from '../bridge/createCoreControl';
 import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
 // P116 H6: hoisted from Kira Studio's own state/keepAwake.ts — the shared half (hydrate, subscribe,
-// the manual toggle). Kira Studio's own agent-aware Settings leaf (setKeepAwakeAgentAware) is not
-// shared — Kira Space has no agent-aware reason to set — so it stays app-side via `extend`,
-// createLayoutStore.ts's own pattern applied here: this window's own toggle must never lag its own
+// the manual toggle). `extend` lets an app add actions of its own, createLayoutStore.ts's own
+// pattern applied here: this window's own toggle must never lag its own
 // click, and a later broadcast arrival (this window's own echo, or another window's) reapplies the
 // identical value, a harmless no-op.
 

@@ -4,19 +4,11 @@ import { control } from '../bridge/control';
 import { defaultSettings, type Settings, type SettingsPatch } from './settingsDomain';
 
 // P17 D1/G12 D9: 'Database MCP' bypasses draft/Save for its own stated reason — an instant-effect
-// CRUD/toggle section, not a staged leaf; P86 §9.3's 'Claude Code' joins it for the same reason.
+// CRUD/toggle section, not a staged leaf.
 // P133 §2.6: 'Scripts' is gone — custom scripts are configured only from the Terminal module's own
 // QuickCommandsDialog.vue now, `openSettingsAt` stays for the Api panes' own deep link
 // (CookiesPane.vue/RequestSettingsPane.vue's "Edit global defaults…").
-export const sections = [
-  'Appearance',
-  'Data',
-  'Cache',
-  'Api',
-  'Claude Code',
-  'Database MCP',
-  'Advanced',
-] as const;
+export const sections = ['Appearance', 'Data', 'Cache', 'Api', 'Database MCP', 'Advanced'] as const;
 export type Section = (typeof sections)[number];
 
 // P103 Part 2 (§5.3): the shared skeleton now lives in

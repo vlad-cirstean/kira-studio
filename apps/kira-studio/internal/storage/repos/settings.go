@@ -55,7 +55,6 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	appsettings.LeafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, appsettings.InRange(0, 100))
 	appsettings.Leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
 	appsettings.Leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
-	appsettings.Leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
 	return result, nil
 }
 
@@ -118,13 +117,6 @@ func upsertDbMcpSection(tx *sql.Tx, dm *model.DbMcpPatch) error {
 	return appsettings.UpsertOptional(tx, "dbMcp.serverEnabled", dm.ServerEnabled)
 }
 
-func upsertClaudeCodeSection(tx *sql.Tx, cc *model.ClaudeCodePatch) error {
-	if cc == nil {
-		return nil
-	}
-	return appsettings.UpsertOptional(tx, "claudeCode.keepAwakeWithAgents", cc.KeepAwakeWithAgents)
-}
-
 // Set validates the patch, writes only the leaves the caller actually patched in one transaction
 // (D15 — a full rewrite would touch eleven unrelated rows), and returns GetAll() afterwards.
 func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
@@ -148,10 +140,7 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertApiSection(tx, patch.Api); err != nil {
 			return err
 		}
-		if err := upsertDbMcpSection(tx, patch.DbMcp); err != nil {
-			return err
-		}
-		return upsertClaudeCodeSection(tx, patch.ClaudeCode)
+		return upsertDbMcpSection(tx, patch.DbMcp)
 	})
 	if err != nil {
 		return model.Settings{}, err

@@ -7,7 +7,7 @@ import type { Settings } from '../../state/settingsDomain';
 // app's own `workbench/SettingsDialog.vue` wrapper binds it per pane, `activeSection === '<Section>'`).
 //
 // `SettingsSections` — this dialog's own five sections of the full shared `Settings` (everything
-// except `dbMcp`/`claudeCode`, which this dialog edits through their own instant-action controls,
+// except `dbMcp`, which this dialog edits through its own instant-action controls,
 // never through the draft) — is what SettingsShell.vue's own `T` generic is actually instantiated
 // with at this app's `<SettingsShell>` call site (`workbench/SettingsDialog.vue`'s own `:current`/
 // `:defaults`), so every pane's prop types must match that same narrowed shape, not the full

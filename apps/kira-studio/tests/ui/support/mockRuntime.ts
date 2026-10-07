@@ -166,7 +166,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
 
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
-  keepAwakeSetAgentAware: 'KeepAwakeService.SetAgentAware',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,

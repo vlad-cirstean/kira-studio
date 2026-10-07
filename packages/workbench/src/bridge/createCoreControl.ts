@@ -14,9 +14,8 @@ import { on, trust, unwrap, windowKey } from './rpc';
 // P116 H5 adds ten more, moved out of Kira Studio's own studioControl once Kira Space grew the
 // same window-chrome gaps (G1-G5/G7): the five menu-pushed signal channels (open-settings,
 // toggle-project-panel, tab-next/prev/close), the keep-awake toggle's read/write/broadcast, the
-// app-metrics broadcast, and the title bar's "New window" button. Kira Studio's own
-// keepAwakeSetAgentAware (the Settings leaf, not the titlebar button) stays app-side — Kira Space
-// has no agent-aware reason to set.
+// app-metrics broadcast, and the title bar's "New window" button. P188: the
+// agent-aware keep-awake setting lives in Kira Space's own Settings, not a bound method.
 //
 // P119 adds three more: updateStatus/updateInstall/updateCancelInstall — both apps' own
 // UpdateService is now byte-identical (Status/InstallUpdate/CancelInstall over the shared

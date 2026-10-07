@@ -1,16 +1,6 @@
 import { createKeepAwakeStore } from '@workbench/state/createKeepAwakeStore';
 import { control } from '../bridge/control';
-import { useSettingsStore } from './settings';
 
-// P116 H6: the shared half (hydrate, subscribe, the manual toggle) moved to
-// createKeepAwakeStore.ts; the agent-aware Settings leaf stays here via `extend` — Kira Space has
-// no agent-aware reason to set.
-export const useKeepAwakeStore = createKeepAwakeStore(control, ({ state }) => ({
-  // setKeepAwakeAgentAware also writes settingsStore.claudeCode.keepAwakeWithAgents directly — this
-  // leaf both persists and recomputes the live assertion in one call, bypassing the Settings
-  // dialog's draft/Save flow entirely (dbmcp.ts's own D7/§7.1 instant-action posture).
-  async setKeepAwakeAgentAware(on: boolean): Promise<void> {
-    state.status = await control.keepAwakeSetAgentAware(on);
-    useSettingsStore().claudeCode.keepAwakeWithAgents = on;
-  },
-}));
+// P116 H6: the whole store is the shared one (hydrate, subscribe, the manual toggle). P188: the
+// agent-aware Settings leaf is Kira Space only, so nothing extends it here.
+export const useKeepAwakeStore = createKeepAwakeStore(control, () => ({}));

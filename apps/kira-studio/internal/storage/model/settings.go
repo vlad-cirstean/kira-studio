@@ -33,17 +33,6 @@ type DbMcpSettings struct {
 	ServerEnabled bool `json:"serverEnabled"`
 }
 
-// ClaudeCodeSettings held two on/off leaves for the P86 hook-based session monitor through
-// P86-P126 (its enable toggle and its first-run-banner-dismiss flag) — P127 moved that whole
-// feature to a shared home outside this app, with no settings-backed toggle there yet, so both left
-// with it; migration 0029 drops the two orphaned rows. KeepAwakeWithAgents is P87 §6's own leaf: on,
-// this Mac is kept awake automatically whenever at least one Claude Code session is live
-// (internal/keepawake owns the actual OS assertion), independent of the title bar's own keep-awake
-// toggle. Off by default.
-type ClaudeCodeSettings struct {
-	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
-}
-
 // ApiSettings mirrors packages/shared/domain/settings.ts's apiSettingsSchema (P90 item 1) — the
 // seven request settings that used to be httpclient package constants (internal/httpclient's own
 // options.go states the coupling back at this file: its normalize() defaults must equal
@@ -66,7 +55,6 @@ type Settings struct {
 	Advanced   AdvancedSettings       `json:"advanced"`
 	Api        ApiSettings            `json:"api"`
 	DbMcp      DbMcpSettings          `json:"dbMcp"`
-	ClaudeCode ClaudeCodeSettings     `json:"claudeCode"`
 }
 
 // DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
@@ -92,8 +80,7 @@ func DefaultSettings() Settings {
 			MaxRedirects:     10,
 			DisableCookieJar: true,
 		},
-		DbMcp:      DbMcpSettings{ServerEnabled: false},
-		ClaudeCode: ClaudeCodeSettings{KeepAwakeWithAgents: false},
+		DbMcp: DbMcpSettings{ServerEnabled: false},
 	}
 }
 
@@ -132,11 +119,6 @@ type DbMcpPatch struct {
 	ServerEnabled *bool `json:"serverEnabled,omitempty"`
 }
 
-// ClaudeCodePatch mirrors ClaudeCodeSettings' own `.partial()` shape (P86 §9.2).
-type ClaudeCodePatch struct {
-	KeepAwakeWithAgents *bool `json:"keepAwakeWithAgents,omitempty"`
-}
-
 type SettingsPatch struct {
 	Appearance *appsettings.AppearancePatch `json:"appearance,omitempty"`
 	Data       *DataPatch                   `json:"data,omitempty"`
@@ -144,7 +126,6 @@ type SettingsPatch struct {
 	Advanced   *AdvancedPatch               `json:"advanced,omitempty"`
 	Api        *ApiPatch                    `json:"api,omitempty"`
 	DbMcp      *DbMcpPatch                  `json:"dbMcp,omitempty"`
-	ClaudeCode *ClaudeCodePatch             `json:"claudeCode,omitempty"`
 }
 
 // ValidHTTPVersion mirrors settings.ts's HTTP_VERSIONS — Go's HTTP/1 *is* 1.1, so "1" is never a
@@ -228,7 +209,7 @@ func validateApiSection(a *ApiPatch) error {
 
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming
 // the offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema
-// either, so they are accepted as-is. DbMcp/ClaudeCode have no bounds either and so no validateX
+// either, so they are accepted as-is. DbMcp has no bounds either and so no validateX
 // of their own.
 func (p SettingsPatch) Validate() error {
 	if err := appsettings.ValidateAppearance(p.Appearance); err != nil {

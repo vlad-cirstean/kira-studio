@@ -6,9 +6,9 @@ import {
 } from '@shared/domain/settings';
 import { z } from 'zod';
 
-// P103 Part 4 (§7.3): this app's own seven-section settingsSchema/settingsPatchSchema/
+// P103 Part 4 (§7.3): this app's own six-section settingsSchema/settingsPatchSchema/
 // defaultSettings, split out of the former one shared `@shared/domain/settings` (which Kira Space's
-// own three-section store carried five dead sections of — data/cache/api/dbMcp/claudeCode — the
+// own three-section store carried five dead sections of — data/cache/api/dbMcp — the
 // same "tab-kind vocabulary" defect P103 Part 2 already fixed for tabs). appearance/logLevel
 // stay genuinely shared; this file imports `appearanceSettingsSchema`/`logLevelSchema`/
 // `HTTP_VERSIONS`/`httpVersionSchema` unexported, purely to build the composed schema below —
@@ -40,7 +40,7 @@ const pageSizeSchema = /*#__PURE__*/ z.union([
 ]);
 
 // Neither dataSettingsSchema/cacheSettingsSchema/advancedSettingsSchema/apiSettingsSchema/
-// dbMcpSettingsSchema/claudeCodeSettingsSchema/settingsSchema/settingsPatchSchema below, nor
+// dbMcpSettingsSchema/settingsSchema/settingsPatchSchema below, nor
 // their own `z.infer` type aliases, are exported: nothing outside this file references the raw
 // zod schema objects or their per-section inferred types directly (confirmed by grep — every real
 // consumer reads through the composed `Settings`/`SettingsPatch`/`defaultSettings` below, or
@@ -125,16 +125,6 @@ const dbMcpSettingsSchema = /*#__PURE__*/ z.object({
   serverEnabled: z.boolean().default(false),
 });
 
-// This section held two on/off leaves for the P86 hook-based session monitor through P86-P126 (its
-// enable toggle and its first-run-banner-dismiss flag) — P127 moved that whole feature to a shared
-// home outside this app, with no settings-backed toggle there yet, so both left with it; migration
-// 0029 drops the two orphaned rows. keepAwakeWithAgents is P87 §6's own leaf: on, this Mac is kept
-// awake automatically whenever at least one Claude Code session is live, independent of the title
-// bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.
-const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
-  keepAwakeWithAgents: z.boolean().default(false),
-});
-
 // `.default(...)` on every new section is load-bearing: an older kira.db has a settings
 // row with no `data`/`cache`/`advanced`/`dbMcp` keys, and that row must still parse on
 // next launch.
@@ -157,9 +147,6 @@ const settingsSchema = /*#__PURE__*/ z.object({
     disableCookieJar: true,
   }),
   dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false }),
-  claudeCode: claudeCodeSettingsSchema.default({
-    keepAwakeWithAgents: false,
-  }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -170,7 +157,6 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.partial().optional(),
   api: apiSettingsSchema.partial().optional(),
   dbMcp: dbMcpSettingsSchema.partial().optional(),
-  claudeCode: claudeCodeSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -204,8 +190,5 @@ export const defaultSettings: Settings = {
   },
   dbMcp: {
     serverEnabled: false,
-  },
-  claudeCode: {
-    keepAwakeWithAgents: false,
   },
 };

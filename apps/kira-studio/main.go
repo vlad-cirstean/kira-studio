@@ -365,13 +365,11 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	dbMcpSvc := bridge.NewDbMcpService(deps, mcpinstall.New(mcpinstall.Deps{}), dbMcpApprovals)
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
-	// P87 §3/§4: one keep-awake assertion for the whole app, composed from the titlebar toggle and
-	// the agent-aware setting (§1). The driver is a runtime.GOOS switch — a real caffeinate child
-	// on macOS, a documented no-op everywhere else. Constructed before terminalSvc below, since its
-	// Registry.OnChange closure closes over it.
+	// P87 §3/§4: one keep-awake assertion for the whole app, driven by the titlebar toggle. The
+	// driver is a runtime.GOOS switch — a real caffeinate child on macOS, a documented no-op
+	// everywhere else.
 	keepAwakeCtl := keepawake.New(keepawake.NewPlatformDriver())
 	keepAwakeSvc := &bridge.KeepAwakeService{Deps: deps, Ctl: keepAwakeCtl, Toggle: &keepawake.Toggle{Ctl: keepAwakeCtl}}
-	bridge.StartKeepAwake(keepAwakeSvc)
 
 	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
 	// it — the title bar's "New window" button reaches this same OpenNewWindow closure the ⇧⌘N
@@ -383,14 +381,6 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	// service plus ChannelTerminal's push channel. P128 §2.1: the bound methods live once in
 	// internal/terminal.BoundService; this app's own TerminalService only embeds it.
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: terminal.NewRegistry()}}
-	// P87 §1.1: the agent reason's own input — every claude-code launch still increments
-	// internal/terminal's own registry count (P127 dropped only the hook-reporting side, not
-	// OpenParams.Agent). AgentSessions() is safe to call from here — session.go documents OnChange
-	// as fired outside the registry mutex for exactly this reason.
-	terminalSvc.Registry.OnChange = func() {
-		bridge.KeepAwakeAgentSessionsChanged(keepAwakeSvc, func() int { return len(terminalSvc.Registry.AgentSessions()) })
-	}
-
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 

@@ -162,7 +162,6 @@ export const IPC = {
   // P87 §10.3: the titlebar keep-awake toggle and the agent-aware Settings leaf.
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
-  keepAwakeSetAgentAware: 'kira:keepAwake:setAgentAware',
 
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',

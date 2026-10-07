@@ -9,7 +9,6 @@ import AdvancedPane from './settings/AdvancedPane.vue';
 import ApiPane from './settings/ApiPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
 import CachePane from './settings/CachePane.vue';
-import ClaudeCodePane from './settings/ClaudeCodePane.vue';
 import DatabaseMcpPane from './settings/DatabaseMcpPane.vue';
 import DataPane from './settings/DataPane.vue';
 
@@ -80,13 +79,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <ApiPane
         :active="s.activeSection === 'Api'"
-        :draft="s.draft"
-        :is-at-default="s.isAtDefault"
-        :reset-leaf="s.resetLeaf"
-        :register-field-error="s.registerFieldError"
-      />
-      <ClaudeCodePane
-        :active="s.activeSection === 'Claude Code'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"
