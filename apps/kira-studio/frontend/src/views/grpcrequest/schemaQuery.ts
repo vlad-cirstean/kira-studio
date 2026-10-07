@@ -12,10 +12,10 @@ import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { resolveGrpcTabState } from './resolve';
 
 // P175 D4 (P11 D4's schema browser runtime, as server state): the resolved schema for a request's
-// *source* — never for a tab. The key mirrors Go's descriptor cache key
-// (grpcclient/descriptors.go cacheKey), so the renderer never refetches what Go would answer from
-// its own cache. Reflection keys carry the raw `target` template (never a resolved value, so no
-// secret enters a cache key) plus the owner ids that give the template its meaning; metadata
+// *source* — never for a tab. Reflection keys carry the raw `target` template (never a resolved
+// value, so no secret enters a cache key) plus the owner ids that give the template its meaning;
+// Go's descriptor cache (grpcclient/descriptors.go cacheKey) hashes the resolved target instead, so
+// a variables change invalidates every reflection key (apiQueries.ts handleApiDataChange). Metadata
 // *values* are read at fetch time, because Go ignores them on a non-reload Describe.
 
 const SCHEMA_DEBOUNCE_MS = 150;

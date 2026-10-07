@@ -228,6 +228,8 @@ async function handleApiDataChange(change: ApiDataChange): Promise<void> {
       return;
     case 'variables':
       await refreshApiQuery(apiVariablesKey(change.scope, change.ownerId));
+      // A reflection schema is keyed by the unresolved target, so a variable edit can change its host.
+      await queryClient.invalidateQueries({ queryKey: ['grpcSchema', 'reflection'] });
       return;
     case 'environments':
       await refreshApiQuery(apiEnvironmentsKey);
