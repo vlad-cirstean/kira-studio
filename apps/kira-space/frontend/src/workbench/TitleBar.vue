@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import ModeSwitcher from '@workbench/components/ModeSwitcher.vue';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import TitleBarWindowActions from '@workbench/components/TitleBarWindowActions.vue';
+import { useAdeWorkflowsUiStore } from '../ade/v2/state/adeWorkflowsUi';
 import { control } from '../bridge/control';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { useLayoutStore } from '../state/layout';
@@ -22,7 +23,9 @@ const layoutStore = useLayoutStore();
 const keepAwakeStore = useKeepAwakeStore();
 const modeStore = useModeStore();
 
-function onClick(mode: SpaceMode): void {
+// Leaving Agents unmounts the workflow editor: confirm before dropping its unsaved edits.
+async function onClick(mode: SpaceMode): Promise<void> {
+  if (modeStore.active === 'ade' && mode !== 'ade' && !(await useAdeWorkflowsUiStore().leave())) return;
   modeStore.setMode(mode);
 }
 
