@@ -21,6 +21,10 @@ const (
 	ChannelGitClientsChanged = "kira:git:clients"
 )
 
+// ChannelCustomScriptsChanged is CustomScriptsService's list-changed broadcast (Emit to every
+// window) — Kira Studio's channel of the same name.
+const ChannelCustomScriptsChanged = "kira:customScripts:changed"
+
 // ChannelGitCredential is P178's credential relay snapshot (every pending prompt a socket client
 // or the ADE board raised), broadcast to every window — ChannelGitPairing's own shape.
 const ChannelGitCredential = "kira:git:credential"

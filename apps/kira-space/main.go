@@ -262,6 +262,7 @@ func main() {
 			application.NewService(settingsSvc),
 			application.NewService(layoutSvc),
 			application.NewService(tabsSvc),
+			application.NewService(&bridge.CustomScriptsService{Deps: deps}),
 			application.NewService(terminalSvc),
 			application.NewService(adeTaskSvc),
 			application.NewService(&bridge.OpsService{Log: git.opLog}),

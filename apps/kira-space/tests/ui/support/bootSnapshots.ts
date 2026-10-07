@@ -24,6 +24,7 @@ export const EMPTY_BOOT_SNAPSHOTS: readonly ControlSnapshot[] = [
   { channel: IPC.codeWorkspaceListRepos, response: [] },
   { channel: IPC.gitClientsList, response: [] },
   { channel: IPC.tabsList, response: [] },
+  { channel: IPC.customScriptsList, response: [] },
 ];
 
 /** A spec's own snapshot for a channel replaces the default outright, rather than being appended

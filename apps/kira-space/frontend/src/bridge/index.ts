@@ -1,5 +1,6 @@
 import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
+import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitClientsService from '@bindings/gitclientsservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
@@ -33,6 +34,7 @@ import type {
   RepoSummary,
   SearchRequest,
 } from '@shared/domain/repo';
+import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import { CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
@@ -55,6 +57,16 @@ import type { TabRecord } from '../state/tabDomain';
 // (G1-G5/G7) — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
 // keep-awake controller, so both are wired the same way Kira Studio's own copy of this file is.
 const spaceControl = {
+  customScriptsList: (): Promise<CustomScript[]> =>
+    unwrap(CustomScriptsService.List()).then((r) => trust<CustomScript[]>(r ?? [])),
+  customScriptsCreate: (fields: CustomScriptFields): Promise<CustomScript> =>
+    unwrap(CustomScriptsService.Create({ fields })).then((r) => trust<CustomScript>(r)),
+  customScriptsUpdate: (id: string, fields: CustomScriptFields): Promise<CustomScript> =>
+    unwrap(CustomScriptsService.Update({ id, fields })).then((r) => trust<CustomScript>(r)),
+  customScriptsRemove: (id: string): Promise<void> => unwrap(CustomScriptsService.Remove({ id })),
+  onCustomScriptsChanged: (cb: (scripts: CustomScript[]) => void): (() => void) =>
+    on(CHANNEL.customScriptsChanged, cb),
+
   // P120: linkOpenExternal moved off createCoreControl.ts's now-deleted shared `link` binding —
   // Kira Studio never had a real use for it, so this app's own LinkService.OpenExternal call
   // stays here instead.

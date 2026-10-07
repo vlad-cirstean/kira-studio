@@ -12,6 +12,7 @@ import { control } from './bridge/control';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCodeReposStore } from './state/coderepos';
+import { useCustomScriptsStore } from './state/customScripts';
 import { useGitClientsStore } from './state/gitClients';
 import { useGitCredentialStore } from './state/gitCredential';
 import { useKeepAwakeStore } from './state/keepAwake';
@@ -33,7 +34,7 @@ import './styles.css';
 // P100 Part 2: Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
 // __KIRA_DEBUG_HOOKS__ block (that whole retention-probe apparatus is data-grid/query-result
 // specific: grid/documents/keyvalue/stream/console page stores, none of which exist here) and no
-// ops/dbMcp/customScripts stores (none of those subsystems exist in this app — apps/kira-space/
+// ops/dbMcp stores (none of those subsystems exist in this app — apps/kira-space/
 // main.go's own Services list has no counterpart for any of them). P127: Studio's own
 // agentHooks/agentSessions stores left too (agent-activity monitoring moved to a shared home, used
 // by no app as of this phase), so that gap has since closed on its own.
@@ -51,6 +52,7 @@ async function mountShell(): Promise<void> {
   const modeStore = useModeStore(pinia);
   const settingsStore = useSettingsStore(pinia);
   const codeReposStore = useCodeReposStore(pinia);
+  const customScriptsStore = useCustomScriptsStore(pinia);
   const gitClientsStore = useGitClientsStore(pinia);
   const gitCredentialStore = useGitCredentialStore(pinia);
   const tabsStore = useTabsStore(pinia);
@@ -94,6 +96,7 @@ async function mountShell(): Promise<void> {
     gitClientsStore.hydrateGitClients(),
     gitCredentialStore.hydrateRelayPrompts(),
     terminalsStore.hydrateTerminalDefaults(),
+    customScriptsStore.hydrateCustomScripts(),
     keepAwakeStore.initKeepAwake(),
     // P129 Part 3 §2.8 item 1: the boot-time hydrate for the ade module's own agent-activity store
     // (repo tabs' needs-input badge, §0.15) — a stuck/erroring subscribe must never block the rest

@@ -35,6 +35,11 @@ export const IPC = {
   // Studio's own ipcChannels.ts.
   windowsEnsure: 'kira:windows:ensure',
   windowsSetMode: 'kira:windows:set-mode',
+  customScriptsList: 'kira:customScripts:list',
+  customScriptsCreate: 'kira:customScripts:create',
+  customScriptsUpdate: 'kira:customScripts:update',
+  customScriptsRemove: 'kira:customScripts:remove',
+  customScriptsChanged: 'kira:customScripts:changed',
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
   keepAwake: 'kira:keepAwake:changed',
