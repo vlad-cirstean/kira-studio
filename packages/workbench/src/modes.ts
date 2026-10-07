@@ -27,6 +27,8 @@ export interface PanelModeDef {
   /** The tab strip's own "+" for this mode, when it has one — TabStripNewButton.vue wrapped around
    *  whatever menu/action this module's own "+" opens (P128 §2.4/§2.6). */
   newTab?: Component;
+  /** `false` hides the tab strip row for a module with no tabs of its own (Docker). */
+  tabStrip?: false;
 }
 
 /** A module that owns the whole content area itself — no left panel, no tab strip, no tabs of its

@@ -39,6 +39,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
+	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/metrics"
@@ -135,7 +136,7 @@ func main() {
 	embedded := wireEmbeddedServices(deps, connectionsSvc, oplogWiring, metricsTicker)
 	dbMcpSvc := embedded.dbMcpSvc
 	keepAwakeSvc := embedded.keepAwakeSvc
-	windowsSvc, terminalSvc := embedded.windowsSvc, embedded.terminalSvc
+	windowsSvc, terminalSvc, dockerSvc := embedded.windowsSvc, embedded.terminalSvc, embedded.dockerSvc
 	events, eventsDetach := embedded.events, embedded.eventsDetach
 
 	lifecycle := wireLifecycle(events, eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
@@ -174,6 +175,7 @@ func main() {
 			application.NewService(keepAwakeSvc),
 			application.NewService(terminalSvc),
 			application.NewService(&bridge.CustomScriptsService{Deps: deps}),
+			application.NewService(dockerSvc),
 			application.NewService(&bridge.UpdateService{
 				Checker: updateChecker, Installer: updateInstaller, Quit: quitter.RequestQuit,
 			}),
@@ -198,7 +200,7 @@ func main() {
 	wireWindowsAndMenu(postAppDeps{
 		app: app, router: router, repositories: repositories,
 		startedAt: startedAt, events: events, windows: windows, closeFlush: closeFlush, quitter: quitter,
-		terminalSvc: terminalSvc, windowsSvc: windowsSvc, keepAwakeSvc: keepAwakeSvc,
+		terminalSvc: terminalSvc, windowsSvc: windowsSvc, keepAwakeSvc: keepAwakeSvc, dockerSvc: dockerSvc,
 		attachDialogs: attachDialogs,
 		reporter:      reporter,
 	})
@@ -345,6 +347,7 @@ type embeddedWired struct {
 	keepAwakeSvc *bridge.KeepAwakeService
 	windowsSvc   *bridge.WindowsService
 	terminalSvc  *bridge.TerminalService
+	dockerSvc    *bridge.DockerService
 	events       *bridge.Events
 	eventsDetach func()
 }
@@ -381,12 +384,13 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	// service plus ChannelTerminal's push channel. P128 §2.1: the bound methods live once in
 	// internal/terminal.BoundService; this app's own TerminalService only embeds it.
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: terminal.NewRegistry()}}
+	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events)}
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 
 	return embeddedWired{
 		dbMcpSvc: dbMcpSvc, keepAwakeSvc: keepAwakeSvc,
-		windowsSvc: windowsSvc, terminalSvc: terminalSvc,
+		windowsSvc: windowsSvc, terminalSvc: terminalSvc, dockerSvc: dockerSvc,
 		events: events, eventsDetach: eventsDetach,
 	}
 }
@@ -467,6 +471,7 @@ type postAppDeps struct {
 	closeFlush   *shell.CloseFlushCoordinator
 	quitter      *shell.Quitter
 	terminalSvc  *bridge.TerminalService
+	dockerSvc    *bridge.DockerService
 	windowsSvc   *bridge.WindowsService
 	keepAwakeSvc *bridge.KeepAwakeService
 
@@ -502,7 +507,8 @@ func wireWindowsAndMenu(d postAppDeps) {
 		WindowDeps: shell.WindowDeps{Windows: windowStore{d.repositories.Windows}, StartedAt: d.startedAt},
 		Windows:    d.windows, CloseFlush: d.closeFlush, Quitter: d.quitter,
 		Terminal: d.terminalSvc.Registry, Repo: windowStore{d.repositories.Windows},
-		Cfg: shell.Config{AppName: "Kira Studio", WindowTitle: "Kira Studio"},
+		OnWindowClosing: []func(string){func(key string) { docker.CloseWindowBound(d.dockerSvc.BoundService, key) }},
+		Cfg:             shell.Config{AppName: "Kira Studio", WindowTitle: "Kira Studio"},
 	}
 	openNew := func() { shell.OpenNewWindow(deps) }
 	d.windowsSvc.OpenNewWindow = openNew

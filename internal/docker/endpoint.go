@@ -288,17 +288,17 @@ func listContexts(e resolveEnv, selected string) ([]ContextInfo, error) {
 	if defHost == "" {
 		defHost = defaultSocket
 	}
-	out := []ContextInfo{{Name: defaultContext, Host: defHost, Description: "Current DOCKER_HOST based configuration", Current: current == defaultContext}}
+	def := ContextInfo{Name: defaultContext, Host: defHost, Description: "Current DOCKER_HOST based configuration", Current: current == defaultContext}
 
 	metaDir := filepath.Join(e.configDir(), "contexts", "meta")
 	entries, err := os.ReadDir(metaDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return out, nil
+			return []ContextInfo{def}, nil
 		}
 		return nil, fmt.Errorf("list docker contexts: %w", err)
 	}
-	var found []ContextInfo
+	found := make([]ContextInfo, 0, len(entries))
 	for _, ent := range entries {
 		raw, err := os.ReadFile(filepath.Join(metaDir, ent.Name(), "meta.json"))
 		if err != nil {
@@ -311,5 +311,5 @@ func listContexts(e resolveEnv, selected string) ([]ContextInfo, error) {
 		found = append(found, ContextInfo{Name: m.Name, Host: m.Endpoints["docker"].Host, Description: m.Metadata.Description, Current: m.Name == current})
 	}
 	sort.Slice(found, func(i, j int) bool { return found[i].Name < found[j].Name })
-	return append(out, found...), nil
+	return append([]ContextInfo{def}, found...), nil
 }

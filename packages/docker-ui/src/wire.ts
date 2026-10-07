@@ -1,5 +1,3 @@
-import type { TerminalEvent } from '@shared/protocol/events';
-
 // Field-for-field mirrors of internal/docker's wire types.
 
 export const DOCKER_CHANNEL = {
@@ -10,9 +8,9 @@ export const DOCKER_CHANNEL = {
   exec: 'kira:docker:exec',
 } as const;
 
-export type EndpointSource = 'selected' | 'env' | 'context' | 'default' | 'probe';
+type EndpointSource = 'selected' | 'env' | 'context' | 'default' | 'probe';
 
-export interface DockerEndpoint {
+interface DockerEndpoint {
   context: string;
   host: string;
   source: EndpointSource;
@@ -35,7 +33,7 @@ export type UnavailableReason =
   | 'tls'
   | 'error';
 
-export interface EngineInfo {
+interface EngineInfo {
   version: string;
   apiVersion: string;
   os: string;
@@ -59,7 +57,7 @@ export interface DockerStatus {
   engine?: EngineInfo;
 }
 
-export interface DockerPort {
+interface DockerPort {
   ip: string;
   privatePort: number;
   publicPort: number;
@@ -120,7 +118,7 @@ export interface DockerNetwork {
   usedBy: string[];
 }
 
-export interface DockerMount {
+interface DockerMount {
   type: string;
   name: string;
   source: string;
@@ -129,7 +127,7 @@ export interface DockerMount {
   rw: boolean;
 }
 
-export interface DockerNetworkAttachment {
+interface DockerNetworkAttachment {
   network: string;
   ipAddress: string;
   gateway: string;
@@ -202,10 +200,4 @@ export interface LogsOpenOptions {
   tail: number;
   timestamps: boolean;
   follow: boolean;
-}
-
-export type DockerExecEvent = TerminalEvent;
-
-export function isUnavailableCode(err: unknown): boolean {
-  return (err as { code?: string } | null)?.code === 'E_DOCKER_UNAVAILABLE';
 }

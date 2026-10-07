@@ -162,7 +162,7 @@ func (r *logRegistry) close(id string) {
 
 func (r *logRegistry) closeWindow(windowKey string) {
 	r.mu.Lock()
-	var cancels []context.CancelFunc
+	cancels := make([]context.CancelFunc, 0, len(r.streams))
 	for id, s := range r.streams {
 		if s.windowKey == windowKey {
 			cancels = append(cancels, s.cancel)
@@ -177,7 +177,7 @@ func (r *logRegistry) closeWindow(windowKey string) {
 
 func (r *logRegistry) closeAll() {
 	r.mu.Lock()
-	var cancels []context.CancelFunc
+	cancels := make([]context.CancelFunc, 0, len(r.streams))
 	for id, s := range r.streams {
 		cancels = append(cancels, s.cancel)
 		delete(r.streams, id)

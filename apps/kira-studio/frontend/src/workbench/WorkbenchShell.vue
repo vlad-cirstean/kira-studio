@@ -31,6 +31,7 @@ const modeNewTab = computed(() => MODES[modeStore.active].newTab);
   <WorkbenchShellBase
     :project-visible="layoutStore.panel.project.visible"
     :project-width="layoutStore.panel.project.width"
+    :tab-strip-visible="MODES[modeStore.active].tabStrip !== false"
     :ops-visible="layoutStore.panel.operations.visible"
     :ops-height="layoutStore.panel.operations.height"
     @resize-project="layoutStore.setProjectWidth"

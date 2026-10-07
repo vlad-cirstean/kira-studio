@@ -41,7 +41,3 @@ export function splitMatches(text: string, needle: string): HighlightPart[] {
   if (at < text.length) out.push({ text: text.slice(at), match: false });
   return out;
 }
-
-export function stripAnsi(line: string): string {
-  return line.includes('\u001b') ? Anser.ansiToText(line) : line;
-}

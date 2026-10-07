@@ -81,7 +81,7 @@ test('mode switch — three mode tabs, an empty Http mode, and Studio state that
 
   // 1. three mode tabs (P91 §2: Terminal joins Studio/Api as a third peer), Studio active by
   // default.
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
+  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(4);
   await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'api')).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Connections');
@@ -314,7 +314,7 @@ async function inkBounds(
 
 async function modeTabInk(
   page: Page,
-  mode: 'studio' | 'api' | 'terminal',
+  mode: 'studio' | 'api' | 'terminal' | 'docker',
 ): Promise<{ iconCentreY: number; labelCentreY: number; iconRightInset: number }> {
   const tab = modeTab(page, mode);
   const iconBoxLocator = tab.locator('[data-testid="mode-tab-icon"]');
@@ -346,13 +346,14 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
   // P91 §17.3: Terminal is a third real .mode-tab — same ink guard extended to it as it was to
   // Studio/Api.
   const terminal = await modeTabInk(page, 'terminal');
+  const docker = await modeTabInk(page, 'docker');
 
   // (a) F9(a)/D6(a): both icons render close to filling their own 16px box — measured, not
   // merely inferred from the font's stated design grid. Before D6 (a 13px glyph in a 16px box)
   // this sandbox's own headless-Chromium render measures a 4px inset on "database" alone, purely
   // from the box/glyph size mismatch, on top of whatever the glyph's own side bearing adds; at
   // native size that mismatch is gone and only the glyph's own (smaller) bearing remains.
-  for (const { iconRightInset } of [studio, api, terminal]) {
+  for (const { iconRightInset } of [studio, api, terminal, docker]) {
     expect(iconRightInset).toBeLessThanOrEqual(3.5);
   }
 
@@ -361,7 +362,7 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
   // A generous tolerance: F9(b)'s own residual is sub-pixel on the two words this app actually
   // renders ("Studio" has no descender, "Api" does — a real, permanent, per-word difference in
   // ink extent that a shared line-height can't and shouldn't erase).
-  for (const { iconCentreY, labelCentreY } of [studio, api, terminal]) {
+  for (const { iconCentreY, labelCentreY } of [studio, api, terminal, docker]) {
     expect(Math.abs(iconCentreY - labelCentreY)).toBeLessThanOrEqual(1.5);
   }
 
