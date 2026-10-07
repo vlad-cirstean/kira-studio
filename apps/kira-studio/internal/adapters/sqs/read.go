@@ -258,7 +258,7 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 	builder.SetMaxReceiveCount(attrs.maxReceiveCount)
 	collected := 0
 	// A read-only poll hides messages for only browseVisibilityTimeout, so a later batch of the same
-	// poll can receive them again; seen keeps each message once and ends the poll when a batch adds none.
+	// poll can receive them again; seen keeps each message once and ends the poll at the first batch holding a repeat.
 	seen := map[string]struct{}{}
 
 	// F10: the duration a cached receipt handle stays trustworthy for — the queue's own attribute
@@ -282,13 +282,13 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 		if err != nil {
 			return page.StreamPage{}, mapError(err)
 		}
-		added, err := pushBatch(builder, result.Messages, handles, visibilityTimeout, readOnly, seen)
+		added, sawDup, err := pushBatch(builder, result.Messages, handles, visibilityTimeout, readOnly, seen)
 		if err != nil {
 			return page.StreamPage{}, err
 		}
 		collected += added
-		if readOnly && added == 0 {
-			break // only messages already shown: the queue is drained as far as a poll can see
+		if readOnly && (added == 0 || sawDup) {
+			break // a repeat means the short visibility window lapsed: stop before raising receive counts again
 		}
 		if len(result.Messages) < batchLimit {
 			break // short of a full batch — queue is likely drained
@@ -313,13 +313,14 @@ func receiveInput(queueURL string, batchLimit int, readOnly bool) *sqs.ReceiveMe
 	return input
 }
 
-// pushBatch adds one received batch to the page and returns how many messages it added. A read-only
-// poll skips messages already seen and keeps no receipt handles (it can never delete).
-func pushBatch(builder *page.StreamPageBuilder, messages []types.Message, handles *receiptHandles, visibilityTimeout time.Duration, readOnly bool, seen map[string]struct{}) (int, error) {
-	added := 0
+// pushBatch adds one received batch to the page and returns how many messages it added and whether
+// it held an already-seen one. A read-only poll skips messages already seen and keeps no receipt
+// handles (it can never delete).
+func pushBatch(builder *page.StreamPageBuilder, messages []types.Message, handles *receiptHandles, visibilityTimeout time.Duration, readOnly bool, seen map[string]struct{}) (added int, sawDup bool, err error) {
 	for _, m := range messages {
 		if readOnly && m.MessageId != nil {
 			if _, dup := seen[*m.MessageId]; dup {
+				sawDup = true
 				continue
 			}
 			seen[*m.MessageId] = struct{}{}
@@ -329,11 +330,11 @@ func pushBatch(builder *page.StreamPageBuilder, messages []types.Message, handle
 			h = handles
 		}
 		if err := pushMessage(builder, m, h, visibilityTimeout); err != nil {
-			return added, mapError(err)
+			return added, sawDup, mapError(err)
 		}
 		added++
 	}
-	return added, nil
+	return added, sawDup, nil
 }
 
 // countQueue is read.ts's countQueue — approximate only; SQS has no exact-count operation.

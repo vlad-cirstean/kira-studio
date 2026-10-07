@@ -105,11 +105,11 @@ const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord
 
 const isReadOnlyBatch = computed(() => isBatch.value && (connRecord.value?.readOnly ?? false));
 const redriveLimit = computed(() => page.value?.maxReceiveCount ?? null);
-const redriveSentence = computed(() =>
-  redriveLimit.value === null
+function redriveSentence(limit: number | null): string {
+  return limit === null
     ? '. '
-    : `. This queue moves a message to its dead-letter queue after ${redriveLimit.value} receives. `,
-);
+    : `. This queue moves a message to its dead-letter queue after ${limit} receives. `;
+}
 
 // D10/D12: a batch tab (SQS) never auto-loads on reconnect — only an explicit Poll does,
 // since every poll consumes from the queue rather than merely browsing it.
@@ -289,8 +289,9 @@ function onRefresh(): void {
 // tab before the first one.
 async function onPoll(): Promise<void> {
   if (isReadOnlyBatch.value && !rt.value?.receiveAcknowledged) {
+    const limit = redriveLimit.value ?? (await streamViewStore.fetchRedriveLimit(props.tab.id));
     const ok = await confirmDialogStore.confirmDialog(
-      `Each poll raises the receive count of every message it receives${redriveSentence.value}Poll anyway?`,
+      `Each poll raises the receive count of every message it receives${redriveSentence(limit)}Poll anyway?`,
     );
     if (!ok) return;
     streamViewStore.acknowledgeReceive(props.tab.id);
