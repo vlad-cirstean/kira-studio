@@ -219,13 +219,30 @@ const CATEGORY_COLOR: Record<ColumnTypeCategory, string> = {
   other: 'var(--kira-fg)',
 };
 
-export function columnTypeColor(dataType: string): string {
-  return CATEGORY_COLOR[columnTypeCategory(dataType)];
+// Literal classes mirror CATEGORY_COLOR for callers that paint text; no --color-syntax-control token exists.
+const CATEGORY_TEXT_CLASS: Record<ColumnTypeCategory, string> = {
+  numeric: 'text-syntax-number',
+  boolean: 'text-syntax-keyword',
+  datetime: 'text-(color:--kira-syntax-control)',
+  json: 'text-fg',
+  array: 'text-fg',
+  uuid: 'text-fg',
+  binary: 'text-fg',
+  string: 'text-fg',
+  other: 'text-fg',
+};
+
+export function columnTypeTextClass(dataType: string): string {
+  return CATEGORY_TEXT_CLASS[columnTypeCategory(dataType)];
 }
 
-/** The authoritative counterpart of columnTypeColor, for a caller that already has a
+/** The authoritative counterpart of columnTypeTextClass, for a caller that already has a
  *  ColumnDescriptor's own typeClass in hand rather than just its dataType string — the grid, its
  *  header tooltip, the cell editor and a console result all do, and use this instead. */
 export function typeClassColor(typeClass: TypeClass): string {
   return CATEGORY_COLOR[categoryForTypeClass(typeClass)];
+}
+
+export function typeClassTextClass(typeClass: TypeClass): string {
+  return CATEGORY_TEXT_CLASS[categoryForTypeClass(typeClass)];
 }

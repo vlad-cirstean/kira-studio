@@ -8,7 +8,7 @@ import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import { connColorVar } from '@theme/connColor';
+import { connColorVar, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -57,7 +57,7 @@ const rt = computed(() => gridViewStore.runtime[props.tab.id]);
 
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 
-const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(--kira-fg-muted)');
+const iconClass = computed(() => connTextClass(connRecord.value?.color) ?? 'text-muted-foreground');
 
 // P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
 const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
@@ -199,7 +199,7 @@ function onCloseSearch(): void {
     <ViewToolbar data-testid="view-head">
       <span v-if="railColor !== undefined" class="size-1.25 rounded-full shrink-0" :class="!railColor ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'" data-testid="conn-dot" :style="{ '--kira-rail': connColorVar(railColor) }" />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
-      <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }"><CodiconIcon :name="targetIcon" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass"><CodiconIcon :name="targetIcon" :size="13" /></span>
       <span class="text-kira-md text-fg truncate" data-testid="grid-target">
         <span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
       </span>

@@ -11,3 +11,42 @@
 export function connColorVar(color: string | null | undefined): string | undefined {
   return color && color !== 'none' ? `var(--kira-conn-${color})` : undefined;
 }
+
+// Tailwind emits only scanned literals, so each class is spelled in full.
+const CONN_BG: Record<string, string> = {
+  red: 'bg-conn-red',
+  orange: 'bg-conn-orange',
+  amber: 'bg-conn-amber',
+  olive: 'bg-conn-olive',
+  green: 'bg-conn-green',
+  teal: 'bg-conn-teal',
+  cyan: 'bg-conn-cyan',
+  blue: 'bg-conn-blue',
+  indigo: 'bg-conn-indigo',
+  violet: 'bg-conn-violet',
+  magenta: 'bg-conn-magenta',
+  grey: 'bg-conn-grey',
+};
+
+const CONN_TEXT: Record<string, string> = {
+  red: 'text-conn-red',
+  orange: 'text-conn-orange',
+  amber: 'text-conn-amber',
+  olive: 'text-conn-olive',
+  green: 'text-conn-green',
+  teal: 'text-conn-teal',
+  cyan: 'text-conn-cyan',
+  blue: 'text-conn-blue',
+  indigo: 'text-conn-indigo',
+  violet: 'text-conn-violet',
+  magenta: 'text-conn-magenta',
+  grey: 'text-conn-grey',
+};
+
+export function connBgClass(color: string | null | undefined): string | undefined {
+  return color ? CONN_BG[color] : undefined;
+}
+
+export function connTextClass(color: string | null | undefined): string | undefined {
+  return color ? CONN_TEXT[color] : undefined;
+}

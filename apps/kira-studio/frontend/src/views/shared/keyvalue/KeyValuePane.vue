@@ -48,7 +48,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { connColorVar, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -128,7 +128,7 @@ const connRecord = computed(() => connectionsStore.connectionRecord(host.value?.
 // P16 design system LAW: connection colour reaches the view as a 2px rail (the toolbar cap)
 // plus a dot (the view header) — never a tint or a full border. Mirrors Toolbar.vue/TreeRow.vue.
 const connColor = computed(() => connRecord.value?.color);
-const iconColor = computed(() => connColorVar(connColor.value) ?? 'var(--kira-info)');
+const iconClass = computed(() => connTextClass(connColor.value) ?? 'text-info');
 
 // P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart).
 const runState = useRunState(() => props.tab?.id);
@@ -723,7 +723,7 @@ onUnmounted(() => {
         <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
           <EngineIcon :kind="connRecord.kind" :size="13" />
         </span>
-        <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }">
+        <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass">
           <CodiconIcon :name="page?.redisType === 'object' ? 'file' : 'key'" :size="13" />
         </span>
         <span class="text-kira-md text-fg truncate" data-testid="keyvalue-target"

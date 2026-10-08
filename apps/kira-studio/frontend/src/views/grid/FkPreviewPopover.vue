@@ -8,7 +8,7 @@ import { onClickOutside, useEventListener } from '@vueuse/core';
 import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
-import { typeClassColor } from '../../theme/icons';
+import { typeClassTextClass } from '../../theme/icons';
 import { type FkPreviewState, fetchReferencedRow, type PreviewSignal } from './fkPreview';
 import { type FkNavContext, foreignKeyValueFilter, qualifiedNameForPath } from './menu';
 
@@ -168,7 +168,7 @@ onUnmounted(() => {
         <table v-else-if="state.status === 'ready'" class="w-full border-collapse text-kira-md">
           <tbody>
             <tr v-for="(col, i) in state.columns" :key="col.name">
-              <th class="text-left font-medium text-muted-foreground whitespace-nowrap align-top py-0.5 pl-0 pr-1" :style="{ color: typeClassColor(col.typeClass) }">
+              <th class="text-left font-medium whitespace-nowrap align-top py-0.5 pl-0 pr-1" :class="typeClassTextClass(col.typeClass)">
                 {{ col.name }}
                 <span v-if="col.isPrimaryKey" class="header-key">PK</span>
                 <span v-if="col.isTarget" class="header-key is-fk">FK</span>

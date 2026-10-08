@@ -4,7 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { columnTypeColor, columnTypeIcon } from '../../theme/icons';
+import { columnTypeIcon, columnTypeTextClass } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
 import { columnsSectionMenu } from './columnsMenu';
 
@@ -76,7 +76,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
             <CodiconIcon
               :name="columnTypeIcon(col.dataType)"
               :size="13"
-              :style="{ color: columnTypeColor(col.dataType) }"
+              :class="columnTypeTextClass(col.dataType)"
             />
           </td>
           <td :class="DEF_TD" class="def-col-name">{{ col.name }}</td>
@@ -85,7 +85,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
             <span v-else-if="keyLabel(col) === 'FK'" class="text-info text-kira-sm">FK</span>
           </td>
           <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">
-            <span :style="{ color: columnTypeColor(col.dataType) }">{{ col.dataType }}</span>
+            <span :class="columnTypeTextClass(col.dataType)">{{ col.dataType }}</span>
             <Tooltip v-if="typeDescription(col.dataType)">
               <TooltipTrigger as-child>
                 <span class="align-middle cursor-help text-subtle ml-0.5" :aria-label="typeDescription(col.dataType) ?? ''">

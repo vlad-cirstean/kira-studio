@@ -70,17 +70,17 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
 // 'orange' is ClickHouse's own identity colour and sits apart from every other SQL engine's
 // blue/cyan/teal/violet hues (Kafka's amber is the nearest neighbour, and belongs to a stream
 // engine that never sits beside a SQL connection in the same list).
-const KIND_ACCENT: Record<ConnectionKind, string> = {
-  postgres: 'cyan',
-  mariadb: 'blue',
-  mysql: 'teal',
-  sqlite: 'violet',
-  clickhouse: 'orange',
-  mongodb: 'green',
-  redis: 'red',
-  kafka: 'amber',
-  sqs: 'magenta',
-  s3: 'olive',
+const KIND_ACCENT_CLASS: Record<ConnectionKind, string> = {
+  postgres: 'text-conn-cyan',
+  mariadb: 'text-conn-blue',
+  mysql: 'text-conn-teal',
+  sqlite: 'text-conn-violet',
+  clickhouse: 'text-conn-orange',
+  mongodb: 'text-conn-green',
+  redis: 'text-conn-red',
+  kafka: 'text-conn-amber',
+  sqs: 'text-conn-magenta',
+  s3: 'text-conn-olive',
 };
 const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'postgres',
@@ -627,7 +627,7 @@ const preconnectText = computed({
       <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
            is identity here, not a control (changed via "Change engine" back to step 1). -->
       <DialogHeader v-else>
-        <span class="flex shrink-0" :style="{ color: `var(--kira-conn-${KIND_ACCENT[draft.kind]})` }">
+        <span class="flex shrink-0" :class="KIND_ACCENT_CLASS[draft.kind]">
           <EngineIcon :kind="draft.kind" :size="13" />
         </span>
         <DialogTitle>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</DialogTitle>
@@ -686,8 +686,8 @@ const preconnectText = computed({
                   @change="pickKind(kind)"
                 />
                 <span
-                  class="flex mb-1 text-muted-foreground"
-                  :style="{ color: SUPPORTED_KINDS.has(kind) ? `var(--kira-conn-${KIND_ACCENT[kind]})` : undefined }"
+                  class="flex mb-1"
+                  :class="SUPPORTED_KINDS.has(kind) ? KIND_ACCENT_CLASS[kind] : 'text-muted-foreground'"
                 >
                   <EngineIcon :kind="kind" :size="22" />
                 </span>

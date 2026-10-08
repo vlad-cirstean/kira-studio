@@ -67,14 +67,14 @@ const summary = computed(() => {
 interface PhaseSegment {
   key: 'dns' | 'connect' | 'tls' | 'wait' | 'download';
   label: string;
-  colorVar: string;
+  bgClass: string;
 }
 const PHASE_SEGMENTS: readonly PhaseSegment[] = [
-  { key: 'dns', label: 'DNS', colorVar: 'var(--kira-conn-violet)' },
-  { key: 'connect', label: 'Connect', colorVar: 'var(--kira-conn-blue)' },
-  { key: 'tls', label: 'TLS', colorVar: 'var(--kira-conn-teal)' },
-  { key: 'wait', label: 'Wait', colorVar: 'var(--kira-conn-amber)' },
-  { key: 'download', label: 'Download', colorVar: 'var(--kira-conn-green)' },
+  { key: 'dns', label: 'DNS', bgClass: 'bg-conn-violet' },
+  { key: 'connect', label: 'Connect', bgClass: 'bg-conn-blue' },
+  { key: 'tls', label: 'TLS', bgClass: 'bg-conn-teal' },
+  { key: 'wait', label: 'Wait', bgClass: 'bg-conn-amber' },
+  { key: 'download', label: 'Download', bgClass: 'bg-conn-green' },
 ];
 // D12: a hop whose own total is a rounding sliver of the send still renders a visible bar, so a
 // sub-millisecond reused hop is seen rather than a hairline.
@@ -97,15 +97,15 @@ function hopBarStyle(hop: HttpTimelineHop): { left: string; width: string } {
 /** D5: the five phases plus a trailing, unlabelled "residue" segment for whatever time inside the
  *  hop's own total is not attributed to any of them — the CONNECT-tunnel gap F12 measured, mostly.
  *  Never padded to make the bar reach the end; the residue segment *is* the honest admission. */
-function hopSegments(hop: HttpTimelineHop): Array<{ colorVar: string; widthPct: number }> {
+function hopSegments(hop: HttpTimelineHop): Array<{ bgClass: string; widthPct: number }> {
   const total = hop.totalMs;
   const segs = PHASE_SEGMENTS.map((s) => ({
-    colorVar: s.colorVar,
+    bgClass: s.bgClass,
     widthPct: pct(hop[s.key]?.durationMs ?? 0, total),
   }));
   const measured = segs.reduce((sum, s) => sum + s.widthPct, 0);
   const residuePct = Math.max(0, 100 - measured);
-  return [...segs, { colorVar: 'var(--kira-conn-grey)', widthPct: residuePct }];
+  return [...segs, { bgClass: 'bg-conn-grey', widthPct: residuePct }];
 }
 
 function residueMs(hop: HttpTimelineHop): number {
@@ -217,7 +217,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
         </div>
         <div class="flex flex-wrap gap-1.5 px-0.5 text-kira-sm text-subtle" data-testid="http-timeline-legend">
           <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="inline-flex items-center gap-0.5">
-            <span class="inline-block h-2 w-2 rounded-kira-sm" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
+            <span class="inline-block h-2 w-2 rounded-kira-sm" :class="seg.bgClass" />{{ seg.label }}
           </span>
           <span class="inline-flex items-center gap-0.5">
             <span class="inline-block h-2 w-2 rounded-kira-sm bg-conn-grey" />Unattributed
@@ -254,7 +254,8 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
                 v-for="(seg, i) in hopSegments(hop)"
                 :key="i"
                 class="h-full"
-                :style="{ width: `${seg.widthPct}%`, backgroundColor: seg.colorVar }"
+                :class="seg.bgClass"
+                :style="{ width: `${seg.widthPct}%` }"
               />
             </div>
           </div>

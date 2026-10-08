@@ -18,7 +18,7 @@ import { findRanges } from '../../../editor/findRanges';
 import MonacoHost from '../../../editor/MonacoHost.vue';
 import { cellKey, type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConnectionsStore } from '../../../state/connections';
-import { typeClassColor } from '../../../theme/icons';
+import { typeClassTextClass } from '../../../theme/icons';
 import EditBufferActions from '../EditBufferActions.vue';
 import ResponseFindBar, { type FindBarHost, type FindBarTarget } from '../ResponseFindBar.vue';
 import { sqlDialectFor } from '../sqlIdent';
@@ -478,9 +478,9 @@ const dataTypeHint = computed(
 
 // Item (regression pass, task batch P46-7): reads the column's own typeClass — the adapter's own
 // authoritative typeClassFor() verdict — rather than re-guessing a category from its dataType
-// string a second time (columnTypeColor, theme/icons.ts, still does that guess for the one
+// string a second time (columnTypeTextClass, theme/icons.ts, still does that guess for the one
 // caller, the Structure pane, that has no typeClass at all to read instead).
-const dataTypeColor = computed(() => typeClassColor(selectedCell.value.column.typeClass));
+const dataTypeClass = computed(() => typeClassTextClass(selectedCell.value.column.typeClass));
 
 // The format itself is never restated here — the format-select right next to this badge already
 // shows it ("Auto — X" when detected, or the manually chosen format), so a leading "detected X" /
@@ -529,11 +529,11 @@ const statusLine = computed(() => {
       >
       <Tooltip v-if="dataTypeHint">
         <TooltipTrigger as-child>
-          <Badge :style="{ color: dataTypeColor }">{{ selectedCell.column.dataType }}</Badge>
+          <Badge :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ dataTypeHint }}</TooltipContent>
       </Tooltip>
-      <Badge v-else :style="{ color: dataTypeColor }">{{ selectedCell.column.dataType }}</Badge>
+      <Badge v-else :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
       <Badge v-if="isNullValue" variant="info" data-testid="cell-editor-badge-null">NULL</Badge>
       <Badge v-if="isEmptyValue" variant="info" data-testid="cell-editor-badge-empty">empty</Badge>
       <Badge v-if="isTruncatedValue" variant="warn" data-testid="cell-editor-badge-truncated">truncated</Badge>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sql-split';
-import { connColorVar } from '@theme/connColor';
+import { connBgClass } from '@theme/connColor';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import { type OpLogColumn, opLogMenuItems } from '@workbench/components/opLog';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -160,7 +160,7 @@ function menuFor(record: OpRecord): MenuItem[] {
         <span
           v-if="connectionFor(record)"
           class="w-2 h-2 shrink-0 rounded-kira-xs"
-          :style="{ background: connColorVar(connectionFor(record)?.color) ?? 'none' }"
+          :class="connBgClass(connectionFor(record)?.color)"
         />
         <span class="truncate min-w-0">{{ connectionFor(record)?.name ?? '—' }}</span>
       </span>

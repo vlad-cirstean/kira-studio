@@ -4,7 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { connColorVar } from '@theme/connColor';
+import { connBgClass } from '@theme/connColor';
 import { useLocalStorage } from '@vueuse/core';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -221,7 +221,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
                     <span
                       v-if="script.color !== 'none'"
                       class="w-2.5 h-2.5 rounded-full shrink-0"
-                      :style="{ background: connColorVar(script.color) }"
+                      :class="connBgClass(script.color)"
                     />
                     <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
                     <div class="flex-1 min-w-0 flex flex-col">

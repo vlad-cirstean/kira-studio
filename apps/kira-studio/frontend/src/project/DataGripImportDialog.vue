@@ -19,17 +19,17 @@ import EngineIcon from '../theme/EngineIcon.vue';
 // is never fetched or shown here (D9/OQ-3): only an outlook badge, resolved from file reads,
 // says what Import is expected to do.
 
-const KIND_ACCENT: Record<ConnectionKind, string> = {
-  postgres: 'cyan',
-  mariadb: 'blue',
-  mysql: 'teal',
-  sqlite: 'violet',
-  clickhouse: 'orange',
-  mongodb: 'green',
-  redis: 'red',
-  kafka: 'amber',
-  sqs: 'magenta',
-  s3: 'olive',
+const KIND_ACCENT_CLASS: Record<ConnectionKind, string> = {
+  postgres: 'text-conn-cyan',
+  mariadb: 'text-conn-blue',
+  mysql: 'text-conn-teal',
+  sqlite: 'text-conn-violet',
+  clickhouse: 'text-conn-orange',
+  mongodb: 'text-conn-green',
+  redis: 'text-conn-red',
+  kafka: 'text-conn-amber',
+  sqs: 'text-conn-magenta',
+  s3: 'text-conn-olive',
 };
 
 const OUTLOOK_LABEL: Record<string, string> = {
@@ -194,7 +194,7 @@ async function onConfirm(): Promise<void> {
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
           </span>
-          <span v-if="row.importable" class="shrink-0 flex" :style="{ color: `var(--kira-conn-${KIND_ACCENT[row.kind as ConnectionKind]})` }">
+          <span v-if="row.importable" class="shrink-0 flex" :class="KIND_ACCENT_CLASS[row.kind as ConnectionKind]">
             <EngineIcon :kind="row.kind as ConnectionKind" :size="15" />
           </span>
           <span v-else class="shrink-0 flex text-subtle"><CodiconIcon name="circle-slash" :size="15" /></span>

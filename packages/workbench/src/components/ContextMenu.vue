@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { connBgClass } from '@theme/connColor';
 import { formatShortcut } from '../shortcuts/keys';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 
@@ -78,8 +78,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                     <span
                       v-if="sub.type === 'item' && sub.swatch"
                       class="w-2.5 h-2.5 rounded-full shrink-0"
-                      :class="{ 'border border-disabled': sub.swatch === 'none' }"
-                      :style="sub.swatch === 'none' ? undefined : { background: connColorVar(sub.swatch) }"
+                      :class="sub.swatch === 'none' ? 'border border-disabled' : connBgClass(sub.swatch)"
                     />
                     <CodiconIcon
                       v-else-if="sub.icon"
@@ -118,8 +117,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                 <span
                   v-if="item.swatch"
                   class="w-2.5 h-2.5 rounded-full shrink-0"
-                  :class="{ 'border border-disabled': item.swatch === 'none' }"
-                  :style="item.swatch === 'none' ? undefined : { background: connColorVar(item.swatch) }"
+                  :class="item.swatch === 'none' ? 'border border-disabled' : connBgClass(item.swatch)"
                 />
                 <CodiconIcon v-else-if="item.icon" :name="item.icon" :size="13" class="text-muted-foreground" />
               </span>

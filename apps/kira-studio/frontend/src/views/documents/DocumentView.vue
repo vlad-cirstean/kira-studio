@@ -11,7 +11,7 @@ import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { connColorVar, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -154,7 +154,7 @@ function editGateFor(row: number): { editable: boolean; label: string } {
 // when a colour is set later. Mirrors Toolbar.vue's `color`/`railStyle` computed pair.
 const connectionColor = computed(() => connectionsStore.connectionRecord(props.tab.connectionId)?.color);
 
-const iconColor = computed(() => connColorVar(connectionColor.value) ?? 'var(--kira-fg-muted)');
+const iconClass = computed(() => connTextClass(connectionColor.value) ?? 'text-muted-foreground');
 
 // P104 §3: ViewChrome/ViewHeader/RunState inlined -- railColor mirrors ViewChrome.vue's own
 // `envColor ?? (connection ? connection.color ?? null : undefined)`; this view has no envColor.
@@ -734,7 +734,7 @@ onUnmounted(() => {
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connRecord.kind" :size="13" />
       </span>
-      <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }">
+      <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass">
         <CodiconIcon name="json" :size="13" />
       </span>
       <span class="text-kira-md text-fg truncate" data-testid="document-target"

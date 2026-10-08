@@ -19,7 +19,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { connColorVar, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -76,7 +76,7 @@ const caps = computed(() => {
 // pair exactly. No colour assigned leaves `--kira-rail` unset, so the reserved slot stays blank
 // instead of shifting anything.
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
-const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(--kira-fg-muted)');
+const iconClass = computed(() => connTextClass(connRecord.value?.color) ?? 'text-muted-foreground');
 
 const pathPrefix = computed(() => (connRecord.value ? `${connRecord.value.name} / ` : ''));
 
@@ -697,7 +697,7 @@ onUnmounted(() => {
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connRecord.kind" :size="13" />
       </span>
-      <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }">
+      <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass">
         <CodiconIcon name="broadcast" :size="13" />
       </span>
       <span class="text-kira-md text-fg truncate"

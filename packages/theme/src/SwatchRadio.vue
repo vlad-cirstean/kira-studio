@@ -3,6 +3,8 @@
 // times (QuickCommandsDialog.vue x2, VariableSetView.vue, ConnectionDialog.vue). The outline fix from
 // I2-8 is already reflected here: peer-focus-visible:outline-* stays always-on utility, the
 // selected-state outline is the only conditional class.
+import { connBgClass } from './connColor';
+
 defineProps<{
   name: string;
   value: string;
@@ -30,11 +32,13 @@ const emit = defineEmits<{ change: [value: string] }>();
     <span
       aria-hidden="true"
       class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
-      :class="{
-        'outline-2 outline-offset-2 outline-fg': checked,
-        'swatch-none': color === 'none',
-      }"
-      :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+      :class="[
+        {
+          'outline-2 outline-offset-2 outline-fg': checked,
+          'swatch-none': color === 'none',
+        },
+        connBgClass(color),
+      ]"
       >&nbsp;</span
     >
   </label>

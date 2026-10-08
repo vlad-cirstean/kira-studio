@@ -2,7 +2,7 @@
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { connColorVar } from '@theme/connColor';
+import { connBgClass, connTextClass } from '@theme/connColor';
 import { formatRelative } from '@workbench/util/format';
 import { computed } from 'vue';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
@@ -39,11 +39,11 @@ function iconFor(entry: RecentTableEntry): string {
   return 'table';
 }
 
-function iconColorFor(entry: RecentTableEntry): string {
+function iconColorClass(entry: RecentTableEntry): string {
   if (entry.kind === 'document') {
-    return connColorVar(connectionFor(entry)?.color) ?? 'var(--kira-fg-muted)';
+    return connTextClass(connectionFor(entry)?.color) ?? 'text-muted-foreground';
   }
-  return 'var(--kira-info)';
+  return 'text-info';
 }
 
 function openRecent(entry: RecentTableEntry): void {
@@ -113,9 +113,9 @@ function openRecent(entry: RecentTableEntry): void {
           >
             <span
               class="w-0.5 h-3.5 rounded-xs shrink-0"
-              :style="{ background: connColorVar(connectionFor(entry)?.color) ?? 'none' }"
+              :class="connBgClass(connectionFor(entry)?.color)"
             />
-            <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColorFor(entry) }">
+            <span class="size-4 flex items-center justify-center shrink-0" :class="iconColorClass(entry)">
               <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>
             <span class="truncate min-w-0">{{ entry.path }}</span>
