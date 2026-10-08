@@ -17,7 +17,7 @@ func TestRunEngine_SetTaskStageMovesBothWaysAndGuardsLiveRuns(t *testing.T) {
 
 	e.start(id)
 	e.waitRun(id, "one/api", model.AdeRunRunning)
-	if _, err := e.board.SetTaskStage(ctx, id, "review"); err == nil {
+	if _, err := e.board.SetTaskStage(ctx, id, "review", ""); err == nil {
 		t.Fatal("stage moved while a run is live")
 	}
 	if err := e.board.StopRun(ctx, e.runs(id)["one/api"].ID); err != nil {
@@ -26,7 +26,7 @@ func TestRunEngine_SetTaskStageMovesBothWaysAndGuardsLiveRuns(t *testing.T) {
 	e.waitRun(id, "one/api", model.AdeRunStuck)
 
 	for _, want := range []string{"review", "build", "done", "build"} {
-		task, err := e.board.SetTaskStage(ctx, id, want)
+		task, err := e.board.SetTaskStage(ctx, id, want, "")
 		if err != nil || task.StageID != want {
 			t.Fatalf("SetTaskStage(%q) = %+v, %v", want, task.StageID, err)
 		}
@@ -34,7 +34,7 @@ func TestRunEngine_SetTaskStageMovesBothWaysAndGuardsLiveRuns(t *testing.T) {
 	if len(e.runs(id)) != 1 {
 		t.Fatal("moving stages deleted runs")
 	}
-	if _, err := e.board.SetTaskStage(ctx, id, "nope"); err == nil {
+	if _, err := e.board.SetTaskStage(ctx, id, "nope", ""); err == nil {
 		t.Fatal("unknown stage accepted")
 	}
 }
@@ -73,7 +73,7 @@ func TestRunEngine_StartedTaskKeepsItsWorkflowAfterAnEdit(t *testing.T) {
 		t.Fatalf("idle task = %+v, want no snapshot and no flag", idleWire)
 	}
 
-	if _, err := e.board.SetTaskStage(ctx, started, "qa"); err == nil {
+	if _, err := e.board.SetTaskStage(ctx, started, "qa", ""); err == nil {
 		t.Fatal("started task moved to a stage only the edited file has")
 	}
 	task, err := e.board.StageDone(ctx, started)
@@ -81,7 +81,7 @@ func TestRunEngine_StartedTaskKeepsItsWorkflowAfterAnEdit(t *testing.T) {
 		t.Fatalf("StageDone = %+v, %v; want review from the snapshot, not qa", task.StageID, err)
 	}
 
-	task, err = e.board.SetTaskStage(ctx, idle, "qa")
+	task, err = e.board.SetTaskStage(ctx, idle, "qa", "")
 	if err != nil || task.StageID != "qa" {
 		t.Fatalf("idle SetTaskStage = %+v, %v; want qa from the live file", task.StageID, err)
 	}

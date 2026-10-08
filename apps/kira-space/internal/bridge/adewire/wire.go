@@ -575,6 +575,9 @@ type StartRunArgs struct {
 	TaskID      string            `json:"taskId"`
 	BranchNames map[string]string `json:"branchNames"`
 	Message     string            `json:"message"`
+	// FromStageID, when set, is the stage the caller saw; the engine refuses with ErrStale when the
+	// task has moved on. Desktop leaves it empty.
+	FromStageID string `json:"fromStageId,omitempty"`
 }
 
 type StepArgs struct {
@@ -666,6 +669,9 @@ type TakeOverArgs struct {
 type LaunchStageArgs struct {
 	TaskID  string `json:"taskId"`
 	Message string `json:"message"`
+	// FromStageID, when set, is the stage the caller saw; the engine refuses with ErrStale when the
+	// task has moved on. Desktop leaves it empty.
+	FromStageID string `json:"fromStageId,omitempty"`
 }
 
 type StartBranchArgs struct {
@@ -681,6 +687,9 @@ type SetTaskWorkflowArgs struct {
 type SetTaskStageArgs struct {
 	TaskID  string `json:"taskId"`
 	StageID string `json:"stageId"`
+	// FromStageID, when set, is the stage the caller saw; the engine refuses with ErrStale when the
+	// task has moved on. Desktop leaves it empty.
+	FromStageID string `json:"fromStageId,omitempty"`
 }
 
 type SendArgs struct {

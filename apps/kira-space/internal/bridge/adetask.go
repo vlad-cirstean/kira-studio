@@ -77,6 +77,8 @@ func adeTaskError(err error) error {
 	switch {
 	case err == nil:
 		return nil
+	case errors.Is(err, ade.ErrStale):
+		return ipcerr.New("E_STALE", err.Error())
 	case errors.Is(err, ade.ErrSetupPending):
 		return ipcerr.New("E_PREPARING", err.Error())
 	case errors.Is(err, ade.ErrInvalidInput), errors.Is(err, repos.ErrEstimateShrink),
@@ -96,6 +98,14 @@ func adeTaskError(err error) error {
 }
 
 var adeWorkflowIDRe = regexp.MustCompile(`^[a-z0-9_-]{1,64}$`)
+
+// validateAdeFromStage checks the optional stale-guard stage id.
+func validateAdeFromStage(id string) error {
+	if id == "" {
+		return nil
+	}
+	return validateAdeItemID(id, "fromStageId")
+}
 
 func adeTaskInvalid(msg string) error { return ipcerr.New("E_INVALID", msg) }
 
@@ -549,6 +559,9 @@ func (s *AdeTaskService) StartRun(ctx context.Context, args adewire.StartRunArgs
 	if len(args.Message) > adeMaxMessageBytes {
 		return adewire.StartRunResult{}, adeTaskInvalid("message is too long")
 	}
+	if err := validateAdeFromStage(args.FromStageID); err != nil {
+		return adewire.StartRunResult{}, err
+	}
 	r, err := s.Engine.StartRun(ctx, args)
 	return r, adeTaskError(err)
 }
@@ -599,7 +612,10 @@ func (s *AdeTaskService) SetTaskStage(ctx context.Context, args adewire.SetTaskS
 	if err := validateAdeItemID(args.StageID, "stageId"); err != nil {
 		return adewire.Task{}, err
 	}
-	t, err := s.Engine.SetTaskStage(ctx, args.TaskID, args.StageID)
+	if err := validateAdeFromStage(args.FromStageID); err != nil {
+		return adewire.Task{}, err
+	}
+	t, err := s.Engine.SetTaskStage(ctx, args.TaskID, args.StageID, args.FromStageID)
 	return t, adeTaskError(err)
 }
 
@@ -650,6 +666,9 @@ func (s *AdeTaskService) LaunchStage(ctx context.Context, args adewire.LaunchSta
 	}
 	if len(args.Message) > adeMaxMessageBytes {
 		return adewire.Launch{}, adeTaskInvalid("message is too long")
+	}
+	if err := validateAdeFromStage(args.FromStageID); err != nil {
+		return adewire.Launch{}, err
 	}
 	l, err := s.Engine.LaunchStage(ctx, args)
 	return l, adeTaskError(err)

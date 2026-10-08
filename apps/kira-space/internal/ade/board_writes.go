@@ -21,6 +21,19 @@ import (
 // ErrInvalidInput marks a caller mistake (bad id, bad value); the bridge maps it to E_INVALID.
 var ErrInvalidInput = errors.New("ade: invalid input")
 
+// ErrStale marks a write built from a board the caller saw before the task moved on; the bridge
+// maps it to E_STALE.
+var ErrStale = errors.New("ade: task moved on")
+
+// staleStage refuses when the caller named the stage it saw and the task is elsewhere now. Called
+// under the task's lock, so no move can slip in between the check and the write.
+func staleStage(tc *taskCtx, from string) error {
+	if from != "" && tc.task.StageID != from {
+		return fmt.Errorf("%w: the task is now at another stage", ErrStale)
+	}
+	return nil
+}
+
 func invalid(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidInput, fmt.Sprintf(format, args...))
 }

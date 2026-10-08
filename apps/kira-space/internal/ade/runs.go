@@ -223,6 +223,9 @@ func (b *TaskBoard) StartRun(ctx context.Context, args adewire.StartRunArgs) (ad
 	if err != nil {
 		return adewire.StartRunResult{}, err
 	}
+	if err := staleStage(tc, args.FromStageID); err != nil {
+		return adewire.StartRunResult{}, err
+	}
 	if tc.stage == nil || tc.stage.Kind == "user" {
 		return adewire.StartRunResult{}, invalid("the current stage is not an automated stage")
 	}
@@ -875,12 +878,15 @@ func (b *TaskBoard) StageDone(_ context.Context, taskID string) (adewire.Task, e
 
 // SetTaskStage moves the task to any stage of its workflow, or to "done". Runs are kept: a stage
 // revisited shows its earlier runs as history. Refused while a run of the task is live.
-func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID string) (adewire.Task, error) {
+func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID, fromStageID string) (adewire.Task, error) {
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
 	tc, err := b.loadTaskCtx(taskID)
 	if err != nil {
+		return adewire.Task{}, err
+	}
+	if err := staleStage(tc, fromStageID); err != nil {
 		return adewire.Task{}, err
 	}
 	if tc.task.WorkflowID == "" {

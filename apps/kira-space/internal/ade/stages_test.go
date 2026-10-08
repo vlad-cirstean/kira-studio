@@ -55,7 +55,7 @@ func TestSkippedStages_engine(t *testing.T) {
 		t.Fatalf("start stage = %q, %v; want b", created.StageID, err)
 	}
 	id := created.ID
-	if _, err := e.board.SetTaskStage(ctx, id, "d"); err == nil {
+	if _, err := e.board.SetTaskStage(ctx, id, "d", ""); err == nil {
 		t.Fatal("SetTaskStage accepted a skipped stage")
 	}
 	if task, err := e.board.StageDone(ctx, id); err != nil || task.StageID != "c" {

@@ -403,6 +403,9 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 	if err != nil {
 		return adewire.Launch{}, err
 	}
+	if err := staleStage(tc, args.FromStageID); err != nil {
+		return adewire.Launch{}, err
+	}
 	if tc.stage == nil || tc.stage.Kind != "user" || !tc.stage.Session {
 		return adewire.Launch{}, invalid("the current stage has no interactive session")
 	}

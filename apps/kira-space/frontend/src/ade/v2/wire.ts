@@ -566,6 +566,7 @@ export interface StartRunArgs {
   taskId: string;
   branchNames: Record<string, string> /* branchId -> name, '' = derived from the task title */;
   message: string;
+  fromStageId?: string;
 }
 export interface StepArgs {
   taskId: string;
@@ -590,6 +591,7 @@ export interface TakeOverArgs {
 export interface LaunchStageArgs {
   taskId: string;
   message: string;
+  fromStageId?: string;
 }
 export interface StartBranchArgs {
   branchId: string;
@@ -602,6 +604,7 @@ export interface SetTaskWorkflowArgs {
 export interface SetTaskStageArgs {
   taskId: string;
   stageId: string;
+  fromStageId?: string;
 }
 export interface SendArgs {
   sessionId: string;
