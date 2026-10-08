@@ -12,12 +12,11 @@ import (
 )
 
 type ortEncoder struct {
-	spec     Spec
-	tk       *hftokenizer.Tokenizer
-	sess     *ort.DynamicAdvancedSession
-	inNames  []string
-	typeIDs  bool
-	outIndex int
+	spec    Spec
+	tk      *hftokenizer.Tokenizer
+	sess    *ort.DynamicAdvancedSession
+	inNames []string
+	typeIDs bool
 }
 
 func newEncoder(libPath, dir string, s Spec) (encoder, error) {
