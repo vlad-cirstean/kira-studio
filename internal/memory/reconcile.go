@@ -41,6 +41,12 @@ type work struct {
 	Keywords     []string
 	cands        []Memory
 	dec          decision
+
+	// vec is Fact's embedding (nil when none could be made); mergedFact/mergedVec cache an
+	// update's rewritten fact across commit retries.
+	vec        []float32
+	mergedFact string
+	mergedVec  []float32
 }
 
 type decision struct {
@@ -88,9 +94,10 @@ func (s *Service) prepare(ctx context.Context, w *work) (needsLLM bool, err erro
 			return false, nil
 		}
 	}
-	cands, err := s.store.searchFTS(ctx, SearchArgs{
-		Query: w.Fact + " " + strings.Join(w.Keywords, " "), Limit: reconcileCandidateLimit,
-	})
+	if w.vec == nil {
+		w.vec = s.embedDoc(ctx, w.Fact)
+	}
+	cands, err := s.candidates(ctx, w)
 	if err != nil {
 		return false, err
 	}
@@ -100,6 +107,41 @@ func (s *Service) prepare(ctx context.Context, w *work) (needsLLM bool, err erro
 		return false, nil
 	}
 	return true, nil
+}
+
+// candidates are the keyword top reconcileCandidateLimit plus up to reconcileVectorCandidates
+// memories whose embedding is within the spec's DocFloor of the new fact, keyword matches first.
+func (s *Service) candidates(ctx context.Context, w *work) ([]Memory, error) {
+	cands, err := s.store.searchFTS(ctx, SearchArgs{
+		Query: w.Fact + " " + strings.Join(w.Keywords, " "), Limit: reconcileCandidateLimit,
+	})
+	if err != nil || w.vec == nil {
+		return cands, err
+	}
+	top, err := s.store.vectorTopK(ctx, s.opts.Embedder.Spec().ID, w.vec, false, reconcileVectorCandidates)
+	if err != nil {
+		return nil, err
+	}
+	have := make(map[int64]struct{}, len(cands))
+	for _, c := range cands {
+		have[c.seq] = struct{}{}
+	}
+	var extra []int64
+	for _, t := range top {
+		if _, dup := have[t.seq]; !dup && t.score >= s.opts.Embedder.Spec().DocFloor {
+			extra = append(extra, t.seq)
+		}
+	}
+	loaded, err := s.store.memoriesBySeq(ctx, extra)
+	if err != nil {
+		return nil, err
+	}
+	for _, seq := range extra {
+		if m, ok := loaded[seq]; ok {
+			cands = append(cands, m)
+		}
+	}
+	return cands, nil
 }
 
 // reconcile makes one model call for every work needing it and fills each work's dec. A bad

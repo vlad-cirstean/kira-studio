@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"strings"
 	"testing"
 )
@@ -61,7 +62,7 @@ func req(items ...Item) StoreRequest {
 
 func newService(t *testing.T, r Runner) (*Service, *Store) {
 	st := newStore(t)
-	return NewService(st, r, nil), st
+	return NewService(st, r, ServiceOptions{}), st
 }
 
 func TestChallengeStoresNothing(t *testing.T) {
@@ -233,5 +234,85 @@ func TestGateMissingIndexIsOutputError(t *testing.T) {
 	}
 	if rows, _ := st.Recent(context.Background(), 10); len(rows) != 0 {
 		t.Error("nothing may be stored")
+	}
+}
+
+// fakeEmbedder maps text to a fixed unit vector; unknown text embeds to the zero vector. A set
+// err makes every call fail.
+type fakeEmbedder struct {
+	vecs map[string][]float32
+	err  error
+}
+
+func (f *fakeEmbedder) Spec() embed.Spec {
+	return embed.Spec{ID: "fake", Dim: 3, QueryPrefix: "q: ", DocFloor: 0.85}
+}
+
+func (f *fakeEmbedder) Status() embed.Status { return embed.Status{State: embed.StateReady} }
+
+func (f *fakeEmbedder) Embed(_ context.Context, texts []string, _ bool) ([][]float32, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := make([][]float32, len(texts))
+	for i, t := range texts {
+		out[i] = f.vecs[t]
+		if out[i] == nil {
+			out[i] = []float32{0, 0, 0}
+		}
+	}
+	return out, nil
+}
+
+func TestHybridSearchUnionsKeywordAndSemantic(t *testing.T) {
+	ctx := context.Background()
+	emb := &fakeEmbedder{vecs: map[string][]float32{
+		"uses postgres for billing":    {1, 0, 0},
+		"prefers tabs for indentation": {0, 1, 0},
+		"deploys happen on fridays":    {0, 0, 1},
+		"whitespace conventions":       {0, 1, 0}, // no word shared with the tabs fact
+		"postgres":                     {0, 0, 1}, // keyword hit, but vector points at fridays
+		"tabs":                         {0, 1, 0},
+	}}
+	st := newStore(t)
+	svc := NewService(st, nil, ServiceOptions{Embedder: emb})
+	t.Cleanup(svc.Close)
+	for _, f := range []string{"uses postgres for billing", "prefers tabs for indentation", "deploys happen on fridays"} {
+		add(t, st, f, "why")
+	}
+	for svc.backfillOnce(ctx) {
+	}
+
+	byFact := func(ms []Memory) map[string]string {
+		out := map[string]string{}
+		for _, m := range ms {
+			out[m.Fact] = m.Match
+		}
+		return out
+	}
+
+	got, err := svc.Search(ctx, SearchArgs{Query: "whitespace conventions", Limit: 1})
+	if err != nil || len(got) != 1 || got[0].Fact != "prefers tabs for indentation" || got[0].Match != matchSemantic {
+		t.Fatalf("semantic-only: %+v, %v", got, err)
+	}
+
+	got, _ = svc.Search(ctx, SearchArgs{Query: "postgres", Limit: 2})
+	m := byFact(got)
+	if len(got) != 2 || m["uses postgres for billing"] != matchKeyword || m["deploys happen on fridays"] != matchSemantic {
+		t.Fatalf("union: %+v", got)
+	}
+	if got[0].Fact != "uses postgres for billing" {
+		t.Errorf("keyword rank breaks the tie: %v", facts(got))
+	}
+
+	got, _ = svc.Search(ctx, SearchArgs{Query: "tabs", Limit: 1})
+	if len(got) != 1 || got[0].Match != matchBoth {
+		t.Fatalf("both: %+v", got)
+	}
+
+	emb.err = errors.New("worker down")
+	got, err = svc.Search(ctx, SearchArgs{Query: "postgres"})
+	if err != nil || len(got) != 1 || got[0].Match != matchKeyword {
+		t.Fatalf("embedder failure should leave keyword results: %+v, %v", got, err)
 	}
 }

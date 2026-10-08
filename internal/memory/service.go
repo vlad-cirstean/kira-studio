@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"sync"
+	"sync/atomic"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -66,14 +69,39 @@ type StoreResult struct {
 
 // Service is the one entry point for both callers: the stdio MCP server and Kira Space's bridge.
 type Service struct {
-	store    *Store
-	runner   Runner
-	sem      *semaphore.Weighted
-	onChange func()
+	store  *Store
+	runner Runner
+	sem    *semaphore.Weighted
+	opts   ServiceOptions
+
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
+	backfilling atomic.Bool
 }
 
-func NewService(store *Store, runner Runner, onChange func()) *Service {
-	return &Service{store: store, runner: runner, sem: semaphore.NewWeighted(maxPipelines), onChange: onChange}
+// ServiceOptions are NewService's optional collaborators; the zero value is keyword-only search.
+type ServiceOptions struct {
+	Embedder Embedder
+	// OnChange runs after a store call commits something.
+	OnChange func()
+	// OnSemantic runs when embedding progress changes (a backfill batch landed).
+	OnSemantic func()
+}
+
+func NewService(store *Store, runner Runner, opts ServiceOptions) *Service {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Service{store: store, runner: runner, sem: semaphore.NewWeighted(maxPipelines), opts: opts, ctx: ctx, cancel: cancel}
+}
+
+// Close stops the backfill and closes the embedder when it has a Close method. It does not close
+// the store.
+func (s *Service) Close() {
+	s.cancel()
+	s.wg.Wait()
+	if c, ok := s.opts.Embedder.(io.Closer); ok {
+		_ = c.Close()
+	}
 }
 
 func invalid(format string, a ...any) error {
@@ -177,8 +205,11 @@ func (s *Service) Store(ctx context.Context, req StoreRequest) (StoreResult, err
 		committed = committed || out.Action != ActionFailed
 		res.Outcomes = append(res.Outcomes, out)
 	}
-	if committed && s.onChange != nil {
-		s.onChange()
+	if committed {
+		if s.opts.OnChange != nil {
+			s.opts.OnChange()
+		}
+		s.kickBackfill()
 	}
 	return res, nil
 }
@@ -194,9 +225,11 @@ func (s *Service) commit(ctx context.Context, req StoreRequest, requestID string
 		if w.dec.Err != nil {
 			return fail(w.dec.Err)
 		}
+		vec, model := s.vectorFor(ctx, w)
 		r, err := s.store.commitFact(ctx, commitInput{
 			Revision: *rev, Action: w.dec.Action, TargetID: w.dec.Target, Fact: w.dec.Fact, Reason: w.dec.Reason,
 			Keywords: w.Keywords, Author: req.Author, Source: req.Source, RequestID: requestID, Why: w.dec.Why,
+			Vec: vec, Model: model,
 		})
 		if err == nil {
 			*rev = r.Revision
@@ -246,10 +279,6 @@ func (d decision) reasonOr(fallback string) string {
 		return d.Reason
 	}
 	return fallback
-}
-
-func (s *Service) Search(ctx context.Context, a SearchArgs) ([]Memory, error) {
-	return s.store.searchFTS(ctx, a)
 }
 
 func (s *Service) Recent(ctx context.Context, limit int) ([]Memory, error) {

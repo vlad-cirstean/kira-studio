@@ -22,7 +22,7 @@ func Run(_ []string) int {
 
 	store := memory.OpenDefault()
 	defer store.Close()
-	svc := memory.NewService(store, memory.NewCLIRunner(), nil)
+	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{})
 	if err := mcpserver.RunStdio(ctx, svc); err != nil && ctx.Err() == nil {
 		fmt.Fprintln(os.Stderr, "kira-memory:", err)
 		return 1

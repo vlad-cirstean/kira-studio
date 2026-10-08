@@ -39,7 +39,7 @@ func (acceptRunner) Run(_ context.Context, c memory.Call) (json.RawMessage, erro
 func TestStoreSearchHistoryOverMCP(t *testing.T) {
 	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
 	defer store.Close()
-	srv := Build(memory.NewService(store, acceptRunner{}, nil))
+	srv := Build(memory.NewService(store, acceptRunner{}, memory.ServiceOptions{}))
 
 	ctx := context.Background()
 	ct, st := mcp.NewInMemoryTransports()

@@ -54,7 +54,7 @@ func (s *MemoryService) service() *memory.Service {
 		return s.svc
 	}
 	s.store = memory.OpenDefault()
-	s.svc = memory.NewService(s.store, memory.NewCLIRunner(), s.emitChanged)
+	s.svc = memory.NewService(s.store, memory.NewCLIRunner(), memory.ServiceOptions{OnChange: s.emitChanged})
 	ctx, cancel := context.WithCancel(context.Background())
 	s.stopWatch = cancel
 	go s.watch(ctx, s.store)

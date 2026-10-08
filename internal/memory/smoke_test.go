@@ -13,7 +13,7 @@ import (
 func TestSmokeRealClaude(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), "memory.db"))
 	defer store.Close()
-	svc := NewService(store, NewCLIRunner(), nil)
+	svc := NewService(store, NewCLIRunner(), ServiceOptions{})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	do := func(r StoreRequest) StoreResult {
