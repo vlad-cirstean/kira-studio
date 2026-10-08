@@ -79,8 +79,7 @@ export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): 
   if (existing) return existing;
 
   const host = document.createElement('div');
-  host.style.height = '100%';
-  host.style.width = '100%';
+  host.classList.add('h-full', 'w-full');
 
   const appearance = deps.appearance();
   const term = new Terminal({

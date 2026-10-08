@@ -1215,7 +1215,7 @@ onUnmounted(() => {
             aria-label="Stream rows"
             @scroll="onScroll"
           >
-            <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+            <div class="relative" :style="{ height: `${totalSize}px` }">
               <div
                 v-for="vi in virtualItems"
                 :key="String(vi.key)"

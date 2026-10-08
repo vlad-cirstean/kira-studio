@@ -1089,7 +1089,7 @@ onUnmounted(() => {
              virtualizer hands back; page rows in range always resolve) so `rowAt(rows[vi.index])!`
              below can carry a definite, non-null DocumentRowView into DocumentRow's own required
              `view` prop. -->
-        <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+        <div class="relative" :style="{ height: `${totalSize}px` }">
           <template v-for="vi in virtualItems" :key="String(vi.key)">
             <!-- P43 iter3 F31a: onRowClick only sets the row's own highlight (state.ts's
                  selectRow) — this view mounts no cell editor dock to publish a selection into

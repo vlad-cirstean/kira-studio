@@ -12,11 +12,13 @@ defineProps<{
 }>();
 
 defineEmits<{ retry: [] }>();
+
+const LOADING_OPACITY = ['opacity-86', 'opacity-72', 'opacity-58', 'opacity-44', 'opacity-30'];
 </script>
 
 <template>
   <div v-if="loading" class="flex flex-col gap-1.5 p-2" data-testid="docker-list-loading" aria-busy="true">
-    <div v-for="n in 5" :key="n" class="h-7 animate-pulse rounded-kira-sm bg-field" :style="{ opacity: 1 - n * 0.14 }" />
+    <div v-for="n in 5" :key="n" class="h-7 animate-pulse rounded-kira-sm bg-field" :class="LOADING_OPACITY[n - 1]" />
   </div>
   <Empty v-else-if="error" class="p-4" data-testid="docker-list-error">
     <EmptyHeader>

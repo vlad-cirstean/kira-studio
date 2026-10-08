@@ -214,7 +214,7 @@ defineSlots<{
           has to stay numerically equal to --kira-h-xs (18px), which every row below and any #detail
           content's own fixed-height styling must match.
         -->
-        <ul aria-label="Operations" class="m-0 p-0" :style="{ height: `${totalSize}px`, position: 'relative' }">
+        <ul aria-label="Operations" class="relative m-0 p-0" :style="{ height: `${totalSize}px` }">
           <template v-for="vi in virtualItems" :key="String(vi.key)">
             <li
               v-if="listItems[vi.index].kind === 'op'"

@@ -189,10 +189,10 @@ async function onSave(): Promise<void> {
       :show-close-button="false"
       data-testid="settings-dialog"
       class="flex flex-col p-0 gap-0"
+      :class="height === undefined && 'max-h-[80vh]'"
       :style="{
         width: `${width ?? 640}px`,
         height: height !== undefined ? `${height}px` : undefined,
-        maxHeight: height === undefined ? '80vh' : undefined,
       }"
     >
       <DialogHeader>

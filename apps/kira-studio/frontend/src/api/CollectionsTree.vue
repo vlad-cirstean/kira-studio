@@ -211,7 +211,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
             />
           </template>
         </div>
-        <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+        <div class="relative" :style="{ height: `${totalSize}px` }">
           <template v-for="item in virtualItems" :key="String(item.key)">
             <CollectionRow
               :class="VIRTUAL_ROW_CLASS"

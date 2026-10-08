@@ -366,7 +366,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       aria-label="Documents"
       @scroll="docVirtual.onScroll"
     >
-      <div :style="{ height: `${docVirtual.totalSize.value}px`, position: 'relative' }">
+      <div class="relative" :style="{ height: `${docVirtual.totalSize.value}px` }">
         <!-- P48 F10-F12: this read-only copy of DocumentRow (no edit/delete affordance) wants no
              pointer cursor outside its head; DocumentRow.vue itself doesn't opt into that. -->
         <DocumentRow
@@ -413,7 +413,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       aria-label="Result rows"
       @scroll="kvVirtual.onScroll"
     >
-      <div :style="{ height: `${kvVirtual.totalSize.value}px`, position: 'relative' }">
+      <div class="relative" :style="{ height: `${kvVirtual.totalSize.value}px` }">
         <div
           v-for="vi in kvVirtual.virtualItems.value"
           :key="String(vi.key)"

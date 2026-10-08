@@ -446,7 +446,7 @@ onMounted(() => {
               aria-label="Keys"
               @scroll="onScroll"
             >
-              <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+              <div class="relative" :style="{ height: `${totalSize}px` }">
                 <!-- P110 I2-15/I2-17: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/
                      src/util/virtualRows.ts) -- see ProjectTree.vue's identical note. -->
                 <div
