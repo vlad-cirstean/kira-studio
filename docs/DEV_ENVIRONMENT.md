@@ -427,6 +427,11 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
   Needs an authenticated `claude` on `PATH` (`claude -p` works here, CLI 2.1.292; ~14 s, a few cents).
   The gate uses `--safe-mode --setting-sources "" --strict-mcp-config --tools "" --no-session-persistence`;
   never `--bare`, it forces API-key auth.
+- Import smoke (P211), real CLI, about 50 s and 0.14 USD:
+  `go test -tags claudesmoke ./internal/memory/importer/ -run Smoke -v`. It runs the engine on
+  `testdata/smoke` with a small chunk budget and re-executes the test binary as `memory-mcp` (set
+  `KIRA_TEST_MEMORY_MCP=1`; `TestMain` in `engine_test.go` handles it), so no built app is needed.
+  Import UI states: `bun run build:test:space`, then Playwright `memory-import` (mock bridge).
 - MCP path: `go build -tags server ./apps/kira-space`, then `claude -p --mcp-config <file>
   --strict-mcp-config` with a `stdio` server `{command: <binary>, args: ["memory-mcp"], env:
   {KIRA_MEMORY_HOME: <tmp>}}`. `printf '' | <binary> memory-mcp` exits 0. The macOS app-bundle binary

@@ -5,7 +5,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | Phase | Title | Status |
 |---|---|---|
 | P210 | Memory embedding search: local embedding model (best quality under 500 MB RAM, less if possible), vectors in SQLite, hybrid with existing FTS recall-first search | Done |
-| P211 | Memory bulk import: pick file or folder; chunk to a Sonnet-friendly size; per-chunk clean-context agent extracts atomic facts; one final agent holding all chunk facts of the file adds memories through the MCP; progress and failure shown | Not started |
+| P211 | Memory bulk import: pick file or folder; chunk to a Sonnet-friendly size; per-chunk clean-context agent extracts atomic facts; one final agent holding all chunk facts of the file adds memories through the MCP; progress and failure shown | Done |
 | P212 Part 1 | Mobile agents web: local web server in Kira Space serving a read-only mobile-laid-out Vue agents module; first-load device approval in Kira Space like the git extension pairing; installable PWA | Done |
 | P212 Part 2 | Mobile agents web writes (amendment): backlog add and reorder, TUI input for stuck agents, start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows disconnected plus a reconnect button) | Not started |
 | P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Done |
@@ -73,6 +73,44 @@ Unverified: macOS (dylib load from `Contents/Frameworks`, arm64 int8 kernels, wo
 `codesign --verify --deep --strict`), the Download model click in the real app (covered by the same
 `embed.Install` the smoke test runs, UI states by typecheck only), and tokenizer parity beyond the 9/10
 ranking probe. Recorded in Known open items.
+
+## P211 result
+
+Memory bulk import: pick files or a folder, scan, confirm an estimate, extract facts per chunk, add
+memories per file through the MCP. Facts live in `docs/ARCHITECTURE.md` ("Memory MCP server and
+module", Stack table, Known open items) and `docs/DEV_ENVIRONMENT.md` (Memory MCP section).
+
+Decisions: plan defaults for every deferred decision. Libraries: goldmark (chunk boundaries), go-git
+gitignore matcher, `backoff/v4`; no tokenizer.
+
+Measured (CLI 2.1.293, Sonnet, sandbox):
+
+| Item | Result |
+|---|---|
+| Extract, 3 chunks of `ARCHITECTURE.md` (2206, 3528, 2410 tokens) | 22, 29, 20 facts; 17, 19, 16 s; 0.044-0.051 USD each |
+| Smoke import, 2 files, 6 chunks | 48 s, 8 calls, 0.135 USD; 24 facts extracted, 20 added, 1 unresolved, 0 dropped, 0 failed |
+| Estimate constants | 20 facts per chunk, 18 s per extract, finalize 15 s + 25 s per 20 facts |
+| Fact reasons | `Stated in <path>, <heading>: "<evidence>"`; gate challenged none |
+
+Gate and reconcile calls inside `memory-mcp` are not in those costs.
+
+Verification: `go test -race` on `./internal/memory/...` and the bridge and shell packages;
+golangci-lint 0 issues; `bun run typecheck`, `bun run lint`, knip; Playwright `memory-import` and
+`memory-module`; real-CLI smoke; step-2 isolation canaries (a user-level `CLAUDE.md` instruction was
+not followed; a call to a non-allowed tool was denied under `--permission-prompts none`).
+
+Deviations from the plan:
+
+- Gitignore uses `gitignore.ParsePattern` per directory, not `ReadPatterns` over an `osfs` filesystem:
+  same matcher, no billy wiring, patterns scoped to their directory.
+- `--allowedTools` is one comma-joined argument so the variadic flag cannot swallow the next flag.
+- The `memory-mcp` re-exec for the smoke test sits in the importer package's one `TestMain`.
+- File list selection shows the selected file's reason, unresolved and dropped facts in a fixed panel
+  under the virtualized list, so rows keep one height.
+
+Unverified: macOS (native multi-file picker, app-bundle `memory-mcp` import mode); a full app run
+with a real `-tags server` binary was not done here, so quit-mid-run recovery is covered by engine
+tests only.
 
 ## P212 Part 1 result
 
