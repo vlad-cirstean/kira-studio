@@ -36,6 +36,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/shell"
@@ -51,9 +52,10 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// runArgvShim runs the askpass and memory-mcp subcommands, before anything Wails-related, so they
+// runArgvShim runs the askpass, memory-mcp and memory-embed subcommands, before anything Wails-related, so they
 // never start a window. memory-mcp is Claude Code's stdio MCP server; it runs before startupfail
-// and the single-instance lock, so it works while the window is open.
+// and the single-instance lock, so it works while the window is open. memory-embed is the ONNX
+// embedding worker those processes and the app spawn; same ordering for the same reason.
 func runArgvShim(args []string) (code int, ok bool) {
 	if len(args) < 2 {
 		return 0, false
@@ -63,11 +65,13 @@ func runArgvShim(args []string) (code int, ok bool) {
 		return gitaskpass.RunHelper(args[2:], os.Environ(), os.Stdout), true
 	case "memory-mcp":
 		return memorycli.Run(args[2:]), true
+	case "memory-embed":
+		return memembed.RunWorker(args[2:]), true
 	}
 	return 0, false
 }
 
-// Startup order: the argv shims (askpass, memory-mcp) -> config.EnsureLayout -> logging.Init/Sweep ->
+// Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout -> logging.Init/Sweep ->
 // storage.Open (migrates) -> repos.New -> wireGit (starts gitsock.Server) -> terminal registry and
 // the ADE tracker (wireTracker, with the Claude Code hooks) -> wireAdeTask -> keep-awake ->
 // application.New (18 bound services plus the git stream registration) -> the menu -> the startup
