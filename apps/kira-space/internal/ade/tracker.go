@@ -310,8 +310,24 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	t.pending[terminalID] = intent
 	t.mu.Unlock()
 	t.releaseExpired(expired)
+	time.AfterFunc(t.deps.PendingTTL, func() { t.expirePending(terminalID) })
 
 	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
+}
+
+// expirePending releases an intent that never composed within PendingTTL, so an abandoned launch's
+// grant does not wait for the next Prepare to be pruned.
+func (t *Tracker) expirePending(terminalID string) {
+	t.mu.Lock()
+	intent, ok := t.pending[terminalID]
+	if ok {
+		delete(t.pending, terminalID)
+	}
+	closed := t.closed
+	t.mu.Unlock()
+	if ok && !closed {
+		t.releaseExpired([]string{intent.RecordID})
+	}
 }
 
 // hasPending reports whether a launch matching the filter was prepared within launchGuardWindow and
