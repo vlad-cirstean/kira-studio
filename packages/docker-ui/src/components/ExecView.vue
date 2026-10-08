@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref, watch } from 'vue';
@@ -46,14 +48,18 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
         data-testid="docker-exec-chip"
       >
         <button type="button" class="cursor-default" @click="activeId = s.id">{{ s.title }}</button>
-        <button type="button" class="cursor-default" :aria-label="`Close ${s.title}`" data-testid="docker-exec-close" @click="closeSession(s.id)">
-          <CodiconIcon name="close" :size="12" />
-        </button>
+        <TooltipIconButton
+          icon="close"
+          :icon-size="12"
+          :label="`Close ${s.title}`"
+          data-testid="docker-exec-close"
+          @click="closeSession(s.id)"
+        />
       </span>
-      <button type="button" :class="tabChipVariants({ active: false })" data-testid="docker-exec-new" @click="openSession">
+      <Button variant="ghost" size="xs" data-testid="docker-exec-new" @click="openSession">
         <CodiconIcon name="add" :size="12" />
         New session
-      </button>
+      </Button>
     </div>
     <div class="relative min-h-0 flex-1">
       <div

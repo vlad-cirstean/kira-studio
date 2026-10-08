@@ -40,6 +40,7 @@ const failure = ref('');
 const streamError = ref('');
 
 let streamId = '';
+let opening: Promise<unknown> = Promise.resolve();
 let seq = 0;
 let off: (() => void) | null = null;
 
@@ -90,7 +91,10 @@ async function close(): Promise<void> {
   off = null;
   const id = streamId;
   streamId = '';
-  if (id) await control.logsClose(id).catch(() => undefined);
+  if (!id) return;
+  // LogsClose can reach Go before the in-flight LogsOpen registers the stream.
+  await opening.catch(() => undefined);
+  await control.logsClose(id).catch(() => undefined);
 }
 
 async function open(): Promise<void> {
@@ -110,13 +114,14 @@ async function open(): Promise<void> {
     }
   });
   try {
-    await control.logsOpen({
+    opening = control.logsOpen({
       streamId: id,
       containerId: props.containerId,
       tail: tail.value,
       timestamps: timestamps.value,
       follow: true,
     });
+    await opening;
   } catch (err) {
     failure.value = err instanceof Error ? err.message : String(err);
   }
