@@ -62,7 +62,9 @@ const (
 )
 
 type entry struct {
-	mu          sync.Mutex
+	mu sync.Mutex
+	// writeMu serialises phone PTY writes so e.mu is never held across a blocking write.
+	writeMu     sync.Mutex
 	id          string
 	ring        *Ring
 	state       state
@@ -273,15 +275,22 @@ func (c *phoneConn) End() int64 {
 func (b *Broker) Input(c *phoneConn, data []byte) bool {
 	e := c.e
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	if e.conn != c {
+		e.mu.Unlock()
 		return false
 	}
 	b.armIdle(e)
-	if err := b.deps.Registry.Write(e.id, data); err != nil {
+	e.mu.Unlock()
+
+	e.writeMu.Lock()
+	defer e.writeMu.Unlock()
+	e.mu.Lock()
+	held := e.conn == c
+	e.mu.Unlock()
+	if !held {
 		return false
 	}
-	return true
+	return b.deps.Registry.Write(e.id, data) == nil
 }
 
 func (b *Broker) Resize(c *phoneConn, cols, rows int) bool {

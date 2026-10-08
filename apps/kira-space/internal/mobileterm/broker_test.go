@@ -186,3 +186,46 @@ func TestBroker_ReleaseDeviceAndExit(t *testing.T) {
 		t.Fatal("attach after exit must fail")
 	}
 }
+
+type blockReg struct {
+	fakeReg
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (f *blockReg) Write(id string, b []byte) error {
+	close(f.entered)
+	<-f.release
+	return f.fakeReg.Write(id, b)
+}
+
+// A parked PTY write must not hold the entry lock: the PTY reader's Output would stall, which
+// stalls the write itself.
+func TestBroker_InputDoesNotBlockEntry(t *testing.T) {
+	reg := &blockReg{entered: make(chan struct{}), release: make(chan struct{})}
+	b := New(Deps{Registry: reg, Sessions: func(s string) (string, bool) { return "t-" + s, true }})
+	b.Opened("t-s1", 100, 30)
+	c, err := b.Attach("s1", phoneA, 50, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan bool)
+	go func() { done <- b.Input(c, []byte("x")) }()
+	<-reg.entered
+
+	finished := make(chan struct{})
+	go func() {
+		b.Output("t-s1", []byte("out"))
+		b.AllowWrite("t-s1")
+		b.Holds()
+		b.Reclaim("t-s1", 0, 0)
+		close(finished)
+	}()
+	select {
+	case <-finished:
+	case <-time.After(3 * time.Second):
+		t.Fatal("entry calls blocked behind a parked write")
+	}
+	close(reg.release)
+	<-done
+}

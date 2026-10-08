@@ -47,7 +47,7 @@ func TestServe_ReplayInputAndReclaim(t *testing.T) {
 	b, reg, _ := newTestBroker(t)
 	b.Output("t-s1", []byte("hello "))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b.Serve(w, r, phoneA, "s1")
+		b.Serve(w, r, phoneA, "s1", nil)
 	}))
 	defer srv.Close()
 
@@ -97,7 +97,7 @@ func TestServe_ResumeAndBadRequest(t *testing.T) {
 	b, _, _ := newTestBroker(t)
 	b.Output("t-s1", []byte("abcdef"))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b.Serve(w, r, phoneA, "s1")
+		b.Serve(w, r, phoneA, "s1", nil)
 	}))
 	defer srv.Close()
 

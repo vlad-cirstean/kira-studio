@@ -8,13 +8,13 @@ const ringCap = 1 << 20
 // Ring keeps the last ringCap bytes of a terminal's output under absolute offsets, so a
 // reconnecting phone resumes from where it stopped. Not safe for concurrent use.
 type Ring struct {
-	buf []byte
+	buf []byte // grows with output up to cap
 	end int64
 	cap int64
 }
 
 func newRing(capacity int) *Ring {
-	return &Ring{buf: make([]byte, capacity), cap: int64(capacity)}
+	return &Ring{cap: int64(capacity)}
 }
 
 func (r *Ring) start() int64 { return max(0, r.end-r.cap) }
@@ -25,11 +25,19 @@ func (r *Ring) End() int64 { return r.end }
 // Append stores b, dropping the oldest bytes once full.
 func (r *Ring) Append(b []byte) {
 	if int64(len(b)) > r.cap {
+		r.buf = append(r.buf, make([]byte, r.cap-int64(len(r.buf)))...)
 		r.end += int64(len(b)) - r.cap
 		b = b[int64(len(b))-r.cap:]
 	}
 	for len(b) > 0 {
 		pos := int(r.end % r.cap)
+		if pos == len(r.buf) && int64(len(r.buf)) < r.cap {
+			n := min(int64(len(b)), r.cap-int64(len(r.buf)))
+			r.buf = append(r.buf, b[:n]...)
+			r.end += n
+			b = b[n:]
+			continue
+		}
 		n := copy(r.buf[pos:], b)
 		r.end += int64(n)
 		b = b[n:]

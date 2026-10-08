@@ -35,8 +35,9 @@ type ctrlFrame struct {
 }
 
 // Serve attaches dev to the session's terminal and pumps frames until either side ends. Binary
-// frames carry terminal bytes both ways; text frames are JSON control messages.
-func (b *Broker) Serve(w http.ResponseWriter, r *http.Request, dev repos.MobileDeviceRow, sessionID string) {
+// frames carry terminal bytes both ways; text frames are JSON control messages. authorized runs
+// after Attach: a revoke or permission change racing the attach finds no hold to release.
+func (b *Broker) Serve(w http.ResponseWriter, r *http.Request, dev repos.MobileDeviceRow, sessionID string, authorized func() bool) {
 	q := r.URL.Query()
 	cols, errC := strconv.Atoi(q.Get("cols"))
 	rows, errR := strconv.Atoi(q.Get("rows"))
@@ -56,6 +57,11 @@ func (b *Broker) Serve(w http.ResponseWriter, r *http.Request, dev repos.MobileD
 	c, err := b.Attach(sessionID, dev, cols, rows)
 	if err != nil {
 		writeErr(w, statusOf(err), err)
+		return
+	}
+	if authorized != nil && !authorized() {
+		b.Release(c)
+		writeErr(w, http.StatusForbidden, ipcerr.New("E_FORBIDDEN", "terminal access was turned off for this phone"))
 		return
 	}
 	ws, err := websocket.Accept(w, r, nil)

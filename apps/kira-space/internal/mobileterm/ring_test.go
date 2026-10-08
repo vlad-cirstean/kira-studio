@@ -34,3 +34,33 @@ func TestRing_OversizeAppendKeepsTail(t *testing.T) {
 		t.Fatalf("snapshot = %q, %d", data, end)
 	}
 }
+
+func TestRing_GrowThenWrap(t *testing.T) {
+	r := newRing(8)
+	r.Append([]byte("abc"))
+	if len(r.buf) != 3 {
+		t.Fatalf("buf = %d, want lazy growth", len(r.buf))
+	}
+	r.Append([]byte("defgh")) // exactly full
+	r.Append([]byte("ij"))    // wraps
+	data, end := r.Snapshot()
+	if string(data) != "cdefghij" || end != 10 {
+		t.Fatalf("snapshot = %q, %d", data, end)
+	}
+
+	r = newRing(8)
+	r.Append([]byte("abcde"))
+	r.Append([]byte("fghijk")) // straddles the grow-to-wrap boundary
+	data, end = r.Snapshot()
+	if string(data) != "defghijk" || end != 11 {
+		t.Fatalf("straddle = %q, %d", data, end)
+	}
+
+	r = newRing(4)
+	r.Append([]byte("ab"))
+	r.Append([]byte("0123456789")) // oversize onto a partial buffer
+	data, end = r.Snapshot()
+	if string(data) != "6789" || end != 12 {
+		t.Fatalf("oversize = %q, %d", data, end)
+	}
+}

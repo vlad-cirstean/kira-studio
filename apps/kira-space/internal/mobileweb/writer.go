@@ -30,7 +30,7 @@ type Writer interface {
 // TerminalBroker owns phone-attached agent terminals (internal/mobileterm). Serve upgrades the
 // request to a WebSocket after resolving the ADE session id itself; the other two end holds.
 type TerminalBroker interface {
-	Serve(w http.ResponseWriter, r *http.Request, dev repos.MobileDeviceRow, sessionID string)
+	Serve(w http.ResponseWriter, r *http.Request, dev repos.MobileDeviceRow, sessionID string, authorized func() bool)
 	ReleaseDevice(deviceID string)
 	ReleaseAll(reason string)
 }

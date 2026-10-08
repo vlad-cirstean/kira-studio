@@ -165,7 +165,7 @@ type fakeTerminals struct {
 	released []string
 }
 
-func (f *fakeTerminals) Serve(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow, id string) {
+func (f *fakeTerminals) Serve(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow, id string, _ func() bool) {
 	f.mu.Lock()
 	f.served = append(f.served, id)
 	f.mu.Unlock()
