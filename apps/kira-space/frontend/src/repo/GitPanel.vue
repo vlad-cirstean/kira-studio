@@ -57,27 +57,14 @@ const repoId = computed(() => repoIdOfWorkspace(workspaceStore.active) ?? '');
 // hides rows on the other. Each keeps its own text across tab switches.
 const local = reactive({ repoSearch: '', fileSearch: '' });
 
-// P84 §8.1/§8.3: which of the two top-level tabs is showing. Not persisted, not module-level
-// (§8.3): `{ immediate: true }` on the watcher below recomputes the right tab from repoId on every
-// remount, so a manual override would only ever survive within one mount anyway.
-//
-// Bug fix (manual testing): only auto-switch to Files on a genuine no-repo -> repo transition
-// (oldId === ''). Switching between two already-open repos must leave the user's chosen tab alone.
-//
-// P92 item 6: backed by state/search.ts's useRepoPanelTabStore, not a local ref — hostHandlers.ts's
-// review.open needs to flip it from outside this component (§5.2's own external-caller note).
+// P220: tab persists (state/search.ts, `kira.git.panelTab`, default Repos); no auto-switch on repo
+// open or mount. With no repo workspace active, Files/Review have nothing to show: display Repos
+// without writing it, so the stored choice returns once a repo is active.
+// P92 item 6: backed by useRepoPanelTabStore — hostHandlers.ts's review.open flips it from outside.
 const tab = computed({
-  get: () => repoPanelTabStore.repoPanelTab(),
+  get: () => (repoId.value ? repoPanelTabStore.repoPanelTab() : 'repos'),
   set: (v: 'repos' | 'files' | 'review') => repoPanelTabStore.setRepoPanelTab(v),
 });
-watch(
-  repoId,
-  (id, oldId) => {
-    if (!oldId && id) tab.value = 'files';
-    else if (!id) tab.value = 'repos';
-  },
-  { immediate: true },
-);
 
 // P67b §4.4: a single click opens (if not yet open) or activates (if open) — OQ-2's adopted
 // recommendation. This panel's entire subject is repositories, so a click that only paints a

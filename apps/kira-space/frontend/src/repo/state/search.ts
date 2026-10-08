@@ -1,6 +1,7 @@
 import type { CodeSearchEvent, FileMatches, SearchStats } from '@shared/domain/repo';
+import { useLocalStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
-import { markRaw, ref } from 'vue';
+import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
 import { createPerRepoState } from './perRepo.ts';
 
@@ -296,20 +297,20 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
   };
 });
 
-// P92 item 6: which of GitPanel.vue's three top-level tabs is showing. Flat, not per-repo keyed
-// like useRepoSearchStore's own `view` — GitPanel.vue is one persistent instance across every
-// repo workspace (C11 §8.4's own note), so this is genuinely one value, not one per repoId. Its
-// own store, not folded into useRepoSearchStore above, so hostHandlers.ts's review.open (the one
-// external caller — "review" used to be a value of `view`, which repo/state/search.ts already let
-// it set) can flip the visible tab without depending on the whole search store.
-export const useRepoPanelTabStore = defineStore('repoPanelTab', () => {
-  const panelTab = ref<'repos' | 'files' | 'review'>('repos');
+// P92 item 6: which of GitPanel.vue's three top-level tabs is showing. Flat, not per-repo: one
+// persistent panel across every repo workspace. Own store so hostHandlers.ts's review.open can flip
+// the tab without depending on the search store. P220: persisted (`kira.git.panelTab`), default Repos.
+type RepoPanelTab = 'repos' | 'files' | 'review';
+const PANEL_TABS: readonly string[] = ['repos', 'files', 'review'];
 
-  function repoPanelTab(): 'repos' | 'files' | 'review' {
-    return panelTab.value;
+export const useRepoPanelTabStore = defineStore('repoPanelTab', () => {
+  const panelTab = useLocalStorage<string>('kira.git.panelTab', 'repos');
+
+  function repoPanelTab(): RepoPanelTab {
+    return PANEL_TABS.includes(panelTab.value) ? (panelTab.value as RepoPanelTab) : 'repos';
   }
 
-  function setRepoPanelTab(tab: 'repos' | 'files' | 'review'): void {
+  function setRepoPanelTab(tab: RepoPanelTab): void {
     panelTab.value = tab;
   }
 
