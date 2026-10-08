@@ -860,9 +860,9 @@ watch(
        scopes every rule in slickTheme.css — imported globally by this file, not relied on from
        SlickGridHost.vue, so a console panel never depends on a data tab having been opened first. -->
   <div
-    class="slick-grid-host"
+    class="slick-grid-host relative h-full font-data text-kira-md text-fg"
     :class="{ 'kira-grid--row-coloring': settingsStore.appearance.rowColoring }"
   >
-    <div ref="rootRef" class="slick-grid-mount"></div>
+    <div ref="rootRef" class="slick-grid-mount h-full w-full"></div>
   </div>
 </template>

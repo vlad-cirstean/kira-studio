@@ -160,18 +160,14 @@ onUnmounted(() => {
         <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="note" data-testid="fk-preview-empty">
           <AlertDescription>No matching row in {{ tableLabel }}</AlertDescription>
         </Alert>
-        <!-- .header-key/.header-key.is-fk: no rule here — this popover is always rendered inside
-             SlickGridHost's own `.slick-grid-host` root (§4.3), so slickTheme.css's own
-             `.slick-grid-host .header-key` rule already applies (the "same header-key style"
-             §4.2 asks for), unscoped CSS reaching into any descendant regardless of which
-             component rendered it. -->
+        <!-- `header-key` marker; look matches SlickGridHost header badges. -->
         <table v-else-if="state.status === 'ready'" class="w-full border-collapse text-kira-md">
           <tbody>
             <tr v-for="(col, i) in state.columns" :key="col.name">
               <th class="text-left font-medium whitespace-nowrap align-top py-0.5 pl-0 pr-1" :class="typeClassTextClass(col.typeClass)">
                 {{ col.name }}
-                <span v-if="col.isPrimaryKey" class="header-key">PK</span>
-                <span v-if="col.isTarget" class="header-key is-fk">FK</span>
+                <span v-if="col.isPrimaryKey" class="header-key ml-1 shrink-0 text-warn">PK</span>
+                <span v-if="col.isTarget" class="header-key ml-1 shrink-0 text-info">FK</span>
               </th>
               <td class="break-words py-0.5">
                 <Badge

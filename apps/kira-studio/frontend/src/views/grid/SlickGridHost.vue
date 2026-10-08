@@ -1071,7 +1071,7 @@ function placeNavButtonsForRenderedCells(): void {
     const isFk = cellEl.classList.contains('fk');
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'cell-nav-btn';
+    btn.className = NAV_BTN_CLASS;
     btn.dataset.testid = 'cell-nav-button';
     btn.dataset.navKind = isFk ? 'fk' : 'pk';
     btn.setAttribute('aria-label', isFk ? 'Go to referenced row' : 'Referenced by');
@@ -1083,6 +1083,12 @@ function placeNavButtonsForRenderedCells(): void {
     cellEl.appendChild(btn);
   }
 }
+
+// `cell-nav-btn`/`header-key` stay as marker names (click delegation, test selectors).
+const NAV_BTN_CLASS =
+  'cell-nav-btn absolute left-1 top-1/2 z-[1] flex size-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-kira-sm border border-(color:--kira-border) bg-elevated p-0 text-(color:--kira-fg-muted) hover:bg-hover hover:text-fg';
+const HEADER_KEY_CLASS = 'header-key ml-1 shrink-0 font-data text-warn';
+const HEADER_KEY_FK_CLASS = 'header-key ml-1 shrink-0 font-data text-info';
 
 // F13 — a click on a `.cell-nav-btn` (a real child of whichever `.slick-cell` it lives in, one
 // per nav-eligible rendered cell since item 12's redesign — placeNavButtonsForRenderedCells'
@@ -1205,7 +1211,7 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   const label = keyLabelFor(descriptor, name, foreignKeyNamesFor(rt()?.meta ?? null));
   if (label) {
     const badge = document.createElement('span');
-    badge.className = label === 'FK' ? 'header-key font-data is-fk' : 'header-key font-data';
+    badge.className = label === 'FK' ? HEADER_KEY_FK_CLASS : HEADER_KEY_CLASS;
     badge.textContent = label;
     args.node.appendChild(badge);
   }
@@ -1227,7 +1233,7 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   // setup()'s effect scope is captured), not a stable Vue-tracked ref; its own destruction is what
   // tears the listener down (onBeforeHeaderCellDestroy's own comment). Declined, named exception.
   const zone = document.createElement('span');
-  zone.className = 'header-select-zone';
+  zone.className = 'header-select-zone absolute inset-0 z-0 cursor-pointer';
   zone.dataset.testid = 'grid-header-select';
   zone.dataset.column = name;
   zone.dataset.colIndex = args.node.dataset.colIndex ?? '';
@@ -2691,18 +2697,18 @@ defineExpose({
        keeps it live, since settingsStore is a reactive store and this is the template's own
        ordinary :class binding. -->
   <div
-    class="slick-grid-host"
+    class="slick-grid-host relative h-full font-data text-kira-md text-fg"
     data-testid="data-grid"
     :class="{
       'kira-grid--row-coloring': settingsStore.appearance.rowColoring,
       'kira-select-all': selectAllActive,
     }"
   >
-    <div ref="rootRef" class="slick-grid-mount"></div>
+    <div ref="rootRef" class="slick-grid-mount h-full w-full"></div>
     <AttributeTooltip :container="headerRowEls" />
     <Alert
       v-if="showNoRows"
-      class="no-rows flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
+      class="no-rows absolute inset-0 flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
       data-testid="grid-no-rows"
     >
       <CodiconIcon name="table" :size="24" class="text-subtle" />
@@ -2710,7 +2716,7 @@ defineExpose({
     </Alert>
     <Alert
       v-else-if="showNoMatchingRows"
-      class="no-rows flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
+      class="no-rows absolute inset-0 flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
       data-testid="grid-no-matching-rows"
     >
       <CodiconIcon name="search" :size="24" class="text-subtle" />

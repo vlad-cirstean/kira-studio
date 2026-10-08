@@ -1110,14 +1110,14 @@ onUnmounted(() => {
     <div class="relative flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="stream-list">
       <Alert
         v-if="isBatch && !rt?.polled"
-        class="no-rows h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+        class="no-rows absolute inset-0 h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
       >
         <CodiconIcon name="arrow-swap" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md font-normal text-muted-foreground">Click Poll to fetch messages</AlertTitle>
       </Alert>
       <Alert
         v-else-if="!rt || rt.rowCount === 0"
-        class="no-rows h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+        class="no-rows absolute inset-0 h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
       >
         <CodiconIcon name="inbox" :size="24" class="text-subtle" />
         <AlertTitle v-if="rt" class="text-kira-md font-normal text-muted-foreground">No messages</AlertTitle>
@@ -1126,7 +1126,7 @@ onUnmounted(() => {
            from "no messages loaded". -->
       <Alert
         v-else-if="displayRows && displayRows.length === 0"
-        class="no-rows h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+        class="no-rows absolute inset-0 h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
         data-testid="stream-no-matching-rows"
       >
         <CodiconIcon name="search" :size="24" class="text-subtle" />

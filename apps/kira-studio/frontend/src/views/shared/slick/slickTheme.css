@@ -9,14 +9,6 @@
    Structural note: this app's own scroll/font vars line up with slick.grid.css's own `.slick-cell`
    sizing (padding, line-height) so the two never fight over box geometry — only colour. */
 
-.slick-grid-host {
-  height: 100%;
-  position: relative;
-  font-size: var(--kira-t-md);
-  font-family: var(--kira-font-data);
-  color: var(--kira-fg);
-}
-
 /* P16 D3 — overscroll disabled on all four edges, replacing the P22-era `contain`. Restated
    findings, still true: no code anywhere in this app (frontend or the Wails-level
    `MacWebviewPreferences`/window options) sets `overscroll-behavior`, intercepts
@@ -50,24 +42,6 @@
    data viewport, so the left viewport is empty and hidden and only one scroller is user-visible. */
 .slick-grid-host .slick-viewport {
   overscroll-behavior: none;
-}
-
-/* C13/§5 D13 — the div SlickGrid itself is constructed against (`rootRef`, SlickGridHost.vue);
-   `.slick-grid-host` above stays the outer positioning context (unchanged size/position) so an
-   empty-state overlay's own `.no-rows { position: absolute; inset: 0 }` still covers exactly the
-   same box it did before this div existed. */
-.slick-grid-mount {
-  height: 100%;
-  width: 100%;
-}
-
-/* C13/§5 D13 — DataGrid.vue's own `.no-rows` rule, ported verbatim: the two empty states overlay
-   the always-mounted grid root as absolutely-positioned siblings rather than replacing it (this
-   host's own root div is what SlickGrid holds references to — `v-if`-ing it away would unmount
-   the element mid-life). */
-.no-rows {
-  position: absolute;
-  inset: 0;
 }
 
 /* slick.grid.css's own header/row/cell borders and backgrounds, retokenised. */
@@ -466,30 +440,6 @@
   padding-left: 24px;
 }
 
-.slick-grid-host .cell-nav-btn {
-  position: absolute;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  background: var(--kira-bg-elevated);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  z-index: 1;
-}
-
-.slick-grid-host .cell-nav-btn:hover {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
 /* Deliberate redesign, not the original port (item 13, a later coordinator round: "drop the
    distinctive blue text coloring currently applied to [key] column values" — the request named
    the primary key specifically, but the only blue-text mechanism this codebase has is `.fk`'s own
@@ -794,19 +744,6 @@
   cursor: col-resize;
 }
 
-/* FIX-8: PK/FK stated as a label, never inferred from colour alone — DataGrid.vue's own
-   `.header-key` badge, appended by onHeaderCellRendered (D2) since a SlickGrid Column's own `name`
-   is plain text with no child markup. */
-.slick-grid-host .header-key {
-  margin-left: var(--kira-s-2);
-  color: var(--kira-warn);
-  font-size: var(--kira-t-xs);
-  flex-shrink: 0;
-}
-.slick-grid-host .header-key.is-fk {
-  color: var(--kira-info);
-}
-
 /* DataGrid.vue's own `.header-select-zone` started as a narrow 10px strip at the header cell's
    left edge (§5 D4, C4). Deliberate redesign, not the original port (items 9-11, a later
    coordinator round): now covers the WHOLE header cell (`inset: 0`) — a left-click anywhere on a
@@ -817,9 +754,8 @@
    grid's own `contextmenu` handler, a different event entirely) — item 9's "right-click also
    selects the column" was already true (`onHeaderContextMenuHandler` already pushes a column
    selection before opening the menu), unrelated to this zone's own left-click-only listener. */
-.slick-grid-host .header-select-zone {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  cursor: pointer;
+
+/* Raw size: check-theme-classes bans text-kira-xs in chrome. */
+.slick-grid-host .header-key {
+  font-size: var(--kira-t-xs);
 }

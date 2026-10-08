@@ -340,10 +340,10 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
     <Alert v-if="copyError" variant="destructive" data-testid="console-copy-error">
       <AlertDescription>{{ copyError }}</AlertDescription>
     </Alert>
-    <div v-if="!page || page.rowCount === 0" class="no-rows h-full flex items-center justify-center text-muted-foreground text-kira-sm">{{ page ? 'No rows' : '' }}</div>
+    <div v-if="!page || page.rowCount === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm">{{ page ? 'No rows' : '' }}</div>
     <!-- P31 D19/P24 D8 precedent: filtering to zero matches is a distinct empty state from "no
          data loaded" — same discipline as KeyValueView.vue's own EmptyState pair. -->
-    <div v-else-if="rowIndices.length === 0" class="no-rows h-full flex items-center justify-center text-muted-foreground text-kira-sm" data-testid="console-no-matching-rows">
+    <div v-else-if="rowIndices.length === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm" data-testid="console-no-matching-rows">
       No matching rows
     </div>
     <ConsoleSlickGrid
