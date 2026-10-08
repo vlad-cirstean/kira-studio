@@ -188,3 +188,53 @@ test('a rejected timeout shows the error and keeps the text', async ({ relaunch 
   );
   await expect(page.locator(t('repo-timeout'))).toHaveValue('soon');
 });
+
+test('picking a swatch sends SetRepoColor and the nav dot follows', async ({ relaunch }) => {
+  const { window: page, control } = await openDialog(relaunch, [
+    {
+      channel: IPC.codeWorkspaceSetRepoColor,
+      response: {
+        id: 'repo-web-app',
+        name: 'acme-customer-dashboard-web-frontend',
+        root: '/tmp/acme-customer-dashboard-web-frontend',
+        repoId: '/tmp/acme-customer-dashboard-web-frontend',
+        sortOrder: 1,
+        color: 'red',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    },
+  ]);
+  await page.locator(`${t('repo-color')} ${t('color-red')}`).check({ force: true });
+  await expect.poll(() => calls(control, IPC.codeWorkspaceSetRepoColor)).toHaveLength(1);
+  expect(calls(control, IPC.codeWorkspaceSetRepoColor)[0]?.args).toEqual({
+    id: 'repo-web-app',
+    color: 'red',
+  });
+  await expect(
+    page.locator(
+      `${t('repos-dialog-repo')}[data-repo-id="repo-web-app"] ${t('repos-dialog-repo-dot')}`,
+    ),
+  ).toHaveClass(/bg-conn-red/);
+});
+
+test('Add environment writes nothing until name and command are filled', async ({ relaunch }) => {
+  const { window: page, control } = await openDialog(relaunch);
+  const patches = () => calls(control, IPC.adeTaskUpdateRepo).map((e) => e.args);
+  const before = await page.locator(t('repo-env')).count();
+
+  await page.locator(t('repo-add-env')).click();
+  await expect(page.locator(t('repo-env'))).toHaveCount(before + 1);
+  const row = page.locator(t('repo-env')).last();
+  await expect(row.locator(t('repo-env-name'))).toBeFocused();
+
+  await row.locator(t('repo-env-name')).fill('qa');
+  await row.locator(t('repo-env-name')).blur();
+  expect(patches()).toHaveLength(0);
+
+  await row.locator(t('repo-env-script')).fill('echo abc');
+  await row.locator(t('repo-env-script')).blur();
+  await expect.poll(patches).toHaveLength(1);
+  const envs = (patches()[0] as { patch: { environments: unknown[] } }).patch.environments;
+  expect(envs).toHaveLength(before + 1);
+  expect(envs[before]).toEqual({ name: 'qa', deployedShaScript: 'echo abc' });
+});
