@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import type { MemoryClarification, MemoryStoreResult } from '@shared/domain/memory';
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -11,14 +9,14 @@ import { computed, reactive, ref } from 'vue';
 import { useStoreMemory } from './queries';
 import { useMemoryUiStore } from './store';
 
-// P201: Add memory — the same gate/reconcile flow the MCP store_memory tool runs. A challenge
-// stores nothing; the user answers (or edits the rows) and resubmits with clarifications.
+// P214: free-text Add memory through the MCP store_memory gate. A challenge stores nothing; answer or edit, resubmit.
 const emit = defineEmits<{ close: [] }>();
 const ui = useMemoryUiStore();
 const store = useStoreMemory();
 
-const MAX_ROWS = 20;
-const rows = ref([{ fact: '', reason: '' }]);
+const MAX_TEXT = 1000;
+const MANUAL_REASON = 'Stated by the user, added manually in the Memory module.';
+const text = ref('');
 const result = ref<MemoryStoreResult | null>(null);
 const answers = reactive<Record<string, string>>({});
 const asked = ref<MemoryClarification[]>([]);
@@ -27,18 +25,10 @@ let controller: AbortController | null = null;
 const busy = computed(() => store.isPending.value);
 const challenged = computed(() => result.value?.status === 'challenged');
 const stored = computed(() => result.value?.status === 'stored');
-const canSubmit = computed(() => !busy.value && rows.value.every((r) => r.fact.trim() !== ''));
+const canSubmit = computed(() => !busy.value && text.value.trim() !== '');
 
 function answerKey(index: number, q: number): string {
   return `${index}:${q}`;
-}
-
-function addRow(): void {
-  if (rows.value.length < MAX_ROWS) rows.value.push({ fact: '', reason: '' });
-}
-
-function removeRow(i: number): void {
-  rows.value.splice(i, 1);
 }
 
 async function submit(): Promise<void> {
@@ -52,7 +42,7 @@ async function submit(): Promise<void> {
   controller = new AbortController();
   try {
     const res = await store.mutateAsync({
-      items: rows.value.map((r) => ({ fact: r.fact.trim(), reason: r.reason.trim() })),
+      items: [{ fact: text.value.trim(), reason: MANUAL_REASON }],
       clarifications,
       signal: controller.signal,
     });
@@ -117,38 +107,31 @@ function select(id: string): void {
         </template>
 
         <template v-else>
-          <div v-for="(row, i) in rows" :key="i" class="flex flex-col gap-1 border-b border-border pb-2" :data-testid="`add-memory-row-${i}`">
-            <div class="flex items-center">
-              <Label :for="`memory-fact-${i}`">Fact</Label>
-              <TooltipIconButton
-                v-if="rows.length > 1"
-                icon="trash"
-                label="Remove"
-                class="ml-auto"
-                :disabled="busy"
-                @click="removeRow(i)"
-              />
-            </div>
-            <Textarea :id="`memory-fact-${i}`" v-model="row.fact" :disabled="busy" placeholder="One durable fact" data-testid="add-memory-fact" />
-            <Label :for="`memory-reason-${i}`">Reason</Label>
-            <Textarea :id="`memory-reason-${i}`" v-model="row.reason" :disabled="busy" placeholder="Why it is true" data-testid="add-memory-reason" />
+          <div class="flex flex-col gap-1">
+            <Label for="memory-text">What should be remembered?</Label>
+            <Textarea
+              id="memory-text"
+              v-model="text"
+              :disabled="busy"
+              :maxlength="MAX_TEXT"
+              placeholder="Facts in your own words; Claude splits and checks them"
+              data-testid="add-memory-text"
+            />
+            <span class="self-end text-kira-sm text-muted-foreground" data-testid="add-memory-count">{{ text.length }} / {{ MAX_TEXT }}</span>
             <template v-if="challenged">
               <div
-                v-for="c in result?.challenges.filter((x) => x.index === i)"
+                v-for="c in result?.challenges.filter((x) => x.index === 0)"
                 :key="c.index"
                 class="flex flex-col gap-1 rounded-kira-sm bg-warn/10 p-1.5"
                 data-testid="add-memory-challenge"
               >
                 <div v-for="(question, q) in c.questions" :key="q" class="flex flex-col gap-0.5">
-                  <Label :for="`memory-answer-${i}-${q}`">{{ question }}</Label>
-                  <Textarea :id="`memory-answer-${i}-${q}`" v-model="answers[answerKey(c.index, q)]" :disabled="busy" placeholder="Your answer" data-testid="add-memory-answer" />
+                  <Label :for="`memory-answer-${q}`">{{ question }}</Label>
+                  <Textarea :id="`memory-answer-${q}`" v-model="answers[answerKey(c.index, q)]" :disabled="busy" placeholder="Your answer" data-testid="add-memory-answer" />
                 </div>
               </div>
             </template>
           </div>
-          <Button variant="dialog" size="kira-lg" class="self-start" :disabled="busy || rows.length >= MAX_ROWS" @click="addRow">
-            <CodiconIcon name="add" :size="12" /> Add another
-          </Button>
           <p v-if="busy" class="m-0 text-kira-sm text-muted-foreground" data-testid="add-memory-busy">Checking with Claude…</p>
         </template>
       </div>
