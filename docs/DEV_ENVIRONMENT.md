@@ -418,6 +418,17 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
 - Phone: enable Settings > Mobile access, scan the setup QR (HTTP port), install the CA profile
   (iOS: then Settings > General > About > Certificate Trust Settings), compare the fingerprint, scan
   the app QR, approve the code in Kira Space. Reset the certificate in the same pane.
+- Writes and terminals (P212 Part 2): a new pairing can change the backlog and stages. Replying to
+  agents and terminal attach need the pane's global "Let phones reply to agents and control their
+  terminals" switch plus the phone's own Agent input switch, both off by default. To try an attach:
+  turn both on, start a task stage session on the desktop, open Need You or Plan on the phone and tap
+  Terminal. The desktop pane shows "Controlling n terminal(s)"; the window shows an overlay with
+  "Reconnect here". Needs an authenticated `claude`, see the Known open items in `ARCHITECTURE.md`.
+- Terminal e2e has no Go server: `tests/mobile/terminal.spec.ts` scripts the socket with
+  `page.routeWebSocket` (hello and bytes in, key frames recorded). `mockServer.ts` records each POST's
+  body and `Idempotency-Key`, and `state.failNext` scripts one refusal. Go side: `go test -race
+  ./apps/kira-space/internal/mobileterm/` drives a real `coder/websocket` client against the broker
+  with a fake clock.
 
 ## Memory MCP and the `claude` CLI (P201)
 

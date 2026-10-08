@@ -12,11 +12,20 @@ import (
 	"github.com/coder/websocket"
 )
 
-func dial(t *testing.T, srv *httptest.Server, query string) (*websocket.Conn, *http.Response, error) {
+// dial returns the handshake status alongside the connection; the response body is closed here.
+func dial(t *testing.T, srv *httptest.Server, query string) (*websocket.Conn, int, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	t.Cleanup(cancel)
-	return websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/?"+query, nil)
+	ws, resp, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/?"+query, nil)
+	status := 0
+	if resp != nil {
+		status = resp.StatusCode
+		if resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}
+	return ws, status, err
 }
 
 func readCtrl(t *testing.T, ws *websocket.Conn) ctrlFrame {
@@ -92,7 +101,7 @@ func TestServe_ResumeAndBadRequest(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, resp, err := dial(t, srv, "cols=0&rows=20"); err == nil || resp.StatusCode != http.StatusBadRequest {
+	if _, status, err := dial(t, srv, "cols=0&rows=20"); err == nil || status != http.StatusBadRequest {
 		t.Fatalf("bad dims: %v", err)
 	}
 	ws, _, err := dial(t, srv, "cols=50&rows=20&from=4")

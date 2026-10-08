@@ -1,9 +1,9 @@
 import type { Run } from '../wire';
 import type { StageBlock } from './stageBlocks';
 
-export const DONE_STAGE_ID = 'done';
+const DONE_STAGE_ID = 'done';
 
-export interface StageOption {
+interface StageOption {
   id: string;
   name: string;
   skipped: boolean;

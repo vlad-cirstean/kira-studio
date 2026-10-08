@@ -7,7 +7,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P210 | Memory embedding search: local embedding model (best quality under 500 MB RAM, less if possible), vectors in SQLite, hybrid with existing FTS recall-first search | Done |
 | P211 | Memory bulk import: pick file or folder; chunk to a Sonnet-friendly size; per-chunk clean-context agent extracts atomic facts; one final agent holding all chunk facts of the file adds memories through the MCP; progress and failure shown | Done |
 | P212 Part 1 | Mobile agents web: local web server in Kira Space serving a read-only mobile-laid-out Vue agents module; first-load device approval in Kira Space like the git extension pairing; installable PWA | Done |
-| P212 Part 2 | Mobile agents web writes (amendment): backlog add and reorder, TUI input for stuck agents, start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows disconnected plus a reconnect button) | Not started |
+| P212 Part 2 | Mobile agents web writes (amendment): backlog add and reorder, TUI input for stuck agents, start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows disconnected plus a reconnect button) | Done |
 | P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Done |
 | P214 | Memory manual add, free text: Add memory dialog gets a single free-text box (no per-row fact/reason; reason auto-filled as manual). Submits through the unchanged store path: the gate already splits into atomic facts, challenges and reconciles; stored only when every step passes. No dependency on P211 | Done |
 | P215 | Test and hook speed regression: tests and the pre-push hook (go build, lint:go, lint:dead) got much slower in roughly the last 24h, not from contention. Measure where time goes per stage first (do not bisect commit history); find the cause; fix it | Not started |
@@ -135,6 +135,26 @@ agents web (P212, Kira Space)".
 - Follow-up amendment P212 Part 2: backlog add and reorder, TUI input for stuck agents,
   start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows
   disconnected plus a reconnect button).
+
+## P212 Part 2 result
+
+Done. Design facts in `docs/ARCHITECTURE.md` "Mobile agents web (P212, Kira Space)"; try-it steps in
+`docs/DEV_ENVIRONMENT.md`.
+
+- Landed (12 commits): migration 0022 and permission settings; stale-stage guard; shared
+  `stageMoves`/`withMovedItem`/`useLaunchOpener`; guarded write routes, idempotency, `MobileWriter`,
+  launch rendezvous; `internal/terminal.Arbiter`; `internal/mobileterm` (ring, broker, WebSocket);
+  desktop overlay and Reconnect; phone writes UI and terminal screen; Playwright specs; docs.
+- Deferred decisions DD1 to DD11: the plan's bold defaults.
+- Found while testing: a reloaded phone deep link always redirected to Need You (first auth check fired
+  the `phase` watcher). Fixed in `mobile/App.vue`.
+- Verified: `go test -race ./apps/kira-space/... ./internal/terminal/...`, golangci-lint 2.13.2 (0
+  issues), knip, typecheck, lint, `test:ui:space` (225 pass), `test:ui:space-mobile` (iOS WebKit and
+  Pixel Chromium). Not verified: a real phone, soft keyboard, PWA background socket, Claude Code redraw
+  after resize (all in Known open items); Take over has no Playwright spec (no stuck-run fixture), Go
+  tests cover its route and rendezvous.
+- `test:visual:space`: Settings dialog snapshots change again (two switches per row and the global
+  switch). Baselines not regenerated here (sandbox fonts); regenerate on the reference machine.
 
 ## P213 result
 
