@@ -132,10 +132,13 @@ test('selecting a memory shows its reason and version trail', async ({ relaunch 
   await expect(trail.locator('[data-testid="memory-version-2"]')).toContainText('Port corrected.');
 });
 
-test('Add memory: a challenge shows questions, resubmit sends clarifications, stored lists outcomes', async ({
+test('Add memory: free text, a challenge shows questions, resubmit sends clarifications, stored lists outcomes', async ({
   relaunch,
 }) => {
-  const item = { fact: 'it uses port 8080', reason: 'because' };
+  const item = {
+    fact: 'it uses port 8080 and deploys on Fridays',
+    reason: 'Stated by the user, added manually in the Memory module.',
+  };
   const answer = { question: 'Which service?', answer: 'billing-api' };
   const { window: page, control } = await relaunch({
     control: [
@@ -158,10 +161,21 @@ test('Add memory: a challenge shows questions, resubmit sends clarifications, st
           outcomes: [
             {
               fact: 'billing-api uses port 8080',
-              reason: 'because',
+              reason: item.reason,
               action: 'add',
               id: 'm9',
               lineageId: 'm9',
+              version: 1,
+              previousId: '',
+              why: '',
+              error: '',
+            },
+            {
+              fact: 'billing-api deploys on Fridays',
+              reason: item.reason,
+              action: 'noop',
+              id: 'm10',
+              lineageId: 'm10',
               version: 1,
               previousId: '',
               why: '',
@@ -176,8 +190,7 @@ test('Add memory: a challenge shows questions, resubmit sends clarifications, st
 
   await page.locator('[data-testid="memory-add"]').click();
   const dialog = page.locator('[data-testid="add-memory-dialog"]');
-  await dialog.locator('[data-testid="add-memory-fact"]').fill(item.fact);
-  await dialog.locator('[data-testid="add-memory-reason"]').fill(item.reason);
+  await dialog.locator('[data-testid="add-memory-text"]').fill(item.fact);
   await dialog.locator('[data-testid="add-memory-submit"]').click();
 
   await expect(dialog.locator('[data-testid="add-memory-challenge"]')).toContainText(
@@ -187,6 +200,7 @@ test('Add memory: a challenge shows questions, resubmit sends clarifications, st
   await dialog.locator('[data-testid="add-memory-submit"]').click();
 
   await expect(dialog.locator('[data-testid="add-memory-outcome-0"]')).toHaveText('Added');
+  await expect(dialog.locator('[data-testid="add-memory-outcome-1"]')).toHaveText('Already known');
   const stores = control.log().filter((e) => e.channel === IPC.memoryStore);
   expect(stores).toHaveLength(2);
   expect(stores[1]?.args).toMatchObject({ clarifications: [answer] });
