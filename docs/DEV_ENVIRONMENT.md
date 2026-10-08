@@ -408,7 +408,9 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
 ## Mobile agents web — build, test, try on a phone (P212)
 
 - Build: `bun run build:space-mobile` writes `apps/kira-space/frontend/dist-mobile`, which `main.go`
-  embeds; `scripts/prepare-worktree.sh` builds it so `go build` works.
+  embeds; gitignored like `frontend/dist`, so `go build ./...` fails on a clean checkout until built.
+  `scripts/prepare-worktree.sh` builds it, root `bun run build:space` chains it (CI), and the
+  Taskfile `build:frontend` task builds it before production `go build`.
 - Tests: `bun run test:ui:space-mobile` (projects `mobile-ios` WebKit, `mobile-android` Chromium;
   builds first). The offline-reload test skips on WebKit. Visual baselines are not part of it.
 - Icons: regenerate from `apps/kira-space/build/appicon.png` into `frontend/mobile/public/` with

@@ -26,7 +26,7 @@
     "predev:space": "bun run setup",
     "dev:space": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-space && wails3 task dev'",
     "build:studio": "cd apps/kira-studio/frontend && bun run build",
-    "build:space": "cd apps/kira-space/frontend && bun run build",
+    "build:space": "cd apps/kira-space/frontend && bun run build && bun run build:mobile",
     "build:space-mobile": "cd apps/kira-space/frontend && bun run build:mobile",
     "build:test:studio": "cd apps/kira-studio/frontend && bun run build:test",
     "proto:dev:grid": "cd apps/kira-studio/frontend && vite --config vite.proto.config.ts",

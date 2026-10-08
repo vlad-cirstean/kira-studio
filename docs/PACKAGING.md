@@ -503,6 +503,11 @@ gone.
 
 ## 8. Kira Space packaging
 
+Kira Space embeds two gitignored bundles: `frontend/dist` (desktop UI) and `frontend/dist-mobile` (phone app,
+`//go:embed all:frontend/dist-mobile`). Both must exist before `go build`. The Taskfile `build:frontend`
+task builds both (`bun run build` then `bun run build:mobile`), so packaged builds embed the real phone app.
+Clean checkout or fresh worktree: `sh scripts/prepare-worktree.sh` builds both. CI: `bun run build:space` chains both.
+
 **As of v1.9 P100, Kira Space is a separate app with its own bundle, own DMG, and its own copy of
 the whole pipeline above** — `apps/kira-space/build/config.yml`, `apps/kira-space/Taskfile.yml` and
 `apps/kira-space/build/darwin/Taskfile.yml`, generated and packaged exactly the way §1-§2 describe
