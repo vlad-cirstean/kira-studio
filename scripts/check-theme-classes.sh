@@ -526,7 +526,7 @@ check_class_all 'p-dialog-body' 'flex flex-col gap-2 p-3 (or gap-0.5 p-1 for the
 check_class_all 'p-dialog-actions' 'flex items-center gap-1.5 (plus justify-end w-full for .end)'
 # P110 B28: the toolbar/view-header/floating-surface/panel family, folded into plain utilities.
 check_class_all 'p-toolbar' 'h-bar shrink-0 flex items-center gap-1.5 px-2 (+ border-b border-border unless .last)'
-check_class_all 'p-toolbar-rail' 'h-0.5 shrink-0 bg-(--kira-rail)'
+check_class_all 'p-toolbar-rail' "colorMarkClass('band', color) (packages/theme/src/connColor.ts)"
 check_class_all 'p-view-head' 'h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border'
 check_class_all 'p-view-target' 'text-kira-md text-fg truncate (plus text-subtle for .path)'
 check_class_all 'p-float' 'bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden'
@@ -536,9 +536,10 @@ check_class_all 'p-panel' 'border border-border rounded-kira bg-bg overflow-hidd
 check_class_all 'p-tab' 'h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-md (plus a local tab-chip hook class where a scoped selector needs one)'
 check_class_all 'p-row' 'h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer (plus hover:bg-hover or a selection ternary)'
 check_class_all 'p-method' 'methodTextClass() (packages/theme/src/methodColor.ts)'
-check_class_all 'p-conn-dot' 'size-1.25 rounded-full shrink-0 (plus bg-(--kira-rail) or bg-none border border-disabled)'
-check_class_all 'p-tab-rail' 'w-0.5 h-3.5 rounded-xs shrink-0 bg-(--kira-rail)'
-check_class_all 'p-tree-rail' 'absolute inset-y-0 left-0 w-0.5 bg-(--kira-rail)'
+check_class_all 'p-conn-dot' "colorMarkClass('dot', color) (packages/theme/src/connColor.ts)"
+check_class_all 'p-tab-rail' "colorMarkClass('bar', color) (packages/theme/src/connColor.ts)"
+check_class_all 'p-tree-rail' "colorMarkClass('rail', color) (packages/theme/src/connColor.ts)"
+check_class_all 'bg-\(--kira-rail\)' "colorMarkClass() (packages/theme/src/connColor.ts)"
 check_class_all 'p-thead' 'h-control-lg shrink-0 flex bg-elevated border-b border-border-strong'
 check_class_all 'p-th' 'flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap'
 check_class_all 'p-td' 'flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate (plus the gutter variant)'

@@ -2,7 +2,7 @@
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { connBgClass, connTextClass } from '@theme/connColor';
+import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { formatRelative } from '@workbench/util/format';
 import { computed } from 'vue';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
@@ -111,10 +111,7 @@ function openRecent(entry: RecentTableEntry): void {
             class="w-full flex items-center cursor-pointer text-left rounded-kira-sm h-6.5 gap-1.5 px-1.5 text-fg text-kira-md hover:bg-hover"
             @click="openRecent(entry)"
           >
-            <span
-              class="w-0.5 h-3.5 rounded-xs shrink-0"
-              :class="connBgClass(connectionFor(entry)?.color)"
-            />
+            <span :class="colorMarkClass('bar', connectionFor(entry)?.color)" />
             <span class="size-4 flex items-center justify-center shrink-0" :class="iconColorClass(entry)">
               <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>

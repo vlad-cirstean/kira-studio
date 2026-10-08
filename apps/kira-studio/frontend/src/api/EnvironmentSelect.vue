@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
-import { connColorVar } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { computed } from 'vue';
 import { useVariablesStore } from './state/variables';
 
@@ -83,10 +83,8 @@ function manage(): void {
           :data-value="activeEnvironmentId"
         >
           <span
-            class="size-1.25 rounded-full shrink-0"
-            :class="(!activeEnvironment?.color || activeEnvironment.color === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
+            :class="colorMarkClass('dot', activeEnvironment?.color)"
             data-testid="conn-dot"
-            :style="{ '--kira-rail': connColorVar(activeEnvironment?.color) }"
           />
           <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ activeEnvironment?.name ?? 'No environment' }}</span>
           <CodiconIcon name="chevron-down" :size="12" />
@@ -101,7 +99,7 @@ function manage(): void {
           data-testid="api-environment-option-none"
           data-value=""
         >
-          <span class="size-1.25 rounded-full shrink-0 bg-none border border-disabled" data-testid="conn-dot" />
+          <span :class="colorMarkClass('dot', 'none')" data-testid="conn-dot" />
           <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">No environment</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
@@ -114,10 +112,8 @@ function manage(): void {
           :data-value="env.id"
         >
           <span
-            class="size-1.25 rounded-full shrink-0"
-            :class="env.color === 'none' ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
+            :class="colorMarkClass('dot', env.color)"
             data-testid="conn-dot"
-            :style="{ '--kira-rail': connColorVar(env.color) }"
           />
           <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ env.name }}</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>

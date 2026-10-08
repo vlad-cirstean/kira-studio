@@ -28,7 +28,7 @@ import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { methodTextClass } from '@theme/methodColor';
 import RunState from '@theme/RunState.vue';
 import { refDebounced } from '@vueuse/core';
@@ -468,10 +468,8 @@ onUnmounted(() => {
     <ViewToolbar data-testid="view-head">
       <span
         v-if="railColor !== undefined"
-        class="size-1.25 rounded-full shrink-0"
-        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
+        :class="colorMarkClass('dot', railColor)"
         data-testid="conn-dot"
-        :style="{ '--kira-rail': connColorVar(railColor) }"
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="globe" :size="13" /></span>
       <span class="text-kira-md text-fg truncate" data-testid="http-request-target">{{ title }}</span>
@@ -522,9 +520,8 @@ onUnmounted(() => {
       </span>
     </ViewToolbar>
     <div
-      class="h-0.5 shrink-0 bg-(--kira-rail)"
+      :class="colorMarkClass('band', railColor)"
       data-testid="toolbar-rail"
-      :style="{ '--kira-rail': connColorVar(railColor) }"
     />
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">

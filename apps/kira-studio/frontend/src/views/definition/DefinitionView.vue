@@ -10,7 +10,7 @@ import { Empty } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -231,9 +231,7 @@ const breadcrumb = computed(() => {
     <ViewToolbar>
       <span
         v-if="railColor !== undefined"
-        class="size-1.25 rounded-full shrink-0"
-        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
-        :style="{ '--kira-rail': connColorVar(railColor) }"
+        :class="colorMarkClass('dot', railColor)"
       />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
@@ -247,7 +245,7 @@ const breadcrumb = computed(() => {
       </Badge>
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
-    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div :class="colorMarkClass('band', railColor)" />
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton

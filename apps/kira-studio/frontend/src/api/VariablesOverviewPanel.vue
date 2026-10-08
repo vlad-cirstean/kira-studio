@@ -7,7 +7,7 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { copyOrReportError } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
 import { useVariableRows } from './state/apiQueries';
@@ -201,9 +201,7 @@ function editEnvironmentVariables(): void {
         >
           <span
             v-if="environmentId"
-            class="size-1.25 rounded-full shrink-0"
-            :class="environmentColor === 'none' ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
-            :style="{ '--kira-rail': connColorVar(environmentColor) }"
+            :class="colorMarkClass('dot', environmentColor)"
             data-testid="variables-overview-environment-dot"
           />
           Edit environment variables…

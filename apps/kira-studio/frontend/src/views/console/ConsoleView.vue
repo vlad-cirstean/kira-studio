@@ -18,7 +18,7 @@ import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -678,9 +678,7 @@ const statusLine = computed(() => {
     <ViewToolbar>
       <span
         v-if="railColor !== undefined"
-        class="size-1.25 rounded-full shrink-0"
-        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
-        :style="{ '--kira-rail': connColorVar(railColor) }"
+        :class="colorMarkClass('dot', railColor)"
       />
       <span v-if="connectionKind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connectionKind" :size="13" />
@@ -694,7 +692,7 @@ const statusLine = computed(() => {
       <span class="ml-auto flex items-center gap-1"></span>
     </ViewToolbar>
 
-    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div :class="colorMarkClass('band', railColor)" />
     <ViewToolbar border="none">
       <div class="flex items-center gap-1.5 min-w-0">
         <!-- The console's search_path/schema control and the "writes go to production" chip from

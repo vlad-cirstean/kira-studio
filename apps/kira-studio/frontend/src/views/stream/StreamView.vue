@@ -19,7 +19,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/pop
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar, connTextClass } from '@theme/connColor';
+import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -73,7 +73,7 @@ const caps = computed(() => {
 
 // P16 design system LAW: connection colour is a 2px rail — here capping the toolbar and as a
 // dot in the view header — never a background tint. Mirrors Toolbar.vue's `color`/`railStyle`
-// pair exactly. No colour assigned leaves `--kira-rail` unset, so the reserved slot stays blank
+// pair exactly. No colour leaves the band empty, so the reserved slot stays blank
 // instead of shifting anything.
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 const iconClass = computed(() => connTextClass(connRecord.value?.color) ?? 'text-muted-foreground');
@@ -690,9 +690,7 @@ onUnmounted(() => {
     <ViewToolbar>
       <span
         v-if="railColor !== undefined"
-        class="size-1.25 rounded-full shrink-0"
-        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
-        :style="{ '--kira-rail': connColorVar(railColor) }"
+        :class="colorMarkClass('dot', railColor)"
       />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connRecord.kind" :size="13" />
@@ -714,7 +712,7 @@ onUnmounted(() => {
       </span>
     </ViewToolbar>
 
-    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div :class="colorMarkClass('band', railColor)" />
     <ViewToolbar :border="isKafka ? 'bottom' : 'none'">
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton

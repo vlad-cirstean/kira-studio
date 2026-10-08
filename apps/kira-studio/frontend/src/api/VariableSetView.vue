@@ -15,7 +15,7 @@ import {
 } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -502,9 +502,7 @@ function onBulkClose(): void {
     <ViewToolbar>
       <span
         v-if="railColor !== undefined"
-        class="size-1.25 rounded-full shrink-0"
-        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
-        :style="{ '--kira-rail': connColorVar(railColor) }"
+        :class="colorMarkClass('dot', railColor)"
       />
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon :name="scope === 'environment' ? 'server-environment' : 'symbol-variable'" :size="13" />
@@ -512,7 +510,7 @@ function onBulkClose(): void {
       <span class="text-kira-md text-fg truncate" data-testid="variable-set-target">{{ tab.state.name || 'Variables' }}</span>
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
-    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div :class="colorMarkClass('band', railColor)" />
     <!-- P22b D9 (remainder): the standard toolbar bands, rather than the hand-spaced single
          #toolbar-2 row this view used to build both controls into on its own — the search box
          (the band every other view's own filter/search control lives in), the .env-text toggle in

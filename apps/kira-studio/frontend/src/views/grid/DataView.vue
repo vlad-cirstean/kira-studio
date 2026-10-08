@@ -8,7 +8,7 @@ import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import { connColorVar, connTextClass } from '@theme/connColor';
+import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -197,7 +197,7 @@ function onCloseSearch(): void {
 <template>
   <div class="h-full flex flex-col min-h-0">
     <ViewToolbar data-testid="view-head">
-      <span v-if="railColor !== undefined" class="size-1.25 rounded-full shrink-0" :class="!railColor ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'" data-testid="conn-dot" :style="{ '--kira-rail': connColorVar(railColor) }" />
+      <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" data-testid="conn-dot" />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
       <span class="size-4 flex items-center justify-center shrink-0" :class="iconClass"><CodiconIcon :name="targetIcon" :size="13" /></span>
       <span class="text-kira-md text-fg truncate" data-testid="grid-target">
@@ -219,9 +219,8 @@ function onCloseSearch(): void {
     </ViewToolbar>
 
     <div
-      class="h-0.5 shrink-0 bg-(--kira-rail)"
+      :class="colorMarkClass('band', railColor)"
       data-testid="toolbar-rail"
-      :style="{ '--kira-rail': connColorVar(railColor) }"
     />
     <ViewToolbar data-testid="data-toolbar">
       <div class="flex items-center gap-1.5 min-w-0">
