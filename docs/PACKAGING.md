@@ -567,13 +567,3 @@ Linux, with no macOS, no `codesign`, and no `code` CLI to probe for. What §5's 
 about Kira Studio's own build applies identically here — `build:native` needs macOS, `codesign`
 does not exist off Darwin — so nothing above has been observed against a real bundle, only read
 from the Taskfiles that produce one.
-
-**whisper.cpp (P216).** `darwin:package` and `darwin:package:universal` depend on `fetch:whisper`
-(`scripts/fetch-whisper.sh darwin-arm64`: clone at the pinned commit, static libs with Metal, built into the
-gitignored `apps/kira-space/build/whisper/darwin-arm64/`). The build task passes the `whisper` tag and the
-cgo flags, so the libs link statically; nothing extra goes into `Contents/Frameworks`. Both plists carry
-`NSMicrophoneUsageDescription`. **S13** checks the commit in `fetch-whisper.sh` appears in
-`internal/memory/stt/spec.go`, the Taskfile passes the tag, and both plists have the usage string. The
-Whisper and VAD models are not bundled: they download on click (pinned SHA-256). Human check on a Mac: build
-links, `lipo -info` on the universal binary, `codesign --verify --deep --strict`, mic prompt appears once.
-CI: `docs/pending-changes/.github__workflows__pr.yml.patch` adds a tagged build to the `checks` job.

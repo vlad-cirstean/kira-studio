@@ -18,7 +18,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P220 | Git module: graph lines still disappear on click and on scroll (find the root cause); default tab is Repos and the last tab the user moved to persists across restarts | Done |
 | P221 | Memory module: move the semantic-search model download and the Connect Claude Code action into Settings | Done |
 | P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Not started |
-| P224 | Remove speech to text completely: the `stt` package, whisper.cpp build, dictation bridge and stream, mic UI, P221's dictation settings section, malgo, S13, plists' microphone string, CI patch, docs; delete the downloaded speech model at startup; keep `modelstore`, `workerproc` and the embed worker | Not started |
+| P224 | Remove speech to text completely: the `stt` package, whisper.cpp build, dictation bridge and stream, mic UI, P221's dictation settings section, malgo, S13, plists' microphone string, CI patch, docs; delete the downloaded speech model at startup; keep `modelstore`, `workerproc` and the embed worker | Done |
 
 ## Requirements (user's words, condensed)
 
@@ -226,30 +226,7 @@ Not done: TS project references (`composite`, `vue-tsc -b`) would dedupe 583 fil
 
 ## P216 result
 
-Memory dictation: Whisper small.en q5_1 in a `memory-stt` worker, mic buttons in Add memory and Memory
-search, live text at the caret, user sends manually. Facts live in `docs/ARCHITECTURE.md` ("Memory MCP
-server and module", Stack table, Known open items), `docs/DEV_ENVIRONMENT.md` and `docs/PACKAGING.md`.
-
-Decisions: plan defaults D1 to D9. O1: whisper.cpp pinned by commit `d1be6fde` (release tarball hash not
-fetchable here), no tarball hash invented. Libraries: whisper.cpp (own cgo glue), malgo, Silero VAD.
-
-Landed: `modelstore` and `workerproc` extracted from embed (embed tests green); `stt` package (spec,
-protocol, engine, stream, worker, client, capture, dictation, `transcript`); `DictationService` and the
-`dictation` stream; fetch script, darwin build, plists, S13; frontend mic, status line, store, queries;
-Playwright `memory-dictation` (8) plus `memory-module` (4); tagged smoke test.
-
-Verification (Linux): `go build ./...`, `go build -tags server,whisper ./apps/kira-space`,
-`CGO_ENABLED=0 go build ./internal/memory/...`, `go test -race ./internal/memory/...
-./apps/kira-space/internal/bridge/`, golangci-lint 2.13.2 untagged and `--build-tags whisper` (0 issues),
-typecheck, lint, knip, Playwright 13 pass. Smoke with the real model: quote matched, VmHWM 336 MB,
-worker exited after the idle stop.
-
-Found while testing: the UI treated stream close after a `final` frame as an unexpected stop. Fixed.
-S10 now skips `build` dirs (fetched whisper.cpp source). `verify-packaging.sh` still reports "debug
-hooks in packaged bundle" because the local `dist` came from a test build; unrelated.
-
-Unverified: real microphone and the TCC prompt, Metal speed, darwin cgo link and `lipo`, `codesign`,
-accuracy on real speech, device switching, all macOS-only items. In Known open items.
+Removed in P224 (user dropped speech to text).
 
 ## P217 result
 
@@ -336,3 +313,12 @@ Code webview; no graph baseline checked). Run both before merge.
 
 Mac handover: open a never-opened repo, confirm lane lines show, click rows, scroll. Switch modules and
 restart; confirm the Git panel tab is kept.
+
+## P224 result
+
+Speech to text removed: dictation UI and queries, the `stt` package, `DictationService` and stream, `memory-stt`
+shim, malgo, whisper.cpp build, S13, microphone plist strings, CI patch and docs. Kept `modelstore`, `workerproc`,
+the embed worker and the webview microphone deny. Space deletes `models/whisper-small.en-q5_1-5359861` at
+startup (`modelstore.RemoveRetired`). `modelDownloads` store lost its `kind` parameter; S10 no longer skips
+`build` dirs. Checks green: go build/vet/test -race, golangci-lint, typecheck, lint, knip, unit, `test:ui:space`
+(231 pass).
