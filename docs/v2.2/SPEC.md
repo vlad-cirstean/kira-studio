@@ -8,7 +8,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P211 | Memory bulk import: pick file or folder; chunk to a Sonnet-friendly size; per-chunk clean-context agent extracts atomic facts; one final agent holding all chunk facts of the file adds memories through the MCP; progress and failure shown | Not started |
 | P212 Part 1 | Mobile agents web: local web server in Kira Space serving a read-only mobile-laid-out Vue agents module; first-load device approval in Kira Space like the git extension pairing; installable PWA | Done |
 | P212 Part 2 | Mobile agents web writes (amendment): backlog add and reorder, TUI input for stuck agents, start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows disconnected plus a reconnect button) | Not started |
-| P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Not started |
+| P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Done |
 | P214 | Code review (one Opus round) and fixes | Not started |
 
 ## Requirements (user's words, condensed)
@@ -92,3 +92,27 @@ agents web (P212, Kira Space)".
 - Follow-up amendment P212 Part 2: backlog add and reorder, TUI input for stuck agents,
   start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows
   disconnected plus a reconnect button).
+
+## P213 result
+
+12 commits on `v2.1-stream-C` (`393978d04`..`f262f96dd`, plus docs). Hooks green on each.
+
+Done:
+- Connection and type colours: `connBgClass`/`connTextClass`, `columnTypeTextClass` literal maps replace 19 direct `:style` colour paints.
+- Static `:style` keys moved to classes; bindings keep runtime geometry only. `:style` bindings 250 to 142 (same grep).
+- ADE: tone `@theme` tokens in `ade/v2/tones.css`; `tones.ts` keeps class maps only. `tagStyle`/`solidStyle`/`actionStyle` deleted (no use in `kira-v21-G` or `origin/v2.0`).
+- git-ui commit grid: cell, badge, ref-strip CSS to `kv:` utilities; `CommitGrid.vue` SlickGrid overrides via `@apply`. Style block 57 to 40 rules.
+- Studio `slickTheme.css`: 70 to 63 rule blocks, 825 to 715 lines; safe single-declaration subset via `@apply`. Host, mount, no-rows, nav button, header badge, select zone moved to class strings.
+- Space review load-error zone: utilities; retry via `buttonVariants`. Rules deleted from `review-decorations.css`.
+- `base.css` html/body and `MonacoHost.vue` find-match tints via `@apply`.
+
+Kept CSS: 5 `<style>` blocks unchanged in count; `slickTheme.css` 63 rules (vendor DOM, composites, raw px sizes, `.cell-input` states, scrollbar pseudo rules).
+
+Verification: `test:unit` 1810 pass; `test:webview` 64 pass; `test:ui:space` 217 pass; `test:ui:studio` 337 pass after one fix (`f262f96dd`: `.is-fk` marker read by `slick-grid.spec.ts`). Visual before/after in scratch worktree at `363cb6622`: Studio 13 and Space 4 specs, zero diff. No baseline touched. Excluded paths (section 3.1) untouched.
+
+Accepted drift:
+- Retry button in review load-error zone: `dialog-danger`/`xs` variant, so height, radius, hover tint differ from old rule (D5). Not covered by a visual spec.
+- `bg-error/12` mixes in oklab, old rule in srgb. Imperceptible.
+- `antialiased` also sets `-moz-osx-font-smoothing`. No effect in Chromium/WebKit.
+
+Unverified: Retry-button and load-error zone appearance (no spec renders it); real-hardware scrolling not checked.
