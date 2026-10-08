@@ -17,7 +17,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P219 | Terminal and API collections: terminal module scripts get collections added the same way as the API module; right-click menu in both modules to move an item into a chosen collection; working-dir field gets a native folder-select dialog | Done |
 | P220 | Git module: graph lines still disappear on click and on scroll (find the root cause); default tab is Repos and the last tab the user moved to persists across restarts | Done |
 | P221 | Memory module: move the semantic-search model download and the Connect Claude Code action into Settings | Done |
-| P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Not started |
+| P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Done |
 | P224 | Remove speech to text completely: the `stt` package, whisper.cpp build, dictation bridge and stream, mic UI, P221's dictation settings section, malgo, S13, plists' microphone string, CI patch, docs; delete the downloaded speech model at startup; keep `modelstore`, `workerproc` and the embed worker | Done |
 
 ## Requirements (user's words, condensed)
@@ -322,3 +322,31 @@ the embed worker and the webview microphone deny. Space deletes `models/whisper-
 startup (`modelstore.RemoveRetired`). `modelDownloads` store lost its `kind` parameter; S10 no longer skips
 `build` dirs. Checks green: go build/vet/test -race, golangci-lint, typecheck, lint, knip, unit, `test:ui:space`
 (231 pass).
+
+## P222 result
+
+Facts in `docs/ARCHITECTURE.md` (Storage, per-repo colour and deployment environments bullets).
+
+Dialog: Settings-shaped (header icon, ghost close, left nav with colour dots, "Scan folders" nav entry,
+footer with Remove and Close). Chip tabs and corner close button gone. Form grouped into Repository,
+Worktrees, Branches, Deployment environments.
+
+Colour: stored on `code_repos` (migration 0024; plan said 0023, taken by P219). `repoColor()` hashing
+deleted. Picker in the dialog and a Colour submenu on Git panel repo rows.
+
+Environments: they track deployed commits (command prints the SHA). Add always failed before (empty
+script rejected as "new-env"); now a draft row is written once name and command are filled. No separate
+terminal setup hook built: Prepare worktree is the per-repo setup script, now described as such.
+
+Deviations: the dialog and environment commits are one commit (same files, not splittable without
+patch staging). Migration 0024 not 0023. Fixtures and specs gained `color: 'none'`. No Go unit test
+added (CRUD path).
+
+Mac handover: open Repositories from the Git panel, compare with Settings, pick a colour and check the
+nav dot, Git panel icon, repo tab rail and ADE repo tags; add an environment and refresh the board.
+
+Checks: `go build`, `go test -race` (palette, quickcommands, storage, bridge, codeworkspace, ade),
+golangci-lint, typecheck, lint, lint:dead clean; full Space UI suite 249 pass, 0 fail. Fails:
+`test:visual:space` all four Settings baselines, unrelated to P222 (no Settings file touched; the
+Settings nav gained Memory in P221, so the baselines predate it, and text antialiasing differs on this
+machine). Not re-recorded. Re-record on the reference machine.

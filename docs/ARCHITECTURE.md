@@ -3916,6 +3916,16 @@ and `docs/v2.0/plans/`.
   `0017`: `ade_tasks.workflow_json`, `workflow_hash` (P196 snapshot). `0018`: `ade_task_branch.origin`
   (P199; `agent` for branches an agent created). `0019`: `ade_worktree_setup.note` (P202 failure reason).
   Space's `0020` is quick commands, not ADE.
+  Space's `0024` (P222) adds `code_repos.color`, not ADE.
+- Per-repo colour (P222): `code_repos.color` is a `PaletteColor` name, never empty. Migration 0024
+  backfills by `sort_order % 6` over `blue, amber, magenta, green, red, cyan`; `Create` assigns the next
+  hue (`internal/palette.AutoRepoColor`). Written by `CodeWorkspaceService.SetRepoColor`; read through
+  `state/coderepos.ts` (`colorOf`, `repoTint`). Painted via `--kira-conn-*` on the Repositories dialog,
+  Git panel icon, repo tab rails and ADE repo tags. The 20-slot ADE work palette now colours tasks only.
+  `internal/palette` is the one Go palette set (Studio's `model.ValidPaletteColor` still has its own).
+- Deployment environments (`ade_repo_envs`): a name plus a shell command that prints the deployed commit
+  SHA. Run in the repo root on board refresh; results mark branches `▲name ✓`/`⚠`/`?`. The UI keeps a
+  new row as a local draft and writes only once name and command are both filled.
 - Run and setup logs: tail 2 MiB per log, chunks of at most 8 KiB, `truncated` once head chunks drop,
   writes batched every 250 ms.
 - Log retention (P177): logs of a task archived 90+ days ago are deleted (`AdeLogsRepo.PurgeArchived`,
