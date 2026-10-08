@@ -106,7 +106,11 @@ func Find(id Identity) (Network, error) {
 	if err != nil {
 		return Network{}, err
 	}
-	if mac, ok := table[id.RouterIP]; !ok || !strings.EqualFold(mac, id.RouterMAC) {
+	mac, ok := table[id.RouterIP]
+	if !ok {
+		return Network{}, ErrNoRouterMAC
+	}
+	if !strings.EqualFold(mac, id.RouterMAC) {
 		return Network{}, ErrOtherRouter
 	}
 	return *found, nil

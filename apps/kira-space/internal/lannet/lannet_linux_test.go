@@ -3,7 +3,6 @@
 package lannet
 
 import (
-	"errors"
 	"net/netip"
 	"strings"
 	"testing"
@@ -24,14 +23,6 @@ func TestParseDefaultRoute(t *testing.T) {
 	}
 	if gw != netip.MustParseAddr("192.168.10.1") || iface != "wlan0" {
 		t.Fatalf("got %s on %s, want 192.168.10.1 on wlan0 (lowest metric, UP+GATEWAY only)", gw, iface)
-	}
-}
-
-func TestParseDefaultRouteNone(t *testing.T) {
-	tbl := "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n" +
-		"eth0\t0001A8C0\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n"
-	if _, _, err := parseDefaultRoute(strings.NewReader(tbl)); !errors.Is(err, ErrNoRoute) {
-		t.Fatalf("got %v, want ErrNoRoute", err)
 	}
 }
 

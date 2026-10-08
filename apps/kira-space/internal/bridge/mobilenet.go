@@ -20,15 +20,16 @@ import (
 type mobileSupervisor struct {
 	runMu sync.Mutex
 
-	stateMu sync.Mutex
-	active  bool
-	stop    chan struct{}
-	done    chan struct{}
-	net     lannet.Network // what the next server start binds
-	reason  string
-	detail  string
-	current *MobileNetwork
-	last    *MobileStatus // last status emitted by a pass
+	stateMu  sync.Mutex
+	active   bool
+	stop     chan struct{}
+	done     chan struct{}
+	net      lannet.Network // what the next server start binds
+	reason   string
+	detail   string
+	startErr string // last start failure text, so a stuck port logs once
+	current  *MobileNetwork
+	last     *MobileStatus // last status emitted by a pass
 }
 
 func (m *mobileSupervisor) network() lannet.Network {
@@ -111,7 +112,7 @@ func (s *MobileAccessService) stopSupervisor() {
 	}
 	s.sup.runMu.Lock()
 	s.sup.stateMu.Lock()
-	s.sup.active, s.sup.reason, s.sup.detail, s.sup.current, s.sup.last = false, "", "", nil, nil
+	s.sup.active, s.sup.reason, s.sup.detail, s.sup.startErr, s.sup.current, s.sup.last = false, "", "", "", nil, nil
 	s.sup.stateMu.Unlock()
 	s.sup.runMu.Unlock()
 }
@@ -140,18 +141,25 @@ func (s *MobileAccessService) reconcile() {
 	}
 	s.sup.stateMu.Unlock()
 
-	switch {
-	case match == nil:
+	startErr := ""
+	if match == nil {
 		s.embedded.Stop()
-	default:
+	} else {
 		s.embedded.Mu.Lock()
 		srv := s.embedded.Server
 		s.embedded.Mu.Unlock()
 		if srv != nil {
 			srv.SetNetwork(*match)
 		} else if _, err := s.embedded.SetRunning(true); err != nil {
-			slog.Warn("mobile access: start", "scope", "mobileweb", "err", err)
+			startErr = err.Error()
 		}
+	}
+	s.sup.stateMu.Lock()
+	changed := startErr != "" && startErr != s.sup.startErr
+	s.sup.startErr = startErr
+	s.sup.stateMu.Unlock()
+	if changed {
+		slog.Warn("mobile access: start", "scope", "mobileweb", "err", startErr)
 	}
 	s.emitIfChanged()
 }
