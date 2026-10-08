@@ -44,7 +44,7 @@ the two halves would share `ade/v2/queries.ts` and `AdeReposPage.vue` and depend
 | **P206 Kira Space: Terminal module after Agents** | `workbench/modes.ts` `MODE_ORDER` becomes `git, ade, terminal`; Studio unchanged | Stream F, after P205 |
 | **P207 Agents module: one visual system with the workbench** | Screenshot audit against the Git and Terminal modules: double frames (shell frame plus ADE panel frames, a third level in editor and rows), uneven nav row, 37 files with arbitrary pixel classes, fixed content widths leaving half a panel empty, mixed button sizes per row, monospace prose, raw `<button>`s, hand-made headers, uneven paddings. Fix: full-layout modules render on chrome with one frame per pane, `PanelHeader` on every pane, shadcn controls at default sizes, tokens only (timeline geometry allowlisted), `font-data` for code-like text only. Before/after screenshots per page beside workbench equivalents | Stream F, last; after stream E lands (E edits the same ADE files) |
 | **P208 Requirements audit** | One pass checks every user request in this chapter against shipped code and tests: the 12 original requests (P185-P196), P197-P199, P200, P201, P202, P203-P207. Findings file under `plans/`; every gap goes back to a Sonnet fixer, same phase number. Details: `plans/queued-requests.md` | Runs after every other v2.1 phase lands. Not started |
-| **P209 Code review** | Per `CLAUDE.md` "Code review": one Opus subagent, three dimensions, scope = everything since the last review session (state base commit). Findings file committed before any fixer starts | Last. Not started |
+| **P209 Code review** | Per `CLAUDE.md` "Code review": one Opus subagent, three dimensions, scope = everything since the last review session (state base commit). Findings file committed before any fixer starts | Last. Done, 1 round |
 
 ## P185 result
 
@@ -141,3 +141,7 @@ All repository configuration in `ReposDialog.vue` (Repositories and Scan folders
 ## P207 result
 
 One frame per pane (`mainFramed` prop on `WorkbenchShell`), `PanelHeader` on every pane, shadcn controls at `kira`/`kira-lg`/`kira-icon`, tokens for sizes, `font-data` for code-like text only. Counts: arbitrary pixel classes under `ade/` 2 (both `border-[1.5px]` ring weight); raw `<button` 3 (task card title, attention badge, session tab chips). Verified: Space UI 215 passed, lint, typecheck, `lint:dead`, before/after screenshots at 1440 and 1100 wide. Open: none.
+
+## P209 result
+
+Rounds: 1. Fixed all 3 Medium, 8 Low and the Nit group. Memory: stale revision re-decides every uncommitted fact. PR cache: refs change re-asks only branches with a PR; a server-side "no PR" entry stays fresh across refs changes. Docker: exec open bounded and cancelled on window close; unverified TLS marked insecure; logs close awaits in-flight open; exec chips use shared buttons. ADE: `branch_status` returns the setup failure note and polls one row; refused stage move no longer snapshots the workflow; abandoned launch grants release on a timer. Space: keep-awake counts headless sessions in SQL. Stale comments fixed. Open: none.
