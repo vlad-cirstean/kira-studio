@@ -7,7 +7,9 @@ import App from './App.vue';
 import { installAdeSignals } from './ade/queries';
 import { useAgentSessionsStore } from './ade/state/agentSessions';
 import { reviewTargetKey } from './ade/v2/queries';
+import { adeReaderKey } from './ade/v2/reader';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
+import { controlAdeReader } from './bridge/adeReader';
 import { control } from './bridge/control';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
@@ -142,6 +144,7 @@ async function mountShell(): Promise<void> {
   }
 
   const app = createApp(App);
+  app.provide(adeReaderKey, controlAdeReader);
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
   app.mount('#app');

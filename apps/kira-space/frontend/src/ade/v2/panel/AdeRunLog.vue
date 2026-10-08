@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useScroll } from '@vueuse/core';
 import { nextTick, ref, watch } from 'vue';
-import { useLog } from '../queries';
+import { useLog } from '../readQueries';
 import type { LogChunk, LogKind } from '../wire';
 
 // Inline log of one run or worktree setup (R28): the first page, then pushed chunks, following the

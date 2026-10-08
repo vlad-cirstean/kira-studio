@@ -3,6 +3,7 @@ import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
 import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
+import { backlogKey, boardKey, useWorkflows } from './readQueries';
 import type {
   AddBacklogItemArgs,
   AddExistingBranchArgs,
@@ -17,7 +18,6 @@ import type {
   GhSyncResult,
   ImportWorkflowArgs,
   LaunchStageArgs,
-  LogKind,
   MoveBacklogItemArgs,
   NewWorkflowArgs,
   RecordMergeArgs,
@@ -42,46 +42,31 @@ import type {
   ValidateWorkflowYamlArgs,
 } from './wire';
 
+export {
+  backlogKey,
+  boardKey,
+  logKey,
+  prsKey,
+  sessionsKey,
+  useBacklog,
+  useBoard,
+  useLog,
+  usePrs,
+  useSessions,
+  useWorkflows,
+  workflowsKey,
+} from './readQueries';
+
 // Board state is push-driven (`kira:adetask:board`, subscribed once in `ade/queries.ts`), so every
 // query is `staleTime: Infinity` and a write relies on the backend's own push instead of
 // invalidating. The two exceptions refetch on their own: the candidate list (`staleTime: 0`, the
 // popover opens on demand) and a failed optimistic write.
 
-export const boardKey = ['adetask', 'board'] as const;
-export const prsKey = ['adetask', 'prs'] as const;
-export const workflowsKey = ['adetask', 'workflows'] as const;
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
-export const logKey = (kind: LogKind, id: string) => ['adetask', 'log', kind, id] as const;
-export const backlogKey = ['adetask', 'backlog'] as const;
-export const sessionsKey = ['adetask', 'sessions'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
 export const ghSyncPlanPrefix = ['adetask', 'ghSyncPlan'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
-
-export function useBoard() {
-  return useQuery({
-    queryKey: boardKey,
-    queryFn: () => control.adeTaskBoard(),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-}
-
-export function usePrs() {
-  return useQuery({
-    queryKey: prsKey,
-    queryFn: () => control.adeTaskPrs(),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-}
-
-export function useWorkflows() {
-  return useQuery({
-    queryKey: workflowsKey,
-    queryFn: () => control.adeTaskWorkflows(),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-}
 
 /** Whether the workflow turns the Kira Space tools on; the agent then names its own branches. */
 export function useSpaceTools(workflowId: MaybeRefOrGetter<string>) {
@@ -101,22 +86,6 @@ export function useCandidates(enabled: () => boolean) {
     staleTime: 0,
     enabled: enabled(),
   }));
-}
-
-export function useSessions() {
-  return useQuery({
-    queryKey: sessionsKey,
-    queryFn: () => control.adeTaskSessions(),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-}
-
-export function useBacklog() {
-  return useQuery({
-    queryKey: backlogKey,
-    queryFn: () => control.adeTaskBacklog(),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
 }
 
 export function useRefresh() {
@@ -260,16 +229,6 @@ export function useWorkflowYaml(fileName: MaybeRefOrGetter<string>) {
     queryFn: () => control.adeTaskWorkflowYaml({ fileName: toValue(fileName) }),
     staleTime: Number.POSITIVE_INFINITY,
     enabled: toValue(fileName) !== '',
-  }));
-}
-
-/** One log from its first chunk; `onAdeTaskLog` appends to this cache (`ade/queries.ts`). */
-export function useLog(kind: MaybeRefOrGetter<LogKind>, id: MaybeRefOrGetter<string>) {
-  return useQuery(() => ({
-    queryKey: logKey(toValue(kind), toValue(id)),
-    queryFn: () => control.adeTaskReadLog({ kind: toValue(kind), id: toValue(id), afterSeq: 0 }),
-    staleTime: Number.POSITIVE_INFINITY,
-    gcTime: 30_000,
   }));
 }
 

@@ -14,6 +14,7 @@
 // @ts-ignore
 import { Events } from '/wails/runtime.js';
 import { windowKey as windowKeyValue } from '../util/window';
+import { toCodedError } from './codedError';
 
 // P57 D5. Wails delivers a bound method's error as a RuntimeError whose .message is
 // ipcerr.Error's own JSON encoding and whose .cause is that same {code, message} as an object
@@ -24,37 +25,7 @@ import { windowKey as windowKeyValue } from '../util/window';
 // existing producer, which leaves the field unset (`omitempty`).
 export function unwrap<T>(p: Promise<T>): Promise<T> {
   return p.catch((err: unknown) => {
-    const e = err as { message?: string; cause?: unknown };
-    const cause = e.cause as { code?: unknown; message?: unknown; details?: unknown } | undefined;
-    let code = 'E_INTERNAL';
-    let message = e.message ?? String(err);
-    let details: unknown;
-    if (cause && typeof cause === 'object' && typeof cause.code === 'string') {
-      code = cause.code;
-      message = typeof cause.message === 'string' ? cause.message : message;
-      details = cause.details;
-    } else {
-      // Belt and braces: a Wails change that stops populating `cause` still leaves the same JSON
-      // in `.message`, because ipcerr.Error.Error() is what CallError.Message is built from.
-      try {
-        const parsed = JSON.parse(message) as {
-          code?: unknown;
-          message?: unknown;
-          details?: unknown;
-        };
-        if (typeof parsed.code === 'string') {
-          code = parsed.code;
-          if (typeof parsed.message === 'string') message = parsed.message;
-          details = parsed.details;
-        }
-      } catch {
-        // not our JSON — E_INTERNAL with the raw text is the right answer
-      }
-    }
-    const out: Error & { code?: string; details?: unknown } = new Error(message);
-    out.code = code;
-    out.details = details;
-    throw out;
+    throw toCodedError(err);
   });
 }
 
