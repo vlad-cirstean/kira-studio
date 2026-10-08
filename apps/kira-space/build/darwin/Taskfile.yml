@@ -89,6 +89,7 @@ tasks:
       # `bun run build`/`scripts/setup.sh`, which G3 D20 deliberately left it out of. Retargeted
       # here from Kira Studio by P100 Part 3 — the extension is Kira Space's own product now.
       - task: common:build:vsix
+      - task: fetch:onnxruntime
     cmds:
       - task: create:app:bundle
 
@@ -97,8 +98,14 @@ tasks:
     deps:
       - task: build:universal
       - task: common:build:vsix
+      - task: fetch:onnxruntime
     cmds:
       - task: create:app:bundle
+
+  fetch:onnxruntime:
+    summary: Downloads the pinned ONNX Runtime dylib for local memory embeddings (checksum-verified)
+    cmds:
+      - sh ../../scripts/fetch-onnxruntime.sh osx-arm64
 
   package:dmg:
     summary: Packages the application into a styled `.dmg`
@@ -163,6 +170,19 @@ tasks:
           exit 1
         fi
         cp "$VSIX" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/kira-space.vsix"
+      # P210: the ONNX Runtime dylib memory embeddings load from Contents/Frameworks (embed.RuntimeLib),
+      # copied BEFORE codesign:adhoc for the same reason as the .vsix. It ships arm64 only (ORT 1.29.1
+      # has no x86_64 macOS build), so a universal bundle's x86_64 slice reports embeddings unavailable.
+      - |
+        ORT="build/onnxruntime/osx-arm64"
+        if [ ! -f "$ORT/libonnxruntime.1.29.1.dylib" ]; then
+          echo "create:app:bundle: $ORT/libonnxruntime.1.29.1.dylib not found — package/package:universal must depend on fetch:onnxruntime" >&2
+          exit 1
+        fi
+        mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Frameworks"
+        cp "$ORT/libonnxruntime.1.29.1.dylib" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Frameworks/"
+        cp "$ORT/LICENSE" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/onnxruntime-LICENSE.txt"
+        cp "$ORT/ThirdPartyNotices.txt" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/onnxruntime-ThirdPartyNotices.txt"
       - task: codesign:adhoc
 
   codesign:adhoc:
@@ -191,6 +211,14 @@ tasks:
         VSIX="{{.BIN_DIR}}/kira-space.vsix"
         if [ -f "$VSIX" ]; then
           cp "$VSIX" "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources/kira-space.vsix"
+        fi
+      # P210: conditional like the .vsix — run `sh ../../scripts/fetch-onnxruntime.sh` once to try
+      # local embeddings from a dev build.
+      - |
+        ORT="build/onnxruntime/osx-arm64/libonnxruntime.1.29.1.dylib"
+        if [ -f "$ORT" ]; then
+          mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Frameworks"
+          cp "$ORT" "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Frameworks/"
         fi
       - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app"
       - '"{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS/{{.APP_NAME}}"'

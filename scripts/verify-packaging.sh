@@ -165,6 +165,18 @@ if [ "${INSTALL_URL_COUNT:-0}" -ne 1 ]; then
   fail "installer URL referenced more than once" "raw.githubusercontent.com should appear exactly once across apps/, packages/, internal/ (InstallScriptURL only); got $INSTALL_URL_COUNT hits: $INSTALL_URL_HITS"
 fi
 
+# --- S12: the bundled ONNX Runtime version agrees everywhere it is pinned (P210) ----------------
+# internal/memory/embed/paths.go's ORTVersion names the dylib RuntimeLib loads from Frameworks; the
+# fetch script downloads that version and the bundle task copies that file name.
+ORT_GO_VERSION="$(sed -n 's/^const ORTVersion = "\([^"]*\)".*/\1/p' internal/memory/embed/paths.go 2>/dev/null | head -1)"
+ORT_SCRIPT_VERSION="$(sed -n 's/^ORT_VERSION="\([^"]*\)".*/\1/p' scripts/fetch-onnxruntime.sh 2>/dev/null | head -1)"
+if [ -z "$ORT_GO_VERSION" ] || [ "$ORT_GO_VERSION" != "$ORT_SCRIPT_VERSION" ]; then
+  fail "ONNX Runtime version mismatch" "internal/memory/embed/paths.go ORTVersion ('$ORT_GO_VERSION') != scripts/fetch-onnxruntime.sh ORT_VERSION ('$ORT_SCRIPT_VERSION')"
+fi
+if ! grep -q "libonnxruntime\.$ORT_GO_VERSION\.dylib" apps/kira-space/build/darwin/Taskfile.yml 2>/dev/null; then
+  fail "ONNX Runtime not bundled" "apps/kira-space/build/darwin/Taskfile.yml's create:app:bundle does not reference libonnxruntime.$ORT_GO_VERSION.dylib"
+fi
+
 if command -v shellcheck >/dev/null 2>&1; then
   if ! shellcheck -s sh scripts/install.sh; then
     fail "shellcheck failed" "shellcheck -s sh scripts/install.sh reported issues — see above"
