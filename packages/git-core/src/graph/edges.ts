@@ -12,6 +12,7 @@ import {
   EDGE_FROM_ROW,
   EDGE_KIND,
   EDGE_KIND_MERGE_IN,
+  EDGE_RUN_LANE,
   EDGE_STRIDE,
   EDGE_TO_LANE,
   EDGE_TO_ROW,
@@ -78,6 +79,7 @@ export class EdgeBuffer {
     this.#edges[base + EDGE_TO_LANE] = toLane;
     this.#edges[base + EDGE_COLOR] = color;
     this.#edges[base + EDGE_KIND] = kind;
+    this.#edges[base + EDGE_RUN_LANE] = toLane;
     this.#count++;
 
     if (toRow !== UNRESOLVED_ROW) {
@@ -112,7 +114,8 @@ export class EdgeBuffer {
   /** G21 D3b: the counterpart `patchTarget` never had — a lane discovered, at its *target* row's
    *  own processing (`lanes.ts` step 2), to converge into `toLane` rather than run straight or
    *  branch out. Sets `EDGE_TO_LANE`/`EDGE_KIND := EDGE_KIND_MERGE_IN` on the edge that was
-   *  pointing at this row, in place if it belongs to this buffer, or as a cross-chunk
+   *  pointing at this row (`EDGE_RUN_LANE` is untouched: the run lane survives, which keeps a
+   *  branch-out edge in its own lane until its last row), in place if it belongs to this buffer, or as a cross-chunk
    *  `(globalEdgeIndex, PATCH_UNCHANGED, toLane, EDGE_KIND_MERGE_IN)` record otherwise — the
    *  exact same route `patchTarget`'s own cross-chunk case already travels, so a `toRow`
    *  resolution and a `toLane` convergence for the same edge (a pending parent that resolves and

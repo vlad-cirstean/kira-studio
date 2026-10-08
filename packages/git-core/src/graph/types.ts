@@ -22,15 +22,19 @@ export interface LayoutInput {
 }
 
 /** One edge record's field offsets within a `EDGE_STRIDE`-wide slice of `LayoutChunk.edges`.
- *  Interleaved at a fixed stride in one `Uint32Array`, not six parallel arrays: one buffer,
- *  one transfer, and a per-frame scan reads six adjacent words instead of touching six pages. */
-export const EDGE_STRIDE = 6;
+ *  Interleaved at a fixed stride in one `Uint32Array`, not seven parallel arrays: one buffer,
+ *  one transfer, and a per-frame scan reads seven adjacent words instead of touching seven pages. */
+export const EDGE_STRIDE = 7;
 export const EDGE_FROM_ROW = 0;
 export const EDGE_TO_ROW = 1;
 export const EDGE_FROM_LANE = 2;
 export const EDGE_TO_LANE = 3;
 export const EDGE_COLOR = 4;
 export const EDGE_KIND = 5;
+/** P225: the lane the edge occupies on its pass-through rows. Set once at append (the lane the
+ *  edge was routed into), never patched: convergence rewrites `EDGE_TO_LANE` only, so a
+ *  branch-out edge that later converges keeps running in its own lane. */
+export const EDGE_RUN_LANE = 6;
 
 /** A real terminal state, not a placeholder: an edge to a parent outside the loaded range (or
  *  below a shallow-clone boundary) keeps this value, and the renderer draws such an edge
@@ -40,8 +44,8 @@ export const UNRESOLVED_ROW = 0xffffffff;
 
 /** 0 straight (parent continues the same lane), 1 branch-out (routed into a different lane
  *  below), 2 merge-in (a lane closing into another at this row). Classified once, where the
- *  lane transition is known (W7) — re-deriving it from lane numbers in the renderer is not
- *  free the way deciding it here is. */
+ *  lane transition is known (W7). The renderer draws from `fromLane`/`EDGE_RUN_LANE`/`toLane`
+ *  (P225), not from this kind: a merge-in bends from the run lane into `toLane` in its last row. */
 export type EdgeKind = 0 | 1 | 2;
 export const EDGE_KIND_STRAIGHT: EdgeKind = 0;
 export const EDGE_KIND_BRANCH_OUT: EdgeKind = 1;

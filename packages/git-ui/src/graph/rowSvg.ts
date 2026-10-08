@@ -16,7 +16,7 @@
  * `columns.ts` — see that file's own doc comment for why (the plan's dependency table has W8
  * depend on W6, not the reverse, so the shared constants had to exist before W8 could).
  */
-import { type DecorationRef, EDGE_KIND_MERGE_IN, UNRESOLVED_ROW } from '@kira/git-core';
+import { type DecorationRef, UNRESOLVED_ROW } from '@kira/git-core';
 import { GEOMETRY } from './geometry.ts';
 import type { EdgeSegment } from './layoutStore.ts';
 import { laneClass, NODE_CLASS, type NodeKind } from './palette.ts';
@@ -87,28 +87,26 @@ export function laneX(lane: number): number {
  * row's top, y=rowHeight is its bottom) — never the edge's full extent, per §5.3's "every segment
  * a row must draw is expressible in that row's own coordinates".
  *
- * Three cases for `EDGE_KIND_STRAIGHT`/`EDGE_KIND_BRANCH_OUT`, decided by comparing `row` against
- * the segment's own `fromRow`/`toRow` (never a second computation of "is this row special" —
- * `LayoutStore.coversRow` already decided this segment belongs to `row` at all):
+ * P225: the shape comes from the segment's three lanes, never from its kind. `fromLane` is the
+ * source node's lane, `runLane` the lane the edge occupies on pass-through rows, `toLane` the
+ * target node's lane (`lanes.ts`; convergence patches `toLane` only). Straight edges have all
+ * three equal; a branch-out has `runLane === toLane`; a straight-then-converge edge has
+ * `fromLane === runLane`; a branch-out that later converges has all three distinct. Cases are
+ * decided by comparing `row` against the segment's own `fromRow`/`toRow` (never a second
+ * computation of "is this row special" — `LayoutStore.coversRow` already decided this segment
+ * belongs to `row` at all):
  * - `row === fromRow`: the commit's own row. A bezier (or, when the lane does not change, an
- *   equivalent straight run) from the node's centre down to the bottom of this row in the
- *   *target* lane — "the transition happens entirely within the row" (§5.3). Overdrawn by
- *   `GEOMETRY.overdraw` past the row's bottom only; the top is the node itself, not a row
+ *   equivalent straight run) from the node's centre down to the bottom of this row,
+ *   `fromLane -> runLane` — "the transition happens entirely within the row" (§5.3). Overdrawn
+ *   by `GEOMETRY.overdraw` past the row's bottom only; the top is the node itself, not a row
  *   boundary, so it gets none.
- * - `row === toRow` (and `toRow` is resolved): the parent's own row. A straight run from the top
- *   of this row down to the node's centre — overdrawn past the top only, for the same reason in
- *   reverse.
+ * - `row === toRow` (and `toRow` is resolved): the parent's own row. From the top of this row
+ *   down to the node's centre, `runLane -> toLane` (a bend when a convergence put the node in
+ *   another lane) — overdrawn past the top only, for the same reason in reverse.
  * - Otherwise (a pass-through row, or an edge whose `toRow` is still `UNRESOLVED_ROW` — "runs to
  *   the bottom of its row and stops", which for a query bounded to `[0, rowCount)` it already
- *   does): a full-height run, overdrawn at both ends — two adjacent rows' runs must meet across a
- *   fractional `devicePixelRatio` without a hairline seam (§5.3's fifth decision).
- *
- * G21 D3c: `EDGE_KIND_MERGE_IN` mirrors that shape about the row's midline, because a merge-in
- * edge's lane transition happens in its *last* row, not its first (`lanes.ts` step 2 only
- * discovers convergence at the shared target row's own processing — see that module's doc
- * comment). So a merge-in edge runs straight down its own `fromLane` for its own row and every
- * pass-through row, and only bends — the same bezier shape the straight/branch-out case uses,
- * reflected top-to-bottom — in its final row, meeting the node it converges into.
+ *   does): a full-height run in `runLane`, overdrawn at both ends — two adjacent rows' runs must
+ *   meet across a fractional `devicePixelRatio` without a hairline seam (§5.3's fifth decision).
  *
  * P7 (item 1): every "the node's own y" reference below (there is no other kind of `rowHeight/2`
  * read in this function — each one is confirmed by its own local variable name: `yEnd`/`yStart`/
@@ -126,44 +124,32 @@ export function edgeCommand(
 ): string {
   const overdraw = GEOMETRY.overdraw;
 
-  if (segment.kind === EDGE_KIND_MERGE_IN) {
-    const isEnd = segment.toRow !== UNRESOLVED_ROW && row === segment.toRow;
-    if (isEnd) {
-      const xFrom = laneX(segment.fromLane);
-      const xTo = laneX(segment.toLane);
-      const yStart = -overdraw;
-      const yEnd = nodeCenterY;
-      if (xFrom === xTo) return `M${fmt(xFrom)},${fmt(yStart)} V${fmt(yEnd)}`;
-      const midY = (yStart + yEnd) / 2;
-      return (
-        `M${fmt(xFrom)},${fmt(yStart)} ` +
-        `C${fmt(xFrom)},${fmt(midY)} ${fmt(xTo)},${fmt(midY)} ${fmt(xTo)},${fmt(yEnd)}`
-      );
-    }
-    const x = laneX(segment.fromLane);
-    const yTop = row === segment.fromRow ? nodeCenterY : -overdraw;
-    const yBottom = rowHeight + overdraw;
-    return `M${fmt(x)},${fmt(yTop)} V${fmt(yBottom)}`;
-  }
-
   if (row === segment.fromRow) {
-    const xFrom = laneX(segment.fromLane);
-    const xTo = laneX(segment.toLane);
-    const yStart = nodeCenterY;
-    const yEnd = rowHeight + overdraw;
-    if (xFrom === xTo) return `M${fmt(xFrom)},${fmt(yStart)} V${fmt(yEnd)}`;
-    const midY = (yStart + yEnd) / 2;
-    return (
-      `M${fmt(xFrom)},${fmt(yStart)} ` +
-      `C${fmt(xFrom)},${fmt(midY)} ${fmt(xTo)},${fmt(midY)} ${fmt(xTo)},${fmt(yEnd)}`
+    return bendCommand(
+      laneX(segment.fromLane),
+      laneX(segment.runLane),
+      nodeCenterY,
+      rowHeight + overdraw,
     );
   }
 
-  const x = laneX(segment.toLane);
   const isEnd = segment.toRow !== UNRESOLVED_ROW && row === segment.toRow;
-  const yTop = -overdraw;
-  const yBottom = isEnd ? nodeCenterY : rowHeight + overdraw;
-  return `M${fmt(x)},${fmt(yTop)} V${fmt(yBottom)}`;
+  if (isEnd) {
+    return bendCommand(laneX(segment.runLane), laneX(segment.toLane), -overdraw, nodeCenterY);
+  }
+  const x = laneX(segment.runLane);
+  return `M${fmt(x)},${fmt(-overdraw)} V${fmt(rowHeight + overdraw)}`;
+}
+
+/** A vertical run at `xFrom` when the lane does not change, else a bezier from `(xFrom, yStart)`
+ *  to `(xTo, yEnd)` with the transition spread across the whole span. */
+function bendCommand(xFrom: number, xTo: number, yStart: number, yEnd: number): string {
+  if (xFrom === xTo) return `M${fmt(xFrom)},${fmt(yStart)} V${fmt(yEnd)}`;
+  const midY = (yStart + yEnd) / 2;
+  return (
+    `M${fmt(xFrom)},${fmt(yStart)} ` +
+    `C${fmt(xFrom)},${fmt(midY)} ${fmt(xTo)},${fmt(midY)} ${fmt(xTo)},${fmt(yEnd)}`
+  );
 }
 
 export interface EdgePathPlan {

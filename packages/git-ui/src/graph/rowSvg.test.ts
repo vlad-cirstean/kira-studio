@@ -150,6 +150,7 @@ describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
       fromRow: 3,
       toRow: 5,
       fromLane: 1,
+      runLane: 1,
       toLane: 0,
       color: 0,
       kind: EDGE_KIND_MERGE_IN,
@@ -182,7 +183,12 @@ describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
   });
 
   test('a straight edge is unaffected by the merge-in branch — unchanged shape', () => {
-    const segment = mergeInSegment({ kind: EDGE_KIND_STRAIGHT, fromLane: 0, toLane: 0 });
+    const segment = mergeInSegment({
+      kind: EDGE_KIND_STRAIGHT,
+      fromLane: 0,
+      runLane: 0,
+      toLane: 0,
+    });
     const d = edgeCommand(segment, 3, rowHeight, nodeCenterY);
     expect(d).not.toContain('C'); // same lane, no bend needed either way
     expect(d.startsWith(`M${laneX(0)},${nodeCenterY}`)).toBe(true);

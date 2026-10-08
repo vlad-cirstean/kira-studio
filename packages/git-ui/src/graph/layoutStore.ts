@@ -14,6 +14,7 @@ import {
   EDGE_FROM_LANE,
   EDGE_FROM_ROW,
   EDGE_KIND,
+  EDGE_RUN_LANE,
   EDGE_STRIDE,
   EDGE_TO_LANE,
   EDGE_TO_ROW,
@@ -43,6 +44,8 @@ export interface EdgeSegment {
   readonly fromRow: number;
   readonly toRow: number;
   readonly fromLane: number;
+  /** The lane the edge occupies on its pass-through rows (`EDGE_RUN_LANE`). */
+  readonly runLane: number;
   readonly toLane: number;
   readonly color: number;
   readonly kind: EdgeKind;
@@ -90,6 +93,7 @@ function readSegment(chunk: LayoutChunk, localIndex: number): EdgeSegment {
     fromRow: chunk.edges[base + EDGE_FROM_ROW] as number,
     toRow: chunk.edges[base + EDGE_TO_ROW] as number,
     fromLane: chunk.edges[base + EDGE_FROM_LANE] as number,
+    runLane: chunk.edges[base + EDGE_RUN_LANE] as number,
     toLane: chunk.edges[base + EDGE_TO_LANE] as number,
     color: chunk.edges[base + EDGE_COLOR] as number,
     kind: chunk.edges[base + EDGE_KIND] as EdgeKind,

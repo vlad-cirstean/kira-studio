@@ -28,6 +28,10 @@
  * `openLanes`/`laneColors` for exactly this purpose. This is still decided only at the shared
  * target row's own processing (never speculatively at edge-creation time), so the paged-equals-
  * one-pass invariant this module exists to protect is unaffected: see `lanes.test.ts`.
+ *
+ * P225: the patch rewrites `toLane` only. `EDGE_RUN_LANE` (set at append, the lane the edge was
+ * routed into) stays, so an edge that branched out into lane N and later converges into lane C
+ * keeps running in N and bends into C in its last row, instead of collapsing onto its source lane.
  */
 import { assert } from '../util/assert.ts';
 import { advanceColorState, allocateColor, initialColorState } from './colors.ts';
@@ -178,8 +182,8 @@ export function assignLanes(
     // Step 2 (G21 D3b): every OTHER lane also expecting this row is a sibling child converging
     // here. Its edge was already emitted pointing at its *own* lane (kind decided provisionally
     // at that edge's own creation time — straight or branch-out, see the module doc comment);
-    // now that convergence is actually discovered, patch that edge to bend into the lane that
-    // won the claim instead, and reclassify it EDGE_KIND_MERGE_IN. Then free the lane for reuse.
+    // now that convergence is actually discovered, patch that edge's `toLane` (never its run lane)
+    // to the lane that won the claim, and reclassify it EDGE_KIND_MERGE_IN. Then free the lane.
     for (let lane = 0; lane < state.laneCount; lane++) {
       if (lane === claimedLane || state.openLanes[lane] !== row) continue;
       const edgeIndex = state.laneEdge[lane];

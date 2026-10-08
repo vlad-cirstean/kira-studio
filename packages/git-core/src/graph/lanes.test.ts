@@ -7,6 +7,7 @@ import {
   EDGE_KIND,
   EDGE_KIND_MERGE_IN,
   EDGE_KIND_STRAIGHT,
+  EDGE_RUN_LANE,
   EDGE_STRIDE,
   EDGE_TO_LANE,
   EDGE_TO_ROW,
@@ -48,6 +49,7 @@ function edgeAt(edges: Uint32Array, localIndex: number) {
     fromRow: edges[base + EDGE_FROM_ROW],
     toRow: edges[base + EDGE_TO_ROW],
     fromLane: edges[base + EDGE_FROM_LANE],
+    runLane: edges[base + EDGE_RUN_LANE],
     toLane: edges[base + EDGE_TO_LANE],
     color: edges[base + EDGE_COLOR],
     kind: edges[base + EDGE_KIND],
@@ -174,5 +176,57 @@ describe('assignLanes — G21 D3 merge-in convergence', () => {
     expect(patchedConverging.toRow).toBe(5);
     expect(patchedConverging.toLane).toBe(0);
     expect(patchedConverging.kind).toBe(EDGE_KIND_MERGE_IN);
+  });
+});
+
+describe('assignLanes — P225 branch-out edge that converges', () => {
+  // Row 0 merges rows 1 and 3; row 3 is also reached by row 2 down lane 0. Row 0's second-parent
+  // edge branches out into lane 1, then converges into lane 0 at row 3. It must keep running in
+  // lane 1: patching only `toLane` once collapsed the whole run onto lane 0.
+  const parentOffsets = Uint32Array.from([0, 2, 3, 4, 4]);
+  const parentRows = Int32Array.from([1, 3, 2, 3]);
+
+  test('one pass: runs in its branch-out lane, ends in the claiming lane', () => {
+    const { edgeBuffer } = assignLanes(
+      { from: 0, to: 4, parentOffsets, parentRows, resolvedParentSlots: Uint32Array.from([]) },
+      undefined,
+    );
+    const edge = edgeAt(edgeBuffer.build(0, 4).edges, 1);
+    expect(edge).toMatchObject({ fromRow: 0, toRow: 3, fromLane: 0, runLane: 1, toLane: 0 });
+    expect(edge.kind).toBe(EDGE_KIND_MERGE_IN);
+  });
+
+  test('paged: patches keep the run lane and equal the one-pass run', () => {
+    const chunk1 = assignLanes(
+      {
+        from: 0,
+        to: 3,
+        parentOffsets: Uint32Array.from([0, 2, 3, 4]),
+        parentRows: Int32Array.from([1, -1, 2, -1]),
+        resolvedParentSlots: Uint32Array.from([]),
+      },
+      undefined,
+    );
+    const chunk2 = assignLanes(
+      { from: 3, to: 4, parentOffsets, parentRows, resolvedParentSlots: Uint32Array.from([1, 3]) },
+      chunk1.frontier as LayoutFrontier,
+    );
+    const built2 = chunk2.edgeBuffer.build(3, 4);
+    const patched = Uint32Array.from(chunk1.edgeBuffer.build(0, 3).edges);
+    for (let i = 0; i < built2.patches.length; i += PATCH_STRIDE) {
+      const base = (built2.patches[i + PATCH_EDGE_INDEX] as number) * EDGE_STRIDE;
+      const toRow = built2.patches[i + PATCH_TO_ROW] as number;
+      const toLane = built2.patches[i + PATCH_TO_LANE] as number;
+      const kind = built2.patches[i + PATCH_KIND] as number;
+      if (toRow !== PATCH_UNCHANGED) patched[base + EDGE_TO_ROW] = toRow;
+      if (toLane !== PATCH_UNCHANGED) patched[base + EDGE_TO_LANE] = toLane;
+      if (kind !== PATCH_UNCHANGED) patched[base + EDGE_KIND] = kind;
+    }
+    const onePass = assignLanes(
+      { from: 0, to: 4, parentOffsets, parentRows, resolvedParentSlots: Uint32Array.from([]) },
+      undefined,
+    ).edgeBuffer.build(0, 4);
+    expect(Array.from(patched)).toEqual(Array.from(onePass.edges.subarray(0, patched.length)));
+    expect(edgeAt(patched, 1)).toMatchObject({ fromLane: 0, runLane: 1, toLane: 0 });
   });
 });

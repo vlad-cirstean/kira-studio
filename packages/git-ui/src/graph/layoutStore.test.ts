@@ -25,7 +25,7 @@ function buildChunk(
   const rowCount = to - from;
   const edgeData = new Uint32Array(edges.length * EDGE_STRIDE);
   for (const [i, edge] of edges.entries()) {
-    edgeData.set(edge, i * EDGE_STRIDE);
+    edgeData.set([...edge, edge[3]], i * EDGE_STRIDE); // run lane = target lane, as `append` sets it
   }
   const edgeIndex = new Uint32Array(rowCount + 1);
   for (let r = 1; r <= rowCount; r++) edgeIndex[r] = edges.length; // every edge starts at row `from`.
