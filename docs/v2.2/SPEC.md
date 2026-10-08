@@ -15,7 +15,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P217 | Code review (one Opus round) and fixes | Done |
 | P218 | Speech engine without a C++ build: step 1 measures build-free engines (sherpa-onnx prebuilt libs first) against the whisper.cpp worker; step 2 swaps in the winner and deletes fetch-whisper.sh, the `whisper` tag, cgo glue, CI patch and S13 whisper bits. Keeps dictation behaviour, malgo capture, worker isolation, pinned-SHA model store, 400 MB RSS ceiling. No winner: stop and ask the user, never back to whisper.cpp | Not started |
 | P219 | Terminal and API collections: terminal module scripts get collections added the same way as the API module; right-click menu in both modules to move an item into a chosen collection; working-dir field gets a native folder-select dialog | Done |
-| P220 | Git module: graph lines still disappear on click and on scroll (find the root cause); default tab is Repos and the last tab the user moved to persists across restarts | Not started |
+| P220 | Git module: graph lines still disappear on click and on scroll (find the root cause); default tab is Repos and the last tab the user moved to persists across restarts | Done |
 | P221 | Memory module: move the semantic-search model download and the Connect Claude Code action into Settings | Done |
 | P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Not started |
 
@@ -305,3 +305,32 @@ suite: 321 pass; 23 fail in `sql-schema.spec` (Monaco typing hangs, also on the 
 failures are 1.1 min load timeouts in ADE and repo-graph specs, all but one pass on rerun, and that
 one passes alone. Visual baseline `quick-commands-dialog` regenerated locally on Linux; regenerate on
 the CI image if it differs.
+
+## P220 result
+
+Facts in `docs/ARCHITECTURE.md` (commit-grid notes, Git panel segment).
+
+Graph root cause, confirmed: `CommitGrid` seeded the graph width from `laneCount` at mount, before the
+layout worker answered. 0 lanes gave 17px. The row SVG clips lanes past the column edge, so every lane-0
+edge and half of each node vanished. Every new repo tab is a first-ever mount, so each hit it. Restored
+tabs kept the persisted width and looked fine. Fix: width floored at 40px (heals persisted narrow
+values), seed deferred to the first layout with lanes, applied once. Click and scroll symptom on macOS
+is inferred (paint before clip applies, then repaint); not reproduced here.
+
+Tab fix: `useRepoPanelTabStore` backed by `useLocalStorage('kira.git.panelTab', 'repos')`; GitPanel
+`repoId` watcher (forced Files on every mount) deleted; shows Repos while no repo is active.
+
+Specs: `repo-graph-lines.spec.ts` (pixel check of lane 0, first mount with click and scroll, restored
+tab with persisted 17px) and `git-panel-tab.spec.ts` (3 cases). Both failed before the fixes (width
+17 against >= 43 / >= 40; tab Repos not selected / Review not kept) and pass after. Existing
+`repo-workspace` (5 tests) and `repo-graph-lifecycle` (1) now click the Files tab after opening a repo.
+
+Deviation: the reload case is asserted with Review selected before the reload, but on the old code it
+fails at its first assertion (Files forced), not at the post-reload line.
+
+Checks: typecheck, lint, lint:dead clean; `test:unit` 1810 pass; full Space UI suite 241 pass, 0 fail
+(no load-only failures). Not run: `test:webview` and `test:visual:space` (shared seed path in the VS
+Code webview; no graph baseline checked). Run both before merge.
+
+Mac handover: open a never-opened repo, confirm lane lines show, click rows, scroll. Switch modules and
+restart; confirm the Git panel tab is kept.

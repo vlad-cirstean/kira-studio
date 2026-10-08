@@ -3670,6 +3670,11 @@ purge. `pr.ts` keeps last-known facts per repo (cap 8), restores them on `setRep
 `CommitGrid` badges a PR only on the commit its head points at (`PrState.prsHeadedAt(sha)`); the
 details pane keeps the ancestry-derived `prForCommit`.
 
+`CommitGrid` seeds the graph column width once on a first-ever mount, from the first layout that has
+lanes (`laneCount` is 0 until the layout worker answers), and floors the width at the 40px column
+minimum. The row SVG clips lanes past the column's right edge, so a narrower column paints no lane
+lines. A user drag always wins; later lane growth does not widen the column.
+
 ### Code review, ported natively (C11)
 
 **As of P100, this section describes Kira Space, not Kira Studio** — same move as C10, above.
@@ -3699,6 +3704,10 @@ per `repoId` (`reviewActivatedRepoIds`, `GitPanel.vue`) rather than with one boo
 Files ⟷ Review ⟷ Search within the *same* repo never tears the mount down (`v-show`), while
 switching to a *different* repo workspace remounts it — safely, because that remount is exactly
 what the session-resume path below exists for.
+
+The chosen Repos/Files/Review tab persists in `localStorage` (`kira.git.panelTab`, shared by all
+windows, last write wins) and defaults to Repos. Opening a repo never switches it. The panel shows
+Repos, without writing it, while no repo workspace is active.
 
 **`review.*` is allowlisted because its writes never touch the repository.** Traced through the
 real handler chain (`internal/gitrpc/handlers.go` → `internal/gitsession/{comments,incremental}.go`
