@@ -171,7 +171,7 @@ export function buildGraphStreamChunk(
   repoId: string,
   seq: number,
   commits: PackedCommitChunk,
-  options: { readonly exhausted?: boolean } = {},
+  options: { readonly exhausted?: boolean; readonly remaining?: number } = {},
 ): GraphStreamChunkFixture {
   const encoded = encodeStreamPayload('graph.stream', {
     repoId,
@@ -179,7 +179,7 @@ export function buildGraphStreamChunk(
     from: commits.from,
     to: commits.to,
     source: 'git',
-    remaining: options.exhausted === false ? 1 : 0,
+    remaining: options.remaining ?? (options.exhausted === false ? 1 : 0),
     exhausted: options.exhausted !== false,
     commits,
   }) as {
