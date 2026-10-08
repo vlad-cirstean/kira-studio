@@ -78,6 +78,8 @@ export const useAuthStore = defineStore('mobileAuth', () => {
     state.phase = 'requesting';
     try {
       await postJson('/api/pair', { label, code: state.code }, { signal: pairing.signal });
+      // A fresh pairing has not read its permissions yet; without this the app shows writes off.
+      await refreshMe();
       state.phase = 'paired';
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
