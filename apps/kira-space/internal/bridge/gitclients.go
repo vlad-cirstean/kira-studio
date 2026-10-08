@@ -83,7 +83,7 @@ func toWireSnapshot(snap gitsock.PairingSnapshot) GitPairingSnapshot {
 	if snap.Pending != nil {
 		out.Pending = &GitPairingRequest{
 			RequestID: snap.Pending.RequestID, ClientID: snap.Pending.ClientID,
-			Label: snap.Pending.Label, PeerPID: snap.Pending.PeerPID, PeerExe: snap.Pending.PeerExe,
+			Label: snap.Pending.Meta.Label, PeerPID: snap.Pending.Meta.Peer.PID, PeerExe: snap.Pending.Meta.Peer.Exe,
 			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
 		}
 	}

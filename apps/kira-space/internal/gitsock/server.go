@@ -139,22 +139,11 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// expireLoop is the real-time driver behind Broker.ExpireOverdue (D8): a queued request whose
-// deadline is measured from enqueue can otherwise only be noticed by whoever next calls Approve/
-// Deny, which may be nobody for a lone, unattended request. pairing_test.go drives ExpireOverdue
-// directly against an injected clock instead of this loop.
+// expireLoop drives Broker.ExpireOverdue on a real 1s ticker. pairing's own tests advance an
+// injected clock instead.
 func (s *Server) expireLoop() {
 	defer s.wg.Done()
-	t := time.NewTicker(time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-t.C:
-			s.broker.ExpireOverdue()
-		case <-s.closeCh:
-			return
-		}
-	}
+	s.broker.RunExpiry(s.closeCh, time.Second)
 }
 
 func (s *Server) acceptLoop() {

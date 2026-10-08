@@ -303,7 +303,7 @@ func TestHandshake_Row6_NoTokenInCooldown_DeniedImmediately(t *testing.T) {
 	enqueued := make(chan PairingRequest, 1)
 	firstDone := make(chan PairingOutcome, 1)
 	go func() {
-		firstDone <- broker.Request("c1", "l", Peer{}, func(req PairingRequest) { enqueued <- req })
+		firstDone <- broker.Request("c1", PairingMeta{Label: "l"}, func(req PairingRequest) { enqueued <- req })
 	}()
 	req := <-enqueued
 	broker.Deny(req.RequestID)

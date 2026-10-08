@@ -1,10 +1,20 @@
-package gitsock
+package pairing
 
 import (
 	"sync"
 	"testing"
 	"time"
 )
+
+const (
+	testTimeout  = 120 * time.Second
+	testCooldown = 60 * time.Second
+	testMaxQueue = 200
+)
+
+func newTestBroker(now func() time.Time) *Broker[struct{}] {
+	return NewBroker[struct{}](Config{Timeout: testTimeout, Cooldown: testCooldown, MaxQueue: testMaxQueue, Now: now})
+}
 
 // fakeClock is the injected clock D8's tests are built around — no time.Sleep anywhere in this
 // file; every deadline is crossed by calling Advance then ExpireOverdue explicitly.
@@ -30,7 +40,7 @@ func (c *fakeClock) Advance(d time.Duration) {
 func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 
 	// G31 round-2 functional-correctness review, finding #6: Request now emits on every enqueue,
 	// not only when the new request becomes the head (see that fix's own comment on Request) — a
@@ -41,7 +51,7 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 	// one at a time, not about how many snapshots fire while it stays the head.
 	var mu sync.Mutex
 	var presentedOrder []string
-	unsub := b.Subscribe(func(snap PairingSnapshot) {
+	unsub := b.Subscribe(func(snap Snapshot[struct{}]) {
 		mu.Lock()
 		defer mu.Unlock()
 		if snap.Pending == nil {
@@ -58,13 +68,13 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 	// they cannot race each other for enqueue order — each is started and its onEnqueued fires
 	// before the next begins).
 	ids := []string{"a", "b", "c"}
-	results := make([]chan PairingOutcome, 0, 3)
+	results := make([]chan Outcome, 0, 3)
 	reqIDs := make([]string, 0, 3)
 	for _, id := range ids {
-		done := make(chan PairingOutcome, 1)
-		enqueued := make(chan PairingRequest, 1)
+		done := make(chan Outcome, 1)
+		enqueued := make(chan Request[struct{}], 1)
 		go func(id string) {
-			done <- b.Request(id, "label-"+id, Peer{}, func(req PairingRequest) { enqueued <- req })
+			done <- b.Request(id, struct{}{}, func(req Request[struct{}]) { enqueued <- req })
 		}(id)
 		req := <-enqueued
 		reqIDs = append(reqIDs, req.RequestID)
@@ -76,10 +86,10 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 		t.Fatalf("got %+v, want head=a queued=3", snap)
 	}
 
-	if got := b.Approve(reqIDs[0]); got != PairingActionResolved {
+	if got := b.Approve(reqIDs[0]); got != Resolved {
 		t.Fatalf("approve a: got %v", got)
 	}
-	if out := <-results[0]; out != PairingApproved {
+	if out := <-results[0]; out != Approved {
 		t.Fatalf("a outcome: got %v", out)
 	}
 
@@ -88,10 +98,10 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 		t.Fatalf("after resolving a: got %+v, want head=b queued=2", snap)
 	}
 
-	if got := b.Deny(reqIDs[1]); got != PairingActionResolved {
+	if got := b.Deny(reqIDs[1]); got != Resolved {
 		t.Fatalf("deny b: got %v", got)
 	}
-	if out := <-results[1]; out != PairingDenied {
+	if out := <-results[1]; out != Denied {
 		t.Fatalf("b outcome: got %v", out)
 	}
 
@@ -119,23 +129,23 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 	t.Cleanup(b.Shutdown) // releases the three Request goroutines.
 
 	seen := make(chan int, 8)
-	unsub := b.Subscribe(func(snap PairingSnapshot) { seen <- snap.Queued })
+	unsub := b.Subscribe(func(snap Snapshot[struct{}]) { seen <- snap.Queued })
 	defer unsub()
 
-	enqueuedA := make(chan PairingRequest, 1)
-	go func() { b.Request("a", "a", Peer{}, func(req PairingRequest) { enqueuedA <- req }) }()
+	enqueuedA := make(chan Request[struct{}], 1)
+	go func() { b.Request("a", struct{}{}, func(req Request[struct{}]) { enqueuedA <- req }) }()
 	<-enqueuedA // a is now the presented head — Queued: 1.
 
-	enqueuedB := make(chan PairingRequest, 1)
-	go func() { b.Request("b", "b", Peer{}, func(req PairingRequest) { enqueuedB <- req }) }()
+	enqueuedB := make(chan Request[struct{}], 1)
+	go func() { b.Request("b", struct{}{}, func(req Request[struct{}]) { enqueuedB <- req }) }()
 	<-enqueuedB // b queues behind a, never presented — Queued must still be reported as 2.
 
-	enqueuedC := make(chan PairingRequest, 1)
-	go func() { b.Request("c", "c", Peer{}, func(req PairingRequest) { enqueuedC <- req }) }()
+	enqueuedC := make(chan Request[struct{}], 1)
+	go func() { b.Request("c", struct{}{}, func(req Request[struct{}]) { enqueuedC <- req }) }()
 	<-enqueuedC // c queues behind a and b — Queued: 3.
 
 	// onEnqueued runs before the emit, so wait for each emission rather than assuming it landed.
@@ -157,22 +167,22 @@ func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T)
 func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 
 	// "b" queues behind "a" and is never presented (never the head) before it is swept — if the
 	// deadline were instead measured from presentation, an un-presented "b" would have no running
 	// countdown yet and this ExpireOverdue call would time out "a" only. Measured from enqueue
 	// (D8), both cross their identical 120s window at the same moment regardless of queue
 	// position, so both time out here.
-	enqueuedA := make(chan PairingRequest, 1)
-	doneA := make(chan PairingOutcome, 1)
-	go func() { doneA <- b.Request("a", "a", Peer{}, func(req PairingRequest) { enqueuedA <- req }) }()
+	enqueuedA := make(chan Request[struct{}], 1)
+	doneA := make(chan Outcome, 1)
+	go func() { doneA <- b.Request("a", struct{}{}, func(req Request[struct{}]) { enqueuedA <- req }) }()
 	<-enqueuedA
 
-	enqueuedB := make(chan PairingRequest, 1)
-	doneB := make(chan PairingOutcome, 1)
+	enqueuedB := make(chan Request[struct{}], 1)
+	doneB := make(chan Outcome, 1)
 	go func() {
-		doneB <- b.Request("b", "b", Peer{}, func(req PairingRequest) { enqueuedB <- req })
+		doneB <- b.Request("b", struct{}{}, func(req Request[struct{}]) { enqueuedB <- req })
 	}()
 	reqB := <-enqueuedB
 	if snap := b.Pending(); snap.Pending == nil || snap.Pending.ClientID != "a" || snap.Queued != 2 {
@@ -182,10 +192,10 @@ func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
 	clock.Advance(121 * time.Second)
 	b.ExpireOverdue()
 
-	if out := recvOrTimeout(t, doneA); out != PairingTimedOut {
+	if out := recvOrTimeout(t, doneA); out != TimedOut {
 		t.Fatalf("a outcome: got %v, want timeout", out)
 	}
-	if out := recvOrTimeout(t, doneB); out != PairingTimedOut {
+	if out := recvOrTimeout(t, doneB); out != TimedOut {
 		t.Fatalf("b outcome: got %v, want timeout — a never-presented request must still expire on its own enqueue-based deadline", out)
 	}
 	if snap := b.Pending(); snap.Pending != nil || snap.Queued != 0 {
@@ -206,18 +216,18 @@ func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
 func TestBroker_RequestAfterShutdownIsAbortedImmediately(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 	b.Shutdown()
 
-	done := make(chan PairingOutcome, 1)
+	done := make(chan Outcome, 1)
 	go func() {
-		done <- b.Request("client-a", "label", Peer{}, nil)
+		done <- b.Request("client-a", struct{}{}, nil)
 	}()
 
 	select {
 	case out := <-done:
-		if out != PairingAborted {
-			t.Fatalf("Request after Shutdown: got %v, want PairingAborted", out)
+		if out != Aborted {
+			t.Fatalf("Request after Shutdown: got %v, want Aborted", out)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Request after Shutdown never returned — it enqueued a fresh entry nothing will ever resolve")
@@ -228,7 +238,7 @@ func TestBroker_RequestAfterShutdownIsAbortedImmediately(t *testing.T) {
 	}
 }
 
-func recvOrTimeout(t *testing.T, ch chan PairingOutcome) PairingOutcome {
+func recvOrTimeout(t *testing.T, ch chan Outcome) Outcome {
 	t.Helper()
 	select {
 	case out := <-ch:
@@ -242,16 +252,16 @@ func recvOrTimeout(t *testing.T, ch chan PairingOutcome) PairingOutcome {
 func TestBroker_DenyOnly_SetsCooldown(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 
-	enqueued := make(chan PairingRequest, 1)
-	done := make(chan PairingOutcome, 1)
+	enqueued := make(chan Request[struct{}], 1)
+	done := make(chan Outcome, 1)
 	go func() {
-		done <- b.Request("client-1", "label", Peer{}, func(req PairingRequest) { enqueued <- req })
+		done <- b.Request("client-1", struct{}{}, func(req Request[struct{}]) { enqueued <- req })
 	}()
 	req := <-enqueued
 	b.Deny(req.RequestID)
-	if out := <-done; out != PairingDenied {
+	if out := <-done; out != Denied {
 		t.Fatalf("outcome: got %v", out)
 	}
 	if !b.InCooldown("client-1") {
@@ -259,10 +269,10 @@ func TestBroker_DenyOnly_SetsCooldown(t *testing.T) {
 	}
 
 	// A reconnect inside the cooldown is denied immediately, without enqueueing.
-	out := b.Request("client-1", "label", Peer{}, func(PairingRequest) {
+	out := b.Request("client-1", struct{}{}, func(Request[struct{}]) {
 		t.Fatal("a cooldown request must not be enqueued")
 	})
-	if out != PairingDenied {
+	if out != Denied {
 		t.Fatalf("cooldown request outcome: got %v", out)
 	}
 
@@ -275,61 +285,61 @@ func TestBroker_DenyOnly_SetsCooldown(t *testing.T) {
 func TestBroker_DoubleAnswer_ReportsAlreadyResolved(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 
-	enqueued := make(chan PairingRequest, 1)
-	done := make(chan PairingOutcome, 1)
+	enqueued := make(chan Request[struct{}], 1)
+	done := make(chan Outcome, 1)
 	go func() {
-		done <- b.Request("client-1", "label", Peer{}, func(req PairingRequest) { enqueued <- req })
+		done <- b.Request("client-1", struct{}{}, func(req Request[struct{}]) { enqueued <- req })
 	}()
 	req := <-enqueued
-	if got := b.Approve(req.RequestID); got != PairingActionResolved {
+	if got := b.Approve(req.RequestID); got != Resolved {
 		t.Fatalf("first approve: got %v", got)
 	}
 	<-done
-	if got := b.Approve(req.RequestID); got != PairingActionAlreadyResolved {
+	if got := b.Approve(req.RequestID); got != AlreadyResolved {
 		t.Fatalf("second approve: got %v, want alreadyResolved", got)
 	}
-	if got := b.Deny(req.RequestID); got != PairingActionAlreadyResolved {
+	if got := b.Deny(req.RequestID); got != AlreadyResolved {
 		t.Fatalf("deny after approve: got %v, want alreadyResolved", got)
 	}
 }
 
 // TestBroker_QueueBoundedAgainstUnlimitedEnqueue is G31 round-2 architecture/security review,
 // finding #10: clientID is entirely client-supplied and unauthenticated at Request time (handshake
-// row 7), so nothing but maxQueueLen stops a local process from opening far more concurrent
+// row 7), so nothing but testMaxQueue stops a local process from opening far more concurrent
 // connections than any real user could ever triage, each blocking a goroutine on its own result
-// channel for up to pairingTimeout. This proves Request aborts immediately (F11: capacity, not a
+// channel for up to testTimeout. This proves Request aborts immediately (F11: capacity, not a
 // user decision) — no enqueue, no onEnqueued call, matching the cooldown short-circuit's own
 // contract — once the queue is already at the cap, rather than growing without bound.
 func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 
-	results := make([]chan PairingOutcome, 0, maxQueueLen)
-	for i := 0; i < maxQueueLen; i++ {
-		enqueued := make(chan PairingRequest, 1)
-		done := make(chan PairingOutcome, 1)
+	results := make([]chan Outcome, 0, testMaxQueue)
+	for i := 0; i < testMaxQueue; i++ {
+		enqueued := make(chan Request[struct{}], 1)
+		done := make(chan Outcome, 1)
 		id := "client-" + string(rune('a'+i%26)) + string(rune('0'+i/26))
 		go func(id string) {
-			done <- b.Request(id, "label", Peer{}, func(req PairingRequest) { enqueued <- req })
+			done <- b.Request(id, struct{}{}, func(req Request[struct{}]) { enqueued <- req })
 		}(id)
 		<-enqueued
 		results = append(results, done)
 	}
-	if snap := b.Pending(); snap.Queued != maxQueueLen {
-		t.Fatalf("Queued = %d, want %d (the queue must be full at the cap)", snap.Queued, maxQueueLen)
+	if snap := b.Pending(); snap.Queued != testMaxQueue {
+		t.Fatalf("Queued = %d, want %d (the queue must be full at the cap)", snap.Queued, testMaxQueue)
 	}
 
-	out := b.Request("one-too-many", "label", Peer{}, func(PairingRequest) {
-		t.Fatal("a request beyond maxQueueLen must not be enqueued")
+	out := b.Request("one-too-many", struct{}{}, func(Request[struct{}]) {
+		t.Fatal("a request beyond testMaxQueue must not be enqueued")
 	})
-	if out != PairingAborted {
-		t.Fatalf("over-cap request outcome: got %v, want PairingAborted", out)
+	if out != Aborted {
+		t.Fatalf("over-cap request outcome: got %v, want Aborted", out)
 	}
-	if snap := b.Pending(); snap.Queued != maxQueueLen {
-		t.Fatalf("Queued after the over-cap attempt = %d, want unchanged %d", snap.Queued, maxQueueLen)
+	if snap := b.Pending(); snap.Queued != testMaxQueue {
+		t.Fatalf("Queued after the over-cap attempt = %d, want unchanged %d", snap.Queued, testMaxQueue)
 	}
 
 	for _, done := range results {
@@ -340,11 +350,11 @@ func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 		}
 	}
 
-	// Release the maxQueueLen goroutines blocked on their result channels.
+	// Release the testMaxQueue goroutines blocked on their result channels.
 	b.Shutdown()
 	for i, done := range results {
-		if out := recvOrTimeout(t, done); out != PairingAborted {
-			t.Fatalf("queued request %d after Shutdown: got %v, want PairingAborted", i, out)
+		if out := recvOrTimeout(t, done); out != Aborted {
+			t.Fatalf("queued request %d after Shutdown: got %v, want Aborted", i, out)
 		}
 	}
 }
@@ -361,13 +371,13 @@ func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 
-	enqueue := func(clientID string) (PairingRequest, chan PairingOutcome) {
-		enqueued := make(chan PairingRequest, 1)
-		done := make(chan PairingOutcome, 1)
+	enqueue := func(clientID string) (Request[struct{}], chan Outcome) {
+		enqueued := make(chan Request[struct{}], 1)
+		done := make(chan Outcome, 1)
 		go func() {
-			done <- b.Request(clientID, "label", Peer{}, func(req PairingRequest) { enqueued <- req })
+			done <- b.Request(clientID, struct{}{}, func(req Request[struct{}]) { enqueued <- req })
 		}()
 		return <-enqueued, done
 	}
@@ -380,14 +390,14 @@ func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T)
 		t.Fatalf("Queued = %d, want 3", snap.Queued)
 	}
 
-	if got := b.Deny(reqA1.RequestID); got != PairingActionResolved {
+	if got := b.Deny(reqA1.RequestID); got != Resolved {
 		t.Fatalf("deny reqA1: got %v", got)
 	}
-	if out := recvOrTimeout(t, doneA1); out != PairingDenied {
+	if out := recvOrTimeout(t, doneA1); out != Denied {
 		t.Fatalf("reqA1 outcome: got %v", out)
 	}
-	if out := recvOrTimeout(t, doneA2); out != PairingDenied {
-		t.Fatalf("reqA2 outcome: got %v, want PairingDenied — a client's OTHER queued request must be purged when the client is denied", out)
+	if out := recvOrTimeout(t, doneA2); out != Denied {
+		t.Fatalf("reqA2 outcome: got %v, want Denied — a client's OTHER queued request must be purged when the client is denied", out)
 	}
 	if !b.InCooldown("client-a") {
 		t.Fatal("client-a must be in cooldown after its denial")
@@ -402,26 +412,26 @@ func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T)
 	if snap := b.Pending(); snap.Pending == nil || snap.Pending.ClientID != "client-b" || snap.Queued != 1 {
 		t.Fatalf("after purging client-a: got %+v, want head=client-b queued=1", snap)
 	}
-	if got := b.Deny(reqB.RequestID); got != PairingActionResolved {
+	if got := b.Deny(reqB.RequestID); got != Resolved {
 		t.Fatalf("deny reqB: got %v", got)
 	}
 	<-doneB
 }
 
 // TestBroker_ApproveAdmitsOnlyThePresentedRequest is P172's guard: a client id is client-asserted,
-// so one Approve must admit exactly one connection. A same-client sibling resolves PairingAborted
+// so one Approve must admit exactly one connection. A same-client sibling resolves Aborted
 // with no token (it redials and reuses the stored token, or is prompted itself); an unrelated
 // client's request stays queued.
 func TestBroker_ApproveAdmitsOnlyThePresentedRequest(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
-	b := NewBroker(clock.Now)
+	b := newTestBroker(clock.Now)
 
-	enqueue := func(clientID string) (PairingRequest, chan PairingOutcome) {
-		enqueued := make(chan PairingRequest, 1)
-		done := make(chan PairingOutcome, 1)
+	enqueue := func(clientID string) (Request[struct{}], chan Outcome) {
+		enqueued := make(chan Request[struct{}], 1)
+		done := make(chan Outcome, 1)
 		go func() {
-			done <- b.Request(clientID, "label", Peer{}, func(req PairingRequest) { enqueued <- req })
+			done <- b.Request(clientID, struct{}{}, func(req Request[struct{}]) { enqueued <- req })
 		}()
 		return <-enqueued, done
 	}
@@ -430,17 +440,17 @@ func TestBroker_ApproveAdmitsOnlyThePresentedRequest(t *testing.T) {
 	reqA2, doneA2 := enqueue("client-a")
 	reqB, doneB := enqueue("client-b")
 
-	if got := b.Approve(reqA1.RequestID); got != PairingActionResolved {
+	if got := b.Approve(reqA1.RequestID); got != Resolved {
 		t.Fatalf("approve reqA1: got %v", got)
 	}
-	if out := recvOrTimeout(t, doneA1); out != PairingApproved {
+	if out := recvOrTimeout(t, doneA1); out != Approved {
 		t.Fatalf("reqA1 outcome: got %v", out)
 	}
-	if tok, ok := b.TakeApprovedToken(reqA1.RequestID); !ok || tok.plain == "" {
+	if tok, ok := b.TakeApprovedToken(reqA1.RequestID); !ok || tok.Plain == "" {
 		t.Fatal("TakeApprovedToken(reqA1): want a minted token for the approved head")
 	}
-	if out := recvOrTimeout(t, doneA2); out != PairingAborted {
-		t.Fatalf("reqA2 outcome: got %v, want PairingAborted", out)
+	if out := recvOrTimeout(t, doneA2); out != Aborted {
+		t.Fatalf("reqA2 outcome: got %v, want Aborted", out)
 	}
 	if _, ok := b.TakeApprovedToken(reqA2.RequestID); ok {
 		t.Fatal("TakeApprovedToken(reqA2): sibling must get no token")
@@ -457,7 +467,7 @@ func TestBroker_ApproveAdmitsOnlyThePresentedRequest(t *testing.T) {
 	if snap := b.Pending(); snap.Pending == nil || snap.Pending.ClientID != "client-b" || snap.Queued != 1 {
 		t.Fatalf("after approving client-a: got %+v, want head=client-b queued=1", snap)
 	}
-	if got := b.Deny(reqB.RequestID); got != PairingActionResolved {
+	if got := b.Deny(reqB.RequestID); got != Resolved {
 		t.Fatalf("deny reqB: got %v", got)
 	}
 	<-doneB
@@ -465,8 +475,8 @@ func TestBroker_ApproveAdmitsOnlyThePresentedRequest(t *testing.T) {
 
 func TestBroker_UnknownRequestID_ReportsAlreadyResolved(t *testing.T) {
 	t.Parallel()
-	b := NewBroker(newFakeClock().Now)
-	if got := b.Approve("no-such-id"); got != PairingActionAlreadyResolved {
+	b := newTestBroker(newFakeClock().Now)
+	if got := b.Approve("no-such-id"); got != AlreadyResolved {
 		t.Fatalf("got %v, want alreadyResolved", got)
 	}
 }

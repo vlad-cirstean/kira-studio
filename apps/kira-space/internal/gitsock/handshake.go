@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/pairing"
 )
 
 // maxLabelBytes is D7's clamp on a client-supplied label before it is ever written to git_clients
@@ -151,7 +152,7 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 	// sitting in the queue, presentable, until Approve mints a token nobody holds.
 	var requestID string
 	var watchDone chan struct{}
-	outcome := deps.Broker.Request(clientID, label, deps.Peer, func(req PairingRequest) {
+	outcome := deps.Broker.Request(clientID, PairingMeta{Label: label, Peer: deps.Peer}, func(req PairingRequest) {
 		requestID = req.RequestID
 		sendHandshake(c, handshakeResponse{
 			Kind: "pairingRequired", RequestID: req.RequestID,
@@ -226,10 +227,10 @@ func stopWatch(c *conn, done chan struct{}) {
 // finishPairing inserts the row *before* sending "paired" (§3.1.2: the reverse order can hand out
 // a token no row backs, which reads as a silent pairing loop to the user). tok is the token
 // Broker.Approve already minted for this connection's own request (P172), never minted again here.
-func finishPairing(c *conn, deps handshakeDeps, clientID, sessionID, label string, tok approvedToken) bool {
+func finishPairing(c *conn, deps handshakeDeps, clientID, sessionID, label string, tok pairing.ApprovedToken) bool {
 	now := deps.Now().UnixMilli()
 	row := repos.GitClientRow{
-		ID: clientID, Label: label, TokenHash: tok.hash, TokenSalt: tok.salt,
+		ID: clientID, Label: label, TokenHash: tok.Hash, TokenSalt: tok.Salt,
 		CreatedAt: now, LastSeenAt: now,
 	}
 	if err := deps.Clients.UpsertOnPair(row); err != nil {
@@ -241,7 +242,7 @@ func finishPairing(c *conn, deps handshakeDeps, clientID, sessionID, label strin
 	if deps.ClientsChanged != nil {
 		deps.ClientsChanged()
 	}
-	if err := sendHandshake(c, handshakeResponse{Kind: "paired", Token: tok.plain}); err != nil {
+	if err := sendHandshake(c, handshakeResponse{Kind: "paired", Token: tok.Plain}); err != nil {
 		return false
 	}
 	sendHandshake(c, handshakeResponse{

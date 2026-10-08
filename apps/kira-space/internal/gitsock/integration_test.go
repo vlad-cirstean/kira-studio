@@ -881,16 +881,16 @@ func TestIntegration_PairingRequestCarriesKernelReportedPeer(t *testing.T) {
 	if req == nil {
 		t.Fatal("no pairing request queued")
 	}
-	if req.PeerPID != os.Getpid() {
-		t.Fatalf("PeerPID = %d, want %d (kernel-reported, not hello's pid 1)", req.PeerPID, os.Getpid())
+	if req.Meta.Peer.PID != os.Getpid() {
+		t.Fatalf("PeerPID = %d, want %d (kernel-reported, not hello's pid 1)", req.Meta.Peer.PID, os.Getpid())
 	}
 	want, err := os.Executable()
 	if err != nil {
 		t.Fatalf("os.Executable: %v", err)
 	}
 	want, _ = filepath.EvalSymlinks(want)
-	got, _ := filepath.EvalSymlinks(req.PeerExe)
+	got, _ := filepath.EvalSymlinks(req.Meta.Peer.Exe)
 	if got != want {
-		t.Fatalf("PeerExe = %q, want %q", req.PeerExe, want)
+		t.Fatalf("PeerExe = %q, want %q", req.Meta.Peer.Exe, want)
 	}
 }
