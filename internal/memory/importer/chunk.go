@@ -167,19 +167,9 @@ func (l lineIndex) isBlank(i int) bool {
 	return strings.TrimSpace(l.src[l.starts[i]:end]) == ""
 }
 
-// buildUnits cuts src at every heading line and every non-blank line that follows a blank one,
-// except inside forbidden spans, then splits any unit larger than Max.
-func buildUnits(src string, lines lineIndex, headings map[int]heading, forbidden []span, b Budget) []unit {
-	if strings.TrimSpace(src) == "" {
-		return nil
-	}
-	hasTop := false
-	for _, h := range headings {
-		if h.level <= 2 {
-			hasTop = true
-			break
-		}
-	}
+// cutPoints are the byte offsets units start at: every heading line and every non-blank line that
+// follows a blank one, except inside forbidden spans.
+func cutPoints(src string, lines lineIndex, headings map[int]heading, forbidden []span) []int {
 	inForbidden := func(off int) bool {
 		return slices.ContainsFunc(forbidden, func(s span) bool { return off > s.start && off < s.end })
 	}
@@ -194,7 +184,19 @@ func buildUnits(src string, lines lineIndex, headings map[int]heading, forbidden
 			cuts = append(cuts, off)
 		}
 	}
-	cuts = append(cuts, len(src))
+	return append(cuts, len(src))
+}
+
+// buildUnits cuts src at cutPoints, tracks the heading path, then splits any unit larger than Max.
+func buildUnits(src string, lines lineIndex, headings map[int]heading, forbidden []span, b Budget) []unit {
+	if strings.TrimSpace(src) == "" {
+		return nil
+	}
+	hasTop := false
+	for _, h := range headings {
+		hasTop = hasTop || h.level <= 2
+	}
+	cuts := cutPoints(src, lines, headings, forbidden)
 
 	var stack []heading
 	var units []unit
@@ -217,21 +219,28 @@ func buildUnits(src string, lines lineIndex, headings map[int]heading, forbidden
 			names[j] = h.text
 		}
 		u.path = strings.Join(names, " > ")
-		if tokens := EstimateTokens(raw); tokens <= b.Max {
-			u.text, u.tokens = raw, tokens
-			units = append(units, u)
-			continue
-		}
-		for j, piece := range splitOversize(raw, b.Target*3) {
-			p := u
-			if j > 0 {
-				p.level, p.heading = 0, false
-			}
-			p.text, p.tokens = piece, EstimateTokens(piece)
-			units = append(units, p)
-		}
+		units = append(units, sizeUnits(u, raw, b)...)
 	}
 	return units
+}
+
+// sizeUnits fills u with raw, or with Target-sized pieces of it when raw exceeds Max. Only the
+// first piece keeps the heading flags.
+func sizeUnits(u unit, raw string, b Budget) []unit {
+	if tokens := EstimateTokens(raw); tokens <= b.Max {
+		u.text, u.tokens = raw, tokens
+		return []unit{u}
+	}
+	var out []unit
+	for j, piece := range splitOversize(raw, b.Target*3) {
+		p := u
+		if j > 0 {
+			p.level, p.heading = 0, false
+		}
+		p.text, p.tokens = piece, EstimateTokens(piece)
+		out = append(out, p)
+	}
+	return out
 }
 
 // splitOversize cuts text into pieces of at most limit runes: at line ends first, then sentence
