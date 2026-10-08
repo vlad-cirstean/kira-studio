@@ -38,7 +38,9 @@ type StoreRequest struct {
 	Items          []Item
 	Clarifications []Clarification
 	Author         string // "user" | "agent"
-	Source         string // "mcp" | "ui"
+	Source         string // "mcp" | "ui" | "import"
+	// SourceRef names the import file for Source "import"; it must be empty otherwise.
+	SourceRef string
 	// Progress, when set, is told the stage: "checking", "reconciling", "saving".
 	Progress func(stage string)
 }
@@ -131,7 +133,16 @@ func validateRequest(req StoreRequest) error {
 	if req.Author != AuthorUser && req.Author != AuthorAgent {
 		return invalid("author must be %q or %q", AuthorUser, AuthorAgent)
 	}
-	if req.Source != SourceMCP && req.Source != SourceUI {
+	switch req.Source {
+	case SourceMCP, SourceUI:
+		if req.SourceRef != "" {
+			return invalid("source %q takes no source ref", req.Source)
+		}
+	case SourceImport:
+		if n := utf8.RuneCountInString(req.SourceRef); n < 1 || n > 64 {
+			return invalid("source %q needs a source ref of 1 to 64 characters", req.Source)
+		}
+	default:
 		return invalid("unknown source %q", req.Source)
 	}
 	return nil
@@ -228,7 +239,7 @@ func (s *Service) commit(ctx context.Context, req StoreRequest, requestID string
 		vec, model := s.vectorFor(ctx, w)
 		r, err := s.store.commitFact(ctx, commitInput{
 			Revision: *rev, Action: w.dec.Action, TargetID: w.dec.Target, Fact: w.dec.Fact, Reason: w.dec.Reason,
-			Keywords: w.Keywords, Author: req.Author, Source: req.Source, RequestID: requestID, Why: w.dec.Why,
+			Keywords: w.Keywords, Author: req.Author, Source: req.Source, SourceRef: req.SourceRef, RequestID: requestID, Why: w.dec.Why,
 			Vec: vec, Model: model,
 		})
 		if err == nil {

@@ -7,6 +7,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/internal/memory/migrations"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -131,5 +133,50 @@ func TestSearchNeverFailsOnFTSSyntax(t *testing.T) {
 		if _, err := s.searchFTS(context.Background(), SearchArgs{Query: q}); err != nil {
 			t.Errorf("query %q: %v", q, err)
 		}
+	}
+}
+
+func TestMigration3KeepsEvents(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	db, err := sqlitex.OpenImmediate(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps, err := migrations.All()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlitex.Migrate(db, steps[:2]); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO memories (id, lineage_id, version, fact, reason, author, status, fact_hash, created_at)
+			VALUES ('m1', 'm1', 1, 'old fact', 'why', 'user', 'current', 'h', 't')`,
+		`INSERT INTO memory_events (request_id, source, action, lineage_id, memory_id, author, created_at)
+			VALUES ('r', 'ui', 'add', 'm1', 'm1', 'user', 't')`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = db.Close()
+
+	s := NewStore(path)
+	t.Cleanup(func() { _ = s.Close() })
+	h, err := s.Lineage(context.Background(), "m1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.Events) != 1 || h.Events[0].Source != SourceUI || h.Events[0].SourceRef != nil {
+		t.Fatalf("event not preserved: %+v", h.Events)
+	}
+	conn, _ := s.conn()
+	if _, err := conn.Exec(`INSERT INTO memory_events (request_id, source, source_ref, action, lineage_id, memory_id, author, created_at)
+		VALUES ('r2', 'import', 'f1', 'noop', 'm1', 'm1', 'agent', 't')`); err != nil {
+		t.Fatalf("import event: %v", err)
+	}
+	if _, err := conn.Exec(`INSERT INTO memory_events (request_id, source, action, lineage_id, memory_id, author, created_at)
+		VALUES ('r3', 'import', 'noop', 'm1', 'm1', 'agent', 't')`); err == nil {
+		t.Fatal("import event without source_ref accepted")
 	}
 }

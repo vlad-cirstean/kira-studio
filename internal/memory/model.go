@@ -6,8 +6,9 @@ const (
 	AuthorUser  = "user"
 	AuthorAgent = "agent"
 
-	SourceMCP = "mcp"
-	SourceUI  = "ui"
+	SourceMCP    = "mcp"
+	SourceUI     = "ui"
+	SourceImport = "import"
 
 	StatusCurrent    = "current"
 	StatusSuperseded = "superseded"
@@ -46,16 +47,19 @@ type Memory struct {
 
 // Event is one audit row: what a store decided for a fact, and why.
 type Event struct {
-	Seq        int64   `json:"seq"`
-	RequestID  string  `json:"requestId"`
-	Source     string  `json:"source"`
-	Action     string  `json:"action"`
-	LineageID  string  `json:"lineageId"`
-	MemoryID   string  `json:"memoryId"`
-	PreviousID *string `json:"previousId"`
-	Author     string  `json:"author"`
-	Rationale  string  `json:"rationale"`
-	CreatedAt  string  `json:"createdAt"`
+	Seq       int64  `json:"seq"`
+	RequestID string `json:"requestId"`
+	Source    string `json:"source"`
+	// SourceRef is the import file id for source "import"; SourceLabel is that file's relative path.
+	SourceRef   *string `json:"sourceRef"`
+	SourceLabel string  `json:"sourceLabel,omitempty"`
+	Action      string  `json:"action"`
+	LineageID   string  `json:"lineageId"`
+	MemoryID    string  `json:"memoryId"`
+	PreviousID  *string `json:"previousId"`
+	Author      string  `json:"author"`
+	Rationale   string  `json:"rationale"`
+	CreatedAt   string  `json:"createdAt"`
 }
 
 // History is every version of one lineage, oldest first, with its audit events.

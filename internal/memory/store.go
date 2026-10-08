@@ -62,6 +62,9 @@ func (s *Store) conn() (*sql.DB, error) {
 	return db, nil
 }
 
+// DB returns the open memory.db handle, for internal/memory subpackages sharing the file.
+func (s *Store) DB() (*sql.DB, error) { return s.conn() }
+
 // Opened reports whether the file has been opened by this Store.
 func (s *Store) Opened() bool {
 	s.mu.Lock()
@@ -189,8 +192,10 @@ func (s *Store) Lineage(ctx context.Context, id string) (History, error) {
 	if len(mems) == 0 {
 		return History{}, ErrNotFound
 	}
-	erows, err := db.QueryContext(ctx, `SELECT seq, request_id, source, action, lineage_id, memory_id, previous_id,
-		author, rationale, created_at FROM memory_events WHERE lineage_id = ? ORDER BY seq`, mems[0].LineageID)
+	erows, err := db.QueryContext(ctx, `SELECT e.seq, e.request_id, e.source, e.source_ref, COALESCE(f.rel_path, ''),
+		e.action, e.lineage_id, e.memory_id, e.previous_id, e.author, e.rationale, e.created_at
+		FROM memory_events e LEFT JOIN import_files f ON e.source = 'import' AND f.id = e.source_ref
+		WHERE e.lineage_id = ? ORDER BY e.seq`, mems[0].LineageID)
 	if err != nil {
 		return History{}, fmt.Errorf("memory: events: %w", err)
 	}
@@ -198,7 +203,7 @@ func (s *Store) Lineage(ctx context.Context, id string) (History, error) {
 	h := History{Memories: mems, Events: []Event{}}
 	for erows.Next() {
 		var e Event
-		if err := erows.Scan(&e.Seq, &e.RequestID, &e.Source, &e.Action, &e.LineageID, &e.MemoryID,
+		if err := erows.Scan(&e.Seq, &e.RequestID, &e.Source, &e.SourceRef, &e.SourceLabel, &e.Action, &e.LineageID, &e.MemoryID,
 			&e.PreviousID, &e.Author, &e.Rationale, &e.CreatedAt); err != nil {
 			return History{}, err
 		}
@@ -267,6 +272,7 @@ type commitInput struct {
 	Keywords  []string
 	Author    string
 	Source    string
+	SourceRef string // import file id; empty stores NULL
 	RequestID string
 	Why       string
 	// Vec, when set, is the L2-normalised embedding of the inserted fact, stored in the same
@@ -345,14 +351,17 @@ func (s *Store) commitFact(ctx context.Context, in commitInput) (commitResult, e
 		return commitResult{}, fmt.Errorf("memory: unknown action %q", in.Action)
 	}
 
-	var prev any
+	var prev, ref any
 	if res.PreviousID != "" {
 		prev = res.PreviousID
 	}
+	if in.SourceRef != "" {
+		ref = in.SourceRef
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO memory_events
-		(request_id, source, action, lineage_id, memory_id, previous_id, author, rationale, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		in.RequestID, in.Source, in.Action, res.LineageID, res.ID, prev, in.Author, in.Why, now); err != nil {
+		(request_id, source, source_ref, action, lineage_id, memory_id, previous_id, author, rationale, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		in.RequestID, in.Source, ref, in.Action, res.LineageID, res.ID, prev, in.Author, in.Why, now); err != nil {
 		return commitResult{}, fmt.Errorf("memory: event: %w", err)
 	}
 	if res.Revision, err = readRevision(ctx, tx); err != nil {
