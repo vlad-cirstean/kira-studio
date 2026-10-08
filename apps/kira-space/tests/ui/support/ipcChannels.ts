@@ -187,4 +187,18 @@ export const IPC = {
   memorySemanticInstall: 'kira:memory:semanticInstall',
   memorySemanticRetry: 'kira:memory:semanticRetry',
   memorySemantic: 'kira:memory:semantic',
+  // P211: bulk import; memoryImport is a push channel, no FQN entry.
+  memoryImportChoose: 'kira:memory:importchoose',
+  memoryImportCreate: 'kira:memory:importcreate',
+  memoryImportJobs: 'kira:memory:importjobs',
+  memoryImportJob: 'kira:memory:importjob',
+  memoryImportStart: 'kira:memory:importstart',
+  memoryImportPause: 'kira:memory:importpause',
+  memoryImportResume: 'kira:memory:importresume',
+  memoryImportCancel: 'kira:memory:importcancel',
+  memoryImportDiscard: 'kira:memory:importdiscard',
+  memoryImportDismiss: 'kira:memory:importdismiss',
+  memoryImportRetryFailed: 'kira:memory:importretryFailed',
+  memoryImportRetryFile: 'kira:memory:importretryFile',
+  memoryImport: 'kira:memory:import',
 } as const;

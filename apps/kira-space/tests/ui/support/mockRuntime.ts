@@ -166,6 +166,18 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memorySemanticStatus: 'MemoryService.SemanticStatus',
   memorySemanticInstall: 'MemoryService.InstallSemanticModel',
   memorySemanticRetry: 'MemoryService.RetrySemantic',
+  memoryImportChoose: 'MemoryImportService.Choose',
+  memoryImportCreate: 'MemoryImportService.Create',
+  memoryImportJobs: 'MemoryImportService.Jobs',
+  memoryImportJob: 'MemoryImportService.Job',
+  memoryImportStart: 'MemoryImportService.Start',
+  memoryImportPause: 'MemoryImportService.Pause',
+  memoryImportResume: 'MemoryImportService.Resume',
+  memoryImportCancel: 'MemoryImportService.Cancel',
+  memoryImportDiscard: 'MemoryImportService.Discard',
+  memoryImportDismiss: 'MemoryImportService.Dismiss',
+  memoryImportRetryFailed: 'MemoryImportService.RetryFailed',
+  memoryImportRetryFile: 'MemoryImportService.RetryFile',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
@@ -250,6 +262,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.adeTaskReviewWindowTarget]: 'null',
   // P201 Part 2: the Memory module lists recent memories as soon as its mode opens.
   [IPC.memoryRecent]: '[]',
+  // P211: no imports by default.
+  [IPC.memoryImportJobs]: '[]',
   // P210: no embedder by default, so the semantic row stays hidden.
   [IPC.memorySemanticStatus]: JSON.stringify({
     state: 'off',
