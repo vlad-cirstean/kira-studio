@@ -12,7 +12,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P214 | Memory manual add, free text: Add memory dialog gets a single free-text box (no per-row fact/reason; reason auto-filled as manual). Submits through the unchanged store path: the gate already splits into atomic facts, challenges and reconciles; stored only when every step passes. No dependency on P211 | Done |
 | P215 | Test and hook speed regression: tests and the pre-push hook (go build, lint:go, lint:dead) got much slower in roughly the last 24h, not from contention. Measure where time goes per stage first (do not bisect commit history); find the cause; fix it | Done |
 | P216 | Memory speech to text: local English-only Whisper small.en quantized q5_1 (whisper.cpp ggml) in a subprocess worker started only on demand and stopped when idle, like memory-embed; mic dictation in the Memory module with live text shown in the input, user sends it manually; model download on click with pinned SHA-256 | Done |
-| P217 | Code review (one Opus round) and fixes | Not started |
+| P217 | Code review (one Opus round) and fixes | Done |
 
 ## Requirements (user's words, condensed)
 
@@ -238,3 +238,21 @@ hooks in packaged bundle" because the local `dist` came from a test build; unrel
 
 Unverified: real microphone and the TCC prompt, Metal speed, darwin cgo link and `lipo`, `codesign`,
 accuracy on real speech, device switching, all macOS-only items. In Known open items.
+
+## P217 result
+
+One Opus round, base `4e57accbe`: 7 findings (1 high, 1 medium, 5 low), all fixed.
+
+- mobileterm: phone input no longer holds the entry lock across the PTY write (separate write mutex,
+  deadlock test). `Serve` re-checks device and permissions after `Attach`. Ring grows lazily to 1 MiB.
+- mobileweb: `maintain` polls addresses each minute and rebinds (new leaf, listeners added and removed,
+  status event via `OnStatusChanged`); `ARCHITECTURE.md` now matches. Agent session route and SSE drop
+  `cwd`. `Publish` skips marshalling with no subscriber.
+- importer: skipped directories count as one ignored entry, no walk. Dialog copy "files and folders ignored".
+- Biome warnings and infos cleared (unused import, stale suppression; rules off for tests and shadcn names).
+
+Verification: `go build ./...`, `go test -race` mobileterm, mobileweb, importer, bridge; golangci-lint
+2.13.2 (0 issues); typecheck, lint, lint:dead; Playwright space-mobile 51 pass, 1 skipped;
+memory-import and memory-module 6 pass.
+
+Not verified: rebind on a real network change (tested with loopback 127.0.0.2).
