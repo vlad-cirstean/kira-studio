@@ -129,7 +129,7 @@ func (b *TaskBoard) setupInfo(sb model.AdeTaskBranch, worktree string) adeagent.
 		}
 		return adeagent.SetupInfo{State: "none"}
 	}
-	return adeagent.SetupInfo{State: row.State}
+	return adeagent.SetupInfo{State: row.State, Note: row.Note}
 }
 
 // worktreePath is worktreeOf with a lookup failure read as "no worktree".
@@ -346,6 +346,9 @@ func (b *TaskBoard) branchInfo(sb model.AdeTaskBranch, nick, worktree string) ad
 		info.Next = "The worktree is still preparing. Call branch_status with waitSeconds, then edit in " + worktree + "."
 	case model.AdeSetupFailed:
 		info.Next = "The worktree setup failed. Tell the user; do not edit until it is fixed."
+		if info.Setup.Note != "" {
+			info.Next += " Reason: " + info.Setup.Note
+		}
 	default:
 		info.Next = "Ready. Work in " + worktree + "."
 	}
@@ -355,44 +358,52 @@ func (b *TaskBoard) branchInfo(sb model.AdeTaskBranch, nick, worktree string) ad
 // BranchStatus implements adeagent.SpaceTools: the state of the repo's worktree, waiting up to wait
 // for a running setup to finish.
 func (b *TaskBoard) BranchStatus(ctx context.Context, taskID, ref string, wait time.Duration) (adeagent.BranchInfo, error) {
+	br, nick, early, err := b.taskBranch(taskID, ref)
+	if err != nil {
+		return adeagent.BranchInfo{}, err
+	}
+	if early != nil {
+		return *early, nil
+	}
 	deadline := time.Now().Add(wait)
-	for {
-		info, running, err := b.branchStatusOnce(ctx, taskID, ref)
-		if err != nil || !running || !time.Now().Before(deadline) {
-			return info, err
-		}
+	for b.setupRunning(br) && time.Now().Before(deadline) {
 		select {
 		case <-ctx.Done():
-			return info, ctx.Err()
+			return b.branchInfo(br, nick, b.worktreePath(ctx, br)), ctx.Err()
 		case <-time.After(time.Second):
 		}
 	}
+	return b.branchInfo(br, nick, b.worktreePath(ctx, br)), nil
 }
 
-func (b *TaskBoard) branchStatusOnce(ctx context.Context, taskID, ref string) (adeagent.BranchInfo, bool, error) {
+func (b *TaskBoard) setupRunning(sb model.AdeTaskBranch) bool {
+	row, err := b.deps.Tasks.GetSetup(sb.ID)
+	return err == nil && row != nil && row.State == model.AdeSetupRunning
+}
+
+// taskBranch resolves ref to the task's branch row; early answers a repo with no branch yet.
+func (b *TaskBoard) taskBranch(taskID, ref string) (br model.AdeTaskBranch, nick string, early *adeagent.BranchInfo, err error) {
 	tc, err := b.spaceCtx(taskID)
 	if err != nil {
-		return adeagent.BranchInfo{}, false, err
+		return br, "", nil, err
 	}
 	_, cfgs, err := b.registeredCandidates()
 	if err != nil {
-		return adeagent.BranchInfo{}, false, err
+		return br, "", nil, err
 	}
 	id, err := resolveRepoRef(ref, b.taskCandidates(tc, cfgs), "task")
 	if err != nil {
-		return adeagent.BranchInfo{}, false, err
+		return br, "", nil, err
 	}
 	for _, br := range tc.branches {
 		if br.CodeRepoID != id {
 			continue
 		}
 		if br.Name == "" {
-			return adeagent.BranchInfo{Repo: tc.nick[id], Setup: adeagent.SetupInfo{State: "none"},
-				Next: "No branch yet. Call request_branch."}, false, nil
+			return br, "", &adeagent.BranchInfo{Repo: tc.nick[id], Setup: adeagent.SetupInfo{State: "none"},
+				Next: "No branch yet. Call request_branch."}, nil
 		}
-		wt := b.worktreePath(ctx, br)
-		info := b.branchInfo(br, tc.nick[id], wt)
-		return info, info.Setup.State == model.AdeSetupRunning, nil
+		return br, tc.nick[id], nil, nil
 	}
-	return adeagent.BranchInfo{}, false, adeagent.ToolError("Repo is not on this task.")
+	return br, "", nil, adeagent.ToolError("Repo is not on this task.")
 }
