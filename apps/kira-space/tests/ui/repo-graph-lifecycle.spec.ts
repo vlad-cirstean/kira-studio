@@ -101,6 +101,7 @@ test('bug 1 regression: opening a file and returning to the graph tab keeps the 
   await installGitStreamMock(page, REPO.repoId);
 
   await repoRow(page).click();
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
 

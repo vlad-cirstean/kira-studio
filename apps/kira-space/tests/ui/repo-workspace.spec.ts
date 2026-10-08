@@ -199,6 +199,7 @@ test('a repo workspace: "Open changes" opens a diff tab', async ({ relaunch }) =
   });
 
   await repoRow(page).click();
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
   await expect(treeRow(page, 'c.ts')).toBeVisible();
 
   await treeRow(page, 'c.ts').click({ button: 'right' });
@@ -238,6 +239,7 @@ test('a repo workspace: search streams results out of order and opens a match', 
   });
 
   await repoRow(page).click();
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
   await page.locator('[data-testid="repo-view-search"]').click();
 
   const queryInput = page.locator('[data-testid="repo-search-query"]');
@@ -416,6 +418,7 @@ test('a repo workspace: the blame annotation stays off with no git record, and i
 
   const noGitRepoRow = page.locator(`[data-testid="repo-row"][data-repo-id="${NO_GIT_REPO.id}"]`);
   await noGitRepoRow.click();
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
   await expect(treeRow(page, 'a.ts')).toBeVisible();
   await treeRow(page, 'a.ts').click();
 
@@ -463,6 +466,7 @@ test('a repo workspace: the status bar blame item follows the cursor, and never 
     });
 
     await repoRow(page).click();
+    await page.locator('[data-testid="git-panel-tab-files"]').click();
     await treeRow(page, 'a.ts').click();
 
     const editor = page.locator('[data-testid="repo-file-editor"]');
@@ -732,6 +736,7 @@ test('a repo workspace: file-tree rows carry per-language icons, directories kee
   });
 
   await repoRow(page).click();
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
 
   const goIcon = treeRow(page, 'main.go').locator('.node-icon');
   const tsIcon = treeRow(page, 'app.ts').locator('.node-icon');
