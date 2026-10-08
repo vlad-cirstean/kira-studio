@@ -20,9 +20,9 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Done |
 | P223 | Mobile agents web as a plain-HTTP page on the trusted LAN only: drop the PWA, local CA, HTTPS and setup listener; bind one LAN interface address; refuse peers outside its private subnet; "Trust this network" (subnet plus router MAC) starts and stops the server by itself; plaintext warning; device tokens expire | Done |
 | P224 | Remove speech to text completely: the `stt` package, whisper.cpp build, dictation bridge and stream, mic UI, P221's dictation settings section, malgo, S13, plists' microphone string, CI patch, docs; delete the downloaded speech model at startup; keep `modelstore`, `workerproc` and the embed worker | Done |
-| P225 | Git graph regression (new since about yesterday, likely from P220's CommitGrid change): commits disappear from the graph and Show more is broken. Find the root cause, fix it, add a regression test that fails before the fix | Not started |
+| P225 | Git graph regression (new since about yesterday, likely from P220's CommitGrid change): commits disappear from the graph and Show more is broken. Find the root cause, fix it, add a regression test that fails before the fix | Done |
 | P226 | Consistent colour bars: wherever the left panel shows an item with a coloured left bar (scripts in Kira Studio, git repos, and other module lists), the same colour renders the same way everywhere. One shared bar component and tone mapping instead of per-module variants | Done |
-| P227 | Code review (one Opus round, all three dimensions) of everything changed since the last review close-out `7f626e91a` (P218 to P226), then one Sonnet fixer. Findings file `plans/P227-findings.md` committed before the fixer, deleted once fixed. Also fix the stale Studio visual baselines (all 12 fail on base). | Planned |
+| P227 | Code review (one Opus round, all three dimensions) of everything changed since the last review close-out `7f626e91a` (P218 to P226), then one Sonnet fixer. Findings file `plans/P227-findings.md` committed before the fixer, deleted once fixed. Also fix the stale Studio visual baselines (all 12 fail on base). | Done |
 
 ## Requirements (user's words, condensed)
 
@@ -405,7 +405,7 @@ run and not re-recorded (Settings snapshots differ since P221 and again now).
 
 ## P225 result
 
-Facts in `docs/ARCHITECTURE.md` (commit-grid notes). Plan: `plans/P225-plan.md`. Two root causes; neither
+Facts in `docs/ARCHITECTURE.md` (commit-grid notes). Two root causes; neither
 came from the last 36 hours. P220 widened the first-mount column from 17px, which made both visible.
 
 A. Outer-lane commits lost their dot. `CommitGrid` applied the P220 seed once, on the first layout with
@@ -454,3 +454,35 @@ Checks: typecheck, lint, lint:dead clean; `test:unit` 1812 pass; `repo-graph-*` 
 Space UI suite 246 pass, 0 fail; `test:webview` 64 pass (the webview renders the same `rowSvg.ts`).
 Not run: `test:visual:space`. Workers=1 was needed locally for the new spec under load; the full suite
 ran with the default config.
+
+## P227 result
+
+Review: 3 Medium, 9 Low, no High (base `7f626e91a`). All fixed; none declined. Findings file deleted.
+
+- M1: device expiry was checked only at request start. `handleEvents` now ends at `ExpiresAt` (timer),
+  the terminal `authorized` callback checks it, and the one-minute `maintain` sweep (`sweepExpired`)
+  calls `DisconnectDevice` and `ReleaseDevice` for devices seen by `withDevice` and now expired. Done
+  with an in-memory id-to-expiry map, not a `DeviceStore.List`: no interface change. Test
+  `TestSweepExpired_EndsStreamsAndTerminals`.
+- M2: `repoColorOf` in `repoLinks.ts` follows the worktree anchor; used by `tabKinds.ts` and the six
+  ADE callers. `GitPanel.vue` needed no change: both its rails already paint the anchor row's colour.
+  Spec `color-rails.spec.ts` worktree case fails before the fix (`amber` vs `cyan`).
+- M3: 12 Studio and 4 Space baselines re-recorded in the dev container; diffs are Inter text, the
+  Docker module (Studio) and Memory, Mobile access, Claude Code nav entries (Space). Added the Memory pane
+  baseline; the Space settings spec now mocks `memoryMcpStatus` (unmocked, the pane rendered a fixture
+  error). Both visual suites green. The container's WebKitGTK may differ from the CI `ui` job image;
+  regenerate on CI if it disagrees.
+- L1: `lannet.Find` returns `ErrNoRouterMAC` for a missing ARP entry. `evaluate` needed no new case: its
+  default branch already maps it to `mobileStopUnavailable` with the error text.
+- L2: the supervisor logs a start failure once per distinct message.
+- L3: environment writes chain on one promise and build their list at run time.
+- L4: colour change returns its promise.
+- L5: `useNow` with a 60 s `useIntervalFn` scheduler (this VueUse has no `interval` option).
+- L6: `handleChunkLayout` comment back on its function.
+- L7: edge kind removed. `EDGE_STRIDE` 6, `PATCH_STRIDE` 3; tests assert lanes.
+- L8: both sub-bar tests deleted (expired device is a row in `TestAuth_Verdicts`).
+- L9: P225 row Done, `P225-plan.md` deleted, README reworded.
+
+Checks: lint, lint:dead, typecheck clean; `test:unit` 1812 pass; Go `mobileweb`, `mobileterm`,
+`lannet`, `bridge` pass (`-race` on the first two); `test:visual:studio` 13 pass, `test:visual:space` 5
+pass; full Space UI suite 248 pass, 0 fail.
