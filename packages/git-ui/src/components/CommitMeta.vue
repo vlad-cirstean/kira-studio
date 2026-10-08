@@ -27,7 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
-import { REF_BADGE_CLASS } from './badgeClass.ts';
+import { prBadgeClass } from './badgeClass.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { appendLinkifiedText } from './linkify.ts';
 import { openAllChangesAnnounced } from './openAllChangesAnnounced.ts';
@@ -423,7 +423,7 @@ const prIcon = computed(() => {
               :key="pr.number"
               class="kv:flex kv:items-center kv:gap-0.5"
             >
-              <span :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${pr.state}`]">
+              <span :class="prBadgeClass(pr.state)">
                 {{ pr.stateLabel }}
               </span>
               <button

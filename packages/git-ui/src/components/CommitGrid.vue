@@ -1283,7 +1283,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
          shown, never a fifth grid column. -->
     <span
       ref="dateWidthProbe"
-      class="kv-cell-date kv:absolute kv:invisible kv:pointer-events-none kv:whitespace-nowrap"
+      class="kv-cell-date kv:tabular-nums kv:absolute kv:invisible kv:pointer-events-none kv:whitespace-nowrap"
       aria-hidden="true"
     ></span>
     <KuiColumnResizeHandle
@@ -1450,286 +1450,25 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   overflow: visible;
 }
 
-.kv-graph-cell {
-  width: 100%;
-  height: 100%;
-  display: block;
-  overflow: visible;
-}
-
-.kv-graph-svg {
-  display: block;
-  overflow: visible;
-  /* P92 item 1: the column is user-resizable now, so a lane past its right edge must be cut.
-     `overflow: hidden` cannot do it — one non-visible axis forces the other to `auto` — and the
-     0.5px vertical overdraw (GEOMETRY.overdraw) has to survive, or two rows' runs meet with a
-     hairline seam at a fractional DPR. */
-  clip-path: inset(-2px 0);
-}
-
-/* G19 D1: the graph column's own HEAD indicator — an unfilled ring in the same token the
-   current-branch badge's own ring/glyph use (.kv-badge-current/.kv-badge-current-glyph, below),
-   additive to whichever shapes the row's node already draws (stash/merge precedence untouched —
-   rowSvg.ts's planNode). */
-.kv-graph-head-ring {
-  stroke: var(--kv-focus-border);
-}
-
-/* G-UX (item 1): the soft backdrop disc behind the HEAD ring — rowSvg.ts's buildRowSvg paints
-   this one shape UNDER the row's own edges, everything else (including the ring above) on top. */
-.kv-graph-head-halo {
-  fill: var(--kv-focus-border);
-  fill-opacity: 0.18;
-}
-
-/* G-UX (item 2b): the literal ask — badges above the message, on their own line, rather than
-   fighting it for horizontal space (item 2a's `.kv-ref-badges` `max-width` cap was the quick,
-   low-risk stopgap; this supersedes it). A 2-row CSS Grid, not a flex column. The subject stays
-   `grid-row: 2` either way (`.kv-message-subject`, below) so it never has to move.
-   P7 (item 1): the badges track is collapsed to `0` by default — a commit with no badges (most
-   rows) is now genuinely single-line, not merely visually empty on a still-full-height row. Only
-   `.kv-cell-message--has-badges` (`columns.ts`'s own `messageFormatter`, set in the same branch
-   that decides whether `.kv-message-badges-row` is even built) reserves the badge track; the
-   row's own real height comes from `getItemMetadata`'s `height` (`columns.ts`'s `rowMetadata`),
-   which uses the identical condition — the two can never disagree about whether a row is tall.
-   P72 §6.3: both tracks are now `--kv-h-xs` (kira-structure.css) — the same token `.kv-badge`'s
-   own height derives from below — instead of the `16px`/`18px` literals the badge used to be
-   three points smaller than. `density.css`'s own `--kv-row-height`/`-compact` derive from the
-   identical token, so a row's real height and this grid's track heights can never drift apart. */
-.kv-cell-message {
-  display: grid;
-  grid-template-rows: 0 var(--kv-h-xs);
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.kv-cell-message.kv-cell-message--has-badges {
-  grid-template-rows: var(--kv-h-xs) var(--kv-h-xs);
-}
-
-/* The row-1 strip — ref badges then the PR badge, sharing one flex row and one `overflow: hidden`
-   boundary so a commit with more decorations than fit truncates as a strip rather than spilling
-   into the graph/author column. No `max-width` cap needed any more (item 2a's own reason for one):
-   this row no longer shares its horizontal space with the subject at all. */
-.kv-message-badges-row {
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.kv-message-subject {
-  grid-row: 2;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* P93 §4.2: the placeholder's own message cell — a plain flex row (never badges, so the 2-row
-   grid `.kv-cell-message` otherwise uses has nothing to lay out), chevron then the "N more commits
-   on X" text in the same muted italic `.kv-row-stash`'s own subject already uses. */
-.kv-cell-message.kv-cell-message--collapsed {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.kv-cell-message--collapsed .kv-message-subject {
-  font-style: italic;
-  color: var(--kv-description-fg);
-}
-
-/* The stash tip (refs/stash — W7's DecorationRef "stash" kind): italic subject text is the row-
-   level cue; the badge itself (dashed square, codicon-archive) is refBadges.ts's job, rendered
-   inline in the message cell, not here. */
-.kv-commit-grid .slick-row.kv-row-stash .kv-message-subject {
-  font-style: italic;
-}
-
-.kv-collapsed-chevron {
-  flex-shrink: 0;
-  font-size: var(--kv-t-md);
-}
-
-/* P11 W13: `columns.ts`'s `messageFormatter`, active only while a search query is compiled. The
-   same token the real editor's own Find widget highlights a match with (§3.4) — not an invented
-   colour. */
-.kv-search-hit {
-  background-color: var(--kv-search-match-bg);
-  border-radius: 2px;
-}
-
-.kv-cell-author {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* refBadges.ts's inline badge strip (P4 W7, §6.2): a row with no decorations never gets this
-   wrapper at all (buildRefBadges returns null), so this only ever costs layout on rows that
-   have something to show. Sits inside `.kv-message-badges-row` now (G-UX item 2b), alongside the
-   PR badge — that shared wrapper owns the row's own `overflow: hidden`/width, so this strip
-   itself needs no shrink/max-width logic of its own beyond not collapsing its own badges. */
-.kv-ref-badges {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-/* P131 Part 2 §5.1: the shape split — `badgeVariants({ variant: 'chip' })` (via `REF_BADGE_CLASS`,
-   `badgeClass.ts`) now owns display/gap/padding/height/line-height/color/border/box-sizing/
-   appearance/font-family/margin and the radius (P7's boxy, button-matching chip; the old fully-
-   rounded pill and its `.kv-badge-pill`/`.kv-badge-square` split are gone, since shadcn's own
-   `chip` variant covers every kind uniformly — never `.kv-badge-square`'s own rectangle). This
-   rule keeps only what `badgeVariants` cannot own: the graph-scale font size, on the same
-   `--kv-t-md`/`--kv-h-xs` (kira-structure.css) scale `.kv-cell-message`'s own subject text uses
-   (P72 §6.3) — a size `check_font_scale` would reject as an arbitrary literal on unprefixed
-   markup, so it stays here rather than folding into the shared `badgeClass.ts` every unprefixed
-   `REF_BADGE_CLASS` consumer (BranchPicker, StackList, CommitMeta) also uses. */
+/* Font sizes stay here: `check_font_scale` exempts this file, and the same size as a class on
+   unprefixed badge markup would trip it. The rest of the badge look is utilities from
+   `badgeClass.ts` (P131 Part 2 §5.1) and the cell builders in `columns.ts`/`refBadges.ts`. */
 .kv-badge {
   font-size: var(--kv-t-md);
 }
 
-.kv-badge-dashed {
-  border-style: dashed;
-}
-
-/* G26 D-4.11: a stack member's own outline, and (only alongside it) the stale dashed variant —
-   reuses .kv-badge-dashed's own affordance rather than inventing a second "needs attention"
-   visual language. */
-.kv-badge-branch--stacked {
-  border-color: var(--kv-badge-branch-stacked-border);
-}
-.kv-badge-branch--stale {
-  border-style: dashed;
-}
-
-/* P72 §6.3: a step below `.kv-badge`'s own label size — an icon reads as decoration, not text —
-   but now moves *with* the type scale instead of staying pinned at a literal. */
+/* P72 §6.3: a step below `.kv-badge`'s own label size — an icon reads as decoration, not text. */
 .kv-badge-icon {
   font-size: var(--kv-t-sm);
 }
 
-/* §6.2's "badge text truncates at ~190px, full name in title" — the icon stays fixed size, only
-   the text label clips. */
-.kv-badge-label {
-  max-width: 190px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* §7's "no colour-only meaning" — every distinct token below pairs with a distinct shape/glyph
-   already chosen in refBadges.ts's badgeSpecFor, this file only supplies the colour.
-   P92 item 10: outline only — a coloured margin/border, no background fill. The label and icon
-   are `--kv-badge-fg` (`.kv-badge`, `.kv-badge-icon` below), a theme-supplied token (white on the
-   dark theme, `vscode-tokens.css`) rather than a literal `#fff`, so a light theme can supply its
-   own without this file knowing which theme is active. Legibility comes from the row's own
-   background behind the badge, not from a fill the badge paints itself. */
-.kv-badge-local {
-  border-color: var(--kv-badge-local-bg);
-}
-
-.kv-badge-remote {
-  border-color: var(--kv-badge-remote-fg);
-}
-
-.kv-badge-tag {
-  border-color: var(--kv-badge-tag-fg);
-}
-
-.kv-badge-stash {
-  border-color: var(--kv-badge-stash-border);
-}
-
-.kv-badge-overflow {
-  /* No kind colour of its own — just the panel border, same as before. */
-  border-color: var(--kv-panel-border);
-}
-
-/* G24 D9/P74 §3.3: the per-commit/per-branch PR badge — a `<button>` when clickable, a plain
-   `<span>` otherwise (never an `<a href>`: see `refBadges.ts`'s own doc comment on why). State
-   travels as one of these four classes, never as text (§7's "no colour-only meaning" is already
-   satisfied by the "#123" number plus the tooltip naming the state in words). */
-.kv-badge-pr {
-  text-decoration: none;
-}
-
-button.kv-badge-pr {
-  cursor: pointer;
-}
-
-.kv-badge-pr--open {
-  border-color: var(--kv-badge-pr-open-fg);
-}
-
-.kv-badge-pr--draft {
-  border-color: var(--kv-badge-pr-draft-fg);
-}
-
-.kv-badge-pr--merged {
-  border-color: var(--kv-badge-pr-merged-fg);
-}
-
-.kv-badge-pr--closed {
-  border-color: var(--kv-badge-pr-closed-fg);
-}
-
-/* G-UX (item 1): replaces the old 5×5px `.kv-badge-dot` — a checkmark glyph reads as "current"
-   at a glance, where a plain dot next to the badge's own icon was easy to miss. Fixed in
-   `--kv-focus-border`, independent of the badge's own kind colour or any lane tint, so "this is
-   the current branch" stays a single, consistent, always-recognisable signal. */
-/* P72 §6.3: `--kv-t-xs`, a step below `.kv-badge-icon`'s own `--kv-t-sm` — same reasoning as that
-   rule's own comment, one step further since a checkmark reads as even more purely decorative. */
+/* P72 §6.3: `--kv-t-xs`, one step further down since a checkmark is even more purely decorative. */
 .kv-badge-current-glyph {
   font-size: var(--kv-t-xs);
-  color: var(--kv-focus-border);
 }
 
-/* The ring goes on the badge itself, not the glyph — a `box-shadow`, not `border`, so it never
-   fights the lane-tinted `border-color` rules below (`.kv-badge-lane-tinted`). */
-.kv-badge-current {
-  box-shadow: 0 0 0 1px var(--kv-focus-border);
+.kv-collapsed-chevron {
+  font-size: var(--kv-t-md);
 }
 
-/* G21 D4: ties a badge back to the row's own lane, on the border — for an outline badge this is
-   the whole of it, same as always: never the label, which stays `--kv-badge-*` (`--kv-graph-lane-N`
-   is tuned for 1.6px SVG strokes on a panel background, not for text contrast, and would fail
-   legibility as a solid label colour on several lanes in several themes). Additive to, never a
-   replacement for, `.kv-badge-remote`/`-tag`/`-stash` above — the kind colour and shape/glyph
-   distinction (§6.1's "no colour-only meaning") still carry the badge's own meaning regardless of
-   whether a lane colour is known. Eight rules, matching `vscode-tokens.css`'s own generated
-   `.kv-lane-0`.`.kv-lane-7` range (`DEFAULT_PALETTE_SIZE`) — deliberately hand-written here rather
-   than folded into that generated block, since this reads `border-color` for an HTML badge, not
-   the `fill`/`stroke` an SVG graph node needs.
-   P92 item 10: the icon is white now (`.kv-badge-icon` inherits `--kv-badge-fg` from `.kv-badge`),
-   so the eight `.kv-badge-icon { color: ... }` lane-tint rules this block used to also carry are
-   gone — border only. */
-.kv-badge-lane-tinted.kv-lane-0 { border-color: var(--kv-graph-lane-0); }
-.kv-badge-lane-tinted.kv-lane-1 { border-color: var(--kv-graph-lane-1); }
-.kv-badge-lane-tinted.kv-lane-2 { border-color: var(--kv-graph-lane-2); }
-.kv-badge-lane-tinted.kv-lane-3 { border-color: var(--kv-graph-lane-3); }
-.kv-badge-lane-tinted.kv-lane-4 { border-color: var(--kv-graph-lane-4); }
-.kv-badge-lane-tinted.kv-lane-5 { border-color: var(--kv-graph-lane-5); }
-.kv-badge-lane-tinted.kv-lane-6 { border-color: var(--kv-graph-lane-6); }
-.kv-badge-lane-tinted.kv-lane-7 { border-color: var(--kv-graph-lane-7); }
-
-/* G19 D2: F2 found this cell had no overflow safety net at all — unlike
-   .kv-message-subject/.kv-cell-author (both above), an absolute-format date overflowing the
-   column's own width was silently clipped by the cell's own `overflow: hidden`, not truncated
-   with an affordance. */
-.kv-cell-date {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* P110 A13: §6.1's own resize handles moved onto the template's own `kv:` utilities directly on
-   each `<KuiColumnResizeHandle>` — nothing else in this file selects `.kv-resize-handle`, so the
-   classname itself is dropped, unlike `.kv-commit-grid` above. */
 </style>

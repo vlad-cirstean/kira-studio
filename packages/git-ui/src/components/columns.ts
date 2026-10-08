@@ -39,6 +39,24 @@ function isStashDecoration(ref: DecorationRef): boolean {
   return ref.kind === 'stash';
 }
 
+// `kv-cell-date` stays as a marker (tests and the width probe read it); `kv-cell-author` has no reader.
+const CELL_TEXT_CLASS = 'kv:overflow-hidden kv:text-ellipsis kv:whitespace-nowrap';
+const CELL_AUTHOR_CLASS = CELL_TEXT_CLASS;
+const CELL_DATE_CLASS = `kv-cell-date kv:tabular-nums ${CELL_TEXT_CLASS}`;
+// The message cell is a 2-row grid: a badge track (0 unless the row has badges) over the subject.
+const CELL_MESSAGE_CLASS =
+  'kv-cell-message kv:grid kv:grid-rows-[0_var(--kv-h-xs)] kv:items-center kv:min-w-0 kv:overflow-hidden';
+const CELL_MESSAGE_BADGES_CLASS =
+  'kv-cell-message kv:grid kv:grid-rows-[var(--kv-h-xs)_var(--kv-h-xs)] kv:items-center kv:min-w-0 kv:overflow-hidden';
+const CELL_MESSAGE_COLLAPSED_CLASS =
+  'kv-cell-message kv:flex kv:items-center kv:gap-1 kv:min-w-0 kv:overflow-hidden';
+const SUBJECT_CLASS =
+  'kv-message-subject kv:row-start-2 kv:min-w-0 kv:overflow-hidden kv:text-ellipsis kv:whitespace-nowrap';
+const SUBJECT_STASH_CLASS = `${SUBJECT_CLASS} kv:italic`;
+const BADGES_ROW_CLASS =
+  'kv:row-start-1 kv:flex kv:items-center kv:gap-1 kv:min-w-0 kv:overflow-hidden';
+const SUBJECT_COLLAPSED_CLASS = `${SUBJECT_CLASS} kv:italic kv:text-muted-foreground`;
+
 function textCell(text: string, className: string): HTMLSpanElement {
   const span = document.createElement('span');
   span.className = className;
@@ -148,16 +166,16 @@ export function collapsedMessageText(hiddenCount: number, label: string | undefi
     : `${hiddenCount} more ${commits} on ${label}`;
 }
 
-/** G-UX (item 2b): the message cell is a 2-row CSS grid now (`CommitGrid.vue`'s `<style>`), not a
+/** G-UX (item 2b): the message cell is a 2-row CSS grid now (`CELL_MESSAGE_CLASS`), not a
  *  single flex row — `refBadges.ts`'s badge strip and `buildPrBadge`'s own badge, when either is
- *  present, share one `grid-row: 1` wrapper (`.kv-message-badges-row`) above the subject's own
+ *  present, share one `grid-row: 1` wrapper (`BADGES_ROW_CLASS`) above the subject's own
  *  `grid-row: 2`, rather than sitting inline before it. A row with neither never gets that wrapper
  *  at all (mirroring `buildRefBadges`'s own "no empty wrapper" rule) — the subject's explicit
  *  `grid-row: 2` still lands it on the same baseline as every other row regardless, so an
  *  undecorated commit costs nothing beyond the row's own fixed height. The subject alone gets
- *  `text-overflow: ellipsis` — a CSS rule on `.kv-message-subject`, not something this formatter
+ *  `text-overflow: ellipsis` — a utility on `SUBJECT_CLASS`, not something this formatter
  *  computes. When a search pattern is active, the subject's text is split by `searchHighlight.ts`'s
- *  `splitHighlights` into alternating plain text nodes and `<span class="kv-search-hit">` elements
+ *  `splitHighlights` into alternating plain text nodes and `kv:bg-search-match` spans
  *  — `enableHtmlRendering: false` (§5.5) and this building every node with `textContent` mean no
  *  escaping code is introduced and none is needed. */
 function messageFormatter(
@@ -169,24 +187,24 @@ function messageFormatter(
 ): Formatter<CommitRecord> {
   return (row, _cell, _value, _columnDef, dataContext) => {
     const cell = document.createElement('span');
-    cell.className = 'kv-cell-message';
+    cell.className = CELL_MESSAGE_CLASS;
 
     // P93 §4.2: the placeholder's own message cell — chevron + "N more commits on X", never the
     // badge/subject rendering below (a contracted range has no single subject either).
     const entry = collapsedCtx.plan().entryAt(row);
     if (entry.kind === 'collapsed') {
-      cell.classList.add('kv-cell-message--collapsed');
+      cell.className = CELL_MESSAGE_COLLAPSED_CLASS;
       cell.dataset.testid = 'graph-collapsed-row';
       cell.dataset.groupKey = collapsedCtx.plan().groupKeyAt(row);
       // `codicon-chevron-right`, not `FileTree.vue`/`ReviewCommitRow.vue`'s own expanded/collapsed
       // pair — a placeholder row only ever means "collapsed" (expanding it replaces the row
       // outright, §4.2), so there is no expanded state for this glyph to reflect.
       const chevron = document.createElement('span');
-      chevron.className = 'codicon codicon-chevron-right kv-collapsed-chevron';
+      chevron.className = 'codicon codicon-chevron-right kv-collapsed-chevron kv:shrink-0';
       chevron.setAttribute('aria-hidden', 'true');
       cell.appendChild(chevron);
       const text = document.createElement('span');
-      text.className = 'kv-message-subject';
+      text.className = SUBJECT_COLLAPSED_CLASS;
       text.textContent = collapsedMessageText(
         entry.hiddenCount,
         collapsedCtx.labelFor(entry.groupIndex),
@@ -207,16 +225,18 @@ function messageFormatter(
       // P7 (item 1): the same condition that decides whether the badges-row element exists at
       // all also decides whether the row is tall enough to show it — `rowMetadata` below makes
       // the identical `decoration.length > 0 || hasPr` check, cheaply, without building this DOM.
-      cell.classList.add('kv-cell-message--has-badges');
+      cell.className = CELL_MESSAGE_BADGES_CLASS;
       const badgesRow = document.createElement('span');
-      badgesRow.className = 'kv-message-badges-row';
+      badgesRow.className = BADGES_ROW_CLASS;
       if (badges !== null) badgesRow.appendChild(badges);
       if (prBadge !== null) badgesRow.appendChild(prBadge);
       cell.appendChild(badgesRow);
     }
 
     const subject = document.createElement('span');
-    subject.className = 'kv-message-subject';
+    subject.className = dataContext.decoration.some(isStashDecoration)
+      ? SUBJECT_STASH_CLASS
+      : SUBJECT_CLASS;
     const pattern = ctx.pattern();
     if (pattern === undefined) {
       subject.textContent = dataContext.subject;
@@ -227,7 +247,7 @@ function messageFormatter(
           continue;
         }
         const hit = document.createElement('span');
-        hit.className = 'kv-search-hit';
+        hit.className = 'kv:bg-search-match kv:rounded-[2px]';
         hit.textContent = run.text;
         subject.appendChild(hit);
       }
@@ -247,8 +267,8 @@ function authorFormatter(
 ): Formatter<CommitRecord> {
   return (row, _cell, _value, _columnDef, dataContext) => {
     if (collapsedCtx.plan().entryAt(row).kind === 'collapsed')
-      return textCell('', 'kv-cell-author');
-    return textCell(dataContext.author.name, 'kv-cell-author');
+      return textCell('', CELL_AUTHOR_CLASS);
+    return textCell(dataContext.author.name, CELL_AUTHOR_CLASS);
   };
 }
 
@@ -267,13 +287,13 @@ function dateFormatter(
 ): Formatter<CommitRecord> {
   return (row, _cell, _value, _columnDef, dataContext) => {
     // P93 §4.2: same "empty for a placeholder" rule as `authorFormatter` — no single date either.
-    if (collapsedCtx.plan().entryAt(row).kind === 'collapsed') return textCell('', 'kv-cell-date');
+    if (collapsedCtx.plan().entryAt(row).kind === 'collapsed') return textCell('', CELL_DATE_CLASS);
     const timestamp = dataContext.author.timestamp;
     const text =
       ctx.dateFormat() === 'absolute'
         ? formatAbsoluteDate(timestamp)
         : formatRelativeDate(timestamp, ctx.now());
-    return textCell(text, 'kv-cell-date');
+    return textCell(text, CELL_DATE_CLASS);
   };
 }
 
@@ -415,8 +435,8 @@ interface RowMetadataContext {
 }
 
 /** P7 (item 1): whether row `row` renders a ref/PR badge strip at all — the exact condition
- *  `messageFormatter` above uses to decide whether to build `.kv-message-badges-row` (and add
- *  `kv-cell-message--has-badges`), recomputed here cheaply (no DOM: `planBadges`'s own exhaustive
+ *  `messageFormatter` above uses to decide whether to build `BADGES_ROW_CLASS`'s row (and use
+ *  `CELL_MESSAGE_BADGES_CLASS`), recomputed here cheaply (no DOM: `planBadges`'s own exhaustive
  *  `badgeSpecFor` switch means every decoration kind, `head` included, always produces a visible
  *  badge, so `decoration.length > 0` alone is a complete proxy) rather than calling
  *  `buildRefBadges`/`buildPrBadge` a second time just to check emptiness. */

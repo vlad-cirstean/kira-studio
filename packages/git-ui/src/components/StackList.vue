@@ -19,7 +19,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
-import { REF_BADGE_CLASS, refBadgeClass } from './badgeClass.ts';
+import { prBadgeClass, refBadgeClass } from './badgeClass.ts';
 import type { PickerList, PickerStackGroup } from './pickerModel.ts';
 import RefSectionHeader from './RefSectionHeader.vue';
 import ShowMoreButton from './ShowMoreButton.vue';
@@ -127,7 +127,7 @@ async function removeFromStack(branch: string): Promise<void> {
           <button
             v-if="row.pr && openExternalCapability"
             type="button"
-            :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${row.pr.state}`]"
+            :class="prBadgeClass(row.pr.state, true)"
             :data-kira-tip="row.pr.title"
             @click="openPullRequest(row.pr.number)"
           >
@@ -135,7 +135,7 @@ async function removeFromStack(branch: string): Promise<void> {
           </button>
           <span
             v-else-if="row.pr"
-            :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${row.pr.state}`]"
+            :class="prBadgeClass(row.pr.state)"
             :data-kira-tip="row.pr.title"
           >
             {{ prBadgeLabel(row.pr) }}

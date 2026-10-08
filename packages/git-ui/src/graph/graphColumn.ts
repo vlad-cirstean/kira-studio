@@ -129,7 +129,7 @@ export function createGraphFormatter(
   const reusable: EdgeSegment[] = [];
   return (row) => {
     const wrapper = document.createElement('div');
-    wrapper.className = 'kv-graph-cell';
+    wrapper.className = 'kv:block kv:h-full kv:w-full kv:overflow-visible';
     const total = rowHeight(row);
     const nodeCenterY = total - compactRowHeight() / 2;
     const width = columnWidth();

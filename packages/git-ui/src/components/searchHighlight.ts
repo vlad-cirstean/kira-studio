@@ -1,7 +1,7 @@
 /**
  * `docs/plans/P11.md` W13: splits a cell's text on a compiled search pattern into alternating
  * plain/matched runs — `columns.ts`'s `messageFormatter` is the only caller, building a
- * `<span class="kv-search-hit">` per matched run and a plain text node for everything between,
+ * `<span class="kv:bg-search-match ...">` per matched run and a plain text node for everything between,
  * never `innerHTML` (`enableHtmlRendering: false`, §5.5).
  *
  * `pattern` is `CompiledQuery`'s own `{ kind: "ok" }.pattern` — deliberately never `i`/case-only

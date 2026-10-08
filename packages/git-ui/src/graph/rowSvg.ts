@@ -349,17 +349,17 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
   circle.setAttribute('r', fmt(plan.r));
 
   // G-UX (item 1): the HEAD halo, like the HEAD ring below, is never lane-coloured —
-  // `.kv-graph-head-halo` (CommitGrid.vue) paints it in `--kv-focus-border` at low opacity.
+  // `kv:fill-focus/18` paints it in `--kv-focus-border` at low opacity.
   if (plan.isHeadHalo) {
-    circle.setAttribute('class', 'kv-graph-head-halo');
+    circle.setAttribute('class', 'kv:fill-focus/18');
     return circle;
   }
 
-  // G19 D1: the HEAD ring is never lane-coloured — `.kv-graph-head-ring` (CommitGrid.vue) paints
+  // G19 D1: the HEAD ring is never lane-coloured — `kv:stroke-focus` paints
   // it in `--kv-focus-border`, the same token the existing branch-badge dot already uses, so it
   // never takes `laneClass`/`NODE_CLASS`, both of which are about this row's own lane colour.
   if (plan.isHeadRing) {
-    circle.setAttribute('class', 'kv-graph-head-ring');
+    circle.setAttribute('class', 'kv:stroke-focus');
     circle.setAttribute('stroke-width', String(GEOMETRY.headRingStrokeWidth));
     circle.style.fill = 'none';
     return circle;
@@ -388,7 +388,7 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
  *  column) and `rowHeight` (this row's own real height — `CommitGrid.vue`'s
  *  `grid.getRowHeight(row)`, P7 (item 1) — so lanes and rows cannot drift). Lane x-coordinates
  *  (`laneX`, `planEdgePaths`/`planNode`) are unchanged — only the box around the drawing is the
- *  column's; `.kv-graph-svg`'s own `clip-path` (`CommitGrid.vue`'s `<style>`) is what actually
+ *  column's; the `clip-path` utility on `kv-graph-svg` is what actually
  *  cuts a lane at the column's right edge, since `overflow: hidden` cannot do it (one non-visible
  *  axis forces the other to `auto`) while still letting `GEOMETRY.overdraw`'s vertical bleed
  *  through — see that rule's own comment.
@@ -404,7 +404,10 @@ export function buildRowSvg(
   width: number,
 ): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('class', 'kv-graph-svg');
+  svg.setAttribute(
+    'class',
+    'kv-graph-svg kv:block kv:overflow-visible kv:[clip-path:inset(-2px_0)]',
+  );
   svg.setAttribute('width', String(width));
   svg.setAttribute('height', String(rowHeight));
   svg.setAttribute('viewBox', `0 0 ${width} ${rowHeight}`);

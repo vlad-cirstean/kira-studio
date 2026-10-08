@@ -36,7 +36,7 @@ import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
-import { REF_BADGE_CLASS } from './badgeClass.ts';
+import { prBadgeClass } from './badgeClass.ts';
 import GlobalStashList from './GlobalStashList.vue';
 import {
   filterPickerInput,
@@ -723,13 +723,13 @@ watch(visibleBranchNames, (names) => {
               <button
                 v-if="prFor(row.shortName) && openExternalCapability"
                 type="button"
-                :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${prFor(row.shortName)!.state}`]"
+                :class="prBadgeClass(prFor(row.shortName)!.state, true)"
                 :data-kira-tip="prTooltip(row.shortName)"
                 @click.stop="openPullRequest(prFor(row.shortName)!.number)"
               >#{{ prFor(row.shortName)!.number }}</button>
               <span
                 v-else-if="prFor(row.shortName)"
-                :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${prFor(row.shortName)!.state}`]"
+                :class="prBadgeClass(prFor(row.shortName)!.state)"
                 :data-kira-tip="prTooltip(row.shortName)"
                 >#{{ prFor(row.shortName)!.number }}</span
               >

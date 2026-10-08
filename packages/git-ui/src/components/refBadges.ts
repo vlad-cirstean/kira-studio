@@ -20,17 +20,26 @@
  */
 import type { DecorationRef } from '@kira/git-core';
 import type { PrRecord } from '@kira/git-ipc';
-import { laneClass } from '../graph/palette.ts';
 import { BADGE_ICONS } from '../icons/index.ts';
-import { REF_BADGE_CLASS } from './badgeClass.ts';
+import {
+  BADGE_KIND_CLASS,
+  BADGE_STACKED_CLASS,
+  laneBorderClass,
+  prBadgeClass,
+  refBadgeClass,
+} from './badgeClass.ts';
+
+// §6.2: badge text truncates at ~190px (full name in the tooltip); the icon keeps its size.
+const BADGE_LABEL_CLASS = 'max-w-[190px] overflow-hidden text-ellipsis';
 
 /** §6.2: "a row with more than three badges collapses the overflow into a +N badge". */
 const MAX_VISIBLE_BADGES = 3;
 
 export interface BadgeSpec {
   readonly icon: string;
-  /** Which `--kv-badge-*` token group this badge draws from — a CSS class, never a colour value
-   *  read or computed here (B4: colours live only in the theme layer). */
+  /** Which `--kv-badge-*` token group this badge draws from — a border-colour utility class (one of
+   *  `BADGE_KIND_CLASS`), never a colour value read or computed here (B4: colours live only in the
+   *  theme layer). */
   readonly colorClass: string;
   readonly text: string;
   readonly isCurrentBranch: boolean;
@@ -55,7 +64,7 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
     case 'branch':
       return {
         icon: BADGE_ICONS.localBranch,
-        colorClass: 'kv-badge-local',
+        colorClass: BADGE_KIND_CLASS.local,
         text: ref.name,
         isCurrentBranch: ref.isHead,
         dashed: false,
@@ -65,7 +74,7 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
     case 'remoteBranch':
       return {
         icon: BADGE_ICONS.remoteBranch,
-        colorClass: 'kv-badge-remote',
+        colorClass: BADGE_KIND_CLASS.remote,
         text: ref.name,
         isCurrentBranch: false,
         dashed: false,
@@ -75,7 +84,7 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
     case 'tag':
       return {
         icon: BADGE_ICONS.tag,
-        colorClass: 'kv-badge-tag',
+        colorClass: BADGE_KIND_CLASS.tag,
         text: ref.name,
         isCurrentBranch: false,
         dashed: false,
@@ -88,7 +97,7 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       // say *which* stash a badge on a non-`stash@{0}` row (P9 W12's own graph walk) belonged to.
       return {
         icon: BADGE_ICONS.stash,
-        colorClass: 'kv-badge-stash',
+        colorClass: BADGE_KIND_CLASS.stash,
         text: `stash@{${ref.index}}`,
         isCurrentBranch: false,
         dashed: true,
@@ -104,7 +113,7 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       // indistinguishable from an ordinary one — the opposite of what this column is for).
       return {
         icon: BADGE_ICONS.localBranch,
-        colorClass: 'kv-badge-local',
+        colorClass: BADGE_KIND_CLASS.local,
         text: 'HEAD',
         isCurrentBranch: true,
         dashed: false,
@@ -127,8 +136,8 @@ interface BadgePlan {
   readonly overflow: OverflowSpec | null;
 }
 
-/** G26 D-4.11: a branch badge's own stack decoration — `stacked` adds `kv-badge-branch--stacked`,
- *  `stale` (meaningful only alongside `stacked`) additionally adds `kv-badge-branch--stale` (a
+/** G26 D-4.11: a branch badge's own stack decoration — `stacked` recolours the border
+ *  (`BADGE_STACKED_CLASS`), `stale` (meaningful only alongside `stacked`) additionally dashes it (a
  *  dashed outline, the existing `dashed` affordance's own visual language, D-4.11's own "reuse,
  *  don't invent" instruction). No new `DecorationRef` kind (`badgeSpecFor`'s exhaustive switch
  *  above is untouched) — this is looked up SEPARATELY, by branch name, from `columns.ts`'s own
@@ -157,10 +166,9 @@ function planBadges(decorations: readonly DecorationRef[]): BadgePlan {
 
 /** G21 D4: `laneColor` is the row's own lane colour index (`LayoutStore.colorOf`), threaded in
  *  from `columns.ts`'s `LaneColorContext` — `undefined` for a row whose layout has not arrived
- *  yet (`graphColumn.ts`'s own already-established "no layout, no colour" case). Appends the
- *  same `.kv-lane-N` class `rowSvg.ts`'s graph nodes/edges already use, alongside — never instead
- *  of — `spec.colorClass`: the badge's shape/icon/label still carry the *kind* signal, the lane
- *  class only tints border+icon (`CommitGrid.vue`'s own badge CSS), tying the badge back to the
+ *  yet (`graphColumn.ts`'s own already-established "no layout, no colour" case). Adds the
+ *  lane's border colour after — never instead of — `spec.colorClass`: the badge's shape/icon/label
+ *  still carry the *kind* signal, the lane only tints the border, tying the badge back to the
  *  branch it decorates without becoming a second, conflicting source of colour meaning. */
 function buildBadgeElement(
   spec: BadgeSpec,
@@ -168,22 +176,23 @@ function buildBadgeElement(
   stackInfoFor?: (branchName: string) => StackBadgeInfo | undefined,
 ): HTMLSpanElement {
   const badge = document.createElement('span');
-  const classes = [REF_BADGE_CLASS, spec.colorClass];
-  if (spec.dashed) classes.push('kv-badge-dashed');
-  if (laneColor !== undefined) classes.push('kv-badge-lane-tinted', laneClass(laneColor));
+  // Border colour order is kind, stacked, lane: `cn` keeps the last, so a lane tint beats the kind
+  // colour exactly as the old specificity did.
+  const classes = [spec.colorClass];
+  if (spec.dashed) classes.push('border-dashed');
   if (spec.refKind === 'branch' && spec.refName !== undefined) {
     const stackInfo = stackInfoFor?.(spec.refName);
-    if (stackInfo?.stacked) classes.push('kv-badge-branch--stacked');
-    if (stackInfo?.stale) classes.push('kv-badge-branch--stale');
+    if (stackInfo?.stacked) classes.push(BADGE_STACKED_CLASS);
+    if (stackInfo?.stale) classes.push('border-dashed');
   }
+  if (laneColor !== undefined) classes.push(laneBorderClass(laneColor));
   // G-UX (item 1): a subtle ring (not a border, which would fight the lane-tint border-color
-  // rules the `kv-badge-lane-tinted` class above can also set) on the current-branch badge itself
-  // — CommitGrid.vue's own `.kv-badge-current` rule.
-  if (spec.isCurrentBranch) classes.push('kv-badge-current');
-  badge.className = classes.join(' ');
+  // above) on the current-branch badge itself.
+  if (spec.isCurrentBranch) classes.push('shadow-[0_0_0_1px_var(--kv-focus-border)]');
+  badge.className = refBadgeClass(...classes);
   // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
   // CommitGrid.vue mounts over its grid host — a mouse-hover affordance independent of whether the
-  // ~190px CSS truncation (kv-badge-label) actually clips this particular badge's text. This file
+  // ~190px CSS truncation (`BADGE_LABEL_CLASS`) actually clips this particular badge's text. This file
   // is plain DOM code outside Vue, so it writes the attribute a real `Tooltip`/`TooltipTrigger`
   // would otherwise carry, rather than using either directly. No `aria-label` alongside it: the
   // visible label span below already gives this badge a real accessible name.
@@ -205,7 +214,7 @@ function buildBadgeElement(
   badge.appendChild(icon);
 
   const label = document.createElement('span');
-  label.className = 'kv-badge-label';
+  label.className = BADGE_LABEL_CLASS;
   label.textContent = spec.text;
   badge.appendChild(label);
 
@@ -216,7 +225,7 @@ function buildBadgeElement(
     // "reliably reach the accessibility tree as a second, non-text signal" reasoning the dot it
     // replaces already established (§6.1/§7's own "no colour/shape-only meaning" still applies).
     const check = document.createElement('span');
-    check.className = 'codicon codicon-check kv-badge-current-glyph';
+    check.className = 'codicon codicon-check kv-badge-current-glyph text-(color:--kv-focus-border)';
     check.setAttribute('role', 'img');
     check.setAttribute('aria-label', 'current branch');
     badge.appendChild(check);
@@ -227,7 +236,7 @@ function buildBadgeElement(
 
 function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
   const badge = document.createElement('span');
-  badge.className = `${REF_BADGE_CLASS} kv-badge-overflow`;
+  badge.className = refBadgeClass(BADGE_KIND_CLASS.overflow);
   badge.setAttribute('data-kira-tip', overflow.title);
   badge.textContent = `+${overflow.count}`;
   return badge;
@@ -276,7 +285,7 @@ export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
  *  `CommitGrid.vue`'s own `onClick` delegation to `DetailActions.openPullRequest`, which composes
  *  and opens the URL host-side) vs. a plain, inert `<span>` — the same button/span split
  *  `BranchPicker.vue`/`StackList.vue` already use, applied here since this file has no `v-if` of
- *  its own. The PR's state is carried as a CSS class, never as text (`kv-badge-pr--<state>`) —
+ *  its own. The PR's state is carried as a border colour class, never as text (`prBadgeClass`) —
  *  width is scarce, and the tooltip already names the state in words. */
 export function buildPrBadge(
   prs: readonly PrRecord[],
@@ -286,7 +295,7 @@ export function buildPrBadge(
   if (best === undefined) return null;
 
   const badge = document.createElement(openExternalCapability ? 'button' : 'span');
-  badge.className = `${REF_BADGE_CLASS} kv-badge-pr kv-badge-pr--${best.state}`;
+  badge.className = prBadgeClass(best.state, openExternalCapability);
   if (badge instanceof HTMLButtonElement) {
     badge.type = 'button';
     // Not a Tab stop inside the roving-tabindex grid; Enter on it would toggle the detail pane.
@@ -297,7 +306,7 @@ export function buildPrBadge(
   badge.setAttribute('data-kira-tip', `${best.title} — ${PR_STATE_LABEL[best.state]}${extra}`);
 
   const label = document.createElement('span');
-  label.className = 'kv-badge-label';
+  label.className = BADGE_LABEL_CLASS;
   label.textContent = `#${best.number}`;
   badge.appendChild(label);
 
@@ -321,7 +330,7 @@ export function buildRefBadges(
 
   const plan = planBadges(decorations);
   const container = document.createElement('span');
-  container.className = 'kv-ref-badges';
+  container.className = 'kv:flex kv:items-center kv:gap-1 kv:shrink-0';
 
   for (const spec of plan.visible) {
     container.appendChild(buildBadgeElement(spec, laneColor, stackInfoFor));
