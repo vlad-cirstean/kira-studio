@@ -2986,7 +2986,7 @@ none imports or is imported by an adapter package.
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
 | `gitrpc` | The method table (**57 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**45**, P178), and the wire types |
-| `gitsock` | The Unix listener, length-prefixed framing, the handshake, the pairing broker, the trust store and stale-socket recovery |
+| `gitsock` | The Unix listener, length-prefixed framing, the handshake, the trust store and stale-socket recovery |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
 | `gitprepare` | The worktree prepare script's execution seam — the one shell exception, below |
@@ -4078,6 +4078,55 @@ and `docs/v2.0/plans/`.
   over sessions, merge, rebase and archive dialogs. The sandbox cannot authenticate an interactive
   `claude`, so a real TUI turn ending (Stop from `claude` itself) is unobserved (Known open items).
 
+## Mobile agents web (P212, Kira Space)
+
+Read-only phone view of the ADE board. Three tabs: Backlog, Need You, Plan. Writes and terminal
+attach are out; P212 Part 2 adds them (see `docs/v2.2/SPEC.md`).
+
+- Package `apps/kira-space/internal/mobileweb`. Off by default (`mobile.enabled`, `mobile.httpsPort`
+  7790, `mobile.setupPort` 7791). Changed only through `bridge.MobileAccessService` actions, which
+  restart the server when running (`internal/embedded.Service`). Boot start and teardown are
+  `bridge.StartMobileIfEnabled` / `StopMobile`.
+- Transport: HTTPS app port plus plain-HTTP setup port. Setup port serves only the setup page, the
+  public CA (`/kira-space-ca.crt`, `.mobileconfig`) and `/setup-info`. One listener per up private
+  IPv4 (RFC 1918) plus `127.0.0.1`; never `0.0.0.0`. Middleware rejects a remote outside RFC 1918 or
+  loopback and a `Host` not matching a bound IP or `<hostname>.local` (DNS-rebinding guard).
+- Certificates: in-process local CA (stdlib `crypto/x509`, ECDSA P-256, 10 years) in
+  `KiraSpaceHome()/mobile`, critical name constraints (10/8, 172.16/12, 192.168/16, 127/8, 100.64/10,
+  `.local`). Leaf: 397 days, serverAuth, SAN IPs plus hostname, re-issued in memory on start and when
+  the IP set changes. A secure origin is what lets the service worker and install work. Reset CA
+  means every phone re-trusts.
+- Pairing: generic `internal/pairing.Broker[M]` (extracted from gitsock; 120 s timeout, 60 s cooldown
+  on deny keyed by remote IP, queue 8). `POST /api/pair` long-polls; phone shows a 4-digit code, the
+  desktop dialog (`MobilePairingDialog`, shared `PairingRequestDialog`) shows it with IP and label.
+  Approval mints a `tokenauth` token; the row (`mobile_devices`, migration 0021) is written before
+  the cookie is sent. Cookie `__Host-kira-space` (`HttpOnly; Secure; SameSite=Strict`, 400 days);
+  only a salted hash is stored; constant-time verify, dummy verify on a missing row.
+- Rate limits (`x/time/rate`, per IP, bounded map): pairing 1 per 10 s burst 3; failed auth 1 per
+  minute burst 10 (then 429 on every `/api`); reads 20/s burst 40 per device. `singleflight`
+  coalesces `Board`/`Prs`.
+- Route table `routes()` is the whole API; a test walks it. GET only: `/api/me`, `/api/events`,
+  `/api/ade/{board,prs,sessions,workflows,backlog,repos,log}`, `/api/agent/sessions`, plus the one
+  public `POST /api/pair`. Every non-safe method already passes `csrfGuard`; a device route is
+  already authenticated and rate limited, so a later write endpoint is one table row (per-device
+  token plus Origin check are in place).
+- Live updates: `appevent.Tap` wraps the app emitter and forwards window-wide `Emit` only (not
+  `EmitTo`/`EmitFocused`) to a hub; the hub applies the SSE channel allowlist (the `kira:adetask:*`
+  read channels, `kira:agent:sessions`, `kira:agent:event`). The three `kira:mobile:*` channels are
+  desktop only. Client invalidates every query on SSE reconnect. Terminal output is never exposed.
+- Frontend: `ade/v2/reader.ts` is the transport seam (`AdeReader`); desktop binds it to `control`,
+  mobile to HTTP. Mobile app in `frontend/mobile/`, second Vite build (`vite.mobile.config.ts`,
+  `tsconfig.mobile.json`, `dist-mobile`, embedded by `main.go`). The build has no `@bindings` alias, so
+  an accidental desktop `control` import fails it. `vue-router` for tabs. PWA: `vite-plugin-pwa`
+  `generateSW` precaches the shell only; `/api/` is `NetworkOnly`, so no task data lands on the phone's
+  disk. Offline shows "Cannot reach Kira Space". Icons in `mobile/public/` are generated once (command
+  in `docs/DEV_ENVIRONMENT.md`).
+- Desktop UI: Settings > Mobile access (`MobileAccessPane`, `uqr` QR codes per bound address, device
+  list, revoke, reset certificate, ports).
+- Tests: Go unit and integration (`mobileweb`, `pairing`, `embedded`, `appevent`); Playwright
+  `mobile-ios`/`mobile-android` projects (`tests/mobile/`, a real in-process mock backend serves
+  `dist-mobile`); desktop `tests/ui/mobile-access.spec.ts`.
+
 ## Memory MCP server and module (P201, Kira Space)
 
 - Storage: `$KIRA_MEMORY_HOME/memory.db` (default `~/.kira-memory/memory.db`), its own SQLite file and
@@ -4658,6 +4707,12 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Mobile agents web is unverified on a real phone (P212).** Covered by Go tests and Playwright
+  WebKit/Chromium emulation only. Unchecked: CA install on real iOS and Android, installed-PWA
+  standalone mode (iOS may keep its own cookie jar: pair again inside the installed app), service
+  worker offline shell on WebKit (Playwright cannot emulate offline there). IPv6 is not served;
+  bound addresses stay fixed until toggle or restart. Delete once checked on a real iPhone and
+  Android phone.
 - **P178 behaviours are unverified in a real VS Code host and on macOS.** Restricted Mode (`untrustedWorkspaces.supported: false`), the Space window opening or focusing over VS Code on a relay prompt (macOS activation), and `LogOutputChannel` level handling ran only in the harness and Kira Space UI tier. Delete once checked on a Mac with a real VS Code window (P180).
 - **P173 failure banner and auto-fetch marker are unobserved in a real VS Code host.** Verified only in the interaction harness (Chromium, fake host) and Kira Space's WebKit UI tier; a real 32 MiB result through Wails is also unexercised. Delete once checked in a real VS Code window against a running Kira Space.
 - **A paired git socket token is a bearer secret, not bound to the peer (P172).** Any same-user process holding the token connects. Pairing shows the kernel-reported process, but reconnects do not re-check it. Options: pin the pairing-time executable or code signature, or accept the same-user threat model. Open user decision; delete when resolved.

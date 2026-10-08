@@ -6,9 +6,11 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 |---|---|---|
 | P210 | Memory embedding search: local embedding model (best quality under 500 MB RAM, less if possible), vectors in SQLite, hybrid with existing FTS recall-first search | Done |
 | P211 | Memory bulk import: pick file or folder; chunk to a Sonnet-friendly size; per-chunk clean-context agent extracts atomic facts; one final agent holding all chunk facts of the file adds memories through the MCP; progress and failure shown | Not started |
-| P212 | Mobile agents web: local web server in Kira Space serving a read-only mobile-laid-out Vue agents module; first-load device approval in Kira Space like the git extension pairing; installable PWA | Not started |
+| P212 Part 1 | Mobile agents web: local web server in Kira Space serving a read-only mobile-laid-out Vue agents module; first-load device approval in Kira Space like the git extension pairing; installable PWA | Done |
+| P212 Part 2 | Mobile agents web writes (amendment): backlog add and reorder, TUI input for stuck agents, start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows disconnected plus a reconnect button) | Not started |
 | P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Not started |
-| P214 | Code review (one Opus round) and fixes | Not started |
+| P214 | Requirements audit: verify every P210–P212 requirement is implemented | Not started |
+| P215 | Code review (one Opus round) and fixes | Not started |
 
 ## Requirements (user's words, condensed)
 
@@ -71,3 +73,23 @@ Unverified: macOS (dylib load from `Contents/Frameworks`, arm64 int8 kernels, wo
 `codesign --verify --deep --strict`), the Download model click in the real app (covered by the same
 `embed.Install` the smoke test runs, UI states by typecheck only), and tokenizer parity beyond the 9/10
 ranking probe. Recorded in Known open items.
+
+## P212 Part 1 result
+
+Done. Read-only phone web app served by Kira Space; design facts in `docs/ARCHITECTURE.md` "Mobile
+agents web (P212, Kira Space)".
+
+- Scope narrowed by the user to three tabs: Backlog, Need You, Plan. Server allowlist stays GET only
+  plus `POST /api/pair`; auth (per-device cookie token, `csrfGuard`, route table) is built so a write
+  endpoint is one row. No terminal/PTY attach.
+- Landed: generic `internal/pairing` and `internal/embedded`, `appevent.Tap`, `mobileweb` server with
+  local CA, migration 0021, desktop Mobile access pane and pairing dialog, transport-agnostic ADE
+  reader, second Vite build, installable PWA, Playwright mobile projects.
+- Verified: Go race tests on the touched packages, `bun run test:ui:space` (221 pass),
+  `test:ui:space-mobile` (iOS WebKit and Pixel Chromium emulation), lint, golangci-lint, knip,
+  typecheck. Not verified: a real phone (CA install, installed PWA, WebKit offline shell).
+- `test:visual:space`: the four Settings dialog snapshots differ because the nav gained a "Mobile
+  access" row. Baselines not regenerated here (sandbox fonts); regenerate on the reference machine.
+- Follow-up amendment P212 Part 2: backlog add and reorder, TUI input for stuck agents,
+  start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows
+  disconnected plus a reconnect button).

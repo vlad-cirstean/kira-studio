@@ -405,6 +405,18 @@ automatically: idempotent, skips when the browser and all five packages are pres
 `KIRA_SKIP_WEBKIT=1` to skip. Failure (offline, apt error) warns with the manual commands and
 exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install only.
 
+## Mobile agents web — build, test, try on a phone (P212)
+
+- Build: `bun run build:space-mobile` writes `apps/kira-space/frontend/dist-mobile`, which `main.go`
+  embeds; `scripts/prepare-worktree.sh` builds it so `go build` works.
+- Tests: `bun run test:ui:space-mobile` (projects `mobile-ios` WebKit, `mobile-android` Chromium;
+  builds first). The offline-reload test skips on WebKit. Visual baselines are not part of it.
+- Icons: regenerate from `apps/kira-space/build/appicon.png` into `frontend/mobile/public/` with
+  `bunx pwa-assets-generator --preset minimal-2023 <appicon.png>`; commit the output.
+- Phone: enable Settings > Mobile access, scan the setup QR (HTTP port), install the CA profile
+  (iOS: then Settings > General > About > Certificate Trust Settings), compare the fingerprint, scan
+  the app QR, approve the code in Kira Space. Reset the certificate in the same pane.
+
 ## Memory MCP and the `claude` CLI (P201)
 
 - `KIRA_MEMORY_HOME` scopes `memory.db` (default `~/.kira-memory`). `testx.RunWithTempHomes` sets it
