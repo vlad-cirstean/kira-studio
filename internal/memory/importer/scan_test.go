@@ -80,7 +80,7 @@ func TestScanWalkRules(t *testing.T) {
 	if res.Truncated || res.Base != root && !strings.HasSuffix(res.Base, filepath.Base(root)) {
 		t.Errorf("truncated=%v base=%q", res.Truncated, res.Base)
 	}
-	// image.png, .hidden/secret.md, .dotfile.md, node_modules/.../readme.md, ignored.md,
+	// image.png, .hidden/ and node_modules/ (one each), .dotfile.md, ignored.md,
 	// sub/ignored-nested.md, docs/gen/out.md, and the symlinked dir.
 	if res.Ignored < 7 {
 		t.Errorf("ignored = %d", res.Ignored)

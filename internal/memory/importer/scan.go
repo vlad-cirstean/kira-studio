@@ -42,8 +42,8 @@ type ScanResult struct {
 	Files []Candidate
 	// Skipped lists supported-extension files left out, one reason each.
 	Skipped []Skip
-	// Ignored counts files with an unsupported extension, gitignored files and files inside skipped
-	// directories. They are counted, not listed.
+	// Ignored counts files with an unsupported extension, gitignored files, and each skipped
+	// directory as one entry (its contents are never walked). They are counted, not listed.
 	Ignored   int
 	Truncated bool
 }
@@ -169,7 +169,7 @@ func (s *scanner) walk(dir string, rootRel []string, inherited []gitignore.Patte
 			}
 		case e.IsDir():
 			if strings.HasPrefix(name, ".") || skippedDirs[name] || matcher.Match(rel, true) {
-				s.res.Ignored += countFiles(full)
+				s.res.Ignored++
 				continue
 			}
 			if err := s.walk(full, rel, patterns); err != nil {
@@ -186,21 +186,6 @@ func (s *scanner) walk(dir string, rootRel []string, inherited []gitignore.Patte
 		}
 	}
 	return nil
-}
-
-// countFiles is a bounded count of the files under a skipped directory, for the "ignored" tally.
-func countFiles(dir string) int {
-	n := 0
-	_ = filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			n++
-		}
-		if n >= 100000 {
-			return filepath.SkipAll
-		}
-		return nil
-	})
-	return n
 }
 
 func readGitignore(path string, domain []string) []gitignore.Pattern {

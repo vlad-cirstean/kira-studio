@@ -72,7 +72,7 @@ async function dismiss(): Promise<void> {
           </p>
           <p class="m-0 text-muted-foreground">
             Runs on your Claude subscription. {{ job.totals.skippedFiles }} files skipped,
-            {{ job.ignoredCount }} ignored by .gitignore.
+            {{ job.ignoredCount }} files and folders ignored.
           </p>
           <p v-if="job.truncated" class="m-0 text-warn" data-testid="import-truncated">
             Too many files: only the first {{ job.estimate.files }} are included.
