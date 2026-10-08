@@ -650,17 +650,6 @@ function scheduleAncestryRebuild(): void {
   });
 }
 
-/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
- *  heights. P92 item 1: the graph column's width is user-set (`widths.value.graph`), not derived
- *  from lane count. Sole exception (P220/P225): a first-ever mount's auto width, which follows lane
- *  growth (`growGraphColumn`) until the user drags the column.
- *
- *  P92 item 4: `invalidateRowHeights()`, not `invalidateRows(rows)` + `render()` — the latter
- *  marks heights dirty but never rebuilds SlickGrid's row-position index (only `updateRowCount()`
- *  does that), so an already-rendered row below one whose height just changed (a badge/PR
- *  decoration) keeps its stale `translateY()` while the index moves on: two rows land in the same
- *  band and their glyphs double up. `invalidateRowHeights()` is the library's own "index and rows
- *  are both stale" entry point, so `_range` is unused now — kept for the callback signature. */
 function graphSeedWidth(): number {
   return Math.min(
     DEFAULT_COLUMN_WIDTHS.graph,
@@ -680,6 +669,17 @@ function growGraphColumn(): void {
   rebuildColumns();
 }
 
+/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
+ *  heights. P92 item 1: the graph column's width is user-set (`widths.value.graph`), not derived
+ *  from lane count. Sole exception (P220/P225): a first-ever mount's auto width, which follows lane
+ *  growth (`growGraphColumn`) until the user drags the column.
+ *
+ *  P92 item 4: `invalidateRowHeights()`, not `invalidateRows(rows)` + `render()` — the latter
+ *  marks heights dirty but never rebuilds SlickGrid's row-position index (only `updateRowCount()`
+ *  does that), so an already-rendered row below one whose height just changed (a badge/PR
+ *  decoration) keeps its stale `translateY()` while the index moves on: two rows land in the same
+ *  band and their glyphs double up. `invalidateRowHeights()` is the library's own "index and rows
+ *  are both stale" entry point, so `_range` is unused now — kept for the callback signature. */
 function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
   growGraphColumn();
