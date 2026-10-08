@@ -119,15 +119,12 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
   return [...defaults.filter((s) => !overridden.has(s.channel)), ...extra];
 }
 
-/** Opens the ade Plan on the fixture day. The clock is installed after boot and the page reloaded,
- *  so the first render already sees `FIXED_NOW`. */
+/** Opens the ade Plan on the fixture day; the clock is pinned before the first navigation. */
 export async function openPlan(
   relaunch: (options?: RelaunchOptions) => Promise<KiraApp>,
   extra: readonly ControlSnapshot[] = [],
 ): Promise<KiraApp> {
-  const app = await relaunch({ control: adeV2Control(extra) });
-  await app.window.clock.install({ time: FIXED_NOW });
-  await app.window.reload();
+  const app = await relaunch({ control: adeV2Control(extra), clockTime: FIXED_NOW });
   await app.window.locator('[data-testid="ade-plan"]').waitFor();
   return app;
 }
