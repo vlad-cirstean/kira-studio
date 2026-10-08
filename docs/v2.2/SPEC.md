@@ -10,7 +10,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P212 Part 2 | Mobile agents web writes (amendment): backlog add and reorder, TUI input for stuck agents, start/next/prev workflow stage, phone attach of the Claude Code terminal (desktop shows disconnected plus a reconnect button) | Done |
 | P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Done |
 | P214 | Memory manual add, free text: Add memory dialog gets a single free-text box (no per-row fact/reason; reason auto-filled as manual). Submits through the unchanged store path: the gate already splits into atomic facts, challenges and reconciles; stored only when every step passes. No dependency on P211 | Done |
-| P215 | Test and hook speed regression: tests and the pre-push hook (go build, lint:go, lint:dead) got much slower in roughly the last 24h, not from contention. Measure where time goes per stage first (do not bisect commit history); find the cause; fix it | Not started |
+| P215 | Test and hook speed regression: tests and the pre-push hook (go build, lint:go, lint:dead) got much slower in roughly the last 24h, not from contention. Measure where time goes per stage first (do not bisect commit history); find the cause; fix it | Done |
 | P216 | Memory speech to text: local English-only Whisper small.en quantized q5_1 (whisper.cpp ggml) in a subprocess worker started only on demand and stopped when idle, like memory-embed; mic dictation in the Memory module with live text shown in the input, user sends it manually; model download on click with pinned SHA-256 | Not started |
 | P217 | Code review (one Opus round) and fixes | Not started |
 
@@ -185,3 +185,29 @@ Unverified: Retry-button and load-error zone appearance (no spec renders it); re
 `AddMemoryDialog.vue`: rows UI replaced by one free-text box (1000-char cap, counter). Sends one item with fixed manual reason; gate splits, challenges, reconciles. Challenge block and outcomes list unchanged. No Go, store-path or model change. `memory-module` Playwright test updated for free text and two outcomes.
 
 Checks: typecheck, lint (no errors), lint:dead, `test:ui:space -- memory-module` 4 pass.
+
+## P215 result
+
+4 commits (`22a8d685d`..`dfd8197f0`) plus docs. No single regression; several costs grew, one test helper booted twice.
+
+Fixes:
+- `openPlan` passed no clock to `relaunch`, then installed clock and reloaded: two full boots in 108 calls across 17 space specs. Now passes `clockTime`.
+- `typecheck:*` now `--incremental`, one `tsBuildInfoFile` per project under `node_modules/.cache/tsbuildinfo` (ignored). Injected type error still reported.
+- `check-theme-classes.sh`: first pass records default-scope names, one combined alternation per family. Zero hits skips ~110 per-name greps; any hit runs the unchanged per-name checks. Injected `text-muted` (`.vue`) and `muted` (git-ui class attr): output and exit code byte-identical to the old script.
+- 43 MB root `kira-space` binary untracked; `/kira-space`, `/kira-studio` ignored.
+
+Measured, warm, second run (seconds):
+
+| Stage | Before | After |
+|---|---|---|
+| `check-theme-classes.sh` | 5.9 | 2.0 |
+| `bun run lint` | 11.5 | 7.3 to 8.1 |
+| `bun run typecheck`, no change | 41 | 17.8 |
+| `bun run typecheck`, leaf edit | 41 | 18 |
+| `bun run typecheck`, cold | 41 | 41.5 |
+| `test:ui:space` (227 pass, incl. 6 s build) | 275 | 220 |
+| `lint:dead` | 3.2 | 3.8 |
+
+Left slow, for a real reason: studio UI (~590 s) and the rest of the suite are CPU-bound at 3.9x on 4 cores. Each test opens a fresh WebKit page and answers every RPC through `page.route` mocking (20 to 130 ms per fulfil). Replacing it with a local mock server is a test-infra redesign, not a regression fix. Mobile tests hit a real local server: 1.0 s median. Pre-push (warm) 11 s, not slow. Cold `go build` 97 s is wails cgo, only after cache wipe.
+
+Not done: TS project references (`composite`, `vue-tsc -b`) would dedupe 583 files shared across programs; own phase if wanted.
