@@ -15,6 +15,7 @@ const REPO = {
   root: '/tmp/lifecycle-repo',
   repoId: '/tmp/lifecycle-repo',
   sortOrder: 1,
+  color: 'none',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 

@@ -80,13 +80,19 @@ function repoMultiDiffTitle(tab: TabRecord): string {
   return `${diff.state.leftLabel} ↔ ${diff.state.rightLabel} (${count} file${count === 1 ? '' : 's'})`;
 }
 
+// A repo tab's rail carries its repository's chosen colour; 'none' keeps the reserved slot empty.
+function repoRailColor(tab: TabRecord): PaletteColor | undefined {
+  const color = useCodeReposStore().colorOf(tab.workspaceId);
+  return color === 'none' ? undefined : color;
+}
+
 export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, PaletteColor, MenuItem> =
   {
     'repo-graph': {
       mode: SPACE_TAB_KIND_MODE['repo-graph'],
       title: (tab) => useCodeReposStore().codeRepoRecord(tab.workspaceId ?? '')?.name ?? 'Graph',
       icon: () => 'source-control',
-      railColor: () => undefined,
+      railColor: repoRailColor,
       defaultState: (): RepoGraphTabState => defaultRepoGraphTabState(),
       // Never actually reached (`pinned: true` refuses duplication, state/tabs.ts), but a real
       // default rather than `{}` keeps this consistent with every other kind's own duplicateState.
@@ -102,7 +108,7 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       mode: SPACE_TAB_KIND_MODE['repo-file'],
       title: repoFileTitle,
       icon: (tab) => ({ filePath: tab.path }),
-      railColor: () => undefined,
+      railColor: repoRailColor,
       defaultState: (): RepoFileTabState => defaultRepoFileTabState(),
       duplicateState: (tab: RepoFileTabRecord): RepoFileTabState => ({ ...tab.state }),
       // Disposes the live editor widget (if any) and the cached model — RepoFileView.vue's own
@@ -117,7 +123,7 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       mode: SPACE_TAB_KIND_MODE['repo-diff'],
       title: repoDiffTitle,
       icon: () => 'git-compare',
-      railColor: () => undefined,
+      railColor: repoRailColor,
       defaultState: (): RepoDiffTabState => defaultRepoDiffTabState(),
       // A commit diff's revision pair must survive duplication — resetting to `{}` would silently
       // turn a duplicated commit-diff tab into a HEAD-vs-worktree one.
@@ -132,7 +138,7 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       mode: SPACE_TAB_KIND_MODE['repo-multi-diff'],
       title: repoMultiDiffTitle,
       icon: () => 'diff-multiple',
-      railColor: () => undefined,
+      railColor: repoRailColor,
       // Never reached through a generic "new tab of this kind" affordance — openRepoMultiDiffTab
       // always supplies a real files/revision pair. This placeholder only satisfies TabKindDef's own
       // required member.

@@ -1,10 +1,33 @@
+import type { PaletteColor } from '@shared/domain/color';
 import { canonicalPath } from '@shared/domain/path';
 import type { RepoSummary } from '@shared/domain/repo';
+import { connColorVar } from '@theme/connColor';
 import { moveId } from '@workbench/util/useSortableReorder';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { useWorkspaceStore } from './workspace';
+
+/** Tint for a repo chip: set `style` and `class` together. `'none'` falls back to neutral chrome. */
+export function repoTint(
+  color: PaletteColor,
+  withBorder = false,
+): { style: Record<string, string>; class: string } {
+  const v = connColorVar(color);
+  if (!v) return { style: {}, class: 'bg-hover text-muted-foreground' };
+  return {
+    style: { '--repo': v },
+    class: `bg-(--repo)/12 text-(--repo)${withBorder ? ' border-(--repo)' : ''}`,
+  };
+}
+
+/** Text-only repo colour: set `style` and `class` together. */
+export function repoText(color: PaletteColor): { style: Record<string, string>; class: string } {
+  const v = connColorVar(color);
+  return v
+    ? { style: { '--repo': v }, class: 'text-(--repo)' }
+    : { style: {}, class: 'text-muted-foreground' };
+}
 
 // C5 §3.4: the repo list store, ConnectionsRepo's own shape for a repository entry — hydrate,
 // import, rename, reorder, remove. No connect/disconnect lifecycle (a repository is a path, not a live
@@ -22,6 +45,10 @@ export const useCodeReposStore = defineStore('coderepos', () => {
   function codeRepoRecord(id: string | null | undefined): RepoSummary | undefined {
     if (!id) return undefined;
     return state.records.find((r) => r.id === id);
+  }
+
+  function colorOf(id: string | null | undefined): PaletteColor {
+    return codeRepoRecord(id)?.color ?? 'none';
   }
 
   function upsertRecord(repo: RepoSummary): void {
@@ -70,6 +97,12 @@ export const useCodeReposStore = defineStore('coderepos', () => {
 
   async function renameCodeRepo(id: string, name: string): Promise<void> {
     const repo = await control.codeWorkspaceRenameRepo(id, name);
+    const idx = state.records.findIndex((r) => r.id === id);
+    if (idx >= 0) state.records[idx] = repo;
+  }
+
+  async function setCodeRepoColor(id: string, color: PaletteColor): Promise<void> {
+    const repo = await control.codeWorkspaceSetRepoColor(id, color);
     const idx = state.records.findIndex((r) => r.id === id);
     if (idx >= 0) state.records[idx] = repo;
   }
@@ -141,6 +174,8 @@ export const useCodeReposStore = defineStore('coderepos', () => {
   return {
     ...toRefs(state),
     codeRepoRecord,
+    colorOf,
+    setCodeRepoColor,
     hydrateCodeRepos,
     initCodeRepos,
     importRepoViaDialog,

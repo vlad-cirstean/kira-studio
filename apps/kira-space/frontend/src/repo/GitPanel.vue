@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { WorktreeEntry } from '@kira/git-ipc';
+import { PALETTE_COLOR_CHOICES } from '@shared/domain/color';
 import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -7,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { connTextClass } from '@theme/connColor';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
@@ -145,6 +147,11 @@ function recordMenuItems(
   return items;
 }
 
+function repoIconClass(repo: RepoSummary): string | undefined {
+  if (repo.color !== 'none') return connTextClass(repo.color);
+  return isOpen(repo.id) ? 'text-fg' : 'text-muted-foreground';
+}
+
 function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
   const items: MenuItem[] = [
     {
@@ -174,6 +181,20 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       label: 'Configure repository…',
       icon: 'settings-gear',
       run: () => reposDialog.show({ repoId: repo.id }),
+    },
+    {
+      type: 'submenu' as const,
+      id: 'color',
+      label: 'Colour',
+      icon: 'symbol-color',
+      items: PALETTE_COLOR_CHOICES.map((color) => ({
+        type: 'item' as const,
+        id: `color-${color}`,
+        label: color,
+        swatch: color,
+        checked: repo.color === color,
+        run: () => void codeReposStore.setCodeRepoColor(repo.id, color),
+      })),
     },
     { type: 'separator' as const },
     ...recordMenuItems(repo, {
@@ -412,7 +433,7 @@ onUnmounted(() => {
                   name="source-control"
                   :size="16"
                   class="shrink-0"
-                  :class="isOpen(repo.id) ? 'text-fg' : 'text-muted-foreground'"
+                  :class="repoIconClass(repo)"
                 />
                 <Tooltip>
                   <TooltipTrigger as-child>

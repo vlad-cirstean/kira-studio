@@ -25,10 +25,3 @@ const PALETTE = [
 export function taskColor(slot: number): string {
   return PALETTE[((slot % PALETTE.length) + PALETTE.length) % PALETTE.length] as string;
 }
-
-/** A stable colour per repo, so a repo reads the same on every row. */
-export function repoColor(codeRepoId: string): string {
-  let h = 0;
-  for (const ch of codeRepoId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return PALETTE[h % PALETTE.length] as string;
-}

@@ -18,6 +18,7 @@ import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type { HeadState } from '@kira/git-ipc';
 import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
+import type { PaletteColor } from '@shared/domain/color';
 import type {
   GitClient,
   GitCredentialPrompt,
@@ -188,6 +189,8 @@ const spaceControl = {
     unwrap(CodeWorkspaceService.ImportRepo({ path })).then((r) => trust<RepoSummary>(r)),
   codeWorkspaceRenameRepo: (id: string, name: string): Promise<RepoSummary> =>
     unwrap(CodeWorkspaceService.RenameRepo({ id, name })).then((r) => trust<RepoSummary>(r)),
+  codeWorkspaceSetRepoColor: (id: string, color: PaletteColor): Promise<RepoSummary> =>
+    unwrap(CodeWorkspaceService.SetRepoColor({ id, color })).then((r) => trust<RepoSummary>(r)),
   codeWorkspaceReorderRepos: (ids: string[]): Promise<RepoSummary[]> =>
     unwrap(CodeWorkspaceService.ReorderRepos({ ids })).then((r) => trust<RepoSummary[]>(r ?? [])),
   codeWorkspaceRemoveRepo: (id: string): Promise<void> =>

@@ -25,6 +25,7 @@ const REPO = {
   root: '/tmp/demo-repo',
   repoId: '/tmp/demo-repo',
   sortOrder: 1,
+  color: 'none',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -87,6 +88,7 @@ const WORKTREE_REPO = {
   root: WORKTREE_PATH,
   repoId: WORKTREE_PATH,
   sortOrder: 2,
+  color: 'none',
   createdAt: '2026-01-02T00:00:00.000Z',
 };
 const WORKTREE_LIST_RESULT = {
@@ -894,6 +896,7 @@ test('every repo row shows its checked-out branch, main worktree first', async (
     root: '/tmp/demo-repo-2',
     repoId: '/tmp/demo-repo-2',
     sortOrder: 2,
+    color: 'none',
     createdAt: '2026-01-03T00:00:00.000Z',
   };
   const REPO2_SHA = `abc1234${'0'.repeat(33)}`;

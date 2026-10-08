@@ -5,12 +5,12 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import { computed, ref, watch } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
+import { repoTint, useCodeReposStore } from '../../../state/coderepos';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { STATUS_TONE, tagLabel } from '../board/actions';
 import { integrationChips } from '../board/labels';
 import { statusWhy, taskPatch } from '../board/panelFacts';
-import { repoColor } from '../palette';
 import { type CardModel, usePlanModel } from '../plan/usePlanModel';
 import { useAddTaskRepo, useUpdateTask } from '../queries';
 import { useAdeAddUiStore } from '../state/adeAddUi';
@@ -30,6 +30,8 @@ const addUi = useAdeAddUiStore();
 const update = useUpdateTask();
 const addRepo = useAddTaskRepo();
 const repos = useRepos();
+const codeRepos = useCodeReposStore();
+const tintOf = (id: string) => repoTint(codeRepos.colorOf(id));
 
 const task = computed(() => props.card.task);
 const review = computed(() => props.card.review);
@@ -216,7 +218,8 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
         <span
           class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-semibold"
-          :style="{ background: `${repoColor(row.branch.codeRepoId)}1f`, color: repoColor(row.branch.codeRepoId) }"
+          :class="tintOf(row.branch.codeRepoId).class"
+          :style="tintOf(row.branch.codeRepoId).style"
           >{{ row.repo }}</span
         >
         <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">

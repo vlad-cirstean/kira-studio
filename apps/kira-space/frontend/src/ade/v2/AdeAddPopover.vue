@@ -8,9 +8,9 @@ import { Textarea } from '@theme/components/ui/textarea';
 import { Toggle } from '@theme/components/ui/toggle';
 import { computed, ref, watch } from 'vue';
 import { useRepos } from '../../repo/state/reposQueries';
+import { repoTint, useCodeReposStore } from '../../state/coderepos';
 import AdeCandidateRow from './AdeCandidateRow.vue';
 import { parseJira } from './jira';
-import { repoColor } from './palette';
 import { useAddExistingBranch, useCandidates, useCreateTask } from './queries';
 import { useAdeAddUiStore } from './state/adeAddUi';
 import { useAdeBoardUiStore } from './state/adeBoardUi';
@@ -30,6 +30,8 @@ const tab = ref('new');
 const error = ref('');
 
 const repos = useRepos();
+const codeRepos = useCodeReposStore();
+const tintOf = (id: string) => repoTint(codeRepos.colorOf(id), true);
 const repoLabel = (id: string): string => {
   const r = repos.data.value?.repos.find((x) => x.codeRepoId === id);
   return r?.nickname || r?.name || id;
@@ -156,11 +158,8 @@ async function pick(b: CandidateBranch): Promise<void> {
             variant="outline"
             size="kira"
             class="font-semibold text-muted-foreground"
-            :style="
-              picked.includes(r.codeRepoId)
-                ? { background: `${repoColor(r.codeRepoId)}1f`, color: repoColor(r.codeRepoId), borderColor: repoColor(r.codeRepoId) }
-                : undefined
-            "
+            :class="picked.includes(r.codeRepoId) ? tintOf(r.codeRepoId).class : ''"
+            :style="picked.includes(r.codeRepoId) ? tintOf(r.codeRepoId).style : undefined"
             :model-value="picked.includes(r.codeRepoId)"
             data-testid="ade-nw-repo"
             @update:model-value="toggleRepo(r.codeRepoId)"

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paletteColorSchema } from './color';
 
 // C5 §3.2: a repo entry's own wire shape — a parallel list to ConnectionSummary, never an
 // extension of it (§3.1's Grounding: a repository needs none of that schema's sixteen fields but
@@ -9,6 +10,7 @@ export const repoSummarySchema = /*#__PURE__*/ z.object({
   root: z.string(),
   repoId: z.string(),
   sortOrder: z.number(),
+  color: paletteColorSchema,
   createdAt: z.string(),
 });
 export type RepoSummary = z.infer<typeof repoSummarySchema>;

@@ -3,9 +3,9 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
+import { repoTint, useCodeReposStore } from '../../../state/coderepos';
 import AdeTip from '../AdeTip.vue';
 import { fixItems } from '../board/fixMenu';
-import { repoColor } from '../palette';
 import { useOpenReviewWindow } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
@@ -81,10 +81,8 @@ function onMenu(ev: MouseEvent): void {
   ]);
 }
 
-const repoStyle = computed(() => {
-  const c = repoColor(props.row.branch.codeRepoId);
-  return { background: `${c}1f`, color: c };
-});
+const codeRepos = useCodeReposStore();
+const repoTintOf = computed(() => repoTint(codeRepos.colorOf(props.row.branch.codeRepoId)));
 const SEG: Record<string, string> = {
   done: 'bg-tone-green-solid',
   running: 'bg-tone-amber-solid',
@@ -134,7 +132,8 @@ const rowBgClass = computed(() => {
     </span>
     <span
       class="shrink-0 rounded-kira-xs px-1 py-px text-kira-sm font-semibold"
-      :style="repoStyle"
+      :class="repoTintOf.class"
+      :style="repoTintOf.style"
       data-testid="ade-branch-repo"
       >{{ row.repo }}</span
     >

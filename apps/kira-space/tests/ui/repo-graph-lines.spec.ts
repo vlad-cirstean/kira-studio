@@ -16,6 +16,7 @@ const REPO = {
   root: '/tmp/lines-repo',
   repoId: '/tmp/lines-repo',
   sortOrder: 1,
+  color: 'none',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 

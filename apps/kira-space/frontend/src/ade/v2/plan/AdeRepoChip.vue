@@ -4,9 +4,9 @@ import { Button } from '@theme/components/ui/button';
 import { Toggle } from '@theme/components/ui/toggle';
 import { useTimeAgo } from '@vueuse/core';
 import { computed } from 'vue';
+import { repoTint, useCodeReposStore } from '../../../state/coderepos';
 import AdeTip from '../AdeTip.vue';
 import { adeAgoOptions } from '../ago';
-import { repoColor } from '../palette';
 
 // One repo of the plan: name toggles its branches on and off, `↻` fetches just this repo.
 const props = defineProps<{
@@ -28,10 +28,8 @@ const note = computed(() => {
   if (props.lastFetchAt === null) return 'never fetched';
   return props.summary ? `${ago.value} · ${props.summary}` : String(ago.value);
 });
-const nameStyle = computed(() => {
-  const c = repoColor(props.codeRepoId);
-  return { background: `${c}1f`, color: c };
-});
+const repos = useCodeReposStore();
+const tint = computed(() => repoTint(repos.colorOf(props.codeRepoId)));
 </script>
 
 <template>
@@ -45,7 +43,8 @@ const nameStyle = computed(() => {
       <Toggle
         size="kira"
         class="shrink-0 px-1.5 font-semibold"
-        :style="nameStyle"
+        :class="tint.class"
+        :style="tint.style"
         :model-value="shown"
         data-testid="ade-repo-toggle"
         @update:model-value="emit('toggle')"
