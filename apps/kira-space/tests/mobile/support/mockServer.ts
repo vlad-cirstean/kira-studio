@@ -31,7 +31,11 @@ interface State {
   /** What `/api/me` reports the desktop allows this phone. */
   permissions: { write: boolean; agentInput: boolean };
   agentInputGlobal: boolean;
-  requests: { method: string; path: string; body: string }[];
+  requests: { method: string; path: string; body: string; key: string }[];
+  /** One-shot scripted failure for the next POST to a path. */
+  failNext: Map<string, { status: number; code: string; message: string }>;
+  /** What `/api/agent/sessions` lists: the live Claude Code tabs. */
+  agentSessions: { terminalId: string; cwd: string }[];
   pairWaiters: ServerResponse[];
   streams: Set<ServerResponse>;
 }
@@ -86,12 +90,28 @@ async function serveFile(res: ServerResponse, pathname: string): Promise<void> {
   }
 }
 
+// Canned answers for the phone's write routes; undefined means the path is not a write route.
+function writeReply(path: string, body: string): unknown {
+  const args = body ? (JSON.parse(body) as Record<string, string>) : {};
+  if (path === '/api/ade/backlog/items')
+    return { id: 'i-new', text: args.text, addedAt: 0, jira: null, githubUrl: '', notes: '' };
+  if (path === '/api/ade/backlog/move') return {};
+  if (path === '/api/ade/tasks/stage') return { taskId: args.taskId, stageId: args.stageId };
+  if (path === '/api/ade/tasks/run') return { runIds: ['run-new'] };
+  if (path === '/api/ade/tasks/launch') return { sessionId: 'sp22' };
+  const session = /^\/api\/agent\/sessions\/([^/]+)\/(send|take-over)$/.exec(path);
+  if (session) return session[2] === 'send' ? {} : { sessionId: session[1] };
+  return undefined;
+}
+
 export async function startMobileServer(): Promise<MobileServer> {
   const initial = (): State => ({
     auth: 'unauthorized',
     permissions: { write: false, agentInput: false },
     agentInputGlobal: false,
     requests: [],
+    failNext: new Map(),
+    agentSessions: [],
     pairWaiters: [],
     streams: new Set(),
   });
@@ -107,7 +127,6 @@ export async function startMobileServer(): Promise<MobileServer> {
     '/api/ade/backlog': fixture('backlog'),
     '/api/ade/repos': { repos },
     '/api/ade/log': fixture('log-page'),
-    '/api/agent/sessions': { sessions: [] },
   };
 
   const unauthorized = (res: ServerResponse): void => {
@@ -127,7 +146,7 @@ export async function startMobileServer(): Promise<MobileServer> {
       return;
     }
     const body = method === 'GET' ? '' : await readBody(req);
-    state.requests.push({ method, path, body });
+    state.requests.push({ method, path, body, key: String(req.headers['idempotency-key'] ?? '') });
 
     if (path === '/api/pair' && method === 'POST') {
       state.pairWaiters.push(res);
@@ -156,6 +175,16 @@ export async function startMobileServer(): Promise<MobileServer> {
       res.write(': open\n\n');
       state.streams.add(res);
       res.on('close', () => state.streams.delete(res));
+    } else if (method === 'POST' && writeReply(path, body) !== undefined) {
+      const fail = state.failNext.get(path);
+      if (fail) {
+        state.failNext.delete(path);
+        json(res, fail.status, { code: fail.code, message: fail.message });
+      } else {
+        json(res, 200, writeReply(path, body));
+      }
+    } else if (path === '/api/agent/sessions' && method === 'GET') {
+      json(res, 200, { sessions: state.agentSessions });
     } else if (path in reads && method === 'GET') {
       json(res, 200, reads[path]);
     } else {

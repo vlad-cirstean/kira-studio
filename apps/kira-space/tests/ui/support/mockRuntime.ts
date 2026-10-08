@@ -51,6 +51,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   mobileRevoke: 'MobileAccessService.Revoke',
   mobileTerminalHolds: 'MobileAccessService.TerminalHolds',
   mobileReclaimTerminal: 'MobileAccessService.ReclaimTerminal',
+  mobileLaunchOpened: 'MobileAccessService.LaunchOpened',
   mobilePairingPending: 'MobileAccessService.PendingPairing',
   mobilePairingApprove: 'MobileAccessService.Approve',
   mobilePairingDeny: 'MobileAccessService.Deny',

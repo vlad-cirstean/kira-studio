@@ -75,6 +75,8 @@ export const IPC = {
   mobilePairingDeny: 'kira:mobile:pairing:deny',
   mobileTerminalHolds: 'kira:mobile:terminals:holds',
   mobileReclaimTerminal: 'kira:mobile:terminals:reclaim',
+  mobileLaunchOpened: 'kira:mobile:launchOpened',
+  mobileOpenLaunch: 'kira:mobile:openLaunch',
   mobileStatus: 'kira:mobile:status',
   mobileDevices: 'kira:mobile:devices',
   mobilePairing: 'kira:mobile:pairing',

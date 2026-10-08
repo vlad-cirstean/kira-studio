@@ -112,6 +112,31 @@ test('permission switches call the bound methods; the global switch gates agent 
   await expect(agentInput).toBeEnabled();
 });
 
+test('a device row says how many terminals the phone controls', async ({ relaunch }) => {
+  const { window } = await relaunch({
+    control: [
+      { channel: IPC.mobileStatusGet, response: runningStatus },
+      { channel: IPC.mobileDevicesList, response: [device] },
+    ],
+  });
+  await openPane(window);
+  await expect(window.locator('[data-testid="mobile-device-terminals-dev-1"]')).toHaveCount(0);
+  await emitWailsEvent(window, IPC.mobileTerminals, [
+    {
+      terminalId: 't1',
+      sessionId: 's1',
+      deviceId: 'dev-1',
+      label: 'Pixel 7',
+      connected: true,
+      since: 0,
+      returnsAt: 0,
+    },
+  ]);
+  await expect(window.locator('[data-testid="mobile-device-terminals-dev-1"]')).toHaveText(
+    'Controlling 1 terminal',
+  );
+});
+
 test('a pushed device list replaces the rendered one', async ({ relaunch }) => {
   const { window } = await relaunch({
     control: [{ channel: IPC.mobileStatusGet, response: runningStatus }],
