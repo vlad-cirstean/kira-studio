@@ -2,6 +2,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // P91 §17.2: TERMINAL_OPEN_OK's shape uses control.log() polling rather than call-count
 // assertions. The mocked DefaultCwd below is '/home/test' — mockRuntime.ts's own boot default
@@ -17,7 +18,7 @@ const SCRIPT = {
   command: 'npm run dev',
   workingDir: '/tmp/demo-repo/frontend',
   color: 'green',
-  collection: '',
+  collectionId: null,
   sortOrder: 0,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -95,7 +96,10 @@ test('running a quick command opens a terminal titled with its name, at its own 
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({
-    control: [TERMINAL_OPEN_OK, { channel: IPC.customScriptsList, response: [SCRIPT] }],
+    control: [
+      TERMINAL_OPEN_OK,
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [SCRIPT] } },
+    ],
   });
 
   await openTerminalModule(page);
@@ -123,7 +127,7 @@ test('the header + is the only add control and opens the dialog with the name fo
   relaunch,
 }) => {
   const { window: page } = await relaunch({
-    control: [{ channel: IPC.customScriptsList, response: [SCRIPT] }],
+    control: [{ channel: IPC.customScriptsList, response: { collections: [], scripts: [SCRIPT] } }],
   });
 
   await openTerminalModule(page);
@@ -140,7 +144,10 @@ test('a multiline script is saved as written with Cmd/Ctrl+Enter; the panel row 
   const MULTI = 'echo one\necho two';
   const { window: page, control } = await relaunch({
     control: [
-      { channel: IPC.customScriptsList, response: [{ ...SCRIPT, command: MULTI }] },
+      {
+        channel: IPC.customScriptsList,
+        response: { collections: [], scripts: [{ ...SCRIPT, command: MULTI }] },
+      },
       { channel: IPC.customScriptsCreate, response: SCRIPT },
     ],
   });
@@ -164,63 +171,105 @@ test('a multiline script is saved as written with Cmd/Ctrl+Enter; the panel row 
   await expect
     .poll(() => control.log().find((entry) => entry.channel === IPC.customScriptsCreate)?.args)
     .toEqual({
-      fields: { name: 'Two lines', command: MULTI, workingDir: '', color: 'none', collection: '' },
+      fields: {
+        name: 'Two lines',
+        command: MULTI,
+        workingDir: '',
+        color: 'none',
+        collectionId: null,
+      },
     });
   await expect(dialog(page)).toHaveCount(0);
 });
 
-test('quick commands group under collapsible collections; titles align left', async ({
+test('quick commands group under collapsible collection rows; empty collections show', async ({
   relaunch,
 }) => {
+  const collections = [
+    {
+      id: 'c-be',
+      name: 'Backend',
+      sortOrder: 0,
+      createdAt: SCRIPT.createdAt,
+      updatedAt: SCRIPT.createdAt,
+    },
+    {
+      id: 'c-web',
+      name: 'Web',
+      sortOrder: 1,
+      createdAt: SCRIPT.createdAt,
+      updatedAt: SCRIPT.createdAt,
+    },
+    {
+      id: 'c-empty',
+      name: 'Empty',
+      sortOrder: 2,
+      createdAt: SCRIPT.createdAt,
+      updatedAt: SCRIPT.createdAt,
+    },
+  ];
   const scripts = [
-    { ...SCRIPT, id: 's-free', name: 'Loose', collection: '' },
-    { ...SCRIPT, id: 's-a1', name: 'Build', collection: 'Backend' },
-    { ...SCRIPT, id: 's-a2', name: 'Test', collection: 'Backend' },
-    { ...SCRIPT, id: 's-b1', name: 'Serve', collection: 'Web' },
+    { ...SCRIPT, id: 's-free', name: 'Loose', collectionId: null },
+    { ...SCRIPT, id: 's-a1', name: 'Build', collectionId: 'c-be' },
+    { ...SCRIPT, id: 's-a2', name: 'Test', collectionId: 'c-be' },
+    { ...SCRIPT, id: 's-b1', name: 'Serve', collectionId: 'c-web' },
   ];
   const { window: page } = await relaunch({
-    control: [{ channel: IPC.customScriptsList, response: scripts }],
+    control: [{ channel: IPC.customScriptsList, response: { collections, scripts } }],
   });
 
   await openTerminalModule(page);
-  const list = page.locator('[data-testid="quick-command-list"]');
-  await expect(page.locator('[data-testid="quick-command-group-Backend"]')).toContainText('2');
-  await expect(page.locator('[data-testid="quick-command-group-Web"]')).toContainText('1');
-  await expect(list.locator('[data-testid^="quick-command-"][type="button"]')).toHaveCount(4);
+  const group = (id: string) =>
+    page.locator(`[data-testid="quick-command-group"][data-id="${id}"]`);
+  await expect(group('c-be')).toContainText('2');
+  await expect(group('c-web')).toContainText('1');
+  await expect(group('c-empty')).toContainText('0');
+  await expect(
+    page.locator('[data-testid="quick-command-list"] [data-testid^="quick-command-s-"]'),
+  ).toHaveCount(4);
 
-  const title = page.locator('[data-testid="quick-command-s-free"]');
-  await expect(title).toHaveCSS('text-align', 'left');
+  await expect(page.locator('[data-testid="quick-command-s-free"]')).toHaveCSS(
+    'text-align',
+    'left',
+  );
 
-  await page
-    .locator('[data-testid="quick-command-group-Backend"] button:has-text("Backend")')
-    .click();
+  await group('c-be').locator('button:has-text("Backend")').click();
   await expect(page.locator('[data-testid="quick-command-s-a1"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="quick-command-s-b1"]')).toBeVisible();
-  await page
-    .locator('[data-testid="quick-command-group-Backend"] button:has-text("Backend")')
-    .click();
+  await group('c-be').locator('button:has-text("Backend")').click();
   await expect(page.locator('[data-testid="quick-command-s-a1"]')).toBeVisible();
 
   await page.locator('[data-testid="toggle-search"]').click();
   await page.locator('[data-testid="tree-search"]').fill('serve');
-  await expect(page.locator('[data-testid="quick-command-group-Backend"]')).toHaveCount(0);
+  await expect(group('c-be')).toHaveCount(0);
+  await expect(group('c-empty')).toHaveCount(0);
   await expect(page.locator('[data-testid="quick-command-s-b1"]')).toBeVisible();
 });
 
-test('the dialog adds a quick command into a collection', async ({ relaunch }) => {
+test('the dialog adds a quick command into a collection chosen from a select', async ({
+  relaunch,
+}) => {
+  const collection = {
+    id: 'c-be',
+    name: 'Backend',
+    sortOrder: 0,
+    createdAt: SCRIPT.createdAt,
+    updatedAt: SCRIPT.createdAt,
+  };
   const { window: page, control } = await relaunch({
     control: [
-      { channel: IPC.customScriptsList, response: [{ ...SCRIPT, collection: 'Backend' }] },
+      { channel: IPC.customScriptsList, response: { collections: [collection], scripts: [] } },
       { channel: IPC.customScriptsCreate, response: SCRIPT },
     ],
   });
 
   await openTerminalModule(page);
   await page.locator('[data-testid="quick-commands-add"]').click();
-  await expect(dialog(page).locator('datalist#quick-command-collections option')).toHaveCount(1);
+  const select = dialog(page).locator('[data-testid="custom-script-collection"]');
+  await expect(select.locator('option')).toHaveText(['No collection', 'Backend']);
   await dialog(page).locator('[data-testid="custom-script-name"]').fill('Lint');
   await dialog(page).locator('[data-testid="custom-script-command"]').fill('bun run lint');
-  await dialog(page).locator('[data-testid="custom-script-collection"]').fill('  Backend ');
+  await select.selectOption('c-be');
   await dialog(page).locator('[data-testid="custom-script-save"]').click();
   await expect
     .poll(() => control.log().find((entry) => entry.channel === IPC.customScriptsCreate)?.args)
@@ -230,9 +279,66 @@ test('the dialog adds a quick command into a collection', async ({ relaunch }) =
         command: 'bun run lint',
         workingDir: '',
         color: 'none',
-        collection: 'Backend',
+        collectionId: 'c-be',
       },
     });
+});
+
+test('header New collection creates one and names it inline', async ({ relaunch }) => {
+  const created = {
+    id: 'c-new',
+    name: 'New collection',
+    sortOrder: 0,
+    createdAt: SCRIPT.createdAt,
+    updatedAt: SCRIPT.createdAt,
+  };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsCreateCollection, response: created },
+      { channel: IPC.customScriptsRenameCollection, response: null },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="quick-commands-new-collection"]').click();
+  await emitWailsEvent(page, IPC.customScriptsChanged, { collections: [created], scripts: [] });
+  const input = page.locator('[data-testid="quick-command-collection-rename-input"]');
+  await expect(input).toBeFocused();
+  await input.fill('Backend');
+  await input.press('Enter');
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.customScriptsRenameCollection)?.args)
+    .toEqual({ id: 'c-new', name: 'Backend' });
+  await expect(input).toHaveCount(0);
+});
+
+test('the collection menu Delete confirms and deletes it', async ({ relaunch }) => {
+  const collection = {
+    id: 'c-be',
+    name: 'Backend',
+    sortOrder: 0,
+    createdAt: SCRIPT.createdAt,
+    updatedAt: SCRIPT.createdAt,
+  };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: { collections: [collection], scripts: [] } },
+      { channel: IPC.customScriptsDeleteCollection, response: null },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page
+    .locator('[data-testid="quick-command-group"][data-id="c-be"]')
+    .click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-delete"]').click();
+  await expect(page.locator('[data-testid="confirm-dialog-message"]')).toHaveText(
+    'Delete collection "Backend" and everything inside it?',
+  );
+  await page.locator('[data-testid="confirm-dialog-confirm"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.customScriptsDeleteCollection)?.args)
+    .toEqual({ id: 'c-be' });
 });
 
 test('Add stays disabled until name and script are filled; it sends the trimmed fields', async ({
@@ -240,7 +346,7 @@ test('Add stays disabled until name and script are filled; it sends the trimmed 
 }) => {
   const { window: page, control } = await relaunch({
     control: [
-      { channel: IPC.customScriptsList, response: [] },
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [] } },
       { channel: IPC.customScriptsCreate, response: SCRIPT },
     ],
   });
@@ -269,7 +375,7 @@ test('Add stays disabled until name and script are filled; it sends the trimmed 
         command: SCRIPT.command,
         workingDir: SCRIPT.workingDir,
         color: 'green',
-        collection: '',
+        collectionId: null,
       },
     });
 });
@@ -279,7 +385,7 @@ test('a rejected working directory keeps the dialog open and shows the backend e
 }) => {
   const { window: page } = await relaunch({
     control: [
-      { channel: IPC.customScriptsList, response: [] },
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [] } },
       {
         channel: IPC.customScriptsCreate,
         error: {
@@ -309,7 +415,7 @@ test('Edit… opens the dialog filled in; Save sends every edited field in one u
   const editedName = `${SCRIPT.name} edited`;
   const { window: page, control } = await relaunch({
     control: [
-      { channel: IPC.customScriptsList, response: [SCRIPT] },
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [SCRIPT] } },
       { channel: IPC.customScriptsUpdate, response: { ...SCRIPT, name: editedName } },
     ],
   });
@@ -340,7 +446,7 @@ test('Edit… opens the dialog filled in; Save sends every edited field in one u
         command: SCRIPT.command,
         workingDir: SCRIPT.workingDir,
         color: 'blue',
-        collection: '',
+        collectionId: null,
       },
     });
 });

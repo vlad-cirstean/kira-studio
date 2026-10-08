@@ -2,6 +2,7 @@ package quickcommands
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -13,7 +14,7 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-const selectColumns = `id, name, command, working_dir, color, collection, sort_order, created_at, updated_at`
+const selectColumns = `id, name, command, working_dir, color, collection_id, sort_order, created_at, updated_at`
 
 // Repo reads and writes the `custom_scripts` table, List ordered deterministically.
 type Repo struct {
@@ -22,17 +23,21 @@ type Repo struct {
 
 func scanRow(row rowScanner) (CustomScript, error) {
 	var s CustomScript
+	var collectionID sql.NullString
 	if err := row.Scan(
-		&s.ID, &s.Name, &s.Command, &s.WorkingDir, &s.Color, &s.Collection, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.Name, &s.Command, &s.WorkingDir, &s.Color, &collectionID, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt,
 	); err != nil {
 		return CustomScript{}, err
+	}
+	if collectionID.Valid {
+		s.CollectionID = &collectionID.String
 	}
 	return s, nil
 }
 
-// List orders by collection, sort_order, name for a stable, deterministic tiebreak.
+// List orders by sort_order, name for a stable, deterministic tiebreak.
 func (r *Repo) List() ([]CustomScript, error) {
-	rows, err := r.DB.Query(`SELECT ` + selectColumns + ` FROM custom_scripts ORDER BY collection ASC, sort_order ASC, name ASC`)
+	rows, err := r.DB.Query(`SELECT ` + selectColumns + ` FROM custom_scripts ORDER BY sort_order ASC, name ASC`)
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (CustomScript, bool, error) {
 		rec, err := scanRow(rows)
 		return rec, true, err
@@ -61,26 +66,29 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 	if err := fields.Validate(); err != nil {
 		return CustomScript{}, fmt.Errorf("quickcommands: %w", err)
 	}
+	if err := r.requireCollection(fields.CollectionID); err != nil {
+		return CustomScript{}, err
+	}
 	sortOrder, err := sqlitex.NextSortOrder(r.DB, "custom_scripts", "")
 	if err != nil {
 		return CustomScript{}, fmt.Errorf("quickcommands: next sort order: %w", err)
 	}
 	now := kiratime.NowISO()
 	rec := CustomScript{
-		ID:         uuid.NewString(),
-		Name:       fields.Name,
-		Command:    fields.Command,
-		WorkingDir: fields.WorkingDir,
-		Color:      fields.Color,
-		Collection: fields.Collection,
-		SortOrder:  sortOrder,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:           uuid.NewString(),
+		Name:         fields.Name,
+		Command:      fields.Command,
+		WorkingDir:   fields.WorkingDir,
+		Color:        fields.Color,
+		CollectionID: fields.CollectionID,
+		SortOrder:    sortOrder,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO custom_scripts (id, name, command, working_dir, color, collection, sort_order, created_at, updated_at)
+		`INSERT INTO custom_scripts (id, name, command, working_dir, color, collection_id, sort_order, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.Color, rec.Collection, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
+		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.Color, rec.CollectionID, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
 	); err != nil {
 		return CustomScript{}, fmt.Errorf("quickcommands: insert: %w", err)
 	}
@@ -94,10 +102,13 @@ func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error
 	if err := fields.Validate(); err != nil {
 		return CustomScript{}, fmt.Errorf("quickcommands: %w", err)
 	}
+	if err := r.requireCollection(fields.CollectionID); err != nil {
+		return CustomScript{}, err
+	}
 	now := kiratime.NowISO()
 	res, err := r.DB.Exec(
-		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, color = ?, collection = ?, updated_at = ? WHERE id = ?`,
-		fields.Name, fields.Command, fields.WorkingDir, fields.Color, fields.Collection, now, id,
+		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, color = ?, collection_id = ?, updated_at = ? WHERE id = ?`,
+		fields.Name, fields.Command, fields.WorkingDir, fields.Color, fields.CollectionID, now, id,
 	)
 	if err != nil {
 		return CustomScript{}, fmt.Errorf("quickcommands: update %s: %w", id, err)
@@ -132,6 +143,113 @@ func (r *Repo) Remove(id string) error {
 	}
 	if n == 0 {
 		return fmt.Errorf("quickcommands: remove %s: %w", id, sql.ErrNoRows)
+	}
+	return nil
+}
+
+// requireCollection refuses a non-nil id that names no custom_script_collections row.
+func (r *Repo) requireCollection(id *string) error {
+	if id == nil {
+		return nil
+	}
+	var one int
+	err := r.DB.QueryRow(`SELECT 1 FROM custom_script_collections WHERE id = ?`, *id).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return invalid("quickcommands: no such collection")
+	}
+	if err != nil {
+		return fmt.Errorf("quickcommands: check collection %s: %w", *id, err)
+	}
+	return nil
+}
+
+// Move sets (nil clears) one command's collection. Returns a wrapped sql.ErrNoRows for an unknown
+// command id.
+func (r *Repo) Move(id string, collectionID *string) error {
+	if err := r.requireCollection(collectionID); err != nil {
+		return err
+	}
+	res, err := r.DB.Exec(
+		`UPDATE custom_scripts SET collection_id = ?, updated_at = ? WHERE id = ?`,
+		collectionID, kiratime.NowISO(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("quickcommands: move %s: %w", id, err)
+	}
+	return requireRow(res, "move", id)
+}
+
+const collectionColumns = `id, name, sort_order, created_at, updated_at`
+
+func scanCollection(row rowScanner) (Collection, error) {
+	var c Collection
+	err := row.Scan(&c.ID, &c.Name, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt)
+	return c, err
+}
+
+// ListCollections orders by sort_order, name (creation order, name as the tiebreak).
+func (r *Repo) ListCollections() ([]Collection, error) {
+	rows, err := r.DB.Query(`SELECT ` + collectionColumns + ` FROM custom_script_collections ORDER BY sort_order ASC, name ASC`)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (Collection, bool, error) {
+		c, err := scanCollection(rows)
+		return c, true, err
+	})
+}
+
+// CreateCollection appends a collection at the end of the order.
+func (r *Repo) CreateCollection(name string) (Collection, error) {
+	name, err := validCollectionName(name)
+	if err != nil {
+		return Collection{}, err
+	}
+	sortOrder, err := sqlitex.NextSortOrder(r.DB, "custom_script_collections", "")
+	if err != nil {
+		return Collection{}, fmt.Errorf("quickcommands: next collection sort order: %w", err)
+	}
+	now := kiratime.NowISO()
+	c := Collection{ID: uuid.NewString(), Name: name, SortOrder: sortOrder, CreatedAt: now, UpdatedAt: now}
+	if _, err := r.DB.Exec(
+		`INSERT INTO custom_script_collections (`+collectionColumns+`) VALUES (?, ?, ?, ?, ?)`,
+		c.ID, c.Name, c.SortOrder, c.CreatedAt, c.UpdatedAt,
+	); err != nil {
+		return Collection{}, fmt.Errorf("quickcommands: insert collection: %w", err)
+	}
+	return c, nil
+}
+
+// RenameCollection renames one collection. Returns a wrapped sql.ErrNoRows for an unknown id.
+func (r *Repo) RenameCollection(id, name string) error {
+	name, err := validCollectionName(name)
+	if err != nil {
+		return err
+	}
+	res, err := r.DB.Exec(
+		`UPDATE custom_script_collections SET name = ?, updated_at = ? WHERE id = ?`,
+		name, kiratime.NowISO(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("quickcommands: rename collection %s: %w", id, err)
+	}
+	return requireRow(res, "rename collection", id)
+}
+
+// DeleteCollection removes a collection; the foreign key cascades to its commands. Returns a
+// wrapped sql.ErrNoRows for an unknown id.
+func (r *Repo) DeleteCollection(id string) error {
+	res, err := r.DB.Exec(`DELETE FROM custom_script_collections WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("quickcommands: delete collection %s: %w", id, err)
+	}
+	return requireRow(res, "delete collection", id)
+}
+
+func requireRow(res sql.Result, op, id string) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("quickcommands: %s %s: rows affected: %w", op, id, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("quickcommands: %s %s: %w", op, id, sql.ErrNoRows)
 	}
 	return nil
 }

@@ -13,6 +13,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import SwatchRadio from '@theme/SwatchRadio.vue';
@@ -20,8 +21,13 @@ import { computed, ref, useTemplateRef } from 'vue';
 import type { TerminalScriptsSeam } from './module';
 
 // Adds one quick command (`script === null`) or edits one. `scripts` is a prop, not
-// `useTerminalModule()`: TerminalPanel.vue owns the seam and mounts this per open.
-const props = defineProps<{ scripts: TerminalScriptsSeam; script: CustomScript | null }>();
+// `useTerminalModule()`: TerminalPanel.vue owns the seam and mounts this per open. `collectionId`
+// presets the collection of a new command (added from a collection's own menu).
+const props = defineProps<{
+  scripts: TerminalScriptsSeam;
+  script: CustomScript | null;
+  collectionId?: string | null;
+}>();
 const emit = defineEmits<{ close: [] }>();
 
 const colors = PALETTE_COLOR_CHOICES;
@@ -29,19 +35,11 @@ const colors = PALETTE_COLOR_CHOICES;
 const name = ref(props.script?.name ?? '');
 const command = ref(props.script?.command ?? '');
 const workingDir = ref(props.script?.workingDir ?? '');
-const collection = ref(props.script?.collection ?? '');
+// '' is the select's "No collection" sentinel; the payload sends null.
+const collection = ref(props.script?.collectionId ?? props.collectionId ?? '');
 const color = ref<PaletteColor>((props.script?.color as PaletteColor | undefined) ?? 'none');
 const error = ref<string | null>(null);
 const saving = ref(false);
-
-const collectionNames = computed(() => [
-  ...new Set(
-    props.scripts
-      .records()
-      .map((s) => s.collection)
-      .filter((c) => c !== ''),
-  ),
-]);
 
 // The dialog's own affordance: the Go check stays the authority on every other rule.
 const canSave = computed(() => name.value.trim() !== '' && command.value.trim() !== '');
@@ -55,7 +53,7 @@ async function save(): Promise<void> {
     command: command.value.trim(),
     workingDir: workingDir.value.trim(),
     color: color.value,
-    collection: collection.value.trim(),
+    collectionId: collection.value === '' ? null : collection.value,
   };
   try {
     if (props.script) await props.scripts.update(props.script.id, fields);
@@ -142,14 +140,16 @@ function onOpenAutoFocus(e: Event): void {
         <div class="flex items-end gap-3">
           <Field class="flex-1 min-w-0">
             <FieldLabel for="quick-command-collection">Collection</FieldLabel>
-            <Input
+            <NativeSelect
               id="quick-command-collection"
               v-model="collection"
-              list="quick-command-collections"
-              placeholder="Optional"
-              maxlength="64"
+              variant="bordered"
+              size="kira-lg"
               data-testid="custom-script-collection"
-            />
+            >
+              <option value="">No collection</option>
+              <option v-for="c in scripts.collections()" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </NativeSelect>
           </Field>
           <fieldset
             class="color-picker m-0 flex h-control flex-wrap items-center gap-1 border-0 p-0"
@@ -169,10 +169,6 @@ function onOpenAutoFocus(e: Event): void {
             </Tooltip>
           </fieldset>
         </div>
-        <datalist id="quick-command-collections">
-          <option v-for="existing in collectionNames" :key="existing" :value="existing" />
-        </datalist>
-
         <FieldError v-if="error" data-testid="custom-script-error">{{ error }}</FieldError>
       </div>
 

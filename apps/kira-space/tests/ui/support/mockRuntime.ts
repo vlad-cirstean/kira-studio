@@ -87,6 +87,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   customScriptsCreate: 'CustomScriptsService.Create',
   customScriptsUpdate: 'CustomScriptsService.Update',
   customScriptsRemove: 'CustomScriptsService.Remove',
+  customScriptsCreateCollection: 'CustomScriptsService.CreateCollection',
+  customScriptsRenameCollection: 'CustomScriptsService.RenameCollection',
+  customScriptsDeleteCollection: 'CustomScriptsService.DeleteCollection',
+  customScriptsMove: 'CustomScriptsService.Move',
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
 

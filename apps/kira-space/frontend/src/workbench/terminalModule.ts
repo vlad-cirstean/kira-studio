@@ -33,6 +33,11 @@ export function createTerminalModule(): TerminalModuleContext {
       create: (fields) => customScriptsStore.createCustomScript(fields),
       update: (id, fields) => customScriptsStore.updateCustomScript(id, fields),
       remove: (id) => customScriptsStore.removeCustomScript(id),
+      collections: () => customScriptsStore.collections,
+      createCollection: (name) => customScriptsStore.createCollection(name),
+      renameCollection: (id, name) => customScriptsStore.renameCollection(id, name),
+      removeCollection: (id) => customScriptsStore.removeCollection(id),
+      move: (id, collectionId) => customScriptsStore.moveScript(id, collectionId),
     },
   };
 }

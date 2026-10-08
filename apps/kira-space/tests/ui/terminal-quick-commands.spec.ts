@@ -9,7 +9,7 @@ const SCRIPT = {
   command: 'echo one\necho two',
   workingDir: '',
   color: 'none',
-  collection: '',
+  collectionId: null,
   sortOrder: 0,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -54,7 +54,7 @@ test('the header + adds a two-line quick command, sent with its newline', async 
         command: SCRIPT.command,
         workingDir: '',
         color: 'none',
-        collection: '',
+        collectionId: null,
       },
     });
 });
@@ -64,7 +64,7 @@ test('clicking a quick command opens a terminal tab titled with its name', async
     control: [
       { channel: IPC.windowsEnsure, response: { mode: 'terminal' } },
       TERMINAL_OPEN_OK,
-      { channel: IPC.customScriptsList, response: [SCRIPT] },
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [SCRIPT] } },
     ],
   });
 

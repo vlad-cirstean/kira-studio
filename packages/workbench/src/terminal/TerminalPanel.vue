@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import type { CustomScript } from '@shared/domain/scripts';
+import type { CustomScript, ScriptCollection } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { connBgClass } from '@theme/connColor';
-import { useLocalStorage } from '@vueuse/core';
+import { useEventListener, useLocalStorage } from '@vueuse/core';
+import InlineRenameInput from '@workbench/components/InlineRenameInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
@@ -15,6 +17,7 @@ import QuickCommandsDialog from './QuickCommandsDialog.vue';
 import { useRemoveScript } from './scriptActions';
 
 const contextMenuStore = useContextMenuStore();
+const confirmDialogStore = useConfirmDialogStore();
 const ctx = useTerminalModule();
 const removeScript = useRemoveScript();
 
@@ -23,54 +26,97 @@ const removeScript = useRemoveScript();
 // menu edits it. Both open `QuickCommandsDialog.vue`.
 const scripts = ctx.scripts;
 
-// Dialog visibility is this component's own local state: nothing else reads it.
-const editor = ref<{ script: CustomScript | null } | null>(null);
+// Dialog visibility is this component's own local state: nothing else reads it. `collectionId`
+// presets a new command's collection (added from a collection's own menu).
+const editor = ref<{ script: CustomScript | null; collectionId: string | null } | null>(null);
 
 const search = ref('');
-const removeError = ref<string | null>(null);
-
-// §11.1: panel search filters rows by name and command.
-const filteredRecords = computed(() => {
-  const records = scripts.records();
-  const q = search.value.trim().toLowerCase();
-  if (q === '') return records;
-  return records.filter(
-    (s) => s.name.toLowerCase().includes(q) || s.command.toLowerCase().includes(q),
-  );
-});
+const actionError = ref<string | null>(null);
+// The collection whose name is being edited inline, if any.
+const renamingId = ref<string | null>(null);
 
 interface ScriptGroup {
-  name: string;
-  rows: CustomScript[];
+  collection: ScriptCollection;
+  rows: readonly CustomScript[];
 }
 
-// Ungrouped rows first and unlabelled, then collections by name; each group keeps list order.
-const groups = computed<ScriptGroup[]>(() => {
-  const byName = new Map<string, CustomScript[]>();
-  for (const script of filteredRecords.value) {
-    const rows = byName.get(script.collection) ?? [];
-    rows.push(script);
-    byName.set(script.collection, rows);
+function matches(script: CustomScript, q: string): boolean {
+  return script.name.toLowerCase().includes(q) || script.command.toLowerCase().includes(q);
+}
+
+// §11.1: panel search filters rows by name and command; a collection shows when its name matches
+// (all its rows) or any of its rows does.
+const view = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  const known = new Set(scripts.collections().map((c) => c.id));
+  const records = scripts.records();
+  const ungrouped = records.filter(
+    (s) => (s.collectionId === null || !known.has(s.collectionId)) && (q === '' || matches(s, q)),
+  );
+  const groups: ScriptGroup[] = [];
+  for (const collection of scripts.collections()) {
+    const own = records.filter((s) => s.collectionId === collection.id);
+    const nameHit = q !== '' && collection.name.toLowerCase().includes(q);
+    const rows = q === '' || nameHit ? own : own.filter((s) => matches(s, q));
+    if (q === '' || nameHit || rows.length > 0) groups.push({ collection, rows });
   }
-  return [...byName.entries()]
-    .map(([name, rows]) => ({ name, rows }))
-    .sort((a, b) => (a.name === '' ? -1 : b.name === '' ? 1 : a.name.localeCompare(b.name)));
+  return { ungrouped, groups };
 });
 
-const collapsed = useLocalStorage<string[]>('kira.quickCommands.collapsed', []);
+const collapsed = useLocalStorage<string[]>('kira.quickCommands.collapsedCollections', []);
 
 // A search shows every matching row, collapsed or not.
-function isOpen(name: string): boolean {
-  return name === '' || search.value.trim() !== '' || !collapsed.value.includes(name);
+function isOpen(id: string): boolean {
+  return search.value.trim() !== '' || !collapsed.value.includes(id);
 }
 
-function toggleGroup(name: string): void {
-  collapsed.value = collapsed.value.includes(name)
-    ? collapsed.value.filter((n) => n !== name)
-    : [...collapsed.value, name];
+function toggleGroup(id: string): void {
+  collapsed.value = collapsed.value.includes(id)
+    ? collapsed.value.filter((n) => n !== id)
+    : [...collapsed.value, id];
 }
 
-const empty = computed(() => scripts.records().length === 0);
+function openGroup(id: string): void {
+  collapsed.value = collapsed.value.filter((n) => n !== id);
+}
+
+const empty = computed(() => scripts.records().length === 0 && scripts.collections().length === 0);
+
+async function guarded(fn: () => Promise<void>): Promise<void> {
+  actionError.value = null;
+  try {
+    await fn();
+  } catch (err) {
+    actionError.value = err instanceof Error ? err.message : String(err);
+  }
+}
+
+// Creates the collection with a placeholder name, then opens it for inline naming (the API tree's
+// own flow); returns its id, or null on failure.
+async function newCollection(): Promise<string | null> {
+  let id: string | null = null;
+  await guarded(async () => {
+    const created = await scripts.createCollection('New collection');
+    openGroup(created.id);
+    renamingId.value = created.id;
+    id = created.id;
+  });
+  return id;
+}
+
+function commitRename(collection: ScriptCollection, name: string): void {
+  renamingId.value = null;
+  void guarded(() => scripts.renameCollection(collection.id, name));
+}
+
+async function confirmDeleteCollection(collection: ScriptCollection): Promise<void> {
+  const ok = await confirmDialogStore.confirmDialog(
+    `Delete collection "${collection.name}" and everything inside it?`,
+    { danger: true, confirmLabel: 'Delete' },
+  );
+  if (!ok) return;
+  await guarded(() => scripts.removeCollection(collection.id));
+}
 
 // P104 §3: PanelShell's own header/search-reveal/type-ahead-redirect logic, inlined via the
 // shared usePanelHeaderSearch composable -- this panel is always searchable (PanelShell's own
@@ -107,12 +153,9 @@ function runScript(script: CustomScript): void {
 
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
 async function onRemove(script: CustomScript): Promise<void> {
-  removeError.value = null;
-  try {
+  await guarded(async () => {
     await removeScript(scripts, script);
-  } catch (err) {
-    removeError.value = err instanceof Error ? err.message : String(err);
-  }
+  });
 }
 
 function onContextMenu(e: MouseEvent, script: CustomScript): void {
@@ -131,7 +174,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       label: 'Edit…',
       icon: 'edit',
       run: () => {
-        editor.value = { script };
+        editor.value = { script, collectionId: null };
       },
     },
     { type: 'separator' },
@@ -146,6 +189,64 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
   ];
   contextMenuStore.openContextMenu(e, items);
 }
+
+function onCollectionContextMenu(e: MouseEvent, collection: ScriptCollection): void {
+  contextMenuStore.openContextMenu(e, [
+    {
+      type: 'item',
+      id: 'new-quick-command',
+      label: 'New quick command',
+      icon: 'add',
+      run: () => {
+        editor.value = { script: null, collectionId: collection.id };
+      },
+    },
+    {
+      type: 'item',
+      id: 'rename',
+      label: 'Rename',
+      icon: 'edit',
+      run: () => {
+        renamingId.value = collection.id;
+      },
+    },
+    { type: 'separator' },
+    {
+      type: 'item',
+      id: 'delete',
+      label: 'Delete',
+      icon: 'trash',
+      danger: true,
+      run: () => confirmDeleteCollection(collection),
+    },
+  ]);
+}
+
+// Right-click on empty space (the empty state included), the API tree's own P105 §5.1 pattern.
+const bodyEl = useTemplateRef<HTMLElement>('bodyEl');
+useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
+  e.preventDefault();
+  contextMenuStore.openContextMenu(e, [
+    {
+      type: 'item',
+      id: 'new-quick-command',
+      label: 'New quick command',
+      icon: 'add',
+      run: () => {
+        editor.value = { script: null, collectionId: null };
+      },
+    },
+    {
+      type: 'item',
+      id: 'new-collection',
+      label: 'New collection',
+      icon: 'new-folder',
+      run: async () => {
+        await newCollection();
+      },
+    },
+  ]);
+});
 </script>
 
 <template>
@@ -166,91 +267,131 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
           label="Add quick command…"
           aria-label="Add quick command"
           data-testid="quick-commands-add"
-          @click="editor = { script: null }"
+          @click="editor = { script: null, collectionId: null }"
+        />
+        <TooltipIconButton
+          icon="new-folder"
+          label="New collection"
+          data-testid="quick-commands-new-collection"
+          @click="newCollection"
         />
       </div>
-      <template v-if="!empty">
-        <div v-if="showSearch" class="shrink-0 border-b border-border px-1.5 py-1">
-          <InputGroup>
-            <InputGroupAddon>
-              <CodiconIcon name="search" :size="13" />
-            </InputGroupAddon>
-            <InputGroupInput v-model="search" placeholder="Search" data-testid="tree-search" />
-            <InputGroupAddon v-if="search" align="inline-end">
-              <InputGroupButton aria-label="Clear search" @click="search = ''">
-                <CodiconIcon name="close" :size="12" />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
-        </div>
-        <div class="min-h-0 flex-1">
-          <div class="flex flex-col h-full overflow-y-auto">
-            <span v-if="removeError" class="px-1.5 py-1 text-error text-kira-sm leading-normal" data-testid="quick-command-remove-error">{{ removeError }}</span>
-            <div
-              v-if="filteredRecords.length > 0"
-              class="flex flex-col"
-              data-testid="quick-command-list"
-            >
-              <template v-for="group in groups" :key="group.name">
-                <div
-                  v-if="group.name !== ''"
-                  class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover"
-                  :data-testid="`quick-command-group-${group.name}`"
+      <div v-if="!empty && showSearch" class="shrink-0 border-b border-border px-1.5 py-1">
+        <InputGroup>
+          <InputGroupAddon>
+            <CodiconIcon name="search" :size="13" />
+          </InputGroupAddon>
+          <InputGroupInput v-model="search" placeholder="Search" data-testid="tree-search" />
+          <InputGroupAddon v-if="search" align="inline-end">
+            <InputGroupButton aria-label="Clear search" @click="search = ''">
+              <CodiconIcon name="close" :size="12" />
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
+      </div>
+      <div ref="bodyEl" class="flex min-h-0 flex-1 flex-col" data-testid="quick-commands-body">
+        <div v-if="!empty" class="flex h-full flex-col overflow-y-auto">
+          <span v-if="actionError" class="px-1.5 py-1 text-error text-kira-sm leading-normal" data-testid="quick-command-error">{{ actionError }}</span>
+          <div class="flex flex-col" data-testid="quick-command-list">
+            <template v-for="script in view.ungrouped" :key="script.id">
+              <button
+                type="button"
+                :disabled="scriptCwd(script) === ''"
+                class="flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                :title="script.command"
+                :data-testid="`quick-command-${script.id}`"
+                @click="runScript(script)"
+                @contextmenu.prevent.stop="onContextMenu($event, script)"
+              >
+                <span
+                  v-if="script.color !== 'none'"
+                  class="w-2.5 h-2.5 rounded-full shrink-0"
+                  :class="connBgClass(script.color)"
+                />
+                <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
+                <div class="flex-1 min-w-0 flex flex-col">
+                  <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
+                  <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
+                </div>
+              </button>
+            </template>
+            <template v-for="group in view.groups" :key="group.collection.id">
+              <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header button toggles by keyboard. -->
+              <div
+                class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover"
+                data-testid="quick-command-group"
+                :data-id="group.collection.id"
+                :data-name="group.collection.name"
+                @contextmenu.prevent.stop="onCollectionContextMenu($event, group.collection)"
+              >
+                <TreeTwisty
+                  :expanded="isOpen(group.collection.id)"
+                  :has-children="group.rows.length > 0"
+                  @toggle="toggleGroup(group.collection.id)"
+                />
+                <CodiconIcon name="folder-library" :size="13" class="shrink-0 text-muted-foreground" />
+                <InlineRenameInput
+                  v-if="renamingId === group.collection.id"
+                  :name="group.collection.name"
+                  data-testid="quick-command-collection-rename-input"
+                  @commit="(name) => commitRename(group.collection, name)"
+                  @cancel="renamingId = null"
+                />
+                <button
+                  v-else
+                  type="button"
+                  class="flex-1 min-w-0 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-semibold text-inherit"
+                  :aria-expanded="isOpen(group.collection.id)"
+                  @click="toggleGroup(group.collection.id)"
+                >{{ group.collection.name }}</button>
+                <span class="text-muted-foreground text-kira-sm">{{ group.rows.length }}</span>
+              </div>
+              <div v-if="isOpen(group.collection.id)" class="flex flex-col pl-3.5">
+                <button
+                  v-for="script in group.rows"
+                  :key="script.id"
+                  type="button"
+                  :disabled="scriptCwd(script) === ''"
+                  class="flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                  :title="script.command"
+                  :data-testid="`quick-command-${script.id}`"
+                  @click="runScript(script)"
+                  @contextmenu.prevent.stop="onContextMenu($event, script)"
                 >
-                  <TreeTwisty :expanded="isOpen(group.name)" :has-children="true" @toggle="toggleGroup(group.name)" />
-                  <button
-                    type="button"
-                    class="flex-1 min-w-0 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-semibold text-inherit"
-                    :aria-expanded="isOpen(group.name)"
-                    @click="toggleGroup(group.name)"
-                  >{{ group.name }}</button>
-                  <span class="text-muted-foreground text-kira-sm">{{ group.rows.length }}</span>
-                </div>
-                <div v-if="isOpen(group.name)" :class="{ 'pl-3.5': group.name !== '' }" class="flex flex-col">
-                  <button
-                    v-for="script in group.rows"
-                    :key="script.id"
-                    type="button"
-                    :disabled="scriptCwd(script) === ''"
-                    class="flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
-                    :title="script.command"
-                    :data-testid="`quick-command-${script.id}`"
-                    @click="runScript(script)"
-                    @contextmenu.prevent="onContextMenu($event, script)"
-                  >
-                    <span
-                      v-if="script.color !== 'none'"
-                      class="w-2.5 h-2.5 rounded-full shrink-0"
-                      :class="connBgClass(script.color)"
-                    />
-                    <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
-                    <div class="flex-1 min-w-0 flex flex-col">
-                      <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
-                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
-                    </div>
-                  </button>
-                </div>
-              </template>
-            </div>
+                  <span
+                    v-if="script.color !== 'none'"
+                    class="w-2.5 h-2.5 rounded-full shrink-0"
+                    :class="connBgClass(script.color)"
+                  />
+                  <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
+                  <div class="flex-1 min-w-0 flex flex-col">
+                    <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
+                    <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
+                  </div>
+                </button>
+              </div>
+            </template>
           </div>
         </div>
-      </template>
-      <div
-        v-else
-        class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
-      >
-        <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
-          <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted-foreground">No quick commands</AlertTitle>
-          <AlertDescription class="text-kira-sm text-muted-foreground">
-            Add one with + above.
-          </AlertDescription>
-        </Alert>
+        <div
+          v-else
+          class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
+        >
+          <span v-if="actionError" class="text-error text-kira-sm leading-normal" data-testid="quick-command-error">{{ actionError }}</span>
+          <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
+            <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
+            <AlertTitle class="text-kira-md font-normal text-muted-foreground">No quick commands</AlertTitle>
+            <AlertDescription class="text-kira-sm text-muted-foreground">
+              Add one with + above.
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
       <QuickCommandsDialog
         v-if="editor"
         :scripts="scripts"
         :script="editor.script"
+        :collection-id="editor.collectionId"
         @close="editor = null"
       />
     </div>

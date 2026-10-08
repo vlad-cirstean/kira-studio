@@ -1,4 +1,4 @@
-import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
+import type { CustomScript, CustomScriptFields, ScriptCollection } from '@shared/domain/scripts';
 import { type ComputedRef, computed, type InjectionKey, inject } from 'vue';
 import type { TerminalLaunch } from '../state/createTerminalTabs';
 import type { TerminalHostDeps } from './terminalHost';
@@ -15,6 +15,12 @@ export interface TerminalScriptsSeam {
   create(fields: CustomScriptFields): Promise<unknown>;
   update(id: string, fields: CustomScriptFields): Promise<unknown>;
   remove(id: string): Promise<void>;
+  collections(): readonly ScriptCollection[];
+  createCollection(name: string): Promise<ScriptCollection>;
+  renameCollection(id: string, name: string): Promise<void>;
+  removeCollection(id: string): Promise<void>;
+  /** collectionId null ungroups. */
+  move(id: string, collectionId: string | null): Promise<void>;
 }
 
 export interface TerminalModuleContext {
