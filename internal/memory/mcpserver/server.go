@@ -47,8 +47,15 @@ type historyInput struct {
 	ID string `json:"id" jsonschema:"id of any version of the memory"`
 }
 
+// Options tune a server instance.
+type Options struct {
+	// ImportRef puts the server in import mode: every stored memory is attributed to the agent with
+	// source "import" and this import file id, whatever author the caller sends.
+	ImportRef string
+}
+
 // Build registers the tools and the prompt. Pure registration: no I/O.
-func Build(svc *memory.Service) *mcp.Server {
+func Build(svc *memory.Service, opts Options) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "kira-memory", Title: "Kira memory", Version: serverVersion},
 		&mcp.ServerOptions{Instructions: instructions})
 
@@ -58,7 +65,7 @@ func Build(svc *memory.Service) *mcp.Server {
 		Description: "Store one or more facts, each with its reason. Every item is checked first: an ambiguous or unreasoned item is challenged with questions and nothing in the request is stored. A fact about something already stored updates it; the old version stays as history.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &f, IdempotentHint: false},
 	}, recovering("store_memory", func(ctx context.Context, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
-		return storeMemory(ctx, svc, req, in)
+		return storeMemory(ctx, svc, opts, req, in)
 	}))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "search_memories",
@@ -115,8 +122,11 @@ func rememberText(text string) string {
 	return out
 }
 
-func storeMemory(ctx context.Context, svc *memory.Service, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
+func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, memory.StoreResult, error) {
 	sr := memory.StoreRequest{Items: in.Items, Clarifications: in.Clarifications, Author: in.Author, Source: memory.SourceMCP}
+	if opts.ImportRef != "" {
+		sr.Author, sr.Source, sr.SourceRef = memory.AuthorAgent, memory.SourceImport, opts.ImportRef
+	}
 	if token := req.Params.GetProgressToken(); token != nil && req.Session != nil {
 		step := 0.0
 		sr.Progress = func(stage string) {
@@ -208,6 +218,6 @@ func recovering[In, Out any](name string, h func(context.Context, *mcp.CallToolR
 
 // RunStdio serves the MCP protocol on stdin/stdout until the client disconnects or ctx ends.
 // Nothing else in the process may write stdout.
-func RunStdio(ctx context.Context, svc *memory.Service) error {
-	return Build(svc).Run(ctx, &mcp.StdioTransport{})
+func RunStdio(ctx context.Context, svc *memory.Service, opts Options) error {
+	return Build(svc, opts).Run(ctx, &mcp.StdioTransport{})
 }
