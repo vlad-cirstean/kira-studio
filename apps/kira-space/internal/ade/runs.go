@@ -889,8 +889,12 @@ func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID string) (ade
 	if stageID == tc.task.StageID {
 		return b.wireTask(tc.task)
 	}
-	if err := b.snapshotWorkflow(&tc.task); err != nil {
+	running, err := b.deps.Tasks.HasRunning(taskID)
+	if err != nil {
 		return adewire.Task{}, err
+	}
+	if running {
+		return adewire.Task{}, invalid("stop its running agents first")
 	}
 	var raw string
 	if stageID != "done" {
@@ -911,12 +915,8 @@ func (b *TaskBoard) SetTaskStage(_ context.Context, taskID, stageID string) (ade
 		}
 		raw = string(enc)
 	}
-	running, err := b.deps.Tasks.HasRunning(taskID)
-	if err != nil {
+	if err := b.snapshotWorkflow(&tc.task); err != nil {
 		return adewire.Task{}, err
-	}
-	if running {
-		return adewire.Task{}, invalid("stop its running agents first")
 	}
 	if err := b.deps.Tasks.SetStage(taskID, stageID, raw); err != nil {
 		return adewire.Task{}, err
