@@ -77,12 +77,27 @@ type ClaudeCodeSettings struct {
 	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
 }
 
+// MobileSettings is P212's mobile agents web server: off until enabled, with the two listener
+// ports (HTTPS app, plain-HTTP setup page). Changed through bridge.MobileAccessService, which
+// restarts the server when it is running.
+type MobileSettings struct {
+	Enabled   bool `json:"enabled"`
+	HTTPSPort int  `json:"httpsPort"`
+	SetupPort int  `json:"setupPort"`
+}
+
 type Settings struct {
 	Appearance Appearance         `json:"appearance"`
 	Advanced   AdvancedSettings   `json:"advanced"`
 	Git        GitSettings        `json:"git"`
 	Ade        AdeSettings        `json:"ade"`
 	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
+	Mobile     MobileSettings     `json:"mobile"`
+}
+
+// DefaultMobileSettings mirrors settingsDomain.ts's mobileSettingsSchema defaults.
+func DefaultMobileSettings() MobileSettings {
+	return MobileSettings{Enabled: false, HTTPSPort: 7790, SetupPort: 7791}
 }
 
 // DefaultGitSettings mirrors docs/v1.3/plans/G7 D16's own default: the same three-pattern default
@@ -125,6 +140,7 @@ func DefaultSettings() Settings {
 		Git:        DefaultGitSettings(),
 		Ade:        DefaultAdeSettings(),
 		ClaudeCode: ClaudeCodeSettings{KeepAwakeWithAgents: false},
+		Mobile:     DefaultMobileSettings(),
 	}
 }
 
@@ -174,12 +190,20 @@ type ClaudeCodePatch struct {
 	KeepAwakeWithAgents *bool `json:"keepAwakeWithAgents,omitempty"`
 }
 
+// MobilePatch mirrors MobileSettings' own `.partial()` shape.
+type MobilePatch struct {
+	Enabled   *bool `json:"enabled,omitempty"`
+	HTTPSPort *int  `json:"httpsPort,omitempty"`
+	SetupPort *int  `json:"setupPort,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
 	Git        *GitPatch        `json:"git,omitempty"`
 	Ade        *AdePatch        `json:"ade,omitempty"`
 	ClaudeCode *ClaudeCodePatch `json:"claudeCode,omitempty"`
+	Mobile     *MobilePatch     `json:"mobile,omitempty"`
 }
 
 // validateAppearanceSection mirrors upsertAppearance's own leaf list (repos/settings.go).
@@ -304,6 +328,22 @@ func validateAdeSection(a *AdePatch) error {
 	return nil
 }
 
+// ValidMobilePort mirrors settingsDomain.ts's mobileSettingsSchema port bounds: unprivileged ports.
+var ValidMobilePort = appsettings.InRange(1024, 65535)
+
+func validateMobileSection(m *MobilePatch) error {
+	if m == nil {
+		return nil
+	}
+	if m.HTTPSPort != nil && !ValidMobilePort(*m.HTTPSPort) {
+		return fmt.Errorf("model: mobile.httpsPort: out of range value %d", *m.HTTPSPort)
+	}
+	if m.SetupPort != nil && !ValidMobilePort(*m.SetupPort) {
+		return fmt.Errorf("model: mobile.setupPort: out of range value %d", *m.SetupPort)
+	}
+	return nil
+}
+
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming the
 // offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema either, so
 // they are accepted as-is.
@@ -320,5 +360,5 @@ func (p SettingsPatch) Validate() error {
 	if err := validateAdeSection(p.Ade); err != nil {
 		return err
 	}
-	return nil
+	return validateMobileSection(p.Mobile)
 }

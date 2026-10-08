@@ -44,6 +44,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Appearance = readAppearance(stored)
 	result.Git = readGit(stored)
 	result.Ade = readAde(stored)
+	result.Mobile = readMobile(stored)
 	appsettings.Leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	return result, nil
@@ -86,6 +87,28 @@ func readAde(stored map[string]json.RawMessage) model.AdeSettings {
 	appsettings.LeafValid(stored, "ade.spanDayShare", &result.SpanDayShare, model.ValidAdeSpanDayShare)
 	appsettings.LeafValid(stored, "ade.headlessSettingSources", &result.HeadlessSettingSources, model.ValidAdeHeadlessSettingSources)
 	return result
+}
+
+// readMobile reads every mobile.* leaf on top of model.DefaultMobileSettings().
+func readMobile(stored map[string]json.RawMessage) model.MobileSettings {
+	result := model.DefaultMobileSettings()
+	appsettings.Leaf(stored, "mobile.enabled", &result.Enabled)
+	appsettings.LeafValid(stored, "mobile.httpsPort", &result.HTTPSPort, model.ValidMobilePort)
+	appsettings.LeafValid(stored, "mobile.setupPort", &result.SetupPort, model.ValidMobilePort)
+	return result
+}
+
+func upsertMobile(tx *sql.Tx, m *model.MobilePatch) error {
+	if m == nil {
+		return nil
+	}
+	if err := appsettings.UpsertOptional(tx, "mobile.enabled", m.Enabled); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "mobile.httpsPort", m.HTTPSPort); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "mobile.setupPort", m.SetupPort)
 }
 
 // upsertAde mirrors upsertGit's own shape.
@@ -178,6 +201,9 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 			return err
 		}
 		if err := upsertAde(tx, patch.Ade); err != nil {
+			return err
+		}
+		if err := upsertMobile(tx, patch.Mobile); err != nil {
 			return err
 		}
 		if patch.ClaudeCode == nil {

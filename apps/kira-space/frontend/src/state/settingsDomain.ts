@@ -130,6 +130,15 @@ const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
   keepAwakeWithAgents: z.boolean().default(false),
 });
 
+// P212: the mobile agents web server. Off until enabled; the two ports are unprivileged. Changed
+// through MobileAccessService, which restarts the server when it is running.
+const MOBILE_PORT_RANGE = { min: 1024, max: 65535 } as const;
+const mobileSettingsSchema = /*#__PURE__*/ z.object({
+  enabled: z.boolean().default(false),
+  httpsPort: z.number().int().min(MOBILE_PORT_RANGE.min).max(MOBILE_PORT_RANGE.max).default(7790),
+  setupPort: z.number().int().min(MOBILE_PORT_RANGE.min).max(MOBILE_PORT_RANGE.max).default(7791),
+});
+
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
 // with no `advanced`/`git`/`ade`/`claudeCode` keys, and that row must still parse on next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
@@ -153,6 +162,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     headlessSettingSources: 'all',
   }),
   claudeCode: claudeCodeSettingsSchema.default({ keepAwakeWithAgents: false }),
+  mobile: mobileSettingsSchema.default({ enabled: false, httpsPort: 7790, setupPort: 7791 }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -162,6 +172,7 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   git: gitSettingsSchema.partial().optional(),
   ade: adeSettingsSchema.partial().optional(),
   claudeCode: claudeCodeSettingsSchema.partial().optional(),
+  mobile: mobileSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -197,5 +208,10 @@ export const defaultSettings: Settings = {
   },
   claudeCode: {
     keepAwakeWithAgents: false,
+  },
+  mobile: {
+    enabled: false,
+    httpsPort: 7790,
+    setupPort: 7791,
   },
 };

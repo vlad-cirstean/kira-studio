@@ -21,6 +21,7 @@ type Repos struct {
 	Settings        *SettingsRepo
 	Windows         *WindowsRepo
 	GitClients      *GitClientsRepo
+	MobileDevices   *MobileDevicesRepo
 	GitRepoSettings *GitRepoSettingsRepo
 	CodeRepos       *CodeReposRepo
 	Layout          *LayoutRepo
@@ -59,6 +60,7 @@ func New(db *sql.DB) (*Repos, error) {
 		Settings:        &SettingsRepo{DB: db, selectAll: settingsSelectAll},
 		Windows:         &WindowsRepo{DB: db},
 		GitClients:      &GitClientsRepo{DB: db},
+		MobileDevices:   &MobileDevicesRepo{DB: db},
 		GitRepoSettings: &GitRepoSettingsRepo{DB: db},
 		CodeRepos:       &CodeReposRepo{DB: db},
 		Layout:          &LayoutRepo{DB: db, selectAll: layoutSelectAll},
