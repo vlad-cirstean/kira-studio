@@ -143,8 +143,11 @@ const widths = ref<ColumnWidths>({
   ...props.columnWidths,
   graph: Math.max(MIN_COLUMN_WIDTH, props.columnWidths.graph),
 });
-// P220: first-ever mount seeds the graph width from the first layout, once (user drag wins).
-let graphSeedPending = false;
+// P225: first-ever mount, the graph column tracks `laneCount` (capped at the default width) until
+// the user drags it. `graphAutoSeeded` marks the first lane-aware width, which may shrink the
+// column; every later step is grow-only.
+let graphAutoWidth = false;
+let graphAutoSeeded = false;
 
 /** G21 D6b: the measured pixel width the absolute date format actually needs at the current
  *  font/zoom — `0` until the probe first resolves (always synchronous in practice; there is no
@@ -405,6 +408,7 @@ function rebuildColumns(): void {
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
+  if (column === 'graph') graphAutoWidth = false;
   const clamped = Math.min(MAX_COLUMN_WIDTH, Math.max(minWidthFor(column), Math.round(next)));
   if (widths.value[column] === clamped) return;
   widths.value = { ...widths.value, [column]: clamped };
@@ -648,8 +652,8 @@ function scheduleAncestryRebuild(): void {
 
 /** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
  *  heights. P92 item 1: the graph column's width is user-set (`widths.value.graph`), not derived
- *  from lane count, so streaming history never rebuilds columns. P220: sole exception, the pending
- *  first-mount seed — applied once, on the first layout with lanes, then a single rebuild.
+ *  from lane count. Sole exception (P220/P225): a first-ever mount's auto width, which follows lane
+ *  growth (`growGraphColumn`) until the user drags the column.
  *
  *  P92 item 4: `invalidateRowHeights()`, not `invalidateRows(rows)` + `render()` — the latter
  *  marks heights dirty but never rebuilds SlickGrid's row-position index (only `updateRowCount()`
@@ -664,13 +668,21 @@ function graphSeedWidth(): number {
   );
 }
 
+/** P225: widens the auto-width graph column as later chunks and pages raise `laneCount`. Not
+ *  emitted or persisted: only a user drag is. Grow-only after the first lane-aware width, so a
+ *  refresh that restarts at `laneCount` 0 never makes the column jump back. */
+function growGraphColumn(): void {
+  if (!graphAutoWidth || props.graphView.laneCount.value === 0) return;
+  const next = graphSeedWidth();
+  if (next === widths.value.graph || (graphAutoSeeded && next < widths.value.graph)) return;
+  graphAutoSeeded = true;
+  widths.value = { ...widths.value, graph: next };
+  rebuildColumns();
+}
+
 function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
-  if (graphSeedPending && props.graphView.laneCount.value > 0) {
-    graphSeedPending = false;
-    widths.value = { ...widths.value, graph: graphSeedWidth() };
-    rebuildColumns();
-  }
+  growGraphColumn();
   grid.invalidateRowHeights();
   if (!layoutCompleteMarked) {
     layoutCompleteMarked = true;
@@ -877,11 +889,13 @@ onMounted(() => {
     const seeded = Math.max(DEFAULT_COLUMN_WIDTHS.date, measuredDateWidth.value);
     if (seeded !== widths.value.date) widths.value = { ...widths.value, date: seeded };
     // P220: laneCount is 0 until the layout worker answers; seeding then would give a 17px column
-    // that clips every lane. Defer to the first layout with lanes (`handleChunkLayout`).
+    // that clips every lane. Defer to the first layout with lanes (`growGraphColumn`).
+    graphAutoWidth = true;
     if (props.graphView.laneCount.value > 0) {
+      graphAutoSeeded = true;
       const graphSeed = graphSeedWidth();
       if (graphSeed !== widths.value.graph) widths.value = { ...widths.value, graph: graphSeed };
-    } else graphSeedPending = true;
+    }
   }
 
   const dataView = createCommitDataView({
