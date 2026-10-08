@@ -41,8 +41,10 @@ tasks:
       - "**/*"
       - exclude: node_modules/**/*
       - exclude: dist/**/*
+      - exclude: dist-mobile/**/*
     generates:
       - dist/**/*
+      - dist-mobile/**/*
     deps:
       - task: install:frontend:deps
       - task: generate:bindings
@@ -53,6 +55,8 @@ tasks:
             ref: .OBFUSCATED
     cmds:
       - bun run {{if eq .DEV "true"}}build:dev{{else}}build{{end}}
+      # P212: the phone app is embedded by main.go next to dist.
+      - bun run build:mobile
     env:
       PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
 

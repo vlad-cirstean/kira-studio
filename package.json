@@ -27,6 +27,7 @@
     "dev:space": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-space && wails3 task dev'",
     "build:studio": "cd apps/kira-studio/frontend && bun run build",
     "build:space": "cd apps/kira-space/frontend && bun run build",
+    "build:space-mobile": "cd apps/kira-space/frontend && bun run build:mobile",
     "build:test:studio": "cd apps/kira-studio/frontend && bun run build:test",
     "proto:dev:grid": "cd apps/kira-studio/frontend && vite --config vite.proto.config.ts",
     "proto:build:grid": "cd apps/kira-studio/frontend && vite build --config vite.proto.config.ts",
@@ -43,12 +44,13 @@
     "lint:dead": "knip",
     "lint:all": "bun run lint && bun run lint:go && bun run lint:dead",
     "format": "biome check --write .",
-    "typecheck": "sh -c 'bun run typecheck:tests:studio & p1=$!; bun run typecheck:web:studio & p2=$!; bun run typecheck:space-web & p6=$!; bun run typecheck:unit:studio & p3=$!; bun run typecheck:space-unit & p7=$!; bun run typecheck:api-core:studio & p4=$!; bun run typecheck:git & p5=$!; bun run typecheck:space-tests & p8=$!; bun run typecheck:proto:studio & p9=$!; bun run typecheck:docker & p10=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p6 || fail=1; wait $p3 || fail=1; wait $p7 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; wait $p8 || fail=1; wait $p9 || fail=1; wait $p10 || fail=1; exit $fail'",
+    "typecheck": "sh -c 'bun run typecheck:tests:studio & p1=$!; bun run typecheck:web:studio & p2=$!; bun run typecheck:space-web & p6=$!; bun run typecheck:space-mobile & p11=$!; bun run typecheck:unit:studio & p3=$!; bun run typecheck:space-unit & p7=$!; bun run typecheck:api-core:studio & p4=$!; bun run typecheck:git & p5=$!; bun run typecheck:space-tests & p8=$!; bun run typecheck:proto:studio & p9=$!; bun run typecheck:docker & p10=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p6 || fail=1; wait $p11 || fail=1; wait $p3 || fail=1; wait $p7 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; wait $p8 || fail=1; wait $p9 || fail=1; wait $p10 || fail=1; exit $fail'",
     "typecheck:tests:studio": "tsgo --noEmit -p apps/kira-studio/tsconfig.tests.json",
     "typecheck:space-tests": "tsgo --noEmit -p apps/kira-space/tsconfig.tests.json",
     "typecheck:web:studio": "vue-tsc --noEmit -p apps/kira-studio/frontend/tsconfig.json",
     "typecheck:proto:studio": "vue-tsc --noEmit -p apps/kira-studio/frontend/tsconfig.proto.json",
     "typecheck:space-web": "vue-tsc --noEmit -p apps/kira-space/frontend/tsconfig.json",
+    "typecheck:space-mobile": "vue-tsc --noEmit -p apps/kira-space/frontend/tsconfig.mobile.json",
     "typecheck:unit:studio": "tsgo --noEmit -p apps/kira-studio/tests/unit/tsconfig.json",
     "typecheck:space-unit": "tsgo --noEmit -p apps/kira-space/tests/unit/tsconfig.json",
     "typecheck:api-core:studio": "tsgo --noEmit -p packages/api-core/tsconfig.json",
@@ -140,6 +142,7 @@
     "vite": "8.3.0",
     "vue": "3.5.42",
     "vue-draggable-plus": "0.6.1",
+    "vue-router": "5.4.0",
     "vue-tsc": "3.3.11"
   }
 }

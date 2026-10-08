@@ -43,18 +43,12 @@ import type {
 } from './wire';
 
 export {
-  backlogKey,
-  boardKey,
   logKey,
-  prsKey,
-  sessionsKey,
   useBacklog,
   useBoard,
-  useLog,
   usePrs,
   useSessions,
   useWorkflows,
-  workflowsKey,
 } from './readQueries';
 
 // Board state is push-driven (`kira:adetask:board`, subscribed once in `ade/queries.ts`), so every

@@ -1,0 +1,9 @@
+/* The phone app's own Tailwind root. Scans this app plus the ADE modules it reuses. */
+@import "@theme/base.css";
+@source "./";
+@source "../src/ade/v2";
+
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
