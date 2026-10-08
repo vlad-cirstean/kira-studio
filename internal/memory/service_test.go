@@ -197,6 +197,33 @@ func TestConcurrentWriterRetriesThenFails(t *testing.T) {
 	}
 }
 
+func TestStaleRedecidesLaterFacts(t *testing.T) {
+	fr := &fakeRunner{
+		gate: func(in gateInput) string {
+			return `{"items":[{"index":0,"verdict":"accept","questions":[],"facts":[
+				{"fact":"deploy target is production","reason":"r","keywords":[]},
+				{"fact":"zebra cluster is in eu-west","reason":"r","keywords":[]}]}]}`
+		},
+		rec: updateAll,
+	}
+	svc, st := newService(t, fr)
+	add(t, st, "deploy target is staging", "seed")
+	first := true
+	fr.hook = func(kind string) {
+		if kind == "reconcile" && first {
+			first = false
+			add(t, st, "zebra cluster is in eu-west region", "foreign")
+		}
+	}
+	res, err := svc.Store(context.Background(), req(Item{"deploy and zebra", "r"}))
+	if err != nil || len(res.Outcomes) != 2 {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+	if o := res.Outcomes[1]; o.Action != ActionUpdate {
+		t.Fatalf("later fact outcome = %+v, want update of the foreign fact", o)
+	}
+}
+
 func TestGateMissingIndexIsOutputError(t *testing.T) {
 	fr := &fakeRunner{gate: func(gateInput) string { return `{"items":[]}` }}
 	svc, st := newService(t, fr)

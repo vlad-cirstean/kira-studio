@@ -172,8 +172,8 @@ func (s *Service) Store(ctx context.Context, req StoreRequest) (StoreResult, err
 	s.progress(req, "saving")
 	requestID := uuid.NewString()
 	committed := false
-	for _, w := range works {
-		out := s.commit(ctx, req, requestID, w, &rev)
+	for i := range works {
+		out := s.commit(ctx, req, requestID, works[i:], &rev)
 		committed = committed || out.Action != ActionFailed
 		res.Outcomes = append(res.Outcomes, out)
 	}
@@ -183,8 +183,10 @@ func (s *Service) Store(ctx context.Context, req StoreRequest) (StoreResult, err
 	return res, nil
 }
 
-// commit applies one fact's decision, rerunning reconcile for it when the store moved underneath.
-func (s *Service) commit(ctx context.Context, req StoreRequest, requestID string, w *work, rev *int64) FactOutcome {
+// commit applies the first work's decision. When the store moved underneath, it re-decides every
+// work not yet committed, since each was decided against the older revision.
+func (s *Service) commit(ctx context.Context, req StoreRequest, requestID string, rest []*work, rev *int64) FactOutcome {
+	w := rest[0]
 	fail := func(err error) FactOutcome {
 		return FactOutcome{Fact: w.Fact, Reason: w.Reason, Action: ActionFailed, Error: err.Error()}
 	}
@@ -207,23 +209,29 @@ func (s *Service) commit(ctx context.Context, req StoreRequest, requestID string
 		if attempt == maxStaleRetries {
 			return fail(errStale)
 		}
-		if err := s.redecide(ctx, w, rev); err != nil {
+		if err := s.redecide(ctx, rest, rev); err != nil {
 			return fail(err)
 		}
 	}
 }
 
-// redecide refreshes the revision and reruns candidate retrieval and reconcile for one fact.
-func (s *Service) redecide(ctx context.Context, w *work, rev *int64) error {
+// redecide refreshes the revision and reruns candidate retrieval and one reconcile for every work given.
+func (s *Service) redecide(ctx context.Context, works []*work, rev *int64) error {
 	var err error
 	if *rev, err = s.store.Revision(ctx); err != nil {
 		return err
 	}
-	need, err := s.prepare(ctx, w)
-	if err != nil || !need {
-		return err
+	var pending []*work
+	for _, w := range works {
+		need, err := s.prepare(ctx, w)
+		if err != nil {
+			return err
+		}
+		if need {
+			pending = append(pending, w)
+		}
 	}
-	return s.reconcile(ctx, []*work{w})
+	return s.reconcile(ctx, pending)
 }
 
 func (d decision) factOr(fallback string) string {
