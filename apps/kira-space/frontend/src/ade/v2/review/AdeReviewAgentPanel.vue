@@ -6,12 +6,11 @@ import { useTerminalsStore } from '../../../state/terminals';
 import { useAgentSessionsStore } from '../../state/agentSessions';
 import { withTuiActivity } from '../activity';
 import { blockingSetups } from '../board/setupGate';
-import { openLaunch } from '../dialog/deliver';
+import { useLaunchOpener } from '../dialog/useLaunchOpener';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { useBoard, useFocusSession, useLaunchReviewAgent, useReviewAgent } from '../queries';
 import AdeTuiPane from '../sessions/AdeTuiPane.vue';
 import { type SessionLookup, sessionView } from '../sessions/sessionView';
-import { useAdeTerminalsStore } from '../state/adeTerminals';
 import { isPreparing, useSetupWait } from '../state/useSetupWait';
 import type { ReviewWindowTarget } from '../wire';
 import AdeReviewCompose from './AdeReviewCompose.vue';
@@ -21,7 +20,7 @@ import AdeReviewCompose from './AdeReviewCompose.vue';
 const props = defineProps<{ target: ReviewWindowTarget; repoLabel: string }>();
 
 const terminals = useTerminalsStore();
-const adeTerminals = useAdeTerminalsStore();
+const launchOpener = useLaunchOpener();
 const agentStore = useAgentSessionsStore();
 const agent = useReviewAgent(() => props.target.taskId);
 const launchM = useLaunchReviewAgent();
@@ -61,16 +60,7 @@ async function start(): Promise<void> {
     const result = await launchM.mutateAsync({ taskId: props.target.taskId });
     setupWait.stop();
     note.value = result.note;
-    await openLaunch(
-      {
-        openTerminalSession: async (tabId, codeRepoId, cwd, cols, rows, command, kind) => {
-          adeTerminals.track(tabId);
-          await terminals.openTerminalSession(tabId, codeRepoId, cwd, cols, rows, command, kind);
-        },
-        terminalSession: (id) => terminals.terminalSession(id),
-      },
-      result.launch,
-    );
+    await launchOpener.open(result.launch);
   } catch (err) {
     if (isPreparing(err)) {
       setupWait.start();

@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { computed, ref } from 'vue';
+import { stageMoves } from '../board/stageMoves';
 import type { CardModel } from '../plan/usePlanModel';
 import { useSetTaskStage } from '../queries';
 
@@ -17,18 +18,14 @@ const props = defineProps<{ card: CardModel }>();
 const setStage = useSetTaskStage();
 const error = ref('');
 
-const DONE = 'done';
-const options = computed(() => [
-  ...props.card.blocks.map((b) => ({ id: b.stage.id, name: b.stage.name, skipped: b.state === 'skipped' })),
-  { id: DONE, name: 'Done', skipped: false },
-]);
-const at = computed(() => {
-  const i = options.value.findIndex((o) => o.id === props.card.task.stageId);
-  return i < 0 ? 0 : i;
-});
-const prev = computed(() => options.value.slice(0, at.value).findLast((o) => !o.skipped));
-const next = computed(() => options.value.slice(at.value + 1).find((o) => !o.skipped));
-const live = computed(() => props.card.task.runs.some((r) => r.state === 'running'));
+const moves = computed(() =>
+  stageMoves(props.card.blocks, props.card.task.stageId, props.card.task.runs),
+);
+const options = computed(() => moves.value.options);
+const at = computed(() => moves.value.at);
+const prev = computed(() => moves.value.prev);
+const next = computed(() => moves.value.next);
+const live = computed(() => moves.value.live);
 const reason = computed(() => (live.value ? 'Stop its running agents first' : ''));
 
 async function move(stageId: string): Promise<void> {

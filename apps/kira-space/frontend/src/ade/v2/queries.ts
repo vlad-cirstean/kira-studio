@@ -3,6 +3,7 @@ import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
 import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
+import { withMovedItem } from './backlogOrder';
 import { backlogKey, boardKey, useWorkflows } from './readQueries';
 import type {
   AddBacklogItemArgs,
@@ -160,15 +161,7 @@ export function useMoveBacklogItem() {
     onMutate: async (args) => {
       await queryClient.cancelQueries({ queryKey: backlogKey, exact: true });
       const prev = queryClient.getQueryData<BacklogResult>(backlogKey);
-      if (prev) {
-        const items = [...prev.items];
-        const from = items.findIndex((i) => i.id === args.id);
-        if (from >= 0) {
-          const [moved] = items.splice(from, 1);
-          if (moved) items.splice(args.toIndex, 0, moved);
-          queryClient.setQueryData<BacklogResult>(backlogKey, { items });
-        }
-      }
+      if (prev) queryClient.setQueryData<BacklogResult>(backlogKey, withMovedItem(prev, args));
       return { prev };
     },
     onError: (_err, _args, ctx) => {

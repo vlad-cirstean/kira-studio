@@ -1,11 +1,9 @@
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
-import { useTerminalsStore } from '../../../state/terminals';
-import { openLaunch } from '../dialog/deliver';
+import { useLaunchOpener } from '../dialog/useLaunchOpener';
 import { useTakeOver } from '../queries';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from './adeBoardUi';
-import { useAdeTerminalsStore } from './adeTerminals';
 import { isPreparing, useSetupWait } from './useSetupWait';
 
 export interface TakeOverConfirm {
@@ -20,8 +18,7 @@ const errMessage = (err: unknown): string => (err instanceof Error ? err.message
 // still going and the launch behind it.
 export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
   const ui = useAdeBoardUiStore();
-  const terminals = useTerminalsStore();
-  const adeTerminals = useAdeTerminalsStore();
+  const launchOpener = useLaunchOpener();
   const takeOverM = useTakeOver();
   const { sessions, view } = useSessionViews();
 
@@ -56,16 +53,7 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
     pending.add(sessionId);
     try {
       const l = await takeOverM.mutateAsync({ sessionId, stopIfRunning: true });
-      await openLaunch(
-        {
-          openTerminalSession: async (tabId, codeRepoId, cwd, cols, rows, command, kind) => {
-            adeTerminals.track(tabId);
-            await terminals.openTerminalSession(tabId, codeRepoId, cwd, cols, rows, command, kind);
-          },
-          terminalSession: (id) => terminals.terminalSession(id),
-        },
-        l,
-      );
+      await launchOpener.open(l);
       ui.openSession({
         taskId: s?.taskId ?? '',
         branchId: s?.branchId ?? '',

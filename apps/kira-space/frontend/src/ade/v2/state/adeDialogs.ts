@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
-import { useTerminalsStore } from '../../../state/terminals';
 import type { BranchAction } from '../board/actions';
 import {
   type DialogSpec,
@@ -13,6 +12,7 @@ import {
 import { deleteAnyway, type FlowDeps, requestArchive, sendDialog } from '../dialog/flow';
 import { adeTurns } from '../dialog/turnWatch';
 import { useDialogCtx } from '../dialog/useDialogCtx';
+import { useLaunchOpener } from '../dialog/useLaunchOpener';
 import {
   useArchiveRisk,
   useArchiveTask,
@@ -23,7 +23,6 @@ import {
   useStartBranch,
 } from '../queries';
 import { useAdeBoardUiStore } from './adeBoardUi';
-import { useAdeTerminalsStore } from './adeTerminals';
 import { useSetupWait } from './useSetupWait';
 
 // The Claude dialog: which one is open, its edits and the work in flight behind it. One concern:
@@ -32,8 +31,7 @@ import { useSetupWait } from './useSetupWait';
 export const useAdeDialogsStore = defineStore('adeDialogs', () => {
   const ui = useAdeBoardUiStore();
   const ctx = useDialogCtx();
-  const terminals = useTerminalsStore();
-  const adeTerminals = useAdeTerminalsStore();
+  const launchOpener = useLaunchOpener();
 
   const spec = ref<DialogSpec | null>(null);
   /** `null` = the unedited template. */
@@ -79,11 +77,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
         send: (a) => sendM.mutateAsync(a),
         startBranch: (a) => startM.mutateAsync(a),
         launchStage: (a) => stageM.mutateAsync(a),
-        openTerminalSession: async (tabId, codeRepoId, cwd, cols, rows, command, kind) => {
-          adeTerminals.track(tabId);
-          await terminals.openTerminalSession(tabId, codeRepoId, cwd, cols, rows, command, kind);
-        },
-        terminalSession: (id) => terminals.terminalSession(id),
+        ...launchOpener.deps,
       },
       turns: { watch: adeTurns.watch },
       setQueuedAfter: (a) => queuedM.mutateAsync(a),
