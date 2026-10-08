@@ -13,3 +13,11 @@ func RegisterGitStream(app *application.App, router *gitrpc.Router) {
 		bridge.ServeGitStream(router, c)
 	})
 }
+
+// RegisterDictationStream registers the dictation stream: one microphone session per connection
+// (bridge.ServeDictationStream).
+func RegisterDictationStream(app *application.App, svc *bridge.DictationService) {
+	app.HandleStream(bridge.DictationStreamName, func(c *application.StreamConn) {
+		bridge.ServeDictationStream(svc, c)
+	})
+}
