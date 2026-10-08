@@ -41,7 +41,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
-	memstt "github.com/kirathecat/kira-studio/internal/memory/stt"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
@@ -59,12 +58,10 @@ var assets embed.FS
 //go:embed all:frontend/dist-mobile
 var mobileAssets embed.FS
 
-// runArgvShim runs the askpass, memory-mcp, memory-embed and memory-stt subcommands, before
-// anything Wails-related, so they
-// never start a window. memory-mcp is Claude Code's stdio MCP server; it runs before startupfail
+// runArgvShim runs the askpass, memory-mcp and memory-embed subcommands, before
+// anything Wails-related, so they never start a window. memory-mcp is Claude Code's stdio MCP server; it runs before startupfail
 // and the single-instance lock, so it works while the window is open. memory-embed is the ONNX
 // embedding worker those processes and the app spawn; same ordering for the same reason.
-// memory-stt is the whisper.cpp dictation worker the app spawns.
 func runArgvShim(args []string) (code int, ok bool) {
 	if len(args) < 2 {
 		return 0, false
@@ -76,8 +73,6 @@ func runArgvShim(args []string) (code int, ok bool) {
 		return memorycli.Run(args[2:]), true
 	case "memory-embed":
 		return memembed.RunWorker(args[2:]), true
-	case "memory-stt":
-		return memstt.RunWorker(args[2:]), true
 	}
 	return 0, false
 }
@@ -85,7 +80,7 @@ func runArgvShim(args []string) (code int, ok bool) {
 // Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout -> logging.Init/Sweep ->
 // storage.Open (migrates) -> repos.New -> wireGit (starts gitsock.Server) -> terminal registry and
 // the ADE tracker (wireTracker, with the Claude Code hooks) -> wireAdeTask -> keep-awake ->
-// application.New (21 bound services plus the git and dictation stream registrations) -> the menu -> the startup
+// application.New (20 bound services plus the git stream registration) -> the menu -> the startup
 // window list, opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP: not this app's
 // module. gitClientsSvc.AttachPush() wires gitsock's pairing/clients-changed feeds onto the two
 // push channels the pairing prompt and Connected-editors pane read.
@@ -200,7 +195,6 @@ func main() {
 	settingsSvc.OnChanged = func(model.Settings) { bridge.KeepAwakeRecompute(keepAwakeSvc) }
 	// memory.db opens on the Memory module's first call.
 	memorySvc := bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}))
-	dictationSvc := bridge.NewDictationService(emitter, memorySvc)
 
 	// windows holds every open window; created here so Archive can close a task's review windows.
 	windows := shell.NewWindowRegistry()
@@ -296,7 +290,6 @@ func main() {
 		// F5: stops every open codeworkspace.Session (cat-file pairs, in-flight searches) — before
 		// repositories.Close(), since a running search still reads settings through Deps.Repos.
 		codeWorkspaceSvc.Shutdown()
-		bridge.CloseDictation(dictationSvc)
 		bridge.CloseMemory(memorySvc)
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)
@@ -329,7 +322,6 @@ func main() {
 			application.NewService(mobileSvc),
 			application.NewService(memorySvc),
 			application.NewService(bridge.NewMemoryImportService(memorySvc, dialogsSvc)),
-			application.NewService(dictationSvc),
 			application.NewService(windowsSvc),
 			application.NewService(&bridge.UpdateService{
 				Checker: updateChecker, Installer: updateInstaller, Quit: quitter.RequestQuit,
@@ -373,7 +365,6 @@ func main() {
 	attachDialogs(app, windowToActOn)
 
 	appshell.RegisterGitStream(app, gitRouter)
-	appshell.RegisterDictationStream(app, dictationSvc)
 
 	winDeps := shell.WindowOpenerDeps{
 		App:        app,

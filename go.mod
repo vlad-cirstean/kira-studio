@@ -17,7 +17,6 @@ require (
 	github.com/docker/cli v29.8.2+incompatible
 	github.com/fsnotify/fsevents v0.2.0
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/gen2brain/malgo v0.11.26
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/gomlx/go-huggingface v0.4.13
