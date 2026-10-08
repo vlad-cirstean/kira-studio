@@ -2,11 +2,12 @@ package importer
 
 import "math"
 
-// Rough constants, replaced by measurements from the smoke run (P211 notes).
+// Constants from the P211 measurements (docs/ARCHITECTURE.md chunks of 2.2k to 3.5k tokens gave 20
+// to 29 facts in 16 to 19 s each).
 const (
-	factsPerChunk     = 12
-	extractSeconds    = 30
-	finalizeBase      = 20
+	factsPerChunk     = 20
+	extractSeconds    = 18
+	finalizeBase      = 15
 	finalizePerBatch  = 25
 	factsPerBatch     = 20
 	extractConcurrent = 3

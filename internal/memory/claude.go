@@ -44,6 +44,9 @@ type Call struct {
 	Budget       string        // --max-budget-usd; empty means claudeCallBudget
 }
 
+// DataHygiene is the untrusted-input paragraph every prompt that reads user documents carries.
+const DataHygiene = dataHygiene
+
 // Runner runs one Call and returns the structured_output object.
 type Runner interface {
 	Run(ctx context.Context, c Call) (json.RawMessage, error)
@@ -129,6 +132,14 @@ type claudeResult struct {
 func (r *CLIRunner) Run(ctx context.Context, c Call) (json.RawMessage, error) {
 	res, err := r.RunResult(ctx, c)
 	return res.Output, err
+}
+
+// Available reports whether the claude CLI can be found.
+func (r *CLIRunner) Available() error {
+	if _, _, found := toolexec.Locate(r.lookPath, r.stat, "claude", toolexec.ClaudeCandidates()); !found {
+		return ErrClaudeNotFound
+	}
+	return nil
 }
 
 // RunResult is Run plus the cost and turn count Claude Code reports.

@@ -16,10 +16,18 @@ import (
 	"github.com/cenkalti/backoff/v4"
 
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func TestMain(m *testing.M) { os.Exit(testx.RunWithTempHomes(m)) }
+// TestMain doubles as the `memory-mcp` entry point: the claudesmoke test points ClaudeAgent at this
+// binary, which Claude Code then starts as the finalize step's MCP server.
+func TestMain(m *testing.M) {
+	if os.Getenv("KIRA_TEST_MEMORY_MCP") == "1" {
+		os.Exit(memorycli.Run(os.Args[2:]))
+	}
+	os.Exit(testx.RunWithTempHomes(m))
+}
 
 // acceptRunner approves every gated fact and adds every reconciled one.
 type acceptRunner struct{}
