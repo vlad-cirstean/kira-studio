@@ -19,7 +19,6 @@
  */
 import {
   coerceSettings,
-  type Logger,
   nfcPath,
   SETTINGS,
   type SettingKey,

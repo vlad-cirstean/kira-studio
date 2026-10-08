@@ -115,7 +115,6 @@ export async function startCommitMetaHarnessServer(): Promise<HarnessServer> {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', () => resolvePromise());
   });
-  // biome-ignore lint/style/noNonNullAssertion: assigned synchronously inside the Promise executor above.
   const s = server!;
   const address = s.address();
   const port = typeof address === 'object' && address ? address.port : 0;

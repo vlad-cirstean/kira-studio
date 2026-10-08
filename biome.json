@@ -74,7 +74,8 @@
       "includes": ["**/tests/**", "**/test/**", "**/*.test.ts", "**/*.spec.ts"],
       "linter": {
         "rules": {
-          "complexity": { "noExcessiveCognitiveComplexity": "off" }
+          "complexity": { "noExcessiveCognitiveComplexity": "off" },
+          "style": { "noNonNullAssertion": "off" }
         }
       }
     },
@@ -90,6 +91,7 @@
         "rules": {
           "style": {
             "useVueHyphenatedAttributes": "off",
+            "useVueMultiWordComponentNames": "off",
             "noNonNullAssertion": "off"
           }
         }
