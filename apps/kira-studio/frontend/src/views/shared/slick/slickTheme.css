@@ -1,3 +1,5 @@
+@reference "@theme/base.css";
+
 /* P22 spike, §6 D7 — a near-verbatim port of GridRow.vue's own <style> block (grid-row -> slick-row,
    grid-cell -> slick-cell, gutter-cell -> kira-gutter), overriding slick.grid.css's own dozen
    hardcoded colours with --kira-* tokens. Unscoped (imported once by SlickGridHost.vue, not a
@@ -41,7 +43,7 @@
    ones exist, but the selector covers all four for free). P182: the gutter canvas now sits in the
    data viewport, so the left viewport is empty and hidden and only one scroller is user-visible. */
 .slick-grid-host .slick-viewport {
-  overscroll-behavior: none;
+  @apply overscroll-none;
 }
 
 /* slick.grid.css's own header/row/cell borders and backgrounds, retokenised. */
@@ -91,17 +93,16 @@
    `scrollLeft`-positioned (it scrolls natively with the viewport); the rule stays per P162 D2 and
    the tooltips containing-block dependency. */
 .slick-grid-host .slick-header-columns {
-  will-change: transform;
+  @apply will-change-transform;
 }
 
 /* P182 — the scrolling header lives inside the scroll viewport (KiraSlickGrid.setScroller). */
 .slick-grid-host .slick-header.ui-state-default.kira-sticky-header {
-  position: sticky;
-  top: 0;
+  @apply sticky top-0;
   z-index: 2; /* above the canvas stacking context (contain: paint) */
   overflow: clip; /* not hidden: a scroll container here would be scrolled again by scrollToX */
   width: var(--sg-scroll-canvas-w);
-  min-width: 100%;
+  @apply min-w-full;
 }
 .slick-grid-host .kira-scroll-pane {
   /* biome-ignore lint/complexity/noImportantStyles: SlickGrid writes inline top/height on every resizeCanvas */
@@ -134,12 +135,11 @@
    list, confirmed by reading the rendered DOM), so this is a real, always-present selector, not a
    speculative escape hatch. */
 .slick-grid-host .slick-header-column.ui-state-default {
-  display: flex;
-  align-items: center;
+  @apply flex items-center;
   gap: var(--kira-s-2);
   padding: 0 var(--kira-s-4);
   background: var(--kira-bg-elevated);
-  color: var(--kira-fg-muted);
+  @apply text-muted-foreground;
   border-right: var(--kira-border-width) solid var(--kira-border);
   font-size: var(--kira-t-sm);
   /* Real-interaction fix, not in the original port: stock's own `.slick-header-column.ui-state-
@@ -153,7 +153,7 @@
      handle's own reported center, elementFromPoint there resolved to the cell, not the handle,
      before this fix. `.header-cell`'s own incumbent rule never had this property at all
      (`DataGrid.vue:2017-2031`) — `visible` here is the equivalent, not a new allowance. */
-  overflow: visible;
+  @apply overflow-visible;
   /* Real-interaction fix, not in the original port: stock's own `.slick-header-column.ui-state-
      default` also carries a fixed `height: 16px; line-height: 16px`, never retokenised — the
      incumbent's own `.header-cell` height instead tracks `rowHeight` (`DataGrid.vue`'s own
@@ -178,12 +178,7 @@
      instead of at the cell's edge. flex-shrink is unaffected — a narrow column's own "shrink this,
      not the badge/indicator" behavior (min-width: 0 + overflow/ellipsis below) is exactly as it
      was. */
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg);
+  @apply flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-fg;
 }
 
 .slick-grid-host .slick-row {
@@ -220,17 +215,15 @@
 /* P182 stage 2 — KiraSlickGrid.setPaneFrozenClasses moves the gutter canvas into the scroll
    viewport beside the data canvas, as one sticky column; the left pane is left empty and hidden. */
 .kira-sticky-gutter .kira-scroll-body {
-  display: flex;
+  @apply flex;
   align-items: flex-start;
-  width: max-content;
-  min-width: 100%;
+  @apply w-max min-w-full;
 }
 .kira-sticky-gutter .kira-scroll-body > .grid-canvas {
-  flex: none;
+  @apply flex-none;
 }
 .slick-grid-host .kira-sticky-gutter .grid-canvas-left {
-  position: sticky;
-  left: 0;
+  @apply sticky left-0;
   z-index: 1; /* above the right canvas it overlaps when scrolled right */
 }
 .slick-grid-host .kira-sticky-gutter .slick-pane-top.slick-pane-left {
@@ -249,7 +242,7 @@
   margin-left: var(--sg-pin-w);
 }
 .slick-grid-host .kira-sticky-gutter .slick-pane-header.slick-pane-left {
-  z-index: 3;
+  @apply z-3;
 }
 
 /* No zebra striping (GridRow.vue's own precedent) — only the hover state below. */
@@ -260,7 +253,7 @@
 .slick-grid-host .slick-cell {
   border-right: var(--kira-border-width) solid var(--kira-border);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg);
+  @apply text-fg;
   padding: 0 var(--kira-s-4);
   /* P22 iter2-pacing D7 item 2: slick.grid.css leaves `.slick-cell` at `display: block`, so cell
      text sat at the top of the box (line-height: normal, no vertical centring) — unlike the
@@ -268,8 +261,7 @@
      this whole spike is compared against. Exact parity with it, chosen over a `line-height` hack
      because that would have to track the 22/28px density setting; this doesn't. A layout-model
      change on every mounted cell, its own commit for that reason. */
-  display: flex;
-  align-items: center;
+  @apply flex items-center;
 }
 
 /* §5 D8 — retokenises slick.grid.css's own `.slick-cell.editable{z-index:11;overflow:visible;
@@ -295,7 +287,7 @@
 .slick-grid-host .slick-cell.editable {
   background: transparent;
   border: none;
-  padding: 0;
+  @apply p-0;
 }
 
 /* §5 D9 — the insert region's own input (`cellFormatter`'s insert branch, SlickGridHost.vue) is
@@ -305,31 +297,24 @@
    `.insert-cell .cell-input { outline: none; }` (`DataGrid.vue:2138-2140`) — the row's own
    `kira-row-inserted` tint (C10) already reads as "this is new" without every cell in it boxed. */
 .slick-grid-host [data-testid="grid-cell-insert"] {
-  padding: 0;
+  @apply p-0;
 }
 .slick-grid-host [data-testid="grid-cell-insert"] .cell-input,
 .slick-grid-host .slick-cell.editable .cell-input {
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  margin: 0;
+  @apply w-full h-full p-0 m-0;
   border: none;
   outline: none;
   background: transparent;
-  color: var(--kira-fg);
+  @apply text-fg;
   font: inherit;
 }
 /* The inline editor is a one-row textarea (editor.ts): it holds line breaks, shows one line. */
 .slick-grid-host .slick-cell.editable textarea.cell-input {
-  height: auto;
-  resize: none;
-  overflow: hidden;
-  white-space: pre;
+  @apply h-auto resize-none overflow-hidden whitespace-pre;
 }
 /* Generated columns are server-computed; their insert input is read-only and muted. */
 .slick-grid-host [data-testid="grid-cell-insert"] .cell-input.cell-generated {
-  color: var(--kira-fg-muted);
-  cursor: default;
+  @apply text-muted-foreground cursor-default;
 }
 /* The accent ring itself — DataGrid.vue's own `.cell-input` base rule (`:2113-2124`),
    `outline: 1px solid var(--kira-accent); outline-offset: -1px`, ported verbatim. Declared after
@@ -347,9 +332,9 @@
      padding too, gutter included, invisible today only because a 1-2 digit right-aligned number
      never gets close to that edge. Zeroed here for the same reason every other property in this
      rule exists: matching the incumbent's box model, not just its paint. */
-  padding-left: 0;
+  @apply pl-0;
   background: var(--kira-bg-elevated);
-  color: var(--kira-fg-subtle);
+  @apply text-subtle;
   font-size: var(--kira-t-xs);
   /* P22 iter2-pacing D7 item 1: `text-align: right` is what makes this work under `.slick-cell`'s
      own `display: block` (as it was until the next rule below landed). D7 item 2's `display: flex`
@@ -358,8 +343,7 @@
      unaffected by the container's text-align) unless the main axis is told otherwise, so
      `justify-content: flex-end` is restored here too, keeping both fixes correct together under
      the layout model D7 item 2 switched to. */
-  text-align: right;
-  justify-content: flex-end;
+  @apply text-right justify-end;
   border-right: var(--kira-border-width) solid var(--kira-border-strong);
 }
 
@@ -372,19 +356,13 @@
    `.gutter-cell.dirty`/`.gutter-cell.deleted::before` rail, ported. */
 .slick-grid-host .slick-row.kira-row-dirty .kira-gutter::before {
   content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  @apply absolute left-0 top-0 bottom-0;
   width: 2px;
   background: var(--kira-warn);
 }
 .slick-grid-host .slick-row.kira-row-deleted .kira-gutter::before {
   content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  @apply absolute left-0 top-0 bottom-0;
   width: 2px;
   background: var(--kira-error);
 }
@@ -395,10 +373,7 @@
    GridRow.vue's own `.gutter-cell.inserted::before`, ported. */
 .slick-grid-host .slick-row.kira-row-inserted .kira-gutter::before {
   content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  @apply absolute left-0 top-0 bottom-0;
   width: 2px;
   background: var(--kira-ok);
 }
@@ -413,8 +388,7 @@
    strike-through, alongside (not instead of) `.kira-row-deleted`'s own gutter rail above — the
    two are independent mechanisms this pass ports both of (`pendingRowClasses`' own comment). */
 .slick-grid-host .slick-row.pending-delete {
-  text-decoration: line-through;
-  opacity: 0.5;
+  @apply line-through opacity-50;
 }
 
 /* §5 D11 — the user's own explicit request (item 3): GridRow.vue's own `.cell-nav-btn`/`.has-nav`
@@ -456,8 +430,7 @@
      `.slick-cell`'s own `display: flex` (see `.kira-gutter`'s own comment above for why
      text-align alone stopped being enough once that landed) — kept alongside text-align so
      nothing regresses if a future formatter ever returns more than a single text node here. */
-  text-align: right;
-  justify-content: flex-end;
+  @apply text-right justify-end;
   font-variant-numeric: tabular-nums;
 }
 
@@ -471,17 +444,17 @@
    rules are kept anyway for D6's own "nine categories become one-line rules" parity, and because a
    future TypeClass addition should not have to remember this file. */
 .kira-grid--row-coloring .tc-numeric {
-  color: var(--kira-syntax-number);
+  @apply text-syntax-number;
 }
 .kira-grid--row-coloring .tc-boolean {
-  color: var(--kira-syntax-keyword);
+  @apply text-syntax-keyword;
 }
 .kira-grid--row-coloring .tc-datetime {
   color: var(--kira-syntax-control);
 }
 .kira-grid--row-coloring .tc-string,
 .kira-grid--row-coloring .tc-other {
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 
 /* P22 iter2-pacing D5: the NULL/truncated markers are now classes on the cell itself
@@ -489,12 +462,11 @@
    two fewer DOM operations and one fewer retained element per NULL cell, and the truncation
    tooltip moves from a 6px span to the whole cell (appendCellHtml's own `toolTip` -> `title`). */
 .slick-grid-host .slick-cell.cell-null {
-  color: var(--kira-fg-subtle);
-  font-style: italic;
+  @apply text-subtle italic;
 }
 .slick-grid-host .slick-cell.cell-truncated::after {
   content: "…";
-  color: var(--kira-fg-muted);
+  @apply text-muted-foreground;
   margin-left: var(--kira-s-1);
 }
 
@@ -503,7 +475,7 @@
    (cell-null's own signal for "this isn't data at all") — a masked cell still has the shape of
    real data, only redacted. */
 .slick-grid-host .slick-cell.cell-masked {
-  color: var(--kira-fg-muted);
+  @apply text-muted-foreground;
 }
 
 /* §6 D5/C5 — the setCellCssStyles seam's own CSS layers: SlickGrid's own 'kira-cell-selected'
@@ -553,7 +525,7 @@
 
 /* C5/§5 D5 — a staged (uncommitted) edit, GridRow.vue's own `.grid-cell.pending-edit` rule. */
 .slick-grid-host .pending-edit {
-  color: var(--kira-warn);
+  @apply text-warn;
 }
 
 /* C12/§5 D5/D12 — the live search highlight, GridRow.vue's own `.grid-cell.search-match`/
@@ -574,7 +546,7 @@
    PK/FK badge and the header select zone. `.slick-header-column-sorted`'s shipped italic is
    neutralised — this app signals sort with the chevron, not a font style. */
 .slick-grid-host .slick-header-column-sorted {
-  font-style: normal;
+  @apply not-italic;
 }
 
 /* P19 F28 correction: this comment block's own next line used to say the chevron painted "at
@@ -626,12 +598,11 @@
    convention (established for the title-bar panel toggles) is that state is shown by shape, not by
    an unrelated brand colour. */
 .slick-grid-host .slick-sort-indicator {
-  flex-shrink: 0;
+  @apply shrink-0;
   /* Pushed after .slick-column-name's own flex-grow (slick-column-name's own rule, above) and
      after .header-key — order: 2 is higher than both their default (0) and header-key's own
      explicit 1, so this is always the last visual item in the row regardless of DOM position. */
-  order: 2;
-  margin-left: auto;
+  @apply order-2 ml-auto;
   /* P28 D4: 12px, and a negative right margin that cancels the flex gap between this and the
      always-present (0px-at-rest) .slick-sort-indicator-numbered after it, so the control sits
      against the header cell's own padding edge instead of 4px short of it. Right-side chrome
@@ -648,39 +619,30 @@
      intercepting clicks meant for the zone underneath on the narrowest columns. The `-asc`/
      `-desc` states keep their own margin, unchanged — a real sort is rarer and already had this
      spacing before this pass. */
-  margin-top: 0;
-  margin-bottom: 0;
+  @apply mt-0 mb-0;
   border: none;
   background: none;
   font-family: "codicon", monospace;
   font-size: 13px;
-  position: relative;
-  z-index: 1;
-  cursor: pointer;
-  line-height: 1;
-  color: var(--kira-fg-muted);
-  overflow: hidden;
+  @apply relative z-1 cursor-pointer leading-none text-muted-foreground overflow-hidden;
   /* The at-rest state stacks both arrows (::before up, ::after down) in a column, each shrunk to
      fit the existing 14x13px box; a sorted state hides one of the two and grows the other back to
      the original single-arrow size (below). */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  @apply flex flex-col items-center justify-center;
   gap: 1px;
 }
 .slick-grid-host .slick-sort-indicator::before {
   content: "\eaa1"; /* codicon-arrow-up — the identical glyph the asc state uses */
   font-size: 7px;
-  line-height: 1;
+  @apply leading-none;
 }
 .slick-grid-host .slick-sort-indicator::after {
   content: "\ea9a"; /* codicon-arrow-down — the identical glyph the desc state uses */
   font-size: 7px;
-  line-height: 1;
+  @apply leading-none;
 }
 .slick-grid-host .slick-sort-indicator:hover {
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 .slick-grid-host .slick-sort-indicator-asc,
 .slick-grid-host .slick-sort-indicator-desc {
@@ -689,7 +651,7 @@
   /* Neutral, not var(--kira-accent) — this control signals its state by which single arrow shows,
      the same way the panel-toggle buttons in the title bar settled on shape/brightness over an
      unrelated brand colour. */
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 .slick-grid-host .slick-sort-indicator-asc::before,
 .slick-grid-host .slick-sort-indicator-desc::before {
@@ -703,27 +665,19 @@
   content: "\ea9a";
 }
 .slick-grid-host .slick-sort-indicator-numbered {
-  order: 3;
-  flex-shrink: 0;
+  @apply order-3 shrink-0;
   /* P28 D4: the indicator above pulls itself over this element's preceding flex gap; at rest
      this is a zero-width no-op, and :not(:empty) below restores its own 2px when a real
      multi-column sort number is showing. */
-  margin: 0;
-  width: 0;
-  min-width: 0;
+  @apply m-0 w-0 min-w-0;
   height: 12px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  @apply p-0 inline-flex items-center justify-center;
   border-radius: 6px;
   background: var(--kira-accent);
   color: var(--kira-accent-fg);
-  font-family: var(--kira-font-ui);
-  font-style: normal;
-  font-weight: 400;
+  @apply font-ui not-italic font-normal;
   font-size: var(--kira-t-xs);
-  line-height: 1;
+  @apply leading-none;
 }
 /* SlickGrid never removes this div, but does leave it text-empty until a multi-column sort
    actually assigns it a number (`sortColNumberInSeparateSpan`) — `:empty` is what tells "no badge
@@ -731,7 +685,7 @@
    for the chevron above. */
 .slick-grid-host .slick-sort-indicator-numbered:not(:empty) {
   margin: 0 0 0 2px;
-  width: auto;
+  @apply w-auto;
   min-width: 12px;
   padding: 0 2px;
 }
@@ -741,7 +695,7 @@
 .slick-grid-host .slick-resizable-handle {
   width: 4px;
   right: -2px;
-  cursor: col-resize;
+  @apply cursor-col-resize;
 }
 
 /* DataGrid.vue's own `.header-select-zone` started as a narrow 10px strip at the header cell's
