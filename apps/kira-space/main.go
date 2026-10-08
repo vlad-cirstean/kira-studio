@@ -39,8 +39,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/memory"
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
+	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
@@ -75,6 +77,13 @@ func runArgvShim(args []string) (code int, ok bool) {
 		return memembed.RunWorker(args[2:]), true
 	}
 	return 0, false
+}
+
+// removeRetiredModels deletes model directories no feature loads any more (P224).
+func removeRetiredModels() {
+	if err := modelstore.RemoveRetired(memory.Home()); err != nil {
+		slog.Warn("remove retired models", "scope", "memory", "err", err)
+	}
 }
 
 // Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout -> logging.Init/Sweep ->
@@ -195,6 +204,7 @@ func main() {
 	settingsSvc.OnChanged = func(model.Settings) { bridge.KeepAwakeRecompute(keepAwakeSvc) }
 	// memory.db opens on the Memory module's first call.
 	memorySvc := bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}))
+	go removeRetiredModels()
 
 	// windows holds every open window; created here so Archive can close a task's review windows.
 	windows := shell.NewWindowRegistry()

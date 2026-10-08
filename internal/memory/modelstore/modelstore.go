@@ -1,5 +1,5 @@
-// Package modelstore installs and checks pinned model files under <home>/models/<id>. It is shared
-// by the embedding and speech workers and imports nothing from package memory.
+// Package modelstore installs and checks pinned model files under <home>/models/<id>. It is used
+// by the embedding worker and imports nothing from package memory.
 package modelstore
 
 import (
@@ -42,6 +42,20 @@ func TotalSize(files []File) int64 {
 // ModelDir is where a model's files live: <home>/models/<id>.
 func ModelDir(home, id string) string {
 	return filepath.Join(home, "models", id)
+}
+
+// retired are model ids no feature loads any more; RemoveRetired deletes their directories.
+var retired = []string{"whisper-small.en-q5_1-5359861"} // P216 speech model, removed in P224
+
+// RemoveRetired deletes the directories of retired models under home. A missing directory is fine.
+func RemoveRetired(home string) error {
+	var errs []error
+	for _, id := range retired {
+		if err := os.RemoveAll(ModelDir(home, id)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 type manifest struct {
