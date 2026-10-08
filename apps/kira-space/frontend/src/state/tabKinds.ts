@@ -2,6 +2,7 @@ import type { PaletteColor } from '@shared/domain/color';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { terminalTabKind } from '@workbench/tabs/terminalTabKind';
 import { parseStateWith, type TabKindRegistry } from '@workbench/tabs/types';
+import { useRepoLinksStore } from '../repo/state/repoLinks';
 import { dropRepoDiffTab, dropRepoFileTab, dropRepoMultiDiffTab } from '../views/repo/editors';
 import { useCodeReposStore } from './coderepos';
 import {
@@ -82,7 +83,7 @@ function repoMultiDiffTitle(tab: TabRecord): string {
 
 // A repo tab's rail carries its repository's chosen colour; 'none' keeps the reserved slot empty.
 function repoRailColor(tab: TabRecord): PaletteColor | undefined {
-  const color = useCodeReposStore().colorOf(tab.workspaceId);
+  const color = useRepoLinksStore().repoColorOf(tab.workspaceId);
   return color === 'none' ? undefined : color;
 }
 

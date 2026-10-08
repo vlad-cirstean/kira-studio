@@ -7,8 +7,9 @@ import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/
 import { Textarea } from '@theme/components/ui/textarea';
 import { Toggle } from '@theme/components/ui/toggle';
 import { computed, ref, watch } from 'vue';
+import { useRepoLinksStore } from '../../repo/state/repoLinks';
 import { useRepos } from '../../repo/state/reposQueries';
-import { repoTint, useCodeReposStore } from '../../state/coderepos';
+import { repoTint } from '../../state/coderepos';
 import AdeCandidateRow from './AdeCandidateRow.vue';
 import { parseJira } from './jira';
 import { useAddExistingBranch, useCandidates, useCreateTask } from './queries';
@@ -30,8 +31,8 @@ const tab = ref('new');
 const error = ref('');
 
 const repos = useRepos();
-const codeRepos = useCodeReposStore();
-const tintOf = (id: string) => repoTint(codeRepos.colorOf(id), true);
+const repoLinks = useRepoLinksStore();
+const tintOf = (id: string) => repoTint(repoLinks.repoColorOf(id), true);
 const repoLabel = (id: string): string => {
   const r = repos.data.value?.repos.find((x) => x.codeRepoId === id);
   return r?.nickname || r?.name || id;

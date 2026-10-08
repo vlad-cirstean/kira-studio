@@ -135,3 +135,60 @@ test('repo, worktree, quick-command and dialog rails share one class, geometry a
   await expect(tab).toHaveAttribute('data-color', 'cyan');
   expect(await paintOf(tab.locator('span').first())).toBe(paint);
 });
+
+test('a linked worktree tab takes its anchor repo colour', async ({ relaunch }) => {
+  const worktree = {
+    ...REPO,
+    id: 'repo-rail-wt',
+    name: 'rail-repo-feature',
+    root: '/tmp/rail-repo-feature',
+    repoId: '/tmp/rail-repo-feature',
+    sortOrder: 2,
+    color: 'amber',
+  };
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO, worktree] },
+      {
+        channel: IPC.codeWorkspaceRepoWorktreeLinks,
+        response: [
+          { id: REPO.id, parentId: '' },
+          { id: worktree.id, parentId: REPO.id },
+        ],
+      },
+      { channel: IPC.codeWorkspaceImportRepo, args: { path: worktree.repoId }, response: worktree },
+      {
+        channel: IPC.codeWorkspaceListFiles,
+        args: { id: worktree.id },
+        response: { paths: ['a.ts'], status: {}, truncated: false },
+      },
+      {
+        channel: IPC.codeWorkspaceReadFile,
+        args: { id: worktree.id, path: 'a.ts' },
+        response: {
+          kind: 'found',
+          text: 'export const a = 1;\n',
+          bytes: 20,
+          limitBytes: 8 * 1024 * 1024,
+          language: 'typescript',
+        },
+      },
+    ],
+  });
+  await installGitStreamMock(page, REPO.repoId, {
+    'repo.open': undefined,
+    'worktree.list': WORKTREE_LIST_RESULT,
+  });
+
+  const repoRow = page.locator(`[data-testid="repo-row"][data-repo-id="${REPO.id}"]`);
+  await repoRow.locator('[data-testid="repo-row-expand"]').click();
+  await page
+    .locator(`[data-testid="repo-worktree-row"][data-worktree-path="${worktree.repoId}"]`)
+    .click();
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
+  await page.locator('[data-testid="repo-tree-row"][data-path="a.ts"]').click();
+  const tab = page.locator(
+    '[data-testid="tab-strip-wrapper"] [data-testid="tab"][data-tab-kind="repo-file"]',
+  );
+  await expect(tab).toHaveAttribute('data-color', 'cyan');
+});

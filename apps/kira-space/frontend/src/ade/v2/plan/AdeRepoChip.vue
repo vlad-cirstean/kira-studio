@@ -4,7 +4,8 @@ import { Button } from '@theme/components/ui/button';
 import { Toggle } from '@theme/components/ui/toggle';
 import { useTimeAgo } from '@vueuse/core';
 import { computed } from 'vue';
-import { repoTint, useCodeReposStore } from '../../../state/coderepos';
+import { useRepoLinksStore } from '../../../repo/state/repoLinks';
+import { repoTint } from '../../../state/coderepos';
 import AdeTip from '../AdeTip.vue';
 import { adeAgoOptions } from '../ago';
 
@@ -28,8 +29,8 @@ const note = computed(() => {
   if (props.lastFetchAt === null) return 'never fetched';
   return props.summary ? `${ago.value} · ${props.summary}` : String(ago.value);
 });
-const repos = useCodeReposStore();
-const tint = computed(() => repoTint(repos.colorOf(props.codeRepoId)));
+const repoLinks = useRepoLinksStore();
+const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
 </script>
 
 <template>

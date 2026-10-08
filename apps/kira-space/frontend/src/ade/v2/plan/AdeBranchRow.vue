@@ -2,8 +2,9 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed } from 'vue';
+import { useRepoLinksStore } from '../../../repo/state/repoLinks';
 import { useRepos } from '../../../repo/state/reposQueries';
-import { repoTint, useCodeReposStore } from '../../../state/coderepos';
+import { repoTint } from '../../../state/coderepos';
 import AdeTip from '../AdeTip.vue';
 import { fixItems } from '../board/fixMenu';
 import { useOpenReviewWindow } from '../queries';
@@ -81,8 +82,8 @@ function onMenu(ev: MouseEvent): void {
   ]);
 }
 
-const codeRepos = useCodeReposStore();
-const repoTintOf = computed(() => repoTint(codeRepos.colorOf(props.row.branch.codeRepoId)));
+const repoLinks = useRepoLinksStore();
+const repoTintOf = computed(() => repoTint(repoLinks.repoColorOf(props.row.branch.codeRepoId)));
 const SEG: Record<string, string> = {
   done: 'bg-tone-green-solid',
   running: 'bg-tone-amber-solid',

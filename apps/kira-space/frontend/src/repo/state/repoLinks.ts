@@ -1,3 +1,4 @@
+import type { PaletteColor } from '@shared/domain/color';
 import { defineStore } from 'pinia';
 import { reactive, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -14,6 +15,13 @@ export const useRepoLinksStore = defineStore('repoLinks', () => {
 
   function worktreeParentId(codeRepoId: string): string {
     return byRepoId.get(codeRepoId) ?? '';
+  }
+
+  /** Display colour of a repo: a linked worktree follows its anchor, so one repo reads one colour
+   *  across the Git panel, tabs and ADE. */
+  function repoColorOf(codeRepoId: string | null | undefined): PaletteColor {
+    if (!codeRepoId) return 'none';
+    return codeReposStore.colorOf(worktreeParentId(codeRepoId) || codeRepoId);
   }
 
   /** One batched `RepoWorktreeLinks` call — every row, no `ids` scoping (§4.2: both callers
@@ -46,5 +54,5 @@ export const useRepoLinksStore = defineStore('repoLinks', () => {
     },
   );
 
-  return { worktreeParentId, refreshRepoWorktreeLinks, noteWorktreeLink };
+  return { worktreeParentId, repoColorOf, refreshRepoWorktreeLinks, noteWorktreeLink };
 });

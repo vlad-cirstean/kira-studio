@@ -192,7 +192,7 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
         label: color,
         swatch: color,
         checked: repo.color === color,
-        run: () => void codeReposStore.setCodeRepoColor(repo.id, color),
+        run: () => codeReposStore.setCodeRepoColor(repo.id, color),
       })),
     },
     { type: 'separator' as const },
