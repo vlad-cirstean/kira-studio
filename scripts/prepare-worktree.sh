@@ -45,7 +45,7 @@ done
 
 # P212: Kira Space also embeds the phone app (`//go:embed all:frontend/dist-mobile`).
 MOBILE_DIST="$ROOT_DIR/apps/kira-space/frontend/dist-mobile"
-if [ -f "$MOBILE_DIST/index.html" ] && [ -f "$MOBILE_DIST/setup.html" ]; then
+if [ -f "$MOBILE_DIST/index.html" ]; then
   echo "prepare-worktree: apps/kira-space/frontend/dist-mobile already built, skipping"
 else
   echo "prepare-worktree: bun run build:mobile (apps/kira-space/frontend)"

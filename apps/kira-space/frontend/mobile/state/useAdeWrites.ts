@@ -7,7 +7,14 @@ import { adeWriter } from '../api/adeWriter';
 import { useAuthStore } from './auth';
 
 /** A new key per user intent: a retry of the same intent reuses it, so the server runs it once. */
-export const newIntentKey = (): string => crypto.randomUUID();
+// `crypto.randomUUID` is undefined on a plain-HTTP origin; `getRandomValues` is not.
+export const newIntentKey = (): string => {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = ((b[6] as number) & 0x0f) | 0x40;
+  b[8] = ((b[8] as number) & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
 
 const PERMISSION_CODES = new Set(['E_WRITE_OFF', 'E_AGENT_INPUT_OFF']);
 

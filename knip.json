@@ -56,7 +56,7 @@
     },
     "apps/kira-space/frontend": {
       // Mirrors apps/kira-studio/frontend's own block above.
-      "entry": ["index.html", "mobile/index.html", "mobile/setup.html", "mobile/setup/main.ts"],
+      "entry": ["index.html", "mobile/index.html"],
       "project": ["src/**/*.{ts,vue}", "mobile/**/*.{ts,vue}"]
     },
     "apps/kira-space-vscode": {

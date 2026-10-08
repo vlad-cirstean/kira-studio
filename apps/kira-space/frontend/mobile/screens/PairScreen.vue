@@ -35,21 +35,17 @@ const notice = computed(() => {
       return message.value;
   }
 });
-const insecure = !window.isSecureContext;
 </script>
 
 <template>
   <main class="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 px-4 py-8" data-testid="pair-screen">
     <h1 class="m-0 text-kira-xl font-semibold">Kira Space Agents</h1>
     <p class="m-0 text-muted-foreground">
-      View your agents from this phone. It is read-only, and the computer must approve this phone
-      first.
+      View your agents from this phone. The computer must approve this phone first.
     </p>
-
-    <Alert v-if="insecure" variant="warn" data-testid="pair-insecure">
-      This page is not secure. Open the setup page from Kira Space on the computer, install the
-      certificate, then open the https address.
-    </Alert>
+    <p class="m-0 text-kira-sm text-muted-foreground">
+      This connection is not encrypted. Use it only on your home network.
+    </p>
 
     <template v-if="waiting">
       <div class="flex flex-col gap-1 rounded-kira border border-border bg-elevated p-3" data-testid="pair-waiting">

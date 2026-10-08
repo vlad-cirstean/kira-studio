@@ -42,8 +42,7 @@ export function useRemoteTerminal(sessionId: string, handlers: Handlers) {
     const { cols, rows } = handlers.size();
     const query = new URLSearchParams({ cols: String(cols), rows: String(rows) });
     if (known) query.set('from', String(offset));
-    const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${scheme}://${location.host}/api/agent/sessions/${encodeURIComponent(sessionId)}/terminal?${query}`;
+    return `ws://${location.host}/api/agent/sessions/${encodeURIComponent(sessionId)}/terminal?${query}`;
   };
 
   const socket = useWebSocket(url, {

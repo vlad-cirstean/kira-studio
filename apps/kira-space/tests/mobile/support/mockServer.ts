@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join, resolve } from 'node:path';
 
 // A stand-in for the Go mobileweb server: the built phone app from frontend/dist-mobile plus a
-// scripted /api. Served by one process so the service worker, the SSE stream and the pairing
+// scripted /api. Served by one process so the SSE stream and the pairing
 // long-poll all run for real. State is per worker and reset before each test.
 
 const DIST = resolve(__dirname, '../../../frontend/dist-mobile');
@@ -14,7 +14,6 @@ const MIME: Readonly<Record<string, string>> = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
-  '.webmanifest': 'application/manifest+json',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
   '.ttf': 'font/ttf',
