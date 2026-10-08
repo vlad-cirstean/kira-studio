@@ -188,10 +188,12 @@ export class PrState {
   }
 
   /** Same-repo refs change: keeps every fact on screen, re-asks for the selected commit and every
-   *  known branch, and applies each answer as it lands. */
+   *  branch with a PR, and applies each answer as it lands. PR-less branches drop to unknown
+   *  without a request (each would cost a GitHub call); the next render asks lazily. */
   #revalidate(): void {
     this.#cancelInFlight();
     this.#disabledForRepo = false;
+    this.#noBranchPr.clear();
     const sha = this.#sha;
     if (sha !== null) void this.#requestCommit(sha);
     void this.#revalidateBranches();
@@ -200,9 +202,7 @@ export class PrState {
   async #revalidateBranches(): Promise<void> {
     const repoId = this.#repoId;
     const generation = this.#clearGeneration;
-    const names = [...this.byBranch.value.keys(), ...this.#noBranchPr].filter(
-      (name) => !this.#branchRequests.has(name),
-    );
+    const names = [...this.byBranch.value.keys()].filter((name) => !this.#branchRequests.has(name));
     let next = 0;
     const worker = async (): Promise<void> => {
       while (next < names.length) {

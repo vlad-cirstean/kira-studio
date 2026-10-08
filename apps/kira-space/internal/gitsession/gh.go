@@ -174,11 +174,21 @@ func (s *ghState) markStale() {
 // classify reports how an entry cached at cachedAt may be used: fresh, served-while-refreshing, or
 // a miss. Caller holds s.mu.
 func (s *ghState) classify(cachedAt time.Time, ttl time.Duration) cacheState {
+	if state := classifyAge(cachedAt, ttl); state != cacheFresh {
+		return state
+	}
+	if cachedAt.Before(s.refsStaleAt) {
+		return cacheStale
+	}
+	return cacheFresh
+}
+
+func classifyAge(cachedAt time.Time, ttl time.Duration) cacheState {
 	age := time.Since(cachedAt)
 	switch {
 	case age >= ghStaleMax:
 		return cacheMiss
-	case age >= ttl || cachedAt.Before(s.refsStaleAt):
+	case age >= ttl:
 		return cacheStale
 	}
 	return cacheFresh
@@ -272,6 +282,10 @@ func (s *ghState) branchCacheGet(branch string) (*ghclient.PR, cacheState) {
 	entry, ok := s.branch[branch]
 	if !ok {
 		return nil, cacheMiss
+	}
+	if entry.pr == nil {
+		// A refs change cannot open a PR on GitHub; only the snapshot refresh can reveal one.
+		return nil, classifyAge(entry.cachedAt, ghBranchTTL)
 	}
 	return entry.pr, s.classify(entry.cachedAt, ghBranchTTL)
 }
