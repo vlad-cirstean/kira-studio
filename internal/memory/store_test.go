@@ -100,7 +100,7 @@ func TestSearchRecall(t *testing.T) {
 		{"stopword only", "the of and", ""},
 	}
 	for _, c := range cases {
-		got, err := s.Search(ctx, SearchArgs{Query: c.q})
+		got, err := s.searchFTS(ctx, SearchArgs{Query: c.q})
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -109,11 +109,11 @@ func TestSearchRecall(t *testing.T) {
 		}
 	}
 
-	cur, _ := s.Search(ctx, SearchArgs{Query: "port"})
+	cur, _ := s.searchFTS(ctx, SearchArgs{Query: "port"})
 	if !slices.Equal(facts(cur), []string{"API port is 9090"}) {
 		t.Errorf("current-only = %v", facts(cur))
 	}
-	all, _ := s.Search(ctx, SearchArgs{Query: "port", IncludeHistory: true})
+	all, _ := s.searchFTS(ctx, SearchArgs{Query: "port", IncludeHistory: true})
 	if len(all) != 2 {
 		t.Fatalf("with history = %v", facts(all))
 	}
@@ -128,7 +128,7 @@ func TestSearchNeverFailsOnFTSSyntax(t *testing.T) {
 	s := newStore(t)
 	add(t, s, "plain fact here", "reason")
 	for _, q := range []string{`"`, `NEAR(a b)`, `a AND -b`, `col:x`, `*`, `fact"" OR "`, `^fact`, `(fact`} {
-		if _, err := s.Search(context.Background(), SearchArgs{Query: q}); err != nil {
+		if _, err := s.searchFTS(context.Background(), SearchArgs{Query: q}); err != nil {
 			t.Errorf("query %q: %v", q, err)
 		}
 	}

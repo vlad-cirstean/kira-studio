@@ -249,7 +249,7 @@ func (d decision) reasonOr(fallback string) string {
 }
 
 func (s *Service) Search(ctx context.Context, a SearchArgs) ([]Memory, error) {
-	return s.store.Search(ctx, a)
+	return s.store.searchFTS(ctx, a)
 }
 
 func (s *Service) Recent(ctx context.Context, limit int) ([]Memory, error) {

@@ -38,6 +38,10 @@ type Memory struct {
 	CreatedAt    string   `json:"createdAt"`
 	SupersededAt *string  `json:"supersededAt"`
 	Versions     int      `json:"versions"`
+	// Match is how a search found this memory: keyword, semantic or both. Empty outside search.
+	Match string `json:"match,omitempty"`
+
+	seq int64
 }
 
 // Event is one audit row: what a store decided for a fact, and why.

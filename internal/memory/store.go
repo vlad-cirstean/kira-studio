@@ -88,7 +88,7 @@ type SearchArgs struct {
 
 const memoryColumns = `m.id, m.lineage_id, m.version, m.fact, m.reason, m.keywords, m.author, m.status,
 	m.supersedes_id, m.superseded_by_id, m.created_at, m.superseded_at,
-	(SELECT count(*) FROM memories x WHERE x.lineage_id = m.lineage_id) AS versions`
+	(SELECT count(*) FROM memories x WHERE x.lineage_id = m.lineage_id) AS versions, m.seq`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -96,7 +96,7 @@ func scanMemory(r rowScanner, extra ...any) (Memory, error) {
 	var m Memory
 	var kw string
 	dest := append([]any{&m.ID, &m.LineageID, &m.Version, &m.Fact, &m.Reason, &kw, &m.Author, &m.Status,
-		&m.SupersedesID, &m.SupersededBy, &m.CreatedAt, &m.SupersededAt, &m.Versions}, extra...)
+		&m.SupersedesID, &m.SupersededBy, &m.CreatedAt, &m.SupersededAt, &m.Versions, &m.seq}, extra...)
 	if err := r.Scan(dest...); err != nil {
 		return Memory{}, err
 	}
@@ -135,8 +135,9 @@ func clampLimit(n int) int {
 	return n
 }
 
-// Search is recall-first (BuildMatch): bm25 orders results, nothing is cut by score.
-func (s *Store) Search(ctx context.Context, a SearchArgs) ([]Memory, error) {
+// searchFTS is the keyword half of search, recall-first (BuildMatch): bm25 orders results, nothing
+// is cut by score. Service.Search fuses it with the vector list.
+func (s *Store) searchFTS(ctx context.Context, a SearchArgs) ([]Memory, error) {
 	match, ok := BuildMatch(a.Query)
 	if !ok {
 		return []Memory{}, nil
@@ -268,6 +269,10 @@ type commitInput struct {
 	Source    string
 	RequestID string
 	Why       string
+	// Vec, when set, is the L2-normalised embedding of the inserted fact, stored in the same
+	// transaction under Model. Noop ignores it.
+	Vec   []byte
+	Model string
 }
 
 type commitResult struct {
@@ -364,13 +369,24 @@ func insertMemory(ctx context.Context, tx *sql.Tx, r commitResult, in commitInpu
 	if supersedes != "" {
 		sup = supersedes
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO memories
+	res, err := tx.ExecContext(ctx, `INSERT INTO memories
 		(id, lineage_id, version, fact, reason, keywords, author, status, supersedes_id, fact_hash, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, 'current', ?, ?, ?)`,
 		r.ID, r.LineageID, r.Version, in.Fact, in.Reason, joinKeywords(in.Keywords), in.Author, sup,
 		factHash(in.Fact), now)
 	if err != nil {
 		return fmt.Errorf("memory: insert: %w", err)
+	}
+	if len(in.Vec) == 0 {
+		return nil
+	}
+	seq, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("memory: insert: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO memory_embeddings (seq, model, vec, created_at)
+		VALUES (?, ?, ?, ?)`, seq, in.Model, in.Vec, now); err != nil {
+		return fmt.Errorf("memory: insert embedding: %w", err)
 	}
 	return nil
 }

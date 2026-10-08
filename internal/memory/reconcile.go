@@ -88,7 +88,7 @@ func (s *Service) prepare(ctx context.Context, w *work) (needsLLM bool, err erro
 			return false, nil
 		}
 	}
-	cands, err := s.store.Search(ctx, SearchArgs{
+	cands, err := s.store.searchFTS(ctx, SearchArgs{
 		Query: w.Fact + " " + strings.Join(w.Keywords, " "), Limit: reconcileCandidateLimit,
 	})
 	if err != nil {
