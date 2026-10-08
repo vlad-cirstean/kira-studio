@@ -14,6 +14,7 @@
  * (§7.3): hunk state renders in `GlyphMarginLane.Right`, comment/add-comment glyphs in
  * `GlyphMarginLane.Left`.
  */
+
 import {
   clampRanges,
   coverage,
@@ -29,6 +30,7 @@ import type {
   ReviewComment,
   Transport,
 } from '@kira/git-ipc';
+import { buttonVariants } from '@theme/components/ui/button';
 import { type App, createApp, nextTick } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
@@ -208,14 +210,15 @@ export function attachReviewDecorations(
     // §3.1: same paint-order defect as the compose zone above — the Retry button is otherwise
     // unreachable.
     domNode.style.zIndex = VIEW_ZONE_Z_INDEX;
-    domNode.className = 'kira-review-load-error';
+    domNode.className =
+      'kira-review-load-error flex h-full items-center gap-2 bg-error/12 px-3 text-kira-md text-error';
     const span = document.createElement('span');
     span.textContent = message;
     domNode.append(span);
     if (retryable) {
       const retry = document.createElement('button');
       retry.type = 'button';
-      retry.className = 'kira-review-load-error-retry';
+      retry.className = buttonVariants({ variant: 'dialog-danger', size: 'xs' });
       retry.textContent = 'Retry';
       retry.addEventListener('click', () => void load());
       domNode.append(retry);
