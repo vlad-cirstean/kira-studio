@@ -129,9 +129,8 @@ fi
 # Rescoped by P119 (was: apps/ packages/ only) — internal/appupdate now lives at internal/, and
 # the invariant still holds for every line of app code: only scripts/install.sh, run by the user's
 # own explicit Update click (never silently), is a sanctioned downloader. scripts/ is deliberately
-# excluded from this scan for exactly that reason. `build` dirs hold fetched third-party sources
-# (P216's whisper.cpp checkout), not app code.
-if grep -rnE --exclude-dir=build 'browser_download_url|releases/download' apps/ packages/ internal/ >/dev/null 2>&1; then
+# excluded from this scan for exactly that reason.
+if grep -rnE 'browser_download_url|releases/download' apps/ packages/ internal/ >/dev/null 2>&1; then
   fail "release asset download present" "apps/, packages/ or internal/ references a release asset download outside scripts/install.sh"
 fi
 
@@ -177,23 +176,6 @@ fi
 if ! grep -q "libonnxruntime\.$ORT_GO_VERSION\.dylib" apps/kira-space/build/darwin/Taskfile.yml 2>/dev/null; then
   fail "ONNX Runtime not bundled" "apps/kira-space/build/darwin/Taskfile.yml's create:app:bundle does not reference libonnxruntime.$ORT_GO_VERSION.dylib"
 fi
-
-# --- S13: the pinned whisper.cpp build and speech models agree everywhere (P216) ---------------
-# scripts/fetch-whisper.sh pins the source commit; internal/memory/stt/spec.go pins the same
-# commit. The darwin build task must pass the `whisper` tag and both plists must carry the
-# microphone usage string, or the shipped app would silently have no dictation.
-WHISPER_SCRIPT_COMMIT="$(sed -n 's/^WHISPER_COMMIT="\([^"]*\)".*/\1/p' scripts/fetch-whisper.sh 2>/dev/null | head -1)"
-if [ -z "$WHISPER_SCRIPT_COMMIT" ] || ! grep -q "$WHISPER_SCRIPT_COMMIT" internal/memory/stt/spec.go 2>/dev/null; then
-  fail "whisper.cpp pin mismatch" "scripts/fetch-whisper.sh WHISPER_COMMIT ('$WHISPER_SCRIPT_COMMIT') is not the commit in internal/memory/stt/spec.go"
-fi
-if ! grep -q "whisper{{if .EXTRA_TAGS}}" apps/kira-space/build/darwin/Taskfile.yml 2>/dev/null; then
-  fail "whisper tag not built" "apps/kira-space/build/darwin/Taskfile.yml's build task does not pass the 'whisper' tag"
-fi
-for PLIST in Info.plist Info.dev.plist; do
-  if ! grep -q "NSMicrophoneUsageDescription" "apps/kira-space/build/darwin/$PLIST" 2>/dev/null; then
-    fail "microphone usage string missing" "apps/kira-space/build/darwin/$PLIST has no NSMicrophoneUsageDescription"
-  fi
-done
 
 if command -v shellcheck >/dev/null 2>&1; then
   if ! shellcheck -s sh scripts/install.sh; then
