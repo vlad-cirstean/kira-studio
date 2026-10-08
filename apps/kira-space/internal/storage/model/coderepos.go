@@ -1,6 +1,10 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/kirathecat/kira-studio/internal/palette"
+)
 
 // CodeRepo is one row of `code_repos` (C5 §3.1) — a repository this app has imported into the
 // native code workspace, distinct from a `connections` row (D1: it carries none of that table's
@@ -11,6 +15,7 @@ type CodeRepo struct {
 	Root      string `json:"root"`
 	RepoID    string `json:"repoId"`
 	SortOrder int    `json:"sortOrder"`
+	Color     string `json:"color"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -28,6 +33,9 @@ func (r CodeRepo) Validate() error {
 	}
 	if r.RepoID == "" {
 		return fmt.Errorf("model: code repo %q: repoId is required", r.ID)
+	}
+	if !palette.Valid(r.Color) {
+		return fmt.Errorf("model: code repo %q: invalid colour %q", r.ID, r.Color)
 	}
 	return nil
 }

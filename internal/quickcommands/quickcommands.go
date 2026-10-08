@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/kirathecat/kira-studio/internal/palette"
 )
 
 // MaxCollectionRunes caps a quick-command collection name.
@@ -28,14 +30,6 @@ func invalid(format string, args ...any) error {
 func IsCallerError(err error) bool {
 	var ve *ValidationError
 	return errors.As(err, &ve) || errors.Is(err, sql.ErrNoRows)
-}
-
-// paletteColors mirrors packages/shared/domain/color.ts's paletteColorSchema (the whole storable
-// set).
-var paletteColors = map[string]bool{
-	"none": true, "red": true, "orange": true, "amber": true, "olive": true, "green": true,
-	"teal": true, "cyan": true, "blue": true, "indigo": true, "violet": true, "magenta": true,
-	"grey": true,
 }
 
 // CustomScript mirrors packages/shared/domain/scripts.ts's customScriptSchema: one custom_scripts
@@ -94,7 +88,7 @@ func (f *CustomScriptFields) Validate() error {
 	if f.WorkingDir != "" && !filepath.IsAbs(f.WorkingDir) {
 		return invalid("quickcommands: working directory must be an absolute path")
 	}
-	if !paletteColors[f.Color] {
+	if !palette.Valid(f.Color) {
 		return invalid("quickcommands: invalid colour")
 	}
 	return nil

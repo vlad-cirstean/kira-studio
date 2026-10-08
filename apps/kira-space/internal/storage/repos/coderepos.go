@@ -6,10 +6,11 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/palette"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const codeReposSelectColumns = `id, name, root, repo_id, sort_order, created_at`
+const codeReposSelectColumns = `id, name, root, repo_id, sort_order, color, created_at`
 
 // CodeReposRepo reads and writes the `code_repos` table (C5 §3.1) — the repo-import store.
 type CodeReposRepo struct {
@@ -18,7 +19,7 @@ type CodeReposRepo struct {
 
 func scanCodeRepoRow(row rowScanner) (model.CodeRepo, error) {
 	var r model.CodeRepo
-	if err := row.Scan(&r.ID, &r.Name, &r.Root, &r.RepoID, &r.SortOrder, &r.CreatedAt); err != nil {
+	if err := row.Scan(&r.ID, &r.Name, &r.Root, &r.RepoID, &r.SortOrder, &r.Color, &r.CreatedAt); err != nil {
 		return model.CodeRepo{}, err
 	}
 	return r, nil
@@ -57,17 +58,20 @@ var ErrCodeRepoExists = errors.New("repos: code repo already exists")
 // (CodeWorkspaceService.ImportRepo) checks first only to return a friendlier error than a raw
 // constraint violation.
 func (r *CodeReposRepo) Create(rec model.CodeRepo) (model.CodeRepo, error) {
-	if err := rec.Validate(); err != nil {
-		return model.CodeRepo{}, fmt.Errorf("repos: %w", err)
-	}
 	sortOrder, err := sqlitex.NextSortOrder(r.DB, "code_repos", "")
 	if err != nil {
 		return model.CodeRepo{}, fmt.Errorf("repos: code repo next sort order: %w", err)
 	}
 	rec.SortOrder = sortOrder
+	if rec.Color == "" {
+		rec.Color = palette.AutoRepoColor(sortOrder)
+	}
+	if err := rec.Validate(); err != nil {
+		return model.CodeRepo{}, fmt.Errorf("repos: %w", err)
+	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO code_repos (id, name, root, repo_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.Name, rec.Root, rec.RepoID, rec.SortOrder, rec.CreatedAt,
+		`INSERT INTO code_repos (id, name, root, repo_id, sort_order, color, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Name, rec.Root, rec.RepoID, rec.SortOrder, rec.Color, rec.CreatedAt,
 	); err != nil {
 		if isUniqueViolation(err) {
 			return model.CodeRepo{}, ErrCodeRepoExists
@@ -91,6 +95,24 @@ func (r *CodeReposRepo) Rename(id, name string) (model.CodeRepo, error) {
 	}
 	if rec == nil {
 		return model.CodeRepo{}, fmt.Errorf("repos: rename code repo %s: not found", id)
+	}
+	return *rec, nil
+}
+
+// SetColor updates only the palette colour.
+func (r *CodeReposRepo) SetColor(id, color string) (model.CodeRepo, error) {
+	if !palette.Valid(color) {
+		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s colour: invalid colour %q", id, color)
+	}
+	if _, err := r.DB.Exec(`UPDATE code_repos SET color = ? WHERE id = ?`, color, id); err != nil {
+		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s colour: %w", id, err)
+	}
+	rec, err := r.Get(id)
+	if err != nil {
+		return model.CodeRepo{}, err
+	}
+	if rec == nil {
+		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s colour: not found", id)
 	}
 	return *rec, nil
 }

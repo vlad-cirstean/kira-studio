@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/palette"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -51,6 +52,11 @@ type CodeWorkspaceImportArgs struct {
 type CodeWorkspaceRenameArgs struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type CodeWorkspaceSetColorArgs struct {
+	ID    string `json:"id"`
+	Color string `json:"color"`
 }
 
 type CodeWorkspaceReorderArgs struct {
@@ -300,6 +306,20 @@ func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.C
 		return model.CodeRepo{}, ipcerr.BadRequest("name is required")
 	}
 	rec, err := s.Deps.Repos.CodeRepos.Rename(args.ID, args.Name)
+	if err == nil {
+		s.reposChanged()
+	}
+	return ipcerr.InternalResult(rec, err)
+}
+
+func (s *CodeWorkspaceService) SetRepoColor(args CodeWorkspaceSetColorArgs) (model.CodeRepo, error) {
+	if args.ID == "" {
+		return model.CodeRepo{}, ipcerr.BadRequest("id is required")
+	}
+	if !palette.Valid(args.Color) {
+		return model.CodeRepo{}, ipcerr.BadRequest("invalid colour")
+	}
+	rec, err := s.Deps.Repos.CodeRepos.SetColor(args.ID, args.Color)
 	if err == nil {
 		s.reposChanged()
 	}
