@@ -12,6 +12,11 @@ import { storeToRefs } from 'pinia';
 import { onMounted, useId, useTemplateRef } from 'vue';
 import AddMemoryDialog from './AddMemoryDialog.vue';
 import ConnectClaudeDialog from './ConnectClaudeDialog.vue';
+import ImportConfirmDialog from './import/ImportConfirmDialog.vue';
+import ImportMenu from './import/ImportMenu.vue';
+import ImportStatus from './import/ImportStatus.vue';
+import { useImportChangeSync } from './import/importQueries';
+import { useImportUiStore } from './import/importStore';
 import { useMemoryChangeSync, useMemorySearch } from './queries';
 import SemanticStatus from './SemanticStatus.vue';
 import { useMemoryUiStore } from './store';
@@ -23,11 +28,18 @@ const { query, includeHistory, selectedId, addOpen, connectOpen } = storeToRefs(
 const debounced = refDebounced(query, 200);
 const search = useMemorySearch(debounced, includeHistory);
 useMemoryChangeSync();
+useImportChangeSync();
+const imports = useImportUiStore();
 
 const searchInput = useTemplateRef<{ $el: HTMLInputElement }>('searchInput');
 onMounted(() => {
   searchInput.value?.$el.focus();
 });
+
+function selectMemory(id: string): void {
+  selectedId.value = id;
+  imports.view = 'memory';
+}
 
 const historyToggleId = useId();
 </script>
@@ -43,6 +55,7 @@ const historyToggleId = useId();
         data-testid="memory-add"
         @click="addOpen = true"
       />
+      <ImportMenu />
       <TooltipIconButton
         icon="plug"
         label="Connect Claude Code"
@@ -67,6 +80,7 @@ const historyToggleId = useId();
         <Label :for="historyToggleId">Include history</Label>
       </div>
       <SemanticStatus />
+      <ImportStatus />
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto" data-testid="memory-results">
       <Alert v-if="search.isError.value" variant="destructive" class="m-1.5 w-auto" data-testid="memory-error">
@@ -89,7 +103,7 @@ const historyToggleId = useId();
           class="flex flex-col gap-1 border-b border-border px-1.5 py-1.5 text-left cursor-default hover:bg-hover"
           :class="{ 'bg-hover': selectedId === memory.id, 'opacity-70': memory.historical }"
           :data-testid="`memory-row-${memory.id}`"
-          @click="selectedId = memory.id"
+          @click="selectMemory(memory.id)"
         >
           <span class="line-clamp-2 text-kira-md">{{ memory.fact }}</span>
           <span class="flex items-center gap-1">
@@ -102,6 +116,7 @@ const historyToggleId = useId();
       </div>
     </div>
     <AddMemoryDialog v-if="addOpen" @close="addOpen = false" />
+    <ImportConfirmDialog v-if="imports.confirmJobId" @close="imports.confirmJobId = null" />
     <ConnectClaudeDialog v-if="connectOpen" @close="connectOpen = false" />
   </div>
 </template>

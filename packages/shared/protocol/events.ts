@@ -73,6 +73,8 @@ export const CHANNEL = {
   memoryChanged: 'kira:memory:changed',
   // P210: semantic-search status or indexing progress changed; empty payload, refetch the status.
   memorySemantic: 'kira:memory:semantic',
+  // P211: an import job or file changed state or progress; empty payload, refetch.
+  memoryImport: 'kira:memory:import',
   // P112: every API-client mutation (collections, saved requests, variables, environments) Emits
   // this with the scopes it touched, so every window's TanStack Query cache invalidates exactly
   // those keys — customScriptsChanged's own shape, generalised to a batch of scopes per event.

@@ -4,11 +4,14 @@ import { Badge } from '@theme/components/ui/badge';
 import { Empty, EmptyDescription, EmptyTitle } from '@theme/components/ui/empty';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
+import ImportView from './import/ImportView.vue';
+import { useImportUiStore } from './import/importStore';
 import { useMemoryHistory } from './queries';
 import { useMemoryUiStore } from './store';
 
 // P201: the main area of the Memory module — the selected memory and its version trail.
 const ui = useMemoryUiStore();
+const imports = useImportUiStore();
 const { selectedId } = storeToRefs(ui);
 const history = useMemoryHistory(selectedId);
 
@@ -25,7 +28,8 @@ function when(iso: string): string {
 </script>
 
 <template>
-  <div class="h-full overflow-y-auto" data-testid="memory-start">
+  <ImportView v-if="imports.view === 'imports'" />
+  <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
     <Alert v-if="history.isError.value" variant="destructive" class="m-3 w-auto">
       <AlertDescription>{{ history.error.value?.message }}</AlertDescription>
     </Alert>
@@ -64,7 +68,7 @@ function when(iso: string): string {
           <span class="text-kira-md whitespace-pre-wrap">{{ version.fact }}</span>
           <span v-for="event in eventsFor(version.id)" :key="event.seq" class="text-kira-sm text-muted-foreground">
             {{ event.action === 'noop' ? 'Reconfirmed' : event.action === 'add' ? 'Added' : 'Updated' }}
-            by {{ event.author }} via {{ event.source }}<template v-if="event.rationale"> — {{ event.rationale }}</template>
+            by {{ event.author }} via {{ event.source }}<template v-if="event.source === 'import'"> ({{ event.sourceLabel ?? event.sourceRef }})</template><template v-if="event.rationale"> — {{ event.rationale }}</template>
           </span>
         </div>
       </div>

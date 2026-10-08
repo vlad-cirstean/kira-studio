@@ -30,7 +30,10 @@ export type Memory = z.infer<typeof memorySchema>;
 export const memoryEventSchema = /*#__PURE__*/ z.object({
   seq: z.number().int(),
   requestId: z.string(),
-  source: /*#__PURE__*/ z.enum(['mcp', 'ui']),
+  source: /*#__PURE__*/ z.enum(['mcp', 'ui', 'import']),
+  // P211: the import job's file id and its path label; set only for source 'import'.
+  sourceRef: z.string().nullable(),
+  sourceLabel: z.string().optional(),
   action: /*#__PURE__*/ z.enum(['add', 'update', 'noop']),
   lineageId: z.string(),
   memoryId: z.string(),

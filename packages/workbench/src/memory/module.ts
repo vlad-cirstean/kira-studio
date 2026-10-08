@@ -8,6 +8,12 @@ import type {
   MemorySemanticStatus,
   MemoryStoreResult,
 } from '@shared/domain/memory';
+import type {
+  ImportAction,
+  ImportChoice,
+  ImportJob,
+  ImportJobDetail,
+} from '@shared/domain/memoryImport';
 import { type InjectionKey, inject } from 'vue';
 
 // P201: the Memory module's injected context, the shared terminal module's shape — the same
@@ -31,6 +37,15 @@ export interface MemoryControl {
   memorySemanticInstall(signal?: AbortSignal): Promise<void>;
   memorySemanticRetry(): Promise<void>;
   onMemorySemantic(cb: () => void): () => void;
+  /** Opens the native picker: several documents or one folder. */
+  memoryImportChoose(kind: 'files' | 'folder'): Promise<ImportChoice>;
+  /** Starts a background scan; the job awaits confirmation once scanned. */
+  memoryImportCreate(paths: string[]): Promise<ImportJob>;
+  memoryImportJobs(): Promise<ImportJob[]>;
+  memoryImportJob(id: string): Promise<ImportJobDetail>;
+  memoryImportAction(action: ImportAction, id: string): Promise<void>;
+  memoryImportRetryFile(fileId: string): Promise<void>;
+  onMemoryImport(cb: () => void): () => void;
 }
 
 export interface MemoryModuleContext {
