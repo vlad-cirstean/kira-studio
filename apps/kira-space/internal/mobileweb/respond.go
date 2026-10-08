@@ -46,6 +46,15 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		case "E_NOT_FOUND":
 			writeError(w, http.StatusNotFound, ie.Code, ie.Message)
 			return
+		case "E_INVALID":
+			writeError(w, http.StatusUnprocessableEntity, ie.Code, ie.Message)
+			return
+		case "E_STALE", "E_PREPARING", "E_TERMINAL_BUSY", "E_NO_WINDOW":
+			writeError(w, http.StatusConflict, ie.Code, ie.Message)
+			return
+		case "E_LAUNCH_TIMEOUT":
+			writeError(w, http.StatusGatewayTimeout, ie.Code, ie.Message)
+			return
 		}
 	}
 	slog.Warn("mobileweb: service error", "scope", "mobileweb", "err", err)

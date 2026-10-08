@@ -18,12 +18,17 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Config wires the server to the services it reads. Nothing here lets it write ADE state.
+// Config wires the server to the services it reads and the narrow Writer it writes through.
 type Config struct {
-	Reader        Reader
-	AgentSessions func() any
-	Devices       DeviceStore
-	Hub           *Hub
+	Reader Reader
+	// Writer, Terminals and AgentInputEnabled are optional: without them the matching routes answer
+	// 503 (Writer, Terminals) or refuse agent input (AgentInputEnabled).
+	Writer            Writer
+	Terminals         TerminalBroker
+	AgentInputEnabled func() bool
+	AgentSessions     func() any
+	Devices           DeviceStore
+	Hub               *Hub
 	// Broker outlives the server: the desktop approval dialog stays subscribed across restarts.
 	Broker *Broker
 	// Assets is the mobile build (index.html, setup.html, assets/, sw.js, manifest).
@@ -47,7 +52,7 @@ type Status struct {
 	LeafExpiresAt int64
 }
 
-// Server is the read-only mobile web server: one HTTPS listener per bound address for the app and
+// Server is the mobile web server: one HTTPS listener per bound address for the app and
 // API, and one plain-HTTP listener per address for the setup page.
 type Server struct {
 	cfg Config
@@ -55,6 +60,9 @@ type Server struct {
 	failedAuth *limiterSet
 	deviceRate *limiterSet
 	pairRate   *limiterSet
+	writeRate  *limiterSet
+	attachRate *limiterSet
+	idem       *idemStore
 	flight     singleflight.Group
 
 	touchMu sync.Mutex
@@ -85,6 +93,9 @@ func New(cfg Config) *Server {
 		failedAuth: newLimiterSet(rate.Every(time.Minute), 10, cfg.Now),
 		deviceRate: newLimiterSet(20, 40, cfg.Now),
 		pairRate:   newLimiterSet(rate.Every(10*time.Second), 3, cfg.Now),
+		writeRate:  newLimiterSet(1, 10, cfg.Now),
+		attachRate: newLimiterSet(rate.Every(2*time.Second), 3, cfg.Now),
+		idem:       newIdemStore(idemTTL),
 		touched:    map[string]time.Time{},
 	}
 }
@@ -188,6 +199,8 @@ func (s *Server) maintain(stop <-chan struct{}) {
 			s.failedAuth.sweep()
 			s.deviceRate.sweep()
 			s.pairRate.sweep()
+			s.writeRate.sweep()
+			s.attachRate.sweep()
 			s.sweepTouched()
 		case <-renew.C:
 			s.renewLeaf()
@@ -260,6 +273,9 @@ func (s *Server) Close() error {
 	cancel()
 	close(stop)
 	s.cfg.Hub.CloseAll()
+	if s.cfg.Terminals != nil {
+		s.cfg.Terminals.ReleaseAll("server stopped")
+	}
 	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	defer done()
 	var firstErr error
@@ -315,5 +331,24 @@ func (s *Server) Revoke(id string) error {
 		return err
 	}
 	s.cfg.Hub.DisconnectDevice(id)
+	if s.cfg.Terminals != nil {
+		s.cfg.Terminals.ReleaseDevice(id)
+	}
 	return nil
+}
+
+// PermissionsChanged ends a device's terminals when its agent input flag is off. The desktop
+// calls it after storing new flags.
+func (s *Server) PermissionsChanged(id string) {
+	if s.cfg.Terminals == nil {
+		return
+	}
+	row, found, err := s.cfg.Devices.ByID(id)
+	if err != nil {
+		slog.Warn("mobileweb: device lookup", "scope", "mobileweb", "device", id, "err", err)
+		return
+	}
+	if !found || row.RevokedAt != nil || !row.CanAgentInput {
+		s.cfg.Terminals.ReleaseDevice(id)
+	}
 }

@@ -17,39 +17,83 @@ const (
 	accessDevice               // requires a paired, unrevoked device
 )
 
+// perm is what a device row additionally needs: nothing, the device's write flag, or the agent
+// input flag plus the global agent input switch.
+type perm int
+
+const (
+	permNone perm = iota
+	permWrite
+	permAgentInput
+)
+
+// kind says how a row's connection lives: a plain request gets a write deadline, a stream (SSE,
+// the pairing long-poll) sets its own, an upgrade is hijacked into a WebSocket.
+type kind int
+
+const (
+	kindPlain kind = iota
+	kindStream
+	kindUpgrade
+)
+
+type deviceHandler = func(http.ResponseWriter, *http.Request, repos.MobileDeviceRow)
+
 type route struct {
 	method string
 	path   string
 	access access
-	handle func(http.ResponseWriter, *http.Request, repos.MobileDeviceRow)
+	perm   perm
+	kind   kind
+	// action names the audit line of a write; reads leave it empty.
+	action string
+	handle deviceHandler
 }
 
 const (
-	apiDeadline = 30 * time.Second
-	flightLimit = 25 * time.Second
+	apiDeadline   = 30 * time.Second
+	writeDeadline = 90 * time.Second
+	flightLimit   = 25 * time.Second
 )
 
+func read(path string, h deviceHandler) route {
+	return route{method: http.MethodGet, path: path, access: accessDevice, handle: h}
+}
+
+func write(path, action string, p perm, h deviceHandler) route {
+	return route{method: http.MethodPost, path: path, access: accessDevice, perm: p, action: action, handle: h}
+}
+
 // routes is the complete app-port API. The mux registers exactly these, and a test walks them: a
-// new endpoint is a deliberate row here. Every state-changing method also passes csrfGuard, and a
-// device route is already per-device authenticated and rate limited, so a later write endpoint
-// is one row, not new plumbing.
+// new endpoint is a deliberate row here. A row that changes state names its permission and audit
+// action; appMux then adds the CSRF check, the device cookie, the permission gate, the write rate
+// limit, the idempotency protocol and the audit line around it, so a row is only its handler.
 func (s *Server) routes() []route {
 	return []route{
-		{http.MethodPost, "/api/pair", accessPublic, func(w http.ResponseWriter, r *http.Request, _ repos.MobileDeviceRow) { s.handlePair(w, r) }},
-		{http.MethodGet, "/api/me", accessDevice, func(w http.ResponseWriter, _ *http.Request, d repos.MobileDeviceRow) {
-			writeJSON(w, http.StatusOK, deviceBody{DeviceID: d.ID, Label: d.Label})
-		}},
-		{http.MethodGet, "/api/events", accessDevice, func(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) { s.handleEvents(w, r, d.ID) }},
-		{http.MethodGet, "/api/ade/board", accessDevice, readJSON(s, "board", true, s.cfg.Reader.Board)},
-		{http.MethodGet, "/api/ade/prs", accessDevice, readJSON(s, "prs", true, s.cfg.Reader.Prs)},
-		{http.MethodGet, "/api/ade/sessions", accessDevice, readJSON(s, "sessions", false, s.cfg.Reader.Sessions)},
-		{http.MethodGet, "/api/ade/workflows", accessDevice, readJSON(s, "workflows", false, s.cfg.Reader.Workflows)},
-		{http.MethodGet, "/api/ade/backlog", accessDevice, readJSON(s, "backlog", false, s.cfg.Reader.Backlog)},
-		{http.MethodGet, "/api/ade/repos", accessDevice, readJSON(s, "repos", false, s.repoNames)},
-		{http.MethodGet, "/api/ade/log", accessDevice, s.handleLog},
-		{http.MethodGet, "/api/agent/sessions", accessDevice, func(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow) {
+		{method: http.MethodPost, path: "/api/pair", access: accessPublic, kind: kindStream,
+			handle: func(w http.ResponseWriter, r *http.Request, _ repos.MobileDeviceRow) { s.handlePair(w, r) }},
+		read("/api/me", s.handleMe),
+		{method: http.MethodGet, path: "/api/events", access: accessDevice, kind: kindStream,
+			handle: func(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) { s.handleEvents(w, r, d.ID) }},
+		read("/api/ade/board", readJSON(s, "board", true, s.cfg.Reader.Board)),
+		read("/api/ade/prs", readJSON(s, "prs", true, s.cfg.Reader.Prs)),
+		read("/api/ade/sessions", readJSON(s, "sessions", false, s.cfg.Reader.Sessions)),
+		read("/api/ade/workflows", readJSON(s, "workflows", false, s.cfg.Reader.Workflows)),
+		read("/api/ade/backlog", readJSON(s, "backlog", false, s.cfg.Reader.Backlog)),
+		read("/api/ade/repos", readJSON(s, "repos", false, s.repoNames)),
+		read("/api/ade/log", s.handleLog),
+		read("/api/agent/sessions", func(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow) {
 			writeJSON(w, http.StatusOK, s.cfg.AgentSessions())
-		}},
+		}),
+		write("/api/ade/backlog/items", "backlog.add", permWrite, s.handleBacklogAdd),
+		write("/api/ade/backlog/move", "backlog.move", permWrite, s.handleBacklogMove),
+		write("/api/ade/tasks/stage", "task.stage", permWrite, s.handleTaskStage),
+		write("/api/ade/tasks/run", "task.run", permWrite, s.handleTaskRun),
+		write("/api/ade/tasks/launch", "task.launch", permWrite, s.handleTaskLaunch),
+		write("/api/agent/sessions/{id}/send", "session.send", permAgentInput, s.handleSessionSend),
+		write("/api/agent/sessions/{id}/take-over", "session.takeOver", permAgentInput, s.handleSessionTakeOver),
+		{method: http.MethodGet, path: "/api/agent/sessions/{id}/terminal", access: accessDevice,
+			perm: permAgentInput, kind: kindUpgrade, action: "terminal.attach", handle: s.handleTerminal},
 	}
 }
 
@@ -60,15 +104,31 @@ func (s *Server) appMux() *http.ServeMux {
 	for _, rt := range s.routes() {
 		var h http.Handler
 		if rt.access == accessDevice {
-			h = s.withDevice(rt.handle)
+			h = s.withDevice(s.gated(rt))
 		} else {
 			h = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { rt.handle(w, r, repos.MobileDeviceRow{}) })
 		}
-		h = noStore(csrfGuard(deadline(rt.path, h)))
+		h = noStore(csrfGuard(rt, deadline(rt, h)))
 		mux.Handle(rt.method+" "+rt.path, h)
 	}
 	mux.Handle("GET /", s.staticHandler())
 	return mux
+}
+
+// gated wraps a device row's handler with everything a write needs, outermost first: permission,
+// rate limit, idempotency (POST), audit. Reads pass through untouched.
+func (s *Server) gated(rt route) deviceHandler {
+	h := rt.handle
+	if rt.perm == permNone {
+		return h
+	}
+	if rt.kind != kindUpgrade {
+		h = s.audited(rt, h)
+		if rt.method == http.MethodPost {
+			h = s.idempotent(rt, h)
+		}
+	}
+	return s.requirePerm(rt, s.writeLimit(rt, h))
 }
 
 func noStore(next http.Handler) http.Handler {
@@ -79,13 +139,18 @@ func noStore(next http.Handler) http.Handler {
 }
 
 // deadline bounds slow clients per route: the server has no global WriteTimeout because the SSE
-// stream and the pairing long-poll outlive any single value. Those two set their own.
-func deadline(path string, next http.Handler) http.Handler {
-	if path == "/api/events" || path == "/api/pair" {
+// stream, the pairing long-poll and a hijacked terminal outlive any single value. Those set their
+// own. A write may wait on git work or the desktop window, so it gets a longer bound.
+func deadline(rt route, next http.Handler) http.Handler {
+	if rt.kind != kindPlain {
 		return next
 	}
+	limit := apiDeadline
+	if rt.perm != permNone {
+		limit = writeDeadline
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(apiDeadline))
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(limit))
 		next.ServeHTTP(w, r)
 	})
 }

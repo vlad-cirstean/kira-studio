@@ -233,9 +233,12 @@ func main() {
 	if err != nil {
 		panic(err) // constant embed path: only a build-time mistake fails here
 	}
+	mobileLaunches := &bridge.MobileLaunches{Emit: emitter, Window: windows.AnyRealKey}
 	mobileSvc := bridge.NewMobileAccessService(&bridge.MobileAccessService{
 		Deps: deps, Reader: adeTaskSvc, Hub: mobileHub, Broker: mobileweb.NewBroker(time.Now), Assets: mobileAssetsFS,
 		AgentSessions: func() any { return terminalSvc.AgentSessions() },
+		Writer:        &bridge.MobileWriter{Svc: adeTaskSvc, Launches: mobileLaunches},
+		Launches:      mobileLaunches,
 	})
 	detachMobilePush := mobileSvc.AttachPush()
 

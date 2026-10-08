@@ -1,0 +1,36 @@
+package mobileweb
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+)
+
+// LaunchResult is what a phone learns from a launch or take over: the ADE session id. The
+// terminal id never crosses to the phone; it addresses sessions, not terminals.
+type LaunchResult struct {
+	SessionID string `json:"sessionId"`
+}
+
+// Writer is the write slice of the ADE task service the phone reaches. *bridge.MobileWriter
+// forwards each method to the AdeTaskService method desktop calls, so validation, engine rules and
+// error mapping are the same. Each method is one row in routes().
+type Writer interface {
+	AddBacklogItem(ctx context.Context, args adewire.AddBacklogItemArgs) (adewire.BacklogItem, error)
+	MoveBacklogItem(ctx context.Context, args adewire.MoveBacklogItemArgs) error
+	SetTaskStage(ctx context.Context, args adewire.SetTaskStageArgs) (adewire.Task, error)
+	StartRun(ctx context.Context, args adewire.StartRunArgs) (adewire.StartRunResult, error)
+	LaunchStage(ctx context.Context, args adewire.LaunchStageArgs) (LaunchResult, error)
+	Send(ctx context.Context, args adewire.SendArgs) error
+	TakeOver(ctx context.Context, args adewire.TakeOverArgs) (LaunchResult, error)
+}
+
+// TerminalBroker owns phone-attached agent terminals (internal/mobileterm). Serve upgrades the
+// request to a WebSocket after resolving the ADE session id itself; the other two end holds.
+type TerminalBroker interface {
+	Serve(w http.ResponseWriter, r *http.Request, dev repos.MobileDeviceRow, sessionID string)
+	ReleaseDevice(deviceID string)
+	ReleaseAll(reason string)
+}

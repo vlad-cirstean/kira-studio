@@ -179,10 +179,12 @@ func isSafeMethod(m string) bool {
 	return m == http.MethodGet || m == http.MethodHead || m == http.MethodOptions
 }
 
-// csrfGuard wraps a route whose method can change state.
-func csrfGuard(next http.Handler) http.Handler {
+// csrfGuard wraps a route whose method can change state, and every WebSocket upgrade: a GET that
+// opens a terminal is as dangerous as a POST, and browsers do not apply CORS to it.
+func csrfGuard(rt route, next http.Handler) http.Handler {
+	checked := rt.kind == kindUpgrade
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !isSafeMethod(r.Method) && !sameOriginRequest(r) {
+		if (checked || !isSafeMethod(r.Method)) && !sameOriginRequest(r) {
 			writeError(w, http.StatusForbidden, "E_FORBIDDEN", "cross-origin request refused")
 			return
 		}

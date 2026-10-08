@@ -84,6 +84,11 @@ type MobileAccessService struct {
 	Hub    *mobileweb.Hub
 	// Broker outlives server restarts; AttachPush runs its expiry loop and shuts it down.
 	Broker *mobileweb.Broker
+	// Writer is the phone's write path and Launches the rendezvous with the desktop window that
+	// opens a phone-started launch's terminal. Terminals owns phone-attached agent terminals.
+	Writer    mobileweb.Writer
+	Launches  *MobileLaunches
+	Terminals mobileweb.TerminalBroker
 
 	embedded embedded.Service[*mobileweb.Server, MobileStatus]
 }
@@ -99,6 +104,7 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 			}
 			srv := mobileweb.New(mobileweb.Config{
 				Reader: s.Reader, AgentSessions: s.AgentSessions, Devices: s.Deps.Repos.MobileDevices,
+				Writer: s.Writer, Terminals: s.Terminals, AgentInputEnabled: s.agentInputEnabled,
 				Hub: s.Hub, Broker: s.Broker, Assets: s.Assets,
 				CADir:     mobileCADir(),
 				HTTPSPort: cfg.Mobile.HTTPSPort, SetupPort: cfg.Mobile.SetupPort,
@@ -132,6 +138,29 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 		},
 	}
 	return s
+}
+
+// agentInputEnabled reads the global switch on each request, so turning it off takes effect at once.
+func (s *MobileAccessService) agentInputEnabled() bool {
+	cfg, err := s.Deps.Repos.Settings.GetAll()
+	return err == nil && cfg.Mobile.AgentInput
+}
+
+type MobileLaunchOpenedArgs struct {
+	TerminalID string `json:"terminalId"`
+	// Error is the window's failure text; empty when the terminal opened.
+	Error string `json:"error"`
+}
+
+// LaunchOpened is the desktop window's answer to a phone-started launch (ChannelMobileOpenLaunch).
+func (s *MobileAccessService) LaunchOpened(args MobileLaunchOpenedArgs) error {
+	if args.TerminalID == "" {
+		return ipcerr.BadRequest("terminalId is required")
+	}
+	if s.Launches != nil {
+		s.Launches.Ack(args.TerminalID, args.Error)
+	}
+	return nil
 }
 
 func (s *MobileAccessService) Status() MobileStatus { return s.embedded.Status() }
@@ -202,6 +231,9 @@ func (s *MobileAccessService) SetAgentInputEnabled(args MobileSetAgentInputArgs)
 		return MobileStatus{}, ipcerr.InternalErr(err)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
+	if !args.Enabled && s.Terminals != nil {
+		s.Terminals.ReleaseAll("agent input turned off")
+	}
 	st := s.embedded.Status()
 	s.emitStatus(st)
 	return st, nil
@@ -220,6 +252,12 @@ func (s *MobileAccessService) SetDevicePermissions(args MobileDevicePermissionsA
 	}
 	if err := s.Deps.Repos.MobileDevices.SetPermissions(args.ID, args.Write, args.AgentInput); err != nil {
 		return ipcerr.InternalErr(err)
+	}
+	s.embedded.Mu.Lock()
+	srv := s.embedded.Server
+	s.embedded.Mu.Unlock()
+	if srv != nil {
+		srv.PermissionsChanged(args.ID)
 	}
 	s.emitDevices()
 	return nil

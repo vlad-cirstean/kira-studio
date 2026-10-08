@@ -158,6 +158,20 @@ func (r *WindowRegistry) Any() application.Window {
 	return nil
 }
 
+// AnyRealKey returns the smallest key of a non-ephemeral window, deterministic so repeated calls
+// pick the same window. false when none is open.
+func (r *WindowRegistry) AnyRealKey() (string, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	best, found := "", false
+	for k, e := range r.entries {
+		if !e.ephemeral && (!found || k < best) {
+			best, found = k, true
+		}
+	}
+	return best, found
+}
+
 // Keys returns every currently registered window's key — Quitter's LiveWindowKeys seam (P8 C8):
 // which windows the quit handshake must wait for is decided at the moment quitting actually
 // starts, not fixed at construction time.

@@ -28,6 +28,10 @@ const (
 	ChannelMobilePairing = "kira:mobile:pairing"
 	ChannelMobileDevices = "kira:mobile:devices"
 	ChannelMobileStatus  = "kira:mobile:status"
+	// ChannelMobileOpenLaunch asks one desktop window to open a phone-started launch's terminal
+	// (EmitTo, never Emit); ChannelMobileTerminals pushes the phone-held terminals list.
+	ChannelMobileOpenLaunch = "kira:mobile:openLaunch"
+	ChannelMobileTerminals  = "kira:mobile:terminals"
 )
 
 // ChannelCustomScriptsChanged is CustomScriptsService's list-changed broadcast (Emit to every

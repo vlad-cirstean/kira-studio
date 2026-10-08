@@ -132,6 +132,7 @@ func (s *Server) finishPairing(w http.ResponseWriter, requestID string, meta Mob
 	row := repos.MobileDeviceRow{
 		ID: uuid.NewString(), Label: meta.Label, UserAgent: meta.UserAgent,
 		TokenHash: tok.Hash, TokenSalt: tok.Salt, CreatedAt: now, LastSeenAt: now, LastIP: meta.RemoteIP,
+		CanWrite: true,
 	}
 	if err := s.cfg.Devices.Insert(row); err != nil {
 		slog.Error("mobileweb: insert paired device", "scope", "mobileweb", "err", err)

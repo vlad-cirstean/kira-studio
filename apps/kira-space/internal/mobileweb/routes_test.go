@@ -44,12 +44,28 @@ func TestRoutes_OnlyAllowlistedPairsReachHandlers(t *testing.T) {
 	}
 }
 
-func TestRoutes_NoPostBesidesPair(t *testing.T) {
+// Every row that is not a read must be guarded: a permission, an audit action, POST (the one
+// exception is the WebSocket upgrade, a GET behind the agent input permission), and only the pairing
+// row is open.
+func TestRoutes_WriteRowsAreGuarded(t *testing.T) {
 	t.Parallel()
 	s, _, _ := newTestServer(t)
 	for _, rt := range s.routes() {
-		if rt.method != http.MethodGet && rt.path != "/api/pair" {
-			t.Errorf("%s %s: the read-only server may expose only POST /api/pair as a non-GET", rt.method, rt.path)
+		if rt.path == "/api/pair" || (rt.method == http.MethodGet && rt.perm == permNone && rt.action == "") {
+			continue
+		}
+		if rt.perm == permNone || rt.action == "" {
+			t.Errorf("%s %s: a state-changing row needs a permission and an audit action", rt.method, rt.path)
+		}
+		switch rt.kind {
+		case kindUpgrade:
+			if rt.method != http.MethodGet || rt.perm != permAgentInput {
+				t.Errorf("%s %s: an upgrade is a GET behind agent input", rt.method, rt.path)
+			}
+		default:
+			if rt.method != http.MethodPost {
+				t.Errorf("%s %s: a write is a POST", rt.method, rt.path)
+			}
 		}
 	}
 }
