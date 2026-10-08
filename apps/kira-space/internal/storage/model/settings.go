@@ -84,6 +84,9 @@ type MobileSettings struct {
 	Enabled   bool `json:"enabled"`
 	HTTPSPort int  `json:"httpsPort"`
 	SetupPort int  `json:"setupPort"`
+	// AgentInput is the global switch for phones replying to agents and attaching to their
+	// terminals; a device also needs its own can_agent_input flag.
+	AgentInput bool `json:"agentInput"`
 }
 
 type Settings struct {
@@ -97,7 +100,7 @@ type Settings struct {
 
 // DefaultMobileSettings mirrors settingsDomain.ts's mobileSettingsSchema defaults.
 func DefaultMobileSettings() MobileSettings {
-	return MobileSettings{Enabled: false, HTTPSPort: 7790, SetupPort: 7791}
+	return MobileSettings{Enabled: false, HTTPSPort: 7790, SetupPort: 7791, AgentInput: false}
 }
 
 // DefaultGitSettings mirrors docs/v1.3/plans/G7 D16's own default: the same three-pattern default
@@ -192,9 +195,10 @@ type ClaudeCodePatch struct {
 
 // MobilePatch mirrors MobileSettings' own `.partial()` shape.
 type MobilePatch struct {
-	Enabled   *bool `json:"enabled,omitempty"`
-	HTTPSPort *int  `json:"httpsPort,omitempty"`
-	SetupPort *int  `json:"setupPort,omitempty"`
+	Enabled    *bool `json:"enabled,omitempty"`
+	HTTPSPort  *int  `json:"httpsPort,omitempty"`
+	SetupPort  *int  `json:"setupPort,omitempty"`
+	AgentInput *bool `json:"agentInput,omitempty"`
 }
 
 type SettingsPatch struct {

@@ -65,6 +65,8 @@ export const IPC = {
   mobileStatusGet: 'kira:mobile:status:get',
   mobileSetEnabled: 'kira:mobile:setEnabled',
   mobileSetPorts: 'kira:mobile:setPorts',
+  mobileSetAgentInput: 'kira:mobile:setAgentInput',
+  mobileSetDevicePermissions: 'kira:mobile:setDevicePermissions',
   mobileResetCertificate: 'kira:mobile:resetCertificate',
   mobileDevicesList: 'kira:mobile:devices:list',
   mobileRevoke: 'kira:mobile:revoke',

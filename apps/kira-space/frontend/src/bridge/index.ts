@@ -118,6 +118,12 @@ const spaceControl = {
     unwrap(MobileAccessService.SetPorts({ httpsPort, setupPort })).then((r) =>
       trust<MobileStatus>(r),
     ),
+  mobileSetAgentInput: (enabled: boolean): Promise<MobileStatus> =>
+    unwrap(MobileAccessService.SetAgentInputEnabled({ enabled })).then((r) =>
+      trust<MobileStatus>(r),
+    ),
+  mobileSetDevicePermissions: (id: string, write: boolean, agentInput: boolean): Promise<void> =>
+    unwrap(MobileAccessService.SetDevicePermissions({ id, write, agentInput })),
   mobileResetCertificate: (): Promise<MobileStatus> =>
     unwrap(MobileAccessService.ResetCertificate()).then((r) => trust<MobileStatus>(r)),
   mobileDevices: (): Promise<MobileDevice[]> =>

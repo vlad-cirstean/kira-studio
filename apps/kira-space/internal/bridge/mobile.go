@@ -25,7 +25,9 @@ type MobileStatus struct {
 	SetupURLs     []string `json:"setupUrls"`
 	Fingerprint   string   `json:"fingerprint"`
 	LeafExpiresAt int64    `json:"leafExpiresAt"`
-	Error         string   `json:"error"`
+	// AgentInput is the global switch for phones replying to agents and attaching to terminals.
+	AgentInput bool   `json:"agentInput"`
+	Error      string `json:"error"`
 }
 
 // MobilePairingRequest is the approval prompt's wire projection (absolute deadline in epoch ms).
@@ -116,6 +118,7 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 			st := MobileStatus{HTTPSPort: model.DefaultMobileSettings().HTTPSPort, SetupPort: model.DefaultMobileSettings().SetupPort}
 			if cfg, err := s.Deps.Repos.Settings.GetAll(); err == nil {
 				st.Enabled, st.HTTPSPort, st.SetupPort = cfg.Mobile.Enabled, cfg.Mobile.HTTPSPort, cfg.Mobile.SetupPort
+				st.AgentInput = cfg.Mobile.AgentInput
 			}
 			if srv != nil {
 				ws := srv.Status()
@@ -184,6 +187,42 @@ func (s *MobileAccessService) SetEnabled(args MobileSetEnabledArgs) (MobileStatu
 	}
 	s.emitStatus(st)
 	return st, nil
+}
+
+type MobileSetAgentInputArgs struct {
+	Enabled bool `json:"enabled"`
+}
+
+// SetAgentInputEnabled flips the global switch for phones replying to agents and controlling their
+// terminals. A phone also needs its own flag (SetDevicePermissions); the desktop toggles are the
+// explicit confirmation for both.
+func (s *MobileAccessService) SetAgentInputEnabled(args MobileSetAgentInputArgs) (MobileStatus, error) {
+	merged, err := s.Deps.Repos.Settings.Set(model.SettingsPatch{Mobile: &model.MobilePatch{AgentInput: &args.Enabled}})
+	if err != nil {
+		return MobileStatus{}, ipcerr.InternalErr(err)
+	}
+	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
+	st := s.embedded.Status()
+	s.emitStatus(st)
+	return st, nil
+}
+
+type MobileDevicePermissionsArgs struct {
+	ID         string `json:"id"`
+	Write      bool   `json:"write"`
+	AgentInput bool   `json:"agentInput"`
+}
+
+// SetDevicePermissions stores one phone's two permission flags.
+func (s *MobileAccessService) SetDevicePermissions(args MobileDevicePermissionsArgs) error {
+	if args.ID == "" {
+		return ipcerr.BadRequest("id is required")
+	}
+	if err := s.Deps.Repos.MobileDevices.SetPermissions(args.ID, args.Write, args.AgentInput); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	s.emitDevices()
+	return nil
 }
 
 type MobileSetPortsArgs struct {

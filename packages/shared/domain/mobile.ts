@@ -11,6 +11,10 @@ export const mobileDeviceSchema = /*#__PURE__*/ z.object({
   lastSeenAt: z.number(),
   lastIp: z.string(),
   revokedAt: z.number().nullable(),
+  /** Change the backlog and move or start tasks. Set from the desktop pane. */
+  canWrite: z.boolean(),
+  /** Reply to agents and control their terminals. Needs the global switch too. */
+  canAgentInput: z.boolean(),
 });
 export type MobileDevice = z.infer<typeof mobileDeviceSchema>;
 
@@ -24,6 +28,8 @@ export const mobileStatusSchema = /*#__PURE__*/ z.object({
   /** SHA-256 of the local CA certificate, shown so the user can compare it on the phone. */
   fingerprint: z.string(),
   leafExpiresAt: z.number(),
+  /** Global switch: phones may reply to agents and control their terminals. */
+  agentInput: z.boolean(),
   error: z.string(),
 });
 export type MobileStatus = z.infer<typeof mobileStatusSchema>;

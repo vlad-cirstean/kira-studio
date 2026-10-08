@@ -13,6 +13,7 @@ const stoppedStatus = {
   setupUrls: [],
   fingerprint: '',
   leafExpiresAt: 0,
+  agentInput: false,
   error: '',
 };
 const runningStatus = {
@@ -31,6 +32,8 @@ const device = {
   lastSeenAt: 1_700_000_100_000,
   lastIp: '192.168.1.40',
   revokedAt: null,
+  canWrite: true,
+  canAgentInput: false,
 };
 
 async function openPane(window: import('@playwright/test').Page): Promise<void> {
@@ -80,6 +83,33 @@ test('revoking a phone confirms first, then calls Revoke', async ({ relaunch }) 
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.mobileRevoke)?.args)
     .toEqual({ id: 'dev-1' });
+});
+
+test('permission switches call the bound methods; the global switch gates agent input', async ({
+  relaunch,
+}) => {
+  const { window, control } = await relaunch({
+    control: [
+      { channel: IPC.mobileStatusGet, response: runningStatus },
+      { channel: IPC.mobileDevicesList, response: [device] },
+      { channel: IPC.mobileSetDevicePermissions, response: null },
+      { channel: IPC.mobileSetAgentInput, response: { ...runningStatus, agentInput: true } },
+    ],
+  });
+  await openPane(window);
+  const agentInput = window.locator('[data-testid="mobile-device-agent-input-dev-1"]');
+  await expect(agentInput).toBeDisabled();
+
+  await window.locator('[data-testid="mobile-device-write-dev-1"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.mobileSetDevicePermissions)?.args)
+    .toEqual({ id: 'dev-1', write: false, agentInput: false });
+
+  await window.locator('[data-testid="mobile-access-agent-input"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.mobileSetAgentInput)?.args)
+    .toEqual({ enabled: true });
+  await expect(agentInput).toBeEnabled();
 });
 
 test('a pushed device list replaces the rendered one', async ({ relaunch }) => {

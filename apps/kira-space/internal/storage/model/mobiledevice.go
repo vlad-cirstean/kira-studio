@@ -10,4 +10,7 @@ type MobileDevice struct {
 	LastSeenAt int64  `json:"lastSeenAt"`
 	LastIP     string `json:"lastIp"`
 	RevokedAt  *int64 `json:"revokedAt"`
+	// CanWrite and CanAgentInput are the two desktop-granted permissions (P212 Part 2).
+	CanWrite      bool `json:"canWrite"`
+	CanAgentInput bool `json:"canAgentInput"`
 }

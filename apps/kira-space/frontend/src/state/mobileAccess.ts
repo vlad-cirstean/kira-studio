@@ -13,6 +13,7 @@ const DEFAULT_STATUS: MobileStatus = {
   setupUrls: [],
   fingerprint: '',
   leafExpiresAt: 0,
+  agentInput: false,
   error: '',
 };
 
@@ -66,6 +67,17 @@ export const useMobileAccessStore = defineStore('mobileAccess', () => {
     state.status = await control.mobileSetPorts(httpsPort, setupPort);
   }
 
+  async function setAgentInput(enabled: boolean): Promise<void> {
+    state.status = await control.mobileSetAgentInput(enabled);
+  }
+
+  async function setDevicePermissions(
+    id: string,
+    permissions: { write: boolean; agentInput: boolean },
+  ): Promise<void> {
+    await control.mobileSetDevicePermissions(id, permissions.write, permissions.agentInput);
+  }
+
   async function resetCertificate(): Promise<void> {
     state.status = await control.mobileResetCertificate();
   }
@@ -88,6 +100,8 @@ export const useMobileAccessStore = defineStore('mobileAccess', () => {
     hydrateMobileAccess,
     setEnabled,
     setPorts,
+    setAgentInput,
+    setDevicePermissions,
     resetCertificate,
     revoke,
     approve,

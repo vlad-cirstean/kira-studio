@@ -137,6 +137,7 @@ const mobileSettingsSchema = /*#__PURE__*/ z.object({
   enabled: z.boolean().default(false),
   httpsPort: z.number().int().min(MOBILE_PORT_RANGE.min).max(MOBILE_PORT_RANGE.max).default(7790),
   setupPort: z.number().int().min(MOBILE_PORT_RANGE.min).max(MOBILE_PORT_RANGE.max).default(7791),
+  agentInput: z.boolean().default(false),
 });
 
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
@@ -162,7 +163,12 @@ const settingsSchema = /*#__PURE__*/ z.object({
     headlessSettingSources: 'all',
   }),
   claudeCode: claudeCodeSettingsSchema.default({ keepAwakeWithAgents: false }),
-  mobile: mobileSettingsSchema.default({ enabled: false, httpsPort: 7790, setupPort: 7791 }),
+  mobile: mobileSettingsSchema.default({
+    enabled: false,
+    httpsPort: 7790,
+    setupPort: 7791,
+    agentInput: false,
+  }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -213,5 +219,6 @@ export const defaultSettings: Settings = {
     enabled: false,
     httpsPort: 7790,
     setupPort: 7791,
+    agentInput: false,
   },
 };

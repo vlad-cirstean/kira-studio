@@ -27,6 +27,7 @@ function parseIntField(raw: string): number {
 const store = useMobileAccessStore();
 const confirmDialogStore = useConfirmDialogStore();
 const switchId = useId();
+const agentInputId = useId();
 const httpsId = useId();
 const setupId = useId();
 
@@ -58,6 +59,13 @@ const portsChanged = computed(
 );
 
 const { busy: toggling, run: onToggle } = useBusyAction((on: boolean) => store.setEnabled(on));
+const { busy: togglingAgentInput, run: onToggleAgentInput } = useBusyAction((on: boolean) =>
+  store.setAgentInput(on),
+);
+const { run: onSetPermissions } = useBusyAction(
+  (id: string, write: boolean, agentInput: boolean) =>
+    store.setDevicePermissions(id, { write, agentInput }),
+);
 const { busy: applying, run: onApplyPorts } = useBusyAction(() =>
   store.setPorts(parseIntField(httpsDraft.value), parseIntField(setupDraft.value)),
 );
@@ -104,12 +112,31 @@ const activeDevices = computed(() => store.devices.filter((d) => !d.revokedAt));
         @update:model-value="(v) => onToggle(v === true)"
       />
       <FieldDescription>
-        Read-only. A phone on your local network pairs once, then sees the board, backlog and plan.
-        Only private network addresses are served.
+        A phone on your local network pairs once, then sees the board, backlog and plan. Each phone
+        can also change the backlog and move or start tasks, and reply to agents. Only private
+        network addresses are served.
       </FieldDescription>
       <FieldError v-if="store.status.error" data-testid="mobile-access-error">
         {{ store.status.error }}
       </FieldError>
+    </Field>
+
+    <Field>
+      <div class="flex items-center justify-between gap-1">
+        <Label :for="agentInputId">Let phones reply to agents and control their terminals</Label>
+      </div>
+      <Switch
+        :id="agentInputId"
+        :model-value="store.status.agentInput"
+        :disabled="togglingAgentInput"
+        data-testid="mobile-access-agent-input"
+        @update:model-value="(v) => onToggleAgentInput(v === true)"
+      />
+      <FieldDescription>
+        Anyone holding a phone with this on can type into Claude Code and run commands as you. Each
+        phone also needs its own Agent input switch below. Turning this off ends every phone
+        terminal now.
+      </FieldDescription>
     </Field>
 
     <Field>
@@ -200,13 +227,34 @@ const activeDevices = computed(() => store.devices.filter((d) => !d.revokedAt));
               Last seen {{ formatRelative(device.lastSeenAt) }}<template v-if="device.lastIp"> from {{ device.lastIp }}</template>
             </span>
           </span>
-          <TooltipIconButton
-            icon="trash"
-            label="Revoke"
-            variant="danger"
-            :data-testid="`mobile-device-revoke-${device.id}`"
-            @click="onRevoke(device.id, device.label)"
-          />
+          <span class="flex shrink-0 items-center gap-2">
+            <Label class="flex items-center gap-1 text-kira-sm">
+              Changes
+              <Switch
+                :model-value="device.canWrite"
+                :data-testid="`mobile-device-write-${device.id}`"
+                @update:model-value="
+                  (v) => onSetPermissions(device.id, v === true, device.canAgentInput)
+                "
+              />
+            </Label>
+            <Label class="flex items-center gap-1 text-kira-sm">
+              Agent input
+              <Switch
+                :model-value="device.canAgentInput"
+                :disabled="!store.status.agentInput"
+                :data-testid="`mobile-device-agent-input-${device.id}`"
+                @update:model-value="(v) => onSetPermissions(device.id, device.canWrite, v === true)"
+              />
+            </Label>
+            <TooltipIconButton
+              icon="trash"
+              label="Revoke"
+              variant="danger"
+              :data-testid="`mobile-device-revoke-${device.id}`"
+              @click="onRevoke(device.id, device.label)"
+            />
+          </span>
         </li>
       </ul>
     </section>
