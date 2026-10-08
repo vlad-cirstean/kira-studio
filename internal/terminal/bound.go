@@ -25,6 +25,27 @@ type BoundService struct {
 	// AbortAgent undoes ComposeAgent's persisted side effects when Open fails after a successful
 	// compose. Set together with ComposeAgent; a no-op for a terminalID it composed nothing for.
 	AbortAgent func(terminalID string)
+	// Arbiter, when set, decides who drives an agent session's input and size and sees its output.
+	// Kira Space sets it (P212 Part 2, the phone terminal broker); Kira Studio leaves it nil, so
+	// the window always drives. A field, not a method, so nothing new is bound.
+	Arbiter Arbiter
+}
+
+// Arbiter lets one other party take over an agent terminal's input and size from its window.
+// Terminals the arbiter does not know (plain shells, anything not opened as an agent) are always
+// allowed.
+type Arbiter interface {
+	// Opened runs after an agent session spawned, with the window's size.
+	Opened(terminalID string, cols, rows int)
+	// Output sees each chunk on the reader goroutine; it must not block.
+	Output(terminalID string, b []byte)
+	// Exited runs once the session's exit event was sent.
+	Exited(terminalID string)
+	// AllowWrite reports whether the window's keystrokes reach the pty.
+	AllowWrite(terminalID string) bool
+	// AllowResize reports whether the window's size reaches the pty; either way the arbiter records
+	// it as the size to return to.
+	AllowResize(terminalID string, cols, rows int) bool
 }
 
 // svc is the internal/terminal.Service this bound type delegates its generic half to — built fresh
@@ -108,6 +129,13 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		command, env = composed, composedEnv
 	}
 
+	var tap func([]byte)
+	var onExit func()
+	if agent && b.Arbiter != nil {
+		id := args.TerminalID
+		tap = func(data []byte) { b.Arbiter.Output(id, data) }
+		onExit = func() { b.Arbiter.Exited(id) }
+	}
 	sess, err := b.svc().OpenWithCoalescedOutput(OpenParams{
 		ID:        args.TerminalID,
 		WindowKey: args.WindowKey,
@@ -117,7 +145,7 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		Command:   command,
 		Env:       env,
 		Agent:     agent,
-	}, args.WindowKey, args.TerminalID)
+	}, args.WindowKey, args.TerminalID, tap, onExit)
 	if err != nil {
 		if composedAgent {
 			b.abortAgent(args.TerminalID)
@@ -131,6 +159,9 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		return OpenResult{}, ipcerr.InternalErr(err)
 	}
 
+	if agent && b.Arbiter != nil {
+		b.Arbiter.Opened(args.TerminalID, args.Cols, args.Rows)
+	}
 	return OpenResult{Shell: sess.Shell()}, nil
 }
 
@@ -143,12 +174,18 @@ func (b *BoundService) abortAgent(terminalID string) {
 // Write decodes args.Data and forwards it to the pty. A no-op for an id with no live session
 // (Registry.Write's own rule) — the renderer can have a keystroke in flight when a shell exits.
 func (b *BoundService) Write(args WriteArgs) error {
+	if b.Arbiter != nil && !b.Arbiter.AllowWrite(args.TerminalID) {
+		return nil
+	}
 	return b.svc().Write(args.TerminalID, args.Data)
 }
 
 // Resize applies cols/rows to the real winsize (pty.Setsize) — a no-op for an id with no live
 // session.
 func (b *BoundService) Resize(args ResizeArgs) error {
+	if b.Arbiter != nil && ValidDim(args.Cols) && ValidDim(args.Rows) && !b.Arbiter.AllowResize(args.TerminalID, args.Cols, args.Rows) {
+		return nil
+	}
 	return b.svc().Resize(args.TerminalID, args.Cols, args.Rows)
 }
 

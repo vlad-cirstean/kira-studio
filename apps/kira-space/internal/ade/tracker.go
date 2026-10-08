@@ -631,6 +631,14 @@ func (t *Tracker) Send(sessionID, message string) error {
 	return nil
 }
 
+// TerminalOf returns the live terminal bound to recordID.
+func (t *Tracker) TerminalOf(recordID string) (string, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	id, ok := t.byRecord[recordID]
+	return id, ok
+}
+
 // Get returns id's own recorded session, nil if none exists — AdeTaskService.FocusSession's own
 // lookup. It reads State/TerminalID only, neither touched by the in-memory lastActive clock.
 func (t *Tracker) Get(id string) (*model.AdeSession, error) {

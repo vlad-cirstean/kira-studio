@@ -104,16 +104,26 @@ func (s *Service) Close(terminalID string) error {
 // OpenWithCoalescedOutput wires p's OnData/OnExit to a fresh coalescing output pump addressed at
 // windowKey/terminalID, then calls Registry.Open — the "output pump" half of Open that is
 // byte-identical between apps. Each app's own Open builds everything else about p (Command, Agent)
-// and calls this instead of Registry.Open directly.
-func (s *Service) OpenWithCoalescedOutput(p OpenParams, windowKey, terminalID string) (*Session, error) {
+// and calls this instead of Registry.Open directly. tap, when non-nil, sees every output chunk on
+// the reader goroutine before the coalescer does; onExit runs after the exit event is sent.
+func (s *Service) OpenWithCoalescedOutput(p OpenParams, windowKey, terminalID string, tap func([]byte), onExit func()) (*Session, error) {
 	coalescer := newOutputCoalescer(s.Emit, windowKey, terminalID)
 	p.OnData = coalescer.push
+	if tap != nil {
+		p.OnData = func(b []byte) {
+			tap(b)
+			coalescer.push(b)
+		}
+	}
 	p.OnExit = func(code int, exitErr error) {
 		msg := ""
 		if exitErr != nil {
 			msg = exitErr.Error()
 		}
 		coalescer.finish(code, msg)
+		if onExit != nil {
+			onExit()
+		}
 	}
 	return s.Registry.Open(p)
 }
