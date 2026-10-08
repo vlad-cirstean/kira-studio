@@ -6,6 +6,7 @@ import { Field, FieldDescription, FieldError } from '@theme/components/ui/field'
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
+import { useIntervalFn, useNow } from '@vueuse/core';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
 import { useBusyAction } from '@workbench/util/useBusyAction';
@@ -26,9 +27,10 @@ function parseIntField(raw: string): number {
   return text === '' ? Number.NaN : Number(text);
 }
 
+const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 60_000) });
 const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 function expiresIn(at: number): string {
-  const hours = Math.round((at - Date.now()) / 3_600_000);
+  const hours = Math.round((at - now.value.getTime()) / 3_600_000);
   if (Math.abs(hours) < 24) return relativeTime.format(hours, 'hour');
   return relativeTime.format(Math.round(hours / 24), 'day');
 }
@@ -113,7 +115,7 @@ async function onRevoke(id: string, label: string): Promise<void> {
 }
 
 const activeDevices = computed(() =>
-  store.devices.filter((d) => !d.revokedAt && d.expiresAt > Date.now()),
+  store.devices.filter((d) => !d.revokedAt && d.expiresAt > now.value.getTime()),
 );
 </script>
 
