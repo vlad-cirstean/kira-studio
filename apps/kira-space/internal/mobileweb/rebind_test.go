@@ -34,7 +34,8 @@ func TestServer_RebindsWhenAddressesChange(t *testing.T) {
 	t.Cleanup(client.CloseIdleConnections)
 	extra := "https://127.0.0.2:" + portStr(port) + "/setup-info"
 
-	if _, err := client.Get(extra); err == nil {
+	if resp, err := client.Get(extra); err == nil {
+		_ = resp.Body.Close()
 		t.Fatal("unbound address answered")
 	}
 	mu.Lock()
@@ -57,7 +58,8 @@ func TestServer_RebindsWhenAddressesChange(t *testing.T) {
 	s.refreshAddrs()
 	<-changed
 	client.CloseIdleConnections()
-	if _, err := client.Get(extra); err == nil {
+	if resp, err := client.Get(extra); err == nil {
+		_ = resp.Body.Close()
 		t.Fatal("removed address still answers")
 	}
 }
