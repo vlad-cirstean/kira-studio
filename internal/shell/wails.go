@@ -130,6 +130,22 @@ func (d *Dialogs) OpenFile(title, filterName, filterPattern string) (string, err
 	return dlg.PromptForSingleSelection()
 }
 
+// OpenMultipleFiles is OpenFile with several selections allowed. An empty result is a cancel.
+func (d *Dialogs) OpenMultipleFiles(title, filterName, filterPattern string) ([]string, error) {
+	t, err := d.attached()
+	if err != nil {
+		return nil, err
+	}
+	dlg := t.app.Dialog.OpenFile().AttachToWindow(t.window()).CanChooseFiles(true)
+	if title != "" {
+		dlg.SetTitle(title)
+	}
+	if filterName != "" {
+		dlg.AddFilter(filterName, filterPattern)
+	}
+	return dlg.PromptForMultipleSelection()
+}
+
 // OpenDirectory is P25 D13: the same OpenFile panel, switched to directory-picking mode —
 // CanChooseDirectories(bool)/CanChooseFiles(bool) already exist on Wails v3 beta.16's
 // OpenFileDialogStruct, so a folder picker is one more method on this seam, not a new mechanism.

@@ -314,6 +314,7 @@ func main() {
 			application.NewService(keepAwakeSvc),
 			application.NewService(mobileSvc),
 			application.NewService(memorySvc),
+			application.NewService(bridge.NewMemoryImportService(memorySvc, dialogsSvc)),
 			application.NewService(windowsSvc),
 			application.NewService(&bridge.UpdateService{
 				Checker: updateChecker, Installer: updateInstaller, Quit: quitter.RequestQuit,

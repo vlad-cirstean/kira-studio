@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
+	"github.com/kirathecat/kira-studio/internal/memory/importer"
 )
 
 // ChannelMemoryChanged fires after any write to memory.db, this process's or the MCP subprocess's.
@@ -22,12 +23,16 @@ const ChannelMemoryChanged = "kira:memory:changed"
 // is empty; the UI refetches SemanticStatus.
 const ChannelMemorySemantic = "kira:memory:semantic"
 
+// ChannelMemoryImport fires when a bulk-import job or file changes state or makes progress. The
+// payload is empty; the UI refetches the job list and the open job.
+const ChannelMemoryImport = "kira:memory:import"
+
 // memoryServerName is the name the kira-memory stdio server registers under in Claude Code.
 const memoryServerName = "kira-memory"
 
 const (
 	memoryWatchInterval = 2 * time.Second
-	semanticEmitGap     = 250 * time.Millisecond
+	emitGap             = 250 * time.Millisecond
 	memoryUIListLimit   = 100
 )
 
@@ -56,12 +61,17 @@ type MemoryService struct {
 	dlDone     int64
 	dlTotal    int64
 
-	emitMu      sync.Mutex
-	emitPending bool
+	// Bursts (a backfill batch, an import progress tick) coalesce to one event per emitGap.
+	semanticEvents *coalescer
+	importEvents   *coalescer
+	engine         *importer.Engine
 }
 
 func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller) *MemoryService {
-	return &MemoryService{events: events, installer: installer}
+	s := &MemoryService{events: events, installer: installer}
+	s.semanticEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemorySemantic, struct{}{}) })
+	s.importEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemoryImport, struct{}{}) })
+	return s
 }
 
 func (s *MemoryService) service() *memory.Service {
@@ -82,20 +92,30 @@ func (s *MemoryService) service() *memory.Service {
 	return s.svc
 }
 
-// emitSemantic coalesces bursts (a backfill batch per few hundred ms) into one event per gap.
-func (s *MemoryService) emitSemantic() {
-	s.emitMu.Lock()
-	defer s.emitMu.Unlock()
-	if s.emitPending {
-		return
+func (s *MemoryService) emitSemantic() { s.semanticEvents.Trigger() }
+
+func (s *MemoryService) emitImport() { s.importEvents.Trigger() }
+
+// importer returns the bulk-import engine, opening it (and memory.db) on first use.
+func (s *MemoryService) importer() (*importer.Engine, error) {
+	s.service()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.engine != nil {
+		return s.engine, nil
 	}
-	s.emitPending = true
-	time.AfterFunc(semanticEmitGap, func() {
-		s.emitMu.Lock()
-		s.emitPending = false
-		s.emitMu.Unlock()
-		s.events.Emit(ChannelMemorySemantic, struct{}{})
+	if s.store == nil {
+		return nil, errors.New("memory service closed")
+	}
+	exe, err := memoryExecutable()
+	if err != nil {
+		return nil, err
+	}
+	s.engine, err = importer.Open(s.store, importer.Options{
+		Agent:    importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home()},
+		OnChange: s.emitImport,
 	})
+	return s.engine, err
 }
 
 func (s *MemoryService) emitChanged() { s.events.Emit(ChannelMemoryChanged, struct{}{}) }
@@ -133,13 +153,16 @@ func CloseMemory(s *MemoryService) {
 	if s.stopWatch != nil {
 		s.stopWatch()
 	}
+	if s.engine != nil {
+		_ = s.engine.Close()
+	}
 	if s.svc != nil {
 		s.svc.Close()
 	}
 	if s.store != nil {
 		_ = s.store.Close()
 	}
-	s.svc, s.store, s.embedder, s.stopWatch = nil, nil, nil, nil
+	s.svc, s.store, s.embedder, s.stopWatch, s.engine = nil, nil, nil, nil, nil
 }
 
 func memoryErr(err error) error {
@@ -148,11 +171,11 @@ func memoryErr(err error) error {
 		return nil
 	case errors.Is(err, memory.ErrInvalid), errors.Is(err, memory.ErrClaudeNotFound), errors.Is(err, memory.ErrClaudeAuth),
 		errors.Is(err, memory.ErrClaudeBudget), errors.Is(err, memory.ErrClaudeTimeout), errors.Is(err, memory.ErrClaudeOutput),
-		errors.Is(err, memory.ErrClaudeOutdated):
+		errors.Is(err, memory.ErrClaudeOutdated), errors.Is(err, memory.ErrClaudeRateLimited), errors.Is(err, memory.ErrClaudeUsageLimit):
 		return ipcerr.BadRequest(err.Error())
 	case errors.Is(err, embed.ErrChecksum):
 		return ipcerr.BadRequest(err.Error())
-	case errors.Is(err, memory.ErrNotFound):
+	case errors.Is(err, memory.ErrNotFound), errors.Is(err, importer.ErrNotFound):
 		return ipcerr.NotFound(err.Error())
 	}
 	return ipcerr.Internal(err.Error())
