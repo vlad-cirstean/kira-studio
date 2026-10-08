@@ -20,6 +20,8 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Done |
 | P223 | Mobile agents web as a plain-HTTP page on the trusted LAN only: drop the PWA, local CA, HTTPS and setup listener; bind one LAN interface address; refuse peers outside its private subnet; "Trust this network" (subnet plus router MAC) starts and stops the server by itself; plaintext warning; device tokens expire | Done |
 | P224 | Remove speech to text completely: the `stt` package, whisper.cpp build, dictation bridge and stream, mic UI, P221's dictation settings section, malgo, S13, plists' microphone string, CI patch, docs; delete the downloaded speech model at startup; keep `modelstore`, `workerproc` and the embed worker | Done |
+| P225 | Git graph regression (new since about yesterday, likely from P220's CommitGrid change): commits disappear from the graph and Show more is broken. Find the root cause, fix it, add a regression test that fails before the fix | Not started |
+| P226 | Consistent colour bars: wherever the left panel shows an item with a coloured left bar (scripts in Kira Studio, git repos, and other module lists), the same colour renders the same way everywhere. One shared bar component and tone mapping instead of per-module variants | Not started |
 
 ## Requirements (user's words, condensed)
 
@@ -35,6 +37,8 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 - P222: add-repo dialog looks unlike app; colour per repo; unclear what add env does, should it add a script?
 - P223: self-signed cert install too shady; drop the PWA and HTTPS; no Tailscale; works only on my local network, checks which network it is and does not work otherwise.
 - P224: "Remove speech to text completely".
+- P225: git graph still broken, commits disappear, Show more broke; new regression since last day; fix it.
+- P226: colours in the left panel must look the same everywhere: a coloured left bar in Studio is the same for scripts and for git.
 
 ## P210 result
 
