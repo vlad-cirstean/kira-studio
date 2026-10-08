@@ -21,7 +21,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P223 | Mobile agents web as a plain-HTTP page on the trusted LAN only: drop the PWA, local CA, HTTPS and setup listener; bind one LAN interface address; refuse peers outside its private subnet; "Trust this network" (subnet plus router MAC) starts and stops the server by itself; plaintext warning; device tokens expire | Done |
 | P224 | Remove speech to text completely: the `stt` package, whisper.cpp build, dictation bridge and stream, mic UI, P221's dictation settings section, malgo, S13, plists' microphone string, CI patch, docs; delete the downloaded speech model at startup; keep `modelstore`, `workerproc` and the embed worker | Done |
 | P225 | Git graph regression (new since about yesterday, likely from P220's CommitGrid change): commits disappear from the graph and Show more is broken. Find the root cause, fix it, add a regression test that fails before the fix | Not started |
-| P226 | Consistent colour bars: wherever the left panel shows an item with a coloured left bar (scripts in Kira Studio, git repos, and other module lists), the same colour renders the same way everywhere. One shared bar component and tone mapping instead of per-module variants | Not started |
+| P226 | Consistent colour bars: wherever the left panel shows an item with a coloured left bar (scripts in Kira Studio, git repos, and other module lists), the same colour renders the same way everywhere. One shared bar component and tone mapping instead of per-module variants | Done |
 
 ## Requirements (user's words, condensed)
 
@@ -391,3 +391,13 @@ mobileterm, bridge, storage), golangci-lint 0 issues, typecheck, lint, lint:dead
 `serviceWorker`, `crypto.subtle`, `navigator.clipboard`, `isSecureContext`, `workbox`;
 `test:ui:space-mobile` 51 pass (1 WebKit skip); `test:ui:space` 244 pass, 0 fail. Visual baselines not
 run and not re-recorded (Settings snapshots differ since P221 and again now).
+
+## P226 result
+
+- `colorMarkClass(mark, color)` in `packages/theme/src/connColor.ts`: marks `rail`, `bar`, `dot`, `band`; paint is literal `bg-conn-*`, no `--kira-rail`.
+- Canonical look: Studio tree rail (2px, full row height, panel edge). Quick commands, Git panel repos and worktrees, Repositories dialog now use it. Play and source-control icons stop carrying colour.
+- Tabs, view header dots and bands, Start recents, op log cell, environment dots all go through the map. Op log cell: 8px square became the 5px dot.
+- Fixed DataView header dot: `'none'` now shows the ring like every other view.
+- `scripts/check-theme-classes.sh` guards `bg-(--kira-rail)`; retired-class replacement texts point at `colorMarkClass`.
+- Specs: new `color-rails.spec.ts` in both apps pin one class string and geometry. `connections`, `tabs`, `api-ui-consistency` style assertions became `bg-conn-*` class checks.
+- Pinned repo-graph tab stays unmarked. ADE chips and view-header icon tints unchanged.
