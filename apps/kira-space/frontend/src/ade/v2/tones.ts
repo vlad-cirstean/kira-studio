@@ -38,3 +38,48 @@ const CLAUDE_SOLID = '#d97757';
 export function actionStyle(tone: TaskAction['tone']): Record<string, string> {
   return tone === 'claude' ? { background: CLAUDE_SOLID, color: TONE_INK.amber } : solidStyle(tone);
 }
+
+// Class maps over the tokens in tones.css. Tailwind emits only literals, so each is spelled in full.
+export const TONE_TEXT_CLASS: Record<Tone, string> = {
+  amber: 'text-tone-amber',
+  red: 'text-tone-red',
+  green: 'text-tone-green',
+  blue: 'text-tone-blue',
+  purple: 'text-tone-purple',
+  grey: 'text-tone-grey',
+};
+
+/** Tag pill (tint background, tone text). */
+export const TONE_TAG_CLASS: Record<Tone, string> = {
+  amber: 'bg-tone-amber-tint text-tone-amber',
+  red: 'bg-tone-red-tint text-tone-red',
+  green: 'bg-tone-green-tint text-tone-green',
+  blue: 'bg-tone-blue-tint text-tone-blue',
+  purple: 'bg-tone-purple-tint text-tone-purple',
+  grey: 'bg-tone-grey-tint text-tone-grey',
+};
+
+/** Solid button (tone solid, fixed ink: a themed ink loses contrast under another theme). */
+export const TONE_SOLID_CLASS: Record<Tone, string> = {
+  amber: 'bg-tone-amber-solid text-tone-ink',
+  red: 'bg-tone-red-solid text-tone-ink',
+  green: 'bg-tone-green-solid text-tone-ink',
+  blue: 'bg-tone-blue-solid text-tone-ink',
+  purple: 'bg-tone-purple-solid text-tone-ink-light',
+  grey: 'bg-tone-grey-solid text-tone-ink',
+};
+
+/** Solid of a task action: its tone, or the Claude brand colour for a launch (`▶ Run`). */
+export const ACTION_CLASS: Record<TaskAction['tone'] | Tone, string> = {
+  ...TONE_SOLID_CLASS,
+  claude: 'bg-claude text-tone-ink',
+};
+
+export const TONE_BORDER_CLASS: Record<Tone, string> = {
+  amber: 'border-tone-amber-solid',
+  red: 'border-tone-red-solid',
+  green: 'border-tone-green-solid',
+  blue: 'border-tone-blue-solid',
+  purple: 'border-tone-purple-solid',
+  grey: 'border-tone-grey-solid',
+};

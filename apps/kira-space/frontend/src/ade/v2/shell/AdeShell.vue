@@ -13,7 +13,7 @@ import AdeRunDialog from '../run/AdeRunDialog.vue';
 import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
-import { tagStyle } from '../tones';
+import { TONE_TAG_CLASS } from '../tones';
 import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
 import AdeCaptureBox from './AdeCaptureBox.vue';
 
@@ -43,7 +43,7 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
           Backlog
           <span
             class="rounded-kira-pill px-1.5 text-kira-sm font-semibold"
-            :style="tagStyle('grey')"
+            :class="TONE_TAG_CLASS.grey"
             data-testid="ade-backlog-count"
             >{{ count }}</span
           >
@@ -57,7 +57,7 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
           <span
             v-if="needsCount > 0"
             class="rounded-kira-pill px-1.5 text-kira-sm font-semibold"
-            :style="tagStyle('amber')"
+            :class="TONE_TAG_CLASS.amber"
             data-testid="ade-needs-count"
             >{{ needsCount }}</span
           >

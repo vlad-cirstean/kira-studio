@@ -11,7 +11,7 @@ import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import AdeLinkRow from '../panel/AdeLinkRow.vue';
 import { type LinkPatch, useLinkFields } from '../panel/useLinkFields';
 import { useUpdateBacklogItem } from '../queries';
-import { solidStyle } from '../tones';
+import { TONE_SOLID_CLASS } from '../tones';
 import type { BacklogItem } from '../wire';
 
 // Detail of one backlog item: title, Jira and GitHub links, notes, and the promote and delete actions.
@@ -73,7 +73,7 @@ function saveNotes(_id: string, value: string): void {
         <Button
           size="kira-lg"
           class="font-semibold"
-          :style="solidStyle('amber')"
+          :class="TONE_SOLID_CLASS.amber"
           title="Turn into a task in the Spec phase, unscheduled (Later)"
           data-testid="ade-backlog-panel-promote"
           @click="emit('promote')"

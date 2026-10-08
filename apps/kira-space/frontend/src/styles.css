@@ -4,4 +4,5 @@
    carry unprefixed shadcn classes alongside their existing kv: ones -- see the plan's §3.2/§4.1
    for why the two prefixes never collide). Path is relative to this file. */
 @import "@workbench/workbench.css";
+@import "./ade/v2/tones.css";
 @source "../../../../packages/git-ui/src";

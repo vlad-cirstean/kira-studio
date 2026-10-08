@@ -3,7 +3,6 @@ import { Button } from '@theme/components/ui/button';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import { usePlanModel } from '../plan/usePlanModel';
-import { TONE } from '../tones';
 import AdeAllSessions from './AdeAllSessions.vue';
 import AdeNeedsRow from './AdeNeedsRow.vue';
 
@@ -38,7 +37,7 @@ function taskOf(taskId: string): { title: string; color: string } {
           :task-title="taskOf(n.taskId).title"
           :task-color="taskOf(n.taskId).color"
         />
-        <div v-if="needs.empty" class="border-b border-border px-3 py-6 text-kira-lg" :style="{ color: TONE.green[1] }" data-testid="ade-needs-empty">
+        <div v-if="needs.empty" class="border-b border-border px-3 py-6 text-kira-lg text-tone-green" data-testid="ade-needs-empty">
           Nothing needs you right now.
         </div>
         <div class="flex items-center gap-2.5 border-b border-border px-3 py-2 text-kira-md text-muted-foreground">

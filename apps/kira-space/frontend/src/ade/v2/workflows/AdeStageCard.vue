@@ -9,14 +9,12 @@ import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu
 import AdeChip from '../AdeChip.vue';
 import type { Tone } from '../board/actions';
 import { FAILURE_OPTIONS, moved, newStep, STATUS_OPTIONS, withKind, withValidBacks } from '../board/workflowForm';
-import { actionStyle } from '../tones';
 import type { OnFailure, Stage, StageKind } from '../wire';
 import AdeStepCard from './AdeStepCard.vue';
 
 // One stage of the form: header (name, type, task status, order), then the fields of its kind.
 const props = defineProps<{ index: number; scopes: string[]; first: boolean; last: boolean; canSkip: boolean }>();
 const contextMenu = useContextMenuStore();
-const sessionOn = { background: actionStyle('claude').background, borderColor: actionStyle('claude').background };
 const stage = defineModel<Stage>('stage', { required: true });
 const emit = defineEmits<{ up: []; down: []; remove: [] }>();
 
@@ -114,7 +112,7 @@ function removeStep(i: number): void {
         <Switch
           :id="n('session')"
           :model-value="stage.session"
-          :style="stage.session ? sessionOn : undefined"
+          :class="stage.session && 'data-[state=checked]:border-claude data-[state=checked]:bg-claude'"
           data-testid="ade-wf-stage-session"
           @update:model-value="(v: boolean) => patch({ session: v, prompt: v ? stage.prompt : '' })"
         />

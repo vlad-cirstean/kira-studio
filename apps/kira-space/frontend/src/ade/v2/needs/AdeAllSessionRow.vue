@@ -7,7 +7,7 @@ import { ACTIVITY_LABEL, shortId } from '../activity';
 import { adeAgoOptions } from '../ago';
 import type { SessionView } from '../sessions/sessionView';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
-import { actionStyle, TONE } from '../tones';
+import { ACTION_CLASS } from '../tones';
 import { useNeedsAction } from './useNeedsAction';
 
 // One session row of All sessions (mockup `agents`): glyph, state, age, button, id, repo, step and
@@ -25,11 +25,11 @@ const state = computed(() => {
   if (props.view.headless && input.value) return 'stuck · needs you';
   return ACTIVITY_LABEL[props.view.kind];
 });
-const stateColor = computed(() => {
-  if (!running.value) return 'var(--kira-fg-muted)';
-  if (props.view.kind === 'input') return TONE.amber[1];
-  if (props.view.kind === 'working') return TONE.green[1];
-  return props.view.kind === 'waiting' ? TONE.blue[1] : 'var(--kira-fg-muted)';
+const stateClass = computed(() => {
+  if (!running.value) return 'text-muted-foreground';
+  if (props.view.kind === 'input') return 'text-tone-amber';
+  if (props.view.kind === 'working') return 'text-tone-green';
+  return props.view.kind === 'waiting' ? 'text-tone-blue' : 'text-muted-foreground';
 });
 /** A live interactive session opens; everything else is taken over. */
 const opens = computed(() => running.value && !props.view.headless);
@@ -46,7 +46,7 @@ function open(): void {
     role="button"
     tabindex="0"
     class="flex cursor-pointer items-center gap-3 rounded-kira px-3 py-1.5"
-    :style="input ? { background: `color-mix(in srgb, ${TONE.amber[2]} 7%, transparent)` } : undefined"
+    :class="input && 'bg-tone-amber-solid/7'"
     data-testid="ade-all-session"
     :data-session-id="view.session.id"
     @click="open"
@@ -54,14 +54,14 @@ function open(): void {
     @keydown.space.self.prevent="open"
   >
     <AdeActivityIcon :kind="view.kind" :size="14" class="w-5 shrink-0" />
-    <span class="w-32.5 shrink-0 truncate text-kira-md" :style="{ color: stateColor }" data-testid="ade-all-state">{{ state }}</span>
+    <span class="w-32.5 shrink-0 truncate text-kira-md" :class="stateClass" data-testid="ade-all-state">{{ state }}</span>
     <span class="w-19 shrink-0 text-kira-md text-muted-foreground">{{ ago }}</span>
     <Button
       v-if="!archived"
       size="kira-lg"
       :variant="opens ? 'dialog' : undefined"
       class="w-23 shrink-0 font-semibold"
-      :style="opens ? undefined : actionStyle('claude')"
+      :class="opens ? undefined : ACTION_CLASS.claude"
       :disabled="takeOver.pending.has(view.session.id)"
       data-testid="ade-all-action"
       @click.stop="opens ? open() : takeOver.request(view.session.id)"

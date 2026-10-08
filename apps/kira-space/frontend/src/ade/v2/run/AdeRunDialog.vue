@@ -11,7 +11,7 @@ import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useSpaceTools, useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { actionStyle } from '../tones';
+import { ACTION_CLASS } from '../tones';
 
 // Agent stage Run dialog (SPEC2 section 5, R24): per-branch names for branches not created yet, the
 // editable message and the read-only finish_step suffix the server always appends.
@@ -96,7 +96,7 @@ async function send(): Promise<void> {
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
-            :style="{ stroke: actionStyle('claude').background }"
+            class="stroke-claude"
           >
             <rect x="3" y="4" width="18" height="16" rx="3" />
             <path d="M7 10l3 2-3 2M12 15h5" />
@@ -163,7 +163,7 @@ async function send(): Promise<void> {
         <Button
           variant="dialog-primary"
           size="kira-lg"
-          :style="actionStyle('claude')"
+          :class="ACTION_CLASS.claude"
           :disabled="busy"
           data-testid="ade-run-send"
           @click="send"

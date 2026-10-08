@@ -2,9 +2,10 @@
 import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
 import { shortAge } from '../ago';
+import type { Tone } from '../board/actions';
 import type { NeedsItem } from '../board/needsYou';
 import AdeRunLog from '../panel/AdeRunLog.vue';
-import { actionStyle, solidStyle, TONE, tagStyle } from '../tones';
+import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS } from '../tones';
 import { useNeedsAction } from './useNeedsAction';
 
 // One needs-you item (mockup `needs`): kind chip, age, its one action, scope, what, over the task.
@@ -15,27 +16,29 @@ const logOpen = ref(false);
 const hasLog = computed(
   () => (props.item.kind === 'stuck run' || props.item.kind === 'failed') && props.item.runIds.length > 0,
 );
-const buttonStyle = computed(() => {
-  if (props.item.action === 'Take over') return actionStyle('claude');
-  return props.item.tone === 'grey'
-    ? { background: 'var(--kira-border-strong)', color: 'var(--kira-fg)' }
-    : solidStyle(props.item.tone);
+const buttonClass = computed(() => {
+  if (props.item.action === 'Take over') return ACTION_CLASS.claude;
+  return props.item.tone === 'grey' ? 'bg-border-strong text-fg' : TONE_SOLID_CLASS[props.item.tone];
 });
-const rowBackground = computed(() => {
-  if (props.item.tone === 'grey') return 'var(--kira-bg-elevated)';
-  return `color-mix(in srgb, ${TONE[props.item.tone][2]} ${props.item.tone === 'red' ? 6 : 5}%, transparent)`;
-});
+const ROW_BG_CLASS: Record<Tone, string> = {
+  amber: 'bg-tone-amber-solid/5',
+  red: 'bg-tone-red-solid/6',
+  green: 'bg-tone-green-solid/5',
+  blue: 'bg-tone-blue-solid/5',
+  purple: 'bg-tone-purple-solid/5',
+  grey: 'bg-elevated',
+};
 </script>
 
 <template>
   <div class="flex flex-col border-b border-border" data-testid="ade-needs-item" :data-kind="item.kind" :data-item-id="item.id">
     <div
       class="flex items-center gap-3 px-3 py-2"
-      :style="{ background: rowBackground }"
+      :class="ROW_BG_CLASS[item.tone]"
     >
       <span
         class="w-23 shrink-0 whitespace-nowrap rounded-kira-sm px-2 py-0.5 text-center text-kira-sm font-bold"
-        :style="tagStyle(item.tone)"
+        :class="TONE_TAG_CLASS[item.tone]"
         data-testid="ade-needs-kind"
         >{{ item.kind }}</span
       >
@@ -43,7 +46,7 @@ const rowBackground = computed(() => {
       <Button
         size="kira-lg"
         class="w-23 shrink-0 font-semibold"
-        :style="buttonStyle"
+        :class="buttonClass"
         :disabled="busy"
         data-testid="ade-needs-action"
         @click="perform(item)"

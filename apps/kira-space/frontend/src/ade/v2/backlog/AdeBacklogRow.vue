@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { adeAgoOptions } from '../ago';
 import { parseGithub } from '../board/panelFacts';
-import { solidStyle, TONE } from '../tones';
+import { TONE_SOLID_CLASS } from '../tones';
 import type { BacklogItem } from '../wire';
 
 // One backlog line: reorder, promote, delete, added-ago, inline-edit text and quiet link facts.
@@ -53,8 +53,7 @@ function commit(): void {
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds inputs and buttons a button cannot. -->
   <div
     class="box-border flex min-h-9 cursor-pointer items-center gap-2 border-b border-border border-l-3 px-3 py-1"
-    :class="selected ? 'bg-select' : 'border-l-transparent hover:bg-hover'"
-    :style="selected ? { borderLeftColor: TONE.amber[2] } : undefined"
+    :class="selected ? 'bg-select border-l-tone-amber-solid' : 'border-l-transparent hover:bg-hover'"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"
@@ -90,7 +89,7 @@ function commit(): void {
       <Button
         size="kira"
         class="shrink-0 font-semibold"
-        :style="solidStyle('amber')"
+        :class="TONE_SOLID_CLASS.amber"
         data-testid="ade-backlog-promote"
         @click.stop="emit('promote')"
       >

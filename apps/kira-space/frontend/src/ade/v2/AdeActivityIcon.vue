@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ACTIVITY_LABEL, type ActivityKind } from './activity';
-import { TONE, TONE_INK } from './tones';
 
 // Activity glyph of a session: `!` needs input, a green dot working, `z` waiting on a monitor, an
 // open dot idle, a square stopped (mockup `act`).
@@ -17,24 +16,18 @@ const dot = computed(() => (big.value ? 'size-2.5' : 'size-2'));
     <span
       v-if="kind === 'input'"
       :class="badge"
-      class="flex items-center justify-center rounded-full text-kira-sm font-extrabold leading-none"
-      :style="{ background: TONE.amber[2], color: TONE_INK.amber }"
+      class="flex items-center justify-center rounded-full bg-tone-amber-solid text-kira-sm font-extrabold leading-none text-tone-ink"
       >!</span
     >
     <span
       v-else-if="kind === 'working'"
       :class="dot"
-      class="m-0.5 inline-block rounded-full"
-      :style="{
-        background: TONE.green[2],
-        boxShadow: `0 0 0 2px color-mix(in srgb, ${TONE.green[2]} 28%, transparent)`,
-      }"
+      class="m-0.5 inline-block rounded-full bg-tone-green-solid shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-tone-green-solid)_28%,transparent)]"
     />
     <span
       v-else-if="kind === 'waiting'"
       :class="badge"
-      class="flex items-center justify-center rounded-full border-2 text-kira-sm font-bold leading-none"
-      :style="{ borderColor: TONE.blue[2], color: TONE.blue[1] }"
+      class="flex items-center justify-center rounded-full border-2 border-tone-blue-solid text-kira-sm font-bold leading-none text-tone-blue"
       >z</span
     >
     <span v-else-if="kind === 'idle'" :class="dot" class="m-0.5 inline-block rounded-full border-2 border-subtle" />

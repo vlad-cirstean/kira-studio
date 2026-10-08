@@ -10,7 +10,6 @@ import { ACTIVITY_LABEL } from '../activity';
 import { adeAgoOptions } from '../ago';
 import { useFocusSession } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { TONE } from '../tones';
 import AdeSessionId from './AdeSessionId.vue';
 import type { SessionView } from './sessionView';
 
@@ -51,8 +50,7 @@ async function show(): Promise<void> {
   <div class="flex min-h-0 flex-1 flex-col" data-testid="ade-tui-pane">
     <div
       class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-kira-md"
-      :class="needsYou ? '' : 'text-muted-foreground'"
-      :style="needsYou ? { color: TONE.amber[1], background: `color-mix(in srgb, ${TONE.amber[2]} 8%, transparent)` } : undefined"
+      :class="needsYou ? 'bg-tone-amber-solid/8 text-tone-amber' : 'text-muted-foreground'"
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
       <span class="truncate" data-testid="ade-tui-label">interactive · {{ ACTIVITY_LABEL[view.kind] }} · {{ ago }}</span>

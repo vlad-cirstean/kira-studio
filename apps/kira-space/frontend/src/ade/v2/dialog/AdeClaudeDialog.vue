@@ -11,16 +11,17 @@ import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { useAdeDialogsStore } from '../state/adeDialogs';
-import { actionStyle, TONE } from '../tones';
+import { ACTION_CLASS } from '../tones';
 import { composeDialog } from './compose';
 
 // The one Claude dialog every opener shares (mockup `dlg`): kind-specific title, busy alert, targets,
 // editable message, push switch and archive risk, then Cancel and the kind's send button.
 const dialogs = useAdeDialogsStore();
 const sending = ref(false);
-// The chosen target chip wears the Claude tone, as the mockup's `chipStyle`.
-const claude = actionStyle('claude').background;
-const chipOn = { borderColor: claude, background: `color-mix(in srgb, ${claude} 16%, transparent)`, color: claude };
+// The chosen target chip wears the Claude tone, as the mockup's `chipStyle`. The hover and state
+// variants repeat the colours: the toggle's own variant classes outrank the plain ones.
+const CHIP_ON_CLASS =
+  'border-claude bg-claude/16 text-claude hover:bg-claude/16 hover:text-claude data-[state=on]:bg-claude/16';
 
 const view = computed(() => {
   const c = dialogs.ctx;
@@ -82,7 +83,7 @@ async function discard(): Promise<void> {
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
-            :style="{ stroke: actionStyle('claude').background }"
+            class="stroke-claude"
           >
             <rect x="3" y="4" width="18" height="16" rx="3" />
             <path d="M7 10l3 2-3 2M12 15h5" />
@@ -127,7 +128,7 @@ async function discard(): Promise<void> {
           data-testid="ade-dialog-setup"
         />
 
-        <div v-if="view.isArchive" class="text-kira-md" :style="{ color: TONE.amber[1] }" data-testid="ade-dialog-risk">
+        <div v-if="view.isArchive" class="text-kira-md text-tone-amber" data-testid="ade-dialog-risk">
           {{ view.riskText }}. Tell Claude what to do with it, or delete the worktrees anyway.
         </div>
 
@@ -149,7 +150,7 @@ async function discard(): Promise<void> {
               :key="opt.value"
               :value="opt.value"
               class="border font-data text-kira-sm"
-              :style="opt.on ? chipOn : undefined"
+              :class="opt.on && CHIP_ON_CLASS"
             >
               {{ opt.label }}
             </ToggleGroupItem>
@@ -198,7 +199,7 @@ async function discard(): Promise<void> {
           <Button
             variant="dialog"
             size="kira-lg"
-            :style="{ borderColor: TONE.red[2], color: TONE.red[1], background: 'transparent' }"
+            class="border-tone-red-solid bg-transparent text-tone-red"
             :disabled="sending"
             data-testid="ade-dialog-delete"
             @click="discard"
@@ -209,7 +210,7 @@ async function discard(): Promise<void> {
         <Button
           variant="dialog-primary"
           size="kira-lg"
-          :style="actionStyle(view.overridden ? 'red' : 'claude')"
+          :class="ACTION_CLASS[view.overridden ? 'red' : 'claude']"
           :disabled="view.blocked || view.sendDisabled || sending || dialogs.waitingSetup"
           data-testid="ade-dialog-send"
           @click="send"

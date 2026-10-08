@@ -2,7 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import AdeTip from '../AdeTip.vue';
 import type { CardModel } from '../plan/usePlanModel';
-import { actionStyle } from '../tones';
+import { ACTION_CLASS } from '../tones';
 import { useTaskAction } from './useTaskAction';
 
 // The task's stage action: `▶ Run`, `▶ <Stage>`, `Take over`, `Approve`, `Retry`, `Done ›`, `Finish ✓`,
@@ -16,7 +16,7 @@ const { action, perform, busy } = useTaskAction(() => props.card);
     <Button
       size="kira-lg"
       class="shrink-0 font-semibold"
-      :style="actionStyle(action.tone)"
+      :class="ACTION_CLASS[action.tone]"
       :disabled="busy"
       :data-testid="`ade-task-action-${action.kind}`"
       @click.stop="perform"

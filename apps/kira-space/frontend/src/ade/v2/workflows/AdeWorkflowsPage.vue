@@ -6,7 +6,6 @@ import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { useImportWorkflow, useNewWorkflow, useWorkflows } from '../queries';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
-import { TONE } from '../tones';
 import type { WorkflowEntry } from '../wire';
 import AdeWorkflowEditor from './AdeWorkflowEditor.vue';
 
@@ -131,8 +130,7 @@ async function createNew(): Promise<void> {
         :key="e.fileName"
         variant="ghost"
         class="box-border h-auto w-full flex-col items-stretch justify-start gap-0.5 whitespace-normal rounded-kira border-l-3 px-2.5 py-2 text-left text-fg"
-        :class="current?.fileName === e.fileName ? 'bg-select' : ''"
-        :style="{ borderLeftColor: current?.fileName === e.fileName ? TONE.amber[2] : 'transparent' }"
+        :class="current?.fileName === e.fileName ? 'bg-select border-l-tone-amber-solid' : 'border-l-transparent'"
         data-testid="ade-wf-row"
         :data-file="e.fileName"
         @click="pick(e.fileName)"
@@ -142,7 +140,7 @@ async function createNew(): Promise<void> {
             e.workflow?.name ?? e.fileName
           }}</span>
           <AdeTip v-if="e.error" :text="e.error.message">
-            <span class="shrink-0 text-kira-sm font-bold" :style="{ color: TONE.red[1] }" data-testid="ade-wf-row-error">✕</span>
+            <span class="shrink-0 text-kira-sm font-bold text-tone-red" data-testid="ade-wf-row-error">✕</span>
           </AdeTip>
         </span>
         <span class="max-w-full truncate text-kira-sm text-muted-foreground" data-testid="ade-wf-row-stages">{{ stages(e) }}</span>

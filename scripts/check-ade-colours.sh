@@ -64,7 +64,7 @@ rgba(163,113,247,0.16)
 EOF
 sort -u "$TMP/allow.raw" >"$TMP/allow"
 
-grep -rnoiE --include='*.vue' --include='*.ts' -- \
+grep -rnoiE --include='*.vue' --include='*.ts' --include='*.css' -- \
   '#[0-9a-f]{3,8}\b|(rgba?|hsla?|oklch|hwb|lab|lch)\([^)]*\)' "$ADE" |
   sed -E 's/^([^:]*:[0-9]+):(.*)$/\1	\2/' |
   awk -F'\t' '{ v = tolower($2); gsub(/ /, "", v); print $1 "\t" v }' >"$TMP/hits" || true

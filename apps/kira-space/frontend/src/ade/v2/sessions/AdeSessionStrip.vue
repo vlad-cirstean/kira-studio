@@ -2,7 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
-import { actionStyle } from '../tones';
+import { ACTION_CLASS } from '../tones';
 import type { SessionView } from './sessionView';
 
 // Tab strip of the running sessions in scope (mockup `termTabs`): activity glyph, TUI / claude -p
@@ -28,8 +28,7 @@ const emit = defineEmits<{ pick: [id: string] }>();
       <AdeActivityIcon :kind="v.kind" />
       <span
         class="shrink-0 rounded-kira-xs px-1 text-kira-sm font-bold"
-        :class="v.headless ? 'border border-dashed border-border-strong text-muted-foreground' : ''"
-        :style="v.headless ? undefined : actionStyle('claude')"
+        :class="v.headless ? 'border border-dashed border-border-strong text-muted-foreground' : ACTION_CLASS.claude"
         data-testid="ade-session-badge"
         >{{ v.badge }}</span
       >

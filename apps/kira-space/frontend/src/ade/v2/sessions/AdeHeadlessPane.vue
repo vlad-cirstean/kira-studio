@@ -8,7 +8,7 @@ import { adeAgoOptions } from '../ago';
 import AdeRunLog from '../panel/AdeRunLog.vue';
 import { useStopRun } from '../queries';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
-import { actionStyle, TONE } from '../tones';
+import { ACTION_CLASS } from '../tones';
 import AdeSessionId from './AdeSessionId.vue';
 import type { SessionView } from './sessionView';
 
@@ -43,8 +43,7 @@ async function onStop(): Promise<void> {
   <div class="flex min-h-0 flex-1 flex-col" data-testid="ade-headless-pane">
     <div
       class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-kira-md"
-      :class="needsYou ? '' : 'text-muted-foreground'"
-      :style="needsYou ? { color: TONE.amber[1], background: `color-mix(in srgb, ${TONE.amber[2]} 8%, transparent)` } : undefined"
+      :class="needsYou ? 'bg-tone-amber-solid/8 text-tone-amber' : 'text-muted-foreground'"
       data-testid="ade-headless-status"
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
@@ -52,7 +51,7 @@ async function onStop(): Promise<void> {
         v-if="!archived"
         size="xs"
         class="shrink-0 rounded-kira-sm px-2.5 font-semibold"
-        :style="actionStyle('claude')"
+        :class="ACTION_CLASS.claude"
         :disabled="takeOver.pending.has(view.session.id)"
         title="Continue this run yourself in an interactive Claude Code session"
         data-testid="ade-session-takeover"
