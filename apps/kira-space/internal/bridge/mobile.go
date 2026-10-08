@@ -8,6 +8,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/embedded"
@@ -72,6 +73,14 @@ func toWireMobileResult(r pairing.ActionResult) MobilePairingActionResult {
 	}
 }
 
+// MobileTerminalBroker is the phone-terminal broker (*mobileterm.Broker): the server-side attach
+// plus the desktop's view of holds and its reclaim.
+type MobileTerminalBroker interface {
+	mobileweb.TerminalBroker
+	Holds() []mobileterm.Hold
+	Reclaim(terminalID string, cols, rows int)
+}
+
 // MobileAccessService is the Mobile access pane's surface: enable/disable the phone web server,
 // move its ports, list and revoke phones, answer the pairing prompt. It owns the server lifecycle.
 type MobileAccessService struct {
@@ -88,7 +97,7 @@ type MobileAccessService struct {
 	// opens a phone-started launch's terminal. Terminals owns phone-attached agent terminals.
 	Writer    mobileweb.Writer
 	Launches  *MobileLaunches
-	Terminals mobileweb.TerminalBroker
+	Terminals MobileTerminalBroker
 
 	embedded embedded.Service[*mobileweb.Server, MobileStatus]
 }
@@ -260,6 +269,32 @@ func (s *MobileAccessService) SetDevicePermissions(args MobileDevicePermissionsA
 		srv.PermissionsChanged(args.ID)
 	}
 	s.emitDevices()
+	return nil
+}
+
+// TerminalHolds lists agent terminals a phone controls, for the desktop overlay and pane note.
+func (s *MobileAccessService) TerminalHolds() []mobileterm.Hold {
+	if s.Terminals == nil {
+		return []mobileterm.Hold{}
+	}
+	return s.Terminals.Holds()
+}
+
+type MobileReclaimArgs struct {
+	TerminalID string `json:"terminalId"`
+	Cols       int    `json:"cols"`
+	Rows       int    `json:"rows"`
+}
+
+// ReclaimTerminal takes an agent terminal back from a phone. Cols and rows are the window's size;
+// 0,0 keeps the last size the window reported.
+func (s *MobileAccessService) ReclaimTerminal(args MobileReclaimArgs) error {
+	if args.TerminalID == "" {
+		return ipcerr.BadRequest("terminalId is required")
+	}
+	if s.Terminals != nil {
+		s.Terminals.Reclaim(args.TerminalID, args.Cols, args.Rows)
+	}
 	return nil
 }
 

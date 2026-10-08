@@ -27,6 +27,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitvsix"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
@@ -177,8 +178,26 @@ func main() {
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
 	// app's own TerminalService only embeds it (own binding-name FQN, no behaviour of its own).
 	// ComposeAgent (P129 Part 1 §4.1) rewrites every claude-code launch through adeTracker.Compose.
+	// termBroker arbitrates phone-attached agent terminals (P212 Part 2); a phone reaches only a
+	// running TUI task session, by ADE session id.
+	termBroker := mobileterm.New(mobileterm.Deps{
+		Registry: terminalRegistry,
+		Sessions: func(sessionID string) (string, bool) {
+			tid, ok := adeTracker.TerminalOf(sessionID)
+			if !ok {
+				return "", false
+			}
+			rec, err := adeTracker.Get(sessionID)
+			if err != nil || rec == nil || rec.Mode != model.AdeSessionModeTUI || rec.State != model.AdeSessionStateRunning || rec.TaskID == "" {
+				return "", false
+			}
+			return tid, true
+		},
+		OnChange: func(h []mobileterm.Hold) { emitter.Emit(bridge.ChannelMobileTerminals, h) },
+	})
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose, AbortAgent: adeTracker.Abort,
+		Arbiter: termBroker,
 	}}
 	// keepAwakeCtl/keepAwakeSvc: the title bar's keep-awake toggle (P116 G5, internal/keepawake.Toggle)
 	// plus P188's agent reason, the live Claude Code session count — terminal agent tabs and running
@@ -239,6 +258,7 @@ func main() {
 		AgentSessions: func() any { return terminalSvc.AgentSessions() },
 		Writer:        &bridge.MobileWriter{Svc: adeTaskSvc, Launches: mobileLaunches},
 		Launches:      mobileLaunches,
+		Terminals:     termBroker,
 	})
 	detachMobilePush := mobileSvc.AttachPush()
 
