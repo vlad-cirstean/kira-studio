@@ -33,21 +33,14 @@
 html,
 body,
 #app {
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
+  @apply h-full m-0 overflow-hidden;
 }
 
 body {
   /* P26: was --kira-font-family (the data font). Chrome — everything with no font-family of its
      own, which preflight's `font: inherit` extends to every form control too — now renders in the
      fixed interface font; every genuinely-data surface names --kira-font-data explicitly. */
-  font-family: var(--kira-font-ui);
-  font-size: var(--kira-t-md);
-  color: var(--kira-fg);
-  background: var(--kira-bg-chrome);
-  -webkit-font-smoothing: antialiased;
-  user-select: none;
+  @apply font-ui text-kira-md text-fg bg-chrome antialiased select-none;
 }
 
 input,

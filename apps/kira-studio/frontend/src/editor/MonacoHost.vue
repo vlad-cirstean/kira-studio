@@ -749,11 +749,11 @@ watch(
 }
 
 .monaco-host :deep(.kira-ed-find-match) {
-  background: var(--kira-search-match);
+  @apply bg-search-match;
 }
 
 .monaco-host :deep(.kira-ed-find-match-current) {
-  background: var(--kira-search-match-current);
+  @apply bg-search-match-current;
 }
 
 /* §4.4/dogfooding: the hover widget's value/caption split — `theme.ts:200,213`'s own two
