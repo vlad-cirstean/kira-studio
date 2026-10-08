@@ -4,7 +4,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 
 | Phase | Title | Status |
 |---|---|---|
-| P210 | Memory embedding search: local embedding model (best quality under 500 MB RAM, less if possible), vectors in SQLite, hybrid with existing FTS recall-first search | Not started |
+| P210 | Memory embedding search: local embedding model (best quality under 500 MB RAM, less if possible), vectors in SQLite, hybrid with existing FTS recall-first search | Done |
 | P211 | Memory bulk import: pick file or folder; chunk to a Sonnet-friendly size; per-chunk clean-context agent extracts atomic facts; one final agent holding all chunk facts of the file adds memories through the MCP; progress and failure shown | Not started |
 | P212 | Mobile agents web: local web server in Kira Space serving a read-only mobile-laid-out Vue agents module; first-load device approval in Kira Space like the git extension pairing; installable PWA | Not started |
 | P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Not started |
@@ -15,3 +15,59 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 - P210: search over embeddings too; SQLite; local model; best under 500 MB RAM, maybe less.
 - P211: import lots of docs; select file or folder, import starts; each file chunked; chunk size suits Sonnet; step 1 extract atomic facts per chunk (agent with clean context each); step 2 one agent sees all chunks' facts of the file and adds memories via MCP so context of whole file is kept.
 - P212: local web server serves mobile version of agents module; first load on phone must be allowed in Kira Space (like git extension); Vue, mobile layout, read-only for now; PWA so it runs outside browser.
+
+## P210 result
+
+Hybrid keyword and semantic memory search, local model, vectors in `memory.db`. Facts live in
+`docs/ARCHITECTURE.md` ("Memory MCP server and module", Stack table, Known open items) and
+`docs/DEV_ENVIRONMENT.md` (Memory MCP section).
+
+Decisions taken (user's deferred defaults): D1 English-only arctic-embed-s int8; D2 download on click
+(35 MB, pinned SHA-256) rather than bundling the model; D3 semantic candidates in reconcile on, cosine
+floor 0.85.
+
+Runtime and model choice, measured on Linux x86_64 (4 cores, ORT CPU, 2 intra-op threads):
+
+| Option | Result |
+|---|---|
+| hugot pure-Go backend, bge-small | 458 MB loaded, 1.05 GB peak, 40x slower than ORT: declined |
+| hugot ORT backend | works, drags GoMLX and go-xla into `go.mod`: declined |
+| `yalue/onnxruntime_go` + `hftokenizer`, arctic-embed-s int8 | 95 MB loaded, 137 MB peak, 4 ms short, 35 ms long: chosen |
+| llama.cpp, sqlite-vec | second native toolchain; native SQLite extension `modernc.org/sqlite` cannot load: declined |
+| multilingual-e5-small int8 | 362 MB peak, weaker English retrieval: D1 alternative |
+| EmbeddingGemma (Gemma terms), jina v3 (CC-BY-NC) | not open-source licences: declined |
+
+Verification (this environment, network reachable):
+
+- Pinned URLs and SHA-256 of `model.onnx` and `tokenizer.json` re-verified against the pinned HF
+  revision; ORT tgz hashes for `osx-arm64` and `linux-x64` verified by `scripts/fetch-onnxruntime.sh`.
+- `go test -tags embedsmoke ./internal/memory/embed/ -run Smoke`: real download via `embed.Install`,
+  real worker, dim 384, unit norm, top-1 9/10 on the 10-query paraphrase probe (miss: "what hardware
+  does the user work on").
+- `memory-mcp` end to end (built binary, real model, `KIRA_ORT_LIB`): first `search_memories` ran while
+  indexing and returned keyword-only; the second, a no-shared-word query ("which relational database
+  serves live traffic"), returned the PostgreSQL fact first with `[semantic]` and state `ready`. Worker
+  RSS 146 MB after backfill plus query; the worker was gone 300 s after the last search; the MCP process
+  exited 0.
+- `go test -race ./internal/memory/... ./apps/kira-space/internal/bridge/`, `bun run test:unit`,
+  typecheck and lint pass; Space UI spec `memory-module.spec.ts` passes (4/4). `CGO_ENABLED=0` and
+  `GOOS=darwin CGO_ENABLED=0` builds of `internal/memory/...` compile (stub path). Visual baselines not
+  regenerated.
+
+Deviations from the plan:
+
+- `Command` in `embed.ClientOptions` takes only `modelDir` (the plan's `ctx` had no use).
+- `Memory.seq` is an unexported field set by `memoryColumns` (now ends in `m.seq`) instead of a variant
+  scanner; `searchFTS` returns `[]Memory`.
+- `Installed` and the manifest live in `embed/manifest.go` (commit 2) because the client needs them
+  before the installer (commit 4). `normalize` moved to `vector.go` so the fake-worker tests run with
+  `CGO_ENABLED=0`.
+- Added `progress` shadcn-vue set uses `bg-field` instead of the registry's `bg-muted` (retired alias
+  guard in `check-theme-classes.sh`).
+- The plan's `CGO_ENABLED=0 go build ./apps/kira-space/...` check cannot pass here (Wails needs cgo on
+  Linux); the stub was checked on `./internal/memory/...`.
+
+Unverified: macOS (dylib load from `Contents/Frameworks`, arm64 int8 kernels, worker footprint,
+`codesign --verify --deep --strict`), the Download model click in the real app (covered by the same
+`embed.Install` the smoke test runs, UI states by typecheck only), and tokenizer parity beyond the 9/10
+ranking probe. Recorded in Known open items.

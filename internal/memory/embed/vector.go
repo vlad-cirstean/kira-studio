@@ -43,3 +43,18 @@ func Dot(a, b []float32) float32 {
 	}
 	return s
 }
+
+// normalize scales v to unit length in place.
+func normalize(v []float32) {
+	var sum float64
+	for _, x := range v {
+		sum += float64(x) * float64(x)
+	}
+	if sum == 0 {
+		return
+	}
+	inv := float32(1 / math.Sqrt(sum))
+	for i := range v {
+		v[i] *= inv
+	}
+}

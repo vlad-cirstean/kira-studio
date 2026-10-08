@@ -417,6 +417,18 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
   --strict-mcp-config` with a `stdio` server `{command: <binary>, args: ["memory-mcp"], env:
   {KIRA_MEMORY_HOME: <tmp>}}`. `printf '' | <binary> memory-mcp` exits 0. The macOS app-bundle binary
   is unchecked (Known open items).
+- Semantic search (P210): the ONNX Runtime library is not in the repo. `sh scripts/fetch-onnxruntime.sh
+  linux-x64` downloads the pinned 1.29.1 build (checksum-verified, idempotent) to
+  `apps/kira-space/build/onnxruntime/linux-x64/` (gitignored) and prints the library path; set
+  `KIRA_ORT_LIB` to it for any process that should embed (the server-tag app, `memory-mcp`). Without it
+  the status is `unavailable` and search stays keyword-only. Hugging Face is reachable through the agent
+  proxy here, so the 35 MB model download works. Real-model check, not in CI:
+  `KIRA_ORT_LIB=… go test -tags embedsmoke ./internal/memory/embed/ -run Smoke -v` (installs into a
+  temp dir, runs the real worker, needs 8/10 top-1). Tests otherwise use a fake `Embedder` and a fake
+  worker (the test binary re-executed), so no network or library is needed. `go build` of the
+  `CGO_ENABLED=0` stub and `GOOS=darwin` pure-Go packages works here; the cgo darwin build does not.
+- Worker footprint: `grep VmRSS /proc/$(pgrep -f 'memory-embed')/status` while it runs; it should
+  vanish about 5 min after the last search.
 
 ## `tests/visual/*` pixel diffs — a sandbox font-package mismatch, not a code regression
 

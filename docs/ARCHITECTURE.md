@@ -51,6 +51,7 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
 | Git module transport (v1.3) | Moved to Kira Space in its entirety as of v1.9 P100 — this is no longer part of Kira Studio's own stack. See "Git module" below for the current, Kira-Space-scoped description |
 | MCP server (M1; repo-map server removed in v1.9 P97) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio, for `internal/dbmcp` | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect, never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source |
+| Local embeddings (P210, Kira Space memory) | ONNX Runtime 1.29.1 (MIT) via `github.com/yalue/onnxruntime_go` v1.36.0 (MIT), `github.com/gomlx/go-huggingface` v0.4.13 (Apache-2.0) `hftokenizer` + `hub` downloader, model Snowflake arctic-embed-s int8 (Apache-2.0) | Cgo `dlopen` of a bundled `libonnxruntime`; inference in a `memory-embed` worker subprocess, vectors as BLOBs in `memory.db`, search in Go. Declined: `knights-analytics/hugot` pure-Go backend (458 MB loaded, 1.05 GB peak, 40x slower) and its ORT backend (drags GoMLX and go-xla into `go.mod` for one pipeline); `sqlite-vec` (a native extension `modernc.org/sqlite` cannot load; its KNN is brute force anyway); llama.cpp (second native toolchain); EmbeddingGemma (Gemma terms), jina v3 (non-commercial). See "Memory MCP server and module" |
 | Native file viewer + diff (C5/C6, Kira Space) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library; neither `packages/workbench`'s nor either app's own `frontend/package.json` redeclares it. **Read-only in the native code workspace specifically** (C5/C6's own repo file viewer and diff tabs, now Kira Space's, stay viewer-only) — P60a (v1.6) reuses this same dependency for every other studio/api editor surface, most of them genuinely editable (the request/message body editors, the cell editor, the bulk variables editor), so "Monaco = read-only" is a C5/C6-local fact about the repo workspace, not a property of the dependency itself; see the Stack table's own "Text editing / viewing" row. Reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6. **81** basic languages Monaco ships get a registered Monarch grammar as of P67c (`packages/workbench/src/editor/monacoEntry.ts`'s own `register.all.js` import, up from 19 — the package's own bundle registers 81, not the 84 once recorded here); `.json`/`.jsonc` color via Monaco's own worker-free JSON tokenizer, not the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5-C7, P67c)" and "Diff tabs (C6)" below |
 | Git graph, native workspace (C10, historical) | Moved to Kira Space as of v1.9 P100 — `apps/kira-studio/frontend/package.json` no longer depends on `@kira/git-ui`/`@kira/git-ipc`/`@kira/git-core`/`seti-icons`, and the bundle-size deltas this row used to record no longer apply to this binary. `@kira/kira-ui` stays a real dependency, for `KuiColumnResizeHandle` only (`views/stream/StreamView.vue`) — an unrelated data-grid feature, not a git-graph leftover; P131 Part 3 reduced kira-ui itself to just that component and `floatingPosition.ts`. See "Git graph in the native workspace (C10)" below, now describing Kira Space's own frontend |
 
@@ -4089,6 +4090,44 @@ and `docs/v2.0/plans/`.
 - Search is recall-first: every term a quoted prefix term OR-ed, plus the whole phrase; stopwords
   dropped; gate-written keywords indexed; bm25 `(10, 2, 4)` orders only; no score cutoff. One builder
   (`memory.BuildMatch`) serves MCP, module and reconcile candidates. User input never reaches FTS5 as syntax.
+- Semantic search (P210): `memory_embeddings` (migration 2; `seq` PK, `model`, little-endian float32
+  `vec`, L2-normalised) holds one vector per memory version, superseded ones too. One model at a time;
+  rows carry the model id and search filters on it. Writing a vector never bumps `memory_revision`. The
+  model is Snowflake arctic-embed-s int8 ONNX (Apache-2.0, 33M params, 384 dims, CLS pooling, query
+  prefix, pinned HF revision `e596f50`, id `arctic-embed-s-int8-e596f50`), embedding the `fact` text
+  only. Files (`model.onnx` 34 MB, `tokenizer.json`) download on an explicit click in the Memory module
+  to `$KIRA_MEMORY_HOME/models/<id>/` with pinned SHA-256 (`embed.Install`, manifest written last), shared
+  by the app and every `memory-mcp` process. MCP never downloads.
+- Embedding runtime: `internal/memory/embed` (leaf package). ONNX Runtime 1.29.1 through
+  `yalue/onnxruntime_go` (cgo, `dlopen`), WordPiece through `gomlx/go-huggingface` `hftokenizer`. It
+  runs in a worker subprocess, `<Kira Space executable> memory-embed --model-dir …` (`runArgvShim`),
+  spawned lazily by whichever process needs vectors and speaking NDJSON on stdin/stdout (batches of at
+  most 32; `embed.Client`). The worker exits when its stdin closes: after 5 min idle (so the OS reclaims
+  the model, which an in-process `Session.Destroy` does not) and whenever the parent dies. A crash or
+  cancelled request kills only the worker. A failed spawn is refused for 60 s (`Reset` clears it).
+  Measured on Linux x86_64: about 95 MB RSS loaded, 137 MB peak, 4 ms short and 35 ms long text.
+  Builds with `CGO_ENABLED=0` compile a stub: status `unavailable`.
+- Runtime library: `$KIRA_ORT_LIB`, else `Kira Space.app/Contents/Frameworks/libonnxruntime.1.29.1.dylib`,
+  bundled arm64-only by `darwin:package` (`scripts/fetch-onnxruntime.sh`, checksum-pinned; native code is
+  never downloaded at runtime). ORT 1.29.1 has no x86_64 macOS build, so a universal bundle's x86_64
+  slice reports embeddings `unavailable`; keyword search is unaffected.
+- Hybrid search, `Service.Search`: FTS top N plus vector top N (brute-force dot product in Go over the
+  stored vectors, bounded min-heap; N is the clamped limit), reciprocal rank fusion `k = 60` over the
+  union, truncated to the limit. No score cutoff on the vector list (cosine scores are compressed:
+  related 0.52-0.76, unrelated 0.39-0.58), so a small store returns nearly everything, ranked.
+  `Memory.match` is `keyword | semantic | both`; the MCP text marks `[semantic]`. The query embeds with
+  a 5 s timeout. Any embedder failure leaves the keyword results unchanged. The gate's related-memory
+  lookup uses the same search.
+- Writes embed in the same transaction as the insert (best effort, 10 s). Reconcile candidates are FTS
+  top 10 plus up to 5 vector neighbours with doc-to-doc cosine at least 0.85 (measured paraphrases
+  0.89-0.94, unrelated at most 0.82); without the floor every store would reach the Sonnet call.
+  Backfill (`Service.StartBackfill`, kicked by Search, Store, service open and install) embeds memories
+  lacking a vector in batches of 32, newest current first; each batch commits alone, and two processes
+  racing write identical rows.
+- Status: `Service.SemanticStatus` is `off` (no embedder), `notInstalled`, `unavailable` (with the
+  worker's message), `indexing` (done/total memories) or `ready`; the bridge overlays `downloading`
+  (bytes). `kira:memory:semantic` (coalesced to one per 250 ms) tells the UI to refetch. The MCP
+  `search_memories` output carries `semantic` and a text note when results are keyword-only.
 - Pipeline, `Service.Store`: validation, gate (one Sonnet call: splits atomic facts, challenges
   ambiguity, weak reasons and secrets, adds keywords), reconcile (one call for facts with candidates;
   hash short-circuit and no-candidate add skip it), commit per fact in one `BEGIN IMMEDIATE`
@@ -4113,6 +4152,8 @@ and `docs/v2.0/plans/`.
   `PRAGMA data_version` watcher, after the MCP subprocess writes. `memory` is the last mode in
   `MODE_ORDER` (`windows.mode` vocabulary; no migration). UI lives in shared `packages/workbench/src/memory/`:
   search panel, detail with version trail, Add memory and Connect dialogs. Kira Studio hosts none of it.
+- Memory UI adds `SemanticStatus.vue` (download button, progress, indexing, retry) and a `semantic`
+  badge on rows found by meaning only.
 - Failure modes: no `claude` on `PATH` or not logged in surfaces a typed message in the dialog and as an
   MCP tool error; the gate can over-challenge; model latency is 5 to 20 s per store.
 
@@ -4850,7 +4891,9 @@ Performance:
 - **A pending insert row's cell is a single-line `<input>` (P176).** A staged value with a line break (pasted TSV/CSV) shows flattened, and typing in that input restages it without the break. Delete once insert cells move to the inline cell editor's textarea.
 
 - **`memory-mcp` as a macOS app-bundle executable is unverified (P201).** Verified with a `-tags server` Linux binary only. Spawning the bundle's executable as a CLI child of Claude Code on a Mac is unobserved. Delete once checked on a Mac.
-- **Memory has no semantic (embedding) search and no delete (P201).** Search is FTS5 with OR-prefix terms; stored memories are never deletable by design (updates keep a `historical` version). The Memory mode in Kira Space shows an empty tab strip.
+- **Memory has no delete (P201).** Stored memories are never deletable by design (updates keep a `historical` version). The Memory mode in Kira Space shows an empty tab strip.
+- **Semantic memory search is unverified on a Mac (P210).** Loading the bundled dylib from `Contents/Frameworks`, int8 kernels on arm64 and the worker footprint were checked on Linux only (95 MB loaded, 137 MB peak). Delete once checked on a Mac.
+- **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
 - **The Space Git window refuses `worktree.prepare` by design (P202).** Prepare-script progress shows in ADE paths and the VS Code extension host, not in the Space Git window's own worktree dialog or toolbar. The git-ui toolbar strip is not screenshot-verified (no fake-host scenario drives `worktree.prepare`). Delete when the user lifts the boundary.
 - **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
 - **The agent MCP tools (`task_info`, `declare_repos`, `request_branch`, `branch_status`) are untested against a real board and real `claude` (P199).** Covered by the `adeagent` go-sdk client test and `agenttools_test.go` only. Delete once one live run calls them.

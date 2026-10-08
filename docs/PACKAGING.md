@@ -301,7 +301,7 @@ frameworks. On Linux that leaves two doors, and neither was opened here:
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
 "skipped A1/A3/A5/A6/N2" note and one "skipped A4/N3" note and passes on the static checks alone,
 and even with a bundle it would skip A1/A3/A5/A6/N2 for want of `codesign`/`PlistBuddy`. **A green
-`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S9/S10/S11), not that
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S9/S10/S11/S12), not that
 any bundle is correct.** S9 (G10 — the extension manifest's `version` matches `build/config.yml`'s
 `info.version`) is a pure string comparison over two committed files, so it runs — and means
 something — even without a bundle; A6 (the bundled `.vsix` exists, is non-empty and `PK`-prefixed)
@@ -439,12 +439,17 @@ P29 added three more static checks, guarding §2.1/§2.2's own findings against 
 - **S10** — no reference under `apps/`, `packages/` or `internal/` to `browser_download_url` or
   `releases/download` — rescoped by P119 to include `internal/` (`appupdate` now lives there).
   `scripts/` is deliberately excluded: `scripts/install.sh` is the one sanctioned downloader, see
-  below.
+  below. P210's embedding-model download is a user-clicked app-code download from a Hugging Face
+  `resolve/` URL with a pinned SHA-256, not a release asset, so S10 stays green. Native code is never
+  downloaded at runtime: the ONNX Runtime dylib is fetched at build time by `scripts/fetch-onnxruntime.sh`.
 - **S11** (P119) — the curl installer and its Go counterpart agree on their one shared contract:
   `scripts/install.sh` exists and passes `sh -n`; its line-2 contract marker
   (`# kira-install-contract: 1`) matches `internal/appupdate/install.go`'s own constant;
   `raw.githubusercontent.com` appears exactly once across `apps/`, `packages/`, `internal/`
   (`InstallScriptURL`); `shellcheck` runs against the script when it's on `PATH`.
+- **S12** (P210) — the bundled ONNX Runtime version agrees: `internal/memory/embed/paths.go`'s
+  `ORTVersion` equals `scripts/fetch-onnxruntime.sh`'s `ORT_VERSION`, and `create:app:bundle` in
+  `apps/kira-space/build/darwin/Taskfile.yml` references `libonnxruntime.<version>.dylib`.
 
 There is no publish provider, no update feed, no `latest-mac.yml`, and no `.blockmap` — the last of
 those was an electron-builder differential-update artifact that has no equivalent here, so it is absent
@@ -525,6 +530,17 @@ so the ad-hoc signature covers it too, and fails loudly if the file is missing r
 packaging a broken bundle silently. `darwin:run`'s `.dev.app` gets the same conditional copy Kira
 Studio's own dev-app task used to, so **Install VS Code Integration** is exercisable from a dev
 build without cutting a real `.dmg`.
+
+**ONNX Runtime (P210).** `darwin:package` and `darwin:package:universal` depend on `fetch:onnxruntime`
+(`scripts/fetch-onnxruntime.sh osx-arm64`: MIT release tgz, SHA-256 pinned, extracted to the gitignored
+`apps/kira-space/build/onnxruntime/osx-arm64/`). `create:app:bundle` copies `libonnxruntime.1.29.1.dylib`
+into `Contents/Frameworks/` and its LICENSE and ThirdPartyNotices into `Contents/Resources/`, before
+`codesign:adhoc`, and fails loudly if the dylib is missing. The dylib is arm64-only (ORT 1.29.1 has no
+x86_64 macOS build); the universal bundle's x86_64 slice reports embeddings unavailable. Adds about
+43 MB to the bundle. `memory-embed` is the same executable run as a subcommand, so no extra binary
+needs signing. Mac verification is a human item (see `docs/ARCHITECTURE.md` Known open items):
+`Contents/Frameworks/libonnxruntime.1.29.1.dylib` present, `codesign --verify --deep --strict` passes,
+worker footprint in Activity Monitor at most 150 MB.
 
 **Installing the extension (G10) — Settings → *Connected editors* → Install VS Code Integration**
 (`apps/kira-space/internal/gitvsix`, retargeted from Kira Studio by P100 Part 3): locates the

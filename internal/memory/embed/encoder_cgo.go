@@ -4,7 +4,6 @@ package embed
 
 import (
 	"fmt"
-	"math"
 	"path/filepath"
 
 	"github.com/gomlx/go-huggingface/tokenizers/api"
@@ -153,20 +152,6 @@ func (e *ortEncoder) truncate(ids []int) []int {
 	out := append([]int(nil), ids[:e.spec.MaxTokens]...)
 	out[len(out)-1] = ids[len(ids)-1]
 	return out
-}
-
-func normalize(v []float32) {
-	var sum float64
-	for _, x := range v {
-		sum += float64(x) * float64(x)
-	}
-	if sum == 0 {
-		return
-	}
-	inv := float32(1 / math.Sqrt(sum))
-	for i := range v {
-		v[i] *= inv
-	}
 }
 
 func (e *ortEncoder) close() {
