@@ -4,7 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { connBgClass } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { useEventListener, useLocalStorage } from '@vueuse/core';
 import InlineRenameInput from '@workbench/components/InlineRenameInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
@@ -314,18 +314,14 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
               <button
                 type="button"
                 :disabled="scriptCwd(script) === ''"
-                class="flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                class="relative flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
                 :title="script.command"
                 :data-testid="`quick-command-${script.id}`"
                 @click="runScript(script)"
                 @contextmenu.prevent.stop="onContextMenu($event, script)"
               >
-                <span
-                  v-if="script.color !== 'none'"
-                  class="w-2.5 h-2.5 rounded-full shrink-0"
-                  :class="connBgClass(script.color)"
-                />
-                <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
+                <span :class="colorMarkClass('rail', script.color)" data-testid="quick-command-rail" aria-hidden="true" />
+                <CodiconIcon name="play" :size="13" class="shrink-0 text-muted-foreground" />
                 <div class="flex-1 min-w-0 flex flex-col">
                   <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
                   <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
@@ -363,24 +359,20 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 >{{ group.collection.name }}</button>
                 <span class="text-muted-foreground text-kira-sm">{{ group.rows.length }}</span>
               </div>
-              <div v-if="isOpen(group.collection.id)" class="flex flex-col pl-3.5">
+              <div v-if="isOpen(group.collection.id)" class="flex flex-col">
                 <button
                   v-for="script in group.rows"
                   :key="script.id"
                   type="button"
                   :disabled="scriptCwd(script) === ''"
-                  class="flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                  class="relative flex items-center gap-1 py-1 pl-5 pr-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
                   :title="script.command"
                   :data-testid="`quick-command-${script.id}`"
                   @click="runScript(script)"
                   @contextmenu.prevent.stop="onContextMenu($event, script)"
                 >
-                  <span
-                    v-if="script.color !== 'none'"
-                    class="w-2.5 h-2.5 rounded-full shrink-0"
-                    :class="connBgClass(script.color)"
-                  />
-                  <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
+                  <span :class="colorMarkClass('rail', script.color)" data-testid="quick-command-rail" aria-hidden="true" />
+                  <CodiconIcon name="play" :size="13" class="shrink-0 text-muted-foreground" />
                   <div class="flex-1 min-w-0 flex flex-col">
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
