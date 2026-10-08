@@ -26,7 +26,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/k2-fsa/sherpa-onnx-go v1.13.8
 	github.com/keybase/go-keychain v0.0.1
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.5.1
@@ -101,9 +100,6 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/k2-fsa/sherpa-onnx-go-linux v1.13.8 // indirect
-	github.com/k2-fsa/sherpa-onnx-go-macos v1.13.8 // indirect
-	github.com/k2-fsa/sherpa-onnx-go-windows v1.13.8 // indirect
 	github.com/klauspost/compress v1.19.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20260802145828-341c2f0c90b5 // indirect
 	github.com/magiconair/properties v1.18.11 // indirect

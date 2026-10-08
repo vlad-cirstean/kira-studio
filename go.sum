@@ -183,14 +183,6 @@ github.com/jcmturner/gokrb5/v8 v8.4.4 h1:x1Sv4HaTpepFkXbt2IkL29DXRf8sOfZXo8eRKh6
 github.com/jcmturner/gokrb5/v8 v8.4.4/go.mod h1:1btQEpgT6k+unzCwX1KdWMEwPPkkgBtP+F6aCACiMrs=
 github.com/jcmturner/rpc/v2 v2.0.3 h1:7FXXj8Ti1IaVFpSAziCZWNzbNuZmnvw/i6CqLNdWfZY=
 github.com/jcmturner/rpc/v2 v2.0.3/go.mod h1:VUJYCIDm3PVOEHw8sgt091/20OJjskO/YJki3ELg/Hc=
-github.com/k2-fsa/sherpa-onnx-go v1.13.8 h1:fyX96YdrMmK/DlBrGLmBat3OqRNsnVBFsRK5djCtVSg=
-github.com/k2-fsa/sherpa-onnx-go v1.13.8/go.mod h1:Sq4gTn8pkMsxfFPPFCBjmMzuRzWA8pHQUwW8gOp2OHs=
-github.com/k2-fsa/sherpa-onnx-go-linux v1.13.8 h1:33xcR9pYuD/VZ2luCWP1PJ4uLLeYM0i5GWGgM1lZjP8=
-github.com/k2-fsa/sherpa-onnx-go-linux v1.13.8/go.mod h1:NXEH2rsBgTdqY59YpPq6CtSBlBAXy/8a9FmpLERU97I=
-github.com/k2-fsa/sherpa-onnx-go-macos v1.13.8 h1:TQFOntGvoH+L+9HpmKukq6cDag674W7YQr3680KK0Q8=
-github.com/k2-fsa/sherpa-onnx-go-macos v1.13.8/go.mod h1:ZOhUAXC62Unj0ZNfu6zxSFKcW96aXf7P3BsqiUyOBbE=
-github.com/k2-fsa/sherpa-onnx-go-windows v1.13.8 h1:PjALQ7qHH6wmGyVeHMhGESh+EAtC/24rzZIth4PXcEs=
-github.com/k2-fsa/sherpa-onnx-go-windows v1.13.8/go.mod h1:5AX7TU8+P/gInjglY1ijtWUM2b8iyR0QX4yEngzMe64=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
 github.com/keybase/go-keychain v0.0.1/go.mod h1:PdEILRW3i9D8JcdM+FmY6RwkHGnhHxXwkPPMeUgOK1k=
 github.com/klauspost/compress v1.19.2 h1:hMRETovs/pu/dVWN7zIT1PGG8t509MwT6bO7XSi26R8=
