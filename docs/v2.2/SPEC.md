@@ -11,7 +11,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Done |
 | P214 | Memory manual add, free text: Add memory dialog gets a single free-text box (no per-row fact/reason; reason auto-filled as manual). Submits through the unchanged store path: the gate already splits into atomic facts, challenges and reconciles; stored only when every step passes. No dependency on P211 | Done |
 | P215 | Test and hook speed regression: tests and the pre-push hook (go build, lint:go, lint:dead) got much slower in roughly the last 24h, not from contention. Measure where time goes per stage first (do not bisect commit history); find the cause; fix it | Done |
-| P216 | Memory speech to text: local English-only Whisper small.en quantized q5_1 (whisper.cpp ggml) in a subprocess worker started only on demand and stopped when idle, like memory-embed; mic dictation in the Memory module with live text shown in the input, user sends it manually; model download on click with pinned SHA-256 | Not started |
+| P216 | Memory speech to text: local English-only Whisper small.en quantized q5_1 (whisper.cpp ggml) in a subprocess worker started only on demand and stopped when idle, like memory-embed; mic dictation in the Memory module with live text shown in the input, user sends it manually; model download on click with pinned SHA-256 | Done |
 | P217 | Code review (one Opus round) and fixes | Not started |
 
 ## Requirements (user's words, condensed)
@@ -211,3 +211,30 @@ Measured, warm, second run (seconds):
 Left slow, for a real reason: studio UI (~590 s) and the rest of the suite are CPU-bound at 3.9x on 4 cores. Each test opens a fresh WebKit page and answers every RPC through `page.route` mocking (20 to 130 ms per fulfil). Replacing it with a local mock server is a test-infra redesign, not a regression fix. Mobile tests hit a real local server: 1.0 s median. Pre-push (warm) 11 s, not slow. Cold `go build` 97 s is wails cgo, only after cache wipe.
 
 Not done: TS project references (`composite`, `vue-tsc -b`) would dedupe 583 files shared across programs; own phase if wanted.
+
+## P216 result
+
+Memory dictation: Whisper small.en q5_1 in a `memory-stt` worker, mic buttons in Add memory and Memory
+search, live text at the caret, user sends manually. Facts live in `docs/ARCHITECTURE.md` ("Memory MCP
+server and module", Stack table, Known open items), `docs/DEV_ENVIRONMENT.md` and `docs/PACKAGING.md`.
+
+Decisions: plan defaults D1 to D9. O1: whisper.cpp pinned by commit `d1be6fde` (release tarball hash not
+fetchable here), no tarball hash invented. Libraries: whisper.cpp (own cgo glue), malgo, Silero VAD.
+
+Landed: `modelstore` and `workerproc` extracted from embed (embed tests green); `stt` package (spec,
+protocol, engine, stream, worker, client, capture, dictation, `transcript`); `DictationService` and the
+`dictation` stream; fetch script, darwin build, plists, S13; frontend mic, status line, store, queries;
+Playwright `memory-dictation` (8) plus `memory-module` (4); tagged smoke test.
+
+Verification (Linux): `go build ./...`, `go build -tags server,whisper ./apps/kira-space`,
+`CGO_ENABLED=0 go build ./internal/memory/...`, `go test -race ./internal/memory/...
+./apps/kira-space/internal/bridge/`, golangci-lint 2.13.2 untagged and `--build-tags whisper` (0 issues),
+typecheck, lint, knip, Playwright 13 pass. Smoke with the real model: quote matched, VmHWM 336 MB,
+worker exited after the idle stop.
+
+Found while testing: the UI treated stream close after a `final` frame as an unexpected stop. Fixed.
+S10 now skips `build` dirs (fetched whisper.cpp source). `verify-packaging.sh` still reports "debug
+hooks in packaged bundle" because the local `dist` came from a test build; unrelated.
+
+Unverified: real microphone and the TCC prompt, Metal speed, darwin cgo link and `lipo`, `codesign`,
+accuracy on real speech, device switching, all macOS-only items. In Known open items.

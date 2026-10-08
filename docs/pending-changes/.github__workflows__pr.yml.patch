@@ -1,0 +1,16 @@
+Why: P216 whisper.cpp glue only compiles under the `whisper` tag; the checks job never builds it, so a darwin cgo break would land unseen.
+
+diff --git a/.github/workflows/pr.yml b/.github/workflows/pr.yml
+--- a/.github/workflows/pr.yml
++++ b/.github/workflows/pr.yml
+@@ -63,3 +63,10 @@
+       - name: Go compile check, every package (darwin build-tag breaks caught here even though the test run below is scoped)
+         run: go build ./...
++      - name: Go compile check, whisper cgo glue (P216 — static libs built by scripts/fetch-whisper.sh, tagged build links them)
++        run: |
++          sh scripts/fetch-whisper.sh darwin-arm64
++          W="$PWD/apps/kira-space/build/whisper/darwin-arm64"
++          CGO_CFLAGS="-I$W/include" CGO_LDFLAGS="-L$W/lib" \
++            go build -tags whisper ./apps/kira-space/...
+       - name: Go unit tests, darwin-relevant packages only (v1.4 P1 — container-tests already runs the full ./... on Linux with Docker, covering every non-container case here too, so a macOS-only full run was pure duplication; these five have real darwin&&cgo test/implementation files — secrets, metrics, localauth, gitclient, datagrip)
+         run: |

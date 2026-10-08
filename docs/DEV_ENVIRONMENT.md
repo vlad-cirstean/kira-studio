@@ -457,6 +457,16 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
   temp dir, runs the real worker, needs 8/10 top-1). Tests otherwise use a fake `Embedder` and a fake
   worker (the test binary re-executed), so no network or library is needed. `go build` of the
   `CGO_ENABLED=0` stub and `GOOS=darwin` pure-Go packages works here; the cgo darwin build does not.
+- Speech to text (P216): `sh scripts/fetch-whisper.sh linux-x64` clones whisper.cpp at the pinned commit
+  and builds static libs into `apps/kira-space/build/whisper/linux-x64/` (gitignored). Tagged build and
+  test: `export CGO_CFLAGS="-I$PWD/apps/kira-space/build/whisper/linux-x64/include"
+  CGO_LDFLAGS="-L$PWD/apps/kira-space/build/whisper/linux-x64/lib"`, then `go build -tags whisper ./...`.
+  golangci-lint runs untagged and with `--build-tags whisper`. Real-model check, not in CI:
+  `go test -tags 'whisper sttsmoke' ./internal/memory/stt/ -run Smoke -v` (downloads 182 MB through the
+  agent proxy into a temp dir, feeds `jfk.wav` at 4x speed, asserts the quote, VmHWM under 400 MB, worker
+  exit after idle). UI states: Playwright `memory-dictation` with a mocked bridge and `dictation` stream
+  (`tests/ui/support/dictationStreamMock.ts`); no microphone needed. The sandbox has no mic and no
+  macOS: capture, TCC and Metal stay unchecked (Known open items).
 - Worker footprint: `grep VmRSS /proc/$(pgrep -f 'memory-embed')/status` while it runs; it should
   vanish about 5 min after the last search.
 
