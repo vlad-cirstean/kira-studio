@@ -109,6 +109,44 @@ export function useRetrySemantic() {
   );
 }
 
+const DICTATION_KEY = [...MEMORY_KEY, 'dictation'] as const;
+
+export function useDictationStatus() {
+  const { control } = useMemoryModule();
+  const off = control.onDictation(() => {
+    void queryClient.invalidateQueries({ queryKey: DICTATION_KEY });
+  });
+  tryOnScopeDispose(off);
+  return useQuery(
+    { queryKey: DICTATION_KEY, queryFn: () => control.dictationStatus() },
+    queryClient,
+  );
+}
+
+export function useInstallDictationModel() {
+  const { control } = useMemoryModule();
+  return useMutation(
+    {
+      mutationKey: [...DICTATION_KEY, 'install'],
+      mutationFn: (signal?: AbortSignal) => control.dictationInstall(signal),
+      onSettled: () => queryClient.invalidateQueries({ queryKey: DICTATION_KEY }),
+    },
+    queryClient,
+  );
+}
+
+export function useRetryDictation() {
+  const { control } = useMemoryModule();
+  return useMutation(
+    {
+      mutationKey: [...DICTATION_KEY, 'retry'],
+      mutationFn: () => control.dictationRetry(),
+      onSettled: () => queryClient.invalidateQueries({ queryKey: DICTATION_KEY }),
+    },
+    queryClient,
+  );
+}
+
 /** Refetches memory queries when the backend reports a write, including the MCP server's. */
 export function useMemoryChangeSync(): void {
   const { control } = useMemoryModule();
