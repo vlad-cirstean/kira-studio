@@ -4097,7 +4097,7 @@ replies and full terminal attach for Claude Code sessions.
 - Certificates: in-process local CA (stdlib `crypto/x509`, ECDSA P-256, 10 years) in
   `KiraSpaceHome()/mobile`, critical name constraints (10/8, 172.16/12, 192.168/16, 127/8, 100.64/10,
   `.local`). Leaf: 397 days, serverAuth, SAN IPs plus hostname, re-issued in memory on start and when
-  the IP set changes. A secure origin is what lets the service worker and install work. Reset CA
+  the IP set changes (polled every minute; listeners follow, status event fires). A secure origin is what lets the service worker and install work. Reset CA
   means every phone re-trusts.
 - Pairing: generic `internal/pairing.Broker[M]` (extracted from gitsock; 120 s timeout, 60 s cooldown
   on deny keyed by remote IP, queue 8). `POST /api/pair` long-polls; phone shows a 4-digit code, the

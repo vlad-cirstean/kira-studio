@@ -14,17 +14,46 @@ import (
 )
 
 // eventChannels is the only set of app events a phone receives. Terminal data, settings, git and
-// every window-addressed event are dropped in Publish.
-var eventChannels = map[string]bool{
-	adewire.ChannelBoard:          true,
-	adewire.ChannelBacklog:        true,
-	adewire.ChannelWorkflows:      true,
-	adewire.ChannelRepos:          true,
-	adewire.ChannelRuns:           true,
-	adewire.ChannelLog:            true,
-	adewire.ChannelSessions:       true,
-	appevent.ChannelAgentSessions: true,
-	appevent.ChannelAgentEvent:    true,
+// every window-addressed event are dropped in Publish. A non-nil value projects the payload before
+// it reaches a phone.
+var eventChannels = map[string]func(any) (any, error){
+	adewire.ChannelBoard:          nil,
+	adewire.ChannelBacklog:        nil,
+	adewire.ChannelWorkflows:      nil,
+	adewire.ChannelRepos:          nil,
+	adewire.ChannelRuns:           nil,
+	adewire.ChannelLog:            nil,
+	adewire.ChannelSessions:       nil,
+	appevent.ChannelAgentSessions: withoutCwd,
+	appevent.ChannelAgentEvent:    withoutCwd,
+}
+
+// withoutCwd drops every "cwd" key: the phone never sees absolute paths.
+func withoutCwd(v any) (any, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var out any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	dropCwd(out)
+	return out, nil
+}
+
+func dropCwd(v any) {
+	switch t := v.(type) {
+	case map[string]any:
+		delete(t, "cwd")
+		for _, c := range t {
+			dropCwd(c)
+		}
+	case []any:
+		for _, c := range t {
+			dropCwd(c)
+		}
+	}
 }
 
 const (
@@ -98,10 +127,24 @@ func (h *Hub) removeLocked(s *Subscription) {
 // Publish matches appevent's Emit signature so a Tap can feed it. Channels outside the allowlist
 // are dropped before any marshalling.
 func (h *Hub) Publish(name string, data any) {
-	if !eventChannels[name] {
+	project, ok := eventChannels[name]
+	if !ok {
 		return
 	}
-	payload, err := json.Marshal(data)
+	h.mu.Lock()
+	idle := len(h.subs) == 0
+	h.mu.Unlock()
+	if idle {
+		return
+	}
+	var err error
+	if project != nil {
+		data, err = project(data)
+	}
+	var payload []byte
+	if err == nil {
+		payload, err = json.Marshal(data)
+	}
 	if err != nil {
 		slog.Warn("mobileweb: marshal event", "scope", "mobileweb", "channel", name, "err", err)
 		return

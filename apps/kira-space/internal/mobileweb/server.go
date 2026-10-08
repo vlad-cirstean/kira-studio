@@ -37,10 +37,14 @@ type Config struct {
 	CADir     string
 	HTTPSPort int
 	SetupPort int
-	// Now, Addrs and OnDevicesChanged are optional (defaults: time.Now, PrivateAddrs, none).
+	// Now, Addrs, AddrPoll, OnDevicesChanged and OnStatusChanged are optional (defaults: time.Now,
+	// PrivateAddrs, one minute, none, none). OnStatusChanged fires, off the server's goroutines,
+	// after the bound addresses changed.
 	Now              func() time.Time
 	Addrs            func() ([]net.IP, error)
+	AddrPoll         time.Duration
 	OnDevicesChanged func()
+	OnStatusChanged  func()
 }
 
 // Status is what the desktop pane shows.
@@ -75,7 +79,11 @@ type Server struct {
 	bound       []net.IP
 	mdns        string
 	leafExpires time.Time
-	servers     []*http.Server
+	servers     map[string][]*boundServer // by bound IP
+	tlsConf     *tls.Config
+	baseCtx     context.Context
+	appHandler  http.Handler
+	setupMux    http.Handler
 	baseCancel  context.CancelFunc
 	stop        chan struct{}
 	wg          sync.WaitGroup
@@ -87,6 +95,9 @@ func New(cfg Config) *Server {
 	}
 	if cfg.Addrs == nil {
 		cfg.Addrs = PrivateAddrs
+	}
+	if cfg.AddrPoll <= 0 {
+		cfg.AddrPoll = time.Minute
 	}
 	return &Server{
 		cfg:        cfg,
@@ -127,56 +138,85 @@ func (s *Server) Start() error {
 	s.ca, s.bound, s.mdns, s.leafExpires = ca, ips, mdns, expires
 	s.certs.Set(leaf)
 
-	tlsConf := &tls.Config{
+	s.tlsConf = &tls.Config{
 		MinVersion: tls.VersionTLS12, GetCertificate: s.certs.GetCertificate, NextProtos: []string{"http/1.1"},
 	}
 	baseCtx, cancel := context.WithCancel(context.Background())
-	appHandler := s.guard(securityHeaders(s.appMux()))
-	setupHandler := s.guard(s.setupHandler())
+	s.baseCtx = baseCtx
+	s.appHandler = s.guard(securityHeaders(s.appMux()))
+	s.setupMux = s.guard(s.setupHandler())
 
-	var listeners []net.Listener
-	var servers []*http.Server
+	servers := map[string][]*boundServer{}
 	closeAll := func() {
 		cancel()
-		for _, l := range listeners {
-			_ = l.Close()
+		for _, group := range servers {
+			for _, b := range group {
+				_ = b.ln.Close()
+			}
 		}
 	}
 	for _, ip := range ips {
-		for _, p := range []struct {
-			port    int
-			handler http.Handler
-			tls     bool
-		}{{s.cfg.HTTPSPort, appHandler, true}, {s.cfg.SetupPort, setupHandler, false}} {
-			ln, err := net.Listen("tcp4", net.JoinHostPort(ip.String(), strconv.Itoa(p.port)))
-			if err != nil {
-				closeAll()
-				return listenError(ip, p.port, err)
-			}
-			listeners = append(listeners, ln)
-			if p.tls {
-				ln = tls.NewListener(ln, tlsConf)
-			}
-			servers = append(servers, &http.Server{
-				Handler: p.handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second,
-				MaxHeaderBytes: 16 << 10, BaseContext: func(net.Listener) context.Context { return baseCtx },
-			})
-			listeners[len(listeners)-1] = ln
+		group, err := s.bindIP(ip)
+		if err != nil {
+			closeAll()
+			return err
 		}
+		servers[ip.String()] = group
 	}
 	s.servers, s.baseCancel, s.stop, s.running = servers, cancel, make(chan struct{}), true
-	for i, srv := range servers {
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			if err := srv.Serve(listeners[i]); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				slog.Warn("mobileweb: serve", "scope", "mobileweb", "err", err)
-			}
-		}()
+	for _, group := range servers {
+		s.serveGroup(group)
 	}
 	s.wg.Add(1)
 	go s.maintain(s.stop)
 	return nil
+}
+
+// boundServer is one listener with the server that will serve it.
+type boundServer struct {
+	srv *http.Server
+	ln  net.Listener
+}
+
+// serveGroup starts serving a bindIP result. Callers hold s.mu with s.running set.
+func (s *Server) serveGroup(group []*boundServer) {
+	for _, b := range group {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			if err := b.srv.Serve(b.ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				slog.Warn("mobileweb: serve", "scope", "mobileweb", "err", err)
+			}
+		}()
+	}
+}
+
+// bindIP opens the app and setup listeners on ip, or neither. Serving starts in serveGroup.
+func (s *Server) bindIP(ip net.IP) ([]*boundServer, error) {
+	var out []*boundServer
+	for _, p := range []struct {
+		port    int
+		handler http.Handler
+		tls     bool
+	}{{s.cfg.HTTPSPort, s.appHandler, true}, {s.cfg.SetupPort, s.setupMux, false}} {
+		ln, err := net.Listen("tcp4", net.JoinHostPort(ip.String(), strconv.Itoa(p.port)))
+		if err != nil {
+			for _, b := range out {
+				_ = b.ln.Close()
+			}
+			return nil, listenError(ip, p.port, err)
+		}
+		bs := &boundServer{ln: ln}
+		if p.tls {
+			bs.ln = tls.NewListener(ln, s.tlsConf)
+		}
+		bs.srv = &http.Server{
+			Handler: p.handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second,
+			MaxHeaderBytes: 16 << 10, BaseContext: func(net.Listener) context.Context { return s.baseCtx },
+		}
+		out = append(out, bs)
+	}
+	return out, nil
 }
 
 func listenError(ip net.IP, port int, err error) error {
@@ -186,15 +226,20 @@ func listenError(ip net.IP, port int, err error) error {
 	return fmt.Errorf("mobileweb: listen on %s:%d: %w", ip, port, err)
 }
 
-// maintain sweeps idle limiter entries and renews the leaf before it expires.
+// maintain sweeps idle limiter entries, follows address changes and renews the leaf before it
+// expires.
 func (s *Server) maintain(stop <-chan struct{}) {
 	defer s.wg.Done()
 	sweep := time.NewTicker(time.Minute)
 	defer sweep.Stop()
 	renew := time.NewTicker(24 * time.Hour)
 	defer renew.Stop()
+	poll := time.NewTicker(s.cfg.AddrPoll)
+	defer poll.Stop()
 	for {
 		select {
+		case <-poll.C:
+			s.refreshAddrs()
 		case <-sweep.C:
 			s.failedAuth.sweep()
 			s.deviceRate.sweep()
@@ -219,6 +264,91 @@ func (s *Server) sweepTouched() {
 			delete(s.touched, id)
 		}
 	}
+}
+
+// refreshAddrs rebinds when the machine's private addresses changed: a new leaf for the new set,
+// listeners opened for added addresses and closed for removed ones. A failure keeps the current
+// bindings and retries on the next poll.
+func (s *Server) refreshAddrs() {
+	ips, err := s.cfg.Addrs()
+	if err != nil {
+		slog.Warn("mobileweb: list addresses", "scope", "mobileweb", "err", err)
+		return
+	}
+	s.mu.Lock()
+	if !s.running || sameIPs(ips, s.bound) {
+		s.mu.Unlock()
+		return
+	}
+	var names []string
+	if s.mdns != "" {
+		names = []string{s.mdns}
+	}
+	leaf, expires, err := s.ca.IssueLeaf(ips, names, s.cfg.Now())
+	if err != nil {
+		s.mu.Unlock()
+		slog.Warn("mobileweb: reissue certificate", "scope", "mobileweb", "err", err)
+		return
+	}
+	added := map[string][]*boundServer{}
+	for _, ip := range ips {
+		if _, ok := s.servers[ip.String()]; ok {
+			continue
+		}
+		group, err := s.bindIP(ip)
+		if err != nil {
+			for _, g := range added {
+				for _, b := range g {
+					_ = b.ln.Close()
+				}
+			}
+			s.mu.Unlock()
+			slog.Warn("mobileweb: bind new address", "scope", "mobileweb", "err", err)
+			return
+		}
+		added[ip.String()] = group
+	}
+	keep := map[string]bool{}
+	for _, ip := range ips {
+		keep[ip.String()] = true
+	}
+	var removed []*boundServer
+	for ip, group := range s.servers {
+		if !keep[ip] {
+			removed = append(removed, group...)
+			delete(s.servers, ip)
+		}
+	}
+	for ip, group := range added {
+		s.servers[ip] = group
+		s.serveGroup(group)
+	}
+	s.bound, s.leafExpires = ips, expires
+	s.certs.Set(leaf)
+	s.mu.Unlock()
+
+	for _, b := range removed {
+		_ = b.srv.Close()
+	}
+	if s.cfg.OnStatusChanged != nil {
+		go s.cfg.OnStatusChanged()
+	}
+}
+
+func sameIPs(a, b []net.IP) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	set := make(map[string]bool, len(b))
+	for _, ip := range b {
+		set[ip.String()] = true
+	}
+	for _, ip := range a {
+		if !set[ip.String()] {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Server) renewLeaf() {
@@ -264,7 +394,13 @@ func (s *Server) Close() error {
 		return nil
 	}
 	s.running = false
-	servers, cancel, stop := s.servers, s.baseCancel, s.stop
+	var servers []*http.Server
+	for _, group := range s.servers {
+		for _, b := range group {
+			servers = append(servers, b.srv)
+		}
+	}
+	cancel, stop := s.baseCancel, s.stop
 	s.servers = nil
 	s.mu.Unlock()
 

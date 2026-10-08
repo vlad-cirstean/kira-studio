@@ -83,7 +83,12 @@ func (s *Server) routes() []route {
 		read("/api/ade/repos", readJSON(s, "repos", false, s.repoNames)),
 		read("/api/ade/log", s.handleLog),
 		read("/api/agent/sessions", func(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow) {
-			writeJSON(w, http.StatusOK, s.cfg.AgentSessions())
+			v, err := withoutCwd(s.cfg.AgentSessions())
+			if err != nil {
+				writeServiceError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, v)
 		}),
 		write("/api/ade/backlog/items", "backlog.add", permWrite, s.handleBacklogAdd),
 		write("/api/ade/backlog/move", "backlog.move", permWrite, s.handleBacklogMove),

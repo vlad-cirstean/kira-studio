@@ -118,6 +118,7 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 				CADir:     mobileCADir(),
 				HTTPSPort: cfg.Mobile.HTTPSPort, SetupPort: cfg.Mobile.SetupPort,
 				OnDevicesChanged: s.emitDevices,
+				OnStatusChanged:  func() { s.emitStatus(s.embedded.Status()) },
 			})
 			if err := srv.Start(); err != nil {
 				return nil, err
