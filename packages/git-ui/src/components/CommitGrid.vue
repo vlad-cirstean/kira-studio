@@ -128,7 +128,7 @@ const emit = defineEmits<{
 const MIN_COLUMN_WIDTH = 40;
 const MAX_COLUMN_WIDTH = 600;
 const MIN_MESSAGE_WIDTH = 120;
-// G21 D6b: mirrors `--kv-s-2` (density.css), `.slick-cell`'s own horizontal padding — one
+// G21 D6b: mirrors `.slick-cell`'s own horizontal padding (`kv:px-1` in the style block below, 4px) — one
 // side; `measureAbsoluteDateWidth`'s own caller doubles it for both sides of the cell.
 const CELL_PADDING_PX = 4;
 
@@ -1319,7 +1319,14 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 </template>
 
 <style>
+@reference "../theme/tailwind.css";
+
 /*
+ * P213: single-declaration properties below are `@apply`'d kv: utilities. `outline: 0` and
+ * `border: 0` stay raw (their utilities are composite and lean on `--tw-*` @property rules a
+ * @reference file never emits), as do `contain`, the `color-mix` head tint, the inset accent
+ * shadow and the focus outline recipe.
+ *
  * The ~80 structural lines SlickGrid needs (§6.1): the library's own stylesheets are not
  * imported (they carry Bootstrap/Salesforce/Material palettes), so viewport, row and cell
  * positioning live here, mapped only to the --kv-* token layer. This file is the only place in
@@ -1345,21 +1352,18 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
    SlickGrid always adds to every row alongside `.slick-row`, so it's included here rather than
    widening the selector to something upstream doesn't actually rely on). */
 .kv-commit-grid .slick-pane {
-  position: absolute;
+  @apply kv:absolute kv:overflow-hidden kv:w-full;
   outline: 0;
-  overflow: hidden;
-  width: 100%;
 }
 
 .kv-commit-grid .slick-viewport,
 .kv-commit-grid .grid-canvas {
-  position: relative;
+  @apply kv:relative kv:bg-panel;
   outline: 0;
-  background-color: var(--kv-panel-bg);
 }
 
 .kv-commit-grid .slick-viewport {
-  width: 100%;
+  @apply kv:w-full;
 }
 
 /* P162: one stacking context and paint boundary for every row (each row is a stacking context
@@ -1369,19 +1373,16 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 }
 
 .kv-commit-grid .slick-row.ui-widget-content {
-  position: absolute;
+  @apply kv:absolute kv:w-full kv:bg-panel kv:cursor-pointer;
   border: 0;
-  width: 100%;
   /* P92 item 4: opaque, not transparent — the canvas already paints this exact token underneath
      (`.grid-canvas`, above), so nothing changes visually, but a repainted row now erases the band
      it owns instead of compositing over whatever was there. */
-  background-color: var(--kv-panel-bg);
   /* G-UX D2 (item 1b): every row opens/toggles the detail pane on click — the whole row reads as
    *  clickable, not only `.kv-cell-date` (whose own `cursor: pointer` this cascades onto too,
    *  `cursor` being an inherited property; that per-cell rule is removed once item 8 relocates
    *  the date-format toggle off the cell entirely). `enableTextSelectionOnCells: true` still lets
    *  a pointer-cursor row be drag-selected for its text. */
-  cursor: pointer;
 }
 
 /* G-UX (item 1): the checked-out row's own subtle background tint + left accent bar — placed
@@ -1391,18 +1392,17 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
    such ordering concern (hover/selected never set it), so it stays on this same rule rather than
    splitting into two. */
 .kv-commit-grid .slick-row.kv-row-head {
-  font-weight: 600;
+  @apply kv:font-semibold;
   background-color: color-mix(in srgb, var(--kv-focus-border) 9%, transparent);
   box-shadow: inset 2px 0 0 0 var(--kv-focus-border);
 }
 
 .kv-commit-grid .slick-row:hover {
-  background-color: var(--kv-row-hover-bg);
+  @apply kv:bg-hover;
 }
 
 .kv-commit-grid .slick-row.kv-row-selected {
-  background-color: var(--kv-row-selected-bg);
-  color: var(--kv-row-selected-fg);
+  @apply kv:bg-selected kv:text-selected-fg;
 }
 
 /* History: a border-only ref badge originally carried its own decoration colour as both `color`
@@ -1430,24 +1430,19 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
    comment on why). The muted tone doubles as the "this is not a real commit" cue the row itself
    otherwise gives no other visual signal for. */
 .kv-commit-grid .slick-row.kv-row-collapsed {
-  color: var(--kv-description-fg);
+  @apply kv:text-muted-foreground;
 }
 
 .kv-commit-grid .slick-cell {
-  position: absolute;
+  @apply kv:absolute kv:flex kv:items-center kv:overflow-hidden kv:py-0 kv:px-1;
   border: none;
-  padding: 0 var(--kv-s-2);
-  display: flex;
-  align-items: center;
-  overflow: hidden;
 }
 
 /* The graph cell alone needs overflow: visible — W8's row overdraw (0.5px past the row's own
    band, so two rows' vertical runs meet without a hairline seam at a fractional DPR) draws
    slightly outside its own cell bounds by design. */
 .kv-commit-grid .kv-cell-graph {
-  padding: 0;
-  overflow: visible;
+  @apply kv:p-0 kv:overflow-visible;
 }
 
 /* Font sizes stay here: `check_font_scale` exempts this file, and the same size as a class on
