@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"github.com/kirathecat/kira-studio/internal/embedded"
 	"log/slog"
 	"time"
 
@@ -42,7 +43,7 @@ type DbMcpService struct {
 	// stays valid across a restart of the embedded server.
 	Approvals *dbmcp.ApprovalBroker
 
-	embedded embeddedService[*dbmcp.Server, DbMcpStatus]
+	embedded embedded.Service[*dbmcp.Server, DbMcpStatus]
 }
 
 // NewDbMcpService wires the embedded lifecycle's own start/stop/status closures once, here, so
@@ -50,8 +51,8 @@ type DbMcpService struct {
 // before T2-13) would leave them nil.
 func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp.ApprovalBroker) *DbMcpService {
 	s := &DbMcpService{Deps: deps, Installer: installer, Approvals: approvals}
-	s.embedded = embeddedService[*dbmcp.Server, DbMcpStatus]{
-		startFn: func(mint bool) (*dbmcp.Server, error) {
+	s.embedded = embedded.Service[*dbmcp.Server, DbMcpStatus]{
+		StartFn: func(mint bool) (*dbmcp.Server, error) {
 			home := config.KiraHome()
 			// The headersHelper script's own content depends only on the token file's path, never
 			// its live value — ensure it once per start (F2), not on every statusFn/Install call.
@@ -88,11 +89,11 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 		// nothing left to break the deadlock but closeHTTP's own backstop timeout. Abandoning first
 		// lets the parked handler return immediately (ApprovalAbandoned), so Shutdown's ordinary
 		// graceful drain finds nothing left in flight.
-		stopFn: func(srv *dbmcp.Server) {
+		StopFn: func(srv *dbmcp.Server) {
 			s.Approvals.AbandonAll()
 			_ = srv.Close()
 		},
-		statusFn: func(srv *dbmcp.Server, startErr error) DbMcpStatus {
+		StatusFn: func(srv *dbmcp.Server, startErr error) DbMcpStatus {
 			inst := s.Installer.Status()
 			st := DbMcpStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
 			if srv == nil {
@@ -234,7 +235,7 @@ func (s *DbMcpService) explainThreshold() int {
 // Unexported, reached only through StartDbMcpIfEnabled below: Wails binds every exported method of
 // a registered service, and a wire-callable Start would let a stray call bypass the settings leaf.
 func (s *DbMcpService) startIfEnabled() {
-	s.embedded.startIfEnabled("dbmcp", func() (bool, error) {
+	s.embedded.StartIfEnabled("dbmcp", func() (bool, error) {
 		settings, err := s.Deps.Repos.Settings.GetAll()
 		if err != nil {
 			return false, err
@@ -246,7 +247,7 @@ func (s *DbMcpService) startIfEnabled() {
 // stop is main.go's own shutdown call — see startIfEnabled's own note on why this is unexported
 // and reached only through StopDbMcp.
 func (s *DbMcpService) stop() {
-	s.embedded.stop()
+	s.embedded.Stop()
 }
 
 // StartDbMcpIfEnabled and StopDbMcp are main.go's own boot/shutdown hooks for the embedded
@@ -273,7 +274,7 @@ func (s *DbMcpService) SetEnabled(args DbMcpSetEnabledArgs) (DbMcpStatus, error)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 
-	st, err := s.embedded.setRunning(args.Enabled)
+	st, err := s.embedded.SetRunning(args.Enabled)
 	if err != nil {
 		slog.Warn("db mcp: start on enable", "scope", "dbmcp", "err", err)
 	}
@@ -284,29 +285,29 @@ func (s *DbMcpService) SetEnabled(args DbMcpSetEnabledArgs) (DbMcpStatus, error)
 // setting or its lifecycle (an app restart loaded the existing hash+salt but has no plaintext to
 // show). A no-op, returning the current status unchanged, when nothing is running.
 func (s *DbMcpService) Regenerate() DbMcpStatus {
-	s.embedded.mu.Lock()
-	defer s.embedded.mu.Unlock()
-	if s.embedded.server == nil {
-		return s.embedded.statusLocked()
+	s.embedded.Mu.Lock()
+	defer s.embedded.Mu.Unlock()
+	if s.embedded.Server == nil {
+		return s.embedded.StatusLocked()
 	}
 	path := mcpauth.PathNamed(config.KiraHome(), dbMcpTokenName)
 	plain, rec, err := mcpauth.MintTTL(mcpauth.TTL)
 	if err != nil {
 		slog.Warn("db mcp: regenerate token", "scope", "dbmcp", "err", err)
-		return s.embedded.statusLocked()
+		return s.embedded.StatusLocked()
 	}
 	if err := mcpauth.Save(path, rec); err != nil {
 		slog.Warn("db mcp: persist regenerated token", "scope", "dbmcp", "err", err)
-		return s.embedded.statusLocked()
+		return s.embedded.StatusLocked()
 	}
 	// The helper script's own live source (F2) — rotation is exactly rewriting this file, no
 	// re-registration, so a stale mirror here would defeat the whole point of Regenerate.
 	if err := mcpauth.SaveHelperToken(mcpauth.HelperTokenPathNamed(config.KiraHome(), dbMcpTokenName), plain); err != nil {
 		slog.Warn("db mcp: persist regenerated helper token", "scope", "dbmcp", "err", err)
-		return s.embedded.statusLocked()
+		return s.embedded.StatusLocked()
 	}
-	s.embedded.server.SetToken(rec)
-	return s.embedded.statusLocked()
+	s.embedded.Server.SetToken(rec)
+	return s.embedded.StatusLocked()
 }
 
 // DbMcpInstallResult is mcpinstall.Result's wire projection — a domain package's plain Go struct
@@ -327,16 +328,16 @@ func toWireDbMcpInstallResult(r mcpinstall.Result) DbMcpInstallResult {
 func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
 	// The lock covers only the state check: the spawn below can take up to 30 s and names a fixed
 	// URL and helper path, so holding mu would block Status, the toggle and app quit behind it.
-	s.embedded.mu.Lock()
-	srv := s.embedded.server
+	s.embedded.Mu.Lock()
+	srv := s.embedded.Server
 	// F8: same gate statusFn uses — the on-disk helper mirror must exist and verify against the
 	// live record, not just "this run minted a fresh token".
 	if srv == nil || !helperTokenValid(srv) {
-		s.embedded.mu.Unlock()
+		s.embedded.Mu.Unlock()
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
 	url := srv.URL()
-	s.embedded.mu.Unlock()
+	s.embedded.Mu.Unlock()
 	helperPath := mcpauth.HeaderHelperScriptPath(config.KiraHome())
 	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, url, helperPath))
 }
