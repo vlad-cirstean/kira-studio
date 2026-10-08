@@ -1,5 +1,5 @@
 /* Tone tokens: queue state, not theme, so the values stay literal (scripts/check-ade-colours.sh).
-   Mirrors TONE in tones.ts; classes come from the maps there. */
+   Classes come from the maps in tones.ts. */
 @theme {
   --color-tone-amber-tint: rgba(232, 163, 61, 0.14);
   --color-tone-amber: #f0b85c;

@@ -14,7 +14,7 @@ import type { CardModel } from '../plan/usePlanModel';
 import { useApprove, useOpenReviewWindow, useRetryRun, useSetTaskStage } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
-import { actionStyle, solidStyle, TONE, tagStyle } from '../tones';
+import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS, TONE_TEXT_CLASS } from '../tones';
 import AdeRunLog from './AdeRunLog.vue';
 import AdeSetupProgress from './AdeSetupProgress.vue';
 
@@ -71,42 +71,31 @@ function onMenu(ev: MouseEvent): void {
   }
   contextMenu.openContextMenu(ev, items);
 }
-const boxStyle = computed(() =>
-  current.value
-    ? {
-        borderColor: `color-mix(in srgb, ${TONE.amber[2]} 40%, var(--kira-bg))`,
-        background: `color-mix(in srgb, ${TONE.amber[2]} 5%, transparent)`,
-      }
-    : undefined,
-);
+const boxClass = computed(() => {
+  if (current.value) return 'border-tone-amber-solid/40 bg-tone-amber-solid/5';
+  return 'border-border bg-elevated';
+});
 /** The row of a run line held back by its branch's prepare script. */
 const heldRow = (rl: { run: { branchId: string }; note: string }) =>
   WAITING_SETUP_NOTES.includes(rl.note) ? props.card.rows.find((r) => r.id === rl.run.branchId) : undefined;
 const stateLabel = (s: StageBlock['state']): string => (s === 'now' ? 'now' : s);
 
-const GLYPH_BOX: Record<string, { bg: string; ink: string; ring: string }> = {
-  done: { bg: TONE.green[2], ink: 'var(--kira-bg)', ring: 'none' },
-  stuck: { bg: TONE.amber[2], ink: 'var(--kira-bg)', ring: 'none' },
-  failed: { bg: TONE.red[2], ink: 'var(--kira-bg)', ring: 'none' },
-  running: { bg: 'transparent', ink: TONE.amber[2], ring: TONE.amber[2] },
-  pending: { bg: 'transparent', ink: 'var(--kira-fg-subtle)', ring: 'var(--kira-border-strong)' },
+const GLYPH_BOX: Record<string, string> = {
+  done: 'bg-tone-green-solid text-bg',
+  stuck: 'bg-tone-amber-solid text-bg',
+  failed: 'bg-tone-red-solid text-bg',
+  running: 'border border-tone-amber-solid text-tone-amber-solid',
+  pending: 'border border-border-strong text-subtle',
 };
 const STEP_GLYPH: Record<string, string> = { done: '✓', running: '●', stuck: '!', failed: '✕', pending: '' };
-function boxStyleOf(state: string): Record<string, string> {
-  const g = GLYPH_BOX[state] ?? GLYPH_BOX.pending;
-  return {
-    background: g?.bg ?? '',
-    color: g?.ink ?? '',
-    border: g && g.ring !== 'none' ? `1.5px solid ${g.ring}` : 'none',
-  };
-}
+const glyphClass = (state: string): string => GLYPH_BOX[state] ?? GLYPH_BOX.pending ?? '';
 const TEXT_TONE: Record<string, string> = {
-  stuck: TONE.red[1],
-  failed: TONE.red[1],
-  running: TONE.amber[1],
-  done: TONE.green[1],
+  stuck: 'text-tone-red',
+  failed: 'text-tone-red',
+  running: 'text-tone-amber',
+  done: 'text-tone-green',
 };
-const statusColor = (state: string): string => TEXT_TONE[state] ?? 'var(--kira-fg-subtle)';
+const statusClass = (state: string): string => TEXT_TONE[state] ?? 'text-subtle';
 
 async function run(fn: () => Promise<unknown>): Promise<void> {
   error.value = '';
@@ -138,14 +127,13 @@ const onReview = (branchId: string): void =>
     { branchId },
     { onError: (err) => (error.value = err instanceof Error ? err.message : String(err)) },
   );
-const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? TONE.amber[1] : 'var(--kira-fg-muted)');
+const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
 </script>
 
 <template>
   <div
-    class="flex flex-col gap-1 rounded-kira border border-border bg-elevated px-2.5 py-2"
-    :class="skipped ? 'opacity-60' : ''"
-    :style="boxStyle"
+    class="flex flex-col gap-1 rounded-kira border px-2.5 py-2"
+    :class="[skipped ? 'opacity-60' : '', boxClass]"
     data-testid="ade-stage-block"
     :data-stage-id="block.stage.id"
     :data-state="block.state"
@@ -155,7 +143,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       <AdeChip :label="stateLabel(block.state)" :tone="STATE_TONE[block.state]" class="min-w-10 text-center" />
       <slot name="action" />
       <span class="text-kira-lg font-bold" data-testid="ade-stage-block-name">{{ block.stage.name }}</span>
-      <span class="font-data text-kira-md font-bold" :style="{ color: TONE.amber[1] }" data-testid="ade-stage-block-count">{{ block.count }}</span>
+      <span class="font-data text-kira-md font-bold text-tone-amber" data-testid="ade-stage-block-count">{{ block.count }}</span>
       <span class="min-w-0 truncate text-kira-sm text-subtle" data-testid="ade-stage-block-mode">{{ block.mode }}</span>
     </div>
 
@@ -169,17 +157,17 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       <div class="flex min-h-control items-center gap-2">
         <span
           class="box-border flex size-4 shrink-0 items-center justify-center rounded-kira-sm text-kira-sm font-extrabold"
-          :style="boxStyleOf(sv.step.state)"
+          :class="glyphClass(sv.step.state)"
           >{{ STEP_GLYPH[sv.step.state] }}</span
         >
-        <span class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: statusColor(sv.step.state) }" data-testid="ade-step-status">{{
+        <span class="shrink-0 whitespace-nowrap text-kira-sm" :class="statusClass(sv.step.state)" data-testid="ade-step-status">{{
           sv.statusText
         }}</span>
         <Button
           v-if="sv.step.approval"
           size="kira"
           class="shrink-0 font-semibold"
-          :style="solidStyle('amber')"
+          :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-step-approve"
           @click="onApprove(sv.step.id)"
         >
@@ -192,8 +180,8 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           data-testid="ade-step-name"
           >{{ sv.step.name }}</span
         >
-        <span v-if="sv.failText" class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE.blue[1] }">{{ sv.failText }}</span>
-        <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE.amber[1] }">needs approval</span>
+        <span v-if="sv.failText" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-blue">{{ sv.failText }}</span>
+        <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">needs approval</span>
         <AdeTip :text="sv.scope">
           <span
             class="min-w-0 shrink truncate text-kira-sm text-subtle"
@@ -205,12 +193,12 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       </div>
       <template v-for="rl in sv.runs" :key="rl.run.branchId">
         <div class="flex min-h-control items-center gap-1.75 pl-6" data-testid="ade-run-line" :data-branch-id="rl.run.branchId">
-          <span class="w-3.5 shrink-0 text-center text-kira-sm font-extrabold" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-glyph">{{ rl.glyph }}</span>
+          <span class="w-3.5 shrink-0 text-center text-kira-sm font-extrabold" :class="TONE_TEXT_CLASS[rl.tone]" data-testid="ade-run-glyph">{{ rl.glyph }}</span>
           <AdeRepoTag
             :code-repo-id="card.rows.find((r) => r.id === rl.run.branchId)?.branch.codeRepoId ?? ''"
             :label="card.rows.find((r) => r.id === rl.run.branchId)?.repo ?? ''"
           />
-          <span class="w-16 shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-status">{{ rl.status }}</span>
+          <span class="w-16 shrink-0 whitespace-nowrap text-kira-sm" :class="TONE_TEXT_CLASS[rl.tone]" data-testid="ade-run-status">{{ rl.status }}</span>
           <Button
             v-if="rl.hasLog"
             variant="dialog"
@@ -225,7 +213,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
             v-if="canTakeOver(rl.run)"
             size="kira"
             class="shrink-0 font-semibold"
-            :style="actionStyle('claude')"
+            :class="ACTION_CLASS.claude"
             :disabled="takeOver.pending.has(rl.run.sessionId)"
             data-testid="ade-run-takeover"
             @click="takeOver.request(rl.run.sessionId)"
@@ -236,7 +224,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
             v-if="rl.canRetry"
             size="kira"
             class="shrink-0 font-semibold"
-            :style="solidStyle('red')"
+            :class="TONE_SOLID_CLASS.red"
             data-testid="ade-run-retry"
             @click="onRetry(rl.run.runId)"
           >
@@ -269,11 +257,11 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       :data-branch-id="row.id"
       @click="ui.selectBranch(card.task.id, row.id)"
     >
-      <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-semibold" :style="tagStyle(row.branch.mergedIntoMain ? 'purple' : 'grey')">{{
+      <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-semibold" :class="TONE_TAG_CLASS[row.branch.mergedIntoMain ? 'purple' : 'grey']">{{
         row.branch.mergedIntoMain ? 'main ✓' : 'main —'
       }}</span>
       <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
-        <span class="shrink-0 text-kira-sm font-semibold" :style="{ color: chipTone(c.tone) }">{{ c.label }}</span>
+        <span class="shrink-0 text-kira-sm font-semibold" :class="chipClass(c.tone)">{{ c.label }}</span>
       </AdeTip>
       <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
       <span class="min-w-0 truncate font-data text-kira-md">{{ row.name }}</span>

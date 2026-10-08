@@ -5,7 +5,7 @@ import { computed, ref } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
 import { setupStatus } from '../board/setupStatus';
 import { useRetrySetup } from '../queries';
-import { solidStyle } from '../tones';
+import { TONE_SOLID_CLASS } from '../tones';
 import type { Branch } from '../wire';
 import AdeRunLog from './AdeRunLog.vue';
 
@@ -41,7 +41,7 @@ async function onRetry(): Promise<void> {
           v-if="status.state === 'failed'"
           size="xs"
           class="shrink-0 rounded-kira-xs px-2 font-semibold"
-          :style="solidStyle('amber')"
+          :class="TONE_SOLID_CLASS.amber"
           :disabled="retry.isPending.value"
           data-testid="ade-setup-retry"
           @click="onRetry"

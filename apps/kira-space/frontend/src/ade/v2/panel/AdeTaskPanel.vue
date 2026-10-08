@@ -16,7 +16,7 @@ import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
-import { TONE } from '../tones';
+import { TONE_TAG_CLASS } from '../tones';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeTaskTab from './AdeTaskTab.vue';
 
@@ -127,7 +127,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
       <div
         v-if="card.review"
         class="flex items-center gap-2 rounded-kira px-2.5 py-1.5 text-kira-md"
-        :style="{ background: TONE.blue[0], color: TONE.blue[1] }"
+        :class="TONE_TAG_CLASS.blue"
         data-testid="ade-panel-review-note"
       >
         {{ card.task.owner || 'Someone' }}’s work. Read-only here: you can keep your own notes.

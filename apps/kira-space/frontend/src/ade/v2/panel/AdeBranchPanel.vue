@@ -15,7 +15,7 @@ import { useOpenReviewWindow, usePrs, useRetrySetup } from '../queries';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
-import { actionStyle, solidStyle, TONE } from '../tones';
+import { ACTION_CLASS, TONE_SOLID_CLASS } from '../tones';
 import type { Deployment, Integration, PR, RepoPrs } from '../wire';
 import AdeChangesTab from './AdeChangesTab.vue';
 import AdePanelFrame from './AdePanelFrame.vue';
@@ -91,8 +91,7 @@ function run(a: HeaderAction): void {
     );
   }
 }
-const actionTone = (a: HeaderAction): Record<string, string> =>
-  a.tone === 'claude' ? actionStyle('claude') : solidStyle(a.tone);
+const actionClass = (a: HeaderAction): string => ACTION_CLASS[a.tone];
 const canForcePush = computed(() => props.row.tag.actions.some((a) => a.kind === 'forcePush'));
 const shared = computed(() => {
   const a = props.model.view.after.get(branch.value.id);
@@ -199,7 +198,8 @@ function deployNote(d: Deployment): string {
       <div class="flex items-start gap-2">
         <span
           class="mt-1 box-border size-3 shrink-0 rounded-kira-xs border-2"
-          :style="{ borderColor: card.review ? TONE.blue[2] : card.color }"
+          :class="card.review && 'border-tone-blue-solid'"
+          :style="card.review ? undefined : { borderColor: card.color }"
           data-testid="ade-panel-dot"
         />
         <AdeTip :text="row.tag.tip">
@@ -227,7 +227,7 @@ function deployNote(d: Deployment): string {
           v-if="setupFailed"
           size="kira-lg"
           class="font-semibold"
-          :style="solidStyle('amber')"
+          :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-panel-retry-setup"
           @click="onRetrySetup"
         >
@@ -237,7 +237,7 @@ function deployNote(d: Deployment): string {
           <Button
             size="kira-lg"
             class="font-semibold"
-            :style="solidStyle('amber')"
+            :class="TONE_SOLID_CLASS.amber"
             data-testid="ade-panel-force-push"
             @click="forcePush = true"
           >
@@ -249,7 +249,7 @@ function deployNote(d: Deployment): string {
           :key="a.kind + a.label"
           size="kira-lg"
           class="font-semibold"
-          :style="actionTone(a)"
+          :class="actionClass(a)"
           :disabled="a.kind === 'created' || rebasing(a)"
           :data-testid="`ade-panel-action-${a.kind}`"
           @click="run(a)"
@@ -325,7 +325,7 @@ function deployNote(d: Deployment): string {
             v-if="canMerge && i.status !== 'merged'"
             size="kira"
             class="shrink-0 font-semibold"
-            :style="actionStyle(i.status === 'stale' ? 'amber' : 'claude')"
+            :class="ACTION_CLASS[i.status === 'stale' ? 'amber' : 'claude']"
             :disabled="dialogs.pending.has(`merge:${branch.id}:${i.target}`)"
             data-testid="ade-branch-merge"
             @click="dialogs.merge(branch.id, i.target)"

@@ -15,7 +15,6 @@ import { type CardModel, usePlanModel } from '../plan/usePlanModel';
 import { useAddTaskRepo, useUpdateTask } from '../queries';
 import { useAdeAddUiStore } from '../state/adeAddUi';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { TONE } from '../tones';
 import type { TaskPatch } from '../wire';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
@@ -109,7 +108,7 @@ function branchLabel(row: CardModel['rows'][number]): string {
   return row.draft ? `new branch · ${row.context.replace(/^no branch yet · /, '')}` : row.name;
 }
 
-const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? TONE.amber[1] : 'var(--kira-fg-muted)');
+const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
 </script>
 
 <template>
@@ -221,7 +220,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           >{{ row.repo }}</span
         >
         <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
-          <span class="shrink-0 text-kira-sm font-semibold" :style="{ color: chipTone(c.tone) }">{{ c.label }}</span>
+          <span class="shrink-0 text-kira-sm font-semibold" :class="chipClass(c.tone)">{{ c.label }}</span>
         </AdeTip>
         <span
           class="min-w-0 flex-1 truncate font-data text-kira-md"
