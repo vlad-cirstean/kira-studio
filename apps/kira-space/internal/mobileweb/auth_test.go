@@ -18,6 +18,13 @@ func TestAuth_Verdicts(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expired := store.addDevice(t, "dev3")
+	store.mu.Lock()
+	row := store.rows["dev3"]
+	row.ExpiresAt = time.Now().Add(-time.Minute).UnixMilli()
+	store.rows["dev3"] = row
+	store.mu.Unlock()
+
 	cases := []struct {
 		name   string
 		cookie string
@@ -29,6 +36,7 @@ func TestAuth_Verdicts(t *testing.T) {
 		{"wrong token", id + ".wrong" + tok[5:], 401, codeUnauthorized},
 		{"unknown device", "nobody." + tok, 401, codeUnauthorized},
 		{"revoked", revoked, 401, codeRevoked},
+		{"expired", expired, 401, codeExpired},
 	}
 	for _, c := range cases {
 		var mut func(*http.Request)
@@ -44,24 +52,6 @@ func TestAuth_Verdicts(t *testing.T) {
 				t.Errorf("%s: a rejected credential must be cleared", c.name)
 			}
 		}
-	}
-}
-
-func TestAuth_ExpiredDeviceIsRefusedAndCleared(t *testing.T) {
-	t.Parallel()
-	s, store, _ := newTestServer(t)
-	cookie := store.addDevice(t, "dev1")
-	store.mu.Lock()
-	row := store.rows["dev1"]
-	row.ExpiresAt = time.Now().Add(-time.Minute).UnixMilli()
-	store.rows["dev1"] = row
-	store.mu.Unlock()
-	rec := do(s, http.MethodGet, "/api/me", "127.0.0.1:50000", withCookie(cookie))
-	if rec.Code != 401 || !strings.Contains(rec.Body.String(), codeExpired) {
-		t.Fatalf("expired device: %d %s", rec.Code, rec.Body)
-	}
-	if !strings.Contains(rec.Header().Get("Set-Cookie"), "Max-Age=0") {
-		t.Error("an expired credential must be cleared")
 	}
 }
 
@@ -103,5 +93,37 @@ func TestAuth_UnpairedLoadsDoNotBurnTheFailureBudget(t *testing.T) {
 		if rec := do(s, http.MethodGet, "/api/me", "127.0.0.1:50000", nil); rec.Code != 401 {
 			t.Fatalf("load %d: status %d", i, rec.Code)
 		}
+	}
+}
+
+func TestSweepExpired_EndsStreamsAndTerminals(t *testing.T) {
+	t.Parallel()
+	s, store, _ := newTestServer(t)
+	cookie := store.addDevice(t, "dev1")
+	if rec := do(s, http.MethodGet, "/api/me", "127.0.0.1:50000", withCookie(cookie)); rec.Code != 200 {
+		t.Fatalf("status %d", rec.Code)
+	}
+	sub, err := s.cfg.Hub.Subscribe("dev1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.sweepExpired()
+	select {
+	case <-sub.Done():
+		t.Fatal("a live device must keep its stream")
+	default:
+	}
+	s.cfg.Now = func() time.Time { return time.Now().Add(48 * time.Hour) }
+	s.sweepExpired()
+	select {
+	case <-sub.Done():
+	case <-time.After(time.Second):
+		t.Fatal("an expired device's stream must end")
+	}
+	terms := s.cfg.Terminals.(*fakeTerminals)
+	terms.mu.Lock()
+	defer terms.mu.Unlock()
+	if len(terms.released) != 1 || terms.released[0] != "dev1" {
+		t.Fatalf("released %v, want [dev1]", terms.released)
 	}
 }

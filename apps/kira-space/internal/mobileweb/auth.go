@@ -137,6 +137,9 @@ func (s *Server) withDevice(h func(http.ResponseWriter, *http.Request, repos.Mob
 			return
 		}
 		s.touch(dev.ID, ip)
+		s.touchMu.Lock()
+		s.expiries[dev.ID] = dev.ExpiresAt
+		s.touchMu.Unlock()
 		h(w, r, dev)
 	}
 }

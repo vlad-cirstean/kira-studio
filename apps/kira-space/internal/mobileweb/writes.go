@@ -272,6 +272,6 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request, d repos.
 	logWrite(d.ID, "terminal.attach", "session", id)
 	s.cfg.Terminals.Serve(w, r, d, id, func() bool {
 		row, found, err := s.cfg.Devices.ByID(d.ID)
-		return err == nil && found && row.RevokedAt == nil && row.CanAgentInput && s.agentInputGlobal()
+		return err == nil && found && row.RevokedAt == nil && row.ExpiresAt > s.cfg.Now().UnixMilli() && row.CanAgentInput && s.agentInputGlobal()
 	})
 }

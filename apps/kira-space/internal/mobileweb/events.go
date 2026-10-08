@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 )
 
@@ -183,8 +184,8 @@ func (h *Hub) CloseAll() {
 
 // handleEvents is the SSE stream. EventSource sends the device cookie itself and reconnects after
 // `retry`; the client refetches everything on each reconnect, so no replay buffer is kept.
-func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, devID string) {
-	sub, err := s.cfg.Hub.Subscribe(devID)
+func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
+	sub, err := s.cfg.Hub.Subscribe(d.ID)
 	if err != nil {
 		writeError(w, http.StatusTooManyRequests, codeRateLimited, "too many open streams")
 		return
@@ -209,6 +210,8 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, devID stri
 	}
 	tick := time.NewTicker(keepAliveInterval)
 	defer tick.Stop()
+	expiry := time.NewTimer(time.UnixMilli(d.ExpiresAt).Sub(s.cfg.Now()))
+	defer expiry.Stop()
 	for {
 		select {
 		case frame := <-sub.C:
@@ -220,6 +223,8 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, devID stri
 				return
 			}
 		case <-sub.Done():
+			return
+		case <-expiry.C:
 			return
 		case <-r.Context().Done():
 			return

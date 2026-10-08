@@ -68,8 +68,9 @@ type Server struct {
 	idem       *idemStore
 	flight     singleflight.Group
 
-	touchMu sync.Mutex
-	touched map[string]time.Time
+	touchMu  sync.Mutex
+	touched  map[string]time.Time
+	expiries map[string]int64 // authenticated devices seen, id to ExpiresAt; guarded by touchMu
 
 	mu         sync.Mutex
 	running    bool
@@ -102,6 +103,7 @@ func New(cfg Config) *Server {
 		attachRate: newLimiterSet(rate.Every(2*time.Second), 3, cfg.Now),
 		idem:       newIdemStore(idemTTL),
 		touched:    map[string]time.Time{},
+		expiries:   map[string]int64{},
 	}
 }
 
@@ -182,6 +184,7 @@ func (s *Server) maintain(stop <-chan struct{}) {
 			s.writeRate.sweep()
 			s.attachRate.sweep()
 			s.sweepTouched()
+			s.sweepExpired()
 		case <-stop:
 			return
 		}
@@ -195,6 +198,27 @@ func (s *Server) sweepTouched() {
 	for id, at := range s.touched {
 		if at.Before(cutoff) {
 			delete(s.touched, id)
+		}
+	}
+}
+
+// sweepExpired ends the streams and terminals of devices past ExpiresAt: authenticate checks
+// expiry only at request start, so a stream opened earlier would otherwise outlive it.
+func (s *Server) sweepExpired() {
+	now := s.cfg.Now().UnixMilli()
+	var expired []string
+	s.touchMu.Lock()
+	for id, at := range s.expiries {
+		if at <= now {
+			expired = append(expired, id)
+			delete(s.expiries, id)
+		}
+	}
+	s.touchMu.Unlock()
+	for _, id := range expired {
+		s.cfg.Hub.DisconnectDevice(id)
+		if s.cfg.Terminals != nil {
+			s.cfg.Terminals.ReleaseDevice(id)
 		}
 	}
 }
