@@ -4203,6 +4203,8 @@ attach are out; P212 Part 2 adds them (see `docs/v2.2/SPEC.md`).
   search panel, detail with version trail, Add memory and Connect dialogs. Kira Studio hosts none of it.
 - Memory UI adds `SemanticStatus.vue` (download button, progress, indexing, retry) and a `semantic`
   badge on rows found by meaning only.
+- Add memory is one free-text box (cap 1000 = `MaxFactLen`), sent as one item with a fixed manual
+  reason. Gate splits it into atomic facts. Author `user`, source `ui`.
 - Failure modes: no `claude` on `PATH` or not logged in surfaces a typed message in the dialog and as an
   MCP tool error; the gate can over-challenge; model latency is 5 to 20 s per store.
 
