@@ -1,3 +1,4 @@
+import { registerSW } from 'virtual:pwa-register';
 import { adeReaderKey } from '@ade/reader';
 import { repoNamesKey } from '@ade/readQueries';
 import { installAdeReadSignals } from '@ade/readSignals';
@@ -31,3 +32,4 @@ app.provide(adeReaderKey, httpAdeReader);
 setUnauthorizedHandler((code) => useAuthStore(pinia).onUnauthorized(code));
 app.use(router);
 app.mount('#app');
+registerSW({ immediate: true });
