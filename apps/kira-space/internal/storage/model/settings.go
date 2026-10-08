@@ -77,13 +77,12 @@ type ClaudeCodeSettings struct {
 	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
 }
 
-// MobileSettings is P212's mobile agents web server: off until enabled, with the two listener
-// ports (HTTPS app, plain-HTTP setup page). Changed through bridge.MobileAccessService, which
-// restarts the server when it is running.
+// MobileSettings is P212's mobile agents web server: off until enabled, with its one plain-HTTP
+// listener port. Changed through bridge.MobileAccessService, which restarts the server when it is
+// running.
 type MobileSettings struct {
-	Enabled   bool `json:"enabled"`
-	HTTPSPort int  `json:"httpsPort"`
-	SetupPort int  `json:"setupPort"`
+	Enabled bool `json:"enabled"`
+	Port    int  `json:"port"`
 	// AgentInput is the global switch for phones replying to agents and attaching to their
 	// terminals; a device also needs its own can_agent_input flag.
 	AgentInput bool `json:"agentInput"`
@@ -100,7 +99,7 @@ type Settings struct {
 
 // DefaultMobileSettings mirrors settingsDomain.ts's mobileSettingsSchema defaults.
 func DefaultMobileSettings() MobileSettings {
-	return MobileSettings{Enabled: false, HTTPSPort: 7790, SetupPort: 7791, AgentInput: false}
+	return MobileSettings{Enabled: false, Port: 7790, AgentInput: false}
 }
 
 // DefaultGitSettings mirrors docs/v1.3/plans/G7 D16's own default: the same three-pattern default
@@ -196,8 +195,7 @@ type ClaudeCodePatch struct {
 // MobilePatch mirrors MobileSettings' own `.partial()` shape.
 type MobilePatch struct {
 	Enabled    *bool `json:"enabled,omitempty"`
-	HTTPSPort  *int  `json:"httpsPort,omitempty"`
-	SetupPort  *int  `json:"setupPort,omitempty"`
+	Port       *int  `json:"port,omitempty"`
 	AgentInput *bool `json:"agentInput,omitempty"`
 }
 
@@ -339,11 +337,8 @@ func validateMobileSection(m *MobilePatch) error {
 	if m == nil {
 		return nil
 	}
-	if m.HTTPSPort != nil && !ValidMobilePort(*m.HTTPSPort) {
-		return fmt.Errorf("model: mobile.httpsPort: out of range value %d", *m.HTTPSPort)
-	}
-	if m.SetupPort != nil && !ValidMobilePort(*m.SetupPort) {
-		return fmt.Errorf("model: mobile.setupPort: out of range value %d", *m.SetupPort)
+	if m.Port != nil && !ValidMobilePort(*m.Port) {
+		return fmt.Errorf("model: mobile.port: out of range value %d", *m.Port)
 	}
 	return nil
 }

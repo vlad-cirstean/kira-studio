@@ -25,8 +25,8 @@ const fixture = (name: string): unknown =>
 export type PairOutcome = 'approve' | 'deny' | 'timeout';
 
 interface State {
-  /** `/api/me` and every device route answer 200, 401 unauthorized or 401 revoked. */
-  auth: 'ok' | 'unauthorized' | 'revoked';
+  /** `/api/me` and every device route answer 200, 401 unauthorized, revoked or expired. */
+  auth: 'ok' | 'unauthorized' | 'revoked' | 'expired';
   /** What `/api/me` reports the desktop allows this phone. */
   permissions: { write: boolean; agentInput: boolean };
   agentInputGlobal: boolean;
@@ -129,11 +129,11 @@ export async function startMobileServer(): Promise<MobileServer> {
   };
 
   const unauthorized = (res: ServerResponse): void => {
-    const revoked = state.auth === 'revoked';
-    json(res, 401, {
-      code: revoked ? 'E_REVOKED' : 'E_UNAUTHORIZED',
-      message: revoked ? 'device revoked' : 'not paired',
-    });
+    const failure = {
+      revoked: { code: 'E_REVOKED', message: 'device revoked' },
+      expired: { code: 'E_EXPIRED', message: 'device access expired' },
+    }[state.auth as 'revoked' | 'expired'] ?? { code: 'E_UNAUTHORIZED', message: 'not paired' };
+    json(res, 401, failure);
   };
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {

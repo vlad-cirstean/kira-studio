@@ -1,13 +1,17 @@
 package bridge
 
 import (
+	"errors"
 	"io/fs"
 	"log/slog"
+	"net/netip"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -16,19 +20,40 @@ import (
 	"github.com/kirathecat/kira-studio/internal/pairing"
 )
 
+// Stop reasons the pane shows while the server is enabled but stopped.
+const (
+	mobileStopNotTrusted  = "notTrusted"
+	mobileStopAway        = "away"
+	mobileStopOtherRouter = "otherRouter"
+	mobileStopUnavailable = "unavailable"
+)
+
+// MobileNetwork is a network as the pane shows it.
+type MobileNetwork struct {
+	Interface string `json:"interface"`
+	Address   string `json:"address"`
+	Subnet    string `json:"subnet"`
+	RouterIP  string `json:"routerIp"`
+	RouterMAC string `json:"routerMac"`
+}
+
 // MobileStatus is the wire projection of the mobile server state plus its settings.
 type MobileStatus struct {
-	Enabled       bool     `json:"enabled"`
-	Running       bool     `json:"running"`
-	HTTPSPort     int      `json:"httpsPort"`
-	SetupPort     int      `json:"setupPort"`
-	AppURLs       []string `json:"appUrls"`
-	SetupURLs     []string `json:"setupUrls"`
-	Fingerprint   string   `json:"fingerprint"`
-	LeafExpiresAt int64    `json:"leafExpiresAt"`
+	Enabled bool   `json:"enabled"`
+	Running bool   `json:"running"`
+	Port    int    `json:"port"`
+	AppURL  string `json:"appUrl"`
 	// AgentInput is the global switch for phones replying to agents and attaching to terminals.
 	AgentInput bool   `json:"agentInput"`
 	Error      string `json:"error"`
+	// StopReason is "" while running or disabled; StopDetail is its user-facing text.
+	StopReason string `json:"stopReason"`
+	StopDetail string `json:"stopDetail"`
+	// Current is what the default route shows now (nil when undetectable); Trusted is the stored one.
+	Current *MobileNetwork `json:"current"`
+	Trusted *MobileNetwork `json:"trusted"`
+	// TrustedAt is epoch ms, 0 when nothing is trusted.
+	TrustedAt int64 `json:"trustedAt"`
 }
 
 // MobilePairingRequest is the approval prompt's wire projection (absolute deadline in epoch ms).
@@ -82,7 +107,7 @@ type MobileTerminalBroker interface {
 }
 
 // MobileAccessService is the Mobile access pane's surface: enable/disable the phone web server,
-// move its ports, list and revoke phones, answer the pairing prompt. It owns the server lifecycle.
+// trust a network, move its port, list and revoke phones, answer the pairing prompt. It owns the server lifecycle.
 type MobileAccessService struct {
 	Deps appcore.Deps
 	// Reader is the read-only ADE slice the phone sees; AgentSessions the live session list.
@@ -99,12 +124,27 @@ type MobileAccessService struct {
 	Launches  *MobileLaunches
 	Terminals MobileTerminalBroker
 
+	// Detect, Find and Poll default to lannet and ten seconds.
+	Detect func() (lannet.Network, error)
+	Find   func(lannet.Identity) (lannet.Network, error)
+	Poll   time.Duration
+	// isLAN is a test seam passed to the server's Config.IsLAN; nil in production.
+	isLAN func(netip.Addr) bool
+
 	embedded embedded.Service[*mobileweb.Server, MobileStatus]
+	sup      mobileSupervisor
 }
 
-func mobileCADir() string { return filepath.Join(config.KiraSpaceHome(), "mobile") }
-
 func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
+	if s.Detect == nil {
+		s.Detect = lannet.Detect
+	}
+	if s.Find == nil {
+		s.Find = lannet.Find
+	}
+	if s.Poll <= 0 {
+		s.Poll = 10 * time.Second
+	}
 	s.embedded = embedded.Service[*mobileweb.Server, MobileStatus]{
 		StartFn: func(bool) (*mobileweb.Server, error) {
 			cfg, err := s.Deps.Repos.Settings.GetAll()
@@ -115,8 +155,7 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 				Reader: s.Reader, AgentSessions: s.AgentSessions, Devices: s.Deps.Repos.MobileDevices,
 				Writer: s.Writer, Terminals: s.Terminals, AgentInputEnabled: s.agentInputEnabled,
 				Hub: s.Hub, Broker: s.Broker, Assets: s.Assets,
-				CADir:     mobileCADir(),
-				HTTPSPort: cfg.Mobile.HTTPSPort, SetupPort: cfg.Mobile.SetupPort,
+				Port: cfg.Mobile.Port, Network: s.sup.network(), IsLAN: s.isLAN,
 				OnDevicesChanged: s.emitDevices,
 				OnStatusChanged:  func() { s.emitStatus(s.embedded.Status()) },
 			})
@@ -131,19 +170,18 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 			}
 		},
 		StatusFn: func(srv *mobileweb.Server, startErr error) MobileStatus {
-			st := MobileStatus{HTTPSPort: model.DefaultMobileSettings().HTTPSPort, SetupPort: model.DefaultMobileSettings().SetupPort}
+			st := MobileStatus{Port: model.DefaultMobileSettings().Port}
 			if cfg, err := s.Deps.Repos.Settings.GetAll(); err == nil {
-				st.Enabled, st.HTTPSPort, st.SetupPort = cfg.Mobile.Enabled, cfg.Mobile.HTTPSPort, cfg.Mobile.SetupPort
-				st.AgentInput = cfg.Mobile.AgentInput
+				st.Enabled, st.Port, st.AgentInput = cfg.Mobile.Enabled, cfg.Mobile.Port, cfg.Mobile.AgentInput
 			}
 			if srv != nil {
 				ws := srv.Status()
-				st.Running, st.AppURLs, st.SetupURLs = ws.Running, ws.AppURLs, ws.SetupURLs
-				st.Fingerprint, st.LeafExpiresAt = ws.Fingerprint, ws.LeafExpiresAt
+				st.Running, st.AppURL = ws.Running, ws.AppURL
 			}
 			if startErr != nil {
 				st.Error = startErr.Error()
 			}
+			s.fillNetwork(&st)
 			return st
 		},
 	}
@@ -173,7 +211,9 @@ func (s *MobileAccessService) LaunchOpened(args MobileLaunchOpenedArgs) error {
 	return nil
 }
 
-func (s *MobileAccessService) Status() MobileStatus { return s.embedded.Status() }
+// Status reports the server state. While the supervisor is off it also reads the current network,
+// so the pane can offer "Trust this network" before the server is enabled.
+func (s *MobileAccessService) Status() MobileStatus { return s.withCurrent(s.embedded.Status()) }
 
 // AttachPush forwards the broker and drives its expiry loop. The returned detach runs in teardown:
 // it unsubscribes and aborts every parked request.
@@ -220,10 +260,15 @@ func (s *MobileAccessService) SetEnabled(args MobileSetEnabledArgs) (MobileStatu
 		return MobileStatus{}, ipcerr.InternalErr(err)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
-	st, err := s.embedded.SetRunning(args.Enabled)
-	if err != nil {
-		slog.Warn("mobile access: start on enable", "scope", "mobileweb", "err", err)
+	var st MobileStatus
+	if args.Enabled {
+		s.startSupervisor()
+		st = s.embedded.Status()
+	} else {
+		s.stopSupervisor()
+		st, _ = s.embedded.SetRunning(false)
 	}
+	st = s.withCurrent(st)
 	s.emitStatus(st)
 	return st, nil
 }
@@ -299,53 +344,22 @@ func (s *MobileAccessService) ReclaimTerminal(args MobileReclaimArgs) error {
 	return nil
 }
 
-type MobileSetPortsArgs struct {
-	HTTPSPort int `json:"httpsPort"`
-	SetupPort int `json:"setupPort"`
+type MobileSetPortArgs struct {
+	Port int `json:"port"`
 }
 
-// SetPorts persists both ports and rebinds the running server onto them.
-func (s *MobileAccessService) SetPorts(args MobileSetPortsArgs) (MobileStatus, error) {
-	if args.HTTPSPort == args.SetupPort {
-		return MobileStatus{}, ipcerr.BadRequest("the two ports must differ")
-	}
-	merged, err := s.Deps.Repos.Settings.Set(model.SettingsPatch{
-		Mobile: &model.MobilePatch{HTTPSPort: &args.HTTPSPort, SetupPort: &args.SetupPort},
-	})
+// SetPort persists the port and rebinds the running server onto it.
+func (s *MobileAccessService) SetPort(args MobileSetPortArgs) (MobileStatus, error) {
+	merged, err := s.Deps.Repos.Settings.Set(model.SettingsPatch{Mobile: &model.MobilePatch{Port: &args.Port}})
 	if err != nil {
 		return MobileStatus{}, ipcerr.InternalErr(err)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
-	st := s.embedded.Status()
-	if st.Running {
+	if s.embedded.Status().Running {
 		s.embedded.Stop()
-		var startErr error
-		st, startErr = s.embedded.SetRunning(true)
-		if startErr != nil {
-			slog.Warn("mobile access: restart on port change", "scope", "mobileweb", "err", startErr)
-		}
-	} else {
-		st = s.embedded.Status()
+		s.reconcile()
 	}
-	s.emitStatus(st)
-	return st, nil
-}
-
-// ResetCertificate replaces the local CA. Every phone must install the new root again. A running
-// server restarts to serve a leaf from the new CA.
-func (s *MobileAccessService) ResetCertificate() (MobileStatus, error) {
-	wasRunning := s.embedded.Status().Running
-	s.embedded.Stop()
-	if _, err := mobileweb.ResetCA(mobileCADir()); err != nil {
-		return MobileStatus{}, ipcerr.InternalErr(err)
-	}
-	st := s.embedded.Status()
-	if wasRunning {
-		var startErr error
-		if st, startErr = s.embedded.SetRunning(true); startErr != nil {
-			slog.Warn("mobile access: restart after certificate reset", "scope", "mobileweb", "err", startErr)
-		}
-	}
+	st := s.withCurrent(s.embedded.Status())
 	s.emitStatus(st)
 	return st, nil
 }
@@ -400,10 +414,38 @@ func (s *MobileAccessService) Deny(args MobileIDArgs) (MobilePairingActionResult
 // StartMobileIfEnabled and StopMobile are main.go's boot and shutdown hooks, package-level so
 // Wails does not bind them.
 func StartMobileIfEnabled(s *MobileAccessService) {
-	s.embedded.StartIfEnabled("mobileweb", func() (bool, error) {
-		cfg, err := s.Deps.Repos.Settings.GetAll()
-		return cfg.Mobile.Enabled, err
-	})
+	removeLegacyMobileCA(filepath.Join(config.KiraSpaceHome(), "mobile"))
+	cfg, err := s.Deps.Repos.Settings.GetAll()
+	if err != nil {
+		slog.Warn("mobileweb: read settings at boot", "scope", "mobileweb", "err", err)
+		return
+	}
+	if cfg.Mobile.Enabled {
+		s.startSupervisor()
+	}
 }
 
-func StopMobile(s *MobileAccessService) { s.embedded.Stop() }
+func StopMobile(s *MobileAccessService) {
+	s.stopSupervisor()
+	s.embedded.Stop()
+}
+
+// removeLegacyMobileCA deletes the pre-P223 local CA. Its key must not linger: a phone that
+// installed the CA would trust any leaf the key signs for private addresses.
+func removeLegacyMobileCA(dir string) {
+	removed := false
+	tmps, _ := filepath.Glob(filepath.Join(dir, "*.tmp"))
+	for _, p := range append([]string{filepath.Join(dir, "ca.key"), filepath.Join(dir, "ca.crt")}, tmps...) {
+		err := os.Remove(p)
+		switch {
+		case err == nil:
+			removed = true
+		case !errors.Is(err, fs.ErrNotExist):
+			slog.Warn("mobileweb: remove legacy CA file", "scope", "mobileweb", "path", p, "err", err)
+		}
+	}
+	_ = os.Remove(dir) // only succeeds when empty
+	if removed {
+		slog.Info("mobileweb: removed legacy local CA", "scope", "mobileweb", "dir", dir)
+	}
+}

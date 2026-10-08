@@ -28,7 +28,7 @@ func TestRoutes_OnlyAllowlistedPairsReachHandlers(t *testing.T) {
 		for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
 			rec := do(s, method, path, "127.0.0.1:50000", func(r *http.Request) {
 				withCookie(cookie)(r)
-				r.Header.Set("Origin", "https://127.0.0.1:7790")
+				r.Header.Set("Origin", "http://127.0.0.1:7790")
 				if path == "/api/events" {
 					// A reachable SSE route would block; cancel at once.
 					ctx, cancel := contextCanceled()
@@ -95,10 +95,10 @@ func TestRoutes_UnsafeMethodNeedsSameOrigin(t *testing.T) {
 	s, _, _ := newTestServer(t)
 	for name, mut := range map[string]func(*http.Request){
 		"no origin":      nil,
-		"foreign origin": func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") },
-		"http origin":    func(r *http.Request) { r.Header.Set("Origin", "http://127.0.0.1:7790") },
+		"foreign origin": func(r *http.Request) { r.Header.Set("Origin", "http://evil.example") },
+		"https origin":   func(r *http.Request) { r.Header.Set("Origin", "https://127.0.0.1:7790") },
 		"cross-site": func(r *http.Request) {
-			r.Header.Set("Origin", "https://127.0.0.1:7790")
+			r.Header.Set("Origin", "http://127.0.0.1:7790")
 			r.Header.Set("Sec-Fetch-Site", "cross-site")
 		},
 	} {
@@ -124,8 +124,8 @@ func TestStatic_ShellAndFallback(t *testing.T) {
 	if rec := do(s, http.MethodGet, "/assets/a.js", "127.0.0.1:50000", nil); !strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
 		t.Error("hashed assets must be immutable")
 	}
-	if rec := do(s, http.MethodGet, "/sw.js", "127.0.0.1:50000", nil); rec.Header().Get("Cache-Control") != "no-cache" {
-		t.Error("service worker must revalidate")
+	if rec := do(s, http.MethodGet, "/index.html", "127.0.0.1:50000", nil); rec.Header().Get("Cache-Control") != "no-cache" {
+		t.Error("the shell must revalidate")
 	}
 }
 

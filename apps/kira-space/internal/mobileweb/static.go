@@ -11,14 +11,9 @@ import (
 	"time"
 )
 
-func init() {
-	// Not in every platform's mime table; the manifest must be served as its own type to install.
-	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
-}
-
 // staticHandler serves the embedded mobile build: the exact file when present, else index.html for
 // a page navigation (client-side routes), else 404. The shell holds no data, so it needs no auth:
-// the install prompt and the pairing screen must load before a device exists.
+// the pairing screen must load before a device exists.
 func (s *Server) staticHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		serveAsset(s.cfg.Assets, w, r, true)

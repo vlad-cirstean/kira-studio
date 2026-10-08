@@ -11,6 +11,8 @@ export const mobileDeviceSchema = /*#__PURE__*/ z.object({
   lastSeenAt: z.number(),
   lastIp: z.string(),
   revokedAt: z.number().nullable(),
+  /** Epoch ms after which the phone must pair again. */
+  expiresAt: z.number(),
   /** Change the backlog and move or start tasks. Set from the desktop pane. */
   canWrite: z.boolean(),
   /** Reply to agents and control their terminals. Needs the global switch too. */
@@ -18,19 +20,40 @@ export const mobileDeviceSchema = /*#__PURE__*/ z.object({
 });
 export type MobileDevice = z.infer<typeof mobileDeviceSchema>;
 
+export const mobileNetworkSchema = /*#__PURE__*/ z.object({
+  interface: z.string(),
+  /** This computer's address on the network; empty for the stored trusted network. */
+  address: z.string(),
+  subnet: z.string(),
+  routerIp: z.string(),
+  routerMac: z.string(),
+});
+export type MobileNetwork = z.infer<typeof mobileNetworkSchema>;
+
+/** Why an enabled server is stopped; '' while it runs or is disabled. */
+export const mobileStopReasonSchema = /*#__PURE__*/ z.enum([
+  '',
+  'notTrusted',
+  'away',
+  'otherRouter',
+  'unavailable',
+]);
+
 export const mobileStatusSchema = /*#__PURE__*/ z.object({
   enabled: z.boolean(),
   running: z.boolean(),
-  httpsPort: z.number(),
-  setupPort: z.number(),
-  appUrls: z.array(z.string()),
-  setupUrls: z.array(z.string()),
-  /** SHA-256 of the local CA certificate, shown so the user can compare it on the phone. */
-  fingerprint: z.string(),
-  leafExpiresAt: z.number(),
+  port: z.number(),
+  appUrl: z.string(),
   /** Global switch: phones may reply to agents and control their terminals. */
   agentInput: z.boolean(),
   error: z.string(),
+  stopReason: mobileStopReasonSchema,
+  stopDetail: z.string(),
+  /** What the default route shows now; null when it cannot be read. */
+  current: mobileNetworkSchema.nullable(),
+  trusted: mobileNetworkSchema.nullable(),
+  /** Epoch ms; 0 when nothing is trusted. */
+  trustedAt: z.number(),
 });
 export type MobileStatus = z.infer<typeof mobileStatusSchema>;
 

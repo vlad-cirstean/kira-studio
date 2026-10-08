@@ -29,6 +29,8 @@ const notice = computed(() => {
       return 'Nobody answered on the computer in time.';
     case 'revoked':
       return 'This phone was removed in Kira Space. Request access again to reconnect.';
+    case 'expired':
+      return 'Access for this phone expired. Request access again.';
     case 'unreachable':
       return 'Cannot reach Kira Space. Check that the computer is awake and on this network.';
     default:

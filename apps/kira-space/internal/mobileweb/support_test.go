@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/tokenauth"
 )
@@ -77,7 +79,7 @@ func (f *fakeStore) addDeviceWith(t *testing.T, id string, write, agentInput boo
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Insert(repos.MobileDeviceRow{ID: id, Label: "phone", TokenHash: hash, TokenSalt: salt, CanWrite: write, CanAgentInput: agentInput}); err != nil {
+	if err := f.Insert(repos.MobileDeviceRow{ID: id, Label: "phone", TokenHash: hash, TokenSalt: salt, CanWrite: write, CanAgentInput: agentInput, ExpiresAt: time.Now().Add(24 * time.Hour).UnixMilli()}); err != nil {
 		t.Fatal(err)
 	}
 	return id + "." + plain
@@ -181,8 +183,6 @@ func (f *fakeTerminals) ReleaseAll(string) {}
 func testAssets() fs.FS {
 	return fstest.MapFS{
 		"index.html":  {Data: []byte("<html>app</html>")},
-		"setup.html":  {Data: []byte("<html>setup</html>")},
-		"sw.js":       {Data: []byte("//sw")},
 		"assets/a.js": {Data: []byte("//a")},
 	}
 }
@@ -194,9 +194,9 @@ func newTestServer(t *testing.T) (*Server, *fakeStore, *fakeReader) {
 		Reader: reader, Writer: &fakeWriter{}, Terminals: &fakeTerminals{}, AgentInputEnabled: func() bool { return true },
 		AgentSessions: func() any { return map[string]any{"sessions": []any{}} },
 		Devices:       store, Hub: NewHub(), Broker: NewBroker(time.Now), Assets: testAssets(),
-		CADir: t.TempDir(), HTTPSPort: 7790, SetupPort: 7791,
+		Port: 7790, Network: loopbackNet(),
 	})
-	s.bound = []net.IP{net.IPv4(127, 0, 0, 1)}
+	s.isLAN = loopbackOK
 	return s, store, reader
 }
 
@@ -206,7 +206,7 @@ func do(s *Server, method, target, remote string, mutate func(*http.Request)) *h
 }
 
 func doBody(s *Server, method, target, remote, body string, mutate func(*http.Request)) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(method, "https://127.0.0.1:7790"+target, strings.NewReader(body))
+	req := httptest.NewRequest(method, "http://127.0.0.1:7790"+target, strings.NewReader(body))
 	req.RemoteAddr = remote
 	if mutate != nil {
 		mutate(req)
@@ -219,6 +219,13 @@ func doBody(s *Server, method, target, remote, body string, mutate func(*http.Re
 func withCookie(v string) func(*http.Request) {
 	return func(r *http.Request) { r.AddCookie(&http.Cookie{Name: cookieName, Value: v}) }
 }
+
+// loopbackNet binds tests to 127.0.0.1 inside 127.0.0.0/8; loopbackOK widens the LAN check to it.
+func loopbackNet() lannet.Network {
+	return lannet.Network{Interface: "lo", Addr: netip.MustParsePrefix("127.0.0.1/8")}
+}
+
+func loopbackOK(a netip.Addr) bool { return a.Is4() && (a.IsLoopback() || lannet.IsLAN(a)) }
 
 func freePort(t *testing.T) int {
 	t.Helper()

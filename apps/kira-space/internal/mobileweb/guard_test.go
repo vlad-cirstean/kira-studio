@@ -2,44 +2,41 @@ package mobileweb
 
 import (
 	"encoding/json"
-	"github.com/google/uuid"
-	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 )
 
 func TestGuard_RemoteAndHost(t *testing.T) {
 	t.Parallel()
 	s, store, _ := newTestServer(t)
+	s.net = lannet.Network{Interface: "en0", Addr: netip.MustParsePrefix("192.168.1.5/24")}
+	s.isLAN = lannet.IsLAN
 	cookie := store.addDevice(t, "dev1")
-	s.mdns = "mac.local"
 	hostReq := func(host string) func(*http.Request) {
 		return func(r *http.Request) { r.Host = host; withCookie(cookie)(r) }
 	}
 	for remote, want := range map[string]int{
-		"127.0.0.1:1": 200, "192.168.1.9:1": 200, "10.1.2.3:1": 200, "172.20.0.4:1": 200,
-		"8.8.8.8:1": 403, "100.64.0.1:1": 403, "[::1]:1": 403, "[2001:db8::1]:1": 403,
+		"192.168.1.9:1": 200, "192.168.1.254:1": 200,
+		"192.168.2.9:1": 403, "10.1.2.3:1": 403, "127.0.0.1:1": 403, "8.8.8.8:1": 403,
+		"100.64.0.1:1": 403, "[::1]:1": 403, "[2001:db8::1]:1": 403,
 	} {
-		if rec := do(s, http.MethodGet, "/api/me", remote, hostReq("127.0.0.1:7790")); rec.Code != want {
+		if rec := do(s, http.MethodGet, "/api/me", remote, hostReq("192.168.1.5:7790")); rec.Code != want {
 			t.Errorf("remote %s: status %d, want %d", remote, rec.Code, want)
 		}
 	}
 	for host, want := range map[string]int{
-		"127.0.0.1:7790": 200, "localhost:7790": 200, "mac.local:7790": 200, "MAC.LOCAL:7790": 200,
-		"evil.example:7790": 403, "10.9.9.9:7790": 403, "": 403,
+		"192.168.1.5:7790": 200, "192.168.1.5": 200,
+		"localhost:7790": 403, "mac.local:7790": 403, "evil.example:7790": 403,
+		"192.168.1.6:7790": 403, "127.0.0.1:7790": 403, "": 403,
 	} {
-		if rec := do(s, http.MethodGet, "/api/me", "127.0.0.1:1", hostReq(host)); rec.Code != want {
+		if rec := do(s, http.MethodGet, "/api/me", "192.168.1.9:1", hostReq(host)); rec.Code != want {
 			t.Errorf("host %q: status %d, want %d", host, rec.Code, want)
 		}
-	}
-}
-
-func TestHostAllowed_UsesBoundSet(t *testing.T) {
-	t.Parallel()
-	bound := []net.IP{net.ParseIP("192.168.1.5")}
-	if !hostAllowed("192.168.1.5:7790", bound, "") || hostAllowed("192.168.1.6:7790", bound, "") {
-		t.Fatal("only bound addresses are valid IP hosts")
 	}
 }
 
@@ -48,7 +45,7 @@ const idemA = "8f14e45f-ceea-467a-9575-1f1e1d3a4b21"
 func postJSON(s *Server, path, cookie, key, body string, mutate ...func(*http.Request)) *httptest.ResponseRecorder {
 	return doBody(s, http.MethodPost, path, "127.0.0.1:50000", body, func(r *http.Request) {
 		withCookie(cookie)(r)
-		r.Header.Set("Origin", "https://127.0.0.1:7790")
+		r.Header.Set("Origin", "http://127.0.0.1:7790")
 		if key != "" {
 			r.Header.Set(idemKeyHeader, key)
 		}
@@ -114,6 +111,18 @@ func TestWrite_AgentInputNeedsGlobalSwitch(t *testing.T) {
 	}
 }
 
+func TestWrite_HTTPSOriginRefused(t *testing.T) {
+	t.Parallel()
+	s, store, _ := newTestServer(t)
+	cookie := store.addDeviceWith(t, "dev1", true, false)
+	rec := postJSON(s, "/api/ade/backlog/items", cookie, idemA, `{"text":"x"}`, func(r *http.Request) {
+		r.Header.Set("Origin", "https://127.0.0.1:7790")
+	})
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("https Origin on a write: %d, want 403", rec.Code)
+	}
+}
+
 func TestWrite_TerminalHandshakeNeedsSameOrigin(t *testing.T) {
 	t.Parallel()
 	s, store, _ := newTestServer(t)
@@ -126,13 +135,13 @@ func TestWrite_TerminalHandshakeNeedsSameOrigin(t *testing.T) {
 			}
 		}).Code
 	}
-	if got := attach("https://evil.example"); got != http.StatusForbidden {
+	if got := attach("http://evil.example"); got != http.StatusForbidden {
 		t.Errorf("foreign Origin: %d, want 403", got)
 	}
 	if got := attach(""); got != http.StatusForbidden {
 		t.Errorf("no Origin: %d, want 403", got)
 	}
-	if got := attach("https://127.0.0.1:7790"); got != http.StatusNoContent {
+	if got := attach("http://127.0.0.1:7790"); got != http.StatusNoContent {
 		t.Errorf("same Origin reaches the broker: %d", got)
 	}
 }

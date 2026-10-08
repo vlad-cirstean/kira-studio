@@ -132,14 +132,14 @@ func (s *Server) finishPairing(w http.ResponseWriter, requestID string, meta Mob
 	row := repos.MobileDeviceRow{
 		ID: uuid.NewString(), Label: meta.Label, UserAgent: meta.UserAgent,
 		TokenHash: tok.Hash, TokenSalt: tok.Salt, CreatedAt: now, LastSeenAt: now, LastIP: meta.RemoteIP,
-		CanWrite: true,
+		CanWrite: true, ExpiresAt: now + deviceTTL.Milliseconds(),
 	}
 	if err := s.cfg.Devices.Insert(row); err != nil {
 		slog.Error("mobileweb: insert paired device", "scope", "mobileweb", "err", err)
 		writeError(w, http.StatusInternalServerError, "E_INTERNAL", "could not save the pairing")
 		return
 	}
-	setCookie(w, row.ID, tok.Plain)
+	setCookie(w, row.ID, tok.Plain, deviceTTL)
 	writeJSON(w, http.StatusOK, deviceBody{DeviceID: row.ID, Label: row.Label})
 	if s.cfg.OnDevicesChanged != nil {
 		s.cfg.OnDevicesChanged()

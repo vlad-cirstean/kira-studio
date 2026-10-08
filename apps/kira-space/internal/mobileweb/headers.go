@@ -6,11 +6,11 @@ import (
 	"regexp"
 )
 
-// The policy's connect-src names this request's host with wss: because older WebKit does not
+// The policy's connect-src names this request's host with ws: because older WebKit does not
 // match a WebSocket against 'self'. The host already passed guard's allowlist; the pattern only
 // keeps a malformed value out of a header.
 const cspBase = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-	"img-src 'self' data:; connect-src 'self'%s; manifest-src 'self'; worker-src 'self'; " +
+	"img-src 'self' data:; connect-src 'self'%s; " +
 	"frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
 var cspHostRe = regexp.MustCompile(`^[A-Za-z0-9.\-:\[\]]{1,255}$`)
@@ -18,7 +18,7 @@ var cspHostRe = regexp.MustCompile(`^[A-Za-z0-9.\-:\[\]]{1,255}$`)
 func contentSecurityPolicy(host string) string {
 	extra := ""
 	if cspHostRe.MatchString(host) {
-		extra = " wss://" + host
+		extra = " ws://" + host
 	}
 	return fmt.Sprintf(cspBase, extra)
 }

@@ -130,18 +130,18 @@ const spaceControl = {
     unwrap(MobileAccessService.Status()).then((r) => trust<MobileStatus>(r)),
   mobileSetEnabled: (enabled: boolean): Promise<MobileStatus> =>
     unwrap(MobileAccessService.SetEnabled({ enabled })).then((r) => trust<MobileStatus>(r)),
-  mobileSetPorts: (httpsPort: number, setupPort: number): Promise<MobileStatus> =>
-    unwrap(MobileAccessService.SetPorts({ httpsPort, setupPort })).then((r) =>
-      trust<MobileStatus>(r),
-    ),
+  mobileSetPort: (port: number): Promise<MobileStatus> =>
+    unwrap(MobileAccessService.SetPort({ port })).then((r) => trust<MobileStatus>(r)),
+  mobileTrustNetwork: (): Promise<MobileStatus> =>
+    unwrap(MobileAccessService.TrustCurrentNetwork()).then((r) => trust<MobileStatus>(r)),
+  mobileForgetNetwork: (): Promise<MobileStatus> =>
+    unwrap(MobileAccessService.ForgetNetwork()).then((r) => trust<MobileStatus>(r)),
   mobileSetAgentInput: (enabled: boolean): Promise<MobileStatus> =>
     unwrap(MobileAccessService.SetAgentInputEnabled({ enabled })).then((r) =>
       trust<MobileStatus>(r),
     ),
   mobileSetDevicePermissions: (id: string, write: boolean, agentInput: boolean): Promise<void> =>
     unwrap(MobileAccessService.SetDevicePermissions({ id, write, agentInput })),
-  mobileResetCertificate: (): Promise<MobileStatus> =>
-    unwrap(MobileAccessService.ResetCertificate()).then((r) => trust<MobileStatus>(r)),
   mobileDevices: (): Promise<MobileDevice[]> =>
     unwrap(MobileAccessService.Devices()).then((r) => trust<MobileDevice[]>(r ?? [])),
   mobileRevoke: (id: string): Promise<void> => unwrap(MobileAccessService.Revoke({ id })),

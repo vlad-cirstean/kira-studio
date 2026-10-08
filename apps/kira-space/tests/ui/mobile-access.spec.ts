@@ -4,25 +4,47 @@ import { emitWailsEvent } from './support/mockRuntime';
 
 // P212: the Mobile access settings pane and the phone pairing prompt.
 
+const lan = {
+  interface: 'en0',
+  address: '192.168.1.20',
+  subnet: '192.168.1.0/24',
+  routerIp: '192.168.1.1',
+  routerMac: 'aa:bb:cc:dd:ee:ff',
+};
 const stoppedStatus = {
   enabled: false,
   running: false,
-  httpsPort: 7790,
-  setupPort: 7791,
-  appUrls: [],
-  setupUrls: [],
-  fingerprint: '',
-  leafExpiresAt: 0,
+  port: 7790,
+  appUrl: '',
   agentInput: false,
   error: '',
+  stopReason: '',
+  stopDetail: '',
+  current: lan,
+  trusted: null,
+  trustedAt: 0,
+};
+const untrustedStatus = {
+  ...stoppedStatus,
+  enabled: true,
+  stopReason: 'notTrusted',
+  stopDetail: 'No trusted network. Trust this network to start the phone server.',
 };
 const runningStatus = {
   ...stoppedStatus,
   enabled: true,
   running: true,
-  appUrls: ['https://192.168.1.20:7790/'],
-  setupUrls: ['http://192.168.1.20:7791/'],
-  fingerprint: 'AB:CD:EF:01',
+  appUrl: 'http://192.168.1.20:7790/',
+  trusted: { ...lan, address: '' },
+  trustedAt: 1_700_000_000_000,
+};
+const awayStatus = {
+  ...runningStatus,
+  running: false,
+  appUrl: '',
+  current: null,
+  stopReason: 'away',
+  stopDetail: 'Stopped: this computer is not on the trusted network 192.168.1.0/24.',
 };
 const device = {
   id: 'dev-1',
@@ -32,6 +54,7 @@ const device = {
   lastSeenAt: 1_700_000_100_000,
   lastIp: '192.168.1.40',
   revokedAt: null,
+  expiresAt: Date.now() + 5 * 24 * 3_600_000,
   canWrite: true,
   canAgentInput: false,
 };
@@ -41,27 +64,116 @@ async function openPane(window: import('@playwright/test').Page): Promise<void> 
   await window.locator('[data-testid="settings-section-Mobile access"]').click();
 }
 
-test('enabling shows the QR codes, URLs and fingerprint', async ({ relaunch }) => {
-  const { window, control } = await relaunch({
-    control: [{ channel: IPC.mobileSetEnabled, response: runningStatus }],
+test('the plaintext warning shows whether the server is off or on', async ({ relaunch }) => {
+  const { window } = await relaunch({
+    control: [{ channel: IPC.mobileStatusGet, response: stoppedStatus }],
   });
   await openPane(window);
-  await expect(window.locator('[data-testid="mobile-access-step-app"]')).toHaveCount(0);
+  const warning = window.locator('[data-testid="mobile-access-plaintext-warning"]');
+  await expect(warning).toContainText('plain HTTP');
+  await emitWailsEvent(window, IPC.mobileStatus, runningStatus);
+  await expect(warning).toBeVisible();
+});
 
-  await window.locator('[data-testid="mobile-access-enabled"]').click();
-  await expect
-    .poll(() => control.log().find((e) => e.channel === IPC.mobileSetEnabled)?.args)
-    .toEqual({ enabled: true });
+test('enabled without a trusted network says why and shows no QR', async ({ relaunch }) => {
+  const { window } = await relaunch({
+    control: [{ channel: IPC.mobileStatusGet, response: untrustedStatus }],
+  });
+  await openPane(window);
+  await expect(window.locator('[data-testid="mobile-access-stopped-reason"]')).toContainText(
+    'Trust this network',
+  );
+  await expect(window.locator('[data-testid="mobile-access-trusted"]')).toHaveText(
+    'No trusted network.',
+  );
+  await expect(window.locator('[data-testid="mobile-access-step-app"]')).toHaveCount(0);
+});
+
+test('trusting the network confirms first, then shows the QR and URL', async ({ relaunch }) => {
+  const { window, control } = await relaunch({
+    control: [
+      { channel: IPC.mobileStatusGet, response: untrustedStatus },
+      { channel: IPC.mobileTrustNetwork, response: runningStatus },
+    ],
+  });
+  await openPane(window);
+  await window.locator('[data-testid="mobile-access-trust"]').click();
+  await expect(window.locator('[data-testid="confirm-dialog"]')).toContainText(
+    '192.168.1.0/24 (router aa:bb:cc:dd:ee:ff)',
+  );
+  expect(control.log().some((e) => e.channel === IPC.mobileTrustNetwork)).toBe(false);
+  await window.locator('[data-testid="confirm-dialog-confirm"]').click();
 
   const app = window.locator('[data-testid="mobile-access-step-app"]');
-  await expect(app).toContainText('https://192.168.1.20:7790/');
+  await expect(app).toContainText('http://192.168.1.20:7790/');
   await expect(app.locator('svg')).toHaveCount(1);
-  await expect(window.locator('[data-testid="mobile-access-step-certificate"]')).toContainText(
-    'http://192.168.1.20:7791/',
+  await expect(window.locator('[data-testid="mobile-access-trusted"]')).toContainText(
+    '192.168.1.0/24, router 192.168.1.1 (aa:bb:cc:dd:ee:ff)',
   );
-  await expect(window.locator('[data-testid="mobile-access-fingerprint"]')).toHaveText(
-    'AB:CD:EF:01',
+});
+
+test('a status event with reason away shows it and hides the QR', async ({ relaunch }) => {
+  const { window } = await relaunch({
+    control: [{ channel: IPC.mobileStatusGet, response: runningStatus }],
+  });
+  await openPane(window);
+  await expect(window.locator('[data-testid="mobile-access-step-app"]')).toBeVisible();
+
+  await emitWailsEvent(window, IPC.mobileStatus, awayStatus);
+  await expect(window.locator('[data-testid="mobile-access-stopped-reason"]')).toContainText(
+    'not on the trusted network 192.168.1.0/24',
   );
+  await expect(window.locator('[data-testid="mobile-access-step-app"]')).toHaveCount(0);
+});
+
+test('forgetting the network confirms first, then calls ForgetNetwork', async ({ relaunch }) => {
+  const { window, control } = await relaunch({
+    control: [
+      { channel: IPC.mobileStatusGet, response: runningStatus },
+      { channel: IPC.mobileForgetNetwork, response: untrustedStatus },
+    ],
+  });
+  await openPane(window);
+  await window.locator('[data-testid="mobile-access-forget"]').click();
+  await window.locator('[data-testid="confirm-dialog-confirm"]').click();
+  await expect
+    .poll(() => control.log().some((e) => e.channel === IPC.mobileForgetNetwork))
+    .toBe(true);
+  await expect(window.locator('[data-testid="mobile-access-trusted"]')).toHaveText(
+    'No trusted network.',
+  );
+});
+
+test('applying a new port calls SetPort', async ({ relaunch }) => {
+  const { window, control } = await relaunch({
+    control: [
+      { channel: IPC.mobileStatusGet, response: runningStatus },
+      { channel: IPC.mobileSetPort, response: { ...runningStatus, port: 7800 } },
+    ],
+  });
+  await openPane(window);
+  await window.locator('[data-testid="mobile-access-port"]').fill('7800');
+  await window.locator('[data-testid="mobile-access-apply-port"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.mobileSetPort)?.args)
+    .toEqual({ port: 7800 });
+});
+
+test('a device row shows its expiry and an expired device is hidden', async ({ relaunch }) => {
+  const { window } = await relaunch({
+    control: [
+      { channel: IPC.mobileStatusGet, response: runningStatus },
+      {
+        channel: IPC.mobileDevicesList,
+        response: [device, { ...device, id: 'dev-2', label: 'Old', expiresAt: Date.now() - 1000 }],
+      },
+    ],
+  });
+  await openPane(window);
+  await expect(window.locator('[data-testid="mobile-device-expires-dev-1"]')).toContainText(
+    'Access expires in 5 days',
+  );
+  await expect(window.locator('[data-testid="mobile-device-row-dev-2"]')).toHaveCount(0);
 });
 
 test('revoking a phone confirms first, then calls Revoke', async ({ relaunch }) => {

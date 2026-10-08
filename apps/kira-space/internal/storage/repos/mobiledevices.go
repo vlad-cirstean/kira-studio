@@ -21,6 +21,8 @@ type MobileDeviceRow struct {
 	LastSeenAt int64
 	LastIP     string
 	RevokedAt  *int64
+	// ExpiresAt is epoch ms; a device past it must pair again.
+	ExpiresAt int64
 	// CanWrite lets the phone change backlog and stages; CanAgentInput lets it reply to agents and
 	// control their terminals. Both are set from the desktop pane only.
 	CanWrite      bool
@@ -32,7 +34,7 @@ type MobileDevicesRepo struct {
 	DB *sql.DB
 }
 
-const mobileDeviceColumns = `id, label, user_agent, token_hash, token_salt, created_at, last_seen_at, last_ip, revoked_at, can_write, can_agent_input`
+const mobileDeviceColumns = `id, label, user_agent, token_hash, token_salt, created_at, last_seen_at, last_ip, revoked_at, can_write, can_agent_input, expires_at`
 
 // ByID reads one row. found is false (with a nil error) when no such row exists; the timing
 // discipline around a miss is the caller's job.
@@ -40,7 +42,7 @@ func (r *MobileDevicesRepo) ByID(id string) (MobileDeviceRow, bool, error) {
 	var rec MobileDeviceRow
 	err := r.DB.QueryRow(`SELECT `+mobileDeviceColumns+` FROM mobile_devices WHERE id = ?`, id).Scan(
 		&rec.ID, &rec.Label, &rec.UserAgent, &rec.TokenHash, &rec.TokenSalt,
-		&rec.CreatedAt, &rec.LastSeenAt, &rec.LastIP, &rec.RevokedAt, &rec.CanWrite, &rec.CanAgentInput,
+		&rec.CreatedAt, &rec.LastSeenAt, &rec.LastIP, &rec.RevokedAt, &rec.CanWrite, &rec.CanAgentInput, &rec.ExpiresAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MobileDeviceRow{}, false, nil
@@ -55,9 +57,9 @@ func (r *MobileDevicesRepo) ByID(id string) (MobileDeviceRow, bool, error) {
 // conflict is a bug, never a re-pair.
 func (r *MobileDevicesRepo) Insert(row MobileDeviceRow) error {
 	_, err := r.DB.Exec(
-		`INSERT INTO mobile_devices (`+mobileDeviceColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO mobile_devices (`+mobileDeviceColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		row.ID, row.Label, row.UserAgent, row.TokenHash, row.TokenSalt,
-		row.CreatedAt, row.LastSeenAt, row.LastIP, row.RevokedAt, row.CanWrite, row.CanAgentInput,
+		row.CreatedAt, row.LastSeenAt, row.LastIP, row.RevokedAt, row.CanWrite, row.CanAgentInput, row.ExpiresAt,
 	)
 	if err != nil {
 		return fmt.Errorf("repos: insert mobile device %s: %w", row.ID, err)
@@ -95,10 +97,10 @@ func (r *MobileDevicesRepo) SetPermissions(id string, canWrite, canAgentInput bo
 // List returns every device, revoked included, most recently seen first, projected to
 // model.MobileDevice (never the hash or the salt).
 func (r *MobileDevicesRepo) List() ([]model.MobileDevice, error) {
-	rows, err := r.DB.Query(`SELECT id, label, user_agent, created_at, last_seen_at, last_ip, revoked_at, can_write, can_agent_input FROM mobile_devices ORDER BY last_seen_at DESC`)
+	rows, err := r.DB.Query(`SELECT id, label, user_agent, created_at, last_seen_at, last_ip, revoked_at, can_write, can_agent_input, expires_at FROM mobile_devices ORDER BY last_seen_at DESC`)
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.MobileDevice, bool, error) {
 		var d model.MobileDevice
-		err := rows.Scan(&d.ID, &d.Label, &d.UserAgent, &d.CreatedAt, &d.LastSeenAt, &d.LastIP, &d.RevokedAt, &d.CanWrite, &d.CanAgentInput)
+		err := rows.Scan(&d.ID, &d.Label, &d.UserAgent, &d.CreatedAt, &d.LastSeenAt, &d.LastIP, &d.RevokedAt, &d.CanWrite, &d.CanAgentInput, &d.ExpiresAt)
 		return d, true, err
 	})
 }

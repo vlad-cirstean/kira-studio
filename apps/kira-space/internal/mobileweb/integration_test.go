@@ -3,8 +3,6 @@ package mobileweb
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -26,24 +24,22 @@ type liveServer struct {
 func startLive(t *testing.T) *liveServer {
 	t.Helper()
 	store, reader := newFakeStore(), &fakeReader{}
-	httpsPort := freePort(t)
+	port := freePort(t)
 	changed := make(chan struct{}, 4)
 	s := New(Config{
 		Reader: reader, AgentSessions: func() any { return map[string]any{"sessions": []any{}} },
-		Devices: store, Hub: NewHub(), Broker: NewBroker(time.Now), Assets: testAssets(), CADir: t.TempDir(),
-		HTTPSPort: httpsPort, SetupPort: freePort(t),
-		Addrs:            func() ([]net.IP, error) { return []net.IP{net.IPv4(127, 0, 0, 1)}, nil },
+		Devices: store, Hub: NewHub(), Broker: NewBroker(time.Now), Assets: testAssets(),
+		Port: port, Network: loopbackNet(),
 		OnDevicesChanged: func() { changed <- struct{}{} },
 	})
+	s.isLAN = loopbackOK
 	if err := s.Start(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	client := &http.Client{Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{RootCAs: s.CA().Pool(), MinVersion: tls.VersionTLS12},
-	}}
+	client := &http.Client{Transport: &http.Transport{}}
 	t.Cleanup(client.CloseIdleConnections)
-	base := "https://127.0.0.1:" + portStr(httpsPort)
+	base := "http://127.0.0.1:" + portStr(port)
 	return &liveServer{s: s, store: store, client: client, base: base, origin: base, changed: changed}
 }
 
@@ -110,7 +106,7 @@ func TestIntegration_PairReadStreamRevoke(t *testing.T) {
 			cookie = c
 		}
 	}
-	if cookie == nil || !cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" {
+	if cookie == nil || cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" {
 		t.Fatalf("device cookie missing or weak: %+v", cookie)
 	}
 	select {
@@ -228,23 +224,5 @@ func TestIntegration_CloseReleasesParkedPairing(t *testing.T) {
 	wg.Wait()
 	if l.s.cfg.Broker.Pending().Pending != nil {
 		t.Fatal("parked request must leave the queue on close")
-	}
-}
-
-func TestIntegration_SetupListenerServesOnlyTheCA(t *testing.T) {
-	l := startLive(t)
-	base := "http://127.0.0.1:" + portStr(l.s.cfg.SetupPort)
-	for path, want := range map[string]int{
-		"/": 200, "/kira-space-ca.crt": 200, "/kira-space-ca.mobileconfig": 200, "/setup-info": 200,
-		"/api/me": 404, "/api/ade/board": 404, "/index.html": 404, "/sw.js": 404,
-	} {
-		resp, err := http.Get(base + path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resp.Body.Close()
-		if resp.StatusCode != want {
-			t.Errorf("setup %s: status %d, want %d", path, resp.StatusCode, want)
-		}
 	}
 }

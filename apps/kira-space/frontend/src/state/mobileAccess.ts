@@ -7,14 +7,15 @@ import { control } from '../bridge/control';
 const DEFAULT_STATUS: MobileStatus = {
   enabled: false,
   running: false,
-  httpsPort: 7790,
-  setupPort: 7791,
-  appUrls: [],
-  setupUrls: [],
-  fingerprint: '',
-  leafExpiresAt: 0,
+  port: 7790,
+  appUrl: '',
   agentInput: false,
   error: '',
+  stopReason: '',
+  stopDetail: '',
+  current: null,
+  trusted: null,
+  trustedAt: 0,
 };
 
 // P212: the Mobile access pane and the phone pairing prompt share this store. The pending
@@ -63,8 +64,16 @@ export const useMobileAccessStore = defineStore('mobileAccess', () => {
     state.status = await control.mobileSetEnabled(enabled);
   }
 
-  async function setPorts(httpsPort: number, setupPort: number): Promise<void> {
-    state.status = await control.mobileSetPorts(httpsPort, setupPort);
+  async function setPort(port: number): Promise<void> {
+    state.status = await control.mobileSetPort(port);
+  }
+
+  async function trustNetwork(): Promise<void> {
+    state.status = await control.mobileTrustNetwork();
+  }
+
+  async function forgetNetwork(): Promise<void> {
+    state.status = await control.mobileForgetNetwork();
   }
 
   async function setAgentInput(enabled: boolean): Promise<void> {
@@ -76,10 +85,6 @@ export const useMobileAccessStore = defineStore('mobileAccess', () => {
     permissions: { write: boolean; agentInput: boolean },
   ): Promise<void> {
     await control.mobileSetDevicePermissions(id, permissions.write, permissions.agentInput);
-  }
-
-  async function resetCertificate(): Promise<void> {
-    state.status = await control.mobileResetCertificate();
   }
 
   async function revoke(id: string): Promise<void> {
@@ -99,10 +104,11 @@ export const useMobileAccessStore = defineStore('mobileAccess', () => {
     ...toRefs(state),
     hydrateMobileAccess,
     setEnabled,
-    setPorts,
+    setPort,
+    trustNetwork,
+    forgetNetwork,
     setAgentInput,
     setDevicePermissions,
-    resetCertificate,
     revoke,
     approve,
     deny,

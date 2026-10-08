@@ -15,6 +15,7 @@ type AuthPhase =
   | 'denied'
   | 'timedOut'
   | 'revoked'
+  | 'expired'
   | 'paired'
   | 'unreachable';
 
@@ -41,7 +42,7 @@ export const useAuthStore = defineStore('mobileAuth', () => {
   let pairing: AbortController | null = null;
 
   function onUnauthorized(code: string): void {
-    state.phase = code === 'E_REVOKED' ? 'revoked' : 'unpaired';
+    state.phase = code === 'E_REVOKED' ? 'revoked' : code === 'E_EXPIRED' ? 'expired' : 'unpaired';
   }
 
   async function check(): Promise<void> {

@@ -93,8 +93,7 @@ func readAde(stored map[string]json.RawMessage) model.AdeSettings {
 func readMobile(stored map[string]json.RawMessage) model.MobileSettings {
 	result := model.DefaultMobileSettings()
 	appsettings.Leaf(stored, "mobile.enabled", &result.Enabled)
-	appsettings.LeafValid(stored, "mobile.httpsPort", &result.HTTPSPort, model.ValidMobilePort)
-	appsettings.LeafValid(stored, "mobile.setupPort", &result.SetupPort, model.ValidMobilePort)
+	appsettings.LeafValid(stored, "mobile.port", &result.Port, model.ValidMobilePort)
 	appsettings.Leaf(stored, "mobile.agentInput", &result.AgentInput)
 	return result
 }
@@ -106,10 +105,7 @@ func upsertMobile(tx *sql.Tx, m *model.MobilePatch) error {
 	if err := appsettings.UpsertOptional(tx, "mobile.enabled", m.Enabled); err != nil {
 		return err
 	}
-	if err := appsettings.UpsertOptional(tx, "mobile.httpsPort", m.HTTPSPort); err != nil {
-		return err
-	}
-	if err := appsettings.UpsertOptional(tx, "mobile.setupPort", m.SetupPort); err != nil {
+	if err := appsettings.UpsertOptional(tx, "mobile.port", m.Port); err != nil {
 		return err
 	}
 	return appsettings.UpsertOptional(tx, "mobile.agentInput", m.AgentInput)

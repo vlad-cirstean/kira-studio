@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestAuth_Verdicts(t *testing.T) {
@@ -43,6 +44,24 @@ func TestAuth_Verdicts(t *testing.T) {
 				t.Errorf("%s: a rejected credential must be cleared", c.name)
 			}
 		}
+	}
+}
+
+func TestAuth_ExpiredDeviceIsRefusedAndCleared(t *testing.T) {
+	t.Parallel()
+	s, store, _ := newTestServer(t)
+	cookie := store.addDevice(t, "dev1")
+	store.mu.Lock()
+	row := store.rows["dev1"]
+	row.ExpiresAt = time.Now().Add(-time.Minute).UnixMilli()
+	store.rows["dev1"] = row
+	store.mu.Unlock()
+	rec := do(s, http.MethodGet, "/api/me", "127.0.0.1:50000", withCookie(cookie))
+	if rec.Code != 401 || !strings.Contains(rec.Body.String(), codeExpired) {
+		t.Fatalf("expired device: %d %s", rec.Code, rec.Body)
+	}
+	if !strings.Contains(rec.Header().Get("Set-Cookie"), "Max-Age=0") {
+		t.Error("an expired credential must be cleared")
 	}
 }
 

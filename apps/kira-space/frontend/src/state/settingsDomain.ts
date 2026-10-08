@@ -130,13 +130,12 @@ const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
   keepAwakeWithAgents: z.boolean().default(false),
 });
 
-// P212: the mobile agents web server. Off until enabled; the two ports are unprivileged. Changed
+// P212: the mobile agents web server. Off until enabled; the port is unprivileged. Changed
 // through MobileAccessService, which restarts the server when it is running.
 export const MOBILE_PORT_RANGE = { min: 1024, max: 65535 } as const;
 const mobileSettingsSchema = /*#__PURE__*/ z.object({
   enabled: z.boolean().default(false),
-  httpsPort: z.number().int().min(MOBILE_PORT_RANGE.min).max(MOBILE_PORT_RANGE.max).default(7790),
-  setupPort: z.number().int().min(MOBILE_PORT_RANGE.min).max(MOBILE_PORT_RANGE.max).default(7791),
+  port: z.number().int().min(MOBILE_PORT_RANGE.min).max(MOBILE_PORT_RANGE.max).default(7790),
   agentInput: z.boolean().default(false),
 });
 
@@ -165,8 +164,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
   claudeCode: claudeCodeSettingsSchema.default({ keepAwakeWithAgents: false }),
   mobile: mobileSettingsSchema.default({
     enabled: false,
-    httpsPort: 7790,
-    setupPort: 7791,
+    port: 7790,
     agentInput: false,
   }),
 });
@@ -217,8 +215,7 @@ export const defaultSettings: Settings = {
   },
   mobile: {
     enabled: false,
-    httpsPort: 7790,
-    setupPort: 7791,
+    port: 7790,
     agentInput: false,
   },
 };

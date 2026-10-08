@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
@@ -15,7 +16,7 @@ import { MOBILE_PORT_RANGE } from '../../state/settingsDomain';
 import MobileQr from './MobileQr.vue';
 import type { SettingsPaneProps } from './types';
 
-// Bypasses draft/Save like ConnectedEditorsPane: enabling, port changes, certificate reset and
+// Bypasses draft/Save like ConnectedEditorsPane: enabling, trusting a network, port changes and
 // revoke are actions on a running server, not settings leaves.
 defineProps<SettingsPaneProps>();
 
@@ -25,40 +26,37 @@ function parseIntField(raw: string): number {
   return text === '' ? Number.NaN : Number(text);
 }
 
+const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+function expiresIn(at: number): string {
+  const hours = Math.round((at - Date.now()) / 3_600_000);
+  if (Math.abs(hours) < 24) return relativeTime.format(hours, 'hour');
+  return relativeTime.format(Math.round(hours / 24), 'day');
+}
+
 const store = useMobileAccessStore();
 const phones = useMobileTerminalsStore();
 const confirmDialogStore = useConfirmDialogStore();
 const switchId = useId();
 const agentInputId = useId();
-const httpsId = useId();
-const setupId = useId();
+const portId = useId();
 
-const httpsDraft = ref(String(store.status.httpsPort));
-const setupDraft = ref(String(store.status.setupPort));
+const portDraft = ref(String(store.status.port));
 watch(
-  () => [store.status.httpsPort, store.status.setupPort] as const,
-  ([https, setup]) => {
-    httpsDraft.value = String(https);
-    setupDraft.value = String(setup);
+  () => store.status.port,
+  (port) => {
+    portDraft.value = String(port);
   },
 );
 
 const portError = computed(() => {
-  const https = parseIntField(httpsDraft.value);
-  const setup = parseIntField(setupDraft.value);
-  for (const n of [https, setup]) {
-    if (!Number.isInteger(n)) return 'Enter a whole number.';
-    if (n < MOBILE_PORT_RANGE.min || n > MOBILE_PORT_RANGE.max) {
-      return `Ports run from ${MOBILE_PORT_RANGE.min} to ${MOBILE_PORT_RANGE.max}.`;
-    }
+  const port = parseIntField(portDraft.value);
+  if (!Number.isInteger(port)) return 'Enter a whole number.';
+  if (port < MOBILE_PORT_RANGE.min || port > MOBILE_PORT_RANGE.max) {
+    return `Ports run from ${MOBILE_PORT_RANGE.min} to ${MOBILE_PORT_RANGE.max}.`;
   }
-  return https === setup ? 'The two ports must differ.' : null;
+  return null;
 });
-const portsChanged = computed(
-  () =>
-    parseIntField(httpsDraft.value) !== store.status.httpsPort ||
-    parseIntField(setupDraft.value) !== store.status.setupPort,
-);
+const portChanged = computed(() => parseIntField(portDraft.value) !== store.status.port);
 
 const { busy: toggling, run: onToggle } = useBusyAction((on: boolean) => store.setEnabled(on));
 const { busy: togglingAgentInput, run: onToggleAgentInput } = useBusyAction((on: boolean) =>
@@ -68,16 +66,42 @@ const { run: onSetPermissions } = useBusyAction(
   (id: string, write: boolean, agentInput: boolean) =>
     store.setDevicePermissions(id, { write, agentInput }),
 );
-const { busy: applying, run: onApplyPorts } = useBusyAction(() =>
-  store.setPorts(parseIntField(httpsDraft.value), parseIntField(setupDraft.value)),
+const { busy: applying, run: onApplyPort } = useBusyAction(() =>
+  store.setPort(parseIntField(portDraft.value)),
 );
+const { busy: trusting, run: runTrust } = useBusyAction(() => store.trustNetwork());
+const { run: runForget } = useBusyAction(() => store.forgetNetwork());
 
-async function onReset(): Promise<void> {
-  const ok = await confirmDialogStore.confirmDialog(
-    'Reset the certificate? Every phone must install the new certificate again.',
-    { danger: true, confirmLabel: 'Reset' },
+const current = computed(() => store.status.current);
+const trusted = computed(() => store.status.trusted);
+const canTrust = computed(() => {
+  const now = current.value;
+  const was = trusted.value;
+  if (!now) return false;
+  return (
+    !was ||
+    was.subnet !== now.subnet ||
+    was.routerIp !== now.routerIp ||
+    was.routerMac !== now.routerMac
   );
-  if (ok) await store.resetCertificate();
+});
+
+async function onTrust(): Promise<void> {
+  const now = current.value;
+  if (!now) return;
+  const ok = await confirmDialogStore.confirmDialog(
+    `Trust ${now.subnet} (router ${now.routerMac})? The phone talks to Kira Space over plain HTTP: anyone on this network can read what it shows. Turn this on only on a network you control, such as your home Wi-Fi.`,
+    { confirmLabel: 'Trust' },
+  );
+  if (ok) await runTrust();
+}
+
+async function onForget(): Promise<void> {
+  const ok = await confirmDialogStore.confirmDialog(
+    'Forget the trusted network? The phone server stops until you trust a network again.',
+    { danger: true, confirmLabel: 'Forget' },
+  );
+  if (ok) await runForget();
 }
 
 async function onRevoke(id: string, label: string): Promise<void> {
@@ -88,23 +112,16 @@ async function onRevoke(id: string, label: string): Promise<void> {
   if (ok) await store.revoke(id);
 }
 
-// One QR per bound address; a phone cannot reach loopback.
-function reachable(urls: string[]): string[] {
-  return urls.filter((u) => {
-    const host = new URL(u).hostname;
-    return host !== 'localhost' && !host.startsWith('127.');
-  });
-}
-const setupUrls = computed(() => reachable(store.status.setupUrls));
-const appUrls = computed(() => reachable(store.status.appUrls));
-const activeDevices = computed(() => store.devices.filter((d) => !d.revokedAt));
+const activeDevices = computed(() =>
+  store.devices.filter((d) => !d.revokedAt && d.expiresAt > Date.now()),
+);
 </script>
 
 <template>
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="switchId">View Agents from a phone on this network</Label>
+        <Label :for="switchId">View Agents from a phone on my trusted network</Label>
       </div>
       <Switch
         :id="switchId"
@@ -114,14 +131,77 @@ const activeDevices = computed(() => store.devices.filter((d) => !d.revokedAt));
         @update:model-value="(v) => onToggle(v === true)"
       />
       <FieldDescription>
-        A phone on your local network pairs once, then sees the board, backlog and plan. Each phone
-        can also change the backlog and move or start tasks, and reply to agents. Only private
-        network addresses are served.
+        A phone on your trusted home network pairs once, then sees the board, backlog and plan. Each
+        phone can also change the backlog and move or start tasks, and reply to agents. The server
+        runs only while this computer is on that network.
       </FieldDescription>
       <FieldError v-if="store.status.error" data-testid="mobile-access-error">
         {{ store.status.error }}
       </FieldError>
     </Field>
+
+    <Alert variant="warn" data-testid="mobile-access-plaintext-warning">
+      The phone talks to Kira Space over plain HTTP. Anyone on the same network can read the board,
+      backlog and terminal output it shows, and can copy the phone's access and act as that phone
+      until it expires or you revoke it. Turn this on only on a network you control, such as your
+      home Wi-Fi.
+    </Alert>
+
+    <section class="flex flex-col gap-1" data-testid="mobile-access-network">
+      <h3 class="m-0 text-kira-sm font-semibold">Trusted network</h3>
+      <p v-if="trusted" class="m-0 text-kira-sm" data-testid="mobile-access-trusted">
+        {{ trusted.subnet }}, router {{ trusted.routerIp }} ({{ trusted.routerMac }}), trusted on
+        {{ trusted.interface }}
+        <template v-if="store.status.trustedAt">
+          on {{ new Date(store.status.trustedAt).toLocaleDateString() }}
+        </template>
+      </p>
+      <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-trusted">
+        No trusted network.
+      </p>
+      <p v-if="current" class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-current">
+        This computer: {{ current.address }} on {{ current.subnet }}, router {{ current.routerIp }}
+        ({{ current.routerMac }})
+      </p>
+      <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-current">
+        This computer is not on a private local network.
+      </p>
+      <div class="flex gap-2">
+        <Button
+          variant="dialog"
+          size="kira-lg"
+          :disabled="trusting || !canTrust"
+          data-testid="mobile-access-trust"
+          @click="onTrust"
+        >
+          Trust this network
+        </Button>
+        <Button
+          v-if="trusted"
+          variant="dialog"
+          size="kira-lg"
+          data-testid="mobile-access-forget"
+          @click="onForget"
+        >
+          Forget
+        </Button>
+      </div>
+      <p
+        v-if="store.status.enabled && !store.status.running && store.status.stopDetail"
+        class="m-0 text-kira-sm"
+        data-testid="mobile-access-stopped-reason"
+      >
+        {{ store.status.stopDetail }}
+      </p>
+    </section>
+
+    <section v-if="store.status.running" class="flex flex-col gap-1" data-testid="mobile-access-step-app">
+      <h3 class="m-0 text-kira-sm font-semibold">Open the app</h3>
+      <figure class="m-0 flex flex-col gap-0.5">
+        <MobileQr :url="store.status.appUrl" />
+        <figcaption class="font-data text-kira-sm break-all select-all">{{ store.status.appUrl }}</figcaption>
+      </figure>
+    </section>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
@@ -142,74 +222,27 @@ const activeDevices = computed(() => store.devices.filter((d) => !d.revokedAt));
     </Field>
 
     <Field>
-      <Label :for="httpsId">App port</Label>
+      <Label :for="portId">Port</Label>
       <NumberStepperInput
-        :id="httpsId"
+        :id="portId"
         :min="MOBILE_PORT_RANGE.min"
         :max="MOBILE_PORT_RANGE.max"
-        data-testid="mobile-access-https-port"
-        :model-value="httpsDraft"
-        @input="(e: Event) => (httpsDraft = (e.target as HTMLInputElement).value)"
-      />
-      <Label :for="setupId">Setup port</Label>
-      <NumberStepperInput
-        :id="setupId"
-        :min="MOBILE_PORT_RANGE.min"
-        :max="MOBILE_PORT_RANGE.max"
-        data-testid="mobile-access-setup-port"
-        :model-value="setupDraft"
-        @input="(e: Event) => (setupDraft = (e.target as HTMLInputElement).value)"
+        data-testid="mobile-access-port"
+        :model-value="portDraft"
+        @input="(e: Event) => (portDraft = (e.target as HTMLInputElement).value)"
       />
       <FieldError v-if="portError" data-testid="mobile-access-port-error">{{ portError }}</FieldError>
       <Button
         variant="dialog"
         size="kira-lg"
         class="self-start"
-        :disabled="applying || !!portError || !portsChanged"
-        data-testid="mobile-access-apply-ports"
-        @click="onApplyPorts"
+        :disabled="applying || !!portError || !portChanged"
+        data-testid="mobile-access-apply-port"
+        @click="onApplyPort"
       >
-        Apply ports
+        Apply port
       </Button>
     </Field>
-
-    <template v-if="store.status.running">
-      <section class="flex flex-col gap-1" data-testid="mobile-access-step-certificate">
-        <h3 class="m-0 text-kira-sm font-semibold">1. Install the certificate</h3>
-        <FieldDescription>
-          Scan with the phone's camera and install the profile it downloads. Compare the
-          fingerprint on the phone.
-        </FieldDescription>
-        <div class="flex flex-wrap gap-2">
-          <figure v-for="url in setupUrls" :key="url" class="m-0 flex flex-col gap-0.5">
-            <MobileQr :url="url" />
-            <figcaption class="font-data text-kira-sm break-all select-all">{{ url }}</figcaption>
-          </figure>
-        </div>
-        <p class="m-0 font-data text-kira-sm break-all select-all" data-testid="mobile-access-fingerprint">
-          {{ store.status.fingerprint }}
-        </p>
-        <Button
-          variant="dialog"
-          size="kira-lg"
-          class="self-start"
-          data-testid="mobile-access-reset-certificate"
-          @click="onReset"
-        >
-          Reset certificate
-        </Button>
-      </section>
-
-      <section class="flex flex-col gap-1" data-testid="mobile-access-step-app">
-        <h3 class="m-0 text-kira-sm font-semibold">2. Open the app</h3>
-        <div class="flex flex-wrap gap-2">
-          <figure v-for="url in appUrls" :key="url" class="m-0 flex flex-col gap-0.5">
-            <MobileQr :url="url" />
-            <figcaption class="font-data text-kira-sm break-all select-all">{{ url }}</figcaption>
-          </figure>
-        </div>
-      </section>
-    </template>
 
     <section class="flex flex-col gap-1">
       <h3 class="m-0 text-kira-sm font-semibold">Paired phones</h3>
@@ -227,6 +260,12 @@ const activeDevices = computed(() => store.devices.filter((d) => !d.revokedAt));
             <span class="truncate">{{ device.label || device.id }}</span>
             <span class="text-subtle text-kira-sm leading-normal">
               Last seen {{ formatRelative(device.lastSeenAt) }}<template v-if="device.lastIp"> from {{ device.lastIp }}</template>
+            </span>
+            <span
+              class="text-subtle text-kira-sm leading-normal"
+              :data-testid="`mobile-device-expires-${device.id}`"
+            >
+              Access expires {{ expiresIn(device.expiresAt) }}
             </span>
             <span
               v-if="phones.countFor(device.id) > 0"
