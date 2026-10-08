@@ -177,3 +177,12 @@ func decodePCM(b64 string) ([]float32, error) {
 	}
 	return out, nil
 }
+
+// encodePCM is the host side of decodePCM.
+func encodePCM(pcm []int16) string {
+	raw := make([]byte, 2*len(pcm))
+	for i, v := range pcm {
+		binary.LittleEndian.PutUint16(raw[2*i:], uint16(v))
+	}
+	return base64.StdEncoding.EncodeToString(raw)
+}
