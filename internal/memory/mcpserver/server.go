@@ -23,7 +23,7 @@ Store a memory when the user states a durable fact, or when you learn one worth 
 
 store_memory challenges an item that is ambiguous, has no real reason or does not make sense. A challenge stores nothing: ask the user the returned questions, or fix the item yourself, then call store_memory again with the revised items and the answers in "clarifications".
 
-search_memories is recall-oriented: it returns loosely related results, best first. Read them and discard what is unrelated. A memory marked historical was replaced by a newer version; pass includeHistory to see old versions. memory_history returns every version of one memory with why it changed.`
+search_memories is recall-oriented: it matches words and meaning, and returns loosely related results, best first. Read them and discard what is unrelated. A memory marked historical was replaced by a newer version; pass includeHistory to see old versions. memory_history returns every version of one memory with why it changed.`
 
 type storeInput struct {
 	Items          []memory.Item          `json:"items" jsonschema:"facts to store, 1 to 20; each with its reason"`
@@ -32,13 +32,15 @@ type storeInput struct {
 }
 
 type searchInput struct {
-	Query          string `json:"query" jsonschema:"free text; every word is matched loosely, prefixes and word forms included"`
+	Query          string `json:"query" jsonschema:"free text; matched by words (prefixes, word forms) and by meaning"`
 	IncludeHistory bool   `json:"includeHistory,omitempty" jsonschema:"also return superseded versions, flagged historical"`
 	Limit          int    `json:"limit,omitempty" jsonschema:"maximum results, default 25, maximum 100"`
 }
 
 type searchOutput struct {
 	Memories []memory.Memory `json:"memories"`
+	// Semantic is the semantic-search state: off, notInstalled, unavailable, indexing or ready.
+	Semantic string `json:"semantic"`
 }
 
 type historyInput struct {
@@ -60,14 +62,19 @@ func Build(svc *memory.Service) *mcp.Server {
 	}))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "search_memories",
-		Description: "Search stored memories. Recall-oriented: returns loosely related results, best first. Superseded versions are included only with includeHistory and are flagged historical.",
+		Description: "Search stored memories by keyword and by meaning. Recall-oriented: returns loosely related results, best first. Superseded versions are included only with includeHistory and are flagged historical.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, recovering("search_memories", func(ctx context.Context, _ *mcp.CallToolRequest, in searchInput) (*mcp.CallToolResult, searchOutput, error) {
 		ms, err := svc.Search(ctx, memory.SearchArgs{Query: in.Query, IncludeHistory: in.IncludeHistory, Limit: in.Limit})
 		if err != nil {
 			return nil, searchOutput{}, err
 		}
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderMemories(ms)}}}, searchOutput{Memories: ms}, nil
+		st, err := svc.SemanticStatus(ctx)
+		if err != nil {
+			st = memory.SemanticStatus{State: memory.SemanticUnavailable, Message: err.Error()}
+		}
+		text := renderMemories(ms) + semanticNote(st)
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, searchOutput{Memories: ms, Semantic: st.State}, nil
 	}))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "memory_history",
@@ -164,9 +171,24 @@ func renderMemories(ms []memory.Memory) string {
 		if m.Historical {
 			flag = " [historical]"
 		}
+		if m.Match == "semantic" {
+			flag += " [semantic]"
+		}
 		fmt.Fprintf(&b, "- %s%s (v%d, %s, id %s)\n  reason: %s\n", m.Fact, flag, m.Version, m.Author, m.ID, m.Reason)
 	}
 	return b.String()
+}
+
+// semanticNote tells the agent when results are keyword-only, so it can say so instead of
+// trusting an empty list. Off, indexing and ready add nothing.
+func semanticNote(st memory.SemanticStatus) string {
+	switch st.State {
+	case memory.SemanticNotInstalled:
+		return "\nNote: semantic search is not installed. Results are keyword matches only. Enable it in Kira Space, Memory, Download model.\n"
+	case memory.SemanticUnavailable:
+		return fmt.Sprintf("\nNote: semantic search is unavailable: %s. Results are keyword matches only.\n", st.Message)
+	}
+	return ""
 }
 
 // recovering turns a handler panic into a tool error: go-sdk runs each request in its own

@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/mcpserver"
 )
 
@@ -22,7 +23,9 @@ func Run(_ []string) int {
 
 	store := memory.OpenDefault()
 	defer store.Close()
-	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{})
+	embedder := embed.NewClient(embed.ClientOptions{Spec: embed.Default, Home: memory.Home()})
+	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{Embedder: embedder})
+	defer svc.Close()
 	if err := mcpserver.RunStdio(ctx, svc); err != nil && ctx.Err() == nil {
 		fmt.Fprintln(os.Stderr, "kira-memory:", err)
 		return 1
