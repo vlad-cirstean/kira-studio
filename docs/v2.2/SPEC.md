@@ -98,10 +98,10 @@ agents web (P212, Kira Space)".
 12 commits on `v2.1-stream-C` (`393978d04`..`f262f96dd`, plus docs). Hooks green on each.
 
 Done:
-- Connection and type colours: `connBgClass`/`connTextClass`, `columnTypeTextClass` literal maps replace 19 direct `:style` colour paints.
+- Connection and type colours: `connBgClass`/`connTextClass`, `columnTypeTextClass` literal maps replace direct `:style` colour paints (plan classes C, D: 19).
 - Static `:style` keys moved to classes; bindings keep runtime geometry only. `:style` bindings 250 to 142 (same grep).
 - ADE: tone `@theme` tokens in `ade/v2/tones.css`; `tones.ts` keeps class maps only. `tagStyle`/`solidStyle`/`actionStyle` deleted (no use in `kira-v21-G` or `origin/v2.0`).
-- git-ui commit grid: cell, badge, ref-strip CSS to `kv:` utilities; `CommitGrid.vue` SlickGrid overrides via `@apply`. Style block 57 to 40 rules.
+- git-ui commit grid: cell, badge, ref-strip CSS to `kv:` utilities; `CommitGrid.vue` SlickGrid overrides via `@apply`. Style block 47 to 16 rule blocks.
 - Studio `slickTheme.css`: 70 to 63 rule blocks, 825 to 715 lines; safe single-declaration subset via `@apply`. Host, mount, no-rows, nav button, header badge, select zone moved to class strings.
 - Space review load-error zone: utilities; retry via `buttonVariants`. Rules deleted from `review-decorations.css`.
 - `base.css` html/body and `MonacoHost.vue` find-match tints via `@apply`.
