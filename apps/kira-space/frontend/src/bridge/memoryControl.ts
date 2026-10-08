@@ -4,6 +4,7 @@ import {
   memoryInstallResultSchema,
   memoryMcpStatusSchema,
   memorySchema,
+  memorySemanticStatusSchema,
   memoryStoreResultSchema,
 } from '@shared/domain/memory';
 import { CHANNEL } from '@shared/protocol/events';
@@ -29,4 +30,15 @@ export const memoryControl: MemoryControl = {
   memoryMcpInstall: async () =>
     memoryInstallResultSchema.parse(await unwrap(MemoryService.InstallClaudeCode())),
   onMemoryChanged: (cb) => on(CHANNEL.memoryChanged, cb),
+  memorySemanticStatus: async () =>
+    memorySemanticStatusSchema.parse(await unwrap(MemoryService.SemanticStatus())),
+  memorySemanticInstall: async (signal) => {
+    const call = MemoryService.InstallSemanticModel();
+    signal?.addEventListener('abort', () => call.cancel(), { once: true });
+    await unwrap(call);
+  },
+  memorySemanticRetry: async () => {
+    await unwrap(MemoryService.RetrySemantic());
+  },
+  onMemorySemantic: (cb) => on(CHANNEL.memorySemantic, cb),
 };

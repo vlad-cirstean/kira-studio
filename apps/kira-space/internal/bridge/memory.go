@@ -12,16 +12,22 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/embed"
 )
 
 // ChannelMemoryChanged fires after any write to memory.db, this process's or the MCP subprocess's.
 const ChannelMemoryChanged = "kira:memory:changed"
+
+// ChannelMemorySemantic fires when semantic-search status or indexing progress changes. The payload
+// is empty; the UI refetches SemanticStatus.
+const ChannelMemorySemantic = "kira:memory:semantic"
 
 // memoryServerName is the name the kira-memory stdio server registers under in Claude Code.
 const memoryServerName = "kira-memory"
 
 const (
 	memoryWatchInterval = 2 * time.Second
+	semanticEmitGap     = 250 * time.Millisecond
 	memoryUIListLimit   = 100
 )
 
@@ -40,7 +46,18 @@ type MemoryService struct {
 	mu        sync.Mutex
 	svc       *memory.Service
 	store     *memory.Store
+	embedder  *embed.Client
 	stopWatch context.CancelFunc
+
+	// installing serialises model downloads; progress is read by SemanticStatus.
+	installing sync.Mutex
+	dlMu       sync.Mutex
+	dlActive   bool
+	dlDone     int64
+	dlTotal    int64
+
+	emitMu      sync.Mutex
+	emitPending bool
 }
 
 func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller) *MemoryService {
@@ -54,11 +71,31 @@ func (s *MemoryService) service() *memory.Service {
 		return s.svc
 	}
 	s.store = memory.OpenDefault()
-	s.svc = memory.NewService(s.store, memory.NewCLIRunner(), memory.ServiceOptions{OnChange: s.emitChanged})
+	s.embedder = embed.NewClient(embed.ClientOptions{Spec: embed.Default, Home: memory.Home(), OnState: s.emitSemantic})
+	s.svc = memory.NewService(s.store, memory.NewCLIRunner(), memory.ServiceOptions{
+		Embedder: s.embedder, OnChange: s.emitChanged, OnSemantic: s.emitSemantic,
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	s.stopWatch = cancel
 	go s.watch(ctx, s.store)
+	s.svc.StartBackfill()
 	return s.svc
+}
+
+// emitSemantic coalesces bursts (a backfill batch per few hundred ms) into one event per gap.
+func (s *MemoryService) emitSemantic() {
+	s.emitMu.Lock()
+	defer s.emitMu.Unlock()
+	if s.emitPending {
+		return
+	}
+	s.emitPending = true
+	time.AfterFunc(semanticEmitGap, func() {
+		s.emitMu.Lock()
+		s.emitPending = false
+		s.emitMu.Unlock()
+		s.events.Emit(ChannelMemorySemantic, struct{}{})
+	})
 }
 
 func (s *MemoryService) emitChanged() { s.events.Emit(ChannelMemoryChanged, struct{}{}) }
@@ -96,10 +133,13 @@ func CloseMemory(s *MemoryService) {
 	if s.stopWatch != nil {
 		s.stopWatch()
 	}
+	if s.svc != nil {
+		s.svc.Close()
+	}
 	if s.store != nil {
 		_ = s.store.Close()
 	}
-	s.svc, s.store, s.stopWatch = nil, nil, nil
+	s.svc, s.store, s.embedder, s.stopWatch = nil, nil, nil, nil
 }
 
 func memoryErr(err error) error {
@@ -109,6 +149,8 @@ func memoryErr(err error) error {
 	case errors.Is(err, memory.ErrInvalid), errors.Is(err, memory.ErrClaudeNotFound), errors.Is(err, memory.ErrClaudeAuth),
 		errors.Is(err, memory.ErrClaudeBudget), errors.Is(err, memory.ErrClaudeTimeout), errors.Is(err, memory.ErrClaudeOutput),
 		errors.Is(err, memory.ErrClaudeOutdated):
+		return ipcerr.BadRequest(err.Error())
+	case errors.Is(err, embed.ErrChecksum):
 		return ipcerr.BadRequest(err.Error())
 	case errors.Is(err, memory.ErrNotFound):
 		return ipcerr.NotFound(err.Error())
@@ -163,6 +205,73 @@ func (s *MemoryService) Store(ctx context.Context, args MemoryStoreArgs) (memory
 		Items: args.Items, Clarifications: args.Clarifications, Author: memory.AuthorUser, Source: memory.SourceUI,
 	})
 	return res, memoryErr(err)
+}
+
+// SemanticStatus reports semantic search: the service's state, overlaid with download progress
+// (bytes in Done and Total) while a model install runs.
+func (s *MemoryService) SemanticStatus(ctx context.Context) (memory.SemanticStatus, error) {
+	st, err := s.service().SemanticStatus(ctx)
+	if err != nil {
+		return memory.SemanticStatus{}, memoryErr(err)
+	}
+	s.dlMu.Lock()
+	defer s.dlMu.Unlock()
+	if s.dlActive {
+		st.State, st.Message, st.Done, st.Total = memory.SemanticDownloading, "", s.dlDone, s.dlTotal
+	}
+	return st, nil
+}
+
+func (s *MemoryService) setDownload(active bool, done, total int64) {
+	s.dlMu.Lock()
+	s.dlActive, s.dlDone, s.dlTotal = active, done, total
+	s.dlMu.Unlock()
+	s.emitSemantic()
+}
+
+// InstallSemanticModel downloads the embedding model into the shared memory home, then starts
+// indexing existing memories. One download at a time; cancelling the call aborts it.
+func (s *MemoryService) InstallSemanticModel(ctx context.Context) error {
+	s.service()
+	if !s.installing.TryLock() {
+		return ipcerr.BadRequest("already downloading")
+	}
+	defer s.installing.Unlock()
+	s.mu.Lock()
+	client, svc := s.embedder, s.svc
+	s.mu.Unlock()
+	if client == nil || svc == nil {
+		return ipcerr.Internal("memory service closed")
+	}
+
+	s.setDownload(true, 0, embed.Default.TotalSize())
+	err := embed.Install(ctx, client.Dir(), embed.Default, func(done, total int64) {
+		s.dlMu.Lock()
+		s.dlDone, s.dlTotal = done, total
+		s.dlMu.Unlock()
+		s.emitSemantic()
+	})
+	s.setDownload(false, 0, 0)
+	if err != nil {
+		return memoryErr(err)
+	}
+	client.Reset()
+	svc.StartBackfill()
+	return nil
+}
+
+// RetrySemantic clears a recorded embedding failure and its spawn backoff, then retries indexing.
+func (s *MemoryService) RetrySemantic() {
+	s.service()
+	s.mu.Lock()
+	client, svc := s.embedder, s.svc
+	s.mu.Unlock()
+	if client == nil || svc == nil {
+		return
+	}
+	client.Reset()
+	svc.StartBackfill()
+	s.emitSemantic()
 }
 
 // MemoryMcpStatus is the Connect dialog's pre-click read.

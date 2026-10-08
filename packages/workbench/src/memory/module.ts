@@ -5,6 +5,7 @@ import type {
   MemoryInstallResult,
   MemoryItem,
   MemoryMcpStatus,
+  MemorySemanticStatus,
   MemoryStoreResult,
 } from '@shared/domain/memory';
 import { type InjectionKey, inject } from 'vue';
@@ -25,6 +26,11 @@ export interface MemoryControl {
   memoryMcpStatus(): Promise<MemoryMcpStatus>;
   memoryMcpInstall(): Promise<MemoryInstallResult>;
   onMemoryChanged(cb: () => void): () => void;
+  memorySemanticStatus(): Promise<MemorySemanticStatus>;
+  /** Downloads the embedding model; aborting `signal` cancels the download. */
+  memorySemanticInstall(signal?: AbortSignal): Promise<void>;
+  memorySemanticRetry(): Promise<void>;
+  onMemorySemantic(cb: () => void): () => void;
 }
 
 export interface MemoryModuleContext {

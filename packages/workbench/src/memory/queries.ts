@@ -71,6 +71,44 @@ export function useInstallMemoryMcp() {
   );
 }
 
+const SEMANTIC_KEY = [...MEMORY_KEY, 'semantic'] as const;
+
+export function useMemorySemanticStatus() {
+  const { control } = useMemoryModule();
+  const off = control.onMemorySemantic(() => {
+    void queryClient.invalidateQueries({ queryKey: SEMANTIC_KEY });
+  });
+  tryOnScopeDispose(off);
+  return useQuery(
+    { queryKey: SEMANTIC_KEY, queryFn: () => control.memorySemanticStatus() },
+    queryClient,
+  );
+}
+
+export function useInstallSemanticModel() {
+  const { control } = useMemoryModule();
+  return useMutation(
+    {
+      mutationKey: [...SEMANTIC_KEY, 'install'],
+      mutationFn: (signal?: AbortSignal) => control.memorySemanticInstall(signal),
+      onSettled: () => queryClient.invalidateQueries({ queryKey: SEMANTIC_KEY }),
+    },
+    queryClient,
+  );
+}
+
+export function useRetrySemantic() {
+  const { control } = useMemoryModule();
+  return useMutation(
+    {
+      mutationKey: [...SEMANTIC_KEY, 'retry'],
+      mutationFn: () => control.memorySemanticRetry(),
+      onSettled: () => queryClient.invalidateQueries({ queryKey: SEMANTIC_KEY }),
+    },
+    queryClient,
+  );
+}
+
 /** Refetches memory queries when the backend reports a write, including the MCP server's. */
 export function useMemoryChangeSync(): void {
   const { control } = useMemoryModule();

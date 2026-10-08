@@ -66,6 +66,8 @@ export const CHANNEL = {
   keepAwake: 'kira:keepAwake:changed',
   // P201: memory.db changed (this app's writes or the kira-memory MCP server's), Emit'd app-wide.
   memoryChanged: 'kira:memory:changed',
+  // P210: semantic-search status or indexing progress changed; empty payload, refetch the status.
+  memorySemantic: 'kira:memory:semantic',
   // P112: every API-client mutation (collections, saved requests, variables, environments) Emits
   // this with the scopes it touched, so every window's TanStack Query cache invalidates exactly
   // those keys — customScriptsChanged's own shape, generalised to a batch of scopes per event.

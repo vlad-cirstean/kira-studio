@@ -22,6 +22,8 @@ export const memorySchema = /*#__PURE__*/ z.object({
   supersededAt: z.string().nullable(),
   // Versions in this memory's lineage.
   versions: z.number().int(),
+  // How a search found this memory; absent outside search.
+  match: /*#__PURE__*/ z.enum(['keyword', 'semantic', 'both']).optional(),
 });
 export type Memory = z.infer<typeof memorySchema>;
 
@@ -90,3 +92,21 @@ export const memoryInstallResultSchema = /*#__PURE__*/ z.object({
   probed: z.array(z.string()),
 });
 export type MemoryInstallResult = z.infer<typeof memoryInstallResultSchema>;
+
+// P210: bridge/memory.go's SemanticStatus. While downloading, done/total are bytes; otherwise they
+// are memory counts (vectors stored vs memories).
+export const memorySemanticStatusSchema = /*#__PURE__*/ z.object({
+  state: /*#__PURE__*/ z.enum([
+    'off',
+    'notInstalled',
+    'downloading',
+    'unavailable',
+    'indexing',
+    'ready',
+  ]),
+  message: z.string(),
+  model: z.string(),
+  done: z.number().int(),
+  total: z.number().int(),
+});
+export type MemorySemanticStatus = z.infer<typeof memorySemanticStatusSchema>;

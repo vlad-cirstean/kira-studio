@@ -154,6 +154,9 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memoryStore: 'MemoryService.Store',
   memoryMcpStatus: 'MemoryService.McpStatus',
   memoryMcpInstall: 'MemoryService.InstallClaudeCode',
+  memorySemanticStatus: 'MemoryService.SemanticStatus',
+  memorySemanticInstall: 'MemoryService.InstallSemanticModel',
+  memorySemanticRetry: 'MemoryService.RetrySemantic',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
@@ -225,6 +228,14 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.adeTaskReviewWindowTarget]: 'null',
   // P201 Part 2: the Memory module lists recent memories as soon as its mode opens.
   [IPC.memoryRecent]: '[]',
+  // P210: no embedder by default, so the semantic row stays hidden.
+  [IPC.memorySemanticStatus]: JSON.stringify({
+    state: 'off',
+    message: '',
+    model: '',
+    done: 0,
+    total: 0,
+  }),
 });
 
 // `windowKey`/`tabId` are excluded outright — a per-window or per-tab id this app generates at

@@ -13,6 +13,7 @@ import { onMounted, useId, useTemplateRef } from 'vue';
 import AddMemoryDialog from './AddMemoryDialog.vue';
 import ConnectClaudeDialog from './ConnectClaudeDialog.vue';
 import { useMemoryChangeSync, useMemorySearch } from './queries';
+import SemanticStatus from './SemanticStatus.vue';
 import { useMemoryUiStore } from './store';
 
 // P201: the Memory module's left panel — recall-first search over the shared memory store, the
@@ -65,6 +66,7 @@ const historyToggleId = useId();
         <Switch :id="historyToggleId" v-model="includeHistory" data-testid="memory-include-history" />
         <Label :for="historyToggleId">Include history</Label>
       </div>
+      <SemanticStatus />
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto" data-testid="memory-results">
       <Alert v-if="search.isError.value" variant="destructive" class="m-1.5 w-auto" data-testid="memory-error">
@@ -93,6 +95,7 @@ const historyToggleId = useId();
           <span class="flex items-center gap-1">
             <Badge :variant="memory.author === 'user' ? 'info' : 'default'">{{ memory.author }}</Badge>
             <Badge v-if="memory.historical" variant="warn">historical</Badge>
+            <Badge v-if="memory.match === 'semantic'" variant="info" data-testid="memory-match-semantic">semantic</Badge>
             <span v-if="memory.versions > 1" class="text-kira-sm text-muted-foreground">v{{ memory.version }}</span>
           </span>
         </button>
