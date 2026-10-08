@@ -453,6 +453,13 @@ export interface OpenSessionEvent {
   sessionId: string;
 }
 
+/** A phone started this launch; the window opens its terminal and answers with `mobileLaunchOpened`. */
+export interface MobileOpenLaunchEvent {
+  launch: Launch;
+  taskId: string;
+  branchId: string;
+}
+
 export interface CreateTaskArgs {
   title: string;
   jira: Jira | null;

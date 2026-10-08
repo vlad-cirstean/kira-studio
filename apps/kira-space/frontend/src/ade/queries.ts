@@ -3,6 +3,7 @@ import { watch } from 'vue';
 import { control } from '../bridge/control';
 import { reposKey } from '../repo/state/reposQueries';
 import type { useAgentSessionsStore } from './state/agentSessions';
+import { installMobileLaunch } from './v2/dialog/mobileLaunch';
 import { adeTurns } from './v2/dialog/turnWatch';
 import { workflowYamlKey } from './v2/queries';
 import { installAdeReadSignals } from './v2/readSignals';
@@ -48,4 +49,5 @@ export function installAdeSignals(
     useAdeBoardUiStore().openSession(event);
   });
   control.onAgentEvent((event) => adeTurns.onEvent(event));
+  installMobileLaunch();
 }

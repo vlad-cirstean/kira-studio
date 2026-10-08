@@ -135,6 +135,10 @@ const spaceControl = {
     unwrap(MobileAccessService.Approve({ id })).then((r) => trust<MobilePairingActionResult>(r)),
   mobilePairingDeny: (id: string): Promise<MobilePairingActionResult> =>
     unwrap(MobileAccessService.Deny({ id })).then((r) => trust<MobilePairingActionResult>(r)),
+  mobileLaunchOpened: (terminalId: string, error: string): Promise<void> =>
+    unwrap(MobileAccessService.LaunchOpened({ terminalId, error })),
+  onMobileOpenLaunch: (cb: (event: V2.MobileOpenLaunchEvent) => void): (() => void) =>
+    on(CHANNEL.mobileOpenLaunch, cb),
   onMobileStatusChanged: (cb: (status: MobileStatus) => void): (() => void) =>
     on(CHANNEL.mobileStatus, cb),
   onMobileDevicesChanged: (cb: (devices: MobileDevice[]) => void): (() => void) =>

@@ -45,6 +45,10 @@ export const CHANNEL = {
   mobilePairing: 'kira:mobile:pairing',
   mobileDevices: 'kira:mobile:devices',
   mobileStatus: 'kira:mobile:status',
+  // P212 Part 2: a phone-started launch for one window to open (EmitTo), and the terminals a phone
+  // currently holds (Emit).
+  mobileOpenLaunch: 'kira:mobile:openLaunch',
+  mobileTerminals: 'kira:mobile:terminals',
   // C7 D7: a repository-wide search's coalesced file groups, delivered via EmitTo (one window
   // only) — grpcCall's own shape, restated for a payload that shares no field with it.
   codeSearch: 'kira:code:search',
