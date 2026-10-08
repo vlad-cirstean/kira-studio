@@ -7,6 +7,5 @@ export const useMemoryUiStore = defineStore('memoryUi', () => {
   const includeHistory = ref(false);
   const selectedId = ref<string | null>(null);
   const addOpen = ref(false);
-  const connectOpen = ref(false);
-  return { query, includeHistory, selectedId, addOpen, connectOpen };
+  return { query, includeHistory, selectedId, addOpen };
 });

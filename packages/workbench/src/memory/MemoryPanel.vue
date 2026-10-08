@@ -11,7 +11,6 @@ import { refDebounced } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
 import { computed, onMounted, useId, useTemplateRef } from 'vue';
 import AddMemoryDialog from './AddMemoryDialog.vue';
-import ConnectClaudeDialog from './ConnectClaudeDialog.vue';
 import DictationStatusLine from './dictation/DictationStatusLine.vue';
 import MicButton from './dictation/MicButton.vue';
 import { useDictationStore } from './dictation/store';
@@ -20,14 +19,14 @@ import ImportMenu from './import/ImportMenu.vue';
 import ImportStatus from './import/ImportStatus.vue';
 import { useImportChangeSync } from './import/importQueries';
 import { useImportUiStore } from './import/importStore';
-import { useDictationStatus, useMemoryChangeSync, useMemorySearch } from './queries';
-import SemanticStatus from './SemanticStatus.vue';
+import MemorySetupHint from './MemorySetupHint.vue';
+import { useDictationStatus, useMemoryChangeSync, useMemorySearch, useMemorySemanticStatus } from './queries';
 import { useMemoryUiStore } from './store';
 
 // P201: the Memory module's left panel — recall-first search over the shared memory store, the
 // same service the kira-memory MCP server writes through.
 const ui = useMemoryUiStore();
-const { query, includeHistory, selectedId, addOpen, connectOpen } = storeToRefs(ui);
+const { query, includeHistory, selectedId, addOpen } = storeToRefs(ui);
 const debounced = refDebounced(query, 200);
 const search = useMemorySearch(debounced, includeHistory);
 useMemoryChangeSync();
@@ -37,6 +36,9 @@ const imports = useImportUiStore();
 const searchInput = useTemplateRef<{ $el: HTMLInputElement }>('searchInput');
 const SEARCH_DICTATION_ID = 'memory-search';
 const dictationStatus = useDictationStatus();
+const semanticStatus = useMemorySemanticStatus();
+const semanticState = computed(() => semanticStatus.data.value?.state);
+const semanticNeedsSetup = computed(() => semanticState.value === 'notInstalled' || semanticState.value === 'unavailable');
 const dictation = useDictationStore();
 const dictating = computed(() => dictation.active && dictation.target === SEARCH_DICTATION_ID);
 const showSearchAddon = computed(
@@ -66,12 +68,6 @@ const historyToggleId = useId();
         @click="addOpen = true"
       />
       <ImportMenu />
-      <TooltipIconButton
-        icon="plug"
-        label="Connect Claude Code"
-        data-testid="memory-connect"
-        @click="connectOpen = true"
-      />
     </div>
     <div class="flex shrink-0 flex-col gap-1 border-b border-border px-1.5 py-1">
       <InputGroup>
@@ -91,7 +87,11 @@ const historyToggleId = useId();
         <Switch :id="historyToggleId" v-model="includeHistory" data-testid="memory-include-history" />
         <Label :for="historyToggleId">Include history</Label>
       </div>
-      <SemanticStatus />
+      <MemorySetupHint
+        v-if="semanticNeedsSetup"
+        :message="semanticState === 'notInstalled' ? 'Semantic search is off.' : 'Semantic search unavailable.'"
+        data-testid="memory-setup-hint-semantic"
+      />
       <ImportStatus />
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto" data-testid="memory-results">
@@ -105,7 +105,12 @@ const historyToggleId = useId();
         <EmptyTitle class="text-kira-md font-normal text-muted-foreground">
           {{ query.trim() === '' ? 'No memories yet' : 'No matching memories' }}
         </EmptyTitle>
-        <EmptyDescription>Add one, or let Claude Code store them.</EmptyDescription>
+        <EmptyDescription v-if="query.trim() !== ''">Add one, or let Claude Code store them.</EmptyDescription>
+        <MemorySetupHint
+          v-else
+          message="Connect Claude Code in Settings to let it store memories."
+          data-testid="memory-setup-hint-claude"
+        />
       </Empty>
       <div v-else class="flex flex-col">
         <button
@@ -129,6 +134,5 @@ const historyToggleId = useId();
     </div>
     <AddMemoryDialog v-if="addOpen" @close="addOpen = false" />
     <ImportConfirmDialog v-if="imports.confirmJobId" @close="imports.confirmJobId = null" />
-    <ConnectClaudeDialog v-if="connectOpen" @close="connectOpen = false" />
   </div>
 </template>

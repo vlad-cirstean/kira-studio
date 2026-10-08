@@ -13,6 +13,7 @@ export const sections = [
   'Connected editors',
   'Mobile access',
   'Claude Code',
+  'Memory',
   'Advanced',
 ] as const;
 export type Section = (typeof sections)[number];

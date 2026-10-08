@@ -72,6 +72,8 @@ export interface MemoryControl {
 
 export interface MemoryModuleContext {
   control: MemoryControl;
+  /** Opens the host's settings at its memory setup section. */
+  openSettings(): void;
 }
 
 export const memoryModuleKey: InjectionKey<MemoryModuleContext> = Symbol('memoryModule');

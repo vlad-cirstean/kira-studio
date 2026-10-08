@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { Progress } from '@theme/components/ui/progress';
 import { computed, ref } from 'vue';
-import { useDictationStatus, useInstallDictationModel, useRetryDictation } from '../queries';
+import { useMemoryModule } from '../module';
+import { useDictationStatus } from '../queries';
 import { useDictation } from './useDictation';
 
-// P216: the dictation mic for one text input. Hidden when the host cannot dictate; otherwise a
-// download prompt, progress, a failure with retry, or the record toggle. Live text lands in `model`.
+// P216: the dictation mic for one text input. Hidden when the host cannot dictate; otherwise the
+// record toggle, or a popover pointing to Settings while the model is not ready (P221). Live text lands in `model`.
 const props = defineProps<{
   /** Names the input in the dictation store; unique per mounted input. */
   targetId: string;
@@ -21,16 +20,11 @@ const model = defineModel<string>({ required: true });
 const MB = 1024 * 1024;
 
 const status = useDictationStatus();
-const install = useInstallDictationModel();
-const retry = useRetryDictation();
+const { openSettings } = useMemoryModule();
 const dictation = useDictation({ id: props.targetId, model, input: props.input, maxLength: props.maxLength });
 
 const data = computed(() => status.data.value);
 const state = computed(() => data.value?.state ?? 'off');
-const percent = computed(() => {
-  const d = data.value;
-  return d && d.total > 0 ? Math.min(100, (d.done / d.total) * 100) : 0;
-});
 const popoverOpen = ref(false);
 const busyPhase = computed(() => dictation.mine.value && ['starting', 'finishing'].includes(dictation.phase.value));
 const label = computed(() => (dictation.recording.value ? 'Stop dictation' : 'Start dictation'));
@@ -39,13 +33,9 @@ const icon = computed(() => {
   return dictation.recording.value ? 'mic-filled' : 'mic';
 });
 
-let abort: AbortController | null = null;
-function download(): void {
-  abort = new AbortController();
-  install.mutate(abort.signal);
-}
-function cancelDownload(): void {
-  abort?.abort();
+function goToSettings(): void {
+  popoverOpen.value = false;
+  openSettings();
 }
 function onClick(): void {
   if (state.value === 'ready') dictation.toggle();
@@ -76,33 +66,16 @@ function onClick(): void {
       </span>
     </PopoverAnchor>
     <PopoverContent v-if="state !== 'ready'" class="w-64" data-testid="dictation-popover">
-      <template v-if="state === 'notInstalled'">
-        <p class="m-0">Dictation runs a local speech model: 182 MB download, about 340 MB RAM while in use.</p>
-        <p v-if="install.isError.value" class="m-0 text-error" data-testid="dictation-error">
-          {{ install.error.value?.message }}
-        </p>
-        <Button size="xs" variant="outline" class="self-start" data-testid="dictation-download" @click="download">
-          {{ install.isError.value ? 'Retry download' : 'Download model' }}
-        </Button>
-      </template>
-      <template v-else-if="state === 'downloading' && data">
-        <span data-testid="dictation-progress-label">
-          Downloading {{ (data.done / MB).toFixed(0) }} / {{ (data.total / MB).toFixed(0) }} MB
-        </span>
-        <Progress :model-value="percent" />
-        <Button size="xs" variant="outline" class="self-start" data-testid="dictation-cancel-download" @click="cancelDownload">
-          Cancel
-        </Button>
-      </template>
-      <template v-else-if="state === 'unavailable'">
-        <p class="m-0 text-error" data-testid="dictation-unavailable">
-          Dictation unavailable: {{ data?.message }}
-        </p>
-        <Button size="xs" variant="outline" class="self-start" data-testid="dictation-retry" @click="retry.mutate()">
-          <CodiconIcon name="refresh" :size="12" />
-          Retry
-        </Button>
-      </template>
+      <p v-if="state === 'notInstalled'" class="m-0">Dictation needs a local speech model.</p>
+      <p v-else-if="state === 'downloading' && data" class="m-0" data-testid="dictation-progress-label">
+        Downloading the speech model: {{ (data.done / MB).toFixed(0) }} / {{ (data.total / MB).toFixed(0) }} MB
+      </p>
+      <p v-else-if="state === 'unavailable'" class="m-0 text-error" data-testid="dictation-unavailable">
+        Dictation unavailable: {{ data?.message }}
+      </p>
+      <Button size="xs" variant="link" class="h-auto self-start p-0" data-testid="dictation-open-settings" @click="goToSettings">
+        Open Settings
+      </Button>
     </PopoverContent>
   </Popover>
 </template>
