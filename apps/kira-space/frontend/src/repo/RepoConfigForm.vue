@@ -71,21 +71,29 @@ const source = computed(() =>
   props.repo.source === 'added' ? 'added individually' : `imported from ${props.repo.source}`,
 );
 const envError = ref('');
-async function writeEnvs(envs: Environment[]): Promise<void> {
-  envError.value = '';
-  try {
-    await write({ environments: envs });
-  } catch (err) {
-    envError.value = err instanceof Error ? err.message : String(err);
-    throw err;
-  }
+// Environment writes send the whole list, so they run one at a time and build it when they run,
+// after the previous write updated props.repo.
+let envWrite: Promise<void> = Promise.resolve();
+function writeEnvs(build: (current: Environment[]) => Environment[]): Promise<void> {
+  const run = async (): Promise<void> => {
+    envError.value = '';
+    try {
+      await write({ environments: build(props.repo.environments) });
+    } catch (err) {
+      envError.value = err instanceof Error ? err.message : String(err);
+      throw err;
+    }
+  };
+  const result = envWrite.then(run);
+  envWrite = result.catch(() => {});
+  return result;
 }
 function saveEnv(i: number, env: Environment): Promise<void> {
-  return writeEnvs(props.repo.environments.map((e, k) => (k === i ? env : e)));
+  return writeEnvs((cur) => cur.map((e, k) => (k === i ? env : e)));
 }
 
 // Rows are keyed by a client id that follows the env through add and remove, so a row's uncommitted
-// text stays with it. Writes send the whole list, so Add and Remove wait for the one in flight.
+// text stays with it.
 // A new environment starts as a local draft and is written once name and command are both filled;
 // the draft keeps its key until the persisted list shows it, so the row keeps its DOM.
 interface EnvDraft extends Environment {
@@ -111,7 +119,7 @@ function resetKeys(): void {
 }
 function removeEnv(i: number): void {
   keys.value.splice(i, 1);
-  writeEnvs(props.repo.environments.filter((_, k) => k !== i)).catch(resetKeys);
+  writeEnvs((cur) => cur.filter((_, k) => k !== i)).catch(resetKeys);
 }
 function addEnv(): void {
   drafts.value.push({ key: crypto.randomUUID(), name: '', deployedShaScript: '', writing: false });
@@ -129,7 +137,7 @@ async function saveDraft(key: string, env: Environment): Promise<void> {
   if (!name || !deployedShaScript) return;
   d.writing = true;
   try {
-    await writeEnvs([...props.repo.environments, { name, deployedShaScript }]);
+    await writeEnvs((cur) => [...cur, { name, deployedShaScript }]);
   } catch (err) {
     d.writing = false;
     throw err;
