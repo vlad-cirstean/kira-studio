@@ -12,7 +12,7 @@ import type {
 } from './wire';
 
 /** Repo facts a read-only client needs: names only, never paths or scripts. */
-export type RepoName = Pick<Repo, 'codeRepoId' | 'name' | 'nickname'>;
+type RepoName = Pick<Repo, 'codeRepoId' | 'name' | 'nickname'>;
 
 /** The ADE read surface, independent of transport: Wails bindings on the desktop, HTTP on the
  *  phone. Read hooks go through it; writes stay on the desktop `control`. */
