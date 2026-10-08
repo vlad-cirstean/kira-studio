@@ -8,8 +8,6 @@ import type { ControlSnapshot } from './support/types';
 // P216: memory dictation against a mocked bridge and a mocked `dictation` stream — the mic button
 // states, live text, caret insertion, stop, error lines. No microphone or model involved.
 
-const MB = 1024 * 1024;
-
 function status(state: string, over: Record<string, unknown> = {}): ControlSnapshot {
   return {
     channel: IPC.dictationStatus,
@@ -43,57 +41,32 @@ test('status off hides the mic button', async ({ relaunch }) => {
   await expect(page.locator('[data-testid^="dictation-mic-"]')).toHaveCount(0);
 });
 
-test('not installed: prompt names the size; a failed download offers retry', async ({
+test('not installed: the mic popover points to Settings > Memory', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [...BASE, status('notInstalled')] });
+  await openMemory(page);
+  await page.locator('[data-testid="dictation-mic-memory-search"]').click();
+  await expect(page.locator('[data-testid="dictation-popover"]')).toBeVisible();
+  await expect(page.locator('[data-testid="dictation-download"]')).toHaveCount(0);
+  await page.locator('[data-testid="dictation-open-settings"]').click();
+  await expect(page.locator('[data-testid="dictation-download"]')).toBeVisible();
+});
+
+test('not installed: Settings opened from the Add dialog stays interactive', async ({
   relaunch,
 }) => {
-  const { window: page } = await relaunch({
-    control: [
-      ...BASE,
-      status('notInstalled'),
-      {
-        channel: IPC.dictationInstall,
-        error: { code: 'checksum', message: 'model: checksum mismatch' },
-      },
-    ],
-  });
-  await openMemory(page);
-  await openAdd(page);
-  await page.locator('[data-testid="dictation-mic-add-memory"]').click();
-  await expect(page.locator('[data-testid="dictation-popover"]')).toContainText('182 MB');
-  await page.locator('[data-testid="dictation-download"]').click();
-  await expect(page.locator('[data-testid="dictation-error"]')).toContainText('checksum');
-  await expect(page.locator('[data-testid="dictation-download"]')).toHaveText('Retry download');
-});
-
-test('downloading shows progress and a cancel button', async ({ relaunch }) => {
-  const { window: page } = await relaunch({
-    control: [...BASE, status('downloading', { done: 95 * MB, total: 182 * MB })],
-  });
-  await openMemory(page);
-  await openAdd(page);
-  await page.locator('[data-testid="dictation-mic-add-memory"]').click();
-  await expect(page.locator('[data-testid="dictation-progress-label"]')).toContainText(
-    '95 / 182 MB',
-  );
-  await expect(page.locator('[data-testid="dictation-cancel-download"]')).toBeVisible();
-});
-
-test('unavailable shows the reason and a retry', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({
     control: [
       ...BASE,
-      status('unavailable', { message: 'worker exited' }),
-      { channel: IPC.dictationRetry, response: undefined },
+      status('notInstalled'),
+      { channel: IPC.dictationInstall, response: undefined },
     ],
   });
   await openMemory(page);
   await openAdd(page);
   await page.locator('[data-testid="dictation-mic-add-memory"]').click();
-  await expect(page.locator('[data-testid="dictation-unavailable"]')).toContainText(
-    'worker exited',
-  );
-  await page.locator('[data-testid="dictation-retry"]').click();
-  await expect.poll(() => control.log().some((e) => e.channel === IPC.dictationRetry)).toBe(true);
+  await page.locator('[data-testid="dictation-open-settings"]').click();
+  await page.locator('[data-testid="dictation-download"]').click();
+  await expect.poll(() => control.log().some((e) => e.channel === IPC.dictationInstall)).toBe(true);
 });
 
 test('listening: live text fills the textarea; Add is never auto-clicked', async ({ relaunch }) => {

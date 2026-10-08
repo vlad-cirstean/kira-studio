@@ -211,33 +211,21 @@ test('Add memory: free text, a challenge shows questions, resubmit sends clarifi
   await expect(dialog).toHaveCount(0);
 });
 
-test('Connect Claude Code shows the registration command', async ({ relaunch }) => {
-  const command =
-    "claude mcp remove --scope user 'kira-memory' 2>/dev/null; claude mcp add-json --scope user 'kira-memory' '{}'";
+test('module hosts no setup; hints open Settings > Memory', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     control: [
-      ...BASE,
+      { channel: IPC.memoryRecent, response: [] },
       {
-        channel: IPC.memoryMcpStatus,
-        response: {
-          command,
-          executable: '/Applications/Kira Space',
-          claudeAvailable: true,
-          probed: [],
-        },
-      },
-      {
-        channel: IPC.memoryMcpInstall,
-        response: { outcome: 'installed', detail: '', probed: [] },
+        channel: IPC.memorySemanticStatus,
+        response: { state: 'notInstalled', message: '', model: '', done: 0, total: 0 },
       },
     ],
   });
   await openMemory(page);
 
-  await page.locator('[data-testid="memory-connect"]').click();
-  await expect(page.locator('[data-testid="memory-mcp-command"]')).toContainText('kira-memory');
-  await page.locator('[data-testid="memory-mcp-install"]').click();
-  await expect(page.locator('[data-testid="memory-mcp-install-outcome"]')).toContainText(
-    'Registered',
-  );
+  await expect(page.locator('[data-testid="memory-connect"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="memory-setup-hint-semantic"]')).toBeVisible();
+  await expect(page.locator('[data-testid="memory-setup-hint-claude"]')).toBeVisible();
+  await page.locator('[data-testid="memory-open-settings"]').first().click();
+  await expect(page.locator('[data-testid="memory-semantic"]')).toBeVisible();
 });
