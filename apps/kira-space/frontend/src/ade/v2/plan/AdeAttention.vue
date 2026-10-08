@@ -3,7 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import AdeTip from '../AdeTip.vue';
 import type { NeedsItem } from '../board/needsYou';
 import { useNeedsAction } from '../needs/useNeedsAction';
-import { solidStyle, TONE } from '../tones';
+import { TONE_SOLID_CLASS } from '../tones';
 
 // The `!` circle: something here needs you. Click does the item's action: Take over a stuck run,
 // open the waiting session.
@@ -21,8 +21,8 @@ function onClick(): void {
       type="button"
       variant="ghost"
       aria-label="Needs you"
-      class="size-4.5 cursor-pointer rounded-full border-0 p-0 text-kira-sm font-extrabold"
-      :style="{ ...solidStyle('amber'), boxShadow: `0 0 0 3px ${TONE.amber[0]}` }"
+      class="size-4.5 cursor-pointer rounded-full border-0 p-0 text-kira-sm font-extrabold shadow-[0_0_0_3px_var(--color-tone-amber-tint)]"
+      :class="TONE_SOLID_CLASS.amber"
       :disabled="busy"
       data-testid="ade-attention"
       @click.stop="onClick"

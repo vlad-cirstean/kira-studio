@@ -3,7 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { type BranchAction, type Tone, tagLabel } from '../board/actions';
-import { actionStyle, solidStyle, tagStyle } from '../tones';
+import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS } from '../tones';
 import { usePlanModel } from './usePlanModel';
 
 // One cell of the left action column: the derived tag and, for a branch, its action buttons.
@@ -18,12 +18,12 @@ const { liveNow } = usePlanModel();
 const label = computed(() => tagLabel(props.tag, liveNow.value.getTime()));
 const emit = defineEmits<{ act: [action: BranchAction] }>();
 
-const STYLE: Record<BranchAction['kind'], () => Record<string, string>> = {
-  forcePush: () => solidStyle('amber'),
-  rebase: () => solidStyle('amber'),
-  queueAfter: () => solidStyle('red'),
-  seeError: () => solidStyle('red'),
-  start: () => actionStyle('claude'),
+const ACTION_BTN_CLASS: Record<BranchAction['kind'], string> = {
+  forcePush: TONE_SOLID_CLASS.amber,
+  rebase: TONE_SOLID_CLASS.amber,
+  queueAfter: TONE_SOLID_CLASS.red,
+  seeError: TONE_SOLID_CLASS.red,
+  start: ACTION_CLASS.claude,
 };
 const TESTID: Record<BranchAction['kind'], string> = {
   forcePush: 'ade-force-push',
@@ -43,7 +43,7 @@ const TESTID: Record<BranchAction['kind'], string> = {
     <AdeTip :text="tag.tip">
       <span
         class="box-border max-w-30 shrink truncate rounded-kira-sm px-1.5 py-0.5 text-kira-sm font-semibold"
-        :style="tagStyle(tag.tone)"
+        :class="TONE_TAG_CLASS[tag.tone]"
         data-testid="ade-tag"
         >{{ label }}</span
       >
@@ -52,7 +52,7 @@ const TESTID: Record<BranchAction['kind'], string> = {
       <Button
         size="kira-lg"
         class="shrink-0 font-semibold"
-        :style="STYLE[a.kind]()"
+        :class="ACTION_BTN_CLASS[a.kind]"
         :disabled="a.kind === 'rebase' && rebasing"
         :data-testid="TESTID[a.kind]"
         @click.stop="emit('act', a)"

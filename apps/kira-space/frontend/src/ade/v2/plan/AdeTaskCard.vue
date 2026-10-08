@@ -6,7 +6,7 @@ import type { BranchAction } from '../board/actions';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
-import { TONE, TONE_INK } from '../tones';
+import { TONE_SOLID_CLASS, TONE_TAG_CLASS } from '../tones';
 import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
 import AdeBranchRow from './AdeBranchRow.vue';
@@ -34,38 +34,33 @@ function act(row: BranchRowModel, a: BranchAction): void {
 }
 
 const p = computed(() => props.card.progress);
-const segColor = (state: string): string => {
-  if (state === 'done') return TONE.green[2];
-  if (state === 'todo') return 'var(--kira-border-strong)';
-  if (state === 'skipped') return 'var(--kira-border)';
-  return p.value.bad ? TONE.red[2] : TONE.amber[2];
+const segClass = (state: string): string => {
+  if (state === 'done') return 'bg-tone-green-solid';
+  if (state === 'todo') return 'bg-border-strong';
+  if (state === 'skipped') return 'bg-border';
+  return p.value.bad ? 'bg-tone-red-solid' : 'bg-tone-amber-solid';
 };
-const labelStyle = computed(() => {
-  if (p.value.finished) return { background: TONE.green[0], color: TONE.green[1] };
-  if (p.value.bad) return { background: TONE.red[2], color: TONE_INK.red };
-  return { background: TONE.amber[0], color: TONE.amber[1] };
+const labelClass = computed(() => {
+  if (p.value.finished) return TONE_TAG_CLASS.green;
+  if (p.value.bad) return TONE_SOLID_CLASS.red;
+  return TONE_TAG_CLASS.amber;
 });
 
-const boxStyle = computed(() => {
+// The left border colour is task data (`card.color`) except on a review card, which wears blue.
+const boxStyle = computed(() => (props.card.review ? undefined : { borderLeftColor: props.card.color }));
+const boxClass = computed(() => {
   const c = props.card;
-  const style: Record<string, string> = {
-    borderLeftColor: c.review ? TONE.blue[2] : c.color,
-  };
-  if (c.allMerged) {
-    style.borderTopColor = style.borderRightColor = style.borderBottomColor = `color-mix(in srgb, ${TONE.purple[2]} 60%, transparent)`;
-  }
-  if (c.parked) {
-    style.background =
-      'repeating-linear-gradient(135deg, var(--kira-bg-elevated) 0 7px, var(--kira-bg-chrome) 7px 14px)';
-  }
-  if (c.ripple && !c.selected) style.outline = `1px dashed ${TONE.amber[2]}`;
-  return style;
+  return [
+    c.parked
+      ? 'border-dashed bg-[repeating-linear-gradient(135deg,var(--kira-bg-elevated)_0_7px,var(--kira-bg-chrome)_7px_14px)]'
+      : '',
+    c.review ? 'cursor-default border-l-tone-blue-solid' : 'cursor-grab',
+    c.allMerged ? 'border-y-tone-purple-solid/60 border-r-tone-purple-solid/60' : '',
+    c.ripple && !c.selected ? 'outline outline-1 outline-dashed outline-tone-amber-solid' : '',
+  ];
 });
 
-const headStyle = computed(() => ({
-  background: props.card.selected ? 'var(--kira-hover)' : `${props.card.color}1c`,
-  borderLeftColor: props.card.selected ? 'var(--kira-focus)' : 'transparent',
-}));
+const headStyle = computed(() => (props.card.selected ? undefined : { background: `${props.card.color}1c` }));
 </script>
 
 <template>
@@ -94,7 +89,7 @@ const headStyle = computed(() => ({
     <div
       :data-task-id="card.task.id"
       class="box-border flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira-pill border border-l-4 border-border-strong bg-elevated shadow-kira"
-      :class="[card.parked ? 'border-dashed' : '', card.review ? 'cursor-default' : 'cursor-grab']"
+      :class="boxClass"
       :style="boxStyle"
       data-testid="ade-card"
       @contextmenu="taskMenu.open"
@@ -103,6 +98,7 @@ const headStyle = computed(() => ({
       <div
         v-if="!card.review"
         class="box-border flex h-17 w-full cursor-pointer flex-col justify-center gap-1 border-b border-l-3 border-b-border px-2.5 py-1.5"
+        :class="card.selected ? 'border-l-focus bg-hover' : 'border-l-transparent'"
         :style="headStyle"
         role="button"
         tabindex="0"
@@ -127,14 +123,13 @@ const headStyle = computed(() => ({
                   v-for="seg in p.segments"
                   :key="seg.id"
                   class="h-1.5 rounded-kira-xs"
-                  :class="seg.wide ? 'w-3.5' : 'w-2.25'"
-                  :style="{ background: segColor(seg.state) }"
+                  :class="[seg.wide ? 'w-3.5' : 'w-2.25', segClass(seg.state)]"
                 />
               </span>
             </AdeTip>
             <span
               class="max-w-37.5 shrink-0 truncate rounded-kira-sm px-1.5 py-px text-kira-sm font-bold"
-              :style="labelStyle"
+              :class="labelClass"
               data-testid="ade-stage-label"
               >{{ p.label }}</span
             >
@@ -143,7 +138,8 @@ const headStyle = computed(() => ({
                 <span class="inline-block h-1.25 w-11.5 overflow-hidden rounded-kira-xs bg-border-strong">
                   <span
                     class="block h-full"
-                    :style="{ width: `${p.percent}%`, background: p.bad ? TONE.red[2] : TONE.amber[2] }"
+                    :class="p.bad ? 'bg-tone-red-solid' : 'bg-tone-amber-solid'"
+                    :style="{ width: `${p.percent}%` }"
                   />
                 </span>
                 <span class="text-kira-sm text-fg">{{ p.percent }}%</span>

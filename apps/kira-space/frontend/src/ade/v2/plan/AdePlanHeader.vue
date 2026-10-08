@@ -3,7 +3,6 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import type { Ripple } from '../board/timeline';
-import { TONE } from '../tones';
 import AdeRepoChip from './AdeRepoChip.vue';
 
 // Sticky top of the Plan: Refresh all, one chip per repo, and the "On merge" line of the selection.
@@ -49,8 +48,7 @@ const emit = defineEmits<{ refreshAll: []; refreshOne: [codeRepoId: string]; tog
       <span v-if="ripple" class="flex items-center gap-1.5 text-kira-sm" data-testid="ade-ripple">
         <span class="text-muted-foreground">On merge</span>
         <span
-          :style="ripple.tone === 'amber' ? { color: TONE.amber[1] } : undefined"
-          :class="ripple.tone === 'amber' ? '' : 'text-subtle'"
+:class="ripple.tone === 'amber' ? 'text-tone-amber' : 'text-subtle'"
           >{{ ripple.text }}</span
         >
       </span>

@@ -9,7 +9,7 @@ import { repoColor } from '../palette';
 import { useOpenReviewWindow } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
-import { TONE } from '../tones';
+import { TONE_TAG_CLASS } from '../tones';
 import AdeAttention from './AdeAttention.vue';
 import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
@@ -86,20 +86,24 @@ const repoStyle = computed(() => {
   return { background: `${c}1f`, color: c };
 });
 const SEG: Record<string, string> = {
-  done: TONE.green[2],
-  running: TONE.amber[2],
-  bad: TONE.red[2],
+  done: 'bg-tone-green-solid',
+  running: 'bg-tone-amber-solid',
+  bad: 'bg-tone-red-solid',
 };
-const segColor = (state: string): string => SEG[state] ?? 'var(--kira-border-strong)';
-const progColor = computed(() => {
+const segClass = (state: string): string => SEG[state] ?? 'bg-border-strong';
+const progClass = computed(() => {
   const tone = props.row.prog?.tone;
-  if (tone === 'red') return TONE.red[1];
-  if (tone === 'green') return TONE.green[1];
-  return tone === 'grey' ? 'var(--kira-fg-muted)' : TONE.amber[1];
+  if (tone === 'red') return 'text-tone-red';
+  if (tone === 'green') return 'text-tone-green';
+  return tone === 'grey' ? 'text-muted-foreground' : 'text-tone-amber';
 });
-const elbowColor = computed(() =>
-  props.row.base?.tone === 'blue' ? TONE.blue[2] : 'var(--kira-border-strong)',
-);
+const elbowClass = computed(() => (props.row.base?.tone === 'blue' ? 'border-tone-blue-solid' : 'border-border-strong'));
+const rowBgClass = computed(() => {
+  if (props.merged) return 'bg-tone-purple-solid/8';
+  return props.row.isReview
+    ? 'bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--kira-info)_8%,transparent)_0_8px,color-mix(in_srgb,var(--kira-info)_3%,transparent)_8px_16px)]'
+    : '';
+});
 </script>
 
 <template>
@@ -107,10 +111,9 @@ const elbowColor = computed(() =>
   <div
     class="box-border flex h-10 w-full cursor-pointer items-center gap-1.5 border-l-3 px-2.5"
     :class="[
-      row.isReview ? 'bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--kira-info)_8%,transparent)_0_8px,color-mix(in_srgb,var(--kira-info)_3%,transparent)_8px_16px)]' : '',
+      rowBgClass,
       selected ? 'border-l-focus' : 'border-l-transparent',
     ]"
-    :style="merged ? { background: `color-mix(in srgb, ${TONE.purple[2]} 8%, transparent)` } : undefined"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"
@@ -126,7 +129,7 @@ const elbowColor = computed(() =>
       <span
         v-if="row.depth"
         class="absolute -top-1 right-0.5 box-border h-4.5 w-2 rounded-bl-kira-sm border-b-2 border-l-2"
-        :style="{ borderColor: elbowColor }"
+        :class="elbowClass"
       />
     </span>
     <span
@@ -138,8 +141,7 @@ const elbowColor = computed(() =>
     <AdeTip v-if="row.base" :text="row.base.tip">
       <span
         class="max-w-27.5 shrink-0 truncate rounded-kira-xs px-1 py-px font-data text-kira-sm font-semibold"
-        :class="row.base.tone === 'blue' ? '' : 'bg-field text-fg'"
-        :style="row.base.tone === 'blue' ? { background: TONE.blue[0], color: TONE.blue[1] } : undefined"
+        :class="row.base.tone === 'blue' ? TONE_TAG_CLASS.blue : 'bg-field text-fg'"
         data-testid="ade-base-marker"
         >{{ row.base.label }}</span
       >
@@ -148,7 +150,7 @@ const elbowColor = computed(() =>
     <AdeTip v-if="row.isReview" text="Someone else's branch: read-only here">
       <span
         class="inline-flex h-5 shrink-0 items-center gap-1 rounded-kira-pill px-2 text-kira-sm font-semibold"
-        :style="{ background: TONE.blue[0], color: TONE.blue[1] }"
+        :class="TONE_TAG_CLASS.blue"
         data-testid="ade-owner-pill"
         >{{ row.branch.owner }}</span
       >
@@ -162,8 +164,7 @@ const elbowColor = computed(() =>
       <AdeTip :text="row.name">
         <span
           class="truncate font-data text-kira-md font-semibold leading-4"
-          :class="row.isReview ? '' : row.draft ? 'italic text-muted-foreground' : 'text-fg'"
-          :style="row.isReview ? { color: TONE.blue[1] } : undefined"
+          :class="row.isReview ? 'text-tone-blue' : row.draft ? 'italic text-muted-foreground' : 'text-fg'"
           data-testid="ade-branch-name"
           >{{ row.name }}</span
         >
@@ -176,10 +177,10 @@ const elbowColor = computed(() =>
                 v-for="(seg, i) in row.prog.segs"
                 :key="i"
                 class="h-1.25 w-1.75 rounded-kira-xs"
-                :style="{ background: segColor(seg) }"
+                :class="segClass(seg)"
               />
             </span>
-            <span class="text-kira-sm font-semibold" :style="{ color: progColor }">{{ row.prog.label }}</span>
+            <span class="text-kira-sm font-semibold" :class="progClass">{{ row.prog.label }}</span>
           </span>
         </AdeTip>
         <span
@@ -192,8 +193,7 @@ const elbowColor = computed(() =>
         <AdeTip v-for="c in row.chips.merged" :key="c.label" :text="c.tip">
           <span
             class="shrink-0 text-kira-sm font-medium"
-            :class="c.tone === 'stale' ? '' : 'text-subtle'"
-            :style="c.tone === 'stale' ? { color: TONE.amber[1] } : undefined"
+            :class="c.tone === 'stale' ? 'text-tone-amber' : 'text-subtle'"
             data-testid="ade-branch-merged"
             >{{ c.label }}</span
           >
@@ -202,8 +202,7 @@ const elbowColor = computed(() =>
         <AdeTip v-for="c in row.chips.deployed" :key="c.label" :text="c.tip">
           <span
             class="shrink-0 text-kira-sm font-medium"
-            :class="c.tone === 'stale' ? '' : 'text-subtle'"
-            :style="c.tone === 'stale' ? { color: TONE.amber[1] } : undefined"
+            :class="c.tone === 'stale' ? 'text-tone-amber' : 'text-subtle'"
             data-testid="ade-branch-deployed"
             >{{ c.label }}</span
           >

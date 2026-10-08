@@ -7,7 +7,6 @@ import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { adeAgoOptions } from '../ago';
 import { repoColor } from '../palette';
-import { TONE } from '../tones';
 
 // One repo of the plan: name toggles its branches on and off, `↻` fetches just this repo.
 const props = defineProps<{
@@ -56,8 +55,7 @@ const nameStyle = computed(() => {
     </AdeTip>
     <span
       class="min-w-0 truncate text-kira-sm"
-      :class="error ? '' : 'text-subtle'"
-      :style="error ? { color: TONE.red[1] } : undefined"
+      :class="error ? 'text-tone-red' : 'text-subtle'"
       data-testid="ade-repo-note"
       >{{ note }}</span
     >

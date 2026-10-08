@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { TONE, TONE_INK } from '../tones';
+import { TONE_SOLID_CLASS } from '../tones';
 import AdeTaskCard from './AdeTaskCard.vue';
 import type { BranchRowModel, CardModel } from './usePlanModel';
 
@@ -58,26 +58,29 @@ const over = computed(() => props.band.overflowTaskIds.length > 0 && !greyed.val
 const accepts = computed(() => !props.band.isPast && !props.band.dayOff);
 const highlight = computed(() => props.dragOver && accepts.value);
 
-const rowBg = computed(() => {
+const rowBgClass = computed(() => {
   if (greyed.value) {
-    return 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--kira-fg) 2%, transparent) 0 6px, transparent 6px 12px)';
+    return 'bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--kira-fg)_2%,transparent)_0_6px,transparent_6px_12px)]';
   }
-  if (overdue.value) return `color-mix(in srgb, ${TONE.amber[2]} 4%, transparent)`;
-  if (props.band.isPast) return 'color-mix(in srgb, var(--kira-fg) 1.5%, transparent)';
-  return 'transparent';
+  if (overdue.value) return 'bg-tone-amber-solid/4';
+  return props.band.isPast ? 'bg-fg/2' : '';
 });
-const rulerBorder = computed(() => {
-  if (props.band.isToday) return TONE.amber[2];
-  return props.band.isPast || greyed.value ? 'var(--kira-border)' : 'var(--kira-border-strong)';
+const rulerBorderClass = computed(() => {
+  if (props.band.isToday) return 'border-r-tone-amber-solid';
+  return props.band.isPast || greyed.value ? 'border-r-border' : 'border-r-border-strong';
 });
-const labelColor = computed(() => {
-  if (greyed.value) return 'var(--kira-fg-disabled)';
-  if (overdue.value) return TONE.amber[1];
-  return empty.value || props.band.isPast ? 'var(--kira-fg-subtle)' : 'var(--kira-fg)';
+const dotClass = computed(() => {
+  if (props.band.isToday) return 'border-tone-amber-solid bg-tone-amber-solid';
+  return props.band.isPast || greyed.value ? 'border-border bg-bg' : 'border-border-strong bg-bg';
 });
-const subColor = computed(() => {
-  if (greyed.value) return 'var(--kira-fg-disabled)';
-  return props.band.overflowHours > 0 && !props.band.isLater ? TONE.red[1] : 'var(--kira-fg-muted)';
+const labelClass = computed(() => {
+  if (greyed.value) return 'text-disabled';
+  if (overdue.value) return 'text-tone-amber';
+  return empty.value || props.band.isPast ? 'text-subtle' : 'text-fg';
+});
+const subClass = computed(() => {
+  if (greyed.value) return 'text-disabled';
+  return props.band.overflowHours > 0 && !props.band.isLater ? 'text-tone-red' : 'text-muted-foreground';
 });
 const sub = computed(() => {
   if (props.band.dayOff) return 'off';
@@ -92,8 +95,7 @@ const solidBorder = computed(
   <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the band holds nested interactive rows. -->
   <div
     class="flex border-t"
-    :class="solidBorder ? 'border-t-border-strong' : 'border-dashed border-t-border'"
-    :style="{ background: rowBg }"
+    :class="[solidBorder ? 'border-t-border-strong' : 'border-dashed border-t-border', rowBgClass]"
     data-testid="ade-day-band"
     data-ade-band
     :data-ade-day="band.key"
@@ -101,34 +103,27 @@ const solidBorder = computed(
   >
     <div
       class="relative box-border w-15 shrink-0 border-r-2 text-right"
-      :class="empty ? 'px-2.5 py-0.5 pl-0' : 'py-1.5 pl-0 pr-2.5'"
-      :style="{ borderRightColor: rulerBorder }"
+      :class="[empty ? 'px-2.5 py-0.5 pl-0' : 'py-1.5 pl-0 pr-2.5', rulerBorderClass]"
     >
       <span
         class="absolute box-border rounded-full border-2"
-        :class="empty ? '-right-1 top-1.5 size-1.5' : '-right-1.5 top-2.5 size-2.5'"
-        :style="{
-          background: band.isToday ? TONE.amber[2] : 'var(--kira-bg)',
-          borderColor: band.isToday ? TONE.amber[2] : rulerBorder,
-        }"
+        :class="[empty ? '-right-1 top-1.5 size-1.5' : '-right-1.5 top-2.5 size-2.5', dotClass]"
       />
       <div
         class="whitespace-nowrap"
-        :class="[empty ? 'text-kira-sm font-medium' : 'text-kira-md font-semibold', band.dayOff ? 'line-through' : '']"
-        :style="{ color: labelColor }"
+        :class="[empty ? 'text-kira-sm font-medium' : 'text-kira-md font-semibold', band.dayOff ? 'line-through' : '', labelClass]"
         data-testid="ade-band-label"
       >
         {{ band.label }}
       </div>
-      <div class="text-kira-sm" :style="{ color: subColor }">{{ sub }}</div>
+      <div class="text-kira-sm" :class="subClass">{{ sub }}</div>
     </div>
     <div
       class="box-border flex min-w-0 flex-1 flex-col gap-2.5 rounded-kira"
       :class="[
         empty ? (greyed ? 'min-h-4' : 'min-h-control') : 'pb-2.5 pl-2 pt-2',
-        highlight ? 'outline outline-1 outline-dashed outline-focus' : '',
+        highlight ? 'outline outline-1 outline-dashed outline-focus bg-focus/10' : '',
       ]"
-      :style="highlight ? { background: 'color-mix(in srgb, var(--kira-focus) 10%, transparent)' } : undefined"
       ref="dropEl"
       data-testid="ade-band-drop"
     >
@@ -136,40 +131,37 @@ const solidBorder = computed(
         v-for="h in history"
         :key="h.key"
         variant="ghost"
-        class="ml-54.5 h-row w-auto justify-start gap-2 px-2.5 font-normal text-muted-foreground"
-        :style="{ background: `color-mix(in srgb, ${TONE.purple[2]} 6%, transparent)` }"
+        class="ml-54.5 h-row w-auto justify-start gap-2 bg-tone-purple-solid/6 px-2.5 font-normal text-muted-foreground"
         :data-selected="ui.selectedTaskId === h.key || undefined"
         data-testid="ade-history-row"
         @click="ui.select(h.key)"
       >
-        <span class="font-bold" :style="{ color: TONE.purple[1] }">✓</span>
-        <span class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE.purple[1] }">{{ h.how }}</span>
+        <span class="font-bold text-tone-purple">✓</span>
+        <span class="shrink-0 whitespace-nowrap text-kira-sm text-tone-purple">{{ h.how }}</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{ h.repos }}</span>
         <span class="min-w-0 truncate font-semibold text-fg">{{ h.title }}</span>
       </Button>
       <div
         v-if="overdue"
-        class="flex items-center gap-2 pl-54.5 text-kira-sm"
-        :style="{ color: TONE.amber[1] }"
+        class="flex items-center gap-2 pl-54.5 text-kira-sm text-tone-amber"
       >
         <span>{{ overdueNote }}</span>
         <Button
           size="kira"
           class="font-semibold"
-          :style="{ background: TONE.amber[2], color: TONE_INK.amber }"
+          :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-band-rollover"
           @click="emit('rollover')"
         >
           Move to today
         </Button>
       </div>
-      <div v-if="over" class="flex items-center gap-2 pl-54.5 text-kira-sm" :style="{ color: TONE.red[1] }">
+      <div v-if="over" class="flex items-center gap-2 pl-54.5 text-kira-sm text-tone-red">
         <span>{{ overflowNote }}</span>
         <Button
           variant="dialog"
           size="kira"
-          class="max-w-90 truncate bg-transparent font-semibold"
-          :style="{ borderColor: TONE.red[2], color: TONE.red[1] }"
+          class="max-w-90 truncate border-tone-red-solid bg-transparent font-semibold text-tone-red"
           data-testid="ade-band-overflow-move"
           @click="emit('overflowMove')"
         >
@@ -196,8 +188,7 @@ const solidBorder = computed(
         <span class="text-subtle">↳</span>
         <span
           class="shrink-0 whitespace-nowrap text-kira-sm"
-          :class="s.merges ? '' : 'text-subtle'"
-          :style="s.merges ? { color: TONE.amber[1] } : undefined"
+          :class="s.merges ? 'text-tone-amber' : 'text-subtle'"
           >{{ s.note }}</span
         >
         <span class="min-w-0 truncate font-semibold text-fg">{{ s.title }}</span>
