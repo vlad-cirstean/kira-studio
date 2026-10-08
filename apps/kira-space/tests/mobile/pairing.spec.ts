@@ -60,6 +60,9 @@ test('a revoked device returns to the pairing screen', async ({ page, app, serve
   server.state.auth = 'ok';
   await app();
   await expect(page.locator(t('app-shell'))).toBeVisible();
+  // Settled: the first reads and the event stream are done, so no background request meets the revoke.
+  await expect(page.locator(t('connection-dot'))).toHaveAttribute('title', 'live');
+  await page.waitForLoadState('networkidle');
   server.state.auth = 'revoked';
   await page.locator(t('refresh')).click();
   await expect(page.locator(t('pair-screen'))).toBeVisible();
