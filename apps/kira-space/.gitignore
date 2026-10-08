@@ -4,4 +4,5 @@ frontend/dist
 frontend/bindings
 frontend/node_modules
 build/onnxruntime
+build/whisper
 frontend/dist-mobile

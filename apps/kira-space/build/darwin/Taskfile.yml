@@ -10,13 +10,18 @@ tasks:
     preconditions:
       - sh: '[ "$(uname -s)" = Darwin ]'
         msg: "Kira Space builds on macOS only — see docs/PACKAGING.md."
+    # P216: every darwin build links the static whisper.cpp libs, so the `whisper` tag is always on.
+    deps:
+      - task: fetch:whisper
+        vars:
+          ARCH: '{{.ARCH}}'
     cmds:
       - task: build:native
         vars:
           ARCH: '{{.ARCH}}'
           DEV: '{{.DEV}}'
           OUTPUT: '{{.OUTPUT}}'
-          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
+          EXTRA_TAGS: 'whisper{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}}'
           OBFUSCATED: '{{.OBFUSCATED}}'
           GARBLE_ARGS: '{{.GARBLE_ARGS}}'
     vars:
@@ -53,8 +58,8 @@ tasks:
       GOOS: darwin
       CGO_ENABLED: 1
       GOARCH: '{{.ARCH | default ARCH}}'
-      CGO_CFLAGS: "-mmacosx-version-min=14.0"
-      CGO_LDFLAGS: "-mmacosx-version-min=14.0"
+      CGO_CFLAGS: "-mmacosx-version-min=14.0 -I{{.ROOT_DIR}}/build/whisper/darwin-{{.ARCH | default ARCH}}/include"
+      CGO_LDFLAGS: "-mmacosx-version-min=14.0 -L{{.ROOT_DIR}}/build/whisper/darwin-{{.ARCH | default ARCH}}/lib"
       MACOSX_DEPLOYMENT_TARGET: "14.0"
 
   build:universal:
@@ -106,6 +111,11 @@ tasks:
     summary: Downloads the pinned ONNX Runtime dylib for local memory embeddings (checksum-verified)
     cmds:
       - sh ../../scripts/fetch-onnxruntime.sh osx-arm64
+
+  fetch:whisper:
+    summary: Builds the pinned whisper.cpp static libs for one darwin arch (P216)
+    cmds:
+      - sh ../../scripts/fetch-whisper.sh darwin-{{.ARCH | default ARCH}}
 
   package:dmg:
     summary: Packages the application into a styled `.dmg`

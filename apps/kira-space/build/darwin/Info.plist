@@ -20,6 +20,8 @@
 		<string>0.0.0</string>
 		<key>LSMinimumSystemVersion</key>
 		<string>14.0.0</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Kira Space listens to the microphone only while you dictate a memory. Speech is transcribed on this Mac.</string>
 		<key>NSHighResolutionCapable</key>
 		<string>true</string>
 		<key>NSHumanReadableCopyright</key>
