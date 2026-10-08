@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kirathecat/kira-studio/internal/appevent"
@@ -28,15 +29,20 @@ type execSession struct {
 type execRegistry struct {
 	mu       sync.Mutex
 	sessions map[string]*execSession
-	pending  map[string]string // terminalId -> windowKey while ExecOpen is still dialling
+	pending  map[string]pendingExec // terminalId -> opening exec, while ExecOpen is still dialling
+}
+
+type pendingExec struct {
+	windowKey string
+	cancel    context.CancelFunc
 }
 
 func newExecRegistry() *execRegistry {
-	return &execRegistry{sessions: map[string]*execSession{}, pending: map[string]string{}}
+	return &execRegistry{sessions: map[string]*execSession{}, pending: map[string]pendingExec{}}
 }
 
 // reserve claims id; false when it is already live or opening.
-func (r *execRegistry) reserve(id, windowKey string) bool {
+func (r *execRegistry) reserve(id, windowKey string, cancel context.CancelFunc) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.sessions[id]; ok {
@@ -45,7 +51,7 @@ func (r *execRegistry) reserve(id, windowKey string) bool {
 	if _, ok := r.pending[id]; ok {
 		return false
 	}
-	r.pending[id] = windowKey
+	r.pending[id] = pendingExec{windowKey: windowKey, cancel: cancel}
 	return true
 }
 
@@ -53,7 +59,7 @@ func (r *execRegistry) reserve(id, windowKey string) bool {
 func (r *execRegistry) register(id string, s *execSession) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.pending[id] != s.windowKey {
+	if p, ok := r.pending[id]; !ok || p.windowKey != s.windowKey {
 		return false
 	}
 	delete(r.pending, id)
@@ -89,8 +95,9 @@ func (s *execSession) close() {
 func (r *execRegistry) closeWindow(windowKey string) {
 	r.mu.Lock()
 	var doomed []*execSession
-	for id, key := range r.pending {
-		if key == windowKey {
+	for id, p := range r.pending {
+		if p.windowKey == windowKey {
+			p.cancel()
 			delete(r.pending, id)
 		}
 	}
@@ -147,29 +154,47 @@ func (m *Manager) execOpen(args ExecOpenArgs) (ExecOpenResult, error) {
 	if !terminal.ValidDim(args.Cols) || !terminal.ValidDim(args.Rows) {
 		return ExecOpenResult{}, ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
 	}
-	if !m.execs.reserve(args.TerminalID, args.WindowKey) {
+	ctx, cancel := context.WithCancel(context.Background())
+	if !m.execs.reserve(args.TerminalID, args.WindowKey, cancel) {
+		cancel()
 		return ExecOpenResult{}, ipcerr.New("E_INVALID", "terminalId is already open")
 	}
 	defer m.execs.release(args.TerminalID)
 
 	cli, ep, err := m.client()
 	if err != nil {
+		cancel()
 		return ExecOpenResult{}, m.mapErr(ep, err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	// The hijacked stream outlives the dial, so the bound is a timer on the session context.
+	var timedOut atomic.Bool
+	dialTimer := time.AfterFunc(callTimeout, func() {
+		timedOut.Store(true)
+		cancel()
+	})
+	fail := func(err error) (ExecOpenResult, error) {
+		dialTimer.Stop()
+		cancel()
+		if timedOut.Load() {
+			err = context.DeadlineExceeded
+		}
+		return ExecOpenResult{}, m.mapErr(ep, err)
+	}
 	size := client.ConsoleSize{Height: uint(args.Rows), Width: uint(args.Cols)}
 	created, err := cli.ExecCreate(ctx, args.ContainerID, client.ExecCreateOptions{
 		TTY: true, AttachStdin: true, AttachStdout: true, AttachStderr: true, ConsoleSize: size,
 		Cmd: []string{"/bin/sh", "-c", execShell},
 	})
 	if err != nil {
-		cancel()
-		return ExecOpenResult{}, m.mapErr(ep, err)
+		return fail(err)
 	}
 	att, err := cli.ExecAttach(ctx, created.ID, client.ExecAttachOptions{TTY: true, ConsoleSize: size})
 	if err != nil {
-		cancel()
-		return ExecOpenResult{}, m.mapErr(ep, err)
+		return fail(err)
+	}
+	if !dialTimer.Stop() {
+		att.Close()
+		return fail(context.DeadlineExceeded)
 	}
 	sess := &execSession{windowKey: args.WindowKey, execID: created.ID, conn: att.HijackedResponse, cancel: cancel}
 	if !m.execs.register(args.TerminalID, sess) {
