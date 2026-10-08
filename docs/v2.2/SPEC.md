@@ -1,13 +1,13 @@
 # v2.2 SPEC
 
-Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same subsystem). Stream B: P212.
+Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same subsystem). Stream B: P212. Stream C: P213 (user override of the 2-stream cap).
 
 | Phase | Title | Status |
 |---|---|---|
 | P210 | Memory embedding search: local embedding model (best quality under 500 MB RAM, less if possible), vectors in SQLite, hybrid with existing FTS recall-first search | Not started |
 | P211 | Memory bulk import: pick file or folder; chunk to a Sonnet-friendly size; per-chunk clean-context agent extracts atomic facts; one final agent holding all chunk facts of the file adds memories through the MCP; progress and failure shown | Not started |
 | P212 | Mobile agents web: local web server in Kira Space serving a read-only mobile-laid-out Vue agents module; first-load device approval in Kira Space like the git extension pairing; installable PWA | Not started |
-| P213 | Requirements audit: verify every P210–P212 requirement is implemented | Not started |
+| P213 | Tailwind audit (user-requested, runs now on stream C as an exception to row order): replace hand-written CSS with Tailwind utilities across both apps and shared packages, including partial matches; skips files owned by P210–P212 | Not started |
 | P214 | Code review (one Opus round) and fixes | Not started |
 
 ## Requirements (user's words, condensed)
