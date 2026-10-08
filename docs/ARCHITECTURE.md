@@ -4203,7 +4203,7 @@ replies and full terminal attach for Claude Code sessions.
   rows carry the model id and search filters on it. Writing a vector never bumps `memory_revision`. The
   model is Snowflake arctic-embed-s int8 ONNX (Apache-2.0, 33M params, 384 dims, CLS pooling, query
   prefix, pinned HF revision `e596f50`, id `arctic-embed-s-int8-e596f50`), embedding the `fact` text
-  only. Files (`model.onnx` 34 MB, `tokenizer.json`) download on an explicit click in the Memory module
+  only. Files (`model.onnx` 34 MB, `tokenizer.json`) download on an explicit click in Settings > Memory
   to `$KIRA_MEMORY_HOME/models/<id>/` with pinned SHA-256 (`embed.Install`, manifest written last), shared
   by the app and every `memory-mcp` process. MCP never downloads.
 - Embedding runtime: `internal/memory/embed` (leaf package). ONNX Runtime 1.29.1 through
@@ -4253,14 +4253,19 @@ replies and full terminal attach for Claude Code sessions.
   `acquireSingleInstance` (`runArgvShim`). Tools `store_memory` (progress notifications `checking`,
   `reconciling`, `saving`), `search_memories` (`includeHistory`), `memory_history`; prompt `remember`
   (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
-  from the Connect dialog (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
+  from Settings > Memory (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
   script lives in Studio's `mcpauth`).
 - Space: `bridge.MemoryService` (`apps/kira-space/internal/bridge/memory.go`; teardown is the
   package-level `bridge.CloseMemory`) emits `kira:memory:changed` after its own writes and, via a 2 s
   `PRAGMA data_version` watcher, after the MCP subprocess writes. `memory` is the last mode in
   `MODE_ORDER` (`windows.mode` vocabulary; no migration). UI lives in shared `packages/workbench/src/memory/`:
-  search panel, detail with version trail, Add memory and Connect dialogs. Kira Studio hosts none of it.
-- Memory UI adds `SemanticStatus.vue` (download button, progress, indexing, retry) and a `semantic`
+  search panel, detail with version trail, Add memory dialog. Kira Studio hosts none of it.
+- Memory setup lives in Kira Space Settings > Memory (`MemoryPane.vue`, composing
+  `packages/workbench/src/memory/settings/*`: Claude Code registration, semantic model, dictation model).
+  The module hosts no setup action; `MemorySetupHint` and the mic popover only link there through
+  `MemoryModuleContext.openSettings`. `useModelDownloadsStore` holds the download `AbortController`, so
+  Cancel survives closing Settings. Open: no "registered with Claude Code" detection.
+- Memory UI adds `settings/SemanticModelSection.vue` (download button, progress, indexing, retry) and a `semantic`
   badge on rows found by meaning only.
 - Add memory is one free-text box (cap 1000 = `MaxFactLen`), sent as one item with a fixed manual
   reason. Gate splits it into atomic facts. Author `user`, source `ui`.
@@ -4311,8 +4316,8 @@ replies and full terminal attach for Claude Code sessions.
   idle, 60 s spawn backoff, killed 2 s after a stop request. Shared lifecycle in `internal/memory/workerproc`;
   model download, SHA-256 check and manifest in `internal/memory/modelstore` (embed uses both).
 - Models, pinned SHA-256: `ggml-small.en-q5_1.bin` bfdff489...ad30 (190098681 bytes), Silero VAD
-  `ggml-silero-v6.2.0.bin` 2aa269b7...6987 (885098 bytes); id `whisper-small.en-q5_1-5359861`. Download on
-  click in the mic popover; cancel stops it; checksum failure shows Retry download.
+  `ggml-silero-v6.2.0.bin` 2aa269b7...6987 (885098 bytes); id `whisper-small.en-q5_1-5359861`. Download in
+  Settings > Memory (the mic popover only points there); cancel stops it; checksum failure shows Retry download.
 - whisper.cpp source is pinned by commit, not release tarball hash (tarball hash not fetchable here);
   `scripts/fetch-whisper.sh <platform>` builds static libs into gitignored `apps/kira-space/build/whisper/`.
   Tagged builds need `CGO_CFLAGS=-I.../include` and `CGO_LDFLAGS=-L.../lib`.

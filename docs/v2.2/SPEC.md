@@ -16,7 +16,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P218 | Speech engine without a C++ build: step 1 measures build-free engines (sherpa-onnx prebuilt libs first) against the whisper.cpp worker; step 2 swaps in the winner and deletes fetch-whisper.sh, the `whisper` tag, cgo glue, CI patch and S13 whisper bits. Keeps dictation behaviour, malgo capture, worker isolation, pinned-SHA model store, 400 MB RSS ceiling. No winner: stop and ask the user, never back to whisper.cpp | Not started |
 | P219 | Terminal and API collections: terminal module scripts get collections added the same way as the API module; right-click menu in both modules to move an item into a chosen collection; working-dir field gets a native folder-select dialog | Not started |
 | P220 | Git module: graph lines still disappear on click and on scroll (find the root cause); default tab is Repos and the last tab the user moved to persists across restarts | Not started |
-| P221 | Memory module: move the semantic-search model download and the Connect Claude Code action into Settings | Not started |
+| P221 | Memory module: move the semantic-search model download and the Connect Claude Code action into Settings | Done |
 | P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Not started |
 
 ## Requirements (user's words, condensed)
@@ -266,3 +266,20 @@ Verification: `go build ./...`, `go test -race` mobileterm, mobileweb, importer,
 memory-import and memory-module 6 pass.
 
 Not verified: rebind on a real network change (tested with loopback 127.0.0.2).
+
+## P221 result
+
+Memory setup moved to Kira Space Settings > Memory (D1 to D4 defaults from the plan applied).
+
+- `MemoryPane.vue` composes `ClaudeCodeMcpSection`, `SemanticModelSection`, `DictationModelSection`
+  (`packages/workbench/src/memory/settings/`). Dictation download moved too.
+- `useModelDownloadsStore` keeps the download `AbortController`; Cancel works after reopening Settings.
+- Module: plug button, Connect dialog and `SemanticStatus` removed. `MemorySetupHint` and the mic popover
+  link to Settings through `MemoryModuleContext.openSettings`.
+- Nested case checked: Settings opened from the Add memory dialog stays interactive.
+- Commits 1 and 2 merged: hook cannot pass with `ConnectClaudeDialog` deleted but still imported.
+- Accepted: a failed-download message is per component instance; reopening Settings after a failure shows
+  the download button without it.
+
+Verification: typecheck, lint, lint:dead, Playwright memory, settings-memory, settings-claude-code, then the full
+`test:ui:space`.
