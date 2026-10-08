@@ -40,6 +40,11 @@ export const CHANNEL = {
   gitClientsChanged: 'kira:git:clients',
   // P178: every pending credential prompt raised by a socket client or the ADE board.
   gitCredential: 'kira:git:credential',
+  // P212: the phone pairing prompt's queue snapshot, the paired phones list and the server state
+  // (Emit to every window; gitPairing's own shape).
+  mobilePairing: 'kira:mobile:pairing',
+  mobileDevices: 'kira:mobile:devices',
+  mobileStatus: 'kira:mobile:status',
   // C7 D7: a repository-wide search's coalesced file groups, delivered via EmitTo (one window
   // only) — grpcCall's own shape, restated for a payload that shares no field with it.
   codeSearch: 'kira:code:search',

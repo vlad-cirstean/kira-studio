@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitvsix"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -51,6 +53,9 @@ import (
 //
 //go:embed all:frontend/dist
 var assets embed.FS
+
+//go:embed all:frontend/dist-mobile
+var mobileAssets embed.FS
 
 // runArgvShim runs the askpass, memory-mcp and memory-embed subcommands, before anything Wails-related, so they
 // never start a window. memory-mcp is Claude Code's stdio MCP server; it runs before startupfail
@@ -131,7 +136,10 @@ func main() {
 	gitDiscovery, gitRunner, gitRegistry := git.discovery, git.runner, git.registry
 	askpassBroker, gitRouter, gitSock := git.askpassBroker, git.router, git.sock
 
-	emitter, attachEmitter := shell.NewDeferredEmitter()
+	rawEmitter, attachEmitter := shell.NewDeferredEmitter()
+	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
+	mobileHub := mobileweb.NewHub()
+	emitter := appevent.NewTap(rawEmitter, mobileHub.Publish)
 	deps := appcore.Deps{Repos: repositories, Events: emitter, GitRegistry: gitRegistry}
 	events := bridge.NewEvents(emitter)
 	detachOpLog := events.AttachOpLog(git.opLog)
@@ -221,6 +229,16 @@ func main() {
 	adeTaskSvc.FocusWindow = windows.Focus
 	closeFlush := shell.NewCloseFlushCoordinator(events)
 
+	mobileAssetsFS, err := fs.Sub(mobileAssets, "frontend/dist-mobile")
+	if err != nil {
+		panic(err) // constant embed path: only a build-time mistake fails here
+	}
+	mobileSvc := bridge.NewMobileAccessService(&bridge.MobileAccessService{
+		Deps: deps, Reader: adeTaskSvc, Hub: mobileHub, Broker: mobileweb.NewBroker(time.Now), Assets: mobileAssetsFS,
+		AgentSessions: func() any { return terminalSvc.AgentSessions() },
+	})
+	detachMobilePush := mobileSvc.AttachPush()
+
 	beforeFlush := sync.OnceFunc(func() {
 		// Kira Studio's own wireLifecycle: the ticker stops before the flush wait rather than after
 		// it (P56 D3).
@@ -245,6 +263,9 @@ func main() {
 		adeTaskBoard.Close()
 		detachGitPush()
 		detachGitCredentialPush()
+		// Before gitSock/DB close: ends open streams and aborts parked pairing requests.
+		bridge.StopMobile(mobileSvc)
+		detachMobilePush()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
 		}
@@ -291,6 +312,7 @@ func main() {
 			application.NewService(&bridge.OpsService{Log: git.opLog}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 			application.NewService(keepAwakeSvc),
+			application.NewService(mobileSvc),
 			application.NewService(memorySvc),
 			application.NewService(windowsSvc),
 			application.NewService(&bridge.UpdateService{
@@ -317,6 +339,7 @@ func main() {
 	})
 
 	attachEmitter(app)
+	bridge.StartMobileIfEnabled(mobileSvc)
 	attachBrowser(app)
 	quitter.Attach(app)
 

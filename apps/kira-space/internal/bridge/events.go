@@ -21,6 +21,15 @@ const (
 	ChannelGitClientsChanged = "kira:git:clients"
 )
 
+// ChannelMobilePairing, ChannelMobileDevices and ChannelMobileStatus are P212's three desktop-only
+// channels: the phone pairing prompt's queue snapshot, the paired phones list and the server state.
+// None is on the mobileweb event allowlist.
+const (
+	ChannelMobilePairing = "kira:mobile:pairing"
+	ChannelMobileDevices = "kira:mobile:devices"
+	ChannelMobileStatus  = "kira:mobile:status"
+)
+
 // ChannelCustomScriptsChanged is CustomScriptsService's list-changed broadcast (Emit to every
 // window) — Kira Studio's channel of the same name.
 const ChannelCustomScriptsChanged = "kira:customScripts:changed"
