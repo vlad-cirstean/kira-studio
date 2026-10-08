@@ -41,6 +41,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
+	memstt "github.com/kirathecat/kira-studio/internal/memory/stt"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
@@ -58,10 +59,12 @@ var assets embed.FS
 //go:embed all:frontend/dist-mobile
 var mobileAssets embed.FS
 
-// runArgvShim runs the askpass, memory-mcp and memory-embed subcommands, before anything Wails-related, so they
+// runArgvShim runs the askpass, memory-mcp, memory-embed and memory-stt subcommands, before
+// anything Wails-related, so they
 // never start a window. memory-mcp is Claude Code's stdio MCP server; it runs before startupfail
 // and the single-instance lock, so it works while the window is open. memory-embed is the ONNX
 // embedding worker those processes and the app spawn; same ordering for the same reason.
+// memory-stt is the whisper.cpp dictation worker the app spawns.
 func runArgvShim(args []string) (code int, ok bool) {
 	if len(args) < 2 {
 		return 0, false
@@ -73,6 +76,8 @@ func runArgvShim(args []string) (code int, ok bool) {
 		return memorycli.Run(args[2:]), true
 	case "memory-embed":
 		return memembed.RunWorker(args[2:]), true
+	case "memory-stt":
+		return memstt.RunWorker(args[2:]), true
 	}
 	return 0, false
 }

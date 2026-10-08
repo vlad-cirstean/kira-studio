@@ -178,8 +178,8 @@ if ! grep -q "libonnxruntime\.$ORT_GO_VERSION\.dylib" apps/kira-space/build/darw
 fi
 
 # --- S13: the pinned whisper.cpp build and speech models agree everywhere (P216) ---------------
-# scripts/fetch-whisper.sh pins the source commit; internal/memory/stt/spec.go pins the same commit. The darwin build task must pass the `whisper` tag and both plists must
-# carry the microphone usage string, or the shipped app would silently have no dictation.
+# scripts/fetch-whisper.sh pins the source commit; internal/memory/stt/spec.go pins the same
+# commit. The darwin build task must pass the `whisper` tag and both plists must carry the microphone usage string, or the shipped app would silently have no dictation.
 WHISPER_SCRIPT_COMMIT="$(sed -n 's/^WHISPER_COMMIT="\([^"]*\)".*/\1/p' scripts/fetch-whisper.sh 2>/dev/null | head -1)"
 if [ -z "$WHISPER_SCRIPT_COMMIT" ] || ! grep -q "$WHISPER_SCRIPT_COMMIT" internal/memory/stt/spec.go 2>/dev/null; then
   fail "whisper.cpp pin mismatch" "scripts/fetch-whisper.sh WHISPER_COMMIT ('$WHISPER_SCRIPT_COMMIT') is not the commit in internal/memory/stt/spec.go"
