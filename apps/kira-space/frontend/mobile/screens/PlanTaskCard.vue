@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TONE, tagStyle } from '@ade/tones';
+import { TONE_SOLID_CLASS, TONE_TAG_CLASS } from '@ade/tones';
 import { Badge } from '@theme/components/ui/badge';
 import { computed } from 'vue';
 import type { PlanCard } from '../state/useAgentsModel';
@@ -30,7 +30,7 @@ const tone = computed(() => STATUS_TONE[props.card.status]);
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <span class="rounded-kira-sm px-2 py-0.5 font-bold" :style="tagStyle(tone)" data-testid="plan-status">{{ card.status }}</span>
+          <span class="rounded-kira-sm px-2 py-0.5 font-bold" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{ card.status }}</span>
           <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-stage">{{ card.progress.label }}</span>
           <Badge v-for="repo in card.repos" :key="repo" variant="chip" class="bg-field text-muted-foreground">{{ repo }}</Badge>
         </span>
@@ -59,7 +59,7 @@ const tone = computed(() => STATUS_TONE[props.card.status]);
         </span>
         <ul v-if="block.steps.length" class="m-0 flex list-none flex-col gap-0.5 p-0 pl-5">
           <li v-for="view in block.steps" :key="view.step.id" class="flex items-center gap-2 text-kira-sm">
-            <span class="size-1.5 shrink-0 rounded-full" :style="{ background: TONE[view.tone][2] }" />
+            <span class="size-1.5 shrink-0 rounded-full" :class="TONE_SOLID_CLASS[view.tone]" />
             <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ view.step.name }}</span>
             <span class="text-subtle">{{ view.statusText }}</span>
           </li>

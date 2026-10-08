@@ -1,5 +1,6 @@
 /* The phone app's own Tailwind root. Scans this app plus the ADE modules it reuses. */
 @import "@theme/base.css";
+@import "../src/ade/v2/tones.css";
 @source "./";
 @source "../src/ade/v2";
 

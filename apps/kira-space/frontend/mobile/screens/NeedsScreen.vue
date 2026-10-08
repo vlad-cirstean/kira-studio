@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { shortAge } from '@ade/ago';
-import { tagStyle } from '@ade/tones';
+import { TONE_TAG_CLASS } from '@ade/tones';
 import { Alert } from '@theme/components/ui/alert';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { useAgentsModel } from '../state/useAgentsModel';
@@ -34,7 +34,7 @@ const { model, boardQuery } = useAgentsModel();
             <span class="flex items-center gap-2">
               <span
                 class="rounded-kira-sm px-2 py-0.5 text-kira-sm font-bold"
-                :style="tagStyle(item.tone)"
+                :class="TONE_TAG_CLASS[item.tone]"
                 >{{ item.kind }}</span
               >
               <span class="text-kira-sm text-subtle">{{ shortAge(item.ageMs) }}</span>
