@@ -236,6 +236,26 @@ func (s *CollectionsService) Delete(args CollectionsTargetArgs) error {
 	return nil
 }
 
+type CollectionsMoveItemArgs struct {
+	ItemID       string `json:"itemId"`
+	CollectionID string `json:"collectionId"`
+}
+
+// MoveItem moves a request or folder, with its subtree, to the root of another collection.
+func (s *CollectionsService) MoveItem(args CollectionsMoveItemArgs) error {
+	if args.ItemID == "" {
+		return ipcerr.BadRequest("itemId is required")
+	}
+	if args.CollectionID == "" {
+		return ipcerr.BadRequest("collectionId is required")
+	}
+	if err := s.Deps.Repos.Collections.MoveItem(args.ItemID, args.CollectionID); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange())
+	return nil
+}
+
 func validTarget(args CollectionsTargetArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")

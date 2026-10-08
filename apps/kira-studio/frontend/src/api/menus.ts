@@ -1,4 +1,5 @@
 import type { MenuItem } from '@workbench/state/contextMenu';
+import { type CollectionChoice, moveToCollectionMenu } from '@workbench/util/collectionMenu';
 import type { CollectionRowVm } from './state/collections';
 
 // P4 D13: the row and background context menus, built with the existing MenuItem type from
@@ -20,6 +21,10 @@ export interface CollectionMenuActions {
   rename(row: CollectionRowVm): void;
   duplicate(row: CollectionRowVm): void;
   remove(row: CollectionRowVm): void;
+  /** Every collection, as the Move to collection submenu's choices. */
+  collections(): readonly CollectionChoice[];
+  moveTo(row: CollectionRowVm, collectionId: string): void;
+  moveToNewCollection(row: CollectionRowVm): void;
   copyUrl(row: CollectionRowVm): void;
   importCollection(): void;
   /** P7 D12: the background menu's own "Import from curl…" item — opens the paste-a-curl-command
@@ -34,6 +39,21 @@ export interface CollectionMenuActions {
   /** P6 D11: the background menu's own "Dynamic values…" item — opens the read-only reference
    *  dialog. Not row-scoped, same as environments() above. */
   dynamicValues(): void;
+}
+
+// Request and folder rows only: a move lands at a collection's root, so the row's own collection
+// is a valid target only when the row sits inside a folder.
+function moveMenu(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem {
+  return moveToCollectionMenu({
+    collections: actions.collections(),
+    current: row.collectionId,
+    allowNone: false,
+    canMoveTo: (id) => !(id === row.collectionId && row.parentId === null),
+    onMove: (id) => {
+      if (id !== null) actions.moveTo(row, id);
+    },
+    onNew: () => actions.moveToNewCollection(row),
+  });
 }
 
 export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem[] {
@@ -72,6 +92,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
         disabled: !row.url,
         run: () => actions.copyUrl(row),
       },
+      moveMenu(row, actions),
       { type: 'separator' },
       {
         type: 'item',
@@ -145,6 +166,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       shortcut: 'tree.duplicate',
       run: () => actions.duplicate(row),
     });
+    items.push(moveMenu(row, actions));
   }
 
   items.push(

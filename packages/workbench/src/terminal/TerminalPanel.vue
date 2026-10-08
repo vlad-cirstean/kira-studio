@@ -10,6 +10,7 @@ import InlineRenameInput from '@workbench/components/InlineRenameInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
+import { moveToCollectionMenu } from '@workbench/util/collectionMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
 import { useTerminalModule } from './module';
@@ -104,6 +105,15 @@ async function newCollection(): Promise<string | null> {
   return id;
 }
 
+async function moveToNewCollection(script: CustomScript): Promise<void> {
+  await guarded(async () => {
+    const created = await scripts.createCollection('New collection');
+    await scripts.move(script.id, created.id);
+    openGroup(created.id);
+    renamingId.value = created.id;
+  });
+}
+
 function commitRename(collection: ScriptCollection, name: string): void {
   renamingId.value = null;
   void guarded(() => scripts.renameCollection(collection.id, name));
@@ -177,6 +187,13 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
         editor.value = { script, collectionId: null };
       },
     },
+    moveToCollectionMenu({
+      collections: scripts.collections(),
+      current: script.collectionId,
+      allowNone: true,
+      onMove: (id) => guarded(() => scripts.move(script.id, id)),
+      onNew: () => moveToNewCollection(script),
+    }),
     { type: 'separator' },
     {
       type: 'item',

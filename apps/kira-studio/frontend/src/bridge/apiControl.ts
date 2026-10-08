@@ -222,6 +222,8 @@ export const apiControl = {
     unwrap(CollectionsService.Rename({ id, target, name })),
   collectionsDelete: (id: string, target: 'collection' | 'item'): Promise<void> =>
     unwrap(CollectionsService.Delete({ id, target })),
+  collectionsMoveItem: (itemId: string, collectionId: string): Promise<void> =>
+    unwrap(CollectionsService.MoveItem({ itemId, collectionId })),
   collectionsImport: (path: string): Promise<WailsModels.ImportReport> =>
     unwrap(CollectionsService.Import({ path })),
   // P5 D16: ExportReport.secretCount is what lets the panel say "N secret values were not

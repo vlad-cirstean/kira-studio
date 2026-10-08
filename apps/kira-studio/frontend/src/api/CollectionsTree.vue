@@ -71,6 +71,9 @@ const actions: CollectionMenuActions = {
   newFolder: (row) => void collectionsStore.createItem(row.collectionId, folderTarget(row), 'folder'),
   newCollection: () => void collectionsStore.createCollection(),
   rename: collectionsStore.beginRename,
+  collections: () => collectionsStore.collections,
+  moveTo: (row, collectionId) => void collectionsStore.moveRow(row, collectionId),
+  moveToNewCollection: (row) => void collectionsStore.moveRowToNewCollection(row),
   duplicate: (row) => void collectionsStore.duplicateRow(row),
   remove: (row) => void confirmAndDelete(row),
   copyUrl: (row) =>

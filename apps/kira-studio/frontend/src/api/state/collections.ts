@@ -418,6 +418,42 @@ export const useCollectionsStore = defineStore('collections', () => {
     }
   }
 
+  const moveRowMutation = useMutation(
+    {
+      mutationKey: ['apiCollectionsTree', 'moveItem'],
+      mutationFn: (args: { itemId: string; collectionId: string }) =>
+        control.collectionsMoveItem(args.itemId, args.collectionId),
+      onSuccess: afterTreeListChange,
+    },
+    queryClient,
+  );
+
+  /** Moves a request or folder, with its subtree, to the root of another collection. Returns
+   *  whether it moved. */
+  async function moveRow(row: CollectionRowVm, collectionId: string): Promise<boolean> {
+    try {
+      await moveRowMutation.mutateAsync({ itemId: row.id, collectionId });
+      revealItem(collectionId, null);
+      state.selected = itemKey(row.id);
+      state.error = null;
+      return true;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+      return false;
+    }
+  }
+
+  /** Creates a collection, moves the row into it, and opens the new collection for naming. */
+  async function moveRowToNewCollection(row: CollectionRowVm): Promise<void> {
+    try {
+      const collection = await createCollectionMutation.mutateAsync();
+      if (!(await moveRow(row, collection.id))) return;
+      state.renamingKey = collectionKey(collection.id);
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
   /** P21 round 2 functional finding 4: Go's own delete genuinely cascades (repos/collections.go's
    *  own comment: "the cascade is genuine") — deleting a folder or a collection removes every
    *  descendant `api_items` row, not just the row itself. This walks the *pre-delete* tree
@@ -807,6 +843,8 @@ export const useCollectionsStore = defineStore('collections', () => {
     createItem,
     createGrpcItem,
     renameRow,
+    moveRow,
+    moveRowToNewCollection,
     deleteRow,
     duplicateRow,
     openRequestRow,

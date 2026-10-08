@@ -141,6 +141,56 @@ test('collections — the tree renders and a request opens into the existing tab
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(1);
 });
 
+test('collections — a request moves to another collection from its context menu', async ({
+  relaunch,
+}) => {
+  const tree = {
+    ...TREE,
+    collections: [
+      ...TREE.collections,
+      { id: 'col-2', name: 'Billing API', sortOrder: 1, createdAt: NOW, updatedAt: NOW },
+      { id: 'col-new', name: 'New collection', sortOrder: 2, createdAt: NOW, updatedAt: NOW },
+    ],
+  };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.collectionsList, response: tree },
+      { channel: IPC.collectionsMoveItem, response: null },
+      {
+        channel: IPC.collectionsCreateCollection,
+        response: tree.collections[2],
+      },
+    ],
+  });
+  await openHttpMode(page);
+  await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+
+  await row(page, 'item-health').click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-move-to-collection"]').hover();
+  await expect(page.locator('[data-testid="menu-item-move-to-col-1"]')).toHaveAttribute(
+    'data-disabled',
+    '',
+  );
+  await page.locator('[data-testid="menu-item-move-to-col-2"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.collectionsMoveItem)?.args)
+    .toEqual({ itemId: 'item-health', collectionId: 'col-2' });
+
+  await row(page, 'item-health').click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-move-to-collection"]').hover();
+  await page.locator('[data-testid="menu-item-move-to-new"]').click();
+  await expect
+    .poll(
+      () =>
+        control
+          .log()
+          .filter((e) => e.channel === IPC.collectionsMoveItem)
+          .at(-1)?.args,
+    )
+    .toEqual({ itemId: 'item-health', collectionId: 'col-new' });
+  await expect(page.locator('[data-testid="collection-rename-input"]')).toBeFocused();
+});
+
 test('collections — editing marks the request dirty, and Save clears it', async ({ relaunch }) => {
   const SAVED_ITEM = {
     id: 'item-create',

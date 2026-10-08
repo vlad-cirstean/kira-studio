@@ -107,6 +107,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   collectionsCreateItem: 'CollectionsService.CreateItem',
   collectionsRename: 'CollectionsService.Rename',
   collectionsDelete: 'CollectionsService.Delete',
+  collectionsMoveItem: 'CollectionsService.MoveItem',
   collectionsImport: 'CollectionsService.Import',
   collectionsExport: 'CollectionsService.Export',
   variablesListEnvironments: 'VariablesService.ListEnvironments',

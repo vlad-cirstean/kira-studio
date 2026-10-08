@@ -513,6 +513,72 @@ func (r *CollectionsRepo) Delete(id, target string) error {
 	return nil
 }
 
+// MoveItem moves an item, with its whole subtree, to the root of collectionID: the subtree's
+// collection_id is rewritten, the item is appended last at the target root, and the items it left
+// behind re-index dense. A no-op when the item already sits at that collection's root.
+func (r *CollectionsRepo) MoveItem(itemID, collectionID string) error {
+	if itemID == "" || collectionID == "" {
+		return fmt.Errorf("repos/collections: item and collection ids are required")
+	}
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos/collections: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var (
+		oldCollection string
+		oldParent     sql.NullString
+	)
+	err = tx.QueryRow(`SELECT collection_id, parent_id FROM api_items WHERE id = ?`, itemID).Scan(&oldCollection, &oldParent)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("repos/collections: no item %s", itemID)
+	}
+	if err != nil {
+		return fmt.Errorf("repos/collections: read item %s: %w", itemID, err)
+	}
+	var one int
+	err = tx.QueryRow(`SELECT 1 FROM api_collections WHERE id = ?`, collectionID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("repos/collections: no collection %s", collectionID)
+	}
+	if err != nil {
+		return fmt.Errorf("repos/collections: read collection %s: %w", collectionID, err)
+	}
+	if oldCollection == collectionID && !oldParent.Valid {
+		return nil
+	}
+
+	order, err := nextItemOrder(tx, collectionID, nil)
+	if err != nil {
+		return err
+	}
+	now := kiratime.NowISO()
+	if _, err := tx.Exec(
+		`WITH RECURSIVE sub(id) AS (
+		   SELECT ? UNION ALL SELECT i.id FROM api_items i JOIN sub ON i.parent_id = sub.id
+		 )
+		 UPDATE api_items SET collection_id = ?, updated_at = ? WHERE id IN (SELECT id FROM sub)`,
+		itemID, collectionID, now,
+	); err != nil {
+		return fmt.Errorf("repos/collections: move subtree of %s: %w", itemID, err)
+	}
+	if _, err := tx.Exec(`UPDATE api_items SET parent_id = NULL, sort_order = ? WHERE id = ?`, order, itemID); err != nil {
+		return fmt.Errorf("repos/collections: place item %s: %w", itemID, err)
+	}
+	var oldParentID *string
+	if oldParent.Valid {
+		oldParentID = &oldParent.String
+	}
+	if err := reindexSiblings(tx, oldCollection, oldParentID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos/collections: commit: %w", err)
+	}
+	return nil
+}
+
 func targetTable(target string) (string, error) {
 	switch target {
 	case "collection":

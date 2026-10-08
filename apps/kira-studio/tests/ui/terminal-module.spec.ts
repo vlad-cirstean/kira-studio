@@ -341,6 +341,66 @@ test('the collection menu Delete confirms and deletes it', async ({ relaunch }) 
     .toEqual({ id: 'c-be' });
 });
 
+test('a quick command moves between collections from its context menu', async ({ relaunch }) => {
+  const collections = [
+    {
+      id: 'c-be',
+      name: 'Backend',
+      sortOrder: 0,
+      createdAt: SCRIPT.createdAt,
+      updatedAt: SCRIPT.createdAt,
+    },
+    {
+      id: 'c-web',
+      name: 'Web',
+      sortOrder: 1,
+      createdAt: SCRIPT.createdAt,
+      updatedAt: SCRIPT.createdAt,
+    },
+  ];
+  const script = { ...SCRIPT, collectionId: 'c-be' };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: { collections, scripts: [script] } },
+      { channel: IPC.customScriptsMove, response: null },
+      { channel: IPC.customScriptsCreateCollection, response: collections[1] },
+    ],
+  });
+  const moves = () =>
+    control
+      .log()
+      .filter((e) => e.channel === IPC.customScriptsMove)
+      .map((e) => e.args);
+  const openMoveMenu = async () => {
+    await page.locator(`[data-testid="quick-command-${script.id}"]`).click({ button: 'right' });
+    await page.locator('[data-testid="menu-item-move-to-collection"]').hover();
+  };
+
+  await openTerminalModule(page);
+  await openMoveMenu();
+  await expect(page.locator('[data-testid="menu-item-move-to-c-be"]')).toHaveAttribute(
+    'data-disabled',
+    '',
+  );
+  await page.locator('[data-testid="menu-item-move-to-c-web"]').click();
+  await expect.poll(moves).toEqual([{ id: script.id, collectionId: 'c-web' }]);
+
+  await openMoveMenu();
+  await page.locator('[data-testid="menu-item-move-to-none"]').click();
+  await expect.poll(moves).toEqual([
+    { id: script.id, collectionId: 'c-web' },
+    { id: script.id, collectionId: null },
+  ]);
+
+  await openMoveMenu();
+  await page.locator('[data-testid="menu-item-move-to-new"]').click();
+  await expect
+    .poll(() => control.log().some((e) => e.channel === IPC.customScriptsCreateCollection))
+    .toBe(true);
+  await expect.poll(() => moves().at(-1)).toEqual({ id: script.id, collectionId: 'c-web' });
+  await expect(page.locator('[data-testid="quick-command-collection-rename-input"]')).toBeFocused();
+});
+
 test('Add stays disabled until name and script are filled; it sends the trimmed fields', async ({
   relaunch,
 }) => {

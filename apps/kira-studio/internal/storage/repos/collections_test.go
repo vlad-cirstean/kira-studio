@@ -262,3 +262,50 @@ func TestSaveRequestShedsOnlyTheChangedOriginMembers(t *testing.T) {
 		t.Errorf("the item's test script did not survive the round trip:\n%s", written)
 	}
 }
+
+// 5. MoveItem rewrites the collection of a whole subtree at depth, lands the item last at the
+// target root, and re-indexes the siblings it left behind dense.
+func TestMoveItemCarriesTheSubtreeAndReindexesBothSides(t *testing.T) {
+	r := newCollectionsRepo(t)
+	src, err := r.CreateCollection("Source")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dst, err := r.CreateCollection("Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := mustCreateItem(t, r, src.ID, nil, model.CollectionItemRequest, "before")
+	folder := mustCreateItem(t, r, src.ID, nil, model.CollectionItemFolder, "folder")
+	inner := mustCreateItem(t, r, src.ID, &folder.ID, model.CollectionItemFolder, "inner")
+	mustCreateItem(t, r, src.ID, &inner.ID, model.CollectionItemRequest, "deep")
+	mustCreateItem(t, r, src.ID, nil, model.CollectionItemRequest, "after")
+	mustCreateItem(t, r, dst.ID, nil, model.CollectionItemRequest, "existing")
+
+	if err := r.MoveItem(folder.ID, "no-such-collection"); err == nil {
+		t.Fatal("moving into an unknown collection was accepted")
+	}
+	if err := r.MoveItem(folder.ID, dst.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	_, items, err := r.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]model.CollectionItem{}
+	for _, item := range items {
+		byName[item.Name] = item
+	}
+	for _, name := range []string{"folder", "inner", "deep"} {
+		if got := byName[name].CollectionID; got != dst.ID {
+			t.Errorf("%s collection = %s, want the target", name, got)
+		}
+	}
+	if f := byName["folder"]; f.ParentID != nil || f.SortOrder != 1 {
+		t.Errorf("folder landed at parent %v order %d, want root order 1", f.ParentID, f.SortOrder)
+	}
+	if byName["before"].SortOrder != 0 || byName["after"].SortOrder != 1 || byName["before"].ID != before.ID {
+		t.Errorf("source siblings not dense: before=%d after=%d", byName["before"].SortOrder, byName["after"].SortOrder)
+	}
+}
