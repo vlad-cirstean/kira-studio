@@ -201,6 +201,7 @@ func hostOpts(host string, files tlsFiles, tlsWanted, skipVerify bool) (Endpoint
 			if err != nil {
 				return Endpoint{}, nil, err
 			}
+			ep.Secure = !skipVerify
 			hc := &http.Client{Transport: &http.Transport{TLSClientConfig: cfg}, CheckRedirect: client.CheckRedirect}
 			return ep, []client.Opt{client.WithHTTPClient(hc), client.WithHost(host)}, nil
 		}
