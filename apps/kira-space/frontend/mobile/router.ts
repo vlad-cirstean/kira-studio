@@ -4,12 +4,14 @@ import BacklogScreen from './screens/BacklogScreen.vue';
 import NeedsScreen from './screens/NeedsScreen.vue';
 import PairScreen from './screens/PairScreen.vue';
 import PlanScreen from './screens/PlanScreen.vue';
+import TerminalScreen from './screens/TerminalScreen.vue';
 import { useAuthStore } from './state/auth';
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/pair', name: 'pair', component: PairScreen },
+    { path: '/terminal/:sessionId', name: 'terminal', component: TerminalScreen, props: true },
     {
       path: '/',
       name: 'home',

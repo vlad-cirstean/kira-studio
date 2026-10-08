@@ -107,6 +107,18 @@ const stopFirst = computed(() => props.card.moves.live);
       </Button>
       <p v-if="stopFirst" class="m-0 w-full text-kira-sm text-subtle">Stop its running agents first to move it.</p>
     </div>
+
+    <div v-if="open && permissions.agentInput && card.tuiSessions.length" class="flex flex-col gap-1 px-3 pb-3 pl-8">
+      <RouterLink
+        v-for="session in card.tuiSessions"
+        :key="session.id"
+        :to="{ name: 'terminal', params: { sessionId: session.id } }"
+        class="flex h-11 items-center rounded-kira border border-border-strong bg-field px-3 text-kira-md text-fg no-underline"
+        data-testid="plan-terminal"
+      >
+        Terminal
+      </RouterLink>
+    </div>
     <ConfirmDialog
       :open="actions.intent.value !== null"
       :title="actions.dialog.value.title"

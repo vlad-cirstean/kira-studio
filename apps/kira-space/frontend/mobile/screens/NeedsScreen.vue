@@ -6,6 +6,7 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PermissionHint from '../components/PermissionHint.vue';
 import ReplySheet from '../components/ReplySheet.vue';
@@ -18,6 +19,7 @@ import { useAgentsModel } from '../state/useAgentsModel';
 const { model, boardQuery } = useAgentsModel();
 const { permissions } = storeToRefs(useAuthStore());
 const writes = useAdeWrites();
+const router = useRouter();
 
 const replying = ref<{ sessionId: string; context: string } | null>(null);
 const takingOver = ref<{ sessionId: string; what: string } | null>(null);
@@ -44,8 +46,9 @@ async function confirmTakeOver(): Promise<void> {
   if (!target) return;
   takeOverError.value = '';
   try {
-    await writes.takeOver.mutateAsync({ sessionId: target.sessionId, key: takeOverKey });
+    const launch = await writes.takeOver.mutateAsync({ sessionId: target.sessionId, key: takeOverKey });
     takingOver.value = null;
+    void router.push({ name: 'terminal', params: { sessionId: launch.sessionId } });
   } catch (err) {
     takeOverError.value = err instanceof Error ? err.message : String(err);
   }
@@ -103,6 +106,14 @@ async function confirmTakeOver(): Promise<void> {
               >
                 Reply
               </Button>
+              <RouterLink
+                v-if="item.kind === 'question'"
+                :to="{ name: 'terminal', params: { sessionId: item.sessionId } }"
+                class="flex h-11 items-center rounded-kira border border-border-strong bg-field px-4 text-kira-md text-fg no-underline"
+                data-testid="needs-terminal"
+              >
+                Terminal
+              </RouterLink>
               <Button
                 v-else-if="item.kind === 'stuck run'"
                 variant="dialog"
