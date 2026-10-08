@@ -20,6 +20,7 @@ import { useGitCredentialStore } from './state/gitCredential';
 import { useKeepAwakeStore } from './state/keepAwake';
 import { useLayoutStore } from './state/layout';
 import { useMobileAccessStore } from './state/mobileAccess';
+import { useMobileTerminalsStore } from './state/mobileTerminals';
 import { useModeStore } from './state/mode';
 import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
@@ -59,6 +60,7 @@ async function mountShell(): Promise<void> {
   const gitClientsStore = useGitClientsStore(pinia);
   const gitCredentialStore = useGitCredentialStore(pinia);
   const mobileAccessStore = useMobileAccessStore(pinia);
+  const mobileTerminalsStore = useMobileTerminalsStore(pinia);
   const tabsStore = useTabsStore(pinia);
   const terminalsStore = useTerminalsStore(pinia);
   const workspaceStore = useWorkspaceStore(pinia);
@@ -100,6 +102,7 @@ async function mountShell(): Promise<void> {
     gitClientsStore.hydrateGitClients(),
     gitCredentialStore.hydrateRelayPrompts(),
     mobileAccessStore.hydrateMobileAccess(),
+    mobileTerminalsStore.hydrateMobileTerminals(),
     terminalsStore.hydrateTerminalDefaults(),
     customScriptsStore.hydrateCustomScripts(),
     keepAwakeStore.initKeepAwake(),

@@ -32,6 +32,7 @@ import type {
   MobilePairingActionResult,
   MobilePairingSnapshot,
   MobileStatus,
+  MobileTerminalHold,
 } from '@shared/domain/mobile';
 import type {
   CodeSearchEvent,
@@ -137,6 +138,12 @@ const spaceControl = {
     unwrap(MobileAccessService.Deny({ id })).then((r) => trust<MobilePairingActionResult>(r)),
   mobileLaunchOpened: (terminalId: string, error: string): Promise<void> =>
     unwrap(MobileAccessService.LaunchOpened({ terminalId, error })),
+  mobileTerminalHolds: (): Promise<MobileTerminalHold[]> =>
+    unwrap(MobileAccessService.TerminalHolds()).then((r) => trust<MobileTerminalHold[]>(r ?? [])),
+  mobileReclaimTerminal: (terminalId: string, cols: number, rows: number): Promise<void> =>
+    unwrap(MobileAccessService.ReclaimTerminal({ terminalId, cols, rows })),
+  onMobileTerminals: (cb: (holds: MobileTerminalHold[]) => void): (() => void) =>
+    on(CHANNEL.mobileTerminals, (holds: MobileTerminalHold[] | null) => cb(holds ?? [])),
   onMobileOpenLaunch: (cb: (event: V2.MobileOpenLaunchEvent) => void): (() => void) =>
     on(CHANNEL.mobileOpenLaunch, cb),
   onMobileStatusChanged: (cb: (status: MobileStatus) => void): (() => void) =>

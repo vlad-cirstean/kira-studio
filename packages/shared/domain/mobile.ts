@@ -57,3 +57,15 @@ export const mobilePairingActionResultSchema = /*#__PURE__*/ z.object({
   result: /*#__PURE__*/ z.enum(['resolved', 'alreadyResolved', 'expired']),
 });
 export type MobilePairingActionResult = z.infer<typeof mobilePairingActionResultSchema>;
+
+export const mobileTerminalHoldSchema = /*#__PURE__*/ z.object({
+  terminalId: z.string(),
+  sessionId: z.string(),
+  deviceId: z.string(),
+  label: z.string(),
+  connected: z.boolean(),
+  since: z.number(),
+  /** When an offline hold falls back to the desktop; 0 while connected. */
+  returnsAt: z.number(),
+});
+export type MobileTerminalHold = z.infer<typeof mobileTerminalHoldSchema>;

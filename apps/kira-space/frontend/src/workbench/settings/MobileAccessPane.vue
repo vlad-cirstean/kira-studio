@@ -10,6 +10,7 @@ import { formatRelative } from '@workbench/util/format';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { computed, ref, useId, watch } from 'vue';
 import { useMobileAccessStore } from '../../state/mobileAccess';
+import { useMobileTerminalsStore } from '../../state/mobileTerminals';
 import { MOBILE_PORT_RANGE } from '../../state/settingsDomain';
 import MobileQr from './MobileQr.vue';
 import type { SettingsPaneProps } from './types';
@@ -25,6 +26,7 @@ function parseIntField(raw: string): number {
 }
 
 const store = useMobileAccessStore();
+const phones = useMobileTerminalsStore();
 const confirmDialogStore = useConfirmDialogStore();
 const switchId = useId();
 const agentInputId = useId();
@@ -225,6 +227,13 @@ const activeDevices = computed(() => store.devices.filter((d) => !d.revokedAt));
             <span class="truncate">{{ device.label || device.id }}</span>
             <span class="text-subtle text-kira-sm leading-normal">
               Last seen {{ formatRelative(device.lastSeenAt) }}<template v-if="device.lastIp"> from {{ device.lastIp }}</template>
+            </span>
+            <span
+              v-if="phones.countFor(device.id) > 0"
+              class="text-kira-sm leading-normal"
+              :data-testid="`mobile-device-terminals-${device.id}`"
+            >
+              Controlling {{ phones.countFor(device.id) }} terminal{{ phones.countFor(device.id) === 1 ? '' : 's' }}
             </span>
           </span>
           <span class="flex shrink-0 items-center gap-2">
