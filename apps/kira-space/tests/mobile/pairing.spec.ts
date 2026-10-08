@@ -68,3 +68,19 @@ test('a revoked device returns to the pairing screen', async ({ page, app, serve
   await expect(page.locator(t('pair-screen'))).toBeVisible();
   await expect(page.locator(t('pair-notice'))).toContainText('removed in Kira Space');
 });
+
+test('an expired device returns to the pairing screen with a notice', async ({
+  page,
+  app,
+  server,
+}) => {
+  server.state.auth = 'ok';
+  await app();
+  await expect(page.locator(t('app-shell'))).toBeVisible();
+  await expect(page.locator(t('connection-dot'))).toHaveAttribute('title', 'live');
+  await page.waitForLoadState('networkidle');
+  server.state.auth = 'expired';
+  await page.locator(t('refresh')).click();
+  await expect(page.locator(t('pair-screen'))).toBeVisible();
+  await expect(page.locator(t('pair-notice'))).toContainText('expired');
+});

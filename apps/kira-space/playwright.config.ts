@@ -36,7 +36,12 @@ export default defineConfig({
     {
       name: 'mobile-android',
       testDir: './tests/mobile',
-      use: { ...devices['Pixel 7'] },
+      // P223: insecure-origin.spec.ts opens the app on a non-loopback host name, which is not a
+      // secure context the way localhost is.
+      use: {
+        ...devices['Pixel 7'],
+        launchOptions: { args: ['--host-resolver-rules=MAP kira-lan.test 127.0.0.1'] },
+      },
       fullyParallel: true,
     },
     {
