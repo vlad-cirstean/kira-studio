@@ -73,6 +73,7 @@ export function useDictation(target: DictationTarget) {
         break;
       case 'final':
         apply(frame.text);
+        store.end();
         placeCaret();
         break;
       case 'error':
