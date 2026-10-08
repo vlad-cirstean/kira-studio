@@ -40,9 +40,9 @@ export const useAuthStore = defineStore('mobileAuth', () => {
     try {
       await getJson('/api/me');
       state.phase = 'paired';
-    } catch (err) {
-      // A 401 already set the phase through onUnauthorized; anything else is a network failure.
-      if ((err as CodedError).code === 'E_NETWORK') state.phase = 'unreachable';
+    } catch {
+      // A 401 already set the phase through onUnauthorized; any other failure means unreachable.
+      if (state.phase === 'checking') state.phase = 'unreachable';
     }
   }
 

@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 // P100 Part 2: Kira Studio's own playwright.config.ts, trimmed to the one project this app's own
 // tests/ui/ tier needs — no `ui-timing` (no wall-clock-budget spec moved here), no `ipc-frontend`
@@ -25,6 +25,19 @@ export default defineConfig({
       use: { browserName: 'webkit' },
       fullyParallel: true,
       workers: '100%',
+    },
+    // P212: the phone app, on a phone-sized iOS (WebKit) and Android (Chromium) profile.
+    {
+      name: 'mobile-ios',
+      testDir: './tests/mobile',
+      use: { ...devices['iPhone 15'] },
+      fullyParallel: true,
+    },
+    {
+      name: 'mobile-android',
+      testDir: './tests/mobile',
+      use: { ...devices['Pixel 7'] },
+      fullyParallel: true,
     },
     {
       name: 'visual',

@@ -61,6 +61,7 @@
     "perf:parse:studio": "bun run build:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=perf parse-callers",
     "test:ui:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --project=ui-timing",
     "test:ui:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.config.ts --project=ui",
+    "test:ui:space-mobile": "bun run build:space-mobile && playwright test --config=apps/kira-space/playwright.config.ts --project=mobile-ios --project=mobile-android",
     "perf:probe:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.perf.config.ts",
     "perf:probe:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.perf.config.ts",
     "test:visual:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=visual",
