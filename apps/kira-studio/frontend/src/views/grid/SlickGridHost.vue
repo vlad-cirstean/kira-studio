@@ -1088,7 +1088,7 @@ function placeNavButtonsForRenderedCells(): void {
 const NAV_BTN_CLASS =
   'cell-nav-btn absolute left-1 top-1/2 z-[1] flex size-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-kira-sm border border-(color:--kira-border) bg-elevated p-0 text-(color:--kira-fg-muted) hover:bg-hover hover:text-fg';
 const HEADER_KEY_CLASS = 'header-key ml-1 shrink-0 font-data text-warn';
-const HEADER_KEY_FK_CLASS = 'header-key ml-1 shrink-0 font-data text-info';
+const HEADER_KEY_FK_CLASS = 'header-key is-fk ml-1 shrink-0 font-data text-info';
 
 // F13 — a click on a `.cell-nav-btn` (a real child of whichever `.slick-cell` it lives in, one
 // per nav-eligible rendered cell since item 12's redesign — placeNavButtonsForRenderedCells'
