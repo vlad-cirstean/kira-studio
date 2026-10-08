@@ -226,3 +226,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## ONNX Runtime and the arctic-embed-s model
+
+Kira Space's memory search (P210) bundles the [ONNX Runtime](https://github.com/microsoft/onnxruntime)
+1.29.1 shared library (MIT) in `Contents/Frameworks`, with its `LICENSE` and `ThirdPartyNotices.txt`
+copied to `Contents/Resources` as `onnxruntime-LICENSE.txt` and `onnxruntime-ThirdPartyNotices.txt`.
+It loads it through `github.com/yalue/onnxruntime_go` (MIT) and tokenizes with
+`github.com/gomlx/go-huggingface` (Apache-2.0). The user downloads the embedding model,
+[Snowflake/snowflake-arctic-embed-s](https://huggingface.co/Snowflake/snowflake-arctic-embed-s)
+(Apache-2.0), on request; it is not bundled.
