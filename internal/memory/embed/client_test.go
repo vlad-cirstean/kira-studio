@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
 )
 
 var testSpec = Spec{
@@ -83,7 +85,7 @@ func newTestClient(t *testing.T, mode string, idle time.Duration, spawns *atomic
 			t.Fatal(err)
 		}
 	}
-	if err := writeManifest(dir, testSpec); err != nil {
+	if err := modelstore.WriteManifest(dir, testSpec.ID, testSpec.Files); err != nil {
 		t.Fatal(err)
 	}
 	c := NewClient(ClientOptions{

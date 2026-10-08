@@ -3,15 +3,12 @@
 // It imports nothing from package memory.
 package embed
 
+import "github.com/kirathecat/kira-studio/internal/memory/modelstore"
+
 const hfRevision = "e596f507467533e48a2e17c007f0e1dacc837b33"
 
 // File is one downloadable model file, pinned by size and SHA-256.
-type File struct {
-	Name   string
-	URL    string
-	SHA256 string
-	Size   int64
-}
+type File = modelstore.File
 
 // Spec pins one embedding model.
 type Spec struct {
@@ -54,10 +51,4 @@ var Default = Spec{
 }
 
 // TotalSize is the sum of the spec's file sizes.
-func (s Spec) TotalSize() int64 {
-	var n int64
-	for _, f := range s.Files {
-		n += f.Size
-	}
-	return n
-}
+func (s Spec) TotalSize() int64 { return modelstore.TotalSize(s.Files) }

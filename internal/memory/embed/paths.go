@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
 )
 
 // ORTVersion is the pinned ONNX Runtime release. scripts/fetch-onnxruntime.sh and the macOS
@@ -17,7 +19,7 @@ var ErrNoRuntime = errors.New("no embedding runtime for this platform")
 
 // ModelDir is where a spec's files live: <home>/models/<id>.
 func ModelDir(home string, s Spec) string {
-	return filepath.Join(home, "models", s.ID)
+	return modelstore.ModelDir(home, s.ID)
 }
 
 // RuntimeLib locates the ONNX Runtime shared library: $KIRA_ORT_LIB, else the copy bundled in the

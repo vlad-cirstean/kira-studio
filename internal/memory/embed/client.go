@@ -1,19 +1,18 @@
 package embed
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/memory/workerproc"
 )
 
 // State is the client's coarse availability.
@@ -35,8 +34,6 @@ const (
 	helloTimeout   = 30 * time.Second
 	requestTimeout = 2 * time.Minute
 	failureBackoff = 60 * time.Second
-	stopGrace      = 2 * time.Second
-	stderrTail     = 2048
 )
 
 // DefaultIdleTimeout is how long an unused worker keeps its model in memory.
@@ -175,23 +172,23 @@ func (c *Client) roundTrip(ctx context.Context, texts []string) ([][]float32, er
 
 	rctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	stop := context.AfterFunc(rctx, w.kill)
+	stop := context.AfterFunc(rctx, w.Kill)
 	defer stop()
 
 	w.nextID++
 	req := workerRequest{ID: w.nextID, Texts: texts}
 	var rep workerReply
-	err = json.NewEncoder(w.stdin).Encode(req)
+	err = json.NewEncoder(w.Stdin).Encode(req)
 	if err == nil {
-		err = w.dec.Decode(&rep)
+		err = w.Dec.Decode(&rep)
 	}
 	if err != nil {
-		w.kill()
+		w.Kill()
 		c.dropWorker(w)
 		if ctxErr := rctx.Err(); ctxErr != nil {
 			return nil, ctxErr
 		}
-		err = fmt.Errorf("embedding worker failed: %w%s", err, w.diagnostics())
+		err = fmt.Errorf("embedding worker failed: %w%s", err, w.Diagnostics())
 		c.setErr(err)
 		return nil, err
 	}
@@ -199,7 +196,7 @@ func (c *Client) roundTrip(ctx context.Context, texts []string) ([][]float32, er
 		return nil, fmt.Errorf("embedding worker: %s", rep.Error)
 	}
 	if rep.ID != req.ID || len(rep.Vectors) != len(texts) {
-		w.kill()
+		w.Kill()
 		c.dropWorker(w)
 		err := errors.New("embedding worker: malformed reply")
 		c.setErr(err)
@@ -273,39 +270,20 @@ func (c *Client) ensureWorker(ctx context.Context) (*worker, error) {
 }
 
 func (c *Client) spawn(ctx context.Context) (*worker, error) {
-	cmd := c.opts.Command(c.dir)
-	tail := &tailBuffer{}
-	cmd.Stderr = tail
-	stdin, err := cmd.StdinPipe()
+	proc, err := workerproc.Start(c.opts.Command(c.dir))
 	if err != nil {
-		return nil, err
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start embedding worker: %w", err)
 	}
-	w := &worker{cmd: cmd, stdin: stdin, dec: json.NewDecoder(stdout), tail: tail, done: make(chan struct{})}
-	go func() {
-		w.waitErr = cmd.Wait()
-		close(w.done)
-	}()
-	hctx, cancel := context.WithTimeout(ctx, helloTimeout)
-	defer cancel()
-	stop := context.AfterFunc(hctx, w.kill)
-	defer stop()
+	w := &worker{Proc: proc}
 	var hello workerHello
-	if err := w.dec.Decode(&hello); err != nil {
-		w.kill()
-		if hctx.Err() != nil {
-			return nil, fmt.Errorf("embedding worker did not start in time%s", w.diagnostics())
+	if err := w.Hello(ctx, helloTimeout, &hello); err != nil {
+		if errors.Is(err, workerproc.ErrHelloTimeout) {
+			return nil, fmt.Errorf("embedding worker did not start in time%s", w.Diagnostics())
 		}
-		return nil, fmt.Errorf("embedding worker exited before ready: %w%s", err, w.diagnostics())
+		return nil, fmt.Errorf("embedding worker exited before ready: %w%s", err, w.Diagnostics())
 	}
 	if hello.Error != "" || !hello.Ready || hello.Dim != c.opts.Spec.Dim {
-		w.kill()
+		w.Kill()
 		msg := hello.Error
 		if msg == "" {
 			msg = "unexpected hello"
@@ -347,7 +325,7 @@ func (c *Client) onIdle() {
 	c.w = nil
 	c.mu.Unlock()
 	if w != nil {
-		w.stop()
+		w.Stop()
 	}
 }
 
@@ -362,74 +340,13 @@ func (c *Client) Close() error {
 	c.w = nil
 	c.mu.Unlock()
 	if w != nil {
-		w.stop()
+		w.Stop()
 	}
 	return nil
 }
 
+// worker is a running process plus its request counter.
 type worker struct {
-	cmd     *exec.Cmd
-	stdin   io.WriteCloser
-	dec     *json.Decoder
-	tail    *tailBuffer
-	done    chan struct{}
-	waitErr error
-	nextID  int
-}
-
-func (w *worker) kill() { _ = w.cmd.Process.Kill() }
-
-// stop closes stdin so the worker exits on its own, killing it after stopGrace.
-func (w *worker) stop() {
-	_ = w.stdin.Close()
-	select {
-	case <-w.done:
-	case <-time.After(stopGrace):
-		w.kill()
-		<-w.done
-	}
-}
-
-func (w *worker) diagnostics() string {
-	select {
-	case <-w.done:
-	case <-time.After(stopGrace):
-	}
-	var parts []string
-	select {
-	case <-w.done:
-		if w.waitErr != nil {
-			parts = append(parts, w.waitErr.Error())
-		}
-	default:
-	}
-	if s := strings.TrimSpace(w.tail.String()); s != "" {
-		parts = append(parts, s)
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return " (" + strings.Join(parts, ": ") + ")"
-}
-
-// tailBuffer keeps the last stderrTail bytes the worker wrote.
-type tailBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
-}
-
-func (t *tailBuffer) Write(p []byte) (int, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.buf.Write(p)
-	if over := t.buf.Len() - stderrTail; over > 0 {
-		t.buf.Next(over)
-	}
-	return len(p), nil
-}
-
-func (t *tailBuffer) String() string {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.buf.String()
+	*workerproc.Proc
+	nextID int
 }
