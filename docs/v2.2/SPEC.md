@@ -18,7 +18,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P220 | Git module: graph lines still disappear on click and on scroll (find the root cause); default tab is Repos and the last tab the user moved to persists across restarts | Done |
 | P221 | Memory module: move the semantic-search model download and the Connect Claude Code action into Settings | Done |
 | P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Done |
-| P223 | Mobile agents web as a plain-HTTP page on the trusted LAN only: drop the PWA, local CA, HTTPS and setup listener; bind one LAN interface address; refuse peers outside its private subnet; "Trust this network" (subnet plus router MAC) starts and stops the server by itself; plaintext warning; device tokens expire | Not started |
+| P223 | Mobile agents web as a plain-HTTP page on the trusted LAN only: drop the PWA, local CA, HTTPS and setup listener; bind one LAN interface address; refuse peers outside its private subnet; "Trust this network" (subnet plus router MAC) starts and stops the server by itself; plaintext warning; device tokens expire | Done |
 | P224 | Remove speech to text completely: the `stt` package, whisper.cpp build, dictation bridge and stream, mic UI, P221's dictation settings section, malgo, S13, plists' microphone string, CI patch, docs; delete the downloaded speech model at startup; keep `modelstore`, `workerproc` and the embed worker | Done |
 
 ## Requirements (user's words, condensed)
@@ -352,3 +352,38 @@ golangci-lint, typecheck, lint, lint:dead clean; full Space UI suite 249 pass, 0
 `test:visual:space` all four Settings baselines, unrelated to P222 (no Settings file touched; the
 Settings nav gained Memory in P221, so the baselines predate it, and text antialiasing differs on this
 machine). Not re-recorded. Re-record on the reference machine.
+
+## P223 result
+
+Facts in `docs/ARCHITECTURE.md` (Mobile agents web, Known open items), `docs/DEV_ENVIRONMENT.md`,
+`docs/PACKAGING.md`.
+
+Done: PWA, local CA, leaf issuance, HTTPS and setup listeners, setup page and the pane's certificate
+step removed. One plain-HTTP listener on the trusted interface's IPv4. Three LAN checks: peer must be
+private or link-local IPv4 inside the bound subnet; exactly one bound address (no wildcard, no
+loopback), rebound on address change; "Trust this network" (subnet, router IP, router MAC) with a 10 s
+supervisor that stops and starts the server and shows why. Plaintext warning in the pane, one line on
+the phone, device tokens expire after 30 days. New package `internal/lannet` (Linux `/proc`, macOS
+route RIB), migration 0025 (plan said 0023; 0023 and 0024 taken by P219 and P222), cookie
+`kira-space-device`, legacy CA files deleted at boot.
+
+Deviations: no `kick` channel; Trust and Forget run one reconcile pass synchronously, so the returned
+status is current. `mobileweb.Config.IsLAN` is an exported test seam (the plan said the bridge test
+needs none, but `Start` refuses loopback by default). While the supervisor is off the bridge `Status`
+reads the current network on demand, so the pane can offer Trust before enabling. Fixed a bug found by
+the new insecure-origin spec: a fresh pairing never read its permissions, so writes showed off until
+a reload (`fix(mobile)` commit). Live curl check against a LAN address skipped: this sandbox has only
+`192.0.2.0/24` (not private; `lannet.Detect` correctly answers "not a private local network") and no
+`ip` tool to add an address. Covered instead by the live `mobileweb` integration tests on loopback and
+the bridge supervisor test.
+
+Mac handover: enable the pane on a Mac, Trust this network, check the macOS Local Network prompt, scan
+the QR, switch Wi-Fi and see the stop reason, switch back. Remove the old "Kira Space local CA" profile
+from phones.
+
+Checks: `go build`, `go vet`, darwin `go vet` of `lannet`, `go test -race` (lannet, mobileweb,
+mobileterm, bridge, storage), golangci-lint 0 issues, typecheck, lint, lint:dead clean;
+`build:space-mobile` output is `index.html`, `favicon.ico`, `assets/` and holds none of `randomUUID`,
+`serviceWorker`, `crypto.subtle`, `navigator.clipboard`, `isSecureContext`, `workbox`;
+`test:ui:space-mobile` 51 pass (1 WebKit skip); `test:ui:space` 244 pass, 0 fail. Visual baselines not
+run and not re-recorded (Settings snapshots differ since P221 and again now).

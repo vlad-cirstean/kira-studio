@@ -4122,25 +4122,43 @@ and `docs/v2.0/plans/`.
 Phone view of the ADE board: Backlog, Need You, Plan. P212 Part 2 added permissioned writes, quick
 replies and full terminal attach for Claude Code sessions.
 
-- Package `apps/kira-space/internal/mobileweb`. Off by default (`mobile.enabled`, `mobile.httpsPort`
-  7790, `mobile.setupPort` 7791). Changed only through `bridge.MobileAccessService` actions, which
-  restart the server when running (`internal/embedded.Service`). Boot start and teardown are
-  `bridge.StartMobileIfEnabled` / `StopMobile`.
-- Transport: HTTPS app port plus plain-HTTP setup port. Setup port serves only the setup page, the
-  public CA (`/kira-space-ca.crt`, `.mobileconfig`) and `/setup-info`. One listener per up private
-  IPv4 (RFC 1918) plus `127.0.0.1`; never `0.0.0.0`. Middleware rejects a remote outside RFC 1918 or
-  loopback and a `Host` not matching a bound IP or `<hostname>.local` (DNS-rebinding guard).
-- Certificates: in-process local CA (stdlib `crypto/x509`, ECDSA P-256, 10 years) in
-  `KiraSpaceHome()/mobile`, critical name constraints (10/8, 172.16/12, 192.168/16, 127/8, 100.64/10,
-  `.local`). Leaf: 397 days, serverAuth, SAN IPs plus hostname, re-issued in memory on start and when
-  the IP set changes (polled every minute; listeners follow, status event fires). A secure origin is what lets the service worker and install work. Reset CA
-  means every phone re-trusts.
+- Package `apps/kira-space/internal/mobileweb`. Off by default (`mobile.enabled`, `mobile.port` 7790).
+  Changed only through `bridge.MobileAccessService` actions, which restart the server when running
+  (`internal/embedded.Service`). Boot start and teardown are `bridge.StartMobileIfEnabled` /
+  `StopMobile`. Boot also deletes the pre-P223 CA files in `KiraSpaceHome()/mobile`.
+- Transport (P223): plain HTTP, no TLS, no PWA, no setup page. User decision: phone view works on
+  the trusted home LAN only, no cert install, no Tailscale. One listener on exactly one address, the
+  trusted interface's IPv4; never `0.0.0.0`, never loopback. `Start` refuses a non-LAN address.
+  Middleware (`guard`) rejects a peer that is not private or link-local IPv4 inside the bound
+  interface's subnet, and a `Host` that is not the bound IP literal (DNS-rebinding guard; no
+  `localhost`, no `.local`). `SetNetwork` rebinds on a DHCP address change: new listener first, then
+  the old closes; failure keeps the old one.
+- Trusted network (`internal/lannet`): identity is subnet + router IP + router MAC (interface name is
+  display only, so Wi-Fi and Ethernet on one LAN match). One row, `mobile_trusted_network`, set by
+  "Trust this network" (`TrustCurrentNetwork`, from `lannet.Detect`: default IPv4 route, interface
+  address containing the gateway, router MAC from the ARP table) and cleared by `ForgetNetwork`.
+  Linux reads `/proc/net/route` and `/proc/net/arp`; macOS reads the route RIB through
+  `golang.org/x/net/route`. No SSID (macOS needs a location permission), no probe traffic (could raise
+  the macOS 15 Local Network prompt). While enabled, a bridge supervisor (`bridge/mobilenet.go`, 10 s)
+  runs `lannet.Find`: stops the server and sets a stop reason (`notTrusted`, `away`, `otherRouter`,
+  `unavailable`, shown in the pane) when the trusted network is absent, starts it when it returns,
+  rebinds on a new address. `Find` ignores the default route, so a VPN owning it does not stop the
+  server; Trust needs the default route on the LAN. A router missing from the ARP table reads as
+  `otherRouter` and retries next poll. MAC spoofing is not prevented: this guards against using the
+  server away from home, it is not authentication.
+- Plaintext: anyone on the same LAN can read the board, backlog and terminal output, and can copy a
+  phone's cookie and act as it. Mitigations: trusted network only, device tokens expire after 30 days
+  (re-pair), revoke, warning always visible in the pane and one line on the phone's pair screen.
 - Pairing: generic `internal/pairing.Broker[M]` (extracted from gitsock; 120 s timeout, 60 s cooldown
   on deny keyed by remote IP, queue 8). `POST /api/pair` long-polls; phone shows a 4-digit code, the
   desktop dialog (`MobilePairingDialog`, shared `PairingRequestDialog`) shows it with IP and label.
   Approval mints a `tokenauth` token; the row (`mobile_devices`, migration 0021) is written before
-  the cookie is sent. Cookie `__Host-kira-space` (`HttpOnly; Secure; SameSite=Strict`, 400 days);
-  only a salted hash is stored; constant-time verify, dummy verify on a missing row.
+  the cookie is sent. Cookie `kira-space-device` (`HttpOnly; SameSite=Strict`, not `Secure`: a
+  `__Host-` name needs `Secure`, which plain HTTP never sends; cookies are not port-scoped, so another
+  HTTP service on the same IP would receive it). Row `expires_at` is 30 days from pairing; expired
+  is 401 `E_EXPIRED` and the phone re-pairs. Migration 0025 revoked the HTTPS-era rows. `Origin` on
+  writes must be `http://` and match `Host`; `Sec-Fetch-Site` is optional (absent on plain HTTP). Only
+  a salted hash is stored; constant-time verify, dummy verify on a missing row.
 - Rate limits (`x/time/rate`, per IP, bounded map): pairing 1 per 10 s burst 3; failed auth 1 per
   minute burst 10 (then 429 on every `/api`); reads 20/s burst 40 per device. `singleflight`
   coalesces `Board`/`Prs`.
@@ -4190,7 +4208,7 @@ replies and full terminal attach for Claude Code sessions.
   resumes. Read limit 64 KiB, input frame cap 16 KiB, input 100/s burst 200, resize 10/s burst 20.
   Close codes 4000 released, 4001 reclaimed by the computer, 4002 replaced, 4003 session exited, 4004
   timeout, 4005 permission off; the phone stops reconnecting on any of them. CSP `connect-src` is
-  `'self' wss://<Host>` (older WebKit does not match `wss:` against `'self'`).
+  `'self' ws://<Host>` (older WebKit does not match `ws:` against `'self'`).
 - Audit: each write, attach, release and reclaim logs one `mobileweb: write` line (device, action,
   ids). Never message text or keystrokes. No persisted audit table.
 - Live updates: `appevent.Tap` wraps the app emitter and forwards window-wide `Emit` only (not
@@ -4201,10 +4219,9 @@ replies and full terminal attach for Claude Code sessions.
 - Frontend: `ade/v2/reader.ts` is the transport seam (`AdeReader`); desktop binds it to `control`,
   mobile to HTTP. Mobile app in `frontend/mobile/`, second Vite build (`vite.mobile.config.ts`,
   `tsconfig.mobile.json`, `dist-mobile`, embedded by `main.go`). The build has no `@bindings` alias, so
-  an accidental desktop `control` import fails it. `vue-router` for tabs. PWA: `vite-plugin-pwa`
-  `generateSW` precaches the shell only; `/api/` is `NetworkOnly`, so no task data lands on the phone's
-  disk. Offline shows "Cannot reach Kira Space". Icons in `mobile/public/` are generated once (command
-  in `docs/DEV_ENVIRONMENT.md`).
+  an accidental desktop `control` import fails it. `vue-router` for tabs. No service worker, manifest or install metas (P223): the shell is one
+  `index.html`. The phone avoids secure-context-only APIs: idempotency keys are a v4 UUID from
+  `crypto.getRandomValues` (`crypto.randomUUID` is undefined on an insecure origin).
 - Phone writes: TanStack mutations (`useAdeWrites`), one `Idempotency-Key` per tap (retry only on a
   lost response). Reorder drags by a handle through `useSortableReorder` and an optimistic
   `withMovedItem`. Start, Back, Next and Take over confirm in a shadcn `Dialog`. Shared with desktop:
@@ -4212,14 +4229,18 @@ replies and full terminal attach for Claude Code sessions.
   tab shell): xterm through `terminalRenderer`, VueUse `useWebSocket`, key bar (Esc, Tab, Shift Tab,
   Ctrl C, arrows honouring application cursor mode, Enter, sticky Ctrl), compose row (paste plus
   Enter), A-/A+ font size (8 to 20), refit on `visualViewport` resize.
-- Desktop UI: Settings > Mobile access (`MobileAccessPane`, `uqr` QR codes per bound address, device
-  list with per-device Changes and Agent input switches, global agent input switch, controlled
-  terminal count, revoke, reset certificate, ports). A window holding a phone-controlled terminal
+- Desktop UI: Settings > Mobile access (`MobileAccessPane`: enable switch, always-visible plaintext
+  warning, trusted network with Trust / Forget and the stop reason, one `uqr` QR for the app URL,
+  global agent input switch, port, device list with per-device Changes and Agent input switches,
+  access expiry, controlled terminal count, revoke). A window holding a phone-controlled terminal
   shows an overlay with "Reconnect here" (`MobileAccessService.ReclaimTerminal`, passes the xterm
   size) and the session tab gets a phone badge (`state/mobileTerminals.ts`).
-- Tests: Go unit and integration (`mobileweb`, `mobileterm`, `bridge`, `pairing`, `embedded`,
-  `appevent`); Playwright `mobile-ios`/`mobile-android` projects (`tests/mobile/`, an in-process mock
-  backend serves `dist-mobile`; the terminal spec scripts the socket with `page.routeWebSocket`);
+- Tests: Go unit and integration (`lannet` parsers, `mobileweb`, `mobileterm`, `bridge`
+  `mobilenet_test.go` supervisor state machine, `pairing`, `embedded`, `appevent`); Playwright
+  `mobile-ios`/`mobile-android` projects (`tests/mobile/`, an in-process mock backend serves
+  `dist-mobile`; the terminal spec scripts the socket with `page.routeWebSocket`;
+  `insecure-origin.spec.ts`, Chromium only, maps a host name to the mock server so the page is a
+  real insecure context);
   desktop `tests/ui/mobile-access.spec.ts` and `ade-tui-takeover.spec.ts`.
 
 ## Memory MCP server and module (P201, Kira Space)
@@ -4851,12 +4872,18 @@ Kept only while genuinely open — delete an item the moment it's resolved, neve
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **Mobile agents web is unverified on a real phone (P212).** Covered by Go tests and Playwright
-  WebKit/Chromium emulation only. Unchecked: CA install on real iOS and Android, installed-PWA
-  standalone mode (iOS may keep its own cookie jar: pair again inside the installed app), service
-  worker offline shell on WebKit (Playwright cannot emulate offline there), the iOS soft keyboard with
-  xterm (the compose row exists for it), the attach WebSocket surviving a backgrounded PWA, and touch
-  drag on a real device (tests drag with a mouse). IPv6 is not served; bound addresses stay fixed until
-  toggle or restart. Delete once checked on a real iPhone and Android phone.
+  WebKit/Chromium emulation only. Unchecked: the iOS soft keyboard with xterm (the compose row exists
+  for it), the attach WebSocket surviving a backgrounded tab, and touch drag on a real device (tests
+  drag with a mouse). IPv6 is not served. Delete once checked on a real iPhone and Android phone.
+- **`lannet` is unverified on macOS (P223).** The route RIB default-route selection and the ARP
+  table read (`NET_RT_FLAGS` with `RTF_LLINFO`, parsed with `route.ParseRIB`) are compile-checked
+  only (`GOOS=darwin go vet`); Linux is covered by parser tests and a live check. Also unchecked:
+  whether accepting LAN connections raises the macOS Local Network prompt. Delete once checked on a
+  Mac.
+- **Mobile traffic is plaintext on the LAN (P223).** Anyone on the same network can read what the phone
+  shows and can copy the phone's cookie to act as it until it expires (30 days) or is revoked. Mitigated
+  by the trusted-network gate, the warning and expiry; not removable without TLS, which the user
+  declined. Delete only if TLS is adopted.
 - **Claude Code redraw after a phone resize or reclaim is unobserved (P212 Part 2).** The PTY resizes
   to the phone's size on attach and back to the window's on return; no Claude account in the sandbox
   (see the P147 item), so only the Go and e2e sides are checked. Delete once checked with an

@@ -412,12 +412,15 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
   `scripts/prepare-worktree.sh` builds it, root `bun run build:space` chains it (CI), and the
   Taskfile `build:frontend` task builds it before production `go build`.
 - Tests: `bun run test:ui:space-mobile` (projects `mobile-ios` WebKit, `mobile-android` Chromium;
-  builds first). The offline-reload test skips on WebKit. Visual baselines are not part of it.
-- Icons: regenerate from `apps/kira-space/build/appicon.png` into `frontend/mobile/public/` with
-  `bunx pwa-assets-generator --preset minimal-2023 <appicon.png>`; commit the output.
-- Phone: enable Settings > Mobile access, scan the setup QR (HTTP port), install the CA profile
-  (iOS: then Settings > General > About > Certificate Trust Settings), compare the fingerprint, scan
-  the app QR, approve the code in Kira Space. Reset the certificate in the same pane.
+  builds first). `insecure-origin.spec.ts` runs on Chromium only (host mapping in
+  `playwright.config.ts`). Visual baselines are not part of it.
+- Phone: enable Settings > Mobile access, click "Trust this network" while on your home Wi-Fi, scan
+  the QR, approve the code in Kira Space. The server runs only on that network (identity: subnet,
+  router IP, router MAC). Phones that installed the old "Kira Space local CA" profile: remove it (iOS:
+  Settings > General > VPN & Device Management; Android: Settings > Security > Encryption &
+  credentials > User credentials).
+- Server build in a sandbox: no LAN, so the pane shows "No network connection" or a container
+  address; the live check needs a private interface address (`curl http://<lan-ip>:7790/`).
 - Writes and terminals (P212 Part 2): a new pairing can change the backlog and stages. Replying to
   agents and terminal attach need the pane's global "Let phones reply to agents and control their
   terminals" switch plus the phone's own Agent input switch, both off by default. To try an attach:

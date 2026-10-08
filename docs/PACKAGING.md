@@ -504,7 +504,8 @@ gone.
 ## 8. Kira Space packaging
 
 Kira Space embeds two gitignored bundles: `frontend/dist` (desktop UI) and `frontend/dist-mobile` (phone app,
-`//go:embed all:frontend/dist-mobile`). Both must exist before `go build`. The Taskfile `build:frontend`
+`//go:embed all:frontend/dist-mobile`; since P223 only `index.html`, `favicon.ico` and `assets/`: no
+service worker, manifest or setup page). Both must exist before `go build`. The Taskfile `build:frontend`
 task builds both (`bun run build` then `bun run build:mobile`), so packaged builds embed the real phone app.
 Clean checkout or fresh worktree: `sh scripts/prepare-worktree.sh` builds both. CI: `bun run build:space` chains both.
 
