@@ -401,3 +401,55 @@ run and not re-recorded (Settings snapshots differ since P221 and again now).
 - `scripts/check-theme-classes.sh` guards `bg-(--kira-rail)`; retired-class replacement texts point at `colorMarkClass`.
 - Specs: new `color-rails.spec.ts` in both apps pin one class string and geometry. `connections`, `tabs`, `api-ui-consistency` style assertions became `bg-conn-*` class checks.
 - Pinned repo-graph tab stays unmarked. ADE chips and view-header icon tints unchanged.
+
+## P225 result
+
+Facts in `docs/ARCHITECTURE.md` (commit-grid notes). Plan: `plans/P225-plan.md`. Two root causes; neither
+came from the last 36 hours. P220 widened the first-mount column from 17px, which made both visible.
+
+A. Outer-lane commits lost their dot. `CommitGrid` applied the P220 seed once, on the first layout with
+lanes. That layout covers the first 500-row chunk only, so the column fit 2 to 4 lanes while the page
+needed up to 8; the row SVG clips nodes past the column edge. Fix: the auto width follows `laneCount`
+(grow-only, capped at the six-lane default, not persisted) until the user drags the column.
+B. A merge's second-parent line vanished, worst after Load more. A branch-out edge into lane N that
+later converged into lane C had its `toLane` overwritten with C. The record held no lane N, so the run
+drew on the source lane, on top of its own node line. Fix: `EDGE_RUN_LANE`, set at append, never
+patched; `edgeCommand` draws from `fromLane`/`runLane`/`toLane`. Output is unchanged for straight,
+branch-out and straight-then-converge edges.
+
+Specs missed it: `repo-graph-lines` has one 300-row chunk and two lanes; no Space UI spec clicked Load
+more; `lanes.test.ts` covered straight-then-converge only.
+
+Specs: `repo-graph-paging.spec.ts` (2000 commits, 500-row chunks, two 1000-row pages, Load more; checks
+clipped nodes and stacked runs per visible row) and a `lanes.test.ts` case (one pass and paged).
+Pre-fix failures, same tree minus the fixes:
+- clipped: `row 1001: cx 43.5`, `row 1002: cx 56.5`, `row 1003: cx 69.5`, `row 1004: cx 82.5`,
+  then lanes 1 to 3 again at rows 1052-1054 and every 50 rows after (column 43px; fan rows need 6).
+- stacked: `row 6: runs 17.5 nodes 17.5`, `row 7: ...`, repeating every 10 rows (second-parent line
+  drawn over the node lane).
+- `lanes.test.ts`: `SyntaxError: Export named 'EDGE_RUN_LANE' not found`. Scratch check on the old
+  layout: edge `5->8` of the same shape is `fromLane 0, toLane 0`.
+
+Deviation from the plan: the first lane-aware width may shrink the column (from the 95px default to
+the lane width, as P220 did); only later steps are grow-only. Plan D2 as written would have kept 95px
+and dropped P220's narrow column.
+
+Not changed: Refresh or auto-refresh after Load more re-walks one page (`Walk.Stream` ignores
+`resumeThroughRow` after a reset), so loaded commits drop out of the list. Behaviour since G16,
+accepted by P203. If this is the "commits disappear" the user saw, it needs its own row. Also not
+changed: `UncommittedChangesStrip` sizes its graph cell from `columnWidths.graph` (default 95), so it
+can misalign with an auto-sized column (since P92).
+
+Mac handover, on a never-opened repo with 5000+ commits and many branches:
+1. Scroll past the first few hundred commits; outer-lane commits keep their dots.
+2. Find a "Merge branch 'main' into ..." commit; its second-parent line runs in its own lane to the
+   main commit, not over the feature line.
+3. Click Load more; lines above stay put, new commits show dots.
+4. Drag the graph column narrower, Load more again; the column keeps the dragged width.
+5. Load more, then Refresh or fetch; the list drops to one page (existing re-walk). Ask whether
+   "commits disappear" meant this.
+
+Checks: typecheck, lint, lint:dead clean; `test:unit` 1812 pass; `repo-graph-*` specs (11) pass; full
+Space UI suite 246 pass, 0 fail; `test:webview` 64 pass (the webview renders the same `rowSvg.ts`).
+Not run: `test:visual:space`. Workers=1 was needed locally for the new spec under load; the full suite
+ran with the default config.
