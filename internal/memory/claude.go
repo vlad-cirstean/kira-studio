@@ -20,6 +20,9 @@ var (
 	ErrClaudeTimeout  = errors.New("Claude Code call timed out.")
 	ErrClaudeOutput   = errors.New("Claude Code returned output the memory store could not use.")
 	ErrClaudeOutdated = errors.New("Claude Code CLI is too old for the memory store. Update Claude Code, then retry.")
+
+	ErrClaudeRateLimited = errors.New("Claude Code is rate limited. Retry shortly.")
+	ErrClaudeUsageLimit  = errors.New("Claude usage limit reached. Resume the import when it resets.")
 )
 
 const (
@@ -33,11 +36,24 @@ type Call struct {
 	System string          // our system prompt
 	Input  string          // JSON document, sent on stdin
 	Schema json.RawMessage // --json-schema
+	// MCPConfig, when set, is an inline --mcp-config JSON naming the only MCP servers the call may
+	// use; AllowedTools then lists the only tools it may call.
+	MCPConfig    string
+	AllowedTools []string
+	Timeout      time.Duration // 0 means claudeTimeout
+	Budget       string        // --max-budget-usd; empty means claudeCallBudget
 }
 
 // Runner runs one Call and returns the structured_output object.
 type Runner interface {
 	Run(ctx context.Context, c Call) (json.RawMessage, error)
+}
+
+// Result is a finished call: the structured_output plus what Claude Code reported spending.
+type Result struct {
+	Output  json.RawMessage
+	CostUSD float64
+	Turns   int
 }
 
 // CLIRunner drives the `claude` CLI headless with every source of ambient context switched off:
@@ -81,13 +97,24 @@ func scrubbedEnv(environ []string) []string {
 // claudeArgs is the isolation contract. Not --bare: it forces ANTHROPIC_API_KEY auth and never
 // reads OAuth/keychain, which breaks a subscription login.
 func claudeArgs(c Call) []string {
-	return []string{
-		"-p", "--model", claudeModel,
-		"--safe-mode", "--setting-sources", "", "--strict-mcp-config", "--tools", "",
+	budget := c.Budget
+	if budget == "" {
+		budget = claudeCallBudget
+	}
+	args := []string{"-p", "--model", claudeModel}
+	if c.MCPConfig == "" {
+		args = append(args, "--safe-mode")
+	}
+	args = append(args, "--setting-sources", "", "--strict-mcp-config", "--tools", "")
+	if c.MCPConfig != "" {
+		// --safe-mode disables --mcp-config servers too (measured in P211), so an MCP call runs
+		// without it; --strict-mcp-config still keeps every other server out.
+		args = append(args, "--mcp-config", c.MCPConfig, "--allowedTools", strings.Join(c.AllowedTools, ","))
+	}
+	return append(args,
 		"--disable-slash-commands", "--no-session-persistence", "--permission-prompts", "none",
 		"--output-format", "json", "--json-schema", string(c.Schema),
-		"--system-prompt", c.System, "--max-budget-usd", claudeCallBudget,
-	}
+		"--system-prompt", c.System, "--max-budget-usd", budget)
 }
 
 type claudeResult struct {
@@ -95,36 +122,49 @@ type claudeResult struct {
 	IsError          bool            `json:"is_error"`
 	Result           string          `json:"result"`
 	StructuredOutput json.RawMessage `json:"structured_output"`
+	TotalCostUSD     float64         `json:"total_cost_usd"`
+	NumTurns         int             `json:"num_turns"`
 }
 
 func (r *CLIRunner) Run(ctx context.Context, c Call) (json.RawMessage, error) {
+	res, err := r.RunResult(ctx, c)
+	return res.Output, err
+}
+
+// RunResult is Run plus the cost and turn count Claude Code reports.
+func (r *CLIRunner) RunResult(ctx context.Context, c Call) (Result, error) {
 	path, _, found := toolexec.Locate(r.lookPath, r.stat, "claude", toolexec.ClaudeCandidates())
 	if !found {
-		return nil, ErrClaudeNotFound
+		return Result{}, ErrClaudeNotFound
 	}
 	dir, err := os.MkdirTemp("", "kira-memory-*")
 	if err != nil {
-		return nil, fmt.Errorf("memory: temp dir: %w", err)
+		return Result{}, fmt.Errorf("memory: temp dir: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
-	runCtx, cancel := context.WithTimeout(ctx, claudeTimeout)
+	timeout := c.Timeout
+	if timeout <= 0 {
+		timeout = claudeTimeout
+	}
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	out, runErr := toolexec.RunIO(runCtx, path, claudeArgs(c), dir, scrubbedEnv(os.Environ()), []byte(c.Input))
 	if runErr != nil && runCtx.Err() != nil {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return Result{}, ctx.Err()
 		}
-		return nil, ErrClaudeTimeout
+		return Result{}, ErrClaudeTimeout
 	}
 	return parseClaudeResult(out, runErr)
 }
 
-func parseClaudeResult(out []byte, runErr error) (json.RawMessage, error) {
+func parseClaudeResult(out []byte, runErr error) (Result, error) {
 	var res claudeResult
 	parsed := json.Unmarshal(out, &res) == nil
+	spent := Result{CostUSD: res.TotalCostUSD, Turns: res.NumTurns}
 	if parsed && res.Subtype == "error_max_budget_usd" {
-		return nil, ErrClaudeBudget
+		return spent, ErrClaudeBudget
 	}
 	if runErr != nil || (parsed && res.IsError) {
 		detail := res.Result
@@ -132,12 +172,13 @@ func parseClaudeResult(out []byte, runErr error) (json.RawMessage, error) {
 		if errors.As(runErr, &execErr) {
 			detail += " " + execErr.Stderr
 		}
-		return nil, classifyFailure(detail, runErr)
+		return spent, classifyFailure(detail, runErr)
 	}
 	if !parsed || len(res.StructuredOutput) == 0 || string(res.StructuredOutput) == "null" {
-		return nil, ErrClaudeOutput
+		return spent, ErrClaudeOutput
 	}
-	return res.StructuredOutput, nil
+	spent.Output = res.StructuredOutput
+	return spent, nil
 }
 
 func classifyFailure(detail string, runErr error) error {
@@ -148,6 +189,11 @@ func classifyFailure(detail string, runErr error) error {
 	case strings.Contains(low, "login") || strings.Contains(low, "log in") || strings.Contains(low, "api key") ||
 		strings.Contains(low, "authenticat") || strings.Contains(low, "oauth"):
 		return ErrClaudeAuth
+	case strings.Contains(low, "usage limit") || strings.Contains(low, "limit reached"):
+		return ErrClaudeUsageLimit
+	case strings.Contains(low, "rate limit") || strings.Contains(low, "rate_limit") || strings.Contains(low, "429") ||
+		strings.Contains(low, "overloaded") || strings.Contains(low, "529"):
+		return ErrClaudeRateLimited
 	}
 	msg := strings.TrimSpace(detail)
 	if msg == "" && runErr != nil {

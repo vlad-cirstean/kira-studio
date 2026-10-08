@@ -76,6 +76,9 @@ func TestCLIRunnerErrorMapping(t *testing.T) {
 		{"is_error with exit 0", `{"is_error":true,"result":"please log in"}`, 0, ErrClaudeAuth},
 		{"missing structured output", `{"is_error":false,"result":"text"}`, 0, ErrClaudeOutput},
 		{"not json", `nope`, 0, ErrClaudeOutput},
+		{"rate limit", `{"is_error":true,"result":"API Error: 429 rate limit exceeded"}`, 0, ErrClaudeRateLimited},
+		{"overloaded", `{"is_error":true,"result":"API Error: 529 overloaded_error"}`, 0, ErrClaudeRateLimited},
+		{"usage limit", `{"is_error":true,"result":"Claude usage limit reached. Your limit resets at 5pm"}`, 0, ErrClaudeUsageLimit},
 	}
 	for _, c := range cases {
 		r, _ := fakeClaude(t, c.out, c.exit)
