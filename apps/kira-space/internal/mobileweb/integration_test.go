@@ -83,7 +83,7 @@ func TestIntegration_PairReadStreamRevoke(t *testing.T) {
 	}
 	pairDone := make(chan result, 1)
 	go func() {
-		resp, err := l.pair(context.Background())
+		resp, err := l.pair(context.Background()) //nolint:bodyclose // closed by the receiver below
 		pairDone <- result{resp, err}
 	}()
 	pending := l.s.cfg.Broker.Pending
@@ -128,7 +128,7 @@ func TestIntegration_PairReadStreamRevoke(t *testing.T) {
 		t.Fatalf("board status %d", board.StatusCode)
 	}
 
-	stream, err := l.get("/api/events", cookie.Value)
+	stream, err := l.get("/api/events", cookie.Value) //nolint:bodyclose // closed by the defer below
 	if err != nil {
 		t.Fatal(err)
 	}
