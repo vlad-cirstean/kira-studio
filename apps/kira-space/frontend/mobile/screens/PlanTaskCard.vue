@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { TONE_SOLID_CLASS, TONE_TAG_CLASS } from '@ade/tones';
 import { Badge } from '@theme/components/ui/badge';
+import { Button } from '@theme/components/ui/button';
+import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
+import { useAuthStore } from '../state/auth';
 import type { PlanCard } from '../state/useAgentsModel';
+import { useTaskActions } from '../state/useTaskActions';
 
 // One planned task: status, current stage and progress, expanding to every stage and its steps.
 const props = defineProps<{ card: PlanCard; open: boolean }>();
@@ -16,6 +21,11 @@ const STATUS_TONE = {
   Blocked: 'red',
 } as const;
 const tone = computed(() => STATUS_TONE[props.card.status]);
+
+const { permissions } = storeToRefs(useAuthStore());
+const actions = useTaskActions(() => props.card);
+const canMove = computed(() => permissions.value.write && props.card.blocks.length > 0);
+const stopFirst = computed(() => props.card.moves.live);
 </script>
 
 <template>
@@ -66,5 +76,46 @@ const tone = computed(() => STATUS_TONE[props.card.status]);
         </ul>
       </li>
     </ol>
+
+    <div v-if="open && canMove" class="flex flex-wrap gap-2 px-3 pb-3 pl-8" data-testid="plan-actions">
+      <Button
+        variant="dialog"
+        class="h-11 px-4"
+        :disabled="stopFirst || !card.moves.prev"
+        data-testid="plan-stage-back"
+        @click="actions.ask('back')"
+      >
+        Back
+      </Button>
+      <Button
+        variant="dialog"
+        class="h-11 px-4"
+        :disabled="stopFirst || !card.moves.next"
+        data-testid="plan-stage-next"
+        @click="actions.ask('next')"
+      >
+        Next
+      </Button>
+      <Button
+        v-if="actions.startKind.value"
+        variant="dialog-primary"
+        class="h-11 px-4"
+        data-testid="plan-start"
+        @click="actions.ask('start')"
+      >
+        Start
+      </Button>
+      <p v-if="stopFirst" class="m-0 w-full text-kira-sm text-subtle">Stop its running agents first to move it.</p>
+    </div>
+    <ConfirmDialog
+      :open="actions.intent.value !== null"
+      :title="actions.dialog.value.title"
+      :text="actions.dialog.value.text"
+      :confirm-label="actions.dialog.value.confirmLabel"
+      :busy="actions.busy.value"
+      :error="actions.error.value"
+      @cancel="actions.cancel"
+      @confirm="actions.confirm"
+    />
   </li>
 </template>

@@ -55,11 +55,23 @@ export function getJson<T>(path: string, params?: Record<string, string | number
   return request<T>(path + query, { headers: { Accept: 'application/json' } });
 }
 
-export function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+interface PostOptions {
+  signal?: AbortSignal;
+  /** One UUID per user intent, reused on a retry: the server replays the first result instead of
+   *  running the write again. Required by every write route. */
+  idempotencyKey?: string;
+}
+
+export function postJson<T>(path: string, body: unknown, options: PostOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+  if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
   return request<T>(path, {
     method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
-    signal,
+    signal: options.signal,
   });
 }

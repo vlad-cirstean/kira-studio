@@ -3,6 +3,11 @@ import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { getJson, postJson } from '../api/http';
 
+interface MobileMe {
+  permissions: { write: boolean; agentInput: boolean };
+  agentInputGlobal: boolean;
+}
+
 type AuthPhase =
   | 'checking'
   | 'unpaired'
@@ -28,6 +33,10 @@ export const useAuthStore = defineStore('mobileAuth', () => {
     /** Shown on the phone and in the desktop prompt so the user can match the request. */
     code: '',
     message: '',
+    /** What the desktop allows this phone; agentInput already folds in the global switch. */
+    permissions: { write: false, agentInput: false },
+    /** The desktop's global agent input switch, so a hint can say which switch is off. */
+    agentInputGlobal: false,
   });
   let pairing: AbortController | null = null;
 
@@ -38,11 +47,25 @@ export const useAuthStore = defineStore('mobileAuth', () => {
   async function check(): Promise<void> {
     state.phase = 'checking';
     try {
-      await getJson('/api/me');
+      applyMe(await getJson<MobileMe>('/api/me'));
       state.phase = 'paired';
     } catch {
       // A 401 already set the phase through onUnauthorized; any other failure means unreachable.
       if (state.phase === 'checking') state.phase = 'unreachable';
+    }
+  }
+
+  function applyMe(me: MobileMe): void {
+    state.permissions = me.permissions;
+    state.agentInputGlobal = me.agentInputGlobal;
+  }
+
+  /** Re-reads the permissions: the desktop can change them while the app is open. */
+  async function refreshMe(): Promise<void> {
+    try {
+      applyMe(await getJson<MobileMe>('/api/me'));
+    } catch {
+      // a 401 already moved the phase; any other failure keeps the last known permissions
     }
   }
 
@@ -53,7 +76,7 @@ export const useAuthStore = defineStore('mobileAuth', () => {
     state.message = '';
     state.phase = 'requesting';
     try {
-      await postJson('/api/pair', { label, code: state.code }, pairing.signal);
+      await postJson('/api/pair', { label, code: state.code }, { signal: pairing.signal });
       state.phase = 'paired';
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -70,5 +93,5 @@ export const useAuthStore = defineStore('mobileAuth', () => {
     state.phase = 'unpaired';
   }
 
-  return { ...toRefs(state), check, requestAccess, cancelRequest, onUnauthorized };
+  return { ...toRefs(state), check, refreshMe, requestAccess, cancelRequest, onUnauthorized };
 });

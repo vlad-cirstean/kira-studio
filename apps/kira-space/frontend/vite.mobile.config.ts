@@ -21,7 +21,7 @@ export default defineConfig({
       manifest: {
         name: 'Kira Space Agents',
         short_name: 'Agents',
-        description: 'Read-only view of your Kira Space agents.',
+        description: 'Your Kira Space agents, backlog and plan on your phone.',
         display: 'standalone',
         start_url: '/',
         scope: '/',

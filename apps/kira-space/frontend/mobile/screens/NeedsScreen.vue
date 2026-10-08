@@ -2,11 +2,54 @@
 import { shortAge } from '@ade/ago';
 import { TONE_TAG_CLASS } from '@ade/tones';
 import { Alert } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
+import { storeToRefs } from 'pinia';
+import { computed, ref } from 'vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
+import PermissionHint from '../components/PermissionHint.vue';
+import ReplySheet from '../components/ReplySheet.vue';
+import { useAuthStore } from '../state/auth';
+import { newIntentKey, useAdeWrites } from '../state/useAdeWrites';
 import { useAgentsModel } from '../state/useAgentsModel';
 
-// Everything that waits on you, most urgent first. Read-only: acting happens on the computer.
+// Everything that waits on you, most urgent first. An agent waiting in its Claude Code session
+// can be answered from here, or taken over when a run is stuck.
 const { model, boardQuery } = useAgentsModel();
+const { permissions } = storeToRefs(useAuthStore());
+const writes = useAdeWrites();
+
+const replying = ref<{ sessionId: string; context: string } | null>(null);
+const takingOver = ref<{ sessionId: string; what: string } | null>(null);
+const takeOverError = ref('');
+let takeOverKey = newIntentKey();
+
+const canReply = computed(() => permissions.value.agentInput);
+const needsAgentInput = computed(
+  () =>
+    !canReply.value &&
+    !!model.value?.needs.items.some(
+      (n) => n.sessionId && (n.kind === 'question' || n.kind === 'stuck run'),
+    ),
+);
+
+function askTakeOver(sessionId: string, what: string): void {
+  takeOverError.value = '';
+  takeOverKey = newIntentKey();
+  takingOver.value = { sessionId, what };
+}
+
+async function confirmTakeOver(): Promise<void> {
+  const target = takingOver.value;
+  if (!target) return;
+  takeOverError.value = '';
+  try {
+    await writes.takeOver.mutateAsync({ sessionId: target.sessionId, key: takeOverKey });
+    takingOver.value = null;
+  } catch (err) {
+    takeOverError.value = err instanceof Error ? err.message : String(err);
+  }
+}
 </script>
 
 <template>
@@ -23,6 +66,7 @@ const { model, boardQuery } = useAgentsModel();
         </EmptyHeader>
       </Empty>
       <template v-else>
+        <PermissionHint v-if="needsAgentInput" what="Replying to agents is off for this phone." />
         <ul class="m-0 flex list-none flex-col p-0">
           <li
             v-for="item in model.needs.items"
@@ -49,10 +93,46 @@ const { model, boardQuery } = useAgentsModel();
             <span class="text-kira-md text-fg">{{ item.what }}</span>
             <span v-if="item.detail" class="text-kira-sm text-muted-foreground">{{ item.detail }}</span>
             <span v-if="item.scope" class="text-kira-sm text-subtle">{{ item.scope }}</span>
+            <span v-if="canReply && item.sessionId" class="flex gap-2 pt-1">
+              <Button
+                v-if="item.kind === 'question'"
+                variant="dialog-primary"
+                class="h-11 px-4"
+                data-testid="needs-reply"
+                @click="replying = { sessionId: item.sessionId, context: item.what }"
+              >
+                Reply
+              </Button>
+              <Button
+                v-else-if="item.kind === 'stuck run'"
+                variant="dialog"
+                class="h-11 px-4"
+                data-testid="needs-take-over"
+                @click="askTakeOver(item.sessionId, item.what)"
+              >
+                Take over
+              </Button>
+            </span>
           </li>
         </ul>
         <p class="m-0 px-3 py-2 text-kira-sm text-subtle" data-testid="needs-footer">{{ model.needs.footer }}</p>
       </template>
     </template>
+    <ReplySheet
+      :open="replying !== null"
+      :session-id="replying?.sessionId ?? ''"
+      :context="replying?.context ?? ''"
+      @close="replying = null"
+    />
+    <ConfirmDialog
+      :open="takingOver !== null"
+      title="Take over?"
+      :text="`${takingOver?.what ?? ''} Taking over stops the background run and continues it in Claude Code on your computer.`"
+      confirm-label="Take over"
+      :busy="writes.takeOver.isPending.value"
+      :error="takeOverError"
+      @cancel="takingOver = null"
+      @confirm="confirmTakeOver"
+    />
   </section>
 </template>

@@ -1,13 +1,15 @@
 import { withTuiActivity } from '@ade/activity';
+import { type TaskAction, taskCell } from '@ade/board/actions';
 import { taskTitle } from '@ade/board/labels';
 import { buildNeedsYou } from '@ade/board/needsYou';
 import { buildTaskProgress, type TaskProgress } from '@ade/board/progress';
 import { buildStageBlocks, type StageBlock } from '@ade/board/stageBlocks';
+import { type StageMoves, stageMoves } from '@ade/board/stageMoves';
 import { type DerivedStatus, deriveStatus } from '@ade/board/status';
 import { localIso } from '@ade/localDay';
 import { taskColor } from '@ade/palette';
 import { useBoard, useRepoNames, useSessions, useWorkflows } from '@ade/readQueries';
-import type { Branch, Task, Workflow } from '@ade/wire';
+import type { Branch, Session, Task, Workflow } from '@ade/wire';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { useAgentSessionsStore } from './agentSessions';
@@ -23,6 +25,12 @@ export interface PlanCard {
   attention: string;
   /** Repo nicknames of the task's branches. */
   repos: string[];
+  /** The desktop's stage action for the task (Run, Stage session, Take over, ...), if any. */
+  action: TaskAction | null;
+  /** Where the stage buttons can go from here. */
+  moves: StageMoves;
+  /** Running interactive Claude Code sessions of the task. */
+  tuiSessions: Session[];
 }
 
 export interface PlanGroup {
@@ -91,26 +99,34 @@ export const useAgentsModel = createSharedComposable(() => {
       const taskProgress = progress.get(task.id) as TaskProgress;
       const branches = task.branchIds.flatMap((id) => branchById.get(id) ?? []);
       const i = input(task);
+      const status = deriveStatus({
+        task,
+        progress: taskProgress,
+        branches,
+        hasSessions: sessions.value.some((s) => s.taskId === task.id),
+      });
+      const taskSessions = sessions.value.filter((s) => s.taskId === task.id);
+      const blocks = buildStageBlocks(
+        i,
+        i.workflow,
+        taskProgress.stage ?? task.currentStage,
+        taskProgress.stageIndex,
+        taskProgress.finished,
+      );
       cards.set(task.id, {
         task,
         title: taskTitle(task, branches[0], ''),
         color: taskColor(task.color),
         progress: taskProgress,
-        status: deriveStatus({
-          task,
-          progress: taskProgress,
-          branches,
-          hasSessions: sessions.value.some((s) => s.taskId === task.id),
-        }),
-        blocks: buildStageBlocks(
-          i,
-          i.workflow,
-          taskProgress.stage ?? task.currentStage,
-          taskProgress.stageIndex,
-          taskProgress.finished,
-        ),
+        status,
+        blocks,
         attention: needs.items.find((n) => n.taskId === task.id)?.what ?? '',
         repos: [...new Set(branches.map((br) => repoLabel(br.codeRepoId)))],
+        action:
+          taskCell({ task, progress: taskProgress, status, branches, sessions: taskSessions })
+            ?.action ?? null,
+        moves: stageMoves(blocks, task.stageId, task.runs),
+        tuiSessions: taskSessions.filter((s) => s.mode === 'tui' && s.state === 'running'),
       });
     }
 

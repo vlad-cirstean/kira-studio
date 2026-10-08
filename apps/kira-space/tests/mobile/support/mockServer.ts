@@ -28,6 +28,9 @@ export type PairOutcome = 'approve' | 'deny' | 'timeout';
 interface State {
   /** `/api/me` and every device route answer 200, 401 unauthorized or 401 revoked. */
   auth: 'ok' | 'unauthorized' | 'revoked';
+  /** What `/api/me` reports the desktop allows this phone. */
+  permissions: { write: boolean; agentInput: boolean };
+  agentInputGlobal: boolean;
   requests: { method: string; path: string; body: string }[];
   pairWaiters: ServerResponse[];
   streams: Set<ServerResponse>;
@@ -84,7 +87,15 @@ async function serveFile(res: ServerResponse, pathname: string): Promise<void> {
 }
 
 export async function startMobileServer(): Promise<MobileServer> {
-  const state: State = { auth: 'unauthorized', requests: [], pairWaiters: [], streams: new Set() };
+  const initial = (): State => ({
+    auth: 'unauthorized',
+    permissions: { write: false, agentInput: false },
+    agentInputGlobal: false,
+    requests: [],
+    pairWaiters: [],
+    streams: new Set(),
+  });
+  const state: State = initial();
   const repos = (
     fixture('repos') as { repos: { codeRepoId: string; name: string; nickname: string }[] }
   ).repos.map(({ codeRepoId, name, nickname }) => ({ codeRepoId, name, nickname }));
@@ -130,7 +141,12 @@ export async function startMobileServer(): Promise<MobileServer> {
       return;
     }
     if (path === '/api/me') {
-      json(res, 200, { deviceId: 'dev-1', label: 'Test phone' });
+      json(res, 200, {
+        deviceId: 'dev-1',
+        label: 'Test phone',
+        permissions: state.permissions,
+        agentInputGlobal: state.agentInputGlobal,
+      });
     } else if (path === '/api/events') {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -160,10 +176,7 @@ export async function startMobileServer(): Promise<MobileServer> {
     state,
     reset() {
       for (const res of [...state.streams, ...state.pairWaiters]) res.destroy();
-      state.auth = 'unauthorized';
-      state.requests = [];
-      state.pairWaiters = [];
-      state.streams = new Set();
+      Object.assign(state, initial());
     },
     emit(channel, data) {
       for (const res of state.streams)
