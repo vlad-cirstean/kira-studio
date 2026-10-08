@@ -14,7 +14,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
-import { connBgClass } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
 import { control } from '../bridge/control';
@@ -114,7 +114,7 @@ const onRemoveRepo = (id: string, name: string) =>
               :key="r.id"
               type="button"
               role="option"
-              class="flex h-5.5 shrink-0 cursor-pointer items-center gap-1.5 rounded-kira-sm border-none px-1.5 text-left text-kira-md"
+              class="relative flex h-5.5 shrink-0 cursor-pointer items-center gap-1.5 rounded-kira-sm border-none px-1.5 text-left text-kira-md"
               :class="showRepos && selected?.id === r.id ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground hover:bg-hover'"
               :aria-selected="showRepos && selected?.id === r.id"
               :title="r.root"
@@ -122,7 +122,7 @@ const onRemoveRepo = (id: string, name: string) =>
               :data-repo-id="r.id"
               @click="pickRepo(r.id)"
             >
-              <span class="size-2 shrink-0 rounded-full" :class="connBgClass(r.color)" data-testid="repos-dialog-repo-dot" />
+              <span :class="colorMarkClass('rail', r.color)" data-testid="repos-dialog-repo-rail" aria-hidden="true" />
               <span class="min-w-0 flex-1 truncate">{{ nickOf(r.id) || r.name }}</span>
             </button>
           </div>

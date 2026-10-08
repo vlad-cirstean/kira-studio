@@ -212,7 +212,7 @@ test('picking a swatch sends SetRepoColor and the nav dot follows', async ({ rel
   });
   await expect(
     page.locator(
-      `${t('repos-dialog-repo')}[data-repo-id="repo-web-app"] ${t('repos-dialog-repo-dot')}`,
+      `${t('repos-dialog-repo')}[data-repo-id="repo-web-app"] ${t('repos-dialog-repo-rail')}`,
     ),
   ).toHaveClass(/bg-conn-red/);
 });

@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connTextClass } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
@@ -147,8 +147,7 @@ function recordMenuItems(
   return items;
 }
 
-function repoIconClass(repo: RepoSummary): string | undefined {
-  if (repo.color !== 'none') return connTextClass(repo.color);
+function repoIconClass(repo: RepoSummary): string {
   return isOpen(repo.id) ? 'text-fg' : 'text-muted-foreground';
 }
 
@@ -409,7 +408,7 @@ onUnmounted(() => {
           <div class="flex flex-col" role="listbox" aria-label="Repositories">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <div
-                class="h-row flex items-center gap-1 px-1.5 cursor-default select-none"
+                class="relative h-row flex items-center gap-1 px-1.5 cursor-default select-none"
                 :class="[isActive(repo.id) ? 'bg-select' : 'hover:bg-hover', { active: isActive(repo.id) }]"
                 data-testid="repo-row"
                 :data-repo-id="repo.id"
@@ -421,6 +420,7 @@ onUnmounted(() => {
                 @keydown.space.prevent="onRowClick(repo.id)"
                 @contextmenu.prevent="onRepoContextMenu($event, repo)"
               >
+                <span :class="colorMarkClass('rail', repo.color)" data-testid="repo-rail" aria-hidden="true" />
                 <!-- P110 I2-13: RepoTreeRow.vue's own twisty, shared via TreeTwisty. -->
                 <TreeTwisty
                   :expanded="worktreesStore.isWorktreesExpanded(repo.id)"
@@ -480,7 +480,7 @@ onUnmounted(() => {
                 <div
                   v-for="wt in worktreesStore.worktreeEntries(repo.id)"
                   :key="wt.path"
-                  class="h-row flex items-center gap-1 cursor-default select-none text-kira-md pr-1.5 pl-6"
+                  class="relative h-row flex items-center gap-1 cursor-default select-none text-kira-md pr-1.5 pl-6"
                   :class="[
                     isActive(worktreeRecordId(wt.path)) ? 'bg-select' : 'hover:bg-hover',
                     wt.isCurrent || isOpen(worktreeRecordId(wt.path)) ? 'text-fg' : 'text-muted-foreground',
@@ -496,6 +496,7 @@ onUnmounted(() => {
                   @keydown.space.prevent.stop="worktreesStore.switchToWorktree(repo.id, wt)"
                   @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
+                  <span :class="colorMarkClass('rail', repo.color)" data-testid="repo-worktree-rail" aria-hidden="true" />
                   <CodiconIcon name="git-branch" :size="14" class="shrink-0" />
                   <Tooltip>
                     <TooltipTrigger as-child>
