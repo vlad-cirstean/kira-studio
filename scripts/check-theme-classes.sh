@@ -23,6 +23,7 @@
 # commit that does the rename/deletion (P110 plan §5.12). Never a batch add at the end.
 set -e
 
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/.."
 
 # Every check needs GNU grep's -P (BSD/macOS grep has none): prefer ggrep (`brew install grep`), then
@@ -64,10 +65,57 @@ SCAN_DIRS="$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC $DOCKER_UI_SRC"
 
 STATUS=0
 
+# Prefilter. A first pass of this script (TC_COLLECT set) runs every call as a no-op that records
+# the default-scope names of check_class_all/check_class_in_attrs_all. One combined alternation
+# per family then replaces ~110 per-name greps: zero hits means every per-name check of that
+# family is skipped; any hit falls back to the unchanged per-name checks, so failure output and
+# exit status stay identical.
+ALL_CLEAN=0
+ATTRS_CLEAN=0
+if [ -z "$TC_COLLECT" ]; then
+  TC_COLLECT=$(mktemp -d)
+  trap 'rm -f "$GREP_ERRORS"; rm -rf "$TC_COLLECT"' EXIT
+  : >"$TC_COLLECT/all"
+  : >"$TC_COLLECT/attrs"
+  TC_COLLECT="$TC_COLLECT" sh "$SELF" >/dev/null 2>&1 || true
+  _alt() { sed 's/^.*$/(?:&)/' "$TC_COLLECT/$1" | paste -sd'|' -; }
+  # _family_hits <alternation> <attrs-only: 1|0>
+  _family_hits() {
+    alt="$1"
+    attrs_only="$2"
+    if [ "$attrs_only" = 1 ]; then
+      grep -rnoP --include='*.vue' --include='*.ts' -- '(?::?class)="[^"]*"' $SCAN_DIRS 2>/dev/null |
+        grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" |
+        grep -v "^${THEME_SRC}/components/ui/" || true
+    else
+      grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
+        -- "(?<![-\\w])(?:[a-z0-9-]+:)*(?:${alt})(?![-\\w])" $SCAN_DIRS 2>/dev/null |
+        grep -v "^${THEME_SRC}/components/ui/" || true
+    fi
+    grep -rnP --include='*.vue' -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+      grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
+      grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" || true
+    grep -rnP --include='*.ts' "" "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+      grep -v "^${GIT_UI_SRC}/lib/cn.ts:" |
+      grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
+      grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" || true
+  }
+  if [ -s "$TC_COLLECT/all" ] && [ -z "$(_family_hits "$(_alt all)" 0)" ]; then
+    ALL_CLEAN=1
+  fi
+  if [ -s "$TC_COLLECT/attrs" ] && [ -z "$(_family_hits "$(_alt attrs)" 1)" ]; then
+    ATTRS_CLEAN=1
+  fi
+  TC_COLLECT=""
+fi
+
 # check_class <retired-name> <replacement> [scan-dirs]
 # Reports every hit outside packages/theme/src/components/ui/, as file:line:match, so the failure
 # output tells the next author what to write instead.
 check_class() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   name="$1"
   replacement="$2"
   dirs="${3:-$SCAN_DIRS}"
@@ -87,6 +135,9 @@ check_class() {
 # would false-positive on those. Scoped instead to `class="..."`/`:class="..."` attribute VALUES
 # only, so a comment using the word never matches.
 check_class_in_attrs() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   name="$1"
   replacement="$2"
   dirs="${3:-$SCAN_DIRS}"
@@ -108,6 +159,9 @@ check_class_in_attrs() {
 # value is a regression, full stop. Same attribute scope and comment-line exclusion as the retired
 # per-name checks it replaces.
 check_no_kui_class() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   hits=$(grep -rnP --include='*.vue' --include='*.ts' \
     -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
@@ -151,6 +205,12 @@ _gu_ku_hits() {
 # closed gap.
 check_class_all() {
   name="$1"
+  if [ -n "$TC_COLLECT" ]; then
+    [ -n "$3" ] || printf '%s
+' "$name" >>"$TC_COLLECT/all"
+    return 0
+  fi
+  [ -n "$3" ] || [ "$ALL_CLEAN" != 1 ] || return 0
   replacement="$2"
   dirs="${3:-$SCAN_DIRS}"
   base_hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
@@ -176,6 +236,12 @@ check_class_all() {
 # own comment-line filter) never false-positives.
 check_class_in_attrs_all() {
   name="$1"
+  if [ -n "$TC_COLLECT" ]; then
+    [ -n "$3" ] || printf '%s
+' "$name" >>"$TC_COLLECT/attrs"
+    return 0
+  fi
+  [ -n "$3" ] || [ "$ATTRS_CLEAN" != 1 ] || return 0
   replacement="$2"
   dirs="${3:-$SCAN_DIRS}"
   base_hits=$(grep -rnoP --include='*.vue' --include='*.ts' \
@@ -208,6 +274,9 @@ check_class_in_attrs_all() {
 # `kv:` variant prefix the outer alternation's own `(?:[a-z0-9-]+:)*` group would otherwise still
 # capture).
 check_alias() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   name="$1"
   replacement="$2"
   hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
@@ -238,6 +307,9 @@ check_alias() {
 # `cut -c11-` (POSIX sh has no `${var:n}` substring expansion) and replaced with
 # `(?<![\w:-])(?!kv:)` -- same rewrite check_alias applies inline to its own pattern.
 check_focus_width() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   pattern="$1"
   hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
     -- "$pattern" $SCAN_DIRS 2>/dev/null || true)
@@ -288,6 +360,9 @@ _font_scale_anchor() {
 # unprefixed scale, so an off-scale `text-*` utility there is a real hit too, distinct from the
 # `kv:`-prefixed one the existing kv pass below already catches.
 check_font_scale() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   host_class='(?<![-\w])text-(?:xs|sm|base|lg|[2-9]?xl|kira-xs|\[(?!#|rgb|hsl|color:|var\()[^\]\s]+\]|\(length:[^)\s]+\))(?![-\w])'
   host_css='(?<![-\w])font-size\s*:(?!\s*var\(--kira-t-(?:sm|md|lg|xl)\)\s*[;}])'
   kv_class='(?<![-\w])kv:text-(?:xs|kui-xs|\[(?!#|rgb|hsl|color:|var\()[^\]\s]+\])(?![-\w])'
@@ -668,6 +743,9 @@ check_focus_width '(?<![-\w])(?:focus-visible|focus-within|focus|group-focus-wit
 # root cause as check_focus_width guards a different regression class. Modelled on check_focus_width:
 # SCAN_DIRS including components/ui (no legitimate survivor for either shape), plus the GU/KU pass.
 check_toggle_orientation() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   pattern="$1"
   hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
     -- "$pattern" $SCAN_DIRS 2>/dev/null || true)
@@ -688,6 +766,9 @@ check_toggle_orientation '(?<![-\w])(?:[a-z0-9-]+:)*(?:group-)?data-(?:horizonta
 # legitimate survivor anywhere, including components/ui itself (tabs/index.ts defines the string
 # once, as a cva template literal, never as this exact prefix).
 check_chip_copy() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   hits=$(grep -rnoP --include='*.vue' \
     -- 'h-control-lg inline-flex items-center gap-1 px-' $SCAN_DIRS 2>/dev/null || true)
   if [ -n "$hits" ]; then
@@ -702,6 +783,9 @@ check_chip_copy
 # Button/tab chips), never the panel tier (rounded-kira) the shadcn registry default used. Scoped to
 # just these two primitives -- rounded-kira is legitimate everywhere else a panel actually renders.
 check_toggle_radius() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
   hits=$(grep -rnoP --include='*.vue' --include='*.ts' \
     -- 'rounded-kira(?![-\w])' "$THEME_SRC/components/ui/toggle" "$THEME_SRC/components/ui/toggle-group" 2>/dev/null || true)
   if [ -n "$hits" ]; then
