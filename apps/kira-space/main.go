@@ -451,16 +451,12 @@ func wireTracker(
 func agentSessionCount(repositories *repos.Repos, registry *terminal.Registry) func() int {
 	return func() int {
 		n := len(registry.AgentSessions())
-		rows, err := repositories.AdeSessions.ListTask()
+		headless, err := repositories.AdeSessions.CountRunningHeadless()
 		if err != nil {
-			slog.Warn("keep-awake: list ade sessions", "scope", "keepawake", "err", err)
+			slog.Warn("keep-awake: count ade sessions", "scope", "keepawake", "err", err)
 			return n
 		}
-		for _, r := range rows {
-			if r.State == model.AdeSessionStateRunning && r.Mode == model.AdeSessionModeHeadless {
-				n++
-			}
-		}
+		n += headless
 		return n
 	}
 }

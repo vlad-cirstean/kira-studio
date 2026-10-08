@@ -57,6 +57,17 @@ func (r *AdeSessionsRepo) ListTask() ([]model.AdeSession, error) {
 	})
 }
 
+// CountRunningHeadless counts headless task sessions still running.
+func (r *AdeSessionsRepo) CountRunningHeadless() (int, error) {
+	var n int
+	err := r.DB.QueryRow(`SELECT count(*) FROM ade_sessions WHERE state = ? AND mode = ?`,
+		model.AdeSessionStateRunning, model.AdeSessionModeHeadless).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("repos: count running headless ade sessions: %w", err)
+	}
+	return n, nil
+}
+
 // ListRunningTUI returns the task rows whose interactive terminal is open.
 func (r *AdeSessionsRepo) ListRunningTUI() ([]model.AdeSession, error) {
 	rows, err := r.DB.Query(`SELECT `+adeSessionsSelectColumns+` FROM ade_sessions
