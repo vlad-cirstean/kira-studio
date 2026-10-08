@@ -1,4 +1,3 @@
-import type { DictationFrame, DictationStatus } from '@shared/domain/dictation';
 import type {
   Memory,
   MemoryClarification,
@@ -19,19 +18,6 @@ import { type InjectionKey, inject } from 'vue';
 
 // P201: the Memory module's injected context, the shared terminal module's shape — the same
 // components mount in any app that provides a control.
-
-/** Callbacks for one dictation stream. `onClose` fires once, after the final frame or on failure. */
-export interface DictationHandlers {
-  onFrame(frame: DictationFrame): void;
-  onClose(): void;
-}
-
-export interface DictationSession {
-  /** Finishes the session: a `final` frame follows, then the stream closes. */
-  stop(): void;
-  /** Discards the session and closes the stream without further frames. */
-  cancel(): void;
-}
 
 export interface MemoryControl {
   memorySearch(query: string, includeHistory: boolean): Promise<Memory[]>;
@@ -60,14 +46,6 @@ export interface MemoryControl {
   memoryImportAction(action: ImportAction, id: string): Promise<void>;
   memoryImportRetryFile(fileId: string): Promise<void>;
   onMemoryImport(cb: () => void): () => void;
-  /** P216: local speech to text. `dictationStatus` is `off` when the host cannot dictate. */
-  dictationStatus(): Promise<DictationStatus>;
-  /** Downloads the speech model; aborting `signal` cancels the download. */
-  dictationInstall(signal?: AbortSignal): Promise<void>;
-  dictationRetry(): Promise<void>;
-  onDictation(cb: () => void): () => void;
-  /** Opens a microphone session; frames arrive through `handlers`. */
-  dictationOpen(handlers: DictationHandlers): DictationSession;
 }
 
 export interface MemoryModuleContext {

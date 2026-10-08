@@ -11,16 +11,13 @@ import { refDebounced } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
 import { computed, onMounted, useId, useTemplateRef } from 'vue';
 import AddMemoryDialog from './AddMemoryDialog.vue';
-import DictationStatusLine from './dictation/DictationStatusLine.vue';
-import MicButton from './dictation/MicButton.vue';
-import { useDictationStore } from './dictation/store';
 import ImportConfirmDialog from './import/ImportConfirmDialog.vue';
 import ImportMenu from './import/ImportMenu.vue';
 import ImportStatus from './import/ImportStatus.vue';
 import { useImportChangeSync } from './import/importQueries';
 import { useImportUiStore } from './import/importStore';
 import MemorySetupHint from './MemorySetupHint.vue';
-import { useDictationStatus, useMemoryChangeSync, useMemorySearch, useMemorySemanticStatus } from './queries';
+import { useMemoryChangeSync, useMemorySearch, useMemorySemanticStatus } from './queries';
 import { useMemoryUiStore } from './store';
 
 // P201: the Memory module's left panel — recall-first search over the shared memory store, the
@@ -34,16 +31,9 @@ useImportChangeSync();
 const imports = useImportUiStore();
 
 const searchInput = useTemplateRef<{ $el: HTMLInputElement }>('searchInput');
-const SEARCH_DICTATION_ID = 'memory-search';
-const dictationStatus = useDictationStatus();
 const semanticStatus = useMemorySemanticStatus();
 const semanticState = computed(() => semanticStatus.data.value?.state);
 const semanticNeedsSetup = computed(() => semanticState.value === 'notInstalled' || semanticState.value === 'unavailable');
-const dictation = useDictationStore();
-const dictating = computed(() => dictation.active && dictation.target === SEARCH_DICTATION_ID);
-const showSearchAddon = computed(
-  () => query.value !== '' || (dictationStatus.data.value?.state ?? 'off') !== 'off',
-);
 onMounted(() => {
   searchInput.value?.$el.focus();
 });
@@ -74,15 +64,13 @@ const historyToggleId = useId();
         <InputGroupAddon>
           <CodiconIcon name="search" :size="13" />
         </InputGroupAddon>
-        <InputGroupInput ref="searchInput" v-model="query" :readonly="dictating" placeholder="Search memories" data-testid="memory-search" />
-        <InputGroupAddon v-if="showSearchAddon" align="inline-end">
-          <MicButton v-model="query" :target-id="SEARCH_DICTATION_ID" :input="() => searchInput?.$el ?? null" />
-          <InputGroupButton v-if="query" aria-label="Clear search" @click="query = ''">
+        <InputGroupInput ref="searchInput" v-model="query" placeholder="Search memories" data-testid="memory-search" />
+        <InputGroupAddon v-if="query" align="inline-end">
+          <InputGroupButton aria-label="Clear search" @click="query = ''">
             <CodiconIcon name="close" :size="12" />
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
-      <DictationStatusLine :target-id="SEARCH_DICTATION_ID" />
       <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground">
         <Switch :id="historyToggleId" v-model="includeHistory" data-testid="memory-include-history" />
         <Label :for="historyToggleId">Include history</Label>

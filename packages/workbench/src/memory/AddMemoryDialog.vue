@@ -5,10 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
-import { computed, reactive, ref, useTemplateRef } from 'vue';
-import DictationStatusLine from './dictation/DictationStatusLine.vue';
-import MicButton from './dictation/MicButton.vue';
-import { useDictationStore } from './dictation/store';
+import { computed, reactive, ref } from 'vue';
 import { useStoreMemory } from './queries';
 import { useMemoryUiStore } from './store';
 
@@ -16,10 +13,6 @@ import { useMemoryUiStore } from './store';
 const emit = defineEmits<{ close: [] }>();
 const ui = useMemoryUiStore();
 const store = useStoreMemory();
-const dictation = useDictationStore();
-const textInput = useTemplateRef<{ $el: HTMLTextAreaElement }>('textInput');
-const DICTATION_ID = 'add-memory';
-const dictating = computed(() => dictation.active && dictation.target === DICTATION_ID);
 
 const MAX_TEXT = 1000;
 const MANUAL_REASON = 'Stated by the user, added manually in the Memory module.';
@@ -118,19 +111,13 @@ function select(id: string): void {
             <Label for="memory-text">What should be remembered?</Label>
             <Textarea
               id="memory-text"
-              ref="textInput"
               v-model="text"
               :disabled="busy"
-              :readonly="dictating"
               :maxlength="MAX_TEXT"
               placeholder="Facts in your own words; Claude splits and checks them"
               data-testid="add-memory-text"
             />
-            <div class="flex items-center gap-1">
-              <MicButton v-model="text" :target-id="DICTATION_ID" :input="() => textInput?.$el ?? null" :max-length="MAX_TEXT" />
-              <DictationStatusLine :target-id="DICTATION_ID" class="min-w-0 flex-1" />
-              <span class="ml-auto shrink-0 text-kira-sm text-muted-foreground" data-testid="add-memory-count">{{ text.length }} / {{ MAX_TEXT }}</span>
-            </div>
+            <span class="self-end text-kira-sm text-muted-foreground" data-testid="add-memory-count">{{ text.length }} / {{ MAX_TEXT }}</span>
             <template v-if="challenged">
               <div
                 v-for="c in result?.challenges.filter((x) => x.index === 0)"

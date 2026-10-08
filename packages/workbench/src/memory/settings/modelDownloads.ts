@@ -1,22 +1,19 @@
 import { defineStore } from 'pinia';
 
-export type ModelKind = 'semantic' | 'dictation';
-
-// P221: in-flight model download handles. Settings unmounts on close while the download keeps
-// running server-side; the handle lives here so a reopened pane can still cancel.
+// P221: in-flight semantic model download handle. Settings unmounts on close while the download
+// keeps running server-side; the handle lives here so a reopened pane can still cancel.
 export const useModelDownloadsStore = defineStore('memoryModelDownloads', () => {
-  const controllers: Partial<Record<ModelKind, AbortController>> = {};
+  let controller: AbortController | undefined;
 
-  function begin(kind: ModelKind): AbortSignal {
-    const controller = new AbortController();
-    controllers[kind] = controller;
+  function begin(): AbortSignal {
+    controller = new AbortController();
     return controller.signal;
   }
-  function cancel(kind: ModelKind): void {
-    controllers[kind]?.abort();
+  function cancel(): void {
+    controller?.abort();
   }
-  function end(kind: ModelKind): void {
-    delete controllers[kind];
+  function end(): void {
+    controller = undefined;
   }
   return { begin, cancel, end };
 });

@@ -198,11 +198,6 @@ export const IPC = {
   memorySemanticInstall: 'kira:memory:semanticInstall',
   memorySemanticRetry: 'kira:memory:semanticRetry',
   memorySemantic: 'kira:memory:semantic',
-  // P216: dictation status/install/retry; memoryDictation is a push channel, no FQN entry.
-  dictationStatus: 'kira:memory:dictationStatus',
-  dictationInstall: 'kira:memory:dictationInstall',
-  dictationRetry: 'kira:memory:dictationRetry',
-  memoryDictation: 'kira:memory:dictation',
   // P211: bulk import; memoryImport is a push channel, no FQN entry.
   memoryImportChoose: 'kira:memory:importchoose',
   memoryImportCreate: 'kira:memory:importcreate',

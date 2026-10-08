@@ -175,9 +175,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memorySemanticStatus: 'MemoryService.SemanticStatus',
   memorySemanticInstall: 'MemoryService.InstallSemanticModel',
   memorySemanticRetry: 'MemoryService.RetrySemantic',
-  dictationStatus: 'DictationService.Status',
-  dictationInstall: 'DictationService.InstallModel',
-  dictationRetry: 'DictationService.Retry',
   memoryImportChoose: 'MemoryImportService.Choose',
   memoryImportCreate: 'MemoryImportService.Create',
   memoryImportJobs: 'MemoryImportService.Jobs',
@@ -278,8 +275,6 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.memoryRecent]: '[]',
   // P211: no imports by default.
   [IPC.memoryImportJobs]: '[]',
-  // P216: no speech engine by default, so the mic button stays hidden.
-  [IPC.dictationStatus]: JSON.stringify({ state: 'off', message: '', done: 0, total: 0 }),
   // P210: no embedder by default, so the semantic row stays hidden.
   [IPC.memorySemanticStatus]: JSON.stringify({
     state: 'off',

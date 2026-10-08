@@ -23,7 +23,7 @@ const percent = computed(() => {
 });
 
 function download(): void {
-  install.mutate(downloads.begin('semantic'), { onSettled: () => downloads.end('semantic') });
+  install.mutate(downloads.begin(), { onSettled: () => downloads.end() });
 }
 </script>
 
@@ -47,7 +47,7 @@ function download(): void {
         size="kira-lg"
         class="self-start"
         data-testid="memory-semantic-cancel"
-        @click="downloads.cancel('semantic')"
+        @click="downloads.cancel()"
       >
         Cancel
       </Button>

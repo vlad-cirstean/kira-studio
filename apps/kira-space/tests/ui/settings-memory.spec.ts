@@ -4,17 +4,8 @@ import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
-// P221: memory setup (Claude Code registration, semantic and speech model downloads) lives in
+// P221: memory setup (Claude Code registration, semantic model download) lives in
 // Settings > Memory, against a mocked bridge.
-
-const MB = 1024 * 1024;
-
-function dictation(state: string, over: Record<string, unknown> = {}): ControlSnapshot {
-  return {
-    channel: IPC.dictationStatus,
-    response: { state, message: '', done: 0, total: 0, ...over },
-  };
-}
 
 function semantic(state: string, over: Record<string, unknown> = {}): ControlSnapshot {
   return {
@@ -87,49 +78,4 @@ test('semantic unavailable: shows the reason and a retry', async ({ relaunch }) 
   await expect
     .poll(() => control.log().some((e) => e.channel === IPC.memorySemanticRetry))
     .toBe(true);
-});
-
-test('dictation not installed: prompt names the size; a failed download offers retry', async ({
-  relaunch,
-}) => {
-  const { window: page } = await relaunch({
-    control: [
-      dictation('notInstalled'),
-      {
-        channel: IPC.dictationInstall,
-        error: { code: 'checksum', message: 'model: checksum mismatch' },
-      },
-    ],
-  });
-  await openMemorySettings(page);
-  await expect(page.locator('[data-testid="dictation-section"]')).toContainText('182 MB');
-  await page.locator('[data-testid="dictation-download"]').click();
-  await expect(page.locator('[data-testid="dictation-error"]')).toContainText('checksum');
-  await expect(page.locator('[data-testid="dictation-download"]')).toHaveText('Retry download');
-});
-
-test('dictation downloading shows progress and a cancel button', async ({ relaunch }) => {
-  const { window: page } = await relaunch({
-    control: [dictation('downloading', { done: 95 * MB, total: 182 * MB })],
-  });
-  await openMemorySettings(page);
-  await expect(page.locator('[data-testid="dictation-progress-label"]')).toContainText(
-    '95 / 182 MB',
-  );
-  await expect(page.locator('[data-testid="dictation-cancel-download"]')).toBeVisible();
-});
-
-test('dictation unavailable shows the reason and a retry', async ({ relaunch }) => {
-  const { window: page, control } = await relaunch({
-    control: [
-      dictation('unavailable', { message: 'worker exited' }),
-      { channel: IPC.dictationRetry, response: undefined },
-    ],
-  });
-  await openMemorySettings(page);
-  await expect(page.locator('[data-testid="dictation-unavailable"]')).toContainText(
-    'worker exited',
-  );
-  await page.locator('[data-testid="dictation-retry"]').click();
-  await expect.poll(() => control.log().some((e) => e.channel === IPC.dictationRetry)).toBe(true);
 });

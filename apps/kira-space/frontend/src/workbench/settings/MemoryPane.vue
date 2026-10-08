@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import ClaudeCodeMcpSection from '@workbench/memory/settings/ClaudeCodeMcpSection.vue';
-import DictationModelSection from '@workbench/memory/settings/DictationModelSection.vue';
 import SemanticModelSection from '@workbench/memory/settings/SemanticModelSection.vue';
 import type { SettingsPaneProps } from './types';
 
@@ -13,6 +12,5 @@ defineProps<SettingsPaneProps>();
   <div class="contents" v-show="active">
     <ClaudeCodeMcpSection />
     <SemanticModelSection />
-    <DictationModelSection />
   </div>
 </template>
