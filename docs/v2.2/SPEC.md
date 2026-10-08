@@ -18,6 +18,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P220 | Git module: graph lines still disappear on click and on scroll (find the root cause); default tab is Repos and the last tab the user moved to persists across restarts | Done |
 | P221 | Memory module: move the semantic-search model download and the Connect Claude Code action into Settings | Done |
 | P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Done |
+| P223 | Mobile agents web as a plain-HTTP page on the trusted LAN only: drop the PWA, local CA, HTTPS and setup listener; bind one LAN interface address; refuse peers outside its private subnet; "Trust this network" (subnet plus router MAC) starts and stops the server by itself; plaintext warning; device tokens expire | Not started |
 | P224 | Remove speech to text completely: the `stt` package, whisper.cpp build, dictation bridge and stream, mic UI, P221's dictation settings section, malgo, S13, plists' microphone string, CI patch, docs; delete the downloaded speech model at startup; keep `modelstore`, `workerproc` and the embed worker | Done |
 
 ## Requirements (user's words, condensed)
@@ -32,6 +33,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 - P220: git graph lines still vanish on click and scroll; default git tab Repos; persist last tab moved to.
 - P221: memory module: semantic download and connect Claude Code move to Settings.
 - P222: add-repo dialog looks unlike app; colour per repo; unclear what add env does, should it add a script?
+- P223: self-signed cert install too shady; drop the PWA and HTTPS; no Tailscale; works only on my local network, checks which network it is and does not work otherwise.
 - P224: "Remove speech to text completely".
 
 ## P210 result
