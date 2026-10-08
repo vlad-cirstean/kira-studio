@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { computed, nextTick, ref, watch } from 'vue';
 import { type TabLike, type TabStripHost, useWorkbenchHost } from '../host';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
@@ -262,9 +262,8 @@ if (moveTab) {
         :data-preview="isPreview(tab)"
         data-pinned="false"
         :data-color="host.railColorFor(tab)"
-        :style="{ '--kira-rail': connColorVar(host.railColorFor(tab)) }"
       >
-        <span class="w-0.5 h-3.5 rounded-xs shrink-0 bg-(--kira-rail)" />
+        <span :class="colorMarkClass('bar', host.railColorFor(tab))" />
         <button
           type="button"
           :aria-current="tab.active || undefined"

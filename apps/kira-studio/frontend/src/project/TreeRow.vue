@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { connColorVar } from '@theme/connColor';
+import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
@@ -147,9 +147,8 @@ function onKeydown(e: KeyboardEvent): void {
     @contextmenu.prevent.stop="onContextMenu"
   >
     <div
-      class="absolute inset-y-0 left-0 w-0.5 bg-(--kira-rail)"
+      :class="colorMarkClass('rail', railColor)"
       data-testid="tree-rail"
-      :style="{ '--kira-rail': connColorVar(railColor) }"
     />
 
     <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already

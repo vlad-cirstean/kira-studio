@@ -203,22 +203,16 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
   const tab = page.locator('[data-testid="tab"]');
   await expect(tab).toHaveAttribute('data-color', 'blue');
-  await expect(tab).toHaveAttribute('style', /--kira-conn-blue/);
-  await expect(page.locator('[data-testid="toolbar-rail"]')).toHaveAttribute(
-    'style',
-    /--kira-conn-blue/,
-  );
+  await expect(tab.locator('span').first()).toHaveClass(/\bbg-conn-blue\b/);
+  await expect(page.locator('[data-testid="toolbar-rail"]')).toHaveClass(/\bbg-conn-blue\b/);
 
   await openRowMenu(page, '');
   await page.hover('[data-testid="menu-item-color"]');
   await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-color-magenta"]');
   await expect(tab).toHaveAttribute('data-color', 'magenta');
-  await expect(tab).toHaveAttribute('style', /--kira-conn-magenta/);
-  await expect(page.locator('[data-testid="toolbar-rail"]')).toHaveAttribute(
-    'style',
-    /--kira-conn-magenta/,
-  );
+  await expect(tab.locator('span').first()).toHaveClass(/\bbg-conn-magenta\b/);
+  await expect(page.locator('[data-testid="toolbar-rail"]')).toHaveClass(/\bbg-conn-magenta\b/);
 });
 
 // P23: the Color submenu's own trigger was ContextMenu.vue's `.submenu` CSS — `left: 100%; top:

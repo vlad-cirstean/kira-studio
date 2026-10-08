@@ -1474,11 +1474,11 @@ test('an environment’s colour reaches the request view’s toolbar cap and hea
   const { window: page } = await relaunch({ control: CONTROL });
 
   const rail = page.locator('[data-testid="http-request-view"] [data-testid="toolbar-rail"]');
-  await expect(rail).toHaveAttribute('style', /--kira-conn-blue/);
+  await expect(rail).toHaveClass(/\bbg-conn-blue\b/);
 
   const headDot = page.locator('[data-testid="view-head"] [data-testid="conn-dot"]');
   await expect(headDot).not.toHaveClass(/none/);
-  await expect(headDot).toHaveAttribute('style', /--kira-conn-blue/);
+  await expect(headDot).toHaveClass(/\bbg-conn-blue\b/);
 
   await page.click('[data-testid="api-environment-select"]');
   await page.click('[data-testid="api-environment-option"][data-value="env-b"]');
