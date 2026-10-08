@@ -3678,11 +3678,11 @@ only width that persists. The width floors at the 40px column minimum. The row S
 the column's right edge, so too narrow a column hides nodes and lines. Lanes past six clip until the
 user drags wider.
 
-Edge records (`EDGE_STRIDE` 7) carry three lanes: `fromLane` (source node), `EDGE_RUN_LANE` (lane on
+Edge records (`EDGE_STRIDE` 6) carry three lanes: `fromLane` (source node), `EDGE_RUN_LANE` (lane on
 pass-through rows, set at append, never patched), `toLane` (target node). Convergence at the target
-row patches `toLane` and `kind` only, so a branch-out edge that later converges keeps running in its
+row patches `toLane` only, so a branch-out edge that later converges keeps running in its
 own lane and bends into the claiming lane in its last row. `rowSvg.edgeCommand` draws from the three
-lanes, not from `kind`.
+lanes. Edges carry no kind.
 
 ### Code review, ported natively (C11)
 

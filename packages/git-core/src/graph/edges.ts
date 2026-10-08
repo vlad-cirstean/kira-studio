@@ -10,13 +10,10 @@ import {
   EDGE_COLOR,
   EDGE_FROM_LANE,
   EDGE_FROM_ROW,
-  EDGE_KIND,
-  EDGE_KIND_MERGE_IN,
   EDGE_RUN_LANE,
   EDGE_STRIDE,
   EDGE_TO_LANE,
   EDGE_TO_ROW,
-  type EdgeKind,
   PATCH_UNCHANGED,
   UNRESOLVED_ROW,
 } from './types.ts';
@@ -26,7 +23,7 @@ export interface BuiltEdges {
   readonly edges: Uint32Array;
   /** CSR into `edges`: length `rowCount + 1`, indexed by `row - from`. */
   readonly edgeIndex: Uint32Array;
-  /** `PATCH_STRIDE`-wide `(globalEdgeIndex, toRow, toLane, kind)` records patching an edge that
+  /** `PATCH_STRIDE`-wide `(globalEdgeIndex, toRow, toLane)` records patching an edge that
    *  belongs to an earlier chunk — see `LayoutChunk.patches`'s own doc comment for the
    *  `PATCH_UNCHANGED` sentinel each field carries when this record does not set it. */
   readonly patches: Uint32Array;
@@ -41,7 +38,7 @@ export interface BuiltEdges {
 export class EdgeBuffer {
   #edges = new Uint32Array(0) as Uint32Array<ArrayBuffer>;
   #count = 0;
-  // flat PATCH_STRIDE-wide groups: [globalEdgeIndex, toRow, toLane, kind, globalEdgeIndex, …]
+  // flat PATCH_STRIDE-wide groups: [globalEdgeIndex, toRow, toLane, globalEdgeIndex, …]
   #patches: number[] = [];
   #maxEdgeSpan = 0;
   #lastFromRow = -1;
@@ -54,14 +51,7 @@ export class EdgeBuffer {
   /** Appends one edge; `fromRow` must be >= every previously appended edge's `fromRow` in this
    *  chunk (the sort invariant `edgeIndex` depends on) — asserted, never assumed, since a
    *  future change emitting one out of order would otherwise corrupt every window query. */
-  append(
-    fromRow: number,
-    toRow: number,
-    fromLane: number,
-    toLane: number,
-    color: number,
-    kind: EdgeKind,
-  ): number {
+  append(fromRow: number, toRow: number, fromLane: number, toLane: number, color: number): number {
     assert(
       fromRow >= this.#lastFromRow,
       `EdgeBuffer.append: fromRow ${fromRow} precedes the last-appended ${this.#lastFromRow} — ` +
@@ -78,7 +68,6 @@ export class EdgeBuffer {
     this.#edges[base + EDGE_FROM_LANE] = fromLane;
     this.#edges[base + EDGE_TO_LANE] = toLane;
     this.#edges[base + EDGE_COLOR] = color;
-    this.#edges[base + EDGE_KIND] = kind;
     this.#edges[base + EDGE_RUN_LANE] = toLane;
     this.#count++;
 
@@ -91,7 +80,7 @@ export class EdgeBuffer {
 
   /** Sets a previously-`UNRESOLVED_ROW` target now that the parent has resolved. If
    *  `globalEdgeIndex` belongs to this buffer, the target is patched in place; otherwise it
-   *  belongs to an earlier chunk and a `(globalEdgeIndex, toRow, PATCH_UNCHANGED, PATCH_UNCHANGED)`
+   *  belongs to an earlier chunk and a `(globalEdgeIndex, toRow, PATCH_UNCHANGED)`
    *  record is appended to `#patches` instead — the mechanism a Load more uses to fix up a
    *  previous page's edges without re-laying it out. */
   patchTarget(globalEdgeIndex: number, toRow: number): void {
@@ -108,15 +97,15 @@ export class EdgeBuffer {
       if (span > this.#maxEdgeSpan) this.#maxEdgeSpan = span;
       return;
     }
-    this.#patches.push(globalEdgeIndex, toRow, PATCH_UNCHANGED, PATCH_UNCHANGED);
+    this.#patches.push(globalEdgeIndex, toRow, PATCH_UNCHANGED);
   }
 
   /** G21 D3b: the counterpart `patchTarget` never had — a lane discovered, at its *target* row's
    *  own processing (`lanes.ts` step 2), to converge into `toLane` rather than run straight or
-   *  branch out. Sets `EDGE_TO_LANE`/`EDGE_KIND := EDGE_KIND_MERGE_IN` on the edge that was
+   *  branch out. Sets `EDGE_TO_LANE` on the edge that was
    *  pointing at this row (`EDGE_RUN_LANE` is untouched: the run lane survives, which keeps a
    *  branch-out edge in its own lane until its last row), in place if it belongs to this buffer, or as a cross-chunk
-   *  `(globalEdgeIndex, PATCH_UNCHANGED, toLane, EDGE_KIND_MERGE_IN)` record otherwise — the
+   *  `(globalEdgeIndex, PATCH_UNCHANGED, toLane)` record otherwise — the
    *  exact same route `patchTarget`'s own cross-chunk case already travels, so a `toRow`
    *  resolution and a `toLane` convergence for the same edge (a pending parent that resolves and
    *  is then discovered to converge, both patched from a *later* chunk) become two independent
@@ -130,10 +119,9 @@ export class EdgeBuffer {
       );
       const base = localIndex * EDGE_STRIDE;
       this.#edges[base + EDGE_TO_LANE] = toLane;
-      this.#edges[base + EDGE_KIND] = EDGE_KIND_MERGE_IN;
       return;
     }
-    this.#patches.push(globalEdgeIndex, PATCH_UNCHANGED, toLane, EDGE_KIND_MERGE_IN);
+    this.#patches.push(globalEdgeIndex, PATCH_UNCHANGED, toLane);
   }
 
   get count(): number {

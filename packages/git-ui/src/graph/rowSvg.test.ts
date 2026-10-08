@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { EDGE_KIND_MERGE_IN, EDGE_KIND_STRAIGHT } from '@kira/git-core';
 import { GEOMETRY } from './geometry.ts';
 import type { EdgeSegment } from './layoutStore.ts';
 import {
@@ -139,7 +138,7 @@ describe('planNode — P93 §6.1 collapsed', () => {
   });
 });
 
-describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
+describe('edgeCommand — G21 D3c merge-in', () => {
   const rowHeight = 22;
   // P7 (item 1): deliberately NOT rowHeight / 2 (11) — proves edgeCommand actually consumes this
   // as its own parameter rather than silently re-deriving the node's y from rowHeight.
@@ -153,7 +152,6 @@ describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
       runLane: 1,
       toLane: 0,
       color: 0,
-      kind: EDGE_KIND_MERGE_IN,
       ...overrides,
     };
   }
@@ -184,7 +182,6 @@ describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
 
   test('a straight edge is unaffected by the merge-in branch — unchanged shape', () => {
     const segment = mergeInSegment({
-      kind: EDGE_KIND_STRAIGHT,
       fromLane: 0,
       runLane: 0,
       toLane: 0,

@@ -4,9 +4,6 @@ import {
   EDGE_COLOR,
   EDGE_FROM_LANE,
   EDGE_FROM_ROW,
-  EDGE_KIND,
-  EDGE_KIND_MERGE_IN,
-  EDGE_KIND_STRAIGHT,
   EDGE_RUN_LANE,
   EDGE_STRIDE,
   EDGE_TO_LANE,
@@ -14,7 +11,6 @@ import {
   type LayoutFrontier,
   type LayoutInput,
   PATCH_EDGE_INDEX,
-  PATCH_KIND,
   PATCH_STRIDE,
   PATCH_TO_LANE,
   PATCH_TO_ROW,
@@ -26,8 +22,7 @@ import {
  * off `main`"), root-caused in the phase's Findings: `feature`'s oldest commit (row 3) has parent
  * row 5, the shared merge base; `main`'s row 4 also parents row 5. Before D3, row 3's edge was
  * left claiming its own (feature's) lane all the way to row 5, disconnected from the commit it
- * converges into. D3 patches it to bend into row 5's actual lane and reclassifies it
- * `EDGE_KIND_MERGE_IN`.
+ * converges into. D3 patches it to bend into row 5's actual lane.
  *
  * Six commits, topo order (row 0 newest), every row single-parent except the root:
  *   row 0 --> row 1 --> row 4 --\
@@ -38,7 +33,7 @@ import {
  * branch's last commit) and row 5 (the merge base) — exactly where the patch has to travel
  * through `LayoutChunk.patches` rather than being resolved in place, the path most likely to be
  * wrong. Row 3's own edge (global index 3) ends up patched *twice* across the page boundary in
- * this scenario — once for `toRow` (a plain parent resolving), once for `toLane`/`kind` (the
+ * this scenario — once for `toRow` (a plain parent resolving), once for `toLane` (the
  * convergence itself) — which is exactly the case `PATCH_UNCHANGED`'s per-field sentinel exists
  * to keep independent.
  */
@@ -52,12 +47,11 @@ function edgeAt(edges: Uint32Array, localIndex: number) {
     runLane: edges[base + EDGE_RUN_LANE],
     toLane: edges[base + EDGE_TO_LANE],
     color: edges[base + EDGE_COLOR],
-    kind: edges[base + EDGE_KIND],
   };
 }
 
 describe('assignLanes — G21 D3 merge-in convergence', () => {
-  test('one pass: the converging edge bends into the claiming lane and is reclassified merge-in', () => {
+  test('one pass: the converging edge bends into the claiming lane and stays in its run lane', () => {
     const input: LayoutInput = {
       from: 0,
       to: 6,
@@ -80,14 +74,15 @@ describe('assignLanes — G21 D3 merge-in convergence', () => {
     // The real assertion this phase is about: the edge now bends into lane 0 (where row 5 was
     // actually claimed), not the lane it started in.
     expect(converging.toLane).toBe(0);
-    expect(converging.kind).toBe(EDGE_KIND_MERGE_IN);
+    expect(converging.runLane).toBe(converging.fromLane);
+    expect(converging.runLane).not.toBe(converging.toLane);
 
     // main's own row 1 -> row 4 edge (index 1) is an ordinary straight run, untouched by D3.
     const straight = edgeAt(built.edges, 1);
     expect(straight.fromRow).toBe(1);
     expect(straight.toRow).toBe(4);
     expect(straight.toLane).toBe(0);
-    expect(straight.kind).toBe(EDGE_KIND_STRAIGHT);
+    expect(straight.runLane).toBe(straight.toLane);
   });
 
   test("paged: split between the branch's last commit and the merge base equals the one-pass run", () => {
@@ -123,8 +118,7 @@ describe('assignLanes — G21 D3 merge-in convergence', () => {
     const built2 = chunk2.edgeBuffer.build(4, 6);
     // Three patch records travel through chunk 2's own `patches`, all naming edges that live in
     // chunk 1 (global indices < 4): slot 1's resolution (edge 1 -> toRow 4), slot 3's resolution
-    // (edge 3 -> toRow 5), and the convergence discovered at row 5 (edge 3 -> toLane 0,
-    // kind merge-in) — the same edge patched twice, for two independent fields.
+    // (edge 3 -> toRow 5), and the convergence discovered at row 5 (edge 3 -> toLane 0) — the same edge patched twice, for two independent fields.
     expect(built2.patches.length).toBe(3 * PATCH_STRIDE);
     const records = [];
     for (let i = 0; i < built2.patches.length; i += PATCH_STRIDE) {
@@ -132,13 +126,12 @@ describe('assignLanes — G21 D3 merge-in convergence', () => {
         edgeIndex: built2.patches[i + PATCH_EDGE_INDEX],
         toRow: built2.patches[i + PATCH_TO_ROW],
         toLane: built2.patches[i + PATCH_TO_LANE],
-        kind: built2.patches[i + PATCH_KIND],
       });
     }
     expect(records).toEqual([
-      { edgeIndex: 1, toRow: 4, toLane: PATCH_UNCHANGED, kind: PATCH_UNCHANGED },
-      { edgeIndex: 3, toRow: 5, toLane: PATCH_UNCHANGED, kind: PATCH_UNCHANGED },
-      { edgeIndex: 3, toRow: PATCH_UNCHANGED, toLane: 0, kind: EDGE_KIND_MERGE_IN },
+      { edgeIndex: 1, toRow: 4, toLane: PATCH_UNCHANGED },
+      { edgeIndex: 3, toRow: 5, toLane: PATCH_UNCHANGED },
+      { edgeIndex: 3, toRow: PATCH_UNCHANGED, toLane: 0 },
     ]);
 
     // Apply every patch the way `LayoutStore.#applyPatches` does — write into chunk 1's own
@@ -150,7 +143,6 @@ describe('assignLanes — G21 D3 merge-in convergence', () => {
       const base = record.edgeIndex * EDGE_STRIDE;
       if (record.toRow !== PATCH_UNCHANGED) patchedEdges[base + EDGE_TO_ROW] = record.toRow;
       if (record.toLane !== PATCH_UNCHANGED) patchedEdges[base + EDGE_TO_LANE] = record.toLane;
-      if (record.kind !== PATCH_UNCHANGED) patchedEdges[base + EDGE_KIND] = record.kind;
     }
 
     const onePass = assignLanes(
@@ -175,7 +167,6 @@ describe('assignLanes — G21 D3 merge-in convergence', () => {
     const patchedConverging = edgeAt(patchedEdges, 3);
     expect(patchedConverging.toRow).toBe(5);
     expect(patchedConverging.toLane).toBe(0);
-    expect(patchedConverging.kind).toBe(EDGE_KIND_MERGE_IN);
   });
 });
 
@@ -193,7 +184,6 @@ describe('assignLanes — P225 branch-out edge that converges', () => {
     );
     const edge = edgeAt(edgeBuffer.build(0, 4).edges, 1);
     expect(edge).toMatchObject({ fromRow: 0, toRow: 3, fromLane: 0, runLane: 1, toLane: 0 });
-    expect(edge.kind).toBe(EDGE_KIND_MERGE_IN);
   });
 
   test('paged: patches keep the run lane and equal the one-pass run', () => {
@@ -217,10 +207,8 @@ describe('assignLanes — P225 branch-out edge that converges', () => {
       const base = (built2.patches[i + PATCH_EDGE_INDEX] as number) * EDGE_STRIDE;
       const toRow = built2.patches[i + PATCH_TO_ROW] as number;
       const toLane = built2.patches[i + PATCH_TO_LANE] as number;
-      const kind = built2.patches[i + PATCH_KIND] as number;
       if (toRow !== PATCH_UNCHANGED) patched[base + EDGE_TO_ROW] = toRow;
       if (toLane !== PATCH_UNCHANGED) patched[base + EDGE_TO_LANE] = toLane;
-      if (kind !== PATCH_UNCHANGED) patched[base + EDGE_KIND] = kind;
     }
     const onePass = assignLanes(
       { from: 0, to: 4, parentOffsets, parentRows, resolvedParentSlots: Uint32Array.from([]) },

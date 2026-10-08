@@ -22,7 +22,6 @@ export {
 } from './graph/rowPlan.ts';
 export type {
   ColorState,
-  EdgeKind,
   LayoutChunk,
   LayoutFrontier,
   LayoutInput,
@@ -35,10 +34,6 @@ export {
   EDGE_COLOR,
   EDGE_FROM_LANE,
   EDGE_FROM_ROW,
-  EDGE_KIND,
-  EDGE_KIND_BRANCH_OUT,
-  EDGE_KIND_MERGE_IN,
-  EDGE_KIND_STRAIGHT,
   EDGE_RUN_LANE,
   EDGE_STRIDE,
   EDGE_TO_LANE,
@@ -46,7 +41,6 @@ export {
   LANE_EMPTY,
   LANE_PENDING,
   PATCH_EDGE_INDEX,
-  PATCH_KIND,
   PATCH_STRIDE,
   PATCH_TO_LANE,
   PATCH_TO_ROW,

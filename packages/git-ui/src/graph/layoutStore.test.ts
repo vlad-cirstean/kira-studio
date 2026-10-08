@@ -11,7 +11,7 @@ import { type EdgeSegment, LayoutStore } from './layoutStore.ts';
 /** Builds a hand-crafted `LayoutChunk` — no real `layoutAppend()` pass, since this module's own
  *  doc comment frames `LayoutStore` as "unit-testable in bun test without a browser" independent
  *  of the layout algorithm that produces real chunks. `edges` is a flat list of
- *  `[fromRow, toRow, fromLane, toLane, color, kind]` tuples, already sorted by fromRow (the
+ *  `[fromRow, toRow, fromLane, toLane, color]` tuples, already sorted by fromRow (the
  *  store's own invariant) since every edge here starts at `from`. `edgeIndex`'s CSR form follows
  *  mechanically: every row before `from + 1` (i.e. row `from` itself) contributes 0 edges to the
  *  running total, and the total from row `from + 1` onward is simply "all of them" (none of this
@@ -19,7 +19,7 @@ import { type EdgeSegment, LayoutStore } from './layoutStore.ts';
 function buildChunk(
   from: number,
   to: number,
-  edges: ReadonlyArray<readonly [number, number, number, number, number, number]>,
+  edges: ReadonlyArray<readonly [number, number, number, number, number]>,
   laneCount = 2,
 ): LayoutChunk {
   const rowCount = to - from;
@@ -46,7 +46,7 @@ function buildChunk(
 function buildPatchChunk(
   from: number,
   to: number,
-  patches: ReadonlyArray<readonly [number, number, number, number]>,
+  patches: ReadonlyArray<readonly [number, number, number]>,
 ): LayoutChunk {
   const rowCount = to - from;
   const patchData = new Uint32Array(patches.length * PATCH_STRIDE);
@@ -87,16 +87,16 @@ describe('LayoutStore — long-edge segment collection stays correct after a pat
     const chunk0 = buildChunk(0, 3, [
       // edge0: will be patched to toRow=1 by chunk1 below — a long-at-append-time edge that
       // turns out to have closed almost immediately.
-      [0, UNRESOLVED_ROW, 0, 0, 1, 0],
+      [0, UNRESOLVED_ROW, 0, 0, 1],
       // edge1: never patched — genuinely still open for the rest of the store's life (an edge to
       // a parent outside the loaded range).
-      [0, UNRESOLVED_ROW, 1, 1, 2, 0],
+      [0, UNRESOLVED_ROW, 1, 1, 2],
     ]);
     store.append(chunk0);
 
     // Chunk 1 (rows 3-11): no edges of its own, but patches chunk0's edge0 (global index 0) to
     // toRow=1 — applied to chunk0's own live `edges` buffer before chunk1 is registered.
-    const chunk1 = buildPatchChunk(3, 12, [[0, 1, PATCH_UNCHANGED, PATCH_UNCHANGED]]);
+    const chunk1 = buildPatchChunk(3, 12, [[0, 1, PATCH_UNCHANGED]]);
     store.append(chunk1);
 
     expect(store.rowCount).toBe(12);
@@ -131,7 +131,7 @@ describe('LayoutStore — long-edge segment collection stays correct after a pat
 
   test('a long edge that never resolves stays included at every row through the end of history', () => {
     const store = new LayoutStore();
-    const chunk0 = buildChunk(0, 3, [[0, UNRESOLVED_ROW, 0, 0, 7, 0]]);
+    const chunk0 = buildChunk(0, 3, [[0, UNRESOLVED_ROW, 0, 0, 7]]);
     store.append(chunk0);
     const chunk1 = buildChunk(3, 20, []); // no patches at all — the edge above is never resolved.
     store.append(chunk1);
@@ -156,12 +156,12 @@ describe('LayoutStore — long-edge segment collection stays correct after a pat
 describe('LayoutStore — #longEdges does not grow without bound as pending edges resolve short', () => {
   test('an edge that resolves short in the very next chunk is demoted out of #longEdges', () => {
     const store = new LayoutStore();
-    const chunk0 = buildChunk(0, 1, [[0, UNRESOLVED_ROW, 0, 0, 1, 0]]);
+    const chunk0 = buildChunk(0, 1, [[0, UNRESOLVED_ROW, 0, 0, 1]]);
     store.append(chunk0);
     expect(store.longEdgeCount).toBe(1); // unresolved at append time — long, as designed.
 
     // Resolves edge0 (global index 0) to toRow=1 — a span of 1, well under LONG_EDGE_ROWS.
-    const chunk1 = buildPatchChunk(1, 2, [[0, 1, PATCH_UNCHANGED, PATCH_UNCHANGED]]);
+    const chunk1 = buildPatchChunk(1, 2, [[0, 1, PATCH_UNCHANGED]]);
     store.append(chunk1);
     expect(store.longEdgeCount).toBe(0); // demoted — no longer a permanent long-edge entry.
 
@@ -179,10 +179,9 @@ describe('LayoutStore — #longEdges does not grow without bound as pending edge
     // span of 1, well under LONG_EDGE_ROWS. So by the time loading finishes, every edge but the
     // very last has been resolved short and demoted.
     for (let c = 0; c < chunkCount; c++) {
-      const patches: Array<[number, number, number, number]> =
-        c > 0 ? [[c - 1, c, PATCH_UNCHANGED, PATCH_UNCHANGED]] : [];
+      const patches: Array<[number, number, number]> = c > 0 ? [[c - 1, c, PATCH_UNCHANGED]] : [];
       const chunk: LayoutChunk = {
-        ...buildChunk(c, c + 1, [[c, UNRESOLVED_ROW, 0, 0, c, 0]]),
+        ...buildChunk(c, c + 1, [[c, UNRESOLVED_ROW, 0, 0, c]]),
         patches: new Uint32Array(patches.flat()),
       };
       store.append(chunk);

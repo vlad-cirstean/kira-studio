@@ -22,19 +22,18 @@ export interface LayoutInput {
 }
 
 /** One edge record's field offsets within a `EDGE_STRIDE`-wide slice of `LayoutChunk.edges`.
- *  Interleaved at a fixed stride in one `Uint32Array`, not seven parallel arrays: one buffer,
- *  one transfer, and a per-frame scan reads seven adjacent words instead of touching seven pages. */
-export const EDGE_STRIDE = 7;
+ *  Interleaved at a fixed stride in one `Uint32Array`, not six parallel arrays: one buffer,
+ *  one transfer, and a per-frame scan reads six adjacent words instead of touching six pages. */
+export const EDGE_STRIDE = 6;
 export const EDGE_FROM_ROW = 0;
 export const EDGE_TO_ROW = 1;
 export const EDGE_FROM_LANE = 2;
 export const EDGE_TO_LANE = 3;
 export const EDGE_COLOR = 4;
-export const EDGE_KIND = 5;
 /** P225: the lane the edge occupies on its pass-through rows. Set once at append (the lane the
  *  edge was routed into), never patched: convergence rewrites `EDGE_TO_LANE` only, so a
  *  branch-out edge that later converges keeps running in its own lane. */
-export const EDGE_RUN_LANE = 6;
+export const EDGE_RUN_LANE = 5;
 
 /** A real terminal state, not a placeholder: an edge to a parent outside the loaded range (or
  *  below a shallow-clone boundary) keeps this value, and the renderer draws such an edge
@@ -42,26 +41,16 @@ export const EDGE_RUN_LANE = 6;
  *  edge field in the same unsigned column. */
 export const UNRESOLVED_ROW = 0xffffffff;
 
-/** 0 straight (parent continues the same lane), 1 branch-out (routed into a different lane
- *  below), 2 merge-in (a lane closing into another at this row). Classified once, where the
- *  lane transition is known (W7). The renderer draws from `fromLane`/`EDGE_RUN_LANE`/`toLane`
- *  (P225), not from this kind: a merge-in bends from the run lane into `toLane` in its last row. */
-export type EdgeKind = 0 | 1 | 2;
-export const EDGE_KIND_STRAIGHT: EdgeKind = 0;
-export const EDGE_KIND_BRANCH_OUT: EdgeKind = 1;
-export const EDGE_KIND_MERGE_IN: EdgeKind = 2;
-
 /** G21 D3b: one patch record's field offsets within a `PATCH_STRIDE`-wide slice of
- *  `LayoutChunk.patches`/`BuiltEdges.patches` — `(globalEdgeIndex, toRow, toLane, kind)`. */
-export const PATCH_STRIDE = 4;
+ *  `LayoutChunk.patches`/`BuiltEdges.patches` — `(globalEdgeIndex, toRow, toLane)`. */
+export const PATCH_STRIDE = 3;
 export const PATCH_EDGE_INDEX = 0;
 export const PATCH_TO_ROW = 1;
 export const PATCH_TO_LANE = 2;
-export const PATCH_KIND = 3;
-/** The sentinel a patch record's `toRow`/`toLane`/`kind` slot carries when *that* field is not
+/** The sentinel a patch record's `toRow`/`toLane` slot carries when *that* field is not
  *  what this particular record is patching — reuses `UNRESOLVED_ROW`'s own bit pattern rather
- *  than inventing a second one: `0xffffffff` is never a legitimate resolved row, lane, or kind
- *  value in any of the three fields, and a patch never sets `toRow` *back* to `UNRESOLVED_ROW`
+ *  than inventing a second one: `0xffffffff` is never a legitimate resolved row or lane
+ *  value in either field, and a patch never sets `toRow` *back* to `UNRESOLVED_ROW`
  *  (resolution only ever moves forward), so the two meanings never collide. */
 export const PATCH_UNCHANGED = 0xffffffff;
 
@@ -77,11 +66,11 @@ export interface LayoutChunk {
    *  length `(to - from) + 1`. Lets the renderer find the edges touching a visible row window
    *  in O(1) instead of scanning from row 0. */
   readonly edgeIndex: Uint32Array;
-  /** `PATCH_STRIDE`-wide `(globalEdgeIndex, toRow, toLane, kind)` records correcting an edge
+  /** `PATCH_STRIDE`-wide `(globalEdgeIndex, toRow, toLane)` records correcting an edge
    *  that belongs to an *earlier* chunk — the mechanism that lets a Load more fix up the
-   *  previous page's edges without re-laying it out. `toRow`/`toLane`/`kind` each carry
+   *  previous page's edges without re-laying it out. `toRow`/`toLane` each carry
    *  `PATCH_UNCHANGED` when that particular field is not what this record is patching, so a
-   *  `toRow`-only resolution (a parent page loading) and a `toLane`/`kind`-only convergence
+   *  `toRow`-only resolution (a parent page loading) and a `toLane`-only convergence
    *  (G21 D3: a lane discovered to converge into another at its target row) share one record
    *  shape and one applier loop instead of two. Empty when this chunk patched nothing outside
    *  itself. */
