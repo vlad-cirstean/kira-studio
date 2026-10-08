@@ -6,8 +6,9 @@ import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
+import InlineRenameInput from '@workbench/components/InlineRenameInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
-import { computed, type HTMLAttributes, nextTick, ref, watch } from 'vue';
+import { computed, type HTMLAttributes } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
 // P4 D13: the same 8 + depth × 14 px indent, roving tabindex and twisty as project/TreeRow.vue,
@@ -55,36 +56,6 @@ const icon = computed(() => {
 });
 
 const renaming = computed(() => collectionsStore.renamingKey === props.row.key);
-const draft = ref('');
-const inputRef = ref<HTMLInputElement | null>(null);
-
-watch(
-  renaming,
-  (isRenaming) => {
-    if (!isRenaming) return;
-    draft.value = props.row.name;
-    void nextTick(() => {
-      inputRef.value?.focus();
-      inputRef.value?.select();
-    });
-  },
-  { immediate: true },
-);
-
-function commitRename(): void {
-  if (!renaming.value) return;
-  const name = draft.value.trim();
-  // An empty name is a cancel, not a rename to '' — the row would become unclickable.
-  if (!name || name === props.row.name) {
-    emit('cancel-rename');
-    return;
-  }
-  emit('rename', props.row, name);
-}
-
-function cancelRename(): void {
-  emit('cancel-rename');
-}
 
 // Splits the label on every case-insensitive occurrence of the live query so only the matched
 // substring is <mark>-ed, not the whole label — project/TreeRow.vue's own highlighting, over this
@@ -175,17 +146,12 @@ function onKeydown(e: KeyboardEvent): void {
     <!-- D13: inline rename doubles as the naming step for all three creation paths, so there is
          one naming interaction instead of a prompt dialog this app does not have. It is also VS
          Code's explorer behaviour, which is the tree this panel is modelled on. -->
-    <input
+    <InlineRenameInput
       v-if="renaming"
-      ref="inputRef"
-      v-model="draft"
-      class="min-w-0 flex-1 rounded-kira-sm border px-0.5 py-0 text-fg bg-field outline-none border-primary"
+      :name="row.name"
       data-testid="collection-rename-input"
-      @click.stop
-      @dblclick.stop
-      @keydown.enter.prevent="commitRename"
-      @keydown.esc.prevent="cancelRename"
-      @blur="commitRename"
+      @commit="(name) => emit('rename', row, name)"
+      @cancel="emit('cancel-rename')"
     />
     <Tooltip v-else>
       <TooltipTrigger as-child>
