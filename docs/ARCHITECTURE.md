@@ -697,12 +697,17 @@ op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
                                                        -- op actually ran against, NULL for every
                                                        -- non-console-execute op kind and for every
                                                        -- pre-existing row
-custom_scripts(id, name, command, working_dir, color, collection, sort_order, created_at, updated_at)
+custom_scripts(id, name, command, working_dir, color, collection_id, sort_order, created_at, updated_at)
                                                        -- P85, migration 0024; quick commands, one row
                                                        -- per command, user-curated (no cap).
-                                                       -- collection (migration 0031, P187): free-text
-                                                       -- group, '' = ungrouped, trimmed, 64 runes max;
-                                                       -- order is collection, sort_order, name
+                                                       -- collection_id (P219, Studio 0033 / Space
+                                                       -- 0023; replaced 0031's free-text collection):
+                                                       -- NULL = ungrouped, FK to
+                                                       -- custom_script_collections ON DELETE CASCADE
+custom_script_collections(id, name, sort_order, created_at, updated_at)
+                                                       -- P219; one row per quick-command group, name
+                                                       -- trimmed, 64 runes max, order is sort_order,
+                                                       -- name (creation order). Empty ones may exist.
 ui_layout(key, value)                                   -- panel sizes, visibility (app-wide)
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key, workspace_id)
@@ -774,13 +779,13 @@ sequence (`apps/kira-space/internal/storage/migrations/`) — see the Git module
 `mcp_auto_explain` (auto-force-EXPLAIN on `run_query`); `0023` created `connection_mask_rules` and
 added `connections.mask_correlation_key`. Prior high-water mark: migration **0019** as of P67d
 (`0019_p67d_repo_map_access.sql`) — `code_repos.mcp_enabled` on top of C5's `code_repos` plus
-`tabs.workspace_id` (above). Current high-water mark is **0032** (`0028_p120_drop_git_settings.sql`, `0029_p127_drop_agent_hooks_settings.sql`,
+`tabs.workspace_id` (above). Current high-water mark is **0033** (`0033_p219_quick_command_collections.sql`; `0028_p120_drop_git_settings.sql`, `0029_p127_drop_agent_hooks_settings.sql`,
 `0030_p168_fk_indexes.sql`, `0031_p187_custom_script_collection.sql`, `0032_p188_drop_claude_code_settings.sql`
 come after 0027; `0024_p85_custom_scripts.sql`
 created `custom_scripts`; `0025_p97_drop_repo_map.sql`; `0026_p100_drop_git_tables.sql`;
 `0027_p108part11_op_log_path.sql` added `op_log.path TEXT`, the console path an op actually ran
 against, F5). Kira Space's own `kira.db` runs its own sequence
-(`apps/kira-space/internal/storage/migrations/`, high-water **0020**): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
+(`apps/kira-space/internal/storage/migrations/`, high-water **0023**; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
 window mode, the ADE tables (see ADE, Storage) and `0020_p204_custom_scripts.sql` (quick commands).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -1059,7 +1064,7 @@ cap did not, and the column that can hold arbitrary user text had no ceiling at 
 | `schema_version` | nothing | one row |
 | `settings`, `ui_layout` | nothing | closed key set; every writer is a hand-listed leaf |
 | `connections`, `connection_ddl`, `connection_tree_filters`, `saved_queries`, `connection_mask_rules` | user action | user action; all cascade on connection delete |
-| `custom_scripts` | user action | user action; one row per script, created and deleted one at a time |
+| `custom_scripts`, `custom_script_collections` | user action | user action; one row per script or collection, created and deleted one at a time; deleting a collection deletes its scripts |
 | `api_collections`, `api_items`, `api_environments`, `api_variables` | user action / import | user action; import capped at 64 MiB upstream |
 | `tabs` | open tabs | rewritten per window per save; cascades on window close |
 | `windows` | live windows | one row per live window (+1 for session restore) |
@@ -1344,23 +1349,30 @@ one; Kira Space's own `TitleBar.vue` renders it for the first time.
 
 **The Terminal entry in both apps' `MODES` points at one shared module (P128 §2.4), not two
 hand-kept-identical copies.** `packages/workbench/src/terminal/module.ts` exports
-`TerminalModuleContext{defaultCwd, openTerminalTab, host, scripts}` (`scripts`'s own
-`TerminalScriptsSeam{records, create, update, remove}`, P133 §2.1; required since P204), the `terminalModuleKey`
+`TerminalModuleContext{defaultCwd, openTerminalTab, host, scripts, chooseFolder}` (`scripts`'s own
+`TerminalScriptsSeam{records, collections, create, update, remove, createCollection, renameCollection, removeCollection, move}`, P133 §2.1/P219; required since P204; plus `chooseFolder(title)`, null when cancelled), the `terminalModuleKey`
 injection key, and `useTerminalModule()`/`useNewTerminal()`; each app's own `App.vue` builds one
 context object (its own `workbench/terminalModule.ts`) and `provide()`s it once, at the root, above
 `WorkbenchShell.vue`. **Quick commands exist in both apps (P204).** Go side: repo-root `internal/quickcommands`
 (`CustomScript`, `CustomScriptFields.Validate`, `ValidationError`, `Repo`, `Service`) holds the
 `custom_scripts` repo, validation and the service logic; each app's bound `bridge.CustomScriptsService`
 keeps its own binding name and delegates to it (windowsvc pattern). Studio's table is migration `0024`
-(+`0031`), Space's is migration `0020`. Frontend side: `createCustomScriptsStore`
+(+`0031`, `0033`), Space's is migration `0020` (+`0023`). `List` answers and every mutation broadcasts one `Snapshot{collections, scripts}`. Frontend side: `createCustomScriptsStore`
 (`packages/workbench/src/terminal`) is the shared store factory over each app's `control`; both apps'
 `state/customScripts.ts` are one-liners. The panel header `+` is the only add control; the empty
 state has none. `QuickCommandsDialog.vue` edits one command (add, or "Edit…" from the row menu):
 Name, Script (`Textarea`, 8 rows, monospace, resizable; a multiline script runs as-is in the user's
-login shell, `shell -c`), Working directory, Collection (`<datalist>` of existing names), colour;
-Cmd/Ctrl+Enter saves. Rows show the first line plus `…`, left-aligned, grouped under collapsible
-collection headers (ungrouped first, collapsed names in `useLocalStorage('kira.quickCommands.collapsed')`,
-search expands matching groups). Collections have no rename/delete UI: edit each command's field.
+login shell, `shell -c`), Working directory (input plus a "Choose…" button opening the native folder dialog through `TerminalModuleContext.chooseFolder`), Collection (`NativeSelect` of existing collections plus "No collection"), colour;
+Cmd/Ctrl+Enter saves. Rows show the first line plus `…`, left-aligned. Collections are real rows, managed like API
+collections: the header `new-folder` button or the list background menu creates one named "New
+collection" and opens it for inline naming (shared `packages/workbench/src/components/InlineRenameInput.vue`,
+also used by the API tree's `CollectionRow.vue`); the collection's menu has New quick command,
+Rename and Delete (confirms; deletes the collection's commands too). Ungrouped commands list first,
+then collections in creation order, empty ones included; collapse state is
+`useLocalStorage('kira.quickCommands.collapsedCollections')` keyed by collection id; search shows a
+collection when its name or one of its commands matches. A command's menu has Run, Edit…, a
+"Move to collection" submenu (`util/collectionMenu.ts`'s `moveToCollectionMenu`: No collection, each
+collection, New collection) and Remove. New collections are created from the panel, not typed in the dialog.
 Settings has no Scripts section.
 `TerminalPanel.vue`, `TerminalStart.vue`, `TerminalNewTab.vue`, and `QuickCommandsDialog.vue` (the
 module's own registry entries and dialog) and `TerminalTabView.vue`/`TerminalHostView.vue` (the tab
@@ -1471,6 +1483,12 @@ so its `visibleRows` is a pure `computed` over one array with no cache, no loadi
 to be incomplete about. While a search is active every ancestor of a match renders expanded
 **without mutating the expansion set**, so clearing the search restores exactly the shape the user
 had.
+
+A request or folder row's menu has "Move to collection" (the same shared `moveToCollectionMenu`;
+no "none", every item belongs to a collection). `CollectionsService.MoveItem` moves the item with its
+whole subtree to the target collection's root in one transaction: the subtree's `collection_id` is
+rewritten, the item lands last at the target root, and the source siblings re-index dense. An open
+request tab follows for free: its collection is derived from the tree, not stored in tab state.
 
 **The tab strip and content area are registry-driven, not a per-kind dispatch chain.**
 `state/tabKinds.ts`'s `TAB_KINDS` (component-free) supplies each `TabKind`'s title/icon/rail

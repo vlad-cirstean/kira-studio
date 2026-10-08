@@ -14,7 +14,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P216 | Memory speech to text: local English-only Whisper small.en quantized q5_1 (whisper.cpp ggml) in a subprocess worker started only on demand and stopped when idle, like memory-embed; mic dictation in the Memory module with live text shown in the input, user sends it manually; model download on click with pinned SHA-256 | Done |
 | P217 | Code review (one Opus round) and fixes | Done |
 | P218 | Speech engine without a C++ build: step 1 measures build-free engines (sherpa-onnx prebuilt libs first) against the whisper.cpp worker; step 2 swaps in the winner and deletes fetch-whisper.sh, the `whisper` tag, cgo glue, CI patch and S13 whisper bits. Keeps dictation behaviour, malgo capture, worker isolation, pinned-SHA model store, 400 MB RSS ceiling. No winner: stop and ask the user, never back to whisper.cpp | Not started |
-| P219 | Terminal and API collections: terminal module scripts get collections added the same way as the API module; right-click menu in both modules to move an item into a chosen collection; working-dir field gets a native folder-select dialog | Not started |
+| P219 | Terminal and API collections: terminal module scripts get collections added the same way as the API module; right-click menu in both modules to move an item into a chosen collection; working-dir field gets a native folder-select dialog | Done |
 | P220 | Git module: graph lines still disappear on click and on scroll (find the root cause); default tab is Repos and the last tab the user moved to persists across restarts | Not started |
 | P221 | Memory module: move the semantic-search model download and the Connect Claude Code action into Settings | Done |
 | P222 | Git add-repo dialog: restyle to match the app's dialog design; per-repo colour choice like other places; explain and fix what the add-env section does (should it take a script?) | Not started |
@@ -283,3 +283,25 @@ Memory setup moved to Kira Space Settings > Memory (D1 to D4 defaults from the p
 
 Verification: typecheck, lint, lint:dead, Playwright memory, settings-memory, settings-claude-code, then the full
 `test:ui:space`.
+
+## P219 result
+
+Quick-command collections are rows (`custom_script_collections`, Studio migration 0033, Space 0023),
+created, renamed inline and deleted like API collections; deleting one deletes its commands. Both
+modules have a "Move to collection" context submenu (shared `moveToCollectionMenu`); API `MoveItem`
+moves a request or folder with its subtree to another collection's root. The quick-command dialog
+gets a "Choose…" native folder picker. Facts live in `docs/ARCHITECTURE.md` (schema, Terminal
+module, API collections).
+
+Defaults taken: collections order by creation; delete cascades to commands (API parity); dialog
+collection field is a select (new collections come from the panel); collapse state re-keyed by id
+under a new local-storage key; no drag and drop.
+
+Verification (Linux): `go build ./...`, `go test -race` on quickcommands, both bridges and both storage
+trees (new migration test, new `MoveItem` repo test), golangci-lint 2.13.2 (0 issues), typecheck, lint,
+lint:dead. Playwright: terminal-module, collections, terminal-quick-commands green. Full Studio UI
+suite: 321 pass; 23 fail in `sql-schema.spec` (Monaco typing hangs, also on the pre-P219 base) and
+`slick-grid.spec` (load timeouts; the checked ones pass alone). Full Space UI suite: 215 pass; the 22
+failures are 1.1 min load timeouts in ADE and repo-graph specs, all but one pass on rerun, and that
+one passes alone. Visual baseline `quick-commands-dialog` regenerated locally on Linux; regenerate on
+the CI image if it differs.
