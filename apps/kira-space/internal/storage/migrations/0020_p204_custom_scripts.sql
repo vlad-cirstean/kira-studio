@@ -1,6 +1,5 @@
 -- P204: quick commands in Kira Space: the same custom_scripts table Kira Studio carries (its 0024
--- plus 0031), shared through internal/quickcommands. Numbered 20 so the sequence stays ordered
--- after the ADE migrations that land alongside (gaps are fine: LoadMigrations sorts).
+-- plus 0031), shared through internal/quickcommands.
 CREATE TABLE custom_scripts (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,

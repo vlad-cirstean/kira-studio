@@ -2,9 +2,8 @@ package quickcommands
 
 import "github.com/kirathecat/kira-studio/internal/ipcerr"
 
-// Service is the shared bound type: each app's bridge.CustomScriptsService is
-// `struct{ *quickcommands.Service }`, so Wails builds binding names from the registered type's
-// own package while every method body lives here once. Every mutation broadcasts the full list
+// Service holds every method body once. Each app's bridge.CustomScriptsService is a wrapper struct
+// with forwarding methods, so Wails builds binding names from the app's own package. Every mutation broadcasts the full list
 // through Emit so a second window's Quick commands list stays live.
 type Service struct {
 	Repo *Repo
