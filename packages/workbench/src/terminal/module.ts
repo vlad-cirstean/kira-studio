@@ -28,6 +28,8 @@ export interface TerminalModuleContext {
   openTerminalTab(opts: { cwd: string; launch?: TerminalLaunch }): void;
   host: TerminalHostDeps;
   scripts: TerminalScriptsSeam;
+  /** Native folder dialog; null when cancelled. */
+  chooseFolder(title: string): Promise<string | null>;
 }
 
 export const terminalModuleKey: InjectionKey<TerminalModuleContext> = Symbol('terminalModule');

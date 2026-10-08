@@ -409,6 +409,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
         :scripts="scripts"
         :script="editor.script"
         :collection-id="editor.collectionId"
+        :choose-folder="ctx.chooseFolder"
         @close="editor = null"
       />
     </div>

@@ -401,6 +401,40 @@ test('a quick command moves between collections from its context menu', async ({
   await expect(page.locator('[data-testid="quick-command-collection-rename-input"]')).toBeFocused();
 });
 
+test('Choose… fills the working directory from the folder dialog', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.filesChooseFolder, response: { canceled: false, path: '/tmp/picked' } },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="quick-commands-add"]').click();
+  await dialog(page).locator('[data-testid="custom-script-workingdir-choose"]').click();
+  await expect(dialog(page).locator('[data-testid="custom-script-workingdir"]')).toHaveValue(
+    '/tmp/picked',
+  );
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.filesChooseFolder)?.args)
+    .toEqual({ title: 'Working directory…' });
+});
+
+test('a cancelled folder dialog leaves the working directory unchanged', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({
+    control: [{ channel: IPC.filesChooseFolder, response: { canceled: true, path: null } }],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="quick-commands-add"]').click();
+  const dir = dialog(page).locator('[data-testid="custom-script-workingdir"]');
+  await dir.fill('/tmp/typed');
+  await dialog(page).locator('[data-testid="custom-script-workingdir-choose"]').click();
+  await expect
+    .poll(() => control.log().some((e) => e.channel === IPC.filesChooseFolder))
+    .toBe(true);
+  await expect(dir).toHaveValue('/tmp/typed');
+});
+
 test('Add stays disabled until name and script are filled; it sends the trimmed fields', async ({
   relaunch,
 }) => {

@@ -1,4 +1,5 @@
 import type { TerminalModuleContext } from '@workbench/terminal/module';
+import { control } from '../bridge/control';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { useSettingsStore } from '../state/settings';
 import { useTerminalsStore } from '../state/terminals';
@@ -27,6 +28,10 @@ export function createTerminalModule(): TerminalModuleContext {
       terminalSession: terminalsStore.terminalSession,
       openTerminalSession: terminalsStore.openTerminalSession,
       resizeTerminal: terminalsStore.resizeTerminal,
+    },
+    chooseFolder: async (title) => {
+      const chosen = await control.filesChooseFolder(title);
+      return chosen.canceled ? null : chosen.path;
     },
     scripts: {
       records: () => customScriptsStore.records,

@@ -27,6 +27,7 @@ const props = defineProps<{
   scripts: TerminalScriptsSeam;
   script: CustomScript | null;
   collectionId?: string | null;
+  chooseFolder: (title: string) => Promise<string | null>;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -43,6 +44,16 @@ const saving = ref(false);
 
 // The dialog's own affordance: the Go check stays the authority on every other rule.
 const canSave = computed(() => name.value.trim() !== '' && command.value.trim() !== '');
+
+async function chooseWorkingDir(): Promise<void> {
+  error.value = null;
+  try {
+    const path = await props.chooseFolder('Working directory…');
+    if (path !== null) workingDir.value = path;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  }
+}
 
 async function save(): Promise<void> {
   if (!canSave.value || saving.value) return;
@@ -128,13 +139,23 @@ function onOpenAutoFocus(e: Event): void {
 
         <Field>
           <FieldLabel for="quick-command-dir">Working directory</FieldLabel>
-          <Input
-            id="quick-command-dir"
-            v-model="workingDir"
-            placeholder="Terminal default directory"
-            class="font-data"
-            data-testid="custom-script-workingdir"
-          />
+          <div class="flex items-center gap-1.5">
+            <Input
+              id="quick-command-dir"
+              v-model="workingDir"
+              placeholder="Terminal default directory"
+              class="min-w-0 flex-1 font-data"
+              data-testid="custom-script-workingdir"
+            />
+            <Button
+              variant="dialog"
+              size="kira-lg"
+              data-testid="custom-script-workingdir-choose"
+              @click="chooseWorkingDir"
+            >
+              Choose…
+            </Button>
+          </div>
         </Field>
 
         <div class="flex items-end gap-3">

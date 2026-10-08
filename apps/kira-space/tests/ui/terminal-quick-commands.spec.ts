@@ -87,3 +87,18 @@ test('clicking a quick command opens a terminal tab titled with its name', async
     )
     .toBe(true);
 });
+
+test('Choose… fills the working directory from the folder dialog', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.windowsEnsure, response: { mode: 'terminal' } },
+      { channel: IPC.filesChooseFolder, response: { canceled: false, path: '/tmp/picked' } },
+    ],
+  });
+  await page.locator('[data-testid="quick-commands-add"]').click();
+  const dialog = page.locator('[data-testid="quick-commands-dialog"]');
+  await dialog.locator('[data-testid="custom-script-workingdir-choose"]').click();
+  await expect(dialog.locator('[data-testid="custom-script-workingdir"]')).toHaveValue(
+    '/tmp/picked',
+  );
+});
