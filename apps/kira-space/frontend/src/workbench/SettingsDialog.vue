@@ -9,6 +9,7 @@ import AppearancePane from './settings/AppearancePane.vue';
 import ClaudeCodePane from './settings/ClaudeCodePane.vue';
 import ConnectedEditorsPane from './settings/ConnectedEditorsPane.vue';
 import GitPane from './settings/GitPane.vue';
+import MobileAccessPane from './settings/MobileAccessPane.vue';
 
 // P100 Part 2: Kira Studio's own workbench/SettingsDialog.vue, the plan's own "small rewrite" —
 // only the sections still relevant to a repo-only workbench (state/settings.ts's own `sections`).
@@ -72,6 +73,13 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <ConnectedEditorsPane
         :active="s.activeSection === 'Connected editors'"
+        :draft="s.draft"
+        :is-at-default="s.isAtDefault"
+        :reset-leaf="s.resetLeaf"
+        :register-field-error="s.registerFieldError"
+      />
+      <MobileAccessPane
+        :active="s.activeSection === 'Mobile access'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"

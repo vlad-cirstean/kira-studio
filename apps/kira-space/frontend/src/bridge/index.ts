@@ -9,6 +9,7 @@ import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
+import * as MobileAccessService from '@bindings/mobileaccessservice.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
@@ -26,6 +27,12 @@ import type {
   GitVsixStatus,
 } from '@shared/domain/git';
 import type { Layout } from '@shared/domain/layout';
+import type {
+  MobileDevice,
+  MobilePairingActionResult,
+  MobilePairingSnapshot,
+  MobileStatus,
+} from '@shared/domain/mobile';
 import type {
   CodeSearchEvent,
   DiffContent,
@@ -101,6 +108,33 @@ const spaceControl = {
     unwrap(GitClientsService.InstallVsCodeIntegration()).then((r) =>
       trust<GitVsixInstallResult>(r),
     ),
+
+  // P212: the Mobile access pane and the phone pairing prompt.
+  mobileStatus: (): Promise<MobileStatus> =>
+    unwrap(MobileAccessService.Status()).then((r) => trust<MobileStatus>(r)),
+  mobileSetEnabled: (enabled: boolean): Promise<MobileStatus> =>
+    unwrap(MobileAccessService.SetEnabled({ enabled })).then((r) => trust<MobileStatus>(r)),
+  mobileSetPorts: (httpsPort: number, setupPort: number): Promise<MobileStatus> =>
+    unwrap(MobileAccessService.SetPorts({ httpsPort, setupPort })).then((r) =>
+      trust<MobileStatus>(r),
+    ),
+  mobileResetCertificate: (): Promise<MobileStatus> =>
+    unwrap(MobileAccessService.ResetCertificate()).then((r) => trust<MobileStatus>(r)),
+  mobileDevices: (): Promise<MobileDevice[]> =>
+    unwrap(MobileAccessService.Devices()).then((r) => trust<MobileDevice[]>(r ?? [])),
+  mobileRevoke: (id: string): Promise<void> => unwrap(MobileAccessService.Revoke({ id })),
+  mobilePairingPending: (): Promise<MobilePairingSnapshot> =>
+    unwrap(MobileAccessService.PendingPairing()).then((r) => trust<MobilePairingSnapshot>(r)),
+  mobilePairingApprove: (id: string): Promise<MobilePairingActionResult> =>
+    unwrap(MobileAccessService.Approve({ id })).then((r) => trust<MobilePairingActionResult>(r)),
+  mobilePairingDeny: (id: string): Promise<MobilePairingActionResult> =>
+    unwrap(MobileAccessService.Deny({ id })).then((r) => trust<MobilePairingActionResult>(r)),
+  onMobileStatusChanged: (cb: (status: MobileStatus) => void): (() => void) =>
+    on(CHANNEL.mobileStatus, cb),
+  onMobileDevicesChanged: (cb: (devices: MobileDevice[]) => void): (() => void) =>
+    on(CHANNEL.mobileDevices, cb),
+  onMobilePairingChanged: (cb: (snap: MobilePairingSnapshot) => void): (() => void) =>
+    on(CHANNEL.mobilePairing, cb),
 
   // C5 §3.3: the native code-viewing workspace's bound surface — repo import/rename/reorder/remove plus
   // the two read primitives (ListFiles/ReadFile). A rejected ImportRepo/RenameRepo/ReorderRepos call carries a

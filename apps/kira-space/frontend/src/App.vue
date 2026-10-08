@@ -18,6 +18,7 @@ import { useSettingsStore } from './state/settings';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
 import { createWorkbenchHost, useTabsStore } from './workbench/host';
+import MobilePairingDialog from './workbench/MobilePairingDialog.vue';
 import { createMemoryModule } from './workbench/memoryModule';
 import TitleBar from './workbench/TitleBar.vue';
 import { createTerminalModule } from './workbench/terminalModule';
@@ -76,6 +77,7 @@ onUnmounted(() => {
       <WorkbenchShell />
     </div>
     <GitPairingDialog />
+    <MobilePairingDialog />
     <GitCredentialDialog />
     <ConfirmDialog />
     <UpdateDialog v-if="appUpdateStore.dialogOpen" :store="appUpdateStore" />

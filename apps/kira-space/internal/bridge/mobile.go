@@ -86,6 +86,8 @@ type MobileAccessService struct {
 	embedded embedded.Service[*mobileweb.Server, MobileStatus]
 }
 
+func mobileCADir() string { return filepath.Join(config.KiraSpaceHome(), "mobile") }
+
 func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 	s.embedded = embedded.Service[*mobileweb.Server, MobileStatus]{
 		StartFn: func(bool) (*mobileweb.Server, error) {
@@ -96,7 +98,7 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 			srv := mobileweb.New(mobileweb.Config{
 				Reader: s.Reader, AgentSessions: s.AgentSessions, Devices: s.Deps.Repos.MobileDevices,
 				Hub: s.Hub, Broker: s.Broker, Assets: s.Assets,
-				CADir:     filepath.Join(config.KiraSpaceHome(), "mobile"),
+				CADir:     mobileCADir(),
 				HTTPSPort: cfg.Mobile.HTTPSPort, SetupPort: cfg.Mobile.SetupPort,
 				OnDevicesChanged: s.emitDevices,
 			})
@@ -211,6 +213,25 @@ func (s *MobileAccessService) SetPorts(args MobileSetPortsArgs) (MobileStatus, e
 		}
 	} else {
 		st = s.embedded.Status()
+	}
+	s.emitStatus(st)
+	return st, nil
+}
+
+// ResetCertificate replaces the local CA. Every phone must install the new root again. A running
+// server restarts to serve a leaf from the new CA.
+func (s *MobileAccessService) ResetCertificate() (MobileStatus, error) {
+	wasRunning := s.embedded.Status().Running
+	s.embedded.Stop()
+	if _, err := mobileweb.ResetCA(mobileCADir()); err != nil {
+		return MobileStatus{}, ipcerr.InternalErr(err)
+	}
+	st := s.embedded.Status()
+	if wasRunning {
+		var startErr error
+		if st, startErr = s.embedded.SetRunning(true); startErr != nil {
+			slog.Warn("mobile access: restart after certificate reset", "scope", "mobileweb", "err", startErr)
+		}
 	}
 	s.emitStatus(st)
 	return st, nil

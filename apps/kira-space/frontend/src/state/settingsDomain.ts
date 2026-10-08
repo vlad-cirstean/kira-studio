@@ -132,7 +132,7 @@ const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
 
 // P212: the mobile agents web server. Off until enabled; the two ports are unprivileged. Changed
 // through MobileAccessService, which restarts the server when it is running.
-const MOBILE_PORT_RANGE = { min: 1024, max: 65535 } as const;
+export const MOBILE_PORT_RANGE = { min: 1024, max: 65535 } as const;
 const mobileSettingsSchema = /*#__PURE__*/ z.object({
   enabled: z.boolean().default(false),
   httpsPort: z.number().int().min(MOBILE_PORT_RANGE.min).max(MOBILE_PORT_RANGE.max).default(7790),
