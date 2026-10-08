@@ -137,7 +137,14 @@ const dateWidthProbe = ref<HTMLSpanElement | null>(null);
 let grid: SlickGrid<CommitRecord> | undefined;
 const tokenReader = new TokenReader();
 
-const widths = ref<ColumnWidths>({ ...props.columnWidths });
+// P220: the graph column never sits below its drag minimum; the row SVG clips lanes past the
+// column's right edge, so a narrower persisted width hides every lane.
+const widths = ref<ColumnWidths>({
+  ...props.columnWidths,
+  graph: Math.max(MIN_COLUMN_WIDTH, props.columnWidths.graph),
+});
+// P220: first-ever mount seeds the graph width from the first layout, once (user drag wins).
+let graphSeedPending = false;
 
 /** G21 D6b: the measured pixel width the absolute date format actually needs at the current
  *  font/zoom — `0` until the probe first resolves (always synchronous in practice; there is no
@@ -640,11 +647,9 @@ function scheduleAncestryRebuild(): void {
 }
 
 /** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
- *  heights. P92 item 1: no longer rebuilds columns here even when `laneCount` grows — the graph
- *  column's width is user-set (`widths.value.graph`), not derived from lane count, so a growing
- *  history streaming in new lanes never needs a `setColumns()` structural rebuild; the row itself
- *  still redraws wider via `invalidateRowHeights()` below, since its formatter reads the *current*
- *  `widths.value.graph` on every call regardless.
+ *  heights. P92 item 1: the graph column's width is user-set (`widths.value.graph`), not derived
+ *  from lane count, so streaming history never rebuilds columns. P220: sole exception, the pending
+ *  first-mount seed — applied once, on the first layout with lanes, then a single rebuild.
  *
  *  P92 item 4: `invalidateRowHeights()`, not `invalidateRows(rows)` + `render()` — the latter
  *  marks heights dirty but never rebuilds SlickGrid's row-position index (only `updateRowCount()`
@@ -652,8 +657,20 @@ function scheduleAncestryRebuild(): void {
  *  decoration) keeps its stale `translateY()` while the index moves on: two rows land in the same
  *  band and their glyphs double up. `invalidateRowHeights()` is the library's own "index and rows
  *  are both stale" entry point, so `_range` is unused now — kept for the callback signature. */
+function graphSeedWidth(): number {
+  return Math.min(
+    DEFAULT_COLUMN_WIDTHS.graph,
+    Math.max(minWidthFor('graph'), graphColumnWidth(props.graphView.laneCount.value)),
+  );
+}
+
 function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
+  if (graphSeedPending && props.graphView.laneCount.value > 0) {
+    graphSeedPending = false;
+    widths.value = { ...widths.value, graph: graphSeedWidth() };
+    rebuildColumns();
+  }
   grid.invalidateRowHeights();
   if (!layoutCompleteMarked) {
     layoutCompleteMarked = true;
@@ -859,14 +876,12 @@ onMounted(() => {
     // `DEFAULT_COLUMN_WIDTHS.date`, e.g. a user who explicitly chose it) is never overridden.
     const seeded = Math.max(DEFAULT_COLUMN_WIDTHS.date, measuredDateWidth.value);
     if (seeded !== widths.value.date) widths.value = { ...widths.value, date: seeded };
-    // P92 item 1: a one-lane repository opens at its own true width (30px), not the six-lane
-    // DEFAULT_COLUMN_WIDTHS.graph (95px) — the cap only bounds how wide the *default* gets, never
-    // forces every repo up to it.
-    const graphSeed = Math.min(
-      graphColumnWidth(props.graphView.laneCount.value),
-      DEFAULT_COLUMN_WIDTHS.graph,
-    );
-    if (graphSeed !== widths.value.graph) widths.value = { ...widths.value, graph: graphSeed };
+    // P220: laneCount is 0 until the layout worker answers; seeding then would give a 17px column
+    // that clips every lane. Defer to the first layout with lanes (`handleChunkLayout`).
+    if (props.graphView.laneCount.value > 0) {
+      const graphSeed = graphSeedWidth();
+      if (graphSeed !== widths.value.graph) widths.value = { ...widths.value, graph: graphSeed };
+    } else graphSeedPending = true;
   }
 
   const dataView = createCommitDataView({
