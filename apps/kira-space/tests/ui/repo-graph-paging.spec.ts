@@ -273,3 +273,96 @@ test("a merge's second-parent line keeps its own lane, before and after Load mor
   expect(await sweep(win, page1Rows, PAGING_ROWS, stackedRuns)).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+const handle = (p: Page, name: string) =>
+  p.getByRole('separator', { name: `Resize ${name} column`, exact: true });
+
+async function drag(p: Page, name: string, dx: number): Promise<void> {
+  const box = (await handle(p, name).boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await p.mouse.move(x, y);
+  await p.mouse.down();
+  for (let i = 1; i <= 10; i++) await p.mouse.move(x + (dx * i) / 10, y);
+  await p.mouse.up();
+}
+
+/** Horizontal overflow signs: canvas wider than the viewport, a scrolled viewport, a graph cell
+ *  off the viewport's left edge. Empty when none. */
+async function overflow(p: Page): Promise<string[]> {
+  return p.evaluate(
+    (sel) => {
+      const vp = document.querySelector(sel.viewport)!;
+      const out: string[] = [];
+      if (vp.scrollWidth > vp.clientWidth) {
+        out.push(`scrollWidth ${vp.scrollWidth} > clientWidth ${vp.clientWidth}`);
+      }
+      if (vp.scrollLeft !== 0) out.push(`scrollLeft ${vp.scrollLeft}`);
+      const cell = vp.querySelector('.slick-row .kv-cell-graph, .slick-row .l0');
+      if (cell) {
+        const x = Math.round(cell.getBoundingClientRect().left - vp.getBoundingClientRect().left);
+        if (x < 0) out.push(`graph cell at x ${x}`);
+      }
+      return out;
+    },
+    { viewport: VIEWPORT },
+  );
+}
+
+async function diagonalWheel(p: Page): Promise<void> {
+  const box = (await p.locator(VIEWPORT).boundingBox())!;
+  await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let i = 0; i < 10; i++) await p.mouse.wheel(40, 60);
+  await p.waitForTimeout(100);
+}
+
+test('columns resized wide never push the graph out of view', async ({ relaunch }) => {
+  const { window: win } = await relaunch({ control: CONTROL });
+  const errors: string[] = [];
+  await openRepo(win, errors);
+  await win.keyboard.press('Escape');
+
+  await drag(win, 'graph', 300);
+  await drag(win, 'author', 300);
+  await drag(win, 'date', 300);
+  expect(await overflow(win)).toEqual([]);
+
+  await handle(win, 'date').focus();
+  for (let i = 0; i < 80; i++) await win.keyboard.press('ArrowRight');
+  expect(await overflow(win)).toEqual([]);
+
+  await diagonalWheel(win);
+  expect(await overflow(win)).toEqual([]);
+  expect(await clippedNodes(win)).toEqual([]);
+
+  await rowAt(win, 3).locator('.kv-cell-message').click();
+  await win.keyboard.press('Escape');
+  expect(await overflow(win)).toEqual([]);
+
+  await win.setViewportSize({ width: 1000, height: 960 });
+  expect(await overflow(win)).toEqual([]);
+
+  await loadMore(win);
+  await diagonalWheel(win);
+  expect(await overflow(win)).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('a resized graph column keeps every node after Load more', async ({ relaunch }) => {
+  const { window: win } = await relaunch({ control: CONTROL });
+  const errors: string[] = [];
+  await openRepo(win, errors);
+
+  await drag(win, 'graph', -100);
+  await scrollToRow(win, PAGE_SIZE - 1, PAGE_SIZE);
+  expect(await clippedNodes(win)).toEqual([]);
+
+  await loadMore(win);
+  const rows = range(PAGE_SIZE, PAGING_ROWS, 30);
+  expect(await sweep(win, rows, PAGING_ROWS, clippedNodes)).toEqual([]);
+  expect(widestNode).toBeGreaterThan(60);
+
+  await drag(win, 'graph', 20);
+  expect(await sweep(win, rows, PAGING_ROWS, clippedNodes)).toEqual([]);
+  expect(errors).toEqual([]);
+});
