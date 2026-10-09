@@ -32,6 +32,10 @@ var packagesExemptFromBridgeCheck = map[string]bool{
 	"internal/bridge":     true,
 	"internal/ipcfixture": true,
 	"internal/appshell":   true,
+	// appwire is the composition root main and the flow harness share; flowharness and its
+	// subpackages boot it, the same role as ipcfixture.
+	"internal/appwire":     true,
+	"internal/flowharness": true,
 }
 
 // TestDomainPackagesDoNotImportBridge used to walk a hand-maintained slice of "the domain

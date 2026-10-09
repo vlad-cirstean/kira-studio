@@ -1,0 +1,237 @@
+package appwire
+
+import (
+	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/clickhouse"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/kafka"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mariadb"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mongo"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mysql"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/postgres"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/redis"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/s3"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqlite"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqs"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
+	"github.com/kirathecat/kira-studio/internal/appupdate"
+	"github.com/kirathecat/kira-studio/internal/docker"
+	"github.com/kirathecat/kira-studio/internal/keepawake"
+	"github.com/kirathecat/kira-studio/internal/metrics"
+	"github.com/kirathecat/kira-studio/internal/shell"
+	"github.com/kirathecat/kira-studio/internal/terminal"
+	"github.com/kirathecat/kira-studio/internal/windowsvc"
+)
+
+// adaptersWired is wireAdapters' own result: the adapter router, the connections service, oplog's
+// wiring and the metrics ticker — every piece main's own later blocks (events wiring, teardown,
+// the Services list) still reach past this function's own return.
+type adaptersWired struct {
+	router         *adapterhost.Router
+	connectionsSvc *connections.Service
+	oplogWiring    *oplog.Wiring
+	metricsTicker  *metrics.Ticker
+}
+
+// wireAdapters runs main's own adapter/cache/connections/tree/oplog/metrics block: the adapter
+// router (backed by enginecache) -> preconnect supervisor -> connections service, started -> tree
+// service -> the cache budget pushed to the router -> oplog, started -> the two per-launch history
+// sweeps plus the freelist reclaim -> the process-metrics ticker, started. deps is mutated in place
+// (Router/Connections/Tree) at the exact points the original sequential code set them, since
+// several bridge.XxxService{Deps: deps} literals built later copy *deps by value.
+func wireAdapters(deps *appcore.Deps, settings model.Settings, repositories *repos.Repos, secretsRepo *repos.SecretsRepo, cipher *secrets.Cipher, authorizer *localauth.Authorizer, db *storage.DB) adaptersWired {
+	adapterDeps := adapters.Deps{Log: func(level, message string) {
+		switch level {
+		case "error":
+			slog.Error(message, "scope", "adapter")
+		case "warn":
+			slog.Warn(message, "scope", "adapter")
+		default:
+			slog.Info(message, "scope", "adapter")
+		}
+	}}
+	goCache := enginecache.NewCache(settings.Cache.L2BudgetMb*1024*1024, adapterDeps.Log)
+	router := adapterhost.NewRouter(adapterDeps, goCache)
+	deps.Router = router
+
+	preconnectSupervisor := preconnect.New()
+	connectionsSvc := connections.New(connections.Deps{
+		Conns: repositories.Connections, Secrets: secretsRepo, Metadata: repositories.Metadata,
+		Cipher: cipher, Auth: authorizer, Backend: router, Preconnect: preconnectSupervisor,
+		MaskRules: repositories.MaskRules,
+	})
+	connectionsSvc.Start()
+	deps.Connections = connectionsSvc
+
+	treeSvc := tree.New(repositories.Connections, repositories.Metadata, router, connectionsSvc)
+	deps.Tree = treeSvc
+
+	// Configure pushes the budget to both caches (§4.9).
+	router.PushCacheConfig(settings)
+
+	// The router's in-process scheduler is oplog's only EventSource now (P58f D9) — every kind has
+	// been native since P58e, so the Node child never produces an op:start/op:end of its own to fan
+	// in (enginebackend.Merge, which used to do that, is deleted).
+	oplogWiring := oplog.New(router.Host(), repositories.Ops, settings.Advanced.OpLogRetentionDays)
+	oplogWiring.Start()
+
+	// P8 D7/F18: a scratch tab's response history is swept once per launch, beside oplog's own
+	// startup prune — tabs is the liveness oracle (TabsRepo.Save always re-inserts every tab
+	// that's currently open), so this removes only a closed tab's history, never a live one's.
+	if err := repositories.ResponseHistory.SweepOrphans(); err != nil {
+		slog.Warn("sweep orphaned response history", "scope", "startup", "err", err)
+	}
+	// P11 D11: the same startup prune, for a scratch tab's gRPC call history.
+	if err := repositories.GrpcHistory.SweepOrphans(); err != nil {
+		slog.Warn("sweep orphaned grpc call history", "scope", "startup", "err", err)
+	}
+	// P23 D5(b): return freed pages to the filesystem once the freelist is worth reclaiming — a
+	// no-op on a database opened before this phase (auto_vacuum stays NONE, D5(a) never converts
+	// an existing file) and on one whose freelist is still small.
+	if err := (&repos.Maintenance{DB: db.DB}).Reclaim(); err != nil {
+		slog.Warn("reclaim freed pages", "scope", "startup", "err", err)
+	}
+
+	metricsTicker := metrics.NewAppTicker("Kira Studio")
+	metricsTicker.Start()
+
+	return adaptersWired{
+		router: router, connectionsSvc: connectionsSvc, oplogWiring: oplogWiring, metricsTicker: metricsTicker,
+	}
+}
+
+// embeddedWired is wireEmbeddedServices' own result — every embedded-service handle main's later
+// blocks (the Services list, teardown, the window-closing terminal cleanup) still reach past this
+// function's own return.
+type embeddedWired struct {
+	dbMcpSvc     *bridge.DbMcpService
+	keepAwakeSvc *bridge.KeepAwakeService
+	windowsSvc   *bridge.WindowsService
+	terminalSvc  *bridge.TerminalService
+	dockerSvc    *bridge.DockerService
+	events       *bridge.Events
+	eventsDetach func()
+}
+
+// wireEmbeddedServices runs main's own embedded-service block: DB MCP (with its own approval
+// broker) -> keep-awake -> the windows service handle -> the embedded terminal -> the app-wide
+// event bus, attached to every producer built so far. deps is taken by value, since every call
+// site here is at or after the point main's own deps.Events assignment (the emitter) has already
+// run — each bridge.XxxService{Deps: deps} literal below is exactly the same value copy the
+// original sequential code made in place.
+func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker) embeddedWired {
+	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle.
+	// StartIfEnabled's own failure (a bind conflict) is logged, never fatal.
+	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
+	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
+	// restart of the embedded server within one app run.
+	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
+	dbMcpSvc := bridge.NewDbMcpService(deps, installer, dbMcpApprovals)
+	bridge.StartDbMcpIfEnabled(dbMcpSvc)
+
+	// P87 §3/§4: one keep-awake assertion for the whole app, driven by the titlebar toggle. The
+	// driver is a runtime.GOOS switch — a real caffeinate child on macOS, a documented no-op
+	// everywhere else.
+	keepAwakeCtl := keepawake.New(keepAwakeDriver)
+	keepAwakeSvc := &bridge.KeepAwakeService{Deps: deps, Ctl: keepAwakeCtl, Toggle: &keepawake.Toggle{Ctl: keepAwakeCtl}}
+
+	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
+	// it — the title bar's "New window" button reaches this same OpenNewWindow closure the ⇧⌘N
+	// menu command already uses. P128 §2.2: the bound methods live once in windowsvc.Service; this
+	// app's own WindowsService only embeds it.
+	windowsSvc := &bridge.WindowsService{Service: &windowsvc.Service{Windows: deps.Repos.Windows}}
+
+	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
+	// service plus ChannelTerminal's push channel. P128 §2.1: the bound methods live once in
+	// internal/terminal.BoundService; this app's own TerminalService only embeds it.
+	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: terminal.NewRegistry()}}
+	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events)}
+	events := bridge.NewEvents(deps.Events)
+	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
+
+	return embeddedWired{
+		dbMcpSvc: dbMcpSvc, keepAwakeSvc: keepAwakeSvc,
+		windowsSvc: windowsSvc, terminalSvc: terminalSvc, dockerSvc: dockerSvc,
+		events: events, eventsDetach: eventsDetach,
+	}
+}
+
+// lifecycleWired is wireLifecycle's own result: the window registry, the close-flush coordinator
+// and the quitter main's later blocks (openWindow, BuildMenu, app's own ShouldQuit/OnShutdown)
+// still reach past this function's own return.
+type lifecycleWired struct {
+	windows     *shell.WindowRegistry
+	closeFlush  *shell.CloseFlushCoordinator
+	quitter     *shell.Quitter
+	beforeFlush func()
+	teardown    func()
+}
+
+// wireLifecycle runs main's own pre-app window-lifecycle block: the window registry -> the
+// close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
+// which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
+// -> the quitter built over both.
+func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
+	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
+	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
+	// them, not just the most recently created (P2 R1's finding, generalised past one window).
+	windows := shell.NewWindowRegistry()
+
+	// closeFlush routes each window's own "flush before close" ack back to whichever
+	// shell.AttachCloseFlush hook is waiting for it (P8 C6, F8's fix) — a separate handshake from
+	// the quit one below: at most one window is ever waiting at a time.
+	closeFlush := shell.NewCloseFlushCoordinator(events)
+
+	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
+	// before the flush wait rather than after it — P56 D3/index.ts:156).
+	beforeFlush := sync.OnceFunc(func() {
+		metricsTicker.Stop()
+		windows.DetachAll()
+	})
+	teardown := sync.OnceFunc(func() {
+		// P119: a Cmd+Q mid-download aborts the install rather than leaving an orphan that later
+		// swaps a bundle the user quit away from. After hand-off this is a no-op.
+		updateInstaller.Cancel()
+		eventsDetach()
+		oplogWiring.Stop()
+		// F13 (P108 Part 7): DB MCP stops before connectionsSvc.Shutdown(), not after — its stopFn
+		// abandons parked approvals then waits out closeHTTP's graceful drain, so no run_query can
+		// still be mid-flight, dialing a preconnect target on demand, once Shutdown below starts
+		// tearing preconnect down.
+		bridge.StopDbMcp(dbMcpSvc)
+		connectionsSvc.Shutdown()
+		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
+		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the
+		// controller's release is independent of the PTY registry terminal.ShutdownBound(terminalSvc.BoundService) stops.
+		bridge.StopKeepAwake(keepAwakeSvc)
+		terminal.ShutdownBound(terminalSvc.BoundService)
+		if err := repositories.Close(); err != nil {
+			slog.Warn("close repos", "scope", "shutdown", "err", err)
+		}
+		if err := db.Close(); err != nil {
+			slog.Warn("close db", "scope", "shutdown", "err", err)
+		}
+	})
+	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second, windows.Keys)
+
+	return lifecycleWired{
+		windows: windows, closeFlush: closeFlush, quitter: quitter, beforeFlush: beforeFlush, teardown: teardown,
+	}
+}
