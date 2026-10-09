@@ -1,10 +1,13 @@
 package gitflow_test
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
@@ -147,3 +150,29 @@ func (r *rig) external(fn func()) {
 	fn()
 	testx.WaitUntil(r.t, wait, func() bool { return len(r.gs.Events("repo.changed")) > before })
 }
+func (r *rig) remote(id string, p gitsession.RemoteOpParams) gitsession.RemoteOpResult {
+	r.t.Helper()
+	return call[gitsession.RemoteOpResult](r.t, r.gs, "remote.run", gitrpc.RemoteRunParams{RepoID: id, RemoteOpParams: p})
+}
+
+func (r *rig) refs(id string) gitsession.RefsResult {
+	r.t.Helper()
+	return call[gitsession.RefsResult](r.t, r.gs, "refs.list", gitrpc.RefsListParams{RepoID: id})
+}
+
+// gitNow runs git with real commit dates. The harness pins old dates for reproducible shas, and
+// --force-if-includes ignores reflog entries older than the remote-tracking ref's last update, so a
+// rewrite that a force push must accept needs a current timestamp.
+func gitNow(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test Author", "GIT_AUTHOR_EMAIL=author@example.com",
+		"GIT_COMMITTER_NAME=Test Author", "GIT_COMMITTER_EMAIL=author@example.com")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+}
+
+func bridgeOpsArgs(limit int) bridge.OpsRecentArgs { return bridge.OpsRecentArgs{Limit: limit} }
