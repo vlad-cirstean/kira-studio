@@ -23,5 +23,12 @@ func TestMain(m *testing.M) {
 		fmt.Println(gateMessage)
 		return
 	}
-	os.Exit(flowharness.Main(m))
+	code := flowharness.Main(m)
+	// Re-executed helper processes (memory-mcp, fake gh) spend nothing and must keep stdout clean.
+	spendMu.Lock()
+	if spent > 0 {
+		fmt.Fprintf(os.Stderr, "real claude spend (claude -p results only, TUI sessions not counted): %.4f USD\n", spent)
+	}
+	spendMu.Unlock()
+	os.Exit(code)
 }

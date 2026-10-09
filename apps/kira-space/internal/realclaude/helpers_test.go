@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -149,6 +150,7 @@ func preflight(t *testing.T, a *realApp, parentSession string) {
 			preflightSkip = fmt.Sprintf("claude -p does not run under a temp HOME (see docs/DEV_ENVIRONMENT.md \"Real `claude` tests (P237)\"): %v\n%s", err, tail(errOut+out, 600))
 			return
 		}
+		recordSpend(out)
 		var res struct {
 			SessionID  string                    `json:"session_id"`
 			ModelUsage map[string]map[string]any `json:"modelUsage"`
@@ -209,11 +211,34 @@ func (a *realApp) run(t *testing.T, dir string, extraEnv []string, args ...strin
 func (a *realApp) claudeP(t *testing.T, dir string, extraEnv []string, prompt string, flags ...string) (stdout, stderr string) {
 	t.Helper()
 	args := append([]string{"-p", prompt, "--model", "haiku", "--max-budget-usd", budget}, flags...)
+	if !slices.Contains(flags, "--output-format") {
+		args = append(args, "--output-format", "json")
+	}
 	out, errOut, err := a.run(t, dir, extraEnv, args...)
 	if err != nil {
 		t.Fatalf("claude -p failed: %v\nstdout: %s\nstderr: %s", err, tail(out, 1500), tail(errOut, 1500))
 	}
+	recordSpend(out)
 	return out, errOut
+}
+
+var (
+	spendMu sync.Mutex
+	spent   float64
+)
+
+// recordSpend adds the total_cost_usd of every result line in out (json or stream-json) to the
+// package total TestMain prints. TUI sessions are not measurable this way.
+func recordSpend(out string) {
+	var total float64
+	for _, m := range parseStream(out) {
+		if m.Type == "result" {
+			total += m.TotalCostUSD
+		}
+	}
+	spendMu.Lock()
+	spent += total
+	spendMu.Unlock()
 }
 
 // streamMsg is the part of a stream-json line the tests read.
@@ -337,7 +362,11 @@ func (a *realApp) teeCost(t *testing.T) float64 {
 
 func (a *realApp) requireCostUnder(t *testing.T) {
 	t.Helper()
-	if c := a.teeCost(t); c > costLimit {
+	c := a.teeCost(t)
+	spendMu.Lock()
+	spent += c
+	spendMu.Unlock()
+	if c > costLimit {
 		t.Fatalf("headless runs cost %.4f USD, limit %.2f", c, costLimit)
 	}
 }

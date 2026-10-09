@@ -359,11 +359,10 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
   Kill leftover `claude` TUI processes after a run.
 - **A reused server-tag harness home keeps persisted tabs.** A stale repo-graph tab in `tabs` makes a
   fresh run open the old graph; delete the row before reuse (P203).
-- **An interactive `claude` cannot sign in here** (P149, 2.1.289): a fresh TUI stops at the theme picker,
-  then the login menu. `claude -p` works. To exercise the Stop hook path, read the launched process's
-  `/proc/<pid>/environ` (`KIRA_AGENT_HOOK_TOKEN`, `KIRA_TERMINAL_ID`) and argv (`--settings <hooks.json>`),
-  then pipe `{"hook_event_name":"Stop","session_id":"<id>","cwd":"<cwd>"}` into the `hook` shim next to
-  that `hooks.json` with the same env.
+- **An interactive `claude` runs here** (P237, 2.1.295). Under a temp `HOME` it needs `.claude.json`
+  `{"hasCompletedOnboarding":true,"theme":"dark","projects":{"<cwd>":{"hasTrustDialogAccepted":true}}}`.
+  Without `projects[cwd]` it stops at the folder-trust dialog. Auth comes from env, so a temp `HOME`
+  still signs in. Hooks fire in the TUI as in `claude -p`. See "Real `claude` tests (P237)".
 - The server build's `EmitTo` broadcasts to every page (`internal/shell/emitto_server.go`, P231). Payloads without
   a window key reach all pages: close-flush request, `AdeTaskOpenSession`, `ChannelMobileOpenLaunch`. With two pages
   in `e2e-real`, closing one window flushes all; focusing an ADE session opens it in all. Use one page per such test.
@@ -380,10 +379,13 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 
 - Go flows: `bun run test:flows:studio`. Complete suite: `bun run test:flows:studio:complete`
   (`KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`, 20 min timeout). Real-backend Playwright:
-  `bun run test:e2e-real:studio`.
+  `bun run test:e2e-real:studio`, which builds `apps/kira-studio/bin/flowservers` (gitignored), the
+  HTTP, HTTPS and gRPC servers the Go flows also use.
+- Run `go test` with `CGO_ENABLED=1`.
 - Docker flows need a daemon; if `docker ps` fails, start one with
   `setsid nohup dockerd > /tmp/dockerd.log 2>&1 < /dev/null &`. Without one they skip, or fail under
-  `KIRA_FLOW_DOCKER=require`. The `not-installed` status class needs a host without `/var/run/docker.sock`
+  `KIRA_FLOW_DOCKER=require`. They pull `mirror.gcr.io/library/alpine:3.20`; labelled leftovers older
+  than an hour are swept at the next run. The `not-installed` status class needs a host without `/var/run/docker.sock`
   (run it on a Mac with Docker stopped and no `~/.docker`).
 - `docker-real.spec.ts` execs into `mirror.gcr.io/library/bash:5.2`: with alpine, busybox ash can swallow an
   Enter that follows a cursor-position reply. Test-side workaround, not a product bug.
@@ -400,16 +402,43 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 - Harness roots use a short `os.MkdirTemp("", "ksf")` path: unix-socket paths cap near 108 bytes.
 - Many watchers per parallel test can hit the inotify limit; raise `fs.inotify.max_user_instances`.
 - Run `go test` with `CGO_ENABLED=1`; lint with `PATH=$HOME/go/bin:$PATH`.
+- Coverage gate (P236): `apps/<app>/internal/flows/coverage/` fails on a bound method with no flow call.
+  Exempt one with a reason in `exempt.txt`.
 
-## Kira Studio flow suites (P232)
+## Real `claude` tests (P237)
 
-- Go flows: `bun run test:flows:studio`. Complete suite: `bun run test:flows:studio:complete`
-  (`KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`, 20 min timeout).
-- Docker flows need `dockerd` up (Docker section) and pull `mirror.gcr.io/library/alpine:3.20`. Labelled
-  leftovers older than an hour are swept at the next run.
-- `bun run test:e2e-real:studio` builds `apps/kira-studio/bin/flowservers` (gitignored), the HTTP, HTTPS
-  and gRPC servers the Go flows also use.
-- Run `go test` with `CGO_ENABLED=1`.
+Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-commit or pre-push.
+
+- Gate: build tag `realclaude` and `KIRA_REAL_CLAUDE=1`. Both required. Without the tag nothing compiles;
+  without the env the package prints `real claude tests: set KIRA_REAL_CLAUDE=1 (spends real tokens)`.
+- Needs an authenticated `claude` on `PATH`. Tests use haiku (`--model haiku`, `ANTHROPIC_MODEL=haiku` for
+  app-built launches), a temp `HOME`, `--max-budget-usd 0.05` and one-sentence prompts. A package preflight
+  skips, not fails, when `claude -p` cannot run under the temp `HOME`.
+- Rule: after changing code in an area below, run that row before calling the change done.
+- Lint the tagged files: `golangci-lint run --build-tags realclaude ./apps/kira-space/internal/realclaude/... ./apps/kira-studio/internal/realclaude/... ./internal/memory/...`.
+- Spend, measured on 2026-10-09 (CLI 2.1.295, haiku): `claude -p` results of the Space suite 0.014 USD, TUI sessions (about 4 at 1 to 2 haiku prompts) an estimated 0.02 USD, Studio suite under 0.01 USD, memory gate smoke a few cents, import smoke 0.14 USD (P211). Space suite about 75 s, Studio about 12 s. The Space run prints its measured `claude -p` spend.
+
+| Changed area (paths) | Command |
+|---|---|
+| Hook injection, shim, listener: `internal/agenthooks/**`, `apps/kira-space/internal/ade/tracker.go`, `internal/terminal/bound.go` | `KIRA_REAL_CLAUDE=1 CGO_ENABLED=1 go test -tags realclaude ./apps/kira-space/internal/realclaude/ -run 'TestTerminalAgentHooks\|TestHookPayloadContract\|TestShimInertForPlainClaude' -v -timeout 15m` |
+| Claude config isolation: anything that composes a `claude` argv or env, `apps/kira-space/internal/appwire/wire.go` | `KIRA_REAL_CLAUDE=1 CGO_ENABLED=1 go test -tags realclaude ./apps/kira-space/internal/realclaude/ -run TestRealClaudeSettingsUntouched -v -timeout 15m` |
+| ADE runs and sessions: `apps/kira-space/internal/{ade,adeagent,adeflow}/**` | `KIRA_REAL_CLAUDE=1 CGO_ENABLED=1 go test -tags realclaude ./apps/kira-space/internal/realclaude/ -run 'TestAdeHeadlessRun\|TestAdeStageSession' -v -timeout 15m` |
+| Memory MCP and install: `internal/memory/memorycli/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go` | `KIRA_REAL_CLAUDE=1 CGO_ENABLED=1 go test -tags realclaude ./apps/kira-space/internal/realclaude/ -run 'TestMemoryMcpThroughClaude\|TestMemoryInstallRegisters' -v -timeout 15m` |
+| Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `KIRA_REAL_CLAUDE=1 CGO_ENABLED=1 go test -tags realclaude ./internal/memory/ -run Smoke -v` |
+| Memory import: `internal/memory/importer/**` | `KIRA_REAL_CLAUDE=1 CGO_ENABLED=1 go test -tags realclaude ./internal/memory/importer/ -run Smoke -v` (about 50 s, 0.14 USD, P211) |
+| DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `KIRA_REAL_CLAUDE=1 CGO_ENABLED=1 go test -tags realclaude ./apps/kira-studio/internal/realclaude/ -v -timeout 15m` |
+| Claude CLI upgrade | the whole suite: both `realclaude` packages plus the two memory rows |
+
+Sandbox notes:
+
+- Inside an agent session the child `claude` reuses the parent's session id. The suite unsets
+  `CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_REMOTE_SESSION_ID` and `CLAUDECODE`; the preflight asserts the ids differ.
+- The TUI tests seed `$HOME/.claude.json` with onboarding done and `projects[cwd]` trust (see the server-tag section).
+- The Space suite replaces the harness's fake `claude` with a wrapper script in `BinDir`: it copies stdout of
+  `claude -p` runs to a file (the app's run log drops the cost) and execs the real binary otherwise.
+- Studio's harness fakes the `claude` MCP installer. `TestDbMcpInstallRegisters` forwards the arguments the
+  fake records to the real `mcpinstall` installer.
+- `~/.claude.json` is not compared in the settings test: the CLI rewrites it on every run (P233 A13).
 
 ## Playwright UI tier — `webkit` needs fetching explicitly
 
@@ -456,12 +485,12 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
 
 - `KIRA_MEMORY_HOME` scopes `memory.db` (default `~/.kira-memory`). `testx.RunWithTempHomes` sets it
   for test binaries.
-- Smoke against the real CLI, not in CI: `go test -tags claudesmoke ./internal/memory/ -run Smoke -v`.
+- Smoke against the real CLI, opt-in (P237): `KIRA_REAL_CLAUDE=1 go test -tags realclaude ./internal/memory/ -run Smoke -v`.
   Needs an authenticated `claude` on `PATH` (`claude -p` works here, CLI 2.1.292; ~14 s, a few cents).
   The gate uses `--safe-mode --setting-sources "" --strict-mcp-config --tools "" --no-session-persistence`;
   never `--bare`, it forces API-key auth.
 - Import smoke (P211), real CLI, about 50 s and 0.14 USD:
-  `go test -tags claudesmoke ./internal/memory/importer/ -run Smoke -v`. It runs the engine on
+  `KIRA_REAL_CLAUDE=1 go test -tags realclaude ./internal/memory/importer/ -run Smoke -v`. It runs the engine on
   `testdata/smoke` with a small chunk budget and re-executes the test binary as `memory-mcp` (set
   `KIRA_TEST_MEMORY_MCP=1`; `TestMain` in `engine_test.go` handles it), so no built app is needed.
   Import UI states: `bun run build:test:space`, then Playwright `memory-import` (mock bridge).
