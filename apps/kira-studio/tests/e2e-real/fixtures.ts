@@ -66,6 +66,8 @@ export interface KiraApp {
   baseURL: string;
   /** Calls a bound service method on the real server, e.g. `call('VariablesService', 'Upsert', args)`. */
   call: <T>(service: string, method: string, args?: unknown) => Promise<T>;
+  /** Kills the server (SIGKILL) and starts it again on the same KIRA_HOME and port, then reloads the page. */
+  relaunch: () => Promise<void>;
 }
 
 interface KiraFixtures {
@@ -129,32 +131,39 @@ export const test = base.extend<KiraFixtures>({
       ...serverEnv,
     };
 
-    const proc = spawn(SERVER_BINARY, [], {
-      cwd: APP_DIR,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const stderr: string[] = [];
-    proc.stderr?.on('data', (chunk: Buffer) => {
-      stderr.push(chunk.toString());
-      process.stderr.write(chunk);
-    });
-    const exited = new Promise<number | null>((r) => proc.once('exit', r));
-
     const baseURL = `http://127.0.0.1:${port}`;
-    try {
-      await Promise.race([
-        waitForHealth(`${baseURL}/health`, 20_000),
-        exited.then((code) => {
-          throw new Error(
-            `kira-server-test exited (code ${code}) before /health:\n${stderr.join('')}`,
-          );
-        }),
-      ]);
-    } catch (err) {
-      proc.kill('SIGKILL');
-      throw err;
+    interface Server {
+      proc: ReturnType<typeof spawn>;
+      exited: Promise<number | null>;
     }
+    const start = async (): Promise<Server> => {
+      const proc = spawn(SERVER_BINARY, [], {
+        cwd: APP_DIR,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const stderr: string[] = [];
+      proc.stderr?.on('data', (chunk: Buffer) => {
+        stderr.push(chunk.toString());
+        process.stderr.write(chunk);
+      });
+      const exited = new Promise<number | null>((r) => proc.once('exit', r));
+      try {
+        await Promise.race([
+          waitForHealth(`${baseURL}/health`, 20_000),
+          exited.then((code) => {
+            throw new Error(
+              `kira-server-test exited (code ${code}) before /health:\n${stderr.join('')}`,
+            );
+          }),
+        ]);
+      } catch (err) {
+        proc.kill('SIGKILL');
+        throw err;
+      }
+      return { proc, exited };
+    };
+    let server = await start();
 
     const page = await browser.newPage();
     page.on('console', (msg) => {
@@ -168,14 +177,21 @@ export const test = base.extend<KiraFixtures>({
       window: page,
       baseURL,
       call: (service, method, args) => bound(baseURL, BRIDGE_PKG, service, method, args),
+      relaunch: async () => {
+        server.proc.kill('SIGKILL');
+        await server.exited;
+        server = await start();
+        await page.goto(`${baseURL}/`);
+        await page.waitForSelector('[data-testid="status-bar"]');
+      },
     });
 
     await page.close();
     // SIGKILL, not a graceful shutdown (§8) — this tier does not test lifecycle/quit handshakes
     // (that's explicitly out of scope, §4), and a process left to its own OnShutdown hooks between
     // tests is exactly the kind of teardown flakiness this fixture doesn't need to own.
-    proc.kill('SIGKILL');
-    await exited;
+    server.proc.kill('SIGKILL');
+    await server.exited;
   },
 });
 

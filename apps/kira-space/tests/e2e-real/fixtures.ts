@@ -66,6 +66,8 @@ export interface KiraSpaceApp {
   call<T>(service: string, method: string, args?: unknown): Promise<T>;
   /** Reloads the page, re-running boot against current server state. */
   reload(): Promise<void>;
+  /** Kills the server (SIGKILL) and starts it again on the same home and port, then reloads the page. */
+  relaunch(): Promise<void>;
 }
 
 interface KiraSpaceFixtures {
@@ -126,27 +128,40 @@ export const test = base.extend<KiraSpaceFixtures>({
       WAILS_SERVER_PORT: String(port),
     };
 
-    const proc = spawn(SERVER_BINARY, [], {
-      cwd: APP_DIR,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const stderr: string[] = [];
-    proc.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk.toString()));
-    const exited = new Promise<number | null>((r) => proc.once('exit', r));
-
     const baseURL = `http://127.0.0.1:${port}`;
+    interface Server {
+      proc: ReturnType<typeof spawn>;
+      exited: Promise<number | null>;
+    }
+    const start = async (): Promise<Server> => {
+      const proc = spawn(SERVER_BINARY, [], {
+        cwd: APP_DIR,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const stderr: string[] = [];
+      proc.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk.toString()));
+      const exited = new Promise<number | null>((r) => proc.once('exit', r));
+      try {
+        await Promise.race([
+          waitForHealth(`${baseURL}/health`, 20_000),
+          exited.then((code) => {
+            throw new Error(
+              `kira-space-server-test exited (code ${code}) before /health:\n${stderr.join('')}`,
+            );
+          }),
+        ]);
+      } catch (err) {
+        proc.kill('SIGKILL');
+        throw err;
+      }
+      return { proc, exited };
+    };
+
+    let server: Server;
     try {
-      await Promise.race([
-        waitForHealth(`${baseURL}/health`, 20_000),
-        exited.then((code) => {
-          throw new Error(
-            `kira-space-server-test exited (code ${code}) before /health:\n${stderr.join('')}`,
-          );
-        }),
-      ]);
+      server = await start();
     } catch (err) {
-      proc.kill('SIGKILL');
       await rm(root, { recursive: true, force: true });
       throw err;
     }
@@ -172,12 +187,19 @@ export const test = base.extend<KiraSpaceFixtures>({
         await page.goto(url);
         await page.waitForSelector('[data-testid="status-bar"]');
       },
+      relaunch: async () => {
+        server.proc.kill('SIGKILL');
+        await server.exited;
+        server = await start();
+        await page.goto(url);
+        await page.waitForSelector('[data-testid="status-bar"]');
+      },
     });
 
     await page.close();
     // SIGKILL: this tier does not test quit handshakes.
-    proc.kill('SIGKILL');
-    await exited;
+    server.proc.kill('SIGKILL');
+    await server.exited;
     await rm(root, { recursive: true, force: true });
   },
 });
