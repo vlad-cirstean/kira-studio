@@ -37,6 +37,7 @@ import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readToken
 import {
   type ColumnFit,
   type ColumnFitInput,
+  effectiveGraphWidth,
   fitColumns,
   MAX_COLUMN_WIDTH,
   maxDragWidth,
@@ -149,11 +150,12 @@ const widths = ref<ColumnWidths>({
   ...props.columnWidths,
   graph: Math.max(MIN_COLUMN_WIDTH, props.columnWidths.graph),
 });
-// P225: first-ever mount, the graph column tracks `laneCount` (capped at the default width) until
-// the user drags it. `graphAutoSeeded` marks the first lane-aware width, which may shrink the
-// column; every later step is grow-only.
-let graphAutoWidth = false;
-let graphAutoSeeded = false;
+// P228: grow-only high-water of the lanes' width for this mount (0 until the first lane-aware
+// layout); a repo switch remounts, which resets it. The column never renders below it, in any
+// mode, so no drawn node clips. `graphAuto`: a first-ever mount tracks the floor, even below the
+// stored width, until the user drags the graph handle.
+const laneFloor = ref(0);
+let graphAuto = false;
 
 /** G21 D6b: the measured pixel width the absolute date format actually needs at the current
  *  font/zoom — `0` until the probe first resolves (always synchronous in practice; there is no
@@ -175,7 +177,12 @@ function remeasureDateWidth(): void {
  *  replaces it, never shrinks below it — `Math.max` covers a `measuredDateWidth` of `0` (not yet
  *  measured) falling back to the global floor exactly like every other column. */
 function minWidthFor(column: keyof ColumnWidths): number {
+  if (column === 'graph') return Math.max(MIN_COLUMN_WIDTH, laneFloor.value);
   return column === 'date' ? Math.max(MIN_COLUMN_WIDTH, measuredDateWidth.value) : MIN_COLUMN_WIDTH;
+}
+
+function graphWidth(): number {
+  return effectiveGraphWidth(widths.value.graph, minWidthFor('graph'), laneFloor.value > 0 && graphAuto);
 }
 
 /** P93 §7: every translation site in this file's own coordinate conversion — SlickGrid's rows
@@ -207,7 +214,7 @@ const graphFormatter = createGraphFormatter(
   () => props.graphView.layoutCurrent,
   (row) => grid?.getRowHeight(row) ?? compactRowHeightPx(tokenReader),
   () => compactRowHeightPx(tokenReader),
-  () => widths.value.graph,
+  graphWidth,
 );
 
 // Positions of the two drag handles (message|author, author|date), recomputed whenever the
@@ -287,7 +294,7 @@ function fitInput(): ColumnFitInput {
     stored: widths.value,
     available: availableWidth(),
     graphFloor: minWidthFor('graph'),
-    graphAuto: false,
+    graphAuto: laneFloor.value > 0 && graphAuto,
     minAuthor: MIN_COLUMN_WIDTH,
     minDate: minWidthFor('date'),
     minMessage: MIN_MESSAGE_WIDTH,
@@ -425,7 +432,7 @@ function rebuildColumns(): void {
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
-  if (column === 'graph') graphAutoWidth = false;
+  if (column === 'graph') graphAuto = false;
   const input = fitInput();
   const limit = maxDragWidth(column, fitColumns(input), input);
   const clamped = Math.min(limit, Math.max(minWidthFor(column), Math.round(next)));
@@ -669,29 +676,18 @@ function scheduleAncestryRebuild(): void {
   });
 }
 
-function graphSeedWidth(): number {
-  return Math.min(
-    DEFAULT_COLUMN_WIDTHS.graph,
-    Math.max(minWidthFor('graph'), graphColumnWidth(props.graphView.laneCount.value)),
-  );
-}
-
-/** P225: widens the auto-width graph column as later chunks and pages raise `laneCount`. Not
- *  emitted or persisted: only a user drag is. Grow-only after the first lane-aware width, so a
- *  refresh that restarts at `laneCount` 0 never makes the column jump back. */
-function growGraphColumn(): void {
-  if (!graphAutoWidth || props.graphView.laneCount.value === 0) return;
-  const next = graphSeedWidth();
-  if (next === widths.value.graph || (graphAutoSeeded && next < widths.value.graph)) return;
-  graphAutoSeeded = true;
-  widths.value = { ...widths.value, graph: next };
-  rebuildColumns();
+/** Raises the lane floor as later chunks and pages raise `laneCount`. Never emitted or persisted:
+ *  only a user drag writes a width. */
+function raiseLaneFloor(): void {
+  const lanes = props.graphView.laneCount.value;
+  if (lanes === 0) return;
+  const before = graphWidth();
+  laneFloor.value = Math.max(laneFloor.value, graphColumnWidth(lanes));
+  if (graphWidth() !== before) rebuildColumns();
 }
 
 /** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
- *  heights. P92 item 1: the graph column's width is user-set (`widths.value.graph`), not derived
- *  from lane count. Sole exception (P220/P225): a first-ever mount's auto width, which follows lane
- *  growth (`growGraphColumn`) until the user drags the column.
+ *  heights; `raiseLaneFloor` widens the graph column when the new lanes need it.
  *
  *  P92 item 4: `invalidateRowHeights()`, not `invalidateRows(rows)` + `render()` — the latter
  *  marks heights dirty but never rebuilds SlickGrid's row-position index (only `updateRowCount()`
@@ -701,7 +697,7 @@ function growGraphColumn(): void {
  *  are both stale" entry point, so `_range` is unused now — kept for the callback signature. */
 function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
-  growGraphColumn();
+  raiseLaneFloor();
   grid.invalidateRowHeights();
   if (!layoutCompleteMarked) {
     layoutCompleteMarked = true;
@@ -907,15 +903,9 @@ onMounted(() => {
     // `DEFAULT_COLUMN_WIDTHS.date`, e.g. a user who explicitly chose it) is never overridden.
     const seeded = Math.max(DEFAULT_COLUMN_WIDTHS.date, measuredDateWidth.value);
     if (seeded !== widths.value.date) widths.value = { ...widths.value, date: seeded };
-    // P220: laneCount is 0 until the layout worker answers; seeding then would give a 17px column
-    // that clips every lane. Defer to the first layout with lanes (`growGraphColumn`).
-    graphAutoWidth = true;
-    if (props.graphView.laneCount.value > 0) {
-      graphAutoSeeded = true;
-      const graphSeed = graphSeedWidth();
-      if (graphSeed !== widths.value.graph) widths.value = { ...widths.value, graph: graphSeed };
-    }
+    graphAuto = true;
   }
+  raiseLaneFloor();
 
   const dataView = createCommitDataView({
     store: props.graphView.store,

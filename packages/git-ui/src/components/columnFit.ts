@@ -24,7 +24,7 @@ export interface ColumnFit {
   readonly message: number;
 }
 
-function effectiveGraphWidth(stored: number, floor: number, auto: boolean): number {
+export function effectiveGraphWidth(stored: number, floor: number, auto: boolean): number {
   return auto ? floor : Math.max(floor, stored);
 }
 
