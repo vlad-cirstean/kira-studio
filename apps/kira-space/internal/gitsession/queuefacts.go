@@ -3,6 +3,8 @@ package gitsession
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
@@ -24,7 +26,48 @@ func (e *RepoEntry) BranchInventory(ctx context.Context) ([]porcelain.InventoryR
 	if err != nil {
 		return nil, err
 	}
-	return porcelain.ParseInventory(raw)
+	refs, err := porcelain.ParseInventory(raw)
+	if err != nil {
+		return nil, err
+	}
+	return refs, e.fillRebasingWorktrees(ctx, refs)
+}
+
+// fillRebasingWorktrees sets the worktree of a branch being rebased: its worktree is detached, so
+// for-each-ref no longer reports it checked out there.
+func (e *RepoEntry) fillRebasingWorktrees(ctx context.Context, refs []porcelain.InventoryRef) error {
+	records, err := e.rawWorktreeList(ctx)
+	if err != nil {
+		return err
+	}
+	rebasing := map[string]string{}
+	for _, r := range records {
+		if !r.Detached {
+			continue
+		}
+		if name := rebaseHeadName(worktreeGitDir(r.Path)); name != "" {
+			rebasing[name] = r.Path
+		}
+	}
+	for i := range refs {
+		if path, ok := rebasing[refs[i].Ref]; ok && refs[i].WorktreePath == "" {
+			refs[i].WorktreePath = path
+		}
+	}
+	return nil
+}
+
+// rebaseHeadName is the full ref a rebase in gitDir will move back to, "" when none runs.
+func rebaseHeadName(gitDir string) string {
+	if gitDir == "" {
+		return ""
+	}
+	for _, dir := range []string{"rebase-merge", "rebase-apply"} {
+		if raw, err := os.ReadFile(filepath.Join(gitDir, dir, "head-name")); err == nil {
+			return strings.TrimSpace(string(raw))
+		}
+	}
+	return ""
 }
 
 // MainRef is §0.6's own rule: origin/HEAD's target when it resolves to a ref that exists, else the

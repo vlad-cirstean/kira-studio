@@ -2,7 +2,6 @@ package ade
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -435,14 +434,10 @@ func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q adeagent.Out
 		}
 		entry := adeagent.RunOutcomeEntry{
 			RunID: r.ID, Kind: kind, Stage: r.StageID, Step: r.StepID, Repo: tc.nick[br.CodeRepoID], Branch: br.Name,
-			State: r.State, FinishedAt: r.FinishedAt, Outcome: json.RawMessage("null"),
+			State: r.State, FinishedAt: r.FinishedAt,
 		}
 		if r.Outcome != nil {
-			raw, err := json.Marshal(r.Outcome)
-			if err != nil {
-				return nil, err
-			}
-			entry.Outcome = raw
+			entry.Outcome = r.Outcome
 		}
 		out = append(out, entry)
 	}

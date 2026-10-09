@@ -2,7 +2,6 @@ package adeagent
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -20,15 +19,15 @@ type OutcomeQuery struct {
 // RunOutcomeEntry is one run as an agent sees it. Outcome is the stored outcome as JSON, null while
 // the run has none.
 type RunOutcomeEntry struct {
-	RunID      string          `json:"runId"`
-	Kind       string          `json:"kind"`
-	Stage      string          `json:"stage"`
-	Step       string          `json:"step"`
-	Repo       string          `json:"repo"`
-	Branch     string          `json:"branch"`
-	State      string          `json:"state"`
-	FinishedAt *int64          `json:"finishedAt"`
-	Outcome    json.RawMessage `json:"outcome"`
+	RunID      string `json:"runId"`
+	Kind       string `json:"kind"`
+	Stage      string `json:"stage"`
+	Step       string `json:"step"`
+	Repo       string `json:"repo"`
+	Branch     string `json:"branch"`
+	State      string `json:"state"`
+	FinishedAt *int64 `json:"finishedAt"`
+	Outcome    any    `json:"outcome"`
 }
 
 // Outcomes is what run_outcome calls; *ade.TaskBoard implements it. It returns the task's runs only,
