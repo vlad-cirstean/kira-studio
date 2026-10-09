@@ -1,7 +1,7 @@
-// Package quickcommands is the one quick-command (custom_scripts) store and bound surface both
+// Package scripts is the one script (custom_scripts) store and bound surface both
 // apps share: the record type and its validation, the SQL repo, and the Wails service each app
 // embeds under its own binding name (windowsvc's precedent).
-package quickcommands
+package scripts
 
 import (
 	"database/sql"
@@ -14,7 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/palette"
 )
 
-// MaxCollectionRunes caps a quick-command collection name.
+// MaxCollectionRunes caps a script collection name.
 const MaxCollectionRunes = 64
 
 // ValidationError marks a caller-input failure, answered as E_BAD_REQUEST.
@@ -33,14 +33,14 @@ func IsCallerError(err error) bool {
 }
 
 // CustomScript mirrors packages/shared/domain/scripts.ts's customScriptSchema: one custom_scripts
-// row, listed in the Terminal module's Quick commands panel.
+// row, listed in the Automations panel.
 type CustomScript struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
 	Command    string `json:"command"`
 	WorkingDir string `json:"workingDir"`
 	Color      string `json:"color"`
-	// CollectionID is nil for an ungrouped command.
+	// CollectionID is nil for an ungrouped script.
 	CollectionID *string `json:"collectionId"`
 	SortOrder    int     `json:"sortOrder"`
 	CreatedAt    string  `json:"createdAt"`
@@ -48,7 +48,7 @@ type CustomScript struct {
 }
 
 // Collection mirrors packages/shared/domain/scripts.ts's scriptCollectionSchema: one
-// custom_script_collections row, the group a quick command lives under.
+// custom_script_collections row, the group a script lives under.
 type Collection struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -80,16 +80,16 @@ func (f *CustomScriptFields) Validate() error {
 	f.Name = strings.TrimSpace(f.Name)
 	f.Command = strings.TrimSpace(f.Command)
 	if f.Name == "" {
-		return invalid("quickcommands: name is required")
+		return invalid("scripts: name is required")
 	}
 	if f.Command == "" {
-		return invalid("quickcommands: command is required")
+		return invalid("scripts: command is required")
 	}
 	if f.WorkingDir != "" && !filepath.IsAbs(f.WorkingDir) {
-		return invalid("quickcommands: working directory must be an absolute path")
+		return invalid("scripts: working directory must be an absolute path")
 	}
 	if !palette.Valid(f.Color) {
-		return invalid("quickcommands: invalid colour")
+		return invalid("scripts: invalid colour")
 	}
 	return nil
 }
@@ -98,10 +98,10 @@ func (f *CustomScriptFields) Validate() error {
 func validCollectionName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "", invalid("quickcommands: collection name is required")
+		return "", invalid("scripts: collection name is required")
 	}
 	if utf8.RuneCountInString(name) > MaxCollectionRunes {
-		return "", invalid("quickcommands: collection name is too long")
+		return "", invalid("scripts: collection name is too long")
 	}
 	return name, nil
 }

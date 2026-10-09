@@ -9,7 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
-	"github.com/kirathecat/kira-studio/internal/quickcommands"
+	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -33,14 +33,14 @@ func TestQuickCommandInPickedFolder(t *testing.T) {
 
 	mark := app.Events.Mark()
 	cmd := "ls marker.txt; exit 4"
-	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{
+	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
 		Name: "list", Command: cmd, WorkingDir: *picked.Path, Color: "blue",
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ev := app.Events.WaitAfter(t, mark, bridge.ChannelCustomScriptsChanged, nil, wait)
-	var snap quickcommands.Snapshot
+	var snap scripts.Snapshot
 	ev.Decode(t, &snap)
 	if len(snap.Scripts) != 1 || snap.Scripts[0].ID != rec.ID || snap.Scripts[0].WorkingDir != dir {
 		t.Fatalf("changed snapshot = %+v, want the new command in %s", snap, dir)
@@ -60,8 +60,8 @@ func TestQuickCommandInPickedFolder(t *testing.T) {
 func TestQuickCommandCollections(t *testing.T) {
 	app := flowharness.New(t)
 	cs := app.W.CustomScripts
-	fields := func(name string, coll *string) quickcommands.CustomScriptFields {
-		return quickcommands.CustomScriptFields{Name: name, Command: "echo " + name, Color: "blue", CollectionID: coll}
+	fields := func(name string, coll *string) scripts.CustomScriptFields {
+		return scripts.CustomScriptFields{Name: name, Command: "echo " + name, Color: "blue", CollectionID: coll}
 	}
 
 	a, err := cs.CreateCollection(bridge.CustomScriptsCreateCollectionArgs{Name: "A"})
@@ -91,7 +91,7 @@ func TestQuickCommandCollections(t *testing.T) {
 		t.Fatal(err)
 	}
 	snap := lastSnapshot(t, app)
-	byName := map[string]quickcommands.CustomScript{}
+	byName := map[string]scripts.CustomScript{}
 	for _, s := range snap.Scripts {
 		byName[s.Name] = s
 	}
@@ -133,13 +133,13 @@ func TestQuickCommandCollections(t *testing.T) {
 	}
 }
 
-func lastSnapshot(t *testing.T, app *flowharness.App) quickcommands.Snapshot {
+func lastSnapshot(t *testing.T, app *flowharness.App) scripts.Snapshot {
 	t.Helper()
 	evs := app.Events.Since(0, bridge.ChannelCustomScriptsChanged)
 	if len(evs) == 0 {
 		t.Fatal("no customScripts:changed event")
 	}
-	var snap quickcommands.Snapshot
+	var snap scripts.Snapshot
 	evs[len(evs)-1].Decode(t, &snap)
 	return snap
 }
@@ -153,18 +153,18 @@ func sameJSON(a, b any) bool {
 func TestCustomScriptUpdateRemove(t *testing.T) {
 	app := flowharness.New(t)
 	cs := app.W.CustomScripts
-	rec, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{Name: "old", Command: "echo old", Color: "blue"}})
+	rec, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{Name: "old", Command: "echo old", Color: "blue"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	keep, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{Name: "keep", Command: "echo keep", Color: "green"}})
+	keep, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{Name: "keep", Command: "echo keep", Color: "green"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	mark := app.Events.Mark()
 	dir := t.TempDir()
-	upd, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: quickcommands.CustomScriptFields{
+	upd, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: scripts.CustomScriptFields{
 		Name: "new", Command: "echo new; exit 3", WorkingDir: dir, Color: "red",
 	}})
 	if err != nil || upd.Name != "new" || upd.Command != "echo new; exit 3" || upd.WorkingDir != dir || upd.Color != "red" {
@@ -183,10 +183,10 @@ func TestCustomScriptUpdateRemove(t *testing.T) {
 		t.Fatalf("exit code = %d, want 3", code)
 	}
 
-	if _, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: "missing", Fields: quickcommands.CustomScriptFields{Name: "x", Command: "x", Color: "blue"}}); err == nil {
+	if _, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: "missing", Fields: scripts.CustomScriptFields{Name: "x", Command: "x", Color: "blue"}}); err == nil {
 		t.Fatal("Update of an unknown command succeeded")
 	}
-	if _, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: quickcommands.CustomScriptFields{Name: "", Command: "x", Color: "blue"}}); err == nil {
+	if _, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: scripts.CustomScriptFields{Name: "", Command: "x", Color: "blue"}}); err == nil {
 		t.Fatal("Update with an empty name succeeded")
 	}
 
@@ -194,7 +194,7 @@ func TestCustomScriptUpdateRemove(t *testing.T) {
 	if err := cs.Remove(bridge.CustomScriptsRemoveArgs{ID: rec.ID}); err != nil {
 		t.Fatal(err)
 	}
-	var snap quickcommands.Snapshot
+	var snap scripts.Snapshot
 	app.Events.WaitAfter(t, mark, bridge.ChannelCustomScriptsChanged, nil, wait).Decode(t, &snap)
 	if len(snap.Scripts) != 1 || snap.Scripts[0].ID != keep.ID {
 		t.Fatalf("snapshot after Remove = %+v, want only %q", snap, keep.Name)

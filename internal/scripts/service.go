@@ -1,10 +1,10 @@
-package quickcommands
+package scripts
 
 import "github.com/kirathecat/kira-studio/internal/ipcerr"
 
 // Service holds every method body once. Each app's bridge.CustomScriptsService is a wrapper struct
 // with forwarding methods, so Wails builds binding names from the app's own package. Every mutation broadcasts the full snapshot
-// through Emit so a second window's Quick commands list stays live.
+// through Emit so a second window's Scripts list stays live.
 type Service struct {
 	Repo *Repo
 	Emit func(snapshot Snapshot)

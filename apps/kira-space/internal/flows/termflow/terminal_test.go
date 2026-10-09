@@ -13,7 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appevent"
-	"github.com/kirathecat/kira-studio/internal/quickcommands"
+	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -116,8 +116,8 @@ func TestCollectionsMoveAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mk := func(name string, collection *string) quickcommands.CustomScript {
-		s, err := svc.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{
+	mk := func(name string, collection *string) scripts.CustomScript {
+		s, err := svc.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
 			Name: name, Command: "echo " + name, Color: "blue", CollectionID: collection,
 		}})
 		if err != nil {
@@ -157,7 +157,7 @@ func TestCollectionsMoveAndDelete(t *testing.T) {
 	if len(last) != 5 {
 		t.Fatalf("%d changed events, want one per mutation (5)", len(last))
 	}
-	var final quickcommands.Snapshot
+	var final scripts.Snapshot
 	last[len(last)-1].Decode(t, &final)
 	if len(final.Collections) != 0 || len(final.Scripts) != 1 {
 		t.Fatalf("last changed event = %+v, want the full snapshot", final)

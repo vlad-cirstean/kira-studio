@@ -12,7 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/memory"
-	"github.com/kirathecat/kira-studio/internal/quickcommands"
+	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -93,14 +93,14 @@ func TestRestartKeepsUserData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	script, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{Name: "build", Command: "make", Color: "blue", CollectionID: &a.ID}})
+	script, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{Name: "build", Command: "make", Color: "blue", CollectionID: &a.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := cs.RenameCollection(bridge.CustomScriptsRenameCollectionArgs{ID: a.ID, Name: "Compile"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: script.ID, Fields: quickcommands.CustomScriptFields{
+	if _, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: script.ID, Fields: scripts.CustomScriptFields{
 		Name: "build all", Command: "make all", Color: "green", CollectionID: &a.ID,
 	}}); err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestRestartKeepsUserData(t *testing.T) {
 	if err := cs.Move(bridge.CustomScriptsMoveArgs{ID: script.ID, CollectionID: &b.ID}); err != nil {
 		t.Fatal(err)
 	}
-	extra, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{Name: "temp", Command: "true", Color: "blue"}})
+	extra, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{Name: "temp", Command: "true", Color: "blue"}})
 	if err != nil {
 		t.Fatal(err)
 	}

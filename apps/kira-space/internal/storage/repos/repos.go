@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/internal/appstorage"
-	"github.com/kirathecat/kira-studio/internal/quickcommands"
+	"github.com/kirathecat/kira-studio/internal/scripts"
 )
 
 // Repos is every storage repo this app needs, constructed once at startup — Kira Studio's own
@@ -35,7 +35,7 @@ type Repos struct {
 	AdeRepoConfig   *AdeRepoConfigRepo
 	AdeFacts        *AdeFactsRepo
 	AdeLogs         *AdeLogsRepo
-	CustomScripts   *quickcommands.Repo
+	CustomScripts   *scripts.Repo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -75,7 +75,7 @@ func New(db *sql.DB) (*Repos, error) {
 		AdeRepoConfig:   &AdeRepoConfigRepo{DB: db},
 		AdeFacts:        &AdeFactsRepo{DB: db},
 		AdeLogs:         &AdeLogsRepo{DB: db},
-		CustomScripts:   &quickcommands.Repo{DB: db},
+		CustomScripts:   &scripts.Repo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll},
 	}, nil
 }

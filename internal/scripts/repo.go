@@ -1,4 +1,4 @@
-package quickcommands
+package scripts
 
 import (
 	"database/sql"
@@ -54,7 +54,7 @@ func (r *Repo) Get(id string) (*CustomScript, error) {
 		return &s, nil
 	}, `SELECT `+selectColumns+` FROM custom_scripts WHERE id = ?`, id)
 	if err != nil {
-		return nil, fmt.Errorf("quickcommands: get %s: %w", id, err)
+		return nil, fmt.Errorf("scripts: get %s: %w", id, err)
 	}
 	return rec, nil
 }
@@ -64,14 +64,14 @@ func (r *Repo) Get(id string) (*CustomScript, error) {
 // before the insert.
 func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 	if err := fields.Validate(); err != nil {
-		return CustomScript{}, fmt.Errorf("quickcommands: %w", err)
+		return CustomScript{}, fmt.Errorf("scripts: %w", err)
 	}
 	if err := r.requireCollection(fields.CollectionID); err != nil {
 		return CustomScript{}, err
 	}
 	sortOrder, err := sqlitex.NextSortOrder(r.DB, "custom_scripts", "")
 	if err != nil {
-		return CustomScript{}, fmt.Errorf("quickcommands: next sort order: %w", err)
+		return CustomScript{}, fmt.Errorf("scripts: next sort order: %w", err)
 	}
 	now := kiratime.NowISO()
 	rec := CustomScript{
@@ -90,7 +90,7 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.Color, rec.CollectionID, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
 	); err != nil {
-		return CustomScript{}, fmt.Errorf("quickcommands: insert: %w", err)
+		return CustomScript{}, fmt.Errorf("scripts: insert: %w", err)
 	}
 	return rec, nil
 }
@@ -100,7 +100,7 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 // (ConnectionsRepo.SetMcpEnabled's own recorded fix, applied here from the start).
 func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error) {
 	if err := fields.Validate(); err != nil {
-		return CustomScript{}, fmt.Errorf("quickcommands: %w", err)
+		return CustomScript{}, fmt.Errorf("scripts: %w", err)
 	}
 	if err := r.requireCollection(fields.CollectionID); err != nil {
 		return CustomScript{}, err
@@ -111,21 +111,21 @@ func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error
 		fields.Name, fields.Command, fields.WorkingDir, fields.Color, fields.CollectionID, now, id,
 	)
 	if err != nil {
-		return CustomScript{}, fmt.Errorf("quickcommands: update %s: %w", id, err)
+		return CustomScript{}, fmt.Errorf("scripts: update %s: %w", id, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return CustomScript{}, fmt.Errorf("quickcommands: update %s: rows affected: %w", id, err)
+		return CustomScript{}, fmt.Errorf("scripts: update %s: rows affected: %w", id, err)
 	}
 	if n == 0 {
-		return CustomScript{}, fmt.Errorf("quickcommands: update %s: %w", id, sql.ErrNoRows)
+		return CustomScript{}, fmt.Errorf("scripts: update %s: %w", id, sql.ErrNoRows)
 	}
 	rec, err := r.Get(id)
 	if err != nil {
 		return CustomScript{}, err
 	}
 	if rec == nil {
-		return CustomScript{}, fmt.Errorf("quickcommands: update %s: %w", id, sql.ErrNoRows)
+		return CustomScript{}, fmt.Errorf("scripts: update %s: %w", id, sql.ErrNoRows)
 	}
 	return *rec, nil
 }
@@ -135,14 +135,14 @@ func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error
 func (r *Repo) Remove(id string) error {
 	res, err := r.DB.Exec(`DELETE FROM custom_scripts WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("quickcommands: remove %s: %w", id, err)
+		return fmt.Errorf("scripts: remove %s: %w", id, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("quickcommands: remove %s: rows affected: %w", id, err)
+		return fmt.Errorf("scripts: remove %s: rows affected: %w", id, err)
 	}
 	if n == 0 {
-		return fmt.Errorf("quickcommands: remove %s: %w", id, sql.ErrNoRows)
+		return fmt.Errorf("scripts: remove %s: %w", id, sql.ErrNoRows)
 	}
 	return nil
 }
@@ -155,10 +155,10 @@ func (r *Repo) requireCollection(id *string) error {
 	var one int
 	err := r.DB.QueryRow(`SELECT 1 FROM custom_script_collections WHERE id = ?`, *id).Scan(&one)
 	if errors.Is(err, sql.ErrNoRows) {
-		return invalid("quickcommands: no such collection")
+		return invalid("scripts: no such collection")
 	}
 	if err != nil {
-		return fmt.Errorf("quickcommands: check collection %s: %w", *id, err)
+		return fmt.Errorf("scripts: check collection %s: %w", *id, err)
 	}
 	return nil
 }
@@ -174,7 +174,7 @@ func (r *Repo) Move(id string, collectionID *string) error {
 		collectionID, kiratime.NowISO(), id,
 	)
 	if err != nil {
-		return fmt.Errorf("quickcommands: move %s: %w", id, err)
+		return fmt.Errorf("scripts: move %s: %w", id, err)
 	}
 	return requireRow(res, "move", id)
 }
@@ -204,7 +204,7 @@ func (r *Repo) CreateCollection(name string) (Collection, error) {
 	}
 	sortOrder, err := sqlitex.NextSortOrder(r.DB, "custom_script_collections", "")
 	if err != nil {
-		return Collection{}, fmt.Errorf("quickcommands: next collection sort order: %w", err)
+		return Collection{}, fmt.Errorf("scripts: next collection sort order: %w", err)
 	}
 	now := kiratime.NowISO()
 	c := Collection{ID: uuid.NewString(), Name: name, SortOrder: sortOrder, CreatedAt: now, UpdatedAt: now}
@@ -212,7 +212,7 @@ func (r *Repo) CreateCollection(name string) (Collection, error) {
 		`INSERT INTO custom_script_collections (`+collectionColumns+`) VALUES (?, ?, ?, ?, ?)`,
 		c.ID, c.Name, c.SortOrder, c.CreatedAt, c.UpdatedAt,
 	); err != nil {
-		return Collection{}, fmt.Errorf("quickcommands: insert collection: %w", err)
+		return Collection{}, fmt.Errorf("scripts: insert collection: %w", err)
 	}
 	return c, nil
 }
@@ -228,7 +228,7 @@ func (r *Repo) RenameCollection(id, name string) error {
 		name, kiratime.NowISO(), id,
 	)
 	if err != nil {
-		return fmt.Errorf("quickcommands: rename collection %s: %w", id, err)
+		return fmt.Errorf("scripts: rename collection %s: %w", id, err)
 	}
 	return requireRow(res, "rename collection", id)
 }
@@ -238,7 +238,7 @@ func (r *Repo) RenameCollection(id, name string) error {
 func (r *Repo) DeleteCollection(id string) error {
 	res, err := r.DB.Exec(`DELETE FROM custom_script_collections WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("quickcommands: delete collection %s: %w", id, err)
+		return fmt.Errorf("scripts: delete collection %s: %w", id, err)
 	}
 	return requireRow(res, "delete collection", id)
 }
@@ -246,10 +246,10 @@ func (r *Repo) DeleteCollection(id string) error {
 func requireRow(res sql.Result, op, id string) error {
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("quickcommands: %s %s: rows affected: %w", op, id, err)
+		return fmt.Errorf("scripts: %s %s: rows affected: %w", op, id, err)
 	}
 	if n == 0 {
-		return fmt.Errorf("quickcommands: %s %s: %w", op, id, sql.ErrNoRows)
+		return fmt.Errorf("scripts: %s %s: %w", op, id, sql.ErrNoRows)
 	}
 	return nil
 }
