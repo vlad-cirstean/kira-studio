@@ -54,6 +54,8 @@ type Exit struct {
 // with itself.
 type Handler struct {
 	OnLine func(Line)
+	// OnRateLimits receives the account's rate-limit windows from a rate_limit_event line.
+	OnRateLimits func(RateLimits)
 }
 
 // quotePOSIX single-quotes s as one shell word.
@@ -112,6 +114,11 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 	cmd.Stdout = newLineWriter(func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
+		if h.OnRateLimits != nil {
+			if rl, ok := parseRateLimits(line); ok {
+				h.OnRateLimits(rl)
+			}
+		}
 		for _, l := range parseLine(line) {
 			emit(l)
 		}

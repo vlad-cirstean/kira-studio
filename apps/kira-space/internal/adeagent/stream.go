@@ -150,3 +150,41 @@ func shortInput(name string, raw json.RawMessage) string {
 	}
 	return " " + arg
 }
+
+// RateWindow is one rate-limit window of a rate_limit_event; Utilization is a 0..1 fraction and
+// ResetsAt Unix seconds.
+type RateWindow struct {
+	Utilization float64 `json:"utilization"`
+	ResetsAt    int64   `json:"resetsAt"`
+}
+
+// RateLimits holds the windows a rate_limit_event carried; either may be nil.
+type RateLimits struct {
+	FiveHour *RateWindow
+	SevenDay *RateWindow
+}
+
+// parseRateLimits reads a `rate_limit_event` stream line; ok is false for any other line or one
+// without a five_hour or seven_day window.
+func parseRateLimits(raw string) (RateLimits, bool) {
+	if !strings.Contains(raw, `"rate_limit_event"`) {
+		return RateLimits{}, false
+	}
+	var msg struct {
+		Type          string `json:"type"`
+		RateLimitInfo struct {
+			UnifiedWindows struct {
+				FiveHour *RateWindow `json:"five_hour"`
+				SevenDay *RateWindow `json:"seven_day"`
+			} `json:"unifiedWindows"`
+		} `json:"rate_limit_info"`
+	}
+	if json.Unmarshal([]byte(raw), &msg) != nil || msg.Type != "rate_limit_event" {
+		return RateLimits{}, false
+	}
+	w := msg.RateLimitInfo.UnifiedWindows
+	if w.FiveHour == nil && w.SevenDay == nil {
+		return RateLimits{}, false
+	}
+	return RateLimits{FiveHour: w.FiveHour, SevenDay: w.SevenDay}, true
+}

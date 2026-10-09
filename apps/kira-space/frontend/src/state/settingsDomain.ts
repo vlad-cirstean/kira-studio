@@ -134,6 +134,8 @@ const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
   notifyOnNeedsInput: z.boolean().default(true),
   notifyOnRunEnded: z.boolean().default(true),
   notifyIncludeMessage: z.boolean().default(true),
+  // P239: Claude Code usage limits in the ADE status bar.
+  usageEnabled: z.boolean().default(true),
 });
 
 // P212: the mobile agents web server. Off until enabled; the port is unprivileged. Changed
@@ -174,6 +176,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     notifyOnNeedsInput: true,
     notifyOnRunEnded: true,
     notifyIncludeMessage: true,
+    usageEnabled: true,
   }),
   mobile: mobileSettingsSchema.default({
     enabled: false,
@@ -230,6 +233,7 @@ export const defaultSettings: Settings = {
     notifyOnNeedsInput: true,
     notifyOnRunEnded: true,
     notifyIncludeMessage: true,
+    usageEnabled: true,
   },
   mobile: {
     enabled: false,

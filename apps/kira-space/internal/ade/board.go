@@ -59,6 +59,8 @@ type TaskBoardDeps struct {
 	// Sessions stores the headless session rows; OnSessions fires when they change.
 	Sessions   *repos.AdeSessionsRepo
 	OnSessions func()
+	// OnRateLimits receives the rate-limit windows a headless run's stream reports (nil = ignored).
+	OnRateLimits func(adeagent.RateLimits)
 	// OnRuns pushes changed runs on kira:adetask:runs.
 	OnRuns func(adewire.RunsChangedEvent)
 	// AgentDir holds each run's MCP config file (0700 dir, 0600 files).

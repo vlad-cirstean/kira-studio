@@ -559,7 +559,8 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 		ClaudeBin: bin, Dir: path, Prompt: prompt, SessionID: b.sessionClaudeID(sessionID), Resume: resume, MCPConfigPath: cfg,
 		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space), Timeout: timeout, Env: cwdEnv,
 	}, adeagent.Handler{
-		OnLine: func(l adeagent.Line) { sink.add(l.Stream, l.Text) },
+		OnLine:       func(l adeagent.Line) { sink.add(l.Stream, l.Text) },
+		OnRateLimits: b.deps.OnRateLimits,
 	})
 	sink.flush()
 	release()

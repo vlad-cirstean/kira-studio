@@ -83,13 +83,16 @@ type ClaudeCodeSettings struct {
 	NotifyOnNeedsInput   bool `json:"notifyOnNeedsInput"`
 	NotifyOnRunEnded     bool `json:"notifyOnRunEnded"`
 	NotifyIncludeMessage bool `json:"notifyIncludeMessage"`
+	// UsageEnabled is P239's usage-limits switch: on, new sessions get the statusline wrapper and
+	// the ADE status bar shows the 5-hour and weekly windows.
+	UsageEnabled bool `json:"usageEnabled"`
 }
 
 // DefaultClaudeCodeSettings mirrors settingsDomain.ts's claudeCodeSettingsSchema defaults.
 func DefaultClaudeCodeSettings() ClaudeCodeSettings {
 	return ClaudeCodeSettings{
 		NotifyEnabled: true, NotifyOnFinished: true, NotifyOnNeedsInput: true, NotifyOnRunEnded: true,
-		NotifyIncludeMessage: true,
+		NotifyIncludeMessage: true, UsageEnabled: true,
 	}
 }
 
@@ -211,6 +214,7 @@ type ClaudeCodePatch struct {
 	NotifyOnNeedsInput   *bool `json:"notifyOnNeedsInput,omitempty"`
 	NotifyOnRunEnded     *bool `json:"notifyOnRunEnded,omitempty"`
 	NotifyIncludeMessage *bool `json:"notifyIncludeMessage,omitempty"`
+	UsageEnabled         *bool `json:"usageEnabled,omitempty"`
 }
 
 // MobilePatch mirrors MobileSettings' own `.partial()` shape.

@@ -1,4 +1,4 @@
-// Package appwire is Kira Space's composition root: it builds the 21 bound services, the git router
+// Package appwire is Kira Space's composition root: it builds the 22 bound services, the git router
 // and socket, the ADE tracker and board, and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It sits
 // above internal/bridge in the layering, like internal/appshell.
@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/netip"
+	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -18,7 +19,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
@@ -123,6 +126,8 @@ type Wired struct {
 	Update         *bridge.UpdateService
 	CodeWorkspace  *bridge.CodeWorkspaceService
 	AgentNotifySvc *bridge.AgentNotifyService
+	ClaudeUsage    *claudeusage.Service
+	ClaudeUsageSvc *bridge.ClaudeUsageService
 
 	detachMetrics   func()
 	detachOpLog     func()
@@ -179,7 +184,12 @@ func Build(opts Options) *Wired {
 		Alive: func(key string) bool { return slices.Contains(w.Windows.Keys(), key) },
 	})
 	w.AgentNotifySvc = &bridge.AgentNotifyService{N: w.AgentNotify}
-	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify)
+	w.ClaudeUsage = claudeusage.New(claudeusage.Deps{
+		Enabled: usageEnabled(repositories), Path: filepath.Join(config.KiraSpaceHome(), "claude-usage.json"),
+		OnChange: func() { bridge.ClaudeUsageChanged(emitter, w.ClaudeUsage.Get()) },
+	})
+	w.ClaudeUsageSvc = &bridge.ClaudeUsageService{U: w.ClaudeUsage}
+	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify, w.ClaudeUsage)
 	w.Tracker, w.AgentHooks = adeTracker, agentHooks
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
@@ -213,7 +223,7 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake, w.AgentNotify)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage)
 	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -297,7 +307,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
 		application.NewService(w.MemoryImport), application.NewService(w.WindowsSvc), application.NewService(w.Update),
-		application.NewService(w.AgentNotifySvc),
+		application.NewService(w.AgentNotifySvc), application.NewService(w.ClaudeUsageSvc),
 	}
 }
 

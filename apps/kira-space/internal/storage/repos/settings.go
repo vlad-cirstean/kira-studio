@@ -229,6 +229,7 @@ func claudeCodeLeaves(c *model.ClaudeCodeSettings, p model.ClaudeCodePatch) []cl
 		{"notifyOnNeedsInput", &c.NotifyOnNeedsInput, p.NotifyOnNeedsInput},
 		{"notifyOnRunEnded", &c.NotifyOnRunEnded, p.NotifyOnRunEnded},
 		{"notifyIncludeMessage", &c.NotifyIncludeMessage, p.NotifyIncludeMessage},
+		{"usageEnabled", &c.UsageEnabled, p.UsageEnabled},
 	}
 }
 

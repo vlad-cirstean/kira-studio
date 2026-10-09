@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentnotify"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
@@ -78,7 +80,7 @@ type gitWired struct {
 // Rows a previous process life left running are stopped by the task board's Recover.
 func wireTracker(
 	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
-	grace time.Duration, notifier *agentnotify.Notifier,
+	grace time.Duration, notifier *agentnotify.Notifier, usage *claudeusage.Service,
 ) (*ade.Tracker, *agenthooks.Manager) {
 	tracker := ade.NewTracker(ade.TrackerDeps{
 		Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
@@ -88,11 +90,24 @@ func wireTracker(
 
 	// Hooks are always on: a start failure (curl missing, a bind conflict) is logged, never fatal —
 	// sessions still spawn and track, activity icons stay absent.
-	hooks := agenthooks.NewManager(agenthooks.Options{OnEvent: func(ev agenthooks.Event) {
-		tracker.HandleEvent(ev)
-		bridge.EmitAgentEvent(emitter, ev)
-		notifier.HandleEvent(ev)
-	}})
+	hooks := agenthooks.NewManager(agenthooks.Options{
+		OnEvent: func(ev agenthooks.Event) {
+			tracker.HandleEvent(ev)
+			bridge.EmitAgentEvent(emitter, ev)
+			notifier.HandleEvent(ev)
+		},
+		StatusLine: usageEnabled(repositories),
+		OnStatusLine: func(_ string, rl agenthooks.RateLimits) {
+			var five, seven *claudeusage.Window
+			if rl.FiveHour != nil {
+				five = claudeusage.FromSession(rl.FiveHour.UsedPercentage, rl.FiveHour.ResetsAt)
+			}
+			if rl.SevenDay != nil {
+				seven = claudeusage.FromSession(rl.SevenDay.UsedPercentage, rl.SevenDay.ResetsAt)
+			}
+			usage.Ingest(claudeusage.SourceSession, five, seven)
+		},
+	})
 	if err := hooks.Start(); err != nil {
 		slog.Warn("agent hooks: start", "scope", "ade", "err", err)
 	}
@@ -136,7 +151,7 @@ func closeTaskReviewWindows(repositories *repos.Repos, closeWindow func(key stri
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
-	notifier *agentnotify.Notifier,
+	notifier *agentnotify.Notifier, usage *claudeusage.Service,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -169,6 +184,16 @@ func wireAdeTask(
 			notifier.HandleRuns(ev.Runs)
 		},
 		OnLog: func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
+		OnRateLimits: func(rl adeagent.RateLimits) {
+			var five, seven *claudeusage.Window
+			if rl.FiveHour != nil {
+				five = claudeusage.FromRun(rl.FiveHour.Utilization, rl.FiveHour.ResetsAt)
+			}
+			if rl.SevenDay != nil {
+				seven = claudeusage.FromRun(rl.SevenDay.Utilization, rl.SevenDay.ResetsAt)
+			}
+			usage.Ingest(claudeusage.SourceRun, five, seven)
+		},
 		OnSessions: func() {
 			bridge.AdeTaskSessionsChanged(events)
 			bridge.KeepAwakeRecompute(keepAwake)
@@ -321,6 +346,17 @@ func wireTermBroker(tracker *ade.Tracker, registry *terminal.Registry, emitter a
 }
 
 // notifyPrefs reads the claudeCode.notify* leaves; a read failure turns notifications off.
+// usageEnabled reads claudeCode.usageEnabled fresh; a read failure counts as on (the default).
+func usageEnabled(repositories *repos.Repos) func() bool {
+	return func() bool {
+		s, err := repositories.Settings.GetAll()
+		if err != nil {
+			return true
+		}
+		return s.ClaudeCode.UsageEnabled
+	}
+}
+
 func notifyPrefs(repositories *repos.Repos) func() agentnotify.Prefs {
 	return func() agentnotify.Prefs {
 		s, err := repositories.Settings.GetAll()
