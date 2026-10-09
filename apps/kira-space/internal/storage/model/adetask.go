@@ -73,19 +73,25 @@ type AdeTaskPatch struct {
 
 // AdeTaskBranch is one row of ade_task_branches. Name "" = branch not created yet.
 type AdeTaskBranch struct {
-	ID          string
-	TaskID      string
-	CodeRepoID  string
-	Name        string
-	Kind        string
-	Base        string
-	QueuedAfter string
-	Position    int
-	HadCommits  bool
-	AddedAt     int64
-	MergedAt    *int64
-	ArchivedAt  *int64
-	Origin      string
+	ID         string
+	TaskID     string
+	CodeRepoID string
+	Name       string
+	Kind       string
+	Base       string
+	// BaseBranchID is the live planner branch this one stacks on ("" = none); Base then holds that
+	// branch's name ("" while it is a draft).
+	BaseBranchID string
+	// BasePendingFrom is the display name of the previous base while a Change base has no verified
+	// rebase yet ("" otherwise).
+	BasePendingFrom string
+	QueuedAfter     string
+	Position        int
+	HadCommits      bool
+	AddedAt         int64
+	MergedAt        *int64
+	ArchivedAt      *int64
+	Origin          string
 }
 
 // AdeBranchOriginAgent marks a branch an agent declared or named.
@@ -125,8 +131,79 @@ type AdeRun struct {
 	ExitCode   *int
 	StartedAt  *int64
 	FinishedAt *int64
-	Outcome    *runoutcome.Outcome
-	Launch     AdeRunLaunch
+	Outcome    *AdeRunOutcome
+	// Purpose is AdeRunPurposeRebase for a rebase run (outside the workflow), "" for a step run.
+	Purpose string
+	// SpecJSON is a rebase run's AdeRebaseSpec ("" otherwise).
+	SpecJSON string
+	Launch   AdeRunLaunch
+}
+
+// AdeRunPurposeRebase mirrors ade_runs.purpose's CHECK.
+const AdeRunPurposeRebase = "rebase"
+
+// AdeRunOutcome is a run's stored end state: the shared outcome plus what the agent reported and
+// what git showed.
+type AdeRunOutcome struct {
+	runoutcome.Outcome
+	Report *AgentReport `json:"report,omitempty"`
+	Rebase *RebaseFacts `json:"rebase,omitempty"`
+}
+
+// AgentReport is the optional detail of a finish_step call.
+type AgentReport struct {
+	ConflictedFiles []string `json:"conflictedFiles,omitempty"`
+	LastGitError    string   `json:"lastGitError,omitempty"`
+	Tried           string   `json:"tried,omitempty"`
+}
+
+// RebaseFacts is what git showed after a rebase run ended.
+type RebaseFacts struct {
+	Verified        bool         `json:"verified"`
+	InProgress      bool         `json:"inProgress"`
+	Aborted         bool         `json:"aborted"`
+	OntoRef         string       `json:"ontoRef"`
+	OntoTip         string       `json:"ontoTip"`
+	ConflictedFiles []string     `json:"conflictedFiles"`
+	Branches        []BranchShas `json:"branches"`
+	Pushed          *bool        `json:"pushed"`
+}
+
+// BranchShas is one rebased branch's tip before and after, and whether it sits on its base.
+type BranchShas struct {
+	BranchID string `json:"branchId"`
+	Name     string `json:"name"`
+	Before   string `json:"before"`
+	After    string `json:"after"`
+	OnBase   bool   `json:"onBase"`
+}
+
+// AdeRebaseSpec is a rebase run's plan, stored in ade_runs.spec_json.
+type AdeRebaseSpec struct {
+	CodeRepoID    string           `json:"codeRepoId"`
+	Repo          string           `json:"repo"`
+	Remote        string           `json:"remote"`
+	OntoRef       string           `json:"ontoRef"`
+	OntoName      string           `json:"ontoName"`
+	OntoTipBefore string           `json:"ontoTipBefore"`
+	ChangeBase    bool             `json:"changeBase"`
+	Stack         []AdeRebaseStack `json:"stack"`
+	Push          bool             `json:"push"`
+	Autostash     bool             `json:"autostash"`
+	// Review is a review branch the rebase must leave alone (Queue after).
+	Review string `json:"review,omitempty"`
+}
+
+// AdeRebaseStack is one branch of a rebase run, root first. ParentRef is the ref it goes onto;
+// ParentBefore is the parent's tip before the run ("" for the root).
+type AdeRebaseStack struct {
+	BranchID     string `json:"branchId"`
+	Name         string `json:"name"`
+	Worktree     string `json:"worktree"`
+	ParentRef    string `json:"parentRef"`
+	ParentName   string `json:"parentName"`
+	ParentBefore string `json:"parentBefore"`
+	Before       string `json:"before"`
 }
 
 // AdeRunLaunch is a held run's launch spec: what the run needs once its worktree gate opens. Non-empty
@@ -160,7 +237,7 @@ type AdeRunPatch struct {
 	ExitCode   *int
 	StartedAt  *int64
 	FinishedAt *int64
-	Outcome    *runoutcome.Outcome
+	Outcome    *AdeRunOutcome
 	Launch     *AdeRunLaunch
 }
 

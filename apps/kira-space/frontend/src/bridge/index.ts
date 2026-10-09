@@ -337,6 +337,16 @@ const spaceControl = {
     unwrap(AdeTaskService.LaunchStage(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskStartBranch: (args: V2.StartBranchArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.StartBranch(args)).then((r) => trust<V2.Launch>(r)),
+  adeTaskRebasePreview: (args: V2.OntoArgs): Promise<V2.RebasePreview> =>
+    unwrap(AdeTaskService.RebasePreview(args)).then((r) => trust<V2.RebasePreview>(r)),
+  adeTaskRebase: (args: V2.RebaseArgs): Promise<V2.RebaseStart> =>
+    unwrap(AdeTaskService.Rebase(args)).then((r) => trust<V2.RebaseStart>(r)),
+  adeTaskAbortRebase: (args: V2.BranchArgs): Promise<void> =>
+    unwrap(AdeTaskService.AbortRebase(args)),
+  adeTaskSetBranchBase: (args: V2.SetBranchBaseArgs): Promise<void> =>
+    unwrap(AdeTaskService.SetBranchBase(args)),
+  adeTaskRepoBranches: (args: V2.RepoBranchesArgs): Promise<V2.RepoBranches> =>
+    unwrap(AdeTaskService.RepoBranches(args)).then((r) => trust<V2.RepoBranches>(r)),
   adeTaskSend: (args: V2.SendArgs): Promise<void> => unwrap(AdeTaskService.Send(args)),
   adeTaskFocusSession: (args: V2.FocusSessionArgs): Promise<boolean> =>
     unwrap(AdeTaskService.FocusSession(args)),

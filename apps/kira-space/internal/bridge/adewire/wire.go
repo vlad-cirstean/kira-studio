@@ -4,7 +4,7 @@
 // Changing a key, type or value set is a contract change.
 package adewire
 
-import "github.com/kirathecat/kira-studio/internal/runoutcome"
+import "github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 
 // StageKind is 'user' | 'agent' | 'script'.
 type StageKind = string
@@ -192,6 +192,9 @@ type Branch struct {
 	Base                string         `json:"base"`
 	BaseBranchID        string         `json:"baseBranchId"`
 	BaseOwner           string         `json:"baseOwner"`
+	BaseMissing         bool           `json:"baseMissing"`
+	BasePendingFrom     string         `json:"basePendingFrom"`
+	RebaseInProgress    bool           `json:"rebaseInProgress"`
 	Tip                 string         `json:"tip"`
 	Ahead               int            `json:"ahead"`
 	Behind              int            `json:"behind"`
@@ -238,8 +241,9 @@ type Run struct {
 	ExitCode   *int     `json:"exitCode"`
 	StartedAt  *int64   `json:"startedAt"`
 	FinishedAt *int64   `json:"finishedAt"`
+	Purpose    string   `json:"purpose"` // '' step run | 'rebase'
 
-	Outcome *runoutcome.Outcome `json:"outcome"`
+	Outcome *model.AdeRunOutcome `json:"outcome"`
 }
 
 type Task struct {
@@ -447,6 +451,8 @@ type CreateTaskArgs struct {
 	Notes       string   `json:"notes"`
 	CodeRepoIDs []string `json:"codeRepoIds"`
 	WorkflowID  string   `json:"workflowId"`
+	// Bases maps a code repo id to the base of its branch; a missing repo starts from main.
+	Bases map[string]BaseChoice `json:"bases"`
 }
 
 type TaskPatch struct {
@@ -466,8 +472,9 @@ type UpdateTaskArgs struct {
 }
 
 type AddTaskRepoArgs struct {
-	TaskID     string `json:"taskId"`
-	CodeRepoID string `json:"codeRepoId"`
+	TaskID     string      `json:"taskId"`
+	CodeRepoID string      `json:"codeRepoId"`
+	Base       *BaseChoice `json:"base"`
 }
 
 type AddExistingBranchArgs struct {
@@ -704,4 +711,86 @@ type SendArgs struct {
 type FocusSessionArgs struct {
 	SessionID string `json:"sessionId"`
 	TaskID    string `json:"taskId"`
+}
+
+// BaseChoice names a base: a planner branch (BranchID), a git ref (Ref) or, with both empty, the
+// repo's main.
+type BaseChoice struct {
+	Ref      string `json:"ref"`
+	BranchID string `json:"branchId"`
+}
+
+type SetBranchBaseArgs struct {
+	BranchID string     `json:"branchId"`
+	Base     BaseChoice `json:"base"`
+}
+
+// OntoArgs names a rebase: BranchID and the branches stacked on it go onto Onto (nil = their
+// current base), or onto the review branch QueueWith, which then also becomes their queue parent.
+type OntoArgs struct {
+	BranchID  string      `json:"branchId"`
+	Onto      *BaseChoice `json:"onto"`
+	QueueWith string      `json:"queueWith"`
+	Push      bool        `json:"push"`
+	Autostash bool        `json:"autostash"`
+}
+
+// RebaseArgs starts the rebase; Message ” = the default prompt.
+type RebaseArgs struct {
+	BranchID  string      `json:"branchId"`
+	Onto      *BaseChoice `json:"onto"`
+	QueueWith string      `json:"queueWith"`
+	Push      bool        `json:"push"`
+	Autostash bool        `json:"autostash"`
+	Message   string      `json:"message"`
+}
+
+type RebaseStackItem struct {
+	BranchID string `json:"branchId"`
+	Name     string `json:"name"`
+	Worktree string `json:"worktree"`
+	OntoRef  string `json:"ontoRef"`
+}
+
+// RebaseBlocker kinds: dirty, running, inProgress, baseMissing, parentDraft, noWorktree, setup.
+type RebaseBlocker struct {
+	BranchID string `json:"branchId"`
+	Kind     string `json:"kind"`
+	Text     string `json:"text"`
+}
+
+type RebasePreview struct {
+	Prompt   string            `json:"prompt"`
+	Suffix   string            `json:"suffix"`
+	Stack    []RebaseStackItem `json:"stack"`
+	Blockers []RebaseBlocker   `json:"blockers"`
+	NoOp     bool              `json:"noOp"`
+}
+
+type RebaseStart struct {
+	RunID string `json:"runId"`
+	NoOp  bool   `json:"noOp"`
+}
+
+type RepoBranchesArgs struct {
+	CodeRepoID string `json:"codeRepoId"`
+	BranchID   string `json:"branchId"`
+}
+
+// BasePick is one base the picker offers; Excluded is why it cannot be chosen (” = choosable).
+type BasePick struct {
+	Name      string `json:"name"`
+	Local     bool   `json:"local"`
+	Remote    bool   `json:"remote"`
+	BranchID  string `json:"branchId"`
+	TaskID    string `json:"taskId"`
+	TaskTitle string `json:"taskTitle"`
+	Draft     bool   `json:"draft"`
+	Excluded  string `json:"excluded"`
+}
+
+type RepoBranches struct {
+	MainName string     `json:"mainName"`
+	Previous string     `json:"previous"`
+	Branches []BasePick `json:"branches"`
 }

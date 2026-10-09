@@ -101,7 +101,7 @@ async function onAddRepo(value: unknown): Promise<void> {
   if (!id) return;
   fieldError.value = '';
   try {
-    await addRepo.mutateAsync({ taskId: task.value.id, codeRepoId: id });
+    await addRepo.mutateAsync({ taskId: task.value.id, codeRepoId: id, base: null });
   } catch (err) {
     fieldError.value = err instanceof Error ? err.message : String(err);
   }

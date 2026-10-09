@@ -24,6 +24,7 @@ const (
 	SourceStart   Source = "start"
 	SourceUser    Source = "user"
 	SourceRestart Source = "restart"
+	SourceVerify  Source = "verify"
 )
 
 const lastErrorCap = 1024

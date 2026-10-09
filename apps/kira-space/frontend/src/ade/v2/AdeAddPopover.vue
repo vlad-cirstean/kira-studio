@@ -76,6 +76,7 @@ async function addNew(): Promise<void> {
       notes: notes.value,
       codeRepoIds: picked.value,
       workflowId: '',
+      bases: {},
     });
     ui.select(task.id);
     title.value = '';

@@ -35,6 +35,9 @@ export function mkBranch(over: Partial<Branch> & Pick<Branch, 'id' | 'taskId'>):
     lastCommitAt: null,
     addedAt: 0,
     origin: '',
+    baseMissing: false,
+    basePendingFrom: '',
+    rebaseInProgress: false,
     ...over,
   };
 }
@@ -76,6 +79,7 @@ export function mkRun(
     startedAt: null,
     finishedAt: null,
     outcome: null,
+    purpose: '',
     ...over,
   };
 }

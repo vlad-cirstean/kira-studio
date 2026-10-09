@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
@@ -70,8 +69,8 @@ func checkEstExtends(old, next string) error {
 }
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
-const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
-const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
+const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, base_branch_id, base_pending_from, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
+const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, purpose, spec_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
 // AdeTaskRepo reads and writes the v2 task store: tasks, branches, plan, runs, worktree setup and
 // last-valid workflows.
@@ -113,7 +112,7 @@ func scanAdeTaskBranch(row rowScanner) (model.AdeTaskBranch, error) {
 	var b model.AdeTaskBranch
 	var had int
 	var merged, archived sql.NullInt64
-	if err := row.Scan(&b.ID, &b.TaskID, &b.CodeRepoID, &b.Name, &b.Kind, &b.Base, &b.QueuedAfter, &b.Position,
+	if err := row.Scan(&b.ID, &b.TaskID, &b.CodeRepoID, &b.Name, &b.Kind, &b.Base, &b.BaseBranchID, &b.BasePendingFrom, &b.QueuedAfter, &b.Position,
 		&had, &b.AddedAt, &merged, &archived, &b.Origin); err != nil {
 		return model.AdeTaskBranch{}, err
 	}
@@ -239,8 +238,8 @@ func insertTaskBranch(tx *sql.Tx, b model.AdeTaskBranch) error {
 	if err := b.Validate(); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`INSERT INTO ade_task_branches (`+adeTaskBranchColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
-		b.ID, b.TaskID, b.CodeRepoID, b.Name, b.Kind, b.Base, b.QueuedAfter, b.Position, boolInt(b.HadCommits), b.AddedAt, b.Origin); err != nil {
+	if _, err := tx.Exec(`INSERT INTO ade_task_branches (`+adeTaskBranchColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
+		b.ID, b.TaskID, b.CodeRepoID, b.Name, b.Kind, b.Base, b.BaseBranchID, b.BasePendingFrom, b.QueuedAfter, b.Position, boolInt(b.HadCommits), b.AddedAt, b.Origin); err != nil {
 		if isUniqueViolation(err) {
 			return ErrBranchOnTask
 		}
@@ -376,7 +375,7 @@ func (r *AdeTaskRepo) AddBranch(b model.AdeTaskBranch) (model.AdeTaskBranch, err
 }
 
 func (r *AdeTaskRepo) queryBranches(where string) ([]model.AdeTaskBranch, error) {
-	rows, err := r.DB.Query(`SELECT b.id, b.task_id, b.code_repo_id, b.name, b.kind, b.base, b.queued_after, b.position,
+	rows, err := r.DB.Query(`SELECT b.id, b.task_id, b.code_repo_id, b.name, b.kind, b.base, b.base_branch_id, b.base_pending_from, b.queued_after, b.position,
 		b.had_commits, b.added_at, b.merged_at, b.archived_at, b.origin
 		FROM ade_task_branches b JOIN ade_tasks t ON t.id = b.task_id WHERE ` + where + ` ORDER BY b.task_id, b.position, b.id`)
 	if err != nil {
@@ -513,6 +512,34 @@ func (r *AdeTaskRepo) SetQueuedAfter(branchID, after string) error {
 	}
 	if n == 0 {
 		return ErrBranchMissing
+	}
+	return nil
+}
+
+// SetBranchBase stores a branch's base: the ref name, the planner branch it stacks on ("" = none) and
+// the previous base's display name while a rebase onto the new one is pending ("" = none).
+func (r *AdeTaskRepo) SetBranchBase(id, base, baseBranchID, pendingFrom string) error {
+	res, err := r.DB.Exec(`UPDATE ade_task_branches SET base = ?, base_branch_id = ?, base_pending_from = ? WHERE id = ?`,
+		base, baseBranchID, pendingFrom, id)
+	if err != nil {
+		return fmt.Errorf("repos: set ade branch base %s: %w", id, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repos: set ade branch base %s: %w", id, err)
+	}
+	if n == 0 {
+		return ErrBranchMissing
+	}
+	return nil
+}
+
+// ClearBasePending drops the pending-rebase mark of the given branches.
+func (r *AdeTaskRepo) ClearBasePending(ids []string) error {
+	for _, id := range ids {
+		if _, err := r.DB.Exec(`UPDATE ade_task_branches SET base_pending_from = '' WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("repos: clear ade base pending %s: %w", id, err)
+		}
 	}
 	return nil
 }
@@ -746,12 +773,12 @@ func scanAdeRun(row rowScanner) (model.AdeRun, error) {
 	var exit, started, finished sql.NullInt64
 	var outcome string
 	if err := row.Scan(&run.ID, &run.TaskID, &run.StageID, &run.StepID, &run.BranchID, &run.Attempt, &run.State,
-		&run.Loops, &run.Note, &run.Summary, &run.SessionID, &exit, &started, &finished, &outcome,
+		&run.Loops, &run.Note, &run.Summary, &run.SessionID, &exit, &started, &finished, &outcome, &run.Purpose, &run.SpecJSON,
 		&run.Launch.Note, &run.Launch.ResumeID, &run.Launch.Prompt, &run.Launch.Extra); err != nil {
 		return model.AdeRun{}, err
 	}
 	if outcome != "" {
-		var o runoutcome.Outcome
+		var o model.AdeRunOutcome
 		if err := json.Unmarshal([]byte(outcome), &o); err != nil {
 			return model.AdeRun{}, fmt.Errorf("repos: decode ade run %s outcome: %w", run.ID, err)
 		}
@@ -762,7 +789,7 @@ func scanAdeRun(row rowScanner) (model.AdeRun, error) {
 	return run, nil
 }
 
-func encodeOutcome(o *runoutcome.Outcome) (string, error) {
+func encodeOutcome(o *model.AdeRunOutcome) (string, error) {
 	if o == nil {
 		return "", nil
 	}
@@ -782,9 +809,9 @@ func (r *AdeTaskRepo) InsertRun(run model.AdeRun) error {
 	if err != nil {
 		return err
 	}
-	if _, err := r.DB.Exec(`INSERT INTO ade_runs (`+adeRunColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	if _, err := r.DB.Exec(`INSERT INTO ade_runs (`+adeRunColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		run.ID, run.TaskID, run.StageID, run.StepID, run.BranchID, run.Attempt, run.State,
-		run.Loops, run.Note, run.Summary, run.SessionID, run.ExitCode, run.StartedAt, run.FinishedAt, outcome,
+		run.Loops, run.Note, run.Summary, run.SessionID, run.ExitCode, run.StartedAt, run.FinishedAt, outcome, run.Purpose, run.SpecJSON,
 		run.Launch.Note, run.Launch.ResumeID, run.Launch.Prompt, run.Launch.Extra); err != nil {
 		return fmt.Errorf("repos: insert ade run %s: %w", run.ID, err)
 	}
@@ -914,7 +941,7 @@ func (r *AdeTaskRepo) SetPendingNote(branchID, note string) ([]model.AdeRun, err
 
 // RecoverRunning turns every running run stuck, with out as its outcome and its reason as the note,
 // and returns them (boot recovery).
-func (r *AdeTaskRepo) RecoverRunning(now int64, out runoutcome.Outcome) ([]model.AdeRun, error) {
+func (r *AdeTaskRepo) RecoverRunning(now int64, out model.AdeRunOutcome) ([]model.AdeRun, error) {
 	outcome, err := encodeOutcome(&out)
 	if err != nil {
 		return nil, err
@@ -991,6 +1018,71 @@ func (r *AdeTaskRepo) HasRunningOn(branchID string) (bool, error) {
 		return false, fmt.Errorf("repos: count running ade runs on %s: %w", branchID, err)
 	}
 	return n > 0, nil
+}
+
+// HasActiveStepRunOn reports whether a step run (not a rebase) on the branch is running or pending.
+func (r *AdeTaskRepo) HasActiveStepRunOn(branchID string) (bool, error) {
+	var n int
+	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE branch_id = ? AND purpose = '' AND state IN (?, ?)`,
+		branchID, model.AdeRunRunning, model.AdeRunPending).Scan(&n); err != nil {
+		return false, fmt.Errorf("repos: count active ade step runs on %s: %w", branchID, err)
+	}
+	return n > 0, nil
+}
+
+// RunningRebaseOn returns the running rebase run whose stack holds the branch, nil when none.
+func (r *AdeTaskRepo) RunningRebaseOn(branchID string) (*model.AdeRun, error) {
+	runs, err := r.RunningRebases()
+	if err != nil {
+		return nil, err
+	}
+	for i := range runs {
+		if runs[i].BranchID == branchID {
+			return &runs[i], nil
+		}
+		var spec model.AdeRebaseSpec
+		if json.Unmarshal([]byte(runs[i].SpecJSON), &spec) != nil {
+			continue
+		}
+		for _, st := range spec.Stack {
+			if st.BranchID == branchID {
+				return &runs[i], nil
+			}
+		}
+	}
+	return nil, nil
+}
+
+// RunningRebases lists the rebase runs in state running.
+func (r *AdeTaskRepo) RunningRebases() ([]model.AdeRun, error) {
+	rows, err := r.DB.Query(`SELECT `+adeRunColumns+` FROM ade_runs WHERE purpose = ? AND state = ? ORDER BY id`,
+		model.AdeRunPurposeRebase, model.AdeRunRunning)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {
+		run, err := scanAdeRun(rows)
+		return run, true, err
+	})
+}
+
+// LatestRebaseRun returns the newest rebase run rooted at the branch, nil when none.
+func (r *AdeTaskRepo) LatestRebaseRun(branchID string) (*model.AdeRun, error) {
+	run, err := scanAdeRun(r.DB.QueryRow(`SELECT `+adeRunColumns+` FROM ade_runs WHERE branch_id = ? AND purpose = ?
+		ORDER BY attempt DESC, id DESC LIMIT 1`, branchID, model.AdeRunPurposeRebase))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repos: latest ade rebase run %s: %w", branchID, err)
+	}
+	return &run, nil
+}
+
+// CountRebaseRuns counts the rebase runs rooted at the branch.
+func (r *AdeTaskRepo) CountRebaseRuns(branchID string) (int, error) {
+	var n int
+	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE branch_id = ? AND purpose = ?`, branchID, model.AdeRunPurposeRebase).Scan(&n); err != nil {
+		return 0, fmt.Errorf("repos: count ade rebase runs %s: %w", branchID, err)
+	}
+	return n, nil
 }
 
 // ArchiveTask archives the task and its branches and drops its plan row in one transaction.

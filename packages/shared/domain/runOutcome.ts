@@ -11,6 +11,7 @@ export const runSourceSchema = /*#__PURE__*/ z.enum([
   'start',
   'user',
   'restart',
+  'verify',
 ]);
 export type RunSource = z.infer<typeof runSourceSchema>;
 

@@ -14,7 +14,9 @@
       "sessionId": "b1c2",
       "exitCode": null,
       "startedAt": 1790035200000,
-      "finishedAt": null
+      "finishedAt": null,
+      "purpose": "",
+      "outcome": null
     }
   ]
 }

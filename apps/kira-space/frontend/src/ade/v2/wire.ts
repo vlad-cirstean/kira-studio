@@ -188,6 +188,12 @@ export interface Branch {
   addedAt: number;
   /** '' user-made, 'agent' declared or named by an agent through the Kira Space tools. */
   origin: '' | 'agent';
+  /** The stored base no longer resolves (deleted or renamed). */
+  baseMissing: boolean;
+  /** Display name of the previous base while a Change base is not completed by a verified rebase; '' otherwise. */
+  basePendingFrom: string;
+  /** A rebase, merge or cherry-pick is left half-done in the worktree. */
+  rebaseInProgress: boolean;
 }
 export interface Pair {
   a: string;
@@ -214,8 +220,35 @@ export interface Run {
   startedAt: number | null;
   finishedAt: number | null;
   /** How the run ended; null while it runs and for rows older than P242. */
-  outcome: RunOutcome | null;
+  outcome: AdeRunOutcome | null;
+  /** 'rebase' for a rebase run (outside the workflow), '' for a step run. */
+  purpose: '' | 'rebase';
 }
+/** What the agent reported beyond status and summary. */
+export interface AgentReport {
+  conflictedFiles?: string[];
+  lastGitError?: string;
+  tried?: string;
+}
+export interface BranchShas {
+  branchId: string;
+  name: string;
+  before: string;
+  after: string;
+  onBase: boolean;
+}
+/** What git showed after a rebase run ended. */
+export interface RebaseFacts {
+  verified: boolean;
+  inProgress: boolean;
+  aborted: boolean;
+  ontoRef: string;
+  ontoTip: string;
+  conflictedFiles: string[];
+  branches: BranchShas[];
+  pushed: boolean | null;
+}
+export type AdeRunOutcome = RunOutcome & { report?: AgentReport; rebase?: RebaseFacts };
 export interface Task {
   id: string;
   kind: 'task' | 'review' | 'parked';
@@ -471,6 +504,80 @@ export interface CreateTaskArgs {
   notes: string;
   codeRepoIds: string[];
   workflowId: string;
+  /** Per repo id; a missing repo starts from its main. */
+  bases: Record<string, BaseChoice>;
+}
+/** A base: a planner branch (branchId), a git ref (ref), or both empty for the repo main. */
+export interface BaseChoice {
+  ref: string;
+  branchId: string;
+}
+export interface SetBranchBaseArgs {
+  branchId: string;
+  base: BaseChoice;
+}
+export interface OntoArgs {
+  branchId: string;
+  /** null = the current base. */
+  onto: BaseChoice | null;
+  /** A review branch id: rebase onto it and queue after it. */
+  queueWith: string;
+  push: boolean;
+  autostash: boolean;
+}
+export interface RebaseArgs extends OntoArgs {
+  /** '' = the default prompt. */
+  message: string;
+}
+export interface RebaseStackItem {
+  branchId: string;
+  name: string;
+  worktree: string;
+  ontoRef: string;
+}
+export type RebaseBlockerKind =
+  | 'dirty'
+  | 'running'
+  | 'inProgress'
+  | 'baseMissing'
+  | 'parentDraft'
+  | 'noWorktree'
+  | 'setup';
+export interface RebaseBlocker {
+  branchId: string;
+  kind: RebaseBlockerKind;
+  text: string;
+}
+export interface RebasePreview {
+  prompt: string;
+  suffix: string;
+  stack: RebaseStackItem[];
+  blockers: RebaseBlocker[];
+  noOp: boolean;
+}
+export interface RebaseStart {
+  runId: string;
+  noOp: boolean;
+}
+export interface RepoBranchesArgs {
+  codeRepoId: string;
+  branchId: string;
+}
+export interface BasePick {
+  name: string;
+  local: boolean;
+  remote: boolean;
+  branchId: string;
+  taskId: string;
+  taskTitle: string;
+  draft: boolean;
+  /** Why it cannot be chosen; '' = choosable. */
+  excluded: string;
+}
+export interface RepoBranches {
+  mainName: string;
+  previous: string;
+  branches: BasePick[];
 }
 export interface TaskPatch {
   title: string | null;
@@ -489,6 +596,7 @@ export interface UpdateTaskArgs {
 export interface AddTaskRepoArgs {
   taskId: string;
   codeRepoId: string;
+  base: BaseChoice | null;
 }
 export interface AddExistingBranchArgs {
   codeRepoId: string;
