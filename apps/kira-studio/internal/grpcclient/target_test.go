@@ -1,6 +1,7 @@
 package grpcclient
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,7 +62,7 @@ func TestNormalizeTarget(t *testing.T) {
 // TestDialConn_CAFile covers the CA-file case (§6.2): a missing or unreadable CA file is refused
 // with a legible E_GRPC_BAD_REQUEST rather than reaching grpc-go at all.
 func TestDialConn_CAFile(t *testing.T) {
-	_, err := dialConn("127.0.0.1:1", TLSConfig{Enabled: true, CAFile: filepath.Join(t.TempDir(), "missing.pem")})
+	_, err := dialConn(context.Background(), "127.0.0.1:1", TLSConfig{Enabled: true, CAFile: filepath.Join(t.TempDir(), "missing.pem")})
 	if err == nil {
 		t.Fatal("dialConn with a missing CA file: want an error, got nil")
 	}

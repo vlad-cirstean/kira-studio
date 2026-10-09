@@ -1,7 +1,10 @@
 package grpcclient
 
 import (
+	"cmp"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -44,7 +47,14 @@ type CallRequest struct {
 
 	MessageJSON string
 	Metadata    []MetaPair
+
+	// Timeout bounds a unary call end to end, E_TIMEOUT on expiry; zero means defaultUnaryTimeout.
+	// A server stream is unbounded by design: the user ends it with Stop.
+	Timeout time.Duration
 }
+
+// defaultUnaryTimeout matches httpclient's default request timeout. A var so tests can lower it.
+var defaultUnaryTimeout = 30 * time.Second
 
 func grpcPath(m protoreflect.MethodDescriptor) string {
 	svc := m.Parent().(protoreflect.ServiceDescriptor)
@@ -132,7 +142,7 @@ func Unary(ctx context.Context, req CallRequest) (CallResult, error) {
 		return CallResult{}, BadRequest(req.FullMethod + " is a streaming method, not unary")
 	}
 
-	conn, err := dialConn(req.Target, req.TLS)
+	conn, err := dialConn(ctx, req.Target, req.TLS)
 	if err != nil {
 		return CallResult{}, err
 	}
@@ -142,6 +152,9 @@ func Unary(ctx context.Context, req CallRequest) (CallResult, error) {
 	if err != nil {
 		return CallResult{}, err
 	}
+	timeout := cmp.Or(req.Timeout, defaultUnaryTimeout)
+	callCtx, cancelCall := context.WithTimeout(callCtx, timeout)
+	defer cancelCall()
 
 	in := dynamicpb.NewMessage(method.Input())
 	if err := unmarshalRequestJSON(req.MessageJSON, in); err != nil {
@@ -155,6 +168,9 @@ func Unary(ctx context.Context, req CallRequest) (CallResult, error) {
 		grpc.Header(&header), grpc.Trailer(&trailer), grpc.MaxCallRecvMsgSize(maxRecvMsgSize))
 	elapsed := time.Since(start)
 
+	if callErr != nil && ctx.Err() == nil && errors.Is(callCtx.Err(), context.DeadlineExceeded) {
+		return CallResult{}, Timeout(fmt.Sprintf("no response from %s within %s", req.Target, timeout))
+	}
 	code, message, asError := terminalOutcome(callCtx, callErr)
 	if asError != nil {
 		return CallResult{}, asError
@@ -210,7 +226,7 @@ func ServerStream(ctx context.Context, req CallRequest, onMessage func(Message))
 // whenever dial itself succeeded, even on a later error — the caller defers its Close once non-nil
 // regardless, the same single defer conn.Close() this replaces used to cover every later failure.
 func openStream(ctx context.Context, req CallRequest, method protoreflect.MethodDescriptor) (conn *grpc.ClientConn, stream grpc.ClientStream, callCtx context.Context, err error) {
-	conn, err = dialConn(req.Target, req.TLS)
+	conn, err = dialConn(ctx, req.Target, req.TLS)
 	if err != nil {
 		return nil, nil, nil, err
 	}

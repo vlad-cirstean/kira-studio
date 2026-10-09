@@ -39,6 +39,8 @@ type GrpcDescribeArgs struct {
 	CollectionID   string                `json:"collectionId"`
 	EnvironmentID  string                `json:"environmentId"`
 	Reload         bool                  `json:"reload"`
+	// OpID is optional; when set, Describe is a cancellable op (OpsService.Cancel), not persisted.
+	OpID string `json:"opId"`
 }
 
 func validDescriptorMode(mode string) bool {
@@ -156,7 +158,18 @@ func (s *GrpcService) Describe(ctx context.Context, args GrpcDescribeArgs) (grpc
 		grpcclient.InvalidateCache(src)
 	}
 
-	schema, err := grpcclient.Describe(ctx, src)
+	var schema grpcclient.Schema
+	if args.OpID == "" {
+		schema, err = grpcclient.Describe(ctx, src)
+	} else {
+		spec := adapterhost.OpSpec{Kind: "grpc", OpID: args.OpID, Incognito: true}
+		_, _, err = s.Deps.Router.Host().RunOp(ctx, spec,
+			func(runCtx context.Context, _ *adapters.OpCtx) (any, error) {
+				var derr error
+				schema, derr = grpcclient.Describe(runCtx, src)
+				return nil, derr
+			})
+	}
 	if err != nil {
 		maskGrpcError(err, used)
 		return grpcclient.Schema{}, mapGrpcError(err)
@@ -193,6 +206,8 @@ type GrpcCallArgs struct {
 	// recordGrpcHistory below and rides along on the op spec so the op log skips persisting this
 	// op too (adapterhost/host.go, oplog/wire.go).
 	Incognito bool `json:"incognito"`
+	// TimeoutMs bounds a unary call; zero uses grpcclient's default.
+	TimeoutMs int `json:"timeoutMs"`
 }
 
 // Call is bridge/http.go's Send with a different payload, deliberately down to the ordering (D7):
@@ -232,6 +247,7 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 				Target: src.Target, TLS: args.TLS, Source: src,
 				FullMethod:  "/" + args.Service + "/" + args.Method,
 				MessageJSON: resolvedMessage, Metadata: src.Metadata,
+				Timeout: time.Duration(args.TimeoutMs) * time.Millisecond,
 			}
 
 			var result grpcclient.CallResult

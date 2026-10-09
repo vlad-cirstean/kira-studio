@@ -123,6 +123,8 @@ export const apiControl = {
     collectionId: string;
     environmentId: string;
     reload: boolean;
+    /** Names the describe as a cancellable op (`opsCancel`); never persisted. */
+    opId: string;
   }): Promise<GrpcSchemaWire> =>
     unwrap(GrpcService.Describe(args)).then((r) => trust<GrpcSchemaWire>(r)),
 

@@ -9,8 +9,10 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -91,7 +93,7 @@ func NormalizeTarget(raw string, tlsRequested bool) (Target, error) {
 // call needs anyway). InsecureSkipVerify is never offered (§0.2/D6): TLS verification is always on
 // when TLS is enabled, with only a plaintext toggle and an optional CA-certificate file to cover
 // the two real cases.
-func dialConn(target string, tlsCfg TLSConfig) (*grpc.ClientConn, error) {
+func dialConn(ctx context.Context, target string, tlsCfg TLSConfig) (*grpc.ClientConn, error) {
 	norm, err := NormalizeTarget(target, tlsCfg.Enabled)
 	if err != nil {
 		return nil, err
@@ -120,7 +122,38 @@ func dialConn(target string, tlsCfg TLSConfig) (*grpc.ClientConn, error) {
 	if err != nil {
 		return nil, Transport(err.Error())
 	}
+	if err := awaitReady(ctx, conn, norm.Dial); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
 	return conn, nil
+}
+
+// defaultDialTimeout bounds TCP connect plus the HTTP/2 handshake. grpc-go's own limit is 20 s and
+// ends in a bare transport error; a server that accepts TCP and never answers must fail faster and
+// say so. A var so tests can lower it.
+var defaultDialTimeout = 5 * time.Second
+
+// awaitReady blocks until conn is READY. A refused connection (TRANSIENT_FAILURE) returns nil: the
+// RPC then fails fast with grpc-go's own Unavailable text, which bridge/grpc.go maps to D17's
+// sentences.
+func awaitReady(ctx context.Context, conn *grpc.ClientConn, target string) error {
+	wait := defaultDialTimeout
+	dialCtx, cancel := context.WithTimeout(ctx, wait)
+	defer cancel()
+	conn.Connect()
+	for state := conn.GetState(); state != connectivity.Ready; state = conn.GetState() {
+		if state == connectivity.TransientFailure || state == connectivity.Shutdown {
+			return nil
+		}
+		if !conn.WaitForStateChange(dialCtx, state) {
+			if ctx.Err() != nil {
+				return Cancelled("request was cancelled")
+			}
+			return Timeout(fmt.Sprintf("no response from %s within %s: the server accepted the connection but did not complete the gRPC handshake", target, wait))
+		}
+	}
+	return nil
 }
 
 // metadataKeyPattern is gRPC's own legal metadata-key alphabet (F6) — validated proactively so a

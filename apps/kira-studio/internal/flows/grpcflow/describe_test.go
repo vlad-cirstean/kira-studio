@@ -164,35 +164,81 @@ func TestReloadAfterSchemaChange(t *testing.T) {
 	}
 }
 
+// A server that accepts TCP and never answers fails within the dial bound, naming target and wait.
 func TestDescribeSilentServer(t *testing.T) {
-	t.Skip("P232 finding A-1: Describe against a silent server blocks 20 s then E_GRPC_TRANSPORT; 10 s budget fails")
 	app := flowharness.New(t)
 	addr := flowharness.Silent(t)
 
 	start := time.Now()
 	_, err := app.W.Grpc.Describe(ctx, describeArgs(addr))
 	took := time.Since(start)
-	if err == nil {
-		t.Fatal("Describe against a silent server succeeded")
+	e := ipcErr(t, err)
+	if e.Code != grpcclient.CodeTimeout || !strings.Contains(e.Message, addr) || !strings.Contains(e.Message, "5s") {
+		t.Errorf("error = %s %q, want %s naming %s and the 5s wait", e.Code, e.Message, grpcclient.CodeTimeout, addr)
 	}
-	if took > 10*time.Second {
-		t.Errorf("Describe took %s, want an error within 10s (Describe has no opId, so no cancel path exists)", took.Round(time.Second))
+	if took > 8*time.Second {
+		t.Errorf("Describe took %s, want an error within 8s", took.Round(time.Second))
+	}
+}
+
+func TestDescribeCancel(t *testing.T) {
+	app := flowharness.New(t)
+	addr := flowharness.Silent(t)
+	args := describeArgs(addr)
+	args.OpID = newOp()
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := app.W.Grpc.Describe(ctx, args)
+		done <- err
+	}()
+	time.Sleep(300 * time.Millisecond)
+	if err := app.W.Ops.Cancel(bridge.OpsCancelArgs{OpID: args.OpID}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if e := ipcErr(t, err); e.Code != grpcclient.CodeCancelled {
+			t.Errorf("error = %s %q, want %s", e.Code, e.Message, grpcclient.CodeCancelled)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Describe did not return after Ops.Cancel")
 	}
 }
 
 func TestCallSilentServer(t *testing.T) {
-	t.Skip("P232 finding A-1: Call against a silent server blocks 20 s then E_GRPC_TRANSPORT; 10 s budget fails")
 	app := flowharness.New(t)
 	addr := flowharness.Silent(t)
 
 	for _, m := range []string{"Unary", "ServerStream"} {
+		args := callArgs(addr, m, `{"text":"x"}`)
+		args.Streaming = m == "ServerStream"
 		start := time.Now()
-		_, err := app.W.Grpc.Call(ctx, callArgs(addr, m, `{"text":"x"}`))
-		if err == nil {
-			t.Fatalf("%s against a silent server succeeded", m)
+		_, err := app.W.Grpc.Call(ctx, args)
+		e := ipcErr(t, err)
+		if e.Code != grpcclient.CodeTimeout || !strings.Contains(e.Message, addr) {
+			t.Errorf("%s error = %s %q, want %s naming %s", m, e.Code, e.Message, grpcclient.CodeTimeout, addr)
 		}
-		if took := time.Since(start); took > 10*time.Second {
-			t.Errorf("%s took %s, want an error within 10s", m, took.Round(time.Second))
+		if took := time.Since(start); took > 8*time.Second {
+			t.Errorf("%s took %s, want an error within 8s", m, took.Round(time.Second))
 		}
+	}
+}
+
+// A connected server that never replies ends a unary call at its own deadline, not at Stop.
+func TestUnaryDeadline(t *testing.T) {
+	app := flowharness.New(t)
+	srv := flowharness.GRPC(t)
+	args := callArgs(srv.Addr, "Slow", `{}`)
+	args.TimeoutMs = 400
+
+	start := time.Now()
+	_, err := app.W.Grpc.Call(ctx, args)
+	e := ipcErr(t, err)
+	if e.Code != grpcclient.CodeTimeout || !strings.Contains(e.Message, srv.Addr) || !strings.Contains(e.Message, "400ms") {
+		t.Errorf("error = %s %q, want %s naming %s and 400ms", e.Code, e.Message, grpcclient.CodeTimeout, srv.Addr)
+	}
+	if took := time.Since(start); took > 3*time.Second {
+		t.Errorf("deadline call took %s, want about 400ms", took.Round(time.Millisecond))
 	}
 }

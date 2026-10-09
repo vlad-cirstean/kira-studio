@@ -232,11 +232,11 @@ func filterServiceNames(services []*grpc_reflection_v1.ServiceResponse) []string
 // FileContainingSymbol/FileByFilename fetch and link) — P108 F4: Describe calls grpcclient.Describe
 // directly, not through the RunOp/Stop path, so nothing else in this package ever cancels a
 // reflection stream a server accepts and then never answers. Without this, that leaves the
-// goroutine and connection blocked forever and the UI spinner never ends. Matches httpclient's own
-// default request timeout (options.go).
+// goroutine and connection blocked forever and the UI spinner never ends. The connect and
+// handshake share this deadline but are bounded sooner by defaultDialTimeout.
 // A var, not a const, so reflect_test.go can lower it for a bounded regression test without a
 // real 30s wait.
-var defaultReflectionTimeout = 30 * time.Second
+var defaultReflectionTimeout = 15 * time.Second
 
 // resolveReflection is D4's reflection source: one ServerReflectionInfo bidi stream, ListServices,
 // then FileContainingSymbol per service, linking every returned FileDescriptorProto into this
@@ -250,7 +250,7 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultReflectionTimeout)
 	defer cancel()
 
-	conn, err := dialConn(src.Target, src.TLS)
+	conn, err := dialConn(ctx, src.Target, src.TLS)
 	if err != nil {
 		return nil, err
 	}
@@ -274,10 +274,7 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 			// legible on its own, so name what actually happened instead.
 			return nil, Transport("the reflection request ended the connection unexpectedly (" + err.Error() + ") after retrying")
 		}
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, Transport("reflection timed out")
-		}
-		return nil, Transport(err.Error())
+		return nil, reflectionFailure(ctx, src.Target, err)
 	}
 
 	l := &linker{
@@ -291,7 +288,7 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 	for _, svc := range services {
 		protos, err := transport.fetch(byFileContainingSymbol, svc)
 		if err != nil {
-			return nil, Transport(err.Error())
+			return nil, reflectionFailure(ctx, src.Target, err)
 		}
 		if err := absorb(l.known, protos); err != nil {
 			return nil, SchemaError(err.Error())
@@ -304,6 +301,15 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 	}
 
 	return &resolved{files: l.reg, mode: mode}, nil
+}
+
+// reflectionFailure names a deadline expiry as E_TIMEOUT, with the target and the wait; any other
+// failure stays a transport error.
+func reflectionFailure(ctx context.Context, target string, err error) *Error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return Timeout(fmt.Sprintf("no reflection answer from %s within %s", target, defaultReflectionTimeout))
+	}
+	return Transport(err.Error())
 }
 
 // linker resolves one file's own dependency closure into reg — resolveReflection's own recursive

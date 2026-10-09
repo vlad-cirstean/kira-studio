@@ -149,7 +149,7 @@ func TestResolveSource_CancelOnlyAffectsOwnCaller(t *testing.T) {
 	if err := <-cancelled; !errors.As(err, &ge) || ge.Code != CodeCancelled {
 		t.Fatalf("cancelled caller err = %v, want %s", err, CodeCancelled)
 	}
-	if err := <-other; !errors.As(err, &ge) || ge.Code != CodeTransport {
-		t.Fatalf("other caller err = %v, want %s (the shared timeout), not a cancellation", err, CodeTransport)
+	if err := <-other; !errors.As(err, &ge) || ge.Code != CodeTimeout {
+		t.Fatalf("other caller err = %v, want %s (the shared timeout), not a cancellation", err, CodeTimeout)
 	}
 }

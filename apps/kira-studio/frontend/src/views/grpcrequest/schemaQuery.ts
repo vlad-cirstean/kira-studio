@@ -80,7 +80,11 @@ function isComplete(source: GrpcSchemaSource): boolean {
 }
 
 /** Describe has no message field, so only target and metadata are resolved (stage 1, as send()). */
-async function describeSchema(source: GrpcSchemaSource, reload: boolean): Promise<GrpcSchemaWire> {
+async function describeSchema(
+  source: GrpcSchemaSource,
+  reload: boolean,
+  signal?: AbortSignal,
+): Promise<GrpcSchemaWire> {
   let target = source.target;
   let metadata: GrpcMetaPairWire[] = [];
   if (source.mode === 'reflection') {
@@ -97,6 +101,8 @@ async function describeSchema(source: GrpcSchemaSource, reload: boolean): Promis
     target = resolved.target;
     metadata = resolved.metadata;
   }
+  const opId = crypto.randomUUID();
+  signal?.addEventListener('abort', () => void control.opsCancel(opId), { once: true });
   return control.grpcDescribe({
     descriptorMode: source.mode,
     target,
@@ -107,6 +113,7 @@ async function describeSchema(source: GrpcSchemaSource, reload: boolean): Promis
     collectionId: source.collectionId,
     environmentId: source.environmentId,
     reload,
+    opId,
   });
 }
 
@@ -119,7 +126,7 @@ export function useGrpcSchema(tab: MaybeRefOrGetter<GrpcRequestTabRecord>) {
     const s = debounced.value;
     return {
       queryKey: grpcSchemaKey(s),
-      queryFn: () => describeSchema(s, false),
+      queryFn: ({ signal }) => describeSchema(s, false, signal),
       enabled: s.ready && isComplete(s),
       staleTime: Number.POSITIVE_INFINITY,
     };
@@ -132,7 +139,7 @@ export function useGrpcSchema(tab: MaybeRefOrGetter<GrpcRequestTabRecord>) {
     await queryClient
       .fetchQuery({
         queryKey: grpcSchemaKey(s),
-        queryFn: () => describeSchema(s, true),
+        queryFn: ({ signal }) => describeSchema(s, true, signal),
         staleTime: 0,
       })
       .catch(() => {});

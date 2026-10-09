@@ -15,6 +15,8 @@ const (
 	CodeSchema     = "E_GRPC_SCHEMA"
 	CodeTransport  = "E_GRPC_TRANSPORT"
 	CodeCancelled  = "E_GRPC_CANCELLED"
+	// CodeTimeout is httpclient's own E_TIMEOUT: a server that accepted TCP and then never answered.
+	CodeTimeout = "E_TIMEOUT"
 )
 
 // Error is the one error type every function in this package returns on failure — mirrors
@@ -43,6 +45,9 @@ func SchemaError(message string) *Error { return newError(CodeSchema, message) }
 
 // Transport — dial, TLS, or codes.Unavailable.
 func Transport(message string) *Error { return newError(CodeTransport, message) }
+
+// Timeout — a deadline of this package's own (dial, reflection, unary) expired.
+func Timeout(message string) *Error { return newError(CodeTimeout, message) }
 
 // Cancelled — the call's context ended (the Stop button, or a caller-supplied deadline).
 func Cancelled(message string) *Error { return newError(CodeCancelled, message) }
