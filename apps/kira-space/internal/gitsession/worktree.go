@@ -165,6 +165,11 @@ func (e *RepoEntry) WorktreeAddPreflight(ctx context.Context, p WorktreeAddParam
 				break
 			}
 		}
+		// refsSnapshot drops this session's own worktree; for an add it is another worktree.
+		if branchCheckedOutElsewhere == nil && snapshot.Head.Kind == "branch" && snapshot.Head.Name == p.Branch {
+			root := e.Summary.Root
+			branchCheckedOutElsewhere = &root
+		}
 	}
 	if p.Mode == "newBranch" {
 		for _, r := range snapshot.Branches {
