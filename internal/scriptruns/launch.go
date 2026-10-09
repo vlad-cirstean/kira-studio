@@ -9,8 +9,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
 
-// launchTTL is how long a normal script's launch token stays valid.
-const launchTTL = 60 * time.Second
+// LaunchTTL is how long a normal script's launch token stays valid; a var so a flow test can shorten it.
+var LaunchTTL = 60 * time.Second
 
 // launch is what Start resolved for a normal script, waiting for its terminal tab to open.
 type launch struct {
@@ -41,7 +41,7 @@ func (s *Service) startTerminal(p *planned) (Started, error) {
 		s.launches = map[string]launch{}
 	}
 	for t, l := range s.launches {
-		if now.Sub(l.created) > launchTTL {
+		if now.Sub(l.created) > LaunchTTL {
 			delete(s.launches, t)
 		}
 	}
@@ -51,13 +51,13 @@ func (s *Service) startTerminal(p *planned) (Started, error) {
 	return Started{Terminal: &TerminalStart{Token: token, Cwd: p.dir.Path}}, nil
 }
 
-// takeLaunch consumes a token: it works once, for the script it was made for, within launchTTL.
+// takeLaunch consumes a token: it works once, for the script it was made for, within LaunchTTL.
 func (s *Service) takeLaunch(token, scriptID string) (launch, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	l, ok := s.launches[token]
 	delete(s.launches, token)
-	if !ok || l.scriptID != scriptID || time.UnixMilli(s.now()).Sub(l.created) > launchTTL {
+	if !ok || l.scriptID != scriptID || time.UnixMilli(s.now()).Sub(l.created) > LaunchTTL {
 		return launch{}, false
 	}
 	return l, true

@@ -18,6 +18,8 @@ package flowharness
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -30,6 +32,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/flowtest"
+	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -45,12 +48,23 @@ const EnvComplete = flowtest.EnvComplete
 // Complete skips a test unless the complete suite is on.
 func Complete(t testing.TB) { flowtest.Complete(t) }
 
+type options struct {
+	smartTimeout time.Duration
+}
+
+// Opt tweaks New.
+type Opt func(*options)
+
+// WithSmartTimeout replaces every smart script's own timeout.
+func WithSmartTimeout(d time.Duration) Opt { return func(o *options) { o.smartTimeout = d } }
+
 // App is one booted Kira Studio.
 type App struct {
 	t *testing.T
 	// Home is the isolated HOME (also what DefaultCwd and the docker config dir read); KiraHome is
-	// KIRA_HOME.
-	Home, KiraHome string
+	// KIRA_HOME. BinDir is the PATH-first directory holding the fake claude and fake-mcp, FakeDir
+	// where the fake agent records its calls.
+	Home, KiraHome, BinDir, FakeDir string
 
 	W            *appwire.Wired
 	Events       *Events
@@ -63,22 +77,31 @@ type App struct {
 	newWindows int
 	db         *storage.DB
 	stopped    bool
+	opts       options
 }
 
 // New boots the app and tears it down at cleanup, in main's order.
-func New(t *testing.T) *App {
+func New(t *testing.T, opts ...Opt) *App {
 	t.Helper()
 	root := t.TempDir()
 	a := &App{
 		t: t, Home: filepath.Join(root, "home"), KiraHome: filepath.Join(root, "kira"),
+		BinDir: filepath.Join(root, "bin"), FakeDir: filepath.Join(root, "fake"),
 		Events: flowtest.NewEvents(), Dialogs: &Dialogs{}, KeepAwake: &KeepAwakeDriver{},
 		McpInstaller: &McpInstaller{}, OSAuth: &OSAuth{},
 	}
-	if err := mkdirs(a.Home); err != nil {
+	for _, opt := range opts {
+		opt(&a.opts)
+	}
+	if err := mkdirs(a.Home, a.BinDir, a.FakeDir); err != nil {
 		t.Fatal(err)
 	}
+	a.writeBin()
 	t.Setenv("KIRA_HOME", a.KiraHome)
 	t.Setenv("HOME", a.Home)
+	t.Setenv("PATH", a.BinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv(fakeagent.EnvDir, a.FakeDir)
+	t.Setenv(fakeagent.EnvScenario, fakeagent.Scenario{}.Encode())
 	t.Setenv("TZ", "UTC")
 	// Linux has no keychain; a no-op on macOS, where the real Keychain-backed cipher is used.
 	t.Setenv("KIRA_INSECURE_SECRETS", "1")
@@ -86,6 +109,32 @@ func New(t *testing.T) *App {
 	a.build()
 	t.Cleanup(a.stop)
 	return a
+}
+
+// writeBin links the test binary as claude and fake-mcp (Main plays them by name) and writes the
+// login-shell profiles that put BinDir first on PATH (login shells reorder it; P150).
+func (a *App) writeBin() {
+	self, err := os.Executable()
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	for _, tool := range []string{"claude", "fake-mcp"} {
+		if err := os.Symlink(self, filepath.Join(a.BinDir, tool)); err != nil {
+			a.t.Fatal(err)
+		}
+	}
+	profile := fmt.Sprintf("export PATH=%q:\"$PATH\"\n", a.BinDir)
+	for _, f := range []string{".bash_profile", ".zprofile", ".profile"} {
+		if err := os.WriteFile(filepath.Join(a.Home, f), []byte(profile), 0o644); err != nil {
+			a.t.Fatal(err)
+		}
+	}
+}
+
+// Scenario installs the fake claude's scenario; processes started afterwards read it.
+func (a *App) Scenario(s fakeagent.Scenario) {
+	a.t.Helper()
+	a.t.Setenv(fakeagent.EnvScenario, s.Encode())
 }
 
 func (a *App) build() {
@@ -109,7 +158,7 @@ func (a *App) build() {
 		DB: db, Repos: r, Cipher: cipher,
 		Authorizer: localauth.New(time.Now, a.OSAuth.evaluate, a.OSAuth.isAvailable),
 		Emitter:    a.Events, Dialogs: a.Dialogs, KeepAwakeDriver: a.KeepAwake, McpInstaller: a.McpInstaller,
-		AppName: "Kira Studio", Version: "flowtest",
+		AppName: "Kira Studio", Version: "flowtest", SmartTimeout: a.opts.smartTimeout,
 	})
 	if err != nil {
 		a.t.Fatalf("appwire.Build: %v", err)

@@ -40,6 +40,7 @@ import (
 )
 
 type options struct {
+	smartTimeout  time.Duration
 	noGh          bool
 	noClaude      bool
 	trackerGrace  time.Duration
@@ -59,6 +60,9 @@ func WithoutClaude() Opt { return func(o *options) { o.noClaude = true } }
 // WithTrackerGrace shortens the ADE tracker's grace window, the wait after a TUI session spawns
 // before a missing process reads as stopped (30s by default).
 func WithTrackerGrace(d time.Duration) Opt { return func(o *options) { o.trackerGrace = d } }
+
+// WithSmartTimeout replaces every smart script's own timeout.
+func WithSmartTimeout(d time.Duration) Opt { return func(o *options) { o.smartTimeout = d } }
 
 // WithMobilePoll sets how often the phone server's network supervisor re-checks (10s by default).
 func WithMobilePoll(d time.Duration) Opt { return func(o *options) { o.mobilePoll = d } }
@@ -163,7 +167,7 @@ func (a *App) writeBin(o options) {
 	if err != nil {
 		a.t.Fatal(err)
 	}
-	var tools []string
+	tools := []string{"fake-mcp"}
 	if !o.noClaude {
 		tools = append(tools, "claude")
 	}
@@ -240,7 +244,7 @@ func (a *App) build() {
 		ghLocator = noGhLocator{}
 	}
 	a.W = appwire.Build(appwire.Options{
-		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, MobilePoll: a.opts.mobilePoll,
+		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},

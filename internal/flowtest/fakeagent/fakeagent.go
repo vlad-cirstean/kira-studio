@@ -3,7 +3,9 @@
 // from scenario data in KIRA_FAKE_SCEN (JSON, or the path of a JSON file), so a stream extends it with testdata, not code.
 //
 // Every call writes its argv, cwd and stdin under KIRA_FAKE_DIR as <repo>-<n>.args/.cwd/.prompt
-// (claude, where <repo> is the worktree's parent directory name) or gh-<n>.args. A scripted Action.MCP
+// (claude, where <repo> is the worktree's parent directory name) or gh-<n>.args. A claude call also
+// keeps its KIRA_* environment (one Go-quoted entry per line) as <repo>-<n>.env and a copy of each --mcp-config file as
+// <repo>-<n>.mcp<i>. Run as "fake-mcp" it is a stdio MCP server with tools echo and ping. A scripted Action.MCP
 // call also keeps its result as mcp-<tool>-<n>.json.
 package fakeagent
 
@@ -17,6 +19,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -129,6 +133,8 @@ func Run(name string, args []string) int {
 		return runClaude(scen, dir, args)
 	case "gh":
 		return runGh(scen, dir, args)
+	case "fake-mcp":
+		return runFakeMCP()
 	}
 	fmt.Fprintln(os.Stderr, "fakeagent: unknown tool", name)
 	return 127
@@ -185,6 +191,12 @@ func runClaude(scen Scenario, dir string, args []string) int {
 	stem := filepath.Join(dir, fmt.Sprintf("%s-%d", repo, n))
 	_ = os.WriteFile(stem+".args", []byte(strings.Join(args, "\n")), 0o644)
 	_ = os.WriteFile(stem+".cwd", []byte(cwd), 0o644)
+	recordEnv(stem)
+	for i, cfg := range argsAfter(args, "--mcp-config") {
+		if raw, err := os.ReadFile(cfg); err == nil {
+			_ = os.WriteFile(fmt.Sprintf("%s.mcp%d", stem, i), raw, 0o644)
+		}
+	}
 
 	headless := false
 	for _, a := range args {
@@ -210,7 +222,7 @@ func runClaude(scen Scenario, dir string, args []string) int {
 	}
 	cfg := argAfter(args, "--mcp-config")
 	for _, c := range action.MCP {
-		res, err := callTool(cfg, c.Server, c.Tool, c.Args)
+		res, err := callTool(argsAfter(args, "--mcp-config"), c.Server, c.Tool, c.Args)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "mcp:", err)
 			return 3
@@ -238,7 +250,7 @@ func runClaude(scen Scenario, dir string, args []string) int {
 	}
 
 	finish := func(status string) int {
-		if _, err := callTool(cfg, claudeheadless.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
+		if _, err := callTool([]string{cfg}, claudeheadless.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
 			fmt.Fprintln(os.Stderr, "finish_step:", err)
 			return 3
 		}
@@ -345,6 +357,29 @@ func emitJSON(v any) {
 	fmt.Println(string(raw))
 }
 
+// argsAfter returns the value after every occurrence of flag.
+func argsAfter(args []string, flag string) []string {
+	var out []string
+	for i, a := range args {
+		if a == flag && i+1 < len(args) {
+			out = append(out, args[i+1])
+		}
+	}
+	return out
+}
+
+// recordEnv keeps the KIRA_* variables the call was started with.
+func recordEnv(stem string) {
+	var lines []string
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "KIRA_PARAM_") || strings.HasPrefix(kv, "KIRA_TASK") {
+			lines = append(lines, strconv.Quote(kv))
+		}
+	}
+	sort.Strings(lines)
+	_ = os.WriteFile(stem+".env", []byte(strings.Join(lines, "\n")), 0o644)
+}
+
 func argAfter(args []string, flag string) string {
 	for i, a := range args {
 		if a == flag && i+1 < len(args) {
@@ -363,29 +398,37 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // callTool connects to server from the --mcp-config file (HTTP or stdio entry) and calls one tool.
-func callTool(cfgPath, server, tool string, args map[string]any) (*mcp.CallToolResult, error) {
-	raw := []byte(cfgPath)
-	if !strings.HasPrefix(strings.TrimSpace(cfgPath), "{") {
-		var err error
-		if raw, err = os.ReadFile(cfgPath); err != nil {
+func callTool(cfgPaths []string, server, tool string, args map[string]any) (*mcp.CallToolResult, error) {
+	type serverEntry struct {
+		URL     string            `json:"url"`
+		Headers map[string]string `json:"headers"`
+		Command string            `json:"command"`
+		Args    []string          `json:"args"`
+		Env     map[string]string `json:"env"`
+	}
+	var entry serverEntry
+	found := false
+	for _, path := range cfgPaths {
+		raw := []byte(path)
+		if !strings.HasPrefix(strings.TrimSpace(path), "{") {
+			var err error
+			if raw, err = os.ReadFile(path); err != nil {
+				return nil, err
+			}
+		}
+		var cfg struct {
+			MCPServers map[string]serverEntry `json:"mcpServers"`
+		}
+		if err := json.Unmarshal(raw, &cfg); err != nil {
 			return nil, err
 		}
+		if e, ok := cfg.MCPServers[server]; ok {
+			entry, found = e, true
+			break
+		}
 	}
-	var cfg struct {
-		MCPServers map[string]struct {
-			URL     string            `json:"url"`
-			Headers map[string]string `json:"headers"`
-			Command string            `json:"command"`
-			Args    []string          `json:"args"`
-			Env     map[string]string `json:"env"`
-		} `json:"mcpServers"`
-	}
-	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return nil, err
-	}
-	entry, ok := cfg.MCPServers[server]
-	if !ok {
-		return nil, fmt.Errorf("server %q not in %s", server, cfgPath)
+	if !found {
+		return nil, fmt.Errorf("server %q not in %s", server, strings.Join(cfgPaths, ", "))
 	}
 	var transport mcp.Transport
 	if entry.Command != "" {
@@ -430,4 +473,28 @@ func recordMCPResult(dir, tool string, res *mcp.CallToolResult) {
 	}
 	n := nextCount(dir, "mcp-"+tool)
 	_ = os.WriteFile(filepath.Join(dir, fmt.Sprintf("mcp-%s-%d.json", tool, n)), raw, 0o644)
+}
+
+type echoArgs struct {
+	Text string `json:"text" jsonschema:"Text to echo back."`
+}
+
+type noArgs struct{}
+
+// runFakeMCP serves a stdio MCP server with two tools, for tests of user MCP servers.
+func runFakeMCP() int {
+	srv := mcp.NewServer(&mcp.Implementation{Name: "fake-mcp", Version: "1"}, nil)
+	mcp.AddTool(srv, &mcp.Tool{Name: "echo", Description: "Echo the text back.\nSecond line."},
+		func(_ context.Context, _ *mcp.CallToolRequest, a echoArgs) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: a.Text}}}, nil, nil
+		})
+	mcp.AddTool(srv, &mcp.Tool{Name: "ping", Description: "Answer pong."},
+		func(_ context.Context, _ *mcp.CallToolRequest, _ noArgs) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "pong"}}}, nil, nil
+		})
+	if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+		fmt.Fprintln(os.Stderr, "fake-mcp:", err)
+		return 1
+	}
+	return 0
 }
