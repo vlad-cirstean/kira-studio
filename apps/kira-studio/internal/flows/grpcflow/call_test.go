@@ -248,18 +248,13 @@ func TestTLSTargets(t *testing.T) {
 	d.TLS = tlsCfg
 	describe(t, app, d)
 
-	stream := callArgs(srv.Addr, "ServerStream", `{"count":1}`)
-	stream.Streaming, stream.TLS = true, tlsCfg
-	if res := call(t, app, stream); res.MessageCount != 1 {
-		t.Errorf("TLS stream delivered %d messages, want 1", res.MessageCount)
-	}
-	if calls := srv.Calls(); len(calls) != 1 || !calls[0].TLS {
-		t.Errorf("server calls = %+v, want one over TLS", calls)
-	}
 	unary := callArgs(srv.Addr, "Unary", `{"text":"tls"}`)
 	unary.TLS = tlsCfg
 	if res := call(t, app, unary); res.CodeName != "OK" {
 		t.Errorf("TLS unary = %s", res.CodeName)
+	}
+	if calls := srv.Calls(); len(calls) != 1 || !calls[0].TLS {
+		t.Errorf("server calls = %+v, want one over TLS", calls)
 	}
 
 	t.Run("no CA fails the handshake", func(t *testing.T) {

@@ -307,11 +307,7 @@ func reply(m protoreflect.MethodDescriptor, in *dynamicpb.Message, text string, 
 
 func (f flowSvc) unary(name string) grpc.MethodDesc {
 	m := f.method(name)
-	return grpc.MethodDesc{MethodName: name, Handler: func(_ any, ctx context.Context, dec func(any) error, _ grpc.UnaryServerInterceptor) (any, error) {
-		in := dynamicpb.NewMessage(m.Input())
-		if err := dec(in); err != nil {
-			return nil, err
-		}
+	handle := func(ctx context.Context, in *dynamicpb.Message) (any, error) {
 		echoMetadata(ctx)
 		switch name {
 		case "Fail":
@@ -325,6 +321,19 @@ func (f flowSvc) unary(name string) grpc.MethodDesc {
 			text = strings.Repeat("x", n)
 		}
 		return reply(m, in, text, int32(in.Get(field(m.Input(), "index")).Int())), nil
+	}
+	return grpc.MethodDesc{MethodName: name, Handler: func(_ any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
+		in := dynamicpb.NewMessage(m.Input())
+		if err := dec(in); err != nil {
+			return nil, err
+		}
+		if interceptor == nil {
+			return handle(ctx, in)
+		}
+		info := &grpc.UnaryServerInfo{FullMethod: "/" + string(f.svc.FullName()) + "/" + name}
+		return interceptor(ctx, in, info, func(ctx context.Context, req any) (any, error) {
+			return handle(ctx, req.(*dynamicpb.Message))
+		})
 	}}
 }
 

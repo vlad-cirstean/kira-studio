@@ -72,6 +72,12 @@ func describeNeedsMetadata(t *testing.T, app *flowharness.App) {
 	if _, ok := findMethod(t, s, "Unary"); !ok {
 		t.Error("describe with the secret metadata lacks Unary")
 	}
+
+	unary := callArgs(srv.Addr, "Unary", `{}`)
+	unary.CollectionID, unary.EnvironmentID, unary.Metadata = colID, envID, args.Metadata
+	if res := call(t, app, unary); res.CodeName != "OK" || len(srv.Calls()) != 1 {
+		t.Errorf("unary with the metadata = %s, %d server calls, want OK and the call recorded", res.CodeName, len(srv.Calls()))
+	}
 }
 
 func TestDescribeProtoAndCall(t *testing.T) {
@@ -125,15 +131,8 @@ func TestDescribeProtoAndCall(t *testing.T) {
 	if res.CodeName != "OK" || !strings.Contains(res.Messages[0].JSON, "via proto") {
 		t.Errorf("proto-mode call = %s %+v", res.CodeName, res.Messages)
 	}
-	// The harness server records streaming calls only (finding A-2), so reach it with a stream too.
-	stream := callArgs(srv.Addr, "ServerStream", `{"count":2}`)
-	stream.Streaming = true
-	stream.DescriptorMode, stream.ProtoPath, stream.ImportPaths = "proto", protoPath, []string{libDir}
-	if got := call(t, app, stream); got.MessageCount != 2 {
-		t.Errorf("proto-mode stream delivered %d messages, want 2", got.MessageCount)
-	}
-	if got := srv.Calls(); len(got) != 1 || got[0].Method != "/"+flowSvc+"/ServerStream" {
-		t.Errorf("server calls = %+v, want one ServerStream", got)
+	if got := srv.Calls(); len(got) != 1 || got[0].Method != "/"+flowSvc+"/Unary" {
+		t.Errorf("server calls = %+v, want one Unary", got)
 	}
 }
 
