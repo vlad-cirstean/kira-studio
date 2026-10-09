@@ -137,9 +137,9 @@ const emit = defineEmits<{
 
 const MIN_COLUMN_WIDTH = 40;
 const MIN_MESSAGE_WIDTH = 120;
-// G21 D6b: mirrors `.slick-cell`'s own horizontal padding (`kv:px-1` in the style block below, 4px) — one
+// G21 D6b: mirrors `.slick-cell`'s own horizontal padding (`kv:px-2` in the style block below, 8px) — one
 // side; `measureAbsoluteDateWidth`'s own caller doubles it for both sides of the cell.
-const CELL_PADDING_PX = 4;
+const CELL_PADDING_PX = 8;
 
 const host = ref<HTMLDivElement | null>(null);
 const dateWidthProbe = ref<HTMLSpanElement | null>(null);
@@ -1492,7 +1492,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 }
 
 .kv-commit-grid .slick-cell {
-  @apply kv:absolute kv:flex kv:items-center kv:overflow-hidden kv:py-0 kv:px-1;
+  @apply kv:absolute kv:flex kv:items-center kv:overflow-hidden kv:py-0 kv:px-2;
   border: none;
 }
 

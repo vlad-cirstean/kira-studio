@@ -45,9 +45,9 @@ const CELL_AUTHOR_CLASS = CELL_TEXT_CLASS;
 const CELL_DATE_CLASS = `kv-cell-date kv:tabular-nums ${CELL_TEXT_CLASS}`;
 // The message cell is a 2-row grid: a badge track (0 unless the row has badges) over the subject.
 const CELL_MESSAGE_CLASS =
-  'kv-cell-message kv:grid kv:grid-rows-[0_var(--kv-h-xs)] kv:items-center kv:min-w-0 kv:overflow-hidden';
+  'kv-cell-message kv:grid kv:grid-rows-[0_1fr] kv:items-center kv:min-w-0 kv:overflow-hidden';
 const CELL_MESSAGE_BADGES_CLASS =
-  'kv-cell-message kv:grid kv:grid-rows-[var(--kv-h-xs)_var(--kv-h-xs)] kv:items-center kv:min-w-0 kv:overflow-hidden';
+  'kv-cell-message kv:grid kv:grid-rows-[var(--kv-h-xs)_1fr] kv:items-center kv:min-w-0 kv:overflow-hidden';
 const CELL_MESSAGE_COLLAPSED_CLASS =
   'kv-cell-message kv:flex kv:items-center kv:gap-1 kv:min-w-0 kv:overflow-hidden';
 const SUBJECT_CLASS =

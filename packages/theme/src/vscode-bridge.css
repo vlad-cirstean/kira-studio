@@ -28,17 +28,19 @@
   /* Surfaces */
   --vscode-editor-background: var(--kira-bg);
   --vscode-editor-foreground: var(--kira-fg);
-  --vscode-panel-background: var(--kira-bg-chrome);
+  /* Host hook in the `kiraSpace` namespace (like `graphLane*`): list row height, read by
+     git-ui's `density.css`. Unset in VS Code, which keeps its font-derived rows. */
+  --vscode-kiraSpace-rowHeight: var(--kira-row-height);
+  /* P229: the graph, detail pane and strip read `panel.background`; Space content is `--kira-bg`. */
+  --vscode-panel-background: var(--kira-bg);
   --vscode-panel-border: var(--kira-border);
   --vscode-widget-shadow: var(--kira-shadow-dialog);
   --vscode-input-background: var(--kira-bg-input);
   --vscode-input-border: var(--kira-border);
   --vscode-widget-border: var(--kira-border-strong);
 
-  /* Toolbar — no dedicated Kira toolbar-surface token exists; `--kira-bg-chrome` is the same
-     "sideBar / statusBar / titleBar / panel" tier a toolbar belongs to (`tokens.css`'s own
-     comment). */
-  --vscode-editorGroupHeader-tabsBackground: var(--kira-bg-chrome);
+  /* Toolbar — P229: content surface, like every other module's content, not the chrome tier. */
+  --vscode-editorGroupHeader-tabsBackground: var(--kira-bg);
   --vscode-editorGroupHeader-tabsBorder: var(--kira-border);
   --vscode-button-background: var(--kira-accent);
   --vscode-button-foreground: var(--kira-accent-fg);
@@ -52,7 +54,7 @@
   --vscode-list-foreground: var(--kira-fg);
   --vscode-list-hoverBackground: var(--kira-hover);
   --vscode-list-activeSelectionBackground: var(--kira-select);
-  --vscode-list-activeSelectionForeground: var(--kira-accent-fg);
+  --vscode-list-activeSelectionForeground: var(--kira-fg);
   /* No separate "inactive selection" tone in Kira's layer — the hover tone is the closest
      dimmer-than-active-selection highlight it has. */
   --vscode-list-inactiveSelectionBackground: var(--kira-hover);

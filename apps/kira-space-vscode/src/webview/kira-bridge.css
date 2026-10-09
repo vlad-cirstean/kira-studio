@@ -94,7 +94,7 @@ body {
   --kira-control-h: var(--kv-control-h);
   --kira-control-h-lg: var(--kv-control-h-lg);
   --kira-control-h-sm: var(--kv-control-h-sm);
-  --kira-row-height: var(--kv-row-height);
+  --kira-row-height: var(--kv-h-sm);
   --kira-bar-h: var(--kv-bar-h);
   --kira-titlebar-h: var(--kv-bar-h);
   --kira-tabbar-h: var(--kv-bar-h);
