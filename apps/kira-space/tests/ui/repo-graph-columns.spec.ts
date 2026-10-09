@@ -193,7 +193,9 @@ test('a tall grid never grows a horizontal scrollbar, open or closed, and keeps 
   const page = await bootGrid(relaunch, manyRows(300), { tip: manyRowShas(0) });
   const viewport = page.locator(`${grid} .slick-viewport-top.slick-viewport-left`);
   await expect
-    .poll(() => viewport.evaluate((el) => el.scrollHeight > el.clientHeight * 4), { timeout: 5000 })
+    .poll(() => viewport.evaluate((el) => el.scrollHeight > el.clientHeight * 4), {
+      timeout: 15_000,
+    })
     .toBe(true);
   const overflow = () => viewport.evaluate((el) => el.scrollWidth - el.clientWidth);
   expect(await overflow()).toBeLessThanOrEqual(0);

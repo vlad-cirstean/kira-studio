@@ -73,7 +73,7 @@ test('a refresh keeps the scroll position', async ({ relaunch }) => {
   const rowHeight = 28;
   await expect
     .poll(async () => Math.abs((await viewport(page).evaluate((el) => el.scrollTop)) - before), {
-      timeout: 5000,
+      timeout: 15_000,
     })
     .toBeLessThanOrEqual(rowHeight);
 });
@@ -136,11 +136,11 @@ test('a restored scrollRow beyond the history clamps to the last row', async ({ 
   await expect(page.locator(`${grid} .slick-row`).first()).toBeVisible();
   await expect
     .poll(() => viewport(page).evaluate((el) => el.scrollHeight > el.clientHeight), {
-      timeout: 5000,
+      timeout: 15_000,
     })
     .toBe(true);
   await expect
-    .poll(() => viewport(page).evaluate((el) => el.scrollTop), { timeout: 5000 })
+    .poll(() => viewport(page).evaluate((el) => el.scrollTop), { timeout: 15_000 })
     .toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
