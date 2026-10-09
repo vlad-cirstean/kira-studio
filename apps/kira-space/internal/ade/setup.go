@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 // setup.go creates the worktrees a run needs and runs each repo's prepare script in a new one. The
@@ -372,11 +373,11 @@ func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.A
 	case res.Cancelled && err == nil:
 		fail("cancelled: " + context.Cause(ctx).Error())
 	case err != nil:
-		fail("could not start: " + err.Error())
+		fail(runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndStartErr, Err: err}).Reason)
 	case res.TimedOut:
-		fail("timed out after " + timeoutText)
+		fail(runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndTimeout, Timeout: timeoutText}).Reason)
 	case res.ExitCode != 0:
-		fail(fmt.Sprintf("exited with status %d", res.ExitCode))
+		fail(runoutcome.ForProcess(runoutcome.Process{ExitCode: res.ExitCode}).Reason)
 	}
 	sink.flush()
 	finished := b.deps.Now().UnixMilli()

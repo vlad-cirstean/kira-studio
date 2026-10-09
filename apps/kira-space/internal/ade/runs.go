@@ -16,6 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 // runs.go is the run engine: StartRun, the step machine's side effects (start, retry, advance),
@@ -27,7 +28,6 @@ const (
 	noteWaitingSetup   = "waiting for worktree setup"
 	noteSetupFailed    = "worktree setup failed"
 	noteWorktreeGone   = "worktree missing"
-	noteNoFinish       = "ended without finish_step"
 	settingSourcesUser = "user"
 	settingSourcesAll  = "user,project,local"
 )
@@ -514,6 +514,24 @@ type outcome struct {
 	state, note, summary string
 	exit                 *int
 	noAdvance            bool // a user stop: the engine does not move the task on
+	out                  runoutcome.Outcome
+}
+
+// fromOutcome builds the engine outcome for state from the shared one; the run note is its reason.
+func fromOutcome(state string, o runoutcome.Outcome) outcome {
+	return outcome{state: state, note: o.Reason, summary: o.Summary, exit: o.ExitCode, out: o}
+}
+
+// agentEnd is how an agent process ended, for the no-report outcomes.
+func agentEnd(exit adeagent.Exit, runErr error, timeout string) runoutcome.Process {
+	p := runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: exit.Code, Timeout: timeout}
+	switch {
+	case runErr != nil:
+		p.End, p.Err = runoutcome.EndStartErr, runErr
+	case exit.TimedOut:
+		p.End = runoutcome.EndTimeout
+	}
+	return p
 }
 
 func (b *TaskBoard) settingSources() string {
@@ -547,7 +565,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 	if err != nil {
 		sink.add(logStderr, "could not start: "+err.Error())
 		sink.flush()
-		b.completeRun(run, sessionID, outcome{state: model.AdeRunFailed, note: "could not start: " + err.Error()})
+		b.completeRun(run, sessionID, fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndStartErr, Err: err})))
 		return
 	}
 	bin := b.deps.ClaudeBin
@@ -570,11 +588,11 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 	if out, ok := stopOutcome(ctx); ok {
 		b.takeFinish(run.ID)
 		code := exit.Code
-		out.exit = &code
+		out.exit, out.out.ExitCode = &code, &code
 		b.completeRun(run, sessionID, out)
 		return
 	}
-	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def.Timeout))
+	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def.Timeout, sink.lastStderr()))
 }
 
 // sessionClaudeID reads the Claude session id stored with the ade_sessions row.
@@ -586,26 +604,29 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 	return rec.ClaudeSessionID
 }
 
-func (b *TaskBoard) agentOutcome(runID string, exit adeagent.Exit, runErr error, timeout string) outcome {
+func (b *TaskBoard) agentOutcome(runID string, exit adeagent.Exit, runErr error, timeout string, lastErr string) outcome {
 	code := exit.Code
-	out := outcome{exit: &code}
 	f, finished := b.takeFinish(runID)
-	switch {
-	case finished && f.status == "done":
-		out.state, out.summary = model.AdeRunDone, f.summary
-	case finished && f.status == "needs_input":
-		out.state, out.note, out.summary = model.AdeRunStuck, f.summary, f.summary
-	case finished:
-		out.state, out.summary = model.AdeRunFailed, f.summary
-		out.note = cmpNonEmpty(f.summary, "failed")
-	case runErr != nil:
-		out.state, out.note = model.AdeRunFailed, "could not start: "+runErr.Error()
-	case exit.TimedOut:
-		out.state, out.note = model.AdeRunFailed, "timed out after "+timeout
-	default:
-		out.state, out.note = model.AdeRunFailed, noteNoFinish
+	if !finished {
+		o := runoutcome.ForProcess(agentEnd(exit, runErr, timeout)).WithLastError(lastErr)
+		return fromOutcome(model.AdeRunFailed, o)
 	}
-	return out
+	o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: f.summary, ExitCode: &code}
+	return fromOutcome(finishState(&o, f.status, f.summary), o)
+}
+
+// finishState fills o from a finish_step call and returns the run state.
+func finishState(o *runoutcome.Outcome, status, summary string) string {
+	switch status {
+	case "done":
+		o.Status = runoutcome.StatusDone
+		return model.AdeRunDone
+	case "needs_input":
+		o.Status, o.Reason = runoutcome.StatusBlocked, summary
+		return model.AdeRunStuck
+	}
+	o.Status, o.Reason = runoutcome.StatusFailed, cmpNonEmpty(summary, "the agent reported failure without a reason")
+	return model.AdeRunFailed
 }
 
 func (b *TaskBoard) superviseScript(ctx context.Context, run model.AdeRun, def stepDef, rec model.CodeRepo, sb model.AdeTaskBranch, path, command string, timeout time.Duration) {
@@ -626,20 +647,26 @@ func (b *TaskBoard) superviseScript(ctx context.Context, run model.AdeRun, def s
 	}
 	code := res.ExitCode
 	if out, ok := stopOutcome(ctx); ok {
-		out.exit = &code
+		out.exit, out.out.ExitCode = &code, &code
 		b.completeRun(run, "", out)
 		return
 	}
-	out := outcome{state: model.AdeRunDone, exit: &code}
+	p := runoutcome.Process{Kind: runoutcome.KindScript, ExitCode: res.ExitCode, Timeout: def.Timeout}
 	switch {
 	case err != nil:
-		out = outcome{state: model.AdeRunFailed, note: "could not start: " + err.Error()}
+		p.End, p.Err = runoutcome.EndStartErr, err
 	case res.TimedOut:
-		out.state, out.note = model.AdeRunFailed, "timed out after "+def.Timeout
-	case res.ExitCode != 0:
-		out.state, out.note = model.AdeRunFailed, fmt.Sprintf("exited with status %d", res.ExitCode)
+		p.End = runoutcome.EndTimeout
 	}
-	b.completeRun(run, "", out)
+	o := runoutcome.ForProcess(p)
+	if o.Status == runoutcome.StatusFailed {
+		o = o.WithLastError(sink.lastStderr())
+	}
+	state := model.AdeRunDone
+	if o.Status != runoutcome.StatusDone {
+		state = model.AdeRunFailed
+	}
+	b.completeRun(run, "", fromOutcome(state, o))
 }
 
 // completeRun records how a process ended, then moves the task on.
@@ -666,6 +693,7 @@ func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out 
 	}
 	updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{
 		State: &out.state, Note: &out.note, Summary: &out.summary, ExitCode: out.exit, FinishedAt: &now,
+		Outcome: storedOutcome(out.out),
 	})
 	if err != nil {
 		slog.Warn("ade: record run outcome", "scope", "ade", "run", run.ID, "err", err)
@@ -1095,4 +1123,11 @@ func toWireSession(s model.AdeSession) adewire.Session {
 		w.CwdMissing = err != nil
 	}
 	return w
+}
+
+func storedOutcome(o runoutcome.Outcome) *runoutcome.Outcome {
+	if !o.Ended() {
+		return nil
+	}
+	return &o
 }

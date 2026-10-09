@@ -2,12 +2,14 @@ package repos
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
@@ -69,7 +71,7 @@ func checkEstExtends(old, next string) error {
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
 const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
-const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, launch_note, launch_resume_id, launch_prompt, launch_extra`
+const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
 // AdeTaskRepo reads and writes the v2 task store: tasks, branches, plan, runs, worktree setup and
 // last-valid workflows.
@@ -742,14 +744,33 @@ func (r *AdeTaskRepo) SetSnapshot(taskID, stageJSON string) error {
 func scanAdeRun(row rowScanner) (model.AdeRun, error) {
 	var run model.AdeRun
 	var exit, started, finished sql.NullInt64
+	var outcome string
 	if err := row.Scan(&run.ID, &run.TaskID, &run.StageID, &run.StepID, &run.BranchID, &run.Attempt, &run.State,
-		&run.Loops, &run.Note, &run.Summary, &run.SessionID, &exit, &started, &finished,
+		&run.Loops, &run.Note, &run.Summary, &run.SessionID, &exit, &started, &finished, &outcome,
 		&run.Launch.Note, &run.Launch.ResumeID, &run.Launch.Prompt, &run.Launch.Extra); err != nil {
 		return model.AdeRun{}, err
+	}
+	if outcome != "" {
+		var o runoutcome.Outcome
+		if err := json.Unmarshal([]byte(outcome), &o); err != nil {
+			return model.AdeRun{}, fmt.Errorf("repos: decode ade run %s outcome: %w", run.ID, err)
+		}
+		run.Outcome = &o
 	}
 	run.ExitCode = nullIntPtr(exit)
 	run.StartedAt, run.FinishedAt = nullInt64Ptr(started), nullInt64Ptr(finished)
 	return run, nil
+}
+
+func encodeOutcome(o *runoutcome.Outcome) (string, error) {
+	if o == nil {
+		return "", nil
+	}
+	b, err := json.Marshal(o)
+	if err != nil {
+		return "", fmt.Errorf("repos: encode run outcome: %w", err)
+	}
+	return string(b), nil
 }
 
 // InsertRun writes a new run attempt.
@@ -757,9 +778,13 @@ func (r *AdeTaskRepo) InsertRun(run model.AdeRun) error {
 	if run.ID == "" || run.TaskID == "" || run.Attempt < 1 {
 		return fmt.Errorf("repos: insert ade run: id, taskId and attempt >= 1 are required")
 	}
-	if _, err := r.DB.Exec(`INSERT INTO ade_runs (`+adeRunColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	outcome, err := encodeOutcome(run.Outcome)
+	if err != nil {
+		return err
+	}
+	if _, err := r.DB.Exec(`INSERT INTO ade_runs (`+adeRunColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		run.ID, run.TaskID, run.StageID, run.StepID, run.BranchID, run.Attempt, run.State,
-		run.Loops, run.Note, run.Summary, run.SessionID, run.ExitCode, run.StartedAt, run.FinishedAt,
+		run.Loops, run.Note, run.Summary, run.SessionID, run.ExitCode, run.StartedAt, run.FinishedAt, outcome,
 		run.Launch.Note, run.Launch.ResumeID, run.Launch.Prompt, run.Launch.Extra); err != nil {
 		return fmt.Errorf("repos: insert ade run %s: %w", run.ID, err)
 	}
@@ -801,14 +826,21 @@ func (r *AdeTaskRepo) UpdateRun(id string, p model.AdeRunPatch) (model.AdeRun, e
 	if p.FinishedAt != nil {
 		cur.FinishedAt = p.FinishedAt
 	}
+	if p.Outcome != nil {
+		cur.Outcome = p.Outcome
+	}
 	if p.Launch != nil {
 		cur.Launch = *p.Launch
 	}
+	outcome, err := encodeOutcome(cur.Outcome)
+	if err != nil {
+		return model.AdeRun{}, err
+	}
 	if _, err := tx.Exec(`UPDATE ade_runs SET state = ?, note = ?, summary = ?, session_id = ?,
-		exit_code = ?, started_at = ?, finished_at = ?, launch_note = ?, launch_resume_id = ?, launch_prompt = ?,
+		exit_code = ?, started_at = ?, finished_at = ?, outcome_json = ?, launch_note = ?, launch_resume_id = ?, launch_prompt = ?,
 		launch_extra = ? WHERE id = ?`,
 		cur.State, cur.Note, cur.Summary, cur.SessionID, cur.ExitCode, cur.StartedAt,
-		cur.FinishedAt, cur.Launch.Note, cur.Launch.ResumeID, cur.Launch.Prompt, cur.Launch.Extra, id); err != nil {
+		cur.FinishedAt, outcome, cur.Launch.Note, cur.Launch.ResumeID, cur.Launch.Prompt, cur.Launch.Extra, id); err != nil {
 		return model.AdeRun{}, fmt.Errorf("repos: update ade run %s: %w", id, err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -880,8 +912,14 @@ func (r *AdeTaskRepo) SetPendingNote(branchID, note string) ([]model.AdeRun, err
 	})
 }
 
-// RecoverRunning turns every running run stuck with note and returns them (boot recovery).
-func (r *AdeTaskRepo) RecoverRunning(now int64, note string) ([]model.AdeRun, error) {
+// RecoverRunning turns every running run stuck, with out as its outcome and its reason as the note,
+// and returns them (boot recovery).
+func (r *AdeTaskRepo) RecoverRunning(now int64, out runoutcome.Outcome) ([]model.AdeRun, error) {
+	outcome, err := encodeOutcome(&out)
+	if err != nil {
+		return nil, err
+	}
+	note := out.Reason
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("repos: begin recover ade runs: %w", err)
@@ -895,22 +933,22 @@ func (r *AdeTaskRepo) RecoverRunning(now int64, note string) ([]model.AdeRun, er
 	if err != nil {
 		return nil, fmt.Errorf("repos: select running ade runs: %w", err)
 	}
-	if _, err := tx.Exec(`UPDATE ade_runs SET state = ?, note = ?, finished_at = ? WHERE state = 'running'`,
-		model.AdeRunStuck, note, now); err != nil {
+	if _, err := tx.Exec(`UPDATE ade_runs SET state = ?, note = ?, finished_at = ?, outcome_json = ? WHERE state = 'running'`,
+		model.AdeRunStuck, note, now, outcome); err != nil {
 		return nil, fmt.Errorf("repos: recover ade runs: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("repos: commit recover ade runs: %w", err)
 	}
 	for i := range runs {
-		runs[i].State, runs[i].Note, runs[i].FinishedAt = model.AdeRunStuck, note, &now
+		runs[i].State, runs[i].Note, runs[i].FinishedAt, runs[i].Outcome = model.AdeRunStuck, note, &now, &out
 	}
 	return runs, nil
 }
 
 // FailRunningSetups marks every running worktree setup failed and returns their branch and task ids
 // (boot recovery).
-func (r *AdeTaskRepo) FailRunningSetups(now int64) ([]model.AdeTaskBranch, error) {
+func (r *AdeTaskRepo) FailRunningSetups(now int64, note string) ([]model.AdeTaskBranch, error) {
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("repos: begin recover ade setups: %w", err)
@@ -927,7 +965,7 @@ func (r *AdeTaskRepo) FailRunningSetups(now int64) ([]model.AdeTaskBranch, error
 		return nil, fmt.Errorf("repos: select running ade setups: %w", err)
 	}
 	if _, err := tx.Exec(`UPDATE ade_worktree_setup SET state = ?, finished_at = ?, note = ? WHERE state = 'running'`,
-		model.AdeSetupFailed, now, "interrupted by restart"); err != nil {
+		model.AdeSetupFailed, now, note); err != nil {
 		return nil, fmt.Errorf("repos: recover ade setups: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

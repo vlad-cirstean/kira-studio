@@ -1,6 +1,8 @@
 // Frozen at P143 (ADE v2 wire contract). Mirrors apps/kira-space/internal/bridge/adewire.
 // Changing a key, type or value set is a contract change (docs/v2.0/plans/P143-ade-v2-preplan.md rule 1).
 
+import type { RunOutcome } from '@shared/domain/runOutcome';
+
 // ---- shared
 export interface Jira {
   key: string;
@@ -211,6 +213,8 @@ export interface Run {
   exitCode: number | null;
   startedAt: number | null;
   finishedAt: number | null;
+  /** How the run ended; null while it runs and for rows older than P242. */
+  outcome: RunOutcome | null;
 }
 export interface Task {
   id: string;

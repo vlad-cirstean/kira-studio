@@ -236,7 +236,7 @@ func TestRunEngine_recover(t *testing.T) {
 	if err := e.board.Recover(); err != nil {
 		t.Fatal(err)
 	}
-	if r, _ := e.repos.AdeTasks.GetRun("r-running"); r.State != model.AdeRunStuck || r.Note != "interrupted by restart" || r.FinishedAt == nil {
+	if r, _ := e.repos.AdeTasks.GetRun("r-running"); r.State != model.AdeRunStuck || r.Note != restartOutcome.Reason || r.FinishedAt == nil {
 		t.Fatalf("running run = %+v", r)
 	}
 	if r, _ := e.repos.AdeTasks.GetRun("r-pending"); r.State != model.AdeRunPending || r.Note != noteSetupFailed {
@@ -245,7 +245,7 @@ func TestRunEngine_recover(t *testing.T) {
 	if s, _ := e.repos.AdeTasks.GetSetup(branch); s == nil || s.State != model.AdeSetupFailed {
 		t.Fatalf("setup = %+v", s)
 	}
-	if !strings.Contains(e.logText("setup", branch), "interrupted by restart") {
+	if !strings.Contains(e.logText("setup", branch), restartOutcome.Reason) {
 		t.Fatal("setup log lacks the interruption line")
 	}
 	for _, sid := range []string{"s-head", "s-tui"} {

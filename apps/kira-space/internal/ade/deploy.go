@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 // envScriptTimeout is the fixed cap on one deploy-sha script (P145 F10).
@@ -41,11 +42,11 @@ func (b *TaskBoard) runEnvScript(ctx context.Context, root, script string) (stri
 	case err != nil:
 		return "", err
 	case res.TimedOut:
-		return "", fmt.Errorf("the script did not finish within %s", envScriptTimeout)
+		return "", fmt.Errorf("the script %s", runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndTimeout, Timeout: envScriptTimeout.String()}).Reason)
 	case res.Cancelled:
 		return "", errors.New("the script was cancelled")
 	case res.ExitCode != 0:
-		return "", fmt.Errorf("the script exited with status %d", res.ExitCode)
+		return "", fmt.Errorf("the script %s", runoutcome.ForProcess(runoutcome.Process{ExitCode: res.ExitCode}).Reason)
 	}
 	for _, l := range res.Output {
 		if l.Stream != "stdout" {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 // live.go is the per-run and per-setup cancel registry (R7): one mechanism for StopRun, Take over
@@ -80,13 +81,19 @@ func stopOutcome(ctx context.Context) (outcome, bool) {
 	if ctx.Err() == nil {
 		return outcome{}, false
 	}
+	cancelled := func(state string, reason string) (outcome, bool) {
+		o := runoutcome.Outcome{Status: runoutcome.StatusCancelled, Source: runoutcome.SourceUser, Reason: reason}
+		out := fromOutcome(state, o)
+		out.noAdvance = true
+		return out, true
+	}
 	switch context.Cause(ctx) {
 	case errStopped:
-		return outcome{state: model.AdeRunStuck, note: errStopped.Error(), noAdvance: true}, true
+		return cancelled(model.AdeRunStuck, errStopped.Error())
 	case errTakenOver:
-		return outcome{state: model.AdeRunStuck, note: errTakenOver.Error(), noAdvance: true}, true
+		return cancelled(model.AdeRunStuck, errTakenOver.Error())
 	case errArchived:
-		return outcome{state: model.AdeRunFailed, note: "stopped: " + errArchived.Error(), noAdvance: true}, true
+		return cancelled(model.AdeRunFailed, "stopped: "+errArchived.Error())
 	}
 	return outcome{}, false
 }

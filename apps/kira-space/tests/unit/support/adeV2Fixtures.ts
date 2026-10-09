@@ -75,6 +75,7 @@ export function mkRun(
     exitCode: null,
     startedAt: null,
     finishedAt: null,
+    outcome: null,
     ...over,
   };
 }

@@ -59,6 +59,7 @@ func (b *TaskBoard) decideSendBack(run model.AdeRun, out outcome) (*sendBack, ou
 	round := spent + 1
 	if round > maxSendBackRounds {
 		out.note = fmt.Sprintf("%s (sent back %d times)", reason, maxSendBackRounds)
+		out.out.Reason = out.note
 		return nil, out
 	}
 	branchName := ""
@@ -69,6 +70,7 @@ func (b *TaskBoard) decideSendBack(run model.AdeRun, out outcome) (*sendBack, ou
 	prev, ran := plan[target].Runs[run.BranchID]
 	if !ran {
 		out.note = fmt.Sprintf("cannot send back: %s did not run on %s", targetDef.Name, branchName)
+		out.out.Reason = out.note
 		return nil, out
 	}
 	opts := runOpts{Loops: round, Launch: model.AdeRunLaunch{Note: fmt.Sprintf("sent back by %s: %s", from.Name, reason)}}
@@ -80,6 +82,7 @@ func (b *TaskBoard) decideSendBack(run model.AdeRun, out outcome) (*sendBack, ou
 	}
 	out.state = model.AdeRunBack
 	out.note = fmt.Sprintf("%s → back to %s (%d of %d)", reason, targetDef.Name, round, maxSendBackRounds)
+	out.out.Reason = out.note
 	return &sendBack{tc: tc, plan: plan, target: target, branch: run.BranchID, attempt: prev.Attempt + 1, opts: opts}, out
 }
 

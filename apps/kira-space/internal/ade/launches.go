@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 // launches.go starts interactive Claude Code sessions for a task: Take over a run's session,
@@ -373,10 +374,9 @@ func (b *TaskBoard) applyTUIFinish(runID, status, summary string) {
 		return
 	}
 	switch status {
-	case "done":
-		b.recordOutcomeLocked(run, "", outcome{state: model.AdeRunDone, summary: summary})
-	case "failed":
-		b.recordOutcomeLocked(run, "", outcome{state: model.AdeRunFailed, summary: summary, note: cmpNonEmpty(summary, "failed")})
+	case "done", "failed":
+		o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: summary}
+		b.recordOutcomeLocked(run, "", fromOutcome(finishState(&o, status, summary), o))
 	default: // needs_input: the run keeps waiting for a decision
 		stuck := model.AdeRunStuck
 		updated, err := b.deps.Tasks.UpdateRun(runID, model.AdeRunPatch{State: &stuck, Note: &summary, Summary: &summary})

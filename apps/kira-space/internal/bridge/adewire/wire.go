@@ -4,6 +4,8 @@
 // Changing a key, type or value set is a contract change.
 package adewire
 
+import "github.com/kirathecat/kira-studio/internal/runoutcome"
+
 // StageKind is 'user' | 'agent' | 'script'.
 type StageKind = string
 
@@ -236,6 +238,8 @@ type Run struct {
 	ExitCode   *int     `json:"exitCode"`
 	StartedAt  *int64   `json:"startedAt"`
 	FinishedAt *int64   `json:"finishedAt"`
+
+	Outcome *runoutcome.Outcome `json:"outcome"`
 }
 
 type Task struct {

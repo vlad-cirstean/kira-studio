@@ -2,6 +2,7 @@ package ade
 
 import (
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,7 @@ type logSink struct {
 	mu      sync.Mutex
 	pending []repos.AdeLogChunk
 	timer   *time.Timer
+	lastErr string
 }
 
 func (b *TaskBoard) newLogSink(kind, id, taskID string) *logSink {
@@ -39,10 +41,20 @@ func (b *TaskBoard) newLogSink(kind, id, taskID string) *logSink {
 func (s *logSink) add(stream, text string) {
 	s.mu.Lock()
 	s.pending = append(s.pending, repos.AdeLogChunk{At: s.b.deps.Now().UnixMilli(), Stream: stream, Text: text})
+	if stream == logStderr && strings.TrimSpace(text) != "" {
+		s.lastErr = text
+	}
 	if s.timer == nil {
 		s.timer = time.AfterFunc(logFlushInterval, s.flush)
 	}
 	s.mu.Unlock()
+}
+
+// lastStderr is the last non-blank stderr line added.
+func (s *logSink) lastStderr() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastErr
 }
 
 // flush stores and pushes what is pending; also the final flush when a run ends.

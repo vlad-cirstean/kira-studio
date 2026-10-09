@@ -457,7 +457,7 @@ func TestRunEngine_failureRules(t *testing.T) {
 	}{
 		{"needs_input is stuck", []string{"needs_input"}, agentStep("first", ""), "first/api", model.AdeRunStuck, "summary-needs_input"},
 		{"stop keeps a failure", []string{"failed"}, agentStep("first", "        on_failure: stop\n"), "first/api", model.AdeRunFailed, "summary-failed"},
-		{"no finish_step", []string{"nofinish"}, agentStep("first", ""), "first/api", model.AdeRunFailed, noteNoFinish},
+		{"no finish_step", []string{"nofinish"}, agentStep("first", ""), "first/api", model.AdeRunFailed, "no report: Claude ended without calling finish_step"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -514,7 +514,7 @@ func TestRunEngine_retryAndTimeout(t *testing.T) {
 		e.workflow(flowYAML(agentStage("build", steps)))
 		id := e.task("api")
 		e.start(id)
-		if r := e.waitRun(id, "first/api", model.AdeRunFailed); r.Note != "timed out after 1s" {
+		if r := e.waitRun(id, "first/api", model.AdeRunFailed); r.Note != "no report: timed out after 1s" {
 			t.Fatalf("note = %q", r.Note)
 		}
 	})

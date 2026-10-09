@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 // ---------------------------------------------------------------------------------------
@@ -541,9 +542,11 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	case res.Cancelled:
 		result.Error = &OpError{Kind: "Cancelled", Message: "the prepare script was cancelled"}
 	case res.TimedOut:
-		result.Error = &OpError{Kind: "Unknown", Message: fmt.Sprintf("the prepare script did not finish within %s and was stopped", timeoutText)}
+		o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndTimeout, Timeout: timeoutText})
+		result.Error = &OpError{Kind: "Unknown", Message: "the prepare script " + o.Reason}
 	case res.ExitCode != 0:
-		result.Error = &OpError{Kind: "Unknown", Message: fmt.Sprintf("the prepare script exited with status %d", res.ExitCode)}
+		o := runoutcome.ForProcess(runoutcome.Process{ExitCode: res.ExitCode})
+		result.Error = &OpError{Kind: "Unknown", Message: "the prepare script " + o.Reason}
 	}
 	return result, nil
 }

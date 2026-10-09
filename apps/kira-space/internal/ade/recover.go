@@ -7,25 +7,28 @@ import (
 	"path/filepath"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
-const noteInterrupted = "interrupted by restart"
+const appName = "Space"
+
+var restartOutcome = runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndRestart, App: appName})
 
 // Recover settles what the previous process life left behind (D7, R9): running runs become stuck,
 // running setups failed, session rows stopped, orphaned MCP configs go. Held (pending) runs keep their launch spec and launch when their gate opens. Nothing resumes by itself.
 // Call it once at boot, before Start and before any window exists.
 func (b *TaskBoard) Recover() error {
 	now := b.deps.Now().UnixMilli()
-	runs, err := b.deps.Tasks.RecoverRunning(now, noteInterrupted)
+	runs, err := b.deps.Tasks.RecoverRunning(now, restartOutcome)
 	if err != nil {
 		return fmt.Errorf("ade: recover: %w", err)
 	}
-	failed, err := b.deps.Tasks.FailRunningSetups(now)
+	failed, err := b.deps.Tasks.FailRunningSetups(now, restartOutcome.Reason)
 	if err != nil {
 		return fmt.Errorf("ade: recover: %w", err)
 	}
 	for _, sb := range failed {
-		line := []repos.AdeLogChunk{{At: now, Stream: logEvent, Text: noteInterrupted}}
+		line := []repos.AdeLogChunk{{At: now, Stream: logEvent, Text: restartOutcome.Reason}}
 		if _, err := b.deps.Logs.Append(repos.AdeLogSetup, sb.ID, line); err != nil {
 			slog.Warn("ade: recover: setup log", "scope", "ade", "branch", sb.ID, "err", err)
 		}

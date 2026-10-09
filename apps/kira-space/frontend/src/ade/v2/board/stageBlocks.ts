@@ -85,7 +85,7 @@ function runLine(r: StepRun): RunLine {
     glyph: g.glyph,
     tone: g.tone,
     status: r.state === 'done' ? 'done' : r.state === 'back' ? 'sent back' : r.state,
-    note: r.note || (r.loops ? `fix round ${r.loops} of 3` : ''),
+    note: r.reason || r.note || (r.loops ? `fix round ${r.loops} of 3` : ''),
     hasLog: started,
     canRetry: started && (r.state === 'failed' || r.state === 'stuck'),
   };

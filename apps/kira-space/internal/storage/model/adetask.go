@@ -1,6 +1,10 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
+)
 
 // AdeTaskKind* are ade_tasks.kind's CHECK values; AdeBranchKind* (below) are the branch kinds.
 const (
@@ -121,6 +125,7 @@ type AdeRun struct {
 	ExitCode   *int
 	StartedAt  *int64
 	FinishedAt *int64
+	Outcome    *runoutcome.Outcome
 	Launch     AdeRunLaunch
 }
 
@@ -155,6 +160,7 @@ type AdeRunPatch struct {
 	ExitCode   *int
 	StartedAt  *int64
 	FinishedAt *int64
+	Outcome    *runoutcome.Outcome
 	Launch     *AdeRunLaunch
 }
 

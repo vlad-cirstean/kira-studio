@@ -10,6 +10,8 @@ export interface StepRun {
   state: RunState;
   loops: number;
   note: string;
+  /** The stored outcome's reason, '' while none. */
+  reason: string;
   runId: string;
   sessionId: string;
   finishedAt: number | null;
@@ -140,6 +142,7 @@ function latestRun(task: Task, stageId: string, stepId: string, branchId: string
     state: best.state,
     loops: best.loops,
     note: best.note,
+    reason: best.outcome?.reason ?? '',
     runId: best.id,
     sessionId: best.sessionId,
     finishedAt: best.finishedAt,
@@ -157,6 +160,7 @@ export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
           state: 'pending',
           loops: 0,
           note: '',
+          reason: '',
           runId: '',
           sessionId: '',
           finishedAt: null,
