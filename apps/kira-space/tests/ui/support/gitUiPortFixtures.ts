@@ -94,6 +94,18 @@ export function singleRowChunks(rows: readonly PackedChunkRow[]): GraphStreamChu
   );
 }
 
+/** Every row in one chunk, as the daemon sends a full page. */
+export function oneChunk(rows: readonly PackedChunkRow[]): GraphStreamChunkFixture[] {
+  return [
+    buildGraphStreamChunk(
+      PORT_REPO.repoId,
+      0,
+      buildPackedChunk(rows, { from: 0, dictionary: IDENTITIES }),
+      { exhausted: true, remaining: 0 },
+    ),
+  ];
+}
+
 export const rootRow = (sha: string, subject: string, extra: Partial<PackedChunkRow> = {}) => ({
   sha,
   subject,
@@ -240,5 +252,158 @@ export async function openCommitDetail(relaunch: Relaunch): Promise<Page> {
   await expect(row).toBeVisible();
   await row.click();
   await expect(page.locator('.kv-meta-subject')).toBeVisible();
+  return page;
+}
+
+const STASH_SHA = '44'.repeat(20);
+
+/** One row per branch-picker tab; `feature-auth` and the stash `auth work` both match "auth". */
+export const PICKER_RESULTS = {
+  'refs.list': {
+    branches: [refRow('main'), refRow('feature-auth')],
+    remoteBranches: [],
+    tags: [refRow('v1', { refname: 'refs/tags/v1', kind: 'tag' })],
+    head: { kind: 'branch', name: 'main' },
+  },
+  'stash.list': {
+    entries: [
+      {
+        index: 0,
+        sha: STASH_SHA,
+        baseSha: SHA_A,
+        baseSubject: 'A commit',
+        indexSha: SHA_A,
+        untrackedSha: undefined,
+        message: 'On main: auth work',
+        branch: 'main',
+        timestamp: 1_700_000_000,
+        fileCount: 1,
+        includedUntracked: false,
+        scope: 'stack',
+        ref: '',
+      },
+    ],
+  },
+  'globalStash.list': { entries: [] },
+  'worktree.list': {
+    worktrees: [
+      {
+        path: PORT_REPO.root,
+        head: SHA_A,
+        branch: 'refs/heads/main',
+        isBare: false,
+        isDetached: false,
+        isMain: true,
+        isCurrent: true,
+        locked: null,
+        prunable: null,
+        openElsewhere: false,
+      },
+    ],
+  },
+  'stack.list': {
+    stacks: [
+      {
+        base: 'main',
+        baseTip: SHA_A,
+        needsRestack: false,
+        branches: [
+          {
+            name: 'stacked-branch',
+            parent: 'main',
+            depth: 0,
+            tip: SHA_A,
+            parentTip: SHA_A,
+            recordedBase: SHA_A,
+            behind: 0,
+            ahead: 1,
+            state: 'upToDate',
+            checkedOutIn: undefined,
+            track: undefined,
+            isHead: false,
+          },
+        ],
+      },
+    ],
+    orphans: [],
+  },
+};
+
+/** Opens the graph with the five picker tabs seeded and the branch picker panel open. */
+export async function openBranchPicker(relaunch: Relaunch): Promise<Page> {
+  const page = await openPortGraph(relaunch, {
+    chunks: singleRowChunks([rootRow(SHA_A, 'A commit')]),
+    results: PICKER_RESULTS,
+  });
+  await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')).toBeVisible();
+  await page.locator('.kv-branch-trigger').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  return page;
+}
+
+export const REVIEW_BRANCH = 'feature/example';
+export const REVIEW_FILE_NONE = 'src/pending.ts';
+export const REVIEW_FILE_PARTIAL = 'src/halfway.ts';
+export const REVIEW_FILE_FULL = 'src/done.ts';
+
+const reviewFile = (path: string, kind: 'none' | 'partial' | 'full') => ({
+  change: {
+    kind: 'modified',
+    path,
+    originalPath: undefined,
+    similarity: undefined,
+    additions: 2,
+    deletions: 1,
+    isBinary: false,
+  },
+  review: {
+    kind,
+    changedSinceReview: false,
+    reviewedAt: kind === 'none' ? undefined : 1_700_000_000_000,
+    reviewedAtSha: kind === 'none' ? undefined : SHA_A,
+  },
+});
+
+export const REVIEW_RESULTS = {
+  'refs.list': {
+    branches: [refRow('main'), refRow(REVIEW_BRANCH)],
+    remoteBranches: [],
+    tags: [],
+    head: { kind: 'branch', name: 'main' },
+  },
+  'review.resolveBase': {
+    branch: REVIEW_BRANCH,
+    base: 'main',
+    reason: 'defaultBranch',
+    range: { kind: 'ready', commitCount: 1 },
+    candidates: [],
+  },
+  'review.files': {
+    branchTip: SHA_A,
+    mergeBase: SHA_B,
+    files: [
+      reviewFile(REVIEW_FILE_NONE, 'none'),
+      reviewFile(REVIEW_FILE_PARTIAL, 'partial'),
+      reviewFile(REVIEW_FILE_FULL, 'full'),
+    ],
+  },
+  'review.mark': {},
+  'commit.detail': COMMIT_DETAIL,
+};
+
+/** Opens the Review tab of the port repo and picks `REVIEW_BRANCH`, reaching the commit list. */
+export async function openReviewListing(
+  relaunch: Relaunch,
+  options: { chunks?: readonly GraphStreamChunkFixture[]; results?: Record<string, unknown> } = {},
+): Promise<Page> {
+  const page = await openPortGraph(relaunch, {
+    chunks: options.chunks ?? singleRowChunks([rootRow(SHA_A, COMMIT_DETAIL.subject)]),
+    results: { ...REVIEW_RESULTS, ...options.results },
+  });
+  await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')).toBeVisible();
+  await page.locator('[data-testid="git-panel-tab-review"]').click();
+  const host = page.locator('[data-testid="repo-review-host"]');
+  await host.getByRole('button', { name: REVIEW_BRANCH }).click();
+  await expect(host.locator('[data-testid^="review-row-"]').first()).toBeVisible();
   return page;
 }

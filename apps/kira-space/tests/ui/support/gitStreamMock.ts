@@ -65,6 +65,7 @@ function installInBrowser({
   // P114 §3.1: every method name seen in a `t: 'req'` frame, answered or not — read back by
   // `gitStreamRequests` below. Reset per install so a fresh `relaunch()` starts a fresh log.
   (window as unknown as { __kiraGitRequests: string[] }).__kiraGitRequests = [];
+  (window as unknown as { __kiraGitParams: unknown[] }).__kiraGitParams = [];
 
   let streamOpenCount = 0;
   let wireVersion = 0;
@@ -159,7 +160,10 @@ function installInBrowser({
         // transport whose lease/dispose tore down the underlying socket (bug 1, §2) must hang
         // exactly as the real bug did, not (wrongly) still answer.
         if (socket.readyState === CLOSED) return;
-        let envelope: { version: number; body?: { t?: string; id?: number; method?: string } };
+        let envelope: {
+          version: number;
+          body?: { t?: string; id?: number; method?: string; params?: unknown };
+        };
         try {
           envelope = JSON.parse(data);
         } catch {
@@ -198,6 +202,10 @@ function installInBrowser({
           (window as unknown as { __kiraGitRequests: string[] }).__kiraGitRequests.push(
             frame.method,
           );
+          (window as unknown as { __kiraGitParams: unknown[] }).__kiraGitParams.push({
+            method: frame.method,
+            params: frame.params,
+          });
         }
         // @kira/git-ipc's rpc.ts frame union: {t:'res', id, ok:true, result}.
         const resultByMethod: Record<string, unknown> = {
@@ -294,6 +302,20 @@ export async function installGitStreamMockOnInit(
 export async function gitStreamRequests(page: Page): Promise<string[]> {
   return page.evaluate(
     () => (window as unknown as { __kiraGitRequests?: string[] }).__kiraGitRequests ?? [],
+  );
+}
+
+/** The params of every request sent for `method`, in order. */
+export async function gitStreamParams(page: Page, method: string): Promise<unknown[]> {
+  return page.evaluate(
+    (m) =>
+      (
+        (window as unknown as { __kiraGitParams?: { method: string; params: unknown }[] })
+          .__kiraGitParams ?? []
+      )
+        .filter((r) => r.method === m)
+        .map((r) => r.params),
+    method,
   );
 }
 
