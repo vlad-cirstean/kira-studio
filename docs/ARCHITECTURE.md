@@ -616,7 +616,7 @@ gate is about turning a secret into visible text, not about using it.
 
 **A second reveal caller, the same gate (P5).** A collection/environment variable's secret value
 goes through the identical `internal/localauth.Authorizer` — `main.go` constructs exactly one and
-hands it to both `connections.Service` and `internal/apivars.Service`, which is what makes the
+passes it through `appwire.Options` to both `connections.Service` and `internal/apivars.Service`, which is what makes the
 5-minute grace genuinely process-wide rather than per-feature: revealing a connection password and
 then a variable's value inside that window prompts only once. `connections.RevealResult`'s Go type
 is not shared with `apivars.RevealResult` — importing Studio's `internal/connections` from the
@@ -784,7 +784,7 @@ come after 0027; `0024_p85_custom_scripts.sql`
 created `custom_scripts`; `0025_p97_drop_repo_map.sql`; `0026_p100_drop_git_tables.sql`;
 `0027_p108part11_op_log_path.sql` added `op_log.path TEXT`, the console path an op actually ran
 against, F5). Kira Space's own `kira.db` runs its own sequence
-(`apps/kira-space/internal/storage/migrations/`, high-water **0023**; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
+(`apps/kira-space/internal/storage/migrations/`, high-water **0025**; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033; `0021_p212_mobile_devices.sql`, `0022_p212_mobile_permissions.sql`, `0024_p222_code_repo_color.sql`, `0025_p223_mobile_lan.sql`): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
 window mode, the ADE tables (see ADE, Storage) and `0020_p204_custom_scripts.sql` (quick commands).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -945,7 +945,7 @@ not an oversight: `TabsRepo.Save` deletes and re-inserts a window's entire tab s
 debounce that fires on every keystroke in the URL field, so `ON DELETE CASCADE` there would erase a
 scratch tab's whole response history about one second after the user typed a character. Instead, a
 scratch tab's history is swept once per launch (`ResponseHistoryRepo.SweepOrphans`, called from
-`main.go` beside `oplog`'s own startup prune) — `DELETE … WHERE item_id IS NULL AND tab_id NOT IN
+`apps/kira-studio/internal/appwire/wire.go` beside `oplog`'s own startup prune) — `DELETE … WHERE item_id IS NULL AND tab_id NOT IN
 (SELECT id FROM tabs)`, using the `tabs` table itself as the liveness oracle, since a tab that is
 open is always a row there. The residue of running this only at launch rather than on tab close — a
 long session that opens and closes many scratch tabs keeps their rows until the next launch — is
@@ -2276,7 +2276,8 @@ Git module, above).
            │
 ┌──────────┴───────────┐
 │  Go shell (Wails v3) │  window, menus, SQLite, settings, op log, keychain,
-│  apps/kira-studio/main.go       │  pre-connect, every adapter, cache, metrics
+│  apps/kira-studio    │  pre-connect, every adapter, cache, metrics
+│  main.go + appwire   │
 └──────────────────────┘
 ```
 
@@ -2337,7 +2338,7 @@ on/off setting (if any), the bound service surface a hook's own launch reaches, 
 `Manager.ComposeLaunch`'s result into its own `TerminalService.Open` — never `ComposeLaunch`'s env
 map directly, since `KIRA_AGENT_HOOK_TOKEN` must stay inside Go. **Kira Space is the first, and so
 far only, consumer (P129 Part 1)** — Kira Studio dropped its own bridge/UI/settings leaves at P127
-and wires none of this; the agent keep-awake reason is Kira Space-only (above, P188). Kira Space's own `main.go` starts `agenthooks.Manager`
+and wires none of this; the agent keep-awake reason is Kira Space-only (above, P188). Kira Space's `internal/appwire/wire.go` (`wireTracker`) starts `agenthooks.Manager`
 unconditionally, with no on/off setting of its own (P129 Part 1's own posture: a start failure —
 `curl` missing, a bind conflict — is logged, never fatal, and sessions still spawn and track with
 activity icons simply absent). `hookEvents` (`internal/agenthooks/config.go`) now also asks Claude
@@ -2500,9 +2501,19 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   the measurements are `docs/v1.1/plans/P4-fe-be-data-transfer-protocol.md` (historical) and
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
+**Composition roots (P231, P232).** Each app's `internal/appwire` owns the object graph. `Options`
+carries the OS seams `main.go` owns: DB, repos, emitter, dialogs, keep-awake driver. Studio adds
+cipher, authorizer and MCP installer. Space adds browser, git `Locator`, mobile assets and LAN seams,
+`GhLocator` and `TrackerGrace`. `Build(Options)` wires every service and returns `*Wired`.
+`Wired.Bound()` is the registration list; `BeforeFlush` and `Teardown` are the ordered shutdown.
+Space also has `BindShell` (window hooks) and `StartMobile`. `main.go` keeps the Wails app, windows,
+menu and `startupfail`. Production and both `flowharness` packages call the same `Build`.
+(`grep -n "^func Build\|^type Options\|func (w \*Wired) Bound\|BindShell\|StartMobile" apps/kira-{studio,space}/internal/appwire/appwire.go`)
+
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options, registering **27** bound services under `apps/kira-studio/internal/bridge/`
-(`grep -c application.NewService apps/kira-studio/main.go`), grouped by module: six shell/app-wide
+options from `appwire.Build`; `Wired.Bound()` registers **27** bound services under
+`apps/kira-studio/internal/bridge/`
+(`grep -o 'NewService(w\.' apps/kira-studio/internal/appwire/appwire.go | wc -l`), grouped by module: six shell/app-wide
 (`AppService`, `SettingsService`, `LayoutService`, `TabsService`, `WindowsService` — P8: a page's
 own boot-time window registration, see Process model's multi-window subsection below —
 `LifecycleService`); nine Studio/database (`ConnectionsService`, `MaskRulesService`, `TreeService`,
@@ -2522,13 +2533,13 @@ as of P100.** It
 was the *Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and
 the only bound service the headless git module had, since everything else it did crossed its own
 socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
-along with the rest of the module (see Git module, above) — Kira Studio's `main.go` binds no
+along with the rest of the module (see Git module, above) — Kira Studio's `Bound()` binds no
 git-related service of any kind any more, confirmed by the grep above and the phase-closing audit's
-own service-list check, below. Kira Space's own `main.go` binds a separate **18**
-(`grep -c application.NewService apps/kira-space/main.go`; this count already included P116/P119's
+own service-list check, below. Kira Space's own `Bound()` binds a separate **20**
+(`grep -o 'NewService(w\.' apps/kira-space/internal/appwire/appwire.go | wc -l`; this count already included P116/P119's
 own additions — `KeepAwakeService`, `WindowsService`, `UpdateService` — before P128 touched it, and
 P129 Part 1's own ADE service (now `AdeTaskService`) since; P201 added `MemoryService`, P204
-`CustomScriptsService`) for its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
+`CustomScriptsService`, P211 `MemoryImportService`, P212 `MobileAccessService`) for its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
 Go type now, not two hand-kept-identical implementations (P128 §2.1/§2.2):**
 `internal/windowsvc.Service` (`Ensure`/`SetMode`/`OpenNew`) and `internal/terminal.BoundService`
 (`Open`/`Write`/`Resize`/`Close`/`DefaultCwd`) each live once at repo root; both apps'
@@ -2608,7 +2619,8 @@ key/focused window — the menu's twelve signal channels, `bridge.Events.Signal`
 `sendToFocusedWindow`). Getting this split wrong the other way (broadcasting a menu command) was a
 real regression the Wails port introduced and P8 fixed: Cmd+W used to close a tab in every open
 window at once, and a menu-driven Run could execute a console statement in a window the user wasn't
-looking at.
+looking at. The `-tags server` build's `EmitTo` broadcasts to every browser window
+(`internal/shell/emitto_server.go`, P231); the native build is unchanged.
 
 **App-wide CPU/footprint metrics** (repo-root `internal/metrics/`, the Go analogue of Electron's
 `app.getAppMetrics()`, shared by both apps as of v1.9 P116 via `NewAppTicker(appName)`) find this
@@ -2817,7 +2829,7 @@ cross-platform fallback.
 **Stale-socket recovery is an `flock`, not a liveness probe.** At startup the app takes an
 exclusive lock on `${KIRA_SPACE_HOME}/git.sock.lock`. Lock acquired: any `git.sock` still on disk is a
 crash leftover — unlink it and listen. Lock already held: another instance is serving, and this one
-does not listen. Either way the app still boots; `main.go` logs the listener's error and never
+does not listen. Either way the app still boots; `internal/appwire/wire.go` logs the listener's error and never
 `Fatal`s on it. A `SIGKILL`ed instance's flock is released by the kernel, so the next launch
 recovers with no stale-pid file and no manual cleanup, and a leaked askpass directory needs no
 startup sweep, since it is inert.
@@ -3605,7 +3617,9 @@ pinned tab's own persisted state (`repoGraphTabStateSchema`'s `viewState` field,
 `z.unknown()` passthrough — `git-ui`'s own `parsePersistedViewState` is the sole validator of that
 version-6 shape, not a second implementation of it here). The transport itself is cached one per
 repo workspace (`repo/git/transport.ts`'s `gitTransportFor`), independent of the tab's own mount
-lifecycle, and disposed only when the workspace closes.
+lifecycle, and disposed only when the workspace closes. The native transport sends `repo.open` once per repo
+before the first request or stream naming it, so a reloaded Review pane or diff tab works without the
+graph tab (P231).
 
 **Theme.** `git-ui`'s whole colour layer is `--kv-X: var(--vscode-X, <VS Code Dark literal>)`; with
 no `--vscode-*` defined at all it would render VS Code Dark inside a light Kira window regardless of
@@ -3687,6 +3701,9 @@ from row 0 after `refsChanged` or Refresh) must drop the layout plan in the same
 (`GraphViewState.#applyChunk` `onReset` clears `#pendingLayoutRange` and calls `#resetLayout()`).
 The plan never references store rows the store lacks; otherwise `CommitGrid`'s generation watcher
 throws `ShaTable: row N out of range` and SlickGrid half-updates (blank rows, missing commits).
+A walk reset remembers its loaded row count (`gitsession.Walk.keepRows`); the next `graph.stream`
+re-reads whole pages until the store holds that many again, so Refresh after Show more keeps the
+loaded depth (the newest commit shifts the last old row out) (P231).
 GitHub PR facts (`gitsession/gh.go`) survive a refs change: `markStale()` drops only GitHub-remote
 detection, stale entries (refs-changed or TTL-expired, up to `ghStaleMax` 1 h) serve at once with one
 background refresh per key (single-flight), and the post-fetch purge reads fresh so closed PRs still
@@ -3928,7 +3945,7 @@ and `docs/v2.0/plans/`.
 
 ### Process wiring
 
-- `main.go` `wireAdeTask` builds `ade.TaskBoard` from `TaskBoardDeps` (repos, own `gitsession.Conn`
+- `internal/appwire/wire.go` `wireAdeTask` builds `ade.TaskBoard` from `TaskBoardDeps` (repos, discovery `GitStatus` (no `GitPath`, P230), own `gitsession.Conn`
   `ade-board`, `adeflow.Reader` over `<home>/workflows`, the `adeagent` `finish_step` server, the
   `Tracker`, log sink, session store). It calls `Recover()` then `Start()`, and installs
   `board.OnTUIStopped` as the tracker's stopped handler.
@@ -3959,7 +3976,8 @@ and `docs/v2.0/plans/`.
   hue (`internal/palette.AutoRepoColor`). Written by `CodeWorkspaceService.SetRepoColor`; read through
   `state/coderepos.ts` (`colorOf`, `repoTint`). Painted via `--kira-conn-*` as `colorMarkClass` row rails on the Repositories dialog
   and Git panel (repos and worktrees), repo tab bars, and ADE repo tags. The 20-slot ADE work palette now colours tasks only.
-  `internal/palette` is the one Go palette set (Studio's `model.ValidPaletteColor` still has its own).
+  `internal/palette` is the one Go palette set (Studio's `model.ValidPaletteColor` still has its own). Worktrees take their anchor repo's colour
+  (`repo/state/repoLinks.ts` `repoColorOf`, used by `tabKinds.ts` and ADE; P227).
 - Deployment environments (`ade_repo_envs`): a name plus a shell command that prints the deployed commit
   SHA. Run in the repo root on board refresh; results mark branches `▲name ✓`/`⚠`/`?`. The UI keeps a
   new row as a local draft and writes only once name and command are both filled.
@@ -3984,7 +4002,10 @@ and `docs/v2.0/plans/`.
   by `gitclient.Discovery`; older git reports `failed`). It touches no worktree, index, HEAD or ref, so
   it is safe beside running agents. Pairs are computed only for a mine branch against a mine or review one, neither parked nor merged, neither an ancestor of the other, with intersecting changed-file sets.
   **go-git declined (D1; SPEC2 §6/§6.2 and design §3.1 asked for it):** v5 `Merge` is fast-forward only
-  and cannot answer "does A conflict with B". `go.mod` has no go-git.
+  and cannot answer "does A conflict with B". go-git v5 is in `go.mod` since P211 for the memory importer's
+  `plumbing/format/gitignore` matcher only; ADE uses none of it.
+- Open repos follow a changed `git.gitPath` (P231): `gitclient.Repo.SetGitPath`; the `gitsession` registry
+  and `TaskBoard.openRepo` re-apply the live setting.
 - Integration (`merged`/`stale`/`not merged`) and deploy (`deployed`/`stale`/`not deployed`) facts use
   `git merge-base --is-ancestor`, `git cherry` and `patch-id --stable` (`gitclient` only). Marks in
   `ade_branch_marks` and `ade_env_state` remember "was merged", "rebased since", "environment moved back".
@@ -4077,7 +4098,8 @@ and `docs/v2.0/plans/`.
 - A worktree is created by a run creating branches, Start, Take over in a new worktree or Add existing
   branch. The repo's prepare script then runs with its timeout; states `preparing`, `ready`, `failed`
   (full output stored). Until `ready`, pipeline steps for that branch wait (`waiting for worktree setup`)
-  and Start/Take over are not offered. `Retry setup` reruns it (recreates the worktree).
+  and Start/Take over are not offered. `Retry setup` reruns it (recreates the worktree). Attaching a remote-only branch creates a local branch
+  from `<remote>/<name>` (origin preferred) that tracks it (`ade/setup.go` `ensureWorktree`, P231).
 - Failure reason (P202): every start path (`StartRun`, `LaunchStage`, `StartBranch`, `TakeOver`, review
   agent, `AddExistingBranch`, `RetrySetup`, `request_branch`) records it in `ade_worktree_setup.note`
   (wire `WorktreeSetup.note`, `recordSetupFailure`). A launch blocked by a pending setup returns
@@ -4184,7 +4206,8 @@ replies and full terminal attach for Claude Code sessions.
   runs `lannet.Find`: stops the server and sets a stop reason (`notTrusted`, `away`, `otherRouter`,
   `unavailable`, shown in the pane) when the trusted network is absent, starts it when it returns,
   rebinds on a new address. `Find` ignores the default route, so a VPN owning it does not stop the
-  server; Trust needs the default route on the LAN. A router missing from the ARP table reads as
+  server; Trust needs the default route on the LAN. `SetPort` reconciles whenever the supervisor is
+  active, so a server stopped by a busy port retries on the new port (`bridge/mobile.go`, P231). A router missing from the ARP table reads as
   `otherRouter` and retries next poll. MAC spoofing is not prevented: this guards against using the
   server away from home, it is not authentication.
 - Plaintext: anyone on the same LAN can read the board, backlog and terminal output, and can copy a
@@ -4197,7 +4220,10 @@ replies and full terminal attach for Claude Code sessions.
   the cookie is sent. Cookie `kira-space-device` (`HttpOnly; SameSite=Strict`, not `Secure`: a
   `__Host-` name needs `Secure`, which plain HTTP never sends; cookies are not port-scoped, so another
   HTTP service on the same IP would receive it). Row `expires_at` is 30 days from pairing; expired
-  is 401 `E_EXPIRED` and the phone re-pairs. Migration 0025 revoked the HTTPS-era rows. `Origin` on
+  is 401 `E_EXPIRED` and the phone re-pairs. Expiry also ends live use (P227): `handleEvents` ends the
+  SSE at `ExpiresAt`, the terminal `authorized` callback checks it, and the one-minute `maintain` loop
+  walks an in-memory id-to-expiry map (`Server.expiries`), disconnecting streams and releasing terminals
+  of expired devices. Migration 0025 revoked the HTTPS-era rows. `Origin` on
   writes must be `http://` and match `Host`; `Sec-Fetch-Site` is optional (absent on plain HTTP). Only
   a salted hash is stored; constant-time verify, dummy verify on a missing row.
 - Rate limits (`x/time/rate`, per IP, bounded map): pairing 1 per 10 s burst 3; failed auth 1 per
@@ -4206,7 +4232,8 @@ replies and full terminal attach for Claude Code sessions.
 - Route table `routes()` is the whole API; a test walks it. Each row has a method, a permission
   (`permNone`, `permWrite`, `permAgentInput`), a kind (plain, SSE stream, WebSocket upgrade) and an
   audit action. Reads: `/api/me`, `/api/events`, `/api/ade/{board,prs,sessions,workflows,backlog,repos,log}`,
-  `/api/agent/sessions`. Public: `POST /api/pair`. Writes, all POST: `/api/ade/backlog/{items,move}`,
+  `/api/agent/sessions`. `/api/ade/sessions`, `/api/agent/sessions` and their SSE channels drop `cwd`
+  (`withoutCwd`). Public: `POST /api/pair`. Writes, all POST: `/api/ade/backlog/{items,move}`,
   `/api/ade/tasks/{stage,run,launch}`, `/api/agent/sessions/{id}/{send,take-over}`; upgrade:
   `GET /api/agent/sessions/{id}/terminal`. No other POST exists; a test checks every non-GET row has a
   permission and an action.
@@ -4349,8 +4376,8 @@ replies and full terminal attach for Claude Code sessions.
   `*ExecError` since `claude -p` prints its structured error to stdout. Unknown-flag stderr maps to
   `ErrClaudeOutdated` ("update Claude Code").
 - MCP server: `<Kira Space executable> memory-mcp`, stdio, spawned per session by Claude Code, so it works
-  with the app closed or open. The branch sits in `apps/kira-space/main.go` before `startupfail` and
-  `acquireSingleInstance` (`runArgvShim`). Tools `store_memory` (progress notifications `checking`,
+  with the app closed or open. `main.go` calls `appwire.RunArgvShim` (`internal/appwire/wire.go`) before `startupfail` and
+  `acquireSingleInstance`. Tools `store_memory` (progress notifications `checking`,
   `reconciling`, `saving`), `search_memories` (`includeHistory`), `memory_history`; prompt `remember`
   (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
   from Settings > Memory (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
@@ -4442,7 +4469,7 @@ attempt. One token file, `mcp-db-token.json`, no slug, because one instance exis
 per `KIRA_HOME` (`internal/bridge/dbmcp.go`'s `dbMcpTokenName`).
 Lifecycle is `bridge.DbMcpService` — the
 server is constructed and started when the Settings toggle turns on (or already is, at boot) and
-stopped when it turns off or the app quits; the `ApprovalBroker` is constructed once in `main.go`
+stopped when it turns off or the app quits; the `ApprovalBroker` is constructed once in `apps/kira-studio/internal/appwire/wire.go`
 and **outlives** the server's own start/stop, so the boot-time event subscription stays valid across
 a restart.
 
