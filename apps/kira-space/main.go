@@ -107,7 +107,7 @@ func main() {
 	app := application.New(application.Options{
 		Name:        "Kira Space",
 		Description: "A git client for macOS\n\nVersion " + buildinfo.Version,
-		Services:    wired.Bound(),
+		Services:    append(wired.Bound(), notifyServices(wired)...),
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
