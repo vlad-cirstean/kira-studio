@@ -1,8 +1,10 @@
 package httpflow
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
@@ -343,5 +345,57 @@ func TestTLSAndHTTPVersion(t *testing.T) {
 	setApi(t, app, model.ApiPatch{SSLVerify: ptr(false)})
 	if got := send(t, app, get(srv.URL+"/echo")); got.Status != 200 {
 		t.Errorf("global sslVerify=false status = %d, want 200", got.Status)
+	}
+}
+
+func TestConcurrentSendsSharedJar(t *testing.T) {
+	app := flowharness.New(t)
+	srv := flowharness.HTTP(t)
+	setApi(t, app, model.ApiPatch{DisableCookieJar: ptr(false)})
+
+	const n = 20
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			name, value := fmt.Sprintf("c%d", i), fmt.Sprintf("v%d", i)
+			if _, err := app.W.Http.Send(ctx, get(srv.URL+"/cookie/set?name="+name+"&value="+value)); err != nil {
+				t.Errorf("set %s: %v", name, err)
+				return
+			}
+			res, err := app.W.Http.Send(ctx, get(srv.URL+"/cookie/echo"))
+			if err != nil {
+				t.Errorf("echo %s: %v", name, err)
+				return
+			}
+			if !strings.Contains(res.Body, `"`+name+`":"`+value+`"`) {
+				t.Errorf("send %d did not replay its own cookie: %s", i, res.Body)
+			}
+		}()
+	}
+	wg.Wait()
+
+	list, err := app.W.Http.Cookies(bridge.HttpCookiesArgs{URL: srv.URL + "/cookie/echo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, c := range list {
+		got[c.Name] = c.Value
+	}
+	if len(got) != n {
+		t.Fatalf("jar holds %d cookies, want %d: %v", len(got), n, got)
+	}
+	for i := range n {
+		if got[fmt.Sprintf("c%d", i)] != fmt.Sprintf("v%d", i) {
+			t.Fatalf("cookie c%d = %q, want v%d", i, got[fmt.Sprintf("c%d", i)], i)
+		}
+	}
+	res := send(t, app, get(srv.URL+"/cookie/echo"))
+	for i := range n {
+		if !strings.Contains(res.Body, fmt.Sprintf(`"c%d":"v%d"`, i, i)) {
+			t.Fatalf("final echo is missing c%d: %s", i, res.Body)
+		}
 	}
 }

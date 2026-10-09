@@ -27,3 +27,9 @@ Findings:
   covers the cancelled-context path instead. A URL seam needs `appwire.Options` (Stream C).
 - F5 (no fix): a run with `claude` off PATH fails with the shell's own `exec: claude: not found`
   text, no structured message. Test asserts the text names claude.
+- Plan correction (Studio): Postman export skips gRPC items (`SkippedGrpc`), so
+  `TestMoveRenameGrpcItem` asserts the skip, not an Export/Import round trip of gRPC items.
+- Plan correction (Studio): history of tabs not saved in `Tabs` is swept at boot, so
+  `TestHistoryClear` saves the surviving tab before the relaunch check.
+- Plan correction (Studio): `DataGrip.Scan` reads a project folder (`.idea/dataSources.xml`), not a
+  JetBrains config dir; the test scans a copy of the `project-six` fixture.

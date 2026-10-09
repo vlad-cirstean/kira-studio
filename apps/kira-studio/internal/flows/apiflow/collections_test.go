@@ -388,3 +388,84 @@ func TestPostmanImportSendExport(t *testing.T) {
 func headerOf(h model.SavedHeader) httpclient.Header {
 	return httpclient.Header{Name: h.Name, Value: h.Value}
 }
+
+func TestMoveRenameGrpcItem(t *testing.T) {
+	app := flowharness.New(t)
+	cs := app.W.Collections
+	from, to := newCollection(t, app, "from"), newCollection(t, app, "to")
+	folder, err := cs.CreateItem(bridge.CollectionsCreateItemArgs{CollectionID: from.ID, Kind: model.CollectionItemFolder, Name: "dir"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := model.SavedGrpcRequest{
+		Target: "localhost:50051", TLSMode: "plaintext", DescriptorMode: "reflection",
+		Service: "kira.flow.v1.Flow", Method: "Unary", Message: `{"text":"hi"}`,
+		Metadata: []model.SavedGrpcMetaRow{{Name: "x-id", Value: "1", Enabled: true}},
+	}
+	item, err := cs.CreateGrpcItem(bridge.CollectionsCreateGrpcItemArgs{CollectionID: from.ID, ParentID: &folder.ID, Name: "unary", Request: &req})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Protocol != model.ItemProtocolGrpc {
+		t.Fatalf("created item protocol %q, want grpc", item.Protocol)
+	}
+
+	// SaveGrpcRequest replaces the body and the name; GetGrpcRequest reads it back.
+	req.Message = `{"text":"edited"}`
+	req.Metadata = append(req.Metadata, model.SavedGrpcMetaRow{Name: "x-trace", Value: "t", Enabled: true})
+	if _, err := cs.SaveGrpcRequest(bridge.CollectionsSaveGrpcRequestArgs{ItemID: item.ID, Name: "unary v2", Request: req}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := cs.GetGrpcRequest(bridge.CollectionsItemArgs{ItemID: item.ID})
+	if err != nil || got.Message != req.Message || len(got.Metadata) != 2 || got.Method != "Unary" {
+		t.Fatalf("GetGrpcRequest = %+v (%v), want the edited request", got, err)
+	}
+	if _, err := cs.GetRequest(bridge.CollectionsItemArgs{ItemID: item.ID}); ipcErr(t, err).Code != "E_BAD_REQUEST" {
+		t.Fatalf("GetRequest on a gRPC item = %v, want E_BAD_REQUEST", err)
+	}
+	if _, err := cs.GetGrpcRequest(bridge.CollectionsItemArgs{ItemID: "missing"}); ipcErr(t, err).Code != "E_NOT_FOUND" {
+		t.Fatalf("GetGrpcRequest of an unknown item = %v, want E_NOT_FOUND", err)
+	}
+
+	if err := cs.Rename(bridge.CollectionsTargetArgs{ID: item.ID, Target: "item", Name: "renamed"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cs.MoveItem(bridge.CollectionsMoveItemArgs{ItemID: folder.ID, CollectionID: to.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cs.MoveItem(bridge.CollectionsMoveItemArgs{ItemID: folder.ID, CollectionID: "missing"}); err == nil {
+		t.Fatal("MoveItem into an unknown collection succeeded")
+	}
+
+	check := func(label string) {
+		t.Helper()
+		all, err := cs.List()
+		if err != nil {
+			t.Fatal(err)
+		}
+		byID := map[string]model.CollectionItem{}
+		for _, it := range all.Items {
+			byID[it.ID] = it
+		}
+		if byID[folder.ID].CollectionID != to.ID || byID[item.ID].CollectionID != to.ID {
+			t.Fatalf("%s: folder in %s, item in %s; want both in %s (a move takes the subtree)", label, byID[folder.ID].CollectionID, byID[item.ID].CollectionID, to.ID)
+		}
+		if it := byID[item.ID]; it.Name != "renamed" || it.ParentID == nil || *it.ParentID != folder.ID || it.Protocol != model.ItemProtocolGrpc {
+			t.Fatalf("%s: item = %+v, want renamed, still under the folder, gRPC", label, it)
+		}
+		if g, err := cs.GetGrpcRequest(bridge.CollectionsItemArgs{ItemID: item.ID}); err != nil || g.Message != req.Message {
+			t.Fatalf("%s: request body after the move = %+v (%v)", label, g, err)
+		}
+	}
+	check("after move")
+	app.Restart(t)
+	cs = app.W.Collections
+	check("after relaunch")
+
+	// Postman has no gRPC item, so an export skips it; the rest of the collection still exports.
+	dest := filepath.Join(t.TempDir(), "out.json")
+	exp, err := cs.Export(bridge.CollectionsExportArgs{CollectionID: to.ID, Path: dest})
+	if err != nil || exp.SkippedGrpc != 1 {
+		t.Fatalf("Export = %+v (%v), want the gRPC item skipped", exp, err)
+	}
+}
