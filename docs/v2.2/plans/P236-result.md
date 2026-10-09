@@ -34,9 +34,21 @@ Base `e0a0e9874`, branch `p236-239-A`. Plan: `P236-plan.md`. Findings: `P236-fin
 - `bun run test:e2e-real:space`: `19 passed (1.4m)`. `bun run test:e2e-real:studio`: `19 passed (2.7m)`.
 - `bun run lint`, `bun run typecheck`, `bun run lint:dead`: exit 0. `bun run lint:go`: `0 issues.`
 
+## After rebase onto v2.0 (final run)
+
+- Extra commits: `9de52cd12` AttachPush unexported (F1 fixed, gate exemptions removed, harness
+  expects 22 bound services), `5068b8563` docker exec-new click (P244), `b48eb523f` bridge test,
+  `8dc41cb7b` termflow close and notify click races (found failing in the final run).
+- Gate passes with the two new services covered, 0 exemptions in both apps.
+- `go build ./...`, `go build -tags server ./apps/kira-space/...`: exit 0.
+- `test:flows:space`, `test:flows:studio`, both `:complete` (docker up): `ok`. `go test -race -count=1`
+  on all flows and flowharness: `ok`.
+- `test:e2e-real:space`: `19 passed (1.5m)`. `test:e2e-real:studio`: `19 passed (1.7m)`.
+- `lint`, `typecheck`, `lint:dead`: exit 0. `lint:go`: `0 issues.`
+- Run once into a full disk (go cache 8 GB): cleared with `go clean -cache`, then rerun clean.
+- P237 real-claude hook tests not rerun: only `Attach*` call sites changed in `appwire`, not hook composition.
+
 ## Not done
 
-- F1 (`AttachPush` exported) needs `appwire.go`, owned by Stream C; left for after landing.
 - F4, F5: no fix (see findings).
-- Journey spec makes its commit with git on disk, not through the UI: Space's Git module has no
-  commit UI. The ADE changes commit row is covered by Stream B/C specs if any.
+- Journey spec makes its commit with git on disk: Space's Git module has no commit UI.
