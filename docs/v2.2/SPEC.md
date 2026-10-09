@@ -31,6 +31,27 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P233 | Claude Code hooks only for sessions Kira Space starts: audit every place Kira Space or Kira Studio changes the user's real Claude Code configuration (`~/.claude/settings.json`, project `.claude/settings.json`, `.claude.json`, MCP registration, hooks), and move each to per-session injection (e.g. `--settings <file>` / `--mcp-config` passed only when Kira Space launches the agent or terminal session, hook shim scoped by an env var set only there). Kira Space must make no change to the user's actual settings files; migrate or remove entries earlier versions wrote, with an explicit user-visible cleanup step. Real-flow test that proves settings.json is byte-identical after the flows. | Done |
 | P234 | Docs refresh: update `docs/ARCHITECTURE.md` (incl. Parallelism, process wiring with `appwire`, stale git-pairing-real line, testing section), `docs/DEV_ENVIRONMENT.md`, the v2.2 README and root `README.md` to match everything shipped in v2.2 (P210-P233). | Done |
 | P235 | Code review (one Opus round, all three dimensions) of everything changed since the P227 close-out `605f63e3f` (P228-P234), then one Sonnet fixer. Findings file `plans/P235-findings.md` committed before the fixer, deleted once fixed. | Done |
+| P236 | More real-flow coverage: audit every bound method and git stream request of both apps against the flow tests, add Go flow tests for the gaps plus user journeys (first run, restart and persistence, two windows, error paths, concurrency), new `e2e-real` journey and restart specs, a bound-method coverage gate, and root-cause fixes for the flaky `repo-graph-paging` "columns resized wide", `ade-board-real` and `ade-v2-panel.spec.ts:239` specs. Fix what the tests find | Todo |
+| P237 | Real `claude` test suite: opt-in only (`-tags realclaude` and `KIRA_REAL_CLAUDE=1`; never in default tests, hooks or CI), haiku with a tiny budget, per-area tests (hook injection and payload contract, settings untouched, ADE headless run and TUI session, memory MCP, DB MCP); the existing `claudesmoke` tests move to the same gate; `docs/DEV_ENVIRONMENT.md` table of area to command with cost; one `CLAUDE.md` pointer | Todo |
+| P238 | Desktop notification when a Kira-started Claude Code session finishes (Stop) or needs input (permission or elicitation Notification), and when an ADE headless run ends (run state; headless runs have no hooks): repo or task name plus a bounded message, click focuses the window and tab, suppressed while that tab is focused, cooldown, per-kind settings toggles and a test button in Settings > Claude Code; native via the Wails v3 notifications service on macOS, no-op on Linux and `-tags server` | Todo |
+| P239 | Claude Code usage limits (5-hour and weekly: % used, reset time) in the status bar, ADE module only. Default source: the `rate_limits` Claude Code hands to a status-line command injected per session (user's own status line kept). Opt-in fallback (off by default): read Claude Code's stored OAuth token read-only and call the undocumented usage endpoint, no refresh, no writes. TanStack Query, tooltip, states, off switch | Todo |
+
+### Streams for P236-P239 (user override: 3 concurrent streams)
+
+Base `a6637fbdf`. Stream A: P236. Stream B: P237. Stream C: P238 then P239 (sequential: both edit
+`internal/agenthooks`, `apps/kira-space/internal/appwire`, `apps/kira-space/main.go`, the Space
+settings model and `ClaudeCodePane.vue`). No ordering dependency between streams: B uses the
+flow harness unchanged and swaps the fake `claude` symlink itself; C injects its fakes through
+`Wired` fields, not the harness. A finding in a file another stream owns is recorded in that
+phase's findings file and fixed after landing. After all three land: re-run P237's hook tests
+(P239 changes hook composition) and P236's coverage gate (C adds bound services); one doc pass
+updates `docs/ARCHITECTURE.md` test counts.
+
+| Stream | Owns (zero overlap) |
+|---|---|
+| A (P236) | `apps/kira-space/internal/flows/**` and `apps/kira-studio/internal/flows/**` except `flows/notifyflow/**` and `flows/usageflow/**`; `apps/kira-space/internal/flowharness/**`; `apps/kira-studio/internal/flowharness/**`; `apps/kira-space/tests/e2e-real/**`; `apps/kira-studio/tests/e2e-real/**`; `apps/kira-space/tests/ui/{repo-graph-paging,ade-v2-panel}.spec.ts`; `packages/git-ui/**`; `apps/kira-space/frontend/src/ade/v2/**`; any product file a P236 finding needs that B or C does not own; `docs/v2.2/plans/P236-findings.md` |
+| B (P237) | `apps/kira-space/internal/realclaude/**`; `apps/kira-studio/internal/realclaude/**`; `internal/memory/smoke_test.go`; `internal/memory/importer/{smoke_test,engine_test}.go`; `docs/DEV_ENVIRONMENT.md`; `CLAUDE.md`; `docs/v2.2/plans/P237-findings.md` |
+| C (P238, P239) | `internal/agenthooks/**`; `internal/terminal/bound.go`; `packages/shared/domain/agent.ts`; `apps/kira-space/internal/ade/tracker.go`; `apps/kira-space/internal/appwire/**`; `apps/kira-space/main.go`, `apps/kira-space/notify_*.go`; `apps/kira-space/internal/agentnotify/**`; `apps/kira-space/internal/claudeusage/**`; `apps/kira-space/internal/bridge/{agentnotify,claudeusage,events}.go`; `apps/kira-space/internal/storage/{model,repos}/settings.go`; `apps/kira-space/internal/flows/{notifyflow,usageflow}/**`; `apps/kira-space/frontend/src/{main.ts,bridge/control.ts}`; `apps/kira-space/frontend/src/state/{settingsDomain,agentNotify,claudeUsage}.ts`; `apps/kira-space/frontend/src/workbench/{StatusBar,ClaudeUsageItem}.vue`, `workbench/settings/ClaudeCodePane.vue`; `apps/kira-space/tests/ui/{settings-agent-notify,claude-usage,settings-claude-code}.spec.ts`; `apps/kira-space/tests/fixtures/**`; `go.mod`, `go.sum`; `docs/ARCHITECTURE.md` |
 
 ## Requirements (user's words, condensed)
 
@@ -48,6 +69,10 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 - P224: "Remove speech to text completely".
 - P225: git graph still broken, commits disappear, Show more broke; new regression since last day; fix it.
 - P226: colours in the left panel must look the same everywhere: a coloured left bar in Studio is the same for scripts and for git.
+- P236: cover more flows and use cases with real tests (e2e, IPC, etc.) so there are no surprises when I test it.
+- P237: tests with a real `claude -p`; not run automatically (real tokens); the agent runs them one by one when changes land in that area.
+- P238: notify me through the OS when a Kira Space agent finishes, so I check what it said or whether it has to ask something.
+- P239: in the ADE module status bar, Claude Code usage limits now (5-hour and weekly, % used, reset time); check how Orca ADE does it and how it gets a token without me doing anything.
 
 ## P210 result
 
