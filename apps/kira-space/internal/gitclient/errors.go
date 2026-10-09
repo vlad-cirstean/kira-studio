@@ -92,11 +92,17 @@ var permissionNeedles = []string{
 // point in httpclient/client.go: a caller cancelling mid-run must classify as KindCancelled, not
 // whatever exit code the killed process happened to leave behind).
 func Classify(ctx context.Context, command []string, res Result, runErr error) error {
-	if ctx.Err() != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return &Error{Kind: KindTimeout, Command: command, Cause: runErr}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		// A process that exited 0 just before the cancel landed leaves runErr nil; the cause must
+		// still unwrap to the context error so callers' errors.Is(err, context.Canceled) holds.
+		cause := runErr
+		if cause == nil {
+			cause = ctxErr
 		}
-		return &Error{Kind: KindCancelled, Command: command, Cause: runErr}
+		if errors.Is(ctxErr, context.DeadlineExceeded) {
+			return &Error{Kind: KindTimeout, Command: command, Cause: cause}
+		}
+		return &Error{Kind: KindCancelled, Command: command, Cause: cause}
 	}
 	if errors.Is(runErr, ErrDirMissing) {
 		return &Error{Kind: KindNotARepository, Command: command, Cause: ErrDirMissing}
