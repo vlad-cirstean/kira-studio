@@ -255,7 +255,7 @@ func TestMessageTruncatedOnRuneBoundary(t *testing.T) {
 	}
 	msg := b.String()
 
-	body := `{"hook_event_name":"Notification","message":` + jsonString(msg) + `}`
+	body := `{"hook_event_name":"Stop","message":` + jsonString(msg) + `,"last_assistant_message":` + jsonString(msg) + `}`
 	resp := postHook(t, client, s.ln.Token, "term-1", body)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -272,6 +272,9 @@ func TestMessageTruncatedOnRuneBoundary(t *testing.T) {
 	}
 	if !isValidUTF8(got) {
 		t.Fatalf("truncated message is not valid UTF-8: %q", got)
+	}
+	if last := events[0].LastAssistantMessage; last != got {
+		t.Fatalf("LastAssistantMessage = %q, want same bound as Message %q", last, got)
 	}
 }
 

@@ -20,7 +20,7 @@ const maxHookPayloadBytes = 4 * 1024 * 1024
 // reaches Options.OnEvent, on a rune boundary so a multi-byte UTF-8 character is never split.
 const maxHookMessageBytes = 200
 
-// hookRequest is the body this listener actually decodes — exactly the nine payload fields §6's
+// hookRequest is the body this listener actually decodes — exactly the ten payload fields §6's
 // Event keeps, snake_case as the installed CLI's own hook payload names them. tool_input,
 // tool_response and transcript_path have no matching field here, so encoding/json silently skips
 // them on decode: nothing about them is ever retained, logged or reachable from Options.OnEvent.
@@ -34,6 +34,8 @@ type hookRequest struct {
 	Message          string `json:"message"`
 	Source           string `json:"source"`
 	Reason           string `json:"reason"`
+	// LastAssistantMessage is Stop's reply text.
+	LastAssistantMessage string `json:"last_assistant_message"`
 }
 
 func (s *Server) mux() http.Handler {
@@ -77,16 +79,17 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 
 	if s.onEvent != nil {
 		s.onEvent(Event{
-			TerminalID:       terminalID,
-			Event:            req.HookEventName,
-			SessionID:        req.SessionID,
-			Cwd:              req.Cwd,
-			ToolName:         req.ToolName,
-			ToolUseID:        req.ToolUseID,
-			NotificationType: req.NotificationType,
-			Message:          truncateMessage(req.Message),
-			Source:           req.Source,
-			Reason:           req.Reason,
+			TerminalID:           terminalID,
+			Event:                req.HookEventName,
+			SessionID:            req.SessionID,
+			Cwd:                  req.Cwd,
+			ToolName:             req.ToolName,
+			ToolUseID:            req.ToolUseID,
+			NotificationType:     req.NotificationType,
+			Message:              truncateMessage(req.Message),
+			Source:               req.Source,
+			Reason:               req.Reason,
+			LastAssistantMessage: truncateMessage(req.LastAssistantMessage),
 		})
 	}
 	w.WriteHeader(http.StatusOK)

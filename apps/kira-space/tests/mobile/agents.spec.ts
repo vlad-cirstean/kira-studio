@@ -18,6 +18,7 @@ const ASK = {
   message: 'Run the migration?',
   source: '',
   reason: '',
+  lastAssistantMessage: '',
 };
 
 // Hook events sent before the app subscribed are lost, so send again until the question shows.

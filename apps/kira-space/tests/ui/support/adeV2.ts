@@ -175,6 +175,7 @@ export async function emitAgentEvent(page: Page, terminalId: string, event: stri
     message: '',
     source: '',
     reason: '',
+    lastAssistantMessage: '',
   });
 }
 

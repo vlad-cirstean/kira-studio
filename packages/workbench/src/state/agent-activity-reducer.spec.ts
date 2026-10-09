@@ -27,6 +27,7 @@ function event(partial: Partial<AgentEvent> & { event: string }): AgentEvent {
     message: '',
     source: '',
     reason: '',
+    lastAssistantMessage: '',
     ...partial,
   };
 }

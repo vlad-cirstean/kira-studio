@@ -33,6 +33,7 @@ export interface AgentEvent {
   message: string; // bounded server-side (§6.1)
   source: string; // SessionStart
   reason: string; // SessionEnd
+  lastAssistantMessage: string; // Stop, bounded server-side
 }
 
 // §13's own reducer output — one Claude Code tab's current activity, derived from the AgentEvent

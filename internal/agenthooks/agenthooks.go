@@ -27,11 +27,11 @@ import (
 // this is a generous backstop, not a value tuned against a known slow path.
 const closeHTTPGraceTimeout = 5 * time.Second
 
-// Event is what the listener hands to Options.OnEvent — the nine hook-payload fields this app
+// Event is what the listener hands to Options.OnEvent — the ten hook-payload fields this app
 // keeps (§6), plus TerminalID from the X-Kira-Terminal header (not the body). tool_input,
 // tool_response and transcript_path are never decoded into anything, so they can never reach
 // here — encoding/json silently skips a body field with no matching struct tag, which is the
-// actual mechanism behind "the listener keeps nine fields and drops the rest without logging".
+// actual mechanism behind "the listener keeps ten fields and drops the rest without logging".
 type Event struct {
 	TerminalID       string `json:"terminalId"`
 	Event            string `json:"event"`
@@ -43,6 +43,8 @@ type Event struct {
 	Message          string `json:"message"`
 	Source           string `json:"source"`
 	Reason           string `json:"reason"`
+	// LastAssistantMessage is Stop's reply text, bounded like Message.
+	LastAssistantMessage string `json:"lastAssistantMessage"`
 }
 
 // Options configures a Server.
