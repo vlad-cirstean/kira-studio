@@ -105,9 +105,7 @@ func TestShellTabRunsGit(t *testing.T) {
 	if err := app.W.Terminal.Close(terminal.CloseArgs{TerminalID: id}); err != nil {
 		t.Fatalf("second Close = %v, want idempotent", err)
 	}
-	if _, ok := app.W.TermRegistry.WindowOf(id); ok {
-		t.Fatal("registry still holds the closed tab")
-	}
+	testx.WaitUntil(t, waitFor, func() bool { _, ok := app.W.TermRegistry.WindowOf(id); return !ok })
 }
 
 func TestCollectionsMoveAndDelete(t *testing.T) {

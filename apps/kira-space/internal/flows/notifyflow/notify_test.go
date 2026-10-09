@@ -1,6 +1,7 @@
 package notifyflow_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -211,6 +212,8 @@ func TestRunEndedNotifies(t *testing.T) {
 
 func TestClickRevealsTerminal(t *testing.T) {
 	app, sink := newApp(t)
+	// The fake claude must outlive the click: once it exits, the terminal leaves the registry.
+	claude(app, map[string][]fakeagent.Action{"*": {{WaitFile: filepath.Join(app.Root, "never")}}})
 	cwd := agentTab(t, app, "tab-1")
 	stop(t, app, "tab-1", cwd, "x")
 	n := sink.only(t)

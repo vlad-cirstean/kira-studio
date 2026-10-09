@@ -35,9 +35,7 @@ func TestShellTab(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitExit(t, app, mark, "w1", "t1")
-	if _, ok := app.W.TerminalRegistry.WindowOf("t1"); ok {
-		t.Fatal("closed shell still registered")
-	}
+	testx.WaitUntil(t, wait, func() bool { _, ok := app.W.TerminalRegistry.WindowOf("t1"); return !ok })
 	if err := svc.Write(terminal.WriteArgs{TerminalID: "t1", Data: "ZWNobyBoaQo="}); err != nil {
 		t.Fatalf("Write after Close = %v, want a no-op", err)
 	}
