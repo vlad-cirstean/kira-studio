@@ -87,9 +87,7 @@ test('adds a repo through the dialog, renames and colours it, browses and opens 
   );
 });
 
-test.fixme('P231 finding A3: code search results never reach a server-build window', async ({
-  kira,
-}) => {
+test('code search results reach the window', async ({ kira }) => {
   const { page, row } = await addViaDialog(kira);
   await row.click();
   await page.locator('[data-testid="git-panel-tab-files"]').click();

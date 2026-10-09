@@ -30,22 +30,6 @@ func (e *emitter) Emit(name string, data any) {
 	app.Event.Emit(name, data)
 }
 
-// EmitTo delivers to exactly one window (P8 D6/C6) — the mechanism the per-window close-flush
-// handshake needs, since app.Event.Emit fans out to every window (transport_event_ipc.go). A key
-// naming no live window (already closed, or never existed) is a silent no-op, matching Emit's own
-// "no app yet" no-op above.
-func (e *emitter) EmitTo(windowKey string, name string, data any) {
-	app := e.app.Load()
-	if app == nil {
-		return
-	}
-	win, ok := app.Window.GetByName(windowKey)
-	if !ok {
-		return
-	}
-	win.DispatchWailsEvent(&application.CustomEvent{Name: name, Data: data})
-}
-
 // EmitFocused delivers to whichever window is currently key/focused (P8 D6/C9) — the successor to
 // Electron's own sendToFocusedWindow(channel) (18fe7bb^:src/main/menu.ts:5-8). Current() resolves
 // the real key window on darwin via [NSApp keyWindow] ?? [NSApp mainWindow]
