@@ -5,11 +5,16 @@ import {
   manyRowShas,
   manyRows,
   oneChunk,
+  openPortGraph,
   openReviewListing,
+  PICKER_RESULTS,
   REVIEW_FILE_FULL,
   REVIEW_FILE_NONE,
   REVIEW_FILE_PARTIAL,
+  REVIEW_RESULTS,
+  rootRow,
   SHA_A,
+  singleRowChunks,
 } from './support/gitUiPortFixtures';
 
 // The review sidebar inside Space: row gestures, host-answered actions, the Files pane checkbox and
@@ -105,4 +110,22 @@ test('600 commits mount 500 rows; Show more reveals the rest', async ({ relaunch
   await expect(rows).toHaveCount(total);
   await expect(showMore).toBeHidden();
   await expect(reviewRow(page, manyRowShas(total - 1))).toHaveCount(1);
+});
+
+test('Review branch changes from the picker opens the Review tab on that branch', async ({
+  relaunch,
+}) => {
+  const page = await openPortGraph(relaunch, {
+    chunks: singleRowChunks([rootRow(SHA_A, 'A commit')]),
+    results: { ...PICKER_RESULTS, ...REVIEW_RESULTS, 'refs.list': PICKER_RESULTS['refs.list'] },
+  });
+  await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')).toBeVisible();
+  await page.locator('.kv-branch-trigger').click();
+  await page
+    .locator('[data-row-id="branch:refs/heads/feature-auth"]')
+    .getByRole('button', { name: 'More actions' })
+    .click();
+  await page.getByText('Review branch changes').click();
+
+  await expect(page.locator('[data-testid="review-branch-name"]')).toHaveText('feature-auth');
 });

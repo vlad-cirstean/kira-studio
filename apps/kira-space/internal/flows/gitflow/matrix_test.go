@@ -60,6 +60,42 @@ func TestUndoSlotIsSharedAndAttributed(t *testing.T) {
 	}
 }
 
+// Guards the undo of a branch delete: sha and tracking config come back, and a second undo is refused.
+func TestUndoBranchDeleteRestoresTracking(t *testing.T) {
+	r := newRig(t)
+	repo := r.app.NewRepo("proj")
+	tip := repo.Commit("one", map[string]string{"f.txt": "1\n"})
+	repo.Branch("tracked", "")
+	repo.Git("config", "--local", "branch.tracked.remote", "origin")
+	repo.Git("config", "--local", "branch.tracked.merge", "refs/heads/tracked")
+	id := r.open(repo.Dir).RepoID
+
+	del := r.mustOp(id, gitsession.OpRequest{Kind: "branchDelete", Name: "tracked", Force: true})
+	if del.Undo == nil || del.Undo.Label != "Deleted branch tracked" {
+		t.Fatalf("undo snapshot = %+v", del.Undo)
+	}
+	if label, _ := undoLabel(t, r.gs, id); label != del.Undo.Label {
+		t.Fatalf("undo.peek = %q, want %q", label, del.Undo.Label)
+	}
+
+	undo := call[gitsession.OpResult](t, r.gs, "undo.run", gitrpc.UndoRunParams{RepoID: id, ID: del.Undo.ID})
+	if !undo.OK {
+		t.Fatalf("undo.run failed: %+v", undo.Error)
+	}
+	if got := repo.Git("rev-parse", "--verify", "refs/heads/tracked"); got != tip {
+		t.Fatalf("restored branch = %s, want %s", got, tip)
+	}
+	cfg := repo.Git("config", "--get-regexp", `^branch\.tracked\.`)
+	if !strings.Contains(cfg, "branch.tracked.remote origin") || !strings.Contains(cfg, "branch.tracked.merge refs/heads/tracked") {
+		t.Fatalf("restored config = %q", cfg)
+	}
+
+	again := call[gitsession.OpResult](t, r.gs, "undo.run", gitrpc.UndoRunParams{RepoID: id, ID: del.Undo.ID})
+	if again.OK || again.Error == nil || again.Error.Kind != "NotFound" {
+		t.Fatalf("second undo.run = %+v, want NotFound", again)
+	}
+}
+
 func TestDetailCacheDropsForEveryWindowOnRefsChanged(t *testing.T) {
 	r := newRig(t)
 	repo := r.app.NewRepo("proj")
