@@ -1,0 +1,13 @@
+services:
+  web:
+    image: mirror.gcr.io/library/alpine:3.20
+    command: ["sleep", "300"]
+    stop_grace_period: 1s
+    labels:
+      kira.flowtest: ${KIRA_FLOWTEST_RUN}
+  cache:
+    image: mirror.gcr.io/library/alpine:3.20
+    command: ["sleep", "300"]
+    stop_grace_period: 1s
+    labels:
+      kira.flowtest: ${KIRA_FLOWTEST_RUN}
