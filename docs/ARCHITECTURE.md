@@ -4511,8 +4511,9 @@ replies and full terminal attach for Claude Code sessions.
   `packages/docker-ui` (`@kira/docker-ui`): containers (grouped by Compose project), images, volumes,
   networks; start/stop/restart; live logs (follow, filter, timestamps; virtualized unless Wrap is on,
   which renders the last 2000 filtered lines; buffer cap 20 000); exec through `TerminalHostView`
-  (`storeId: 'docker-exec'`); per-container CPU and RAM in the list and a Stats view; server state on
-  TanStack Query.
+  (`storeId: 'docker-exec'`; the Terminal tab opens no session until New session is clicked);
+  per-container CPU and RAM in the engine overview table, the container header and a Stats view, the
+  side list shows none; server state on TanStack Query.
 - Endpoint order (`endpoint.go`): selected UI context, `DOCKER_HOST`, `DOCKER_CONTEXT`/`currentContext`
   (TLS contexts included), default socket, socket probe (Desktop, Colima, OrbStack). Typed
   not-installed, daemon-down and unreachable states.
