@@ -1,8 +1,9 @@
 import { expect, test } from './fixtures';
-import { acceptingGate, GATED_FACT } from './support/memoryGate';
+import { ACCEPTING_GATE, GATED_FACT } from './support/memoryGate';
+
+test.use({ scenario: ACCEPTING_GATE });
 
 test('a memory added through the gate is listed and found by search', async ({ kira }) => {
-  await acceptingGate(kira);
   const page = kira.window;
   await page.locator('[data-testid="mode-tab"][data-mode="memory"]').click();
   await expect(page.locator('[data-testid="memory-panel"]')).toBeVisible();

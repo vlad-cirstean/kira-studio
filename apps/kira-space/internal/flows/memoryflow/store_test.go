@@ -25,7 +25,6 @@ const waitFor = 20 * time.Second
 
 func gate(t *testing.T, app *flowharness.App, file string, actions ...fakeagent.Action) {
 	t.Helper()
-	jsonClaude(t, app)
 	abs, err := filepath.Abs(filepath.Join("testdata", file))
 	if err != nil {
 		t.Fatal(err)

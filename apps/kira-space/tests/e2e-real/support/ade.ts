@@ -78,11 +78,3 @@ export async function runTask(page: Page, branch: string): Promise<void> {
   await page.locator('[data-testid="ade-run-branch"]').fill(branch);
   await page.locator('[data-testid="ade-run-send"]').click();
 }
-
-/** Run shells are login shells that reorder PATH; their profile must put the fixture's fake claude first. */
-export async function fakeClaudeOnLoginPath(kira: KiraSpaceApp): Promise<void> {
-  const profile = `export PATH=${JSON.stringify(join(kira.root, 'bin'))}:"$PATH"\n`;
-  for (const f of ['.bash_profile', '.zprofile', '.profile']) {
-    await writeFile(join(kira.root, 'home', f), profile);
-  }
-}

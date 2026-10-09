@@ -1,0 +1,23 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "total_cost_usd": 0.01,
+  "num_turns": 1,
+  "structured_output": {
+    "items": [
+      {
+        "index": 0,
+        "verdict": "accept",
+        "questions": [],
+        "facts": [
+          {
+            "fact": "The billing service uses PostgreSQL 16.",
+            "reason": "Stated by the maintainer in the migration notes.",
+            "keywords": ["billing", "postgres", "database"]
+          }
+        ]
+      }
+    ]
+  }
+}

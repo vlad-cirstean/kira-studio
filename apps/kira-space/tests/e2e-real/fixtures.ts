@@ -96,7 +96,10 @@ export const test = base.extend<KiraSpaceFixtures>({
       join(home, '.gitconfig'),
       '[user]\n\tname = Flow Test\n\temail = flow@example.test\n[init]\n\tdefaultBranch = main\n',
     );
+    // Run shells are login shells that reorder PATH; their profile keeps the fake claude first.
+    const profile = `export PATH=${JSON.stringify(binDir)}:"$PATH"\n`;
     await Promise.all([
+      ...['.bash_profile', '.zprofile', '.profile'].map((f) => writeFile(join(home, f), profile)),
       symlink(FAKE_AGENT_BINARY, join(binDir, 'claude')),
       symlink(FAKE_AGENT_BINARY, join(binDir, 'gh')),
     ]);

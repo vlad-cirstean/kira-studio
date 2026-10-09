@@ -1,6 +1,6 @@
 // Package fakeagent is the stand-in for the claude and gh CLIs in flow tests. A flow runs it as a
 // re-executed test binary (flowharness.Main) or as the cmd/fakeclaude binary; the behaviour comes
-// from scenario data in KIRA_FAKE_SCEN, so a stream extends it with testdata, not code.
+// from scenario data in KIRA_FAKE_SCEN (JSON, or the path of a JSON file), so a stream extends it with testdata, not code.
 //
 // Every call writes its argv, cwd and stdin under KIRA_FAKE_DIR as <repo>-<n>.args/.cwd/.prompt
 // (claude, where <repo> is the worktree's parent directory name) or gh-<n>.args.
@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -33,6 +34,9 @@ type Scenario struct {
 	// Claude maps a repo name (the worktree's parent directory, "*" as fallback) to one Action per
 	// attempt; the last Action repeats.
 	Claude map[string][]Action `json:"claude,omitempty"`
+	// Prompts answer headless calls by their --system-prompt before any Claude action runs; the
+	// first rule that matches answers.
+	Prompts []PromptRule `json:"prompts,omitempty"`
 	// Gh rules are tried in order; the first whose Match is a substring of the joined args answers.
 	Gh []GhRule `json:"gh,omitempty"`
 }
@@ -89,6 +93,19 @@ type MCPCall struct {
 	Args   map[string]any `json:"args,omitempty"`
 }
 
+// PromptRule answers a headless call whose --system-prompt contains System. Doc narrows it to one
+// document: the basename of the first "path" in the prompt, or of KIRA_DOC, which the fake exports to
+// the MCP servers it starts so a nested call (memory-mcp's gate) keeps the document it belongs to.
+// Fail makes the first N matching calls end with a budget error; the rule's calls are counted in
+// <KIRA_FAKE_DIR>/rule-<index>.count. WaitFile blocks until the path exists, then Emit prints the file.
+type PromptRule struct {
+	System   string `json:"system"`
+	Doc      string `json:"doc,omitempty"`
+	Fail     int    `json:"fail,omitempty"`
+	WaitFile string `json:"waitFile,omitempty"`
+	Emit     string `json:"emit,omitempty"`
+}
+
 // GhRule answers a gh invocation.
 type GhRule struct {
 	Match  string `json:"match"`
@@ -100,7 +117,11 @@ type GhRule struct {
 // Run plays the named tool ("claude" or "gh") for one invocation and returns its exit code.
 func Run(name string, args []string) int {
 	var scen Scenario
-	_ = json.Unmarshal([]byte(os.Getenv(EnvScenario)), &scen)
+	raw := []byte(os.Getenv(EnvScenario))
+	if len(raw) > 0 && raw[0] != '{' { // a path, as the e2e-real fixture sets it
+		raw, _ = os.ReadFile(string(raw))
+	}
+	_ = json.Unmarshal(raw, &scen)
 	dir := os.Getenv(EnvDir)
 	switch name {
 	case "claude":
@@ -173,7 +194,16 @@ func runClaude(scen Scenario, dir string, args []string) int {
 	if headless {
 		prompt, _ := io.ReadAll(os.Stdin)
 		_ = os.WriteFile(stem+".prompt", prompt, 0o644)
-		emitJSON(map[string]any{"type": "system", "subtype": "init", "session_id": "fake"})
+		if doc := promptDoc(prompt); doc != "" {
+			_ = os.Setenv("KIRA_DOC", doc)
+		}
+		if code, answered := answerPrompt(scen, dir, args); answered {
+			return code
+		}
+		// A one-document json caller parses stdout as a single value, so it gets no stream.
+		if argAfter(args, "--output-format") != "json" {
+			emitJSON(map[string]any{"type": "system", "subtype": "init", "session_id": "fake"})
+		}
 	} else {
 		// An interactive TUI session: its stdin is a PTY; keep a record of what the app types.
 		go func() {
@@ -251,6 +281,49 @@ func runClaude(scen Scenario, dir string, args []string) int {
 	return 0 // "nofinish"
 }
 
+var promptPath = regexp.MustCompile(`"path":"([^"]*)"`)
+
+// promptDoc is the basename of the first "path" the prompt names, or KIRA_DOC when it names none.
+func promptDoc(prompt []byte) string {
+	if m := promptPath.FindSubmatch(prompt); m != nil {
+		return filepath.Base(string(m[1]))
+	}
+	return os.Getenv("KIRA_DOC")
+}
+
+// answerPrompt plays the first PromptRule matching the call's system prompt.
+func answerPrompt(scen Scenario, dir string, args []string) (code int, answered bool) {
+	system, doc := argAfter(args, "--system-prompt"), os.Getenv("KIRA_DOC")
+	for i, r := range scen.Prompts {
+		if !strings.Contains(system, r.System) || (r.Doc != "" && r.Doc != doc) {
+			continue
+		}
+		if r.Fail > 0 {
+			if nextCount(dir, fmt.Sprintf("rule-%d", i)) <= r.Fail {
+				emitJSON(map[string]any{"type": "result", "subtype": "error_max_budget_usd", "is_error": true})
+				return 0, true
+			}
+			continue
+		}
+		for r.WaitFile != "" {
+			if _, err := os.Stat(r.WaitFile); err == nil {
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		if r.Emit != "" {
+			raw, err := os.ReadFile(r.Emit)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "fakeagent:", err)
+				return 3, true
+			}
+			_, _ = os.Stdout.Write(raw)
+		}
+		return 0, true
+	}
+	return 0, false
+}
+
 func emitJSON(v any) {
 	raw, _ := json.Marshal(v)
 	fmt.Println(string(raw))
@@ -275,9 +348,12 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // callTool connects to server from the --mcp-config file (HTTP or stdio entry) and calls one tool.
 func callTool(cfgPath, server, tool string, args map[string]any) error {
-	raw, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return err
+	raw := []byte(cfgPath)
+	if !strings.HasPrefix(strings.TrimSpace(cfgPath), "{") {
+		var err error
+		if raw, err = os.ReadFile(cfgPath); err != nil {
+			return err
+		}
 	}
 	var cfg struct {
 		MCPServers map[string]struct {

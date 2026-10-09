@@ -1,15 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from './fixtures';
-import {
-  addTask,
-  type Board,
-  DONE_SCENARIO,
-  fakeClaudeOnLoginPath,
-  openPlan,
-  runTask,
-  saveFlow,
-} from './support/ade';
+import { addTask, type Board, DONE_SCENARIO, openPlan, runTask, saveFlow } from './support/ade';
 import { createRepoWithRemote, git } from './support/gitRepo';
 
 test.use({ scenario: DONE_SCENARIO });
@@ -21,7 +13,6 @@ test('a run gives a task a real worktree, and archiving removes it', async ({ ki
   ]);
   await kira.call('CodeWorkspaceService', 'ImportRepo', { path: repo });
   await saveFlow(kira);
-  await fakeClaudeOnLoginPath(kira);
 
   const page = await openPlan(kira);
   await addTask(page, 'Fix login');

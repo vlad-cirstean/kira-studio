@@ -14,20 +14,37 @@ import (
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-// importApp boots the app with the shim and a finalize agent that stores two facts through the real
-// memory-mcp server. The gate answers come from gate-<file>.json.
-func importApp(t *testing.T) (*flowharness.App, string) {
+func testdata(t *testing.T, name string) string {
 	t.Helper()
-	app := flowharness.New(t)
-	dir := jsonClaude(t, app)
-	for _, f := range []string{"gate-billing.md.json", "gate-release.md.json", "reconcile.json", "extract-billing.md.json", "extract-release.md.json"} {
-		shimFile(t, dir, f, f)
-	}
-	finalize, err := filepath.Abs(filepath.Join("testdata", "finalize.json"))
+	abs, err := filepath.Abs(filepath.Join("testdata", name))
 	if err != nil {
 		t.Fatal(err)
 	}
-	app.Scenario(fakeagent.Scenario{Claude: map[string][]fakeagent.Action{"*": {{
+	return abs
+}
+
+const (
+	gateSystem      = "gatekeeper of a long-term memory"
+	reconcileSystem = "reconcile new facts"
+	extractSystem   = "extract durable facts"
+)
+
+// importApp boots the app with a finalize agent that stores two facts through the real memory-mcp
+// server. Gate, reconcile and extract answers come from canned files per document; the extract
+// rules in front let a test make a document fail or hang. release never exists, so a held
+// document blocks for good.
+func importApp(t *testing.T, extract ...fakeagent.PromptRule) *flowharness.App {
+	t.Helper()
+	app := flowharness.New(t)
+	finalize := testdata(t, "finalize.json")
+	prompts := append(extract,
+		fakeagent.PromptRule{System: gateSystem, Doc: "billing.md", Emit: testdata(t, "gate-billing.md.json")},
+		fakeagent.PromptRule{System: gateSystem, Doc: "release.md", Emit: testdata(t, "gate-release.md.json")},
+		fakeagent.PromptRule{System: reconcileSystem, Emit: testdata(t, "reconcile.json")},
+		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", Emit: testdata(t, "extract-billing.md.json")},
+		fakeagent.PromptRule{System: extractSystem, Doc: "release.md", Emit: testdata(t, "extract-release.md.json")},
+	)
+	app.Scenario(fakeagent.Scenario{Prompts: prompts, Claude: map[string][]fakeagent.Action{"*": {{
 		MCP: []fakeagent.MCPCall{{Server: "kira-memory", Tool: "store_memory", Args: map[string]any{
 			"author": "agent",
 			"items": []map[string]string{
@@ -37,7 +54,7 @@ func importApp(t *testing.T) (*flowharness.App, string) {
 		}}},
 		Emit: finalize,
 	}}}})
-	return app, dir
+	return app
 }
 
 func jobDetail(t *testing.T, app *flowharness.App, id string) importer.JobDetail {
@@ -100,7 +117,8 @@ func importDir(t *testing.T) string {
 }
 
 func TestImportLifecycle(t *testing.T) {
-	app, shim := importApp(t)
+	held := filepath.Join(t.TempDir(), "release")
+	app := importApp(t, fakeagent.PromptRule{System: extractSystem, Doc: "ops.md", WaitFile: held, Emit: testdata(t, "extract-billing.md.json")})
 
 	awaiting := createJob(t, app, importDir(t))
 	if awaiting.Job.Estimate.Files != 2 || len(awaiting.Files) != 2 {
@@ -142,10 +160,6 @@ func TestImportLifecycle(t *testing.T) {
 	// A second job, held mid-extract: pause and resume keep it alive, cancel ends it for good.
 	docs := t.TempDir()
 	if err := os.WriteFile(filepath.Join(docs, "ops.md"), []byte("# Ops\n\nPager rotation changes every Monday.\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	shimFile(t, shim, "extract-billing.md.json", "extract-ops.md.json")
-	if err := os.WriteFile(filepath.Join(shim, "hold"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	second := createJob(t, app, docs)
@@ -198,10 +212,8 @@ func TestImportLifecycle(t *testing.T) {
 // only what failed.
 func TestImportRetries(t *testing.T) {
 	flowharness.Complete(t)
-	app, shim := importApp(t)
-	if err := os.WriteFile(filepath.Join(shim, "fail-release.md"), []byte("2"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	// Rule 0 spends two extract budgets on release.md: the first run and the first retry.
+	app := importApp(t, fakeagent.PromptRule{System: extractSystem, Doc: "release.md", Fail: 2})
 	job := createJob(t, app, importDir(t))
 	id := bridge.MemoryImportJobArgs{ID: job.Job.ID}
 	if err := app.W.MemoryImport.Start(id); err != nil {
@@ -217,9 +229,9 @@ func TestImportRetries(t *testing.T) {
 	}
 	var again importer.JobDetail
 	testx.WaitUntil(t, waitFor, func() bool {
-		left, _ := os.ReadFile(filepath.Join(shim, "fail-release.md"))
+		spent, _ := os.ReadFile(filepath.Join(app.FakeDir, "rule-0.count"))
 		again = jobDetail(t, app, id.ID)
-		return strings.TrimSpace(string(left)) == "0" && again.Job.State != importer.JobRunning &&
+		return strings.TrimSpace(string(spent)) == "2" && again.Job.State != importer.JobRunning &&
 			fileNamed(t, again, "release.md").State == importer.FileFailed
 	})
 	if got := fileNamed(t, again, "release.md"); got.State != importer.FileFailed {

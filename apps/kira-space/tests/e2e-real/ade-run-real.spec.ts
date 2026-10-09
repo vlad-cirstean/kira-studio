@@ -1,14 +1,6 @@
 import { join } from 'node:path';
 import { expect, test } from './fixtures';
-import {
-  addTask,
-  type Board,
-  DONE_SCENARIO,
-  fakeClaudeOnLoginPath,
-  openPlan,
-  runTask,
-  saveFlow,
-} from './support/ade';
+import { addTask, type Board, DONE_SCENARIO, openPlan, runTask, saveFlow } from './support/ade';
 import { createRepoWithRemote } from './support/gitRepo';
 
 test.use({ scenario: DONE_SCENARIO });
@@ -20,7 +12,6 @@ test('a run finishes its first step and waits for approval on the second', async
   ]);
   await kira.call('CodeWorkspaceService', 'ImportRepo', { path: repo });
   await saveFlow(kira);
-  await fakeClaudeOnLoginPath(kira);
 
   const page = await openPlan(kira);
   await addTask(page, 'Fix login');
