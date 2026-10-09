@@ -4657,19 +4657,25 @@ alongside these four.** `apps/kira-space/tests/unit/` and `apps/kira-space/tests
 test:ui:space`) mirror Kira Studio's own `tests/unit/`/`tests/ui/` shape, running against Kira
 Space's own built bundle; `apps/kira-space/internal/` has its own Go suite too, covered by the same
 `bun run test:go` (it runs both apps' packages together — see below). `apps/kira-space-vscode/tests/` (renamed from `apps/kira-studio-vscode/tests/` at P100 Part 3) is
-the git module's own frontend tier, unchanged in shape by the move — full detail below. Kira Space has no
-`ipc/`/`e2e-real/` tier of its own: it has no database adapters to exercise the `ipc/` wire-boundary
-split against, and no real-container-per-engine coverage need to justify porting `e2e-real/`'s
-infrastructure (its own Go suite already builds real repositories under `t.TempDir()`, below) —
-**one exception, a real gap, not a design choice**: `git-pairing-real.spec.ts`, the one spec that
-proved pairing/token-reuse/revocation against a real `-tags server` binary and a real socket, was
-never ported when the rest of the module moved; it stayed behind in `apps/kira-studio/tests/e2e-real/`
-where it could no longer pass (no `gitsock` left in that binary to dial), so this phase deleted it
-rather than leave a broken spec in the tree. Porting a real `e2e-real/` tier for Kira Space — its own
-fixtures, a `playwright.config.ts` project, a `git-pairing-real.spec.ts` that dials Kira Space's own
-socket (the `-tags server` substitute itself needs no new work, above) — is real missing coverage,
-out of this phase's own icon/docs/audit scope; named here for a future phase rather than silently
-dropped.
+the git module's own frontend tier, unchanged in shape by the move — full detail below. Kira Space has no `ipc/`
+tier: no database adapters to split against. It has two real-backend tiers instead (P231).
+
+**Flow tier (Go).** `apps/kira-space/internal/appwire` is the composition root: `Build(Options)`
+wires repos, git, gitsock, terminal, ADE, memory, mobile and the bound services; `main.go` supplies
+native pieces (dialogs, browser, keep-awake, locator, window hooks), tests supply fakes.
+`internal/flowharness` boots `appwire.Build` in-process on a temp home. Real: SQLite, git (fixed
+dates, `git fast-import` history), the git stream, gitsock, PTY, watchers, mobile HTTP. Faked: the
+`claude` and `gh` CLIs (`flowharness/fakeagent`, scenario JSON), dialogs, browser, keep-awake, LAN
+detection, window manager. Flow tests live in `internal/flows/{gitflow,repoflow,editorflow,adeflow,memoryflow,termflow,appflow,mobileflow}`.
+`bun run test:flows:space` is the general suite. `bun run test:flows:space:complete` sets
+`KIRA_FLOW_COMPLETE=1` and adds the slow permutation coverage.
+
+**e2e-real tier (Playwright).** `apps/kira-space/tests/e2e-real/`, project `e2e-real`
+(`bun run test:e2e-real:space`): a `go build -tags server` binary on a temp home, fake `claude`/`gh`
+first on `PATH`, Chromium on `/?window=<uuid>`. Server build locates git through
+`gitclient.NewHostLocator` (`locator_server.go`), not the darwin-only locator. Limits: no native
+dialogs (`page.route` stub), no terminal output (`EmitTo` needs a native window), no mobile access.
+Build lock, port and health helpers are shared with Studio via `packages/workbench/src/testing/e2eReal.ts`.
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
 `KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real

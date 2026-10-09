@@ -240,23 +240,10 @@ historical prose.
   integrated. With `--rebase-merges` the same rebase replayed exactly one real conflict, once.
   State the shape that makes this apply (a feature branch that carries merge commits of its own),
   not just the flag.
-- **`CodeWorkspaceService.ImportRepo` cannot succeed in this container, by design, not as a sandbox
-  quirk** (P129 Part 5's own `§6.1` live check): `gitclient.NewPlatformLocator()` returns
-  `unsupportedLocator` on every non-darwin `runtime.GOOS`, whose `Locate` always reports `notFound`
-  regardless of a configured `git.path` — this app's git *discovery* is macOS-only by its own design
-  comment ("docs/v1.3/SPEC.md, macOS only"), so `ImportRepo`'s `Discovery.Status` gate can never pass
-  here. `AdeTaskService`'s own git operations (`StartRun`, `Archive`, …) do **not** go through that
-  gate — they read `settings.Git.GitPath` directly
-  (`main.go`'s `adeGitPathSetting`) and run real git via `gitclient.Run` unconditionally. A live
-  check against a real repo therefore: (1) inserts a `model.CodeRepo` row directly (a throwaway
-  `internal/storage`/`internal/storage/repos` Go program, `repos.New(db.DB)` then
-  `CodeRepos.Create`, against the same `KIRA_SPACE_HOME` the server will open, run with the server
-  stopped), bypassing `ImportRepo` entirely; (2) calls `SettingsService.Set` with
-  `{"git":{"gitPath":"/usr/bin/git"}}` once the server is up, since the default `git.path` setting
-  is `""` and `exec.CommandContext(ctx, "", …)` fails outright (or seed the `settings` row
-  alongside the windows / code_repos rows: `INSERT INTO settings (key, value) VALUES ('git.path',
-  '"/usr/bin/git"')`; without it `StartRun` fails `E_INTERNAL … exec: no command`); (3) drives
-  `AdeTaskService`'s bound calls as usual. The `/wails/runtime` POST body for a bound call, driven with a plain `curl` (no
+- **`CodeWorkspaceService.ImportRepo` works in the `-tags server` build** (P231): `locator_server.go`
+  uses `gitclient.NewHostLocator`, which finds `git` on `PATH`. The darwin locator stays native-only.
+  Set `git.path` via `SettingsService.Set` (`{"git":{"gitPath":"/usr/bin/git"}}`) or the `settings`
+  row `git.path`; the default `""` fails `exec: no command` in ADE git calls. The `/wails/runtime` POST body for a bound call, driven with a plain `curl` (no
   browser, no `wails3` client): `{"object":0,"method":0,"args":{"call-id":"<uuid>","methodName":
   "github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge.<Service>.<Method>",
   "methodID":0,"args":[<positional JSON args>]}}` — `object:0`/`method:0` select Wails v3's own
@@ -355,16 +342,10 @@ historical prose.
 Build: `go build -tags server ./apps/kira-space/...` (Wails v3/Go's own `server` platform, above),
 temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 
-- **Seed `windows('main')` plus a `code_repos` row before navigating to `/?window=main`.** A server
-  build serves bound calls over TCP with no webview and no native shell — nothing creates the
-  `windows` row a real GUI boot would. Without it the boot call fails `unknown window: main`
-  (`internal/appstorage/tabs.go:117`). Insert both rows into the SQLite DB under `KIRA_SPACE_HOME`
-  directly before the first request.
-- **Git discovery is darwin-only** (`apps/kira-space/internal/gitclient/discovery.go`,
-  `NewPlatformLocator`): on any other `runtime.GOOS`, `unsupportedLocator.Locate` always returns
-  `false`, so real git features never come up in this recipe as shipped. Exercising them needs a
-  throwaway local patch to `Locate` returning a real `git` binary path — **never commit that
-  patch**; revert it before finishing the session, same as any other sandbox-only workaround.
+- **Page boots with `/?window=<uuid>`**: the renderer calls `WindowsService.Ensure`, which creates
+  the `windows` row. No seeding. Import repos via `CodeWorkspaceService.ImportRepo`.
+- **Git discovery works here** (P231): the server build uses `gitclient.NewHostLocator`. No
+  throwaway `Locate` patch.
 - **A fresh or reused worktree needs `bun run setup` before typecheck, unit tests, knip or a push.**
   Bindings are gitignored; a stale set (e.g. a removed `SetAgentAware`, a new `DockerService`) breaks
   `typecheck`, `test:unit` and the pre-push `lint:dead` (knip). Run it in the worktree you push from,
@@ -391,6 +372,17 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
   build with a `-overlay` JSON replacing the discovery file.
 - **In harness scripts never `pkill -f` or `pgrep -f` a pattern that appears in your own command line**
   (e.g. `claude --session-id`): it kills the calling shell. Anchor it (`pgrep -f '^claude --session-id'`).
+
+## Kira Space flow suites (P231)
+
+- Go flows: `bun run test:flows:space`. Complete suite: `bun run test:flows:space:complete`
+  (`KIRA_FLOW_COMPLETE=1`, 20 min timeout). Real-backend Playwright: `bun run test:e2e-real:space`
+  (builds `apps/kira-space/bin/kira-space-server-test` and `bin/fakeclaude`, gitignored).
+- Fake `claude`/`gh`: the test binary or `fakeclaude` symlinked as `claude`/`gh`. Scenario JSON
+  path in `KIRA_FAKE_SCEN`, call records (`.args`, `.cwd`, `.prompt`) in `KIRA_FAKE_DIR`.
+- Harness roots use a short `os.MkdirTemp("", "ksf")` path: unix-socket paths cap near 108 bytes.
+- Many watchers per parallel test can hit the inotify limit; raise `fs.inotify.max_user_instances`.
+- Run `go test` with `CGO_ENABLED=1`; lint with `PATH=$HOME/go/bin:$PATH`.
 
 ## Playwright UI tier — `webkit` needs fetching explicitly
 
