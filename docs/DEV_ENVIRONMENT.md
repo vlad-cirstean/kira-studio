@@ -44,7 +44,7 @@ means it hasn't been applied yet; don't recreate one that already exists for the
 and don't let this workaround become an excuse to touch workflow files more often than the task
 needs.
 
-## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
+## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`, and Docker flow tests)
 
 - **Claude Code on the web's Linux containers**: `docker` is preinstalled but the daemon isn't
   running and there's no systemd. Start it directly, as root: `nohup dockerd > /tmp/dockerd.log 2>&1 &
@@ -53,6 +53,8 @@ needs.
 - **The Docker module's real-engine test needs the daemon up** (P200): `go test -race -v
   ./internal/docker/... ./internal/shell/...`; `TestEngine` skips without `dockerd`, so confirm it
   shows `--- PASS`, not `SKIP`.
+- **Studio Docker flow tests need the daemon up too**; see "Kira Studio flow
+  suites (P232)" below.
 - **The other dev environment (macOS) uses Colima** (`colima start`) — not `dockerd` directly, and
   no systemd there either.
 - **Docker Hub blob downloads are blocked here.** `production.cloudfront.docker.com` (the CDN every
@@ -362,8 +364,7 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
   `/proc/<pid>/environ` (`KIRA_AGENT_HOOK_TOKEN`, `KIRA_TERMINAL_ID`) and argv (`--settings <hooks.json>`),
   then pipe `{"hook_event_name":"Stop","session_id":"<id>","cwd":"<cwd>"}` into the `hook` shim next to
   that `hooks.json` with the same env.
-- **The server-tag build drops terminal output**: `EmitTo(windowKey)` needs a native window
-  (`internal/shell/wails.go`), so a TUI tab stays blank. Sessions, hooks and the DB still work.
+- The server build's `EmitTo` broadcasts (`internal/shell/emitto_server.go`, P231); listeners filter by id.
 - **A fake `gh` or `claude` needs a `HOME` override** (P150). PTY login shells reorder `PATH`, so a prefix
   set in the server's env is lost. Point `HOME` at a dir whose `.bash_profile` prepends the fake bin dir,
   then confirm with `/proc/<pid>/cmdline`. Discovery uses `exec.LookPath` for `gh`.
@@ -383,6 +384,16 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 - Harness roots use a short `os.MkdirTemp("", "ksf")` path: unix-socket paths cap near 108 bytes.
 - Many watchers per parallel test can hit the inotify limit; raise `fs.inotify.max_user_instances`.
 - Run `go test` with `CGO_ENABLED=1`; lint with `PATH=$HOME/go/bin:$PATH`.
+
+## Kira Studio flow suites (P232)
+
+- Go flows: `bun run test:flows:studio`. Complete suite: `bun run test:flows:studio:complete`
+  (`KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`, 20 min timeout).
+- Docker flows need `dockerd` up (Docker section) and pull `mirror.gcr.io/library/alpine:3.20`. Labelled
+  leftovers older than an hour are swept at the next run.
+- `bun run test:e2e-real:studio` builds `apps/kira-studio/bin/flowservers` (gitignored), the HTTP, HTTPS
+  and gRPC servers the Go flows also use.
+- Run `go test` with `CGO_ENABLED=1`.
 
 ## Playwright UI tier — `webkit` needs fetching explicitly
 
@@ -469,9 +480,8 @@ failure is a real regression: check whether the diff is this uniform text-render
 (every glyph on the page, not one specific element) rather than an element moving/resizing/changing
 color — the former is this sandbox's font drift, not a bug, and `--update-snapshots` run from here
 would corrupt the real CI baseline with this container's non-canonical rendering rather than fix
-anything. Confirmed 2026-09-22 (v1.9 P104 Stream A verification). v2.1 added real content changes on
-top of the drift (fourth Studio mode tab, Space Claude Code settings item, quick-commands dialog), so
-those baselines need one regeneration on the CI-Linux setup, not just a drift dismissal.
+anything. Confirmed 2026-09-22 (v1.9 P104 Stream A verification). Baselines were re-recorded in this
+container (P227, P229); regenerate on CI only if the `ui` job disagrees.
 
 ## `golangci-lint` / `knip` — code-quality tooling in this environment (P94)
 
@@ -513,6 +523,8 @@ pre-push design.
   in the `.githooks/pre-push` hook (`go build ./...`, `bun run lint:go`, `bun run lint:dead`, ~30s
   warm) — push is
   when work leaves the machine, the same boundary CI defends — and in CI's `checks` job.
+- **`typecheck:*` run `--incremental`** (P215) with one `tsBuildInfoFile` per project under
+  `node_modules/.cache/tsbuildinfo` (gitignored). Delete that directory to force a cold check.
 
 ## A pre-P97 dev box still has orphaned repo-map files on disk
 
@@ -687,7 +699,7 @@ flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LAD
 ## Grid prototype (P165) — `proto/grid/`
 
 Dev-only Cheetah Grid prototype beside SlickGrid baselines. Not in the shipped bundle; Go embeds only
-`frontend/dist`. Plan and verdict: `docs/v2.0/plans/P163-cheetah-grid-prototype.md`.
+`frontend/dist`. Plan and verdict: `docs/v2.0/plans/P165-cheetah-grid-prototype.md`.
 
 - Pages: `cheetah.html`, `slick.html?variant=kira|stock`, `empty.html` (bare scroller control).
   Query: `fixture=features` (NULL, empty, truncated, masked, FK rows), `w`/`h`, `rowHeight`, `zebra=1`,
