@@ -13,3 +13,9 @@
 - Repro: review a branch, open its diff tab, reload the page with the Review sidebar and diff tab restored, graph tab not shown. Opening the graph tab (first workspace tab), then Retry, recovers.
 - Suspected cause: only the graph host sends `repo.open` on a fresh stream connection; Review pane and diff editor compare before it, and Retry does not re-open the repo. Not traced to a line (found in the browser).
 - Class: obvious fix (Review and diff paths ensure `repo.open` on connect/Retry)
+
+## A3 code search results never reach a server-build window
+- Test: e2e-real repos-dialog-real `P231 finding A3` (test.fixme)
+- Failure: search status stays "Searching…"; no result rows.
+- Suspected cause: apps/kira-space/internal/shell/wails.go `emitter.EmitTo` (~37-47) finds no window via `app.Window.GetByName(windowKey)` in the `-tags server` build; silent no-op. Also hits other EmitTo events (terminal output, ADE open-session).
+- Class: needs harness/Commit-0 change (server-build emitter delivers EmitTo to browser window by key, or broadcasts)
