@@ -444,11 +444,16 @@ function rebuildColumns(): void {
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
+  const drawnBefore = graphWidth();
   if (column === 'graph') graphAuto = false;
   const input = fitInput();
   const limit = maxDragWidth(column, fitColumns(input), input);
   const clamped = Math.min(limit, Math.max(minWidthFor(column), Math.round(next)));
-  if (widths.value[column] === clamped) return;
+  if (widths.value[column] === clamped) {
+    // Leaving auto mode changes the drawn width (lane floor to stored) with no stored change.
+    if (column === 'graph' && graphWidth() !== drawnBefore) rebuildColumns();
+    return;
+  }
   widths.value = { ...widths.value, [column]: clamped };
   rebuildColumns();
   emit('update:columnWidths', widths.value);
