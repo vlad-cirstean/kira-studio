@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // P201: internal/memory's wire shapes (Memory, Event, History, StoreResult) and
-// bridge/memory.go's MemoryMcpStatus/MemoryInstallResult.
+// bridge/memory.go's MemoryMcpStatus.
 export const memoryAuthorSchema = /*#__PURE__*/ z.enum(['user', 'agent']);
 export type MemoryAuthor = z.infer<typeof memoryAuthorSchema>;
 
@@ -81,20 +81,12 @@ export const memoryStoreResultSchema = /*#__PURE__*/ z.object({
 export type MemoryStoreResult = z.infer<typeof memoryStoreResultSchema>;
 
 export const memoryMcpStatusSchema = /*#__PURE__*/ z.object({
-  command: z.string(),
   executable: z.string(),
   claudeAvailable: z.boolean(),
+  claudePath: z.string(),
   probed: z.array(z.string()),
 });
 export type MemoryMcpStatus = z.infer<typeof memoryMcpStatusSchema>;
-
-// "installed" | "notFound" | "installFailed" — mcpinstall's outcome vocabulary.
-export const memoryInstallResultSchema = /*#__PURE__*/ z.object({
-  outcome: /*#__PURE__*/ z.enum(['installed', 'notFound', 'installFailed']),
-  detail: z.string(),
-  probed: z.array(z.string()),
-});
-export type MemoryInstallResult = z.infer<typeof memoryInstallResultSchema>;
 
 // P210: bridge/memory.go's SemanticStatus. While downloading, done/total are bytes; otherwise they
 // are memory counts (vectors stored vs memories).

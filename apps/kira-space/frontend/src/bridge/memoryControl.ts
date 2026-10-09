@@ -1,8 +1,8 @@
 import * as MemoryImportService from '@bindings/memoryimportservice.js';
 import * as MemoryService from '@bindings/memoryservice.js';
+import { claudeLegacyCleanupSchema, claudeLegacyStatusSchema } from '@shared/domain/claudeConfig';
 import {
   memoryHistorySchema,
-  memoryInstallResultSchema,
   memoryMcpStatusSchema,
   memorySchema,
   memorySemanticStatusSchema,
@@ -43,8 +43,6 @@ export const memoryControl: MemoryControl = {
     return memoryStoreResultSchema.parse(await unwrap(call));
   },
   memoryMcpStatus: async () => memoryMcpStatusSchema.parse(await unwrap(MemoryService.McpStatus())),
-  memoryMcpInstall: async () =>
-    memoryInstallResultSchema.parse(await unwrap(MemoryService.InstallClaudeCode())),
   onMemoryChanged: (cb) => on(CHANNEL.memoryChanged, cb),
   memorySemanticStatus: async () =>
     memorySemanticStatusSchema.parse(await unwrap(MemoryService.SemanticStatus())),
@@ -72,4 +70,12 @@ export const memoryControl: MemoryControl = {
     await unwrap(MemoryImportService.RetryFile({ fileId }));
   },
   onMemoryImport: (cb) => on(CHANNEL.memoryImport, cb),
+};
+
+// P233: entries earlier versions registered in the user's Claude Code config; listed and removed
+// only on the user's request.
+export const claudeLegacyControl = {
+  load: async () => claudeLegacyStatusSchema.parse(await unwrap(MemoryService.ClaudeLegacy())),
+  remove: async () =>
+    claudeLegacyCleanupSchema.parse(await unwrap(MemoryService.RemoveClaudeLegacy())),
 };

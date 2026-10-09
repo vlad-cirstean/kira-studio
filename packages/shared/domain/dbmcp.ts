@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-// M1 §6.2: the Database MCP section's own domain — bridge/dbmcp.go's DbMcpStatus/
-// DbMcpInstallResult wire projections. command is the copy-paste registration text naming the
-// headersHelper script path; it holds no secret.
+// M1 §6.2: the Database MCP section's own domain — bridge/dbmcp.go's DbMcpStatus wire
+// projection. command is copy-paste text for a user who runs it themselves outside Kira Space; it
+// names the headersHelper script path and holds no secret.
 export const dbMcpStatusSchema = /*#__PURE__*/ z.object({
   running: z.boolean(),
   command: z.string(),
@@ -14,14 +14,6 @@ export const dbMcpStatusSchema = /*#__PURE__*/ z.object({
   error: z.string(),
 });
 export type DbMcpStatus = z.infer<typeof dbMcpStatusSchema>;
-
-// "installed" | "notFound" | "installFailed" — mcpinstall.Install's own outcome vocabulary.
-export const dbMcpInstallResultSchema = /*#__PURE__*/ z.object({
-  outcome: /*#__PURE__*/ z.enum(['installed', 'notFound', 'installFailed']),
-  detail: z.string(),
-  probed: z.array(z.string()),
-});
-export type DbMcpInstallResult = z.infer<typeof dbMcpInstallResultSchema>;
 
 // M3 §6.2/§9.3: the plan evidence an approval request can carry — dbmcp.ApprovalPlan's wire
 // projection (bridge/dbmcp.go's DbMcpApprovalPlan). Issues are capped at 10 server-side

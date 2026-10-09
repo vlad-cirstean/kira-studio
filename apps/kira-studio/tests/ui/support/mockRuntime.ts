@@ -145,7 +145,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dbMcpStatus: 'DbMcpService.Status',
   dbMcpSetEnabled: 'DbMcpService.SetEnabled',
   dbMcpRegenerate: 'DbMcpService.Regenerate',
-  dbMcpInstallClaudeCode: 'DbMcpService.InstallClaudeCode',
+  dbMcpClaudeLegacy: 'DbMcpService.ClaudeLegacy',
+  dbMcpRemoveClaudeLegacy: 'DbMcpService.RemoveClaudeLegacy',
   dbMcpPendingApprovals: 'DbMcpService.PendingApprovals',
   dbMcpApproveQuery: 'DbMcpService.ApproveQuery',
   dbMcpDenyQuery: 'DbMcpService.DenyQuery',
@@ -331,6 +332,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     expiresAt: '',
     error: '',
   }),
+  // P233: the Database MCP pane lists earlier Claude Code registrations when it opens.
+  [IPC.dbMcpClaudeLegacy]: JSON.stringify({ file: '/home/u/.claude.json', entries: [] }),
   // P66: initAppUpdate() polls this unconditionally right after mount, on every boot — the same
   // no-committed-fixture-will-ever-snapshot-this reasoning as dbMcpStatus above. "no update" is
   // the honest default for a dev-server run under Playwright, which never reports a tagged release

@@ -6,8 +6,10 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import LegacyClaudeConfigSection from '@workbench/claude/LegacyClaudeConfigSection.vue';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { computed, useId } from 'vue';
+import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
 import { useDbMcpStore } from '../../state/dbmcp';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
@@ -42,24 +44,6 @@ const { busy: dbMcpToggling, run: onToggleDbMcpEnabled } = useBusyAction(
 const { busy: dbMcpRegenerating, run: onRegenerateDbMcpToken } = useBusyAction(
   guard(() => dbMcpStore.regenerateDbMcpToken()),
 );
-const { busy: dbMcpInstalling, run: onInstallDbMcpClaudeCode } = useBusyAction(
-  guard(() => dbMcpStore.installDbMcpClaudeCode()),
-);
-
-const dbMcpInstallMessage = computed(() => {
-  const result = dbMcpStore.installResult;
-  if (!result) return null;
-  switch (result.outcome) {
-    case 'installed':
-      return 'Registered with Claude Code.';
-    case 'notFound':
-      return "Claude Code's CLI isn't available. Copy the command above and run it yourself once it is installed.";
-    case 'installFailed':
-      return `Claude Code refused the registration: ${result.detail}. Copy the command above and run it yourself.`;
-    default:
-      return null;
-  }
-});
 
 const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpStore.status.expiresAt));
 
@@ -116,29 +100,26 @@ const dbMcpEnabledId = useId();
            once a command was shown (the common case post-F8: the command shows across ordinary
            restarts now, so this is no longer the rare branch it used to be). -->
       <template v-else-if="dbMcpStore.status.running">
-        <template v-if="dbMcpStore.status.command">
+        <FieldDescription data-testid="db-mcp-sessions">
+          Claude Code sessions Kira Space starts get kira-db while this server runs. Kira Studio does
+          not change your Claude Code configuration.
+        </FieldDescription>
+        <details v-if="dbMcpStore.status.command" data-testid="db-mcp-outside">
+          <summary class="cursor-pointer text-kira-sm text-muted-foreground">Use outside Kira Space</summary>
+          <FieldDescription class="my-1">
+            A command you run yourself to register kira-db in Claude Code for sessions Kira Space
+            does not start. It edits your Claude Code configuration.
+          </FieldDescription>
           <p
             class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-sm leading-normal"
             data-testid="db-mcp-command"
           >
             {{ dbMcpStore.status.command }}
           </p>
-          <Button
-            variant="dialog"
-            size="kira-lg"
-            class="self-start"
-            :disabled="dbMcpInstalling"
-            data-testid="db-mcp-install-button"
-            @click="onInstallDbMcpClaudeCode"
-          >{{ dbMcpStore.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
-          </Button>
-          <FieldDescription v-if="dbMcpInstallMessage" data-testid="db-mcp-install-outcome">
-            {{ dbMcpInstallMessage }}
-          </FieldDescription>
-        </template>
+        </details>
         <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-no-token">
-          This server restarted since it was last enabled; its registration command needs a
-          fresh token to show again.
+          This server restarted since it was last enabled; the command for use outside Kira Space
+          needs a fresh token to show again.
         </p>
         <Button
           variant="dialog"
@@ -162,6 +143,12 @@ const dbMcpEnabledId = useId();
         }}
       </FieldDescription>
     </template>
+
+    <LegacyClaudeConfigSection
+      :load="control.dbMcpClaudeLegacy"
+      :remove="control.dbMcpRemoveClaudeLegacy"
+      backup-dir="~/.kira-studio/claude-config-backups"
+    />
 
     <FieldLegend>Exposed connections</FieldLegend>
     <FieldDescription>

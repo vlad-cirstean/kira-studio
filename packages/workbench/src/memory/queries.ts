@@ -63,14 +63,6 @@ export function useMemoryMcpStatus() {
   );
 }
 
-export function useInstallMemoryMcp() {
-  const { control } = useMemoryModule();
-  return useMutation(
-    { mutationKey: [...MEMORY_KEY, 'install'], mutationFn: () => control.memoryMcpInstall() },
-    queryClient,
-  );
-}
-
 const SEMANTIC_KEY = [...MEMORY_KEY, 'semantic'] as const;
 
 export function useMemorySemanticStatus() {

@@ -13,9 +13,9 @@ for (const section of sections) {
         {
           channel: IPC.memoryMcpStatus,
           response: {
-            command: "claude mcp add-json --scope user 'kira-memory' '{}'",
             executable: '/Applications/Kira Space',
             claudeAvailable: true,
+            claudePath: '/usr/local/bin/claude',
             probed: [],
           },
         },
