@@ -6,6 +6,9 @@
 - Repro: `flowharness.Silent(t)` (TCP accept, never write); `GrpcService.Describe{reflection, target}`.
 - Suspected cause: `grpcclient/reflect.go:250` bounds reflection at `defaultReflectionTimeout` (30 s), but the HTTP/2 handshake never completes, so gRPC's own connect timeout (20 s default, `MinConnectTimeout`) ends it first. `Describe` has no `opId`, so the user has no cancel path (`bridge/grpc.go:139`). Found by read; observed 20.10 s.
 - Proposed fix: bound dial+handshake in `grpcclient.dialConn` (`grpc.WithConnectParams` with `MinConnectTimeout` ~5 s, or a short connect deadline in `resolveReflection`), and consider an `opId` on `Describe` so Stop works.
+- Requirement (user): Describe against a server that accepts TCP but never answers must fail well under 20 s. Bound connect + HTTP/2 handshake + reflection by one deadline, default about 5 s, overridable by the request's own timeout if the UI has one. Return a clear timeout error (a timeout code and a sentence naming the target and the wait), not `E_GRPC_TRANSPORT` with a bare `error reading server preface: raw-read tcp ... use of closed network connection`.
+- Same defect in Call and ServerStream: probed against `Silent`, both block 20.00 s then return the same bare `E_GRPC_TRANSPORT`. Skipped test `TestCallSilentServer` (10 s budget) covers both; same fix applies in the shared dial path.
+- Call has no first-response deadline once connected. By read, `grpcclient/call.go` sets none: a server that completes the handshake but never replies blocks until the user presses Stop (the call has an `opId`, so Stop works). Not probed (the harness has no handshake-then-silent server; `Slow` replies eventually). Proposed: keep unbounded for streams by design, but give unary a configurable deadline with a visible default, and surface `E_TIMEOUT`.
 - Class: product bug
 
 ## A-2 Harness: unary methods skip the server interceptor

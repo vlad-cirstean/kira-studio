@@ -180,3 +180,20 @@ func TestDescribeSilentServer(t *testing.T) {
 		t.Errorf("Describe took %s, want an error within 10s (Describe has no opId, so no cancel path exists)", took.Round(time.Second))
 	}
 }
+
+func TestCallSilentServer(t *testing.T) {
+	t.Skip("P232 finding A-1: Call against a silent server blocks 20 s then E_GRPC_TRANSPORT; 10 s budget fails")
+	app := flowharness.New(t)
+	addr := flowharness.Silent(t)
+
+	for _, m := range []string{"Unary", "ServerStream"} {
+		start := time.Now()
+		_, err := app.W.Grpc.Call(ctx, callArgs(addr, m, `{"text":"x"}`))
+		if err == nil {
+			t.Fatalf("%s against a silent server succeeded", m)
+		}
+		if took := time.Since(start); took > 10*time.Second {
+			t.Errorf("%s took %s, want an error within 10s", m, took.Round(time.Second))
+		}
+	}
+}
