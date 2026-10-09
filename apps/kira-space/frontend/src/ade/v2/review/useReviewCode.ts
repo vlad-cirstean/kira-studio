@@ -1,0 +1,84 @@
+import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
+import { computed, nextTick, watch } from 'vue';
+import { reviewChoices } from '../board/reviewCode';
+import type { CardModel } from '../plan/usePlanModel';
+import { usePlanModel } from '../plan/usePlanModel';
+import { useOpenReviewWindow } from '../queries';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
+
+interface OpenOpts {
+  /** Replaces the default, which shows the message in the task panel. */
+  onError?(message: string): void;
+}
+
+function refocus(el: HTMLElement | null): void {
+  if (el?.isConnected) el.focus({ preventScroll: true });
+}
+
+/** Opens a branch's review window. Go focuses an already open one. Focus returns to the invoker. */
+export function useReviewCode() {
+  const ui = useAdeBoardUiStore();
+  const contextMenu = useContextMenuStore();
+  const { model } = usePlanModel();
+  const mutation = useOpenReviewWindow();
+
+  function open(
+    taskId: string,
+    branchId: string,
+    returnTo: HTMLElement | null,
+    opts?: OpenOpts,
+  ): void {
+    delete ui.actionError[taskId];
+    mutation.mutate(
+      { branchId },
+      {
+        onError: (err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          if (opts?.onError) return opts.onError(message);
+          if (ui.selectedTaskId !== taskId) ui.select(taskId);
+          ui.actionError[taskId] = message;
+        },
+        onSettled: () => refocus(returnTo),
+      },
+    );
+  }
+
+  /** One branch opens it; several show a picker under `anchor`. */
+  function openTask(card: CardModel, anchor: HTMLElement | null): void {
+    const graph = model.value?.view.graph;
+    if (!graph) return;
+    const choices = reviewChoices(card, graph);
+    const taskId = card.task.id;
+    if (choices.length === 0) return;
+    if (choices.length === 1) {
+      if (!choices[0].disabled) open(taskId, choices[0].branchId, anchor);
+      return;
+    }
+    const items: MenuItem[] = [
+      { type: 'label', label: 'Review which branch?' },
+      ...choices.map(
+        (c): MenuItem => ({
+          type: 'item',
+          id: `ade-review-pick-${c.branchId}`,
+          label: c.label,
+          disabled: c.disabled,
+          hint: c.tip,
+          run: () => open(taskId, c.branchId, anchor),
+        }),
+      ),
+    ];
+    const r = anchor?.getBoundingClientRect();
+    contextMenu.openContextMenuAt(r?.left ?? 0, r?.bottom ?? 0, items);
+    watch(
+      () => contextMenu.open,
+      async () => {
+        await nextTick();
+        refocus(anchor);
+      },
+      { once: true },
+    );
+  }
+
+  const pending = computed(() => mutation.isPending.value);
+  return { open, openTask, pending };
+}

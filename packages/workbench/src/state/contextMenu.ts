@@ -1,4 +1,5 @@
 import type { ShortcutId } from '@shared/domain/shortcuts';
+import type { TextPart } from '@theme/varText';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 
@@ -17,7 +18,7 @@ export type MenuItem =
        *  rendered through the same Tooltip/TooltipTrigger/TooltipContent trio every other hint
        *  uses (P104 §5.3), so it inherits the shared open-delay/rearm behavior for free rather than
        *  the row inventing its own. */
-      hint?: string;
+      hint?: string | readonly TextPart[];
       /** P21: names a binding in shared/domain/shortcuts.ts by id, never a display string — a typo is a
        *  type error, and the printed key can never drift from the key that actually runs `run()`. */
       shortcut?: ShortcutId;
