@@ -4,7 +4,7 @@
 
 Kira Studio is a native macOS workbench that combines a visual database client for ten engines
 (DataGrip/DBeaver class) with an HTTP/gRPC API client (Postman/Insomnia class). It is built on
-Wails (Go) and Vue 3, and you switch between its **Studio** (database), **Api**, **Terminal** and
+Wails (Go) and Vue 3, and you switch between its **Studio** (database), **Api**, **Automations** and
 **Docker** modes with one button.
 
 This repository also contains a sibling app, **Kira Space** — a native git client and code
@@ -107,7 +107,7 @@ Per-engine adapter facts).
   re-run, plus a persisted operation log.
 - **Also** — three-tier caching with no speculative prefetch
   ([`docs/PERF.md`](docs/PERF.md)), Touch ID (or system password) confirmation before revealing a saved password,
-  multiple windows (`⇧⌘N`), a command palette (`⇧⌘P`), a terminal module with quick commands
+  multiple windows (`⇧⌘N`), a command palette (`⇧⌘P`), an Automations module with scripts
   grouped in collections, and Settings for appearance, data, cache, Api, Database MCP and advanced
   options.
 

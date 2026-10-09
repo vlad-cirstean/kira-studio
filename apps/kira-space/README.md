@@ -47,7 +47,7 @@ and Vue 3. Its modules are Git, Agents, Terminal and Memory. The same backend al
 - **Memory** — an MCP server for Claude Code with keyword and semantic search. Semantic search needs
   an optional local model of about 35 MB, downloaded when you click the button in Settings > Memory.
   Add memories by hand, or import files or folders in bulk.
-- **Terminal** — a terminal module with quick commands grouped in collections.
+- **Automations** — an Automations module: scripts grouped in collections, each run in its own folder with a status and result, plus terminals.
 - **Phone view** — Settings > Mobile access serves the Agents board to a phone. It uses plain HTTP and
   is meant for a trusted home network only: you pair by QR code and approve the code on the desktop,
   device tokens expire after 30 days, and traffic is not encrypted.
