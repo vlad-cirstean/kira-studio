@@ -37,6 +37,9 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P239 | Claude Code usage limits (5-hour and weekly: % used, reset time) in the status bar, ADE module only. Default source: the `rate_limits` Claude Code hands to a status-line command injected per session (user's own status line kept). Opt-in fallback (off by default): read Claude Code's stored OAuth token read-only and call the undocumented usage endpoint, no refresh, no writes. TanStack Query, tooltip, states, off switch | Todo |
 | P240 | One-step review from the ADE Plan: a Review code action on every task card, branch row, task and branch context menu, task panel header and a keyboard shortcut (Cmd/Ctrl+Shift+R on the selected task or branch) opens the existing per-branch review window on the branch and its base, focusing an already open one; a task with several branches picks one; hidden for parked branches, disabled with a reason for an uncreated branch or one with no commits on its base; focus returns to the invoking element. Frontend only, reuses `OpenReviewWindow`. Waits for Stream A (P236 owns `ade/v2/**`) | Todo |
 | P241 | Task base branch and headless rebase: pick the base (repo main default, any local or remote branch, or another planner branch to stack on) when creating a task and per branch; a Change base action on a started task stores the new base and rebases the branch and its stacked children. Rebase, Queue after and Change base become one shared button rule across tag, header and fix menu (no popup), run as a headless Claude run through the run engine after the existing prompt dialog. The agent reports through `finish_step` (done, failed or needs_input with reason, conflicted files, last git error, what it tried); Kira Space verifies the result in git, synthesizes `no report` on crash, exit or timeout, stores a structured outcome on the run, shows it on the board, panel, Needs you and the P238 notification, and serves it to other agents via a `run_outcome` MCP tool. Abort rebase as an explicit action. Waits for Streams A and C and for P240 (shared files) | Todo |
+| P242 Part 1 | Automations: rename the Terminal module (user-facing only) to Automations; one shared run outcome (done, failed, blocked, cancelled with source and reason) for every ADE run and every script run; script runs in terminal tabs recorded in a run store with live state and elapsed time, a runs list, Stop, Copy for agent, status bar count; working directory per script (ADE worktree toggle, picked folder, default `<app home>/automations/<id>`, never `$HOME`; legacy rows keep `$HOME` with a notice). Runs after P241 | Todo |
+| P242 Part 2 | Smart scripts: a script kind run as headless Claude (`claude -p`, stream-json log, schema-forced final report), AI badge, declared params (text, select, multi-select, secret) plus ADE variables in Space, run dialog with task/branch popup on ambiguity and a full preview, invocable from Automations, an ADE task or branch, and as a workflow step; same live status and outcome as Part 1; notification and `run_outcome` in Space; Studio without ADE variables | Todo |
+| P242 Part 3 | Recurring scripts: a cron schedule (5 fields, timezone, next 3 fires shown) on a normal or smart script; enable toggle, run now, no overlap by default, concurrency cap, missed runs skipped by default, fires only while the app runs; normal scripts run headless; runs in the same run list with a `scheduled` trigger; notification on failure (Space). `adhocore/gronx` | Todo |
 
 ### Streams for P236-P239 (user override: 3 concurrent streams)
 
@@ -77,6 +80,7 @@ updates `docs/ARCHITECTURE.md` test counts.
 - P239: in the ADE module status bar, Claude Code usage limits now (5-hour and weekly, % used, reset time); check how Orca ADE does it and how it gets a token without me doing anything.
 - P240: very easy, from a task in the ADE plan window, to open a review window.
 - P241: set the base branch of a new task and change it for a started one; base changes stay a button next to the task, no popup, buttons consistent; rebases done by a headless Claude run (it resolves conflicts), prompt shown first as always; the agent reports back to the kira-ade MCP when done or failed, with a reason, shown to me and passable to another agent.
+- P242: smart scripts: on-demand headless Claude scripts that report how they ended; same params as a workflow plus custom envs (input or multi-select of predefined options); used in workflows, from the terminal section and from an ADE task; popup to choose when an interpolated value is ambiguous (2 branches, 2 repos); see it running the whole time, then success or failure with the reason, the same for every headless Claude and every normal script run; AI badge; Studio too, without ADE variables. Added: rename the Terminal section to Automations; recurring scripts on a cron schedule; working directory = ADE workdir when run from ADE (toggle), a picked folder, or by default a new folder under the Kira home, never the home directory.
 
 ## P210 result
 
@@ -742,5 +746,17 @@ Skipped: none. Checks: lint, typecheck, lint:dead, golangci-lint, `go build` (+ 
 Pending.
 
 ## P241 result
+
+Pending.
+
+## P242 Part 1 result
+
+Pending.
+
+## P242 Part 2 result
+
+Pending.
+
+## P242 Part 3 result
 
 Pending.
