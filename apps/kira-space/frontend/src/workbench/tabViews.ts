@@ -1,3 +1,4 @@
+import ScriptRunView from '@workbench/automations/runs/ScriptRunView.vue';
 import TerminalTabView from '@workbench/terminal/TerminalTabView.vue';
 import type { Component } from 'vue';
 import type { SpaceTabKind } from '../state/tabDomain';
@@ -21,4 +22,5 @@ export const TAB_VIEWS: Record<SpaceTabKind, Component> = {
   'repo-diff': RepoDiffTabView,
   'repo-multi-diff': RepoMultiDiffTabView,
   terminal: TerminalTabView,
+  'script-run': ScriptRunView,
 };

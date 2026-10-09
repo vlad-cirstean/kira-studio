@@ -1,5 +1,7 @@
 import type { PaletteColor } from '@shared/domain/color';
+import { scriptRunState } from '@workbench/automations/runs/runStates';
 import type { MenuItem } from '@workbench/state/contextMenu';
+import { scriptRunTabKind } from '@workbench/tabs/scriptRunTabKind';
 import { terminalTabKind } from '@workbench/tabs/terminalTabKind';
 import { parseStateWith, type TabKindRegistry } from '@workbench/tabs/types';
 import { useRepoLinksStore } from '../repo/state/repoLinks';
@@ -164,5 +166,9 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       SPACE_TAB_KIND_MODE.terminal,
       (tabId) => useTerminalsStore().closeTerminalSession(tabId),
       (tabId) => useTerminalsStore().terminalSession(tabId),
+    ),
+    'script-run': scriptRunTabKind<'script-run', TabRecord, TabIcon, PaletteColor, MenuItem>(
+      SPACE_TAB_KIND_MODE['script-run'],
+      scriptRunState,
     ),
   };

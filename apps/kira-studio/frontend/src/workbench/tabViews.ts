@@ -1,3 +1,4 @@
+import ScriptRunView from '@workbench/automations/runs/ScriptRunView.vue';
 import type { TabViewMap } from '@workbench/tabs/types';
 import TerminalTabView from '@workbench/terminal/TerminalTabView.vue';
 import EnvironmentsTabView from '../api/EnvironmentsView.vue';
@@ -37,4 +38,5 @@ export const TAB_VIEWS: TabViewMap<StudioTabKind> = {
   // Terminal-module tab or a repo terminal — the two differ only in workspaceId/codeRepoId, set by
   // whichever opener built the tab.
   terminal: TerminalTabView,
+  'script-run': ScriptRunView,
 };

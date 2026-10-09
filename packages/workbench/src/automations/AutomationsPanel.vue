@@ -15,7 +15,7 @@ import { moveToCollectionMenu } from '@workbench/util/collectionMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
 import { useAutomationsModule } from './module';
-import { useRunScript } from './runScript';
+import { useRerun, useRunScript } from './runScript';
 import RunElapsed from './runs/RunElapsed.vue';
 import RunsSection from './runs/RunsSection.vue';
 import { useScriptRuns } from './runs/runsQueries';
@@ -201,10 +201,9 @@ async function runScript(script: CustomScript): Promise<void> {
   actionError.value = await startScript(script);
 }
 
-async function rerun(scriptId: string): Promise<void> {
-  const script = scripts.records().find((x) => x.id === scriptId);
-  if (script) await runScript(script);
-  else actionError.value = 'This script no longer exists.';
+const rerunRun = useRerun();
+async function rerun(run: ScriptRun): Promise<void> {
+  actionError.value = await rerunRun(run);
 }
 
 const { data: runs } = useScriptRuns();

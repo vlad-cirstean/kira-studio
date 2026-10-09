@@ -54,10 +54,13 @@ export function terminalTabKind<
         color: 'none',
         launchKind: 'shell',
         scriptId: '',
+        launchToken: '',
       }) as TerminalState,
     // Copying the cwd (and command/label/color) means "Duplicate tab" on a terminal opens a
     // second session with the same launch — which needs no special case.
-    duplicateState: (tab) => ({ ...(tab as TerminalRecord).state }) as TerminalState,
+    // A launch token is single-use: a duplicate must not carry the original's.
+    duplicateState: (tab) =>
+      ({ ...(tab as TerminalRecord).state, launchToken: '' }) as TerminalState,
     // The one place a PTY dies on close — blind-called for every kind (dropPageStoresForTab), so
     // a non-terminal tab id is a registry miss here, not a branch.
     dropResources,

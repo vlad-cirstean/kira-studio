@@ -1,4 +1,9 @@
-import { type TabScope, tabRecordBase, terminalTabStateSchema } from '@shared/domain/tabs';
+import {
+  scriptRunTabStateSchema,
+  type TabScope,
+  tabRecordBase,
+  terminalTabStateSchema,
+} from '@shared/domain/tabs';
 import { z } from 'zod';
 
 // P103 Part 2 (§5.1): Kira Space's own tab-kind vocabulary, split out of the old shared
@@ -13,6 +18,7 @@ const spaceTabKindSchema = /*#__PURE__*/ z.enum([
   'repo-diff',
   'repo-multi-diff',
   'terminal',
+  'script-run',
 ]);
 export type SpaceTabKind = z.infer<typeof spaceTabKindSchema>;
 
@@ -22,6 +28,7 @@ export const SPACE_RENDERABLE_TAB_KINDS: readonly SpaceTabKind[] = [
   'repo-diff',
   'repo-multi-diff',
   'terminal',
+  'script-run',
 ];
 
 export const SPACE_TAB_KIND_MODE: Record<SpaceTabKind, TabScope> = {
@@ -30,6 +37,7 @@ export const SPACE_TAB_KIND_MODE: Record<SpaceTabKind, TabScope> = {
   'repo-diff': 'repo',
   'repo-multi-diff': 'repo',
   terminal: 'repo',
+  'script-run': 'repo',
 };
 
 // C5 §6.2: the permanently pinned, unclosable first tab every repo workspace reserves for the
@@ -113,6 +121,11 @@ const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     ...tabRecordBase,
     kind: z.literal('terminal'),
     state: terminalTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('script-run'),
+    state: scriptRunTabStateSchema,
   }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;

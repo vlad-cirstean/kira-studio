@@ -58,6 +58,8 @@ export interface ScriptRunsSeam {
 export interface AutomationsModuleContext {
   defaultCwd(): string;
   openTerminalTab(opts: { cwd: string; launch?: TerminalLaunch }): void;
+  /** Opens (or focuses) the tab of one smart script run. */
+  openRunTab(runId: string, label: string): void;
   host: TerminalHostDeps;
   scripts: ScriptsSeam;
   runs: ScriptRunsSeam;

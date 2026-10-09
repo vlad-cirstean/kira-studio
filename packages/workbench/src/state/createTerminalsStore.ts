@@ -56,6 +56,7 @@ export interface TerminalsControl {
     command?: string,
     launchKind?: TerminalLaunchKind,
     scriptId?: string,
+    launchToken?: string,
   ): Promise<{ shell: string }>;
   terminalWrite(terminalId: string, data: string): Promise<void>;
   terminalResize(terminalId: string, cols: number, rows: number): Promise<void>;
@@ -178,6 +179,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
       command = '',
       launchKind: TerminalLaunchKind = 'shell',
       scriptId = '',
+      launchToken = '',
     ): Promise<void> {
       ensureSubscribed();
       const cwdCanonical = canonicalPath(cwd);
@@ -202,6 +204,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
           command,
           launchKind,
           scriptId,
+          launchToken,
         );
         const sess = byTabId.get(tabId);
         if (sess) sess.shell = shell;

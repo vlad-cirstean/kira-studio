@@ -117,7 +117,7 @@ export interface TabsHost<
    *  Kira Studio's `['studio', 'api']`. Kira Space needs none: every workspace key it has comes
    *  from a restored tab's own `workspaceId`. */
   seedWorkspaceKeys?: readonly K[];
-  /** A restored tab persists by default whenever `kind !== 'terminal'` (Kira Space's own rule,
+  /** A restored tab persists by default whenever `kind` is neither 'terminal' nor 'script-run' (Kira Space's own rule,
    *  the whole rule). Kira Studio narrows it further: also never an incognito tab. */
   persistable?(tab: R): boolean;
   /** Runs once, after `hydrateTabs` has parsed every restored tab and seeded
@@ -200,7 +200,8 @@ export function createTabsStore<
     let saveChain: Promise<void> = Promise.resolve();
 
     function persistableTabs(): R[] {
-      const isPersistable = host.persistable ?? ((t: R) => t.kind !== 'terminal');
+      const isPersistable =
+        host.persistable ?? ((t: R) => t.kind !== 'terminal' && t.kind !== 'script-run');
       return tabsState.tabs.filter(isPersistable);
     }
 

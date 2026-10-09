@@ -69,8 +69,18 @@ export const terminalTabStateSchema = z.object({
   launchKind: terminalLaunchKindSchema.default('shell'),
   // The stored script a launchKind 'script' tab runs; Go loads its command and folder. '' otherwise.
   scriptId: z.string().default(''),
+  // The single-use token a parametrised script's launch carries; never persisted (terminal tabs are not).
+  launchToken: z.string().default(''),
 });
 export type TerminalTabState = z.infer<typeof terminalTabStateSchema>;
+
+// A smart script run's tab: the run it follows and the script's name at open time (the tab title).
+// Not persisted, like a terminal tab: the run list reopens it.
+export const scriptRunTabStateSchema = /*#__PURE__*/ z.object({
+  runId: z.string(),
+  label: z.string().default(''),
+});
+export type ScriptRunTabState = z.infer<typeof scriptRunTabStateSchema>;
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. Generic over
  *  any record carrying `kind`/`path`, since `TabRecord` itself is now per-app. */

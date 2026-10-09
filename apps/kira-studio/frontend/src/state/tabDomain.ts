@@ -8,6 +8,7 @@ import {
 import {
   type PageSize,
   pageSizeSchema,
+  scriptRunTabStateSchema,
   sortSpecSchema,
   type TabScope,
   tabRecordBase,
@@ -42,6 +43,8 @@ const studioTabKindSchema = /*#__PURE__*/ z.enum([
   'environments',
   // P83 §7.1: an embedded shell at a working directory, rendered with @xterm/xterm.
   'terminal',
+  // P242: a smart script run, opened from the Automations module.
+  'script-run',
 ]);
 export type StudioTabKind = z.infer<typeof studioTabKindSchema>;
 
@@ -62,6 +65,7 @@ export const STUDIO_RENDERABLE_TAB_KINDS: readonly StudioTabKind[] = [
   'variable-set',
   'environments',
   'terminal',
+  'script-run',
 ];
 
 // P1 D5: a tab's mode is a total function of its kind — no mode column, no migration. All seven
@@ -79,6 +83,7 @@ export const STUDIO_TAB_KIND_MODE: Record<StudioTabKind, TabScope> = {
   'variable-set': 'api',
   environments: 'api',
   terminal: 'repo',
+  'script-run': 'repo',
 };
 
 // P108 Part 12 F14: every field defaulted, matching defaultDataTabState's own values below and
@@ -232,6 +237,11 @@ const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     ...tabRecordBase,
     kind: z.literal('terminal'),
     state: terminalTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('script-run'),
+    state: scriptRunTabStateSchema,
   }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;

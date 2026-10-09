@@ -10,7 +10,7 @@ import type { TerminalMountSession } from './useTerminalMount';
 export type TerminalHostTabState = Pick<
   TerminalTabState,
   'codeRepoId' | 'cwd' | 'command' | 'launchKind'
-> & { scriptId?: string };
+> & { scriptId?: string; launchToken?: string };
 
 export interface TerminalHostDeps {
   rendererDeps: TerminalRendererDeps;
@@ -24,6 +24,7 @@ export interface TerminalHostDeps {
     command: string,
     launchKind: TerminalHostTabState['launchKind'],
     scriptId: string,
+    launchToken: string,
   ) => Promise<void>;
   resizeTerminal: (tabId: string, cols: number, rows: number) => void;
 }

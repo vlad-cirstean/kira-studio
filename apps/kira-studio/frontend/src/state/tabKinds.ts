@@ -13,7 +13,9 @@ import {
 } from '@shared/domain/http';
 import { tabTitle } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import { scriptRunState } from '@workbench/automations/runs/runStates';
 import type { MenuItem } from '@workbench/state/contextMenu';
+import { scriptRunTabKind } from '@workbench/tabs/scriptRunTabKind';
 import { terminalTabKind } from '@workbench/tabs/terminalTabKind';
 import { parseStateWith, type TabKindRegistry } from '@workbench/tabs/types';
 import { useTreeStore } from '../project/state/tree';
@@ -344,5 +346,9 @@ export const TAB_KINDS: TabKindRegistry<
     STUDIO_TAB_KIND_MODE.terminal,
     (tabId) => useTerminalsStore().closeTerminalSession(tabId),
     (tabId) => useTerminalsStore().terminalSession(tabId),
+  ),
+  'script-run': scriptRunTabKind<'script-run', TabRecord, TabIcon, ConnectionColor, MenuItem>(
+    STUDIO_TAB_KIND_MODE['script-run'],
+    scriptRunState,
   ),
 };

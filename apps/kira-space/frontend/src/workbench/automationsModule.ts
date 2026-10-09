@@ -3,6 +3,7 @@ import { control } from '../bridge/control';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
+import { useTabsStore } from '../state/tabs';
 import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
 
@@ -15,11 +16,18 @@ export function createAutomationsModule(): AutomationsModuleContext {
   const settingsStore = useSettingsStore();
   const terminalsStore = useTerminalsStore();
   const modeStore = useModeStore();
+  const tabsStore = useTabsStore();
 
   return {
     defaultCwd: () => terminalsStore.terminalDefaults.cwd,
     openTerminalTab: (opts) => {
       openTerminalTab({ workspaceId: 'automations', cwd: opts.cwd, launch: opts.launch });
+    },
+    openRunTab: (runId, label) => {
+      tabsStore.openTab('script-run', null, runId, () => ({ runId, label }), {
+        reuse: true,
+        workspaceId: 'automations',
+      });
     },
     host: {
       rendererDeps: {

@@ -5,12 +5,15 @@ import { Button } from '@theme/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { useLocalStorage } from '@vueuse/core';
 import { computed, ref } from 'vue';
+import { useAutomationsModule } from '../module';
+import SmartBadge from '../smart/SmartBadge.vue';
 import RunElapsed from './RunElapsed.vue';
 import RunOutcomeBlock from './RunOutcomeBlock.vue';
 import RunStatusBadge from './RunStatusBadge.vue';
 import { useScriptRuns, useStopScriptRun } from './runsQueries';
 
-const emit = defineEmits<{ rerun: [scriptId: string] }>();
+const emit = defineEmits<{ rerun: [run: ScriptRun] }>();
+const ctx = useAutomationsModule();
 
 type Filter = 'all' | 'running' | 'failed';
 const open = useLocalStorage('kira.automations.runsOpen', true);
@@ -27,6 +30,10 @@ const rows = computed(() => {
 });
 
 function toggle(run: ScriptRun): void {
+  if (run.kind === 'smart') {
+    ctx.openRunTab(run.id, run.scriptName);
+    return;
+  }
   expanded.value = expanded.value === run.id ? null : run.id;
 }
 </script>
@@ -68,6 +75,7 @@ function toggle(run: ScriptRun): void {
             @click="toggle(run)"
           >
             <RunStatusBadge :state="run.state" />
+            <SmartBadge v-if="run.kind === 'smart'" />
             <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ run.scriptName }}</span>
             <RunElapsed :run="run" class="text-kira-sm text-muted-foreground" />
           </button>
@@ -82,7 +90,7 @@ function toggle(run: ScriptRun): void {
           </Button>
         </div>
         <div v-if="expanded === run.id" class="px-1.5 pb-1.5">
-          <RunOutcomeBlock :run="run" @rerun="emit('rerun', run.scriptId)" />
+          <RunOutcomeBlock :run="run" @rerun="emit('rerun', run)" />
         </div>
       </div>
     </div>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { computed, ref } from 'vue';
 import { useAutomationsModule } from '../automations/module';
-import { useRunScript } from '../automations/runScript';
+import { useRerun } from '../automations/runScript';
 import RunElapsed from '../automations/runs/RunElapsed.vue';
 import RunOutcomeBlock from '../automations/runs/RunOutcomeBlock.vue';
 import RunStatusBadge from '../automations/runs/RunStatusBadge.vue';
@@ -18,12 +19,11 @@ const run = useScriptRunByTerminal(() => props.tab.id);
 const scriptRun = computed(() => (props.tab.state.launchKind === 'script' ? run.value : null));
 const ended = computed(() => scriptRun.value !== null && scriptRun.value.state !== 'running');
 
-const runScript = useRunScript();
+const rerunRun = useRerun();
 const rerunError = ref<string | null>(null);
 
-async function rerun(scriptId: string): Promise<void> {
-  const script = ctx.scripts.records().find((x) => x.id === scriptId);
-  rerunError.value = script ? await runScript(script) : 'This script no longer exists.';
+async function rerun(run: ScriptRun): Promise<void> {
+  rerunError.value = await rerunRun(run);
 }
 
 async function tail(): Promise<string> {
@@ -47,7 +47,7 @@ async function tail(): Promise<string> {
           :run="scriptRun"
           compact
           :tail="tail"
-          @rerun="rerun(scriptRun.scriptId)"
+          @rerun="rerun(scriptRun)"
         />
         <span v-if="rerunError" class="text-kira-sm text-error" data-testid="script-run-error">{{ rerunError }}</span>
       </div>

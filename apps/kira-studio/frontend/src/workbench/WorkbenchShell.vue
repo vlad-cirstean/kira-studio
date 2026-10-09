@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RunScriptDialogHost from '@workbench/automations/run/RunScriptDialogHost.vue';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import WorkbenchShellBase from '@workbench/components/WorkbenchShell.vue';
@@ -59,6 +60,7 @@ const modeNewTab = computed(() => MODES[modeStore.active].newTab);
     </template>
     <template #status>
       <StatusBar />
+      <RunScriptDialogHost />
     </template>
   </WorkbenchShellBase>
 </template>

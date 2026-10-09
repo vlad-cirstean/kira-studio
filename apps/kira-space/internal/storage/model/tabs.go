@@ -34,6 +34,7 @@ var RenderableTabKinds = map[string]bool{
 	"repo-diff":       true,
 	"repo-multi-diff": true,
 	"terminal":        true,
+	"script-run":      true,
 }
 
 // IsRenderableTabKind reports whether kind is one of the renderable tab kinds.

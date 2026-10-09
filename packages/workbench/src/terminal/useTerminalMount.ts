@@ -6,7 +6,7 @@ import { loadTerminalRenderer } from './terminalRendererLoader';
 export type TerminalMountTabState = Pick<
   TerminalTabState,
   'codeRepoId' | 'cwd' | 'command' | 'launchKind'
-> & { scriptId?: string };
+> & { scriptId?: string; launchToken?: string };
 
 /** The subset of createTerminalsStore.ts's own TerminalSession this needs — status/exitCode/error
  *  drive footerText below, nothing else. */
@@ -38,6 +38,7 @@ export interface UseTerminalMountOptions {
     command: string,
     launchKind: TerminalLaunchKind,
     scriptId: string,
+    launchToken: string,
   ) => Promise<void>;
   resizeTerminal: (tabId: string, cols: number, rows: number) => void;
 }
@@ -95,6 +96,7 @@ export function useTerminalMount(options: UseTerminalMountOptions) {
         tabState.command,
         tabState.launchKind,
         tabState.scriptId ?? '',
+        tabState.launchToken ?? '',
       );
     }
 

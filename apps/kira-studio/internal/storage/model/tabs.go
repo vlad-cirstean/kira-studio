@@ -49,6 +49,8 @@ var RenderableTabKinds = map[string]bool{
 	// (go-ts-vocabulary-parity.spec.ts) demands a vocabulary complete regardless of what currently
 	// reaches it.
 	"terminal": true,
+	// P242: a smart script run; never persisted either, still part of the vocabulary.
+	"script-run": true,
 }
 
 // IsRenderableTabKind reports whether kind is one of the renderable tab kinds.

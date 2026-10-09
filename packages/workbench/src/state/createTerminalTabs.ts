@@ -17,6 +17,8 @@ export interface TerminalLaunch {
   kind: TerminalLaunchKind;
   /** Set for a stored script: Go then runs the stored command in its resolved folder. */
   scriptId?: string;
+  /** Single-use token of a parametrised script's launch (ScriptRuns Start). */
+  launchToken?: string;
 }
 
 export interface OpenTerminalTabOpts<K extends string> {
@@ -57,6 +59,7 @@ export function createOpenTerminalTab<K extends string>(useTabsStore: () => Term
         color: opts.launch?.color ?? 'none',
         launchKind: opts.launch?.kind ?? 'shell',
         scriptId: opts.launch?.scriptId ?? '',
+        launchToken: opts.launch?.launchToken ?? '',
       }),
       { reuse: false, workspaceId: opts.workspaceId },
     );

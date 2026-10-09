@@ -3,7 +3,7 @@ import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { Button } from '@theme/components/ui/button';
 import { copyOrReportError } from '@workbench/util/clipboard';
 import { ref } from 'vue';
-import { runReportText } from './runText';
+import { costText, runReportText } from './runText';
 
 // The run's result: reason, exit code, and the two actions. `tail` supplies the last terminal
 // lines for Copy for agent; `compact` drops the detail lines for the terminal tab strip.
@@ -38,6 +38,13 @@ async function copyForAgent(): Promise<void> {
 <template>
   <div class="flex flex-col gap-1 text-kira-sm" data-testid="run-outcome">
     <span data-testid="run-outcome-reason">{{ run.outcome?.reason || 'No result yet.' }}</span>
+    <span v-if="run.outcome?.summary" data-testid="run-outcome-summary">{{ run.outcome.summary }}</span>
+    <span v-if="run.outcome?.costUsd !== undefined" class="text-muted-foreground" data-testid="run-outcome-cost">
+      Cost {{ costText(run.outcome.costUsd) }}
+    </span>
+    <span v-if="run.outcome?.permissionDenials?.length" class="text-muted-foreground" data-testid="run-outcome-denials">
+      Denied: {{ run.outcome.permissionDenials.join(', ') }}
+    </span>
     <template v-if="!compact">
       <span v-if="run.outcome?.exitCode !== undefined" class="text-muted-foreground" data-testid="run-outcome-exit">
         Exit code {{ run.outcome.exitCode }}

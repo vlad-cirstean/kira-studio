@@ -1,0 +1,18 @@
+<script setup lang="ts">
+import { storeToRefs } from 'pinia';
+import RunScriptDialog from './RunScriptDialog.vue';
+import { useScriptRunDialogStore } from './runDialog';
+
+const store = useScriptRunDialogStore();
+const { request } = storeToRefs(store);
+</script>
+
+<template>
+  <RunScriptDialog
+    v-if="request"
+    :key="request.scriptId"
+    :script-id="request.scriptId"
+    :prefill="request.prefill"
+    @close="store.close()"
+  />
+</template>

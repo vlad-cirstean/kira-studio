@@ -130,7 +130,8 @@ export const useTabsStore = createTabsStore({
   // P71 §3.1: an incognito tab is never written — left out of the snapshot entirely, and
   // TabsService.Save replaces the window's whole tab set, so a tab switched to incognito
   // mid-session also drops whatever row it already had, with no separate delete call needed.
-  persistable: (t) => !useTabIncognitoStore().isIncognito(t.id) && t.kind !== 'terminal',
+  persistable: (t) =>
+    !useTabIncognitoStore().isIncognito(t.id) && t.kind !== 'terminal' && t.kind !== 'script-run',
   onOpened(record, reused) {
     if (!reused) {
       markHydrated(record.id);
