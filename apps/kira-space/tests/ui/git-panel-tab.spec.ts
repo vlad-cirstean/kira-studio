@@ -27,7 +27,7 @@ const CONTROL: ControlSnapshot[] = [
 
 const panelTab = (page: Page, name: 'repos' | 'files' | 'review') =>
   page.locator(`[data-testid="git-panel-tab-${name}"]`);
-const modeTab = (page: Page, mode: 'git' | 'terminal') =>
+const modeTab = (page: Page, mode: 'git' | 'automations') =>
   page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 
 test('opening a repo from the Repos list leaves the Repos tab selected', async ({ relaunch }) => {
@@ -47,7 +47,7 @@ test('the picked tab survives leaving the Git module and coming back', async ({ 
   await panelTab(page, 'review').click();
   await expect(panelTab(page, 'review')).toHaveAttribute('data-state', 'on');
 
-  await modeTab(page, 'terminal').click();
+  await modeTab(page, 'automations').click();
   await expect(panelTab(page, 'review')).toHaveCount(0);
   await modeTab(page, 'git').click();
   await expect(panelTab(page, 'review')).toHaveAttribute('data-state', 'on');

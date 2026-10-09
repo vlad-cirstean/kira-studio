@@ -314,7 +314,7 @@ async function inkBounds(
 
 async function modeTabInk(
   page: Page,
-  mode: 'studio' | 'api' | 'terminal' | 'docker',
+  mode: 'studio' | 'api' | 'automations' | 'docker',
 ): Promise<{ iconCentreY: number; labelCentreY: number; iconRightInset: number }> {
   const tab = modeTab(page, mode);
   const iconBoxLocator = tab.locator('[data-testid="mode-tab-icon"]');
@@ -345,7 +345,7 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
   const api = await modeTabInk(page, 'api');
   // P91 §17.3: Terminal is a third real .mode-tab — same ink guard extended to it as it was to
   // Studio/Api.
-  const terminal = await modeTabInk(page, 'terminal');
+  const terminal = await modeTabInk(page, 'automations');
   const docker = await modeTabInk(page, 'docker');
 
   // (a) F9(a)/D6(a): both icons render close to filling their own 16px box — measured, not

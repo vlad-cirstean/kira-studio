@@ -74,8 +74,8 @@ test('reveal-terminal switches to the Terminal module and shows that tab', async
     control: [{ channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } }],
   });
   const mode = (m: string) => page.locator(`[data-testid="mode-tab"][data-mode="${m}"]`);
-  await mode('terminal').click();
-  await page.click('[data-testid="terminal-start-new"]');
+  await mode('automations').click();
+  await page.click('[data-testid="automations-start-new"]');
   const tabs = page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]');
   await expect(tabs).toHaveCount(1);
   const openedId = () =>
@@ -89,6 +89,6 @@ test('reveal-terminal switches to the Terminal module and shows that tab', async
   await mode('git').click();
   await expect(mode('git')).toHaveClass(/is-active/);
   await emitWailsEvent(page, IPC.agentRevealTerminal, { terminalId: openedId() });
-  await expect(mode('terminal')).toHaveClass(/is-active/);
+  await expect(mode('automations')).toHaveClass(/is-active/);
   await expect(tabs).toHaveCount(1);
 });

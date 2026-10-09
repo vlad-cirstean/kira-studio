@@ -10,7 +10,7 @@ import type { ControlSnapshot } from './support/types';
 // persisted mode, a click eventually (never synchronously) reaches windowsSetMode, and a full
 // round trip across all three modules leaves the right tabs showing in each.
 
-function modeTab(page: Page, mode: 'git' | 'terminal' | 'ade') {
+function modeTab(page: Page, mode: 'git' | 'automations' | 'ade') {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
@@ -19,20 +19,20 @@ test('the title bar lists Git, Agents, Terminal, then Memory', async ({ relaunch
   const modes = await page
     .locator('[data-testid="mode-tab"]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-mode')));
-  expect(modes).toEqual(['git', 'ade', 'terminal', 'memory']);
+  expect(modes).toEqual(['git', 'ade', 'automations', 'memory']);
 });
 
 test('a window boots into whatever mode windowsEnsure answers with, with no Git panel mounted alongside it', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({
-    control: [{ channel: IPC.windowsEnsure, response: { mode: 'terminal' } }],
+    control: [{ channel: IPC.windowsEnsure, response: { mode: 'automations' } }],
   });
 
-  await expect(modeTab(page, 'terminal')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'automations')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'git')).not.toHaveClass(/is-active/);
-  await expect(page.locator('[data-testid="terminal-panel"]')).toBeVisible();
-  await expect(page.locator('[data-testid="terminal-start"]')).toBeVisible();
+  await expect(page.locator('[data-testid="automations-panel"]')).toBeVisible();
+  await expect(page.locator('[data-testid="automations-start"]')).toBeVisible();
   // The Git module's own left panel never mounts alongside another module's (WorkbenchShell.vue's
   // own `<component :is="activeModePanel">` — one panel at a time, P128 §2.6).
   await expect(page.locator('[data-testid="git-panel-tab-repos"]')).toHaveCount(0);
@@ -54,7 +54,7 @@ test('clicking a mode tab schedules exactly one debounced windowsSetMode, never 
 
   const setModeCalls = () => control.log().filter((e) => e.channel === IPC.windowsSetMode);
 
-  await modeTab(page, 'terminal').click();
+  await modeTab(page, 'automations').click();
   // Nothing yet — the click itself must not fire a synchronous IPC (F20's own invariant, shared
   // with Kira Studio's mode store since P128 §2.3).
   expect(setModeCalls()).toHaveLength(0);
@@ -62,7 +62,7 @@ test('clicking a mode tab schedules exactly one debounced windowsSetMode, never 
   expect(setModeCalls()).toHaveLength(0);
   await page.clock.runFor(2);
   await expect.poll(() => setModeCalls().length).toBe(1);
-  expect(setModeCalls()[0]?.args).toMatchObject({ mode: 'terminal' });
+  expect(setModeCalls()[0]?.args).toMatchObject({ mode: 'automations' });
 });
 
 const REPO = {
@@ -114,14 +114,14 @@ test('round trip: a repo\'s tabs hide behind Terminal, a Terminal-module tab ope
   // Switching to Terminal hides the repo's own tab strip entirely — visibleWorkspace()
   // (state/workspace.ts) now reads the mode store's own `'terminal'` id, not the still-active repo
   // workspace underneath it.
-  await modeTab(page, 'terminal').click();
-  await expect(modeTab(page, 'terminal')).toHaveClass(/is-active/);
-  await expect(page.locator('[data-testid="terminal-start"]')).toBeVisible();
+  await modeTab(page, 'automations').click();
+  await expect(modeTab(page, 'automations')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="automations-start"]')).toBeVisible();
   await expect(tab(page)).toHaveCount(0);
 
-  // Opening one there (terminal-start's own "New terminal") is the only tab visible while
+  // Opening one there (automations-start's own "New terminal") is the only tab visible while
   // Terminal stays active.
-  await page.click('[data-testid="terminal-start-new"]');
+  await page.click('[data-testid="automations-start-new"]');
   await expect(tab(page, 'terminal')).toHaveCount(1);
   await expect(tab(page)).toHaveCount(1);
 

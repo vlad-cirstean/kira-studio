@@ -283,7 +283,7 @@ test('leaving Agents with unsaved edits asks first', async ({ relaunch }) => {
   const { window: page } = await openWorkflows(relaunch);
   const name = page.locator(t('ade-wf-form-name'));
   await name.fill('Edited');
-  const terminal = page.locator('[data-testid="mode-tab"][data-mode="terminal"]');
+  const terminal = page.locator('[data-testid="mode-tab"][data-mode="automations"]');
   await terminal.click();
   await expect(page.locator(t('confirm-dialog'))).toBeVisible();
   await page.locator(t('confirm-dialog-cancel')).click();

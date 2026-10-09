@@ -350,7 +350,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // script gets "no scripts yet", not a fixture miss.
   [IPC.customScriptsList]: '{"collections":[],"scripts":[]}',
   // P91: main.ts's bootstrap() joins hydrateTerminalDefaults() to the same unconditional-every-boot
-  // Promise.all, same reasoning — a spec that never cares about the Terminal module's own default
+  // Promise.all, same reasoning — a spec that never cares about the Automations module's own default
   // cwd gets a plausible home directory, not a fixture miss. A spec that DOES care (terminal-
   // module.spec.ts's own unscoped-launch case) still wins with its own snapshot.
   [IPC.terminalDefaultCwd]: JSON.stringify({ path: '/home/test' }),

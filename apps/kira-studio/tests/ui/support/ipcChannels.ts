@@ -151,7 +151,7 @@ export const IPC = {
   terminalWrite: 'kira:terminal:write',
   terminalResize: 'kira:terminal:resize',
   terminalClose: 'kira:terminal:close',
-  // P91 §7: the Terminal module's own unscoped-launch default (the user's home directory).
+  // P91 §7: the Automations module's own unscoped-launch default (the user's home directory).
   terminalDefaultCwd: 'kira:terminal:defaultCwd',
 
   // P85 §9.2: the custom-scripts CRUD surface.
@@ -209,6 +209,10 @@ export const IPC = {
   // window (not one), driven by emitWailsEvent(page, IPC.customScriptsChanged, …) the same way.
   customScriptsChanged: 'kira:customScripts:changed',
   scriptRunsChanged: 'kira:scriptRuns:changed',
+  scriptRunsList: 'kira:scriptRuns:list',
+  scriptRunsGet: 'kira:scriptRuns:get',
+  scriptRunsStop: 'kira:scriptRuns:stop',
+  scriptRunsResolveDir: 'kira:scriptRuns:resolveDir',
   // P87 §3.2/§10.3: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape restated. Real wire channel string verbatim
   // (internal/appevent's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never

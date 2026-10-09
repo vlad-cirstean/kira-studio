@@ -1,0 +1,238 @@
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
+import type { ControlSnapshot } from './support/types';
+
+// P242 Part 1: Automations runs on the mocked bridge. A run's push event is emitted by hand; the
+// terminal id is the client-generated tab id, read back from the terminalOpen call.
+
+const SCRIPT = {
+  id: 'script-1',
+  name: 'Build all',
+  command: 'make build',
+  workingDir: '',
+  dirMode: 'kira',
+  color: 'blue',
+  collectionId: null,
+  sortOrder: 0,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+
+const DIR = { path: '/kira/automations/script-1', mode: 'kira', base: '/kira', blocker: '' };
+
+const BASE: ControlSnapshot[] = [
+  { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+  { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
+  { channel: IPC.scriptRunsResolveDir, response: DIR },
+  { channel: IPC.customScriptsList, response: { collections: [], scripts: [SCRIPT] } },
+];
+
+function run(terminalId: string, state: string, extra: Record<string, unknown> = {}) {
+  const finished = state !== 'running';
+  return {
+    id: 'run-1',
+    scriptId: SCRIPT.id,
+    scriptName: SCRIPT.name,
+    color: SCRIPT.color,
+    kind: 'script',
+    trigger: 'terminal',
+    state,
+    terminalId,
+    cwd: DIR.path,
+    command: SCRIPT.command,
+    outcome: finished
+      ? { status: state, reason: 'finished', source: 'exit', reported: false }
+      : null,
+    createdAt: 1_000,
+    startedAt: 1_000,
+    finishedAt: finished ? 4_000 : null,
+    ...extra,
+  };
+}
+
+async function startRun(page: Page, control: { log(): { channel: string; args?: unknown }[] }) {
+  await page.locator(`[data-testid="script-${SCRIPT.id}"]`).click();
+  let terminalId = '';
+  await expect
+    .poll(() => {
+      const e = control.log().find((x) => x.channel === IPC.terminalOpen);
+      terminalId = (e?.args as { terminalId?: string } | undefined)?.terminalId ?? '';
+      return terminalId;
+    })
+    .not.toBe('');
+  return terminalId;
+}
+
+const modeTab = (page: Page) => page.locator('[data-testid="mode-tab"][data-mode="automations"]');
+
+async function installClipboardSpy(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __clipboard: string[] };
+    w.__clipboard = [];
+    navigator.clipboard.writeText = (text: string) => {
+      w.__clipboard.push(text);
+      return Promise.resolve();
+    };
+  });
+}
+
+test('the module is named Automations', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [] });
+  await expect(modeTab(page)).toHaveText(/Automations/);
+  await modeTab(page).click();
+  await expect(page.locator('[data-testid="automations-panel"]')).toContainText('Automations');
+  await expect(page.locator('[data-testid="automations-panel"]')).toContainText('No scripts');
+  await expect(page.locator('[data-testid="automations-add"]')).toBeVisible();
+  await expect(page.locator('[data-testid="automations-start"]')).toContainText(
+    'Run a script from the panel',
+  );
+});
+
+test('a run shows a spinner, a tab badge and the status bar count, then its result', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({ control: BASE });
+  await modeTab(page).click();
+  const terminalId = await startRun(page, control);
+  const open = control.log().find((e) => e.channel === IPC.terminalOpen);
+  expect((open?.args as { scriptId?: string } | undefined)?.scriptId).toBe(SCRIPT.id);
+
+  await emitWailsEvent(page, IPC.scriptRunsChanged, run(terminalId, 'running'));
+  await expect(
+    page.locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-running"]`),
+  ).toBeVisible();
+  await expect(page.locator('[data-testid="status-runs"]')).toContainText('1 running');
+  await expect(page.locator('[data-testid="run-row"][data-state="running"]')).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid="script-run-strip"] [data-testid="run-status"]'),
+  ).toHaveText('Running');
+
+  await emitWailsEvent(page, IPC.scriptRunsChanged, run(terminalId, 'done'));
+  await expect(page.locator('[data-testid="status-runs"]')).toHaveCount(0);
+  await expect(
+    page.locator('[data-testid="run-row"][data-state="done"] [data-testid="run-status"]'),
+  ).toHaveText('Succeeded');
+  await expect(page.locator('[data-testid="script-run-outcome"]')).toBeVisible();
+  await expect(page.locator('[data-testid="tab-badge"]')).toHaveCount(1);
+});
+
+test('a failed run shows its reason and Copy for agent copies it', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({ control: BASE });
+  await modeTab(page).click();
+  const terminalId = await startRun(page, control);
+  await installClipboardSpy(page);
+  await emitWailsEvent(
+    page,
+    IPC.scriptRunsChanged,
+    run(terminalId, 'failed', {
+      outcome: {
+        status: 'failed',
+        reason: 'exited with status 3',
+        source: 'exit',
+        reported: false,
+        exitCode: 3,
+      },
+    }),
+  );
+  const outcome = page.locator('[data-testid="script-run-outcome"]');
+  await expect(outcome.locator('[data-testid="run-outcome-reason"]')).toHaveText(
+    'exited with status 3',
+  );
+  await outcome.locator('[data-testid="run-copy"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __clipboard: string[] }).__clipboard.at(-1) ?? '',
+      ),
+    )
+    .toContain('exited with status 3');
+  const copied = await page.evaluate(
+    () => (window as unknown as { __clipboard: string[] }).__clipboard.at(-1) ?? '',
+  );
+  expect(copied).toContain('Script: Build all');
+  expect(copied).toContain('Exit code: 3');
+});
+
+test('Run again opens a second terminal for the same script', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({ control: BASE });
+  await modeTab(page).click();
+  const terminalId = await startRun(page, control);
+  await emitWailsEvent(page, IPC.scriptRunsChanged, run(terminalId, 'failed'));
+  await page.locator('[data-testid="script-run-outcome"] [data-testid="run-again"]').click();
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.terminalOpen).length)
+    .toBe(2);
+});
+
+test('Stop on a running row stops that run', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({
+    control: [...BASE, { channel: IPC.scriptRunsStop, response: null }],
+  });
+  await modeTab(page).click();
+  const terminalId = await startRun(page, control);
+  await emitWailsEvent(page, IPC.scriptRunsChanged, run(terminalId, 'running'));
+  await page.locator('[data-testid="run-row"] [data-testid="run-stop"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.scriptRunsStop)?.args)
+    .toEqual({ id: 'run-1' });
+});
+
+test('a blocked folder shows the reason and opens no terminal', async ({ relaunch }) => {
+  const blocked = { ...DIR, blocker: '/kira/automations/script-1 is not a real folder: remove it' };
+  const { window: page, control } = await relaunch({
+    control: [
+      ...BASE.filter((s) => s.channel !== IPC.scriptRunsResolveDir),
+      { channel: IPC.scriptRunsResolveDir, response: blocked },
+    ],
+  });
+  await modeTab(page).click();
+  await page.locator(`[data-testid="script-${SCRIPT.id}"]`).click();
+  await expect(page.locator('[data-testid="script-error"]')).toHaveText(blocked.blocker);
+  expect(control.log().some((e) => e.channel === IPC.terminalOpen)).toBe(false);
+});
+
+test('a legacy home script offers the automations folder', async ({ relaunch }) => {
+  const legacy = { ...SCRIPT, dirMode: 'home' };
+  const { window: page } = await relaunch({
+    control: [
+      ...BASE.filter(
+        (s) => s.channel !== IPC.customScriptsList && s.channel !== IPC.scriptRunsResolveDir,
+      ),
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [legacy] } },
+      {
+        channel: IPC.scriptRunsResolveDir,
+        response: { path: '/home/test', mode: 'home', base: '/home/test', blocker: '' },
+      },
+    ],
+  });
+  await modeTab(page).click();
+  await page.locator(`[data-testid="script-${SCRIPT.id}"]`).click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-edit"]').click();
+  const dialog = page.locator('[data-testid="script-dialog"]');
+  const notice = dialog.locator('[data-testid="script-dialog-home-notice"]');
+  await expect(notice.locator('[data-testid="var-chip"][data-var="HOME"]')).toContainText(
+    '/home/test',
+  );
+  await notice.locator('[data-testid="script-dialog-use-kira"]').click();
+  await expect(dialog.locator('[data-testid="script-dialog-dir-preview"]')).toBeVisible();
+  await expect(dialog.locator('[data-testid="script-dialog-home-notice"]')).toHaveCount(0);
+});
+
+test('the Runs filter narrows to failed runs', async ({ relaunch }) => {
+  const rows = [
+    run('t-a', 'done', { id: 'r-a', createdAt: 3_000 }),
+    run('t-b', 'failed', { id: 'r-b', createdAt: 2_000 }),
+  ];
+  const { window: page } = await relaunch({
+    control: [...BASE, { channel: IPC.scriptRunsList, response: rows }],
+  });
+  await modeTab(page).click();
+  await expect(page.locator('[data-testid="run-row"]')).toHaveCount(2);
+  await page.locator('[data-testid="runs-filter-failed"]').click();
+  await expect(page.locator('[data-testid="run-row"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="run-row"]')).toHaveAttribute('data-state', 'failed');
+  await page.locator('[data-testid="runs-filter-running"]').click();
+  await expect(page.locator('[data-testid="runs-empty"]')).toBeVisible();
+});

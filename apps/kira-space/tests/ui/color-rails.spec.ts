@@ -119,9 +119,9 @@ test('repo, worktree, quick-command and dialog rails share one class, geometry a
   expect(await paintOf(navRail)).toBe(paint);
   await page.keyboard.press('Escape');
 
-  await page.locator('[data-testid="mode-tab"][data-mode="terminal"]').click();
-  const scriptRow = page.locator(`[data-testid="quick-command-${SCRIPT.id}"]`);
-  const scriptRail = scriptRow.locator('[data-testid="quick-command-rail"]');
+  await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
+  const scriptRow = page.locator(`[data-testid="script-${SCRIPT.id}"]`);
+  const scriptRail = scriptRow.locator('[data-testid="script-rail"]');
   await expectRail(scriptRail, scriptRow);
   expect(await paintOf(scriptRail)).toBe(paint);
 

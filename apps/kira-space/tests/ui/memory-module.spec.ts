@@ -90,7 +90,7 @@ const BASE: ControlSnapshot[] = [
   { channel: IPC.memoryHistory, response: HISTORY },
 ];
 
-function modeTab(page: Page, mode: 'git' | 'terminal' | 'ade' | 'memory') {
+function modeTab(page: Page, mode: 'git' | 'automations' | 'ade' | 'memory') {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 

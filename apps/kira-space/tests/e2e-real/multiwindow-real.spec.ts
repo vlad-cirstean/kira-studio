@@ -10,15 +10,15 @@ test('terminal output reaches only the page that owns the terminal', async ({ ki
   await other.waitForSelector('[data-testid="status-bar"]');
 
   const owner = kira.window;
-  await owner.locator('[data-testid="mode-tab"][data-mode="terminal"]').click();
-  await owner.locator('[data-testid="terminal-start-new"]').click();
+  await owner.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
+  await owner.locator('[data-testid="automations-start-new"]').click();
   await expect(owner.locator('.xterm-rows')).toBeVisible();
   await owner.locator('.xterm-helper-textarea').focus();
   await owner.keyboard.type('echo only-mine-$((20+22))');
   await owner.keyboard.press('Enter');
   await expect(owner.locator('.xterm-rows')).toContainText('only-mine-42');
 
-  await other.locator('[data-testid="mode-tab"][data-mode="terminal"]').click();
+  await other.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
   await expect(other.locator('.xterm-rows')).toHaveCount(0);
   await expect(other.locator('body')).not.toContainText('only-mine-42');
   await context.close();

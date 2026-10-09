@@ -3,7 +3,7 @@ import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 
-// P226: one colour mark across modules. The Studio connection tree rail and the quick-command
+// P226: one colour mark across modules. The Studio connection tree rail and the script
 // rail share one class string and geometry; apps/kira-space/tests/ui/color-rails.spec.ts pins
 // the same literal for the Space rails.
 
@@ -52,7 +52,7 @@ function script(id: string, color: string, sortOrder: number) {
   };
 }
 
-test('tree and quick-command rails share one class, geometry and paint', async ({ relaunch }) => {
+test('tree and script rails share one class, geometry and paint', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     control: [
       { channel: IPC.connectionsList, response: [CONNECTION] },
@@ -72,9 +72,9 @@ test('tree and quick-command rails share one class, geometry and paint', async (
   const treeRowBox = await treeRow.boundingBox();
   const treePaint = await treeRail.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-  await modeTab(page, 'terminal').click();
-  const row = page.locator('[data-testid="quick-command-a"]');
-  const rail = row.locator('[data-testid="quick-command-rail"]');
+  await modeTab(page, 'automations').click();
+  const row = page.locator('[data-testid="script-a"]');
+  const rail = row.locator('[data-testid="script-rail"]');
   await expect(rail).toHaveAttribute('class', RAIL_CLASS);
   const box = await rail.boundingBox();
   const rowBox = await row.boundingBox();
@@ -90,8 +90,8 @@ test('tree and quick-command rails share one class, geometry and paint', async (
   }
   expect(paint).toBe(treePaint);
 
-  const plain = page.locator('[data-testid="quick-command-b"]');
-  await expect(plain.locator('[data-testid="quick-command-rail"]')).toHaveAttribute(
+  const plain = page.locator('[data-testid="script-b"]');
+  await expect(plain.locator('[data-testid="script-rail"]')).toHaveAttribute(
     'class',
     EMPTY_RAIL_CLASS,
   );
