@@ -149,3 +149,63 @@ func sameJSON(a, b any) bool {
 	y, _ := json.Marshal(b)
 	return bytes.Equal(x, y)
 }
+
+func TestCustomScriptUpdateRemove(t *testing.T) {
+	app := flowharness.New(t)
+	cs := app.W.CustomScripts
+	rec, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{Name: "old", Command: "echo old", Color: "blue"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keep, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{Name: "keep", Command: "echo keep", Color: "green"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mark := app.Events.Mark()
+	dir := t.TempDir()
+	upd, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: quickcommands.CustomScriptFields{
+		Name: "new", Command: "echo new; exit 3", WorkingDir: dir, Color: "red",
+	}})
+	if err != nil || upd.Name != "new" || upd.Command != "echo new; exit 3" || upd.WorkingDir != dir || upd.Color != "red" {
+		t.Fatalf("Update = %+v (%v)", upd, err)
+	}
+	app.Events.WaitAfter(t, mark, bridge.ChannelCustomScriptsChanged, nil, wait)
+
+	// The updated command is what a terminal now runs.
+	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
+		TerminalID: "upd", WindowKey: "w1", Cwd: upd.WorkingDir, Cols: 80, Rows: 24, Command: upd.Command, LaunchKind: terminal.LaunchKindScript,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	waitMatch(t, app, mark, "w1", "upd", line("new"))
+	if code := waitExit(t, app, mark, "w1", "upd"); code != 3 {
+		t.Fatalf("exit code = %d, want 3", code)
+	}
+
+	if _, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: "missing", Fields: quickcommands.CustomScriptFields{Name: "x", Command: "x", Color: "blue"}}); err == nil {
+		t.Fatal("Update of an unknown command succeeded")
+	}
+	if _, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: quickcommands.CustomScriptFields{Name: "", Command: "x", Color: "blue"}}); err == nil {
+		t.Fatal("Update with an empty name succeeded")
+	}
+
+	mark = app.Events.Mark()
+	if err := cs.Remove(bridge.CustomScriptsRemoveArgs{ID: rec.ID}); err != nil {
+		t.Fatal(err)
+	}
+	var snap quickcommands.Snapshot
+	app.Events.WaitAfter(t, mark, bridge.ChannelCustomScriptsChanged, nil, wait).Decode(t, &snap)
+	if len(snap.Scripts) != 1 || snap.Scripts[0].ID != keep.ID {
+		t.Fatalf("snapshot after Remove = %+v, want only %q", snap, keep.Name)
+	}
+	if err := cs.Remove(bridge.CustomScriptsRemoveArgs{ID: rec.ID}); err == nil {
+		t.Fatal("removing an already removed command succeeded")
+	}
+
+	app.Restart(t)
+	again, err := app.W.CustomScripts.List()
+	if err != nil || len(again.Scripts) != 1 || again.Scripts[0].ID != keep.ID {
+		t.Fatalf("after Restart = %+v (%v)", again, err)
+	}
+}

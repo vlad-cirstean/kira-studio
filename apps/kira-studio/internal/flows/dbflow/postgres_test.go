@@ -1,0 +1,65 @@
+package dbflow
+
+import (
+	"testing"
+	"time"
+
+	"github.com/testcontainers/testcontainers-go"
+	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/testsupport"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+)
+
+// startPostgres runs a throwaway Postgres on a random port; the journey seeds it through the app.
+func startPostgres(t *testing.T) connections.Input {
+	t.Helper()
+	flowharness.RequireDocker(t)
+	const pass, dbName = "flowpass", "flowdb"
+	c, err := tcpostgres.Run(ctx, testsupport.ImageFor("postgres", "postgres:17-alpine"),
+		tcpostgres.WithDatabase(dbName), tcpostgres.WithUsername("postgres"), tcpostgres.WithPassword(pass),
+		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(120*time.Second)),
+	)
+	if err != nil {
+		t.Fatalf("start postgres: %v", err)
+	}
+	t.Cleanup(func() { _ = testcontainers.TerminateContainer(c) })
+	host, err := c.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mapped, err := c.MappedPort(ctx, "5432/tcp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return connections.Input{ConnectionFields: model.ConnectionFields{
+		Name: "flow pg", Kind: "postgres", Color: "indigo", Mode: "fields",
+		Host: ptr(host), Port: ptr(int(mapped.Num())), Database: ptr(dbName), Username: ptr("postgres"),
+		Options: map[string]any{"sslmode": "disable"}, McpReadMode: "deny", McpWriteMode: "deny", McpDdlMode: "deny",
+	}, Password: ptr(pass)}
+}
+
+func TestPostgresJourney(t *testing.T) {
+	flowharness.Complete(t)
+	in := startPostgres(t)
+	app := flowharness.New(t)
+	seed := createConn(t, app, in)
+	if st := connect(t, app, seed.ID); st.Status != "connected" {
+		t.Fatalf("seed connect = %+v", st)
+	}
+	execute(t, app, seed.ID,
+		"create table users (id serial primary key, name text not null, email text)",
+		"insert into users (name, email) values ('ada', 'ada@example.com'), ('bob', 'bob@example.com'), ('cy', null)",
+		"create view named_users as select id, name from users")
+	if err := app.W.Connections.Remove(bridge.ConnectionsIDArgs{ID: seed.ID}); err != nil {
+		t.Fatal(err)
+	}
+	bad := in
+	bad.Port = ptr(1)
+	j := &journey{t: t, app: app, input: in, table: "users", readSQL: "select id, name, email from users order by id", rows: 3, bad: &bad}
+	j.run()
+}
