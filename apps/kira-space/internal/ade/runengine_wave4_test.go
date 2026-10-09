@@ -336,7 +336,7 @@ func quotedAfter(t *testing.T, command, flag string) string {
 // spawn composes a launch the way the terminal host would and registers it live.
 func (e *engine) spawn(l adewire.Launch) string {
 	e.t.Helper()
-	composed, _, err := e.tracker.Compose(l.TerminalID, l.Command)
+	composed, _, err := e.tracker.Compose(l.TerminalID, "", l.Command)
 	if err != nil {
 		e.t.Fatalf("Compose: %v", err)
 	}

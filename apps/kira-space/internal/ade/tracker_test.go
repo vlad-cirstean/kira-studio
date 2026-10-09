@@ -104,7 +104,7 @@ func composeAndSpawn(t *testing.T, tr *Tracker, live *fakeLive, args PrepareArgs
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
-	if _, _, err := tr.Compose(res.TerminalID, res.Command); err != nil {
+	if _, _, err := tr.Compose(res.TerminalID, "", res.Command); err != nil {
 		t.Fatalf("Compose: %v", err)
 	}
 	live.add(res.TerminalID)
@@ -172,7 +172,7 @@ func TestTracker_ComposeMismatchedCommandRefused(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
-	if _, _, err := tr.Compose(res.TerminalID, res.Command+" extra"); err != ErrCommandMismatch {
+	if _, _, err := tr.Compose(res.TerminalID, "", res.Command+" extra"); err != ErrCommandMismatch {
 		t.Fatalf("Compose with mismatched command: err = %v, want ErrCommandMismatch", err)
 	}
 }
@@ -183,7 +183,7 @@ func TestTracker_SpawnNeverRegisteredStopsAfterGrace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
-	if _, _, err := tr.Compose(res.TerminalID, res.Command); err != nil {
+	if _, _, err := tr.Compose(res.TerminalID, "", res.Command); err != nil {
 		t.Fatalf("Compose: %v", err)
 	}
 	// Never added to `live` — the spawn itself failed after Compose returned.
@@ -243,7 +243,7 @@ func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
 	if resumeRes.Cwd != original {
 		t.Fatalf("resume result cwd = %q, want the originally recorded cwd %q", resumeRes.Cwd, original)
 	}
-	if _, _, err := tr.Compose(resumeRes.TerminalID, resumeRes.Command); err != nil {
+	if _, _, err := tr.Compose(resumeRes.TerminalID, "", resumeRes.Command); err != nil {
 		t.Fatalf("Compose resume: %v", err)
 	}
 	sessions, _ = listSessions(tr)
@@ -326,7 +326,7 @@ func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, _, err := tr.Compose(res.TerminalID, res.Command); err != nil {
+			if _, _, err := tr.Compose(res.TerminalID, "", res.Command); err != nil {
 				t.Errorf("Compose: %v", err)
 				return
 			}
@@ -375,11 +375,11 @@ func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("retry after abandoned launch: err = %v, want nil", err)
 	}
-	if _, _, err := tr.Compose(abandoned.TerminalID, abandoned.Command); err != nil {
+	if _, _, err := tr.Compose(abandoned.TerminalID, "", abandoned.Command); err != nil {
 		t.Fatalf("superseded intent composed without error path: %v", err)
 	}
 	// The superseded intent is gone, so it took the no-intent hooks-only path and held nothing.
-	if _, _, err := tr.Compose(a.TerminalID, a.Command); err != nil {
+	if _, _, err := tr.Compose(a.TerminalID, "", a.Command); err != nil {
 		t.Fatalf("Compose retry: %v", err)
 	}
 	live.add(a.TerminalID)
@@ -392,10 +392,10 @@ func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
 	tr.mu.Lock()
 	tr.pending["second"] = pendingIntent{RecordID: recordID, ClaudeSessionID: p1.SessionID, Command: p1.Command, Resume: true, CreatedAt: clock.Now()}
 	tr.mu.Unlock()
-	if _, _, err := tr.Compose(p1.TerminalID, p1.Command); err != nil {
+	if _, _, err := tr.Compose(p1.TerminalID, "", p1.Command); err != nil {
 		t.Fatalf("first Compose: %v", err)
 	}
-	if _, _, err := tr.Compose("second", p1.Command); err != ErrSessionRunning {
+	if _, _, err := tr.Compose("second", "", p1.Command); err != ErrSessionRunning {
 		t.Fatalf("second Compose: err = %v, want ErrSessionRunning", err)
 	}
 }
@@ -414,7 +414,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	composed, _, err := tr.Compose(res.TerminalID, res.Command)
+	composed, _, err := tr.Compose(res.TerminalID, "", res.Command)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +451,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	if again.RecordID != res.RecordID || again.Command != "claude --resume 'claude-9'" {
 		t.Fatalf("resume = %+v", again)
 	}
-	if _, _, err := tr.Compose(again.TerminalID, again.Command); err != nil {
+	if _, _, err := tr.Compose(again.TerminalID, "", again.Command); err != nil {
 		t.Fatal(err)
 	}
 	if rec, _ = store.Get(res.RecordID); rec.State != model.AdeSessionStateRunning {
@@ -516,7 +516,7 @@ func TestTracker_AbortDeletesFreshAndStopsResumed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
-	if _, _, err := tr.Compose(fresh.TerminalID, fresh.Command); err != nil {
+	if _, _, err := tr.Compose(fresh.TerminalID, "", fresh.Command); err != nil {
 		t.Fatalf("Compose: %v", err)
 	}
 	tr.Abort(fresh.TerminalID)
@@ -538,7 +538,7 @@ func TestTracker_AbortDeletesFreshAndStopsResumed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Prepare resume: %v", err)
 	}
-	if _, _, err := tr.Compose(resumed.TerminalID, resumed.Command); err != nil {
+	if _, _, err := tr.Compose(resumed.TerminalID, "", resumed.Command); err != nil {
 		t.Fatalf("Compose resume: %v", err)
 	}
 	tr.Abort(resumed.TerminalID)
@@ -546,7 +546,7 @@ func TestTracker_AbortDeletesFreshAndStopsResumed(t *testing.T) {
 	if len(sessions) != 1 || sessions[0].State != model.AdeSessionStateStopped {
 		t.Fatalf("after aborting a resume: %+v, want one stopped row", sessions)
 	}
-	if _, _, err := tr.Compose("unknown", "claude"); err != nil {
+	if _, _, err := tr.Compose("unknown", "", "claude"); err != nil {
 		t.Fatalf("Compose: %v", err)
 	}
 	tr.Abort("unknown")

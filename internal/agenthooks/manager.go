@@ -71,7 +71,7 @@ func (m *Manager) Status() Status {
 // text — a host must never return it from a bound method; deciding which launches get hooks at all
 // (a claude-code launch, never a plain shell or script) is the host's own call, made before this is
 // reached.
-func (m *Manager) ComposeLaunch(terminalID, command string) (string, []string) {
+func (m *Manager) ComposeLaunch(terminalID, cwd, command string) (string, []string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.srv == nil {

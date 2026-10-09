@@ -21,7 +21,7 @@ type BoundService struct {
 	// it nil, so its own Open is byte-identical to before this field existed. A func field, not a
 	// method: Wails' binding generator only ever sees exported *methods* on the registered type
 	// (§1.7's FQN rule), so adding this never grows either app's own bound-call surface.
-	ComposeAgent func(terminalID, command string) (string, []string, error)
+	ComposeAgent func(terminalID, cwd, command string) (string, []string, error)
 	// AbortAgent undoes ComposeAgent's persisted side effects when Open fails after a successful
 	// compose. Set together with ComposeAgent; a no-op for a terminalID it composed nothing for.
 	AbortAgent func(terminalID string)
@@ -116,7 +116,7 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	command, env := args.Command, []string(nil)
 	composedAgent := agent && b.ComposeAgent != nil
 	if composedAgent {
-		composed, composedEnv, err := b.ComposeAgent(args.TerminalID, command)
+		composed, composedEnv, err := b.ComposeAgent(args.TerminalID, args.Cwd, command)
 		if err != nil {
 			return OpenResult{}, ipcerr.New("E_INVALID", err.Error())
 		}

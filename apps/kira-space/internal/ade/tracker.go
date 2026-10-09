@@ -142,7 +142,7 @@ type Tracker struct {
 	// fresh marks records Compose inserted (not resumed), so Abort deletes rather than stops them.
 	fresh map[string]bool
 
-	hooks func(terminalID, command string) (string, []string)
+	hooks func(terminalID, cwd, command string) (string, []string)
 
 	// graceTimers are Compose's pending Reconcile timers, stopped by Close; graceWG waits for a
 	// callback already running.
@@ -187,13 +187,13 @@ func (t *Tracker) SetStoppedHandler(fn func(recordID string)) {
 // SetHooks installs the launch-composition callback (agenthooks.Manager.ComposeLaunch) — called
 // once in main.go before any window exists, so Compose never races an unset hooks func with a
 // real launch.
-func (t *Tracker) SetHooks(fn func(terminalID, command string) (string, []string)) {
+func (t *Tracker) SetHooks(fn func(terminalID, cwd, command string) (string, []string)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.hooks = fn
 }
 
-func (t *Tracker) hooksFn() func(string, string) (string, []string) {
+func (t *Tracker) hooksFn() func(string, string, string) (string, []string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.hooks
@@ -352,7 +352,7 @@ func (t *Tracker) hasPending(match func(pendingIntent) bool) bool {
 // calls it for every claude-code launch, composed or not. No intent for terminalID (a claude-code
 // launch not started through Prepare; this app has none today) means hooks-only composition, no
 // record — §4.4's own explicit fallback.
-func (t *Tracker) Compose(terminalID, command string) (string, []string, error) {
+func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, error) {
 	t.mu.Lock()
 	intent, ok := t.pending[terminalID]
 	if ok {
@@ -365,7 +365,7 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 		if hooks == nil {
 			return command, nil, nil
 		}
-		composed, env := hooks(terminalID, command)
+		composed, env := hooks(terminalID, cwd, command)
 		return composed, env, nil
 	}
 
@@ -377,7 +377,7 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 	// leave a persisted row for a conversation that never ran.
 	composed, env := command, []string(nil)
 	if hooks := t.hooksFn(); hooks != nil {
-		composed, env = hooks(terminalID, command)
+		composed, env = hooks(terminalID, cwd, command)
 	}
 	if intent.Message != "" {
 		// The command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
