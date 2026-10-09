@@ -1,7 +1,6 @@
 package bridge_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,7 +79,7 @@ func TestDbMcpLeavesClaudeConfig(t *testing.T) {
 	if st := svc.Status(); !st.ClaudeAvailable {
 		t.Fatalf("Status = %+v, want claude found", st)
 	}
-	svc.InstallClaudeCode(context.Background())
+	svc.ClaudeLegacy()
 	svc.Regenerate()
 	assertUnchanged := func(flow string) {
 		t.Helper()
