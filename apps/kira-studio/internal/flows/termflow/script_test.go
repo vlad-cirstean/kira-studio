@@ -34,7 +34,7 @@ func TestScriptInPickedFolder(t *testing.T) {
 	mark := app.Events.Mark()
 	cmd := "ls marker.txt; exit 4"
 	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
-		Name: "list", Command: cmd, WorkingDir: *picked.Path, Color: "blue",
+		Name: "list", Command: cmd, DirMode: scripts.DirModeFixed, WorkingDir: *picked.Path, Color: "blue",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +165,7 @@ func TestCustomScriptUpdateRemove(t *testing.T) {
 	mark := app.Events.Mark()
 	dir := t.TempDir()
 	upd, err := cs.Update(bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: scripts.CustomScriptFields{
-		Name: "new", Command: "echo new; exit 3", WorkingDir: dir, Color: "red",
+		Name: "new", Command: "echo new; exit 3", DirMode: scripts.DirModeFixed, WorkingDir: dir, Color: "red",
 	}})
 	if err != nil || upd.Name != "new" || upd.Command != "echo new; exit 3" || upd.WorkingDir != dir || upd.Color != "red" {
 		t.Fatalf("Update = %+v (%v)", upd, err)

@@ -19,6 +19,7 @@
 package flowharness
 
 import (
+	"database/sql"
 	"fmt"
 	"net/netip"
 	"os"
@@ -273,6 +274,9 @@ func (a *App) Restart() {
 	a.stop()
 	a.build()
 }
+
+// DB is the live database, for tests that plant or inspect rows no bound call reaches.
+func (a *App) DB() *sql.DB { return a.db.DB }
 
 // Scenario installs the fake agent's scenario; processes started afterwards read it.
 func (a *App) Scenario(s fakeagent.Scenario) {

@@ -17,6 +17,7 @@
 package flowharness
 
 import (
+	"database/sql"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -124,6 +125,9 @@ func (a *App) build() {
 		a.t.Fatalf("clear cookies: %v", err)
 	}
 }
+
+// DB is the live database, for tests that plant or inspect rows no bound call reaches.
+func (a *App) DB() *sql.DB { return a.db.DB }
 
 // NewWindows is how many times the app asked the shell for a new window.
 func (a *App) NewWindows() int {
