@@ -42,7 +42,7 @@ func newBoardHarness(t *testing.T) *boardHarness {
 	h.board = NewTaskBoard(TaskBoardDeps{
 		Credentials: gitcred.New(),
 		Tasks:       r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos, Runner: gitclient.NewExecRunner(),
-		Registry: registry, GitPath: func() string { return "git" },
+		Registry:  registry,
 		GitStatus: func(context.Context) gitclient.GitStatus { return h.status.Load().(gitclient.GitStatus) },
 		Workflows: &adeflow.Reader{Dir: t.TempDir(), Store: r.AdeTasks},
 		OnBoard:   func() { h.emitted.Add(1) }, HomeDir: "/home/u",
@@ -214,6 +214,10 @@ func TestTaskBoard_notCreatedAndTooOldGit(t *testing.T) {
 	h.addTask("T1", "task", branchSpec{id: "b1", repo: "r", name: "feat", kind: "mine"})
 	h.addTask("T2", "task", branchSpec{id: "b2", repo: "r", name: "", kind: "mine"})
 
+	// Opens (and caches) the repo while git is still ok; a later tooOld only fails the checks.
+	if _, err := h.board.openRepo(context.Background(), "r"); err != nil {
+		t.Fatal(err)
+	}
 	h.status.Store(gitclient.GitStatus{Kind: "tooOld", Detected: "2.30.0", Required: "2.38.0"})
 	board, err := h.board.Board(context.Background())
 	if err != nil {

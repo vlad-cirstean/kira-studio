@@ -569,7 +569,7 @@ func wireAdeTask(
 	board := ade.NewTaskBoard(ade.TaskBoardDeps{
 		Tasks: repositories.AdeTasks, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
-		Registry: git.registry, GitPath: gitPath,
+		Registry:        git.registry,
 		GitStatus:       func(ctx context.Context) gitclient.GitStatus { return git.discovery.Status(ctx, gitPath()) },
 		Askpass:         git.askpassBroker,
 		Workflows:       &adeflow.Reader{Dir: adeflow.Dir(config.KiraSpaceHome()), Store: repositories.AdeTasks},
@@ -614,10 +614,8 @@ func wireAdeTask(
 	return board
 }
 
-// adeGitPathSetting is TaskBoardDeps.GitPath's own construction — git.gitPath's own configured value
-// verbatim (never resolved through Discovery.Status here), the same shape gitPathFrom
-// (gitrpc/handlers.go) and CodeWorkspaceService.gitPathSetting already read it in: Registry.Acquire
-// resolves an unset/relative path itself.
+// adeGitPathSetting reads git.gitPath verbatim ("" by default). Not an executable: only
+// Discovery.Status resolves it to one, so the board opens repos with GitStatus().Path.
 func adeGitPathSetting(repositories *repos.Repos) func() string {
 	return func() string {
 		settings, err := repositories.Settings.GetAll()

@@ -226,7 +226,6 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 		},
 		Tasks: r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		GitRepoSettings: r.GitRepoSettings.Get, Runner: gitclient.NewExecRunner(), Registry: registry,
-		GitPath:   func() string { return "git" },
 		GitStatus: func(context.Context) gitclient.GitStatus { return gitclient.GitStatus{Kind: "ok", Path: "git"} },
 		Workflows: &adeflow.Reader{Dir: wfDir, Store: r.AdeTasks},
 		Logs:      r.AdeLogs, Sessions: r.AdeSessions, AgentDir: filepath.Join(t.TempDir(), "agent"), ClaudeBin: self,

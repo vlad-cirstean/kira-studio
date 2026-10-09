@@ -45,7 +45,6 @@ type TaskBoardDeps struct {
 	CodeRepos       *repos.CodeReposRepo
 	GitRepoSettings func(repoID string) (model.GitRepoSettings, error)
 	Registry        *gitsession.Registry
-	GitPath         func() string
 	// GitStatus is the app's git discovery (cached); every rebase-conflict check consults it first.
 	GitStatus func(ctx context.Context) gitclient.GitStatus
 	Askpass   *gitaskpass.Broker
@@ -282,7 +281,11 @@ func (b *TaskBoard) openRepo(ctx context.Context, codeRepoID string) (*gitsessio
 	if rec == nil {
 		return nil, fmt.Errorf("ade: board: code repo %s not found", codeRepoID)
 	}
-	summary, err := b.conn.Open(ctx, b.deps.Registry, b.deps.GitPath(), rec.Root)
+	status := b.deps.GitStatus(ctx)
+	if status.Kind != "ok" {
+		return nil, fmt.Errorf("ade: git is unavailable: %s", status.Kind)
+	}
+	summary, err := b.conn.Open(ctx, b.deps.Registry, status.Path, rec.Root)
 	if err != nil {
 		return nil, err
 	}

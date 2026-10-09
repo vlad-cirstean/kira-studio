@@ -3,9 +3,12 @@ package ade
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 )
 
 func fetchStamp(t *testing.T, h *boardHarness, repoID string) int64 {
@@ -90,7 +93,11 @@ func repoState(t *testing.T, h *boardHarness, repoID string) (remote string, fet
 func TestTaskBoard_RefreshWithDefaultGitPathSetting(t *testing.T) {
 	skipWithoutGitQueue(t)
 	h := newBoardHarness(t)
-	h.board.deps.GitPath = func() string { return "" }
+	gitBin, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not on PATH")
+	}
+	h.status.Store(gitclient.GitStatus{Kind: "ok", Path: gitBin})
 	_, dir := initQueueRepo(t)
 	h.addRepo("a", dir)
 	runGitQueue(t, dir, "checkout", "-q", "-b", "feat", "main")
