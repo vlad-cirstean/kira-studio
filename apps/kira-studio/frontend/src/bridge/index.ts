@@ -20,14 +20,13 @@ import * as TreeService from '@bindings/treeservice.js';
 import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type * as DataGripModels from '@bindings-internal/datagrip/models.js';
-import type { ClaudeLegacyCleanup, ClaudeLegacyStatus } from '@shared/domain/claudeConfig';
 import type {
   ConnectionInput,
   ConnectionState,
   ConnectionSummary,
 } from '@shared/domain/connection';
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
-import type { DbMcpApprovalSnapshot, DbMcpStatus } from '@shared/domain/dbmcp';
+import type { DbMcpApprovalSnapshot, DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { Layout } from '@shared/domain/layout';
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
@@ -276,10 +275,8 @@ const studioControl = {
     unwrap(DbMcpService.SetEnabled({ enabled })).then((r) => trust<DbMcpStatus>(r)),
   dbMcpRegenerate: (): Promise<DbMcpStatus> =>
     unwrap(DbMcpService.Regenerate()).then((r) => trust<DbMcpStatus>(r)),
-  dbMcpClaudeLegacy: (): Promise<ClaudeLegacyStatus> =>
-    unwrap(DbMcpService.ClaudeLegacy()).then((r) => trust<ClaudeLegacyStatus>(r)),
-  dbMcpRemoveClaudeLegacy: (): Promise<ClaudeLegacyCleanup> =>
-    unwrap(DbMcpService.RemoveClaudeLegacy()).then((r) => trust<ClaudeLegacyCleanup>(r)),
+  dbMcpInstallClaudeCode: (): Promise<DbMcpInstallResult> =>
+    unwrap(DbMcpService.InstallClaudeCode()).then((r) => trust<DbMcpInstallResult>(r)),
   dbMcpPendingApprovals: (): Promise<DbMcpApprovalSnapshot> =>
     unwrap(DbMcpService.PendingApprovals()).then((r) => trust<DbMcpApprovalSnapshot>(r)),
   dbMcpApproveQuery: (requestId: string): Promise<DbMcpApprovalSnapshot> =>

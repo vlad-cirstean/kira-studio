@@ -2,9 +2,8 @@ package bridge
 
 import (
 	"context"
+	"github.com/kirathecat/kira-studio/internal/embedded"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
@@ -12,15 +11,13 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/claudecfg"
-	"github.com/kirathecat/kira-studio/internal/embedded"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 )
 
-// dbMcpServerName is the name the copy-paste command registers under — internal/dbmcp's own
+// dbMcpServerName is the one name every Install call registers under — internal/dbmcp's own
 // server identity (Implementation.Name, dbmcp/server.go).
-const dbMcpServerName = claudecfg.NameDB
+const dbMcpServerName = "kira-db"
 
 // dbMcpTokenName is mcpauth.PathNamed's own file-name argument — no repo-id slug (M1 §2.2): one DB
 // MCP instance exists per app process per KIRA_HOME, with no second identity to key several apart
@@ -31,11 +28,11 @@ const dbMcpTokenName = "mcp-db"
 // it is implemented — the caller states only the methods it actually calls.
 type McpInstaller interface {
 	Status() mcpinstall.Status
-	Remove(ctx context.Context, name string) mcpinstall.Result
+	Install(ctx context.Context, name, url, token string) mcpinstall.Result
 }
 
 // DbMcpService is the Database MCP section's whole surface (M1 §6.2): Status, SetEnabled,
-// Regenerate, ClaudeLegacy, RemoveClaudeLegacy — it owns the embedded *dbmcp.Server's actual lifecycle,
+// Regenerate, InstallClaudeCode — it owns the embedded *dbmcp.Server's actual lifecycle,
 // constructed and started when the setting turns on (or already is, at boot), stopped when it
 // turns off or the app quits.
 type DbMcpService struct {
@@ -76,12 +73,6 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 			if err != nil {
 				return nil, err
 			}
-			// Kira Space reads this to give its own Claude Code sessions kira-db; nothing is
-			// registered in the user's Claude Code config.
-			ep := claudecfg.DBEndpoint{URL: srv.URL(), HeadersHelper: mcpauth.HeaderHelperScriptPath(home)}
-			if err := claudecfg.WriteDBEndpoint(home, ep); err != nil {
-				slog.Warn("db mcp: write endpoint file", "scope", "dbmcp", "err", err)
-			}
 			go func() {
 				if err := srv.Serve(); err != nil {
 					slog.Warn("db mcp embedded server", "scope", "dbmcp", "err", err)
@@ -100,9 +91,6 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 		// graceful drain finds nothing left in flight.
 		StopFn: func(srv *dbmcp.Server) {
 			s.Approvals.AbandonAll()
-			if err := claudecfg.RemoveDBEndpoint(config.KiraHome()); err != nil {
-				slog.Warn("db mcp: remove endpoint file", "scope", "dbmcp", "err", err)
-			}
 			_ = srv.Close()
 		},
 		StatusFn: func(srv *dbmcp.Server, startErr error) DbMcpStatus {
@@ -322,61 +310,36 @@ func (s *DbMcpService) Regenerate() DbMcpStatus {
 	return s.embedded.StatusLocked()
 }
 
-// ClaudeLegacyEntry is one Kira-written registration found in the user's Claude Code config.
-type ClaudeLegacyEntry struct {
-	Name    string `json:"name"`
-	Summary string `json:"summary"`
+// DbMcpInstallResult is mcpinstall.Result's wire projection — a domain package's plain Go struct
+// never crosses the wire directly, only this tagged copy of it.
+type DbMcpInstallResult struct {
+	Outcome string   `json:"outcome"`
+	Detail  string   `json:"detail"`
+	Probed  []string `json:"probed"`
 }
 
-// ClaudeLegacyStatus lists registrations earlier Kira versions made in File.
-type ClaudeLegacyStatus struct {
-	File    string              `json:"file"`
-	Entries []ClaudeLegacyEntry `json:"entries"`
+func toWireDbMcpInstallResult(r mcpinstall.Result) DbMcpInstallResult {
+	return DbMcpInstallResult{Outcome: r.Outcome, Detail: r.Detail, Probed: r.Probed}
 }
 
-// ClaudeLegacyCleanup is RemoveClaudeLegacy's outcome.
-type ClaudeLegacyCleanup struct {
-	Outcome    string   `json:"outcome"`
-	Removed    []string `json:"removed"`
-	Remaining  []string `json:"remaining"`
-	BackupPath string   `json:"backupPath"`
-	Detail     string   `json:"detail"`
-	Commands   []string `json:"commands"`
-}
-
-func claudeConfigFile() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
+// InstallClaudeCode never returns a Go error — mcpinstall.Install's own contract, following
+// connections.Service.Reveal's own precedent. A no-op result (outcome notFound) when nothing is
+// running: there is nothing to register yet.
+func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
+	// The lock covers only the state check: the spawn below can take up to 30 s and names a fixed
+	// URL and helper path, so holding mu would block Status, the toggle and app quit behind it.
+	s.embedded.Mu.Lock()
+	srv := s.embedded.Server
+	// F8: same gate statusFn uses — the on-disk helper mirror must exist and verify against the
+	// live record, not just "this run minted a fresh token".
+	if srv == nil || !helperTokenValid(srv) {
+		s.embedded.Mu.Unlock()
+		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
-	return claudecfg.ConfigPath(os.Getenv, home)
-}
-
-// ClaudeLegacy reads the user's Claude Code config for entries earlier versions registered. Read
-// only; a missing or unreadable file lists nothing.
-func (s *DbMcpService) ClaudeLegacy() ClaudeLegacyStatus {
-	st := ClaudeLegacyStatus{File: claudeConfigFile(), Entries: []ClaudeLegacyEntry{}}
-	found, err := claudecfg.DetectLegacy(st.File)
-	if err != nil {
-		slog.Warn("db mcp: read claude config", "scope", "dbmcp", "err", err)
-		return st
-	}
-	for _, e := range found.Entries {
-		st.Entries = append(st.Entries, ClaudeLegacyEntry{Name: e.Name, Summary: e.Summary})
-	}
-	return st
-}
-
-// RemoveClaudeLegacy removes every Kira-written entry ClaudeLegacy lists, after backing the file up
-// under Kira Studio's home. It runs only when the user confirms; nothing calls it on its own.
-func (s *DbMcpService) RemoveClaudeLegacy(ctx context.Context) ClaudeLegacyCleanup {
-	file := claudeConfigFile()
-	r := claudecfg.CleanupLegacy(ctx, s.Installer, file, filepath.Join(config.KiraHome(), "claude-config-backups"),
-		[]string{claudecfg.NameMemory, claudecfg.NameDB, claudecfg.NameRepoMap})
-	return ClaudeLegacyCleanup{
-		Outcome: r.Outcome, Removed: r.Removed, Remaining: r.Remaining,
-		BackupPath: r.BackupPath, Detail: r.Detail, Commands: r.Commands,
-	}
+	url := srv.URL()
+	s.embedded.Mu.Unlock()
+	helperPath := mcpauth.HeaderHelperScriptPath(config.KiraHome())
+	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, url, helperPath))
 }
 
 // dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own

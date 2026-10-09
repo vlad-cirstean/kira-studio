@@ -17,8 +17,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
-	"sync/atomic"
 	"time"
 
 	"github.com/kirathecat/kira-studio/internal/localsock"
@@ -52,9 +50,6 @@ type Options struct {
 	// OnEvent is called once per accepted hook request, from that request's own handler goroutine
 	// (net/http's usual one-goroutine-per-request model) — never after Close returns.
 	OnEvent func(Event)
-	// SessionMCP returns the --mcp-config document for one launch. nil, or an error, composes the
-	// launch without MCP config; a launch never fails for it.
-	SessionMCP func() ([]byte, error)
 }
 
 // Server owns, for its own lifetime: a 0700 temp directory, the generated hooks.json (§2.4), the
@@ -69,8 +64,6 @@ type Server struct {
 	quotedHooksPath string
 	shimPath        string
 	onEvent         func(Event)
-	sessionMCP      func() ([]byte, error)
-	mcpSeq          atomic.Int64
 
 	ln   *localsock.Listener
 	http *http.Server
@@ -127,8 +120,8 @@ func New(opts Options) (*Server, error) {
 
 	s := &Server{
 		hooksPath: hooksPath, quotedHooksPath: quotedHooksPath, shimPath: shimPath,
-		onEvent: opts.OnEvent, sessionMCP: opts.SessionMCP,
-		ln: ln,
+		onEvent: opts.OnEvent,
+		ln:      ln,
 	}
 	s.http = &http.Server{
 		Handler: s.mux(),
@@ -162,24 +155,6 @@ func (s *Server) Env(terminalID string) []string {
 		"KIRA_AGENT_HOOK_SOCKET=" + s.ln.SockPath,
 		"KIRA_AGENT_HOOK_TOKEN=" + s.ln.Token,
 	}
-}
-
-// mcpConfigArg writes one launch's --mcp-config document (0600, inside the private dir, removed
-// with it on Close) and returns its single-quoted path. "" means no document: no provider, or it
-// returned nothing.
-func (s *Server) mcpConfigArg() (string, error) {
-	if s.sessionMCP == nil {
-		return "", nil
-	}
-	doc, err := s.sessionMCP()
-	if err != nil || len(doc) == 0 {
-		return "", err
-	}
-	path := filepath.Join(s.ln.Dir, "mcp-"+strconv.FormatInt(s.mcpSeq.Add(1), 10)+".json")
-	if err := os.WriteFile(path, doc, 0o600); err != nil {
-		return "", fmt.Errorf("agenthooks: write mcp config: %w", err)
-	}
-	return shellSingleQuote(path)
 }
 
 // Close shuts the HTTP server down with a bounded context (dbmcp/http.go's own closeHTTP

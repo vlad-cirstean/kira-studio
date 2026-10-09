@@ -1,9 +1,8 @@
-// Package mcpinstall locates Claude Code's CLI and removes MCP registrations through it. Kira
-// never registers servers in the user's Claude Code config: sessions Kira Space starts get them
-// per launch (internal/claudecfg). Every spawn is argv-only, never a shell, and the package never
-// writes another program's config file directly. Command is the one exception: it renders shell
-// syntax (`;`, redirection) purely as copy-paste TEXT for a user to run themselves, never executed
-// by this package.
+// Package mcpinstall registers MCP servers with Claude Code's own CLI — the one client the apps
+// install for (docs/v1.7/plans/M1-db-mcp-server-core.md). Every real
+// spawn Install makes is argv-only, never a shell, never writes another program's config file
+// directly. Command is the one exception: it renders shell syntax (`;`, redirection) purely as
+// copy-paste TEXT for the pane's fallback UI, never executed by this package itself.
 package mcpinstall
 
 import (
@@ -11,14 +10,16 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
-// spawnTimeout bounds the one spawn Remove makes: a local, fast operation, so a wedged child is
-// the only failure a bound guards against.
+// spawnTimeout is this package's own bound on the one spawn Install makes (`claude mcp add`) — a
+// local, fast operation with no network round trip of its own, so a wedged child is the only
+// failure mode a bound needs to guard against.
 const spawnTimeout = 30 * time.Second
 
 // Deps are the three independent seams this package needs: finding `claude`, checking a candidate
@@ -55,8 +56,8 @@ func New(d Deps) *Installer {
 	return i
 }
 
-// Status is advisory: Remove re-resolves `claude` itself, so a CLI installed after Status was last
-// read still works.
+// Status is the pane's own pre-click render — advisory only: Install re-resolves everything
+// itself, so a `claude` installed after Status was last read still works on the next click.
 type Status struct {
 	// ClaudePath is "" when `claude` was not found at any probed location.
 	ClaudePath string
@@ -65,24 +66,26 @@ type Status struct {
 	Probed []string
 }
 
-// Result is Remove's outcome — see the Outcome* constants below. Remove never returns a Go error:
-// the outcome is a value the pane renders.
+// Result is Install's own outcome — see the Outcome* constants below. Install never returns a Go
+// error (connections.Service.Reveal's own precedent): a registration attempt is a value the pane
+// renders, not a failure the caller must handle specially.
 type Result struct {
 	Outcome string
-	// Detail is a bounded, single-line reason on removeFailed — never the token, never a child's
+	// Detail is a bounded, single-line reason on installFailed — never the token, never a child's
 	// stderr verbatim beyond what exec.go's firstLineBounded already truncated it to.
 	Detail string
 	Probed []string
 }
 
 const (
+	// OutcomeInstalled: `claude` found, `mcp add` exited 0.
+	OutcomeInstalled = "installed"
 	// OutcomeNotFound: `claude` not found anywhere in the probe order — not a failure state (§7.2):
 	// the command is already on screen to copy, and needs no fallback of its own.
 	OutcomeNotFound = "notFound"
-	// OutcomeRemoved: `claude` found, and the server is no longer registered under that name.
-	OutcomeRemoved = "removed"
-	// OutcomeRemoveFailed: `claude mcp remove` failed for a reason other than "not registered".
-	OutcomeRemoveFailed = "removeFailed"
+	// OutcomeInstallFailed: `claude` was found but exited non-zero (e.g. a name collision) or could
+	// not be spawned.
+	OutcomeInstallFailed = "installFailed"
 )
 
 // locateClaude checks PATH first, then every absolute candidate in order, every path considered
@@ -118,12 +121,14 @@ type serverJSON struct {
 	HeadersHelper string `json:"headersHelper"`
 }
 
-// Command renders a remove-then-add-json pair for a user to run themselves — shown with shell-style quoting for copy-paste rather than passed through a
+// Command renders the exact two-step argv Install spawns (F3: remove, ignoring "not registered",
+// then add-json) — shown with shell-style quoting for copy-paste rather than passed through a
 // shell. No token anywhere in this string (F2): helperPath names a local script, never a secret
 // itself, so unlike the old `--header "Authorization: Bearer <token>"` form this is safe to display
 // and safe to have landed in a shell history.
 //
-// F10: headersHelper is shell-quoted — a helperPath containing a space (KIRA_HOME or
+// F10: headersHelper is shell-quoted here, the same way Install below quotes it, so the displayed
+// command matches what Install actually sends — a helperPath containing a space (KIRA_HOME or
 // $HOME with one, common on macOS for a custom KIRA_HOME) would otherwise break into two shell
 // words once Claude Code later runs the stored headersHelper string through a shell of its own,
 // silently sending no Authorization header and failing every call with an unexplained 401.
@@ -146,7 +151,7 @@ func detailFor(ctx context.Context, err error) string {
 
 // isNotRegisteredError reports whether err is `claude mcp remove`'s own "nothing to remove" outcome
 // (verified against the installed CLI, 2.1.280: exit 1, stderr `No MCP server named "<name>" in
-// user scope`) — the one remove failure Remove treats as success.
+// user scope`) — the one remove failure Install must treat as success rather than propagate (F3).
 func isNotRegisteredError(err error) bool {
 	var runErr *toolexec.ExecError
 	if !errors.As(err, &runErr) {
@@ -155,16 +160,75 @@ func isNotRegisteredError(err error) bool {
 	return strings.Contains(runErr.Stderr, "No MCP server named")
 }
 
-// Remove unregisters name from the user scope. A name that is not registered counts as removed.
-func (i *Installer) Remove(ctx context.Context, name string) Result {
+// Install re-resolves `claude` fresh and never returns a Go error — every outcome is a named
+// Result value (§7.2's own "Install button" spec). helperPath is EnsureHeaderHelperScript's own
+// return value — the local script's path, never a token.
+//
+// Removes any existing registration under name first (F3): add-json fails outright on a name
+// collision, and F2's headersHelper design means a token rotation never needs re-registration at
+// all — but the Install button itself can still be clicked again (a stale registration from an
+// older app version's `--header` form, or simply re-running it), so this stays idempotent
+// regardless. A "nothing to remove" outcome is not a failure and is never surfaced as one.
+func (i *Installer) Install(ctx context.Context, name, url, helperPath string) Result {
+	// F10: a relative helperPath resolves against Claude Code's own cwd, not Kira's — reachable
+	// when os.UserHomeDir fails and kirapaths.Home falls back to a relative path. Refuse outright
+	// rather than register a headersHelper that silently reads the wrong file (or nothing).
+	if !filepath.IsAbs(helperPath) {
+		return Result{Outcome: OutcomeInstallFailed, Detail: "internal error: header helper path is not absolute"}
+	}
+
+	// F10: Claude Code runs the stored headersHelper string through a shell of its own at
+	// connection time — an unquoted path containing a space (or any other shell metacharacter)
+	// splits into more than one word there, so no Authorization header is ever sent and every call
+	// gets a 401 with no hint why. Single-quoting here is the fix; EnsureHeaderHelperScript already
+	// quotes the token path the same way for the same reason, one level down.
+	return i.register(ctx, name, serverJSON{Type: "http", URL: url, HeadersHelper: ShellQuote(helperPath)})
+}
+
+// stdioServerJSON is add-json's shape for a stdio server: a command and its argv.
+type stdioServerJSON struct {
+	Type    string   `json:"type"`
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+}
+
+// StdioCommand renders the same remove-then-add-json pair for a stdio server, as copy-paste text.
+func StdioCommand(name, command string, args []string) string {
+	payload, _ := json.Marshal(stdioServerJSON{Type: "stdio", Command: command, Args: args})
+	return "claude mcp remove --scope user " + ShellQuote(name) + " 2>/dev/null; claude mcp add-json --scope user " +
+		ShellQuote(name) + " " + ShellQuote(string(payload))
+}
+
+// InstallStdio registers a stdio MCP server with Claude Code, replacing any registration of name.
+func (i *Installer) InstallStdio(ctx context.Context, name, command string, args []string) Result {
+	if !filepath.IsAbs(command) {
+		return Result{Outcome: OutcomeInstallFailed, Detail: "internal error: server command path is not absolute"}
+	}
+	return i.register(ctx, name, stdioServerJSON{Type: "stdio", Command: command, Args: args})
+}
+
+// register is the shared remove-then-add-json path.
+func (i *Installer) register(ctx context.Context, name string, server any) Result {
 	claudePath, probed, found := i.locateClaude()
 	if !found {
 		return Result{Outcome: OutcomeNotFound, Probed: probed}
 	}
+
 	spawnCtx, cancel := context.WithTimeout(ctx, spawnTimeout)
 	defer cancel()
-	if err := i.run(spawnCtx, claudePath, []string{"mcp", "remove", "--scope", "user", name}); err != nil && !isNotRegisteredError(err) {
-		return Result{Outcome: OutcomeRemoveFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
+
+	removeArgs := []string{"mcp", "remove", "--scope", "user", name}
+	if err := i.run(spawnCtx, claudePath, removeArgs); err != nil && !isNotRegisteredError(err) {
+		return Result{Outcome: OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
 	}
-	return Result{Outcome: OutcomeRemoved, Probed: probed}
+
+	payload, err := json.Marshal(server)
+	if err != nil {
+		return Result{Outcome: OutcomeInstallFailed, Detail: err.Error(), Probed: probed}
+	}
+	addArgs := []string{"mcp", "add-json", "--scope", "user", name, string(payload)}
+	if err := i.run(spawnCtx, claudePath, addArgs); err != nil {
+		return Result{Outcome: OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
+	}
+	return Result{Outcome: OutcomeInstalled, Probed: probed}
 }

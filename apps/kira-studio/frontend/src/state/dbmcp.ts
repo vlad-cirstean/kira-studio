@@ -1,4 +1,4 @@
-import type { DbMcpApprovalSnapshot, DbMcpStatus } from '@shared/domain/dbmcp';
+import type { DbMcpApprovalSnapshot, DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -18,6 +18,7 @@ const DEFAULT_STATUS: DbMcpStatus = {
 export const useDbMcpStore = defineStore('dbmcp', () => {
   const state = reactive({
     status: DEFAULT_STATUS as DbMcpStatus,
+    installResult: null as DbMcpInstallResult | null,
     // M2 §5: the prompt-mode approval queue — run_query's approval broker's own pending/queued
     // shape.
     approval: { pending: null, queued: 0 } as DbMcpApprovalSnapshot,
@@ -71,12 +72,18 @@ export const useDbMcpStore = defineStore('dbmcp', () => {
   async function setDbMcpEnabled(enabled: boolean): Promise<void> {
     state.status = await control.dbMcpSetEnabled(enabled);
     useSettingsStore().dbMcp.serverEnabled = enabled;
+    // A fresh enable/disable makes any previous install outcome stale.
+    state.installResult = null;
   }
 
   // Covers the app-restart-with-no-plaintext-held case — the Database MCP section shows this action
   // in place of the command whenever status.running is true but status.command is empty.
   async function regenerateDbMcpToken(): Promise<void> {
     state.status = await control.dbMcpRegenerate();
+  }
+
+  async function installDbMcpClaudeCode(): Promise<void> {
+    state.installResult = await control.dbMcpInstallClaudeCode();
   }
 
   return {
@@ -87,5 +94,6 @@ export const useDbMcpStore = defineStore('dbmcp', () => {
     denyQuery,
     setDbMcpEnabled,
     regenerateDbMcpToken,
+    installDbMcpClaudeCode,
   };
 });

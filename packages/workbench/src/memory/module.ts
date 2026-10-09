@@ -2,6 +2,7 @@ import type {
   Memory,
   MemoryClarification,
   MemoryHistory,
+  MemoryInstallResult,
   MemoryItem,
   MemoryMcpStatus,
   MemorySemanticStatus,
@@ -29,6 +30,7 @@ export interface MemoryControl {
     signal?: AbortSignal,
   ): Promise<MemoryStoreResult>;
   memoryMcpStatus(): Promise<MemoryMcpStatus>;
+  memoryMcpInstall(): Promise<MemoryInstallResult>;
   onMemoryChanged(cb: () => void): () => void;
   memorySemanticStatus(): Promise<MemorySemanticStatus>;
   /** Downloads the embedding model; aborting `signal` cancels the download. */

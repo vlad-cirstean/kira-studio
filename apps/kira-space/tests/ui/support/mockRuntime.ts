@@ -173,8 +173,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memoryHistory: 'MemoryService.History',
   memoryStore: 'MemoryService.Store',
   memoryMcpStatus: 'MemoryService.McpStatus',
-  memoryClaudeLegacy: 'MemoryService.ClaudeLegacy',
-  memoryRemoveClaudeLegacy: 'MemoryService.RemoveClaudeLegacy',
+  memoryMcpInstall: 'MemoryService.InstallClaudeCode',
   memorySemanticStatus: 'MemoryService.SemanticStatus',
   memorySemanticInstall: 'MemoryService.InstallSemanticModel',
   memorySemanticRetry: 'MemoryService.RetrySemantic',
@@ -277,8 +276,6 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.adeTaskReviewWindowTarget]: 'null',
   // P201 Part 2: the Memory module lists recent memories as soon as its mode opens.
   [IPC.memoryRecent]: '[]',
-  // P233: no earlier Claude Code registrations by default.
-  [IPC.memoryClaudeLegacy]: JSON.stringify({ file: '/home/u/.claude.json', entries: [] }),
   // P211: no imports by default.
   [IPC.memoryImportJobs]: '[]',
   // P210: no embedder by default, so the semantic row stays hidden.

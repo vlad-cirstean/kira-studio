@@ -86,7 +86,7 @@ func wireTracker(
 
 	// Hooks are always on: a start failure (curl missing, a bind conflict) is logged, never fatal —
 	// sessions still spawn and track, activity icons stay absent.
-	hooks := agenthooks.NewManager(agenthooks.Options{SessionMCP: bridge.SessionMCPConfig, OnEvent: func(ev agenthooks.Event) {
+	hooks := agenthooks.NewManager(agenthooks.Options{OnEvent: func(ev agenthooks.Event) {
 		tracker.HandleEvent(ev)
 		bridge.EmitAgentEvent(emitter, ev)
 	}})

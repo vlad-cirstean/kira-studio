@@ -1,4 +1,4 @@
-// Package claudeflow holds real-flow tests that Kira Space never writes Claude Code configuration
-// outside the sessions it starts: Memory MCP status, legacy cleanup and agent terminal and ADE launches, run against a fake HOME
-// and a fake claude CLI.
+// Package claudeflow holds real-flow tests that Kira Space applies its Claude Code hooks only to the
+// sessions it starts: agent terminal and ADE launches run against a fake HOME seeded with the
+// user's own Claude Code settings, which must stay byte-identical.
 package claudeflow

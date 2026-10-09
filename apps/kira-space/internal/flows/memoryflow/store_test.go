@@ -2,7 +2,12 @@ package memoryflow_test
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"path/filepath"
+	"slices"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
@@ -133,4 +139,67 @@ func TestSemanticNotInstalled(t *testing.T) {
 	if again, err := app.W.Memory.Search(ctx, bridge.MemorySearchArgs{Query: "staging"}); err != nil || len(again) != 1 {
 		t.Fatalf("search after retry = %+v, %v", again, err)
 	}
+}
+
+func TestConnectClaudeCode(t *testing.T) {
+	app := flowharness.New(t)
+	gate(t, app, "", fakeagent.Action{})
+	before := app.W.Memory.McpStatus()
+	if !before.ClaudeAvailable || !filepath.IsAbs(before.Executable) || !strings.Contains(before.Command, "memory-mcp") {
+		t.Fatalf("McpStatus = %+v, want claude found and an absolute executable", before)
+	}
+	res := app.W.Memory.InstallClaudeCode(ctx)
+	if res.Outcome != mcpinstall.OutcomeInstalled {
+		t.Fatalf("InstallClaudeCode = %+v, want installed", res)
+	}
+	argv := recordedArgs(t, app)
+	if len(argv) != 2 {
+		t.Fatalf("claude ran %d times, want the remove and add-json pair: %q", len(argv), argv)
+	}
+	if want := "mcp\nremove\n--scope\nuser\nkira-memory"; argv[0] != want {
+		t.Fatalf("first call = %q, want %q", argv[0], want)
+	}
+	add := strings.Split(argv[1], "\n")
+	if len(add) != 6 || strings.Join(add[:5], " ") != "mcp add-json --scope user kira-memory" {
+		t.Fatalf("second call = %q, want add-json for kira-memory", argv[1])
+	}
+	var server struct {
+		Type    string   `json:"type"`
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+	}
+	if err := json.Unmarshal([]byte(add[5]), &server); err != nil {
+		t.Fatal(err)
+	}
+	if server.Type != "stdio" || server.Command != before.Executable || !filepath.IsAbs(server.Command) || !slices.Equal(server.Args, []string{"memory-mcp"}) {
+		t.Fatalf("registered server = %+v, want stdio %s memory-mcp", server, before.Executable)
+	}
+	if after := app.W.Memory.McpStatus(); after.Command != before.Command {
+		t.Fatalf("status after = %+v, want the same command as before", after)
+	}
+}
+
+// recordedArgs returns the fake claude's argv files in call order.
+func recordedArgs(t *testing.T, app *flowharness.App) []string {
+	t.Helper()
+	files, err := filepath.Glob(filepath.Join(app.FakeDir, "*.args"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Slice(files, func(i, j int) bool { return callNumber(files[i]) < callNumber(files[j]) })
+	var out []string
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, string(raw))
+	}
+	return out
+}
+
+func callNumber(path string) int {
+	base := strings.TrimSuffix(filepath.Base(path), ".args")
+	n, _ := strconv.Atoi(base[strings.LastIndex(base, "-")+1:])
+	return n
 }

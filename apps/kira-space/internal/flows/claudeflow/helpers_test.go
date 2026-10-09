@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -28,90 +27,7 @@ var ctx = context.Background()
 const (
 	waitFor = 20 * time.Second
 	window  = "w-claude"
-	// emulateArg switches the test binary into the claude mcp emulation (TestMain).
-	emulateArg = "claudecfg-emulate"
 )
-
-// fakeCLI puts a claude on PATH that emulates `claude mcp add-json|remove --scope user` on the
-// user's .claude.json and hands everything else to the harness's fake agent. The real CLI is
-// never run: it rewrites ~/.claude.json on every invocation (counters, project trust).
-func fakeCLI(t *testing.T, app *flowharness.App) {
-	t.Helper()
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	link := filepath.Join(app.BinDir, "claude")
-	realDir := filepath.Join(app.BinDir, "real")
-	if err := os.MkdirAll(realDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	realClaude := filepath.Join(realDir, "claude")
-	if err := os.Rename(link, realClaude); err != nil {
-		t.Fatal(err)
-	}
-	script := fmt.Sprintf("#!/bin/sh\ncase \"$1\" in\n  mcp) exec %s %s \"$@\" ;;\n  *) exec %s \"$@\" ;;\nesac\n",
-		shQuote(self), emulateArg, shQuote(realClaude))
-	if err := os.WriteFile(link, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
-
-// emulateMcp plays `claude mcp ...` on $CLAUDE_CONFIG_DIR/.claude.json or $HOME/.claude.json.
-func emulateMcp(args []string) int {
-	dir := os.Getenv("KIRA_FAKE_DIR")
-	if dir != "" {
-		n := 0
-		if raw, err := os.ReadFile(filepath.Join(dir, "cfg.count")); err == nil {
-			_, _ = fmt.Sscanf(string(raw), "%d", &n)
-		}
-		n++
-		_ = os.WriteFile(filepath.Join(dir, "cfg.count"), []byte(fmt.Sprint(n)), 0o644)
-		_ = os.WriteFile(filepath.Join(dir, fmt.Sprintf("cfg-%d.args", n)), []byte(strings.Join(args, "\n")), 0o644)
-	}
-	path := filepath.Join(os.Getenv("HOME"), ".claude.json")
-	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
-		path = filepath.Join(d, ".claude.json")
-	}
-	doc := map[string]any{}
-	if raw, err := os.ReadFile(path); err == nil {
-		if err := json.Unmarshal(raw, &doc); err != nil {
-			fmt.Fprintln(os.Stderr, "emulate:", err)
-			return 2
-		}
-	}
-	servers, _ := doc["mcpServers"].(map[string]any)
-	if servers == nil {
-		servers = map[string]any{}
-	}
-	switch {
-	case len(args) == 6 && args[1] == "add-json" && args[2] == "--scope" && args[3] == "user":
-		var v any
-		if err := json.Unmarshal([]byte(args[5]), &v); err != nil {
-			fmt.Fprintln(os.Stderr, "emulate: bad json:", err)
-			return 1
-		}
-		servers[args[4]] = v
-	case len(args) == 5 && args[1] == "remove" && args[2] == "--scope" && args[3] == "user":
-		if _, ok := servers[args[4]]; !ok {
-			fmt.Fprintf(os.Stderr, "No MCP server named %q in user scope\n", args[4])
-			return 1
-		}
-		delete(servers, args[4])
-	default:
-		fmt.Fprintln(os.Stderr, "emulate: unsupported:", strings.Join(args, " "))
-		return 2
-	}
-	doc["mcpServers"] = servers
-	out, _ := json.MarshalIndent(doc, "", "  ")
-	if err := os.WriteFile(path, out, 0o600); err != nil {
-		fmt.Fprintln(os.Stderr, "emulate:", err)
-		return 2
-	}
-	return 0
-}
 
 func writeFile(t *testing.T, path, body string) {
 	t.Helper()
