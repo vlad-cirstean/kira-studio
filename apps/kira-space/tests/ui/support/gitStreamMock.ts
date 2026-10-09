@@ -46,6 +46,8 @@ export interface GitStreamMockArgs {
   /** Per-open chunk lists: open N answers list N, the last list repeats. Wins over
    *  `graphStreamChunks` when both are given. */
   graphStreamOpens?: readonly (readonly GraphStreamChunkFixture[])[];
+  /** Chunks past this index of the first open are held until `gitStreamRelease`. */
+  graphStreamHoldAfter?: number;
 }
 
 function installInBrowser({
@@ -53,6 +55,7 @@ function installInBrowser({
   extraResults,
   graphStreamChunks,
   graphStreamOpens,
+  graphStreamHoldAfter,
 }: GitStreamMockArgs): void {
   const w =
     (window as unknown as { _wails?: { streamFactory?: (name: string) => unknown } })._wails ?? {};
@@ -64,6 +67,17 @@ function installInBrowser({
   (window as unknown as { __kiraGitRequests: string[] }).__kiraGitRequests = [];
 
   let streamOpenCount = 0;
+  let wireVersion = 0;
+  let releaseHeld: (() => void) | undefined;
+  (window as unknown as { __kiraGitRelease: () => void }).__kiraGitRelease = () => releaseHeld?.();
+  const openSockets: MockSocket[] = [];
+  (
+    window as unknown as { __kiraGitEmit: (method: string, payload: unknown) => void }
+  ).__kiraGitEmit = (method, payload) => {
+    for (const socket of openSockets) {
+      deliver(socket, { version: wireVersion, body: { t: 'evt', method, payload } });
+    }
+  };
 
   const CONNECTING = 0;
   const OPEN = 1;
@@ -151,6 +165,7 @@ function installInBrowser({
         } catch {
           return;
         }
+        wireVersion = envelope.version;
         const frame = envelope.body;
         if (frame?.id === undefined) return;
         // `graph.stream` opens as `t: 'open'`, not `t: 'req'` — a real unary call's frame
@@ -162,11 +177,20 @@ function installInBrowser({
           : graphStreamChunks;
         if (frame.t === 'open' && frame.method === 'graph.stream' && openChunks) {
           const id = frame.id;
+          const hold = streamOpenCount === 0 ? graphStreamHoldAfter : undefined;
           streamOpenCount++;
-          for (const chunk of openChunks) {
+          const now = hold === undefined ? openChunks : openChunks.slice(0, hold);
+          for (const chunk of now) {
             deliverGraphStreamChunk(socket, envelope.version, id, chunk);
           }
-          deliver(socket, { version: envelope.version, body: { t: 'end', id } });
+          const finish = (): void => {
+            for (const chunk of openChunks.slice(now.length)) {
+              deliverGraphStreamChunk(socket, envelope.version, id, chunk);
+            }
+            deliver(socket, { version: envelope.version, body: { t: 'end', id } });
+          };
+          if (hold === undefined) finish();
+          else releaseHeld = finish;
           return;
         }
         if (frame?.t !== 'req' || frame.id === undefined) return;
@@ -219,6 +243,7 @@ function installInBrowser({
     // Genuinely asynchronous — a later macrotask, not the same tick `Stream()` returns in. Any
     // code that sends before this fires is sending on a CONNECTING socket, exactly the window
     // bug 2 lived in.
+    openSockets.push(socket);
     setTimeout(() => {
       socket.readyState = OPEN;
       socket.onopen?.({});
@@ -241,12 +266,14 @@ export async function installGitStreamMock(
   extraResults?: Record<string, unknown>,
   graphStreamChunks?: readonly GraphStreamChunkFixture[],
   graphStreamOpens?: readonly (readonly GraphStreamChunkFixture[])[],
+  graphStreamHoldAfter?: number,
 ): Promise<void> {
   await page.evaluate(installInBrowser, {
     repoId: gitRepoId,
     extraResults,
     graphStreamChunks,
     graphStreamOpens,
+    graphStreamHoldAfter,
   });
 }
 
@@ -267,5 +294,24 @@ export async function installGitStreamMockOnInit(
 export async function gitStreamRequests(page: Page): Promise<string[]> {
   return page.evaluate(
     () => (window as unknown as { __kiraGitRequests?: string[] }).__kiraGitRequests ?? [],
+  );
+}
+
+/** Pushes a server event (`t: 'evt'`) to every open git socket, the way the daemon announces
+ *  `repo.changed` or `autoFetch.changed`. */
+export async function gitStreamEmit(page: Page, method: string, payload: unknown): Promise<void> {
+  await page.evaluate(
+    ({ method, payload }) =>
+      (
+        window as unknown as { __kiraGitEmit: (method: string, payload: unknown) => void }
+      ).__kiraGitEmit(method, payload),
+    { method, payload },
+  );
+}
+
+/** Delivers the chunks `graphStreamHoldAfter` held back, then ends the first stream. */
+export async function gitStreamRelease(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    (window as unknown as { __kiraGitRelease: () => void }).__kiraGitRelease(),
   );
 }
