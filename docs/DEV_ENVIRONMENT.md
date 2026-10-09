@@ -364,7 +364,9 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
   `/proc/<pid>/environ` (`KIRA_AGENT_HOOK_TOKEN`, `KIRA_TERMINAL_ID`) and argv (`--settings <hooks.json>`),
   then pipe `{"hook_event_name":"Stop","session_id":"<id>","cwd":"<cwd>"}` into the `hook` shim next to
   that `hooks.json` with the same env.
-- The server build's `EmitTo` broadcasts (`internal/shell/emitto_server.go`, P231); listeners filter by id.
+- The server build's `EmitTo` broadcasts to every page (`internal/shell/emitto_server.go`, P231). Payloads without
+  a window key reach all pages: close-flush request, `AdeTaskOpenSession`, `ChannelMobileOpenLaunch`. With two pages
+  in `e2e-real`, closing one window flushes all; focusing an ADE session opens it in all. Use one page per such test.
 - **A fake `gh` or `claude` needs a `HOME` override** (P150). PTY login shells reorder `PATH`, so a prefix
   set in the server's env is lost. Point `HOME` at a dir whose `.bash_profile` prepends the fake bin dir,
   then confirm with `/proc/<pid>/cmdline`. Discovery uses `exec.LookPath` for `gh`.
