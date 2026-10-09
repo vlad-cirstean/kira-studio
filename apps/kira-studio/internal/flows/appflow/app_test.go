@@ -103,4 +103,20 @@ func TestDataGripScan(t *testing.T) {
 	if list, err := app.W.Connections.List(); err != nil || len(list) != 0 {
 		t.Fatalf("Scan created connections: %v %v", list, err)
 	}
+
+	if _, err := app.W.DataGrip.Import(bridge.DataGripImportArgs{Path: project}); !errors.As(err, &ie) || ie.Code != "E_BAD_REQUEST" {
+		t.Fatalf("Import without a selection = %v, want E_BAD_REQUEST", err)
+	}
+	var uuids []string
+	for _, r := range prev.Rows {
+		uuids = append(uuids, r.UUID)
+	}
+	report, err := app.W.DataGrip.Import(bridge.DataGripImportArgs{Path: project, SelectedUUIDs: uuids})
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := app.W.Connections.List()
+	if err != nil || len(list) != len(uuids) {
+		t.Fatalf("Import created %d connections (%v), want %d; report %+v", len(list), err, len(uuids), report)
+	}
 }

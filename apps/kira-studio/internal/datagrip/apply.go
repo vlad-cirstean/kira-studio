@@ -133,6 +133,8 @@ func applyOne(ds DataSource, projectDir string, cfg SecurityConfig, secretsAvail
 			Name: name, Kind: fields.Kind, Color: color, Mode: "fields",
 			Host: fields.Host, Port: fields.Port, Database: fields.Database,
 			Username: fields.Username, Options: map[string]any{},
+			// The connection dialog's defaults; Create rejects an empty permission mode.
+			McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny", McpAutoExplain: true,
 		},
 		Password: password,
 	}
