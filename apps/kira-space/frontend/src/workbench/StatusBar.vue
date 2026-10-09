@@ -13,7 +13,10 @@ import { computed } from 'vue';
 import { useAppMetricsStore } from '../state/appMetrics';
 import { useAppUpdateStore } from '../state/appUpdate';
 import { useBlameStatusStore } from '../state/blameStatus';
+import { useModeStore } from '../state/mode';
+import { useSettingsStore } from '../state/settings';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
+import ClaudeUsageItem from './ClaudeUsageItem.vue';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item (P76
 // §5.2) on the left. Now a thin composition over the shared bar chrome
@@ -24,6 +27,8 @@ import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 const blameStatusStore = useBlameStatusStore();
 const appMetricsStore = useAppMetricsStore();
 const appUpdateStore = useAppUpdateStore();
+const modeStore = useModeStore();
+const settingsStore = useSettingsStore();
 
 // P76 §5.2: 'none' and 'uncommitted' both render nothing — an always-present "Uncommitted" readout
 // is the extension's own choice; this bar hides items with nothing to say instead.
@@ -67,6 +72,8 @@ function onRevealBlameCommit(): void {
         :current-version="appUpdateStore.currentVersion"
         @open="appUpdateStore.openUpdateDialog()"
       />
+      <!-- P239: Claude Code usage limits, ADE module only. -->
+      <ClaudeUsageItem v-if="modeStore.active === 'ade' && settingsStore.claudeCode.usageEnabled" />
       <AppMetricsItem :sample="appMetricsStore.sample" />
     </template>
     <!-- P110 I2-19 (§3.5.3): `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s

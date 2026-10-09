@@ -16,7 +16,7 @@ const switchId = useId();
 
 type NotifyLeaf = Exclude<
   keyof Settings['claudeCode'],
-  'keepAwakeWithAgents'
+  'keepAwakeWithAgents' | 'usageEnabled'
 >;
 
 // P238: master first; the rest are disabled while it is off.
@@ -36,6 +36,10 @@ function sendTest(): void {
   void control.agentNotifySendTest().catch((err: unknown) => {
     console.error('agent notify: test failed', err);
   });
+}
+
+function setUsage(on: boolean): void {
+  props.draft.claudeCode.usageEnabled = on;
 }
 
 function setKeepAwake(on: boolean): void {
@@ -106,6 +110,32 @@ function setKeepAwake(on: boolean): void {
       >
         Send test notification
       </Button>
+    </Field>
+
+    <Field>
+      <div class="flex items-center justify-between gap-1">
+        <Label :for="`${switchId}-usage`">Show Claude Code usage limits in the ADE status bar</Label>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-claudeCode-usageEnabled"
+          :disabled-trigger="isAtDefault('claudeCode', 'usageEnabled')"
+          :disabled="isAtDefault('claudeCode', 'usageEnabled')"
+          @click="resetLeaf('claudeCode', 'usageEnabled')"
+        />
+      </div>
+      <Switch
+        :id="`${switchId}-usage`"
+        :model-value="draft.claudeCode.usageEnabled"
+        data-testid="settings-claude-code-usage"
+        @update:model-value="(v) => setUsage(v === true)"
+      />
+      <FieldDescription>
+        Shows the 5-hour and weekly limits that Claude Code sessions started from Kira Space
+        report. Claude Code hands the numbers to a status-line hook on this Mac; nothing is
+        sent anywhere and no login or token is read. Applies to sessions started after you
+        change it. Pro and Max plans only.
+      </FieldDescription>
     </Field>
   </div>
 </template>
