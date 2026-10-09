@@ -4233,6 +4233,12 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
   marked. Un-reviewing one fires `unmarkFileAsViewed` server side through the unmark observer
   (`SetObserver`), for ledger files only. Partial reviews never sync.
 - Monaco objects stay in `shallowRef` (`useDiffEditor`): a deep `ref` hangs the page.
+- One entry rule (P240): `board/reviewCode.ts` `reviewChoice` hides (parked), disables with a reason (uncreated
+  branch, `ahead === 0`, with or without uncommitted changes) or enables each branch; `useReviewCode` is the
+  one caller of `OpenReviewWindow`. Controls: card head, branch row, task and branch menus, both panels,
+  review stage block, `ade.reviewCode` (Cmd/Ctrl+Shift+R, local binding, no `accel.go` row). A task with
+  several branches shows a picker. Interpolated UI values render through `VarText` (`packages/theme`,
+  `TextPart`): the resolved value in a marked chip. `MenuItem.hint` takes `TextPart[]`.
 
 ### Tests
 

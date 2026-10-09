@@ -50,7 +50,7 @@ function reviewTarget(e: KeyboardEvent): { taskId?: string; branchId?: string; e
   return { taskId: ui.selectedTaskId ?? undefined };
 }
 useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
-  if (e.defaultPrevented || !shortcutFor(e, ['ade.reviewCode'])) return;
+  if (ui.view !== 'plan' || e.defaultPrevented || !shortcutFor(e, ['ade.reviewCode'])) return;
   e.preventDefault();
   const m = model.value;
   if (!m) return;
@@ -128,14 +128,14 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
         </TabsTrigger>
       </TabsList>
     </nav>
-    <div class="flex min-h-0 flex-1 gap-0.5">
+    <div ref="planEl" class="flex min-h-0 flex-1 gap-0.5">
       <AdeBacklogPage v-if="ui.view === 'backlog'" />
       <AdeNeedsPage v-else-if="ui.view === 'needs'" />
       <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
-      <div v-else ref="planEl" class="contents">
+      <template v-else>
         <AdePlanView />
         <AdePanel v-if="ui.selectedTaskId" />
-      </div>
+      </template>
     </div>
     <AdeRunDialog />
     <AdeClaudeDialog />
