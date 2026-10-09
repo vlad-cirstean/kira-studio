@@ -132,6 +132,7 @@ test('+ Add repo adds a draft branch in the chosen repo', async ({ relaunch }) =
   expect(control.log().find((e) => e.channel === IPC.adeTaskAddTaskRepo)?.args).toEqual({
     taskId: 'T_bill',
     codeRepoId: 'repo-mobile',
+    base: null,
   });
 });
 

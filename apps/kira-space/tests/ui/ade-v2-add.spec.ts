@@ -47,6 +47,7 @@ test('New task creates a branchless task in chosen repos and selects it', async 
     notes: '',
     codeRepoIds: ['repo-web-app', 'repo-api'],
     workflowId: '',
+    bases: {},
   });
   await expect(page.locator('[data-testid="ade-add-popover"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="ade-task"][data-task-id="T_deps"]')).toHaveAttribute(

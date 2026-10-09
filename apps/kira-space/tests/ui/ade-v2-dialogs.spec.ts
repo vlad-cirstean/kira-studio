@@ -19,11 +19,10 @@ async function openCard(page: Page, taskId: string): Promise<void> {
   await expect(page.locator(t('ade-panel'))).toBeVisible();
 }
 
-test('Rebase on ↓N main names the repo, restacks the chain and sends to the running session', async ({
+test('Rebase on ↓N main shows the server prompt and starts a background run', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openPlan(relaunch);
-  await emitAgentSessions(page, ['term-9ab0']);
   await page
     .locator(`${row('b_auth')} >> xpath=ancestor::*[@data-testid="ade-task"][1]`)
     .locator(t('ade-rebase'))
@@ -32,24 +31,18 @@ test('Rebase on ↓N main names the repo, restacks the chain and sends to the ru
   const dialog = page.locator(t('ade-dialog'));
   await expect(dialog).toBeVisible();
   await expect(page.locator(t('ade-dialog-title'))).toHaveText('Rebase onto main');
-  const message = page.locator(t('ade-dialog-message'));
-  await expect(message).toHaveValue(/Rebase feat\/oauth-login \(repo web-app\) onto main/);
-  await expect(message).toHaveValue(/git fetch origin && git rebase origin\/main/);
-  await expect(message).toHaveValue(
-    /In ~\/wt\/web-app\/oauth-login-ui: git rebase feat\/oauth-login/,
+  await expect(page.locator(t('ade-dialog-message'))).toHaveValue(
+    'Rebase feat/billing onto origin/main.',
   );
-  await expect(message).toHaveValue(/Do not push\./);
-  await page.locator(t('ade-dialog-push')).click();
-  await expect(message).toHaveValue(/git push --force-with-lease/);
-  await expect(page.locator(t('ade-dialog-push-label'))).toHaveText(
-    'Also force-push after rebasing',
-  );
+  await expect(page.locator(t('ade-dialog-suffix'))).toHaveText(/finish_step/);
+  await expect(page.locator(t('ade-dialog-target'))).toHaveCount(0);
+  await expect(page.locator(t('ade-dialog-send'))).toHaveText('Run in background');
   await page.locator(t('ade-dialog-send')).click();
   await expect(dialog).toBeHidden();
-  const sent = calls(control, IPC.adeTaskSend);
+  const sent = calls(control, IPC.adeTaskRebase);
   expect(sent).toHaveLength(1);
-  expect(sent[0]?.args).toMatchObject({ sessionId: '9ab0' });
-  expect(calls(control, IPC.adeTaskSetQueuedAfter)).toHaveLength(0);
+  expect(sent[0]?.args).toMatchObject({ branchId: 'b_auth', message: '', onto: null });
+  expect(calls(control, IPC.adeTaskSend)).toHaveLength(0);
 });
 
 test('a blank message disables Send', async ({ relaunch }) => {
@@ -65,9 +58,7 @@ test('a blank message disables Send', async ({ relaunch }) => {
   await expect(page.locator(t('ade-dialog-send'))).toBeEnabled();
 });
 
-test('queue after a review branch says not to modify it and records the order after delivery', async ({
-  relaunch,
-}) => {
+test('queue after a review branch sends Rebase with queueWith', async ({ relaunch }) => {
   const board = adeBoard((bd) => {
     (bd.pairs as unknown[]).push({
       a: 'b_authui',
@@ -80,33 +71,11 @@ test('queue after a review branch says not to modify it and records the order af
     { channel: IPC.adeTaskBoard, response: board },
   ]);
   await page.locator(row('b_authui')).click();
-  await page.locator(t('ade-panel-action-queueAfter')).click();
-  await expect(page.locator(t('ade-dialog-message'))).toHaveValue(/Do not modify/);
+  await page.locator(t('ade-panel-action-queue')).click();
   await page.locator(t('ade-dialog-send')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSetQueuedAfter)).toHaveLength(1);
-});
-
-test('a failed order record after delivery closes the dialog and reports in the panel', async ({
-  relaunch,
-}) => {
-  const board = adeBoard((bd) => {
-    (bd.pairs as unknown[]).push({
-      a: 'b_authui',
-      b: 'b_sara',
-      shared: ['src/payments/client.ts'],
-      conflicts: ['src/payments/client.ts'],
-    });
-  });
-  const { window: page, control } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskBoard, response: board },
-    { channel: IPC.adeTaskSetQueuedAfter, error: { code: 'invalid', message: 'branch is gone' } },
-  ]);
-  await page.locator(row('b_authui')).click();
-  await page.locator(t('ade-panel-action-queueAfter')).click();
-  await page.locator(t('ade-dialog-send')).click();
-  await expect(page.locator(t('ade-dialog'))).toHaveCount(0);
-  await expect(page.getByText('recording the order failed: branch is gone')).toBeVisible();
-  expect(calls(control, IPC.adeTaskSetQueuedAfter)).toHaveLength(1);
+  await expect.poll(() => calls(control, IPC.adeTaskRebase)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskRebase)[0]?.args).toMatchObject({ queueWith: 'b_sara' });
+  expect(calls(control, IPC.adeTaskSetQueuedAfter)).toHaveLength(0);
 });
 
 test('a TUI session at work lists a busy block with an override', async ({ relaunch }) => {
@@ -120,7 +89,7 @@ test('a TUI session at work lists a busy block with an override', async ({ relau
   await expect(page.locator(t('ade-dialog'))).toBeVisible();
 });
 
-test('a running background run blocks the dialog with no override', async ({ relaunch }) => {
+test('a running background run disables the rebase act with a tip', async ({ relaunch }) => {
   const board = adeBoard((bd) => {
     const br = bd.branches.find((x) => x.id === 'b_bill');
     if (br) br.behind = 2;
@@ -129,12 +98,7 @@ test('a running background run blocks the dialog with no override', async ({ rel
     { channel: IPC.adeTaskBoard, response: board },
   ]);
   await page.locator(row('b_bill')).click({ button: 'right' });
-  await page.getByRole('menuitem', { name: /Rebase onto main/ }).click();
-  await expect(page.locator(t('ade-dialog-headless'))).toHaveText(
-    'A background run is active on feat/usage-billing. Stop it in Sessions, or wait.',
-  );
-  await expect(page.locator(t('ade-dialog-override'))).toHaveCount(0);
-  await expect(page.locator(t('ade-dialog-send'))).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: /Rebase onto main/ })).toBeDisabled();
 });
 
 test('Merge from the fix menu: path, push line, recorded only after a Stop', async ({

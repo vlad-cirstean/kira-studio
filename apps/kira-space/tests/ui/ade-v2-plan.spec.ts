@@ -66,7 +66,7 @@ test('branch rows show base markers and the derived branch tags', async ({ relau
   ]);
 
   const markers = await page.locator('[data-testid="ade-base-marker"]').allInnerTexts();
-  expect(markers).toContain('⑂ search-schema');
+  expect(markers.map((m) => m.replace(/\s+/g, ''))).toContain('⑂search-schema');
   const tags = await page.locator('[data-testid="ade-tag"]').allInnerTexts();
   expect(tags).toContain('↓3 main');
   expect(tags).toContain('checking…');
