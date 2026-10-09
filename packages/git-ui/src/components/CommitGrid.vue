@@ -92,6 +92,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:columnWidths', widths: ColumnWidths): void;
+  /** Drawn graph column width, for the uncommitted strip's matching cell. Not persisted. */
+  (e: 'graphWidth', px: number): void;
   /** The top loaded row currently in view — what `viewState.scrollRow` should hold (a row
    *  index, not a pixel offset: it survives a re-walk, a pixel offset does not). */
   (e: 'scroll', row: number): void;
@@ -418,6 +420,15 @@ function updateHandlePositions(): void {
 // P92 item 2: reads `availableWidth()` now, not `host.clientWidth` — same dedupe, correct box.
 let lastRebuiltWidth = -1;
 
+let lastEmittedGraphWidth = -1;
+
+function emitGraphWidth(): void {
+  const px = graphWidth();
+  if (px === lastEmittedGraphWidth) return;
+  lastEmittedGraphWidth = px;
+  emit('graphWidth', px);
+}
+
 function rebuildColumns(): void {
   // G-UX (item 9): resizeCanvas() BEFORE setColumns() — SlickGrid's own cached canvas width has
   // to already reflect the host's current size before the new column set (and its `left` offsets)
@@ -429,6 +440,7 @@ function rebuildColumns(): void {
   grid?.setColumns(currentColumns());
   updateHandlePositions();
   lastRebuiltWidth = availableWidth();
+  emitGraphWidth();
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
@@ -1030,6 +1042,7 @@ onMounted(() => {
   });
 
   updateHandlePositions();
+  emitGraphWidth();
   // `initialScrollRow` (`viewState.scrollRow`) is a persisted store row — translate to the
   // display row this mount's plan currently resolves it to. `applyInitialScrollRow` (P108 F1)
   // handles a plan that does not cover it yet (cold boot, before the first chunk lands) by

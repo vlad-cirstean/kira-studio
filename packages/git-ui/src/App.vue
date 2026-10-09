@@ -180,6 +180,8 @@ const bootError = ref<string | undefined>(undefined);
 
 const detailOpen = ref(true);
 const columnWidths = ref<ColumnWidths>(DEFAULT_COLUMN_WIDTHS);
+// Drawn graph column width reported by CommitGrid; differs from the persisted one when lanes need more.
+const gridGraphWidth = ref(DEFAULT_COLUMN_WIDTHS.graph);
 const dateFormat = ref<DateFormat>(props.dateFormat ?? 'relative');
 const detailWidth = ref(DEFAULT_DETAIL_WIDTH);
 const scrollRow = ref(0);
@@ -1860,7 +1862,7 @@ onBeforeUnmount(() => {
             <UncommittedChangesStrip
               :graph-view="graphView"
               :ops-state="opsState"
-              :graph-width="columnWidths.graph"
+              :graph-width="gridGraphWidth"
               @select="onSelectWorking"
             />
             <CommitGrid
@@ -1878,6 +1880,7 @@ onBeforeUnmount(() => {
               :open-external-capability="gridOpenExternalCapability"
               v-bind="initialScrollRowProp"
               @update:column-widths="columnWidths = $event"
+              @graph-width="gridGraphWidth = $event"
               @scroll="scrollRow = $event"
               @toggle-detail="toggleDetail"
               @open-detail="openDetail"
