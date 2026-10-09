@@ -4,11 +4,12 @@
 
 Kira Studio is a native macOS workbench that combines a visual database client for ten engines
 (DataGrip/DBeaver class) with an HTTP/gRPC API client (Postman/Insomnia class). It is built on
-Wails (Go) and Vue 3, and you switch between the **Studio** (database) and **Api** modes with one
-button.
+Wails (Go) and Vue 3, and you switch between its **Studio** (database), **Api**, **Terminal** and
+**Docker** modes with one button.
 
 This repository also contains a sibling app, **Kira Space** — a native git client and code
-workspace, plus a VS Code extension over the same backend. This README covers Kira Studio; see
+workspace with coding agents (ADE), a memory store, a terminal and a phone view on your home
+network, plus a VS Code extension over the same backend. This README covers Kira Studio; see
 [`apps/kira-space/README.md`](apps/kira-space/README.md) for Kira Space.
 
 ## Status
@@ -106,15 +107,23 @@ Per-engine adapter facts).
   re-run, plus a persisted operation log.
 - **Also** — three-tier caching with no speculative prefetch
   ([`docs/PERF.md`](docs/PERF.md)), Touch ID (or system password) confirmation before revealing a saved password,
-  multiple windows (`⇧⌘N`), a command palette (`⇧⌘P`), terminal tabs with launchable scripts, and
-  Settings for appearance, data, cache, Api, scripts, Claude Code, Database MCP and advanced options.
+  multiple windows (`⇧⌘N`), a command palette (`⇧⌘P`), a terminal module with quick commands
+  grouped in collections, and Settings for appearance, data, cache, Api, Database MCP and advanced
+  options.
+
+### Docker
+
+A Docker mode manages the local engine or a saved context: containers, images, volumes and networks,
+live container logs and stats, and exec terminals into a running container. A remote `tcp://` engine
+without TLS works but is flagged as insecure in the UI.
 
 ### Api (HTTP/gRPC client)
 
 - **Request builder** — method, URL, params, headers and body (raw, JSON/XML/HTML/JS,
   form-urlencoded, multipart, binary file), with a raw request editor alongside.
 - **gRPC** — unary and streaming calls, sharing collections, environments and variables with HTTP.
-- **Collections** — a tree of requests and folders with Postman-format import and export.
+- **Collections** — a tree of requests and folders with Postman-format import and export. Move a
+  request or folder to another collection.
 - **Environments and variables** — collection- and environment-scoped variables, color-coded
   environments, Faker-backed dynamic values, and secret masking in history and logs.
 - **curl** — paste a curl command to build a request, or copy any request out as curl.
@@ -157,7 +166,7 @@ bun run dev:studio       # native window with hot reload (installs dependencies 
 bun run package:studio   # build and ad-hoc sign the .app and .dmg
 ```
 
-Other scripts you'll use most (all but the last cover Kira Space too):
+Other scripts you'll use most (all but the last two cover Kira Space too):
 
 - `bun run setup` — install dependencies without building or running anything.
 - `bun run lint` and `bun run typecheck` — Biome plus the repo's style guards; TypeScript for every
@@ -165,6 +174,9 @@ Other scripts you'll use most (all but the last cover Kira Space too):
 - `bun run test:unit`, `bun run test:go` — the unit and Go suites (Go's real-engine cases need
   Docker and skip without it).
 - `bun run test:ui:studio` — Playwright UI tests against the built frontend.
+- `bun run test:flows:studio` and `bun run test:e2e-real:studio` — the Go flow tests, which run the
+  real app wiring against real SQLite, HTTP and gRPC servers and Docker, and the full-stack
+  Playwright tier.
 
 `package.json` lists every script. `bun install` also installs git hooks: `pre-commit` runs lint and
 typecheck, `pre-push` runs the Go build and linters. The app stores its data in `~/.kira-studio/`
@@ -198,7 +210,7 @@ docs                  architecture, packaging, performance and the per-chapter r
   limitations.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — building, releasing, install and update.
 - [`docs/DEV_ENVIRONMENT.md`](docs/DEV_ENVIRONMENT.md) — building and testing in a given sandbox.
-- [`docs/v1.9/`](docs/v1.9/) — the current development chapter's spec and phase plans. Earlier
+- [`docs/v2.2/`](docs/v2.2/) — the current development chapter's spec and phase plans. Earlier
   chapters live alongside it in `docs/`.
 - [`CLAUDE.md`](CLAUDE.md) — the working agreement for changes to this repo.
 

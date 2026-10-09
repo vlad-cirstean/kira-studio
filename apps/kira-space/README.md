@@ -2,17 +2,18 @@
 
 [![PR](https://github.com/vlad-cirstean/kira-studio/actions/workflows/pr.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/pr.yml)
 
-A native macOS git client: a commit graph, branch review and remote operations over a
-VS Code-adjacent code workspace (file tree, Monaco viewer, diffs, search) — built on Wails (Go)
-and Vue 3. The same backend also serves the **Kira Space VS Code extension**
+A native macOS git client and code workspace: a commit graph, branch review and remote operations
+over a VS Code-adjacent workspace (file tree, Monaco viewer, diffs, search), with coding agents, a
+memory store, a terminal and a phone view on your home network — built on Wails (Go)
+and Vue 3. Its modules are Git, Agents, Terminal and Memory. The same backend also serves the **Kira Space VS Code extension**
 (`apps/kira-space-vscode`), which brings the same graph and review sidebar into an editor window.
 
 ## Status
 
 - **Beta, split out of Kira Studio as its own app at v1.9 P100.** The git backend, the native code
   workspace and the VS Code extension all shipped as part of Kira Studio through v1.3-v1.8; P100
-  moved them here, unchanged in behavior, into a standalone app with no `Studio`/`Api` database or
-  API tooling of its own. See the root [`README.md`](../../README.md) for that sibling app and
+  moved them here, unchanged in behavior, into a standalone app with no database or API tooling of
+  its own. See the root [`README.md`](../../README.md) for that sibling app and
   [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md)'s Git module section for the fuller history.
 - **macOS 14+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
@@ -39,12 +40,24 @@ and Vue 3. The same backend also serves the **Kira Space VS Code extension**
   tree.
 - **Markdown reading view** — a rendered-Markdown toggle beside the raw view, per tab.
 
+## Agents, memory, terminal and phone
+
+- **Agents** — a task planner with workflows, runs and interactive Claude Code sessions. Hooks ride
+  each session's own `--settings` file, so your Claude Code settings files are never touched.
+- **Memory** — an MCP server for Claude Code with keyword and semantic search. Semantic search needs
+  an optional local model of about 35 MB, downloaded when you click the button in Settings > Memory.
+  Add memories by hand, or import files or folders in bulk.
+- **Terminal** — a terminal module with quick commands grouped in collections.
+- **Phone view** — Settings > Mobile access serves the Agents board to a phone. It uses plain HTTP and
+  is meant for a trusted home network only: you pair by QR code and approve the code on the desktop,
+  device tokens expire after 30 days, and traffic is not encrypted.
+
 ## Git features
 
 The git backend runs inside this app — spawn discipline, porcelain parsing, the paged log walk,
 pre-flight hazard analysis, every write — and serves two frontends over it: this window's own
 native workspace (a pinned native graph tab and a native code-review layer, both described under
-Code workspace above — this app has exactly one module, no `Studio`/`Api` mode switcher), and the
+Code workspace above), and the
 **Kira Space** VS Code extension, which dials the same backend over a Unix socket at
 `~/.kira-space/git.sock`. The `.vsix` ships inside
 this app's own DMG rather than through the Marketplace, and installs from a *Connected editors*
@@ -127,6 +140,8 @@ Two limits worth knowing up front:
 - macOS 14 or later, Apple Silicon (`arm64`).
 - [Git](https://git-scm.com) 2.38 or newer on `PATH`. The native Git module needs nothing beyond
   that.
+- Optional: an authenticated `claude` CLI for Agents
+  and Memory.
 - Optional: [VS Code](https://code.visualstudio.com) 1.134+, to install the bundled **Kira Space**
   extension into as a second frontend, and the [GitHub CLI](https://cli.github.com) (`gh`), already
   logged in, for PR links — without it the PR indicator simply stays blank and nothing else
@@ -184,7 +199,8 @@ The scripts specific to this app:
 | Script | What it does |
 |---|---|
 | `bun run dev:space` | `cd apps/kira-space && wails3 task dev` — native window, HMR |
-| `bun run build:space` | Production Vue build into `apps/kira-space/frontend/dist` |
+| `bun run build:space` | Production Vue builds into `apps/kira-space/frontend/dist`, plus the phone bundle `dist-mobile` |
+| `bun run build:space-mobile` | Builds only the phone bundle |
 | `bun run typecheck:space-web` | `apps/kira-space/frontend/src`, including `.vue` files (`vue-tsc`) |
 | `bun run typecheck:space-tests` | `apps/kira-space/tests/` tiers and `playwright.config.ts` (`tsgo`) |
 | `bun run typecheck:space-unit` | `apps/kira-space/tests/unit` (`tsgo`) |
@@ -193,6 +209,10 @@ The scripts specific to this app:
 | `bun run package:vscode` | Packages it into `apps/kira-space/bin/kira-space.vsix` (`scripts/package-vscode.ts`) — `bun run package:space` runs this before bundling it into the app |
 | `bun run test:webview` | Builds the extension bundle, then runs Playwright against its own webviews (layout + interaction, see Tests below) |
 | `bun run test:ui:space` | Builds, then runs Playwright (WebKit) against this app's own built bundle |
+| `bun run test:ui:space-mobile` | Builds the phone bundle, then runs its Playwright tests on iOS (WebKit) and Android (Chromium) profiles |
+| `bun run test:e2e-real:space` | Playwright against a real `-tags server` build of this app |
+| `bun run test:flows:space` | Go flow tests: the real app wiring on a temp home (`test:flows:space:complete` adds the slow permutations) |
+| `bun run test:visual:space` | Pixel-diff baselines |
 | `bun run package:space` | Builds the native Wails bundle and the `.dmg` around it, ad-hoc signs both — `apps/kira-space/bin/Kira Space.{app,dmg}` |
 
 `bun run test:unit`, `bun run test:go` and `bun run typecheck` (unscoped) already cover this app —
@@ -202,12 +222,14 @@ they run every project/package in the workspace, git included.
 `git.sock.lock`, all under `~/.kira-space/`. The `KIRA_SPACE_HOME` environment variable relocates
 that whole directory, the same way `KIRA_HOME` does for Kira Studio's own home — the two are
 independent, so running both apps at once (or two test instances) never contends over one socket
-or one database.
+or one database. Memories live apart, in `~/.kira-memory/` (`KIRA_MEMORY_HOME`): `memory.db` and the
+downloaded `models/`.
 
 ## Tests
 
-Two TypeScript suites under `apps/kira-space/tests/` (`unit/`, `ui/`), plus a suite under
-`apps/kira-space-vscode/tests/` for the git webviews, and the Go suite under `apps/kira-space/`.
+TypeScript suites under `apps/kira-space/tests/` (`unit/`, `ui/`, `mobile/`, `e2e-real/`, `visual/`,
+and an opt-in `perf/`), a suite under `apps/kira-space-vscode/tests/` for the git webviews, and the Go
+suite under `apps/kira-space/`, including the flow tier (`test:flows:space`).
 `packages/db-fixtures/` is not exercised here — that's Kira Studio's own DB fixture corpus.
 
 - **`bun run test:unit`** — plain TypeScript modules exercised with fakes rather than a real
@@ -231,12 +253,15 @@ handles windowing, IPC and the whole git backend — no sidecar, no second runti
 frontend runs in the OS's own WebView (WKWebView on macOS).
 
 ```
-apps/kira-space/internal        the Go app: git backend (gitclient, gitops, gitstore, gitrpc, gitsock, gitsession, ...), the native code workspace (codeworkspace), the IPC bridge
+apps/kira-space/internal        the Go app: git backend (gitclient, gitops, gitstore, gitrpc, gitsock, gitsession, ...), the native code workspace (codeworkspace), agents (ade), the phone server (mobileweb), wiring (appwire), flow tests (flowharness), the IPC bridge
 apps/kira-space/frontend/src    the Vue 3 app (bindings + the built bundle live alongside it, both gitignored)
 apps/kira-space/tests/unit      unit suite — no external resource
 apps/kira-space/tests/ui        Playwright against the built bundle, WebKit
+apps/kira-space/tests/mobile    Playwright for the phone bundle
+apps/kira-space/tests/e2e-real  Playwright against a real server build
+apps/kira-space/tests/visual    pixel-diff baselines
 apps/kira-space-vscode          the Kira Space VS Code extension — the git module's second frontend
-internal             repo-root Go shared by both apps: `shell`, `appevent`, `rpcstream`, `ipcerr`, `startupfail`, `appstorage`, and more
+internal             repo-root Go shared by both apps: `shell`, `appevent`, `rpcstream`, `ipcerr`, `startupfail`, `appstorage`, `memory`, `agenthooks`, and more
 packages/workbench   the shared workbench shell (TitleBar/StatusBar/MainView/TabStrip), Pinia store factories, the Monaco editor bootstrap, both apps' test harnesses
 packages/git-ipc     the git contract, RPC/codec/validation, the socket channel, the FlatBuffers schema
 packages/git-core    client-side git logic: commit store, lane layout, the client half of search, ports

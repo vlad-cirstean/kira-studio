@@ -46,7 +46,7 @@ duplicated here; this file only points at them.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job: spawn the right subagents in order, carry context between them,
   and track progress. The actual writing always happens in a subagent.
-- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.9/` today) needs an
+- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v2.2/` today) needs an
   Opus-authored plan committed under that chapter's `plans/` before implementation starts — spawn
   an **Opus subagent** (`Agent` tool, `model: "opus"`) whose only job is writing that plan. No plan
   there means no implementing straight from the spec; get the plan written and committed first.
@@ -149,7 +149,7 @@ duplicated here; this file only points at them.
 - No per-phase PRs. One feature branch per chapter.
 - **Every chapter uses `P` phase numbers, one running sequence across the whole repo, not
   per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8/v1.9 continue one counter (v1.6 topped out at `P70`; v1.8
-  starts at `P71`, v1.9 at `P96`). Before opening a new chapter, scan every prior chapter's `SPEC.md` for the
+  starts at `P71`, v1.9 at `P96`, v2.0 at `P126`, v2.1 at `P185`, v2.2 at `P210`). Before opening a new chapter, scan every prior chapter's `SPEC.md` for the
   highest `P` number used across all of them, not just the chapter immediately before it, and
   continue from there — regardless of whether that chapter was shaped as independent misc phases or
   one cohesive subsystem. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and stay
