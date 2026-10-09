@@ -4,7 +4,7 @@ package scriptruns
 
 import "github.com/kirathecat/kira-studio/internal/runoutcome"
 
-// Trigger says what started a run. Part 1 writes only TriggerTerminal; the table's CHECK reserves the rest.
+// Trigger says what started a run.
 type Trigger string
 
 const (
@@ -14,8 +14,27 @@ const (
 	TriggerScheduled Trigger = "scheduled"
 )
 
+// Run kinds.
+const (
+	KindScript = "script"
+	KindSmart  = "smart"
+)
+
 // States are the outcome statuses plus Running.
 const StateRunning = "running"
+
+// RunParam is a param as a run shows it; a secret value is stored as the mask.
+type RunParam struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// RunTools is what a smart run was launched with.
+type RunTools struct {
+	Tools        []string `json:"tools"`
+	AllowedTools []string `json:"allowedTools"`
+	McpServers   []string `json:"mcpServers"`
+}
 
 // Run mirrors packages/shared/domain/scriptRuns.ts's scriptRunSchema.
 type Run struct {
@@ -33,4 +52,10 @@ type Run struct {
 	CreatedAt  int64               `json:"createdAt"`
 	StartedAt  *int64              `json:"startedAt"`
 	FinishedAt *int64              `json:"finishedAt"`
+	// Smart runs only; empty for a script run.
+	Model     string     `json:"model"`
+	SessionID string     `json:"sessionId"`
+	Prompt    string     `json:"prompt"`
+	Params    []RunParam `json:"params"`
+	Tools     RunTools   `json:"tools"`
 }

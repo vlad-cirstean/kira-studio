@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const columns = `id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command, outcome_json, created_at, started_at, finished_at`
+const columns = `id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command, outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json, tools_json`
 
 // keepFinished is how many finished runs are retained.
 const keepFinished = 500
@@ -22,12 +22,21 @@ type rowScanner interface{ Scan(dest ...any) error }
 
 func scan(row rowScanner) (Run, error) {
 	var r Run
-	var outcome string
+	var outcome, paramsJSON, toolsJSON string
 	var started, finished sql.NullInt64
 	if err := row.Scan(&r.ID, &r.ScriptID, &r.ScriptName, &r.Color, &r.Kind, &r.Trigger, &r.State, &r.TerminalID,
-		&r.Cwd, &r.Command, &outcome, &r.CreatedAt, &started, &finished); err != nil {
+		&r.Cwd, &r.Command, &outcome, &r.CreatedAt, &started, &finished,
+		&r.Model, &r.SessionID, &r.Prompt, &paramsJSON, &toolsJSON); err != nil {
 		return Run{}, err
 	}
+	r.Params = []RunParam{}
+	if err := json.Unmarshal([]byte(paramsJSON), &r.Params); err != nil {
+		return Run{}, fmt.Errorf("scriptruns: decode run %s params: %w", r.ID, err)
+	}
+	if err := json.Unmarshal([]byte(toolsJSON), &r.Tools); err != nil {
+		return Run{}, fmt.Errorf("scriptruns: decode run %s tools: %w", r.ID, err)
+	}
+	r.Tools = r.Tools.nonNil()
 	if outcome != "" {
 		var o runoutcome.Outcome
 		if err := json.Unmarshal([]byte(outcome), &o); err != nil {
@@ -61,9 +70,18 @@ func (r *Repo) Insert(run Run) error {
 	if err != nil {
 		return err
 	}
-	if _, err := r.DB.Exec(`INSERT INTO script_runs (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	params, err := json.Marshal(nonNilParams(run.Params))
+	if err != nil {
+		return fmt.Errorf("scriptruns: encode params: %w", err)
+	}
+	tools, err := json.Marshal(run.Tools.nonNil())
+	if err != nil {
+		return fmt.Errorf("scriptruns: encode tools: %w", err)
+	}
+	if _, err := r.DB.Exec(`INSERT INTO script_runs (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		run.ID, run.ScriptID, run.ScriptName, run.Color, run.Kind, run.Trigger, run.State, run.TerminalID,
-		run.Cwd, run.Command, outcome, run.CreatedAt, run.StartedAt, run.FinishedAt); err != nil {
+		run.Cwd, run.Command, outcome, run.CreatedAt, run.StartedAt, run.FinishedAt,
+		run.Model, run.SessionID, run.Prompt, string(params), string(tools)); err != nil {
 		return fmt.Errorf("scriptruns: insert %s: %w", run.ID, err)
 	}
 	return nil
@@ -134,11 +152,101 @@ func (r *Repo) FailRunning(out runoutcome.Outcome, now int64) ([]Run, error) {
 	})
 }
 
-// Purge keeps only the newest keepFinished finished runs.
+// Purge keeps only the newest keepFinished finished runs and drops the logs of the rest.
 func (r *Repo) Purge() error {
 	if _, err := r.DB.Exec(`DELETE FROM script_runs WHERE state <> 'running' AND id NOT IN
 		(SELECT id FROM script_runs WHERE state <> 'running' ORDER BY created_at DESC, id DESC LIMIT ?)`, keepFinished); err != nil {
 		return fmt.Errorf("scriptruns: purge: %w", err)
 	}
+	if _, err := r.DB.Exec(`DELETE FROM script_run_logs WHERE run_id NOT IN (SELECT id FROM script_runs)`); err != nil {
+		return fmt.Errorf("scriptruns: purge logs: %w", err)
+	}
 	return nil
+}
+
+func (t RunTools) nonNil() RunTools {
+	if t.Tools == nil {
+		t.Tools = []string{}
+	}
+	if t.AllowedTools == nil {
+		t.AllowedTools = []string{}
+	}
+	if t.McpServers == nil {
+		t.McpServers = []string{}
+	}
+	return t
+}
+
+func nonNilParams(p []RunParam) []RunParam {
+	if p == nil {
+		return []RunParam{}
+	}
+	return p
+}
+
+// LogChunk is one stored log line.
+type LogChunk struct {
+	Seq    int    `json:"seq"`
+	Stream string `json:"stream"`
+	Text   string `json:"text"`
+}
+
+// maxLogLines is how many lines of one run are kept; older ones are dropped.
+const maxLogLines = 5000
+
+// AppendLogs stores chunks whose Seq the caller assigned, then drops lines older than the newest
+// maxLogLines.
+func (r *Repo) AppendLogs(runID string, chunks []LogChunk) error {
+	if len(chunks) == 0 {
+		return nil
+	}
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("scriptruns: append logs: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	stmt, err := tx.Prepare(`INSERT INTO script_run_logs (run_id, seq, stream, text) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("scriptruns: append logs: %w", err)
+	}
+	defer func() { _ = stmt.Close() }()
+	for _, c := range chunks {
+		if _, err := stmt.Exec(runID, c.Seq, c.Stream, c.Text); err != nil {
+			return fmt.Errorf("scriptruns: append logs: %w", err)
+		}
+	}
+	last := chunks[len(chunks)-1].Seq
+	if _, err := tx.Exec(`DELETE FROM script_run_logs WHERE run_id = ? AND seq <= ?`, runID, last-maxLogLines); err != nil {
+		return fmt.Errorf("scriptruns: trim logs: %w", err)
+	}
+	return tx.Commit()
+}
+
+// LogPage is what ReadLog answers.
+type LogPage struct {
+	Chunks []LogChunk `json:"chunks"`
+	// Truncated is true when older lines were dropped.
+	Truncated bool `json:"truncated"`
+}
+
+// ReadLog returns the lines of a run after afterSeq, oldest first.
+func (r *Repo) ReadLog(runID string, afterSeq int) (LogPage, error) {
+	rows, err := r.DB.Query(`SELECT seq, stream, text FROM script_run_logs WHERE run_id = ? AND seq > ? ORDER BY seq ASC LIMIT ?`,
+		runID, afterSeq, maxLogLines)
+	chunks, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (LogChunk, bool, error) {
+		var c LogChunk
+		err := rows.Scan(&c.Seq, &c.Stream, &c.Text)
+		return c, true, err
+	})
+	if err != nil {
+		return LogPage{}, fmt.Errorf("scriptruns: read log %s: %w", runID, err)
+	}
+	if chunks == nil {
+		chunks = []LogChunk{}
+	}
+	var first sql.NullInt64
+	if err := r.DB.QueryRow(`SELECT MIN(seq) FROM script_run_logs WHERE run_id = ?`, runID).Scan(&first); err != nil {
+		return LogPage{}, fmt.Errorf("scriptruns: read log %s: %w", runID, err)
+	}
+	return LogPage{Chunks: chunks, Truncated: first.Valid && first.Int64 > 1}, nil
 }

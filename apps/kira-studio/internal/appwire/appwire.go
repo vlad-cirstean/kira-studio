@@ -43,6 +43,8 @@ type Options struct {
 	McpInstaller    bridge.McpInstaller
 	AppName         string
 	Version         string
+	// SmartTimeout replaces every smart script's own timeout (a flow-test seam); production leaves it zero.
+	SmartTimeout time.Duration
 }
 
 // Wired is the built object graph.
@@ -144,9 +146,9 @@ func Build(opts Options) (*Wired, error) {
 	// cancels it so a Cmd+Q mid-download aborts the install rather than orphaning a bundle swap.
 	updateInstaller := appupdate.NewInstaller(appupdate.Studio, opts.Version)
 
-	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker)
+	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, opts.SmartTimeout)
 	lifecycle := wireLifecycle(embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, repositories, db)
+		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, repositories, db)
 
 	w := &Wired{
 		StartedAt: startedAt, Repos: repositories, Deps: deps, Router: router, Events: embedded.events,

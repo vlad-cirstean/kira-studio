@@ -74,6 +74,8 @@ type Options struct {
 	TrackerGrace time.Duration
 	// RebaseTimeout bounds one ADE rebase run; 0 keeps the default (20 minutes).
 	RebaseTimeout time.Duration
+	// SmartTimeout replaces every smart script's own timeout (a flow-test seam); 0 keeps each script's.
+	SmartTimeout time.Duration
 }
 
 // ShellHooks completes the window-manager seams once the shell exists. CloseWindow, FocusWindow and
@@ -118,6 +120,7 @@ type Wired struct {
 	Tabs           *bridge.TabsService
 	CustomScripts  *bridge.CustomScriptsService
 	ScriptRuns     *bridge.ScriptRunsService
+	runs           *scriptruns.Service
 	Terminal       *bridge.TerminalService
 	AdeTask        *bridge.AdeTaskService
 	Ops            *bridge.OpsService
@@ -203,8 +206,11 @@ func Build(opts Options) *Wired {
 	w.TermBroker = termBroker
 	runs := &scriptruns.Service{
 		Runs: repositories.ScriptRuns, Scripts: repositories.CustomScripts, Registry: terminalRegistry, Home: deps.Home, App: "Space",
-		Emit: func(r scriptruns.Run) { emitter.Emit(bridge.ChannelScriptRunsChanged, r) },
+		Emit:         func(r scriptruns.Run) { emitter.Emit(bridge.ChannelScriptRunsChanged, r) },
+		EmitLog:      func(p scriptruns.LogPush) { emitter.Emit(bridge.ChannelScriptRunLog, p) },
+		SmartTimeout: opts.SmartTimeout,
 	}
+	w.runs = runs
 	if err := runs.Recover(); err != nil {
 		slog.Warn("recover script runs", "scope", "startup", "err", err)
 	}
@@ -348,6 +354,7 @@ func (w *Wired) teardown(db io.Closer) {
 	// (Reconcile marks its row stopped) while the DB is still open. Then shutdownTracker flushes
 	// whatever last-active time is still only in memory and stops the hooks listener.
 	terminal.ShutdownBound(w.Terminal.BoundService)
+	w.runs.Close()
 	shutdownTracker(w.Tracker, w.AgentHooks)
 	w.AdeBoard.Close()
 	w.detachGitPush()

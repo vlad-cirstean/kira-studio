@@ -39,13 +39,16 @@ type ScriptLaunch struct {
 	RunID   string
 	Cwd     string
 	Command string
+	// Env is KEY=value entries the script's shell gets on top of the terminal's own.
+	Env []string
 }
 
 // ScriptLauncher is the run store a script-launching Open reports to.
 type ScriptLauncher interface {
-	// Begin loads the script, prepares its folder and records a running run. An error is the
-	// caller's: a blocked folder or an unknown script.
-	Begin(scriptID, terminalID string) (ScriptLaunch, error)
+	// Begin loads the script, prepares its folder and records a running run. launchToken, when set,
+	// is the single-use token of a confirmed run dialog. An error is the caller's: a blocked
+	// folder, an unknown script or a token that expired.
+	Begin(scriptID, terminalID, launchToken string) (ScriptLaunch, error)
 	// Failed records that the run's session did not spawn.
 	Failed(runID string, err error)
 	// Exited records how the run's session ended.
@@ -135,23 +138,24 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	agent := args.LaunchKind == LaunchKindClaudeCode
 
 	var scriptRun string
+	var scriptEnv []string
 	if args.ScriptID != "" {
 		if b.Scripts == nil {
 			return OpenResult{}, ipcerr.New("E_INVALID", "scripts are not available")
 		}
-		launch, err := b.Scripts.Begin(args.ScriptID, args.TerminalID)
+		launch, err := b.Scripts.Begin(args.ScriptID, args.TerminalID, args.ScriptLaunchToken)
 		if err != nil {
 			return OpenResult{}, err
 		}
 		scriptRun = launch.RunID
-		args.Cwd, args.Command = launch.Cwd, launch.Command
+		args.Cwd, args.Command, scriptEnv = launch.Cwd, launch.Command, launch.Env
 		if len(args.Command) > MaxCommandBytes {
 			b.Scripts.Failed(scriptRun, errors.New("command is too long"))
 			return OpenResult{}, ipcerr.New("E_INVALID", "command is too long")
 		}
 	}
 
-	command, env := args.Command, []string(nil)
+	command, env := args.Command, scriptEnv
 	composedAgent := agent && b.ComposeAgent != nil
 	if composedAgent {
 		composed, composedEnv, err := b.ComposeAgent(args.TerminalID, args.Cwd, command)

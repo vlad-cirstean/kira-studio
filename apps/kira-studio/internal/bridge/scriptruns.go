@@ -9,3 +9,6 @@ type ScriptRunsService struct {
 
 // ChannelScriptRunsChanged pushes one changed script run to every window.
 const ChannelScriptRunsChanged = "kira:scriptRuns:changed"
+
+// ChannelScriptRunLog pushes the log lines a smart run just stored: {runId, chunks}.
+const ChannelScriptRunLog = "kira:scriptRunLog:appended"

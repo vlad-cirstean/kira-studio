@@ -25,7 +25,13 @@ type OpenArgs struct {
 	// ScriptID, only with LaunchKindScript, makes the host load the stored script: its command and
 	// resolved folder replace Cwd and Command, which are ignored.
 	ScriptID string `json:"scriptId"`
+	// ScriptLaunchToken, only with ScriptID, is the single-use token a confirmed run dialog got
+	// from scriptRuns.Start: it carries the run's folder and environment.
+	ScriptLaunchToken string `json:"scriptLaunchToken"`
 }
+
+// MaxLaunchTokenBytes bounds ScriptLaunchToken.
+const MaxLaunchTokenBytes = 64
 
 // ValidateOpen is both apps' own TerminalService.Open — identical up to whatever each app's own
 // Open builds into OpenParams past this call (P107 I2-5). The cwd check is not a trust boundary and
@@ -44,6 +50,9 @@ func ValidateOpen(args OpenArgs) error {
 	}
 	if !ValidLaunchKind(args.LaunchKind) {
 		return ipcerr.New("E_INVALID", "launchKind must be shell, claude-code or script")
+	}
+	if args.ScriptLaunchToken != "" && (args.ScriptID == "" || len(args.ScriptLaunchToken) > MaxLaunchTokenBytes) {
+		return ipcerr.New("E_INVALID", "scriptLaunchToken needs scriptId and at most 64 characters")
 	}
 	if args.ScriptID != "" {
 		if args.LaunchKind != LaunchKindScript {

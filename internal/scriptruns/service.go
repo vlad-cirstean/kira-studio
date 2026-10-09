@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
@@ -25,6 +27,21 @@ type Service struct {
 	// Emit pushes a changed run to every window.
 	Emit func(Run)
 	Now  func() time.Time
+
+	// EmitLog pushes the log lines a smart run just stored.
+	EmitLog func(LogPush)
+	// Getenv reads the user's environment for their Claude config; nil means os.Getenv.
+	Getenv func(string) string
+	// SmartTimeout, when positive, replaces every smart run's own timeout (a flow test).
+	SmartTimeout time.Duration
+
+	mu        sync.Mutex
+	closed    bool
+	smart     map[string]*smartRun
+	finishes  map[string]claudeheadless.Finish
+	launches  map[string]launch
+	server    *claudeheadless.Server
+	smartWait sync.WaitGroup
 }
 
 var _ terminal.ScriptLauncher = (*Service)(nil)
@@ -43,8 +60,9 @@ func (s *Service) emit(r Run) {
 }
 
 // Begin loads the script, prepares its folder and records a running run. A blocked folder records
-// a failed run too, so the attempt shows in the runs list.
-func (s *Service) Begin(scriptID, terminalID string) (terminal.ScriptLaunch, error) {
+// a failed run too, so the attempt shows in the runs list. A launch token, from Start, carries the
+// folder, command and env the user saw in the run dialog.
+func (s *Service) Begin(scriptID, terminalID, token string) (terminal.ScriptLaunch, error) {
 	rec, err := s.Scripts.Get(scriptID)
 	if err != nil {
 		return terminal.ScriptLaunch{}, ipcerr.InternalErr(err)
@@ -52,12 +70,21 @@ func (s *Service) Begin(scriptID, terminalID string) (terminal.ScriptLaunch, err
 	if rec == nil {
 		return terminal.ScriptLaunch{}, ipcerr.NotFound("script not found")
 	}
-	dir := scripts.ResolveDir(*rec, s.Home)
+	dir, command, trigger := scripts.ResolveDir(*rec, s.Home), rec.Command, TriggerTerminal
+	var env []string
+	var params []RunParam
+	if token != "" {
+		l, ok := s.takeLaunch(token, scriptID)
+		if !ok {
+			return terminal.ScriptLaunch{}, ipcerr.New("E_INVALID", "this run expired: start it again")
+		}
+		dir, command, env, params, trigger = l.dir, l.command, l.env, l.params, TriggerManual
+	}
 	now := s.now()
 	run := Run{
-		ID: uuid.NewString(), ScriptID: rec.ID, ScriptName: rec.Name, Color: rec.Color, Kind: "script",
-		Trigger: TriggerTerminal, State: StateRunning, TerminalID: terminalID, Cwd: dir.Path, Command: rec.Command,
-		CreatedAt: now, StartedAt: &now,
+		ID: uuid.NewString(), ScriptID: rec.ID, ScriptName: rec.Name, Color: rec.Color, Kind: KindScript,
+		Trigger: trigger, State: StateRunning, TerminalID: terminalID, Cwd: dir.Path, Command: command,
+		CreatedAt: now, StartedAt: &now, Params: params,
 	}
 	if err := scripts.PrepareDir(dir); err != nil {
 		o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndStartErr, Err: err})
@@ -69,7 +96,7 @@ func (s *Service) Begin(scriptID, terminalID string) (terminal.ScriptLaunch, err
 		return terminal.ScriptLaunch{}, ipcerr.InternalErr(err)
 	}
 	s.emit(run)
-	return terminal.ScriptLaunch{RunID: run.ID, Cwd: dir.Path, Command: rec.Command}, nil
+	return terminal.ScriptLaunch{RunID: run.ID, Cwd: dir.Path, Command: command, Env: env}, nil
 }
 
 func (s *Service) record(run Run) {
@@ -132,13 +159,17 @@ func (s *Service) List(limit int) ([]Run, error) {
 // Get returns one run.
 func (s *Service) Get(id string) (Run, error) { return s.Runs.Get(id) }
 
-// Stop ends a running run's session; the run then finishes as stopped by the user.
+// Stop ends a running run; the run then finishes as stopped by the user.
 func (s *Service) Stop(id string) error {
 	run, err := s.Runs.Get(id)
 	if err != nil {
 		return err
 	}
 	if run.State != StateRunning {
+		return nil
+	}
+	if run.Kind == KindSmart {
+		s.stopSmart(id)
 		return nil
 	}
 	s.Registry.Close(run.TerminalID)

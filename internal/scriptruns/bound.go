@@ -1,6 +1,9 @@
 package scriptruns
 
 import (
+	"context"
+
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
@@ -63,4 +66,59 @@ func (b *Bound) ResolveDir(args ResolveDirArgs) (scripts.Dir, error) {
 
 type ResolveDirArgs struct {
 	ScriptID string `json:"scriptId"`
+}
+
+// Preview resolves a run the way Start would, without starting it.
+func (b *Bound) Preview(args RunArgs) (Preview, error) {
+	if args.ScriptID == "" {
+		return Preview{}, ipcerr.BadRequest("scriptId is required")
+	}
+	pv, err := b.Svc.Preview(args)
+	if err != nil {
+		return Preview{}, ipcerr.Wrap(err)
+	}
+	return pv, nil
+}
+
+// Start runs what Preview showed: a smart script runs headless, a normal one returns the token its
+// terminal tab opens with.
+func (b *Bound) Start(args StartArgs) (Started, error) {
+	if args.ScriptID == "" {
+		return Started{}, ipcerr.BadRequest("scriptId is required")
+	}
+	started, err := b.Svc.Start(args)
+	if err != nil {
+		return Started{}, ipcerr.Wrap(err)
+	}
+	return started, nil
+}
+
+type ReadLogArgs struct {
+	ID       string `json:"id"`
+	AfterSeq int    `json:"afterSeq"`
+}
+
+// ReadLog returns a smart run's log lines after AfterSeq.
+func (b *Bound) ReadLog(args ReadLogArgs) (LogPage, error) {
+	if args.ID == "" {
+		return LogPage{}, ipcerr.BadRequest("id is required")
+	}
+	return ipcerr.InternalResult(b.Svc.Runs.ReadLog(args.ID, args.AfterSeq))
+}
+
+// McpServers lists the MCP servers of the user's Claude config.
+func (b *Bound) McpServers() ([]claudeheadless.UserServer, error) {
+	return ipcerr.InternalResult(b.Svc.McpServers())
+}
+
+type McpToolsArgs struct {
+	Server string `json:"server"`
+}
+
+// McpTools lists the tools of one of those servers.
+func (b *Bound) McpTools(args McpToolsArgs) ([]claudeheadless.UserTool, error) {
+	if args.Server == "" {
+		return nil, ipcerr.BadRequest("server is required")
+	}
+	return ipcerr.InternalResult(b.Svc.McpTools(context.Background(), args.Server))
 }

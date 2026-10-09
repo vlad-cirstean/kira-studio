@@ -1,0 +1,64 @@
+package scriptruns
+
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"time"
+
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/scripts"
+)
+
+// launchTTL is how long a normal script's launch token stays valid.
+const launchTTL = 60 * time.Second
+
+// launch is what Start resolved for a normal script, waiting for its terminal tab to open.
+type launch struct {
+	scriptID string
+	dir      scripts.Dir
+	command  string
+	env      []string
+	params   []RunParam
+	created  time.Time
+}
+
+func (s *Service) startTerminal(p *planned) (Started, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return Started{}, ipcerr.InternalErr(err)
+	}
+	token := base64.RawURLEncoding.EncodeToString(raw)
+	if err := scripts.PrepareDir(p.dir); err != nil {
+		return Started{}, ipcerr.New("E_INVALID", err.Error())
+	}
+	now := time.UnixMilli(s.now())
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return Started{}, ipcerr.New("E_INVALID", "Kira is closing")
+	}
+	if s.launches == nil {
+		s.launches = map[string]launch{}
+	}
+	for t, l := range s.launches {
+		if now.Sub(l.created) > launchTTL {
+			delete(s.launches, t)
+		}
+	}
+	s.launches[token] = launch{
+		scriptID: p.script.ID, dir: p.dir, command: p.script.Command, env: p.envList, params: p.params, created: now,
+	}
+	return Started{Terminal: &TerminalStart{Token: token, Cwd: p.dir.Path}}, nil
+}
+
+// takeLaunch consumes a token: it works once, for the script it was made for, within launchTTL.
+func (s *Service) takeLaunch(token, scriptID string) (launch, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l, ok := s.launches[token]
+	delete(s.launches, token)
+	if !ok || l.scriptID != scriptID || time.UnixMilli(s.now()).Sub(l.created) > launchTTL {
+		return launch{}, false
+	}
+	return l, true
+}
