@@ -335,12 +335,13 @@ test('columns resized wide never push the graph out of view', async ({ relaunch 
   expect(await overflow(win)).toEqual([]);
   expect(await clippedNodes(win)).toEqual([]);
 
+  await scrollToRow(win, 3, PAGE_SIZE);
   await rowAt(win, 3).locator('.kv-cell-message').click();
   await win.keyboard.press('Escape');
   expect(await overflow(win)).toEqual([]);
 
   await win.setViewportSize({ width: 1000, height: 960 });
-  expect(await overflow(win)).toEqual([]);
+  await expect.poll(() => overflow(win)).toEqual([]);
 
   await loadMore(win);
   await diagonalWheel(win);

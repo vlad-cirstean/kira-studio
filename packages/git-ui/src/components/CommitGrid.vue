@@ -35,6 +35,13 @@ import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
 import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readTokens.ts';
 import {
+  type ColumnFit,
+  type ColumnFitInput,
+  fitColumns,
+  MAX_COLUMN_WIDTH,
+  maxDragWidth,
+} from './columnFit.ts';
+import {
   buildColumns,
   collapsedMessageText,
   createCommitDataView,
@@ -126,7 +133,6 @@ const emit = defineEmits<{
 }>();
 
 const MIN_COLUMN_WIDTH = 40;
-const MAX_COLUMN_WIDTH = 600;
 const MIN_MESSAGE_WIDTH = 120;
 // G21 D6b: mirrors `.slick-cell`'s own horizontal padding (`kv:px-1` in the style block below, 4px) — one
 // side; `measureAbsoluteDateWidth`'s own caller doubles it for both sides of the cell.
@@ -212,6 +218,10 @@ const handleLeftDate = ref(0);
 // P92 item 1: graph|message, unlike the other two, renders in compact mode too — compact drops
 // author/date (G-UX D1) but keeps the graph column, so this one has no `!detailOpen` gate.
 const handleLeftGraph = ref(0);
+const maxGraph = ref(MAX_COLUMN_WIDTH);
+const maxAuthor = ref(MAX_COLUMN_WIDTH);
+const maxDate = ref(MAX_COLUMN_WIDTH);
+const effectiveWidths = ref<ColumnFit>({ graph: 0, author: 0, date: 0, message: 0 });
 
 let unsubscribeLayout: (() => void) | undefined;
 let unsubscribeTokens: (() => void) | undefined;
@@ -272,14 +282,17 @@ function handleFocusIn(event: FocusEvent): void {
   focusedRowIndex = rowAttr != null ? Number(rowAttr) : null;
 }
 
-function computeMessageWidth(hostWidth: number): number {
-  // G-UX D1: with the detail pane open, `author`/`date` are not rendered at all (`currentColumns`
-  // passes `compact: true`) — the width they would have reserved goes to the subject instead.
-  const reserved = props.detailOpen ? 0 : widths.value.author + widths.value.date;
-  // P92 item 1: widths.value.graph — the column's actual, user-set width — not
-  // graphColumnWidth(laneCount), which no longer tracks what the column is sized to.
-  const fixed = widths.value.graph + reserved;
-  return Math.max(MIN_MESSAGE_WIDTH, hostWidth - fixed);
+function fitInput(): ColumnFitInput {
+  return {
+    stored: widths.value,
+    available: availableWidth(),
+    graphFloor: minWidthFor('graph'),
+    graphAuto: false,
+    minAuthor: MIN_COLUMN_WIDTH,
+    minDate: minWidthFor('date'),
+    minMessage: MIN_MESSAGE_WIDTH,
+    compact: props.detailOpen,
+  };
 }
 
 /** `undefined` whenever there is nothing to highlight: no `search` prop at all, an empty/invalid
@@ -336,10 +349,10 @@ function availableWidth(): number {
 }
 
 function currentColumns(): Column<CommitRecord>[] {
-  const hostWidth = availableWidth();
   const laneCount = props.graphView.laneCount.value;
+  const fit = fitColumns(fitInput());
   return buildColumns(
-    { ...widths.value, laneCount, messageWidth: computeMessageWidth(hostWidth) },
+    { graph: fit.graph, author: fit.author, date: fit.date, laneCount, messageWidth: fit.message },
     { dateFormat: () => props.dateFormat, now: () => Date.now() },
     graphFormatter,
     { pattern: searchPattern },
@@ -368,13 +381,17 @@ function currentColumns(): Column<CommitRecord>[] {
 
 function updateHandlePositions(): void {
   // P92 item 1: the graph|message handle renders in compact mode too (see `handleLeftGraph`'s own
-  // comment), so its position is computed unconditionally; the author/date handles stay gated —
-  // G-UX D1's own reason (compact mode drops those two columns entirely) still holds for them.
-  handleLeftGraph.value = widths.value.graph;
+  // comment); the author/date handles stay gated, compact mode drops those two columns.
+  const input = fitInput();
+  const fit = fitColumns(input);
+  effectiveWidths.value = fit;
+  handleLeftGraph.value = fit.graph;
+  maxGraph.value = maxDragWidth('graph', fit, input);
   if (props.detailOpen) return;
-  const hostWidth = availableWidth();
-  handleLeftAuthor.value = widths.value.graph + computeMessageWidth(hostWidth);
-  handleLeftDate.value = handleLeftAuthor.value + widths.value.author;
+  handleLeftAuthor.value = fit.graph + fit.message;
+  handleLeftDate.value = handleLeftAuthor.value + fit.author;
+  maxAuthor.value = maxDragWidth('author', fit, input);
+  maxDate.value = maxDragWidth('date', fit, input);
 }
 
 // Regression fix (post-P79-merge): the width `rebuildColumns()` last actually ran against —
@@ -409,7 +426,9 @@ function rebuildColumns(): void {
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
   if (column === 'graph') graphAutoWidth = false;
-  const clamped = Math.min(MAX_COLUMN_WIDTH, Math.max(minWidthFor(column), Math.round(next)));
+  const input = fitInput();
+  const limit = maxDragWidth(column, fitColumns(input), input);
+  const clamped = Math.min(limit, Math.max(minWidthFor(column), Math.round(next)));
   if (widths.value[column] === clamped) return;
   widths.value = { ...widths.value, [column]: clamped };
   rebuildColumns();
@@ -1319,9 +1338,9 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
       :style="{ left: `${handleLeftGraph}px` }"
       label="Resize graph column"
-      :value="widths.graph"
+      :value="effectiveWidths.graph"
       :min="minWidthFor('graph')"
-      :max="MAX_COLUMN_WIDTH"
+      :max="maxGraph"
       @update:value="(w) => setColumnWidth('graph', w)"
     />
     <KuiColumnResizeHandle
@@ -1329,9 +1348,9 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
       :style="{ left: `${handleLeftAuthor}px` }"
       label="Resize author column"
-      :value="widths.author"
+      :value="effectiveWidths.author"
       :min="MIN_COLUMN_WIDTH"
-      :max="MAX_COLUMN_WIDTH"
+      :max="maxAuthor"
       @update:value="(w) => setColumnWidth('author', w)"
     />
     <KuiColumnResizeHandle
@@ -1339,9 +1358,9 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
       :style="{ left: `${handleLeftDate}px` }"
       label="Resize date column"
-      :value="widths.date"
+      :value="effectiveWidths.date"
       :min="minWidthFor('date')"
-      :max="MAX_COLUMN_WIDTH"
+      :max="maxDate"
       @update:value="(w) => setColumnWidth('date', w)"
     />
   </div>
@@ -1393,6 +1412,13 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 
 .kv-commit-grid .slick-viewport {
   @apply kv:w-full;
+}
+
+/* SlickGrid rewrites inline `overflow-x: auto` on every resizeCanvas. Columns always fit
+   (columnFit.ts); important hidden is the last guard so a sideways wheel never scrolls the graph
+   off screen. */
+.kv-commit-grid .slick-viewport {
+  @apply kv:overflow-x-hidden!;
 }
 
 /* P162: one stacking context and paint boundary for every row (each row is a stacking context
