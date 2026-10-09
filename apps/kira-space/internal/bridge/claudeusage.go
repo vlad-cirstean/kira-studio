@@ -1,8 +1,8 @@
 package bridge
 
 import (
-	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
+	"github.com/kirathecat/kira-studio/internal/appevent"
 )
 
 // ChannelClaudeUsage is P239's push: a Kira-started session or run reported new limits. Payload

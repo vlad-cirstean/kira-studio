@@ -15,7 +15,7 @@ const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 30_000) });
 
 const windows = computed(() => {
   const d = data.value;
-  if (!d || d.state !== 'ok') return [];
+  if (d?.state !== 'ok') return [];
   return [
     { label: '5h', long: '5-hour', window: d.fiveHour },
     { label: 'wk', long: 'Weekly', window: d.sevenDay },
@@ -55,7 +55,7 @@ const lines = computed(() =>
 
 const sourceLine = computed(() => {
   const d = data.value;
-  if (!d || d.state !== 'ok') return '';
+  if (d?.state !== 'ok') return '';
   const from = d.source === 'run' ? 'a background ADE run' : 'a Claude Code session';
   return `From ${from}, ${span(now.value.getTime() - d.updatedAt)} ago`;
 });
