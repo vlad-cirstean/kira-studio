@@ -2345,6 +2345,16 @@ Code to fire `UserPromptSubmit`, the one hook event P127's own set left out — 
 (below) is its first consumer. `AgentEvent`'s wire shape is unchanged (`packages/shared/domain/
 agent.ts`) — every field a real hook payload can carry was already there.
 
+**Hooks reach only Kira Space sessions (P233).** Nothing in either app writes Claude Code hooks into
+the user's `~/.claude/settings.json`, project `.claude/settings(.local).json` or any other settings
+file (audited: no writer exists, and none ever did). Hooks ride `--settings <hooks.json>` plus the
+`KIRA_*` env on launches Kira Space composes, from a private temp dir deleted on `Close`. The shim
+exits 0 before any request unless `KIRA_AGENT_HOOK_TOKEN` and `KIRA_TERMINAL_ID` are set, so a
+`hooks.json` or copied entry loaded in the user's own sessions is inert. MCP registration
+(Settings > Memory, Studio Database MCP) is a separate, explicit user action that edits
+`~/.claude.json` through the `claude` CLI and is out of this rule. Real-flow proof:
+`flows/claudeflow` (fake HOME, seeded settings, byte snapshots).
+
 **`reduceAgentActivity`'s own phase lattice gained a fourth value, `waiting` (P129 Part 1 §4.8).**
 `AgentActivity` gained `wakeArmed` (sticky across a turn, set when a `PreToolUse` names `Monitor` or
 `ScheduleWakeup` — the two tools an agent uses to arm a wake-up rather than end its turn for good)

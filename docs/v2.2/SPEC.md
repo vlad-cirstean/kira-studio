@@ -28,7 +28,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P230 | Agent module Refresh broken: shows 'never fetched' then a git error. Find root cause, fix, add regression spec. | Done |
 | P231 | Real-flow tests for every main flow of Kira Space, split at the IPC (bridge) level: Go-side tests drive the bound services against real `git` and real temporary git repos (no mocked git, default settings), TS-side tests drive the frontend against the real bridge contract. Covers all modules (git, agents/ADE, memory, terminal, API/quick commands, repos, settings, mobile web). Two parallel streams (A, B) with disjoint file ownership. Then fix every issue the tests find. | Done |
 | P232 | Real-flow tests for Kira Studio, same type as P231 (Go bound-service tests at the IPC level against real git/real services with default settings, plus real-UI `e2e-real` specs): API module (requests, collections, variables/environments, quick commands, gRPC), Docker module, with real API calls over HTTP and gRPC (real local HTTP servers and a real gRPC server with reflection and `.proto` descriptors, no mocked transport) and real Docker commands against a real Docker daemon (containers, images, volumes, networks, logs, exec), skipping with a clear message when no daemon is reachable, and Studio's own terminal wiring (`bridge/terminal.go`, terminal module host, Studio quick commands). Reuses P231's harness patterns; then fix every issue found. | Planned (Commit 0 done: appwire, flowtest, flowharness, e2e-real servers) |
-| P233 | Claude Code hooks only for sessions Kira Space starts: audit every place Kira Space or Kira Studio changes the user's real Claude Code configuration (`~/.claude/settings.json`, project `.claude/settings.json`, `.claude.json`, MCP registration, hooks), and move each to per-session injection (e.g. `--settings <file>` / `--mcp-config` passed only when Kira Space launches the agent or terminal session, hook shim scoped by an env var set only there). Kira Space must make no change to the user's actual settings files; migrate or remove entries earlier versions wrote, with an explicit user-visible cleanup step. Real-flow test that proves settings.json is byte-identical after the flows. | Planned |
+| P233 | Claude Code hooks only for sessions Kira Space starts: audit every place Kira Space or Kira Studio changes the user's real Claude Code configuration (`~/.claude/settings.json`, project `.claude/settings.json`, `.claude.json`, MCP registration, hooks), and move each to per-session injection (e.g. `--settings <file>` / `--mcp-config` passed only when Kira Space launches the agent or terminal session, hook shim scoped by an env var set only there). Kira Space must make no change to the user's actual settings files; migrate or remove entries earlier versions wrote, with an explicit user-visible cleanup step. Real-flow test that proves settings.json is byte-identical after the flows. | Done |
 | P234 | Docs refresh: update `docs/ARCHITECTURE.md` (incl. Parallelism, process wiring with `appwire`, stale git-pairing-real line, testing section), `docs/DEV_ENVIRONMENT.md`, the v2.2 README and root `README.md` to match everything shipped in v2.2 (P210-P233). | Planned |
 | P235 | Code review (one Opus round, all three dimensions) of everything changed since the P227 close-out `605f63e3f` (P228-P234), then one Sonnet fixer. Findings file `plans/P235-findings.md` committed before the fixer, deleted once fixed. | Planned |
 
@@ -645,3 +645,38 @@ Deviations:
 - Test git emits `fatal: expected 'acknowledgments'` warnings on push in e2e-real helpers; pushes succeed.
 
 Mac handover: on a desktop build, open a terminal tab and an ADE session and confirm output renders in the right window only (native `EmitTo` is untouched); reload a Review pane with the graph tab closed and confirm it compares.
+
+## P233 result
+
+Scope cut by the user mid-phase: hooks only. No MCP injection, no endpoint file, no `claudecfg`
+package, no cleanup UI or migration; Kira Space "Register with Claude Code" and Studio Database MCP
+Install stay exactly as before. Earlier commits for the larger scope are net-reverted by
+`67f8e9ba3`.
+
+Audit (`rg` over apps, internal, packages, scripts, plus git history): no code writes hooks into
+`~/.claude/settings.json`, project `.claude/settings.json` or `.claude.json`. Hooks already ride a
+per-session temp file passed as `--settings`, plus `KIRA_*` env set only on Kira launches
+(`internal/agenthooks`). Earlier versions never wrote Kira hook entries into real settings, so no
+cleanup exists.
+
+Change: the hook shim exits 0 at once unless `KIRA_AGENT_HOOK_TOKEN` and `KIRA_TERMINAL_ID` are
+set, so a stray copy never reaches the server.
+
+Tests:
+
+- `TestShimInertWithoutSessionEnv` (`internal/agenthooks`): real shim against a counting unix-socket
+  server. Pre-fix failure: `shim without session env reached the server 3 time(s), want 0`.
+- `claudeflow.TestClaudeSettingsUntouched` (`apps/kira-space/internal/flows/claudeflow`): fake HOME
+  with seeded Claude config; mode+sha256 identical after a terminal agent session, an ADE session
+  start and an app restart; launch argv carries one `--settings` path outside the fake home. Passes
+  pre-change too, since hooks were already per-session; it is the regression guard.
+- Final tree: Go packages touched, all Space flows, lint, typecheck, knip, test:unit 1822, Space UI
+  251, Studio UI 347 (3 load flakes passed under `--workers=1`), e2e-real Space 12 pass 2 skipped
+  (`ade-board-real` flaked once on git push negotiation, passed alone), test:webview 64.
+
+Deviation from plan: plan covered MCP injection, endpoint file, `claudecfg` and a cleanup step; all
+dropped per user instruction.
+
+Mac handover: run a Kira Space agent session, then `ps` shows `--settings` only (no `--mcp-config`);
+a plain `claude` in a terminal shows no Kira hooks; `shasum ~/.claude/settings.json` unchanged
+after using the app.
