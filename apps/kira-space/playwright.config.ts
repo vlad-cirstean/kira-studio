@@ -44,6 +44,15 @@ export default defineConfig({
       },
       fullyParallel: true,
     },
+    // Real Go server (-tags server), real SQLite/git/PTY/stream; fake claude/gh. Chromium: the
+    // server build serves a plain browser page, no WebKit embed involved.
+    {
+      name: 'e2e-real',
+      testDir: './tests/e2e-real',
+      use: { browserName: 'chromium' },
+      fullyParallel: true,
+      workers: 2,
+    },
     {
       name: 'visual',
       testDir: './tests/visual',

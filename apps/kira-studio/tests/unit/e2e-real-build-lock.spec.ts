@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { acquireBuildLock, isLockStale } from '../e2e-real/fixtures';
+import { acquireBuildLock, isLockStale } from '@workbench/testing/e2eReal';
 
 // F10 (P108 Part 6): acquireBuildLock used to loop forever on EEXIST with no stale-lock recovery
 // — a killed test run left `.e2e-real-build.lock` behind, and the next run hung silently waiting
@@ -19,7 +19,7 @@ async function withTempLockDir(fn: (lockPath: string) => Promise<void>): Promise
   }
 }
 
-describe('tests/e2e-real/fixtures.ts — build lock stale recovery (F10)', () => {
+describe('testing/e2eReal.ts — build lock stale recovery (F10)', () => {
   test('no lock file at all is never stale (nothing to reclaim)', async () => {
     await withTempLockDir(async (lockPath) => {
       expect(await isLockStale(lockPath)).toBe(false);

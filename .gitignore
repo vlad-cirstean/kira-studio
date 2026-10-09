@@ -190,3 +190,4 @@ dist-proto-hooks/
 # Root-level go build output (go build ./apps/...), never repo content.
 /kira-space
 /kira-studio
+apps/kira-space/bin/
