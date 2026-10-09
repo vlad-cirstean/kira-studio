@@ -3,12 +3,15 @@ package bridge
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
+	"github.com/kirathecat/kira-studio/internal/claudecfg"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory"
@@ -27,9 +30,6 @@ const ChannelMemorySemantic = "kira:memory:semantic"
 // payload is empty; the UI refetches the job list and the open job.
 const ChannelMemoryImport = "kira:memory:import"
 
-// memoryServerName is the name the kira-memory stdio server registers under in Claude Code.
-const memoryServerName = "kira-memory"
-
 const (
 	memoryWatchInterval = 2 * time.Second
 	emitGap             = 250 * time.Millisecond
@@ -39,7 +39,7 @@ const (
 // MemoryMcpInstaller is mcpinstall.Installer's seam as MemoryService consumes it.
 type MemoryMcpInstaller interface {
 	Status() mcpinstall.Status
-	InstallStdio(ctx context.Context, name, command string, args []string) mcpinstall.Result
+	Remove(ctx context.Context, name string) mcpinstall.Result
 }
 
 // MemoryService is the Memory module's bridge over the shared memory.Service. memory.db opens on
@@ -297,19 +297,13 @@ func (s *MemoryService) RetrySemantic() {
 	s.emitSemantic()
 }
 
-// MemoryMcpStatus is the Connect dialog's pre-click read.
+// MemoryMcpStatus is the Claude Code status line: the binary Kira Space's own sessions launch as
+// the memory server, and whether the claude CLI was found.
 type MemoryMcpStatus struct {
-	Command         string   `json:"command"`
 	Executable      string   `json:"executable"`
 	ClaudeAvailable bool     `json:"claudeAvailable"`
+	ClaudePath      string   `json:"claudePath"`
 	Probed          []string `json:"probed"`
-}
-
-// MemoryInstallResult is mcpinstall's outcome vocabulary on the wire.
-type MemoryInstallResult struct {
-	Outcome string   `json:"outcome"`
-	Detail  string   `json:"detail"`
-	Probed  []string `json:"probed"`
 }
 
 // memoryExecutable is the running binary, symlinks resolved, so the registration survives a
@@ -325,27 +319,71 @@ func memoryExecutable() (string, error) {
 	return exe, nil
 }
 
-// McpStatus reports the registration command for this binary and whether `claude` is installed.
+// McpStatus reports the memory server binary and whether `claude` is installed.
 func (s *MemoryService) McpStatus() MemoryMcpStatus {
 	inst := s.installer.Status()
-	st := MemoryMcpStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
+	st := MemoryMcpStatus{ClaudeAvailable: inst.ClaudePath != "", ClaudePath: inst.ClaudePath, Probed: inst.Probed}
+	if st.Probed == nil {
+		st.Probed = []string{}
+	}
 	if exe, err := memoryExecutable(); err == nil {
 		st.Executable = exe
-		st.Command = mcpinstall.StdioCommand(memoryServerName, exe, []string{"memory-mcp"})
 	}
 	return st
 }
 
-// InstallClaudeCode registers the kira-memory stdio server with Claude Code. It never returns a
-// Go error: every outcome is a value the dialog renders.
-func (s *MemoryService) InstallClaudeCode(ctx context.Context) MemoryInstallResult {
-	exe, err := memoryExecutable()
+// ClaudeLegacyEntry is one Kira-written registration found in the user's Claude Code config.
+type ClaudeLegacyEntry struct {
+	Name    string `json:"name"`
+	Summary string `json:"summary"`
+}
+
+// ClaudeLegacyStatus lists registrations earlier Kira versions made in File.
+type ClaudeLegacyStatus struct {
+	File    string              `json:"file"`
+	Entries []ClaudeLegacyEntry `json:"entries"`
+}
+
+// ClaudeLegacyCleanup is RemoveClaudeLegacy's outcome.
+type ClaudeLegacyCleanup struct {
+	Outcome    string   `json:"outcome"`
+	Removed    []string `json:"removed"`
+	Remaining  []string `json:"remaining"`
+	BackupPath string   `json:"backupPath"`
+	Detail     string   `json:"detail"`
+	Commands   []string `json:"commands"`
+}
+
+func claudeConfigFile() string {
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return MemoryInstallResult{Outcome: mcpinstall.OutcomeInstallFailed, Detail: err.Error(), Probed: []string{}}
+		home = "."
 	}
-	r := s.installer.InstallStdio(ctx, memoryServerName, exe, []string{"memory-mcp"})
-	if r.Probed == nil {
-		r.Probed = []string{}
+	return claudecfg.ConfigPath(os.Getenv, home)
+}
+
+// ClaudeLegacy reads the user's Claude Code config for entries earlier versions registered. Read
+// only; a missing or unreadable file lists nothing.
+func (s *MemoryService) ClaudeLegacy() ClaudeLegacyStatus {
+	st := ClaudeLegacyStatus{File: claudeConfigFile(), Entries: []ClaudeLegacyEntry{}}
+	found, err := claudecfg.DetectLegacy(st.File)
+	if err != nil {
+		slog.Warn("memory: read claude config", "scope", "memory", "err", err)
+		return st
 	}
-	return MemoryInstallResult{Outcome: r.Outcome, Detail: r.Detail, Probed: r.Probed}
+	for _, e := range found.Entries {
+		st.Entries = append(st.Entries, ClaudeLegacyEntry{Name: e.Name, Summary: e.Summary})
+	}
+	return st
+}
+
+// RemoveClaudeLegacy removes every Kira-written entry ClaudeLegacy lists, after backing the file up
+// under Kira Space's home. It runs only when the user confirms; nothing calls it on its own.
+func (s *MemoryService) RemoveClaudeLegacy(ctx context.Context) ClaudeLegacyCleanup {
+	r := claudecfg.CleanupLegacy(ctx, s.installer, claudeConfigFile(), filepath.Join(config.KiraSpaceHome(), "claude-config-backups"),
+		[]string{claudecfg.NameMemory, claudecfg.NameDB, claudecfg.NameRepoMap})
+	return ClaudeLegacyCleanup{
+		Outcome: r.Outcome, Removed: r.Removed, Remaining: r.Remaining,
+		BackupPath: r.BackupPath, Detail: r.Detail, Commands: r.Commands,
+	}
 }

@@ -65,7 +65,9 @@ func TestClaudeConfigUntouched(t *testing.T) {
 		if st := app.W.Memory.McpStatus(); !st.ClaudeAvailable {
 			t.Fatalf("McpStatus = %+v, want claude found", st)
 		}
-		app.W.Memory.InstallClaudeCode(ctx)
+		if l := app.W.Memory.ClaudeLegacy(); len(l.Entries) != 0 {
+			t.Fatalf("ClaudeLegacy = %+v, want none in a clean config", l)
+		}
 		check(t, "memory_connect")
 	})
 
