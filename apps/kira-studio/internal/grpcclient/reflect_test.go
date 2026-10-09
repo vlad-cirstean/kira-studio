@@ -66,9 +66,17 @@ func TestLinkerLink_CyclicDependency_ReturnsError(t *testing.T) {
 type blockingReflectionServer struct {
 	grpc_reflection_v1.UnimplementedServerReflectionServer
 	unblock chan struct{}
+	// started, when non-nil, receives a signal per accepted reflection stream.
+	started chan struct{}
 }
 
 func (s *blockingReflectionServer) ServerReflectionInfo(stream grpc.BidiStreamingServer[grpc_reflection_v1.ServerReflectionRequest, grpc_reflection_v1.ServerReflectionResponse]) error {
+	if s.started != nil {
+		select {
+		case s.started <- struct{}{}:
+		default:
+		}
+	}
 	select {
 	case <-s.unblock:
 	case <-stream.Context().Done():
@@ -122,7 +130,7 @@ func TestResolveReflection_UnresponsiveServer_TimesOutBounded(t *testing.T) {
 // gets the resolution's own outcome.
 func TestResolveSource_CancelOnlyAffectsOwnCaller(t *testing.T) {
 	old := defaultReflectionTimeout
-	defaultReflectionTimeout = 300 * time.Millisecond
+	defaultReflectionTimeout = 2 * time.Second
 	t.Cleanup(func() { defaultReflectionTimeout = old })
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -130,7 +138,7 @@ func TestResolveSource_CancelOnlyAffectsOwnCaller(t *testing.T) {
 		t.Fatalf("net.Listen: %v", err)
 	}
 	srv := grpc.NewServer()
-	blocker := &blockingReflectionServer{unblock: make(chan struct{})}
+	blocker := &blockingReflectionServer{unblock: make(chan struct{}), started: make(chan struct{}, 1)}
 	defer close(blocker.unblock)
 	grpc_reflection_v1.RegisterServerReflectionServer(srv, blocker)
 	go func() { _ = srv.Serve(lis) }()
@@ -142,7 +150,12 @@ func TestResolveSource_CancelOnlyAffectsOwnCaller(t *testing.T) {
 	other := make(chan error, 1)
 	go func() { _, err := resolveSource(cancelCtx, src); cancelled <- err }()
 	go func() { _, err := resolveSource(context.Background(), src); other <- err }()
-	time.Sleep(50 * time.Millisecond)
+	// Shared resolution is in flight once the server sees its one reflection stream.
+	select {
+	case <-blocker.started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("reflection stream never reached the server")
+	}
 	cancel()
 
 	var ge *Error
