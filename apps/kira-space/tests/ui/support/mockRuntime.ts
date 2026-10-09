@@ -95,6 +95,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   customScriptsMove: 'CustomScriptsService.Move',
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
+  agentNotifyReportFocus: 'AgentNotifyService.ReportFocus',
+  agentNotifySendTest: 'AgentNotifyService.SendTest',
 
   // P128 §2.2/§2.6: this app now persists a per-window module mode too, via the same shared
   // internal/windowsvc.Service Kira Studio's own WindowsService embeds.
@@ -260,6 +262,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // build, and a spec that never cares about keep-awake should still see the titlebar button it
   // will ship with. A spec that DOES care (window-chrome.spec.ts's own keep-awake cases) still wins
   // with its own snapshot.
+  // P238: every window reports its focus at boot.
+  [IPC.agentNotifyReportFocus]: 'null',
+  [IPC.agentNotifySendTest]: 'null',
   [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
   // P119: no update available by default — same shape as Kira Studio's own WILDCARD_DEFAULTS
   // entry, so every other existing Space spec keeps booting unchanged.

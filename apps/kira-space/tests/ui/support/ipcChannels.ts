@@ -123,6 +123,11 @@ export const IPC = {
   terminalAgentSessions: 'kira:terminal:agentSessions',
   agentSessions: 'kira:agent:sessions',
   agentEvent: 'kira:agent:event',
+  // P238: desktop notifications. The two calls report focus and send a test; the pushes are a click's reveal.
+  agentNotifyReportFocus: 'kira:agentnotify:reportFocus',
+  agentNotifySendTest: 'kira:agentnotify:sendTest',
+  agentRevealTerminal: 'kira:agent:reveal-terminal',
+  agentRevealTask: 'kira:agent:reveal-task',
   // P145: the ade v2 board surface. `adeTaskBoard` names the bound call; its push counterpart is
   // `adeTaskBoardChanged` (the same call/push split as `gitClientsList`/`gitClientsChanged`).
   adeTaskBoard: 'kira:adetask:board:call',
