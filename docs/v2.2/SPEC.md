@@ -23,6 +23,9 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P225 | Git graph regression (new since about yesterday, likely from P220's CommitGrid change): commits disappear from the graph and Show more is broken. Find the root cause, fix it, add a regression test that fails before the fix | Done |
 | P226 | Consistent colour bars: wherever the left panel shows an item with a coloured left bar (scripts in Kira Studio, git repos, and other module lists), the same colour renders the same way everywhere. One shared bar component and tone mapping instead of per-module variants | Done |
 | P227 | Code review (one Opus round, all three dimensions) of everything changed since the last review close-out `7f626e91a` (P218 to P226), then one Sonnet fixer. Findings file `plans/P227-findings.md` committed before the fixer, deleted once fixed. Also fix the stale Studio visual baselines (all 12 fail on base). | Done |
+| P228 | Git graph still broken after P225; user suspects resizing columns breaks it. Reproduce with real column resizes (every column, drag then scroll, click, Load more), find root cause, fix, add regression spec that resizes columns first. | Planned |
+| P229 | Git section (graph, toolbar, detail, stash and other git panes) looks different from the rest of the app: bring it in line with the app's shadcn-vue/Tailwind look (spacing, type, colours, controls, rows). Includes the git UI inside Kira Space. | Planned |
+| P230 | Agent module Refresh broken: shows 'never fetched' then a git error. Find root cause, fix, add regression spec. | Planned |
 
 ## Requirements (user's words, condensed)
 
