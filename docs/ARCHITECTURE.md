@@ -4683,14 +4683,16 @@ repo's CI runs.
 
 ## Testing
 
-Five suites under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`, `visual/`; plus the
-Go suite in `apps/kira-studio/` (`bun run test:go`). `packages/db-fixtures/` is a shared fixture
+Studio suites under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`, `visual/`, plus
+opt-in `perf/` and `proto/` (`playwright.proto.config.ts`); `fixtures/` and `support/` are not suites.
+Also the Go suite in `apps/kira-studio/` (`bun run test:go`) and the Studio flow tier (below). `packages/db-fixtures/` is a shared fixture
 corpus, not a suite of its own (see below). `ipc/` is the odd one out among the first four — it is two suites in
 one directory, a Go backend half and a Playwright frontend half per adapter, sharing one fixture
 module by design (P50, below).
 
-**As of P100, Kira Space is a second, separate app with its own test tree, not a fifth suite
-alongside these four.** `apps/kira-space/tests/unit/` and `apps/kira-space/tests/ui/` (`bun run
+**As of P100, Kira Space is a second, separate app with its own test tree, not another suite
+alongside these.** Space's suites are `unit/`, `ui/`, `mobile/`, `e2e-real/`, `visual/` and `perf/`,
+plus the Go flow tier. `apps/kira-space/tests/unit/` and `apps/kira-space/tests/ui/` (`bun run
 test:ui:space`) mirror Kira Studio's own `tests/unit/`/`tests/ui/` shape, running against Kira
 Space's own built bundle; `apps/kira-space/internal/` has its own Go suite too, covered by the same
 `bun run test:go` (it runs both apps' packages together — see below). `apps/kira-space-vscode/tests/` (renamed from `apps/kira-studio-vscode/tests/` at P100 Part 3) is
@@ -4718,6 +4720,21 @@ dialogs (`page.route` stub), no mobile access. The server build's `EmitTo` broad
 browser window (`internal/shell/emitto_server.go`); listeners filter by their own ids. The fixture
 writes login-shell profiles that put the fake `claude` first on `PATH`.
 Build lock, port and health helpers are shared with Studio via `packages/workbench/src/testing/e2eReal.ts`.
+
+**Studio flow tier (Go, P232).** `apps/kira-studio/internal/flowharness.New` boots `appwire.Build`
+in-process with temp `HOME`/`KIRA_HOME`, `TZ=UTC` and `KIRA_INSECURE_SECRETS=1`; `Restart` rebuilds the
+app, `Quit` runs `ServiceShutdown` like Wails. Real: SQLite, HTTP/HTTPS servers with a per-binary test CA
+(`CAFile`), gRPC with reflection and `testdata/flow.proto`, a silent TCP server, the Docker engine.
+Faked: dialogs (queued answers), keep-awake driver, MCP installer (records, never touches Claude
+config), OS auth. `RequireDocker` skips without a daemon and fails under `KIRA_FLOW_DOCKER=require`;
+the one image is `mirror.gcr.io/library/alpine:3.20`; labelled resources are swept in
+`flowharness.Main`; `DOCKER_HOST` resolves before `HOME` is swapped. Packages under
+`apps/kira-studio/internal/flows/`: `apiflow` (collections, variables, history, Postman data),
+`httpflow` (requests, redirects, cookies, TLS, bodies), `grpcflow` (describe, call), `dockerflow` (the
+Docker module against a real engine), `termflow` (terminals, quick commands). Shared with Space:
+`internal/flowtest` (`Events` recorder implementing `appevent.Emitter`; `Complete` gate on
+`KIRA_FLOW_COMPLETE`). `bun run test:flows:studio` is the general suite;
+`test:flows:studio:complete` sets `KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`.
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
 `KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real
@@ -4835,8 +4852,8 @@ were deleted outright with no analogue: no `webPreferences`, fuse or Chromium-pe
 concept is left to assert, and no `process.uptime()` equivalent — cold start is now a manual procedure
 (`docs/PERF.md` §3).
 
-**`tests/ui/`** (`bun run test:ui:studio`) is its replacement for everything that ported: **283**
-tests across **53** spec files, split across the `ui` and `ui-timing` projects (v1.9 P109 recount,
+**`tests/ui/`** (`bun run test:ui:studio`) is its replacement for everything that ported: **349**
+tests across **58** spec files, split across the `ui` and `ui-timing` projects (P234 recount,
 `npx playwright test --list --project=ui --project=ui-timing` from `apps/kira-studio` — v1.4 P6's
 own recount is now historical; `docs/PERF.md` §5 records that earlier tier's own measured
 wall-clock cost, 5m4s) driving the **real built `apps/kira-studio/
@@ -4856,8 +4873,9 @@ P13), Explain/auto-explain and the DDL-driven SQL language service (`console-exp
 (`fake-data.spec.ts`, P15), credential reveal (`credential-reveal.spec.ts`, P14), row coloring
 (`row-coloring.spec.ts`, P9), and settings apply-on-save (`settings-apply-on-save.spec.ts`, P17).
 
-**`tests/e2e-real/`** is the full-stack *wiring* tier, and it is deliberately small — four specs
-(sqlite, postgres, mariadb, multiwindow), six tests. `multiwindow-real.spec.ts` is the only
+**`tests/e2e-real/`** is the full-stack *wiring* tier, and it is deliberately small — five specs
+(sqlite, postgres, mariadb, multiwindow, `api-boot-real.spec.ts`), seven tests (P234 recount,
+`npx playwright test --list --project=e2e-real`). `multiwindow-real.spec.ts` is the only
 full-stack proof of P8's `tabs.window_key` isolation ("two windows, one backend: each keeps only
 its own tabs"), referenced by name in the multi-window subsection below. It builds the Go shell
 with `-tags server` (Wails v3's
@@ -4873,13 +4891,17 @@ proof that used to kill the Node engine child mid-session and assert every conne
 (`C2`, retired with the child it needed) — rewritten in P58f M10 to prove **two native kinds in one
 session** instead: a MariaDB and a Kafka connection both open, the page reloads, and both
 serve a real read afterward, since no child is left to kill and the property worth proving now
-is that native adapters coexist cleanly within one process across a reload.
+is that native adapters coexist cleanly within one process across a reload. A worker-scoped
+`flowServers` fixture spawns `apps/kira-studio/bin/flowservers` (built once under the shared build
+lock), so this tier and the Go flow tier share one server implementation. The `serverEnv` option adds
+environment to the spawned server. `kira.call` runs over the shared `bound()` helper in
+`packages/workbench/src/testing/e2eReal.ts`.
 
-**`tests/visual/`** (`bun run test:visual:studio`, v1.4 P6) is a bounded pixel-diff tier — **six**
-specs, **13** snapshots total: one canonical at-rest screenshot each for five of them (the workbench
-shell, the data grid, the SQL console, the connection dialog, the Schema (DDL) editor), plus
-`settings.spec.ts` (P110 I2-1b) alone contributing 8, one per Settings pane (Appearance, Data,
-Cache, Api, Scripts, Claude Code, Database MCP, Advanced) — reusing `tests/ui/`'s own fixtures/mocked wire planes.
+**`tests/visual/`** (`bun run test:visual:studio`, v1.4 P6) is a bounded pixel-diff tier — **eight**
+specs, **13** snapshots total: one canonical at-rest screenshot each for seven of them (the workbench
+shell, the data grid, the SQL console, the connection dialog, the Schema (DDL) editor, the HTTP request
+view, the terminal module's quick-commands dialog), plus `settings.spec.ts` alone contributing 6, one per
+Settings pane (Appearance, Data, Cache, Api, Database MCP, Advanced) — reusing `tests/ui/`'s own fixtures/mocked wire planes.
 Its own project (not folded into `ui`) mirrors why `ui-timing` is its own project too — a different
 measurement contract earns a different one. Baselines are captured/updated only from the `ui` CI
 job's own `ubuntu-latest` environment, never a local macOS run (WKWebView vs. WebKitGTK glyph
@@ -4891,7 +4913,9 @@ to their trailing generic keyword, removing a multi-hop fontconfig fallback's ow
 ambiguity on the CI image. `docs/v1.4/plans/P6-visual-regression.md` is the full design record,
 including what's deliberately out of scope (the extension's webview tier, `apps/kira-space-vscode/
 tests/` as of P100's rename — no CI job runs it at all today, and its VS-Code-theme-following
-palette is a different baselining problem than this app's single hard-coded dark theme).
+palette is a different baselining problem than this app's single hard-coded dark theme). Kira Space has
+its own `apps/kira-space/tests/visual/` (`bun run test:visual:space`): `settings` (5 panes: Advanced,
+Appearance, Connected editors, Git, Memory) and `git-module` (3: graph, graph detail, stash dialog; P229).
 
 **`apps/kira-space-vscode/tests/`** (`bun run test:webview`) is the git module's own frontend tier
 — Playwright against the extension's real emitted webview documents and its real built bundle, in
@@ -4926,10 +4950,10 @@ was ported from — drift in either fails on the same bytes. `internal/mask/pari
 **Parallelism.** `apps/kira-studio/playwright.config.ts` runs six projects (v1.4 P27 added
 `ui-timing`, v1.4 P6 added `visual`, v2.0 P160 added the opt-in `perf`, in no suite script, serial,
 `tests/perf/`): `ui`, `ui-timing`, `ipc-frontend`, `e2e-real`, `visual` and `perf`,
-every one but `ui-timing` `fullyParallel`. Kira Space has its own two-project
-`apps/kira-space/playwright.config.ts` (`ui`, `visual`) and the extension has its own
-`apps/kira-space-vscode/playwright.config.ts` (`webview-layout`, `webview-interaction`) — neither
-carries a `ui-timing`/`e2e-real` equivalent of its own. `ui` being fully parallel is a real change from the old `e2e` project's
+every one but `ui-timing` `fullyParallel`. Kira Space has its own
+`apps/kira-space/playwright.config.ts` (`ui`, `mobile-ios`, `mobile-android`, `e2e-real` with
+`workers: 2`, `visual`) and the extension has its own
+`apps/kira-space-vscode/playwright.config.ts` (`webview-layout`, `webview-interaction`). `ui` being fully parallel is a real change from the old `e2e` project's
 `workers: 1`, and it is earned rather than inherited: that serialisation existed because concurrent
 Electron apps contend over wall-clock/RSS budgets and Docker containers, and this tier has neither —
 the same reasoning that already made `ipc-frontend` (and `visual`, which carries no timing
@@ -5163,11 +5187,6 @@ repo-wide).
   no standalone operation. Building one needs a new `OpRequest` kind, a new `opSpec` with an undo
   policy, a new preflight, a new dialog and a further `ContractVersion` bump — out of scope until a
   phase actually asks for it.
-- **Kira Space has no full-stack (`e2e-real`) tier, so git pairing has no real-socket test** (found
-  v1.9 P109). `git-pairing-real.spec.ts` was deleted at P100 rather than ported (Testing, above):
-  nothing drives pairing, token reuse or revocation against a real `-tags server` Kira Space binary
-  and a real `git.sock`. Go unit tests cover `gitsock` in-process only. Closing it needs a Kira Space
-  `e2e-real` project (fixtures, a `playwright.config.ts` project, the spec).
 
 Performance:
 - **`repo/state/fileTree.ts`'s `useFileTreeStore` (Pinia now, same file) tree-filter computed has
@@ -5211,4 +5230,6 @@ Performance:
 - **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
-- **Visual baselines need regeneration on the CI-Linux font setup (P188, P200, P201, P204).** Studio about 13 (data-view, connection-dialog, console, http-request-view, schema-dialog, settings panes, workbench at rest, terminal-module quick-commands dialog) and Space about 4 (`settings` panes) fail from glyph-wide anti-aliasing drift plus new content: the fourth Studio mode tab, the Space Claude Code settings item and the new quick-commands dialog. Regenerate once on the baseline environment and check each diff is the expected change only.
+- **Visual baselines are unchecked on the CI `ui` job image (P227, P229).** P227 re-recorded the 13 Studio and the Space Settings baselines in the dev container, P229 added 3 git-module ones; both suites pass there. If the CI job disagrees, regenerate there and check each diff is the expected change only.
+- **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
+- **Load-sensitive UI specs (P230, P231).** The `repo-graph-paging` drag step fails about 1 run in 80 at 8 workers; the `ade-v2-panel` handle-drag width fails under load. Both pass alone. Delete once deflaked.
