@@ -1,9 +1,13 @@
 import { expect, test } from 'bun:test';
+import * as path from 'node:path';
+import { decodeStreamPayload } from './codec.ts';
+import type { DecorationRef, StreamChunkOf } from './contract.ts';
 import {
   createStreamChannel,
   MalformedBlobFrameError,
   type StreamSocketLike,
 } from './streamChannel.ts';
+import { unwrapVersioned } from './validate.ts';
 
 // A minimal WebSocket-like double: this file's own contract is "MessageChannelLike over a
 // WebSocket-like object" (§3.4), not any particular runtime's WebSocket — a plain in-memory stand-
@@ -207,4 +211,157 @@ test('sets binaryType to arraybuffer so inbound frames are never delivered as a 
   socket.binaryType = 'blob';
   createStreamChannel(socket);
   expect(socket.binaryType).toBe('arraybuffer');
+});
+
+// D16: the golden graph.stream chunk frame, captured from the native stream by
+// flows/gitflow TestFixtures_CaptureGraphChunkFrame (KIRA_GIT_FIXTURES=write). Catches the Go
+// encoder and the decode path disagreeing: a field in the wrong slot, a big-endian column.
+interface GraphChunkFixture {
+  readonly envelope: {
+    readonly repoId: string;
+    readonly seq: number;
+    readonly from: number;
+    readonly to: number;
+    readonly source: 'git' | 'cache';
+    readonly remaining: number;
+    readonly exhausted: boolean;
+  };
+  readonly commits: {
+    readonly from: number;
+    readonly to: number;
+    readonly shaWidthBytes: number;
+    readonly shas: readonly string[];
+    readonly parentOffsets: readonly number[];
+    readonly parentShas: readonly string[];
+    readonly identityIds: readonly number[];
+    readonly times: readonly number[];
+    readonly subjects: readonly string[];
+    readonly subjectOffsets: readonly number[];
+    readonly dictionaryBase: number;
+    readonly dictionary: readonly string[];
+    readonly decorations: ReadonlyArray<{
+      readonly row: number;
+      readonly refs: ReadonlyArray<{
+        readonly kind: string;
+        readonly name?: string;
+        readonly isHead?: boolean;
+      }>;
+    }>;
+  };
+}
+
+function expectedDecorationRef(r: {
+  kind: string;
+  name?: string;
+  isHead?: boolean;
+}): DecorationRef {
+  switch (r.kind) {
+    case 'branch':
+      if (r.name === undefined) throw new Error('branch decoration fixture is missing a name');
+      return { kind: 'branch', name: r.name, isHead: r.isHead ?? false };
+    case 'remoteBranch':
+      if (r.name === undefined) {
+        throw new Error('remoteBranch decoration fixture is missing a name');
+      }
+      return { kind: 'remoteBranch', name: r.name };
+    case 'tag':
+      if (r.name === undefined) throw new Error('tag decoration fixture is missing a name');
+      return { kind: 'tag', name: r.name };
+    case 'head':
+      return { kind: 'head' };
+    case 'stash':
+      if (r.name === undefined) throw new Error('stash decoration fixture is missing an index');
+      return { kind: 'stash', index: Number(r.name) };
+    default:
+      throw new Error(`streamChannel.test.ts: unrecognised decoration kind ${r.kind}`);
+  }
+}
+
+test('D16: decodes the captured Go-encoded graph.stream chunk frame field for field', async () => {
+  const fixtureDir = path.join(import.meta.dir, '..', 'testdata');
+  const raw = new Uint8Array(
+    await Bun.file(path.join(fixtureDir, 'graphChunkFrame.bin')).arrayBuffer(),
+  );
+  const expected = JSON.parse(
+    await Bun.file(path.join(fixtureDir, 'graphChunkFrame.json')).text(),
+  ) as GraphChunkFixture;
+
+  const socket = new MockSocket();
+  const channel = createStreamChannel(socket);
+  const received = new Promise<unknown>((resolve) => channel.onMessage(resolve));
+  // The Wails stream carries whole frames: the captured body goes in with no length prefix.
+  socket.deliver(toArrayBuffer(raw));
+
+  const envelope = await received;
+  const frameBody = unwrapVersioned(envelope as { version: number; body: unknown }) as {
+    readonly t: string;
+    readonly id: number;
+    readonly seq: number;
+    readonly chunk: unknown;
+  };
+  expect(frameBody.t).toBe('chunk');
+
+  const chunk = decodeStreamPayload(
+    'graph.stream',
+    frameBody.chunk,
+  ) as StreamChunkOf<'graph.stream'>;
+
+  expect(chunk.repoId).toBe(expected.envelope.repoId);
+  expect(chunk.seq).toBe(expected.envelope.seq);
+  expect(chunk.from).toBe(expected.envelope.from);
+  expect(chunk.to).toBe(expected.envelope.to);
+  expect(chunk.source).toBe(expected.envelope.source);
+  expect(chunk.remaining).toBe(expected.envelope.remaining);
+  expect(chunk.exhausted).toBe(expected.envelope.exhausted);
+
+  const commits = chunk.commits;
+  expect(commits.from).toBe(expected.commits.from);
+  expect(commits.to).toBe(expected.commits.to);
+  expect(commits.shaWidthBytes).toBe(expected.commits.shaWidthBytes);
+
+  const shaWidth = commits.shaWidthBytes;
+  const shasBytes = new Uint8Array(commits.shas);
+  const gotShas: string[] = [];
+  for (let i = 0; i < shasBytes.length; i += shaWidth) {
+    gotShas.push(Buffer.from(shasBytes.slice(i, i + shaWidth)).toString('hex'));
+  }
+  expect(gotShas).toEqual([...expected.commits.shas]);
+
+  expect(Array.from(new Uint32Array(commits.parentOffsets))).toEqual([
+    ...expected.commits.parentOffsets,
+  ]);
+  const parentShasBytes = new Uint8Array(commits.parentShas);
+  const gotParentShas: string[] = [];
+  for (let i = 0; i < parentShasBytes.length; i += shaWidth) {
+    gotParentShas.push(Buffer.from(parentShasBytes.slice(i, i + shaWidth)).toString('hex'));
+  }
+  expect(gotParentShas).toEqual([...expected.commits.parentShas]);
+
+  expect(Array.from(new Uint32Array(commits.identityIds))).toEqual([
+    ...expected.commits.identityIds,
+  ]);
+  expect(Array.from(new Uint32Array(commits.times))).toEqual([...expected.commits.times]);
+  expect(Array.from(new Uint32Array(commits.subjectOffsets))).toEqual([
+    ...expected.commits.subjectOffsets,
+  ]);
+
+  const subjectBytes = new Uint8Array(commits.subjectBytes);
+  const subjectOffsets = Array.from(new Uint32Array(commits.subjectOffsets));
+  const gotSubjects: string[] = [];
+  for (let i = 0; i < subjectOffsets.length - 1; i++) {
+    gotSubjects.push(
+      Buffer.from(subjectBytes.slice(subjectOffsets[i], subjectOffsets[i + 1])).toString('utf8'),
+    );
+  }
+  expect(gotSubjects).toEqual([...expected.commits.subjects]);
+
+  expect(commits.dictionaryBase).toBe(expected.commits.dictionaryBase);
+  expect([...commits.dictionary]).toEqual([...expected.commits.dictionary]);
+
+  const gotDecorations = commits.decorations.map(([row, refs]) => ({ row, refs: [...refs] }));
+  const wantDecorations = expected.commits.decorations.map((d) => ({
+    row: d.row,
+    refs: d.refs.map(expectedDecorationRef),
+  }));
+  expect(gotDecorations).toEqual(wantDecorations);
 });

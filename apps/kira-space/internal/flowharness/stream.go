@@ -163,6 +163,7 @@ type wireFrame struct {
 type frameIn struct {
 	wireFrame
 	blob []byte
+	raw  []byte
 }
 
 // GitStream is a client of the real bridge.ServeGitStream over an in-memory connection.
@@ -232,7 +233,7 @@ func (s *GitStream) readLoop() {
 			s.t.Errorf("git stream: bad frame: %v", err)
 			continue
 		}
-		f := frameIn{wireFrame: env.Body, blob: blob}
+		f := frameIn{wireFrame: env.Body, blob: blob, raw: raw}
 		if f.T == "evt" {
 			s.mu.Lock()
 			s.events = append(s.events, Event{Seq: len(s.events), Channel: f.Method, Data: f.Payload})
@@ -362,19 +363,39 @@ func (c *StreamCall) Cancel() {
 // Next returns the next chunk; ok is false once the stream ended, with err the stream's failure.
 func (c *StreamCall) Next() (chunk Chunk, ok bool, err error) {
 	c.s.t.Helper()
+	f, ok, err := c.nextFrame()
+	if !ok {
+		return Chunk{}, false, err
+	}
+	return Chunk{Seq: f.Seq, JSON: f.Chunk, Blob: f.blob}, true, nil
+}
+
+// NextRaw is Next returning the chunk frame body exactly as ServeGitStream sent it, blob header
+// included.
+func (c *StreamCall) NextRaw() (raw []byte, ok bool, err error) {
+	c.s.t.Helper()
+	f, ok, err := c.nextFrame()
+	if !ok {
+		return nil, false, err
+	}
+	return f.raw, true, nil
+}
+
+func (c *StreamCall) nextFrame() (frameIn, bool, error) {
+	c.s.t.Helper()
 	select {
 	case f := <-c.ch:
 		if f.T == "end" {
 			c.s.unregister(c.id)
 			if f.Error != nil {
-				return Chunk{}, false, f.Error
+				return frameIn{}, false, f.Error
 			}
-			return Chunk{}, false, nil
+			return frameIn{}, false, nil
 		}
-		return Chunk{Seq: f.Seq, JSON: f.Chunk, Blob: f.blob}, true, nil
+		return f, true, nil
 	case <-time.After(requestTimeout):
 		c.s.t.Fatalf("stream %d: no frame within %s", c.id, requestTimeout)
-		return Chunk{}, false, nil
+		return frameIn{}, false, nil
 	}
 }
 

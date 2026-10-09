@@ -176,8 +176,8 @@ historical prose.
   — a separate native window/process from `bun run dev:studio`'s Kira Studio, on its own Vite dev-server
   port (9246, beside Kira Studio's 9245) so both can run at once without colliding.
 - **The perf probes are opt-in and assert nothing.**
-  `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-space/internal/gitsock/ -v`
-  prints one `key=value` line per probe. No threshold assertion, deliberately: this container's
+  `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-space/internal/flows/gitflow/ -v`
+  prints one `key=value` line per probe. The `gitsock` copy goes in P243 Part 2. No threshold assertion, deliberately: this container's
   numbers and a real Mac's aren't comparable, so a hard bound would be flaky in exactly the way
   it's meant to guard against. Record numbers in the commit message and, when they
   answer a stated budget, in `docs/PERF.md`.
