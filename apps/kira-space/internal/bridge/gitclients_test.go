@@ -64,7 +64,7 @@ func TestGitClientsService_AttachPush(t *testing.T) {
 		Broker: broker,
 	}
 
-	detach := svc.AttachPush()
+	detach := AttachGitClientsPush(svc)
 	if sock.onClientsChanged == nil || broker.onPairingChanged == nil {
 		t.Fatal("AttachPush did not subscribe to both feeds")
 	}
