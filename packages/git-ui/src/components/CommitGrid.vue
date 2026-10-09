@@ -473,6 +473,7 @@ function toggleGroup(displayRow: number): void {
  *  no sha to select" — a click on one expands its group instead, never reaching `selection.select`
  *  or either detail-pane emit. */
 function handleClick(displayRow: number): void {
+  if (displayRow >= plan().length) return; // the plan shrank (refresh, reload) after the row painted
   if (plan().entryAt(displayRow).kind === 'collapsed') {
     toggleGroup(displayRow);
     return;
@@ -508,7 +509,7 @@ function prNumberFromClick(event: MouseEvent | undefined): number | undefined {
 function handleContextMenu(event: MouseEvent): void {
   event.preventDefault();
   const cell = grid?.getCellFromEvent(event);
-  if (!cell) return;
+  if (!cell || cell.row >= plan().length) return;
   // P93 §4.2: "a collapsed row is never 'selected'" applies to a right-click too — its own
   // storeRowAt is a hidden (contracted) row, not one on screen, so selecting it and opening a
   // commit-scoped menu for it would be wrong in the same way handleClick's own guard avoids.
@@ -1001,7 +1002,8 @@ onMounted(() => {
       scrollRaf = 0;
       // `scroll`'s own contract (`viewState.scrollRow`) is a store row — `getViewport().top` is
       // SlickGrid's own display row.
-      if (grid) emit('scroll', plan().storeRowAt(grid.getViewport().top));
+      const top = grid?.getViewport().top;
+      if (top !== undefined && top < plan().length) emit('scroll', plan().storeRowAt(top));
     });
   });
   // `stopImmediatePropagation()` only for a key `handleKeyDown` actually claimed — see that
@@ -1282,7 +1284,7 @@ function scrollToTopRow(row: number): void {
  *  function's own contract. */
 function getViewportTop(): number | undefined {
   const top = grid?.getViewport().top;
-  return top === undefined ? undefined : plan().storeRowAt(top);
+  return top === undefined || top >= plan().length ? undefined : plan().storeRowAt(top);
 }
 
 /** `docs/plans/P11.md` W14: `SearchBox.vue`'s second-stage `Escape` (§6.6) asks to move real DOM

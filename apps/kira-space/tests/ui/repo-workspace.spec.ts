@@ -334,7 +334,8 @@ test('a repo workspace: switching the panel to Review mounts the review sidebar'
   // tab immediately, which is what first calls Stream('git') — repo/git/transport.ts's
   // gitTransportFor is lazy, unlike bridge/port.ts's own module-scope Stream('engine'), so
   // page.evaluate (not page.addInitScript) is both sufficient and correct here.
-  await installGitStreamMock(page, REPO.repoId);
+  // The transport opens the repo before the first request that names it.
+  await installGitStreamMock(page, REPO.repoId, { 'repo.open': null });
 
   await repoRow(page).click();
   // P92 item 6: Review moved from the Files body's own segment to GitPanel's top-level tab row.
