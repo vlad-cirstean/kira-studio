@@ -15,6 +15,7 @@
  * `stack` prop at all (nothing else in this file ever read it).
  */
 import type { StackBranch } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import type { OpsState } from '../state/ops.ts';
@@ -142,7 +143,7 @@ async function removeFromStack(branch: string): Promise<void> {
           </span>
           <span v-if="row.trackText" class="kv:text-sm kv:text-muted-foreground">{{ row.trackText }}</span>
           <span v-if="row.checkedOutIn" class="kv:text-sm kv:opacity-80" :data-kira-tip="row.checkedOutIn">
-            <span class="codicon codicon-repo" aria-hidden="true"></span>
+            <CodiconIcon name="repo" :size="13" />
           </span>
         </div>
         <TooltipIconButton

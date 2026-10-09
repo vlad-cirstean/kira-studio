@@ -21,6 +21,7 @@
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import { CheckIcon, MinusIcon } from '@lucide/vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -30,7 +31,7 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, useId, watch } from 'vue';
-import { ACTION_ICONS } from '../icons/index.ts';
+import { ACTION_ICONS, codiconName } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
 import { cn } from '../lib/cn.ts';
 import { rowVariants } from '../lib/rowVariants.ts';
@@ -554,7 +555,7 @@ const parentSelectId = useId();
     <div v-if="showToolbar !== false" class="kv:flex kv:gap-1 kv:px-2 kv:pb-1">
       <InputGroup variant="kira" class="flex-1 min-w-0">
         <InputGroupAddon>
-          <span class="codicon codicon-search" aria-hidden="true"></span>
+          <CodiconIcon name="search" :size="13" />
         </InputGroupAddon>
         <InputGroupInput
           :model-value="filterInput"
@@ -574,7 +575,7 @@ const parentSelectId = useId();
         <Tooltip v-for="option in listModeOptions" :key="option.id">
           <TooltipTrigger as-child>
             <ToggleGroupItem :value="option.id" :aria-label="option.label">
-              <span class="codicon" :class="option.icon" aria-hidden="true"></span>
+              <CodiconIcon :name="codiconName(option.icon)" :size="13" />
             </ToggleGroupItem>
           </TooltipTrigger>
           <TooltipContent>{{ option.label }}</TooltipContent>
@@ -653,7 +654,7 @@ const parentSelectId = useId();
           <span class="kv:overflow-hidden kv:text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
-              <span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>
+              <CodiconIcon name="arrow-small-right" :size="13" />
               {{ renameDisplay(row.node.change)?.to }}
             </template>
             <template v-else>{{ row.node.name }}</template>
@@ -761,7 +762,7 @@ const parentSelectId = useId();
           <span class="kv:overflow-hidden kv:text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
-              <span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>
+              <CodiconIcon name="arrow-small-right" :size="13" />
               {{ renameDisplay(row.node.change)?.to }}
             </template>
             <template v-else>{{ row.node.name }}</template>

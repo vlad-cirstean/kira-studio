@@ -32,11 +32,11 @@ async function undo(): Promise<void> {
 </script>
 
 <template>
-  <div v-if="writeCapability && ops.undoSlot.value" class="kv:flex kv:items-center kv:gap-0.5">
+  <div v-if="writeCapability && ops.undoSlot.value" class="flex items-center gap-0.5">
     <Tooltip>
       <TooltipTrigger as-child>
         <Button variant="toolbar" size="kira" :disabled="ops.busy.value" @click="undo">
-          <CodiconIcon name="discard" />
+          <CodiconIcon name="discard" :size="13" />
           {{ ops.undoSlot.value.label }}
         </Button>
       </TooltipTrigger>
@@ -59,7 +59,7 @@ async function undo(): Promise<void> {
       </TooltipTrigger>
       <TooltipContent>Copy recovery SHA {{ ops.undoSlot.value.recoverySha }}</TooltipContent>
     </Tooltip>
-    <span v-else class="kv:font-data kv:text-sm kv:text-muted-foreground kv:cursor-copy">{{
+    <span v-else class="font-data text-kira-sm text-muted-foreground cursor-copy">{{
       ops.undoSlot.value.recoverySha.slice(0, 7)
     }}</span>
   </div>

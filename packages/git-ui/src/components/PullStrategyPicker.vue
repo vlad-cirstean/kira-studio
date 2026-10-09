@@ -146,7 +146,7 @@ defineExpose({ run: runDefault });
           data-testid="pull-button"
           @click="runDefault"
         >
-          <CodiconIcon name="repo-pull" />
+          <CodiconIcon name="repo-pull" :size="13" />
           {{ mainLabel }}
         </Button>
       </TooltipTrigger>
@@ -163,7 +163,7 @@ defineExpose({ run: runDefault });
           aria-label="Pull strategy options"
           data-testid="pull-strategy-trigger"
         >
-          <CodiconIcon name="chevron-down" />
+          <CodiconIcon name="chevron-down" :size="13" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" class="w-65" aria-label="Pull strategy">

@@ -236,8 +236,8 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
 <template>
   <Popover :open="popoverOpen" @update:open="onPopoverOpenChange">
     <PopoverAnchor as-child>
-      <div ref="rootEl" class="kv:relative kv:flex-1 kv:min-w-0">
-        <div class="kv:flex kv:items-center kv:gap-1">
+      <div ref="rootEl" class="relative flex-1 min-w-0">
+        <div class="flex items-center gap-1">
           <InputGroup variant="kira" class="flex-1 min-w-0" data-testid="search-input">
             <InputGroupAddon>
               <CodiconIcon name="search" :size="13" />
@@ -264,7 +264,7 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          <section class="kv:flex kv:gap-0.25" aria-label="Search options">
+          <section class="flex gap-0.25" aria-label="Search options">
             <TooltipIconButton
               icon="case-sensitive"
               label="Match case"
@@ -302,7 +302,7 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
             <option value="commits">Commits</option>
             <option value="refs">Refs</option>
           </NativeSelect>
-          <span v-if="countLabel" class="kv:px-0.5 kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
+          <span v-if="countLabel" class="px-0.5 text-muted-foreground text-kira-sm whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
           <TooltipIconButton icon="close" label="Close search" data-testid="search-close-button" @click="emit('close')" />
         </div>
       </div>
@@ -323,7 +323,7 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
         :id="ERROR_ID"
         role="alert"
         data-testid="search-error"
-        class="kv:py-0.5 kv:px-1 kv:text-error kv:text-sm"
+        class="py-0.5 px-1 text-error text-kira-sm"
       >
         {{ errorText }}
       </div>

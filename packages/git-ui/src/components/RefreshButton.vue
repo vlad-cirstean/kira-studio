@@ -84,7 +84,7 @@ defineExpose({ refresh: doRefresh });
         aria-label="Refresh"
         @click="doRefresh"
       >
-        <CodiconIcon name="refresh" :class="{ 'animate-spin': isRefreshing }" />
+        <CodiconIcon name="refresh" :size="13" :class="{ 'animate-spin': isRefreshing }" />
         <span
           v-if="hasPendingChange"
           class="absolute top-0.75 right-0.75 size-1.5 rounded-full bg-focus"

@@ -12,7 +12,7 @@
  * toggled rather than always rendered (`App.vue` owns it now, alongside `AppToolbar`, not this
  * component).
  *
- * G34 D13: this bar's own metrics used to be a literal 35px (`--kv-toolbar-height`), argued as
+ * G34 D13 (P229: now `ViewToolbar.vue`'s recipe, restated since `@workbench` is not importable here): this bar's own metrics used to be a literal 35px (`--kv-toolbar-height`), argued as
  * matching the panel title bar's — which does not hold, since that title bar is VS Code chrome
  * outside this webview's iframe and there is no shared edge to align to. It is now `--kv-bar-h`
  * (34px at the default font size, growing with it, Kira's own toolbar/tab-bar/title-bar token —
@@ -348,7 +348,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
        no implicit role of its own to conflict with the explicit one, which is all this element
        ever wanted (§6.2's own layout, not a page banner). -->
   <div
-    class="kv:flex kv:items-center kv:gap-1.5 kv:h-bar kv:px-2 kv:bg-toolbar kv:border-b kv:border-toolbar-border kv:shrink-0"
+    class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border"
     role="toolbar"
     aria-label="Kira Space toolbar"
   >
@@ -375,17 +375,17 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     />
     <span
       v-if="stackState.restacking.value"
-      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap"
+      class="inline-flex items-center h-control-sm px-1.5 rounded-kira-sm gap-1 text-muted-foreground text-kira-sm whitespace-nowrap"
       role="status"
       aria-live="polite"
     >
       <!-- Pre-approved spinner change (P110 I2-35, §1.4/§3.11.1): codicon's own stepped 1.5s
            spin -> Tailwind's smooth 1s `animate-spin`, the same change already made just below. -->
-      <span class="codicon codicon-sync kv:inline-block kv:animate-spin" aria-hidden="true"></span>
+      <CodiconIcon name="sync" :size="13" class="animate-spin" />
       Restacking…
     </span>
     <span
-      class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
+      class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
       aria-hidden="true"
     ></span>
     <RefreshButton
@@ -397,7 +397,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
 
     <template v-if="write && hasRemote">
       <span
-        class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
+        class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
         aria-hidden="true"
       ></span>
       <Tooltip>
@@ -409,7 +409,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
             data-testid="fetch-button"
             @click="doFetch"
           >
-            <CodiconIcon name="cloud-download" />
+            <CodiconIcon name="cloud-download" :size="13" />
             Fetch
           </Button>
         </TooltipTrigger>
@@ -436,7 +436,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
               data-testid="push-button"
               @click="doPush"
             >
-              <CodiconIcon name="repo-push" />
+              <CodiconIcon name="repo-push" :size="13" />
               Push
             </Button>
           </TooltipTrigger>
@@ -452,7 +452,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
               aria-label="Push options"
               data-testid="push-overflow-trigger"
             >
-              <CodiconIcon name="chevron-down" />
+              <CodiconIcon name="chevron-down" :size="13" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="w-40" aria-label="Push options">
@@ -470,7 +470,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
           data-testid="autofetch-stopped"
           @click="onAutoFetchMarkerClick"
         >
-          <CodiconIcon name="warning" />
+          <CodiconIcon name="warning" :size="13" />
           Auto-fetch stopped
         </Button>
       </TooltipTrigger>
@@ -479,7 +479,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
 
     <template v-if="write">
       <span
-        class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
+        class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
         aria-hidden="true"
       ></span>
       <Tooltip>
@@ -491,7 +491,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
             data-testid="stash-changes-button"
             @click="emit('stash-changes')"
           >
-            <CodiconIcon name="inbox" />
+            <CodiconIcon name="inbox" :size="13" />
             Stash
           </Button>
         </TooltipTrigger>
@@ -505,13 +505,13 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
          where Fetch/Pull/Push/Stash/Undo went. -->
     <span
       v-if="!write"
-      class="kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis"
+      class="text-muted-foreground text-kira-sm whitespace-nowrap overflow-hidden text-ellipsis"
       data-testid="read-only-note"
     >
       Read-only view — use the VS Code extension to make changes
     </span>
 
-    <span class="kv:flex-1" aria-hidden="true"></span>
+    <span class="flex-1" aria-hidden="true"></span>
 
     <TooltipIconButton
       icon="list-tree"
@@ -541,13 +541,13 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
 
     <div
       v-if="write && remoteBusy"
-      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted-foreground kv:text-sm"
+      class="inline-flex items-center h-control-sm px-1.5 rounded-kira-sm gap-1 text-muted-foreground text-kira-sm"
       data-testid="remote-progress"
     >
       <!-- Pre-approved spinner change (§1.4/§6.4): stepped 1.5s rotation -> Tailwind's smooth 1s
            `animate-spin`. -->
-      <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>
-      <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-65">{{ progressText }}</span>
+      <CodiconIcon name="loading" :size="13" class="animate-spin" />
+      <span class="whitespace-nowrap overflow-hidden text-ellipsis max-w-65">{{ progressText }}</span>
       <TooltipIconButton
         icon="close"
         :label="cancellable ? 'Cancel' : (cancelDisabledReason ?? '')"
@@ -562,19 +562,15 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
          cancels the run). A failed run stays until dismissed; a finished one fades after 5 s. -->
     <Popover v-if="write && prepareVisible">
       <div
-        class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-sm"
-        :class="prepareStatus === 'failed' ? 'kv:text-diff-deleted' : 'kv:text-muted-foreground'"
+        class="inline-flex items-center h-control-sm px-1.5 rounded-kira-sm gap-1 text-kira-sm"
+        :class="prepareStatus === 'failed' ? 'text-error' : 'text-muted-foreground'"
         :data-state="prepareStatus"
         data-testid="worktree-prepare-progress"
       >
-        <span
-          v-if="prepareStatus === 'running'"
-          class="codicon codicon-loading kv:inline-block kv:animate-spin"
-          aria-hidden="true"
-        ></span>
-        <span v-else-if="prepareStatus === 'ready'" class="codicon codicon-check" aria-hidden="true"></span>
-        <span v-else class="codicon codicon-error" aria-hidden="true"></span>
-        <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-65" data-testid="worktree-prepare-text">{{ prepareText }}</span>
+        <CodiconIcon v-if="prepareStatus === 'running'" name="loading" :size="13" class="animate-spin" />
+        <CodiconIcon v-else-if="prepareStatus === 'ready'" name="check" :size="13" />
+        <CodiconIcon v-else name="error" :size="13" />
+        <span class="whitespace-nowrap overflow-hidden text-ellipsis max-w-65" data-testid="worktree-prepare-text">{{ prepareText }}</span>
         <PopoverTrigger as-child>
           <Button variant="ghost" size="xs" data-testid="worktree-prepare-output">Output</Button>
         </PopoverTrigger>

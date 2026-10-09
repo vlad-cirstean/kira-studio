@@ -52,3 +52,8 @@ export const PICKER_TAB_ICONS = {
   worktrees: 'codicon-multiple-windows',
   stacks: 'codicon-list-tree',
 } as const;
+
+/** `CodiconIcon` takes the bare name; the icon maps above hold the full `codicon-*` class. */
+export function codiconName(cls: string): string {
+  return cls.replace(/^codicon-/, '');
+}

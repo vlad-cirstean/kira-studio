@@ -65,7 +65,7 @@ const canShowOperations = computed(() => props.notice.logged && props.showOperat
         data-testid="failure-banner-dismiss"
         @click="emit('dismiss')"
       >
-        <CodiconIcon name="close" />
+        <CodiconIcon name="close" :size="13" />
       </Button>
     </AlertAction>
   </Alert>

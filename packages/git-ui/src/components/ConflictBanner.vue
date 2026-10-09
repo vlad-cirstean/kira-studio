@@ -20,6 +20,8 @@
  * still announces on appearance (the whole point) without demanding attention indefinitely.
  */
 import { describeInProgress } from '@kira/git-core';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
@@ -85,27 +87,23 @@ const PATH_DISPLAY_CAP = 20;
 </script>
 
 <template>
-  <!-- W20: `bg-panel`, not `--kv-overlay-bg` — that token is a translucent modal-backdrop scrim,
-       meant to sit behind an opaque dialog, not host text of its own; over a light theme it fails
-       contrast against this banner's own text (axe's color-contrast scan, vscode-light/
-       high-contrast-light). This is persistent chrome, so it gets an opaque panel background. -->
-  <div
+  <!-- W20: an opaque Alert surface, not `--kv-overlay-bg` — that token is a translucent
+       modal-backdrop scrim, which fails contrast over a light theme. -->
+  <Alert
     v-if="inProgress"
-    class="kv:shrink-0 kv:py-1 kv:px-2 kv:bg-panel kv:border-b kv:border-panel-border"
+    variant="warn"
     role="status"
+    class="shrink-0 block rounded-none border-x-0 border-t-0 py-1 px-2"
     data-testid="conflict-banner"
   >
-    <div class="kv:flex kv:items-center kv:gap-1">
-      <span
-        class="codicon codicon-warning kv:text-diff-modified"
-        aria-hidden="true"
-      ></span>
-      <span class="kv:font-semibold">{{ describeInProgress(inProgress) }}</span>
-      <span v-if="inProgress.unmergedCount > 0" class="kv:text-muted-foreground kv:text-sm">
+    <div class="flex items-center gap-1">
+      <CodiconIcon name="warning" :size="13" class="text-warn" />
+      <span class="font-semibold">{{ describeInProgress(inProgress) }}</span>
+      <span v-if="inProgress.unmergedCount > 0" class="text-muted-foreground text-kira-sm">
         {{ inProgress.unmergedCount }} unresolved {{ inProgress.unmergedCount === 1 ? "file" : "files" }}
       </span>
 
-      <span class="kv:flex-1"></span>
+      <span class="flex-1"></span>
 
       <Button
         v-if="resolveConflictEnabled"
@@ -149,7 +147,7 @@ const PATH_DISPLAY_CAP = 20;
     <p
       v-if="inProgress.unmergedCount > 0 && resolveConflictEnabled"
       :id="CONTINUE_REASON_ID"
-      class="kv:mt-0.5 kv:text-sm kv:text-muted-foreground"
+      class="mt-0.5 text-kira-sm text-muted-foreground"
     >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} first, then Continue{{
@@ -159,29 +157,29 @@ const PATH_DISPLAY_CAP = 20;
     <p
       v-else-if="inProgress.unmergedCount > 0"
       :id="CONTINUE_REASON_ID"
-      class="kv:mt-0.5 kv:text-sm kv:text-muted-foreground"
+      class="mt-0.5 text-kira-sm text-muted-foreground"
     >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} in your own editor and stage them,
       then Continue{{ inProgress.canSkip ? ", or Skip this commit and move on." : "." }}
     </p>
-    <p v-else-if="inProgress.canSkip" class="kv:mt-0.5 kv:text-sm kv:text-muted-foreground">
+    <p v-else-if="inProgress.canSkip" class="mt-0.5 text-kira-sm text-muted-foreground">
       No conflicts remain. Continue to commit this change, or Skip if it is already present.
     </p>
 
     <ul
       v-if="inProgress.conflictedPaths.length > 0"
-      class="kv:mt-0.5 kv:pl-3 kv:max-h-20 kv:overflow-y-auto kv:font-data kv:text-sm"
+      class="mt-0.5 pl-3 max-h-20 overflow-y-auto font-data text-kira-sm"
     >
       <li v-for="path in inProgress.conflictedPaths.slice(0, PATH_DISPLAY_CAP)" :key="path">
         <code>{{ path }}</code>
       </li>
       <li
         v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP"
-        class="kv:text-muted-foreground"
+        class="text-muted-foreground"
       >
         +{{ inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }} more
       </li>
     </ul>
-  </div>
+  </Alert>
 </template>

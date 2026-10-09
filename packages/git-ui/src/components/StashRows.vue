@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { StashEntry } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * I2-21: `StashList.vue`'s and `GlobalStashList.vue`'s own row list, selection and row-menu
  * open/select were byte-identical apart from each row's own label fields (badge/origin/message,
@@ -103,7 +104,7 @@ function onMenuSelect(id: string): void {
       :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
       @click="select(entry)"
     >
-      <span class="codicon codicon-archive" aria-hidden="true"></span>
+      <CodiconIcon name="archive" :size="13" />
       <span v-if="rowModel(entry).badge" class="kv:whitespace-nowrap kv:font-data">{{ rowModel(entry).badge }}</span>
       <span
         v-if="rowModel(entry).origin"

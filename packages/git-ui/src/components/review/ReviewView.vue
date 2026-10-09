@@ -30,6 +30,7 @@ import type {
   UiActionKind,
 } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -40,7 +41,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
-import { ACTION_ICONS } from '../../icons/index.ts';
+import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
 import { cn } from '../../lib/cn.ts';
 import { rowVariants } from '../../lib/rowVariants.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
@@ -841,7 +842,7 @@ watch(
         </p>
         <InputGroup variant="kira">
           <InputGroupAddon>
-            <span class="codicon codicon-search" aria-hidden="true"></span>
+            <CodiconIcon name="search" :size="13" />
           </InputGroupAddon>
           <InputGroupInput
             ref="branchFilter"
@@ -851,7 +852,7 @@ watch(
           />
           <InputGroupAddon v-if="branchFilter" align="inline-end">
             <InputGroupButton aria-label="Clear filter" @click="branchFilter = ''">
-              <span class="codicon codicon-close" aria-hidden="true"></span>
+              <CodiconIcon name="close" :size="13" />
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
@@ -911,7 +912,7 @@ watch(
           />
           <div class="kv:flex kv:flex-col kv:gap-0.5 kv:flex-1 kv:min-w-0">
             <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
-              <span class="codicon codicon-git-branch" aria-hidden="true"></span>
+              <CodiconIcon name="git-branch" :size="13" />
               <span
                 class="kv:font-data kv:font-semibold kv:truncate"
                 data-testid="review-branch-name"
@@ -947,7 +948,7 @@ watch(
            expanded row plus a third, separately-stateful copy in the Files pane. -->
       <div
         v-if="review.phase.value === 'listing'"
-        class="kv-review-toolbar kv:flex kv:items-center kv:gap-1.5 kv:h-bar kv:px-2 kv:border-b kv:border-panel-border kv:shrink-0"
+        class="kv-review-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border"
       >
         <ToggleGroup
           type="single"
@@ -960,7 +961,7 @@ watch(
           <Tooltip v-for="o in panelOptions" :key="o.id">
             <TooltipTrigger as-child>
               <ToggleGroupItem :value="o.id" :aria-label="`${o.label} (${o.badge})`">
-                <span :class="['codicon', o.icon]" aria-hidden="true" />
+                <CodiconIcon :name="codiconName(o.icon)" :size="13" />
                 <Badge variant="count">{{ o.badge }}</Badge>
               </ToggleGroupItem>
             </TooltipTrigger>
@@ -1001,7 +1002,7 @@ watch(
           <Tooltip v-for="o in listModeOptions" :key="o.id">
             <TooltipTrigger as-child>
               <ToggleGroupItem :value="o.id" :aria-label="o.label">
-                <span :class="['codicon', o.icon]" aria-hidden="true" />
+                <CodiconIcon :name="codiconName(o.icon)" :size="13" />
               </ToggleGroupItem>
             </TooltipTrigger>
             <TooltipContent>{{ o.label }}</TooltipContent>

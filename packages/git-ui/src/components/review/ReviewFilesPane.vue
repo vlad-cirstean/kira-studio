@@ -19,10 +19,11 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
-import { ACTION_ICONS } from '../../icons/index.ts';
+import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewFilesState } from '../../state/reviewFiles.ts';
@@ -142,7 +143,7 @@ function onToggleReviewed(path: string): void {
           <Tooltip v-for="o in diffModeOptions" :key="o.id">
             <TooltipTrigger as-child>
               <ToggleGroupItem :value="o.id" :aria-label="o.label">
-                <span :class="['codicon', o.icon]" aria-hidden="true" />
+                <CodiconIcon :name="codiconName(o.icon)" :size="13" />
               </ToggleGroupItem>
             </TooltipTrigger>
             <TooltipContent>{{ o.label }}</TooltipContent>

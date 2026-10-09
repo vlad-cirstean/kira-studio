@@ -17,6 +17,7 @@
  * used to render `worktrees.entries.value` straight through, uncapped) — part of N1's fix.
  */
 import type { WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -144,10 +145,10 @@ async function confirmRemove(): Promise<void> {
         <span v-if="entry.isCurrent" class="kv:text-sm kv:opacity-80" data-kira-tip="This window">●</span>
         <span v-if="entry.isMain" class="kv:text-sm kv:opacity-80" data-kira-tip="Main worktree">M</span>
         <span v-if="entry.locked" class="kv:text-sm kv:opacity-80" :data-kira-tip="entry.locked.reason">
-          <span class="codicon codicon-lock" aria-hidden="true"></span>
+          <CodiconIcon name="lock" :size="13" />
         </span>
         <span v-if="entry.openElsewhere" class="kv:text-sm kv:opacity-80" data-kira-tip="Open in another window">
-          <span class="codicon codicon-window" aria-hidden="true"></span>
+          <CodiconIcon name="window" :size="13" />
         </span>
         <span class="kv:truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>
         <span class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-sm kv:text-muted-foreground">{{ entry.path }}</span>

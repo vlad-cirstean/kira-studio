@@ -10,11 +10,12 @@
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { computed, ref, useTemplateRef } from 'vue';
-import { STATE_ICONS } from '../../icons/index.ts';
+import { codiconName, STATE_ICONS } from '../../icons/index.ts';
 import { cn } from '../../lib/cn.ts';
 import { rowVariants } from '../../lib/rowVariants.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -114,7 +115,7 @@ function onOpenAutoFocus(e: Event): void {
         <Button variant="toolbar" size="kira" class="max-w-full" data-testid="base-selector-trigger">
           <span class="kv:truncate kv:font-semibold">{{ triggerLabel }}</span>
           <span v-if="triggerReason" class="kv:text-muted-foreground kv:text-sm">{{ triggerReason }}</span>
-          <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
+          <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
         </Button>
       </PopoverTrigger>
 
@@ -127,7 +128,7 @@ function onOpenAutoFocus(e: Event): void {
         <div class="kv:max-h-80 kv:flex kv:flex-col kv:min-h-0">
           <InputGroup variant="kira" class="m-1">
             <InputGroupAddon>
-              <span class="codicon codicon-search" aria-hidden="true"></span>
+              <CodiconIcon name="search" :size="13" />
             </InputGroupAddon>
             <InputGroupInput
               ref="filterEl"
@@ -137,7 +138,7 @@ function onOpenAutoFocus(e: Event): void {
             />
             <InputGroupAddon v-if="filter" align="inline-end">
               <InputGroupButton aria-label="Clear filter" @click="filter = ''">
-                <span class="codicon codicon-close" aria-hidden="true"></span>
+                <CodiconIcon name="close" :size="13" />
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
@@ -174,7 +175,7 @@ function onOpenAutoFocus(e: Event): void {
                 :class="cn(rowVariants(), 'kv:w-full')"
                 @click="pick(row.shortName)"
               >
-                <span class="codicon codicon-cloud" aria-hidden="true"></span>
+                <CodiconIcon name="cloud" :size="13" />
                 <span class="kv:truncate">{{ row.shortName }}</span>
               </button>
               <div

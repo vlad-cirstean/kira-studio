@@ -15,6 +15,7 @@
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
 import type { RefRow, StashEntry } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
@@ -26,7 +27,7 @@ import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
-import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
+import { codiconName, PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import { cn } from '../lib/cn.ts';
 import { enabledNeighbour, firstEnabled, type MenuItem } from '../lib/menuModel.ts';
 import { rowVariants } from '../lib/rowVariants.ts';
@@ -605,9 +606,9 @@ watch(visibleBranchNames, (names) => {
           <TooltipTrigger as-child>
             <PopoverTrigger as-child>
               <Button ref="triggerEl" variant="toolbar" size="kira" class="kv-branch-trigger max-w-50">
-                <span class="codicon codicon-git-branch" aria-hidden="true"></span>
+                <CodiconIcon name="git-branch" :size="13" />
                 <span class="kv:truncate">{{ triggerLabel }}</span>
-                <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
+                <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -638,7 +639,7 @@ watch(visibleBranchNames, (names) => {
             <Tooltip v-for="tab in tabOptions" :key="tab.id">
               <TooltipTrigger as-child>
                 <ToggleGroupItem :value="tab.id" :aria-label="`${tab.label} (${tab.badge})`">
-                  <span class="codicon" :class="tab.icon" aria-hidden="true"></span>
+                  <CodiconIcon :name="codiconName(tab.icon)" :size="13" />
                   <Badge variant="count" data-testid="picker-tab-badge">{{ tab.badge }}</Badge>
                 </ToggleGroupItem>
               </TooltipTrigger>
@@ -648,7 +649,7 @@ watch(visibleBranchNames, (names) => {
 
           <InputGroup variant="kira" class="m-1">
             <InputGroupAddon>
-              <span class="codicon codicon-search" aria-hidden="true"></span>
+              <CodiconIcon name="search" :size="13" />
             </InputGroupAddon>
             <InputGroupInput
               ref="filterEl"
@@ -661,7 +662,7 @@ watch(visibleBranchNames, (names) => {
               <Tooltip>
                 <TooltipTrigger as-child>
                   <InputGroupButton aria-label="Clear filter" @click="filter = ''">
-                    <span class="codicon codicon-close" aria-hidden="true"></span>
+                    <CodiconIcon name="close" :size="13" />
                   </InputGroupButton>
                 </TooltipTrigger>
                 <TooltipContent>Clear filter</TooltipContent>
@@ -765,7 +766,7 @@ watch(visibleBranchNames, (names) => {
               :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
               @click="checkoutRemote(row)"
             >
-              <span class="codicon codicon-cloud" aria-hidden="true"></span>
+              <CodiconIcon name="cloud" :size="13" />
               <span class="kv:truncate">{{ row.shortName }}</span>
               <span class="kv:text-sm kv:text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </button>

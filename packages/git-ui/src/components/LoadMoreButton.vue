@@ -57,7 +57,7 @@ function handleCancel(): void {
        mid-load. -->
   <div
     v-if="!graphView.exhausted.value && (isLoading || graphView.remaining.value > 0)"
-    class="kv:flex kv:items-center kv:justify-center kv:gap-1 kv:py-1 kv:px-2 kv:shrink-0"
+    class="flex items-center justify-center gap-1 py-1 px-2 shrink-0"
   >
     <Tooltip>
       <TooltipTrigger as-child>

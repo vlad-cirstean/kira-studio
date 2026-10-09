@@ -18,6 +18,8 @@
  * this can stay on screen for a real outage's whole duration, and `alert` would re-announce
  * itself indefinitely rather than announcing once on appearance.
  */
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { useTimeoutFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import type { HostConnectionState } from '../bridge/client.ts';
@@ -74,17 +76,15 @@ const detail = computed(() => props.state?.detail);
 </script>
 
 <template>
-  <div
+  <Alert
     v-if="visible"
-    class="kv:shrink-0 kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-panel kv:border-b kv:border-panel-border"
+    variant="destructive"
     role="status"
+    class="shrink-0 flex items-center gap-1 rounded-none border-x-0 border-t-0 py-1 px-2"
     data-testid="connection-banner"
   >
-    <span
-      class="codicon codicon-debug-disconnect kv:text-diff-deleted"
-      aria-hidden="true"
-    ></span>
-    <span class="kv:font-semibold">{{ title }}</span>
-    <span v-if="detail" class="kv:text-muted-foreground kv:text-sm">{{ detail }}</span>
-  </div>
+    <CodiconIcon name="debug-disconnect" :size="13" />
+    <AlertTitle class="font-semibold">{{ title }}</AlertTitle>
+    <AlertDescription v-if="detail" class="text-kira-sm">{{ detail }}</AlertDescription>
+  </Alert>
 </template>

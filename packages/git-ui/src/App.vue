@@ -1828,7 +1828,7 @@ onBeforeUnmount(() => {
 
       <template v-else-if="repoState.activeRepo.value.head.kind === 'unborn'">
         <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
-        <div v-if="searchOpen" ref="searchRowEl" class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-toolbar kv:border-b kv:border-toolbar-border kv:shrink-0">
+        <div v-if="searchOpen" ref="searchRowEl" class="flex items-center gap-1 py-1 px-2 border-b border-border shrink-0">
           <SearchBox
             ref="searchBoxRef"
             :search="searchState"
@@ -1842,7 +1842,7 @@ onBeforeUnmount(() => {
 
       <template v-else>
         <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
-        <div v-if="searchOpen" ref="searchRowEl" class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-toolbar kv:border-b kv:border-toolbar-border kv:shrink-0">
+        <div v-if="searchOpen" ref="searchRowEl" class="flex items-center gap-1 py-1 px-2 border-b border-border shrink-0">
           <SearchBox
             ref="searchBoxRef"
             :search="searchState"
