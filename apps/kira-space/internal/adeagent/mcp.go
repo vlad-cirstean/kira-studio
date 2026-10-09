@@ -27,9 +27,25 @@ const (
 	finishStatusNeed = "needs_input"
 )
 
+// Finish is one finish_step call. Reason, ConflictedFiles, LastGitError and Tried are optional detail
+// for a failure or a question.
+type Finish struct {
+	Status, Summary, Reason string
+	ConflictedFiles         []string
+	LastGitError, Tried     string
+}
+
 // FinishFunc receives a run's finish_step call. The last call of a run wins; the caller applies the
 // outcome when the process exits.
-type FinishFunc func(runID, status, summary string)
+type FinishFunc func(runID string, f Finish)
+
+// Bounds on a finish_step call's text fields.
+const (
+	maxFinishText    = 1 << 10
+	maxFinishGitErr  = 4 << 10
+	maxFinishFiles   = 200
+	maxFinishFileLen = 1 << 10
+)
 
 // Grant is what one registration may do. A run grant reports through finish_step; a Space grant
 // adds the task tools, which act on TaskID alone.
@@ -54,6 +70,7 @@ type Server struct {
 	dir      string
 	onFinish FinishFunc
 	space    SpaceTools
+	outcomes Outcomes
 
 	mu     sync.Mutex
 	seq    uint64
@@ -65,17 +82,43 @@ type Server struct {
 
 // NewServer returns a stopped Server; config files go in dir (created 0700). space may be nil: a
 // Space grant is then refused.
-func NewServer(dir string, onFinish FinishFunc, space SpaceTools) *Server {
-	return &Server{dir: dir, onFinish: onFinish, space: space}
+func NewServer(dir string, onFinish FinishFunc, space SpaceTools, outcomes Outcomes) *Server {
+	return &Server{dir: dir, onFinish: onFinish, space: space, outcomes: outcomes}
 }
 
 type finishArgs struct {
-	Status  string `json:"status" jsonschema:"done when the step is complete, failed when it could not be completed, needs_input when a decision from the user is needed."`
-	Summary string `json:"summary" jsonschema:"One line: what was done, what failed, or the question for the user."`
+	Status          string   `json:"status" jsonschema:"done when the step is complete, failed when it could not be completed, needs_input when a decision from the user is needed."`
+	Summary         string   `json:"summary" jsonschema:"One line: what was done, what failed, or the question for the user."`
+	Reason          string   `json:"reason,omitempty" jsonschema:"Why it failed, or what you need. Give it when status is failed or needs_input."`
+	ConflictedFiles []string `json:"conflictedFiles,omitempty" jsonschema:"Files that still conflict, relative to the repo."`
+	LastGitError    string   `json:"lastGitError,omitempty" jsonschema:"The last git error output you saw."`
+	Tried           string   `json:"tried,omitempty" jsonschema:"What you tried before giving up."`
+}
+
+// checkFinish bounds the call's text fields; the error names the field.
+func checkFinish(a finishArgs) string {
+	for _, f := range []struct {
+		name string
+		v    string
+		max  int
+	}{{"summary", a.Summary, maxFinishText}, {"reason", a.Reason, maxFinishText}, {"tried", a.Tried, maxFinishText}, {"lastGitError", a.LastGitError, maxFinishGitErr}} {
+		if len(f.v) > f.max {
+			return fmt.Sprintf("%s is too long: at most %d bytes", f.name, f.max)
+		}
+	}
+	if len(a.ConflictedFiles) > maxFinishFiles {
+		return fmt.Sprintf("conflictedFiles has too many entries: at most %d", maxFinishFiles)
+	}
+	for _, f := range a.ConflictedFiles {
+		if len(f) > maxFinishFileLen {
+			return fmt.Sprintf("a conflictedFiles entry is too long: at most %d bytes", maxFinishFileLen)
+		}
+	}
+	return ""
 }
 
 // buildMCPServer returns the tool set a grant sees: an agent never lists a tool it cannot call.
-func (s *Server) buildMCPServer(finish, space bool) *mcp.Server {
+func (s *Server) buildMCPServer(finish, space, outcomes bool) *mcp.Server {
 	opts := &mcp.ServerOptions{}
 	if space {
 		opts.Instructions = spaceInstructions
@@ -89,6 +132,9 @@ func (s *Server) buildMCPServer(finish, space bool) *mcp.Server {
 	}
 	if space {
 		s.addSpaceTools(srv)
+	}
+	if outcomes {
+		s.addOutcomeTool(srv)
 	}
 	return srv
 }
@@ -122,6 +168,9 @@ func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args fi
 	default:
 		return toolError(`status must be "done", "failed" or "needs_input"`), nil, nil
 	}
+	if msg := checkFinish(args); msg != "" {
+		return toolError(msg), nil, nil
+	}
 	var info *auth.TokenInfo
 	if req.Extra != nil {
 		info = req.Extra.TokenInfo
@@ -130,7 +179,10 @@ func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args fi
 	if !ok || g.RunID == "" {
 		return nil, nil, errors.New("finish_step: no run behind this call")
 	}
-	s.onFinish(g.RunID, args.Status, args.Summary)
+	s.onFinish(g.RunID, Finish{
+		Status: args.Status, Summary: args.Summary, Reason: args.Reason, ConflictedFiles: args.ConflictedFiles,
+		LastGitError: args.LastGitError, Tried: args.Tried,
+	})
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Recorded. Stop now."}}}, nil, nil
 }
 
@@ -158,17 +210,22 @@ func (s *Server) startLocked() error {
 	if err != nil {
 		return fmt.Errorf("adeagent: bind: %w", err)
 	}
-	servers := map[[2]bool]*mcp.Server{
-		{true, false}: s.buildMCPServer(true, false),
-		{false, true}: s.buildMCPServer(false, true),
-		{true, true}:  s.buildMCPServer(true, true),
+	servers := map[[3]bool]*mcp.Server{}
+	for _, finish := range []bool{false, true} {
+		for _, space := range []bool{false, true} {
+			for _, outcomes := range []bool{false, true} {
+				if finish || space || outcomes {
+					servers[[3]bool{finish, space, outcomes}] = s.buildMCPServer(finish, space, outcomes)
+				}
+			}
+		}
 	}
 	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		g, ok := s.grant(auth.TokenInfoFromContext(r.Context()))
 		if !ok {
 			return nil
 		}
-		return servers[[2]bool{g.RunID != "", g.Space}]
+		return servers[[3]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil}]
 	}, &mcp.StreamableHTTPOptions{Stateless: true})
 	protected := auth.RequireBearerToken(s.verify, nil)(handler)
 	mux := http.NewServeMux()

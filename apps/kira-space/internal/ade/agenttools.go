@@ -2,6 +2,7 @@ package ade
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -406,4 +407,44 @@ func (b *TaskBoard) taskBranch(taskID, ref string) (br model.AdeTaskBranch, nick
 		return br, tc.nick[id], nil, nil
 	}
 	return br, "", nil, adeagent.ToolError("Repo is not on this task.")
+}
+
+// RunOutcomes is the run_outcome tool's read: the task's runs, newest first, filtered by q.
+func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q adeagent.OutcomeQuery) ([]adeagent.RunOutcomeEntry, error) {
+	tc, err := b.spaceCtx(taskID)
+	if err != nil {
+		return nil, err
+	}
+	runs, err := b.deps.Tasks.RunsOfTask(taskID)
+	if err != nil {
+		return nil, err
+	}
+	out := []adeagent.RunOutcomeEntry{}
+	for i := len(runs) - 1; i >= 0 && len(out) < q.Limit; i-- {
+		r := runs[i]
+		kind := "step"
+		if r.Purpose == model.AdeRunPurposeRebase {
+			kind = "rebase"
+		}
+		if q.RunID != "" && r.ID != q.RunID || q.Kind != "" && q.Kind != kind {
+			continue
+		}
+		br, _ := tc.branch(r.BranchID)
+		if q.Branch != "" && br.Name != q.Branch {
+			continue
+		}
+		entry := adeagent.RunOutcomeEntry{
+			RunID: r.ID, Kind: kind, Stage: r.StageID, Step: r.StepID, Repo: tc.nick[br.CodeRepoID], Branch: br.Name,
+			State: r.State, FinishedAt: r.FinishedAt, Outcome: json.RawMessage("null"),
+		}
+		if r.Outcome != nil {
+			raw, err := json.Marshal(r.Outcome)
+			if err != nil {
+				return nil, err
+			}
+			entry.Outcome = raw
+		}
+		out = append(out, entry)
+	}
+	return out, nil
 }

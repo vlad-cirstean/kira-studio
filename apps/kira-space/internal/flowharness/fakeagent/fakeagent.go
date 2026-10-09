@@ -3,7 +3,8 @@
 // from scenario data in KIRA_FAKE_SCEN (JSON, or the path of a JSON file), so a stream extends it with testdata, not code.
 //
 // Every call writes its argv, cwd and stdin under KIRA_FAKE_DIR as <repo>-<n>.args/.cwd/.prompt
-// (claude, where <repo> is the worktree's parent directory name) or gh-<n>.args.
+// (claude, where <repo> is the worktree's parent directory name) or gh-<n>.args. A scripted Action.MCP
+// call also keeps its result as mcp-<tool>-<n>.json.
 package fakeagent
 
 import (
@@ -209,10 +210,12 @@ func runClaude(scen Scenario, dir string, args []string) int {
 	}
 	cfg := argAfter(args, "--mcp-config")
 	for _, c := range action.MCP {
-		if err := callTool(cfg, c.Server, c.Tool, c.Args); err != nil {
+		res, err := callTool(cfg, c.Server, c.Tool, c.Args)
+		if err != nil {
 			fmt.Fprintln(os.Stderr, "mcp:", err)
 			return 3
 		}
+		recordMCPResult(dir, c.Tool, res)
 	}
 	if action.Emit != "" {
 		raw, err := os.ReadFile(action.Emit)
@@ -235,7 +238,7 @@ func runClaude(scen Scenario, dir string, args []string) int {
 	}
 
 	finish := func(status string) int {
-		if err := callTool(cfg, adeagent.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
+		if _, err := callTool(cfg, adeagent.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
 			fmt.Fprintln(os.Stderr, "finish_step:", err)
 			return 3
 		}
@@ -360,12 +363,12 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // callTool connects to server from the --mcp-config file (HTTP or stdio entry) and calls one tool.
-func callTool(cfgPath, server, tool string, args map[string]any) error {
+func callTool(cfgPath, server, tool string, args map[string]any) (*mcp.CallToolResult, error) {
 	raw := []byte(cfgPath)
 	if !strings.HasPrefix(strings.TrimSpace(cfgPath), "{") {
 		var err error
 		if raw, err = os.ReadFile(cfgPath); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	var cfg struct {
@@ -378,11 +381,11 @@ func callTool(cfgPath, server, tool string, args map[string]any) error {
 		} `json:"mcpServers"`
 	}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return err
+		return nil, err
 	}
 	entry, ok := cfg.MCPServers[server]
 	if !ok {
-		return fmt.Errorf("server %q not in %s", server, cfgPath)
+		return nil, fmt.Errorf("server %q not in %s", server, cfgPath)
 	}
 	var transport mcp.Transport
 	if entry.Command != "" {
@@ -402,15 +405,29 @@ func callTool(cfgPath, server, tool string, args map[string]any) error {
 	defer cancel()
 	sess, err := mcp.NewClient(&mcp.Implementation{Name: "fake", Version: "1"}, nil).Connect(ctx, transport, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer sess.Close()
 	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: tool, Arguments: args})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if res.IsError {
-		return fmt.Errorf("tool error: %v", res.Content)
+		return nil, fmt.Errorf("tool error: %v", res.Content)
 	}
-	return nil
+	return res, nil
+}
+
+// recordMCPResult keeps what a scripted tool call returned, as <dir>/mcp-<tool>-<n>.json.
+func recordMCPResult(dir, tool string, res *mcp.CallToolResult) {
+	var v any = res.StructuredContent
+	if v == nil {
+		v = res.Content
+	}
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	n := nextCount(dir, "mcp-"+tool)
+	_ = os.WriteFile(filepath.Join(dir, fmt.Sprintf("mcp-%s-%d.json", tool, n)), raw, 0o644)
 }
