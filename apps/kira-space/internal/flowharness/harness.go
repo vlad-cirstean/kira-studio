@@ -26,9 +26,11 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appwire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeagent"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
@@ -37,7 +39,9 @@ import (
 )
 
 type options struct {
-	noGh bool
+	noGh         bool
+	trackerGrace time.Duration
+	mobilePoll   time.Duration
 }
 
 // Opt tweaks New.
@@ -45,6 +49,18 @@ type Opt func(*options)
 
 // WithoutGh leaves gh off PATH entirely, system installs included.
 func WithoutGh() Opt { return func(o *options) { o.noGh = true } }
+
+// WithTrackerGrace shortens the ADE tracker's grace window, the wait after a TUI session spawns
+// before a missing process reads as stopped (30s by default).
+func WithTrackerGrace(d time.Duration) Opt { return func(o *options) { o.trackerGrace = d } }
+
+// WithMobilePoll sets how often the phone server's network supervisor re-checks (10s by default).
+func WithMobilePoll(d time.Duration) Opt { return func(o *options) { o.mobilePoll = d } }
+
+// noGhLocator finds no gh anywhere, system installs included.
+type noGhLocator struct{}
+
+func (noGhLocator) Locate() (string, []string, bool) { return "", []string{"gh (on PATH)"}, false }
 
 // App is one booted Kira Space.
 type App struct {
@@ -67,6 +83,7 @@ type App struct {
 	stopped  bool
 	built    int
 	scenario fakeagent.Scenario
+	opts     options
 }
 
 // New boots the app; the test is skipped without git on PATH. Everything is torn down in main's
@@ -96,6 +113,7 @@ func New(t *testing.T, opts ...Opt) *App {
 			t.Fatal(err)
 		}
 	}
+	a.opts = o
 	a.writeHome()
 	a.writeBin(o)
 	t.Setenv("KIRA_HOME", filepath.Join(root, "studio"))
@@ -205,7 +223,12 @@ func (a *App) build() {
 		a.t.Fatalf("repos.New: %v", err)
 	}
 	a.db, a.repos, a.stopped = db, r, false
+	var ghLocator ghclient.Locator
+	if a.opts.noGh {
+		ghLocator = noGhLocator{}
+	}
 	a.W = appwire.Build(appwire.Options{
+		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},

@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
@@ -29,7 +30,6 @@ import (
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
-	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -76,10 +76,11 @@ type gitWired struct {
 // Rows a previous process life left running are stopped by the task board's Recover.
 func wireTracker(
 	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
+	grace time.Duration,
 ) (*ade.Tracker, *agenthooks.Manager) {
 	tracker := ade.NewTracker(ade.TrackerDeps{
 		Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
-		WriteTerminal: registry.Write, Now: time.Now,
+		WriteTerminal: registry.Write, Now: time.Now, Grace: grace,
 		OnChange: func() { bridge.AdeTaskSessionsChanged(events) },
 	})
 
@@ -113,7 +114,7 @@ func agentSessionCount(repositories *repos.Repos, registry *terminal.Registry) f
 }
 
 // closeTaskReviewWindows returns the hook that closes every review window of an archived task.
-func closeTaskReviewWindows(repositories *repos.Repos, windows *shell.WindowRegistry) func(taskID string) {
+func closeTaskReviewWindows(repositories *repos.Repos, closeWindow func(key string) bool) func(taskID string) {
 	return func(taskID string) {
 		keys, err := repositories.AdeReview.KeysByTask(taskID)
 		if err != nil {
@@ -121,7 +122,7 @@ func closeTaskReviewWindows(repositories *repos.Repos, windows *shell.WindowRegi
 			return
 		}
 		for _, k := range keys {
-			windows.Close(k)
+			closeWindow(k)
 		}
 	}
 }
@@ -233,10 +234,14 @@ func shutdownTracker(tracker *ade.Tracker, hooks *agenthooks.Manager) {
 
 // wireGit builds the git runner, discovery (over locator), session registry, router and the
 // pairing socket, and starts the socket.
-func wireGit(repositories *repos.Repos, credentials *gitcred.Relay, locator gitclient.Locator) gitWired {
+func wireGit(repositories *repos.Repos, credentials *gitcred.Relay, locator gitclient.Locator, ghLocator ghclient.Locator) gitWired {
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(locator, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
+	if ghLocator != nil {
+		gitRegistry.Gh = ghclient.NewClient(
+			ghclient.NewDiscovery(ghLocator, ghclient.NewExecRunner(), ghclient.NewRealClock()), ghclient.NewExecRunner())
+	}
 	// Set before gitSock.Start: a paired VS Code client can run a write the moment the socket is up.
 	opLog := oplog.New()
 	gitRegistry.OpLog = opLog

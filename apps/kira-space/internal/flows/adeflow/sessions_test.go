@@ -44,13 +44,13 @@ func sessionByID(t *testing.T, app *flowharness.App, id string) adewire.Session 
 	return adewire.Session{}
 }
 
-// A stopped state waits out the tracker's 30s grace window after the spawn.
+// A stopped state waits out the tracker's grace window after the spawn (shortened by the test).
 func waitSession(t *testing.T, app *flowharness.App, id, state string) adewire.Session {
 	t.Helper()
 	var got adewire.Session
 	wait := waitFor
 	if state == "stopped" {
-		wait = 50 * time.Second
+		wait = 10 * time.Second
 	}
 	testx.WaitUntil(t, wait, func() bool {
 		res, _ := app.W.AdeTask.Sessions(ctx)
@@ -68,7 +68,7 @@ func waitSession(t *testing.T, app *flowharness.App, id, state string) adewire.S
 func TestInteractiveSessions(t *testing.T) {
 	dir := t.TempDir()
 	flag := func(n string) string { return filepath.Join(dir, n) }
-	app := flowharness.New(t)
+	app := flowharness.New(t, flowharness.WithTrackerGrace(time.Second))
 	// Call 1 is the headless run; calls 2 to 4 are interactive Claude Code processes held open by a flag file.
 	claude(app, map[string][]fakeagent.Action{"*": {
 		{Name: "done"}, {WaitFile: flag("takeover")}, {WaitFile: flag("stage")}, {Name: "sleep"},

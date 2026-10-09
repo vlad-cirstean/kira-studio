@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
@@ -60,6 +61,11 @@ type Options struct {
 	MobileDetect func() (lannet.Network, error)
 	MobileFind   func(lannet.Identity) (lannet.Network, error)
 	MobilePoll   time.Duration
+	// GhLocator resolves the gh CLI; nil means the platform locator.
+	GhLocator ghclient.Locator
+	// TrackerGrace is how long the ADE tracker waits before it reads a spawned TUI session as
+	// stopped; zero means the tracker default.
+	TrackerGrace time.Duration
 }
 
 // ShellHooks completes the window-manager seams once the shell exists. CloseWindow, FocusWindow and
@@ -129,7 +135,7 @@ func Build(opts Options) *Wired {
 	w := &Wired{Repos: repositories}
 
 	credentialRelay := gitcred.New()
-	git := wireGit(repositories, credentialRelay, opts.Locator)
+	git := wireGit(repositories, credentialRelay, opts.Locator, opts.GhLocator)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
@@ -164,7 +170,7 @@ func Build(opts Options) *Wired {
 	// Registry, since Tracker.Reconcile/Send both need the same live-session set and PTYs.
 	terminalRegistry := terminal.NewRegistry()
 	w.TermRegistry = terminalRegistry
-	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events)
+	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace)
 	w.Tracker, w.AgentHooks = adeTracker, agentHooks
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
@@ -192,7 +198,13 @@ func Build(opts Options) *Wired {
 	// windows holds every open window; created here so Archive can close a task's review windows.
 	w.Windows = shell.NewWindowRegistry()
 	w.AdeBoard = wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry),
-		closeTaskReviewWindows(repositories, w.Windows), credentialRelay, w.KeepAwake)
+		closeTaskReviewWindows(repositories, func(key string) bool {
+			// Through the bound hook, so a shell that overrides CloseWindow sees archive closes too.
+			if w.AdeTask != nil && w.AdeTask.CloseWindow != nil {
+				return w.AdeTask.CloseWindow(key)
+			}
+			return w.Windows.Close(key)
+		}), credentialRelay, w.KeepAwake)
 	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count

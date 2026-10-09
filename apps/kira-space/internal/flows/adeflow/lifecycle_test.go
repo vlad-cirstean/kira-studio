@@ -66,6 +66,9 @@ func TestArchiveRisk(t *testing.T) {
 	if tgt, err := app.W.AdeTask.ReviewWindowTarget(ctx, adewire.WindowKeyArgs{WindowKey: key}); err != nil || tgt != nil {
 		t.Fatalf("review target after archive = %+v, %v, want nil", tgt, err)
 	}
+	if closed := app.WindowMgr.Closed; !slices.Contains(closed, key) {
+		t.Fatalf("window manager closed %v, want the review window %s", closed, key)
+	}
 }
 
 func TestReviewWindowAndAgent(t *testing.T) {
@@ -187,9 +190,6 @@ func githubClone(t *testing.T, app *flowharness.App) (adewire.Branch, string) {
 }
 
 func TestGitHubWithoutGh(t *testing.T) {
-	// The gh locator also probes /usr/local/bin and /opt/homebrew/bin, so a host install can still answer; without a login it reports unauthenticated.
-	t.Setenv("GH_TOKEN", "")
-	t.Setenv("GITHUB_TOKEN", "")
 	app := flowharness.New(t, flowharness.WithoutGh())
 	claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}}})
 	br, repoID := githubClone(t, app)
@@ -207,7 +207,7 @@ func TestGitHubWithoutGh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GitHubSyncPlan returned an error, want a status: %v", err)
 	}
-	if !slices.Contains([]adewire.GhSyncStatus{"ghMissing", "unauthenticated", "unavailable"}, plan.Status) || plan.Pr != nil || len(plan.Files) != 0 {
+	if plan.Status != "ghMissing" || plan.Pr != nil || len(plan.Files) != 0 {
 		t.Fatalf("plan = %+v, want an unavailable state with no files", plan)
 	}
 	res, err := app.W.AdeTask.GitHubSyncApply(ctx, adewire.BranchArgs{BranchID: br.ID})
