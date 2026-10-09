@@ -53,6 +53,11 @@ type CustomScript struct {
 	SortOrder    int     `json:"sortOrder"`
 	CreatedAt    string  `json:"createdAt"`
 	UpdatedAt    string  `json:"updatedAt"`
+	// Kind is KindScript or KindSmart; for a smart script Command is the prompt.
+	Kind   string  `json:"kind"`
+	Params []Param `json:"params"`
+	// Smart is nil for a normal script.
+	Smart *Smart `json:"smart"`
 }
 
 // Collection mirrors packages/shared/domain/scripts.ts's scriptCollectionSchema: one
@@ -81,6 +86,11 @@ type CustomScriptFields struct {
 	Color   string `json:"color"`
 	// CollectionID groups the command in the panel; nil means ungrouped.
 	CollectionID *string `json:"collectionId"`
+	// Kind is KindScript or KindSmart; "" means KindScript.
+	Kind   string  `json:"kind"`
+	Params []Param `json:"params"`
+	// Smart is required for a smart script (missing fields take the defaults) and nil otherwise.
+	Smart *Smart `json:"smart"`
 }
 
 // Validate is the complete rule set: the Go check is the authority, the mirrored zod schema is
@@ -92,9 +102,37 @@ func (f *CustomScriptFields) Validate() error {
 	if f.Name == "" {
 		return invalid("scripts: name is required")
 	}
-	if f.Command == "" {
-		return invalid("scripts: command is required")
+	if f.Kind == "" {
+		f.Kind = KindScript
 	}
+	switch f.Kind {
+	case KindScript:
+		if f.Smart != nil {
+			return invalid("scripts: only a smart script has smart settings")
+		}
+		if f.Command == "" {
+			return invalid("scripts: command is required")
+		}
+	case KindSmart:
+		if f.Command == "" {
+			return invalid("scripts: prompt is required")
+		}
+		if utf8.RuneCountInString(f.Command) > MaxPrompt {
+			return invalid("scripts: prompt is longer than %d characters", MaxPrompt)
+		}
+		smart, err := validSmart(f.Smart)
+		if err != nil {
+			return err
+		}
+		f.Smart = smart
+	default:
+		return invalid("scripts: kind must be script or smart")
+	}
+	params, err := validParams(f.Params, f.Kind, f.Command)
+	if err != nil {
+		return err
+	}
+	f.Params = params
 	if f.DirMode == "" {
 		f.DirMode = DirModeKira
 	}

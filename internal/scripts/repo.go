@@ -2,6 +2,7 @@ package scripts
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -14,7 +15,7 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-const selectColumns = `id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at`
+const selectColumns = `id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json`
 
 // Repo reads and writes the `custom_scripts` table, List ordered deterministically.
 type Repo struct {
@@ -24,15 +25,43 @@ type Repo struct {
 func scanRow(row rowScanner) (CustomScript, error) {
 	var s CustomScript
 	var collectionID sql.NullString
+	var paramsJSON, smartJSON string
 	if err := row.Scan(
 		&s.ID, &s.Name, &s.Command, &s.WorkingDir, &s.DirMode, &s.Color, &collectionID, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt,
+		&s.Kind, &paramsJSON, &smartJSON,
 	); err != nil {
 		return CustomScript{}, err
+	}
+	s.Params = []Param{}
+	if err := json.Unmarshal([]byte(paramsJSON), &s.Params); err != nil {
+		return CustomScript{}, fmt.Errorf("scripts: decode params of %s: %w", s.ID, err)
+	}
+	if smartJSON != "" {
+		s.Smart = &Smart{}
+		if err := json.Unmarshal([]byte(smartJSON), s.Smart); err != nil {
+			return CustomScript{}, fmt.Errorf("scripts: decode smart settings of %s: %w", s.ID, err)
+		}
 	}
 	if collectionID.Valid {
 		s.CollectionID = &collectionID.String
 	}
 	return s, nil
+}
+
+// encodeExtras is the params_json and smart_json column values of validated fields.
+func encodeExtras(f CustomScriptFields) (params, smart string, err error) {
+	pb, err := json.Marshal(f.Params)
+	if err != nil {
+		return "", "", fmt.Errorf("scripts: encode params: %w", err)
+	}
+	if f.Smart == nil {
+		return string(pb), "", nil
+	}
+	sb, err := json.Marshal(f.Smart)
+	if err != nil {
+		return "", "", fmt.Errorf("scripts: encode smart settings: %w", err)
+	}
+	return string(pb), string(sb), nil
 }
 
 // List orders by sort_order, name for a stable, deterministic tiebreak.
@@ -76,6 +105,10 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 	if err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: next sort order: %w", err)
 	}
+	paramsJSON, smartJSON, err := encodeExtras(fields)
+	if err != nil {
+		return CustomScript{}, err
+	}
 	now := kiratime.NowISO()
 	rec := CustomScript{
 		ID:           uuid.NewString(),
@@ -88,11 +121,15 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 		SortOrder:    sortOrder,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+		Kind:         fields.Kind,
+		Params:       fields.Params,
+		Smart:        fields.Smart,
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO custom_scripts (id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO custom_scripts (id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.DirMode, rec.Color, rec.CollectionID, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
+		rec.Kind, paramsJSON, smartJSON,
 	); err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: insert: %w", err)
 	}
@@ -118,10 +155,16 @@ func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error
 			return CustomScript{}, errHomeRetired
 		}
 	}
+	paramsJSON, smartJSON, err := encodeExtras(fields)
+	if err != nil {
+		return CustomScript{}, err
+	}
 	now := kiratime.NowISO()
 	res, err := r.DB.Exec(
-		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, dir_mode = ?, color = ?, collection_id = ?, updated_at = ? WHERE id = ?`,
-		fields.Name, fields.Command, fields.WorkingDir, fields.DirMode, fields.Color, fields.CollectionID, now, id,
+		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, dir_mode = ?, color = ?, collection_id = ?, updated_at = ?,
+		 kind = ?, params_json = ?, smart_json = ? WHERE id = ?`,
+		fields.Name, fields.Command, fields.WorkingDir, fields.DirMode, fields.Color, fields.CollectionID, now,
+		fields.Kind, paramsJSON, smartJSON, id,
 	)
 	if err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: update %s: %w", id, err)

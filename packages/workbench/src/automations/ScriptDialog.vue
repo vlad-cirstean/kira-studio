@@ -96,6 +96,9 @@ async function save(): Promise<void> {
   const fields = {
     name: name.value.trim(),
     command: command.value.trim(),
+    kind: 'script' as const,
+    params: [],
+    smart: null,
     dirMode: dirMode.value,
     workingDir: dirMode.value === 'fixed' ? workingDir.value.trim() : '',
     color: color.value,

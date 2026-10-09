@@ -12,6 +12,7 @@ export const runSourceSchema = /*#__PURE__*/ z.enum([
   'user',
   'restart',
   'verify',
+  'budget',
 ]);
 export type RunSource = z.infer<typeof runSourceSchema>;
 
@@ -23,5 +24,7 @@ export const runOutcomeSchema = /*#__PURE__*/ z.object({
   exitCode: z.number().optional(),
   lastError: z.string().optional(),
   summary: z.string().optional(),
+  costUsd: z.number().optional(),
+  permissionDenials: z.array(z.string()).optional(),
 });
 export type RunOutcome = z.infer<typeof runOutcomeSchema>;

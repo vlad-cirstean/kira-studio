@@ -25,6 +25,7 @@ const (
 	SourceUser    Source = "user"
 	SourceRestart Source = "restart"
 	SourceVerify  Source = "verify"
+	SourceBudget  Source = "budget"
 )
 
 const lastErrorCap = 1024
@@ -37,6 +38,10 @@ type Outcome struct {
 	ExitCode  *int   `json:"exitCode,omitempty"`
 	LastError string `json:"lastError,omitempty"`
 	Summary   string `json:"summary,omitempty"`
+	// CostUSD is what a Claude run reported spending; nil when it reported none.
+	CostUSD *float64 `json:"costUsd,omitempty"`
+	// PermissionDenials names the tools Claude was denied during the run.
+	PermissionDenials []string `json:"permissionDenials,omitempty"`
 }
 
 // Ended reports whether the outcome is set.
