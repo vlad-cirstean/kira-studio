@@ -75,6 +75,22 @@ type AdeSettings struct {
 // the title bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.
 type ClaudeCodeSettings struct {
 	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
+	// Notify* are P238's desktop-notification leaves, all on by default: NotifyEnabled is the master
+	// switch, the next three pick which events notify, NotifyIncludeMessage puts the reply text in
+	// the body.
+	NotifyEnabled        bool `json:"notifyEnabled"`
+	NotifyOnFinished     bool `json:"notifyOnFinished"`
+	NotifyOnNeedsInput   bool `json:"notifyOnNeedsInput"`
+	NotifyOnRunEnded     bool `json:"notifyOnRunEnded"`
+	NotifyIncludeMessage bool `json:"notifyIncludeMessage"`
+}
+
+// DefaultClaudeCodeSettings mirrors settingsDomain.ts's claudeCodeSettingsSchema defaults.
+func DefaultClaudeCodeSettings() ClaudeCodeSettings {
+	return ClaudeCodeSettings{
+		NotifyEnabled: true, NotifyOnFinished: true, NotifyOnNeedsInput: true, NotifyOnRunEnded: true,
+		NotifyIncludeMessage: true,
+	}
 }
 
 // MobileSettings is P212's mobile agents web server: off until enabled, with its one plain-HTTP
@@ -141,7 +157,7 @@ func DefaultSettings() Settings {
 		Advanced:   AdvancedSettings{GitLogLevel: "info"},
 		Git:        DefaultGitSettings(),
 		Ade:        DefaultAdeSettings(),
-		ClaudeCode: ClaudeCodeSettings{KeepAwakeWithAgents: false},
+		ClaudeCode: DefaultClaudeCodeSettings(),
 		Mobile:     DefaultMobileSettings(),
 	}
 }
@@ -189,7 +205,12 @@ type AdePatch struct {
 
 // ClaudeCodePatch mirrors ClaudeCodeSettings' own `.partial()` shape.
 type ClaudeCodePatch struct {
-	KeepAwakeWithAgents *bool `json:"keepAwakeWithAgents,omitempty"`
+	KeepAwakeWithAgents  *bool `json:"keepAwakeWithAgents,omitempty"`
+	NotifyEnabled        *bool `json:"notifyEnabled,omitempty"`
+	NotifyOnFinished     *bool `json:"notifyOnFinished,omitempty"`
+	NotifyOnNeedsInput   *bool `json:"notifyOnNeedsInput,omitempty"`
+	NotifyOnRunEnded     *bool `json:"notifyOnRunEnded,omitempty"`
+	NotifyIncludeMessage *bool `json:"notifyIncludeMessage,omitempty"`
 }
 
 // MobilePatch mirrors MobileSettings' own `.partial()` shape.

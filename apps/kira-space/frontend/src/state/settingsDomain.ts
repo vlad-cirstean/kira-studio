@@ -128,6 +128,12 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
 // other raw section schemas.
 const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
   keepAwakeWithAgents: z.boolean().default(false),
+  // P238: desktop notifications. All on by default; notifyEnabled is the master switch.
+  notifyEnabled: z.boolean().default(true),
+  notifyOnFinished: z.boolean().default(true),
+  notifyOnNeedsInput: z.boolean().default(true),
+  notifyOnRunEnded: z.boolean().default(true),
+  notifyIncludeMessage: z.boolean().default(true),
 });
 
 // P212: the mobile agents web server. Off until enabled; the port is unprivileged. Changed
@@ -161,7 +167,14 @@ const settingsSchema = /*#__PURE__*/ z.object({
     spanDayShare: 0.5,
     headlessSettingSources: 'all',
   }),
-  claudeCode: claudeCodeSettingsSchema.default({ keepAwakeWithAgents: false }),
+  claudeCode: claudeCodeSettingsSchema.default({
+    keepAwakeWithAgents: false,
+    notifyEnabled: true,
+    notifyOnFinished: true,
+    notifyOnNeedsInput: true,
+    notifyOnRunEnded: true,
+    notifyIncludeMessage: true,
+  }),
   mobile: mobileSettingsSchema.default({
     enabled: false,
     port: 7790,
@@ -212,6 +225,11 @@ export const defaultSettings: Settings = {
   },
   claudeCode: {
     keepAwakeWithAgents: false,
+    notifyEnabled: true,
+    notifyOnFinished: true,
+    notifyOnNeedsInput: true,
+    notifyOnRunEnded: true,
+    notifyIncludeMessage: true,
   },
   mobile: {
     enabled: false,

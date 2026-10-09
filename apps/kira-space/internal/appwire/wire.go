@@ -5,10 +5,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentnotify"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
@@ -76,7 +78,7 @@ type gitWired struct {
 // Rows a previous process life left running are stopped by the task board's Recover.
 func wireTracker(
 	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
-	grace time.Duration,
+	grace time.Duration, notifier *agentnotify.Notifier,
 ) (*ade.Tracker, *agenthooks.Manager) {
 	tracker := ade.NewTracker(ade.TrackerDeps{
 		Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
@@ -89,6 +91,7 @@ func wireTracker(
 	hooks := agenthooks.NewManager(agenthooks.Options{OnEvent: func(ev agenthooks.Event) {
 		tracker.HandleEvent(ev)
 		bridge.EmitAgentEvent(emitter, ev)
+		notifier.HandleEvent(ev)
 	}})
 	if err := hooks.Start(); err != nil {
 		slog.Warn("agent hooks: start", "scope", "ade", "err", err)
@@ -133,6 +136,7 @@ func closeTaskReviewWindows(repositories *repos.Repos, closeWindow func(key stri
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
+	notifier *agentnotify.Notifier,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -160,8 +164,11 @@ func wireAdeTask(
 		CloseTerminal:   closeTerminal,
 		Windows:         repositories.Windows, ReviewWindows: repositories.AdeReview, GhSynced: repositories.AdeGhSynced,
 		CloseReviewWindows: closeReviewWindows,
-		OnRuns:             func(ev adewire.RunsChangedEvent) { bridge.AdeTaskRunsChanged(events, ev) },
-		OnLog:              func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
+		OnRuns: func(ev adewire.RunsChangedEvent) {
+			bridge.AdeTaskRunsChanged(events, ev)
+			notifier.HandleRuns(ev.Runs)
+		},
+		OnLog: func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
 		OnSessions: func() {
 			bridge.AdeTaskSessionsChanged(events)
 			bridge.KeepAwakeRecompute(keepAwake)
@@ -311,4 +318,93 @@ func wireTermBroker(tracker *ade.Tracker, registry *terminal.Registry, emitter a
 		},
 		OnChange: func(h []mobileterm.Hold) { emitter.Emit(bridge.ChannelMobileTerminals, h) },
 	})
+}
+
+// notifyPrefs reads the claudeCode.notify* leaves; a read failure turns notifications off.
+func notifyPrefs(repositories *repos.Repos) func() agentnotify.Prefs {
+	return func() agentnotify.Prefs {
+		s, err := repositories.Settings.GetAll()
+		if err != nil {
+			slog.Warn("notify: read settings", "scope", "notify", "err", err)
+			return agentnotify.Prefs{}
+		}
+		c := s.ClaudeCode
+		return agentnotify.Prefs{
+			Enabled: c.NotifyEnabled, OnFinished: c.NotifyOnFinished, OnNeedsInput: c.NotifyOnNeedsInput,
+			OnRunEnded: c.NotifyOnRunEnded, IncludeMessage: c.NotifyIncludeMessage,
+		}
+	}
+}
+
+// describeAgent names what a hook event belongs to: the ADE task, else the code repository whose
+// root holds cwd, else cwd's basename. Terminal tabs are not persisted, so no tab row exists.
+func (w *Wired) describeAgent(terminalID, cwd string) agentnotify.Target {
+	t := agentnotify.Target{}
+	t.WindowKey, _ = w.TermRegistry.WindowOf(terminalID)
+	if recordID, ok := w.Tracker.RecordOf(terminalID); ok {
+		t.RecordID = recordID
+		if rec, err := w.Tracker.Get(recordID); err == nil && rec != nil {
+			t.TaskID = rec.TaskID
+			if title := w.taskTitle(rec.TaskID); title != "" {
+				t.Name = title
+			}
+		}
+	}
+	if t.Name == "" {
+		t.Name = w.repoNameFor(cwd)
+	}
+	return t
+}
+
+func (w *Wired) taskTitle(taskID string) string {
+	task, err := w.Repos.AdeTasks.GetTask(taskID)
+	if err != nil {
+		return ""
+	}
+	return task.Title
+}
+
+// repoNameFor is the name of the code repository with the longest root holding cwd.
+func (w *Wired) repoNameFor(cwd string) string {
+	if cwd == "" {
+		return "Claude session"
+	}
+	repoList, err := w.Repos.CodeRepos.List()
+	best, name := -1, ""
+	if err == nil {
+		for _, r := range repoList {
+			if r.Root != "" && (cwd == r.Root || strings.HasPrefix(cwd, strings.TrimRight(r.Root, "/")+"/")) && len(r.Root) > best {
+				best, name = len(r.Root), r.Name
+			}
+		}
+	}
+	if name == "" {
+		return filepath.Base(cwd)
+	}
+	return name
+}
+
+// revealNote answers a notification click: focus the owning window and tell it what to show.
+func (w *Wired) revealNote(n agentnotify.Note) {
+	focus := w.AdeTask.FocusWindow
+	if focus == nil {
+		focus = w.Windows.Focus
+	}
+	if n.RecordID != "" {
+		if ok, err := w.AdeTask.FocusSession(context.Background(), adewire.FocusSessionArgs{SessionID: n.RecordID}); err == nil && ok {
+			return
+		}
+	}
+	if n.TerminalID != "" {
+		if key, ok := w.TermRegistry.WindowOf(n.TerminalID); ok && focus(key) {
+			w.Emitter.EmitTo(key, bridge.ChannelAgentRevealTerminal, map[string]string{"terminalId": n.TerminalID})
+			return
+		}
+	}
+	if key, ok := w.Windows.AnyRealKey(); ok {
+		focus(key)
+		if n.TaskID != "" {
+			w.Emitter.EmitTo(key, bridge.ChannelAgentRevealTask, map[string]string{"taskId": n.TaskID})
+		}
+	}
 }

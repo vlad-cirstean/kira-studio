@@ -45,7 +45,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Git = readGit(stored)
 	result.Ade = readAde(stored)
 	result.Mobile = readMobile(stored)
-	appsettings.Leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
+	readClaudeCode(stored, &result.ClaudeCode)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	return result, nil
 }
@@ -206,13 +206,47 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertMobile(tx, patch.Mobile); err != nil {
 			return err
 		}
-		if patch.ClaudeCode == nil {
-			return nil
-		}
-		return appsettings.UpsertOptional(tx, "claudeCode.keepAwakeWithAgents", patch.ClaudeCode.KeepAwakeWithAgents)
+		return upsertClaudeCode(tx, patch.ClaudeCode)
 	})
 	if err != nil {
 		return model.Settings{}, err
 	}
 	return r.GetAll()
+}
+
+// claudeCodeLeaf pairs one claudeCode.<key> bool leaf with its read target and patch field.
+type claudeCodeLeaf struct {
+	key string
+	dst *bool
+	set *bool
+}
+
+func claudeCodeLeaves(c *model.ClaudeCodeSettings, p model.ClaudeCodePatch) []claudeCodeLeaf {
+	return []claudeCodeLeaf{
+		{"keepAwakeWithAgents", &c.KeepAwakeWithAgents, p.KeepAwakeWithAgents},
+		{"notifyEnabled", &c.NotifyEnabled, p.NotifyEnabled},
+		{"notifyOnFinished", &c.NotifyOnFinished, p.NotifyOnFinished},
+		{"notifyOnNeedsInput", &c.NotifyOnNeedsInput, p.NotifyOnNeedsInput},
+		{"notifyOnRunEnded", &c.NotifyOnRunEnded, p.NotifyOnRunEnded},
+		{"notifyIncludeMessage", &c.NotifyIncludeMessage, p.NotifyIncludeMessage},
+	}
+}
+
+func readClaudeCode(stored map[string]json.RawMessage, c *model.ClaudeCodeSettings) {
+	for _, l := range claudeCodeLeaves(c, model.ClaudeCodePatch{}) {
+		appsettings.Leaf(stored, "claudeCode."+l.key, l.dst)
+	}
+}
+
+func upsertClaudeCode(tx *sql.Tx, p *model.ClaudeCodePatch) error {
+	if p == nil {
+		return nil
+	}
+	var unused model.ClaudeCodeSettings
+	for _, l := range claudeCodeLeaves(&unused, *p) {
+		if err := appsettings.UpsertOptional(tx, "claudeCode."+l.key, l.set); err != nil {
+			return err
+		}
+	}
+	return nil
 }

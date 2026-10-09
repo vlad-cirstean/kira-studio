@@ -1,4 +1,4 @@
-// Package appwire is Kira Space's composition root: it builds the 20 bound services, the git router
+// Package appwire is Kira Space's composition root: it builds the 21 bound services, the git router
 // and socket, the ADE tracker and board, and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It sits
 // above internal/bridge in the layering, like internal/appshell.
@@ -9,10 +9,12 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentnotify"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
@@ -92,6 +94,7 @@ type Wired struct {
 	Git           gitWired
 	Tracker       *ade.Tracker
 	AgentHooks    *agenthooks.Manager
+	AgentNotify   *agentnotify.Notifier
 	TermBroker    *mobileterm.Broker
 	TermRegistry  *terminal.Registry
 	AdeBoard      *ade.TaskBoard
@@ -99,26 +102,27 @@ type Wired struct {
 	Metrics       *metrics.Ticker
 	UpdateInstall *appupdate.Installer
 
-	GitClients    *bridge.GitClientsService
-	GitCredential *bridge.GitCredentialService
-	GitHub        *bridge.GitHubService
-	Link          *bridge.LinkService
-	Files         *bridge.FilesService
-	Settings      *bridge.SettingsService
-	Layout        *bridge.LayoutService
-	Tabs          *bridge.TabsService
-	CustomScripts *bridge.CustomScriptsService
-	Terminal      *bridge.TerminalService
-	AdeTask       *bridge.AdeTaskService
-	Ops           *bridge.OpsService
-	Lifecycle     *bridge.LifecycleService
-	KeepAwake     *bridge.KeepAwakeService
-	Mobile        *bridge.MobileAccessService
-	Memory        *bridge.MemoryService
-	MemoryImport  *bridge.MemoryImportService
-	WindowsSvc    *bridge.WindowsService
-	Update        *bridge.UpdateService
-	CodeWorkspace *bridge.CodeWorkspaceService
+	GitClients     *bridge.GitClientsService
+	GitCredential  *bridge.GitCredentialService
+	GitHub         *bridge.GitHubService
+	Link           *bridge.LinkService
+	Files          *bridge.FilesService
+	Settings       *bridge.SettingsService
+	Layout         *bridge.LayoutService
+	Tabs           *bridge.TabsService
+	CustomScripts  *bridge.CustomScriptsService
+	Terminal       *bridge.TerminalService
+	AdeTask        *bridge.AdeTaskService
+	Ops            *bridge.OpsService
+	Lifecycle      *bridge.LifecycleService
+	KeepAwake      *bridge.KeepAwakeService
+	Mobile         *bridge.MobileAccessService
+	Memory         *bridge.MemoryService
+	MemoryImport   *bridge.MemoryImportService
+	WindowsSvc     *bridge.WindowsService
+	Update         *bridge.UpdateService
+	CodeWorkspace  *bridge.CodeWorkspaceService
+	AgentNotifySvc *bridge.AgentNotifyService
 
 	detachMetrics   func()
 	detachOpLog     func()
@@ -170,7 +174,12 @@ func Build(opts Options) *Wired {
 	// Registry, since Tracker.Reconcile/Send both need the same live-session set and PTYs.
 	terminalRegistry := terminal.NewRegistry()
 	w.TermRegistry = terminalRegistry
-	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace)
+	w.AgentNotify = agentnotify.New(agentnotify.Deps{
+		Prefs: notifyPrefs(repositories), Describe: w.describeAgent, TaskTitle: w.taskTitle, Reveal: w.revealNote,
+		Alive: func(key string) bool { return slices.Contains(w.Windows.Keys(), key) },
+	})
+	w.AgentNotifySvc = &bridge.AgentNotifyService{N: w.AgentNotify}
+	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify)
 	w.Tracker, w.AgentHooks = adeTracker, agentHooks
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
@@ -204,7 +213,7 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify)
 	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -278,7 +287,7 @@ func (w *Wired) BindShell(h ShellHooks) {
 // StartMobile starts the phone server when settings enable it; call after the shell is up.
 func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 
-// Bound returns the 20 bound services in registration order.
+// Bound returns the 21 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitClients), application.NewService(w.GitCredential),
@@ -288,6 +297,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
 		application.NewService(w.MemoryImport), application.NewService(w.WindowsSvc), application.NewService(w.Update),
+		application.NewService(w.AgentNotifySvc),
 	}
 }
 

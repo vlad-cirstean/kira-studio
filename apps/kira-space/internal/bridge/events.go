@@ -70,6 +70,14 @@ const (
 	ChannelAgentEvent    = appevent.ChannelAgentEvent
 )
 
+// ChannelAgentRevealTerminal and ChannelAgentRevealTask are P238's notification-click pushes
+// (EmitTo, one window): show that terminal tab, or that ADE task. Space only, not on the phone
+// allowlist.
+const (
+	ChannelAgentRevealTerminal = "kira:agent:reveal-terminal"
+	ChannelAgentRevealTask     = "kira:agent:reveal-task"
+)
+
 // The five below are P116's own window-chrome-parity channels (G1-G5/G7) — Kira Studio's own
 // channels of the same name, hoisted to repo-root internal/appevent.
 const (
