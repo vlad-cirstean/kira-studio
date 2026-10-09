@@ -101,6 +101,8 @@ async function describeSchema(
     target = resolved.target;
     metadata = resolved.metadata;
   }
+  // A listener added after an abort never fires, so bail out before dialling.
+  signal?.throwIfAborted();
   const opId = crypto.randomUUID();
   signal?.addEventListener('abort', () => void control.opsCancel(opId), { once: true });
   return control.grpcDescribe({

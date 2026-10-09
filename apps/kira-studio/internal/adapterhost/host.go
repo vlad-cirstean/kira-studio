@@ -285,6 +285,32 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 	return opID, value, err
 }
 
+// Cancellable registers opID so CancelOp cancels the returned context, without emitting op events
+// (no Operations panel row, no op log). release must be called when the work ends. A duplicate id
+// is refused; an earlier Stop for opID returns an already-cancelled context.
+func (h *Host) Cancellable(ctx context.Context, opID string) (context.Context, func(), error) {
+	h.mu.Lock()
+	if _, exists := h.running[opID]; exists {
+		h.mu.Unlock()
+		return nil, nil, adapters.New(adapters.CodeQuery, "duplicate operation id: "+opID, nil)
+	}
+	derived, cancel := context.WithCancel(ctx)
+	if expiry, ok := h.earlyCancels[opID]; ok {
+		delete(h.earlyCancels, opID)
+		if time.Now().Before(expiry) {
+			cancel()
+		}
+	}
+	h.running[opID] = runningOp{cancel: cancel}
+	h.mu.Unlock()
+	return derived, func() {
+		h.mu.Lock()
+		delete(h.running, opID)
+		h.mu.Unlock()
+		cancel()
+	}, nil
+}
+
 // safeRun is P58 D16's recover() boundary: a panic inside fn becomes a failed op instead of
 // crashing the app. E_INTERNAL deliberately is not one of adapters' eight closed error codes
 // (OQ-1) — the renderer's classify() already handles an unrecognized code correctly, and adding it
