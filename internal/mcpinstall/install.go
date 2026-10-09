@@ -86,6 +86,10 @@ const (
 	// OutcomeInstallFailed: `claude` was found but exited non-zero (e.g. a name collision) or could
 	// not be spawned.
 	OutcomeInstallFailed = "installFailed"
+	// OutcomeRemoved: `claude` found, and the server is no longer registered under that name.
+	OutcomeRemoved = "removed"
+	// OutcomeRemoveFailed: `claude mcp remove` failed for a reason other than "not registered".
+	OutcomeRemoveFailed = "removeFailed"
 )
 
 // locateClaude checks PATH first, then every absolute candidate in order, every path considered
@@ -231,4 +235,18 @@ func (i *Installer) register(ctx context.Context, name string, server any) Resul
 		return Result{Outcome: OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
 	}
 	return Result{Outcome: OutcomeInstalled, Probed: probed}
+}
+
+// Remove unregisters name from the user scope. A name that is not registered counts as removed.
+func (i *Installer) Remove(ctx context.Context, name string) Result {
+	claudePath, probed, found := i.locateClaude()
+	if !found {
+		return Result{Outcome: OutcomeNotFound, Probed: probed}
+	}
+	spawnCtx, cancel := context.WithTimeout(ctx, spawnTimeout)
+	defer cancel()
+	if err := i.run(spawnCtx, claudePath, []string{"mcp", "remove", "--scope", "user", name}); err != nil && !isNotRegisteredError(err) {
+		return Result{Outcome: OutcomeRemoveFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
+	}
+	return Result{Outcome: OutcomeRemoved, Probed: probed}
 }
