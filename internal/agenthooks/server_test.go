@@ -6,8 +6,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -287,4 +290,59 @@ func jsonString(s string) string {
 
 func isValidUTF8(s string) bool {
 	return utf8.ValidString(s)
+}
+
+// TestShimInertWithoutSessionEnv guards that a loaded hooks.json outside a Kira session reaches
+// nothing: without the session env the shim exits before any request; with it, one arrives.
+func TestShimInertWithoutSessionEnv(t *testing.T) {
+	curl, err := exec.LookPath("curl")
+	if err != nil {
+		t.Skip("no curl")
+	}
+	dir, err := os.MkdirTemp("", "ks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	sock := filepath.Join(dir, "s")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hits atomic.Int32
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	})}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	body, err := buildShim(curl, sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shim := filepath.Join(dir, "hook")
+	if err := os.WriteFile(shim, []byte(body), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	run := func(env ...string) {
+		t.Helper()
+		cmd := exec.Command(shim)
+		cmd.Env = append([]string{"PATH=" + os.Getenv("PATH")}, env...)
+		cmd.Stdin = strings.NewReader(`{"hook_event_name":"Stop"}`)
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("shim exited non-zero: %v", err)
+		}
+	}
+
+	run()
+	run("KIRA_AGENT_HOOK_TOKEN=tok")
+	run("KIRA_TERMINAL_ID=t1")
+	if n := hits.Load(); n != 0 {
+		t.Fatalf("shim without session env reached the server %d time(s), want 0", n)
+	}
+	run("KIRA_AGENT_HOOK_TOKEN=tok", "KIRA_TERMINAL_ID=t1")
+	if n := hits.Load(); n != 1 {
+		t.Fatalf("shim with session env reached the server %d time(s), want 1", n)
+	}
 }

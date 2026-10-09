@@ -262,14 +262,15 @@ with `"port 8766 in use: <error>"` when the status reports a bind error), `Statu
 `InstallClaudeCode`, `Regenerate`, `SetEnabled(false)`. Assert snapshot unchanged; post-fix also
 assert `mcp-db-endpoint.json` exists while running with the live URL and is gone after disable.
 
-### 4.3 Expected pre-fix failures (implementer replaces with the actual lines in Commit 1)
+### 4.3 Pre-fix failures (recorded at Commit 1)
 
-- `TestClaudeConfigUntouched/memory_connect`: `memory_connect changed Claude Code config: .claude.json sha256 ...`
-- `TestClaudeConfigUntouched/terminal_agent_session`: `agent launch argv has no --mcp-config: [--settings /tmp/.../hooks.json]`
-- `.../terminal_agent_session_with_db`, `.../ade_session_start`: same missing `--mcp-config`
-- `TestShimInertWithoutSessionEnv`: `shim without session env reached the server 1 time(s), want 0`
-- `TestDbMcpLeavesClaudeConfig`: `DB MCP flow changed Claude Code config: .claude.json sha256 ...`
-- `TestLegacyCleanup`: build failure `undefined: ... ClaudeLegacy` (method does not exist yet)
+- `TestClaudeConfigUntouched/memory_connect`: `memory_connect changed Claude Code config: home/.claude.json changed (-rw-r--r-- sha256 f2cbdfa37f8cbabd to -rw-r--r-- sha256 a113efc2c870620d)`
+- `.../terminal_agent_session`, `.../terminal_agent_session_with_db`: `agent launch argv has no --mcp-config: ["--settings" "/tmp/kira-agent-.../hooks.json"]`
+- `.../ade_session_start`: `agent launch argv has no --mcp-config: ["--session-id" "..." "--settings" "/tmp/kira-agent-.../hooks.json" "--" ...]`
+- `TestClaudeConfigUntouched` (restart check): `app restart changed Claude Code config: home/.claude.json changed (...)` (cascade of memory_connect)
+- `TestShimInertWithoutSessionEnv`: `shim without session env reached the server 3 time(s), want 0`
+- `TestDbMcpLeavesClaudeConfig`: `DB MCP flow enable changed Claude Code config: .claude.json`
+- `TestLegacyCleanup`: lands with Commit 5 (needs `ClaudeLegacy`).
 
 ## 5. Commits
 
