@@ -50,16 +50,16 @@ function onOpenFile(index: number, pinned: boolean): void {
 </script>
 
 <template>
-  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
-    <div class="kv:flex-none kv:p-3 kv:font-semibold kv:border-b kv:border-panel-border">
+  <div class="flex flex-col min-h-0 h-full">
+    <div class="flex-none p-3 font-semibold border-b border-border">
       Uncommitted Changes
     </div>
-    <p v-if="workingState.error.value" class="kv:m-0 kv:p-3 kv:text-error">
+    <p v-if="workingState.error.value" class="m-0 p-3 text-error">
       Couldn't load uncommitted changes — {{ workingState.error.value }}
     </p>
     <FileTree
       v-else
-      class="kv:flex-auto kv:min-h-0"
+      class="flex-auto min-h-0"
       :files="files"
       :selected-file="workingState.selectedFile.value"
       :list-mode="workingState.listMode.value"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * G-UX (item 3): "when checking out a branch that advanced, ask if I want to pull it too" —
  * `OpsState.runCheckout`'s own post-switch confirm step (`#maybePromptPostCheckoutPull`), mirroring
@@ -11,6 +12,7 @@
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -38,12 +40,17 @@ function pullNow(): void {
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && notNow()">
     <DialogContent
       :show-close-button="false"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Pull the latest changes?</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
         <DialogDescription>
           <strong>{{ pending.branch }}</strong> is {{ pending.behind }}
           {{ pending.behind === 1 ? 'commit' : 'commits' }} behind
@@ -51,12 +58,12 @@ function pullNow(): void {
         </DialogDescription>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
-        <Button variant="dialog-primary" size="kira-lg" data-testid="post-checkout-pull-now" @click="pullNow">
-          Pull now
-        </Button>
+      <DialogFooter class="justify-end">
         <Button variant="dialog" size="kira-lg" data-testid="post-checkout-pull-not-now" @click="notNow">
           Not now
+        </Button>
+        <Button variant="dialog-primary" size="kira-lg" data-testid="post-checkout-pull-now" @click="pullNow">
+          Pull now
         </Button>
       </DialogFooter>
     </DialogContent>

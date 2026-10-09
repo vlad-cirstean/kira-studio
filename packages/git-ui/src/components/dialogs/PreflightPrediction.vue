@@ -28,12 +28,12 @@ const noCommitModel = computed({
 </script>
 
 <template>
-  <div v-if="prediction.kind === 'clean'" class="kv:my-2 kv:text-diff-added">
+  <div v-if="prediction.kind === 'clean'" class="text-ok">
     No conflicts predicted.
   </div>
-  <div v-else-if="prediction.kind === 'conflicts'" class="kv:my-2">
+  <div v-else-if="prediction.kind === 'conflicts'">
     <p>This will likely conflict in:</p>
-    <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+    <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
       <li v-for="path in prediction.paths" :key="path"><code>{{ path }}</code></li>
     </ul>
     <Label class="flex flex-row items-center gap-1 mt-1">
@@ -41,7 +41,7 @@ const noCommitModel = computed({
       Stop before committing (<code>--no-commit</code>), so I can resolve first
     </Label>
   </div>
-  <div v-else-if="prediction.kind === 'unknown'" class="kv:my-2">
+  <div v-else-if="prediction.kind === 'unknown'">
     Couldn't predict the outcome: {{ prediction.reason }}
   </div>
 </template>

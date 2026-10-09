@@ -26,9 +26,11 @@
  * still only supplies its own body/footer content.
  */
 import type { CheckoutPreflight } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -79,12 +81,17 @@ function stashAndCarry(): void {
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Can't check out {{ preflight?.target.name }}</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
         <template v-if="headline?.kind === 'inProgressOperation'">
           <DialogDescription>An operation is already in progress. Resolve or abort it first.</DialogDescription>
         </template>
@@ -99,7 +106,7 @@ function stashAndCarry(): void {
 
         <template v-else-if="headline?.kind === 'blockedByUntracked'">
           <DialogDescription>These untracked files would be overwritten by the checkout:</DialogDescription>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+          <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="path in headline.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
           <p>Move or remove them yourself, then try again — there is no safe way to discard them here.</p>
@@ -107,24 +114,24 @@ function stashAndCarry(): void {
 
         <template v-else-if="trackedBlocker">
           <DialogDescription>These local changes would be overwritten by the checkout:</DialogDescription>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+          <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="path in trackedBlocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
-          <p v-if="canDiscard" class="kv:text-diff-deleted">
+          <p v-if="canDiscard" class="text-error">
             Discard permanently deletes these changes — this cannot be undone.
             <template v-if="canStashAndCarry">Stashing them instead keeps them, safely.</template>
           </p>
         </template>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button v-if="canStashAndCarry" variant="dialog-primary" size="kira-lg" @click="stashAndCarry">
           Stash changes and check out
         </Button>
         <Button v-if="canDiscard" variant="dialog-danger" size="kira-lg" @click="discard">
           Discard changes and check out
         </Button>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

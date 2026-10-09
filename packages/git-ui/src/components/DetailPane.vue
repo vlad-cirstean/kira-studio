@@ -16,12 +16,13 @@
  * above the tree, a second "details" instance for Refs/Signature/PR below it, each with its own
  * scroll cap) — it is a single instance now, folding all of that behind one "Show more" region, so
  * nothing renders stranded below the file tree any more. The collapsed-state proportion is
- * enforced the same way as before: `CommitMeta.vue`'s own root is `kv:flex-none` with a `max-height`
+ * enforced the same way as before: `CommitMeta.vue`'s own root is `flex-none` with a `max-height`
  * cap (a bounded `%` of the pane's own height, not of the viewport — P110 A14 moved the cap and its
  * `expanded` variant fully into `CommitMeta.vue` itself, since only it knows that state), and
- * `<FileTree>` here is `kv:flex-auto` and takes the remainder.
+ * `<FileTree>` here is `flex-auto` and takes the remainder.
  */
 import type { CommitStore } from '@kira/git-core';
+import { Empty, EmptyDescription } from '@theme/components/ui/empty';
 import { computed } from 'vue';
 import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -65,8 +66,8 @@ function onOpenFile(index: number, pinned: boolean): void {
 </script>
 
 <template>
-  <div class="kv-detail-pane kv:flex kv:flex-col kv:min-h-0 kv:h-full">
-    <p v-if="detailState.error.value" class="kv:m-0 kv:p-3 kv:text-error">
+  <div class="kv-detail-pane flex flex-col min-h-0 h-full">
+    <p v-if="detailState.error.value" class="m-0 p-3 text-error">
       Couldn't load this commit — {{ detailState.error.value }}
     </p>
 
@@ -78,7 +79,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         :pr-for-commit="pr?.prForCommit(detailState.sha.value ?? '')"
       />
       <FileTree
-        class="kv-detail-pane-tree kv:flex-auto kv:min-h-0 kv:border-y kv:border-panel-border"
+        class="kv-detail-pane-tree flex-auto min-h-0 border-y border-border"
         :files="detail.files"
         :selected-file="detailState.selectedFile.value"
         :list-mode="detailState.listMode.value"
@@ -96,6 +97,6 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <p v-else-if="!detailState.error.value" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Loading…</p>
+    <Empty v-else-if="!detailState.error.value" class="p-6"><EmptyDescription>Loading…</EmptyDescription></Empty>
   </div>
 </template>

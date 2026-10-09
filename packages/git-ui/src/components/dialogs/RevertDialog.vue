@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * `docs/plans/P6.md` W15: §7.10's confirm step. `OpsState.runRevert` awaits this dialog whenever
  * the preflight is not a clean, non-merge, single-sha revert (`verdict !== "clean"` or a mainline
@@ -11,6 +12,7 @@
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -64,19 +66,24 @@ function confirm(): void {
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Revert</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
         <DialogDescription>
           Reverting applies the inverse of {{ isMultiSha ? 'each selected commit' : 'this commit' }}
           as a new commit — the original stays in history, so this is safe on branches you've already
           pushed.
         </DialogDescription>
 
-        <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
+        <p v-if="preflight?.detachedHead" class="text-error">
           HEAD is detached: the revert commit will not belong to any branch until you create one.
         </p>
 
@@ -89,9 +96,9 @@ function confirm(): void {
             <div
               v-for="entry in preflight?.mainlineRequired"
               :key="entry.sha"
-              class="kv:my-1 kv:p-1 kv:border kv:border-panel-border kv:rounded-sm"
+              class="p-1 border border-border rounded-kira-sm"
             >
-              <p class="kv:m-0 kv:mb-0.5 kv:font-semibold"><code>{{ entry.sha.slice(0, 7) }}</code></p>
+              <p class="m-0 mb-0.5 font-semibold"><code>{{ entry.sha.slice(0, 7) }}</code></p>
               <Label
                 v-for="parent in entry.parents"
                 :key="parent.parentNumber"
@@ -112,18 +119,18 @@ function confirm(): void {
             v-model:no-commit="noCommit"
           />
 
-          <p v-if="isMultiSha" class="kv:text-diff-deleted">
+          <p v-if="isMultiSha" class="text-error">
             This prediction covers only the first of the {{ preflight?.shas.length }} selected
             commits — the rest may conflict differently.
           </p>
         </template>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canConfirm" @click="confirm">
           Revert
         </Button>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

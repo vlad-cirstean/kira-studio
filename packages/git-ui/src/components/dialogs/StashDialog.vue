@@ -23,9 +23,17 @@
  */
 import { validateRefName } from '@kira/git-core';
 import type { StashBranchPreflight, StashEntry } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
@@ -268,14 +276,19 @@ function onClose(): void {
     <DialogContent
       :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
         <template v-if="mode === 'create'">
-          <label :for="messageId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <label :for="messageId" class="flex flex-col gap-0.5">
             Message (optional)
             <Input
               :id="messageId"
@@ -286,22 +299,22 @@ function onClose(): void {
               placeholder="git's own WIP message"
             />
           </label>
-          <Label class="flex flex-row items-center gap-1 my-1">
+          <Label class="flex flex-row items-center gap-1">
             <Checkbox v-model="includeUntracked" />
             Include untracked files (<code>-u</code>)
           </Label>
-          <Label class="flex flex-row items-center gap-1 my-1">
+          <Label class="flex flex-row items-center gap-1">
             <Checkbox v-model="keepIndex" />
             Keep staged changes staged (<code>--keep-index</code>)
           </Label>
-          <p v-if="pathspec.length > 0" class="kv:text-diff-deleted">
+          <p v-if="pathspec.length > 0" class="text-error">
             Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
             stashed, not the whole working tree.
           </p>
         </template>
 
         <template v-else-if="mode === 'branch'">
-          <p class="kv:text-diff-deleted">
+          <p class="text-error">
             From <code>{{
               // A template literal here would put two closing braces back to back, which this Vue
               // parser reads as the mustache's own closing delimiter mid-expression.
@@ -310,15 +323,15 @@ function onClose(): void {
             }}</code>:
             {{ branchTarget?.message }}
           </p>
-          <label :for="branchNameId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <label :for="branchNameId" class="flex flex-col gap-0.5">
             Branch name
             <Input :id="branchNameId" v-model="branchName" type="text" size="kira" class="w-full" />
           </label>
-          <p v-if="branchNameLocalError" class="kv:text-diff-deleted kv:my-0.5">{{ branchNameLocalError }}</p>
-          <p v-else-if="branchPreflight?.name.error" class="kv:text-diff-deleted kv:my-0.5">
+          <p v-if="branchNameLocalError" class="text-error">{{ branchNameLocalError }}</p>
+          <p v-else-if="branchPreflight?.name.error" class="text-error">
             {{ branchPreflight.name.error }}
           </p>
-          <div v-if="branchPreflight?.verdict === 'blocked'" class="kv:my-2">
+          <div v-if="branchPreflight?.verdict === 'blocked'">
             <p>
               The branch will be created, but switching to it will not be clean — your working tree
               has changes that would be overwritten. You will stay on your current branch until you
@@ -328,18 +341,18 @@ function onClose(): void {
         </template>
 
         <template v-else-if="mode === 'save'">
-          <label :for="saveLabelId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <label :for="saveLabelId" class="flex flex-col gap-0.5">
             Label
             <Input :id="saveLabelId" v-model="saveLabel" type="text" size="kira" class="w-full" />
           </label>
-          <fieldset class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <fieldset class="flex flex-col gap-0.5">
             <legend>Source</legend>
             <RadioGroup v-model="saveSource">
               <Label class="flex flex-row items-center gap-1">
                 <RadioGroupItem value="workingTree" />
                 This working tree
               </Label>
-              <p v-if="saveSource === 'workingTree' && saveHasUntracked" class="kv:text-diff-deleted">
+              <p v-if="saveSource === 'workingTree' && saveHasUntracked" class="text-error">
                 Untracked files will not be included — <code>git stash create</code> cannot save them.
                 Promote an existing stash entry that already includes them instead if you need to keep
                 those too.
@@ -350,32 +363,32 @@ function onClose(): void {
               </Label>
             </RadioGroup>
           </fieldset>
-          <p class="kv:text-diff-deleted">The source is copied — it is never removed or dropped.</p>
+          <p class="text-error">The source is copied — it is never removed or dropped.</p>
         </template>
 
         <template v-else-if="mode === 'popConfirm' && pending">
           <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
             <div
               v-if="blocker.kind === 'untrackedCollision'"
-              class="kv:my-2"
+             
             >
               <p>These untracked files already exist in your working tree and would be overwritten:</p>
-              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
               </ul>
               <p>Remedy: move or remove them yourself, or discard them and try again.</p>
             </div>
             <div
               v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'"
-              class="kv:my-2"
+             
             >
               <p>Your uncommitted changes to these files would be overwritten:</p>
-              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
               </ul>
               <p>Remedy: commit or discard those changes first.</p>
             </div>
-            <div v-else class="kv:my-2">
+            <div v-else>
               <p>An operation is already in progress — finish or abort it first.</p>
             </div>
           </template>
@@ -383,16 +396,16 @@ function onClose(): void {
           <template v-if="pending.preflight.blockers.length === 0">
             <div
               v-if="pending.preflight.prediction.kind === 'clean'"
-              class="kv:my-2 kv:text-diff-added"
+              class="text-ok"
             >
               No conflicts predicted.
             </div>
             <div
               v-else-if="pending.preflight.prediction.kind === 'conflicts'"
-              class="kv:my-2"
+             
             >
               <p>This will likely conflict in:</p>
-              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in pending.preflight.prediction.paths" :key="path">
                   <code>{{ path }}</code>
                 </li>
@@ -404,19 +417,20 @@ function onClose(): void {
                 — nothing is lost.
               </p>
             </div>
-            <div v-else class="kv:my-2">
+            <div v-else>
               Couldn't predict the outcome: {{ pending.preflight.prediction.reason }}
             </div>
           </template>
         </template>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
         <template v-if="mode === 'create'">
-          <Button variant="dialog-primary" size="kira-lg" @click="submitCreate">Stash</Button>
           <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
+          <Button variant="dialog-primary" size="kira-lg" @click="submitCreate">Stash</Button>
         </template>
         <template v-else-if="mode === 'branch'">
+          <Button variant="dialog" size="kira-lg" @click="cancelBranch">Cancel</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -425,22 +439,21 @@ function onClose(): void {
           >
             Create branch
           </Button>
-          <Button variant="dialog" size="kira-lg" @click="cancelBranch">Cancel</Button>
         </template>
         <template v-else-if="mode === 'save'">
+          <Button variant="dialog" size="kira-lg" @click="cancelSave">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitSave" @click="submitSave">
             Save
           </Button>
-          <Button variant="dialog" size="kira-lg" @click="cancelSave">Cancel</Button>
         </template>
         <template v-else-if="mode === 'popConfirm' && pending">
+          <Button variant="dialog" size="kira-lg" @click="cancelPop">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="confirmPop">
             {{ pending.preflight.verdict === 'blocked' ? 'Force ' : '' }}{{
               pending.verb === 'pop' ? 'Pop' : 'Apply'
             }}
             anyway
           </Button>
-          <Button variant="dialog" size="kira-lg" @click="cancelPop">Cancel</Button>
         </template>
       </DialogFooter>
     </DialogContent>

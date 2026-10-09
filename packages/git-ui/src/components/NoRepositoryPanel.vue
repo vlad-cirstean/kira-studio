@@ -10,9 +10,11 @@ import type { HostKind, RepoCandidate } from '@kira/git-ipc';
  * VS Code's one-repo-per-window model).
  */
 import { TransportError } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { onMounted, ref } from 'vue';
-import { STATE_ICONS } from '../icons/index.ts';
+import { codiconName, STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
 
 const props = defineProps<{ repoState: RepoState; host: HostKind }>();
@@ -52,19 +54,14 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
 </script>
 
 <template>
-  <div
-    class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-fg"
-    data-testid="no-repository-panel"
-  >
-    <span
-      class="codicon kv:text-[32px] kv:text-muted-foreground"
-      :class="STATE_ICONS.repo"
-      aria-hidden="true"
-    ></span>
-    <h2 class="kv:m-0 kv:text-lg kv:font-semibold">Open a repository</h2>
+  <Empty class="h-full p-6" data-testid="no-repository-panel">
+    <EmptyMedia variant="icon">
+      <CodiconIcon :name="codiconName(STATE_ICONS.repo)" :size="24" />
+    </EmptyMedia>
+    <EmptyTitle class="font-semibold text-fg">Open a repository</EmptyTitle>
     <ul
       v-if="repoState.candidates.value.length > 0"
-      class="kv:flex kv:flex-col kv:gap-0.5 kv:m-0 kv:p-0 kv:list-none kv:max-w-105 kv:w-full"
+      class="flex flex-col gap-0.5 m-0 p-0 list-none max-w-105 w-full"
     >
       <li v-for="candidate in repoState.candidates.value" :key="candidate.path">
         <!-- P108 F4: disabled while any open (this candidate, another candidate, the bootstrap
@@ -83,23 +80,20 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
       </li>
     </ul>
     <template v-else>
-      <p
+      <EmptyDescription
         v-if="refreshError"
-        class="kv:max-w-105 kv:m-0 kv:text-muted-foreground kv:text-center"
+        class="max-w-105"
         data-testid="no-repository-refresh-error"
       >
         Couldn't check this workspace's folders for a Git repository — {{ refreshError }}.
-      </p>
-      <p
-        v-else-if="host === 'kira'"
-        class="kv:max-w-105 kv:m-0 kv:text-muted-foreground kv:text-center"
-      >
+      </EmptyDescription>
+      <EmptyDescription v-else-if="host === 'kira'" class="max-w-105">
         This workspace's folder is not a Git repository.
-      </p>
-      <p v-else class="kv:max-w-105 kv:m-0 kv:text-muted-foreground kv:text-center">
+      </EmptyDescription>
+      <EmptyDescription v-else class="max-w-105">
         Kira Space follows the folders open in this VS Code window. None of them is a Git
         repository — open one with File → Open Folder.
-      </p>
+      </EmptyDescription>
       <Button
         v-if="refreshError"
         variant="toolbar"
@@ -110,12 +104,8 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
         Retry
       </Button>
     </template>
-    <p
-      v-if="pickError"
-      class="kv:max-w-105 kv:m-0 kv:text-muted-foreground kv:text-center"
-      data-testid="no-repository-pick-error"
-    >
+    <EmptyDescription v-if="pickError" class="max-w-105" data-testid="no-repository-pick-error">
       Couldn't open that repository — {{ pickError }}.
-    </p>
-  </div>
+    </EmptyDescription>
+  </Empty>
 </template>

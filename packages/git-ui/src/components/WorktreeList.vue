@@ -20,7 +20,14 @@ import type { WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
@@ -181,12 +188,17 @@ async function confirmRemove(): Promise<void> {
       <DialogContent
         :show-close-button="false"
         :aria-describedby="undefined"
-        class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+        class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
       >
         <DialogHeader>
           <DialogTitle>{{ pendingRemove ? `Remove ${pendingRemove.entry.path}` : '' }}</DialogTitle>
+          <DialogClose as-child>
+            <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+              <CodiconIcon name="close" :size="13" />
+            </Button>
+          </DialogClose>
         </DialogHeader>
-        <div class="min-h-0 overflow-y-auto">
+        <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
           <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
             <p class="text-error">{{ blockerText(pendingRemove.preflight) }}</p>
           </template>
@@ -198,7 +210,8 @@ async function confirmRemove(): Promise<void> {
             <Input v-model="typedToken" size="kira" class="w-full" aria-label="Confirmation token" />
           </template>
         </div>
-        <DialogFooter class="justify-end gap-1">
+        <DialogFooter class="justify-end">
+          <Button variant="dialog" size="kira-lg" @click="cancelRemove">Cancel</Button>
           <Button
             v-if="pendingRemove?.preflight.verdict === 'dirty'"
             variant="dialog-primary"
@@ -208,7 +221,6 @@ async function confirmRemove(): Promise<void> {
           >
             Remove anyway
           </Button>
-          <Button variant="dialog" size="kira-lg" @click="cancelRemove">Cancel</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

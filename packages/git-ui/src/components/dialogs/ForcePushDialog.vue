@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * `docs/plans/P8.md` W17: the confirm step for `OpsState.runForcePush` — mirrors
  * `CheckoutDialog.vue`/`RevertDialog.vue`'s own "a hazard pre-flight sets a pending ref, this
@@ -24,6 +25,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -91,12 +93,17 @@ function confirmPlain(): void {
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Force push {{ pending.branch }} to {{ pending.remote }}?</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
         <DialogDescription>
           This will overwrite <code>{{ pending.remote }}/{{ resolvedBranch }}</code>, currently at
           <code>{{ shortSha(pending.preflight.remoteTip) }}</code>.
@@ -106,11 +113,11 @@ function confirmPlain(): void {
           </template>
         </DialogDescription>
 
-        <p v-if="protectedBy" class="kv:text-diff-deleted kv:my-0.5">
+        <p v-if="protectedBy" class="text-error">
           <code>{{ resolvedBranch }}</code> matches your protected pattern
           <code>{{ protectedBy }}</code>. Type the branch name to confirm.
         </p>
-        <label v-if="protectedBy" :for="branchNameId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+        <label v-if="protectedBy" :for="branchNameId" class="flex flex-col gap-0.5">
           Branch name
           <Input
             :id="branchNameId"
@@ -123,18 +130,18 @@ function confirmPlain(): void {
           />
         </label>
 
-        <details class="kv:mt-2 kv:pt-1 kv:border-t kv:border-panel-border">
-          <summary class="kv:cursor-pointer kv:text-muted-foreground">Use plain <code>--force</code> instead</summary>
-          <p class="kv:text-diff-deleted kv:my-0.5">
+        <details class="mt-2 pt-1 border-t border-border">
+          <summary class="cursor-pointer text-muted-foreground">Use plain <code>--force</code> instead</summary>
+          <p class="text-error">
             This skips the lease check entirely — it will overwrite the remote branch even if someone
             else has pushed to it since the lease's own tip was read, with no protection against
             discarding their work.
           </p>
-          <Label class="flex flex-row items-center gap-1 my-1">
+          <Label class="flex flex-row items-center gap-1">
             <Checkbox v-model="understandPlain" data-testid="force-push-plain-ack" />
             I understand — overwrite the remote branch without checking for other pushes
           </Label>
-          <div class="kv:flex kv:justify-end kv:mt-1">
+          <div class="flex justify-end mt-1">
             <Button
               variant="dialog-danger"
               size="kira-lg"
@@ -148,7 +155,8 @@ function confirmPlain(): void {
         </details>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"
@@ -158,7 +166,6 @@ function confirmPlain(): void {
         >
           Force push (with lease)
         </Button>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -74,9 +74,9 @@ const listEl = useTemplateRef<HTMLElement>('list');
 </script>
 
 <template>
-  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
-    <div class="kv:flex kv:items-center kv:gap-1 kv:h-bar kv:px-2 kv:border-b kv:border-panel-border kv:shrink-0 kv:font-ui">
-      <span class="kv:text-muted-foreground kv:text-sm" data-testid="review-comments-count">{{
+  <div class="flex flex-col min-h-0 h-full">
+    <div class="flex items-center gap-1 h-bar px-2 border-b border-border shrink-0 font-ui">
+      <span class="text-muted-foreground kv:text-sm" data-testid="review-comments-count">{{
         countLabel
       }}</span>
       <TooltipIconButton
@@ -95,7 +95,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
       />
-      <div v-else class="kv:flex kv:items-center kv:gap-1 kv:ml-auto kv:text-base">
+      <div v-else class="flex items-center gap-1 ml-auto kv:text-base">
         <Button variant="toolbar" size="kira" @click="reviewComments.clear()">
           Confirm clear ({{ reviewComments.comments.value.length }})
         </Button>
@@ -103,35 +103,35 @@ const listEl = useTemplateRef<HTMLElement>('list');
       </div>
     </div>
 
-    <p v-if="reviewComments.loadError.value" class="kv:m-0 kv:p-3 kv:text-error">
+    <p v-if="reviewComments.loadError.value" class="m-0 p-3 text-error">
       Couldn't load the comment list — {{ reviewComments.loadError.value }}
     </p>
 
     <template v-else>
       <template v-if="groups.length > 0">
-      <section ref="list" class="kv:flex-1 kv:min-h-0 kv:overflow-auto" aria-label="Comments">
+      <section ref="list" class="flex-1 min-h-0 overflow-auto" aria-label="Comments">
         <section
           v-for="group in groups"
           :key="group.path"
           :aria-label="group.path"
-          class="kv:border-t kv:border-panel-border kv:first:border-t-0"
+          class="border-t border-border first:border-t-0"
         >
           <div
-            class="kv:pt-1 kv:px-2 kv:pb-0.5 kv:font-data kv:font-semibold kv:text-row-fg"
+            class="pt-1 px-2 pb-0.5 font-data font-semibold text-fg"
             aria-hidden="true"
           >
             {{ group.path }}
           </div>
-          <ul class="kv:m-0 kv:p-0 kv:list-none">
+          <ul class="m-0 p-0 list-none">
             <li
               v-for="c in group.comments"
               :key="c.id"
-              class="kv:relative kv:flex kv:flex-col kv:gap-0.5 kv:pt-0.5 kv:px-2 kv:pb-1 kv:hover:bg-hover"
+              class="relative flex flex-col gap-0.5 pt-0.5 px-2 pb-1 hover:bg-hover"
             >
-              <div class="kv:flex kv:items-center kv:gap-1">
+              <div class="flex items-center gap-1">
                 <button
                   type="button"
-                  class="kv:font-data kv:text-muted-foreground kv:text-sm kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:after:absolute kv:after:inset-0"
+                  class="font-data text-muted-foreground kv:text-sm bg-transparent border-0 p-0 cursor-pointer after:absolute after:inset-0"
                   :aria-label="`Open ${group.path} ${lineLabel(c.range)}`"
                   @click="emit('select-comment', group.path)"
                 >
@@ -139,7 +139,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
                 </button>
                 <span
                   v-if="anchorTitle(c)"
-                  class="codicon codicon-warning kv:text-diff-modified"
+                  class="codicon codicon-warning text-warn"
                   role="img"
                   :data-kira-tip="anchorTitle(c)"
                   :aria-label="anchorTitle(c)"
@@ -152,7 +152,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
                   @click="reviewComments.remove(c.id)"
                 />
               </div>
-              <p class="kv:m-0 kv:pl-2.5 kv:whitespace-pre-wrap kv:text-row-fg kv:text-base">{{ c.body }}</p>
+              <p class="m-0 pl-2.5 whitespace-pre-wrap text-fg kv:text-base">{{ c.body }}</p>
             </li>
           </ul>
         </section>
@@ -160,13 +160,13 @@ const listEl = useTemplateRef<HTMLElement>('list');
       <AttributeTooltip :container="listEl" />
       </template>
 
-      <p v-else-if="!reviewComments.loading.value" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
+      <p v-else-if="!reviewComments.loading.value" class="m-0 p-3 text-muted-foreground">
         No comments yet — open a file from the Files tab and use the + in the diff's gutter.
       </p>
 
       <p
         v-if="reviewComments.loading.value && groups.length === 0"
-        class="kv:m-0 kv:p-3 kv:text-muted-foreground"
+        class="m-0 p-3 text-muted-foreground"
       >
         Loading…
       </p>

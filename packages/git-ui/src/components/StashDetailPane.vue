@@ -15,6 +15,7 @@
  * composition against it when `path` is not among the primary sha's changed files.
  */
 import type { CommitStore } from '@kira/git-core';
+import { Empty, EmptyDescription } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -57,15 +58,15 @@ function onOpenFile(index: number, pinned: boolean): void {
 </script>
 
 <template>
-  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
-    <p v-if="stash.error.value" class="kv:m-0 kv:p-3 kv:text-error">
+  <div class="flex flex-col min-h-0 h-full">
+    <p v-if="stash.error.value" class="m-0 p-3 text-error">
       Couldn't load this stash — {{ stash.error.value }}
     </p>
 
     <template v-if="entry">
-      <div class="kv:py-2 kv:px-3 kv:border-b kv:border-panel-border">
-        <p class="kv:m-0 kv:mb-0.5 kv:font-semibold kv:break-words">{{ entry.message }}</p>
-        <p class="kv:m-0 kv:text-sm kv:text-muted-foreground">
+      <div class="py-2 px-3 border-b border-border">
+        <p class="m-0 mb-0.5 font-semibold break-words">{{ entry.message }}</p>
+        <p class="m-0 kv:text-sm text-muted-foreground">
           <Tooltip>
             <TooltipTrigger as-child>
               <span>{{ formatRelativeDate(entry.timestamp) }}</span>
@@ -74,11 +75,11 @@ function onOpenFile(index: number, pinned: boolean): void {
           </Tooltip>
           <span> · based on <code>{{ entry.baseSha.slice(0, 7) }}</code></span>
           <span v-if="entry.baseSubject"> {{ entry.baseSubject }}</span>
-          <span v-if="entry.includedUntracked" class="kv:ml-1 kv:font-data kv:opacity-80">-u</span>
+          <span v-if="entry.includedUntracked" class="ml-1 font-data opacity-80">-u</span>
         </p>
       </div>
       <FileTree
-        class="kv:flex-auto kv:min-h-0 kv:border-y kv:border-panel-border"
+        class="flex-auto min-h-0 border-y border-border"
         :files="files"
         :selected-file="stash.selectedFile.value"
         :list-mode="stash.listMode.value"
@@ -94,6 +95,6 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <p v-else-if="!stash.error.value" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Loading…</p>
+    <Empty v-else-if="!stash.error.value" class="p-6"><EmptyDescription>Loading…</EmptyDescription></Empty>
   </div>
 </template>

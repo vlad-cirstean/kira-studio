@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Empty, EmptyDescription } from '@theme/components/ui/empty';
 /**
  * `docs/plans/P4.md` W11: the real shell. P0 sketched two empty regions and P3 hung a live-data
  * strip on them "replaced by P4's real list and toolbar" (that comment's own words) — this file
@@ -1916,7 +1917,7 @@ onBeforeUnmount(() => {
               @update:value="setDetailWidth"
               @change="setDetailWidth"
             />
-            <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Select a commit to see its details.</p>
+            <Empty v-if="!hasSelection" class="p-6"><EmptyDescription>Select a commit to see its details.</EmptyDescription></Empty>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"
@@ -1950,7 +1951,7 @@ onBeforeUnmount(() => {
             data-testid="detail-region"
             aria-label="Commit detail"
           >
-            <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Select a commit to see its details.</p>
+            <Empty v-if="!hasSelection" class="p-6"><EmptyDescription>Select a commit to see its details.</EmptyDescription></Empty>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"

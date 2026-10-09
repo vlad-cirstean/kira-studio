@@ -606,10 +606,10 @@ test.describe('graph grid columns', () => {
     });
   });
 
-  // P92 §12.2 item 10: every badge kind used to paint an opaque background — now an outline only,
-  // the label/icon staying the theme's own --kv-badge-fg token.
-  test.describe('ref/tag badges render as outlines (item 10)', () => {
-    test("a tag badge's background is transparent, its border carries the colour, and its icon matches the badge's own text colour", async ({
+  // P92 §12.2 item 10 / P229: a badge is an outline plus a 15% tint of its kind colour, the
+  // label/icon staying the theme's own --kv-badge-fg token.
+  test.describe('ref/tag badges render as tinted outlines (item 10)', () => {
+    test("a tag badge's background is a translucent tint, its border carries the colour, and its icon matches the badge's own text colour", async ({
       page,
     }) => {
       await page.addInitScript(buildFakeGraphHostInitScript({ streamMode: 'oneDecoratedOneNot' }));
@@ -637,7 +637,8 @@ test.describe('graph grid columns', () => {
         };
       });
 
-      expect(backgroundColor).toMatch(/^(rgba\(0,\s*0,\s*0,\s*0\)|transparent)$/);
+      expect(backgroundColor).not.toMatch(/^(rgba\(0,\s*0,\s*0,\s*0\)|transparent)$/);
+      expect(backgroundColor).toMatch(/\/ 0\.15\)$|,\s*0\.15\)$/);
       expect(borderColor).not.toMatch(/^(rgba\(0,\s*0,\s*0,\s*0\)|transparent)$/);
       expect(iconColor).toBe(badgeColor);
     });

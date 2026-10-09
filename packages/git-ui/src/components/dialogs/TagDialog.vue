@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * `docs/plans/P6.md` W15: "create tag here" (W14's row menu). Unlike `CheckoutDialog.vue`/
  * `RevertDialog.vue`, this one is not driven by an `OpsState` pending-ref (P6 has no
@@ -12,7 +13,14 @@
 import type { RefRow } from '@kira/git-ipc';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -72,52 +80,57 @@ async function submit(): Promise<void> {
     <DialogContent
       :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Create tag</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
-        <p class="kv:text-diff-deleted">Tagging <code>{{ target.slice(0, 7) }}</code></p>
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+        <p class="text-error">Tagging <code>{{ target.slice(0, 7) }}</code></p>
 
-        <label :for="nameId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+        <label :for="nameId" class="flex flex-col gap-0.5">
           Name
           <Input :id="nameId" v-model="name" type="text" size="kira" class="w-full" />
         </label>
-        <p v-if="state.nameError" class="kv:text-diff-deleted kv:my-0.5">{{ state.nameError }}</p>
+        <p v-if="state.nameError" class="text-error">{{ state.nameError }}</p>
 
         <template v-if="state.verdict === 'blockedByExisting'">
-          <p class="kv:text-diff-deleted kv:my-0.5">
+          <p class="text-error">
             A tag named "{{ name }}" already exists{{ state.existingIsAnnotated ? ' (annotated)' : '' }}.
           </p>
-          <Label class="flex flex-row items-center gap-1 my-1">
+          <Label class="flex flex-row items-center gap-1">
             <Checkbox v-model="force" />
             Replace it
           </Label>
         </template>
 
         <template v-if="state.verdict === 'movesWithForce' && state.requiresAnnotationToPreserve">
-          <p class="kv:text-diff-deleted kv:my-0.5">
+          <p class="text-error">
             The existing tag is annotated — moving it without a message here would silently downgrade
             it to lightweight. Supply a message below to keep it annotated.
           </p>
         </template>
 
-        <Label class="flex flex-row items-center gap-1 my-1">
+        <Label class="flex flex-row items-center gap-1">
           <Checkbox v-model="annotated" />
           Annotated
         </Label>
-        <label v-if="annotated" :for="messageId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+        <label v-if="annotated" :for="messageId" class="flex flex-col gap-0.5">
           Message
           <Textarea :id="messageId" v-model="message" rows="3" class="w-full" />
         </label>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
           Create tag
         </Button>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

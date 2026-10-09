@@ -309,8 +309,8 @@ const prIcon = computed(() => {
     v-if="detail"
     :class="
       expanded
-        ? 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-initial kv:min-h-[min(220px,60%)] kv:max-h-7/10 kv:overflow-auto'
-        : 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-none kv:max-h-1/5 kv:overflow-hidden'
+        ? 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 px-3 py-2 kv:flex-initial kv:min-h-[min(220px,60%)] kv:max-h-7/10 kv:overflow-auto'
+        : 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 px-3 py-2 kv:flex-none kv:max-h-1/5 kv:overflow-hidden'
     "
     data-testid="commit-meta"
   >
@@ -377,7 +377,7 @@ const prIcon = computed(() => {
     <Button
       variant="link"
       size="kira"
-      class="kv-meta-body-toggle mt-0.5 h-auto p-0 justify-start text-focus text-kira-lg"
+      class="kv-meta-body-toggle mt-0.5 h-auto p-0 justify-start text-muted-foreground hover:text-fg"
       @click="expanded = !expanded"
     >
       {{ expanded ? 'Show less' : 'Show more' }}

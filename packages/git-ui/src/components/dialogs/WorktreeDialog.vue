@@ -28,10 +28,18 @@
  */
 import { validateRefName } from '@kira/git-core';
 import type { WorktreeAddPreflight } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
@@ -292,14 +300,19 @@ function onClose(): void {
     <DialogContent
       :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
         <template v-if="phase === 'create'">
-          <label :for="pathId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <label :for="pathId" class="flex flex-col gap-0.5">
             Path
             <Input
               :id="pathId"
@@ -310,7 +323,7 @@ function onClose(): void {
               placeholder="../my-repo-feature-x"
             />
           </label>
-          <fieldset class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <fieldset class="flex flex-col gap-0.5">
             <legend>Start from</legend>
             <RadioGroup v-model="mode">
               <Label class="flex flex-row items-center gap-1">
@@ -328,7 +341,7 @@ function onClose(): void {
             </RadioGroup>
           </fieldset>
 
-          <label v-if="mode === 'existingBranch'" :for="branchId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <label v-if="mode === 'existingBranch'" :for="branchId" class="flex flex-col gap-0.5">
             Branch
             <Input
               :id="branchId"
@@ -344,17 +357,17 @@ function onClose(): void {
             </datalist>
           </label>
           <template v-else-if="mode === 'newBranch'">
-            <label :for="branchId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            <label :for="branchId" class="flex flex-col gap-0.5">
               New branch name
               <Input :id="branchId" v-model="branch" type="text" size="kira" class="w-full" placeholder="feature/x" />
             </label>
-            <p v-if="newBranchNameError" class="kv:text-diff-deleted kv:my-0.5">{{ newBranchNameError }}</p>
-            <label :for="startPointId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            <p v-if="newBranchNameError" class="text-error">{{ newBranchNameError }}</p>
+            <label :for="startPointId" class="flex flex-col gap-0.5">
               Start point
               <Input :id="startPointId" v-model="startPoint" type="text" size="kira" class="w-full" placeholder="main" />
             </label>
           </template>
-          <label v-else :for="startPointId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <label v-else :for="startPointId" class="flex flex-col gap-0.5">
             Commit-ish
             <Input
               :id="startPointId"
@@ -367,7 +380,7 @@ function onClose(): void {
           </label>
 
           <template v-if="preflight">
-            <p v-for="blocker in preflight.blockers" :key="blocker.kind" class="kv:text-diff-deleted kv:my-0.5">
+            <p v-for="blocker in preflight.blockers" :key="blocker.kind" class="text-error">
               <template v-if="blocker.kind === 'invalidPath'">The path is invalid.</template>
               <template v-else-if="blocker.kind === 'pathExists'">
                 <code>{{ blocker.path }}</code> already exists.
@@ -383,13 +396,13 @@ function onClose(): void {
                 <code>{{ blocker.startPoint }}</code> does not resolve to a commit.
               </template>
             </p>
-            <p v-if="canOfferDetachHere" class="kv:text-diff-deleted">
+            <p v-if="canOfferDetachHere" class="text-error">
               The new worktree will start with a detached HEAD.
             </p>
             <Button v-if="canOfferDetachHere" variant="dialog-primary" size="kira-lg" @click="submitCreateDetached">
               Create it detached at that branch's commit
             </Button>
-            <p v-for="note in preflight.notes" :key="note.kind" class="kv:text-diff-deleted">
+            <p v-for="note in preflight.notes" :key="note.kind" class="text-error">
               <template v-if="note.kind === 'pathInsideRepo'">
                 This path is inside the current repository.
               </template>
@@ -404,11 +417,11 @@ function onClose(): void {
         </template>
 
         <template v-else-if="phase === 'prepare'">
-          <p class="kv:text-diff-deleted">Worktree created at <code>{{ worktreeCreated }}</code>.</p>
+          <p class="text-error">Worktree created at <code>{{ worktreeCreated }}</code>.</p>
           <template v-if="!started">
             <p>This repository has a prepare script:</p>
-            <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-sm kv:whitespace-pre-wrap kv:break-all">{{ prepareScript }}</pre>
-            <p v-if="!runPrepareScriptCapability" class="kv:text-diff-deleted kv:my-0.5">
+            <pre class="max-h-60 overflow-y-auto p-1 bg-bg border border-border font-data text-kira-sm whitespace-pre-wrap break-all">{{ prepareScript }}</pre>
+            <p v-if="!runPrepareScriptCapability" class="text-error">
               Running scripts is disabled here.
             </p>
             <Label v-else class="flex flex-row items-center gap-1">
@@ -430,14 +443,15 @@ function onClose(): void {
         </template>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
         <template v-if="phase === 'create'">
+          <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitCreate" @click="submitCreate">
             Create
           </Button>
-          <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
         </template>
         <template v-else-if="phase === 'prepare' && !started">
+          <Button variant="dialog" size="kira-lg" @click="skipPrepare">Skip</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -446,7 +460,6 @@ function onClose(): void {
           >
             Run
           </Button>
-          <Button variant="dialog" size="kira-lg" @click="skipPrepare">Skip</Button>
         </template>
         <template v-else-if="phase === 'prepare' && preparing">
           <Button variant="dialog" size="kira-lg" @click="cancelPrepare">Cancel</Button>

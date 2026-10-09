@@ -16,10 +16,12 @@
  * `Checkbox`+`Label`, and the confirm-token field is `Input`.
  */
 import type { ResetMode } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -86,7 +88,7 @@ function confirm(): void {
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
       :show-close-button="false"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>
@@ -95,9 +97,14 @@ function confirm(): void {
           <code>{{ shortTarget }}</code>
           <template v-if="preflight?.targetSubject">— {{ preflight.targetSubject }}</template>
         </DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
-        <p v-if="preflight && !preflight.branch" class="kv:text-diff-deleted">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+        <p v-if="preflight && !preflight.branch" class="text-error">
           You are not on a branch, so no branch is changed — this moves HEAD only.
         </p>
 
@@ -110,12 +117,12 @@ function confirm(): void {
             <template v-if="preflight.branch"><code>{{ preflight.branch }}</code></template>
             <template v-else>HEAD</template>:
           </DialogDescription>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+          <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="c in preflight.leavingCommits" :key="c.sha">
               <code>{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
             </li>
           </ul>
-          <p v-if="preflight.leavingTruncated" class="kv:text-muted-foreground kv:italic">and more…</p>
+          <p v-if="preflight.leavingTruncated" class="text-muted-foreground italic">and more…</p>
         </template>
         <DialogDescription v-else-if="preflight">
           This moves to a different line of history: {{ preflight.leaving }} commit{{
@@ -124,8 +131,8 @@ function confirm(): void {
           leave, {{ preflight.gaining }} arrive.
         </DialogDescription>
 
-        <fieldset class="kv:my-2 kv:p-1 kv:border kv:border-panel-border kv:rounded-sm">
-          <legend class="kv:px-0.5 kv:text-muted-foreground">Mode</legend>
+        <fieldset class="p-1 border border-border rounded-kira-sm">
+          <legend class="px-0.5 text-muted-foreground">Mode</legend>
           <RadioGroup :model-value="mode" @update:model-value="(v) => selectMode(v as ResetMode)">
             <Label class="flex flex-row items-start gap-1 py-1">
               <RadioGroupItem value="soft" class="mt-0.5" />
@@ -153,21 +160,21 @@ function confirm(): void {
         </fieldset>
 
         <template v-if="mode === 'hard' && destroys.length > 0">
-          <p class="kv:text-diff-deleted">This will permanently discard these uncommitted changes:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+          <p class="text-error">This will permanently discard these uncommitted changes:</p>
+          <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="path in destroys" :key="path"><code>{{ path }}</code></li>
           </ul>
-          <p class="kv:text-muted-foreground kv:italic">
+          <p class="text-muted-foreground italic">
             Untracked and ignored files are <strong>not</strong> affected.
           </p>
 
-          <Label v-if="canStashFirst" class="flex flex-row items-center gap-1 my-1">
+          <Label v-if="canStashFirst" class="flex flex-row items-center gap-1">
             <Checkbox v-model="stashFirst" />
             Stash these changes first instead of discarding them
           </Label>
 
           <template v-if="!stashFirst">
-            <label :for="tokenId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            <label :for="tokenId" class="flex flex-col gap-0.5">
               Type <code>{{ shortTarget }}</code> to confirm
               <Input
                 :id="tokenId"
@@ -182,7 +189,8 @@ function confirm(): void {
         </template>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button
           v-if="isHardDestructive && canStashFirst"
           variant="dialog-primary"
@@ -203,7 +211,6 @@ function confirm(): void {
         >
           Reset
         </Button>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -4,3 +4,4 @@
 - C2 contrast (fg #cccccc on 15% tint, Space dark): over --kira-bg lanes 7.3-9.2, kinds 7.6-8.9; over bg-select lanes 5.5-7.4, kinds 5.6-6.7. All >= 4.5.
 - C3 done: toolbar/search/review-toolbar ViewToolbar recipe; Alert banners; all raw codicon spans -> CodiconIcon 13 (codiconName helper in icons/index.ts). repo-graph-paging "columns resized wide" drag spec flakes at --workers=2, passes at 1.
 - C4 done: rowVariants layout menu/tree (theme cn); FileTree indent = 8px + depth * --kv-tree-indent (host setting kept; Space default 8 not 14 -> deviation); MenuSections one-line labels, detail trailing; picker/review rows unprefixed.
+- C5 done: Empty-based panels, detail meta px-3 py-2 + muted "Show more", dialogs recipe (header close, padded body, Cancel first), webview badge spec updated for the tint (graph-columns.spec.ts).

@@ -27,9 +27,17 @@
  */
 import { SETTINGS } from '@kira/git-core';
 import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -178,15 +186,20 @@ async function save(): Promise<void> {
     <DialogContent
       :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Repository settings</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
-        <section class="kv:my-2 kv:first:mt-1">
-          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Graph</h3>
-          <label :for="pageSizeId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+        <section class="first:mt-1">
+          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Graph</h3>
+          <label :for="pageSizeId" class="flex flex-col gap-0.5">
             Load more page size
             <Input
               :id="pageSizeId"
@@ -199,12 +212,12 @@ async function save(): Promise<void> {
               :aria-invalid="!pageSizeValid"
               @update:model-value="onPageSizeChange"
             />
-            <span v-if="!pageSizeValid" class="kv:text-error kv:text-sm" role="alert">
+            <span v-if="!pageSizeValid" class="text-error text-kira-sm" role="alert">
               Enter a whole number from {{ SETTINGS['kiraSpace.graph.pageSize'].minimum }} to
               {{ SETTINGS['kiraSpace.graph.pageSize'].maximum }}.
             </span>
           </label>
-          <label :for="graphScopeId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <label :for="graphScopeId" class="flex flex-col gap-0.5">
             Scope
             <NativeSelect
               :id="graphScopeId"
@@ -221,50 +234,50 @@ async function save(): Promise<void> {
           </label>
         </section>
 
-        <section class="kv:my-2 kv:first:mt-1">
-          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Checkout</h3>
-          <Label class="flex flex-row items-center gap-1 my-1">
+        <section class="first:mt-1">
+          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Checkout</h3>
+          <Label class="flex flex-row items-center gap-1">
             <Checkbox v-model="draft['kiraSpace.checkout.autoStash']" />
             Automatically stash local changes that block a branch switch
           </Label>
-          <p class="kv:text-diff-deleted">
+          <p class="text-error">
             The stash is tagged with the branch you switched FROM and is never popped back
             automatically — bring it back deliberately from the stash list, even onto a different
             branch. Off restores the old dialog (discard / stash and carry / cancel).
           </p>
         </section>
 
-        <section class="kv:my-2 kv:first:mt-1">
-          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Stash</h3>
-          <Label class="flex flex-row items-center gap-1 my-1">
+        <section class="first:mt-1">
+          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Stash</h3>
+          <Label class="flex flex-row items-center gap-1">
             <Checkbox v-model="draft['kiraSpace.stash.showInGraph']" />
             Show stash entries as nodes in the commit graph
           </Label>
-          <Label class="flex flex-row items-center gap-1 my-1">
+          <Label class="flex flex-row items-center gap-1">
             <Checkbox v-model="draft['kiraSpace.stash.includeUntracked']" />
             "Include untracked files" starts checked in the Stash dialog
           </Label>
         </section>
 
-        <section class="kv:my-2 kv:first:mt-1">
-          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Branch review</h3>
-          <label :for="baseCandidatesId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+        <section class="first:mt-1">
+          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Branch review</h3>
+          <label :for="baseCandidatesId" class="flex flex-col gap-0.5">
             Candidate base branches (one per line, tried in order)
             <Textarea :id="baseCandidatesId" v-model="baseCandidatesText" rows="3" class="w-full" />
           </label>
         </section>
 
-        <section class="kv:my-2 kv:first:mt-1">
-          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">GitHub</h3>
-          <Label class="flex flex-row items-center gap-1 my-1">
+        <section class="first:mt-1">
+          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">GitHub</h3>
+          <Label class="flex flex-row items-center gap-1">
             <Checkbox v-model="draft['kiraSpace.github.enabled']" />
             Show pull request status for this repository
           </Label>
         </section>
 
-        <section v-if="writeCapability" class="kv:my-2 kv:first:mt-1">
-          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Pull</h3>
-          <label :for="pullStrategyId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+        <section v-if="writeCapability" class="first:mt-1">
+          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Pull</h3>
+          <label :for="pullStrategyId" class="flex flex-col gap-0.5">
             Strategy
             <NativeSelect
               :id="pullStrategyId"
@@ -282,15 +295,15 @@ async function save(): Promise<void> {
         </section>
       </div>
 
-      <p v-if="saveError" class="kv:m-0 kv:mt-1 kv:text-error" role="alert">
+      <p v-if="saveError" class="m-0 mt-1 text-error" role="alert">
         Couldn't save settings — {{ saveError }}
       </p>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
+        <Button variant="dialog" size="kira-lg" @click="close">Cancel</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!pageSizeValid" @click="save">
           Save
         </Button>
-        <Button variant="dialog" size="kira-lg" @click="close">Cancel</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -16,8 +16,16 @@
  * `DialogTitle`'s default slot, and the parent picker is `NativeSelect`.
  */
 import type { RestackPreflight } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
@@ -136,7 +144,7 @@ function closeDialog(): void {
     <DialogContent
       :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>
@@ -146,10 +154,15 @@ function closeDialog(): void {
               : `Restack ${target?.branch ?? ''}`
           }}
         </DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
         <template v-if="target?.mode === 'setParent'">
-          <label :for="parentId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          <label :for="parentId" class="flex flex-col gap-0.5">
             Parent branch
             <NativeSelect
               :id="parentId"
@@ -165,13 +178,13 @@ function closeDialog(): void {
         </template>
 
         <template v-else-if="target?.mode === 'restack' && preflight">
-          <p v-if="preflight.verdict === 'blocked'" class="kv:text-diff-deleted">
+          <p v-if="preflight.verdict === 'blocked'" class="text-error">
             {{ blockerText(preflight) }}
           </p>
           <p v-else-if="preflight.verdict === 'noop'">This stack is already up to date.</p>
           <template v-else>
             <p>The following branches will be restacked onto <code>{{ preflight.base }}</code>:</p>
-            <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-base">
+            <ul class="max-h-50 overflow-y-auto p-1 bg-bg border border-border text-kira-md">
               <li v-for="entry in preflight.plan" :key="entry.branch">
                 <code>{{ entry.branch }}</code> onto <code>{{ entry.parent }}</code>
                 ({{ entry.commits }} commit{{ entry.commits === 1 ? '' : 's' }},
@@ -179,7 +192,7 @@ function closeDialog(): void {
                 base: {{ entry.baseSource }})
               </li>
             </ul>
-            <p v-if="preflight.needsForcePush.length > 0" class="kv:text-muted-foreground">
+            <p v-if="preflight.needsForcePush.length > 0" class="text-muted-foreground">
               These branches will need a force-push afterwards:
               {{ preflight.needsForcePush.join(', ') }}.
             </p>
@@ -187,7 +200,7 @@ function closeDialog(): void {
 
           <template v-if="stack.restacking.value">
             <p>Restacking…</p>
-            <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-base">
+            <ul class="max-h-50 overflow-y-auto p-1 bg-bg border border-border text-kira-md">
               <li v-for="(p, i) in stack.progress.value" :key="i">
                 {{ p.branch }} ({{ p.index }}/{{ p.total }})
               </li>
@@ -196,16 +209,17 @@ function closeDialog(): void {
         </template>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
         <template v-if="target?.mode === 'setParent'">
-          <Button variant="dialog-primary" size="kira-lg" @click="submitSetParent">Save</Button>
           <Button variant="dialog" size="kira-lg" @click="closeDialog">Cancel</Button>
+          <Button variant="dialog-primary" size="kira-lg" @click="submitSetParent">Save</Button>
         </template>
         <template v-else-if="target?.mode === 'restack'">
           <template v-if="stack.restacking.value">
             <Button variant="dialog" size="kira-lg" @click="cancelRestack">Cancel restack</Button>
           </template>
           <template v-else>
+            <Button variant="dialog" size="kira-lg" @click="closeDialog">Close</Button>
             <Button
               variant="dialog-primary"
               size="kira-lg"
@@ -214,7 +228,6 @@ function closeDialog(): void {
             >
               Restack
             </Button>
-            <Button variant="dialog" size="kira-lg" @click="closeDialog">Close</Button>
           </template>
         </template>
       </DialogFooter>

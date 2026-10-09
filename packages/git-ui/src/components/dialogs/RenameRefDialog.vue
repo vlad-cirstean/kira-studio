@@ -13,8 +13,16 @@
  * only supplies its own body/footer content.
  */
 import { validateRefName } from '@kira/git-core';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
@@ -59,26 +67,31 @@ async function submit(): Promise<void> {
     <DialogContent
       :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
     >
       <DialogHeader>
         <DialogTitle>Rename branch</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
       </DialogHeader>
-      <div class="min-h-0 overflow-y-auto">
-        <p class="kv:text-diff-deleted">Renaming <code>{{ currentName }}</code></p>
+      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+        <p class="text-error">Renaming <code>{{ currentName }}</code></p>
 
-        <label :for="nameId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+        <label :for="nameId" class="flex flex-col gap-0.5">
           New name
           <Input :id="nameId" v-model="name" type="text" size="kira" class="w-full" />
         </label>
-        <p v-if="nameError" class="kv:text-diff-deleted kv:my-0.5">{{ nameError }}</p>
+        <p v-if="nameError" class="text-error">{{ nameError }}</p>
       </div>
 
-      <DialogFooter class="justify-end gap-1">
+      <DialogFooter class="justify-end">
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
           Rename branch
         </Button>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
