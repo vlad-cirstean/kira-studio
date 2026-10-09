@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -39,6 +40,17 @@ type Spec struct {
 	// AllowedTools become --allowedTools; the caller adds the finish_step tool.
 	AllowedTools []string
 	Timeout      time.Duration
+	// Model is --model; "" omits it.
+	Model string
+	// MaxBudgetUSD is --max-budget-usd; 0 omits it.
+	MaxBudgetUSD float64
+	// Tools is --tools, the built-ins that exist for the run; nil omits the flag, empty passes "".
+	Tools []string
+	// Isolated loads no settings file, only the --mcp-config servers, and denies instead of
+	// prompting; it overrides SettingSources.
+	Isolated bool
+	// MCPConfigPaths are extra --mcp-config files after MCPConfigPath.
+	MCPConfigPaths []string
 	// Env is the full child environment; nil = os.Environ().
 	Env []string
 }
@@ -56,6 +68,8 @@ type Handler struct {
 	OnLine func(Line)
 	// OnRateLimits receives the account's rate-limit windows from a rate_limit_event line.
 	OnRateLimits func(RateLimits)
+	// OnResult receives the run's closing result line.
+	OnResult func(Result)
 }
 
 // quotePOSIX single-quotes s as one shell word.
@@ -75,7 +89,27 @@ func Script(s Spec) string {
 		session = []string{"--resume", quotePOSIX(s.Resume)}
 	}
 	words := append([]string{"exec", bin, "-p", "--output-format", "stream-json", "--verbose"}, session...)
-	words = append(words, "--mcp-config", quotePOSIX(s.MCPConfigPath), "--setting-sources", quotePOSIX(s.SettingSources))
+	words = append(words, "--mcp-config", quotePOSIX(s.MCPConfigPath))
+	for _, p := range s.MCPConfigPaths {
+		words = append(words, "--mcp-config", quotePOSIX(p))
+	}
+	if s.Model != "" {
+		words = append(words, "--model", quotePOSIX(s.Model))
+	}
+	if s.MaxBudgetUSD > 0 {
+		words = append(words, "--max-budget-usd", strconv.FormatFloat(s.MaxBudgetUSD, 'f', -1, 64))
+	}
+	sources := s.SettingSources
+	if s.Isolated {
+		sources = ""
+	}
+	words = append(words, "--setting-sources", quotePOSIX(sources))
+	if s.Isolated {
+		words = append(words, "--strict-mcp-config", "--permission-prompts", "none")
+	}
+	if s.Tools != nil {
+		words = append(words, "--tools", quotePOSIX(strings.Join(s.Tools, ",")))
+	}
 	if len(s.AllowedTools) > 0 {
 		words = append(words, "--allowedTools")
 		for _, t := range s.AllowedTools {
@@ -117,6 +151,11 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 		if h.OnRateLimits != nil {
 			if rl, ok := parseRateLimits(line); ok {
 				h.OnRateLimits(rl)
+			}
+		}
+		if h.OnResult != nil {
+			if r, ok := parseResult(line); ok {
+				h.OnResult(r)
 			}
 		}
 		for _, l := range parseLine(line) {

@@ -52,11 +52,11 @@ func connect(t *testing.T, cfgPath, tokenOverride string) (*mcp.ClientSession, e
 func TestFinishStepServer(t *testing.T) {
 	var mu sync.Mutex
 	var got []string
-	srv := NewServer(t.TempDir(), func(runID string, f Finish) {
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(runID string, f Finish) {
 		mu.Lock()
 		got = append(got, runID+"|"+f.Status+"|"+f.Summary)
 		mu.Unlock()
-	}, nil, nil)
+	}})
 	t.Cleanup(func() { _ = srv.Close() })
 	cfgA, releaseA, err := srv.Register(Grant{RunID: "run-a"})
 	if err != nil {
@@ -164,7 +164,7 @@ func toolNames(t *testing.T, s *mcp.ClientSession) map[string]bool {
 func TestGrantScopes(t *testing.T) {
 	space := &fakeSpace{}
 	var finished []string
-	srv := NewServer(t.TempDir(), func(runID string, f Finish) { finished = append(finished, runID+"|"+f.Status) }, space, nil)
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(runID string, f Finish) { finished = append(finished, runID+"|"+f.Status) }, Space: space})
 	t.Cleanup(func() { _ = srv.Close() })
 
 	cfgRun, relRun, err := srv.Register(Grant{RunID: "run-1", TaskID: "task-1"})
@@ -250,14 +250,14 @@ func TestGrantScopes(t *testing.T) {
 }
 
 func TestRegisterRefusesUselessGrants(t *testing.T) {
-	srv := NewServer(t.TempDir(), func(string, Finish) {}, &fakeSpace{}, nil)
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(string, Finish) {}, Space: &fakeSpace{}})
 	t.Cleanup(func() { _ = srv.Close() })
 	for _, g := range []Grant{{}, {Space: true}, {RunID: "r", Space: true}} {
 		if _, _, err := srv.Register(g); err == nil {
 			t.Errorf("Register(%+v) accepted", g)
 		}
 	}
-	noTools := NewServer(t.TempDir(), func(string, Finish) {}, nil, nil)
+	noTools := NewServer(Options{Dir: t.TempDir(), OnFinish: func(string, Finish) {}})
 	t.Cleanup(func() { _ = noTools.Close() })
 	if _, _, err := noTools.Register(Grant{TaskID: "t", Space: true}); err == nil {
 		t.Error("a Space grant without tools accepted")

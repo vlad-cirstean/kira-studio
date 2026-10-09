@@ -151,7 +151,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]claudeheadless.Finish{}, stepMsgs: map[string]string{},
 		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
 	}
-	b.agent = claudeheadless.NewServer(deps.AgentDir, b.recordFinish, b, b)
+	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b})
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return deps.Credentials.Ask(ctx, boardConnLabel, req)

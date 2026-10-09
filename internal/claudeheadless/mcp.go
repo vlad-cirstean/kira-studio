@@ -80,10 +80,18 @@ type Server struct {
 	closed bool
 }
 
-// NewServer returns a stopped Server; config files go in dir (created 0700). space may be nil: a
-// Space grant is then refused.
-func NewServer(dir string, onFinish FinishFunc, space SpaceTools, outcomes Outcomes) *Server {
-	return &Server{dir: dir, onFinish: onFinish, space: space, outcomes: outcomes}
+// Options configure a Server. Space may be nil: a Space grant is then refused. Outcomes may be nil:
+// no grant then lists run_outcome.
+type Options struct {
+	Dir      string
+	OnFinish FinishFunc
+	Space    SpaceTools
+	Outcomes Outcomes
+}
+
+// NewServer returns a stopped Server; config files go in o.Dir (created 0700).
+func NewServer(o Options) *Server {
+	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes}
 }
 
 type finishArgs struct {

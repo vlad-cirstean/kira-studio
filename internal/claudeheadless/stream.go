@@ -188,3 +188,48 @@ func parseRateLimits(raw string) (RateLimits, bool) {
 	}
 	return RateLimits{FiveHour: w.FiveHour, SevenDay: w.SevenDay}, true
 }
+
+// Result is what the closing `result` line reports.
+type Result struct {
+	Subtype string
+	IsError bool
+	// CostUSD is nil when the line carried no total_cost_usd.
+	CostUSD *float64
+	Denials []string
+	// Text is the final message, cut at maxResultText.
+	Text string
+}
+
+const maxResultText = 1 << 10
+
+// parseResult reads a `result` stream line; ok is false for any other line.
+func parseResult(raw string) (Result, bool) {
+	if !strings.Contains(raw, `"result"`) {
+		return Result{}, false
+	}
+	var msg struct {
+		Type    string   `json:"type"`
+		Subtype string   `json:"subtype"`
+		IsError bool     `json:"is_error"`
+		Cost    *float64 `json:"total_cost_usd"`
+		Result  string   `json:"result"`
+		Denials []struct {
+			ToolName string `json:"tool_name"`
+		} `json:"permission_denials"`
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(raw)), &msg) != nil || msg.Type != "result" {
+		return Result{}, false
+	}
+	r := Result{Subtype: msg.Subtype, IsError: msg.IsError, CostUSD: msg.Cost, Text: msg.Result}
+	if len(r.Text) > maxResultText {
+		r.Text = strings.ToValidUTF8(r.Text[:maxResultText], "") + "…"
+	}
+	seen := map[string]bool{}
+	for _, d := range msg.Denials {
+		if d.ToolName != "" && !seen[d.ToolName] {
+			seen[d.ToolName] = true
+			r.Denials = append(r.Denials, d.ToolName)
+		}
+	}
+	return r, true
+}
