@@ -11,6 +11,9 @@ export function git(cwd: string, ...args: string[]): string {
     encoding: 'utf8',
     env: {
       ...process.env,
+      // The host's own config (push.negotiate=true on some machines) must not reach the helper repos.
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_NOSYSTEM: '1',
       GIT_AUTHOR_NAME: 'Flow Test',
       GIT_AUTHOR_EMAIL: 'flow@example.test',
       GIT_COMMITTER_NAME: 'Flow Test',
