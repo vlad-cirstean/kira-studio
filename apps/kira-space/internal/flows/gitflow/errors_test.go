@@ -17,7 +17,6 @@ func rawProcessText(s string) bool {
 }
 
 func TestRepoDeletedWhileOpen(t *testing.T) {
-	t.Skip("P236 finding F3: a deleted repo surfaces a raw fork/exec string")
 	r := newRig(t)
 	repo := r.app.NewRepo("proj")
 	repo.Commit("base", map[string]string{"a.txt": "a\n"})
@@ -39,9 +38,9 @@ func TestRepoDeletedWhileOpen(t *testing.T) {
 			t.Fatalf("%s on a deleted repo = %+v, want a classified error without process text", req.method, we)
 		}
 	}
-	res := r.op(id, gitsession.OpRequest{Kind: "branchCreate", Name: "x", StartPoint: "main"})
-	if res.OK || res.Error == nil || res.Error.Kind == "" || rawProcessText(res.Error.Message) {
-		t.Fatalf("op on a deleted repo = %+v, want a classified failure", res)
+	we := wireErr(t, r.gs, "op.run", gitrpc.OpRunParams{RepoID: id, Op: gitsession.OpRequest{Kind: "branchCreate", Name: "x", StartPoint: "main"}})
+	if we.Code == "" || rawProcessText(we.Message) {
+		t.Fatalf("op on a deleted repo = %+v, want a classified failure", we)
 	}
 	if res := call[gitrpc.RepoOpenResult](t, r.gs, "repo.open", gitrpc.RepoOpenParams{Path: repo.Dir}); res.Kind == "ok" {
 		t.Fatalf("repo.open of the deleted path = %+v, want a refusal", res)
@@ -70,7 +69,6 @@ func TestPushRejectedNonFastForward(t *testing.T) {
 }
 
 func TestWorktreeAddBranchCheckedOutElsewhere(t *testing.T) {
-	t.Skip("P236 finding F2: preflight.worktreeAdd calls the repo's own checked-out branch clean")
 	r := newRig(t)
 	repo := r.app.NewRepo("proj")
 	repo.Commit("base", map[string]string{"a.txt": "a\n"})

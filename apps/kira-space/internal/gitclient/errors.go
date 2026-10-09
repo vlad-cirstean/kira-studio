@@ -29,6 +29,10 @@ const (
 	KindUnknown ErrorKind = "unknown"
 )
 
+// ErrDirMissing is Start's refusal to spawn in a working directory that no longer exists (a repo
+// deleted while open); Classify maps it to KindNotARepository.
+var ErrDirMissing = errors.New("working directory no longer exists")
+
 // Error is gitclient's own error type. Command/ExitCode/Stderr are the raw material Classify
 // worked from, kept on the value for a caller that wants to log more than the classified Kind.
 type Error struct {
@@ -93,6 +97,9 @@ func Classify(ctx context.Context, command []string, res Result, runErr error) e
 			return &Error{Kind: KindTimeout, Command: command, Cause: runErr}
 		}
 		return &Error{Kind: KindCancelled, Command: command, Cause: runErr}
+	}
+	if errors.Is(runErr, ErrDirMissing) {
+		return &Error{Kind: KindNotARepository, Command: command, Cause: ErrDirMissing}
 	}
 	if runErr != nil {
 		return &Error{Kind: KindUnknown, Command: command, Cause: runErr}

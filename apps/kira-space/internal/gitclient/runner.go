@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strings"
@@ -313,6 +314,11 @@ type execRunner struct{}
 func NewExecRunner() Runner { return execRunner{} }
 
 func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process, error) {
+	if spec.Dir != "" {
+		if _, err := os.Stat(spec.Dir); errors.Is(err, fs.ErrNotExist) {
+			return nil, ErrDirMissing
+		}
+	}
 	cmd := exec.CommandContext(ctx, gitPath, buildArgv(spec)...)
 	cmd.Dir = spec.Dir
 	cmd.Env = buildEnv(os.Environ(), spec.Env)
