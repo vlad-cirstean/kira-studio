@@ -10,9 +10,20 @@
   Found by read, git checked by hand.
 - Class: product bug. Fix idea: for a remote-only branch use `newBranch` mode with StartPoint `<remote>/<name>`, or resolve the remote-tracking ref in the preflight.
 
+## B-2 ADE refresh of an already-open repo ignores a changed git path
+- Test: appflow TestGitPathSettingEverywhere/refresh_of_an_open_repo_follows_the_setting (skipped "P231 finding B-2")
+- Failure: `refresh row 0 reports no error with an unusable git`
+- Repro: import a repo with a remote, create a task, `Refresh` once (repo now open). Set `git.gitPath` to an executable that is not git.
+  Git stream `app.init` reports `unusable` and `ImportRepo` fails `E_GIT_UNAVAILABLE`, but `AdeTask.Refresh` returns a row with no error and fetches with the old binary.
+  Without the earlier `Refresh`, the same sequence returns the classified row error.
+- Suspected cause: `ade/board.go:268-276` `openRepo` returns the cached `conn.Entry`; `gitsession/registry.go:169` `gitclient.NewRepo(summary, runner, gitPath)` bakes the path at open time, so settings never reach an open repo. Found by read, confirmed by the test.
+- Class: product bug. Fix idea: resolve the path per call (Repo reads the live setting), or drop open entries when `git.gitPath` changes.
+
 ## Harness notes (not product bugs)
 - `WithoutGh` hides gh from PATH only. `ghclient.NewPlatformLocator` also probes `/opt/homebrew/bin/gh` and `/usr/local/bin/gh`, so a host install still answers. `TestGitHubWithoutGh` accepts `ghMissing`, `unauthenticated` or `unavailable`. Fix idea: harness-level locator seam.
 - Archive closes review windows through `appwire` `closeTaskReviewWindows` on the real `shell.WindowRegistry`, not the `WindowManager` recorder. The recorder cannot see it. `TestArchiveRisk` asserts the review window row is gone (`ReviewWindowTarget` nil) instead.
 - Tracker grace window is 30s and not configurable from the harness. A taken-over or launched TUI session reads `stopped` only 30s after spawn. `TestInteractiveSessions` waits up to 50s per stop (about 60s total). Fix idea: expose `Grace` in `appwire.Options`.
 - Fake claude prints a stream-json `init` line for every `-p` call and reads `--mcp-config` as a file path. `memory.CLIRunner` (`--output-format json`) parses stdout as one document and the importer passes the MCP config inline, so the fake cannot serve memory flows as is. `memoryflow` fronts it with a test-local bash shim (`shim_test.go`) that drops the init line, writes the inline config to a file and answers gate, reconcile and extract calls from canned files. Fix idea: fake suppresses `init` when `--output-format json` is present and accepts inline `--mcp-config`.
 - Search without a model on disk reports `notInstalled`, not `unavailable`. `unavailable` needs an installed model and a missing ONNX runtime. `TestSemanticUnavailable` asserts `notInstalled`.
+- Host `pathLocator` falls back to PATH when the configured git path is missing, so a missing file does not yield `notFound` listing the path on Linux. `TestGitPathSettingEverywhere` uses an executable non-git script (`unusable`) as the bad path.
+- `appearance.dateFormat` reaches git only through `app.init` (`dateFormat`), not `commit.detail`. `TestDateFormatReachesGit` asserts `app.init`.
