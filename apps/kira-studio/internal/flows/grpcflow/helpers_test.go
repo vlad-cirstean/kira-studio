@@ -78,6 +78,9 @@ func findMethod(t *testing.T, s grpcclient.Schema, name string) (grpcclient.Meth
 		if svc.Name != "Flow" {
 			continue
 		}
+		if svc.FullName != flowSvc {
+			t.Fatalf("service FullName = %q, want %q (the UI calls by it)", svc.FullName, flowSvc)
+		}
 		for _, m := range svc.Methods {
 			if m.Name == name {
 				return m, true

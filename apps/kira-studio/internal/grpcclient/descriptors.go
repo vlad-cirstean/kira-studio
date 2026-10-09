@@ -67,8 +67,10 @@ type Schema struct {
 }
 
 type Service struct {
-	Name    string   `json:"name"`
-	Methods []Method `json:"methods"`
+	Name string `json:"name"` // short, for display
+	// FullName is the package-qualified name a Call addresses.
+	FullName string   `json:"fullName"`
+	Methods  []Method `json:"methods"`
 }
 
 type Method struct {
@@ -407,7 +409,7 @@ func projectSchema(r *resolved) Schema {
 
 func projectService(sd protoreflect.ServiceDescriptor) Service {
 	methods := sd.Methods()
-	svc := Service{Name: string(sd.Name()), Methods: make([]Method, 0, methods.Len())}
+	svc := Service{Name: string(sd.Name()), FullName: string(sd.FullName()), Methods: make([]Method, 0, methods.Len())}
 	for i := 0; i < methods.Len(); i++ {
 		md := methods.Get(i)
 		svc.Methods = append(svc.Methods, Method{

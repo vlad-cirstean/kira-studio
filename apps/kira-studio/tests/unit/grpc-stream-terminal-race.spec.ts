@@ -80,6 +80,7 @@ function streamingSchema(): GrpcSchemaWire {
     services: [
       {
         name: 'Svc',
+        fullName: 'Svc',
         methods: [
           {
             name: 'Stream',

@@ -39,6 +39,7 @@ const UNARY_SCHEMA = {
   services: [
     {
       name: 'demo.Echo',
+      fullName: 'demo.Echo',
       methods: [
         {
           name: 'SayHello',

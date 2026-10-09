@@ -32,11 +32,7 @@ test('reflection describes the flow service over the UI', async ({ kira, flowSer
   ).toBeVisible();
 });
 
-// P232 finding A-3: Describe returns the short service name, Call needs the full one.
-test.fixme('P232 finding A-3: a unary call shows message, header and trailer', async ({
-  kira,
-  flowServers,
-}) => {
+test('a unary call shows message, header and trailer', async ({ kira, flowServers }) => {
   const page = kira.window;
   await openGrpc(page, flowServers.grpc);
   await pick(page, 'Unary', '{"text":"hello"}');
@@ -53,8 +49,7 @@ test.fixme('P232 finding A-3: a unary call shows message, header and trailer', a
   await expect(metadata).toContainText('grpc-status');
 });
 
-// P232 finding A-3: Describe returns the short service name, Call needs the full one.
-test.fixme('P232 finding A-3: a server stream delivers messages one by one and Stop ends it', async ({
+test('a server stream delivers messages one by one and Stop ends it', async ({
   kira,
   flowServers,
 }) => {

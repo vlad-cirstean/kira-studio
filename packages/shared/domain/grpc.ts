@@ -27,7 +27,10 @@ export interface GrpcMethodWire {
 
 /** internal/grpcclient.Service — one service the schema browser lists. */
 export interface GrpcServiceWire {
+  /** Short name, for display. */
   name: string;
+  /** Package-qualified name; what a Call addresses. */
+  fullName: string;
   methods: GrpcMethodWire[];
 }
 

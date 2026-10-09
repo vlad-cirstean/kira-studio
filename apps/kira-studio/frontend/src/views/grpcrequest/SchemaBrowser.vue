@@ -93,7 +93,7 @@ const filteredServices = computed(() => {
 
 function selectMethod(service: string, method: string): void {
   const m = props.schema?.services
-    .find((s) => s.name === service)
+    .find((s) => s.fullName === service)
     ?.methods.find((mm) => mm.name === method);
   patchGrpcRequestTabState(props.tab.id, {
     service,
@@ -216,7 +216,7 @@ function selectMethod(service: string, method: string): void {
     </InputGroup>
     <div class="flex-1 min-h-0 overflow-auto px-1.5 py-1" data-testid="grpc-service-list">
       <template v-if="schema && filteredServices.length > 0">
-        <div v-for="svc in filteredServices" :key="svc.name" class="mb-1.5">
+        <div v-for="svc in filteredServices" :key="svc.fullName" class="mb-1.5">
           <div class="text-kira-sm text-muted-foreground uppercase tracking-wider py-0.5" data-testid="grpc-service-name">{{ svc.name }}</div>
           <!-- The row's own template class list (P110 B29) supplies height/display/align-items/
                gap/padding/border-radius/color/font-size/cursor and its own hover/selected
@@ -226,9 +226,9 @@ function selectMethod(service: string, method: string): void {
             :key="m.name"
             type="button"
             class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer w-full justify-between border-0 bg-none text-left"
-            :class="(tab.state.service === svc.name && tab.state.method === m.name) ? 'bg-select' : 'hover:bg-hover'"
+            :class="(tab.state.service === svc.fullName && tab.state.method === m.name) ? 'bg-select' : 'hover:bg-hover'"
             data-testid="grpc-method-row"
-            @click="selectMethod(svc.name, m.name)"
+            @click="selectMethod(svc.fullName, m.name)"
           >
             <span class="text-kira-md font-data">{{ m.name }}</span>
             <Badge

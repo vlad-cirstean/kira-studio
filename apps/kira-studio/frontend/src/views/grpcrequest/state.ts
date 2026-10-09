@@ -93,7 +93,7 @@ export function findMethod(
   method: string,
 ): { clientStreaming: boolean; serverStreaming: boolean; requestTemplate: string } | null {
   if (!schema) return null;
-  const svc = schema.services.find((s) => s.name === service);
+  const svc = schema.services.find((s) => s.fullName === service);
   const m = svc?.methods.find((m) => m.name === method);
   return m ?? null;
 }

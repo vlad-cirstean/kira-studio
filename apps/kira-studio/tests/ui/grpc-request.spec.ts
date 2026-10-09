@@ -39,6 +39,7 @@ const UNARY_SCHEMA = {
   services: [
     {
       name: 'demo.Echo',
+      fullName: 'demo.Echo',
       methods: [
         {
           name: 'SayHello',
@@ -60,6 +61,7 @@ const TWO_SERVICE_SCHEMA = {
   services: [
     {
       name: 'demo.Echo',
+      fullName: 'demo.Echo',
       methods: [
         {
           name: 'SayHello',
@@ -74,6 +76,7 @@ const TWO_SERVICE_SCHEMA = {
     },
     {
       name: 'demo.Items',
+      fullName: 'demo.Items',
       methods: [
         {
           name: 'ListItems',
@@ -95,6 +98,7 @@ const STREAM_SCHEMA = {
   services: [
     {
       name: 'demo.Items',
+      fullName: 'demo.Items',
       methods: [
         {
           name: 'ListItems',

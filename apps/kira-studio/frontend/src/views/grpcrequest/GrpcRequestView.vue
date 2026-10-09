@@ -94,7 +94,7 @@ const methodOptions = computed(() => {
   for (const svc of schema.value.services) {
     for (const m of svc.methods) {
       const badge = m.serverStreaming || m.clientStreaming ? ' (stream)' : '';
-      out.push({ value: `${svc.name}|${m.name}`, label: `${svc.name}/${m.name}${badge}` });
+      out.push({ value: `${svc.fullName}|${m.name}`, label: `${svc.fullName}/${m.name}${badge}` });
     }
   }
   return out;
