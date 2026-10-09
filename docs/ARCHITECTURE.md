@@ -2328,7 +2328,7 @@ Studio's titlebar toggle is its only reason.
 `internal/agenthooks` (P86-P126: the local HTTP listener a Claude Code hook shells out to, plus the
 bridge glue that started it, composed a tab's launch and projected running sessions to the
 renderer) moved to repo-root `internal/agenthooks` — `Manager` (start/stop/status, plus
-`ComposeLaunch` for the `--settings` flag and hook env a launcher adds to a terminal command), the
+`ComposeLaunch(terminalID, cwd, command)` for the `--settings` flag and hook env a launcher adds to a terminal command), the
 socket protocol and its documented bounds (one connection at a time, bounded event size). The
 renderer-side reducer and store hoisted the same way, to
 `packages/workbench/src/state/{agentActivity,createAgentSessionsStore}.ts`; the wire types both
@@ -4120,8 +4120,43 @@ claude-code PTY) and the board's `OnRuns` (headless runs, which have no hooks).
 - Platform: `notify_darwin.go` (`darwin && !server`) registers the Wails v3 notifications service and
   `WailsSink`; `notify_other.go` returns no service, so Linux and `-tags server` post nothing.
   Message text only goes to the local notification centre.
-- `AgentNotifyService` is the 21st Kira Space bound service.
+- `AgentNotifyService` is the 21st Kira Space bound service (`ClaudeUsageService`, P239, is the 22nd).
 - Tests: `flows/notifyflow` (hook events through the real shim), `tests/ui/settings-agent-notify.spec.ts`.
+
+### Claude Code usage limits (P239)
+
+ADE status-bar item `5h 23% · wk 41%` with reset times in a tooltip. No credential read, no network
+call: Kira only listens to what Claude Code already computes. Package `internal/claudeusage`
+(`Service.Ingest`, `Get`), bound as `ClaudeUsageService` (the 22nd Kira Space bound service), push
+`kira:claude:usage` (Space only, at most one per 10 s on a changed value).
+
+| Feed | Source | Units |
+|---|---|---|
+| `session` | interactive tab: statusline `rate_limits.five_hour` and `seven_day` | `used_percentage` 0-100, `resets_at` epoch s |
+| `run` | headless run: stream-json `rate_limit_event.rate_limit_info.unifiedWindows` | `utilization` 0..1, `resetsAt` epoch s |
+
+- `claude -p` never invokes a `statusLine` (checked on claude 2.1.295), so headless runs feed through
+  their output instead (`adeagent.Handler.OnRateLimits`, chained from `ade/runs.go`). Newest reading
+  wins per window; the tooltip shows the source and its age.
+- Session feed: `Manager.ComposeLaunch(terminalID, cwd, command)` writes
+  `<server dir>/settings-<12 hex>.json` (0600; hooks plus a `statusLine` pointing at the shim in
+  `statusline` mode) and passes that to `--settings`. Claude Code replaces the user's own statusline
+  for that session, so the shim runs the user's command (read-only lookup: project
+  `.claude/settings.local.json`, `.claude/settings.json`, then `$CLAUDE_CONFIG_DIR` or `~/.claude`
+  `settings.json`; passed as `KIRA_USER_STATUSLINE`) and prints its output. The user's files are never
+  written.
+- The shim forwards a payload containing `rate_limits` at most once per 30 s per terminal, in the
+  background, to `POST /statusline` (same token and terminal checks as `/hook`, 64 KiB cap). The
+  listener decodes `rate_limits` only; nothing else of the payload is kept.
+- States: `ok`, `waiting` (nothing yet: `Usage: –`, hint "Start a Claude Code session to see usage"),
+  `off`. A window whose reset time passed is dropped on read. The last numbers persist to
+  `<KIRA_SPACE_HOME>/claude-usage.json` (0600, atomic) and reload at start.
+- Setting `claudeCode.usageEnabled` (default on). Off: no `statusLine` injected into new launches,
+  the item is hidden, `Get` returns `off`. Applies to launches after the change.
+- Frontend: `state/claudeUsage.ts` (TanStack Query, 60 s poll, push replaces the cache),
+  `workbench/ClaudeUsageItem.vue` (tones at 80 and 95 percent), shown in ADE mode only.
+- Tests: `flows/usageflow` (statusline through the real shim and socket, run stream through the
+  board), `tests/ui/claude-usage.spec.ts`.
 
 ### Worktree setup
 
@@ -5012,6 +5047,11 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
+
+- **Claude Code usage limits show only what Kira-started sessions report (P239).** Claude Code sends
+  `rate_limits` only for claude.ai Pro and Max plans and only after the first API response of a
+  session, so the item reads `Usage: –` until then. A session in another terminal is invisible.
+  Unverified on a real Mac build and on Team or Enterprise seats.
 
 - **Desktop notifications are unverified on macOS (P238).** Needs a signed bundle and the user's
   one-time OS permission; a dev build run outside a bundle cannot post (Wails checks the bundle id).
