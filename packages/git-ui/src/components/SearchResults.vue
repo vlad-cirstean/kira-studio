@@ -19,8 +19,8 @@
  * rendering only the inner listbox content.
  */
 import { Button } from '@theme/components/ui/button';
+import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
-import { cn } from '../lib/cn.ts';
 import { rowVariants } from '../lib/rowVariants.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
@@ -53,9 +53,9 @@ const isEmpty = computed(() => props.model.sections.length === 0);
  *  same property; §1.3). */
 function optionClass(option: SearchOption): string {
   return cn(
-    rowVariants(),
-    'kv:px-2 kv:py-0.5',
-    option.id === props.highlightedId ? 'kv:bg-hover' : '',
+    rowVariants({ layout: 'tree' }),
+    'pl-2',
+    option.id === props.highlightedId ? 'bg-hover' : '',
   );
 }
 </script>

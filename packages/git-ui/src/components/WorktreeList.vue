@@ -137,21 +137,21 @@ async function confirmRemove(): Promise<void> {
     <div
       v-for="entry in section.visible"
       :key="entry.path"
-      class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
+      class="kv-branch-row flex items-center gap-0.5 px-1"
       :data-row-id="`worktree:${entry.path}`"
       :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
     >
-      <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
-        <span v-if="entry.isCurrent" class="kv:text-sm kv:opacity-80" data-kira-tip="This window">●</span>
-        <span v-if="entry.isMain" class="kv:text-sm kv:opacity-80" data-kira-tip="Main worktree">M</span>
-        <span v-if="entry.locked" class="kv:text-sm kv:opacity-80" :data-kira-tip="entry.locked.reason">
+      <div class="kv-branch-row-main flex items-center gap-0.5 flex-1 min-w-0 text-left">
+        <span v-if="entry.isCurrent" class="text-kira-sm opacity-80" data-kira-tip="This window">●</span>
+        <span v-if="entry.isMain" class="text-kira-sm opacity-80" data-kira-tip="Main worktree">M</span>
+        <span v-if="entry.locked" class="text-kira-sm opacity-80" :data-kira-tip="entry.locked.reason">
           <CodiconIcon name="lock" :size="13" />
         </span>
-        <span v-if="entry.openElsewhere" class="kv:text-sm kv:opacity-80" data-kira-tip="Open in another window">
+        <span v-if="entry.openElsewhere" class="text-kira-sm opacity-80" data-kira-tip="Open in another window">
           <CodiconIcon name="window" :size="13" />
         </span>
-        <span class="kv:truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>
-        <span class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-sm kv:text-muted-foreground">{{ entry.path }}</span>
+        <span class="truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>
+        <span class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground">{{ entry.path }}</span>
       </div>
       <TooltipIconButton
         v-if="writeCapability && !entry.isCurrent"
@@ -173,7 +173,7 @@ async function confirmRemove(): Promise<void> {
       />
     </div>
     <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No worktrees</div>
+    <div v-if="section.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-kira-sm">No worktrees</div>
 
     <!-- P131 Part 2 §5: opens inside BranchPicker's own modal Popover panel (§5.2) -- reka's
          modal content there prevents the panel dismissing under this nested Dialog. -->
@@ -188,7 +188,7 @@ async function confirmRemove(): Promise<void> {
         </DialogHeader>
         <div class="min-h-0 overflow-y-auto">
           <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
-            <p class="kv:text-diff-deleted">{{ blockerText(pendingRemove.preflight) }}</p>
+            <p class="text-error">{{ blockerText(pendingRemove.preflight) }}</p>
           </template>
           <template v-else-if="pendingRemove?.preflight.verdict === 'dirty'">
             <p>

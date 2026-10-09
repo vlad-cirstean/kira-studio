@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { cn } from '@theme/lib/utils';
 /**
  * I2-21: `StashList.vue`'s and `GlobalStashList.vue`'s own row list, selection and row-menu
  * open/select were byte-identical apart from each row's own label fields (badge/origin/message,
@@ -11,7 +12,6 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  * via `menuSelect` for the caller's own `switch`.
  */
 import { computed, ref } from 'vue';
-import { cn } from '../lib/cn.ts';
 import type { MenuSection } from '../lib/menuModel.ts';
 import { rowVariants } from '../lib/rowVariants.ts';
 import type { StashState } from '../state/stash.ts';
@@ -93,35 +93,35 @@ function onMenuSelect(id: string): void {
   <div
     v-for="entry in section.visible"
     :key="entry.sha"
-    class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
-    :class="{ 'kv:bg-hover': stash.selectedSha.value === entry.sha }"
+    class="kv-branch-row flex items-center gap-0.5 px-1"
+    :class="{ 'bg-hover': stash.selectedSha.value === entry.sha }"
     :data-kira-tip="rowModel(entry).rowTooltip"
     :data-row-id="rowModel(entry).id"
     :tabindex="focusedRowId === rowModel(entry).id ? 0 : -1"
   >
     <button
       type="button"
-      :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
+      :class="cn(rowVariants(), 'kv-branch-row-main flex-1 min-w-0 text-left')"
       @click="select(entry)"
     >
       <CodiconIcon name="archive" :size="13" />
-      <span v-if="rowModel(entry).badge" class="kv:whitespace-nowrap kv:font-data">{{ rowModel(entry).badge }}</span>
+      <span v-if="rowModel(entry).badge" class="whitespace-nowrap font-data">{{ rowModel(entry).badge }}</span>
       <span
         v-if="rowModel(entry).origin"
-        class="kv:whitespace-nowrap kv:text-sm kv:px-1 kv:rounded-sm kv:bg-stash-origin kv:text-stash-origin-fg"
+        class="whitespace-nowrap text-kira-sm px-1 rounded-kira-sm kv:bg-stash-origin kv:text-stash-origin-fg"
         :data-kira-tip="rowModel(entry).originTooltip"
         >{{ rowModel(entry).origin }}</span
       >
       <span
         v-if="rowModel(entry).auto"
-        class="kv:whitespace-nowrap kv:text-sm kv:px-1 kv:rounded-sm kv:bg-stash-auto kv:text-stash-auto-fg"
+        class="whitespace-nowrap text-kira-sm px-1 rounded-kira-sm kv:bg-stash-auto kv:text-stash-auto-fg"
         data-kira-tip="Created automatically by an auto-stashed checkout"
         >auto</span
       >
-      <span class="kv-stash-message kv:flex-1 kv:min-w-0 kv:truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
-      <span v-if="entry.includedUntracked" class="kv:font-data kv:text-sm kv:opacity-80" data-kira-tip="Includes untracked files">-u</span>
-      <span class="kv:text-sm kv:text-muted-foreground kv:whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
-      <span class="kv:text-sm kv:text-muted-foreground kv:whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
+      <span class="kv-stash-message flex-1 min-w-0 truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
+      <span v-if="entry.includedUntracked" class="font-data text-kira-sm opacity-80" data-kira-tip="Includes untracked files">-u</span>
+      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
+      <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </button>
     <RowActionsButton
       @click="openMenuFromButton(entry, $event)"
@@ -129,7 +129,7 @@ function onMenuSelect(id: string): void {
     />
   </div>
   <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-  <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">{{ emptyMessage }}</div>
+  <div v-if="section.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-kira-sm">{{ emptyMessage }}</div>
 
   <RowContextMenu
     v-if="stashMenu"

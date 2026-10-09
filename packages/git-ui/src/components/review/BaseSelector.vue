@@ -14,9 +14,9 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import { cn } from '@theme/lib/utils';
 import { computed, ref, useTemplateRef } from 'vue';
 import { codiconName, STATE_ICONS } from '../../icons/index.ts';
-import { cn } from '../../lib/cn.ts';
 import { rowVariants } from '../../lib/rowVariants.ts';
 import type { RefsState } from '../../state/refs.ts';
 import { buildRefListSections } from '../refListModel.ts';
@@ -149,7 +149,7 @@ function onOpenAutoFocus(e: Event): void {
                 v-for="candidate in suggested"
                 :key="candidate.ref"
                 type="button"
-                :class="cn(rowVariants(), 'kv:w-full')"
+                :class="cn(rowVariants(), 'w-full')"
                 @click="pick(candidate.ref)"
               >
                 <span class="kv:truncate">{{ candidate.ref }}</span>
@@ -163,7 +163,7 @@ function onOpenAutoFocus(e: Event): void {
                 v-for="row in sections.branches.visible"
                 :key="row.refname"
                 type="button"
-                :class="cn(rowVariants(), 'kv:w-full')"
+                :class="cn(rowVariants(), 'w-full')"
                 @click="pick(row.shortName)"
               >
                 <span class="kv:truncate">{{ row.shortName }}</span>
@@ -172,7 +172,7 @@ function onOpenAutoFocus(e: Event): void {
                 v-for="row in sections.remoteBranches.visible"
                 :key="row.refname"
                 type="button"
-                :class="cn(rowVariants(), 'kv:w-full')"
+                :class="cn(rowVariants(), 'w-full')"
                 @click="pick(row.shortName)"
               >
                 <CodiconIcon name="cloud" :size="13" />

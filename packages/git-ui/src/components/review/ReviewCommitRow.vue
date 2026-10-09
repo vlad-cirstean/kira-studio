@@ -16,6 +16,7 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import { TransportError } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { useEventListener } from '@vueuse/core';
 import { computed, ref, useTemplateRef } from 'vue';
@@ -198,7 +199,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 <template>
   <div
     v-if="commit"
-    class="kv:flex kv:flex-col kv:border-b kv:border-panel-border kv:cursor-pointer kv:group kv:focus-visible:outline-1 kv:focus-visible:outline-focus kv:focus-visible:-outline-offset-2"
+    class="flex flex-col border-b border-border cursor-pointer group focus-visible:outline-1 focus-visible:outline-focus focus-visible:-outline-offset-2"
     role="treeitem"
     :aria-expanded="expanded"
     :tabindex="focused ? 0 : -1"
@@ -216,26 +217,26 @@ function onOpenFile(index: number, pinned: boolean): void {
          already sits on, and that combination passes. -->
     <div
       ref="headerEl"
-      class="kv-review-row-header kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-1.5 kv:min-w-0 kv:font-ui kv:group-hover:bg-hover"
+      class="kv-review-row-header flex items-center gap-1 py-1 px-2 min-h-row min-w-0 font-ui group-hover:bg-hover"
     >
-      <span
-        class="codicon kv:text-codicon kv:w-3 kv:shrink-0"
-        :class="expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
-        aria-hidden="true"
-      ></span>
+      <CodiconIcon
+        :name="expanded ? 'chevron-down' : 'chevron-right'"
+        :size="13"
+        class="size-3.5 shrink-0 text-center text-muted-foreground"
+      />
       <!-- G14 D8 row 1: two lines — subject on its own, full-width line; author/date/sha, muted,
            below it. GitLens's own commit-node anatomy. -->
-      <span class="kv:flex kv:flex-col kv:gap-0.5 kv:flex-1 kv:min-w-0">
-        <span class="kv:truncate">{{ commit.subject }}</span>
-        <span class="kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap kv:overflow-hidden">
-          <span class="kv:overflow-hidden kv:text-ellipsis">{{ commit.author.name }}</span>
-          <span class="kv:shrink-0" aria-hidden="true">·</span>
-          <span class="kv:overflow-hidden kv:text-ellipsis">{{ dateText }}</span>
-          <span class="kv:shrink-0" aria-hidden="true">·</span>
+      <span class="flex flex-col gap-0.5 flex-1 min-w-0">
+        <span class="truncate">{{ commit.subject }}</span>
+        <span class="flex items-center gap-0.5 text-muted-foreground kv:text-sm whitespace-nowrap overflow-hidden">
+          <span class="overflow-hidden text-ellipsis">{{ commit.author.name }}</span>
+          <span class="shrink-0" aria-hidden="true">·</span>
+          <span class="overflow-hidden text-ellipsis">{{ dateText }}</span>
+          <span class="shrink-0" aria-hidden="true">·</span>
           <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
                sha renders as plain text; the existing copySha context-menu item (buildReadOnlyRowMenu)
                already covers this, and F7 found these two affordances genuinely redundant with it. -->
-          <span class="kv:font-data kv:text-inherit kv:shrink-0 kv:bg-transparent kv:border-0 kv:cursor-pointer kv:p-0">{{ shortSha }}</span>
+          <span class="font-data text-inherit shrink-0 bg-transparent border-0 cursor-pointer p-0">{{ shortSha }}</span>
         </span>
       </span>
       <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within
@@ -245,8 +246,8 @@ function onOpenFile(index: number, pinned: boolean): void {
            styling. -->
       <span
         :class="[
-          'kv-review-row-actions kv:flex kv:items-center kv:gap-0.5 kv:shrink-0',
-          focused ? 'kv:opacity-100' : 'kv:opacity-0 kv:group-hover:opacity-100 kv:group-focus-within:opacity-100',
+          'kv-review-row-actions flex items-center gap-0.5 shrink-0',
+          focused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
         ]"
       >
         <TooltipIconButton
@@ -266,8 +267,8 @@ function onOpenFile(index: number, pinned: boolean): void {
       </span>
     </div>
 
-    <div v-if="expanded" class="kv:border-t kv:border-panel-border kv:min-h-30 kv:max-h-80 kv:flex kv:flex-col">
-      <p v-if="expansion?.detail.error.value" class="kv:m-0 kv:p-2 kv:text-error">
+    <div v-if="expanded" class="border-t border-border min-h-30 max-h-80 flex flex-col">
+      <p v-if="expansion?.detail.error.value" class="m-0 p-2 text-error">
         Couldn't load this commit — {{ expansion.detail.error.value }}
       </p>
       <FileTree
@@ -284,7 +285,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         @open-file="onOpenFile"
         @update:parent-index="expansion.detail.setParentIndex($event)"
       />
-      <p v-else class="kv:m-0 kv:p-2 kv:text-muted-foreground">Loading…</p>
+      <p v-else class="m-0 p-2 text-muted-foreground">Loading…</p>
     </div>
 
     <RowContextMenu

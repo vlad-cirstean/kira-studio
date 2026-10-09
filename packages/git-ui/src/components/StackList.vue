@@ -92,9 +92,9 @@ async function removeFromStack(branch: string): Promise<void> {
   <section aria-label="Stacks">
     <RefSectionHeader label="Stacks" />
 
-    <div v-for="group in stacks.visible" :key="group.summary.base" class="kv:mb-1">
-      <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted-foreground">
-        <span class="kv:flex-1 kv:min-w-0 kv:truncate" :data-kira-tip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
+    <div v-for="group in stacks.visible" :key="group.summary.base" class="mb-1">
+      <div class="flex items-center gap-0.5 py-0.5 px-1 font-semibold text-muted-foreground">
+        <span class="flex-1 min-w-0 truncate" :data-kira-tip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
         <Button
           v-if="writeCapability"
           variant="toolbar"
@@ -110,14 +110,14 @@ async function removeFromStack(branch: string): Promise<void> {
       <div
         v-for="row in rowsFor(group.branches)"
         :key="row.name"
-        class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
+        class="kv-branch-row flex items-center gap-0.5 px-1"
         :style="{ paddingLeft: `calc(var(--kv-s-2) + ${row.depth} * var(--kv-s-4))` }"
         :data-row-id="`stack:${row.name}`"
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
-        <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
-          <span v-if="row.isHead" class="kv:text-sm kv:opacity-80" data-kira-tip="Current branch">●</span>
-          <span class="kv:truncate">{{ row.name }}</span>
+        <div class="kv-branch-row-main flex items-center gap-0.5 flex-1 min-w-0 text-left">
+          <span v-if="row.isHead" class="text-kira-sm opacity-80" data-kira-tip="Current branch">●</span>
+          <span class="truncate">{{ row.name }}</span>
           <span
             v-if="row.stale"
             :class="refBadgeClass('bg-(--kv-stack-stale-bg) text-(color:--kv-stack-stale-fg)')"
@@ -141,8 +141,8 @@ async function removeFromStack(branch: string): Promise<void> {
           >
             {{ prBadgeLabel(row.pr) }}
           </span>
-          <span v-if="row.trackText" class="kv:text-sm kv:text-muted-foreground">{{ row.trackText }}</span>
-          <span v-if="row.checkedOutIn" class="kv:text-sm kv:opacity-80" :data-kira-tip="row.checkedOutIn">
+          <span v-if="row.trackText" class="text-kira-sm text-muted-foreground">{{ row.trackText }}</span>
+          <span v-if="row.checkedOutIn" class="text-kira-sm opacity-80" :data-kira-tip="row.checkedOutIn">
             <CodiconIcon name="repo" :size="13" />
           </span>
         </div>
@@ -162,20 +162,20 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
-    <div v-if="orphans.visible.length > 0" class="kv:mb-1">
-      <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted-foreground">
-        <span class="kv:flex-1 kv:min-w-0 kv:truncate">Needs attention</span>
+    <div v-if="orphans.visible.length > 0" class="mb-1">
+      <div class="flex items-center gap-0.5 py-0.5 px-1 font-semibold text-muted-foreground">
+        <span class="flex-1 min-w-0 truncate">Needs attention</span>
       </div>
       <div
         v-for="row in orphanRows()"
         :key="row.name"
-        class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
+        class="kv-branch-row flex items-center gap-0.5 px-1"
         :data-row-id="`orphan:${row.name}`"
         :tabindex="focusedRowId === `orphan:${row.name}` ? 0 : -1"
       >
-        <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
-          <span class="kv:truncate">{{ row.name }}</span>
-          <span class="kv:truncate kv:text-sm kv:text-diff-deleted">{{ row.orphanReason }}</span>
+        <div class="kv-branch-row-main flex items-center gap-0.5 flex-1 min-w-0 text-left">
+          <span class="truncate">{{ row.name }}</span>
+          <span class="truncate text-kira-sm text-error">{{ row.orphanReason }}</span>
         </div>
         <TooltipIconButton
           v-if="writeCapability"
@@ -191,7 +191,7 @@ async function removeFromStack(branch: string): Promise<void> {
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
-      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
+      class="py-0.5 px-2 text-muted-foreground text-kira-sm"
     >
       No stacked branches
     </div>

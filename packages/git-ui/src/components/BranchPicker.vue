@@ -25,10 +25,10 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import { codiconName, PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
-import { cn } from '../lib/cn.ts';
 import { enabledNeighbour, firstEnabled, type MenuItem } from '../lib/menuModel.ts';
 import { rowVariants } from '../lib/rowVariants.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -701,7 +701,7 @@ watch(visibleBranchNames, (names) => {
             <template v-else>
               <button
                 type="button"
-                :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
+                :class="cn(rowVariants(), 'kv-branch-row-main flex-1 min-w-0 text-left')"
                 @click="checkoutBranch(row)"
               >
                 <span
@@ -763,7 +763,7 @@ watch(visibleBranchNames, (names) => {
           >
             <button
               type="button"
-              :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
+              :class="cn(rowVariants(), 'kv-branch-row-main flex-1 min-w-0 text-left')"
               @click="checkoutRemote(row)"
             >
               <CodiconIcon name="cloud" :size="13" />

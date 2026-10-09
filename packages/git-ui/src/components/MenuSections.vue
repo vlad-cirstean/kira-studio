@@ -3,11 +3,13 @@
 // KuiMenuList held for its three consumers (RowContextMenu, AppToolbar's push menu,
 // PullStrategyPicker), now rendering a MenuSection[] as DropdownMenuItems instead of building its
 // own row/keyboard-nav machinery (reka's DropdownMenuContent already owns that).
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '@theme/components/ui/dropdown-menu';
+import { codiconName } from '../icons/index.ts';
 import type { MenuSection } from '../lib/menuModel.ts';
 
 defineProps<{
@@ -34,12 +36,15 @@ const emit = defineEmits<(e: 'select', id: string) => void>();
       <!-- KuiMenuList's own G34 D9 rule: the icon box is unconditional so every row's label
            starts at the same x position whether or not that particular item carries an icon. -->
       <span class="flex items-center justify-center shrink-0 size-4">
-        <span v-if="item.icon" class="codicon" :class="item.icon" aria-hidden="true" />
+        <CodiconIcon
+          v-if="item.icon"
+          :name="codiconName(item.icon)"
+          :size="13"
+          class="text-muted-foreground"
+        />
       </span>
-      <span class="flex flex-col min-w-0">
-        <span>{{ item.label }}</span>
-        <span v-if="item.detail" class="text-kira-sm text-muted-foreground">{{ item.detail }}</span>
-      </span>
+      <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ item.label }}</span>
+      <span v-if="item.detail" class="ml-auto pl-2 text-kira-sm text-muted-foreground whitespace-nowrap">{{ item.detail }}</span>
       <span v-if="item.disabled && item.disabledReason" :id="`${item.id}-reason`" class="sr-only">
         {{ item.disabledReason }}
       </span>

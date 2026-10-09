@@ -30,10 +30,10 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { computed, nextTick, ref, useId, watch } from 'vue';
 import { ACTION_ICONS, codiconName } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
-import { cn } from '../lib/cn.ts';
 import { rowVariants } from '../lib/rowVariants.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -262,10 +262,9 @@ function rowClass(row: FileTreeRow, index: number): string {
   const selected = row.kind === 'file' && row.node.fileIndex === props.selectedFile;
   return cn(
     'kv-file-tree-row',
-    rowVariants({ selected }),
-    'kv:py-0.5 kv:px-2',
+    rowVariants({ layout: 'tree', selected }),
     index === focusedRow.value
-      ? 'kv:group-focus-within:outline kv:group-focus-within:outline-1 kv:group-focus-within:outline-focus kv:group-focus-within:-outline-offset-1'
+      ? 'group-focus-within:outline group-focus-within:outline-1 group-focus-within:outline-focus group-focus-within:-outline-offset-1'
       : '',
   );
 }
@@ -601,7 +600,7 @@ const parentSelectId = useId();
         :aria-expanded="row.kind === 'directory' ? row.expanded : undefined"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
-        :style="{ paddingLeft: `calc(var(--kv-tree-indent) * ${row.depth})` }"
+        :style="{ paddingLeft: `calc(8px + var(--kv-tree-indent) * ${row.depth})` }"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
@@ -610,12 +609,12 @@ const parentSelectId = useId();
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
                rows' checkbox column aligned underneath it. -->
-          <span v-if="reviewStates" class="kv:w-3.5 kv:shrink-0" aria-hidden="true"></span>
-          <span
-            class="codicon kv:text-codicon kv:w-3"
-            :class="row.expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
-            aria-hidden="true"
-          ></span>
+          <span v-if="reviewStates" class="w-3.5 shrink-0" aria-hidden="true"></span>
+          <CodiconIcon
+            :name="row.expanded ? 'chevron-down' : 'chevron-right'"
+            :size="13"
+            class="size-3.5 shrink-0 text-center text-muted-foreground"
+          />
           <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
           <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-sm kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
@@ -647,7 +646,7 @@ const parentSelectId = useId();
             <CheckIcon v-else />
           </Checkbox>
           <span
-            class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:mask-contain kv:mask-no-repeat kv:mask-center"
+            class="kv-file-tree-icon shrink-0 size-4 mask-contain mask-no-repeat mask-center"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
@@ -709,7 +708,7 @@ const parentSelectId = useId();
         role="option"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
-        :style="{ paddingLeft: `calc(var(--kv-tree-indent) * ${row.depth})` }"
+        :style="{ paddingLeft: `calc(8px + var(--kv-tree-indent) * ${row.depth})` }"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
@@ -718,12 +717,12 @@ const parentSelectId = useId();
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
                rows' checkbox column aligned underneath it. -->
-          <span v-if="reviewStates" class="kv:w-3.5 kv:shrink-0" aria-hidden="true"></span>
-          <span
-            class="codicon kv:text-codicon kv:w-3"
-            :class="row.expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
-            aria-hidden="true"
-          ></span>
+          <span v-if="reviewStates" class="w-3.5 shrink-0" aria-hidden="true"></span>
+          <CodiconIcon
+            :name="row.expanded ? 'chevron-down' : 'chevron-right'"
+            :size="13"
+            class="size-3.5 shrink-0 text-center text-muted-foreground"
+          />
           <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
           <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-sm kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
@@ -755,7 +754,7 @@ const parentSelectId = useId();
             <CheckIcon v-else />
           </Checkbox>
           <span
-            class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:mask-contain kv:mask-no-repeat kv:mask-center"
+            class="kv-file-tree-icon shrink-0 size-4 mask-contain mask-no-repeat mask-center"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>

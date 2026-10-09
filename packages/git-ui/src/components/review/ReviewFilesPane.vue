@@ -123,15 +123,15 @@ function onToggleReviewed(path: string): void {
 </script>
 
 <template>
-  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
-    <p v-if="reviewFiles.loadError.value" class="kv:m-0 kv:p-3 kv:text-error">
+  <div class="flex flex-col min-h-0 h-full">
+    <p v-if="reviewFiles.loadError.value" class="m-0 p-3 text-error">
       Couldn't load the file list — {{ reviewFiles.loadError.value }}
     </p>
 
     <template v-else>
       <!-- G12 D12/D16: which two revisions a click opens in VS Code's diff editor — the one real
            capability removing DiffView would otherwise have lost. -->
-      <div class="kv:flex kv:items-center kv:gap-1.5 kv:py-0.5 kv:px-2 kv:border-b kv:border-panel-border kv:font-ui">
+      <div class="flex items-center gap-1.5 py-0.5 px-2 border-b border-border font-ui">
         <ToggleGroup
           type="single"
           variant="outline"
@@ -149,19 +149,19 @@ function onToggleReviewed(path: string): void {
             <TooltipContent>{{ o.label }}</TooltipContent>
           </Tooltip>
         </ToggleGroup>
-        <span v-if="deltaStatusText" class="kv:ml-auto kv:text-muted-foreground kv:text-sm">{{ deltaStatusText }}</span>
+        <span v-if="deltaStatusText" class="ml-auto text-muted-foreground kv:text-sm">{{ deltaStatusText }}</span>
       </div>
-      <p v-if="reviewFiles.diffError.value" class="kv:m-0 kv:p-3 kv:text-error">
+      <p v-if="reviewFiles.diffError.value" class="m-0 p-3 text-error">
         Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
       </p>
       <!-- G30 round-1 functional-correctness review, finding #7: a failed review.mark used to be
            an unhandled promise rejection with nothing shown here — the checkbox just silently
            reverted on the next render. Mirrors loadError/diffError's own pattern exactly. -->
-      <p v-if="reviewFiles.markError.value" class="kv:m-0 kv:p-3 kv:text-error">
+      <p v-if="reviewFiles.markError.value" class="m-0 p-3 text-error">
         Couldn't update that file's review status — {{ reviewFiles.markError.value }}
       </p>
 
-      <div v-if="hasFilter" class="kv:flex kv:items-center kv:py-0.5 kv:px-2 kv:border-b kv:border-panel-border kv:font-ui">
+      <div v-if="hasFilter" class="flex items-center py-0.5 px-2 border-b border-border font-ui">
         <ToggleGroup
           type="single"
           variant="outline"
@@ -174,13 +174,13 @@ function onToggleReviewed(path: string): void {
           <ToggleGroupItem value="all">All</ToggleGroupItem>
         </ToggleGroup>
       </div>
-      <p v-if="nothingToReview" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
+      <p v-if="nothingToReview" class="m-0 p-3 text-muted-foreground">
         Nothing changed since your last review.
       </p>
 
       <FileTree
         v-else
-        class="kv-review-files-tree kv:flex-auto kv:min-h-0 kv:border-b kv:border-panel-border"
+        class="kv-review-files-tree flex-auto min-h-0 border-b border-border"
         :files="files"
         :selected-file="selectedIndex"
         :list-mode="listMode"
@@ -194,7 +194,7 @@ function onToggleReviewed(path: string): void {
         @open-file="onOpenFileIndex"
         @toggle-reviewed="onToggleReviewed"
       />
-      <p v-if="reviewFiles.loading.value && files.length === 0" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
+      <p v-if="reviewFiles.loading.value && files.length === 0" class="m-0 p-3 text-muted-foreground">
         Loading…
       </p>
     </template>

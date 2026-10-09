@@ -38,11 +38,11 @@ import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
-import { cn } from '../../lib/cn.ts';
 import { rowVariants } from '../../lib/rowVariants.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import { copyToClipboard } from '../../state/clipboardActions.ts';
@@ -863,7 +863,7 @@ watch(
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
               type="button"
-              :class="cn(rowVariants(), 'kv:w-full kv:text-left')"
+              :class="cn(rowVariants({ layout: 'tree' }), 'w-full pl-2 text-left')"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -881,7 +881,7 @@ watch(
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
               type="button"
-              :class="cn(rowVariants(), 'kv:w-full kv:text-left')"
+              :class="cn(rowVariants({ layout: 'tree' }), 'w-full pl-2 text-left')"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}

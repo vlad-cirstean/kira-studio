@@ -8,8 +8,8 @@
  * this file's own template, not that one's.
  */
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
+import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
-import { cn } from '../lib/cn.ts';
 import { rowVariants } from '../lib/rowVariants.ts';
 import type { OpsState } from '../state/ops.ts';
 import RefSectionHeader from './RefSectionHeader.vue';
@@ -111,30 +111,30 @@ async function onRefMenuSelect(id: string): Promise<void> {
     <div
       v-for="row in section.visible"
       :key="row.refname"
-      class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
+      class="kv-branch-row flex items-center gap-0.5 px-1"
       :data-row-id="`tag:${row.refname}`"
       :tabindex="focusedRowId === `tag:${row.refname}` ? 0 : -1"
     >
       <button
         type="button"
-        :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
+        :class="cn(rowVariants(), 'kv-branch-row-main flex-1 min-w-0 text-left')"
         @click="checkout(row)"
       >
         <span
           class="codicon codicon-tag"
-          :class="{ 'kv:opacity-60': !row.annotation }"
+          :class="{ 'opacity-60': !row.annotation }"
           aria-hidden="true"
         ></span>
-        <span class="kv:truncate">{{ row.shortName }}</span>
-        <span class="kv:text-sm kv:text-muted-foreground">{{ row.annotation ? "annotated" : "lightweight" }}</span>
+        <span class="truncate">{{ row.shortName }}</span>
+        <span class="text-kira-sm text-muted-foreground">{{ row.annotation ? "annotated" : "lightweight" }}</span>
         <span
           v-if="row.annotation"
-          class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-sm kv:text-muted-foreground"
+          class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground"
           :data-kira-tip="row.annotation.subject"
         >
           {{ row.annotation.subject }}
         </span>
-        <span class="kv:font-data kv:text-sm kv:text-muted-foreground">{{ targetCommit(row) }}</span>
+        <span class="font-data text-kira-sm text-muted-foreground">{{ targetCommit(row) }}</span>
       </button>
       <RowActionsButton
         @click="openRefMenuFromButton(row, $event)"
@@ -142,7 +142,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
       />
     </div>
     <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No tags</div>
+    <div v-if="section.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-kira-sm">No tags</div>
 
     <RowContextMenu
       v-if="refMenu"
