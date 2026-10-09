@@ -79,6 +79,8 @@ type TaskBoardDeps struct {
 	CloseReviewWindows func(taskID string)
 	// HeadlessSettingSources returns the ade.headlessSettingSources setting, read fresh per run.
 	HeadlessSettingSources func() string
+	// RebaseTimeout bounds a rebase run; 0 = defaultRebaseTimeout.
+	RebaseTimeout time.Duration
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
 	// uses, notification included, so git-ui sees a new prepare script.
 	SetRepoSettings func(repoID string, patch model.GitRepoSettingsPatch) error

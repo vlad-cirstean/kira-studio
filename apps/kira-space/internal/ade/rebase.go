@@ -28,13 +28,19 @@ const (
 	verifyTimeout     = 2 * time.Minute
 )
 
-// rebaseTimeout bounds a rebase run; a var so a test can shorten it.
-var rebaseTimeout = 20 * time.Minute
+const defaultRebaseTimeout = 20 * time.Minute
 
 var rebaseTools = []string{"Bash(git:*)", "Read", "Edit", "Write", "Grep", "Glob", adeagent.FinishStepTool, adeagent.RunOutcomeTool}
 
-func rebaseDef() stepDef {
-	return stepDef{ID: rebaseStepID, Name: "Rebase", AllowedTools: rebaseTools, Timeout: formatTimeout(rebaseTimeout)}
+func (b *TaskBoard) rebaseTimeout() time.Duration {
+	if b.deps.RebaseTimeout > 0 {
+		return b.deps.RebaseTimeout
+	}
+	return defaultRebaseTimeout
+}
+
+func (b *TaskBoard) rebaseDef() stepDef {
+	return stepDef{ID: rebaseStepID, Name: "Rebase", AllowedTools: rebaseTools, Timeout: formatTimeout(b.rebaseTimeout())}
 }
 
 func formatTimeout(d time.Duration) string {
@@ -197,13 +203,12 @@ func (b *TaskBoard) planRebase(ctx context.Context, tc *taskCtx, args adewire.On
 	}
 	if commit {
 		for i, n := range p.stack {
-			if n.sb.TaskID != tc.task.ID {
-				if paths[i] == "" {
-					return nil, invalid("%s has no worktree: start its task first", n.sb.Name)
-				}
-				continue
+			if n.sb.TaskID == tc.task.ID {
+				paths[i], err = b.launchGate(ctx, tc, n.sb)
+			} else {
+				paths[i], err = b.launchGateOf(ctx, n.sb)
 			}
-			if paths[i], err = b.launchGate(ctx, tc, n.sb); err != nil {
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -226,6 +231,18 @@ func (b *TaskBoard) planRebase(ctx context.Context, tc *taskCtx, args adewire.On
 }
 
 func (p *rebasePlan) blockersClear() bool { return len(p.blockers) == 0 }
+
+// launchGateOf opens the launch gate of a branch on another task, under that task's mutex.
+func (b *TaskBoard) launchGateOf(ctx context.Context, sb model.AdeTaskBranch) (string, error) {
+	mu := b.taskMu(sb.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	tc, err := b.loadTaskCtx(sb.TaskID)
+	if err != nil {
+		return "", err
+	}
+	return b.launchGate(ctx, tc, sb)
+}
 
 // resolveRebaseTarget picks the ref the root goes onto: the review branch to queue after, a chosen
 // base (Change base), or the branch's current base. An unresolved base is a blocker, not an error.
@@ -503,7 +520,7 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 	go func() {
 		defer b.wg.Done()
 		defer endRun()
-		b.superviseAgent(runCtx, updated, rebaseDef(), sessionID, "", root.Worktree, prompt, rebaseTimeout)
+		b.superviseAgent(runCtx, updated, b.rebaseDef(), sessionID, "", root.Worktree, prompt, b.rebaseTimeout())
 	}()
 	return updated, nil
 }

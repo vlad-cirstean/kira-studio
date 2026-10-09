@@ -280,7 +280,7 @@ func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map
 	paths := map[string]string{}
 	title := taskTitle(tc.task, tc.branches)
 	space := b.spaceEnabled(tc.task)
-	for _, sb := range parentsFirst(tc.branches) {
+	for _, sb := range tc.branches {
 		if sb.Kind != model.AdeBranchKindMine {
 			continue
 		}
@@ -307,40 +307,6 @@ func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map
 		}
 	}
 	return paths, nil
-}
-
-// parentsFirst orders branches so a stacked branch follows the branch it is based on.
-func parentsFirst(in []model.AdeTaskBranch) []model.AdeTaskBranch {
-	out := make([]model.AdeTaskBranch, 0, len(in))
-	placed := map[string]bool{}
-	for len(out) < len(in) {
-		progressed := false
-		for _, br := range in {
-			if placed[br.ID] {
-				continue
-			}
-			waiting := false
-			for _, p := range in {
-				if p.ID == br.BaseBranchID && !placed[p.ID] && p.ID != br.ID {
-					waiting = true
-				}
-			}
-			if !waiting {
-				placed[br.ID] = true
-				out = append(out, br)
-				progressed = true
-			}
-		}
-		if !progressed { // a cycle cannot be stored; keep the rest in order
-			for _, br := range in {
-				if !placed[br.ID] {
-					out = append(out, br)
-				}
-			}
-			break
-		}
-	}
-	return out
 }
 
 func stepMessageKey(taskID, stageID, stepID string) string {

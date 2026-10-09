@@ -151,7 +151,7 @@ func closeTaskReviewWindows(repositories *repos.Repos, closeWindow func(key stri
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
-	notifier *agentnotify.Notifier, usage *claudeusage.Service,
+	notifier *agentnotify.Notifier, usage *claudeusage.Service, rebaseTimeout time.Duration,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -208,6 +208,7 @@ func wireAdeTask(
 		},
 		AutofetchMinutes: adeAutofetchMinutes(repositories),
 		HomeDir:          userHome,
+		RebaseTimeout:    rebaseTimeout,
 		Now:              time.Now,
 	})
 	tracker.SetStoppedHandler(board.OnTUIStopped)

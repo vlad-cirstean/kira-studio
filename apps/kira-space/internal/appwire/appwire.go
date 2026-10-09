@@ -72,6 +72,8 @@ type Options struct {
 	// TrackerGrace is how long the ADE tracker waits before it reads a spawned TUI session as
 	// stopped; zero means the tracker default.
 	TrackerGrace time.Duration
+	// RebaseTimeout bounds one ADE rebase run; 0 keeps the default (20 minutes).
+	RebaseTimeout time.Duration
 }
 
 // ShellHooks completes the window-manager seams once the shell exists. CloseWindow, FocusWindow and
@@ -233,7 +235,7 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage, opts.RebaseTimeout)
 	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
