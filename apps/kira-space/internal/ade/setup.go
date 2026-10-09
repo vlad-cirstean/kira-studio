@@ -98,6 +98,18 @@ func localBranch(inv []porcelain.InventoryRef, short string) (porcelain.Inventor
 	return porcelain.InventoryRef{}, false
 }
 
+// remoteBranch finds the remote-tracking ref for short, preferring origin.
+func remoteBranch(inv []porcelain.InventoryRef, short string) (porcelain.InventoryRef, bool) {
+	var found porcelain.InventoryRef
+	ok := false
+	for _, r := range inv {
+		if r.Remote != "" && r.Short == short && (!ok || r.Remote == "origin") {
+			found, ok = r, true
+		}
+	}
+	return found, ok
+}
+
 func branchExists(inv []porcelain.InventoryRef, short string) bool {
 	for _, r := range inv {
 		if r.Short == short {
@@ -115,7 +127,7 @@ type worktreeResult struct {
 }
 
 // ensureWorktree makes the branch's worktree exist (R14): a branch checked out anywhere, the repo
-// root included, runs there as is; a created branch without one gets an existingBranch worktree; a
+// root included, runs there as is; a created branch without one gets an existingBranch worktree (a remote-only one a newBranch tracking it); a
 // not-created branch gets its name, then a newBranch worktree from its base. wanted is the caller's
 // name for a not-created branch ("" = derived from the task title).
 func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.CodeRepo, sb model.AdeTaskBranch, wanted string) (worktreeResult, error) {
@@ -138,7 +150,14 @@ func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.
 			return worktreeResult{Path: row.WorktreePath, Name: sb.Name}, nil
 		}
 		path := b.freePath(rec.Name, sb.Name)
-		if err := b.addWorktree(ctx, entry, gitsession.OpRequest{Kind: "worktreeAdd", Mode: "existingBranch", Path: path, Branch: sb.Name}); err != nil {
+		req := gitsession.OpRequest{Kind: "worktreeAdd", Mode: "existingBranch", Path: path, Branch: sb.Name}
+		if _, local := localBranch(inv, sb.Name); !local {
+			// Remote-only: git cannot resolve the bare short name, so branch it off the tracking ref.
+			if rb, ok := remoteBranch(inv, sb.Name); ok {
+				req.Mode, req.StartPoint = "newBranch", rb.Remote+"/"+rb.Short
+			}
+		}
+		if err := b.addWorktree(ctx, entry, req); err != nil {
 			return worktreeResult{}, err
 		}
 		return worktreeResult{Path: path, Name: sb.Name, Fresh: true}, nil

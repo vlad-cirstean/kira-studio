@@ -199,7 +199,6 @@ func TestTaskBranches(t *testing.T) {
 	}
 
 	t.Run("remote-only branch", func(t *testing.T) {
-		t.Skip("P231 finding B-1: attaching a remote-only branch leaves no worktree (preflight cannot resolve the short name)")
 		added, err := app.W.AdeTask.AddExistingBranch(ctx, adewire.AddExistingBranchArgs{CodeRepoID: rec.ID, Name: "remote-topic"})
 		if err != nil {
 			t.Fatal(err)
