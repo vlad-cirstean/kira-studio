@@ -94,13 +94,13 @@ func (s *GitClientsService) PendingPairing() GitPairingSnapshot {
 	return toWireSnapshot(s.Broker.Pending())
 }
 
-// AttachPush wires gitsock's two change feeds (Broker.Subscribe, Sock.OnClientsChanged) onto this
+// AttachGitClientsPush wires gitsock's two change feeds (Broker.Subscribe, Sock.OnClientsChanged) onto this
 // service's own two push channels (ChannelGitPairing/ChannelGitClientsChanged), each payload run
 // through the same wire projection the request/response methods above use. Kept here rather than
 // in main.go so gitsock's own types (PairingSnapshot) stay out of it — this file's existing
 // interface-at-consumer precedent (GitSock/GitBroker above). Call once at startup, after the
 // service is constructed; the returned unsubscribe runs in teardown, before gitSock.Close().
-func (s *GitClientsService) AttachPush() (unsubscribe func()) {
+func AttachGitClientsPush(s *GitClientsService) (unsubscribe func()) {
 	unPairing := s.Broker.Subscribe(func(snap gitsock.PairingSnapshot) {
 		s.Deps.Events.Emit(ChannelGitPairing, toWireSnapshot(snap))
 	})

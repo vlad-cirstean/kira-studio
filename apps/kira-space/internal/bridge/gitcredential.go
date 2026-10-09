@@ -56,9 +56,9 @@ func (s *GitCredentialService) Provide(args GitCredentialProvideArgs) (bool, err
 	return s.Relay.Provide(args.RequestID, args.Secret), nil
 }
 
-// AttachPush broadcasts every relay change on ChannelGitCredential. Call once at startup; the
+// AttachGitCredentialPush broadcasts every relay change on ChannelGitCredential. Call once at startup; the
 // returned unsubscribe runs in teardown.
-func (s *GitCredentialService) AttachPush() (unsubscribe func()) {
+func AttachGitCredentialPush(s *GitCredentialService) (unsubscribe func()) {
 	return s.Relay.Subscribe(func(snap gitcred.Snapshot) {
 		s.Deps.Events.Emit(ChannelGitCredential, toWirePrompts(snap))
 	})

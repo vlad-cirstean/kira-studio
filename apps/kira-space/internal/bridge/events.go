@@ -13,7 +13,7 @@ import (
 const ChannelCodeSearch = appevent.ChannelCodeSearch
 
 // ChannelGitPairing and ChannelGitClientsChanged are G1's own two push channels — the pairing
-// prompt's live queue snapshot, and the Connected editors pane's list. GitClientsService.AttachPush
+// prompt's live queue snapshot, and the Connected editors pane's list. AttachGitClientsPush
 // (gitclients.go) subscribes gitsock's Broker.Subscribe/OnClientsChanged and pushes through these;
 // main.go calls it once at startup.
 const (

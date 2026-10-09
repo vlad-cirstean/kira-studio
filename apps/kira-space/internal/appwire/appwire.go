@@ -167,9 +167,9 @@ func Build(opts Options) *Wired {
 	w.GitClients = &bridge.GitClientsService{
 		Deps: deps, Sock: git.sock, Broker: git.sock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{}),
 	}
-	w.detachGitPush = w.GitClients.AttachPush()
+	w.detachGitPush = bridge.AttachGitClientsPush(w.GitClients)
 	w.GitCredential = &bridge.GitCredentialService{Deps: deps, Relay: credentialRelay}
-	w.detachGitCred = w.GitCredential.AttachPush()
+	w.detachGitCred = bridge.AttachGitCredentialPush(w.GitCredential)
 	w.GitHub = &bridge.GitHubService{Deps: deps, Browser: opts.Browser}
 	w.Link = &bridge.LinkService{Browser: opts.Browser}
 	w.Settings = &bridge.SettingsService{Deps: deps}
@@ -256,7 +256,7 @@ func Build(opts Options) *Wired {
 		Detect:        opts.MobileDetect, Find: opts.MobileFind, Poll: opts.MobilePoll,
 		IsLAN: opts.MobileIsLAN,
 	})
-	w.detachMobile = w.Mobile.AttachPush()
+	w.detachMobile = bridge.AttachMobilePush(w.Mobile)
 
 	w.beforeFlushOnce = sync.OnceFunc(func() {
 		// The ticker stops before the flush wait rather than after it (P56 D3).
@@ -297,7 +297,7 @@ func (w *Wired) BindShell(h ShellHooks) {
 // StartMobile starts the phone server when settings enable it; call after the shell is up.
 func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 
-// Bound returns the 21 bound services in registration order.
+// Bound returns the 22 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitClients), application.NewService(w.GitCredential),

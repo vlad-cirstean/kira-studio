@@ -116,7 +116,7 @@ type MobileAccessService struct {
 	// Assets is the embedded mobile build.
 	Assets fs.FS
 	Hub    *mobileweb.Hub
-	// Broker outlives server restarts; AttachPush runs its expiry loop and shuts it down.
+	// Broker outlives server restarts; AttachMobilePush runs its expiry loop and shuts it down.
 	Broker *mobileweb.Broker
 	// Writer is the phone's write path and Launches the rendezvous with the desktop window that
 	// opens a phone-started launch's terminal. Terminals owns phone-attached agent terminals.
@@ -215,9 +215,9 @@ func (s *MobileAccessService) LaunchOpened(args MobileLaunchOpenedArgs) error {
 // so the pane can offer "Trust this network" before the server is enabled.
 func (s *MobileAccessService) Status() MobileStatus { return s.withCurrent(s.embedded.Status()) }
 
-// AttachPush forwards the broker and drives its expiry loop. The returned detach runs in teardown:
+// AttachMobilePush forwards the broker and drives its expiry loop. The returned detach runs in teardown:
 // it unsubscribes and aborts every parked request.
-func (s *MobileAccessService) AttachPush() (detach func()) {
+func AttachMobilePush(s *MobileAccessService) (detach func()) {
 	unPairing := s.Broker.Subscribe(func(snap pairing.Snapshot[mobileweb.MobileMeta]) {
 		s.Deps.Events.Emit(ChannelMobilePairing, toWireMobileSnapshot(snap))
 	})

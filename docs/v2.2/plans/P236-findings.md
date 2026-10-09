@@ -13,12 +13,7 @@ Plan corrections (not product bugs):
 
 Findings:
 
-- F1 (after landing, needs `apps/kira-space/internal/appwire/appwire.go`, owned by Stream C):
-  `GitClientsService.AttachPush`, `GitCredentialService.AttachPush` and
-  `MobileAccessService.AttachPush` are exported methods, so Wails binds them. A page can call
-  them: a second `MobileAccessService.AttachPush` starts another `RunExpiry` loop and returns a
-  detach nobody runs. Fix: package-level funcs (the `docker.CloseWindowBound` precedent), called
-  from `appwire`. Coverage gate exempts the three until then.
+- F1 (fixed in `fix(bridge)`): the three `AttachPush` methods were exported, so Wails bound them. They are now package-level `AttachGitClientsPush`, `AttachGitCredentialPush` and `AttachMobilePush`, called from `appwire`. Gate exemptions removed.
 - F2 (fixed in `fix(gitsession)`): `WorktreeAddPreflight` reports the repo's own checked-out
   branch as clean.
 - F3 (fixed in `fix(gitclient)`): a repo deleted while open surfaces a raw `fork/exec` string.
