@@ -30,7 +30,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P232 | Real-flow tests for Kira Studio, same type as P231 (Go bound-service tests at the IPC level against real git/real services with default settings, plus real-UI `e2e-real` specs): API module (requests, collections, variables/environments, quick commands, gRPC), Docker module, with real API calls over HTTP and gRPC (real local HTTP servers and a real gRPC server with reflection and `.proto` descriptors, no mocked transport) and real Docker commands against a real Docker daemon (containers, images, volumes, networks, logs, exec), skipping with a clear message when no daemon is reachable, and Studio's own terminal wiring (`bridge/terminal.go`, terminal module host, Studio quick commands). Reuses P231's harness patterns; then fix every issue found. | Done |
 | P233 | Claude Code hooks only for sessions Kira Space starts: audit every place Kira Space or Kira Studio changes the user's real Claude Code configuration (`~/.claude/settings.json`, project `.claude/settings.json`, `.claude.json`, MCP registration, hooks), and move each to per-session injection (e.g. `--settings <file>` / `--mcp-config` passed only when Kira Space launches the agent or terminal session, hook shim scoped by an env var set only there). Kira Space must make no change to the user's actual settings files; migrate or remove entries earlier versions wrote, with an explicit user-visible cleanup step. Real-flow test that proves settings.json is byte-identical after the flows. | Done |
 | P234 | Docs refresh: update `docs/ARCHITECTURE.md` (incl. Parallelism, process wiring with `appwire`, stale git-pairing-real line, testing section), `docs/DEV_ENVIRONMENT.md`, the v2.2 README and root `README.md` to match everything shipped in v2.2 (P210-P233). | Done |
-| P235 | Code review (one Opus round, all three dimensions) of everything changed since the P227 close-out `605f63e3f` (P228-P234), then one Sonnet fixer. Findings file `plans/P235-findings.md` committed before the fixer, deleted once fixed. | Planned |
+| P235 | Code review (one Opus round, all three dimensions) of everything changed since the P227 close-out `605f63e3f` (P228-P234), then one Sonnet fixer. Findings file `plans/P235-findings.md` committed before the fixer, deleted once fixed. | Done |
 
 ## Requirements (user's words, condensed)
 
@@ -659,7 +659,7 @@ Mac handover: on a desktop build, type a long line fast into a Terminal tab and 
 Scope cut by the user mid-phase: hooks only. No MCP injection, no endpoint file, no `claudecfg`
 package, no cleanup UI or migration; Kira Space "Register with Claude Code" and Studio Database MCP
 Install stay exactly as before. Earlier commits for the larger scope are net-reverted by
-`67f8e9ba3`.
+`10852247c`.
 
 Audit (`rg` over apps, internal, packages, scripts, plus git history): no code writes hooks into
 `~/.claude/settings.json`, project `.claude/settings.json` or `.claude.json`. Hooks already ride a
@@ -694,3 +694,16 @@ after using the app.
 Done. Fixed per file: `docs/ARCHITECTURE.md` (A1-A26: `appwire` composition roots and `main.go` pointers, Bound counts 27 and 20, migrations to 0025, P227 and P231 facts, Testing tiers incl. P232 Commit 0, recounts, open items), `docs/DEV_ENVIRONMENT.md` (D1-D6), root `README.md` (R1-R7), `apps/kira-space/README.md` (S1-S7), `docs/v2.2/README.md`, `CLAUDE.md` (C1, C2); SPEC P212, P225, P228 results condensed.
 Checks: scratch path and script checker 38 misses left (4 real ones fixed), all on lines naming a deleted, renamed or build-output thing or the `docs/pending-*` workaround; stale-phrase grep 0 hits; counts 27, 20, 0025, 349 UI tests in 58 files, 7 e2e-real tests in 5 files, visual 13 Studio (8 specs) and 8 Space; `bun run lint`, `bun run lint:dead` clean.
 Deviations: none from the plan; DD1-DD7 took the first option. P232 sections untouched: P232 Stream B and its fixer append test contents beside the new Studio flow tier paragraph and DEV_ENVIRONMENT section.
+
+## P235 result
+
+Done. Review findings F1-F6 all fixed; findings file deleted.
+
+- F1: gRPC unary deadline now follows `api.requestTimeoutMs` (0 = none, 5 s dial bound stays); `timeoutMs` clamped 0..3_600_000; stale 30 s comment and `docs/ARCHITECTURE.md` fixed.
+- F2: `Host.Cancellable` registers a Describe for `CancelOp` with no op events; no Operations row.
+- F3: `describeSchema` calls `signal?.throwIfAborted()` before dialling.
+- F4: `setColumnWidth` rebuilds when leaving graph auto mode changes the drawn width, even if stored width is unchanged.
+- F5: Not scoped per window: adding window keys to three payloads plus listeners is out of proportion for a sandbox-only build. Comment corrected and limitation recorded in `docs/DEV_ENVIRONMENT.md`.
+- F6: P233 commit hash replaced with `10852247c`.
+
+Skipped: none. Checks: lint, typecheck, lint:dead, golangci-lint, `go build` (+ `-tags server`), Go tests for bridge/grpcclient/adapterhost/shell, `test:flows:studio`, Studio `grpc-request` and Space `repo-graph-lines`/`repo-workspace` UI specs pass. `TestResolveSource_CancelOnlyAffectsOwnCaller` flaked once under load, passes alone and on the base.
