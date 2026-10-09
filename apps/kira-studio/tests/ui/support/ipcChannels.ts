@@ -209,6 +209,7 @@ export const IPC = {
   // window (not one), driven by emitWailsEvent(page, IPC.customScriptsChanged, …) the same way.
   customScriptsChanged: 'kira:customScripts:changed',
   scriptRunsChanged: 'kira:scriptRuns:changed',
+  scriptRunLog: 'kira:scriptRunLog:appended',
   scriptRunsList: 'kira:scriptRuns:list',
   scriptRunsGet: 'kira:scriptRuns:get',
   scriptRunsStop: 'kira:scriptRuns:stop',

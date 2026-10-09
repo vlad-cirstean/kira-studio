@@ -36,6 +36,12 @@ export function createAutomationsModule(): AutomationsModuleContext {
       stop: (id) => control.scriptRunsStop(id),
       resolveDir: (scriptId) => control.scriptRunsResolveDir(scriptId),
       onChanged: (cb) => control.onScriptRunsChanged(cb),
+      preview: (args) => control.scriptRunsPreview(args),
+      start: (args, hash) => control.scriptRunsStart(args, hash),
+      readLog: (id, afterSeq) => control.scriptRunsReadLog(id, afterSeq),
+      onLog: (cb) => control.onScriptRunLog(cb),
+      mcpServers: () => control.scriptRunsMcpServers(),
+      mcpTools: (server) => control.scriptRunsMcpTools(server),
     },
     showAutomations: () => modeStore.setMode('automations'),
     chooseFolder: async (title) => {

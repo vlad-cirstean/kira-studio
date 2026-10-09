@@ -43,12 +43,21 @@ import type {
   SortSpec,
 } from '@shared/domain/queries';
 import type { ConnectionDdl } from '@shared/domain/schema';
-import type { ScriptRun } from '@shared/domain/scriptRuns';
+import type {
+  ScriptRun,
+  ScriptRunArgs,
+  ScriptRunLogChunk,
+  ScriptRunLogPage,
+  ScriptRunPreview,
+  ScriptRunStarted,
+} from '@shared/domain/scriptRuns';
 import type {
   CustomScript,
   CustomScriptFields,
   ScriptCollection,
   ScriptDir,
+  ScriptMcpServer,
+  ScriptMcpTool,
   ScriptsSnapshot,
 } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
@@ -378,6 +387,23 @@ const studioControl = {
     unwrap(ScriptRunsService.ResolveDir({ scriptId })).then((r) => trust<ScriptDir>(r)),
   onScriptRunsChanged: (cb: (run: ScriptRun) => void): (() => void) =>
     on(CHANNEL.scriptRunsChanged, (r) => cb(trust<ScriptRun>(r))),
+  scriptRunsPreview: (args: ScriptRunArgs): Promise<ScriptRunPreview> =>
+    unwrap(ScriptRunsService.Preview(args)).then((r) => trust<ScriptRunPreview>(r)),
+  scriptRunsStart: (args: ScriptRunArgs, hash: string): Promise<ScriptRunStarted> =>
+    unwrap(ScriptRunsService.Start({ ...args, hash })).then((r) => trust<ScriptRunStarted>(r)),
+  scriptRunsReadLog: (id: string, afterSeq: number): Promise<ScriptRunLogPage> =>
+    unwrap(ScriptRunsService.ReadLog({ id, afterSeq })).then((r) => {
+      const page = trust<Partial<ScriptRunLogPage>>(r);
+      return { chunks: page.chunks ?? [], truncated: page.truncated ?? false };
+    }),
+  onScriptRunLog: (
+    cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void,
+  ): (() => void) =>
+    on(CHANNEL.scriptRunLog, (r) => cb(trust<{ runId: string; chunks: ScriptRunLogChunk[] }>(r))),
+  scriptRunsMcpServers: (): Promise<ScriptMcpServer[]> =>
+    unwrap(ScriptRunsService.McpServers()).then((r) => trust<ScriptMcpServer[]>(r ?? [])),
+  scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>
+    unwrap(ScriptRunsService.McpTools({ server })).then((r) => trust<ScriptMcpTool[]>(r ?? [])),
 };
 
 // P103 Part 2 (§5.6): one exported object, composed from the methods shared with Kira Space

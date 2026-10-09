@@ -1,9 +1,18 @@
-import type { ScriptRun } from '@shared/domain/scriptRuns';
+import type {
+  ScriptRun,
+  ScriptRunArgs,
+  ScriptRunLogChunk,
+  ScriptRunLogPage,
+  ScriptRunPreview,
+  ScriptRunStarted,
+} from '@shared/domain/scriptRuns';
 import type {
   CustomScript,
   CustomScriptFields,
   ScriptCollection,
   ScriptDir,
+  ScriptMcpServer,
+  ScriptMcpTool,
 } from '@shared/domain/scripts';
 import { type ComputedRef, computed, type InjectionKey, inject } from 'vue';
 import type { TerminalLaunch } from '../state/createTerminalTabs';
@@ -35,6 +44,15 @@ export interface ScriptRunsSeam {
   /** Where a saved script runs; an empty id answers the app home as `base`, for an unsaved script. */
   resolveDir(scriptId: string): Promise<ScriptDir>;
   onChanged(cb: (run: ScriptRun) => void): () => void;
+  /** What a run would do, exactly as `start` does it. */
+  preview(args: ScriptRunArgs): Promise<ScriptRunPreview>;
+  /** `hash` is the preview's; a script edited since answers E_CONFLICT. */
+  start(args: ScriptRunArgs, hash: string): Promise<ScriptRunStarted>;
+  readLog(id: string, afterSeq: number): Promise<ScriptRunLogPage>;
+  onLog(cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void): () => void;
+  /** Servers of the user's Claude config. */
+  mcpServers(): Promise<ScriptMcpServer[]>;
+  mcpTools(server: string): Promise<ScriptMcpTool[]>;
 }
 
 export interface AutomationsModuleContext {

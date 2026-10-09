@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
-import type { CustomScript, ScriptCollection } from '@shared/domain/scripts';
+import type { CustomScript, ScriptCollection, ScriptKind } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
@@ -21,6 +21,7 @@ import RunsSection from './runs/RunsSection.vue';
 import { useScriptRuns } from './runs/runsQueries';
 import ScriptDialog from './ScriptDialog.vue';
 import { useRemoveScript } from './scriptActions';
+import SmartBadge from './smart/SmartBadge.vue';
 
 const contextMenuStore = useContextMenuStore();
 const confirmDialogStore = useConfirmDialogStore();
@@ -34,7 +35,11 @@ const scripts = ctx.scripts;
 
 // Dialog visibility is this component's own local state: nothing else reads it. `collectionId`
 // presets a new script's collection (added from a collection's own menu).
-const editor = ref<{ script: CustomScript | null; collectionId: string | null } | null>(null);
+const editor = ref<{
+  script: CustomScript | null;
+  kind: ScriptKind;
+  collectionId: string | null;
+} | null>(null);
 
 const search = ref('');
 const actionError = ref<string | null>(null);
@@ -157,6 +162,35 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   },
 });
 
+function newScriptItems(collectionId: string | null): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'new-script',
+      label: 'New script',
+      icon: 'add',
+      run: () => {
+        editor.value = { script: null, kind: 'script', collectionId };
+      },
+    },
+    {
+      type: 'item',
+      id: 'new-smart-script',
+      label: 'New smart script',
+      icon: 'sparkle',
+      run: () => {
+        editor.value = { script: null, kind: 'smart', collectionId };
+      },
+    },
+  ];
+}
+
+// The header "+" opens a dropdown under the button, the tab strip "+" pattern.
+function onAddClick(e: MouseEvent): void {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, newScriptItems(null));
+}
+
 function firstLine(command: string): string {
   const [first = '', ...rest] = command.split('\n');
   return rest.length > 0 ? `${first}…` : first;
@@ -202,7 +236,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       label: 'Edit…',
       icon: 'edit',
       run: () => {
-        editor.value = { script, collectionId: null };
+        editor.value = { script, kind: script.kind, collectionId: null };
       },
     },
     moveToCollectionMenu({
@@ -227,15 +261,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 
 function onCollectionContextMenu(e: MouseEvent, collection: ScriptCollection): void {
   contextMenuStore.openContextMenu(e, [
-    {
-      type: 'item',
-      id: 'new-script',
-      label: 'New script',
-      icon: 'add',
-      run: () => {
-        editor.value = { script: null, collectionId: collection.id };
-      },
-    },
+    ...newScriptItems(collection.id),
     {
       type: 'item',
       id: 'rename',
@@ -262,15 +288,7 @@ const bodyEl = useTemplateRef<HTMLElement>('bodyEl');
 useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
   e.preventDefault();
   contextMenuStore.openContextMenu(e, [
-    {
-      type: 'item',
-      id: 'new-script',
-      label: 'New script',
-      icon: 'add',
-      run: () => {
-        editor.value = { script: null, collectionId: null };
-      },
-    },
+    ...newScriptItems(null),
     {
       type: 'item',
       id: 'new-collection',
@@ -299,10 +317,10 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
         />
         <TooltipIconButton
           icon="add"
-          label="New script…"
+          label="New…"
           aria-label="New script"
           data-testid="automations-add"
-          @click="editor = { script: null, collectionId: null }"
+          @click="onAddClick"
         />
         <TooltipIconButton
           icon="new-folder"
@@ -345,7 +363,10 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 />
                 <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
                 <div class="flex-1 min-w-0 flex flex-col">
-                  <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
+                  <span class="flex min-w-0 items-center gap-1">
+                    <SmartBadge v-if="script.kind === 'smart'" />
+                    <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
+                  </span>
                   <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
                 </div>
                 <RunElapsed
@@ -405,7 +426,10 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 />
                 <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
                   <div class="flex-1 min-w-0 flex flex-col">
+                    <span class="flex min-w-0 items-center gap-1">
+                    <SmartBadge v-if="script.kind === 'smart'" />
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
+                  </span>
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
                   </div>
                   <RunElapsed
@@ -437,6 +461,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
         v-if="editor"
         :scripts="scripts"
         :script="editor.script"
+        :kind="editor.kind"
         :collection-id="editor.collectionId"
         :choose-folder="ctx.chooseFolder"
         :resolve-dir="ctx.runs.resolveDir"

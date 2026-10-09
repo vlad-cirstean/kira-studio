@@ -45,6 +45,7 @@ export const IPC = {
   customScriptsMove: 'kira:customScripts:move',
   customScriptsChanged: 'kira:customScripts:changed',
   scriptRunsChanged: 'kira:scriptRuns:changed',
+  scriptRunLog: 'kira:scriptRunLog:appended',
   scriptRunsList: 'kira:scriptRuns:list',
   scriptRunsGet: 'kira:scriptRuns:get',
   scriptRunsStop: 'kira:scriptRuns:stop',

@@ -62,6 +62,8 @@ export const CHANNEL = {
   customScriptsChanged: 'kira:customScripts:changed',
   // P242: one Automations run was created or changed (Emit, app-wide) — carries the whole run.
   scriptRunsChanged: 'kira:scriptRuns:changed',
+  // P242: log lines a smart run just stored, {runId, chunks} (Emit, app-wide).
+  scriptRunLog: 'kira:scriptRunLog:appended',
   // P108 Part 12 F18: one connection's mask-rule set changed (Upsert/Remove/RegenerateKey) —
   // schemaChanged's own per-connection shape (Emit, not EmitTo), so a second window's Privacy tab,
   // grid header menu and grid preview all stay in sync rather than reading a stale rule list.

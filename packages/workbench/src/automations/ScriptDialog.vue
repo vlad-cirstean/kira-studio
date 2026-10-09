@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
-import type { CustomScript, ScriptDir, ScriptDirMode } from '@shared/domain/scripts';
+import type {
+  CustomScript,
+  ScriptDir,
+  ScriptDirMode,
+  ScriptKind,
+  ScriptParam,
+  SmartSettings,
+} from '@shared/domain/scripts';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
@@ -23,8 +30,14 @@ import VarText from '@theme/components/VarText.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import type { TextPart } from '@theme/varText';
 import { queryClient } from '@workbench/state/queryClient';
-import { computed, ref, useTemplateRef } from 'vue';
+import { computed, ref, toRaw, useTemplateRef } from 'vue';
 import type { ScriptsSeam } from './module';
+import ParamsEditor from './ParamsEditor.vue';
+import McpToolsField from './smart/McpToolsField.vue';
+import SmartBadge from './smart/SmartBadge.vue';
+import SmartSettingsFields from './smart/SmartSettingsFields.vue';
+import { defaultSmart, varsUsed } from './smart/smartSettings';
+import ToolsField from './smart/ToolsField.vue';
 
 // Adds one script (`script === null`) or edits one. `scripts` is a prop, not
 // `useAutomationsModule()`: AutomationsPanel.vue owns the seam and mounts this per open. `collectionId`
@@ -32,6 +45,8 @@ import type { ScriptsSeam } from './module';
 const props = defineProps<{
   scripts: ScriptsSeam;
   script: CustomScript | null;
+  /** Kind of a new script; an edited script keeps its own. */
+  kind?: ScriptKind;
   collectionId?: string | null;
   chooseFolder: (title: string) => Promise<string | null>;
   resolveDir: (scriptId: string) => Promise<ScriptDir>;
@@ -39,8 +54,27 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const colors = PALETTE_COLOR_CHOICES;
+const title = computed(() => {
+  const what = isSmart ? 'smart script' : 'script';
+  return `${props.script ? 'Edit' : 'New'} ${what}`;
+});
 
+const kind: ScriptKind = props.script?.kind ?? props.kind ?? 'script';
+const isSmart = kind === 'smart';
 const name = ref(props.script?.name ?? '');
+const params = ref<ScriptParam[]>(structuredClone(toRaw(props.script?.params ?? [])));
+const smart = ref<SmartSettings>(
+  structuredClone(toRaw(props.script?.smart ?? defaultSmart())),
+);
+const usedVars = computed(() => (isSmart ? varsUsed(command.value) : []));
+const usesParts = computed<TextPart[]>(() => {
+  const parts: TextPart[] = ['Uses: '];
+  usedVars.value.forEach((v, i) => {
+    if (i > 0) parts.push(', ');
+    parts.push({ name: v, value: v });
+  });
+  return parts;
+});
 const command = ref(props.script?.command ?? '');
 const dirMode = ref<ScriptDirMode>(props.script?.dirMode ?? 'kira');
 const workingDir = ref(props.script?.workingDir ?? '');
@@ -96,9 +130,9 @@ async function save(): Promise<void> {
   const fields = {
     name: name.value.trim(),
     command: command.value.trim(),
-    kind: 'script' as const,
-    params: [],
-    smart: null,
+    kind,
+    params: params.value,
+    smart: isSmart ? smart.value : null,
     dirMode: dirMode.value,
     workingDir: dirMode.value === 'fixed' ? workingDir.value.trim() : '',
     color: color.value,
@@ -133,7 +167,8 @@ function onOpenAutoFocus(e: Event): void {
       @keydown.ctrl.enter.prevent="save"
     >
       <DialogHeader>
-        <DialogTitle>{{ script ? 'Edit script' : 'New script' }}</DialogTitle>
+        <DialogTitle>{{ title }}</DialogTitle>
+        <SmartBadge v-if="isSmart" />
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -160,20 +195,31 @@ function onOpenAutoFocus(e: Event): void {
         </Field>
 
         <Field>
-          <FieldLabel for="script-command">Command</FieldLabel>
+          <FieldLabel for="script-command">{{ isSmart ? 'Prompt' : 'Command' }}</FieldLabel>
           <Textarea
             id="script-command"
             v-model="command"
             rows="8"
             spellcheck="false"
-            placeholder="npm run build"
+            :placeholder="isSmart ? 'Summarize the open TODOs in this folder' : 'npm run build'"
             class="field-sizing-fixed min-h-40 resize-y font-data leading-normal"
             data-testid="script-dialog-command"
           />
-          <FieldDescription>
+          <FieldDescription v-if="isSmart" data-testid="script-dialog-uses">
+            <template v-if="usedVars.length > 0"><VarText :parts="usesParts" /></template>
+            <template v-else>Use {name} to insert a parameter. Press Cmd/Ctrl+Enter to save.</template>
+          </FieldDescription>
+          <FieldDescription v-else>
             Runs in your login shell; lines run in order. Press Cmd/Ctrl+Enter to save.
           </FieldDescription>
         </Field>
+
+        <template v-if="isSmart">
+          <SmartSettingsFields v-model="smart" />
+          <ToolsField v-model="smart" />
+          <McpToolsField v-model="smart" />
+        </template>
+        <ParamsEditor v-model="params" :kind="kind" />
 
         <Field>
           <FieldLabel>Working directory</FieldLabel>
