@@ -191,3 +191,6 @@ dist-proto-hooks/
 /kira-space
 /kira-studio
 apps/kira-space/bin/
+
+# flow coverage gate (the "coverage" rule above would hide it)
+!apps/*/internal/flows/coverage/
