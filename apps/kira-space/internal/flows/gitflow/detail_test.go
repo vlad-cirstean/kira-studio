@@ -156,4 +156,14 @@ func TestCommitDetailAndDiff(t *testing.T) {
 			t.Fatalf("file.read of a path absent at the revision = %q, want missing", res.Kind)
 		}
 	})
+	t.Run("file.goToTarget is live on disk and unavailable nowhere", func(t *testing.T) {
+		live := call[gitsession.GoToTarget](t, r.gs, "file.goToTarget", gitrpc.FileGoToTargetParams{RepoID: id, Rev: mixed, Path: "a.txt"})
+		if live.Kind != "live" || live.AbsPath != filepath.Join(repo.Dir, "a.txt") {
+			t.Fatalf("on-disk path = %+v, want live at the worktree path", live)
+		}
+		gone := call[gitsession.GoToTarget](t, r.gs, "file.goToTarget", gitrpc.FileGoToTargetParams{RepoID: id, Rev: root, Path: "nowhere.txt"})
+		if gone.Kind != "unavailable" {
+			t.Fatalf("path neither at the revision nor on disk = %+v, want unavailable", gone)
+		}
+	})
 }

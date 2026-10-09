@@ -108,6 +108,13 @@ func TestRestartKeepsUserData(t *testing.T) {
 	if err := cs.Move(bridge.CustomScriptsMoveArgs{ID: script.ID, CollectionID: &b.ID}); err != nil {
 		t.Fatal(err)
 	}
+	extra, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: quickcommands.CustomScriptFields{Name: "temp", Command: "true", Color: "blue"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cs.Remove(bridge.CustomScriptsRemoveArgs{ID: extra.ID}); err != nil {
+		t.Fatal(err)
+	}
 
 	items := []memory.Item{
 		{Fact: "billing runs postgres", Reason: "migration notes"},

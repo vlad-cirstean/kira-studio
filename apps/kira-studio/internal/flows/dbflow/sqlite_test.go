@@ -3,6 +3,7 @@ package dbflow
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -171,6 +172,20 @@ func (j *journey) savedQueries(connID, tablePath string) {
 	consoles, err := app.W.Queries.ListConsole(bridge.QueriesListArgs{ConnectionID: connID, Path: ""})
 	if err != nil || len(consoles) != 1 || consoles[0].ID != console.ID {
 		t.Fatalf("Queries.ListConsole = %+v (%v), want the one console", consoles, err)
+	}
+
+	doomed, err := app.W.Queries.Save(bridge.QueriesSaveArgs{
+		ConnectionID: connID, Path: tablePath, Name: "doomed", Body: model.FilterBody{Where: &where},
+	})
+	if err != nil {
+		t.Fatalf("Queries.Save doomed: %v", err)
+	}
+	if err := app.W.Queries.Delete(bridge.QueriesIDArgs{ID: doomed.ID}); err != nil {
+		t.Fatalf("Queries.Delete: %v", err)
+	}
+	filters, err = app.W.Queries.List(bridge.QueriesListArgs{ConnectionID: connID, Path: tablePath})
+	if err != nil || len(filters) != 1 || filters[0].ID != saved.ID {
+		t.Fatalf("Queries.List after Delete = %+v (%v), want the one filter", filters, err)
 	}
 
 	for _, w := range []string{"id = 1", "id = 2", "id = 1"} {
@@ -355,4 +370,27 @@ func TestSecretsStatusAndReveal(t *testing.T) {
 	wantPassword("after a relaunch", "rotated")
 	update(ptr(""))
 	wantPassword("empty clears it", "")
+}
+
+func TestSchemaDDLSetGet(t *testing.T) {
+	app := flowharness.New(t)
+	conn, err := app.W.Connections.Create(connections.Input{ConnectionFields: model.ConnectionFields{
+		Name: "ddl", Kind: "sqlite", Color: "teal", Mode: "fields", Database: ptr(filepath.Join(t.TempDir(), "d.db")), Options: map[string]any{},
+		McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := app.W.Schema.Set(bridge.SchemaSetArgs{ConnectionID: conn.ID, DDL: "create table t (id integer);"})
+	if err != nil {
+		t.Fatalf("Schema.Set: %v", err)
+	}
+	got, err := app.W.Schema.Get(bridge.SchemaGetArgs{ConnectionID: conn.ID})
+	if err != nil || !reflect.DeepEqual(got, set) {
+		t.Fatalf("Schema.Get = %+v (%v), want %+v", got, err, set)
+	}
+	var ie *ipcerr.Error
+	if _, err := app.W.Schema.Get(bridge.SchemaGetArgs{}); !errors.As(err, &ie) || ie.Code != "E_BAD_REQUEST" {
+		t.Fatalf("Schema.Get without a connection = %v, want E_BAD_REQUEST", err)
+	}
 }

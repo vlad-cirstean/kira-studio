@@ -77,4 +77,26 @@ func TestHistoryClear(t *testing.T) {
 	if httpLen("tab-a") != 0 || grpcLen("tab-a") != 0 || httpLen("tab-b") != 1 || grpcLen("tab-b") != 1 {
 		t.Fatal("cleared and kept history differ after a relaunch")
 	}
+
+	item, err := app.W.Collections.CreateGrpcItem(bridge.CollectionsCreateGrpcItemArgs{
+		CollectionID: newCollection(t, app, "adopt").ID, Name: "saved",
+		Request: &model.SavedGrpcRequest{TLSMode: "plaintext", DescriptorMode: "reflection", Target: "localhost:50051"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	adopted, err := app.W.GrpcHistory.Adopt(bridge.GrpcHistoryAdoptArgs{TabID: "tab-b", ItemID: item.ID})
+	if err != nil || adopted.Adopted != 1 {
+		t.Fatalf("GrpcHistory.Adopt = %+v (%v), want 1 row", adopted, err)
+	}
+	rows, err := app.W.GrpcHistory.List(bridge.GrpcHistoryScopeArgs{ItemID: item.ID})
+	if err != nil || len(rows) != 1 || grpcLen("tab-b") != 0 {
+		t.Fatalf("after Adopt: item rows %d (%v), tab-b rows %d, want 1 and 0", len(rows), err, grpcLen("tab-b"))
+	}
+	if err := app.W.GrpcHistory.Delete(bridge.GrpcHistoryIDArgs{ID: rows[0].ID}); err != nil {
+		t.Fatal(err)
+	}
+	if rows, _ := app.W.GrpcHistory.List(bridge.GrpcHistoryScopeArgs{ItemID: item.ID}); len(rows) != 0 {
+		t.Fatalf("GrpcHistory.Delete left %d rows", len(rows))
+	}
 }

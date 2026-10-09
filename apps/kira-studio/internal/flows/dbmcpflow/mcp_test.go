@@ -74,6 +74,9 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil || !st.Running {
 		t.Fatalf("SetEnabled = %+v (%v), want running", st, err)
 	}
+	if got := app.W.DbMcp.Status(); !got.Running || got.Command != st.Command {
+		t.Fatalf("Status = %+v, want running with SetEnabled's command", got)
+	}
 	m := urlRe.FindStringSubmatch(st.Command)
 	if m == nil {
 		t.Fatalf("Status.Command has no server url: %q", st.Command)
