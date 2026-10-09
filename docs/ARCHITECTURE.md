@@ -4090,6 +4090,31 @@ and `docs/v2.0/plans/`.
   beside the fetch, not before it; `AdeReviewSync` shows a per-repo fetch error row. A repo with no
   remote gets a local rescan (P230), not an error row.
 
+### Task base and rebase runs (P241)
+
+- Base: `ade_branches.base`, `base_branch_id` (stack on a planner branch), `base_pending_from` (set when a
+  base change is stored, cleared only after a rebase verified in git). `baseMissing` marks a base ref that
+  no longer resolves; Review code refuses it. Resolution is remote first (`origin/<ref>`), validated by
+  `git check-ref-format`. Cycles refused. `CreateTask.bases` and `AddTaskRepo.base` pick it per repo;
+  `SetBranchBase` stores one for a draft branch; `RepoBranches` feeds the picker.
+- Rebase, Queue after and Change base are one `ade_runs` row with `purpose='rebase'`, run headless through the
+  run engine. `RebasePreview` composes the prompt, blockers and stack server-side; `Rebase` sends it
+  (`message ''` = default) and returns `{runId, noOp}`. One mutex per task covers start, abort and recovery.
+  Change base stores the base first and never reverts it on failure; retry is `Rebase`.
+- Stacked branches restack in order: a child rebases `--onto <parent> <parent's old tip>`.
+- Outcome: `model.AdeRunOutcome` = `runoutcome.Outcome` + optional `Report` (conflicted files, last git
+  error, what was tried) + `Rebase` facts. `finish_step` takes `reason`, `conflictedFiles`, `lastGitError`,
+  `tried`. `decideRebaseOutcome` checks git after the run (each branch on its base, no rebase in progress):
+  an agent `done` that git disagrees with becomes `failed`, source `verify`. A run without a report gets
+  `no report: <why>` and facts from git. Timeout is `Deps.RebaseTimeout`.
+- `AbortRebase` runs `git rebase --abort` in the worktree; `BranchInventory` keeps the worktree path of a
+  branch mid-rebase (detached HEAD, read from `rebase-merge/head-name`) so abort and `rebaseInProgress` work.
+- MCP `run_outcome` (Space grant, same task only) returns the latest ended runs with outcome, so another
+  agent reads why a rebase failed. The P238 notification titles a rebase run `Rebase <verdict> · <task>`.
+- UI rule: `board/rebaseActions.ts` decides every rebase act; tag action, panel header, fix menu, task menu
+  and the card button share it. `adeDialogs.act` runs one. No automatic rebase and no popup when a base
+  moves. Merge, archive, stage and start dialogs still deliver to a TUI session.
+
 ### Interactive sessions
 
 - `ade.Tracker` is one instance shared by `terminal.BoundService.ComposeAgent` (`Compose`),

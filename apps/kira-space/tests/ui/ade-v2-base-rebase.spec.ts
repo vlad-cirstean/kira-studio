@@ -360,3 +360,23 @@ test('no dialog opens on board load or when a run changes a base', async ({ rela
   await expect(page.locator(t('ade-plan'))).toBeVisible();
   await expect(page.locator(t('ade-dialog'))).toHaveCount(0);
 });
+
+test('a failed step that reported detail shows it in its stage block', async ({ relaunch }) => {
+  const { window: page } = await open(relaunch, (b) => {
+    const run = b.tasks
+      .find((x) => x.id === 'T_cart')
+      ?.runs.find((r) => r.id === 'r_T_cart_release_b_cart');
+    if (run)
+      run.outcome = {
+        status: 'failed',
+        reason: 'release script exited 1',
+        source: 'agent',
+        reported: true,
+        report: { lastGitError: 'push rejected', tried: 'retry' },
+      };
+  });
+  await page.locator(`${t('ade-card')}[data-task-id="T_cart"] ${t('ade-card-head')}`).click();
+  const out = page.locator(t('ade-run-outcome'));
+  await expect(out.locator(t('ade-outcome-reason'))).toHaveText('release script exited 1');
+  await expect(out.locator(t('ade-outcome-git-error'))).toHaveText('push rejected');
+});

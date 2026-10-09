@@ -18,6 +18,7 @@ import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS, TONE_TEXT_CLASS } from '../tones';
 import AdeRunLog from './AdeRunLog.vue';
+import AdeRunOutcome from './AdeRunOutcome.vue';
 import AdeSetupProgress from './AdeSetupProgress.vue';
 
 // One stage of the Workflow block: header (state chip, action slot, name, count, mode), then its
@@ -78,6 +79,11 @@ const boxClass = computed(() => {
   return 'border-border bg-elevated';
 });
 /** The row of a run line held back by its branch's prepare script. */
+// A failed step that reported detail (reason, conflicted files, last git error) shows it.
+const reportRun = (runId: string) => {
+  const r = props.card.task.runs.find((x) => x.id === runId);
+  return r?.outcome?.report && (r.state === 'failed' || r.state === 'stuck') ? r : undefined;
+};
 const heldRow = (rl: { run: { branchId: string }; note: string }) =>
   WAITING_SETUP_NOTES.includes(rl.note) ? props.card.rows.find((r) => r.id === rl.run.branchId) : undefined;
 const stateLabel = (s: StageBlock['state']): string => (s === 'now' ? 'now' : s);
@@ -245,6 +251,12 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           compact
           :branch="heldRow(rl)!.branch"
           :repo="heldRow(rl)!.repo"
+        />
+        <AdeRunOutcome
+          v-if="reportRun(rl.run.runId)"
+          :run="reportRun(rl.run.runId)!"
+          :title="`${block.stage.name} report`"
+          class="my-0.5 ml-6"
         />
         <div v-if="openLog === rl.run.runId && rl.run.runId" class="my-0.5 ml-6">
           <AdeRunLog kind="run" :id="rl.run.runId" max-height="140px" />
