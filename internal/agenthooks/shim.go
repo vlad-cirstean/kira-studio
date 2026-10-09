@@ -26,6 +26,7 @@ func buildShim(curlPath, sockPath string) (string, error) {
 # tool call, and this shim only reports. stderr is discarded for the same reason — a stale socket
 # must not print into the agent's transcript on every tool call.
 exec 2>/dev/null
+[ -n "$KIRA_AGENT_HOOK_TOKEN" ] && [ -n "$KIRA_TERMINAL_ID" ] || exit 0
 "%s" --silent --max-time 2 --output /dev/null \
   --unix-socket "%s" \
   --header "Authorization: Bearer $KIRA_AGENT_HOOK_TOKEN" \
