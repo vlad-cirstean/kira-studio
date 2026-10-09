@@ -1,21 +1,30 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@theme/components/ui/dropdown-menu';
 import VarText from '@theme/components/VarText.vue';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import type { BranchAction } from '../board/actions';
+import { changeBaseChoices } from '../board/changeBase';
 import { taskReviewTip } from '../board/reviewCode';
 import { useReviewCode } from '../review/useReviewCode';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
+import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { TONE_SOLID_CLASS, TONE_TAG_CLASS } from '../tones';
 import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
 import AdeBranchRow from './AdeBranchRow.vue';
-import type { BranchRowModel, CardModel } from './usePlanModel';
+import { type BranchRowModel, type CardModel, usePlanModel } from './usePlanModel';
 import { useTaskMenu } from './useTaskMenu';
 
 const props = defineProps<{ card: CardModel }>();
@@ -23,6 +32,8 @@ const emit = defineEmits<{ select: []; forcePush: [row: BranchRowModel] }>();
 
 const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
+const takeOver = useAdeTakeOverStore();
+const { model } = usePlanModel();
 const taskMenu = useTaskMenu(() => props.card);
 const reviewCode = useReviewCode();
 const choices = computed(() => reviewCode.choicesOf(props.card));
@@ -32,13 +43,29 @@ function onMenuKey(ev: KeyboardEvent): void {
   if (ev.currentTarget instanceof Element) taskMenu.openAt(ev.currentTarget);
 }
 
+// One branch opens Change base at once; several ask which.
+const baseChoices = computed(() => {
+  const m = model.value;
+  return m ? changeBaseChoices(props.card, { graph: m.view.graph, after: m.view.after, board: m.board }) : [];
+});
+
 function act(row: BranchRowModel, a: BranchAction): void {
-  if (a.kind === 'forcePush') emit('forcePush', row);
+  if (a.act) dialogs.act(a.act);
+  else if (a.kind === 'forcePush') emit('forcePush', row);
   else if (a.kind === 'seeError') {
     ui.selectBranch(row.branch.taskId, row.id);
     ui.focusSetup = true;
+  } else if (a.kind === 'seeLog') {
+    ui.selectBranch(row.branch.taskId, row.id);
+    ui.branchTab = 'details';
+    ui.focusRebaseLog = true;
+  } else if (a.kind === 'takeOver') {
+    delete ui.actionError[row.branch.taskId];
+    takeOver.request(a.sessionId ?? '').catch((err: unknown) => {
+      ui.actionError[row.branch.taskId] = err instanceof Error ? err.message : String(err);
+      ui.select(row.branch.taskId);
+    });
   } else if (a.kind === 'start') dialogs.start(row.id);
-  else dialogs.rebase(row.id, a);
 }
 
 const p = computed(() => props.card.progress);
@@ -88,7 +115,6 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
         :key="row.id"
         :tag="row.tag"
         :actions="row.tag.actions"
-        :rebasing="dialogs.pending.has(`rebase:${row.id}`)"
         @act="(a) => act(row, a)"
         @contextmenu="(ev: MouseEvent) => card.review && taskMenu.open(ev)"
       />
@@ -162,6 +188,45 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
               >{{ card.meta }}</span
             >
           </AdeTip>
+          <DropdownMenu v-if="baseChoices.length > 1">
+            <AdeTip text="Change the base of a branch">
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  class="size-4.5 shrink-0"
+                  aria-label="Change base"
+                  data-testid="ade-card-change-base"
+                  @click.stop
+                >
+                  <CodiconIcon name="git-branch" :size="13" />
+                </Button>
+              </DropdownMenuTrigger>
+            </AdeTip>
+            <DropdownMenuContent align="end" data-testid="ade-card-change-base-menu">
+              <DropdownMenuItem
+                v-for="c in baseChoices"
+                :key="c.branchId"
+                :disabled="c.disabled"
+                data-testid="ade-card-change-base-item"
+                @select="dialogs.act(c.act)"
+              >
+                <VarText :parts="c.parts" />
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <TooltipIconButton
+            v-else-if="baseChoices.length === 1"
+            icon="git-branch"
+            label="Change base"
+            class="size-4.5 shrink-0"
+            disabled-trigger
+            :disabled="baseChoices[0].disabled"
+            data-testid="ade-card-change-base"
+            @click.stop="dialogs.act(baseChoices[0].act)"
+          >
+            <VarText :parts="baseChoices[0].tip" />
+          </TooltipIconButton>
           <TooltipIconButton
             v-if="choices.length"
             icon="git-compare"

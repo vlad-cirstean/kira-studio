@@ -1,14 +1,13 @@
 import type { Tone } from '../board/actions';
-import { type BranchGraph, shortBranchName } from '../board/branchGraph';
-import type { Branch } from '../wire';
+import type { BranchGraph } from '../board/branchGraph';
+import { type RebaseAct, rebaseActs } from '../board/rebaseActions';
+import type { Branch, Run } from '../wire';
 
-// Branch panel header actions beyond Force push and Retry setup (mockup `acts2`): rebase onto main
-// or a branch, queue after a conflicting review branch, re-merge a stale target, start an agent.
+// Branch panel header actions beyond Force push and Retry setup (mockup `acts2`): the rebase acts,
+// re-merge a stale target, start an agent.
 
 export type HeaderAction =
-  | { kind: 'rebaseMain'; label: string; tone: Tone; rootId: string }
-  | { kind: 'rebaseOnto'; label: string; tone: Tone; ontoId: string }
-  | { kind: 'queueAfter'; label: string; tone: Tone; withId: string }
+  | { kind: 'rebase'; label: string; tone: Tone; act: RebaseAct }
   | { kind: 'remerge'; label: string; tone: Tone; target: string }
   | { kind: 'start'; label: string; tone: 'claude' }
   | { kind: 'review'; label: string; tone: 'grey' }
@@ -20,41 +19,44 @@ export interface HeaderInput {
   /** `TimelineView.after`: the earlier-merging branch this one shares files with. */
   after: ReadonlyMap<string, { id: string; file: string }>;
   hadSession: boolean;
+  runs: readonly Run[];
+  mainName: string;
 }
+
+const plain = (parts: readonly (string | { value: string })[]): string =>
+  parts.map((p) => (typeof p === 'string' ? p : p.value)).join('');
+
+const ACT_TONE: Record<RebaseAct['kind'], Tone> = {
+  rebase: 'amber',
+  queue: 'red',
+  changeBase: 'grey',
+  abortRebase: 'red',
+};
 
 export function headerActions(i: HeaderInput): HeaderAction[] {
   const b = i.branch;
-  if (b.name === '') {
-    return [{ kind: 'created', label: 'Created when the pipeline runs', tone: 'grey' }];
-  }
   const review: HeaderAction = { kind: 'review', label: 'Review code', tone: 'grey' };
+  const acts = rebaseActs({
+    branch: b,
+    graph: i.graph,
+    after: i.after,
+    runs: i.runs,
+    mainName: i.mainName,
+  });
+  const asHeader = (a: RebaseAct): HeaderAction => ({
+    kind: 'rebase',
+    label: plain(a.label),
+    tone: ACT_TONE[a.kind],
+    act: a,
+  });
+  if (b.name === '') {
+    return [
+      { kind: 'created', label: 'Created when the pipeline runs', tone: 'grey' },
+      ...acts.map(asHeader),
+    ];
+  }
   if (b.kind !== 'mine' || b.mergedIntoMain) return [review];
-  const out: HeaderAction[] = [];
-  const rootId = i.graph.rootOf(b.id);
-  const root = i.graph.byBranch.get(rootId);
-  if (root?.kind === 'mine' && root.behind > 0) {
-    out.push({ kind: 'rebaseMain', label: 'Rebase onto main', tone: 'amber', rootId });
-  }
-  const follow = i.after.get(b.id);
-  const followName = follow ? i.graph.byBranch.get(follow.id)?.name : undefined;
-  if (follow && followName) {
-    out.push({
-      kind: 'rebaseOnto',
-      label: `Rebase onto ${shortBranchName(followName)}`,
-      tone: 'amber',
-      ontoId: follow.id,
-    });
-  }
-  const conf = i.graph.conflicts.get(b.id)?.[0];
-  const confName = conf ? i.graph.byBranch.get(conf.with)?.name : undefined;
-  if (conf && confName) {
-    out.push({
-      kind: 'queueAfter',
-      label: `Queue after ${shortBranchName(confName)}`,
-      tone: 'red',
-      withId: conf.with,
-    });
-  }
+  const out: HeaderAction[] = acts.map(asHeader);
   for (const g of b.integration) {
     if (g.status === 'stale') {
       out.push({

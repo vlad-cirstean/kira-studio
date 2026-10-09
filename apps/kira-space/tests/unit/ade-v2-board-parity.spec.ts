@@ -221,6 +221,9 @@ describe('per task', () => {
   });
 });
 
+const flat = (parts: readonly (string | { value: string })[]): string =>
+  parts.map((p) => (typeof p === 'string' ? p : p.value)).join('');
+
 describe('per branch', () => {
   const byBranch = () => new Map(board.branches.map((b) => [b.id, b]));
 
@@ -248,6 +251,7 @@ describe('per branch', () => {
           graph: timeline.graph,
           plan: board.plan,
           after: timeline.after,
+          runs: [],
           nowMs: NOW,
           hadSession: sessions.sessions.some((s) => s.branchId === b.id),
           mainName: 'main',
@@ -285,10 +289,10 @@ describe('per branch', () => {
         const b = byBranch().get(id) as Branch;
         const { row } = oracleRow(t.id, b);
         const m = baseMarker(b, timeline.graph, 'main');
-        expect([b.id, m?.label ?? '']).toEqual([b.id, row.baseLabel]);
+        expect([b.id, flat(m?.label ?? [])]).toEqual([b.id, row.baseLabel]);
         if (m) {
           expect([b.id, m.tone === 'blue']).toEqual([b.id, row.baseStyle.includes('#93b6ff')]);
-          expect([b.id, m.tip]).toEqual([b.id, row.baseTip]);
+          expect([b.id, flat(m.tip)]).toEqual([b.id, row.baseTip]);
         }
       }
     }
@@ -377,6 +381,7 @@ describe('rebase-conflict check states', () => {
       graph,
       plan: mkPlan(),
       after: new Map(),
+      runs: [],
       nowMs: 0,
       hadSession: true,
       mainName: 'main',

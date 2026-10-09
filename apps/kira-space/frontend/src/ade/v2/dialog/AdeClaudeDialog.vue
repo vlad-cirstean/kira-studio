@@ -7,12 +7,15 @@ import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
+import AdeBasePicker from '../AdeBasePicker.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
+import { baseOf } from '../board/rebaseActions';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
+import { useRebasePreview } from '../queries';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { ACTION_CLASS } from '../tones';
-import { composeDialog } from './compose';
+import { composeDialog, isRebaseKind } from './compose';
 
 // The one Claude dialog every opener shares (mockup `dlg`): kind-specific title, busy alert, targets,
 // editable message, push switch and archive risk, then Cancel and the kind's send button.
@@ -23,11 +26,47 @@ const sending = ref(false);
 const CHIP_ON_CLASS =
   'border-claude bg-claude/16 text-claude hover:bg-claude/16 hover:text-claude data-[state=on]:bg-claude/16';
 
+// The rebase kinds show the server's own prompt; a pick or a switch asks for it again.
+const previewArgs = computed(() => {
+  const s = dialogs.spec;
+  if (!s || !isRebaseKind(s) || s.draft) return null;
+  return {
+    branchId: s.branchId ?? '',
+    onto: s.onto ?? null,
+    queueWith: s.queueWith ?? '',
+    push: dialogs.push,
+    autostash: dialogs.autostash,
+  };
+});
+const preview = useRebasePreview(previewArgs);
+
 const view = computed(() => {
   const c = dialogs.ctx;
   const s = dialogs.spec;
   if (!c || !s) return null;
-  return composeDialog(c, s, { msg: dialogs.msg, push: dialogs.push, override: dialogs.override });
+  return composeDialog(c, s, {
+    msg: dialogs.msg,
+    push: dialogs.push,
+    override: dialogs.override,
+    autostash: dialogs.autostash,
+    preview: preview.data.value ?? null,
+  });
+});
+
+const previewError = computed(() => {
+  const e = preview.error.value;
+  return e ? (e instanceof Error ? e.message : String(e)) : '';
+});
+
+// Change base: the branch being rebased, for the picker's repo and the base it shows now.
+const baseBranch = computed(() => {
+  const s = dialogs.spec;
+  return s?.kind === 'changeBase' ? dialogs.ctx?.graph.byBranch.get(s.branchId ?? '') : undefined;
+});
+const currentBase = computed(() => {
+  const c = dialogs.ctx;
+  const b = baseBranch.value;
+  return c && b ? baseOf(b, c.graph, c.repoState(b.codeRepoId).mainName) : '';
 });
 
 // The launch waits behind a prepare script: show each branch's, and why it is held or refused.
@@ -128,6 +167,28 @@ async function discard(): Promise<void> {
           data-testid="ade-dialog-setup"
         />
 
+        <div v-if="baseBranch" class="flex items-center gap-2" data-testid="ade-dialog-base">
+          <span class="text-muted-foreground">Base</span>
+          <AdeBasePicker
+            :code-repo-id="baseBranch.codeRepoId"
+            :branch-id="baseBranch.id"
+            :model-value="dialogs.spec?.onto ?? null"
+            :current="currentBase"
+            @update:model-value="dialogs.pickBase"
+          />
+        </div>
+
+        <Alert v-for="b in view.blockers" :key="b.branchId + b.kind" variant="destructive" data-testid="ade-dialog-blocker" :data-kind="b.kind">
+          <AlertDescription>{{ b.text }}</AlertDescription>
+        </Alert>
+        <label v-if="view.canAutostash" for="ade-dialog-autostash" class="flex items-center gap-2 text-kira-sm">
+          <Switch id="ade-dialog-autostash" v-model="dialogs.autostash" data-testid="ade-dialog-autostash" />
+          <span>Autostash: stash the uncommitted changes, rebase, then restore them</span>
+        </label>
+        <p v-if="view.noOp" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-dialog-noop">
+          The branch already sits on this base: saving only records it.
+        </p>
+
         <div v-if="view.isArchive" class="text-kira-md text-tone-amber" data-testid="ade-dialog-risk">
           {{ view.riskText }}. Tell Claude what to do with it, or delete the worktrees anyway.
         </div>
@@ -165,7 +226,7 @@ async function discard(): Promise<void> {
           </span>
         </label>
 
-        <div class="flex flex-col gap-1">
+        <div v-if="view.showMessage" class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
             <label for="ade-dialog-message" class="flex-1 text-muted-foreground">Message to Claude</label>
             <Button
@@ -186,7 +247,17 @@ async function discard(): Promise<void> {
             data-testid="ade-dialog-message"
             @update:model-value="(v) => (dialogs.msg = String(v))"
           />
+          <pre
+            v-if="view.suffix"
+            class="m-0 whitespace-pre-wrap rounded-kira border border-border bg-bg px-2 py-1.5 font-data text-kira-sm text-muted-foreground"
+            data-testid="ade-dialog-suffix"
+            >{{ view.suffix }}</pre
+          >
         </div>
+
+        <Alert v-if="previewError" variant="destructive" data-testid="ade-dialog-preview-error">
+          <AlertDescription>{{ previewError }}</AlertDescription>
+        </Alert>
 
         <Alert v-if="dialogs.error" variant="destructive" data-testid="ade-dialog-error">
           <AlertDescription>{{ dialogs.error }}</AlertDescription>

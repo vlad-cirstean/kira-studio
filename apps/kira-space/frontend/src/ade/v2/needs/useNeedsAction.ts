@@ -35,7 +35,11 @@ export function useNeedsAction() {
   async function run(n: NeedsItem): Promise<void> {
     delete ui.actionError[n.taskId];
     try {
-      if (n.action === 'Take over') await takeOver.request(n.sessionId);
+      if (n.kind === 'rebase') {
+        ui.view = 'plan';
+        ui.selectBranch(n.taskId, n.branchId);
+        ui.branchTab = 'details';
+      } else if (n.action === 'Take over') await takeOver.request(n.sessionId);
       else if (n.action === 'Retry') {
         await Promise.all(n.runIds.map((runId) => retry.mutateAsync({ runId })));
       } else if (n.action === 'Open') await openSession(n.sessionId, n.taskId, n.branchId);

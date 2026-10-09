@@ -1,14 +1,23 @@
 import { ACTIVITY_LABEL, type ActivityKind, activityKind, shortId } from '../activity';
-import type { BranchAction } from '../board/actions';
 import type { BranchGraph } from '../board/branchGraph';
-import type { ArchiveRisk, Branch, BranchRisk, Session, Task } from '../wire';
+import { type RebaseAct, stackIds } from '../board/rebaseActions';
+import type {
+  ArchiveRisk,
+  BaseChoice,
+  Branch,
+  BranchRisk,
+  RebaseBlocker,
+  RebasePreview,
+  Session,
+  Task,
+} from '../wire';
 
 // Pure templates and view model of the Claude dialog (mockup `dlg`, SPEC2 sections 5, 6, 9, 10).
 // No Vue, no clock; `AdeClaudeDialog.vue` wraps `composeDialog` in a computed. The stage and start
 // templates mirror the server defaults (`composeStageMessage`, `composeStartMessage`): an unedited
 // message is sent as `''` and the server composes it, so these only show what it will say.
 
-type DialogKind = 'rebase' | 'queue' | 'merge' | 'stage' | 'start' | 'archive';
+type DialogKind = 'rebase' | 'queue' | 'changeBase' | 'merge' | 'stage' | 'start' | 'archive';
 
 export interface DialogTarget {
   branchId: string;
@@ -19,11 +28,15 @@ export interface DialogTarget {
 export interface DialogSpec {
   kind: DialogKind;
   title: string;
-  /** rebase / queue: the stack root being rebased; merge / start: the branch. */
+  /** rebase / queue / changeBase: the branch being rebased; merge / start: the branch. */
   branchId?: string;
-  /** rebase / queue: the branch id to rebase onto, `'main'` for the repo's main. */
-  onto?: string;
-  /** rebase / queue: the stack the busy check covers. */
+  /** rebase / changeBase: the picked base, `null` = the current one. */
+  onto?: BaseChoice | null;
+  /** queue: the review branch to rebase onto and queue after. */
+  queueWith?: string;
+  /** changeBase: the branch is not created yet, so only the stored base changes. */
+  draft?: boolean;
+  /** rebase / queue / changeBase: the stack the busy check covers. */
   stack?: string[];
   /** merge: the integration branch. */
   target?: string;
@@ -39,6 +52,9 @@ export interface DialogState {
   msg: string | null;
   push: boolean;
   override: boolean;
+  autostash: boolean;
+  /** The rebase kinds' server-composed prompt; `null` while it loads or for a draft. */
+  preview: RebasePreview | null;
 }
 
 export interface DialogCtx {
@@ -73,6 +89,16 @@ export interface DialogView {
   overridden: boolean;
   /** A running background run on the stack: blocks with no override. */
   headless: string;
+  /** The message box shows: every kind but a draft's Change base. */
+  showMessage: boolean;
+  /** The rebase prompt's read-only closing instructions. */
+  suffix: string;
+  blockers: RebaseBlocker[];
+  /** A dirty blocker the Autostash switch can clear. */
+  canAutostash: boolean;
+  autostashOn: boolean;
+  /** The branches already sit on the base: Send only stores it. */
+  noOp: boolean;
   canPush: boolean;
   pushOn: boolean;
   pushLabel: string;
@@ -124,39 +150,6 @@ function runningTui(ctx: DialogCtx, branchId: string): Session[] {
   );
 }
 
-function ontoName(ctx: DialogCtx, b: Branch, onto: string): string {
-  return onto === 'main'
-    ? ctx.repoState(b.codeRepoId).mainName || 'main'
-    : (branchOf(ctx, onto)?.name ?? onto);
-}
-
-function ontoRef(ctx: DialogCtx, b: Branch, onto: string): string {
-  if (onto === 'main') {
-    const st = ctx.repoState(b.codeRepoId);
-    return `${st.remote || 'origin'}/${st.mainName || 'main'}`;
-  }
-  const o = branchOf(ctx, onto);
-  return o?.kind === 'review'
-    ? `${ctx.repoState(b.codeRepoId).remote || 'origin'}/${o.name}`
-    : (o?.name ?? onto);
-}
-
-/** The root plus every created branch of mine stacked on it, depth first. */
-function stackOf(ctx: DialogCtx, rootId: string): string[] {
-  const out = [rootId];
-  const down = (id: string): void => {
-    for (const c of ctx.graph.kids.get(id) ?? []) {
-      const kid = branchOf(ctx, c);
-      if (kid && kid.kind === 'mine' && kid.name !== '') {
-        out.push(c);
-        down(c);
-      }
-    }
-  };
-  down(rootId);
-  return out;
-}
-
 function targetsFor(ctx: DialogCtx, ids: readonly string[]): DialogTarget[] {
   return ids.map((branchId) => ({
     branchId,
@@ -166,39 +159,35 @@ function targetsFor(ctx: DialogCtx, ids: readonly string[]): DialogTarget[] {
 
 // ---- openers
 
+/** The dialog behind a `rebase` or `queue` act: the server composes its prompt. */
 export function rebaseSpec(
   ctx: DialogCtx,
-  rootId: string,
-  onto: string,
-  title: string,
+  act: Extract<RebaseAct, { kind: 'rebase' | 'queue' }>,
 ): DialogSpec {
-  const kind = branchOf(ctx, onto)?.kind === 'review' ? 'queue' : 'rebase';
   return {
-    kind,
-    title,
-    branchId: rootId,
-    onto,
-    stack: stackOf(ctx, rootId),
-    targets: targetsFor(ctx, [rootId]),
+    kind: act.kind,
+    title: act.label.map((p) => (typeof p === 'string' ? p : p.value)).join(''),
+    branchId: act.branchId,
+    onto: act.kind === 'rebase' ? act.onto : null,
+    queueWith: act.kind === 'queue' ? act.withId : '',
+    stack: stackIds(ctx.graph, act.branchId),
+    targets: [],
   };
 }
 
-/** The dialog behind a branch cell's `Rebase` / `Queue after` button. A queue-after or a rebase
- *  onto the repo's main acts on the stack root; a rebase onto a branch acts on the branch itself. */
-export function specForBranchAction(
+export function changeBaseSpec(
   ctx: DialogCtx,
-  branchId: string,
-  action: BranchAction,
-): DialogSpec | null {
-  if (action.kind === 'queueAfter' && action.target) {
-    const name = branchOf(ctx, action.target)?.name ?? '';
-    return rebaseSpec(ctx, ctx.graph.rootOf(branchId), action.target, `Queue after ${name}`);
-  }
-  if (action.kind !== 'rebase') return null;
-  if (!action.target)
-    return rebaseSpec(ctx, ctx.graph.rootOf(branchId), 'main', 'Rebase onto main');
-  const name = branchOf(ctx, action.target)?.name ?? '';
-  return rebaseSpec(ctx, branchId, action.target, `Rebase onto ${name}`);
+  act: Extract<RebaseAct, { kind: 'changeBase' }>,
+): DialogSpec {
+  return {
+    kind: 'changeBase',
+    title: 'Change base',
+    branchId: act.branchId,
+    onto: null,
+    draft: act.draft,
+    stack: stackIds(ctx.graph, act.branchId),
+    targets: [],
+  };
 }
 
 export function mergeSpec(ctx: DialogCtx, branchId: string, target: string): DialogSpec {
@@ -242,39 +231,6 @@ export function archiveSpec(ctx: DialogCtx, risk: ArchiveRisk): DialogSpec {
 // ---- templates
 
 const ASK = 'If anything is unclear, ask me before changing anything.';
-
-function rebaseMessage(ctx: DialogCtx, spec: DialogSpec, push: boolean): string {
-  const b = branchOf(ctx, spec.branchId ?? '') as Branch;
-  const onto = spec.onto ?? 'main';
-  const o = onto === 'main' ? undefined : branchOf(ctx, onto);
-  const remote = ctx.repoState(b.codeRepoId).remote || 'origin';
-  const chain: [string, string][] = [];
-  const down = (id: string): void => {
-    for (const c of ctx.graph.kids.get(id) ?? []) {
-      const kid = branchOf(ctx, c);
-      if (kid && kid.kind === 'mine' && kid.name !== '') {
-        chain.push([c, id]);
-        down(c);
-      }
-    }
-  };
-  down(b.id);
-  const lines = [
-    `Rebase ${b.name} (repo ${ctx.repo(b.codeRepoId).nick}) onto ${ontoName(ctx, b, onto)}${chain.length ? ', then restack the branches built on it:' : '.'}`,
-    `1. In ${wtOf(ctx, b)}: git fetch ${remote} && git rebase ${ontoRef(ctx, b, onto)}`,
-  ];
-  chain.forEach(([child, parent], i) => {
-    lines.push(
-      `${i + 2}. In ${wtOf(ctx, branchOf(ctx, child) as Branch)}: git rebase ${branchOf(ctx, parent)?.name ?? parent}`,
-    );
-  });
-  if (o?.kind === 'review') lines.push(`Do not modify ${o.name}.`);
-  lines.push(
-    `Resolve any conflicts. ${push ? 'Then push each rebased branch with: git push --force-with-lease' : 'Do not push.'}`,
-  );
-  lines.push(ASK);
-  return lines.join('\n');
-}
 
 /** Worktree of the integration branch `T`, kept apart from the branch's own. */
 function mergeWorktree(ctx: DialogCtx, b: Branch, target: string): string {
@@ -371,7 +327,8 @@ export function templateFor(ctx: DialogCtx, spec: DialogSpec, state: DialogState
   switch (spec.kind) {
     case 'rebase':
     case 'queue':
-      return rebaseMessage(ctx, spec, state.push);
+    case 'changeBase':
+      return state.preview?.prompt ?? '';
     case 'merge':
       return mergeMessage(ctx, spec, state.push);
     case 'archive':
@@ -393,8 +350,13 @@ export function resolvedChoice(ctx: DialogCtx, tg: DialogTarget): string {
   return running.some((s) => s.id === tg.choice) ? tg.choice : (running[0] as Session).id;
 }
 
+/** The kinds that rewrite a branch through a background rebase run. */
+export function isRebaseKind(spec: DialogSpec): boolean {
+  return spec.kind === 'rebase' || spec.kind === 'queue' || spec.kind === 'changeBase';
+}
+
 function busyFor(ctx: DialogCtx, spec: DialogSpec): DialogView['busy'] {
-  if (spec.kind !== 'rebase' && spec.kind !== 'queue') return [];
+  if (!isRebaseKind(spec) || spec.draft) return [];
   const out: DialogView['busy'] = [];
   for (const id of spec.stack ?? []) {
     const b = branchOf(ctx, id);
@@ -413,7 +375,7 @@ function busyFor(ctx: DialogCtx, spec: DialogSpec): DialogView['busy'] {
 }
 
 function headlessFor(ctx: DialogCtx, spec: DialogSpec): string {
-  if (spec.kind !== 'rebase' && spec.kind !== 'queue') return '';
+  if (!isRebaseKind(spec) || spec.draft) return '';
   for (const id of spec.stack ?? []) {
     if (
       ctx.sessions.some((s) => s.branchId === id && s.mode === 'headless' && s.state === 'running')
@@ -438,9 +400,14 @@ function riskText(ctx: DialogCtx, spec: DialogSpec): string {
     .join(' · ');
 }
 
-function sendLabel(spec: DialogSpec, overridden: boolean): string {
+function sendLabel(spec: DialogSpec, overridden: boolean, noOp: boolean): string {
   if (overridden) return 'Send anyway';
+  if (spec.kind === 'changeBase' && (spec.draft || noOp)) return 'Save base';
   switch (spec.kind) {
+    case 'rebase':
+    case 'queue':
+    case 'changeBase':
+      return 'Run in background';
     case 'stage':
       return 'Open session';
     case 'start':
@@ -458,6 +425,19 @@ export function composeDialog(ctx: DialogCtx, spec: DialogSpec, state: DialogSta
   const busy = busyFor(ctx, spec);
   const headless = headlessFor(ctx, spec);
   const overridden = busy.length > 0 && state.override;
+  const rebase = isRebaseKind(spec);
+  const draft = spec.kind === 'changeBase' && spec.draft === true;
+  const blockers = rebase && !draft ? (state.preview?.blockers ?? []) : [];
+  const dirty = blockers.some((b) => b.kind === 'dirty');
+  const noOp = rebase && !draft && state.preview?.noOp === true;
+  const sendDisabled = !rebase
+    ? message.trim().length === 0
+    : draft
+      ? spec.onto == null
+      : state.preview === null ||
+        blockers.some((b) => b.kind !== 'dirty') ||
+        (dirty && !state.autostash) ||
+        (!noOp && message.trim().length === 0);
   const targets: DialogView['targets'] = spec.targets.map((tg) => {
     const b = branchOf(ctx, tg.branchId);
     const running = runningTui(ctx, tg.branchId);
@@ -481,7 +461,7 @@ export function composeDialog(ctx: DialogCtx, spec: DialogSpec, state: DialogSta
     title: spec.title,
     message,
     edited: state.msg !== null,
-    sendDisabled: message.trim().length === 0,
+    sendDisabled,
     blocked: headless !== '' || (busy.length > 0 && !state.override),
     busy,
     busyShown: busy.length > 0,
@@ -491,13 +471,19 @@ export function composeDialog(ctx: DialogCtx, spec: DialogSpec, state: DialogSta
     overrideLabel: state.override ? 'Undo override' : 'Override…',
     overridden,
     headless,
-    canPush: spec.kind === 'rebase' || spec.kind === 'queue' || spec.kind === 'merge',
+    showMessage: !draft && !noOp,
+    suffix: rebase && !draft ? (state.preview?.suffix ?? '') : '',
+    blockers,
+    canAutostash: dirty,
+    autostashOn: state.autostash,
+    noOp,
+    canPush: (rebase && !draft && !noOp) || spec.kind === 'merge',
     pushOn: state.push,
     pushLabel:
       spec.kind === 'merge' ? `Also push ${spec.target}` : 'Also force-push after rebasing',
     isArchive: spec.kind === 'archive',
     riskText: riskText(ctx, spec),
     targets,
-    sendLabel: sendLabel(spec, overridden),
+    sendLabel: sendLabel(spec, overridden, noOp),
   };
 }

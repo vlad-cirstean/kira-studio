@@ -10,12 +10,13 @@ import { computed, ref, watch } from 'vue';
 import { useRepoLinksStore } from '../../repo/state/repoLinks';
 import { useRepos } from '../../repo/state/reposQueries';
 import { repoTint } from '../../state/coderepos';
+import AdeBasePicker from './AdeBasePicker.vue';
 import AdeCandidateRow from './AdeCandidateRow.vue';
 import { parseJira } from './jira';
 import { useAddExistingBranch, useCandidates, useCreateTask } from './queries';
 import { useAdeAddUiStore } from './state/adeAddUi';
 import { useAdeBoardUiStore } from './state/adeBoardUi';
-import type { CandidateBranch } from './wire';
+import type { BaseChoice, CandidateBranch } from './wire';
 
 // Add: a new task (lands in Later, branchless) or an existing branch of any repo.
 const ui = useAdeBoardUiStore();
@@ -42,6 +43,9 @@ const title = ref('');
 const jira = ref('');
 const notes = ref('');
 const picked = ref<string[]>([]);
+/** Per repo; a repo without an entry starts from its main. */
+const bases = ref<Record<string, BaseChoice>>({});
+const MAIN: BaseChoice = { ref: '', branchId: '' };
 const createTask = useCreateTask();
 
 watch(open, (o) => {
@@ -59,6 +63,7 @@ watch(open, (o) => {
 
 function toggleRepo(id: string): void {
   picked.value = picked.value.includes(id) ? picked.value.filter((x) => x !== id) : [...picked.value, id];
+  bases.value = Object.fromEntries(Object.entries(bases.value).filter(([k]) => picked.value.includes(k)));
 }
 
 const cantAdd = computed(
@@ -76,12 +81,13 @@ async function addNew(): Promise<void> {
       notes: notes.value,
       codeRepoIds: picked.value,
       workflowId: '',
-      bases: {},
+      bases: bases.value,
     });
     ui.select(task.id);
     title.value = '';
     jira.value = '';
     notes.value = '';
+    bases.value = {};
     open.value = false;
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
@@ -169,6 +175,16 @@ async function pick(b: CandidateBranch): Promise<void> {
             {{ r.nickname || r.name }}
           </Toggle>
         </fieldset>
+        <template v-for="id in picked" :key="id">
+          <span class="text-muted-foreground" data-testid="ade-nw-base-label">Base · {{ repoLabel(id) }}</span>
+          <div class="min-w-0" :data-repo-id="id" data-testid="ade-nw-base">
+            <AdeBasePicker
+              :code-repo-id="id"
+              :model-value="bases[id] ?? MAIN"
+              @update:model-value="(c) => (bases[id] = c)"
+            />
+          </div>
+        </template>
         <label for="ade-nw-notes" class="self-start pt-1.5 text-muted-foreground">Notes</label>
         <Textarea
           id="ade-nw-notes"

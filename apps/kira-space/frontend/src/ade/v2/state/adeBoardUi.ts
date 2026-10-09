@@ -19,6 +19,8 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const historyReach = ref<number | null>(null);
   /** A See error click asked the open branch panel to scroll to its Worktree setup block. */
   const focusSetup = ref(false);
+  /** A See log click asked the open branch panel to open its Last rebase log. */
+  const focusRebaseLog = ref(false);
   /** Task whose agent Run dialog is open. */
   const runTaskId = ref<string | null>(null);
   /** Last failed stage action per task, shown in the panel header until the next attempt. */
@@ -71,6 +73,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     historyReach,
     runTaskId,
     focusSetup,
+    focusRebaseLog,
     actionError,
     refreshSummary,
     showAllItems,

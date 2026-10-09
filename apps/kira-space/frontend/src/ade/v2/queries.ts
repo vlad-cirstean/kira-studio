@@ -21,15 +21,21 @@ import type {
   LaunchStageArgs,
   MoveBacklogItemArgs,
   NewWorkflowArgs,
+  OntoArgs,
+  RebaseArgs,
+  RebasePreview,
+  RebaseStart,
   RecordMergeArgs,
   RefreshArgs,
+  RepoBranches,
+  RepoBranchesArgs,
   ReviewAgentLaunch,
   RunArgs,
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
   SendArgs,
+  SetBranchBaseArgs,
   SetPlanArgs,
-  SetQueuedAfterArgs,
   SetTaskStageArgs,
   SetTaskWorkflowArgs,
   StartBranchArgs,
@@ -331,12 +337,6 @@ export function useRecordMerge() {
   return useMutation({ mutationFn: (args: RecordMergeArgs) => control.adeTaskRecordMerge(args) });
 }
 
-export function useSetQueuedAfter() {
-  return useMutation({
-    mutationFn: (args: SetQueuedAfterArgs) => control.adeTaskSetQueuedAfter(args),
-  });
-}
-
 export function useArchiveRisk() {
   return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskArchiveRisk(args) });
 }
@@ -380,5 +380,47 @@ export function useGitHubSyncApply() {
   return useMutation({
     mutationFn: (args: BranchArgs): Promise<GhSyncResult> => control.adeTaskGitHubSyncApply(args),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ghSyncPlanPrefix }),
+  });
+}
+
+/** The bases the picker offers for a repo; read on open (git moves between opens), never pushed. */
+export function useRepoBranches(args: MaybeRefOrGetter<RepoBranchesArgs | null>) {
+  return useQuery(() => {
+    const a = toValue(args);
+    return {
+      queryKey: ['adetask', 'repoBranches', a] as const,
+      queryFn: (): Promise<RepoBranches> => control.adeTaskRepoBranches(a as RepoBranchesArgs),
+      staleTime: 0,
+      enabled: a !== null,
+    };
+  });
+}
+
+/** The prompt, stack and blockers a Rebase would use; the key holds the pick, so a pick refetches. */
+export function useRebasePreview(args: MaybeRefOrGetter<OntoArgs | null>) {
+  return useQuery(() => {
+    const a = toValue(args);
+    return {
+      queryKey: ['adetask', 'rebasePreview', a] as const,
+      queryFn: (): Promise<RebasePreview> => control.adeTaskRebasePreview(a as OntoArgs),
+      staleTime: 0,
+      enabled: a !== null,
+    };
+  });
+}
+
+export function useRebase() {
+  return useMutation({
+    mutationFn: (args: RebaseArgs): Promise<RebaseStart> => control.adeTaskRebase(args),
+  });
+}
+
+export function useAbortRebase() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskAbortRebase(args) });
+}
+
+export function useSetBranchBase() {
+  return useMutation({
+    mutationFn: (args: SetBranchBaseArgs) => control.adeTaskSetBranchBase(args),
   });
 }

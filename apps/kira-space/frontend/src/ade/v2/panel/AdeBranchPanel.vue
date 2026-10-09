@@ -11,6 +11,7 @@ import AdeChip from '../AdeChip.vue';
 import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
+import { type RebaseAct, rebaseActs } from '../board/rebaseActions';
 import { baseNameOf } from '../board/reviewCode';
 import { type CardModel, type PlanModel, usePlanModel } from '../plan/usePlanModel';
 import { usePrs, useRetrySetup } from '../queries';
@@ -19,9 +20,10 @@ import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { ACTION_CLASS, TONE_SOLID_CLASS } from '../tones';
-import type { Deployment, Integration, PR, RepoPrs } from '../wire';
+import type { Deployment, Integration, PR, RepoPrs, Run } from '../wire';
 import AdeChangesTab from './AdeChangesTab.vue';
 import AdePanelFrame from './AdePanelFrame.vue';
+import AdeRunOutcome from './AdeRunOutcome.vue';
 import AdeWorktreeSetup from './AdeWorktreeSetup.vue';
 import { type HeaderAction, headerActions } from './headerActions';
 
@@ -65,25 +67,39 @@ async function onRetrySetup(): Promise<void> {
     setupError.value = err instanceof Error ? err.message : String(err);
   }
 }
+const runs = computed(() => props.card.task.runs);
+const mainName = computed(
+  () => props.model.board.repos.find((r) => r.codeRepoId === branch.value.codeRepoId)?.mainName ?? '',
+);
 const actions = computed(() =>
   headerActions({
     branch: branch.value,
     graph: graph.value,
     after: props.model.view.after,
     hadSession: sessions.value.some((x) => x.branchId === branch.value.id),
+    runs: runs.value,
+    mainName: mainName.value,
   }),
 );
-const rebasing = (a: HeaderAction): boolean =>
-  (a.kind === 'rebaseMain' && dialogs.pending.has(`rebase:${a.rootId}`)) ||
-  (a.kind === 'rebaseOnto' && dialogs.pending.has(`rebase:${branch.value.id}`));
+const lastRebase = computed(() =>
+  runs.value
+    .filter((r) => r.purpose === 'rebase' && r.branchId === branch.value.id)
+    .reduce<Run | null>((best, r) => (!best || r.attempt >= best.attempt ? r : best), null),
+);
+// The acts that follow a finished rebase: try again, or abort what it left behind.
+const outcomeActs = computed((): RebaseAct[] =>
+  rebaseActs({
+    branch: branch.value,
+    graph: graph.value,
+    after: props.model.view.after,
+    runs: runs.value,
+    mainName: mainName.value,
+  }).filter((a) => a.id === 'rebase-retry' || a.id === 'abort-rebase'),
+);
 function run(a: HeaderAction): void {
   const id = branch.value.id;
-  if (a.kind === 'rebaseMain') dialogs.rebaseOnto(a.rootId, 'main', 'Rebase onto main');
-  else if (a.kind === 'rebaseOnto') {
-    dialogs.rebaseOnto(id, a.ontoId, `Rebase onto ${graph.value.byBranch.get(a.ontoId)?.name ?? ''}`);
-  } else if (a.kind === 'queueAfter') {
-    dialogs.rebaseOnto(graph.value.rootOf(id), a.withId, `Queue after ${graph.value.byBranch.get(a.withId)?.name ?? ''}`);
-  } else if (a.kind === 'remerge') dialogs.merge(id, a.target);
+  if (a.kind === 'rebase') dialogs.act(a.act);
+  else if (a.kind === 'remerge') dialogs.merge(id, a.target);
   else if (a.kind === 'start') dialogs.start(id);
   else if (a.kind === 'review') {
     setupError.value = '';
@@ -243,7 +259,7 @@ function deployNote(d: Deployment): string {
             Force push
           </Button>
         </AdeTip>
-        <template v-for="a in actions" :key="a.kind + a.label">
+        <template v-for="a in actions" :key="(a.kind === 'rebase' ? a.act.id : a.kind) + a.label">
           <AdeTip v-if="a.kind === 'review'" :parts="reviewChoice?.tip ?? []">
             <TooltipDisabledTrigger :disabled="reviewOff">
               <Button
@@ -258,16 +274,30 @@ function deployNote(d: Deployment): string {
               </Button>
             </TooltipDisabledTrigger>
           </AdeTip>
+          <AdeTip v-else-if="a.kind === 'rebase'" :parts="a.act.tip">
+            <TooltipDisabledTrigger :disabled="a.act.disabled">
+              <Button
+                size="kira-lg"
+                class="font-semibold"
+                :class="actionClass(a)"
+                :disabled="a.act.disabled"
+                :data-testid="`ade-panel-action-${a.act.id}`"
+                @click="run(a)"
+              >
+                {{ a.label }}
+              </Button>
+            </TooltipDisabledTrigger>
+          </AdeTip>
           <Button
             v-else
             size="kira-lg"
             class="font-semibold"
             :class="actionClass(a)"
-            :disabled="a.kind === 'created' || rebasing(a)"
+            :disabled="a.kind === 'created'"
             :data-testid="`ade-panel-action-${a.kind}`"
             @click="run(a)"
           >
-            {{ rebasing(a) ? 'Rebasing…' : a.label }}
+            {{ a.label }}
           </Button>
         </template>
       </div>
@@ -322,6 +352,8 @@ function deployNote(d: Deployment): string {
       </div>
 
       <AdeWorktreeSetup :row="row" />
+
+      <AdeRunOutcome v-if="lastRebase" :run="lastRebase" title="Last rebase" :acts="outcomeActs" listen />
 
       <div class="flex flex-col gap-0.5">
         <div class="pb-0.5 text-kira-sm text-muted-foreground">Merged into</div>

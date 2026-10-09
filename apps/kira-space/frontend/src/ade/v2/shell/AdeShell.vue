@@ -3,6 +3,7 @@ import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/
 import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { computed, useTemplateRef } from 'vue';
+import AdeAbortRebaseDialog from '../AdeAbortRebaseDialog.vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
 import AdeClaudeDialog from '../dialog/AdeClaudeDialog.vue';
@@ -139,6 +140,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
     </div>
     <AdeRunDialog />
     <AdeClaudeDialog />
+    <AdeAbortRebaseDialog />
     <AdeTakeOverDialog />
   </Tabs>
 </template>

@@ -139,6 +139,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
       nowMs: c.nowMs,
       hadSession: c.sessions.some((x) => x.branchId === bid),
       mainName: main,
+      runs: task.runs,
     }),
     prog: prog ? { segs: prog.segments, label: prog.label, tone: prog.tone, tip: prog.tip } : null,
     ripple: c.ripple?.branchIds.includes(bid) ?? false,

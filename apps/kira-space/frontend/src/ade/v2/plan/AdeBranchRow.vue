@@ -45,6 +45,8 @@ function onMenu(ev: MouseEvent): void {
             ?.integrationBranches ?? [],
         after: m.view.after,
         unpushed: m.board.plan.unpushed,
+        runs: m.view.graph.byTask.get(props.row.branch.taskId)?.runs ?? [],
+        mainName: m.board.repos.find((r) => r.codeRepoId === props.row.branch.codeRepoId)?.mainName ?? '',
       })
     : null;
   ev.preventDefault();
@@ -73,10 +75,11 @@ function onMenu(ev: MouseEvent): void {
           type: 'item' as const,
           id: it.id,
           label: it.label,
+          disabled: it.kind === 'act' ? it.act.disabled : undefined,
+          hint: it.kind === 'act' ? it.hint : undefined,
           run: () => {
             if (it.kind === 'merge') dialogs.merge(id, it.target);
-            else if (it.kind === 'rebaseMain') dialogs.rebaseOnto(it.rootId, 'main', it.label);
-            else if (it.kind === 'rebaseOnto') dialogs.rebaseOnto(id, it.onto, it.label);
+            else if (it.kind === 'act') dialogs.act(it.act);
             else emit('forcePush');
           },
         }))),
@@ -140,13 +143,17 @@ const rowBgClass = computed(() => {
       data-testid="ade-branch-repo"
       >{{ row.repo }}</span
     >
-    <AdeTip v-if="row.base" :text="row.base.tip">
+    <AdeTip v-if="row.base" :parts="row.base.tip">
       <span
         class="max-w-27.5 shrink-0 truncate rounded-kira-xs px-1 py-px font-data text-kira-sm font-semibold"
-        :class="row.base.tone === 'blue' ? TONE_TAG_CLASS.blue : 'bg-field text-fg'"
+        :class="[
+          row.base.tone === 'blue' ? TONE_TAG_CLASS.blue : 'bg-field text-fg',
+          row.base.pending ? 'border border-dashed border-tone-amber-solid' : '',
+        ]"
         data-testid="ade-base-marker"
-        >{{ row.base.label }}</span
-      >
+        :data-pending="row.base.pending || undefined"
+        ><VarText :parts="row.base.label"
+      /></span>
     </AdeTip>
     <AdeAttention v-if="row.attention" :tip="row.attention" :item="row.attentionItem" />
     <AdeTip v-if="row.isReview" text="Someone else's branch: read-only here">

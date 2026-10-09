@@ -1,4 +1,4 @@
-import type { Board, Session } from '../wire';
+import type { Board, Branch, Run, Session } from '../wire';
 import { formatElapsed } from './actions';
 import type { TaskProgress } from './progress';
 
@@ -7,6 +7,7 @@ import type { TaskProgress } from './progress';
 export type NeedsKind =
   | 'stuck run'
   | 'failed'
+  | 'rebase'
   | 'question'
   | 'approval'
   | 'setup failed'
@@ -16,6 +17,7 @@ export type NeedsKind =
 export const NEEDS_RANK: readonly NeedsKind[] = [
   'stuck run',
   'failed',
+  'rebase',
   'question',
   'approval',
   'setup failed',
@@ -28,6 +30,7 @@ const ACTION: Record<
 > = {
   'stuck run': 'Take over',
   failed: 'Retry',
+  rebase: 'Open',
   question: 'Open',
   approval: 'Approve',
   'setup failed': 'See error',
@@ -37,6 +40,7 @@ const ACTION: Record<
 const TONE: Record<NeedsKind, 'red' | 'amber' | 'grey'> = {
   'stuck run': 'red',
   failed: 'red',
+  rebase: 'red',
   question: 'amber',
   approval: 'amber',
   'setup failed': 'red',
@@ -189,9 +193,41 @@ function questionItems(c: Ctx): NeedsItem[] {
     );
 }
 
+/** The latest rebase run of each branch, by branch id. */
+function latestRebases(board: Pick<Board, 'tasks'>): Map<string, Run> {
+  const out = new Map<string, Run>();
+  for (const t of board.tasks) {
+    for (const r of t.runs) {
+      const cur = out.get(r.branchId);
+      if (r.purpose === 'rebase' && (!cur || r.attempt >= cur.attempt)) out.set(r.branchId, r);
+    }
+  }
+  return out;
+}
+
+function rebaseItem(c: Ctx, b: Branch, run: Run | undefined): NeedsItem | null {
+  const running = run?.state === 'running' || run?.state === 'pending';
+  if (running) return null;
+  const failed = run?.state === 'failed' || run?.state === 'stuck';
+  if (!failed && b.basePendingFrom === '') return null;
+  const verb = run?.state === 'stuck' ? 'needs you' : failed ? 'failed' : 'pending';
+  return item('rebase', {
+    id: `rebase:${b.id}`,
+    taskId: b.taskId,
+    branchId: b.id,
+    scope: c.nick(b.id),
+    what: `Rebase of ${c.nameOf(b.id)} ${verb}`,
+    detail: run?.outcome?.reason ?? '',
+    ageMs: c.age(run?.finishedAt),
+  });
+}
+
 function branchItems(c: Ctx): NeedsItem[] {
   const out: NeedsItem[] = [];
+  const rebases = latestRebases(c.i.board);
   for (const b of c.i.board.branches) {
+    const r = b.kind === 'mine' ? rebaseItem(c, b, rebases.get(b.id)) : null;
+    if (r) out.push(r);
     if (b.setup?.state === 'failed') {
       out.push(
         item('setup failed', {

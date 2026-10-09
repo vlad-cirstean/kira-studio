@@ -1,6 +1,8 @@
-import type { Branch, Plan, Session, Task } from '../wire';
+import type { TextPart } from '@theme/varText';
+import type { Branch, Plan, Run, Session, Task } from '../wire';
 import { type BranchGraph, shortBranchName } from './branchGraph';
 import type { TaskProgress } from './progress';
+import { type RebaseAct, rebaseActs } from './rebaseActions';
 import type { DerivedStatus } from './status';
 
 // Left action column: task stage action and branch tag + action, both first-match tables
@@ -183,20 +185,36 @@ export function taskCell(i: TaskCellInput): TaskCell | null {
 
 // ---- branch cell
 
-type BranchActionKind = 'seeError' | 'queueAfter' | 'forcePush' | 'rebase' | 'start';
+type BranchActionKind =
+  | 'seeError'
+  | 'forcePush'
+  | 'rebase'
+  | 'queue'
+  | 'changeBase'
+  | 'abortRebase'
+  | 'seeLog'
+  | 'takeOver'
+  | 'start';
 
 export interface BranchAction {
   kind: BranchActionKind;
   label: string;
   tip: string;
-  /** `queueAfter` / `rebase`: branch id to follow, `''` = the branch's own base ref (main by default). */
-  target?: string;
+  /** The tip with its base and branch names as variables, when it names any. */
+  tipParts?: readonly TextPart[];
+  disabled?: boolean;
+  /** `rebase` / `queue` / `changeBase` / `abortRebase`: what the button runs. */
+  act?: RebaseAct;
+  /** `takeOver`: the rebase run's session. */
+  sessionId?: string;
 }
 
 export interface BranchTag {
   label: string;
   tone: Tone;
   tip: string;
+  /** The tip with its base names as variables, when it names any. */
+  tipParts?: readonly TextPart[];
   actions: BranchAction[];
   /** Start of a running setup; the label's elapsed time re-reads the clock (`tagLabel`). */
   since?: number;
@@ -217,6 +235,8 @@ export interface BranchTagInput {
   hadSession: boolean;
   /** Short name of the repo's main branch, `''` when unresolved. */
   mainName: string;
+  /** Runs of the branch's task. */
+  runs: readonly Run[];
 }
 
 type Rule = (i: BranchTagInput) => BranchTag | null;
@@ -297,18 +317,154 @@ const conflict: Rule = (i) => {
   const conf = i.graph.conflicts.get(i.branch.id)?.[0];
   if (!conf) return null;
   const name = nameOf(i, conf.with);
-  return tag('✕ conflict', 'red', `conflicts with ${name}: ${conf.files.join(', ')}`, [
-    { kind: 'queueAfter', label: 'Queue after', tip: `rebase onto ${name}`, target: conf.with },
-  ]);
+  return tag(
+    '✕ conflict',
+    'red',
+    `conflicts with ${name}: ${conf.files.join(', ')}`,
+    actsOf(i, 'queue'),
+  );
+};
+
+const SHORT: Record<RebaseAct['kind'], string> = {
+  rebase: 'Rebase',
+  queue: 'Queue after',
+  changeBase: 'Change base',
+  abortRebase: 'Abort rebase',
+};
+
+function actionOf(act: RebaseAct): BranchAction {
+  const label = act.kind === 'rebase' && act.retry ? 'Retry rebase' : SHORT[act.kind];
+  return {
+    kind: act.kind,
+    label,
+    tip: plain(act.tip),
+    tipParts: act.tip,
+    disabled: act.disabled,
+    act,
+  };
+}
+
+const plain = (parts: readonly TextPart[]): string =>
+  parts.map((p) => (typeof p === 'string' ? p : p.value)).join('');
+
+/** The rebase acts of the branch whose ids are listed, as tag buttons. */
+function actsOf(i: BranchTagInput, ...ids: string[]): BranchAction[] {
+  return rebaseActs({
+    branch: i.branch,
+    graph: i.graph,
+    after: i.after,
+    runs: i.runs,
+    mainName: i.mainName,
+  })
+    .filter((a) => ids.includes(a.id))
+    .map(actionOf);
+}
+
+function lastRebase(i: BranchTagInput): Run | null {
+  let best: Run | null = null;
+  for (const r of i.runs) {
+    if (
+      r.purpose === 'rebase' &&
+      r.branchId === i.branch.id &&
+      (!best || r.attempt >= best.attempt)
+    ) {
+      best = r;
+    }
+  }
+  return best;
+}
+
+const seeLog: BranchAction = { kind: 'seeLog', label: 'See log', tip: 'open the rebase log' };
+
+function takeOverOf(run: Run | null): BranchAction[] {
+  return run && run.sessionId !== ''
+    ? [
+        {
+          kind: 'takeOver',
+          label: 'Take over',
+          tip: 'continue the rebase yourself in Claude Code',
+          sessionId: run.sessionId,
+        },
+      ]
+    : [];
+}
+
+const rebasing: Rule = (i) => {
+  const run = lastRebase(i);
+  return run && (run.state === 'running' || run.state === 'pending')
+    ? tag('⟳ rebasing', 'blue', 'A background run is rebasing this branch', [seeLog])
+    : null;
+};
+
+const rebasePending: Rule = (i) => {
+  const b = i.branch;
+  if (b.kind !== 'mine' || b.basePendingFrom === '') return null;
+  const run = lastRebase(i);
+  const reason = run?.outcome?.reason ? `\n${run.outcome.reason}` : '';
+  const parts: TextPart[] = [
+    'Base changed from ',
+    { name: 'base', value: b.basePendingFrom },
+    ' to ',
+    { name: 'base', value: b.base },
+    '. The branch is not rebased onto it yet.',
+    ...(reason ? [reason] : []),
+  ];
+  return {
+    ...tag('⚠ base changed, rebase pending', 'amber', plain(parts), [
+      ...actsOf(i, 'rebase-retry', 'abort-rebase'),
+      ...(run ? [seeLog] : []),
+      ...takeOverOf(run && (run.state === 'failed' || run.state === 'stuck') ? run : null),
+    ]),
+    tipParts: parts,
+  };
+};
+
+const rebaseRunFailed: Rule = (i) => {
+  const run = lastRebase(i);
+  if (!run || (run.state !== 'failed' && run.state !== 'stuck')) return null;
+  const stuck = run.state === 'stuck';
+  return tag(
+    stuck ? '✋ rebase needs you' : '✕ rebase failed',
+    'red',
+    run.outcome?.reason || (stuck ? 'the rebase agent needs you' : 'the last rebase failed'),
+    [
+      ...actsOf(i, 'rebase-retry', 'rebase-base', 'rebase-self', 'abort-rebase'),
+      seeLog,
+      ...takeOverOf(run),
+    ],
+  );
+};
+
+const rebaseInProgress: Rule = (i) =>
+  i.branch.kind === 'mine' && i.branch.rebaseInProgress
+    ? tag(
+        '⚠ rebase in progress',
+        'amber',
+        'a rebase is left half-done in the worktree',
+        actsOf(i, 'abort-rebase'),
+      )
+    : null;
+
+const baseMissing: Rule = (i) => {
+  const b = i.branch;
+  if (b.kind !== 'mine' || !b.baseMissing) return null;
+  const parts: TextPart[] = ['Base ', { name: 'base', value: b.base }, ' no longer exists'];
+  return {
+    ...tag('✕ base missing', 'red', plain(parts), actsOf(i, 'change-base')),
+    tipParts: parts,
+  };
 };
 
 const rebaseConflicts: Rule = (i) => {
   const paths = rebaseConflict(i);
   if (!paths.length) return null;
   const base = baseLabel(i);
-  return tag('✕ conflict', 'red', `conflicts with ${base} if rebased: ${paths.join(', ')}`, [
-    { kind: 'rebase', label: 'Rebase', tip: `rebase onto ${base}`, target: i.branch.baseBranchId },
-  ]);
+  return tag(
+    '✕ conflict',
+    'red',
+    `conflicts with ${base} if rebased: ${paths.join(', ')}`,
+    actsOf(i, 'rebase-base', 'rebase-self'),
+  );
 };
 
 const notPushed: Rule = (i) =>
@@ -324,14 +480,7 @@ const behindMain: Rule = (i) =>
         `↓${i.branch.behind} ${baseLabel(i)}`,
         'amber',
         `${i.branch.behind} commits behind ${baseLabel(i)}`,
-        [
-          {
-            kind: 'rebase',
-            label: 'Rebase',
-            tip: `rebase onto ${baseLabel(i)}`,
-            target: i.branch.baseBranchId,
-          },
-        ],
+        actsOf(i, 'rebase-base'),
       )
     : null;
 
@@ -343,7 +492,7 @@ const sharesFiles: Rule = (i) => {
     `↻ ${shortBranchName(name)}`,
     'amber',
     `shares ${a.file} with ${name}; merges after it`,
-    [{ kind: 'rebase', label: 'Rebase', tip: `rebase onto ${name}`, target: a.id }],
+    actsOf(i, 'rebase-onto'),
   );
 };
 
@@ -389,6 +538,11 @@ const BRANCH_RULES: readonly Rule[] = [
   merged,
   parked,
   review,
+  rebasing,
+  rebasePending,
+  rebaseRunFailed,
+  rebaseInProgress,
+  baseMissing,
   conflict,
   rebaseConflicts,
   notPushed,

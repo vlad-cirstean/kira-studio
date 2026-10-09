@@ -3,6 +3,8 @@ import type { TextPart } from '@theme/varText';
 import type { CardModel } from '../plan/usePlanModel';
 import type { Plan, Session } from '../wire';
 import { type Calendar, LATER, nextWork } from './calendar';
+import type { ChangeBaseChoice } from './changeBase';
+import type { RebaseAct } from './rebaseActions';
 import type { ReviewChoice } from './reviewCode';
 import { nextStageId } from './stageBlocks';
 
@@ -20,6 +22,7 @@ export type TaskMenuCmd =
   | { kind: 'link'; url: string }
   | { kind: 'copy'; text: string }
   | { kind: 'review'; branchId: string }
+  | { kind: 'changeBase'; act: RebaseAct }
   | { kind: 'archive' };
 
 export interface TaskMenuItem {
@@ -50,6 +53,8 @@ export interface TaskMenuInput {
   archivePending: boolean;
   /** The task's Review code targets; none for a parked task. */
   choices: readonly ReviewChoice[];
+  /** The task's Change base targets. */
+  baseChoices: readonly ChangeBaseChoice[];
 }
 
 const DONE = 'done';
@@ -156,6 +161,28 @@ function reviewEntry(choices: readonly ReviewChoice[]): TaskMenuEntry[] {
   ];
 }
 
+function changeBaseEntry(choices: readonly ChangeBaseChoice[]): TaskMenuEntry[] {
+  const item = (c: ChangeBaseChoice, id: string, label: string): TaskMenuItem => ({
+    id,
+    label,
+    cmd: { kind: 'changeBase', act: c.act },
+    disabled: c.disabled,
+    hint: c.tip,
+  });
+  if (choices.length === 0) return [];
+  if (choices.length === 1) {
+    return [{ type: 'item', ...item(choices[0], 'ade-task-change-base', 'Change base…') }];
+  }
+  return [
+    {
+      type: 'submenu',
+      id: 'ade-task-change-base',
+      label: 'Change base…',
+      items: choices.map((c) => item(c, `ade-task-change-base-${c.branchId}`, c.label)),
+    },
+  ];
+}
+
 function planEntry(i: TaskMenuInput): TaskMenuEntry {
   const day = i.card.entry.day;
   const at = (id: string, label: string, to: number): TaskMenuItem => ({
@@ -233,6 +260,7 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
       label: c.parked ? 'Mark as merging' : 'Mark as not merging',
       cmd: { kind: 'park', parked: !c.parked },
     });
+    out.push(...changeBaseEntry(i.baseChoices));
   }
 
   const links: TaskMenuItem[] = [];

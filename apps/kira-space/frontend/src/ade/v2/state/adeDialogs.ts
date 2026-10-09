@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
-import type { BranchAction } from '../board/actions';
+import type { RebaseAct } from '../board/rebaseActions';
 import {
+  changeBaseSpec,
   type DialogSpec,
   mergeSpec,
   rebaseSpec,
-  specForBranchAction,
   stageSpec,
   startSpec,
 } from '../dialog/compose';
@@ -14,14 +14,17 @@ import { adeTurns } from '../dialog/turnWatch';
 import { useDialogCtx } from '../dialog/useDialogCtx';
 import { useLaunchOpener } from '../dialog/useLaunchOpener';
 import {
+  useAbortRebase,
   useArchiveRisk,
   useArchiveTask,
   useLaunchStage,
+  useRebase,
   useRecordMerge,
   useSend,
-  useSetQueuedAfter,
+  useSetBranchBase,
   useStartBranch,
 } from '../queries';
+import type { BaseChoice } from '../wire';
 import { useAdeBoardUiStore } from './adeBoardUi';
 import { useSetupWait } from './useSetupWait';
 
@@ -38,14 +41,19 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
   const msg = ref<string | null>(null);
   const push = ref(false);
   const override = ref(false);
+  const autostash = ref(false);
   const error = ref('');
+  /** The branch an Abort rebase confirmation is open for. */
+  const abortTarget = ref<{ branchId: string; name: string } | null>(null);
   /** In-flight work: `rebase:<branch>`, `merge:<branch>:<target>`, `archive:<task>`. */
   const pending = reactive(new Set<string>());
 
   const sendM = useSend();
   const startM = useStartBranch();
   const stageM = useLaunchStage();
-  const queuedM = useSetQueuedAfter();
+  const rebaseM = useRebase();
+  const baseM = useSetBranchBase();
+  const abortM = useAbortRebase();
   const mergeM = useRecordMerge();
   const riskM = useArchiveRisk();
   const archiveM = useArchiveTask();
@@ -60,6 +68,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
     msg.value = null;
     push.value = false;
     override.value = false;
+    autostash.value = false;
     error.value = '';
   }
 
@@ -80,7 +89,8 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
         ...launchOpener.deps,
       },
       turns: { watch: adeTurns.watch },
-      setQueuedAfter: (a) => queuedM.mutateAsync(a),
+      rebase: (a) => rebaseM.mutateAsync(a),
+      setBranchBase: (a) => baseM.mutateAsync(a),
       recordMerge: (a) => mergeM.mutateAsync(a),
       archiveTask: (a) => archiveM.mutateAsync(a),
       archiveRisk: (a) => riskM.mutateAsync(a),
@@ -110,6 +120,8 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
         msg: msg.value,
         push: push.value,
         override: override.value,
+        autostash: autostash.value,
+        preview: null,
       });
     }
   }
@@ -126,16 +138,34 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
     await requestArchive(d, taskId);
   }
 
-  function rebase(branchId: string, action: BranchAction): void {
+  /** Runs a rebase act: the rebase kinds open the dialog, Abort rebase asks first. */
+  function act(a: RebaseAct): void {
     const c = ctx.value;
-    const next = c ? specForBranchAction(c, branchId, action) : null;
-    if (next) open(next);
+    if (a.kind === 'abortRebase') {
+      abortTarget.value = {
+        branchId: a.branchId,
+        name: c?.graph.byBranch.get(a.branchId)?.name ?? '',
+      };
+    } else if (c) open(a.kind === 'changeBase' ? changeBaseSpec(c, a) : rebaseSpec(c, a));
   }
 
-  /** Rebase `rootId` and its stack onto another branch or the repo's main (header, fix menu). */
-  function rebaseOnto(rootId: string, onto: string, title: string): void {
-    const c = ctx.value;
-    if (c) open(rebaseSpec(c, rootId, onto, title));
+  /** The Abort rebase confirmation's yes: an error message keeps it open, `null` closes it. */
+  async function confirmAbort(): Promise<string | null> {
+    const t = abortTarget.value;
+    if (!t) return null;
+    try {
+      await abortM.mutateAsync({ branchId: t.branchId });
+      return null;
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  /** The base picker's choice in a Change base dialog; the edited prompt no longer fits it. */
+  function pickBase(choice: BaseChoice): void {
+    if (!spec.value) return;
+    spec.value = { ...spec.value, onto: choice };
+    msg.value = null;
   }
 
   function merge(branchId: string, target: string): void {
@@ -166,6 +196,8 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
     msg,
     push,
     override,
+    autostash,
+    abortTarget,
     error,
     waitingSetup,
     pending,
@@ -174,8 +206,9 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
     send,
     discardAnyway,
     archive,
-    rebase,
-    rebaseOnto,
+    act,
+    confirmAbort,
+    pickBase,
     merge,
     stage,
     start,

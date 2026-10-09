@@ -2,6 +2,7 @@ import { useClipboard } from '@vueuse/core';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { type MaybeRefOrGetter, toValue } from 'vue';
 import { control } from '../../../bridge/control';
+import { changeBaseChoices } from '../board/changeBase';
 import { movePlanArgs } from '../board/dropPlan';
 import { taskPatch } from '../board/panelFacts';
 import { reviewChoices } from '../board/reviewCode';
@@ -96,6 +97,8 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
           return reviewCode.open(taskId, cmd.branchId, anchor);
         case 'archive':
           return dialogs.archive(taskId);
+        case 'changeBase':
+          return dialogs.act(cmd.act);
       }
     } catch (err) {
       fail(taskId, err);
@@ -134,6 +137,11 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
       cal: m.cal,
       archivePending: dialogs.pending.has(`archive:${c.task.id}`),
       choices: reviewChoices(c, m.view.graph),
+      baseChoices: changeBaseChoices(c, {
+        graph: m.view.graph,
+        after: m.view.after,
+        board: m.board,
+      }),
     }).map(toMenu);
   }
 

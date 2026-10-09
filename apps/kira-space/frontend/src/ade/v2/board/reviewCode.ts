@@ -36,6 +36,9 @@ export function reviewChoice(
     tip,
   });
   if (b.name === '') return choice(true, ['Create the branch first']);
+  if (b.baseMissing) {
+    return choice(true, ['Base ', base, ' no longer exists. Change the base first']);
+  }
   if (b.ahead === 0 && b.dirty.length > 0) {
     return choice(true, [
       'Only uncommitted changes on ',

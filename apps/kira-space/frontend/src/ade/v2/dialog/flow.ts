@@ -3,8 +3,10 @@ import type {
   ArchiveRisk,
   Launch,
   OpenSessionEvent,
+  RebaseArgs,
+  RebaseStart,
   RecordMergeArgs,
-  SetQueuedAfterArgs,
+  SetBranchBaseArgs,
   TaskArgs,
 } from '../wire';
 import {
@@ -26,7 +28,8 @@ export interface FlowDeps {
   ctx: DialogCtx;
   launch: LaunchDeps;
   turns: { watch: (terminalId: string, opts: { requireSubmit: boolean }) => TurnWatch };
-  setQueuedAfter: (args: SetQueuedAfterArgs) => Promise<void>;
+  rebase: (args: RebaseArgs) => Promise<RebaseStart>;
+  setBranchBase: (args: SetBranchBaseArgs) => Promise<void>;
   recordMerge: (args: RecordMergeArgs) => Promise<void>;
   archiveTask: (args: TaskArgs) => Promise<void>;
   archiveRisk: (args: TaskArgs) => Promise<ArchiveRisk>;
@@ -110,38 +113,31 @@ async function deliverToBranch(
   }
 }
 
-/** Rebase / queue: mark the root busy, deliver, record the follow order for a branch `onto`, and
- *  clear the busy mark when the turn ends (in the background; the dialog closes at once). */
+/** Rebase / queue / change base: the server runs the rebase in the background, so the dialog
+ *  closes once it accepts; a draft branch only stores its base. */
 async function sendRebase(deps: FlowDeps, spec: DialogSpec, state: DialogState): Promise<void> {
-  const root = spec.branchId ?? '';
-  const onto = spec.onto ?? 'main';
-  const key = `rebase:${root}`;
+  const branchId = spec.branchId ?? '';
+  const key = `rebase:${branchId}`;
   deps.pending.add(key);
-  let delivered: Awaited<ReturnType<typeof deliverToBranch>>;
   try {
-    delivered = await deliverToBranch(deps, spec, messageOf(deps, spec, state));
-  } catch (err) {
-    deps.pending.remove(key);
-    failInDialog(deps, err);
-    return;
-  }
-  // Claude already has the prompt: a failure from here on must not leave Send armed to repeat it.
-  const { watch, launch } = delivered;
-  const taskId = taskOfBranch(deps, root);
-  if (onto !== 'main') {
-    try {
-      await deps.setQueuedAfter({ branchId: root, afterBranchId: onto });
-    } catch (err) {
-      deps.setActionError(
-        taskId,
-        `rebase sent, but recording the order failed: ${errMessage(err)}`,
-      );
+    if (spec.draft) {
+      await deps.setBranchBase({ branchId, base: spec.onto ?? { ref: '', branchId: '' } });
+    } else {
+      await deps.rebase({
+        branchId,
+        onto: spec.onto ?? null,
+        queueWith: spec.queueWith ?? '',
+        push: state.push,
+        autostash: state.autostash,
+        message: state.msg ?? '',
+      });
     }
+    deps.closeDialog();
+  } catch (err) {
+    deps.setError(errMessage(err));
+  } finally {
+    deps.pending.remove(key);
   }
-  announce(deps, launch, taskId, root);
-  void (watch as TurnWatch | null)?.done.then(() => deps.pending.remove(key));
-  if (!watch) deps.pending.remove(key);
-  deps.closeDialog();
 }
 
 /** Merge: recorded only when the dialog's own turn finishes (`Stop`), never on `SessionEnd`. */
@@ -321,6 +317,7 @@ export async function sendDialog(
   switch (spec.kind) {
     case 'rebase':
     case 'queue':
+    case 'changeBase':
       return sendRebase(deps, spec, state);
     case 'merge':
       return sendMerge(deps, spec, state);

@@ -52,46 +52,26 @@ function ctxWith(sessions: Session[], repoName?: (id: string) => string): Dialog
 }
 
 const ctx = ctxWith(loadFixture<SessionsResult>('sessions').sessions);
-const STATE = { msg: null, push: false, override: false };
+const STATE = { msg: null, push: false, override: false, autostash: false, preview: null };
+
+function rbSpec(c: DialogCtx, branchId: string) {
+  return rebaseSpec(c, {
+    kind: 'rebase',
+    id: 'rebase-base',
+    label: ['Rebase onto main'],
+    branchId,
+    onto: null,
+    retry: false,
+    tip: [],
+    disabled: false,
+  });
+}
 
 function mockupMessage(dialog: Record<string, unknown>, push = false): string {
   return runMockupV2({ dialog, dialogPush: push }).dialog.message as string;
 }
 
-describe('templates equal the mockup', () => {
-  test('rebase with a restack chain, push off and on', () => {
-    const spec = rebaseSpec(ctx, 'b_bill', 'main', 'Rebase onto main');
-    for (const push of [false, true]) {
-      const want = mockupMessage(
-        {
-          kind: 'rebase',
-          roots: ['b_bill'],
-          onto: 'main',
-          ids: ['b_bill', 'b_billdash'],
-          targets: [{ branch: 'b_bill', choice: 'new' }],
-          title: 'Rebase onto main',
-        },
-        push,
-      );
-      expect(templateFor(ctx, spec, { ...STATE, push })).toBe(want);
-    }
-  });
-
-  test('queue onto a review branch adds the do-not-modify line', () => {
-    const spec = rebaseSpec(ctx, 'b_search', 'b_li', 'Queue after li/search-schema');
-    expect(spec.kind).toBe('queue');
-    const want = mockupMessage({
-      kind: 'queue',
-      roots: ['b_search'],
-      onto: 'b_li',
-      ids: ['b_search', 'b_searchui'],
-      targets: [{ branch: 'b_search', choice: 'new' }],
-      title: 'Queue after li/search-schema',
-    });
-    expect(templateFor(ctx, spec, STATE)).toBe(want);
-    expect(want).toContain('Do not modify li/search-schema.');
-  });
-
+describe('merge template equals the mockup', () => {
   test('merge of a stale branch, push off and on', () => {
     const spec = mergeSpec(ctx, 'b_auth', 'develop');
     expect(spec.title).toBe('Re-merge into develop');
@@ -153,7 +133,7 @@ describe('busy and headless blocks', () => {
 
   test('a working TUI session on a stacked branch blocks until overridden', () => {
     const c = ctxWith([tui({})]);
-    const spec = rebaseSpec(c, 'b_bill', 'main', 'Rebase onto main');
+    const spec = rbSpec(c, 'b_bill');
     const blocked = composeDialog(c, spec, STATE);
     expect(blocked.blocked).toBe(true);
     expect(blocked.busy[0]?.text).toBe('web-app · feat/billing-dashboard · claude aaaa · working');
@@ -165,14 +145,14 @@ describe('busy and headless blocks', () => {
 
   test('an idle or input session does not block', () => {
     const c = ctxWith([tui({ activity: 'input' }), tui({ id: 'bbbb', activity: 'idle' })]);
-    expect(composeDialog(c, rebaseSpec(c, 'b_bill', 'main', 't'), STATE).blocked).toBe(false);
+    expect(composeDialog(c, rbSpec(c, 'b_bill'), STATE).blocked).toBe(false);
   });
 
   test('a running headless run blocks with no override', () => {
     const c = ctxWith([
       tui({ mode: 'headless', terminalId: '', runId: 'r1', activity: 'working' }),
     ]);
-    const v = composeDialog(c, rebaseSpec(c, 'b_bill', 'main', 't'), { ...STATE, override: true });
+    const v = composeDialog(c, rbSpec(c, 'b_bill'), { ...STATE, override: true });
     expect(v.blocked).toBe(true);
     expect(v.headless).toBe(
       'A background run is active on feat/billing-dashboard. Stop it in Sessions, or wait.',
@@ -181,7 +161,7 @@ describe('busy and headless blocks', () => {
 
   test('a stopped headless run does not block', () => {
     const c = ctxWith([tui({ mode: 'headless', state: 'stopped', terminalId: '' })]);
-    expect(composeDialog(c, rebaseSpec(c, 'b_bill', 'main', 't'), STATE).blocked).toBe(false);
+    expect(composeDialog(c, rbSpec(c, 'b_bill'), STATE).blocked).toBe(false);
   });
 });
 
@@ -207,13 +187,13 @@ describe('targets', () => {
   });
 
   test('no running session offers a new one', () => {
-    const v = composeDialog(ctxWith([]), rebaseSpec(ctxWith([]), 'b_bill', 'main', 't'), STATE);
+    const v = composeDialog(ctxWith([]), mergeSpec(ctxWith([]), 'b_bill', 'develop'), STATE);
     expect(v.targets[0]?.options).toEqual([{ value: 'new', label: 'new session', on: true }]);
   });
 
   test('one running session is the only agent and the default', () => {
     const c = ctxWith([running('9ab01234', 'b_bill')]);
-    const v = composeDialog(c, rebaseSpec(c, 'b_bill', 'main', 't'), STATE);
+    const v = composeDialog(c, mergeSpec(c, 'b_bill', 'develop'), STATE);
     expect(v.targets[0]?.options).toEqual([
       { value: '9ab01234', label: 'claude 9ab0 (only agent)', on: true },
     ]);
@@ -221,7 +201,7 @@ describe('targets', () => {
 
   test('a stored choice that stopped falls back to the first running one', () => {
     const c = ctxWith([running('aaaa', 'b_bill'), running('bbbb', 'b_bill')]);
-    const spec = rebaseSpec(c, 'b_bill', 'main', 't');
+    const spec = mergeSpec(c, 'b_bill', 'develop');
     spec.targets = [{ branchId: 'b_bill', choice: 'gone' }];
     const v = composeDialog(c, spec, STATE);
     expect(v.targets[0]?.options.map((o) => o.on)).toEqual([true, false]);
@@ -329,7 +309,7 @@ describe('stage and start mirror the server defaults', () => {
 
 describe('send gating', () => {
   test('a blank message disables send, an edit marks the view edited', () => {
-    const spec = rebaseSpec(ctx, 'b_bill', 'main', 't');
+    const spec = mergeSpec(ctx, 'b_bill', 'develop');
     expect(composeDialog(ctx, spec, { ...STATE, msg: '  \n' }).sendDisabled).toBe(true);
     const v = composeDialog(ctx, spec, { ...STATE, msg: 'go' });
     expect(v.edited).toBe(true);

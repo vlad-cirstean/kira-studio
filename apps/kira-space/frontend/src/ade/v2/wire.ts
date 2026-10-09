@@ -225,12 +225,12 @@ export interface Run {
   purpose: '' | 'rebase';
 }
 /** What the agent reported beyond status and summary. */
-export interface AgentReport {
+interface AgentReport {
   conflictedFiles?: string[];
   lastGitError?: string;
   tried?: string;
 }
-export interface BranchShas {
+interface BranchShas {
   branchId: string;
   name: string;
   before: string;
@@ -238,7 +238,7 @@ export interface BranchShas {
   onBase: boolean;
 }
 /** What git showed after a rebase run ended. */
-export interface RebaseFacts {
+interface RebaseFacts {
   verified: boolean;
   inProgress: boolean;
   aborted: boolean;
@@ -248,7 +248,7 @@ export interface RebaseFacts {
   branches: BranchShas[];
   pushed: boolean | null;
 }
-export type AdeRunOutcome = RunOutcome & { report?: AgentReport; rebase?: RebaseFacts };
+type AdeRunOutcome = RunOutcome & { report?: AgentReport; rebase?: RebaseFacts };
 export interface Task {
   id: string;
   kind: 'task' | 'review' | 'parked';
@@ -529,13 +529,13 @@ export interface RebaseArgs extends OntoArgs {
   /** '' = the default prompt. */
   message: string;
 }
-export interface RebaseStackItem {
+interface RebaseStackItem {
   branchId: string;
   name: string;
   worktree: string;
   ontoRef: string;
 }
-export type RebaseBlockerKind =
+type RebaseBlockerKind =
   | 'dirty'
   | 'running'
   | 'inProgress'
