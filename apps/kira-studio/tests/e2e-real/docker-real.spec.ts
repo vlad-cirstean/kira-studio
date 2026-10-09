@@ -85,6 +85,7 @@ test('Docker mode lists a compose-labelled container, streams logs, execs and st
     ).toBeVisible();
 
     await page.locator('[data-testid="docker-tab-terminal"]').click();
+    await page.locator('[data-testid="docker-exec-new"]').click();
     await expect(page.locator('.xterm-rows')).toBeVisible();
     await page.locator('.xterm-helper-textarea').focus();
     await page.keyboard.type('echo kira-$((1+1))', { delay: 0 });
