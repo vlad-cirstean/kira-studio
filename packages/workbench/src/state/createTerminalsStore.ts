@@ -55,6 +55,7 @@ export interface TerminalsControl {
     rows: number,
     command?: string,
     launchKind?: TerminalLaunchKind,
+    scriptId?: string,
   ): Promise<{ shell: string }>;
   terminalWrite(terminalId: string, data: string): Promise<void>;
   terminalResize(terminalId: string, cols: number, rows: number): Promise<void>;
@@ -75,7 +76,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
     // P91 §7: the Terminal module's own unscoped-launch default — the user's home directory,
     // resolved in Go (bridge/terminal.go's DefaultCwd) and hydrated once at boot, beside
     // hydrateCustomScripts (main.ts). '' means "not yet hydrated, or $HOME could not be resolved" —
-    // every caller (TabStrip.vue's Terminal entry, TerminalStart.vue's button) disables its launch on
+    // every caller (TabStrip.vue's Terminal entry, AutomationsStart.vue's button) disables its launch on
     // that value rather than falling back to some other path (§7.2).
     const terminalDefaults = reactive({ cwd: '' });
 
@@ -176,6 +177,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
       rows: number,
       command = '',
       launchKind: TerminalLaunchKind = 'shell',
+      scriptId = '',
     ): Promise<void> {
       ensureSubscribed();
       const cwdCanonical = canonicalPath(cwd);
@@ -199,6 +201,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
           rows,
           command,
           launchKind,
+          scriptId,
         );
         const sess = byTabId.get(tabId);
         if (sess) sess.shell = shell;

@@ -9,7 +9,7 @@ import { emitWailsEvent } from './support/mockRuntime';
 // (IPC.terminalDefaultCwd) — so an unscoped terminal's title falls out of its basename, 'test'
 // (tabKinds.ts's terminal kind: `s.label || basename(s.cwd) || 'Terminal'`).
 //
-// QuickCommandsDialog.vue adds or edits one command; the panel header `+` is the only add control,
+// ScriptDialog.vue adds or edits one command; the panel header `+` is the only add control,
 // a row's context menu "Edit…" the only edit entry.
 
 const SCRIPT = {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue';
 
-// Inline naming field shared by the API collection tree and the quick-command panel: Enter and blur
+// Inline naming field shared by the API collection tree and the Automations panel: Enter and blur
 // commit, Esc cancels, an empty or unchanged name is a cancel (the row would become unclickable).
 const props = defineProps<{ name: string }>();
 const emit = defineEmits<{ commit: [name: string]; cancel: [] }>();

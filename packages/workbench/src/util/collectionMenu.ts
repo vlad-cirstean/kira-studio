@@ -5,7 +5,7 @@ export interface CollectionChoice {
   name: string;
 }
 
-/** The "Move to collection" submenu both the quick-command and API context menus share. */
+/** The "Move to collection" submenu both the script and API context menus share. */
 export function moveToCollectionMenu(opts: {
   collections: readonly CollectionChoice[];
   current: string | null;

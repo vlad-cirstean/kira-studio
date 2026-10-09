@@ -13,7 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
-func TestQuickCommandInPickedFolder(t *testing.T) {
+func TestScriptInPickedFolder(t *testing.T) {
 	app := flowharness.New(t)
 
 	canceled, err := app.W.Files.ChooseFolder(bridge.FilesChooseFolderArgs{})
@@ -57,7 +57,7 @@ func TestQuickCommandInPickedFolder(t *testing.T) {
 	}
 }
 
-func TestQuickCommandCollections(t *testing.T) {
+func TestScriptCollections(t *testing.T) {
 	app := flowharness.New(t)
 	cs := app.W.CustomScripts
 	fields := func(name string, coll *string) scripts.CustomScriptFields {

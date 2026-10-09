@@ -1,23 +1,24 @@
-import type { TerminalModuleContext } from '@workbench/terminal/module';
+import type { AutomationsModuleContext } from '@workbench/automations/module';
 import { control } from '../bridge/control';
 import { useCustomScriptsStore } from '../state/customScripts';
+import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
 import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
 
-// P128 §2.4/§2.7: this app's own terminal-module context, provided once in App.vue (alongside
-// workbenchHostKey) for the shared TerminalPanel.vue/TerminalStart.vue/TerminalNewTab.vue/
-// TerminalTabView.vue to inject. `'terminal'` is this app's own module workspace (state/workspace.ts's `visibleWorkspace`
-// reads the mode store for it directly; it never reaches `repoIdOfWorkspace`/`GitPanel`).
-export function createTerminalModule(): TerminalModuleContext {
+// P128 §2.4: this app's own Automations-module context, provided once in App.vue (alongside
+// workbenchHostKey) for the shared AutomationsPanel.vue/AutomationsStart.vue/AutomationsNewTab.vue/
+// TerminalTabView.vue to inject. `scripts` wires the shared script store's own CRUD.
+export function createAutomationsModule(): AutomationsModuleContext {
   const customScriptsStore = useCustomScriptsStore();
   const settingsStore = useSettingsStore();
   const terminalsStore = useTerminalsStore();
+  const modeStore = useModeStore();
 
   return {
     defaultCwd: () => terminalsStore.terminalDefaults.cwd,
     openTerminalTab: (opts) => {
-      openTerminalTab({ workspaceId: 'terminal', cwd: opts.cwd, launch: opts.launch });
+      openTerminalTab({ workspaceId: 'automations', cwd: opts.cwd, launch: opts.launch });
     },
     host: {
       rendererDeps: {
@@ -29,6 +30,13 @@ export function createTerminalModule(): TerminalModuleContext {
       openTerminalSession: terminalsStore.openTerminalSession,
       resizeTerminal: terminalsStore.resizeTerminal,
     },
+    runs: {
+      list: (limit) => control.scriptRunsList(limit),
+      stop: (id) => control.scriptRunsStop(id),
+      resolveDir: (scriptId) => control.scriptRunsResolveDir(scriptId),
+      onChanged: (cb) => control.onScriptRunsChanged(cb),
+    },
+    showAutomations: () => modeStore.setMode('automations'),
     chooseFolder: async (title) => {
       const chosen = await control.filesChooseFolder(title);
       return chosen.canceled ? null : chosen.path;

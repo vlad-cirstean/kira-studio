@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // P110 I2-24 (§3.10): the 10-utility swatch label/input/span recipe, carried once instead of 4
-// times (QuickCommandsDialog.vue x2, VariableSetView.vue, ConnectionDialog.vue). The outline fix from
+// times (ScriptDialog.vue x2, VariableSetView.vue, ConnectionDialog.vue). The outline fix from
 // I2-8 is already reflected here: peer-focus-visible:outline-* stays always-on utility, the
 // selected-state outline is the only conditional class.
 import { connBgClass } from './connColor';

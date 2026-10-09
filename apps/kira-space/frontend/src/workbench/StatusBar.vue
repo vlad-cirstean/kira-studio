@@ -6,6 +6,7 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
+import RunsStatusItem from '@workbench/automations/runs/RunsStatusItem.vue';
 import AppMetricsItem from '@workbench/components/AppMetricsItem.vue';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
 import UpdateAvailableItem from '@workbench/components/UpdateAvailableItem.vue';
@@ -66,6 +67,7 @@ function onRevealBlameCommit(): void {
       </Tooltip>
     </template>
     <template #right>
+      <RunsStatusItem />
       <UpdateAvailableItem
         v-if="appUpdateStore.available"
         :latest-version="appUpdateStore.latestVersion"

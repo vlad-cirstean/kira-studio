@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import TabStripNewButton from '@workbench/components/TabStripNewButton.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
-import { useTerminalModule } from './module';
+import { useAutomationsModule } from './module';
 
 // P91 §8/§9: the tab strip's own "+" for the Terminal module — one plain, unscoped session at the
 // resolved home directory. Hoisted to the shared terminal module at P128 §2.4 — TabStripNewButton
 // carries the wrapper/Tooltip/button markup both apps' own "+" already shared; this file keeps
 // exactly the terminal module's own menu content, verbatim from Kira Studio's own
 // WorkbenchShell.vue.
-const ctx = useTerminalModule();
+const ctx = useAutomationsModule();
 const contextMenuStore = useContextMenuStore();
 
 function menuItems(): MenuItem[] {

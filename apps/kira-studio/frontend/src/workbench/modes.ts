@@ -8,7 +8,7 @@ import StudioStart from './panels/StudioStart.vue';
 
 // P91 OQ-1: Terminal joins Studio/Api last, the plan's own stated default. Hoisted here from
 // TitleBar.vue at P128 §2.3: one file lists a module.
-export const MODE_ORDER: AppMode[] = ['studio', 'api', 'terminal', 'docker'];
+export const MODE_ORDER: AppMode[] = ['studio', 'api', 'automations', 'docker'];
 
 // P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Api's own
 // entries are both EmptyState-based (§0.2) — P1 adds no HTTP functionality, only the seam.
@@ -26,12 +26,12 @@ export const MODES: ModeRegistry<AppMode, PanelModeDef> = {
   api: { label: 'Api', icon: 'globe', panel: CollectionsPanel, start: ApiStart },
   // P91 §2: a peer module, lazy the same reason Studio/Api's entries are — nothing
   // in a Studio-only session should pay for the terminal panel's own launch chunk.
-  terminal: {
-    label: 'Terminal',
-    icon: 'terminal-bash',
-    panel: defineAsyncComponent(() => import('@workbench/terminal/TerminalPanel.vue')),
-    start: defineAsyncComponent(() => import('@workbench/terminal/TerminalStart.vue')),
-    newTab: defineAsyncComponent(() => import('@workbench/terminal/TerminalNewTab.vue')),
+  automations: {
+    label: 'Automations',
+    icon: 'run-all',
+    panel: defineAsyncComponent(() => import('@workbench/automations/AutomationsPanel.vue')),
+    start: defineAsyncComponent(() => import('@workbench/automations/AutomationsStart.vue')),
+    newTab: defineAsyncComponent(() => import('@workbench/automations/AutomationsNewTab.vue')),
   },
   // P200: lazy like Terminal; no tabs of its own, so the tab strip is hidden for this mode.
   docker: {

@@ -2,12 +2,12 @@
 // P104 §6.1: every converted call site reaches timing (delayDuration/skipDelayDuration) through
 // this one provider.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
+import { automationsModuleKey } from '@workbench/automations/module';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
 import { runCommand } from '@workbench/shortcuts/commands';
-import { terminalModuleKey } from '@workbench/terminal/module';
 import { onMounted, onUnmounted, provide } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
 import { useCollectionsStore } from './api/state/collections';
@@ -26,20 +26,20 @@ import { useModeStore } from './state/mode';
 import { useObjectStoreStore } from './state/objectStore';
 import { useSettingsStore } from './state/settings';
 import { useTabsStore } from './state/tabs';
+import { createAutomationsModule } from './workbench/automationsModule';
 import DbMcpApprovalDialog from './workbench/DbMcpApprovalDialog.vue';
 import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
 import { createWorkbenchHost } from './workbench/host';
 import TitleBar from './workbench/TitleBar.vue';
-import { createTerminalModule } from './workbench/terminalModule';
 import UploadObjectDialog from './workbench/UploadObjectDialog.vue';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
 
 // P103 Part 2 (§5.4): provided once, here, for MainView/TabStrip/WorkbenchShell (via their own
 // per-app workbench/*.vue wrappers) to inject through packages/workbench/src/host.ts.
 provide(workbenchHostKey, createWorkbenchHost());
-// P128 §2.4: the terminal module's own context, for TerminalPanel.vue/TerminalStart.vue/
-// TerminalNewTab.vue/TerminalTabView.vue (all shared with Kira Space) to inject.
-provide(terminalModuleKey, createTerminalModule());
+// P128 §2.4: the terminal module's own context, for AutomationsPanel.vue/AutomationsStart.vue/
+// AutomationsNewTab.vue/TerminalTabView.vue (all shared with Kira Space) to inject.
+provide(automationsModuleKey, createAutomationsModule());
 
 const appUpdateStore = useAppUpdateStore();
 const paletteStore = usePaletteStore();

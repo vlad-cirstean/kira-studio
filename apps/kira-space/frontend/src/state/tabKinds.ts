@@ -163,5 +163,6 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
     terminal: terminalTabKind<'terminal', TabRecord, TabIcon, PaletteColor, MenuItem>(
       SPACE_TAB_KIND_MODE.terminal,
       (tabId) => useTerminalsStore().closeTerminalSession(tabId),
+      (tabId) => useTerminalsStore().terminalSession(tabId),
     ),
   };

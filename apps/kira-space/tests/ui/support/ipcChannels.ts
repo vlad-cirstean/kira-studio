@@ -44,6 +44,7 @@ export const IPC = {
   customScriptsDeleteCollection: 'kira:customScripts:deleteCollection',
   customScriptsMove: 'kira:customScripts:move',
   customScriptsChanged: 'kira:customScripts:changed',
+  scriptRunsChanged: 'kira:scriptRuns:changed',
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
   keepAwake: 'kira:keepAwake:changed',

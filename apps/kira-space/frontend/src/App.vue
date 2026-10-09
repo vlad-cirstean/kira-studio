@@ -2,12 +2,12 @@
 // P104 §6.1: every converted call site reaches timing (delayDuration/skipDelayDuration) through
 // this one provider.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
+import { automationsModuleKey } from '@workbench/automations/module';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
 import { memoryModuleKey } from '@workbench/memory/module';
-import { terminalModuleKey } from '@workbench/terminal/module';
 import { onMounted, onUnmounted, provide } from 'vue';
 import AdeReviewWindow from './ade/v2/review/AdeReviewWindow.vue';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
@@ -15,21 +15,21 @@ import { control } from './bridge/control';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useLayoutStore } from './state/layout';
 import { useSettingsStore } from './state/settings';
+import { createAutomationsModule } from './workbench/automationsModule';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
 import { createWorkbenchHost, useTabsStore } from './workbench/host';
 import MobilePairingDialog from './workbench/MobilePairingDialog.vue';
 import { createMemoryModule } from './workbench/memoryModule';
 import TitleBar from './workbench/TitleBar.vue';
-import { createTerminalModule } from './workbench/terminalModule';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
 
 // P103 Part 2 (§5.4): provided once, here, for MainView/TabStrip/WorkbenchShell (via their own
 // per-app workbench/*.vue wrappers) to inject through packages/workbench/src/host.ts.
 provide(workbenchHostKey, createWorkbenchHost());
-// P128 §2.4/§2.7: the terminal module's own context, for TerminalPanel.vue/TerminalStart.vue/
-// TerminalNewTab.vue/TerminalTabView.vue (all shared with Kira Studio) to inject.
-provide(terminalModuleKey, createTerminalModule());
+// P128 §2.4/§2.7: the terminal module's own context, for AutomationsPanel.vue/AutomationsStart.vue/
+// AutomationsNewTab.vue/TerminalTabView.vue (all shared with Kira Studio) to inject.
+provide(automationsModuleKey, createAutomationsModule());
 provide(memoryModuleKey, createMemoryModule());
 
 // P100 Part 2: Kira Studio's own App.vue, trimmed to this app's own always-mounted root dialogs —

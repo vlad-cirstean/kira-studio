@@ -41,8 +41,8 @@ export function installAgentNotifyFocus(): void {
     const tab = tabs.tabs.find((t) => t.id === terminalId);
     if (!tab) return;
     const key = tab.workspaceId ?? GENERAL_WORKSPACE;
-    if (key === 'terminal') {
-      mode.setMode('terminal');
+    if (key === 'automations') {
+      mode.setMode('automations');
     } else {
       useWorkspaceStore().activateWorkspace(key);
       mode.setMode('git');

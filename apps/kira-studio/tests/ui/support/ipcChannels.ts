@@ -208,6 +208,7 @@ export const IPC = {
   // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape, EmitTo every
   // window (not one), driven by emitWailsEvent(page, IPC.customScriptsChanged, …) the same way.
   customScriptsChanged: 'kira:customScripts:changed',
+  scriptRunsChanged: 'kira:scriptRuns:changed',
   // P87 §3.2/§10.3: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape restated. Real wire channel string verbatim
   // (internal/appevent's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never

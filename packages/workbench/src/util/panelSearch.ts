@@ -2,7 +2,7 @@ import { useEventListener } from '@vueuse/core';
 import { nextTick, type Ref, ref } from 'vue';
 
 // P104 §3 (PanelShell -> inline composition): the reveal/toggle/type-ahead-redirect behaviour
-// PanelShell.vue used to own, factored out so GitPanel.vue/TerminalPanel.vue/ProjectPanel.vue can
+// PanelShell.vue used to own, factored out so GitPanel.vue/AutomationsPanel.vue/ProjectPanel.vue can
 // each inline their own header markup without tripling this logic. Ported verbatim from
 // PanelShell.vue's own onPanelKeydown/toggleSearch/revealSearch.
 //

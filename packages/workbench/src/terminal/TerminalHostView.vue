@@ -17,6 +17,8 @@ export type { TerminalHostDeps, TerminalHostTabState } from './terminalHost';
 const props = defineProps<{
   tab: { id: string; state: TerminalHostTabState };
   deps: TerminalHostDeps;
+  /** A caller-supplied result block (the "outcome" slot) replaces the plain exit footer. */
+  hideFooter?: boolean;
 }>();
 
 const container = ref<HTMLElement | null>(null);
@@ -35,8 +37,9 @@ const { session, footerText } = useTerminalMount({
   <div class="flex flex-col h-full bg-bg p-1">
     <slot />
     <div ref="container" class="flex-1 min-h-0" data-testid="repo-terminal-host" />
+    <slot name="outcome" />
     <div
-      v-if="session && (session.status === 'exited' || session.status === 'failed')"
+      v-if="!hideFooter && session && (session.status === 'exited' || session.status === 'failed')"
       class="shrink-0 text-kira-sm bg-chrome py-0.5 px-1"
       :class="session.status === 'failed' ? 'text-error' : 'text-muted-foreground'"
       data-testid="repo-terminal-footer"

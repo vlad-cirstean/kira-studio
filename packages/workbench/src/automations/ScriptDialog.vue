@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
-import type { CustomScript } from '@shared/domain/scripts';
+import type { CustomScript, ScriptDir, ScriptDirMode } from '@shared/domain/scripts';
+import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -13,21 +14,27 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import VarText from '@theme/components/VarText.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
+import type { TextPart } from '@theme/varText';
+import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, useTemplateRef } from 'vue';
-import type { TerminalScriptsSeam } from './module';
+import type { ScriptsSeam } from './module';
 
-// Adds one quick command (`script === null`) or edits one. `scripts` is a prop, not
-// `useTerminalModule()`: TerminalPanel.vue owns the seam and mounts this per open. `collectionId`
-// presets the collection of a new command (added from a collection's own menu).
+// Adds one script (`script === null`) or edits one. `scripts` is a prop, not
+// `useAutomationsModule()`: AutomationsPanel.vue owns the seam and mounts this per open. `collectionId`
+// presets the collection of a new script (added from a collection's own menu).
 const props = defineProps<{
-  scripts: TerminalScriptsSeam;
+  scripts: ScriptsSeam;
   script: CustomScript | null;
   collectionId?: string | null;
   chooseFolder: (title: string) => Promise<string | null>;
+  resolveDir: (scriptId: string) => Promise<ScriptDir>;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -35,7 +42,27 @@ const colors = PALETTE_COLOR_CHOICES;
 
 const name = ref(props.script?.name ?? '');
 const command = ref(props.script?.command ?? '');
+const dirMode = ref<ScriptDirMode>(props.script?.dirMode ?? 'kira');
 const workingDir = ref(props.script?.workingDir ?? '');
+const dir = useQuery(
+  {
+    queryKey: ['scriptRuns', 'dir', props.script?.id ?? ''],
+    queryFn: () => props.resolveDir(props.script?.id ?? ''),
+    staleTime: 0,
+  },
+  queryClient,
+);
+const blocker = computed(() => (dirMode.value === props.script?.dirMode ? (dir.data.value?.blocker ?? '') : ''));
+const folderParts = computed<TextPart[]>(() => [
+  { name: 'Kira home', value: dir.data.value?.base ?? '…' },
+  '/automations/',
+  { name: 'script id', value: props.script?.id ?? 'set on save' },
+]);
+const homeParts = computed<TextPart[]>(() => [
+  'Runs in your home folder ',
+  { name: 'HOME', value: dir.data.value?.base ?? '…' },
+  ', the old default. New scripts use the Kira automations folder.',
+]);
 // '' is the select's "No collection" sentinel; the payload sends null.
 const collection = ref(props.script?.collectionId ?? props.collectionId ?? '');
 const color = ref<PaletteColor>((props.script?.color as PaletteColor | undefined) ?? 'none');
@@ -43,13 +70,20 @@ const error = ref<string | null>(null);
 const saving = ref(false);
 
 // The dialog's own affordance: the Go check stays the authority on every other rule.
-const canSave = computed(() => name.value.trim() !== '' && command.value.trim() !== '');
+const canSave = computed(
+  () =>
+    name.value.trim() !== '' &&
+    command.value.trim() !== '' &&
+    (dirMode.value !== 'fixed' || workingDir.value.trim() !== ''),
+);
 
 async function chooseWorkingDir(): Promise<void> {
   error.value = null;
   try {
     const path = await props.chooseFolder('Working directory…');
-    if (path !== null) workingDir.value = path;
+    if (path === null) return;
+    workingDir.value = path;
+    dirMode.value = 'fixed';
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
   }
@@ -62,7 +96,8 @@ async function save(): Promise<void> {
   const fields = {
     name: name.value.trim(),
     command: command.value.trim(),
-    workingDir: workingDir.value.trim(),
+    dirMode: dirMode.value,
+    workingDir: dirMode.value === 'fixed' ? workingDir.value.trim() : '',
     color: color.value,
     collectionId: collection.value === '' ? null : collection.value,
   };
@@ -88,21 +123,21 @@ function onOpenAutoFocus(e: Event): void {
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent
       :show-close-button="false"
-      data-testid="quick-commands-dialog"
+      data-testid="script-dialog"
       class="flex flex-col gap-0 p-0 w-150 max-w-[90vw] max-h-4/5"
       @open-auto-focus="onOpenAutoFocus"
       @keydown.meta.enter.prevent="save"
       @keydown.ctrl.enter.prevent="save"
     >
       <DialogHeader>
-        <DialogTitle>{{ script ? 'Edit quick command' : 'Add quick command' }}</DialogTitle>
+        <DialogTitle>{{ script ? 'Edit script' : 'New script' }}</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
             size="icon-sm"
             class="ml-auto"
             aria-label="Close"
-            data-testid="quick-commands-dialog-close"
+            data-testid="script-dialog-close"
           >
             <CodiconIcon name="close" :size="13" />
           </Button>
@@ -111,26 +146,26 @@ function onOpenAutoFocus(e: Event): void {
 
       <div class="flex flex-col gap-3 overflow-auto p-3">
         <Field>
-          <FieldLabel for="quick-command-name">Name</FieldLabel>
+          <FieldLabel for="script-name">Name</FieldLabel>
           <Input
-            id="quick-command-name"
+            id="script-name"
             ref="nameEl"
             v-model="name"
             placeholder="Build"
-            data-testid="custom-script-name"
+            data-testid="script-dialog-name"
           />
         </Field>
 
         <Field>
-          <FieldLabel for="quick-command-script">Script</FieldLabel>
+          <FieldLabel for="script-command">Command</FieldLabel>
           <Textarea
-            id="quick-command-script"
+            id="script-command"
             v-model="command"
             rows="8"
             spellcheck="false"
             placeholder="npm run build"
             class="field-sizing-fixed min-h-40 resize-y font-data leading-normal"
-            data-testid="custom-script-command"
+            data-testid="script-dialog-command"
           />
           <FieldDescription>
             Runs in your login shell; lines run in order. Press Cmd/Ctrl+Enter to save.
@@ -138,35 +173,57 @@ function onOpenAutoFocus(e: Event): void {
         </Field>
 
         <Field>
-          <FieldLabel for="quick-command-dir">Working directory</FieldLabel>
-          <div class="flex items-center gap-1.5">
-            <Input
-              id="quick-command-dir"
-              v-model="workingDir"
-              placeholder="Terminal default directory"
-              class="min-w-0 flex-1 font-data"
-              data-testid="custom-script-workingdir"
-            />
-            <Button
-              variant="dialog"
-              size="kira-lg"
-              data-testid="custom-script-workingdir-choose"
-              @click="chooseWorkingDir"
-            >
+          <FieldLabel>Working directory</FieldLabel>
+          <RadioGroup
+            :model-value="dirMode === 'home' ? '' : dirMode"
+            class="gap-1.5"
+            data-testid="script-dialog-dirmode"
+            @update:model-value="(v) => (dirMode = v === 'fixed' ? 'fixed' : 'kira')"
+          >
+            <div class="flex items-center gap-2">
+              <RadioGroupItem id="script-dir-kira" value="kira" data-testid="script-dialog-dir-kira" />
+              <Label for="script-dir-kira">Kira automations folder</Label>
+            </div>
+            <div class="flex items-center gap-2">
+              <RadioGroupItem id="script-dir-fixed" value="fixed" data-testid="script-dialog-dir-fixed" />
+              <Label for="script-dir-fixed">Choose folder…</Label>
+            </div>
+          </RadioGroup>
+          <div v-if="dirMode === 'fixed'" class="flex items-center gap-1.5">
+            <span class="min-w-0 flex-1 truncate font-data" data-testid="script-dialog-workingdir">
+              {{ workingDir || 'No folder chosen' }}
+            </span>
+            <Button variant="dialog" size="kira-lg" data-testid="script-dialog-workingdir-choose" @click="chooseWorkingDir">
               Choose…
             </Button>
           </div>
+          <FieldDescription v-else-if="dirMode === 'home'" data-testid="script-dialog-home-notice">
+            <VarText :parts="homeParts" />
+            <Button
+              variant="dialog"
+              size="kira-lg"
+              class="ml-2"
+              data-testid="script-dialog-use-kira"
+              @click="dirMode = 'kira'"
+            >
+              Use automations folder
+            </Button>
+          </FieldDescription>
+          <FieldDescription v-else data-testid="script-dialog-dir-preview">
+            <VarText :parts="folderParts" />
+          </FieldDescription>
+          <FieldError v-if="blocker" data-testid="script-dialog-dir-blocker">{{ blocker }}</FieldError>
         </Field>
 
         <div class="flex items-end gap-3">
           <Field class="flex-1 min-w-0">
-            <FieldLabel for="quick-command-collection">Collection</FieldLabel>
+            <FieldLabel for="script-collection">Collection</FieldLabel>
             <NativeSelect
-              id="quick-command-collection"
+              id="script-collection"
               v-model="collection"
               variant="bordered"
               size="kira-lg"
-              data-testid="custom-script-collection"
+              data-testid="script-dialog-collection"
             >
               <option value="">No collection</option>
               <option v-for="c in scripts.collections()" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -179,7 +236,7 @@ function onOpenAutoFocus(e: Event): void {
             <Tooltip v-for="swatch in colors" :key="swatch">
               <TooltipTrigger as-child>
                 <SwatchRadio
-                  name="quick-command-color"
+                  name="script-color"
                   :value="swatch"
                   :color="swatch"
                   :checked="color === swatch"
@@ -190,18 +247,18 @@ function onOpenAutoFocus(e: Event): void {
             </Tooltip>
           </fieldset>
         </div>
-        <FieldError v-if="error" data-testid="custom-script-error">{{ error }}</FieldError>
+        <FieldError v-if="error" data-testid="script-dialog-error">{{ error }}</FieldError>
       </div>
 
       <DialogFooter class="justify-end">
         <DialogClose as-child>
-          <Button variant="dialog" size="kira-lg" data-testid="custom-script-cancel">Cancel</Button>
+          <Button variant="dialog" size="kira-lg" data-testid="script-dialog-cancel">Cancel</Button>
         </DialogClose>
         <Button
           variant="dialog-primary"
           size="kira-lg"
           :disabled="!canSave || saving"
-          data-testid="custom-script-save"
+          data-testid="script-dialog-save"
           @click="save"
         >
           {{ script ? 'Save' : 'Add' }}

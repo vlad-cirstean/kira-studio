@@ -60,6 +60,8 @@ export const CHANNEL = {
   // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape (Emit, not EmitTo,
   // so every window's tab-strip dropdown stays in sync).
   customScriptsChanged: 'kira:customScripts:changed',
+  // P242: one Automations run was created or changed (Emit, app-wide) — carries the whole run.
+  scriptRunsChanged: 'kira:scriptRuns:changed',
   // P108 Part 12 F18: one connection's mask-rule set changed (Upsert/Remove/RegenerateKey) —
   // schemaChanged's own per-connection shape (Emit, not EmitTo), so a second window's Privacy tab,
   // grid header menu and grid preview all stay in sync rather than reading a stale rule list.

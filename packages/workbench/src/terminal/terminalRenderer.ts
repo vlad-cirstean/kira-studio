@@ -124,6 +124,17 @@ export function fitTerminal(tabId: string): { cols: number; rows: number } | nul
   return { cols: attached.term.cols, rows: attached.term.rows };
 }
 
+/** The last `lines` non-empty-trailing rows of tabId's terminal, '' when it has none. */
+export function tailTerminal(tabId: string, lines: number): string {
+  const attached = byTabId.get(tabId);
+  if (!attached) return '';
+  const buf = attached.term.buffer.active;
+  const out: string[] = [];
+  for (let y = 0; y < buf.length; y++) out.push(buf.getLine(y)?.translateToString(true) ?? '');
+  while (out.length > 0 && out[out.length - 1] === '') out.pop();
+  return out.slice(-lines).join('\n');
+}
+
 /** §6.3: re-applies the live "Data font" setting to an already-open terminal and re-fits it —
  *  the settings watch's own target (RepoTerminalView.vue). A no-op for an id with no attached
  *  terminal. */

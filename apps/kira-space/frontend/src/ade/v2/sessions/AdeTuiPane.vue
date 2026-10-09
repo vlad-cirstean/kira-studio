@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { useDateFormat, useTimeAgo } from '@vueuse/core';
-import { useTerminalModule } from '@workbench/terminal/module';
+import { useAutomationsModule } from '@workbench/automations/module';
 import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref } from 'vue';
 import { useMobileTerminalsStore } from '../../../state/mobileTerminals';
@@ -20,7 +20,7 @@ const props = defineProps<{ view: SessionView }>();
 
 const terminals = useTerminalsStore();
 const phones = useMobileTerminalsStore();
-const terminal = useTerminalModule();
+const terminal = useAutomationsModule();
 const focus = useFocusSession();
 const ui = useAdeBoardUiStore();
 const missing = ref(false);

@@ -15,6 +15,8 @@ export interface TerminalLaunch {
   label: string;
   color: PaletteColor;
   kind: TerminalLaunchKind;
+  /** Set for a stored script: Go then runs the stored command in its resolved folder. */
+  scriptId?: string;
 }
 
 export interface OpenTerminalTabOpts<K extends string> {
@@ -54,6 +56,7 @@ export function createOpenTerminalTab<K extends string>(useTabsStore: () => Term
         label: opts.launch?.label ?? '',
         color: opts.launch?.color ?? 'none',
         launchKind: opts.launch?.kind ?? 'shell',
+        scriptId: opts.launch?.scriptId ?? '',
       }),
       { reuse: false, workspaceId: opts.workspaceId },
     );

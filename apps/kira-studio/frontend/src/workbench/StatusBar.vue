@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import RunsStatusItem from '@workbench/automations/runs/RunsStatusItem.vue';
 import AppMetricsItem from '@workbench/components/AppMetricsItem.vue';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
 import UpdateAvailableItem from '@workbench/components/UpdateAvailableItem.vue';
@@ -39,6 +40,7 @@ const cacheSizeLabel = computed(() => {
 <template>
   <StatusBarBase>
     <template #right>
+      <RunsStatusItem />
       <UpdateAvailableItem
         v-if="appUpdateStore.available"
         :latest-version="appUpdateStore.latestVersion"

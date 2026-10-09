@@ -1,6 +1,11 @@
 import { type TabScope, type TerminalTabState, terminalTabStateSchema } from '@shared/domain/tabs';
 import { parseStateWith, type TabKindDef } from './types';
 
+export interface TerminalSessionStatus {
+  status: 'starting' | 'running' | 'exited' | 'failed';
+  exitCode: number | null;
+}
+
 // A filesystem basename (state.cwd is an absolute path, not an encoded NodePath).
 function basename(path: string): string {
   const slash = path.lastIndexOf('/');
@@ -22,8 +27,12 @@ export function terminalTabKind<
   Icon,
   Color,
   Menu,
->(mode: TabScope, dropResources: (tabId: string) => void): TabKindDef<K, R, Icon, Color, Menu> {
-  type TerminalRecord = Extract<R, { kind: K }> & { state: TerminalTabState };
+>(
+  mode: TabScope,
+  dropResources: (tabId: string) => void,
+  sessionStatus: (tabId: string) => TerminalSessionStatus | undefined,
+): TabKindDef<K, R, Icon, Color, Menu> {
+  type TerminalRecord = Extract<R, { kind: K }> & { id: string; state: TerminalTabState };
   type TerminalState = Extract<R, { kind: K }>['state'];
 
   return {
@@ -44,6 +53,7 @@ export function terminalTabKind<
         label: '',
         color: 'none',
         launchKind: 'shell',
+        scriptId: '',
       }) as TerminalState,
     // Copying the cwd (and command/label/color) means "Duplicate tab" on a terminal opens a
     // second session with the same launch — which needs no special case.
@@ -52,6 +62,18 @@ export function terminalTabKind<
     // a non-terminal tab id is a registry miss here, not a branch.
     dropResources,
     menuExtras: () => [],
+    // A script tab shows how its run is going; a plain shell has nothing to flag.
+    badge: (tab) => {
+      const t = tab as TerminalRecord;
+      if (t.state.launchKind !== 'script') return null;
+      const s = sessionStatus(t.id);
+      if (!s) return null;
+      if (s.status === 'starting' || s.status === 'running')
+        return { icon: 'loading', tooltip: 'Running' };
+      if (s.status === 'failed' || (s.exitCode ?? 0) !== 0)
+        return { icon: 'error', tooltip: 'Failed' };
+      return { icon: 'check', tooltip: 'Succeeded' };
+    },
     parseState: parseStateWith(terminalTabStateSchema) as (raw: unknown) => TerminalState | null,
   };
 }

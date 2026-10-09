@@ -1,19 +1,21 @@
 import { z } from 'zod';
 import { paletteColorSchema } from './color';
 
-// P85 §9.2: zod schemas mirroring internal/storage/model/customscript.go — mask.ts's own
+// P85 §9.2: zod schemas mirroring internal/scripts — mask.ts's own
 // Fields/full split (maskRuleFieldsSchema/maskRuleSchema).
 
-// customScriptFieldsSchema mirrors model.CustomScriptFields — what the Create/Update bound calls
-// accept. The Go check (model.CustomScriptFields.Validate, P85 §10.3) is the authority; this is
+// Where a script runs: the app's automations folder, a picked folder, or (legacy rows only) $HOME.
+export const scriptDirModeSchema = /*#__PURE__*/ z.enum(['kira', 'fixed', 'home']);
+export type ScriptDirMode = z.infer<typeof scriptDirModeSchema>;
+
+// customScriptFieldsSchema mirrors scripts.CustomScriptFields — what the Create/Update bound calls
+// accept. The Go check (scripts.CustomScriptFields.Validate) is the authority; this is
 // only the dialog's own affordance for disabling Add before a round trip.
 export const customScriptFieldsSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   command: z.string(),
-  // '' means the host app's own default directory — Kira Studio's own $HOME
-  // (internal/bridge/terminal.go's DefaultCwd), its only real consumer today; this schema lives
-  // here, not in Kira Studio's own settingsDomain.ts, in case Kira Space ever grows the same
-  // custom-scripts feature.
+  dirMode: scriptDirModeSchema,
+  // The picked folder when dirMode is 'fixed'; '' otherwise.
   workingDir: z.string(),
   color: paletteColorSchema,
   // null = ungrouped; the panel groups rows under their collection.
@@ -30,7 +32,7 @@ export const customScriptSchema = /*#__PURE__*/ customScriptFieldsSchema.extend(
 });
 export type CustomScript = z.infer<typeof customScriptSchema>;
 
-// scriptCollectionSchema mirrors quickcommands.Collection — one custom_script_collections row.
+// scriptCollectionSchema mirrors scripts.Collection — one custom_script_collections row.
 export const scriptCollectionSchema = /*#__PURE__*/ z.object({
   id: z.string(),
   name: z.string(),
@@ -40,10 +42,19 @@ export const scriptCollectionSchema = /*#__PURE__*/ z.object({
 });
 export type ScriptCollection = z.infer<typeof scriptCollectionSchema>;
 
-// quickCommandsSnapshotSchema mirrors quickcommands.Snapshot — what List answers and every
+// scriptsSnapshotSchema mirrors scripts.Snapshot — what List answers and every
 // mutation broadcasts.
-export const quickCommandsSnapshotSchema = /*#__PURE__*/ z.object({
+export const scriptsSnapshotSchema = /*#__PURE__*/ z.object({
   collections: z.array(scriptCollectionSchema),
   scripts: z.array(customScriptSchema),
 });
-export type QuickCommandsSnapshot = z.infer<typeof quickCommandsSnapshotSchema>;
+export type ScriptsSnapshot = z.infer<typeof scriptsSnapshotSchema>;
+
+// scriptDirSchema mirrors scripts.Dir — where a saved script runs, and why it cannot.
+export const scriptDirSchema = /*#__PURE__*/ z.object({
+  path: z.string(),
+  mode: scriptDirModeSchema,
+  base: z.string(),
+  blocker: z.string(),
+});
+export type ScriptDir = z.infer<typeof scriptDirSchema>;

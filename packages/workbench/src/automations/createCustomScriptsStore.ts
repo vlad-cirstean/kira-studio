@@ -1,18 +1,18 @@
 import type {
   CustomScript,
   CustomScriptFields,
-  QuickCommandsSnapshot,
   ScriptCollection,
+  ScriptsSnapshot,
 } from '@shared/domain/scripts';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { hydrateThenSubscribe } from '../state/hydrateThenSubscribe';
 
-// The quick-command store both apps define from their own `control` calls (createKeepAwakeStore's
+// The script store both apps define from their own `control` calls (createKeepAwakeStore's
 // precedent). A snapshot broadcast replaces `collections` and `records` wholesale, so a command added in one
 // window shows up in every other.
 export interface CustomScriptsControl {
-  customScriptsList(): Promise<QuickCommandsSnapshot>;
+  customScriptsList(): Promise<ScriptsSnapshot>;
   customScriptsCreate(fields: CustomScriptFields): Promise<CustomScript>;
   customScriptsUpdate(id: string, fields: CustomScriptFields): Promise<CustomScript>;
   customScriptsRemove(id: string): Promise<void>;
@@ -20,12 +20,12 @@ export interface CustomScriptsControl {
   customScriptsRenameCollection(id: string, name: string): Promise<void>;
   customScriptsDeleteCollection(id: string): Promise<void>;
   customScriptsMove(id: string, collectionId: string | null): Promise<void>;
-  onCustomScriptsChanged(cb: (snapshot: QuickCommandsSnapshot) => void): () => void;
+  onCustomScriptsChanged(cb: (snapshot: ScriptsSnapshot) => void): () => void;
 }
 
 /** A Go nil slice crosses the bridge as null; coerce both arrays so the store always holds arrays. */
-export function quickCommandsSnapshotOf(raw: unknown): QuickCommandsSnapshot {
-  const r = (raw ?? {}) as Partial<QuickCommandsSnapshot>;
+export function scriptsSnapshotOf(raw: unknown): ScriptsSnapshot {
+  const r = (raw ?? {}) as Partial<ScriptsSnapshot>;
   return { collections: r.collections ?? [], scripts: r.scripts ?? [] };
 }
 

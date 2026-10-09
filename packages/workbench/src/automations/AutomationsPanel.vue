@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript, ScriptCollection } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -13,22 +14,26 @@ import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu
 import { moveToCollectionMenu } from '@workbench/util/collectionMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
-import { useTerminalModule } from './module';
-import QuickCommandsDialog from './QuickCommandsDialog.vue';
+import { useAutomationsModule } from './module';
+import { useRunScript } from './runScript';
+import RunElapsed from './runs/RunElapsed.vue';
+import RunsSection from './runs/RunsSection.vue';
+import { useScriptRuns } from './runs/runsQueries';
+import ScriptDialog from './ScriptDialog.vue';
 import { useRemoveScript } from './scriptActions';
 
 const contextMenuStore = useContextMenuStore();
 const confirmDialogStore = useConfirmDialogStore();
-const ctx = useTerminalModule();
+const ctx = useAutomationsModule();
 const removeScript = useRemoveScript();
 
-// The Terminal module's own left panel: a view over the custom_scripts store through the
-// `ctx.scripts` seam, both apps. The header `+` is the one way to add a command; a row's context
-// menu edits it. Both open `QuickCommandsDialog.vue`.
+// The Automations module's own left panel: a view over the custom_scripts store through the
+// `ctx.scripts` seam, both apps. The header `+` is the one way to add a script; a row's context
+// menu edits it. Both open `ScriptDialog.vue`.
 const scripts = ctx.scripts;
 
 // Dialog visibility is this component's own local state: nothing else reads it. `collectionId`
-// presets a new command's collection (added from a collection's own menu).
+// presets a new script's collection (added from a collection's own menu).
 const editor = ref<{ script: CustomScript | null; collectionId: string | null } | null>(null);
 
 const search = ref('');
@@ -64,7 +69,19 @@ const view = computed(() => {
   return { ungrouped, groups };
 });
 
-const collapsed = useLocalStorage<string[]>('kira.quickCommands.collapsedCollections', []);
+// Renamed from kira.quickCommands.collapsedCollections: copy the old value once.
+const COLLAPSED_KEY = 'kira.automations.collapsedCollections';
+const LEGACY_COLLAPSED_KEY = 'kira.quickCommands.collapsedCollections';
+try {
+  const legacy = localStorage.getItem(LEGACY_COLLAPSED_KEY);
+  if (legacy !== null && localStorage.getItem(COLLAPSED_KEY) === null) {
+    localStorage.setItem(COLLAPSED_KEY, legacy);
+  }
+  localStorage.removeItem(LEGACY_COLLAPSED_KEY);
+} catch {
+  // storage unavailable: start with nothing collapsed
+}
+const collapsed = useLocalStorage<string[]>(COLLAPSED_KEY, []);
 
 // A search shows every matching row, collapsed or not.
 function isOpen(id: string): boolean {
@@ -140,26 +157,28 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   },
 });
 
-// §11.2: the tab therefore titles itself with the script's name and paints its rail with the
-// script's colour, through tabKinds.ts's existing title()/railColor() — no new title or colour
-// logic needed here.
-function scriptCwd(script: CustomScript): string {
-  return script.workingDir || ctx.defaultCwd();
-}
-
 function firstLine(command: string): string {
   const [first = '', ...rest] = command.split('\n');
   return rest.length > 0 ? `${first}…` : first;
 }
 
-function runScript(script: CustomScript): void {
-  const cwd = scriptCwd(script);
-  if (cwd === '') return;
-  ctx.openTerminalTab({
-    cwd,
-    launch: { command: script.command, label: script.name, color: script.color, kind: 'script' },
-  });
+const startScript = useRunScript();
+async function runScript(script: CustomScript): Promise<void> {
+  actionError.value = await startScript(script);
 }
+
+async function rerun(scriptId: string): Promise<void> {
+  const script = scripts.records().find((x) => x.id === scriptId);
+  if (script) await runScript(script);
+  else actionError.value = 'This script no longer exists.';
+}
+
+const { data: runs } = useScriptRuns();
+const liveRunByScript = computed(() => {
+  const m = new Map<string, ScriptRun>();
+  for (const r of runs.value ?? []) if (r.state === 'running' && !m.has(r.scriptId)) m.set(r.scriptId, r);
+  return m;
+});
 
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
 async function onRemove(script: CustomScript): Promise<void> {
@@ -175,7 +194,6 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       id: 'run',
       label: 'Run',
       icon: 'play',
-      disabled: scriptCwd(script) === '',
       run: () => runScript(script),
     },
     {
@@ -211,8 +229,8 @@ function onCollectionContextMenu(e: MouseEvent, collection: ScriptCollection): v
   contextMenuStore.openContextMenu(e, [
     {
       type: 'item',
-      id: 'new-quick-command',
-      label: 'New quick command',
+      id: 'new-script',
+      label: 'New script',
       icon: 'add',
       run: () => {
         editor.value = { script: null, collectionId: collection.id };
@@ -246,8 +264,8 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
   contextMenuStore.openContextMenu(e, [
     {
       type: 'item',
-      id: 'new-quick-command',
-      label: 'New quick command',
+      id: 'new-script',
+      label: 'New script',
       icon: 'add',
       run: () => {
         editor.value = { script: null, collectionId: null };
@@ -267,10 +285,10 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
 </script>
 
 <template>
-  <div data-testid="terminal-panel">
+  <div data-testid="automations-panel">
     <div ref="rootEl" class="flex h-full flex-col">
       <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
-        <span class="font-semibold">Quick commands</span>
+        <span class="font-semibold">Automations</span>
         <TooltipIconButton
           icon="search"
           :label="showSearch ? 'Hide search' : 'Search'"
@@ -281,15 +299,15 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
         />
         <TooltipIconButton
           icon="add"
-          label="Add quick command…"
-          aria-label="Add quick command"
-          data-testid="quick-commands-add"
+          label="New script…"
+          aria-label="New script"
+          data-testid="automations-add"
           @click="editor = { script: null, collectionId: null }"
         />
         <TooltipIconButton
           icon="new-folder"
           label="New collection"
-          data-testid="quick-commands-new-collection"
+          data-testid="automations-new-collection"
           @click="newCollection"
         />
       </div>
@@ -306,33 +324,42 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
           </InputGroupAddon>
         </InputGroup>
       </div>
-      <div ref="bodyEl" class="flex min-h-0 flex-1 flex-col" data-testid="quick-commands-body">
+      <div ref="bodyEl" class="flex min-h-0 flex-1 flex-col" data-testid="automations-body">
         <div v-if="!empty" class="flex h-full flex-col overflow-y-auto">
-          <span v-if="actionError" class="px-1.5 py-1 text-error text-kira-sm leading-normal" data-testid="quick-command-error">{{ actionError }}</span>
-          <div class="flex flex-col" data-testid="quick-command-list">
+          <span v-if="actionError" class="px-1.5 py-1 text-error text-kira-sm leading-normal" data-testid="script-error">{{ actionError }}</span>
+          <div class="flex flex-col" data-testid="script-list">
             <template v-for="script in view.ungrouped" :key="script.id">
               <button
                 type="button"
-                :disabled="scriptCwd(script) === ''"
-                class="relative flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                                class="relative flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
                 :title="script.command"
-                :data-testid="`quick-command-${script.id}`"
+                :data-testid="`script-${script.id}`"
                 @click="runScript(script)"
                 @contextmenu.prevent.stop="onContextMenu($event, script)"
               >
-                <span :class="colorMarkClass('rail', script.color)" data-testid="quick-command-rail" aria-hidden="true" />
-                <CodiconIcon name="play" :size="13" class="shrink-0 text-muted-foreground" />
+                <span :class="colorMarkClass('rail', script.color)" data-testid="script-rail" aria-hidden="true" />
+                <span
+                  v-if="liveRunByScript.get(script.id)"
+                  class="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary border-r-transparent"
+                  data-testid="script-running"
+                />
+                <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
                 <div class="flex-1 min-w-0 flex flex-col">
                   <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
                   <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
                 </div>
+                <RunElapsed
+                  v-if="liveRunByScript.get(script.id)"
+                  :run="liveRunByScript.get(script.id)!"
+                  class="shrink-0 text-kira-sm text-muted-foreground"
+                />
               </button>
             </template>
             <template v-for="group in view.groups" :key="group.collection.id">
               <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header button toggles by keyboard. -->
               <div
                 class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover"
-                data-testid="quick-command-group"
+                data-testid="script-group"
                 :data-id="group.collection.id"
                 :data-name="group.collection.name"
                 @contextmenu.prevent.stop="onCollectionContextMenu($event, group.collection)"
@@ -346,7 +373,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 <InlineRenameInput
                   v-if="renamingId === group.collection.id"
                   :name="group.collection.name"
-                  data-testid="quick-command-collection-rename-input"
+                  data-testid="script-collection-rename-input"
                   @commit="(name) => commitRename(group.collection, name)"
                   @cancel="renamingId = null"
                 />
@@ -364,19 +391,28 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   v-for="script in group.rows"
                   :key="script.id"
                   type="button"
-                  :disabled="scriptCwd(script) === ''"
-                  class="relative flex items-center gap-1 py-1 pl-5 pr-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                                    class="relative flex items-center gap-1 py-1 pl-5 pr-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
                   :title="script.command"
-                  :data-testid="`quick-command-${script.id}`"
+                  :data-testid="`script-${script.id}`"
                   @click="runScript(script)"
                   @contextmenu.prevent.stop="onContextMenu($event, script)"
                 >
-                  <span :class="colorMarkClass('rail', script.color)" data-testid="quick-command-rail" aria-hidden="true" />
-                  <CodiconIcon name="play" :size="13" class="shrink-0 text-muted-foreground" />
+                  <span :class="colorMarkClass('rail', script.color)" data-testid="script-rail" aria-hidden="true" />
+                  <span
+                  v-if="liveRunByScript.get(script.id)"
+                  class="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary border-r-transparent"
+                  data-testid="script-running"
+                />
+                <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
                   <div class="flex-1 min-w-0 flex flex-col">
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
                   </div>
+                  <RunElapsed
+                    v-if="liveRunByScript.get(script.id)"
+                    :run="liveRunByScript.get(script.id)!"
+                    class="shrink-0 text-kira-sm text-muted-foreground"
+                  />
                 </button>
               </div>
             </template>
@@ -386,22 +422,24 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
           v-else
           class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
         >
-          <span v-if="actionError" class="text-error text-kira-sm leading-normal" data-testid="quick-command-error">{{ actionError }}</span>
+          <span v-if="actionError" class="text-error text-kira-sm leading-normal" data-testid="script-error">{{ actionError }}</span>
           <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
             <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md font-normal text-muted-foreground">No quick commands</AlertTitle>
+            <AlertTitle class="text-kira-md font-normal text-muted-foreground">No scripts</AlertTitle>
             <AlertDescription class="text-kira-sm text-muted-foreground">
               Add one with + above.
             </AlertDescription>
           </Alert>
         </div>
       </div>
-      <QuickCommandsDialog
+      <RunsSection @rerun="rerun" />
+      <ScriptDialog
         v-if="editor"
         :scripts="scripts"
         :script="editor.script"
         :collection-id="editor.collectionId"
         :choose-folder="ctx.chooseFolder"
+        :resolve-dir="ctx.runs.resolveDir"
         @close="editor = null"
       />
     </div>

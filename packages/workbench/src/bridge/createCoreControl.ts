@@ -67,6 +67,7 @@ export interface CoreBindings {
       windowKey: string;
       command: string;
       launchKind: string;
+      scriptId: string;
     }): Promise<unknown>;
     Write(a: { terminalId: string; data: string }): Promise<void>;
     Resize(a: { terminalId: string; cols: number; rows: number }): Promise<void>;
@@ -155,6 +156,7 @@ export interface CoreControl<S, L, T, P, M> {
     rows: number,
     command?: string,
     launchKind?: TerminalLaunchKind,
+    scriptId?: string,
   ) => Promise<{ shell: string }>;
   terminalWrite: (terminalId: string, data: string) => Promise<void>;
   terminalResize: (terminalId: string, cols: number, rows: number) => Promise<void>;
@@ -227,6 +229,7 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
       rows: number,
       command?: string,
       launchKind?: TerminalLaunchKind,
+      scriptId?: string,
     ): Promise<{ shell: string }> =>
       unwrap(
         b.terminal.Open({
@@ -237,6 +240,7 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
           windowKey,
           command: command ?? '',
           launchKind: launchKind ?? 'shell',
+          scriptId: scriptId ?? '',
         }),
       ).then((r) => trust<{ shell: string }>(r)),
     terminalWrite: (terminalId: string, data: string): Promise<void> =>

@@ -15,4 +15,4 @@
 // (deleted, not just trimmed): with no repo-prefixed workspace ever occurring here again, "which
 // workspace" and "which mode" are the same one-dimensional question they were before C5 ever
 // introduced the distinction.
-export type AppMode = 'studio' | 'api' | 'terminal' | 'docker';
+export type AppMode = 'studio' | 'api' | 'automations' | 'docker';

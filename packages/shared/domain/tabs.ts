@@ -67,6 +67,8 @@ export const terminalTabStateSchema = z.object({
   // fields above — a terminal tab is never persisted, but parseState runs on duplicateState's
   // output too, so an older in-memory record still needs to parse.
   launchKind: terminalLaunchKindSchema.default('shell'),
+  // The stored script a launchKind 'script' tab runs; Go loads its command and folder. '' otherwise.
+  scriptId: z.string().default(''),
 });
 export type TerminalTabState = z.infer<typeof terminalTabStateSchema>;
 

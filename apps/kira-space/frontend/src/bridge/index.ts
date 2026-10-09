@@ -13,6 +13,7 @@ import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
 import * as MobileAccessService from '@bindings/mobileaccessservice.js';
 import * as OpsService from '@bindings/opsservice.js';
+import * as ScriptRunsService from '@bindings/scriptrunsservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TerminalService from '@bindings/terminalservice.js';
@@ -45,16 +46,18 @@ import type {
   RepoSummary,
   SearchRequest,
 } from '@shared/domain/repo';
+import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type {
   CustomScript,
   CustomScriptFields,
-  QuickCommandsSnapshot,
   ScriptCollection,
+  ScriptDir,
+  ScriptsSnapshot,
 } from '@shared/domain/scripts';
 import { CHANNEL } from '@shared/protocol/events';
+import { scriptsSnapshotOf } from '@workbench/automations/createCustomScriptsStore';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
-import { quickCommandsSnapshotOf } from '@workbench/terminal/createCustomScriptsStore';
 import type * as V2 from '../ade/v2/wire';
 import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
@@ -75,8 +78,8 @@ import { memoryControl } from './memoryControl';
 // (G1-G5/G7) — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
 // keep-awake controller, so both are wired the same way Kira Studio's own copy of this file is.
 const spaceControl = {
-  customScriptsList: (): Promise<QuickCommandsSnapshot> =>
-    unwrap(CustomScriptsService.List()).then((r) => quickCommandsSnapshotOf(r)),
+  customScriptsList: (): Promise<ScriptsSnapshot> =>
+    unwrap(CustomScriptsService.List()).then((r) => scriptsSnapshotOf(r)),
   customScriptsCreate: (fields: CustomScriptFields): Promise<CustomScript> =>
     unwrap(CustomScriptsService.Create({ fields })).then((r) => trust<CustomScript>(r)),
   customScriptsUpdate: (id: string, fields: CustomScriptFields): Promise<CustomScript> =>
@@ -90,8 +93,16 @@ const spaceControl = {
     unwrap(CustomScriptsService.DeleteCollection({ id })),
   customScriptsMove: (id: string, collectionId: string | null): Promise<void> =>
     unwrap(CustomScriptsService.Move({ id, collectionId })),
-  onCustomScriptsChanged: (cb: (snapshot: QuickCommandsSnapshot) => void): (() => void) =>
-    on(CHANNEL.customScriptsChanged, (r) => cb(quickCommandsSnapshotOf(r))),
+  onCustomScriptsChanged: (cb: (snapshot: ScriptsSnapshot) => void): (() => void) =>
+    on(CHANNEL.customScriptsChanged, (r) => cb(scriptsSnapshotOf(r))),
+
+  scriptRunsList: (limit?: number): Promise<ScriptRun[]> =>
+    unwrap(ScriptRunsService.List({ limit: limit ?? 0 })).then((r) => trust<ScriptRun[]>(r ?? [])),
+  scriptRunsStop: (id: string): Promise<void> => unwrap(ScriptRunsService.Stop({ id })),
+  scriptRunsResolveDir: (scriptId: string): Promise<ScriptDir> =>
+    unwrap(ScriptRunsService.ResolveDir({ scriptId })).then((r) => trust<ScriptDir>(r)),
+  onScriptRunsChanged: (cb: (run: ScriptRun) => void): (() => void) =>
+    on(CHANNEL.scriptRunsChanged, (r) => cb(trust<ScriptRun>(r))),
 
   // P120: linkOpenExternal moved off createCoreControl.ts's now-deleted shared `link` binding —
   // Kira Studio never had a real use for it, so this app's own LinkService.OpenExternal call

@@ -127,7 +127,7 @@
 }
 
 /* ColorPicker's "no colour" swatch: a diagonal slash, never a 13th hue standing in for "nothing
-   chosen". Copied byte-identical across ConnectionDialog/QuickCommandsDialog/VariableSetView. */
+   chosen". Copied byte-identical across ConnectionDialog/ScriptDialog/VariableSetView. */
 @utility swatch-none {
   border: 1.5px solid var(--kira-fg-muted);
   background: linear-gradient(

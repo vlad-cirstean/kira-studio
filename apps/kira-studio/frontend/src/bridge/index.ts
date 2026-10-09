@@ -13,6 +13,7 @@ import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
 import * as SchemaService from '@bindings/schemaservice.js';
+import * as ScriptRunsService from '@bindings/scriptrunsservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TerminalService from '@bindings/terminalservice.js';
@@ -42,19 +43,21 @@ import type {
   SortSpec,
 } from '@shared/domain/queries';
 import type { ConnectionDdl } from '@shared/domain/schema';
+import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type {
   CustomScript,
   CustomScriptFields,
-  QuickCommandsSnapshot,
   ScriptCollection,
+  ScriptDir,
+  ScriptsSnapshot,
 } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { CHANNEL, type MaskRulesChangedEvent } from '@shared/protocol/events';
+import { scriptsSnapshotOf } from '@workbench/automations/createCustomScriptsStore';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap } from '@workbench/bridge/rpc';
-import { quickCommandsSnapshotOf } from '@workbench/terminal/createCustomScriptsStore';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
@@ -350,8 +353,8 @@ const studioControl = {
 
   // P85 §9.3: the Scripts settings section and the tab strip's own dropdown both go through
   // state/customScripts.ts, the one store that wraps these.
-  customScriptsList: (): Promise<QuickCommandsSnapshot> =>
-    unwrap(CustomScriptsService.List()).then((r) => quickCommandsSnapshotOf(r)),
+  customScriptsList: (): Promise<ScriptsSnapshot> =>
+    unwrap(CustomScriptsService.List()).then((r) => scriptsSnapshotOf(r)),
   customScriptsCreate: (fields: CustomScriptFields): Promise<CustomScript> =>
     unwrap(CustomScriptsService.Create({ fields })).then((r) => trust<CustomScript>(r)),
   customScriptsUpdate: (id: string, fields: CustomScriptFields): Promise<CustomScript> =>
@@ -365,8 +368,16 @@ const studioControl = {
     unwrap(CustomScriptsService.DeleteCollection({ id })),
   customScriptsMove: (id: string, collectionId: string | null): Promise<void> =>
     unwrap(CustomScriptsService.Move({ id, collectionId })),
-  onCustomScriptsChanged: (cb: (snapshot: QuickCommandsSnapshot) => void): (() => void) =>
-    on(CHANNEL.customScriptsChanged, (r) => cb(quickCommandsSnapshotOf(r))),
+  onCustomScriptsChanged: (cb: (snapshot: ScriptsSnapshot) => void): (() => void) =>
+    on(CHANNEL.customScriptsChanged, (r) => cb(scriptsSnapshotOf(r))),
+
+  scriptRunsList: (limit?: number): Promise<ScriptRun[]> =>
+    unwrap(ScriptRunsService.List({ limit: limit ?? 0 })).then((r) => trust<ScriptRun[]>(r ?? [])),
+  scriptRunsStop: (id: string): Promise<void> => unwrap(ScriptRunsService.Stop({ id })),
+  scriptRunsResolveDir: (scriptId: string): Promise<ScriptDir> =>
+    unwrap(ScriptRunsService.ResolveDir({ scriptId })).then((r) => trust<ScriptDir>(r)),
+  onScriptRunsChanged: (cb: (run: ScriptRun) => void): (() => void) =>
+    on(CHANNEL.scriptRunsChanged, (r) => cb(trust<ScriptRun>(r))),
 };
 
 // P103 Part 2 (§5.6): one exported object, composed from the methods shared with Kira Space

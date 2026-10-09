@@ -343,5 +343,6 @@ export const TAB_KINDS: TabKindRegistry<
   terminal: terminalTabKind<'terminal', TabRecord, TabIcon, ConnectionColor, MenuItem>(
     STUDIO_TAB_KIND_MODE.terminal,
     (tabId) => useTerminalsStore().closeTerminalSession(tabId),
+    (tabId) => useTerminalsStore().terminalSession(tabId),
   ),
 };
