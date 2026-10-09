@@ -1,0 +1,15 @@
+id: imported
+name: Imported flow
+stages:
+  - id: plan
+    name: Plan
+    kind: user
+    status: To do
+  - id: ship
+    name: Ship
+    kind: script
+    status: In review
+    runs_on: each repo
+    timeout: 1m
+    command: |
+      echo shipped

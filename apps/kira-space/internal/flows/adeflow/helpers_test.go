@@ -168,3 +168,50 @@ func commitIn(t *testing.T, dir, name string) {
 	gitOut(t, dir, "add", "-A")
 	gitOut(t, dir, "commit", "-q", "-m", "add "+name)
 }
+
+func mustAbs(t *testing.T, p string) string {
+	t.Helper()
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return abs
+}
+
+const userStage = "  - id: review\n    name: Review\n    kind: user\n    status: In review\n    session: true\n"
+
+func logText(t *testing.T, app *flowharness.App, kind, id string) string {
+	t.Helper()
+	var sb strings.Builder
+	after := 0
+	for {
+		page, err := app.W.AdeTask.ReadLog(ctx, adewire.ReadLogArgs{Kind: kind, ID: id, AfterSeq: after})
+		if err != nil {
+			t.Fatalf("ReadLog: %v", err)
+		}
+		if len(page.Chunks) == 0 {
+			return sb.String()
+		}
+		for _, c := range page.Chunks {
+			sb.WriteString(c.Text)
+			sb.WriteByte('\n')
+		}
+		after = page.NextSeq
+	}
+}
+
+func fakeFile(t *testing.T, app *flowharness.App, name string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(app.FakeDir, name))
+	if err != nil {
+		t.Fatalf("fake claude never wrote %s: %v", name, err)
+	}
+	return string(raw)
+}
+
+func setPrepare(t *testing.T, app *flowharness.App, repoID, script string) {
+	t.Helper()
+	if _, err := app.W.AdeTask.UpdateRepo(ctx, adewire.UpdateRepoArgs{CodeRepoID: repoID, Patch: adewire.RepoPatch{PrepareScript: &script}}); err != nil {
+		t.Fatalf("UpdateRepo prepare script: %v", err)
+	}
+}
