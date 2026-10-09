@@ -1,6 +1,7 @@
 package gitflow_test
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"strings"
@@ -176,3 +177,30 @@ func gitNow(t *testing.T, dir string, args ...string) {
 }
 
 func bridgeOpsArgs(limit int) bridge.OpsRecentArgs { return bridge.OpsRecentArgs{Limit: limit} }
+
+// refsChangedCount counts the refsChanged signals gs has received.
+func refsChangedCount(gs *flowharness.GitStream) int {
+	n := 0
+	for _, e := range gs.Events("repo.changed") {
+		var p struct {
+			Kind string `json:"kind"`
+		}
+		if raw, ok := e.Data.(json.RawMessage); ok && json.Unmarshal(raw, &p) == nil && p.Kind == "refsChanged" {
+			n++
+		}
+	}
+	return n
+}
+
+// externalOn runs a change made outside the app and waits until every stream heard refsChanged.
+func externalOn(t *testing.T, fn func(), streams ...*flowharness.GitStream) {
+	t.Helper()
+	before := make([]int, len(streams))
+	for i, s := range streams {
+		before[i] = refsChangedCount(s)
+	}
+	fn()
+	for i, s := range streams {
+		testx.WaitUntil(t, wait, func() bool { return refsChangedCount(s) > before[i] })
+	}
+}

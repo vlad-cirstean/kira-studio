@@ -205,6 +205,18 @@ func (a *App) OpenGitStream() *GitStream {
 	return s
 }
 
+// Fire sends a request without waiting for its reply and returns a cancel for it, as a UI abandoning
+// a call would. The reply, if any, is dropped.
+func (s *GitStream) Fire(method string, params any) (cancel func()) {
+	s.t.Helper()
+	id, _ := s.register()
+	s.send(wireFrame{T: "req", ID: id, Method: method, Params: rawParams(s.t, params)})
+	return func() {
+		s.send(wireFrame{T: "cancel", ID: id})
+		s.unregister(id)
+	}
+}
+
 // Close ends the connection and waits for the server loop to return.
 func (s *GitStream) Close() {
 	s.closed.Do(s.conn.closeOut)
