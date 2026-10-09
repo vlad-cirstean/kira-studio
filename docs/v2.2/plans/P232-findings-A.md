@@ -20,3 +20,11 @@
 - `api.disableCookieJar` defaults to true, so default settings keep no cookie jar; `TestCookieJar` asserts that, then enables the jar through `SettingsService.Set`.
 - Default `api.httpVersion` is "2": default sends to HTTPS arrive as HTTP/2.0.
 - Reflection schema mode reads `reflection-v1`; `Service.Name` is the short name (`Flow`), `Method.FullName` is dotted (`kira.flow.v1.Flow.Unary`).
+
+## A-3 (product bug): UI gRPC Call fails for any service in a proto package
+
+- Where: `apps/kira-studio/internal/grpcclient/descriptors.go:410` (`projectService` sets `Service.Name` to `sd.Name()`, the short name) vs `descriptors.go:462` (`resolveMethod` looks up `FindDescriptorByName` with the full name) and `bridge/grpc.go:217,233` (`args.Service + "/" + args.Method`).
+- Observed: browser spec `api-grpc-real.spec.ts`: Describe lists service `Flow`; picking `Unary` and pressing Call shows `service Flow not found in the resolved schema: proto: not found`. Go flow tests pass because they send the full name `kira.flow.v1.Flow` by hand.
+- Cause: the UI stores `schema.services[].name` as the call's service. Short name works only for services without a package.
+- Fix: project the full name into `Service.Name` (keep the short name for display), or build `Call` from `Method.FullName`.
+- Status: unary and server-stream UI specs are `test.fixme('P232 finding A-3 ...')`. Written against the expected fix; not run past the failing step.
