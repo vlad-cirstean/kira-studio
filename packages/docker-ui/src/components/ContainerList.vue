@@ -5,13 +5,11 @@ import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
 import { computed } from 'vue';
-import { formatPercent, formatSize, isActiveState, publishedPorts, stateDotClass } from '../lib/format';
+import { isActiveState, publishedPorts, stateDotClass } from '../lib/format';
 import { useContainerAction, useContainers } from '../queries';
-import { useDockerStatsStore } from '../state/dockerStats';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { DockerContainer } from '../wire';
 import ListState from './ListState.vue';
-import UsageBar from './UsageBar.vue';
 import VirtualList from './VirtualList.vue';
 
 const GROUP_ROW_HEIGHT = 28;
@@ -32,7 +30,6 @@ interface ContainerRow {
 type Row = GroupRow | ContainerRow;
 
 const ui = useDockerUiStore();
-const stats = useDockerStatsStore();
 const containers = useContainers();
 const actions = useContainerAction();
 const contextMenu = useContextMenuStore();
@@ -159,7 +156,7 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
       </div>
       <div
         v-else
-        class="group/row grid h-full cursor-default select-none grid-cols-[0.5rem_minmax(0,1fr)_2.75rem_3.5rem_1.25rem] grid-rows-[auto_auto] items-center gap-x-1.5 gap-y-0.5 py-1 pr-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
+        class="group/row grid h-full cursor-default select-none grid-cols-[0.5rem_minmax(0,1fr)_auto_1.25rem] grid-rows-[auto_auto] items-center gap-x-1.5 gap-y-0.5 py-1 pr-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
         :class="[
           row.grouped ? 'pl-5' : 'pl-1.5',
           isSelected(row.container) ? 'bg-select shadow-[inset_2px_0_0_var(--color-focus)]' : 'hover:bg-hover',
@@ -182,11 +179,8 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
           :class="row.container.state === 'running' ? '' : 'text-muted-foreground'"
           data-testid="docker-row-name"
         >{{ row.container.name }}</span>
-        <template v-if="row.container.state === 'running' && stats.latest.get(row.container.id)">
-          <span class="text-right font-data text-kira-sm" data-testid="docker-row-cpu">{{ formatPercent(stats.latest.get(row.container.id)!.cpuPercent) }}</span>
-          <span class="text-right font-data text-kira-sm text-muted-foreground" data-testid="docker-row-mem">{{ formatSize(stats.latest.get(row.container.id)!.memUsage) }}</span>
-        </template>
-        <span v-else class="col-span-2 text-right text-kira-sm text-muted-foreground" data-testid="docker-row-state">{{ row.container.state }}</span>
+        <span v-if="row.container.state !== 'running'" class="text-right text-kira-sm text-muted-foreground" data-testid="docker-row-state">{{ row.container.state }}</span>
+        <span v-else />
         <span class="row-span-2 flex items-center justify-end">
           <CodiconIcon v-if="actions.isBusy(row.container.id)" name="loading" :size="12" class="codicon-modifier-spin" />
           <span v-else class="hidden group-hover/row:flex group-focus-within/row:flex">
@@ -207,14 +201,10 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
           </span>
         </span>
         <span />
-        <span class="flex min-w-0 items-baseline gap-1.5 text-kira-sm text-muted-foreground">
+        <span class="col-span-2 flex min-w-0 items-baseline gap-1.5 text-kira-sm text-muted-foreground">
           <span class="truncate" data-testid="docker-row-image">{{ row.container.image }}</span>
           <span v-if="portLabel(row.container)" class="max-w-[40%] shrink-0 truncate font-data" data-testid="docker-row-ports">{{ portLabel(row.container) }}</span>
         </span>
-        <template v-if="row.container.state === 'running' && stats.latest.get(row.container.id)">
-          <UsageBar :percent="stats.latest.get(row.container.id)!.cpuPercent" />
-          <UsageBar :percent="stats.latest.get(row.container.id)!.memPercent" />
-        </template>
       </div>
     </template>
   </VirtualList>

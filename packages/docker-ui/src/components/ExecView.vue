@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref, watch } from 'vue';
@@ -14,6 +15,9 @@ const ctx = useDocker();
 const store = useDockerExecSessionsStore();
 const sessions = computed(() => store.forContainer(props.containerId));
 const activeId = ref('');
+const shownId = computed(() =>
+  sessions.value.some((s) => s.id === activeId.value) ? activeId.value : (sessions.value[0]?.id ?? ''),
+);
 
 function openSession(): void {
   activeId.value = store.open(ctx, props.containerId).id;
@@ -21,30 +25,39 @@ function openSession(): void {
 
 function closeSession(id: string): void {
   store.close(ctx, id);
-  if (activeId.value === id) activeId.value = sessions.value[0]?.id ?? '';
 }
 
 watch(
   () => props.containerId,
   () => {
-    const first = sessions.value[0];
-    if (first) activeId.value = first.id;
-    else openSession();
+    activeId.value = sessions.value[0]?.id ?? '';
   },
   { immediate: true },
 );
 
-// An exec session dies with its container; no chip is kept for a stopped one.
+// TerminalHostView needs a tab-shaped state; exec sessions have no cwd.
 const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command: '', launchKind: 'shell' as const } });
 </script>
 
 <template>
   <div class="flex h-full flex-col" data-testid="docker-exec">
+    <Empty v-if="sessions.length === 0" class="h-full" data-testid="docker-exec-empty">
+      <EmptyHeader>
+        <EmptyMedia variant="icon"><CodiconIcon name="terminal" :size="16" /></EmptyMedia>
+        <EmptyTitle>No terminal session</EmptyTitle>
+        <EmptyDescription>Start a shell inside this container.</EmptyDescription>
+      </EmptyHeader>
+      <Button size="kira" variant="secondary" data-testid="docker-exec-new" @click="openSession">
+        <CodiconIcon name="add" :size="12" />
+        New session
+      </Button>
+    </Empty>
+    <template v-else>
     <div class="flex shrink-0 items-center gap-0.5 border-b border-border px-1.5 py-1">
       <span
         v-for="s in sessions"
         :key="s.id"
-        :class="tabChipVariants({ active: s.id === activeId })"
+        :class="tabChipVariants({ active: s.id === shownId })"
         data-testid="docker-exec-chip"
       >
         <button type="button" class="cursor-default" @click="activeId = s.id">{{ s.title }}</button>
@@ -65,12 +78,13 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
       <div
         v-for="s in sessions"
         :key="s.id"
-        v-show="s.id === activeId"
+        v-show="s.id === shownId"
         class="absolute inset-0"
         :data-testid="`docker-exec-pane`"
       >
         <TerminalHostView :tab="hostTab(s.id)" :deps="ctx.execHostDeps" />
       </div>
     </div>
+    </template>
   </div>
 </template>

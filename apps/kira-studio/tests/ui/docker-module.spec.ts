@@ -125,7 +125,7 @@ function detail(c: ReturnType<typeof container>) {
 
 async function setup(
   relaunch: Parameters<Parameters<typeof test>[2]>[0]['relaunch'],
-  opts: { status?: unknown } = {},
+  opts: { status?: unknown; handlers?: Record<string, (args: unknown) => unknown> } = {},
 ) {
   const { window: page } = await relaunch({ control: [] });
   const state = { status: opts.status ?? OK_STATUS, containers: seedContainers() };
@@ -147,6 +147,7 @@ async function setup(
         if (c) c.state = 'exited';
       },
       ExecOpen: () => ({ shell: 'sh' }),
+      ...opts.handlers,
     },
   });
   return { page, docker, state };
@@ -222,7 +223,7 @@ test('Stop calls the bound method and the row updates after a changed event', as
   await expect(row).toHaveAttribute('data-state', 'exited');
 });
 
-test('stats events update the rows; leaving the mode unsubscribes and unwatches', async ({
+test('stats events reach the overview, not the side list; leaving the mode unsubscribes and unwatches', async ({
   relaunch,
 }) => {
   const { page, docker } = await setup(relaunch);
@@ -246,9 +247,12 @@ test('stats events update the rows; leaving the mode unsubscribes and unwatches'
       },
     ],
   });
-  await expect(
-    page.locator('[data-testid="docker-row"][data-name="solo"] [data-testid="docker-row-cpu"]'),
-  ).toContainText('12.5%');
+  await expect(page.locator('[data-testid="docker-engine-cpu"]')).toContainText('12.5%');
+  for (const id of ['docker-row-cpu', 'docker-row-mem', 'docker-usage-bar']) {
+    await expect(
+      page.locator(`[data-testid="docker-container-list"] [data-testid="${id}"]`),
+    ).toHaveCount(0);
+  }
 
   await modeTab(page, 'studio').click();
   await expect.poll(() => docker.calls('StatsUnsubscribe').length).toBeGreaterThan(0);
@@ -307,6 +311,7 @@ test('terminal: exec opens for the container, input is written, closing the chip
   await openDocker(page);
   await openContainer(page, 'solo', 'terminal');
 
+  await page.locator('[data-testid="docker-exec-new"]').click();
   await expect.poll(() => docker.calls('ExecOpen').length).toBe(1);
   expect(docker.calls('ExecOpen')[0].args).toMatchObject({ containerId: 'c-solo' });
   await expect(page.locator('.xterm-rows')).toBeVisible();
@@ -317,6 +322,76 @@ test('terminal: exec opens for the container, input is written, closing the chip
 
   await page.locator('[data-testid="docker-exec-close"]').click();
   await expect.poll(() => docker.calls('ExecClose').length).toBe(1);
+});
+
+test('terminal: no session opens until New session is clicked; sessions survive tab switches', async ({
+  relaunch,
+}) => {
+  const { page, docker } = await setup(relaunch);
+  await openDocker(page);
+  await openContainer(page, 'solo', 'terminal');
+
+  await expect(page.locator('[data-testid="docker-exec-empty"]')).toBeVisible();
+  await expect(page.locator('[data-testid="docker-exec-chip"]')).toHaveCount(0);
+  expect(docker.calls('ExecOpen')).toHaveLength(0);
+  await page.locator('[data-testid="docker-tab-logs"]').click();
+  await page.locator('[data-testid="docker-tab-terminal"]').click();
+  await expect(page.locator('[data-testid="docker-exec-empty"]')).toBeVisible();
+  expect(docker.calls('ExecOpen')).toHaveLength(0);
+
+  await page.locator('[data-testid="docker-exec-new"]').focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => docker.calls('ExecOpen').length).toBe(1);
+  await expect(page.locator('[data-testid="docker-exec-chip"]')).toHaveCount(1);
+  await expect(page.locator('.xterm-rows')).toBeVisible();
+
+  await page.locator('[data-testid="docker-tab-logs"]').click();
+  await page.locator('[data-testid="docker-tab-terminal"]').click();
+  await expect(page.locator('[data-testid="docker-exec-chip"]')).toHaveCount(1);
+  expect(docker.calls('ExecOpen')).toHaveLength(1);
+
+  await page.locator('[data-testid="docker-exec-close"]').click();
+  await expect.poll(() => docker.calls('ExecClose').length).toBe(1);
+  await expect(page.locator('[data-testid="docker-exec-empty"]')).toBeVisible();
+  expect(docker.calls('ExecOpen')).toHaveLength(1);
+});
+
+test('engine dropdown items do not overlap', async ({ relaunch }) => {
+  const { page } = await setup(relaunch, {
+    handlers: {
+      Contexts: () => [
+        { name: 'default', host: 'unix:///var/run/docker.sock', description: '', current: true },
+        {
+          name: 'colima',
+          host: 'unix:///Users/me/.colima/default/docker.sock',
+          description: '',
+          current: false,
+        },
+        { name: 'remote', host: 'tcp://10.0.0.5:2376', description: '', current: false },
+      ],
+    },
+  });
+  await openDocker(page);
+  await page.locator('[data-testid="docker-endpoint-chip"]').click();
+  await expect(page.locator('[data-testid="docker-context-option"]')).toHaveCount(3);
+
+  const bad = await page
+    .locator('[data-testid="docker-context-menu"] [role="menuitemradio"]')
+    .evaluateAll((items) => {
+      const problems: string[] = [];
+      let prevBottom = Number.NEGATIVE_INFINITY;
+      for (const item of items) {
+        const r = item.getBoundingClientRect();
+        if (r.top < prevBottom - 0.5) problems.push('items overlap');
+        prevBottom = r.bottom;
+        for (const span of item.querySelectorAll('span')) {
+          const s = span.getBoundingClientRect();
+          if (s.top < r.top - 0.5 || s.bottom > r.bottom + 0.5) problems.push('text spills');
+        }
+      }
+      return problems;
+    });
+  expect(bad).toEqual([]);
 });
 
 test('images, volumes and networks list; "used by" selects the container', async ({ relaunch }) => {
@@ -386,10 +461,8 @@ test('engine overview tabulates containers with humanized stats; section tabs sh
   });
   await expect(page.locator('[data-testid="docker-engine-mem"]')).toHaveText('1.5 GB');
   await expect(
-    page.locator(
-      '[data-testid="docker-row"][data-name="shop-db-1"] [data-testid="docker-row-mem"]',
-    ),
-  ).toHaveText('1.5 GB');
+    page.locator('[data-testid="docker-table-row"][data-name="shop-db-1"]'),
+  ).toContainText('1.5 GB');
 
   await page.locator('[data-testid="docker-table-row"][data-name="solo"]').click();
   await expect(page.locator('[data-testid="docker-detail-name"]')).toHaveText('solo');

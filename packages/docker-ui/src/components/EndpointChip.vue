@@ -57,7 +57,7 @@ async function onSelect(value: unknown): Promise<void> {
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" class="w-56" data-testid="docker-context-menu">
       <DropdownMenuRadioGroup :model-value="selected" @update:model-value="onSelect">
-        <DropdownMenuRadioItem :value="AUTOMATIC" class="h-control" data-testid="docker-context-automatic">
+        <DropdownMenuRadioItem :value="AUTOMATIC" class="min-h-control" data-testid="docker-context-automatic">
           <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Automatic</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
@@ -66,7 +66,7 @@ async function onSelect(value: unknown): Promise<void> {
           v-for="c in contexts.data.value ?? []"
           :key="c.name"
           :value="c.name"
-          class="h-control"
+          class="min-h-control"
           data-testid="docker-context-option"
           :data-value="c.name"
         >
