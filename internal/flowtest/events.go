@@ -1,4 +1,6 @@
-package flowharness
+// Package flowtest holds the app-agnostic pieces of the flow-test harnesses (Kira Space and Kira
+// Studio): the recording event emitter and the complete-suite gate.
+package flowtest
 
 import (
 	"encoding/json"
@@ -36,7 +38,8 @@ type Events struct {
 	notify chan struct{}
 }
 
-func newEvents() *Events { return &Events{notify: make(chan struct{})} }
+// NewEvents returns an empty recorder.
+func NewEvents() *Events { return &Events{notify: make(chan struct{})} }
 
 func (e *Events) add(ev Event) {
 	e.mu.Lock()
