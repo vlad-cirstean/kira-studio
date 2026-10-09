@@ -44,3 +44,6 @@
 - Host `pathLocator` falls back to PATH when the configured git path is missing, so a missing file does not yield `notFound` listing the path on Linux. `TestGitPathSettingEverywhere` uses an executable non-git script (`unusable`) as the bad path.
 - `appearance.dateFormat` reaches git only through `app.init` (`dateFormat`), not `commit.detail`. `TestDateFormatReachesGit` asserts `app.init`.
 - `appwire.Options.MobilePoll` is not reachable from `flowharness.New`; the supervisor polls every 10s. Tests drive state changes through the bound calls instead.
+- e2e-real `kira` fixture lacks the login-shell profile the Go harness writes. ADE run shells are login shells that reorder PATH, so a run picked the host `claude` (real model, "stuck") instead of the fake. `support/ade.ts` `fakeClaudeOnLoginPath` writes `.bash_profile`/`.zprofile`/`.profile` per test. Fix idea: fixture writes them.
+- e2e-real fake `claude` has the same JSON-mode gap as the Go harness. `support/memoryGate.ts` replaces `<root>/bin/claude` with a bash front that answers the gate prompt from one canned accept answer. Fix idea: same fake change as above.
+- git-ui reads `app.init` git status only when a repo opens: the Git module with no repo open shows `No repository open` even with an unusable git path. `settings-git-path-real` opens a repo to see the blocked panel.
