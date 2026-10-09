@@ -44,6 +44,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P243 Part 2 | Drop the VS Code extension and the git server it uses: delete `apps/kira-space-vscode`, `internal/gitsock`, `internal/gitvsix`, `GitClientsService`, the Connected editors pane and pairing dialog, `git_clients` (migration), `.vsix` build and packaging, `test:webview`; drop extension-only contract surface (`worktree.prepare*`, host capabilities, `HostKind`, `settings.changed`, `connection.changed`, injected params, socket channel, RPC server, base64 encoding) and the stream allowlist; remove leftover `git.sock` files at startup; pending workflow patches; docs. No restyling (P245) | Todo |
 | P244 | Docker page polish: Terminal tab must not auto-open a session (explicit 'New session' button), fix the overlapping text in the engine dropdown, remove CPU and RAM from the left bar | Todo |
 | P245 | Git module visual alignment: make the git module look exactly like the rest of the app, using only Tailwind and mostly default values (drop `kv:` prefix indirection and custom styles) | Todo |
+| P246 | Popup routing across windows plus system notifications: route every app-originated popup or prompt by origin through one central Go prompt router (origin window key or none) and one shared frontend host. Window-triggered shows in that window. Generic (no originating window: cron, MCP, background script or agent event) shows only in the main window (lowest-order real, non-ephemeral window), never in every window, never duplicated; none open queues it for next window open or focus. Each popup also fires a system notification through the P238 sink (click focuses the right window and popup; answering or dismissing anywhere clears it). Covers the P242 Part 3 cron 'run now?' confirm, MCP-initiated prompts, script and automation triggers; Space and Studio (Studio has no ADE or cron windows, apply to its existing prompts). Depends on P238 and P242 Part 3, lands after both | Todo |
 
 ### Streams for P236-P239 (user override: 3 concurrent streams)
 
@@ -88,6 +89,7 @@ updates `docs/ARCHITECTURE.md` test counts.
 - P243: "drop the VS Code extension, and the git server it uses to connect, etc."; make the later git restyle easier where removal allows (record what blocks it). Split into Part 1 (carry coverage) and Part 2 (removal) by the planner: removal deletes about 120 gitsock tests and 62 webview tests whose uncovered cases must move first.
 - P244: Docker page: Terminal tab must not open a session by itself, an explicit New session button instead; engine dropdown text overlaps, fix it; remove CPU and RAM from the left bar.
 - P245: git module must look exactly like the rest of the app, only Tailwind, mostly default values.
+- P246: popups and prompts the app raises route by origin: window-triggered shows in that window; generic (cron, MCP, background script or agent event) shows only in the main window (lowest-order real, non-ephemeral window), never in all windows, never duplicated; no window open queues it for next open or focus and keeps the system notification. Each popup also fires a system notification via the P238 sink; click focuses the right window and popup; answering or dismissing in one place clears the notification. Requires a central prompt router in Go (origin window key or none) plus a shared frontend host, flow tests per P236 conventions, and an e2e with two windows. Depends on P238 (notifications) and P242 Part 3 (cron popup); lands after both. Part 3's cron popup shows in the main window only until this phase generalizes it. Covers Space and Studio where prompts exist.
 
 ## P210 result
 
@@ -790,5 +792,9 @@ Pending.
 Pending.
 
 ## P245 result
+
+Pending.
+
+## P246 result
 
 Pending.
