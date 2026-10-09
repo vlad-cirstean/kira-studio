@@ -6,10 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -27,12 +29,18 @@ const waitFor = 20 * time.Second
 
 func freePort(t *testing.T) int {
 	t.Helper()
-	ln, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
+	// Below the ephemeral range: parallel packages' outgoing connections cannot take the port.
+	for range 200 {
+		port := 20000 + rand.IntN(10000)
+		ln, err := net.Listen("tcp4", "127.0.0.1:"+strconv.Itoa(port))
+		if err != nil {
+			continue
+		}
+		ln.Close()
+		return port
 	}
-	defer ln.Close()
-	return ln.Addr().(*net.TCPAddr).Port
+	t.Fatal("no free port below the ephemeral range")
+	return 0
 }
 
 // serve trusts the loopback network and starts the phone server on a free port.
