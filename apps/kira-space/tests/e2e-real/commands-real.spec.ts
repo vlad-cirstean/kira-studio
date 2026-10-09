@@ -16,6 +16,8 @@ test('a collection and a script moved into it survive a reload', async ({ kira }
   await expect(page.locator('[data-testid="script-group"][data-name="Builds"]')).toBeVisible();
 
   await page.locator('[data-testid="automations-add"]').click();
+
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   const dialog = page.locator('[data-testid="script-dialog"]');
   await dialog.locator('[data-testid="script-dialog-name"]').fill('Build all');
   await dialog.locator('[data-testid="script-dialog-command"]').fill('echo one');

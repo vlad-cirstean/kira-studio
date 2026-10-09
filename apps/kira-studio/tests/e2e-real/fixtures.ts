@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test as base, type Page } from '@playwright/test';
@@ -15,6 +15,7 @@ import { type FlowServers, startFlowServers } from './support/flowServers';
 const ROOT_DIR = resolve(__dirname, '../../../..');
 const APP_DIR = resolve(ROOT_DIR, 'apps/kira-studio');
 const SERVER_BINARY = resolve(APP_DIR, 'bin/kira-server-test');
+const FAKE_AGENT_BINARY = resolve(APP_DIR, 'bin/fakeclaude');
 const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge';
 
 function goBinDir(): string {
@@ -54,6 +55,11 @@ function buildPrerequisites(): Promise<void> {
         env,
         stdio: 'inherit',
       });
+      execFileSync(
+        'go',
+        ['build', '-o', FAKE_AGENT_BINARY, '../../internal/flowtest/fakeagent/cmd/fakeclaude'],
+        { cwd: APP_DIR, env, stdio: 'inherit' },
+      );
     } finally {
       await release();
     }
@@ -75,6 +81,9 @@ interface KiraFixtures {
   consoleErrors: string[];
   /** Extra environment for the spawned server (merged last): `test.use({ serverEnv: { HOME } })`. */
   serverEnv: Record<string, string>;
+  /** Fake claude scenario (internal/flowtest/fakeagent). Set, the server gets a scratch HOME whose login
+   *  shell puts the fake claude first on PATH; unset, the environment is untouched. */
+  scenario: object | undefined;
   kira: KiraApp;
   /** The flow harness's real HTTP, HTTPS and gRPC servers, one set per test so recorded requests never leak between tests. */
   flowServers: FlowServers;
@@ -93,6 +102,8 @@ export const test = base.extend<KiraFixtures, { prerequisites: true }>({
   ],
 
   serverEnv: [{}, { option: true }],
+
+  scenario: [undefined, { option: true }],
 
   flowServers: [
     // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
@@ -116,16 +127,39 @@ export const test = base.extend<KiraFixtures, { prerequisites: true }>({
     await use([]);
   },
 
-  kira: async ({ browser, kiraHome, consoleErrors, serverEnv }, use) => {
+  kira: async ({ browser, kiraHome, consoleErrors, serverEnv, scenario }, use) => {
     // Non-negotiable per tests/e2e/fixtures.ts's own precedent (P25 D10): a real ~/.kira-studio
     // must never be touched by a test run.
     if (!kiraHome.startsWith(tmpdir())) {
       throw new Error(`KIRA_HOME fixture "${kiraHome}" is not under the OS tmpdir`);
     }
 
+    const fake: Record<string, string> = {};
+    if (scenario) {
+      const home = join(kiraHome, 'fake', 'home');
+      const binDir = join(kiraHome, 'fake', 'bin');
+      const fakeDir = join(kiraHome, 'fake', 'calls');
+      await Promise.all([home, binDir, fakeDir].map((d) => mkdir(d, { recursive: true })));
+      // Run shells are login shells that reorder PATH; their profile keeps the fake claude first.
+      const profile = `export PATH=${JSON.stringify(binDir)}:"$PATH"\n`;
+      const scenarioPath = join(kiraHome, 'fake', 'scenario.json');
+      await Promise.all([
+        ...['.bash_profile', '.zprofile', '.profile'].map((f) => writeFile(join(home, f), profile)),
+        symlink(FAKE_AGENT_BINARY, join(binDir, 'claude')),
+        writeFile(scenarioPath, JSON.stringify(scenario)),
+      ]);
+      Object.assign(fake, {
+        HOME: home,
+        PATH: `${binDir}:${process.env.PATH ?? ''}`,
+        KIRA_FAKE_DIR: fakeDir,
+        KIRA_FAKE_SCEN: scenarioPath,
+      });
+    }
+
     const port = await getFreePort();
     const env: NodeJS.ProcessEnv = {
       ...process.env,
+      ...fake,
       KIRA_HOME: kiraHome,
       // Linux has no real keychain backing (CLAUDE.md) — same Linux-only development fallback
       // tests/e2e/fixtures.ts already sets, a no-op on macOS.

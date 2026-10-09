@@ -14,6 +14,9 @@ import { emitWailsEvent } from './support/mockRuntime';
 
 const SCRIPT = {
   id: 'script-1',
+  kind: 'script',
+  params: [],
+  smart: null,
   name: 'Dev server',
   command: 'npm run dev',
   workingDir: '/tmp/demo-repo/frontend',
@@ -143,6 +146,7 @@ test('the header + is the only add control and opens the dialog with the name fo
   await expect(page.locator('[data-testid="script-empty-add"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="automations-add"]')).toHaveCount(1);
   await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   await expect(dialog(page)).toBeVisible();
   await expect(dialog(page).locator('[data-testid="script-dialog-name"]')).toBeFocused();
 });
@@ -169,6 +173,8 @@ test('a multiline script is saved as written with Cmd/Ctrl+Enter; the panel row 
   await expect(row).toHaveAttribute('title', MULTI);
 
   await page.locator('[data-testid="automations-add"]').click();
+
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   await dialog(page).locator('[data-testid="script-dialog-name"]').fill('Two lines');
   const script = dialog(page).locator('[data-testid="script-dialog-command"]');
   await script.focus();
@@ -184,6 +190,9 @@ test('a multiline script is saved as written with Cmd/Ctrl+Enter; the panel row 
       fields: {
         name: 'Two lines',
         command: MULTI,
+        kind: 'script',
+        params: [],
+        smart: null,
         dirMode: 'kira',
         workingDir: '',
         color: 'none',
@@ -270,6 +279,7 @@ test('the dialog adds a script into a collection chosen from a select', async ({
 
   await openTerminalModule(page);
   await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   const select = dialog(page).locator('[data-testid="script-dialog-collection"]');
   await expect(select.locator('option')).toHaveText(['No collection', 'Backend']);
   await dialog(page).locator('[data-testid="script-dialog-name"]').fill('Lint');
@@ -282,6 +292,9 @@ test('the dialog adds a script into a collection chosen from a select', async ({
       fields: {
         name: 'Lint',
         command: 'bun run lint',
+        kind: 'script',
+        params: [],
+        smart: null,
         dirMode: 'kira',
         workingDir: '',
         color: 'none',
@@ -421,6 +434,7 @@ test('Choose… fills the folder from the folder dialog', async ({ relaunch }) =
 
   await openTerminalModule(page);
   await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   await pickFixed(page);
   await dialog(page).locator(CHOOSE).click();
   await expect(dialog(page).locator('[data-testid="script-dialog-workingdir"]')).toHaveText(
@@ -441,6 +455,7 @@ test('a cancelled folder dialog leaves the folder unchanged', async ({ relaunch 
 
   await openTerminalModule(page);
   await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   await pickFixed(page);
   await dialog(page).locator(CHOOSE).click();
   await expect
@@ -465,6 +480,7 @@ test('Add stays disabled until name and script are filled; it sends the trimmed 
 
   await openTerminalModule(page);
   await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   await expect(dialog(page)).toBeVisible();
 
   const save = dialog(page).locator('[data-testid="script-dialog-save"]');
@@ -486,6 +502,9 @@ test('Add stays disabled until name and script are filled; it sends the trimmed 
       fields: {
         name: SCRIPT.name,
         command: SCRIPT.command,
+        kind: 'script',
+        params: [],
+        smart: null,
         dirMode: 'fixed',
         workingDir: SCRIPT.workingDir,
         color: 'green',
@@ -514,6 +533,7 @@ test('a rejected folder keeps the dialog open and shows the backend error', asyn
 
   await openTerminalModule(page);
   await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   await dialog(page).locator('[data-testid="script-dialog-name"]').fill(SCRIPT.name);
   await dialog(page).locator('[data-testid="script-dialog-command"]').fill(SCRIPT.command);
   await pickFixed(page);
@@ -562,6 +582,9 @@ test('Edit… opens the dialog filled in; Save sends every edited field in one u
       fields: {
         name: editedName,
         command: SCRIPT.command,
+        kind: 'script',
+        params: [],
+        smart: null,
         dirMode: 'fixed',
         workingDir: SCRIPT.workingDir,
         color: 'blue',

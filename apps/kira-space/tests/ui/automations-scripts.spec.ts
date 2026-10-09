@@ -5,6 +5,9 @@ import type { ControlSnapshot } from './support/types';
 
 const SCRIPT = {
   id: 'script-1',
+  kind: 'script',
+  params: [],
+  smart: null,
   name: 'Build all',
   command: 'echo one\necho two',
   workingDir: '',
@@ -43,6 +46,8 @@ test('the header + adds a two-line script, sent with its newline', async ({ rela
   await expect(page.locator('[data-testid="automations-panel"]')).toContainText('No scripts');
 
   await page.locator('[data-testid="automations-add"]').click();
+
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   const dialog = page.locator('[data-testid="script-dialog"]');
   await expect(dialog).toBeVisible();
   await dialog.locator('[data-testid="script-dialog-name"]').fill(SCRIPT.name);
@@ -59,6 +64,9 @@ test('the header + adds a two-line script, sent with its newline', async ({ rela
       fields: {
         name: SCRIPT.name,
         command: SCRIPT.command,
+        kind: 'script',
+        params: [],
+        smart: null,
         dirMode: 'kira',
         workingDir: '',
         color: 'none',
@@ -112,6 +120,7 @@ test('Choose folder… switches the script to a fixed folder', async ({ relaunch
     ],
   });
   await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   const dialog = page.locator('[data-testid="script-dialog"]');
   const preview = dialog.locator('[data-testid="script-dialog-dir-preview"]');
   await expect(preview.locator('[data-testid="var-chip"][data-var="Kira home"]')).toContainText(

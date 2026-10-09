@@ -10,6 +10,9 @@ import { emitWailsEvent } from './support/mockRuntime';
 
 const SCRIPT = {
   id: 'script-1',
+  kind: 'script',
+  params: [],
+  smart: null,
   name: 'Build all',
   command: 'make build',
   workingDir: '',

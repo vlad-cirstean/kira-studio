@@ -2,7 +2,7 @@
 import type { ScriptParam } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Command, CommandItem, CommandList } from '@theme/components/ui/command';
+import { Command, CommandGroup, CommandItem, CommandList } from '@theme/components/ui/command';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -66,9 +66,11 @@ function summary(p: ScriptParam): string {
         <PopoverContent class="w-64 p-0">
           <Command multiple :model-value="values[p.name] ?? []" @update:model-value="(v) => set(p.name, v as string[])">
             <CommandList>
-              <CommandItem v-for="o in p.options" :key="o" :value="o" :data-testid="`run-param-option-${p.name}-${o}`">
-                {{ o }}
-              </CommandItem>
+              <CommandGroup>
+                <CommandItem v-for="o in p.options" :key="o" :value="o" :data-testid="`run-param-option-${p.name}-${o}`">
+                  {{ o }}
+                </CommandItem>
+              </CommandGroup>
             </CommandList>
           </Command>
         </PopoverContent>

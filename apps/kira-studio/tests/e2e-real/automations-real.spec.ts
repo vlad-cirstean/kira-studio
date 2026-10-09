@@ -6,6 +6,7 @@ import { expect, test } from './fixtures';
 async function addScript(page: import('@playwright/test').Page, name: string, command: string) {
   await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
   await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   const dialog = page.locator('[data-testid="script-dialog"]');
   await dialog.locator('[data-testid="script-dialog-name"]').fill(name);
   await dialog.locator('[data-testid="script-dialog-command"]').fill(command);

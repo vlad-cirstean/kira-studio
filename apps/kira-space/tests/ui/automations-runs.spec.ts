@@ -9,6 +9,9 @@ import type { ControlSnapshot } from './support/types';
 
 const SCRIPT = {
   id: 'script-1',
+  kind: 'script',
+  params: [],
+  smart: null,
   name: 'Build all',
   command: 'make build',
   workingDir: '',

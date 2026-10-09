@@ -35,6 +35,7 @@ test('a script runs in the picked folder', async ({ kira }) => {
     });
     await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
     await page.locator('[data-testid="automations-add"]').click();
+    await page.locator('[data-testid="menu-item-new-script"]').click();
     const dialog = page.locator('[data-testid="script-dialog"]');
     await dialog.locator('[data-testid="script-dialog-name"]').fill('List folder');
     await dialog.locator('[data-testid="script-dialog-command"]').fill('ls');
