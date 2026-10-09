@@ -8,15 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 )
 
 func toolErrText(t *testing.T, err error) string {
 	t.Helper()
-	var te adeagent.ToolError
+	var te claudeheadless.ToolError
 	if !errors.As(err, &te) {
-		t.Fatalf("err = %v; want an adeagent.ToolError", err)
+		t.Fatalf("err = %v; want an claudeheadless.ToolError", err)
 	}
 	return te.Error()
 }

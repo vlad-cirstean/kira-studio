@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -352,7 +353,7 @@ func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.A
 	if entry, err := b.openRepo(ctx, sb.CodeRepoID); err == nil {
 		commonDir = entry.Summary.CommonDir
 	}
-	shell, login := gitprepare.ResolveShell(os.Getenv, gitprepare.IsExecutableFile)
+	shell, login := loginshell.ResolveShell(os.Getenv, loginshell.IsExecutableFile)
 	res, err := b.scriptRunner().Run(ctx, gitprepare.Spec{
 		Shell: shell, LoginShell: login, Script: script, Dir: path, Timeout: timeout,
 		Env: gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: path, WorktreeBranch: name, RepoRoot: rec.Root, RepoCommonDir: commonDir}),

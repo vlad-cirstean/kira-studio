@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 )
 
 func main() {

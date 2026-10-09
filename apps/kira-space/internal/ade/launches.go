@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 )
 
 // launches.go starts interactive Claude Code sessions for a task: Take over a run's session,
@@ -283,18 +283,18 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 	space := b.spaceEnabled(tc.task)
 	var release func()
 	if runID != "" || space {
-		cfg, rel, err := b.agent.Register(adeagent.Grant{RunID: runID, TaskID: tc.task.ID, Space: space})
+		cfg, rel, err := b.agent.Register(claudeheadless.Grant{RunID: runID, TaskID: tc.task.ID, Space: space})
 		if err != nil {
 			return adewire.Launch{}, err
 		}
 		release = rel
 		var tools []string
 		if runID != "" {
-			tools = append(tools, adeagent.FinishStepTool)
+			tools = append(tools, claudeheadless.FinishStepTool)
 		}
-		tools = append(tools, adeagent.RunOutcomeTool)
+		tools = append(tools, claudeheadless.RunOutcomeTool)
 		if space {
-			tools = append(tools, adeagent.SpaceToolNames...)
+			tools = append(tools, claudeheadless.SpaceToolNames...)
 		}
 		pa.ExtraArgs = append(pa.ExtraArgs, "--mcp-config", cfg, "--allowedTools")
 		pa.ExtraArgs = append(pa.ExtraArgs, tools...)
@@ -361,7 +361,7 @@ func (b *TaskBoard) tuiBound(runID string) bool {
 }
 
 // applyTUIFinish applies a finish_step call of a taken-over run at call time (R14).
-func (b *TaskBoard) applyTUIFinish(runID string, f adeagent.Finish) {
+func (b *TaskBoard) applyTUIFinish(runID string, f claudeheadless.Finish) {
 	if b.ctx.Err() != nil {
 		return
 	}

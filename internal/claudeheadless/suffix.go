@@ -1,4 +1,4 @@
-package adeagent
+package claudeheadless
 
 // FinishStepSuffix ends every agent step prompt (SPEC2 section 5.1.2). It is not in the workflow
 // YAML and cannot be removed.

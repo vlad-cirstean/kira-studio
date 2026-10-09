@@ -15,7 +15,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
@@ -23,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -144,7 +144,7 @@ func fakeFinish(cfgPath, status, summary string) error {
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return err
 	}
-	entry := cfg.MCPServers[adeagent.ServerName]
+	entry := cfg.MCPServers[claudeheadless.ServerName]
 	token := strings.TrimPrefix(entry.Headers["Authorization"], "Bearer ")
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -394,7 +394,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStageDone(t *testing.T) {
 	}
 
 	args := e.fakeFile("api-1.args")
-	for _, want := range []string{"--output-format\nstream-json", "--setting-sources\nuser,project,local", adeagent.FinishStepTool, "Bash(git *)"} {
+	for _, want := range []string{"--output-format\nstream-json", "--setting-sources\nuser,project,local", claudeheadless.FinishStepTool, "Bash(git *)"} {
 		if !strings.Contains(args, want) {
 			t.Fatalf("argv lacks %q:\n%s", want, args)
 		}
@@ -406,7 +406,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStageDone(t *testing.T) {
 	if strings.Contains(args, "Bearer") {
 		t.Fatal("bearer token on argv")
 	}
-	if prompt := e.fakeFile("api-1.prompt"); !strings.Contains(prompt, "Step 1/2: one") || !strings.Contains(prompt, adeagent.FinishStepSuffix) {
+	if prompt := e.fakeFile("api-1.prompt"); !strings.Contains(prompt, "Step 1/2: one") || !strings.Contains(prompt, claudeheadless.FinishStepSuffix) {
 		t.Fatalf("prompt = %q", prompt)
 	}
 

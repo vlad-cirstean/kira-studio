@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 )
 
 // runVars are the prompt and command variables of one run (SPEC2 section 5.1.1).
@@ -70,14 +70,14 @@ func composePrompt(in promptInput) string {
 		body += "\n\n" + strings.Join(in.Context, "\n")
 	}
 	if in.Space {
-		body += "\n\n" + adeagent.SpaceSuffix
+		body += "\n\n" + claudeheadless.SpaceSuffix
 	}
-	return body + "\n\n" + adeagent.FinishStepSuffix + "\n"
+	return body + "\n\n" + claudeheadless.FinishStepSuffix + "\n"
 }
 
 // composeResumePrompt is the message a resumed run gets: the line, then the finish_step instruction.
 func composeResumePrompt(line string) string {
-	return line + "\n\n" + adeagent.FinishStepSuffix + "\n"
+	return line + "\n\n" + claudeheadless.FinishStepSuffix + "\n"
 }
 
 // repoLine is one repo of a launch message.

@@ -1,4 +1,4 @@
-package adeagent
+package claudeheadless
 
 import (
 	"context"

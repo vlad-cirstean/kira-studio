@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 )
 
 // maxBranchNameBytes is git's ref name limit on common file systems.
@@ -20,9 +20,9 @@ const maxBranchNameBytes = 255
 func toolErr(err error) error {
 	switch {
 	case errors.Is(err, ErrInvalidInput):
-		return adeagent.ToolError(strings.TrimPrefix(err.Error(), ErrInvalidInput.Error()+": "))
+		return claudeheadless.ToolError(strings.TrimPrefix(err.Error(), ErrInvalidInput.Error()+": "))
 	case errors.Is(err, repos.ErrTaskNotFound):
-		return adeagent.ToolError("The task no longer exists.")
+		return claudeheadless.ToolError("The task no longer exists.")
 	}
 	return err
 }
@@ -41,7 +41,7 @@ func (b *TaskBoard) spaceCtx(taskID string) (*taskCtx, error) {
 
 func (b *TaskBoard) spaceWritable(tc *taskCtx) error {
 	if tc.task.Kind == model.AdeTaskKindReview {
-		return adeagent.ToolError("This is a review task. Branches cannot be declared or created on it.")
+		return claudeheadless.ToolError("This is a review task. Branches cannot be declared or created on it.")
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ func resolveRepoRef(ref string, cands []repoCandidate, kind string) (string, err
 				for i, h := range hits {
 					ids[i] = h.id
 				}
-				return "", adeagent.ToolError(fmt.Sprintf("%q matches several repos. Use a code repo id: %s.", ref, strings.Join(ids, ", ")))
+				return "", claudeheadless.ToolError(fmt.Sprintf("%q matches several repos. Use a code repo id: %s.", ref, strings.Join(ids, ", ")))
 			}
 		}
 	}
@@ -83,10 +83,10 @@ func resolveRepoRef(ref string, cands []repoCandidate, kind string) (string, err
 		names[i] = cmpNonEmpty(c.nickname, c.name)
 	}
 	if kind == "registered" {
-		return "", adeagent.ToolError(fmt.Sprintf("Repo %q is not registered in Kira Space. Registered: %s. Ask the user to import it from Git > Manage repositories, then try again.",
+		return "", claudeheadless.ToolError(fmt.Sprintf("Repo %q is not registered in Kira Space. Registered: %s. Ask the user to import it from Git > Manage repositories, then try again.",
 			ref, joinOrNone(names)))
 	}
-	return "", adeagent.ToolError(fmt.Sprintf("Repo %q is not on this task. On the task: %s. Call declare_repos first.", ref, joinOrNone(names)))
+	return "", claudeheadless.ToolError(fmt.Sprintf("Repo %q is not on this task. On the task: %s. Call declare_repos first.", ref, joinOrNone(names)))
 }
 
 func joinOrNone(s []string) string {
@@ -121,15 +121,15 @@ func (b *TaskBoard) taskCandidates(tc *taskCtx, cfgs []model.AdeRepoConfig) []re
 	return out
 }
 
-func (b *TaskBoard) setupInfo(sb model.AdeTaskBranch, worktree string) adeagent.SetupInfo {
+func (b *TaskBoard) setupInfo(sb model.AdeTaskBranch, worktree string) claudeheadless.SetupInfo {
 	row, err := b.deps.Tasks.GetSetup(sb.ID)
 	if err != nil || row == nil {
 		if worktree != "" {
-			return adeagent.SetupInfo{State: "ready"}
+			return claudeheadless.SetupInfo{State: "ready"}
 		}
-		return adeagent.SetupInfo{State: "none"}
+		return claudeheadless.SetupInfo{State: "none"}
 	}
-	return adeagent.SetupInfo{State: row.State, Note: row.Note}
+	return claudeheadless.SetupInfo{State: row.State, Note: row.Note}
 }
 
 // worktreePath is worktreeOf with a lookup failure read as "no worktree".
@@ -138,17 +138,17 @@ func (b *TaskBoard) worktreePath(ctx context.Context, sb model.AdeTaskBranch) st
 	return path
 }
 
-func (b *TaskBoard) spaceInfo(ctx context.Context, tc *taskCtx) (adeagent.TaskInfo, error) {
+func (b *TaskBoard) spaceInfo(ctx context.Context, tc *taskCtx) (claudeheadless.TaskInfo, error) {
 	_, cfgs, err := b.registeredCandidates()
 	if err != nil {
-		return adeagent.TaskInfo{}, err
+		return claudeheadless.TaskInfo{}, err
 	}
-	info := adeagent.TaskInfo{
+	info := claudeheadless.TaskInfo{
 		Title:      taskTitle(tc.task, tc.branches),
 		JiraKey:    tc.task.JiraKey,
 		Stage:      "",
-		Repos:      []adeagent.TaskRepo{},
-		Registered: make([]adeagent.RegisteredRepo, 0, len(cfgs)),
+		Repos:      []claudeheadless.TaskRepo{},
+		Registered: make([]claudeheadless.RegisteredRepo, 0, len(cfgs)),
 	}
 	if tc.stage != nil {
 		info.Stage = tc.stage.Name
@@ -157,7 +157,7 @@ func (b *TaskBoard) spaceInfo(ctx context.Context, tc *taskCtx) (adeagent.TaskIn
 		info.Workflow = wf.Name
 	}
 	for _, br := range tc.branches {
-		r := adeagent.TaskRepo{Repo: tc.nick[br.CodeRepoID], CodeRepoID: br.CodeRepoID}
+		r := claudeheadless.TaskRepo{Repo: tc.nick[br.CodeRepoID], CodeRepoID: br.CodeRepoID}
 		if br.Name != "" {
 			name := br.Name
 			r.Branch = &name
@@ -167,42 +167,42 @@ func (b *TaskBoard) spaceInfo(ctx context.Context, tc *taskCtx) (adeagent.TaskIn
 		info.Repos = append(info.Repos, r)
 	}
 	for _, c := range cfgs {
-		info.Registered = append(info.Registered, adeagent.RegisteredRepo{Name: c.Name, Nickname: c.Nickname, CodeRepoID: c.CodeRepoID, Path: c.Root})
+		info.Registered = append(info.Registered, claudeheadless.RegisteredRepo{Name: c.Name, Nickname: c.Nickname, CodeRepoID: c.CodeRepoID, Path: c.Root})
 	}
 	return info, nil
 }
 
-// TaskInfo implements adeagent.SpaceTools.
-func (b *TaskBoard) TaskInfo(ctx context.Context, taskID string) (adeagent.TaskInfo, error) {
+// TaskInfo implements claudeheadless.SpaceTools.
+func (b *TaskBoard) TaskInfo(ctx context.Context, taskID string) (claudeheadless.TaskInfo, error) {
 	tc, err := b.spaceCtx(taskID)
 	if err != nil {
-		return adeagent.TaskInfo{}, err
+		return claudeheadless.TaskInfo{}, err
 	}
 	return b.spaceInfo(ctx, tc)
 }
 
-// DeclareRepos implements adeagent.SpaceTools: it only adds not-created branches in registered
+// DeclareRepos implements claudeheadless.SpaceTools: it only adds not-created branches in registered
 // repos, never removes one, and ignores a repo the task already has.
-func (b *TaskBoard) DeclareRepos(ctx context.Context, taskID string, refs []string) (adeagent.TaskInfo, error) {
+func (b *TaskBoard) DeclareRepos(ctx context.Context, taskID string, refs []string) (claudeheadless.TaskInfo, error) {
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
 	tc, err := b.spaceCtx(taskID)
 	if err != nil {
-		return adeagent.TaskInfo{}, err
+		return claudeheadless.TaskInfo{}, err
 	}
 	if err := b.spaceWritable(tc); err != nil {
-		return adeagent.TaskInfo{}, err
+		return claudeheadless.TaskInfo{}, err
 	}
 	cands, _, err := b.registeredCandidates()
 	if err != nil {
-		return adeagent.TaskInfo{}, err
+		return claudeheadless.TaskInfo{}, err
 	}
 	ids := make([]string, 0, len(refs))
 	for _, ref := range refs {
 		id, err := resolveRepoRef(ref, cands, "registered")
 		if err != nil {
-			return adeagent.TaskInfo{}, err
+			return claudeheadless.TaskInfo{}, err
 		}
 		ids = append(ids, id)
 	}
@@ -220,7 +220,7 @@ func (b *TaskBoard) DeclareRepos(ctx context.Context, taskID string, refs []stri
 			ID: b.newID(), TaskID: taskID, CodeRepoID: id, Kind: model.AdeBranchKindMine,
 			AddedAt: b.deps.Now().UnixMilli(), Origin: model.AdeBranchOriginAgent,
 		}); err != nil {
-			return adeagent.TaskInfo{}, toolErr(err)
+			return claudeheadless.TaskInfo{}, toolErr(err)
 		}
 		added = true
 	}
@@ -229,7 +229,7 @@ func (b *TaskBoard) DeclareRepos(ctx context.Context, taskID string, refs []stri
 	}
 	tc, err = b.spaceCtx(taskID)
 	if err != nil {
-		return adeagent.TaskInfo{}, err
+		return claudeheadless.TaskInfo{}, err
 	}
 	return b.spaceInfo(ctx, tc)
 }
@@ -238,23 +238,23 @@ func (b *TaskBoard) DeclareRepos(ctx context.Context, taskID string, refs []stri
 func (b *TaskBoard) validateAgentBranch(ctx context.Context, rec model.CodeRepo, name string) error {
 	switch {
 	case name == "" || strings.TrimSpace(name) != name:
-		return adeagent.ToolError("The branch name is empty or has leading or trailing spaces.")
+		return claudeheadless.ToolError("The branch name is empty or has leading or trailing spaces.")
 	case len(name) > maxBranchNameBytes:
-		return adeagent.ToolError(fmt.Sprintf("The branch name is longer than %d bytes.", maxBranchNameBytes))
+		return claudeheadless.ToolError(fmt.Sprintf("The branch name is longer than %d bytes.", maxBranchNameBytes))
 	case strings.HasPrefix(name, "-") || strings.Contains(name, "@{") || name == "HEAD":
-		return adeagent.ToolError(fmt.Sprintf("%q is not a valid branch name.", name))
+		return claudeheadless.ToolError(fmt.Sprintf("%q is not a valid branch name.", name))
 	}
 	cmd := exec.CommandContext(ctx, "git", "check-ref-format", "--branch", name)
 	cmd.Dir = rec.Root
 	if err := cmd.Run(); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
-			return adeagent.ToolError(fmt.Sprintf("%q is not a valid git branch name.", name))
+			return claudeheadless.ToolError(fmt.Sprintf("%q is not a valid git branch name.", name))
 		}
 		return fmt.Errorf("ade: check branch name: %w", err)
 	}
 	if main := b.mainShortName(ctx, rec.ID); main != "" && name == main {
-		return adeagent.ToolError(fmt.Sprintf("%q is the repo's main branch. Pick a new feature branch name.", name))
+		return claudeheadless.ToolError(fmt.Sprintf("%q is the repo's main branch. Pick a new feature branch name.", name))
 	}
 	cfgs, err := b.deps.RepoConfig.List()
 	if err != nil {
@@ -266,33 +266,33 @@ func (b *TaskBoard) validateAgentBranch(ctx context.Context, rec model.CodeRepo,
 		}
 		for _, t := range c.IntegrationBranches {
 			if t == name {
-				return adeagent.ToolError(fmt.Sprintf("%q is an integration branch of the repo. Pick a new feature branch name.", name))
+				return claudeheadless.ToolError(fmt.Sprintf("%q is an integration branch of the repo. Pick a new feature branch name.", name))
 			}
 		}
 	}
 	return nil
 }
 
-// RequestBranch implements adeagent.SpaceTools: it creates the branch and its worktree, or confirms
+// RequestBranch implements claudeheadless.SpaceTools: it creates the branch and its worktree, or confirms
 // the one the task already has under that name.
-func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref, name string) (adeagent.BranchInfo, error) {
+func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref, name string) (claudeheadless.BranchInfo, error) {
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
 	tc, err := b.spaceCtx(taskID)
 	if err != nil {
-		return adeagent.BranchInfo{}, err
+		return claudeheadless.BranchInfo{}, err
 	}
 	if err := b.spaceWritable(tc); err != nil {
-		return adeagent.BranchInfo{}, err
+		return claudeheadless.BranchInfo{}, err
 	}
 	_, cfgs, err := b.registeredCandidates()
 	if err != nil {
-		return adeagent.BranchInfo{}, err
+		return claudeheadless.BranchInfo{}, err
 	}
 	id, err := resolveRepoRef(ref, b.taskCandidates(tc, cfgs), "task")
 	if err != nil {
-		return adeagent.BranchInfo{}, err
+		return claudeheadless.BranchInfo{}, err
 	}
 	var sb model.AdeTaskBranch
 	for _, br := range tc.branches {
@@ -302,45 +302,45 @@ func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref, name string)
 	}
 	nick := tc.nick[id]
 	if sb.Kind != model.AdeBranchKindMine {
-		return adeagent.BranchInfo{}, adeagent.ToolError(fmt.Sprintf("The branch of %s on this task is not yours to create.", nick))
+		return claudeheadless.BranchInfo{}, claudeheadless.ToolError(fmt.Sprintf("The branch of %s on this task is not yours to create.", nick))
 	}
 	if sb.Name != "" && sb.Name != name {
-		return adeagent.BranchInfo{}, adeagent.ToolError(fmt.Sprintf("%s already has branch %q on this task. Branches cannot be renamed; use that one.", nick, sb.Name))
+		return claudeheadless.BranchInfo{}, claudeheadless.ToolError(fmt.Sprintf("%s already has branch %q on this task. Branches cannot be renamed; use that one.", nick, sb.Name))
 	}
 	rec, err := b.deps.CodeRepos.Get(id)
 	if err != nil {
-		return adeagent.BranchInfo{}, err
+		return claudeheadless.BranchInfo{}, err
 	}
 	if rec == nil {
-		return adeagent.BranchInfo{}, adeagent.ToolError(fmt.Sprintf("Repo %s is no longer registered.", nick))
+		return claudeheadless.BranchInfo{}, claudeheadless.ToolError(fmt.Sprintf("Repo %s is no longer registered.", nick))
 	}
 	fresh := sb.Name == ""
 	if fresh {
 		if err := b.validateAgentBranch(ctx, *rec, name); err != nil {
-			return adeagent.BranchInfo{}, err
+			return claudeheadless.BranchInfo{}, err
 		}
 	}
 	res, err := b.ensureWorktree(ctx, taskTitle(tc.task, tc.branches), *rec, sb, name)
 	if err != nil {
-		return adeagent.BranchInfo{}, toolErr(err)
+		return claudeheadless.BranchInfo{}, toolErr(err)
 	}
 	if fresh {
 		if err := b.deps.Tasks.SetBranchOrigin(sb.ID, model.AdeBranchOriginAgent); err != nil {
-			return adeagent.BranchInfo{}, err
+			return claudeheadless.BranchInfo{}, err
 		}
 		sb.Name = res.Name
 	}
 	if res.Fresh {
 		if err := b.startSetup(*rec, sb, res.Name, res.Path, b.onSetupReady); err != nil {
-			return adeagent.BranchInfo{}, err
+			return claudeheadless.BranchInfo{}, err
 		}
 	}
 	b.notifyBoard()
 	return b.branchInfo(sb, nick, res.Path), nil
 }
 
-func (b *TaskBoard) branchInfo(sb model.AdeTaskBranch, nick, worktree string) adeagent.BranchInfo {
-	info := adeagent.BranchInfo{Repo: nick, Branch: sb.Name, Worktree: worktree, Setup: b.setupInfo(sb, worktree)}
+func (b *TaskBoard) branchInfo(sb model.AdeTaskBranch, nick, worktree string) claudeheadless.BranchInfo {
+	info := claudeheadless.BranchInfo{Repo: nick, Branch: sb.Name, Worktree: worktree, Setup: b.setupInfo(sb, worktree)}
 	switch info.Setup.State {
 	case model.AdeSetupRunning:
 		info.Next = "The worktree is still preparing. Call branch_status with waitSeconds, then edit in " + worktree + "."
@@ -355,12 +355,12 @@ func (b *TaskBoard) branchInfo(sb model.AdeTaskBranch, nick, worktree string) ad
 	return info
 }
 
-// BranchStatus implements adeagent.SpaceTools: the state of the repo's worktree, waiting up to wait
+// BranchStatus implements claudeheadless.SpaceTools: the state of the repo's worktree, waiting up to wait
 // for a running setup to finish.
-func (b *TaskBoard) BranchStatus(ctx context.Context, taskID, ref string, wait time.Duration) (adeagent.BranchInfo, error) {
+func (b *TaskBoard) BranchStatus(ctx context.Context, taskID, ref string, wait time.Duration) (claudeheadless.BranchInfo, error) {
 	br, nick, early, err := b.taskBranch(taskID, ref)
 	if err != nil {
-		return adeagent.BranchInfo{}, err
+		return claudeheadless.BranchInfo{}, err
 	}
 	if early != nil {
 		return *early, nil
@@ -382,7 +382,7 @@ func (b *TaskBoard) setupRunning(sb model.AdeTaskBranch) bool {
 }
 
 // taskBranch resolves ref to the task's branch row; early answers a repo with no branch yet.
-func (b *TaskBoard) taskBranch(taskID, ref string) (br model.AdeTaskBranch, nick string, early *adeagent.BranchInfo, err error) {
+func (b *TaskBoard) taskBranch(taskID, ref string) (br model.AdeTaskBranch, nick string, early *claudeheadless.BranchInfo, err error) {
 	tc, err := b.spaceCtx(taskID)
 	if err != nil {
 		return br, "", nil, err
@@ -400,16 +400,16 @@ func (b *TaskBoard) taskBranch(taskID, ref string) (br model.AdeTaskBranch, nick
 			continue
 		}
 		if br.Name == "" {
-			return br, "", &adeagent.BranchInfo{Repo: tc.nick[id], Setup: adeagent.SetupInfo{State: "none"},
+			return br, "", &claudeheadless.BranchInfo{Repo: tc.nick[id], Setup: claudeheadless.SetupInfo{State: "none"},
 				Next: "No branch yet. Call request_branch."}, nil
 		}
 		return br, tc.nick[id], nil, nil
 	}
-	return br, "", nil, adeagent.ToolError("Repo is not on this task.")
+	return br, "", nil, claudeheadless.ToolError("Repo is not on this task.")
 }
 
 // RunOutcomes is the run_outcome tool's read: the task's runs, newest first, filtered by q.
-func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q adeagent.OutcomeQuery) ([]adeagent.RunOutcomeEntry, error) {
+func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q claudeheadless.OutcomeQuery) ([]claudeheadless.RunOutcomeEntry, error) {
 	tc, err := b.spaceCtx(taskID)
 	if err != nil {
 		return nil, err
@@ -418,7 +418,7 @@ func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q adeagent.Out
 	if err != nil {
 		return nil, err
 	}
-	out := []adeagent.RunOutcomeEntry{}
+	out := []claudeheadless.RunOutcomeEntry{}
 	for i := len(runs) - 1; i >= 0 && len(out) < q.Limit; i-- {
 		r := runs[i]
 		kind := "step"
@@ -432,7 +432,7 @@ func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q adeagent.Out
 		if q.Branch != "" && br.Name != q.Branch {
 			continue
 		}
-		entry := adeagent.RunOutcomeEntry{
+		entry := claudeheadless.RunOutcomeEntry{
 			RunID: r.ID, Kind: kind, Stage: r.StageID, Step: r.StepID, Repo: tc.nick[br.CodeRepoID], Branch: br.Name,
 			State: r.State, FinishedAt: r.FinishedAt,
 		}

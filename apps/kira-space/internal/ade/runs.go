@@ -11,11 +11,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -33,7 +34,7 @@ const (
 )
 
 // recordFinish is the MCP server's callback; the last call of a run wins and is applied at exit.
-func (b *TaskBoard) recordFinish(runID string, f adeagent.Finish) {
+func (b *TaskBoard) recordFinish(runID string, f claudeheadless.Finish) {
 	if b.tuiBound(runID) {
 		b.goTracked(func() { b.applyTUIFinish(runID, f) }) // a taken-over run: applied at call time (R14)
 		return
@@ -43,7 +44,7 @@ func (b *TaskBoard) recordFinish(runID string, f adeagent.Finish) {
 	b.runMu.Unlock()
 }
 
-func (b *TaskBoard) takeFinish(runID string) (adeagent.Finish, bool) {
+func (b *TaskBoard) takeFinish(runID string) (claudeheadless.Finish, bool) {
 	b.runMu.Lock()
 	defer b.runMu.Unlock()
 	f, ok := b.finishes[runID]
@@ -531,7 +532,7 @@ func fromOutcome(state string, o runoutcome.Outcome) outcome {
 }
 
 // agentEnd is how an agent process ended, for the no-report outcomes.
-func agentEnd(exit adeagent.Exit, runErr error, timeout string) runoutcome.Process {
+func agentEnd(exit claudeheadless.Exit, runErr error, timeout string) runoutcome.Process {
 	p := runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: exit.Code, Timeout: timeout}
 	switch {
 	case runErr != nil:
@@ -551,9 +552,9 @@ func (b *TaskBoard) settingSources() string {
 
 func allowedTools(step []string, space bool) []string {
 	out := slices.Clone(step)
-	want := []string{adeagent.FinishStepTool, adeagent.RunOutcomeTool}
+	want := []string{claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool}
 	if space {
-		want = append(want, adeagent.SpaceToolNames...)
+		want = append(want, claudeheadless.SpaceToolNames...)
 	}
 	for _, t := range want {
 		if !slices.Contains(out, t) {
@@ -570,7 +571,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil && !rebase {
 		space = b.spaceEnabled(task)
 	}
-	cfg, release, err := b.agent.Register(adeagent.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space})
+	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space})
 	if err != nil {
 		sink.add(logStderr, "could not start: "+err.Error())
 		sink.flush()
@@ -591,11 +592,11 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 	if rebase {
 		env = append(env, "GIT_EDITOR=true")
 	}
-	exit, runErr := adeagent.Run(ctx, adeagent.Spec{
+	exit, runErr := claudeheadless.Run(ctx, claudeheadless.Spec{
 		ClaudeBin: bin, Dir: path, Prompt: prompt, SessionID: b.sessionClaudeID(sessionID), Resume: resume, MCPConfigPath: cfg,
 		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space), Timeout: timeout, Env: env,
-	}, adeagent.Handler{
-		OnLine:       func(l adeagent.Line) { sink.add(l.Stream, l.Text) },
+	}, claudeheadless.Handler{
+		OnLine:       func(l claudeheadless.Line) { sink.add(l.Stream, l.Text) },
 		OnRateLimits: b.deps.OnRateLimits,
 	})
 	sink.flush()
@@ -620,7 +621,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 		end := fromOutcome(model.AdeRunFailed, o)
 		end.out.ExitCode = &code
 		f, ok := b.takeFinish(run.ID)
-		var report *adeagent.Finish
+		var report *claudeheadless.Finish
 		if ok {
 			report = &f
 		}
@@ -639,7 +640,7 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 	return rec.ClaudeSessionID
 }
 
-func (b *TaskBoard) agentOutcome(runID string, exit adeagent.Exit, runErr error, timeout string, lastErr string) outcome {
+func (b *TaskBoard) agentOutcome(runID string, exit claudeheadless.Exit, runErr error, timeout string, lastErr string) outcome {
 	code := exit.Code
 	f, finished := b.takeFinish(runID)
 	if !finished {
@@ -650,7 +651,7 @@ func (b *TaskBoard) agentOutcome(runID string, exit adeagent.Exit, runErr error,
 }
 
 // fromFinish is the outcome of a run whose agent called finish_step.
-func fromFinish(f adeagent.Finish, exit *int) outcome {
+func fromFinish(f claudeheadless.Finish, exit *int) outcome {
 	o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: f.Summary, ExitCode: exit}
 	state := finishState(&o, f)
 	out := fromOutcome(state, o)
@@ -659,7 +660,7 @@ func fromFinish(f adeagent.Finish, exit *int) outcome {
 }
 
 // finishState fills o from a finish_step call and returns the run state.
-func finishState(o *runoutcome.Outcome, f adeagent.Finish) string {
+func finishState(o *runoutcome.Outcome, f claudeheadless.Finish) string {
 	switch f.Status {
 	case "done":
 		o.Status = runoutcome.StatusDone
@@ -673,7 +674,7 @@ func finishState(o *runoutcome.Outcome, f adeagent.Finish) string {
 }
 
 // reportOf is the detail a finish_step call carried beyond status and summary, nil when none.
-func reportOf(f adeagent.Finish) *model.AgentReport {
+func reportOf(f claudeheadless.Finish) *model.AgentReport {
 	if len(f.ConflictedFiles) == 0 && f.LastGitError == "" && f.Tried == "" {
 		return nil
 	}
@@ -682,7 +683,7 @@ func reportOf(f adeagent.Finish) *model.AgentReport {
 
 func (b *TaskBoard) superviseScript(ctx context.Context, run model.AdeRun, def stepDef, rec model.CodeRepo, sb model.AdeTaskBranch, path, command string, timeout time.Duration) {
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
-	shell, login := gitprepare.ResolveShell(os.Getenv, gitprepare.IsExecutableFile)
+	shell, login := loginshell.ResolveShell(os.Getenv, loginshell.IsExecutableFile)
 	res, err := b.scriptRunner().Run(ctx, gitprepare.Spec{
 		Shell: shell, LoginShell: login, Script: command, Dir: path, Timeout: timeout,
 		Env: gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: path, WorktreeBranch: sb.Name, RepoRoot: rec.Root}),

@@ -3961,7 +3961,7 @@ and `docs/v2.0/plans/`.
 ### Process wiring
 
 - `internal/appwire/wire.go` `wireAdeTask` builds `ade.TaskBoard` from `TaskBoardDeps` (repos, discovery `GitStatus` (no `GitPath`, P230), own `gitsession.Conn`
-  `ade-board`, `adeflow.Reader` over `<home>/workflows`, the `adeagent` `finish_step` server, the
+  `ade-board`, `adeflow.Reader` over `<home>/workflows`, the `claudeheadless` `finish_step` server, the
   `Tracker`, log sink, session store). It calls `Recover()` then `Start()`, and installs
   `board.OnTUIStopped` as the tracker's stopped handler.
 - `bridge.AdeTaskService` binds 53 methods (`grep -c '^func (s \*AdeTaskService)'`; 53 `adeTask*` entries
@@ -4065,7 +4065,7 @@ and `docs/v2.0/plans/`.
   --mcp-config <file> --setting-sources <src> [--allowedTools ...]'`, cwd the worktree, prompt on stdin,
   `Setsid` + `procgroup.GracefulCancel`. No `--permission-mode`, no `--strict-mcp-config`.
   App setting `ade.headlessSettingSources` is `all` (default, `user,project,local`) or `user`.
-- `finish_step` MCP server (`internal/adeagent`): one loopback listener, bearer token per run
+- `finish_step` MCP server (`internal/claudeheadless`): one loopback listener, bearer token per run
   (`tokenauth`), config `<home>/ade/runs/<runId>.mcp.json` mode `0600` deleted at process exit, token
   never on argv, last call wins and applies at exit. `suffix.go` holds the text appended to the message.
   A run that ends without it fails with `ended without finish_step`; timeout is `failed`; script
@@ -4077,7 +4077,7 @@ and `docs/v2.0/plans/`.
 - Restart recovery (`recover.go`, D7): `Recover()` runs before `Start()`; running runs become `stuck`
   with note `interrupted by restart`, running setups fail, task sessions stop, stale `*.mcp.json` files
   are removed. Pending runs keep their launch spec and launch when their gate opens. Nothing auto-resumes.
-- Agent tools (P199, `ade/agenttools.go` implements `adeagent.SpaceTools` on `*ade.TaskBoard`): the
+- Agent tools (P199, `ade/agenttools.go` implements `claudeheadless.SpaceTools` on `*ade.TaskBoard`): the
   loopback MCP server issues scoped grants (run, task, Space), one bearer token per launch. A
   workflow with `kira_space_mcp` gives headless runs and the task's TUI sessions the Space grant:
   `task_info`, `declare_repos` (registered repos only, additive), `request_branch` (name checked by
@@ -4176,7 +4176,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 | `run` | headless run: stream-json `rate_limit_event.rate_limit_info.unifiedWindows` | `utilization` 0..1, `resetsAt` epoch s |
 
 - `claude -p` never invokes a `statusLine` (checked on claude 2.1.295), so headless runs feed through
-  their output instead (`adeagent.Handler.OnRateLimits`, chained from `ade/runs.go`). Newest reading
+  their output instead (`claudeheadless.Handler.OnRateLimits`, chained from `ade/runs.go`). Newest reading
   wins per window; the tooltip shows the source and its age.
 - Session feed: `Manager.ComposeLaunch(terminalID, cwd, command)` writes
   `<server dir>/settings-<12 hex>.json` (0600; hooks plus a `statusLine` pointing at the shim in
@@ -4282,9 +4282,9 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 
 ### Tests
 
-- Go: `internal/ade` (board, integration, deploy, run engine, steps, tracker), `adeflow`, `adeagent`,
+- Go: `internal/ade` (board, integration, deploy, run engine, steps, tracker), `adeflow`, `claudeheadless`,
   `bridge/adewire`; `go test -race` on those plus `gitsession`.
-- P199 protocol is covered by `adeagent` `TestGrantScopes` (go-sdk client) and `agenttools_test.go`.
+- P199 protocol is covered by `claudeheadless` `TestGrantScopes` (go-sdk client) and `agenttools_test.go`.
 - `tests/unit/ade-v2-*` (board parity with the mockup's logic, dialog, drop plan, progress, timeline) and
   `ade-notes-markdown`; 13 `tests/ui/ade-v2-*.spec.ts` on the mock runtime; no ADE visual spec.
 - Live smoke (server build, real `claude -p`) covers runs, send-back, restart recovery, Spec/Start/Take
@@ -4825,7 +4825,7 @@ wires repos, git, gitsock, terminal, ADE, memory, mobile and the bound services;
 native pieces (dialogs, browser, keep-awake, locator, window hooks), tests supply fakes.
 `internal/flowharness` boots `appwire.Build` in-process on a temp home. Real: SQLite, git (fixed
 dates, `git fast-import` history), the git stream, gitsock, PTY, watchers, mobile HTTP. Faked: the
-`claude` and `gh` CLIs (`flowharness/fakeagent`, scenario JSON), dialogs, browser, keep-awake, LAN
+`claude` and `gh` CLIs (`internal/flowtest/fakeagent`, scenario JSON), dialogs, browser, keep-awake, LAN
 detection, window manager. `appwire.Options` exposes the test seams `GhLocator`, `TrackerGrace` and
 `MobilePoll` (`flowharness.WithoutGh`, `WithTrackerGrace`, `WithMobilePoll`). The fake `claude` prints
 no stream `init` line under `--output-format json`, accepts an inline `--mcp-config`, and answers
@@ -5355,7 +5355,7 @@ Performance:
 - **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
 - **The Space Git window refuses `worktree.prepare` by design (P202).** Prepare-script progress shows in ADE paths and the VS Code extension host, not in the Space Git window's own worktree dialog or toolbar. The git-ui toolbar strip is not screenshot-verified (no fake-host scenario drives `worktree.prepare`). Delete when the user lifts the boundary.
 - **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
-- **The agent MCP tools (`task_info`, `declare_repos`, `request_branch`, `branch_status`) are untested against a real board and real `claude` (P199).** Covered by the `adeagent` go-sdk client test and `agenttools_test.go` only. Delete once one live run calls them.
+- **The agent MCP tools (`task_info`, `declare_repos`, `request_branch`, `branch_status`) are untested against a real board and real `claude` (P199).** Covered by the `claudeheadless` go-sdk client test and `agenttools_test.go` only. Delete once one live run calls them.
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
 - **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.

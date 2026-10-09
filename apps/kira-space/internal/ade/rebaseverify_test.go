@@ -3,8 +3,8 @@ package ade
 import (
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -14,12 +14,12 @@ func TestDecideRebaseOutcome(t *testing.T) {
 	failedEnd := fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent}))
 	crashEnd := fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: 1}))
 	stoppedEnd := fromOutcome(model.AdeRunStuck, runoutcome.Outcome{Status: runoutcome.StatusCancelled, Source: runoutcome.SourceUser, Reason: "stopped by you"})
-	fin := func(status string) *adeagent.Finish {
-		return &adeagent.Finish{Status: status, Summary: "s", Reason: "because"}
+	fin := func(status string) *claudeheadless.Finish {
+		return &claudeheadless.Finish{Status: status, Summary: "s", Reason: "because"}
 	}
 	cases := []struct {
 		name       string
-		f          *adeagent.Finish
+		f          *claudeheadless.Finish
 		chk        rebaseCheck
 		end        outcome
 		wantState  string

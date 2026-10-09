@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -99,7 +99,7 @@ func opName(op *gitpreflight.InProgressOperation) string {
 
 // decideRebaseOutcome turns the agent's report (nil: it never called finish_step), what git showed
 // and how the process ended into the run's outcome. A claim of done holds only when git agrees.
-func decideRebaseOutcome(f *adeagent.Finish, chk rebaseCheck, end outcome) outcome {
+func decideRebaseOutcome(f *claudeheadless.Finish, chk rebaseCheck, end outcome) outcome {
 	facts := chk.facts
 	if f == nil {
 		out := end

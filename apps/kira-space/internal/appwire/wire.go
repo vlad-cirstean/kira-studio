@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentnotify"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
@@ -30,6 +29,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
@@ -184,7 +184,7 @@ func wireAdeTask(
 			notifier.HandleRuns(ev.Runs)
 		},
 		OnLog: func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
-		OnRateLimits: func(rl adeagent.RateLimits) {
+		OnRateLimits: func(rl claudeheadless.RateLimits) {
 			var five, seven *claudeusage.Window
 			if rl.FiveHour != nil {
 				five = claudeusage.FromRun(rl.FiveHour.Utilization, rl.FiveHour.ResetsAt)

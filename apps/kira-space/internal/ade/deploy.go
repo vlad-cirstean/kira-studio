@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -33,7 +34,7 @@ func (b *TaskBoard) scriptRunner() gitprepare.Runner {
 // runEnvScript runs one environment script in the repo root and returns the sha it prints: the
 // first stdout line that looks like one.
 func (b *TaskBoard) runEnvScript(ctx context.Context, root, script string) (string, error) {
-	shell, login := gitprepare.ResolveShell(os.Getenv, gitprepare.IsExecutableFile)
+	shell, login := loginshell.ResolveShell(os.Getenv, loginshell.IsExecutableFile)
 	res, err := b.scriptRunner().Run(ctx, gitprepare.Spec{
 		Shell: shell, LoginShell: login, Script: script, Dir: root, Timeout: envScriptTimeout,
 		Env: gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: root, RepoRoot: root}),

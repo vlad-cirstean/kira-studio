@@ -9,8 +9,8 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/flowtest"
+	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 )
 
 func TestStatusLineFeed(t *testing.T) {

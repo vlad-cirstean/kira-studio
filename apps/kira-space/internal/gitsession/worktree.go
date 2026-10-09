@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -502,7 +503,7 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	if getenv == nil {
 		getenv = os.Getenv
 	}
-	shell, loginShell := gitprepare.ResolveShell(getenv, gitprepare.IsExecutableFile)
+	shell, loginShell := loginshell.ResolveShell(getenv, loginshell.IsExecutableFile)
 
 	branch := ""
 	if target.Branch != "" {

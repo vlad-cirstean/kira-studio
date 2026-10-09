@@ -1,5 +1,5 @@
 // Package gitprepare spawns user-authored shell scripts: the worktree prepare script, ADE
-// setup/stage/deploy scripts and the ADE agent command (via adeagent). Callers pick the script,
+// setup/stage/deploy scripts and the ADE agent command (via claudeheadless). Callers pick the script,
 // directory and environment; this package owns only the mechanism.
 //
 // Safety argument: the app never interpolates app data into the command string. The command is

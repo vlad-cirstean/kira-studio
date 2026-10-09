@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
 
@@ -73,7 +74,7 @@ type osRunner struct{}
 // precedent) so a test can observe whether cmd.Cancel's SIGKILL escalation was actually invoked.
 var killGroup = procgroup.Kill
 
-// Run spawns BuildArgv(spec.Shell, spec.LoginShell, spec.Script) under spec.Dir/spec.Env, per
+// Run spawns loginshell.BuildArgv(spec.Shell, spec.LoginShell, spec.Script) under spec.Dir/spec.Env, per
 // D12: stdin is never set on the *exec.Cmd, which os/exec documents as reading from the null
 // device — so the child never inherits this process's own stdin and is never attached to a pty;
 // Setsid puts it in its own session so a group signal reaches whatever it forks, not just the
@@ -88,7 +89,7 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	runCtx, cancel := context.WithTimeout(ctx, spec.Timeout)
 	defer cancel()
 
-	argv := BuildArgv(spec.Shell, spec.LoginShell, spec.Script)
+	argv := loginshell.BuildArgv(spec.Shell, spec.LoginShell, spec.Script)
 	cmd := exec.CommandContext(runCtx, argv[0], argv[1:]...)
 	cmd.Dir = spec.Dir
 	cmd.Env = spec.Env

@@ -1,4 +1,4 @@
-package adeagent
+package claudeheadless
 
 import (
 	"context"
@@ -118,7 +118,7 @@ func fail(tool string, err error) *mcp.CallToolResult {
 	if errors.As(err, &te) {
 		return toolError(te.Error())
 	}
-	slog.Warn("adeagent: space tool", "scope", "ade", "tool", tool, "err", err)
+	slog.Warn("claudeheadless: space tool", "scope", "ade", "tool", tool, "err", err)
 	return toolError("Kira Space could not complete that. Try again, or ask the user.")
 }
 

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -52,7 +52,7 @@ func (f *rbFx) advanceMain(t *testing.T, file, body string) {
 func (f *rbFx) agent(sh string, finish map[string]any) {
 	a := fakeagent.Action{Name: "nofinish", Sh: sh}
 	if finish != nil {
-		a.MCP = []fakeagent.MCPCall{{Server: adeagent.ServerName, Tool: "finish_step", Args: finish}}
+		a.MCP = []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "finish_step", Args: finish}}
 	}
 	claude(f.app, map[string][]fakeagent.Action{"*": {a}})
 }
@@ -289,10 +289,10 @@ func TestRebaseRun(t *testing.T) {
 		task, br := f.task(t, "Fix", adewire.BaseChoice{})
 		claude(f.app, map[string][]fakeagent.Action{"*": {
 			{Name: "done"},
-			{Name: "nofinish", MCP: []fakeagent.MCPCall{{Server: adeagent.ServerName, Tool: "finish_step", Args: map[string]any{
+			{Name: "nofinish", MCP: []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "finish_step", Args: map[string]any{
 				"status": "failed", "summary": "conflict", "reason": "clash", "conflictedFiles": []string{"x.txt"},
 			}}}},
-			{Name: "done", MCP: []fakeagent.MCPCall{{Server: adeagent.ServerName, Tool: "run_outcome", Args: map[string]any{"kind": "rebase"}}}},
+			{Name: "done", MCP: []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "run_outcome", Args: map[string]any{"kind": "rebase"}}}},
 		}})
 		if err := f.startRun(t, task, br, "feat/api-work"); err != nil {
 			t.Fatal(err)
@@ -331,7 +331,7 @@ func TestRebaseRun(t *testing.T) {
 		gate := filepath.Join(f.app.Work, "release-rebase")
 		claude(f.app, map[string][]fakeagent.Action{"*": {
 			{Name: "done"},
-			{Name: "nofinish", Sh: rebaseSh, WaitFile: gate, MCP: []fakeagent.MCPCall{{Server: adeagent.ServerName, Tool: "finish_step", Args: done()}}},
+			{Name: "nofinish", Sh: rebaseSh, WaitFile: gate, MCP: []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "finish_step", Args: done()}}},
 			{Name: "done"},
 		}})
 		if err := f.startRun(t, task, br, "feat/api-work"); err != nil {
@@ -367,11 +367,11 @@ func TestRebaseRun(t *testing.T) {
 		commitIn(t, br.Worktree, "clash.txt")
 		f.advanceMain(t, "clash.txt", "clash.txt\n\ntheirs\n")
 		claude(f.app, map[string][]fakeagent.Action{"*": {
-			{Name: "nofinish", Sh: rebaseSh + " || true", MCP: []fakeagent.MCPCall{{Server: adeagent.ServerName, Tool: "finish_step", Args: map[string]any{
+			{Name: "nofinish", Sh: rebaseSh + " || true", MCP: []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "finish_step", Args: map[string]any{
 				"status": "failed", "summary": "conflict", "reason": "clash.txt conflicts",
 			}}}},
 			{Name: "nofinish", Sh: "printf 'merged\\n' > clash.txt && git add clash.txt && GIT_EDITOR=true git rebase --continue", MCP: []fakeagent.MCPCall{{
-				Server: adeagent.ServerName, Tool: "finish_step", Args: done(),
+				Server: claudeheadless.ServerName, Tool: "finish_step", Args: done(),
 			}}},
 		}})
 		run := f.waitRebase(t, task.ID, f.rebase(t, br, adewire.RebaseArgs{}).RunID)
@@ -394,7 +394,7 @@ func TestRebaseRun(t *testing.T) {
 		f := newBaseFx(t)
 		task, br := f.task(t, "Fix", adewire.BaseChoice{})
 		claude(f.app, map[string][]fakeagent.Action{"*": {{Name: "nofinish", MCP: []fakeagent.MCPCall{{
-			Server: adeagent.ServerName, Tool: "finish_step",
+			Server: claudeheadless.ServerName, Tool: "finish_step",
 			Args: map[string]any{"status": "failed", "summary": "stuck", "reason": "push rejected", "lastGitError": "non-fast-forward"},
 		}}}}})
 		if err := f.startRun(t, task, br, "feat/api-fix"); err != nil {

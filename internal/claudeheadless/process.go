@@ -1,4 +1,4 @@
-package adeagent
+package claudeheadless
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
 
@@ -88,13 +88,13 @@ func Script(s Spec) string {
 // Run starts claude, feeds the prompt on stdin and streams parsed output to h until it exits.
 func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 	if spec.Timeout <= 0 {
-		return Exit{}, errors.New("adeagent: Spec.Timeout must be positive")
+		return Exit{}, errors.New("claudeheadless: Spec.Timeout must be positive")
 	}
 	runCtx, cancel := context.WithTimeout(ctx, spec.Timeout)
 	defer cancel()
 
-	shell, login := gitprepare.ResolveShell(os.Getenv, gitprepare.IsExecutableFile)
-	argv := gitprepare.BuildArgv(shell, login, Script(spec))
+	shell, login := loginshell.ResolveShell(os.Getenv, loginshell.IsExecutableFile)
+	argv := loginshell.BuildArgv(shell, login, Script(spec))
 	cmd := exec.CommandContext(runCtx, argv[0], argv[1:]...)
 	cmd.Dir = spec.Dir
 	cmd.Env = spec.Env

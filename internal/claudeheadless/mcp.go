@@ -1,4 +1,4 @@
-package adeagent
+package claudeheadless
 
 import (
 	"context"
@@ -201,14 +201,14 @@ func (s *Server) verify(_ context.Context, token string, _ *http.Request) (*auth
 // startLocked binds the listener and begins serving; s.mu is held.
 func (s *Server) startLocked() error {
 	if s.closed {
-		return errors.New("adeagent: server is closed")
+		return errors.New("claudeheadless: server is closed")
 	}
 	if s.ln != nil {
 		return nil
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return fmt.Errorf("adeagent: bind: %w", err)
+		return fmt.Errorf("claudeheadless: bind: %w", err)
 	}
 	servers := map[[3]bool]*mcp.Server{}
 	for _, finish := range []bool{false, true} {
@@ -240,17 +240,17 @@ func (s *Server) startLocked() error {
 // deletes that registration's file and token only; call it when the process has exited.
 func (s *Server) Register(g Grant) (configPath string, release func(), err error) {
 	if g.RunID == "" && !g.Space {
-		return "", nil, errors.New("adeagent: grant allows nothing")
+		return "", nil, errors.New("claudeheadless: grant allows nothing")
 	}
 	if g.Space && (g.TaskID == "" || s.space == nil) {
-		return "", nil, errors.New("adeagent: space grant needs a task and space tools")
+		return "", nil, errors.New("claudeheadless: space grant needs a task and space tools")
 	}
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {
 		return "", nil, err
 	}
 	if err := os.MkdirAll(s.dir, 0o700); err != nil {
-		return "", nil, fmt.Errorf("adeagent: config dir: %w", err)
+		return "", nil, fmt.Errorf("claudeheadless: config dir: %w", err)
 	}
 	s.mu.Lock()
 	if err := s.startLocked(); err != nil {
@@ -280,7 +280,7 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	}
 	if err != nil {
 		release()
-		return "", nil, fmt.Errorf("adeagent: write mcp config: %w", err)
+		return "", nil, fmt.Errorf("claudeheadless: write mcp config: %w", err)
 	}
 	return path, release, nil
 }

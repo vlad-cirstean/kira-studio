@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -238,7 +238,7 @@ func runClaude(scen Scenario, dir string, args []string) int {
 	}
 
 	finish := func(status string) int {
-		if _, err := callTool(cfg, adeagent.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
+		if _, err := callTool(cfg, claudeheadless.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
 			fmt.Fprintln(os.Stderr, "finish_step:", err)
 			return 3
 		}

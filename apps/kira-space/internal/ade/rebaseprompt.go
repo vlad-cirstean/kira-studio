@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 )
 
 // composeRebasePrompt is the one rebase prompt: the preview shows it, the run sends it. The fixed
@@ -50,5 +50,5 @@ func composeRebasePrompt(spec model.AdeRebaseSpec) string {
 
 // rebaseRunPrompt is what the agent receives: the (possibly edited) message and the report suffix.
 func rebaseRunPrompt(message string) string {
-	return strings.TrimRight(message, "\n") + "\n\n" + adeagent.RebaseReportSuffix
+	return strings.TrimRight(message, "\n") + "\n\n" + claudeheadless.RebaseReportSuffix
 }

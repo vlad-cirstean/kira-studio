@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -30,7 +30,7 @@ const (
 
 const defaultRebaseTimeout = 20 * time.Minute
 
-var rebaseTools = []string{"Bash(git:*)", "Read", "Edit", "Write", "Grep", "Glob", adeagent.FinishStepTool, adeagent.RunOutcomeTool}
+var rebaseTools = []string{"Bash(git:*)", "Read", "Edit", "Write", "Grep", "Glob", claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool}
 
 func (b *TaskBoard) rebaseTimeout() time.Duration {
 	if b.deps.RebaseTimeout > 0 {
@@ -375,7 +375,7 @@ func (b *TaskBoard) RebasePreview(ctx context.Context, args adewire.OntoArgs) (a
 	if err != nil {
 		return adewire.RebasePreview{}, err
 	}
-	out := adewire.RebasePreview{Suffix: adeagent.RebaseReportSuffix, Stack: []adewire.RebaseStackItem{}, Blockers: p.blockers, NoOp: p.noOp}
+	out := adewire.RebasePreview{Suffix: claudeheadless.RebaseReportSuffix, Stack: []adewire.RebaseStackItem{}, Blockers: p.blockers, NoOp: p.noOp}
 	if out.Blockers == nil {
 		out.Blockers = []adewire.RebaseBlocker{}
 	}
@@ -527,7 +527,7 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 
 // completeRebase verifies the result in git, then settles the run. f is the agent's last finish_step
 // call, nil when it made none; end says how the process ended.
-func (b *TaskBoard) completeRebase(run model.AdeRun, sessionID string, f *adeagent.Finish, end outcome) {
+func (b *TaskBoard) completeRebase(run model.AdeRun, sessionID string, f *claudeheadless.Finish, end outcome) {
 	spec, err := specOf(run)
 	if err != nil {
 		slog.Warn("ade: rebase spec", "scope", "ade", "run", run.ID, "err", err)
@@ -602,7 +602,7 @@ func (b *TaskBoard) releaseRebaseGate(taskID string, spec model.AdeRebaseSpec) {
 
 // applyRebaseFinish applies a finish_step call of a taken-over rebase run: git decides again. The
 // task mutex is held.
-func (b *TaskBoard) applyRebaseFinish(run model.AdeRun, f adeagent.Finish) {
+func (b *TaskBoard) applyRebaseFinish(run model.AdeRun, f claudeheadless.Finish) {
 	spec, err := specOf(run)
 	if err != nil {
 		slog.Warn("ade: rebase spec", "scope", "ade", "run", run.ID, "err", err)

@@ -10,7 +10,7 @@ import { stubNativeDialogs } from './support/routes';
 
 // Kira Space's real-backend tier: a `go build -tags server` binary on real SQLite, git, PTY and
 // stream, reached by a plain browser page. The claude and gh CLIs are the fake agent
-// (flowharness/fakeagent); dialogs, keep-awake and the window manager have no server-build
+// (internal/flowtest/fakeagent); dialogs, keep-awake and the window manager have no server-build
 // counterpart.
 
 const ROOT_DIR = resolve(__dirname, '../../../..');
@@ -43,7 +43,7 @@ function buildPrerequisites(): Promise<void> {
       run('go', ['build', '-tags', 'server', '-o', SERVER_BINARY, '.'], APP_DIR);
       run(
         'go',
-        ['build', '-o', FAKE_AGENT_BINARY, './internal/flowharness/fakeagent/cmd/fakeclaude'],
+        ['build', '-o', FAKE_AGENT_BINARY, '../../internal/flowtest/fakeagent/cmd/fakeclaude'],
         APP_DIR,
       );
     } finally {

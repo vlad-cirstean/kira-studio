@@ -6,7 +6,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 )
 
 func TestRunWithoutClaudeOnPath(t *testing.T) {
