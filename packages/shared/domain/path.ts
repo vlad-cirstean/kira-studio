@@ -1,6 +1,6 @@
 // P100 Part 2: split out of Kira Studio's own state/coderepos.ts (moving to kira-space's own
 // frontend in this phase) — a pure, generic path normalizer with no store/state dependency, used
-// by both apps' own terminal-session bookkeeping (Kira Studio's standalone Terminal module,
+// by both apps' own terminal-session bookkeeping (Kira Studio's standalone Automations module,
 // state/terminals.ts + state/terminalTabs.ts; Kira Space's repo-worktree terminal, its own
 // state/terminals.ts + state/coderepos.ts). One definition in packages/shared, not two duplicated
 // copies — unlike the Monaco bootstrap or the PTY engine (this phase's own documented "duplicate,

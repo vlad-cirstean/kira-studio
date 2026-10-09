@@ -12,7 +12,7 @@ import StatusBar from './StatusBar.vue';
 // P103 Part 2 (§5.4): Kira Studio's own WorkbenchShell.vue, now a thin composition over the shared
 // grid/splitters/TabStrip/MainView package components — this file keeps exactly the per-app
 // content those components' slots need: the mode-scoped left-panel lookup (D6/C6) and the
-// Operations dock. P128 §2.3/§2.4: the Terminal module's own "+" menu (`terminalModuleMenuItems`/
+// Operations dock. P128 §2.3/§2.4: the Automations module's own "+" menu (`terminalModuleMenuItems`/
 // `onNewTab`) moved into the module itself (packages/workbench/src/terminal/AutomationsNewTab.vue) —
 // `#new-tab` now renders whichever mode's own `ModeDef.newTab` is set, with no per-module branch
 // here at all.

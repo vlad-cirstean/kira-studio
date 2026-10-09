@@ -3,7 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { ref } from 'vue';
 
-// P128 §2.3: hoisted from Kira Studio's own WorkbenchShell.vue (the terminal module's own "+") and
+// P128 §2.3: hoisted from Kira Studio's own WorkbenchShell.vue (the automations module's own "+") and
 // Kira Space's own WorkbenchShell.vue (the git module's own "+") — the wrapper/Tooltip/button
 // markup was already identical between the two; only the label, tooltip text and click target
 // differed. `click` emits the button element itself so a caller anchoring a dropdown menu

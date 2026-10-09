@@ -17,7 +17,7 @@ import StatusBar from './StatusBar.vue';
 // `ade` writes ops). P128 §2.6/§2.7: `GitPanel`/`GitStart`, once this whole app's own
 // left panel, are now one entry (`git`) in this app's own module registry (workbench/modes.ts),
 // alongside `terminal` and `ade` — the per-module "+" branch this file used to hold moved into the
-// module itself (repo/GitNewTab.vue), the same shape Kira Studio's own terminal module took at
+// module itself (repo/GitNewTab.vue), the same shape Kira Studio's own automations module took at
 // P128 §2.4. This file keeps only this app's own per-app content: the mode-scoped left-panel
 // lookup and the "view.find" keydown binding.
 const layoutStore = useLayoutStore();

@@ -37,7 +37,7 @@ import WorkbenchShell from './workbench/WorkbenchShell.vue';
 // P103 Part 2 (§5.4): provided once, here, for MainView/TabStrip/WorkbenchShell (via their own
 // per-app workbench/*.vue wrappers) to inject through packages/workbench/src/host.ts.
 provide(workbenchHostKey, createWorkbenchHost());
-// P128 §2.4: the terminal module's own context, for AutomationsPanel.vue/AutomationsStart.vue/
+// P128 §2.4: the automations module's own context, for AutomationsPanel.vue/AutomationsStart.vue/
 // AutomationsNewTab.vue/TerminalTabView.vue (all shared with Kira Space) to inject.
 provide(automationsModuleKey, createAutomationsModule());
 

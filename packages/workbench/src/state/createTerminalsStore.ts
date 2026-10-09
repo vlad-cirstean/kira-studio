@@ -8,7 +8,7 @@ import { loadTerminalRenderer } from '../terminal/terminalRendererLoader';
 import { createOrderedWriter } from './orderedWrites';
 
 // P103 Part 2 (§5.3): hoisted from both apps' own state/terminals.ts — byte-identical (P83's
-// Kira Studio Terminal module, P83's Kira Space repo-worktree terminal), once each app's own
+// Kira Studio Automations module, P83's Kira Space repo-worktree terminal), once each app's own
 // `canonicalPath` resolved to the same packages/shared function (this phase found Kira Space's
 // state/coderepos.ts still defining a local duplicate — folded into @shared/domain/path, its
 // documented single-definition intent since P100 Part 2). Parameterized only over `control`
@@ -73,7 +73,7 @@ export interface TerminalsStoreOptions {
 
 export function createTerminalsStore(control: TerminalsControl, options: TerminalsStoreOptions) {
   return defineStore(options.storeId ?? 'terminals', () => {
-    // P91 §7: the Terminal module's own unscoped-launch default — the user's home directory,
+    // P91 §7: the Automations module's own unscoped-launch default — the user's home directory,
     // resolved in Go (bridge/terminal.go's DefaultCwd) and hydrated once at boot, beside
     // hydrateCustomScripts (main.ts). '' means "not yet hydrated, or $HOME could not be resolved" —
     // every caller (TabStrip.vue's Terminal entry, AutomationsStart.vue's button) disables its launch on

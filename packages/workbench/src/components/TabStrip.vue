@@ -17,7 +17,7 @@ import { wheelToHorizontal } from '../util/wheelScroll';
 // through the host's own `iconFor`/`tabIndicator`/`tabBadge` hooks (host.ts) instead of an
 // app-local import. The trailing "+"
 // new-tab affordance is real per-app
-// divergence (Kira Studio: the Terminal module's own plain-session menu; Kira Space: one repo-root
+// divergence (Kira Studio: the Automations module's own plain-session menu; Kira Space: one repo-root
 // terminal, no menu) — not a lookup a host hook can express cleanly, so it stays a `#new-tab` slot,
 // each app supplying its own button exactly as before.
 // Read once: a host object is stable for the component's life (both apps and ade build it once).
@@ -195,7 +195,7 @@ if (moveTab) {
 </script>
 
 <template>
-  <!-- P91 §8: always one wrapper — the Terminal module's own normal initial state is zero tabs,
+  <!-- P91 §8: always one wrapper — the Automations module's own normal initial state is zero tabs,
        which needs the "+" (below) just as much as a populated strip does. -->
   <div
     class="h-full flex items-center min-w-0"

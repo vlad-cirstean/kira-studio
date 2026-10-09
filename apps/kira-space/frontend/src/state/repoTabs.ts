@@ -12,7 +12,7 @@ import { openTerminalTab, type TerminalLaunch } from './terminalTabs';
 import { repoWorkspaceKey, useWorkspaceStore } from './workspace';
 
 // P91 §6: moved to state/terminalTabs.ts, which openTerminalTab below now shares with the
-// Terminal module's own (non-repo-scoped) opener — re-exported so no importer of this module
+// Automations module's own (non-repo-scoped) opener — re-exported so no importer of this module
 // breaks.
 export type { TerminalLaunch };
 
@@ -264,7 +264,7 @@ export function openRepoReviewDiffTab(
 //
 // P91 §6: delegates to state/terminalTabs.ts's openTerminalTab for the actual tab-open — this
 // function's own remaining job is exactly "which workspace does the tab belong to", the
-// openRepoWorkspace side effect that the Terminal module's own opener must NOT have.
+// openRepoWorkspace side effect that the Automations module's own opener must NOT have.
 export function openRepoTerminalTab(
   codeRepoId: string,
   cwd: string,

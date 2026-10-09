@@ -110,7 +110,7 @@ export const useTabsStore = createTabsStore({
     // tab strip is on screen right now. P128 §2.6: that's `visibleWorkspace()` — the open repo (or
     // GENERAL_WORKSPACE) while `git` mode is active, else the active module's own id — not
     // `useWorkspaceStore().active` directly, which stays git-only and would keep stepping the
-    // Git module's own tabs even while, say, the Terminal module is on screen.
+    // Git module's own tabs even while, say, the Automations module is on screen.
     function activateNextTab(): void {
       actions.stepTab(visibleWorkspace(), 1);
     }

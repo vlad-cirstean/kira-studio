@@ -16,7 +16,7 @@ import type {
 } from '@shared/domain/memoryImport';
 import { type InjectionKey, inject } from 'vue';
 
-// P201: the Memory module's injected context, the shared terminal module's shape — the same
+// P201: the Memory module's injected context, the shared automations module's shape — the same
 // components mount in any app that provides a control.
 
 export interface MemoryControl {

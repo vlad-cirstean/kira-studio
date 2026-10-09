@@ -9,7 +9,7 @@ import { type ComputedRef, computed, type InjectionKey, inject } from 'vue';
 import type { TerminalLaunch } from '../state/createTerminalTabs';
 import type { TerminalHostDeps } from '../terminal/terminalHost';
 
-// P128 §2.4: the shared terminal module's own injected context — AutomationsPanel.vue/
+// P128 §2.4: the shared automations module's own injected context — AutomationsPanel.vue/
 // AutomationsStart.vue/AutomationsNewTab.vue read this instead of an app-specific store, so the same
 // three components mount in both apps. `openTerminalTab` binds the app's own module workspace
 // ('terminal' in both) itself, so shared code never names a workspace key.
