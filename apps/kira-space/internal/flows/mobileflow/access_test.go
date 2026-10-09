@@ -139,7 +139,6 @@ func TestEnableTrustPort(t *testing.T) {
 	unreachable(t, "127.0.0.1:"+strconv.Itoa(next))
 
 	t.Run("a new port starts a server stopped by a busy one", func(t *testing.T) {
-		t.Skip("P231 finding B-3")
 		if _, err := app.W.Mobile.SetEnabled(bridge.MobileSetEnabledArgs{Enabled: true}); err != nil {
 			t.Fatal(err)
 		}

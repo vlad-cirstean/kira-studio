@@ -357,8 +357,9 @@ func (s *MobileAccessService) SetPort(args MobileSetPortArgs) (MobileStatus, err
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 	if s.embedded.Status().Running {
 		s.embedded.Stop()
-		s.reconcile()
 	}
+	// Also retries a server a busy port stopped; a no-op while the supervisor is off.
+	s.reconcile()
 	st := s.withCurrent(s.embedded.Status())
 	s.emitStatus(st)
 	return st, nil
