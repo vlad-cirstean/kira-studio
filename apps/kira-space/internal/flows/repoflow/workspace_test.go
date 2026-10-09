@@ -256,3 +256,48 @@ func TestCodeSearch(t *testing.T) {
 		}
 	})
 }
+
+// Leaving a workspace while its search runs ends the search quietly (no error, no more events) and
+// the workspace reopens on the next read.
+func TestCloseWorkspaceStopsSearch(t *testing.T) {
+	app := flowharness.New(t)
+	big := app.NewRepo("search-close")
+	bulk := map[string]string{}
+	line := strings.Repeat("x", 80) + " needle\n"
+	for i := range 600 {
+		bulk["d"+strconv.Itoa(i%20)+"/f"+strconv.Itoa(i)+".txt"] = strings.Repeat(line, 400)
+	}
+	big.Commit("bulk", bulk)
+	rec := importVia(t, app, big.Dir)
+	cw := app.W.CodeWorkspace
+
+	if _, err := cw.StartSearch(ctx, bridge.CodeWorkspaceSearchArgs{ID: rec.ID, WindowKey: "w1", Query: "needle"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cw.CloseWorkspace(idArgs(rec.ID)); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, 10*time.Second, func() bool { _, done, _, _, _ := searchEvents(app, "w1"); return done })
+	_, _, stats, searchErr, total := searchEvents(app, "w1")
+	if searchErr != nil {
+		t.Fatalf("closing the workspace surfaced as a search error: %+v", searchErr)
+	}
+	if stats != nil && stats.Matches >= codeworkspace.MaxSearchMatches {
+		t.Fatalf("search ran to its cap (%+v) after the workspace closed", stats)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if _, _, _, _, after := searchEvents(app, "w1"); after != total {
+		t.Fatalf("events kept coming after close: %d -> %d", total, after)
+	}
+
+	// Closing twice, or an id that never opened, is harmless; an empty id is refused.
+	if err := cw.CloseWorkspace(idArgs(rec.ID)); err != nil {
+		t.Fatalf("second CloseWorkspace = %v", err)
+	}
+	if err := cw.CloseWorkspace(idArgs("")); errCode(err) != "E_BAD_REQUEST" {
+		t.Fatalf("CloseWorkspace with no id = %v, want E_BAD_REQUEST", err)
+	}
+	if _, err := cw.ReadFile(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "d0/f0.txt"}); err != nil {
+		t.Fatalf("ReadFile after close: %v", err)
+	}
+}

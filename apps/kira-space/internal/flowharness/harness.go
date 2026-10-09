@@ -40,6 +40,7 @@ import (
 
 type options struct {
 	noGh         bool
+	noClaude     bool
 	trackerGrace time.Duration
 	mobilePoll   time.Duration
 }
@@ -47,8 +48,11 @@ type options struct {
 // Opt tweaks New.
 type Opt func(*options)
 
-// WithoutGh leaves gh off PATH entirely, system installs included.
+// WithoutGh leaves gh off PATH entirely, system installs included (claude stays the fake).
 func WithoutGh() Opt { return func(o *options) { o.noGh = true } }
+
+// WithoutClaude leaves claude off PATH entirely, system installs included.
+func WithoutClaude() Opt { return func(o *options) { o.noClaude = true } }
 
 // WithTrackerGrace shortens the ADE tracker's grace window, the wait after a TUI session spawns
 // before a missing process reads as stopped (30s by default).
@@ -154,9 +158,12 @@ func (a *App) writeBin(o options) {
 	if err != nil {
 		a.t.Fatal(err)
 	}
-	tools := []string{"claude", "gh"}
-	if o.noGh {
-		tools = []string{"claude"}
+	var tools []string
+	if !o.noClaude {
+		tools = append(tools, "claude")
+	}
+	if !o.noGh {
+		tools = append(tools, "gh")
 	}
 	for _, tool := range tools {
 		if err := os.Symlink(self, filepath.Join(a.BinDir, tool)); err != nil {
@@ -165,11 +172,11 @@ func (a *App) writeBin(o options) {
 	}
 }
 
-// pathTail is the inherited PATH, or for WithoutGh a directory of wrappers for every inherited
-// executable except gh and claude.
+// pathTail is the inherited PATH, or for WithoutGh and WithoutClaude a directory of wrappers for
+// every inherited executable except gh and claude.
 func (a *App) pathTail(o options) string {
 	inherited := os.Getenv("PATH")
-	if !o.noGh {
+	if !o.noGh && !o.noClaude {
 		return inherited
 	}
 	clean := filepath.Join(a.Root, "pathbin")

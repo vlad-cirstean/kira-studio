@@ -19,3 +19,11 @@ Findings:
   them: a second `MobileAccessService.AttachPush` starts another `RunExpiry` loop and returns a
   detach nobody runs. Fix: package-level funcs (the `docker.CloseWindowBound` precedent), called
   from `appwire`. Coverage gate exempts the three until then.
+- F2 (fixed in `fix(gitsession)`): `WorktreeAddPreflight` reports the repo's own checked-out
+  branch as clean.
+- F3 (fixed in `fix(gitclient)`): a repo deleted while open surfaces a raw `fork/exec` string.
+- F4 (no fix): `InstallSemanticModel` downloads through the third-party hub client with a
+  hard-coded URL and no env-proxy honoring, so no hermetic offline test exists. The test
+  covers the cancelled-context path instead. A URL seam needs `appwire.Options` (Stream C).
+- F5 (no fix): a run with `claude` off PATH fails with the shell's own `exec: claude: not found`
+  text, no structured message. Test asserts the text names claude.
