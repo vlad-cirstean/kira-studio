@@ -24,6 +24,9 @@ import type { TextPart } from '@theme/varText';
 import { formatShortcut } from '../shortcuts/keys';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 
+// A disabled item takes no pointer events, so its hint needs them back to show on hover.
+const HINT_WHEN_DISABLED = 'data-disabled:pointer-events-auto';
+
 const contextMenuStore = useContextMenuStore();
 
 function onUpdateOpen(open: boolean): void {
@@ -78,6 +81,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                     <DropdownMenuItem
                       :disabled="sub.type === 'item' && !!sub.disabled"
                       :variant="sub.type === 'item' && sub.danger ? 'destructive' : 'default'"
+                      :class="sub.type === 'item' && sub.hint && HINT_WHEN_DISABLED"
                       :data-testid="`menu-item-${sub.id}`"
                       @select="sub.type === 'item' && onItemClick(sub)"
                     >
@@ -122,6 +126,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
             <DropdownMenuItem
               :disabled="!!item.disabled"
               :variant="item.danger ? 'destructive' : 'default'"
+              :class="item.hint && HINT_WHEN_DISABLED"
               :data-testid="`menu-item-${item.id}`"
               @select="onItemClick(item)"
             >

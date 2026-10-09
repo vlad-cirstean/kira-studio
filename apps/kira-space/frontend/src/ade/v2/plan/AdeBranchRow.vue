@@ -26,7 +26,7 @@ const { model } = usePlanModel();
 const repos = useRepos();
 const reviewCode = useReviewCode();
 const choice = computed(() => reviewCode.choiceOf(props.row));
-const rowEl = useTemplateRef<HTMLElement>('rowEl');
+const rowRef = useTemplateRef<HTMLElement>('rowEl');
 const hasChips = computed(() => props.row.chips.merged.length + props.row.chips.deployed.length > 0);
 const selected = computed(() => ui.selectedBranchId === props.row.id);
 
@@ -61,7 +61,7 @@ function onMenu(ev: MouseEvent): void {
             disabled: choice.value.disabled,
             hint: choice.value.tip,
             shortcut: 'ade.reviewCode' as const,
-            run: () => reviewCode.open(props.row.branch.taskId, id, rowEl.value),
+            run: () => reviewCode.open(props.row.branch.taskId, id, rowRef.value),
           },
         ]
       : []),
@@ -220,7 +220,7 @@ const rowBgClass = computed(() => {
       disabled-trigger
       :disabled="reviewCode.pending.value || choice.disabled"
       data-testid="ade-branch-review"
-      @click.stop="reviewCode.open(row.branch.taskId, row.id, rowEl)"
+      @click.stop="reviewCode.open(row.branch.taskId, row.id, rowRef)"
     >
       <VarText :parts="choice.tip" />
       <span class="text-muted-foreground"> ({{ formatShortcut('ade.reviewCode') }})</span>

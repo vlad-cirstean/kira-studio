@@ -6,7 +6,8 @@ defineProps<{ parts: readonly TextPart[] }>();
 </script>
 
 <template>
-  <template v-for="(p, i) in parts" :key="i">
+  <span class="whitespace-pre-line"
+    ><template v-for="(p, i) in parts" :key="i">
     <template v-if="typeof p === 'string'">{{ p }}</template>
     <span
       v-else
@@ -15,7 +16,8 @@ defineProps<{ parts: readonly TextPart[] }>();
       :data-var="p.name"
       :aria-label="`${p.name}: ${p.value}`"
     >
-      <CodiconIcon name="symbol-variable" :size="11" />{{ p.value }}
+      <CodiconIcon name="symbol-variable" :size="11" /><span>{{ p.value }}</span>
     </span>
-  </template>
+  </template
+  ></span>
 </template>

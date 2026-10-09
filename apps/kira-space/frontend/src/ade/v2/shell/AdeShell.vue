@@ -35,7 +35,7 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
 
 // Review code on the focused branch or card, else the selected one.
 const reviewCode = useReviewCode();
-const planEl = useTemplateRef<HTMLElement>('planEl');
+const planRef = useTemplateRef<HTMLElement>('planEl');
 function reviewTarget(e: KeyboardEvent): { taskId?: string; branchId?: string; el?: HTMLElement } {
   const t = e.target instanceof Element ? e.target : null;
   const rowEl = t?.closest<HTMLElement>('[data-testid="ade-branch-row"][data-branch-id]');
@@ -49,7 +49,7 @@ function reviewTarget(e: KeyboardEvent): { taskId?: string; branchId?: string; e
   if (ui.selectedBranchId) return { branchId: ui.selectedBranchId };
   return { taskId: ui.selectedTaskId ?? undefined };
 }
-useEventListener(planEl, 'keydown', (e: KeyboardEvent) => {
+useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
   if (e.defaultPrevented || !shortcutFor(e, ['ade.reviewCode'])) return;
   e.preventDefault();
   const m = model.value;
