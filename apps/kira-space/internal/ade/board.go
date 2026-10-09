@@ -808,8 +808,9 @@ func (b *TaskBoard) ForcePush(ctx context.Context, branchID string) (adewire.For
 	return out, nil
 }
 
+// lastFetchAt reads the worktree's own FETCH_HEAD: git writes it per linked worktree, not in the common dir.
 func lastFetchAt(entry *gitsession.RepoEntry) *int64 {
-	info, err := os.Stat(filepath.Join(entry.Summary.CommonDir, "FETCH_HEAD"))
+	info, err := os.Stat(filepath.Join(entry.Summary.GitDir, "FETCH_HEAD"))
 	if err != nil {
 		return nil
 	}

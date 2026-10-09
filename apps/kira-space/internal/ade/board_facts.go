@@ -137,6 +137,8 @@ func (b *TaskBoard) repoFacts(ctx context.Context, codeRepoID string, branches [
 		fallback()
 		return res
 	}
+	remote, _ := entry.DefaultRemote(ctx)
+	res.state.Remote, res.state.LastFetchAt = remote, lastFetchAt(entry)
 	if err := b.collectRepo(ctx, entry, codeRepoID, branches, setupOf, res); err != nil {
 		slog.Warn("ade board: repo facts", "repo", codeRepoID, "err", err)
 		res.hadCommits, res.merged, res.jobs, res.pairs = nil, map[string]int64{}, map[string]rebaseJob{}, []adewire.Pair{}
@@ -158,7 +160,7 @@ func (b *TaskBoard) collectRepo(ctx context.Context, entry *gitsession.RepoEntry
 	if err != nil {
 		return err
 	}
-	remote, _ := entry.DefaultRemote(ctx)
+	remote := res.state.Remote
 	caches, rebaseC := b.cachesFor(codeRepoID)
 	sc := &boardCtx{
 		entry: entry, repoID: codeRepoID, inv: inv, userEmail: userEmail, remote: remote, mainTip: mainTip,
@@ -168,7 +170,7 @@ func (b *TaskBoard) collectRepo(ctx context.Context, entry *gitsession.RepoEntry
 	if hasMain {
 		sc.mainName, _ = mainDisplay(mainRefName)
 	}
-	res.state = adewire.RepoState{CodeRepoID: codeRepoID, MainName: sc.mainName, Remote: remote, LastFetchAt: lastFetchAt(entry)}
+	res.state.MainName = sc.mainName
 	if err := b.loadFacts(sc, branches); err != nil {
 		return err
 	}
