@@ -139,3 +139,60 @@ export async function openPortGraph(relaunch: Relaunch, options: OpenGraphOption
   await page.locator(`[data-testid="repo-row"][data-repo-id="${PORT_REPO.id}"]`).click();
   return page;
 }
+
+/** A current-shape persisted graph view state; a version or field mismatch discards it whole. */
+export function persistedViewState(scrollRow: number): Record<string, unknown> {
+  return {
+    version: 8,
+    repoId: PORT_REPO.repoId,
+    loadedRows: 0,
+    detailOpen: false,
+    scrollRow,
+    selectedSha: null,
+    columnWidths: { author: 140, date: 152, graph: 95 },
+    dateFormat: 'relative',
+    detailWidth: 380,
+    fileListMode: 'tree',
+    searchCaseSensitive: false,
+    searchWholeWord: false,
+    searchRegex: false,
+    searchScope: 'both',
+    searchOpen: false,
+    collapseBranches: false,
+  };
+}
+
+/** Restores an active graph tab carrying `viewState`, with the git mock installed at boot. */
+export async function restorePortGraph(
+  relaunch: Relaunch,
+  viewState: Record<string, unknown>,
+  chunks: readonly GraphStreamChunkFixture[],
+  results: Record<string, unknown> = {},
+): Promise<Page> {
+  const { window: page } = await relaunch({
+    control: [
+      ...PORT_CONTROL,
+      {
+        channel: IPC.tabsList,
+        response: [
+          {
+            id: 'restored-repo-graph',
+            kind: 'repo-graph',
+            connectionId: null,
+            path: '',
+            order: 0,
+            active: true,
+            workspaceId: PORT_REPO.id,
+            state: { viewState, reviewSession: null },
+          },
+        ],
+      },
+    ],
+    gitStream: {
+      repoId: PORT_REPO.repoId,
+      extraResults: { ...BASE_RESULTS, ...results },
+      graphStreamChunks: chunks,
+    },
+  });
+  return page;
+}
