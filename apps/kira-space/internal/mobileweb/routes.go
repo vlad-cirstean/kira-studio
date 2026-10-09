@@ -77,7 +77,13 @@ func (s *Server) routes() []route {
 			handle: func(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) { s.handleEvents(w, r, d) }},
 		read("/api/ade/board", readJSON(s, "board", true, s.cfg.Reader.Board)),
 		read("/api/ade/prs", readJSON(s, "prs", true, s.cfg.Reader.Prs)),
-		read("/api/ade/sessions", readJSON(s, "sessions", false, s.cfg.Reader.Sessions)),
+		read("/api/ade/sessions", readJSON(s, "sessions", false, func(ctx context.Context) (any, error) {
+			v, err := s.cfg.Reader.Sessions(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return withoutCwd(v)
+		})),
 		read("/api/ade/workflows", readJSON(s, "workflows", false, s.cfg.Reader.Workflows)),
 		read("/api/ade/backlog", readJSON(s, "backlog", false, s.cfg.Reader.Backlog)),
 		read("/api/ade/repos", readJSON(s, "repos", false, s.repoNames)),

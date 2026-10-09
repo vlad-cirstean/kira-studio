@@ -74,7 +74,7 @@ func TestPhoneReadsRealAde(t *testing.T) {
 	f.startSession(t)
 	p, _ := pairedPhone(t, f)
 
-	check := func(path string, bound any, leaksCwd ...bool) {
+	check := func(path string, bound any, stripCwd ...bool) {
 		t.Helper()
 		r := p.get(path)
 		if r.Status != http.StatusOK {
@@ -82,10 +82,14 @@ func TestPhoneReadsRealAde(t *testing.T) {
 		}
 		var got any
 		r.json(t, &got)
-		if want := normalize(t, bound); !reflect.DeepEqual(got, want) {
+		want := normalize(t, bound)
+		if len(stripCwd) > 0 {
+			dropKey(want, "cwd")
+		}
+		if !reflect.DeepEqual(got, want) {
 			t.Errorf("GET %s differs from the bound service\n got: %s\nwant: %s", path, r.Body, mustJSON(want))
 		}
-		if hasKey(got, "cwd") && len(leaksCwd) == 0 {
+		if hasKey(got, "cwd") {
 			t.Errorf("GET %s leaks a cwd: %s", path, r.Body)
 		}
 	}
@@ -105,7 +109,6 @@ func TestPhoneReadsRealAde(t *testing.T) {
 	sessions, _ := app.W.AdeTask.Sessions(ctx)
 	check("/api/ade/sessions", sessions, true)
 	t.Run("sessions carry no cwd", func(t *testing.T) {
-		t.Skip("P231 finding B-4")
 		var got any
 		p.get("/api/ade/sessions").json(t, &got)
 		if hasKey(got, "cwd") {
