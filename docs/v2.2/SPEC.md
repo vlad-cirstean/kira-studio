@@ -40,6 +40,10 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P242 Part 1 | Automations: rename the Terminal module (user-facing only) to Automations; one shared run outcome (done, failed, blocked, cancelled with source and reason) for every ADE run and every script run; script runs in terminal tabs recorded in a run store with live state and elapsed time, a runs list, Stop, Copy for agent, status bar count; working directory per script (ADE worktree toggle, picked folder, default `<app home>/automations/<id>`, never `$HOME`; legacy rows keep `$HOME` with a notice). Runs after P241 | Todo |
 | P242 Part 2 | Smart scripts: a script kind run as headless Claude (`claude -p`, stream-json log, schema-forced final report), AI badge, declared params (text, select, multi-select, secret) plus ADE variables in Space, run dialog with task/branch popup on ambiguity and a full preview, invocable from Automations, an ADE task or branch, and as a workflow step; same live status and outcome as Part 1; notification and `run_outcome` in Space; Studio without ADE variables | Todo |
 | P242 Part 3 | Recurring scripts: a cron schedule (5 fields, timezone, next 3 fires shown) on a normal or smart script; enable toggle, run now, no overlap by default, concurrency cap, missed runs skipped by default, fires only while the app runs; normal scripts run headless; runs in the same run list with a `scheduled` trigger; notification on failure (Space). `adhocore/gronx` | Todo |
+| P243 Part 1 | Drop the VS Code extension, prep: carry test coverage off the extension and `git.sock` before deleting them. Audit every `internal/gitsock` Go test and every extension webview interaction/layout spec, classify (transport-only, already covered, uncovered), port the uncovered ones to native-stream flow tests and Space `ui` specs; move the graph-chunk golden fixture and the git stream perf tests to the native stream. Nothing deleted. Runs after P242 Part 3 and after Stream A (P236) has landed | Todo |
+| P243 Part 2 | Drop the VS Code extension and the git server it uses: delete `apps/kira-space-vscode`, `internal/gitsock`, `internal/gitvsix`, `GitClientsService`, the Connected editors pane and pairing dialog, `git_clients` (migration), `.vsix` build and packaging, `test:webview`; drop extension-only contract surface (`worktree.prepare*`, host capabilities, `HostKind`, `settings.changed`, `connection.changed`, injected params, socket channel, RPC server, base64 encoding) and the stream allowlist; remove leftover `git.sock` files at startup; pending workflow patches; docs. No restyling (P245) | Todo |
+| P244 | Docker page polish: Terminal tab must not auto-open a session (explicit 'New session' button), fix the overlapping text in the engine dropdown, remove CPU and RAM from the left bar | Todo |
+| P245 | Git module visual alignment: make the git module look exactly like the rest of the app, using only Tailwind and mostly default values (drop `kv:` prefix indirection and custom styles) | Todo |
 
 ### Streams for P236-P239 (user override: 3 concurrent streams)
 
@@ -81,6 +85,9 @@ updates `docs/ARCHITECTURE.md` test counts.
 - P240: very easy, from a task in the ADE plan window, to open a review window.
 - P241: set the base branch of a new task and change it for a started one; base changes stay a button next to the task, no popup, buttons consistent; rebases done by a headless Claude run (it resolves conflicts), prompt shown first as always; the agent reports back to the kira-ade MCP when done or failed, with a reason, shown to me and passable to another agent.
 - P242: smart scripts: on-demand headless Claude scripts that report how they ended; same params as a workflow plus custom envs (input or multi-select of predefined options); used in workflows, from the terminal section and from an ADE task; popup to choose when an interpolated value is ambiguous (2 branches, 2 repos); see it running the whole time, then success or failure with the reason, the same for every headless Claude and every normal script run; AI badge; Studio too, without ADE variables. Added: rename the Terminal section to Automations; recurring scripts on a cron schedule; working directory = ADE workdir when run from ADE (toggle), a picked folder, or by default a new folder under the Kira home, never the home directory.
+- P243: "drop the VS Code extension, and the git server it uses to connect, etc."; make the later git restyle easier where removal allows (record what blocks it). Split into Part 1 (carry coverage) and Part 2 (removal) by the planner: removal deletes about 120 gitsock tests and 62 webview tests whose uncovered cases must move first.
+- P244: Docker page: Terminal tab must not open a session by itself, an explicit New session button instead; engine dropdown text overlaps, fix it; remove CPU and RAM from the left bar.
+- P245: git module must look exactly like the rest of the app, only Tailwind, mostly default values.
 
 ## P210 result
 
@@ -758,5 +765,21 @@ Pending.
 Pending.
 
 ## P242 Part 3 result
+
+Pending.
+
+## P243 Part 1 result
+
+Pending.
+
+## P243 Part 2 result
+
+Pending.
+
+## P244 result
+
+Pending.
+
+## P245 result
 
 Pending.
