@@ -28,7 +28,7 @@ Tests:
 ## Deviations
 
 - Plan case "stacked draft parents": impossible (a draft cannot parent); stack case runs on created branches.
-- Plan case 9 reduced to last-finish-wins; the second-process check is covered by `mcp_test.go`.
+- Plan case 9 reduced to last-finish-wins; the released-config call from a second process is not tested.
 - Timeout case uses `Deps.RebaseTimeout` set by the harness, not an app setting.
 - `golangci-lint` unusable in this container (Go version below its minimum); `gofmt` and `go vet` used.
 - Two bugs found by the flow tests and fixed: worktree missing from `BranchInventory` mid-rebase (broke
