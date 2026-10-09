@@ -164,12 +164,16 @@ func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.
 		return worktreeResult{Path: path, Name: sb.Name, Fresh: true}, nil
 	}
 
+	start, err := b.startPoint(ctx, entry, sb)
+	if err != nil {
+		return worktreeResult{}, err
+	}
 	name, err := b.claimBranchName(sb, title, wanted, inv)
 	if err != nil {
 		return worktreeResult{}, err
 	}
 	path := b.freePath(rec.Name, name)
-	req := gitsession.OpRequest{Kind: "worktreeAdd", Mode: "newBranch", Path: path, Branch: name, StartPoint: b.startPoint(ctx, entry, sb, inv)}
+	req := gitsession.OpRequest{Kind: "worktreeAdd", Mode: "newBranch", Path: path, Branch: name, StartPoint: start}
 	if err := b.addWorktree(ctx, entry, req); err != nil {
 		if rerr := b.deps.Tasks.SetBranchName(sb.ID, ""); rerr != nil {
 			slog.Warn("ade: release branch name", "scope", "ade", "branch", sb.ID, "err", rerr)
@@ -217,27 +221,24 @@ func branchNameErr(err error, name string) error {
 	return err
 }
 
-// startPoint is the ref a new branch starts from: the stored base, else the repo's main. A local
-// branch wins over its remote-tracking twin.
-func (b *TaskBoard) startPoint(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch, inv []porcelain.InventoryRef) string {
-	remote, _ := entry.DefaultRemote(ctx)
-	short := sb.Base
-	var full string
-	if short == "" {
-		ref, _, ok, err := entry.MainRef(ctx)
-		if err != nil || !ok {
-			return ""
-		}
-		short, _ = mainDisplay(ref)
-		full = ref
+// startPoint is the ref a new branch starts from: its resolved base (remote-first), else the repo's
+// main. A base that is not created yet or no longer exists refuses the start.
+func (b *TaskBoard) startPoint(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) (string, error) {
+	sc, err := b.baseCtxFor(ctx, entry, sb.CodeRepoID)
+	if err != nil {
+		return "", err
 	}
-	if row, ok := resolveQueuedRef(inv, short, remote); ok {
-		return row.Ref
+	br := sc.resolveBase(sb)
+	switch br.reason {
+	case baseParentDraft:
+		return "", invalid("base %s is not created yet: start its task first", cmpNonEmpty(sc.byID[sb.BaseBranchID].Name, "branch"))
+	case baseMissing:
+		return "", invalid("base %s no longer exists", br.name)
 	}
-	if full != "" {
-		return full
+	if !br.ok {
+		return "", nil
 	}
-	return short
+	return br.full, nil
 }
 
 func (b *TaskBoard) addWorktree(ctx context.Context, entry *gitsession.RepoEntry, req gitsession.OpRequest) error {

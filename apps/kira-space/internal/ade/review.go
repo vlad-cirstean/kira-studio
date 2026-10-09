@@ -42,21 +42,20 @@ func (b *TaskBoard) reviewSpellings(ctx context.Context, entry *gitsession.RepoE
 		return "", "", invalid("branch %s not found in its repo", sb.Name)
 	}
 	branch = refSpelling(row)
-	if sb.Base != "" {
-		if brow, ok := resolveQueuedRef(inv, sb.Base, remote); ok {
-			return branch, refSpelling(brow), nil
-		}
-		return branch, sb.Base, nil
-	}
-	mainRef, _, hasMain, err := entry.MainRef(ctx)
+	sc, err := b.baseCtxFor(ctx, entry, sb.CodeRepoID)
 	if err != nil {
 		return "", "", err
 	}
-	if !hasMain {
-		return "", "", invalid("the repo has no main branch to review against")
+	br := sc.resolveBase(sb)
+	switch {
+	case br.ok:
+		return branch, br.ref, nil
+	case br.reason == baseMissing:
+		return branch, cmpNonEmpty(sb.Base, br.name), nil
+	case br.reason == baseParentDraft:
+		return "", "", invalid("the base of %s is not created yet", sb.Name)
 	}
-	_, spelling := mainDisplay(mainRef)
-	return branch, spelling, nil
+	return "", "", invalid("the repo has no main branch to review against")
 }
 
 func (b *TaskBoard) reviewTarget(ctx context.Context, tc *taskCtx, sb model.AdeTaskBranch) (adewire.ReviewWindowTarget, error) {

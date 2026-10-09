@@ -146,7 +146,49 @@ func validateCreateTask(a adewire.CreateTaskArgs) error {
 	if len(a.WorkflowID) > adeMaxBranchBytes {
 		return adeTaskInvalid("workflowId is too long")
 	}
+	if len(a.Bases) > adeTaskMaxRepoIDs {
+		return adeTaskInvalid("bases is too long")
+	}
+	for id, c := range a.Bases {
+		if err := validateAdeItemID(id, "bases"); err != nil {
+			return err
+		}
+		if err := validateAdeBaseChoice(c, "bases"); err != nil {
+			return err
+		}
+	}
 	return validateAdeTaskRepoIDs(a.CodeRepoIDs)
+}
+
+// validateAdeBaseChoice checks a base choice: a branch name and a planner branch id, both optional.
+func validateAdeBaseChoice(c adewire.BaseChoice, field string) error {
+	if c.Ref != "" {
+		if err := validateAdeBranchName(c.Ref, field+".ref"); err != nil {
+			return err
+		}
+	}
+	if c.BranchID != "" {
+		return validateAdeItemID(c.BranchID, field+".branchId")
+	}
+	return nil
+}
+
+func validateAdeOnto(a adewire.OntoArgs) error {
+	if err := validateAdeItemID(a.BranchID, "branchId"); err != nil {
+		return err
+	}
+	if a.QueueWith != "" {
+		if err := validateAdeItemID(a.QueueWith, "queueWith"); err != nil {
+			return err
+		}
+		if a.Onto != nil {
+			return adeTaskInvalid("onto and queueWith are mutually exclusive")
+		}
+	}
+	if a.Onto != nil {
+		return validateAdeBaseChoice(*a.Onto, "onto")
+	}
+	return nil
 }
 
 func validateUpdateTask(a adewire.UpdateTaskArgs) error {
@@ -301,8 +343,67 @@ func (s *AdeTaskService) AddTaskRepo(ctx context.Context, args adewire.AddTaskRe
 	if err := validateAdeTaskID(args.CodeRepoID, "codeRepoId"); err != nil {
 		return adewire.Branch{}, err
 	}
+	if args.Base != nil {
+		if err := validateAdeBaseChoice(*args.Base, "base"); err != nil {
+			return adewire.Branch{}, err
+		}
+	}
 	br, err := s.Engine.AddTaskRepo(ctx, args)
 	return br, adeTaskError(err)
+}
+
+// RebasePreview returns the prompt Rebase would send, its stack and what blocks it.
+func (s *AdeTaskService) RebasePreview(ctx context.Context, args adewire.OntoArgs) (adewire.RebasePreview, error) {
+	if err := validateAdeOnto(args); err != nil {
+		return adewire.RebasePreview{}, err
+	}
+	p, err := s.Engine.RebasePreview(ctx, args)
+	return p, adeTaskError(err)
+}
+
+// Rebase starts the background rebase of a branch (and the branches stacked on it).
+func (s *AdeTaskService) Rebase(ctx context.Context, args adewire.RebaseArgs) (adewire.RebaseStart, error) {
+	if err := validateAdeOnto(adewire.OntoArgs{BranchID: args.BranchID, Onto: args.Onto, QueueWith: args.QueueWith}); err != nil {
+		return adewire.RebaseStart{}, err
+	}
+	if len(args.Message) > adeMaxMessageBytes {
+		return adewire.RebaseStart{}, adeTaskInvalid("message is too long")
+	}
+	r, err := s.Engine.Rebase(ctx, args)
+	return r, adeTaskError(err)
+}
+
+// AbortRebase aborts the rebase left in progress in a branch worktree.
+func (s *AdeTaskService) AbortRebase(ctx context.Context, args adewire.BranchArgs) error {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.AbortRebase(ctx, args))
+}
+
+// SetBranchBase sets the base of a branch that is not created yet.
+func (s *AdeTaskService) SetBranchBase(ctx context.Context, args adewire.SetBranchBaseArgs) error {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return err
+	}
+	if err := validateAdeBaseChoice(args.Base, "base"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.SetBranchBase(ctx, args))
+}
+
+// RepoBranches lists the bases the picker offers for a repo.
+func (s *AdeTaskService) RepoBranches(ctx context.Context, args adewire.RepoBranchesArgs) (adewire.RepoBranches, error) {
+	if err := validateAdeItemID(args.CodeRepoID, "codeRepoId"); err != nil {
+		return adewire.RepoBranches{}, err
+	}
+	if args.BranchID != "" {
+		if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+			return adewire.RepoBranches{}, err
+		}
+	}
+	r, err := s.Engine.RepoBranches(ctx, args)
+	return r, adeTaskError(err)
 }
 
 func (s *AdeTaskService) AddExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs) (adewire.AddExistingBranchResult, error) {

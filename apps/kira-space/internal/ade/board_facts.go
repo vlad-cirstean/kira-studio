@@ -30,6 +30,7 @@ type repoResult struct {
 func zeroBranch(sb model.AdeTaskBranch, base string, setup *adewire.WorktreeSetup) adewire.Branch {
 	return adewire.Branch{
 		ID: sb.ID, TaskID: sb.TaskID, CodeRepoID: sb.CodeRepoID, Name: sb.Name, Kind: sb.Kind, Base: base,
+		BaseBranchID: sb.BaseBranchID, BasePendingFrom: sb.BasePendingFrom,
 		Setup: setup, Integration: []adewire.Integration{}, Deployments: []adewire.Deployment{},
 		ConflictsIfRebased: []string{}, ConflictCheck: conflictDone, Files: []adewire.FileChange{},
 		Commits: []adewire.Commit{}, Dirty: []adewire.DirtyEntry{}, AddedAt: sb.AddedAt, Origin: sb.Origin,
@@ -48,12 +49,15 @@ type boardCtx struct {
 	userEmail string
 	remote    string
 	mainName  string
+	mainRef   string
+	mainFull  string
 	mainTip   string
 	hasMain   bool
 	caches    *repoCaches
 	nowMs     int64
 	resolved  map[string]resolvedRef // branch id -> resolved ref
 	byName    map[string]model.AdeTaskBranch
+	byID      map[string]model.AdeTaskBranch
 	// P145 facts: configured integration targets and environments, the stored marks and env states.
 	targets  []string
 	envs     []model.AdeRepoEnv
@@ -69,38 +73,68 @@ func (sc *boardCtx) ownerOf(row porcelain.InventoryRef) string {
 	return row.AuthorName
 }
 
-// baseRef is a branch's resolved latest base.
+// baseReason says why a base did not resolve.
+type baseReason string
+
+const (
+	baseParentDraft baseReason = "parentDraft"
+	baseMissing     baseReason = "baseMissing"
+)
+
+// baseRef is a branch's resolved latest base. ref is the spelling git takes (a short local name, or
+// <remote>/<short>); row is its inventory row, empty for main.
 type baseRef struct {
 	tip      string
 	branchID string
 	owner    string
+	name     string
+	ref      string
+	full     string
+	row      porcelain.InventoryRef
 	ok       bool
+	reason   baseReason
 }
 
-// resolveBase: main for ” or the main short name; another live planner branch of the repo; else
-// the default remote's branch, else the local one.
+// resolveBase is the one base rule (P241): a live planner parent by id, main for ” or the main
+// short name, another live planner branch of the repo by name, else the default remote's branch,
+// else the local one.
 func (sc *boardCtx) resolveBase(sb model.AdeTaskBranch) baseRef {
+	if sb.BaseBranchID != "" {
+		if other, ok := sc.byID[sb.BaseBranchID]; ok && other.ID != sb.ID {
+			if other.Name == "" {
+				return baseRef{reason: baseParentDraft}
+			}
+			if br, ok := sc.plannerRef(other); ok {
+				return br
+			}
+			return baseRef{name: other.Name, reason: baseMissing}
+		}
+	}
 	if sb.Base == "" || sb.Base == sc.mainName {
-		return baseRef{tip: sc.mainTip, ok: sc.hasMain}
+		return baseRef{tip: sc.mainTip, name: sc.mainName, ref: sc.mainRef, full: sc.mainFull, ok: sc.hasMain}
 	}
 	if other, ok := sc.byName[sb.Base]; ok && other.ID != sb.ID {
-		if rr := sc.resolved[other.ID]; rr.found {
-			owner := ""
-			if other.Kind != model.AdeBranchKindMine {
-				owner = sc.ownerOf(rr.row)
-			}
-			return baseRef{tip: rr.row.Tip, branchID: other.ID, owner: owner, ok: true}
+		if br, ok := sc.plannerRef(other); ok {
+			return br
 		}
 	}
-	if row, ok := findRemoteRow(sc.inv, sc.remote, sb.Base); ok && sc.remote != "" {
-		return baseRef{tip: row.Tip, owner: sc.ownerOf(row), ok: true}
+	if row, ok := resolveBaseRow(sc.inv, sb.Base, sc.remote); ok {
+		return baseRef{tip: row.Tip, owner: sc.ownerOf(row), name: sb.Base, ref: refSpelling(row), full: row.Ref, row: row, ok: true}
 	}
-	for _, r := range sc.inv {
-		if r.Remote == "" && r.Short == sb.Base {
-			return baseRef{tip: r.Tip, owner: sc.ownerOf(r), ok: true}
-		}
+	return baseRef{name: sb.Base, reason: baseMissing}
+}
+
+// plannerRef resolves another planner branch by its own name (local first).
+func (sc *boardCtx) plannerRef(other model.AdeTaskBranch) (baseRef, bool) {
+	row, found := resolveQueuedRef(sc.inv, other.Name, sc.remote)
+	if !found {
+		return baseRef{}, false
 	}
-	return baseRef{}
+	owner := ""
+	if other.Kind != model.AdeBranchKindMine {
+		owner = sc.ownerOf(row)
+	}
+	return baseRef{tip: row.Tip, branchID: other.ID, owner: owner, name: other.Name, ref: refSpelling(row), full: row.Ref, row: row, ok: true}, true
 }
 
 type branchOut struct {
@@ -165,16 +199,18 @@ func (b *TaskBoard) collectRepo(ctx context.Context, entry *gitsession.RepoEntry
 	sc := &boardCtx{
 		entry: entry, repoID: codeRepoID, inv: inv, userEmail: userEmail, remote: remote, mainTip: mainTip,
 		hasMain: hasMain, caches: caches, nowMs: b.deps.Now().UnixMilli(),
-		resolved: map[string]resolvedRef{}, byName: map[string]model.AdeTaskBranch{},
+		resolved: map[string]resolvedRef{}, byName: map[string]model.AdeTaskBranch{}, byID: map[string]model.AdeTaskBranch{},
 	}
 	if hasMain {
-		sc.mainName, _ = mainDisplay(mainRefName)
+		sc.mainName, sc.mainRef = mainDisplay(mainRefName)
+		sc.mainFull = mainRefName
 	}
 	res.state.MainName = sc.mainName
 	if err := b.loadFacts(sc, branches); err != nil {
 		return err
 	}
 	for _, sb := range branches {
+		sc.byID[sb.ID] = sb
 		if sb.Name == "" {
 			continue
 		}
@@ -268,6 +304,10 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 
 	base := sc.resolveBase(sb)
 	wb.BaseBranchID, wb.BaseOwner = base.branchID, base.owner
+	wb.BaseMissing = base.reason == baseMissing
+	if base.name != "" {
+		baseName, wb.Base = base.name, base.name
+	}
 	var files []porcelain.FileChange
 	if base.ok {
 		rf, err := rangeFacts(ctx, sc.entry, sc.caches, base.tip, row.Tip)
@@ -293,6 +333,7 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 		for _, d := range toDirtyEntries(status) {
 			wb.Dirty = append(wb.Dirty, adewire.DirtyEntry{Code: d.Code, Path: d.Path})
 		}
+		wb.RebaseInProgress = sc.entry.WorktreeInProgress(wb.Worktree, status) != nil
 	}
 
 	if sb.Kind == model.AdeBranchKindMine && base.ok {
@@ -318,6 +359,8 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 	}
 	switch {
 	case wb.MergedIntoMain:
+	case base.reason == baseParentDraft:
+		wb.ConflictCheck, wb.ConflictCheckReason = conflictFailed, "base branch is not created yet"
 	case !base.ok:
 		wb.ConflictCheck, wb.ConflictCheckReason = conflictFailed, fmt.Sprintf("base %s not found", baseName)
 	default:
@@ -352,7 +395,7 @@ func (sc *boardCtx) mainDepth(ctx context.Context, sb model.AdeTaskBranch, row p
 	if !sc.hasMain {
 		return 0, nil
 	}
-	if sb.Base == "" || sb.Base == sc.mainName {
+	if sb.BaseBranchID == "" && (sb.Base == "" || sb.Base == sc.mainName) {
 		return baseAhead, nil
 	}
 	ahead, _, err := sc.entry.AheadBehind(ctx, row.Tip, sc.mainTip)

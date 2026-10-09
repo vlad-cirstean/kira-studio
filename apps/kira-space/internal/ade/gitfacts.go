@@ -129,6 +129,22 @@ type resolvedRef struct {
 	found bool
 }
 
+// resolveBaseRow is the identity rule for a base named by a short ref: the default remote's branch
+// when it exists, else the local one (a base is what the team shares, not a stale local twin).
+func resolveBaseRow(inventory []porcelain.InventoryRef, short, defaultRemote string) (porcelain.InventoryRef, bool) {
+	if defaultRemote != "" {
+		if row, ok := findRemoteRow(inventory, defaultRemote, short); ok {
+			return row, true
+		}
+	}
+	for _, r := range inventory {
+		if r.Remote == "" && r.Short == short {
+			return r, true
+		}
+	}
+	return porcelain.InventoryRef{}, false
+}
+
 // mainDisplay is the short-form split of MainRef's full refname:
 // `refs/heads/X` -> name X, ref X (a local-only main); `refs/remotes/<r>/X` -> name X, ref
 // `<r>/X` (a remote-tracking main, the common case); only this display pair is shortened. A refname this doesn't recognize (never

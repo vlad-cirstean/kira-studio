@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -122,7 +123,7 @@ func jiraFields(j *adewire.Jira) (key, url string) {
 // --- tasks -------------------------------------------------------------------------------------
 
 // CreateTask creates a task with one not-created branch per repo, appended to the plan as Later.
-func (b *TaskBoard) CreateTask(_ context.Context, args adewire.CreateTaskArgs) (adewire.Task, error) {
+func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs) (adewire.Task, error) {
 	jiraKey, jiraURL := jiraFields(args.Jira)
 	title := strings.TrimSpace(args.Title)
 	if title == "" && jiraKey == "" {
@@ -152,11 +153,20 @@ func (b *TaskBoard) CreateTask(_ context.Context, args adewire.CreateTaskArgs) (
 			return adewire.Task{}, err
 		}
 	}
+	for id := range args.Bases {
+		if !slices.Contains(args.CodeRepoIDs, id) {
+			return adewire.Task{}, invalid("bases: repo %s is not on the task", id)
+		}
+	}
 	branches := make([]model.AdeTaskBranch, len(args.CodeRepoIDs))
 	for i, repoID := range args.CodeRepoIDs {
+		base, baseBranchID, err := b.storedBase(ctx, repoID, b.repoNickOf(repoID), args.Bases[repoID])
+		if err != nil {
+			return adewire.Task{}, err
+		}
 		branches[i] = model.AdeTaskBranch{
 			ID: b.newID(), TaskID: task.ID, CodeRepoID: repoID, Kind: model.AdeBranchKindMine,
-			Position: i, AddedAt: task.CreatedAt,
+			Position: i, AddedAt: task.CreatedAt, Base: base, BaseBranchID: baseBranchID,
 		}
 	}
 	stored, err := b.deps.Tasks.CreateTask(task, branches)
@@ -198,15 +208,22 @@ func (b *TaskBoard) AddTaskRepo(ctx context.Context, args adewire.AddTaskRepoArg
 	if err := b.requireRepos([]string{args.CodeRepoID}); err != nil {
 		return adewire.Branch{}, err
 	}
+	var base, baseBranchID string
+	if args.Base != nil {
+		var err error
+		if base, baseBranchID, err = b.storedBase(ctx, args.CodeRepoID, b.repoNickOf(args.CodeRepoID), *args.Base); err != nil {
+			return adewire.Branch{}, err
+		}
+	}
 	sb, err := b.deps.Tasks.AddBranch(model.AdeTaskBranch{
 		ID: b.newID(), TaskID: args.TaskID, CodeRepoID: args.CodeRepoID, Kind: model.AdeBranchKindMine,
-		AddedAt: b.deps.Now().UnixMilli(),
+		AddedAt: b.deps.Now().UnixMilli(), Base: base, BaseBranchID: baseBranchID,
 	})
 	if err != nil {
 		return adewire.Branch{}, err
 	}
 	b.notifyBoard()
-	return zeroBranch(sb, b.mainShortName(ctx, sb.CodeRepoID), nil), nil
+	return zeroBranch(sb, cmpNonEmpty(sb.Base, b.mainShortName(ctx, sb.CodeRepoID)), nil), nil
 }
 
 // CandidateBranches lists, per code repo, local and remote-only branches that are not on a live
@@ -629,8 +646,8 @@ func (b *TaskBoard) Repos(_ context.Context) (adewire.ReposResult, error) {
 	return out, nil
 }
 
-// queueCycle reports whether walking parents from start reaches selfID. The Plan orders a branch
-// by its queue link, else by the live branch of its repo that its base names (resolveBase).
+// queueCycle reports whether walking parents from start reaches selfID. A branch's parent is its
+// base branch, else its queue link, else the live branch of its repo that its base names.
 func queueCycle(byID map[string]model.AdeTaskBranch, selfID string, start model.AdeTaskBranch) bool {
 	byName := make(map[[2]string]string, len(byID))
 	for _, br := range byID {
@@ -640,7 +657,10 @@ func queueCycle(byID map[string]model.AdeTaskBranch, selfID string, start model.
 	}
 	cur := start
 	for range len(byID) + 1 {
-		parent := cur.QueuedAfter
+		parent := cur.BaseBranchID
+		if parent == "" {
+			parent = cur.QueuedAfter
+		}
 		if parent == "" && cur.Base != "" {
 			parent = byName[[2]string{cur.CodeRepoID, cur.Base}]
 		}
