@@ -3951,7 +3951,10 @@ and `docs/v2.0/plans/`.
 
 - Board facts per repo run on `ade-board`: branch inventory, ahead/behind against the base, files,
   commits, dirty state, caches keyed by tip pairs. Refresh fetches the default remote, then derives
-  again through the same path; autofetch interval is a setting.
+  again through the same path; without a remote it rescans locally and the chip reads `no remote`.
+  Autofetch interval is a setting. The board opens repos with `GitStatus().Path` (discovery), never
+  the raw `git.gitPath` setting (`""` by default); non-ok git fails the open with
+  `ade: git is unavailable`. `lastFetchAt` is the mtime of the worktree git dir's `FETCH_HEAD`.
 - Conflict pairs and the rebase-conflict check use `git merge-tree --write-tree` (git >= 2.38, enforced
   by `gitclient.Discovery`; older git reports `failed`). It touches no worktree, index, HEAD or ref, so
   it is safe beside running agents. Pairs are computed only for a mine branch against a mine or review one, neither parked nor merged, neither an ancestor of the other, with intersecting changed-file sets.
@@ -4023,7 +4026,8 @@ and `docs/v2.0/plans/`.
   name, then id; errors come back as actionable `ToolError` text. Branches and repos the agent added
   carry `origin = 'agent'` and show an `agent` chip.
 - Git refresh (P191): the UI sends the explicit repo ids it shows; `refreshRepo` runs env scripts
-  beside the fetch, not before it; `AdeReviewSync` shows a per-repo fetch error row.
+  beside the fetch, not before it; `AdeReviewSync` shows a per-repo fetch error row. A repo with no
+  remote gets a local rescan (P230), not an error row.
 
 ### Interactive sessions
 

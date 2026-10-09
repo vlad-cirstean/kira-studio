@@ -25,7 +25,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P227 | Code review (one Opus round, all three dimensions) of everything changed since the last review close-out `7f626e91a` (P218 to P226), then one Sonnet fixer. Findings file `plans/P227-findings.md` committed before the fixer, deleted once fixed. Also fix the stale Studio visual baselines (all 12 fail on base). | Done |
 | P228 | Git graph still broken after P225; user suspects resizing columns breaks it. Reproduce with real column resizes (every column, drag then scroll, click, Load more), find root cause, fix, add regression spec that resizes columns first. | Done |
 | P229 | Git section (graph, toolbar, detail, stash and other git panes) looks different from the rest of the app: bring it in line with the app's shadcn-vue/Tailwind look (spacing, type, colours, controls, rows). Includes the git UI inside Kira Space. | Planned |
-| P230 | Agent module Refresh broken: shows 'never fetched' then a git error. Find root cause, fix, add regression spec. | Planned |
+| P230 | Agent module Refresh broken: shows 'never fetched' then a git error. Find root cause, fix, add regression spec. | Done |
 | P231 | Real-flow tests for every main flow of Kira Space, split at the IPC (bridge) level: Go-side tests drive the bound services against real `git` and real temporary git repos (no mocked git, default settings), TS-side tests drive the frontend against the real bridge contract. Covers all modules (git, agents/ADE, memory, terminal, API/quick commands, repos, settings, mobile web). Two parallel streams (A, B) with disjoint file ownership. Then fix every issue the tests find. | Planned |
 
 ## Requirements (user's words, condensed)
@@ -543,3 +543,40 @@ Review: 3 Medium, 9 Low, no High (base `7f626e91a`). All fixed; none declined. F
 Checks: lint, lint:dead, typecheck clean; `test:unit` 1812 pass; Go `mobileweb`, `mobileterm`,
 `lannet`, `bridge` pass (`-race` on the first two); `test:visual:studio` 13 pass, `test:visual:space` 5
 pass; full Space UI suite 248 pass, 0 fail.
+
+## P230 result
+
+Root causes:
+
+- C1: board opened repos with the raw `git.gitPath` setting (`""` by default), so `exec.Command("")`
+  failed every open. Board read fell back (chip `never fetched`); Refresh returned
+  `Unknown: git rev-parse --is-bare-repository failed (unknown): exec: no command`. Every ADE test
+  harness set `GitPath` to `git`, so none caught it. Fix: open with `GitStatus().Path`; `TaskBoardDeps.GitPath` deleted.
+- C2: no remote returned a `NoRemote` error row. Fix: skip only the fetch; rest of the refresh runs; chip reads `no remote`.
+- C3: `lastFetchAt` stat'ed the common dir's `FETCH_HEAD`; git writes it per worktree. Fix: `Summary.GitDir`.
+- F4: `repoFacts` sets `remote` and `lastFetchAt` before `collectRepo`, so a later failure cannot read as `never fetched`.
+
+Pre-fix failures (test commit `e4d08c490` alone):
+
+- G1: `board repo remote="" lastFetchAt=<nil>, want origin and a fetch time` (log: `exec: no command`)
+- G2: `row error = {Kind:NoRemote Message:this repository has no remote configured}, want none`
+- G3: `lastFetchAt is nil after a refresh of a linked worktree root`
+- U1: `Expected: "no remote"`, `Received: "never fetched"`
+
+Deviations:
+
+- `TestTaskBoard_notCreatedAndTooOldGit` was not cached before `tooOld` as the plan assumed (first
+  board call came after the status switch); it now warms the cache with `openRepo` first.
+- G1 after F1 sets `GitStatus` to the absolute `exec.LookPath("git")` instead of the `GitPath` override.
+- D1-D4 taken as default.
+
+Checks: typecheck, lint, lint:go, lint:dead clean; `go test ./apps/kira-space/...` pass; `ade-v2-` UI
+specs pass; full Space UI suite 248 pass, 1 fail under load (`ade-v2-panel` handle-drag width; passes 3 of 3 alone with `--workers=1`; unrelated).
+
+Mac handover:
+
+1. Settings > Git > Git executable path empty. Agents > Plan: chips show a time (`5m ago`), not `never fetched`, for any fetched repo.
+2. `Refresh all`: `fetching…`, then `<n> refs changed` or `no changes`; no red text; no `exec: no command` in the console log.
+3. Repo with no remote: chip reads `no remote`; `↻` tip reads `Rescan … (no remote to fetch)`; click: `no remote · no changes`, not red.
+4. Repo with a bad remote URL: red classified message stays.
+5. Set Git executable path to a real git (`/opt/homebrew/bin/git`), relaunch, `Refresh all`: same as step 2.
