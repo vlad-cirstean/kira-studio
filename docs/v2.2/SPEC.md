@@ -29,7 +29,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P231 | Real-flow tests for every main flow of Kira Space, split at the IPC (bridge) level: Go-side tests drive the bound services against real `git` and real temporary git repos (no mocked git, default settings), TS-side tests drive the frontend against the real bridge contract. Covers all modules (git, agents/ADE, memory, terminal, API/quick commands, repos, settings, mobile web). Two parallel streams (A, B) with disjoint file ownership. Then fix every issue the tests find. | Done |
 | P232 | Real-flow tests for Kira Studio, same type as P231 (Go bound-service tests at the IPC level against real git/real services with default settings, plus real-UI `e2e-real` specs): API module (requests, collections, variables/environments, quick commands, gRPC), Docker module, with real API calls over HTTP and gRPC (real local HTTP servers and a real gRPC server with reflection and `.proto` descriptors, no mocked transport) and real Docker commands against a real Docker daemon (containers, images, volumes, networks, logs, exec), skipping with a clear message when no daemon is reachable, and Studio's own terminal wiring (`bridge/terminal.go`, terminal module host, Studio quick commands). Reuses P231's harness patterns; then fix every issue found. | Planned (Commit 0 done: appwire, flowtest, flowharness, e2e-real servers) |
 | P233 | Claude Code hooks only for sessions Kira Space starts: audit every place Kira Space or Kira Studio changes the user's real Claude Code configuration (`~/.claude/settings.json`, project `.claude/settings.json`, `.claude.json`, MCP registration, hooks), and move each to per-session injection (e.g. `--settings <file>` / `--mcp-config` passed only when Kira Space launches the agent or terminal session, hook shim scoped by an env var set only there). Kira Space must make no change to the user's actual settings files; migrate or remove entries earlier versions wrote, with an explicit user-visible cleanup step. Real-flow test that proves settings.json is byte-identical after the flows. | Done |
-| P234 | Docs refresh: update `docs/ARCHITECTURE.md` (incl. Parallelism, process wiring with `appwire`, stale git-pairing-real line, testing section), `docs/DEV_ENVIRONMENT.md`, the v2.2 README and root `README.md` to match everything shipped in v2.2 (P210-P233). | Planned |
+| P234 | Docs refresh: update `docs/ARCHITECTURE.md` (incl. Parallelism, process wiring with `appwire`, stale git-pairing-real line, testing section), `docs/DEV_ENVIRONMENT.md`, the v2.2 README and root `README.md` to match everything shipped in v2.2 (P210-P233). | Done |
 | P235 | Code review (one Opus round, all three dimensions) of everything changed since the P227 close-out `605f63e3f` (P228-P234), then one Sonnet fixer. Findings file `plans/P235-findings.md` committed before the fixer, deleted once fixed. | Planned |
 
 ## Requirements (user's words, condensed)
@@ -153,7 +153,7 @@ agents web (P212, Kira Space)".
   endpoint is one row. No terminal/PTY attach.
 - Landed: generic `internal/pairing` and `internal/embedded`, `appevent.Tap`, `mobileweb` server with
   local CA, migration 0021, desktop Mobile access pane and pairing dialog, transport-agnostic ADE
-  reader, second Vite build, installable PWA, Playwright mobile projects.
+  reader, second Vite build, installable PWA, Playwright mobile projects (PWA and local CA removed in P223).
 - Verified: Go race tests on the touched packages, `bun run test:ui:space` (221 pass),
   `test:ui:space-mobile` (iOS WebKit and Pixel Chromium emulation), lint, golangci-lint, knip,
   typecheck. Not verified: a real phone (CA install, installed PWA, WebKit offline shell).
@@ -431,13 +431,8 @@ more; `lanes.test.ts` covered straight-then-converge only.
 
 Specs: `repo-graph-paging.spec.ts` (2000 commits, 500-row chunks, two 1000-row pages, Load more; checks
 clipped nodes and stacked runs per visible row) and a `lanes.test.ts` case (one pass and paged).
-Pre-fix failures, same tree minus the fixes:
-- clipped: `row 1001: cx 43.5`, `row 1002: cx 56.5`, `row 1003: cx 69.5`, `row 1004: cx 82.5`,
-  then lanes 1 to 3 again at rows 1052-1054 and every 50 rows after (column 43px; fan rows need 6).
-- stacked: `row 6: runs 17.5 nodes 17.5`, `row 7: ...`, repeating every 10 rows (second-parent line
-  drawn over the node lane).
-- `lanes.test.ts`: `SyntaxError: Export named 'EDGE_RUN_LANE' not found`. Scratch check on the old
-  layout: edge `5->8` of the same shape is `fromLane 0, toLane 0`.
+Pre-fix failures: clipped nodes from `row 1001: cx 43.5` (column 43px, fan rows need 6); stacked runs
+every 10 rows (`row 6: runs 17.5 nodes 17.5`); `lanes.test.ts` edge `5->8` was `fromLane 0, toLane 0`.
 
 Deviation from the plan: the first lane-aware width may shrink the column (from the 95px default to
 the lane width, as P220 did); only later steps are grow-only. Plan D2 as written would have kept 95px
@@ -449,14 +444,7 @@ accepted by P203. If this is the "commits disappear" the user saw, it needs its 
 changed: `UncommittedChangesStrip` sizes its graph cell from `columnWidths.graph` (default 95), so it
 can misalign with an auto-sized column (since P92).
 
-Mac handover, on a never-opened repo with 5000+ commits and many branches:
-1. Scroll past the first few hundred commits; outer-lane commits keep their dots.
-2. Find a "Merge branch 'main' into ..." commit; its second-parent line runs in its own lane to the
-   main commit, not over the feature line.
-3. Click Load more; lines above stay put, new commits show dots.
-4. Drag the graph column narrower, Load more again; the column keeps the dragged width.
-5. Load more, then Refresh or fetch; the list drops to one page (existing re-walk). Ask whether
-   "commits disappear" meant this.
+Superseded by P228's handover; step 5 fixed in P231 A1.
 
 Checks: typecheck, lint, lint:dead clean; `test:unit` 1812 pass; `repo-graph-*` specs (11) pass; full
 Space UI suite 246 pass, 0 fail; `test:webview` 64 pass (the webview renders the same `rowSvg.ts`).
@@ -488,8 +476,7 @@ unchanged and still has no row.
 Specs: R1 and R2 in `repo-graph-paging.spec.ts` (resize, wheel, click, window shrink, Load more).
 Pre-fix failures, WebKit, same tree minus the fixes:
 - R1: `scrollWidth 1355 > clientWidth 1148` after dragging graph, author and date +300 each.
-- R2: 61 clipped entries: `row 1001: cx 43.5`, `row 1002: cx 56.5`, `row 1003: cx 69.5`,
-  `row 1004: cx 82.5`, `row 1052: cx 43.5`, `row 1053: cx 56.5`, `row 1054: cx 69.5`, `row 1102: cx 43.5`.
+- R2: 61 clipped entries, first `row 1001: cx 43.5`, then every 50 rows.
 `columnFit.test.ts` covers shrink order, minimums, compact, auto vs user graph width, drag maximums.
 
 Deviations from the plan: `fitColumns` takes `graphAuto` as already combined with "lane floor known"
@@ -680,3 +667,9 @@ dropped per user instruction.
 Mac handover: run a Kira Space agent session, then `ps` shows `--settings` only (no `--mcp-config`);
 a plain `claude` in a terminal shows no Kira hooks; `shasum ~/.claude/settings.json` unchanged
 after using the app.
+
+## P234 result
+
+Done. Fixed per file: `docs/ARCHITECTURE.md` (A1-A26: `appwire` composition roots and `main.go` pointers, Bound counts 27 and 20, migrations to 0025, P227 and P231 facts, Testing tiers incl. P232 Commit 0, recounts, open items), `docs/DEV_ENVIRONMENT.md` (D1-D6), root `README.md` (R1-R7), `apps/kira-space/README.md` (S1-S7), `docs/v2.2/README.md`, `CLAUDE.md` (C1, C2); SPEC P212, P225, P228 results condensed.
+Checks: scratch path and script checker 38 misses left (4 real ones fixed), all on lines naming a deleted, renamed or build-output thing or the `docs/pending-*` workaround; stale-phrase grep 0 hits; counts 27, 20, 0025, 349 UI tests in 58 files, 7 e2e-real tests in 5 files, visual 13 Studio (8 specs) and 8 Space; `bun run lint`, `bun run lint:dead` clean.
+Deviations: none from the plan; DD1-DD7 took the first option. P232 sections untouched: P232 Stream B and its fixer append test contents beside the new Studio flow tier paragraph and DEV_ENVIRONMENT section.

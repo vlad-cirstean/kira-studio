@@ -1579,7 +1579,7 @@ resolved (P12 D17) — this is an audit, not a restructuring.**
 |---|---|
 | `internal/bridge` is one Go package holding both modules' services | Accepted. Already one file per service, and the six Api files import nothing from the thirteen Studio ones — splitting the package would rewrite every bound method's FQN (`apps/kira-studio/tests/ui/support/mockRuntime.ts`'s own `BRIDGE_PKG` plus its 136 `FQN_SUFFIX_BY_IPC_KEY` entries) for no compile-time boundary Go's own `internal/` visibility rule doesn't already give |
 | `appcore.Deps` carries Studio's `Connections`/`Tree`/`Router` into Api services, and Api's `ApiVars` into Studio's (`ConnectionsService`) | Accepted, documented. One struct embedded by value into twenty-one bound services (`grep -rl 'Deps appcore.Deps' apps/kira-studio/internal/bridge \| wc -l`, re-measured at P127 — `AgentHooksService` was one of them); a standalone Api app needs only `Deps{DB, Repos, ApiVars, Events}` from it |
-| `internal/storage/{model,repos}` carries both modules' tables and imports `httpclient`/`postman` (`model.ResponseHistorySnapshot` embeds `httpclient.Response` by value; `repos.CollectionsRepo` speaks `postman.Tree`/`postman.Item`) | **The real blocker, named.** Splitting it is a five-constructor, every-repo-test change for zero behaviour delta — worth doing only once a second host genuinely exists. The shape, so it need not be rediscovered: `model/{collections,variables,grpc,responsehistory}.go` and `repos/{collections,variables,response_history,grpc_history}.go` move to an `internal/apistore` package; `repos.Repos` keeps its four Api fields as an embedded `*apistore.Repos`; `postman` imports `apistore` instead of `model`, and `model` stops importing `httpclient` |
+| `apps/kira-studio/internal/storage/{model,repos}` carries both modules' tables and imports `httpclient`/`postman` (`model.ResponseHistorySnapshot` embeds `httpclient.Response` by value; `repos.CollectionsRepo` speaks `postman.Tree`/`postman.Item`) | **The real blocker, named.** Splitting it is a five-constructor, every-repo-test change for zero behaviour delta — worth doing only once a second host genuinely exists. The shape, so it need not be rediscovered: `model/{collections,variables,grpc,responsehistory}.go` and `repos/{collections,variables,response_history,grpc_history}.go` move to a new `apistore` package (not created); `repos.Repos` keeps its four Api fields as an embedded `*apistore.Repos`; `postman` imports `apistore` instead of `model`, and `model` stops importing `httpclient` |
 | `adapterhost.Host.RunOp` is the Api module's op scheduler | Accepted **by design**, not neglect — one op log beats a second dead ring on every request tab or a second `useRunState`/ops store, and both `bridge/http.go` and `bridge/grpc.go` pass `ConnectionID: nil` into the same scheduler every DB adapter uses |
 | `ConnectionsService.SecretsStatus` is the Api module's only call into a Studio service (`api/VariableSetView.vue`'s own OS-keychain check) | Accepted, documented. It reports a *process-wide platform fact*, not a connection fact, and lives on `ConnectionsService` only because Studio's connections needed it first; the honest fix is a `SecretsService` of its own — a new bound method, out of scope for a phase whose row forbids adding one |
 
@@ -1632,13 +1632,13 @@ proposed, is declined with a reason.**
 `api/ApiDialogs.vue` mounts the module's six dialogs, each still gated by its own store's `open`
 flag exactly as before — a template-only wrapper, not a behaviour change.
 
-**`packages/api-ui` still does not exist, but the P12-era shared-UI extraction it was waiting on
+**No `api-ui` package exists, but the P12-era shared-UI extraction it was waiting on
 has since happened, just not as a standalone Api package.** At P12, the module mounted 43
 hand-rolled-primitive imports across eleven distinct Vue components, plus `CodiconIcon`,
 `editor/CodeMirrorHost.vue` (deleted at P60b, replaced by `editor/MonacoHost.vue`) and
 `editor/theme` (also gone — Monaco's own theme lives in `packages/workbench/src/editor/
 monacoTheme.ts` now). P98/P104/P110 extracted the shared UI these hand-rolled primitives needed
-into three real packages instead of the one `packages/ui-kit` this paragraph used to propose:
+into three real packages instead of the one `ui-kit` package this paragraph used to propose:
 `packages/theme` (shadcn-vue `components/ui/*`, Tailwind tokens, `CodiconIcon`), `packages/workbench`
 (the shell components, Pinia store factories, the editor bootstrap, test harnesses — see the Stack
 table's frontend-library-baseline row) and `packages/kira-ui` (originally the git-side `Kui*`
@@ -1646,7 +1646,7 @@ primitives; P131 reduced it to `KuiColumnResizeHandle` plus a floating-positioni
 the package-table row below). The
 Api module's own UI (`ApiDialogs.vue`, the request/response views, `api/state/`) stays inside
 `apps/kira-studio/frontend/src/api/` because only Kira Studio hosts an Api module at all — there is
-no second app to extract a shared `packages/api-ui` for.
+no second app to extract a shared `api-ui` package for.
 
 **An HTTP request body is one of five modes; there is no GraphQL mode.** `packages/shared/domain/
 http.ts`'s `httpBodyModeSchema` — `'none' | 'raw' | 'code' | 'urlencoded' | 'formdata' | 'file'` —
@@ -4333,7 +4333,7 @@ replies and full terminal attach for Claude Code sessions.
   by the app and every `memory-mcp` process. MCP never downloads.
 - Embedding runtime: `internal/memory/embed` (leaf package). ONNX Runtime 1.29.1 through
   `yalue/onnxruntime_go` (cgo, `dlopen`), WordPiece through `gomlx/go-huggingface` `hftokenizer`. It
-  runs in a worker subprocess, `<Kira Space executable> memory-embed --model-dir …` (`runArgvShim`),
+  runs in a worker subprocess, `<Kira Space executable> memory-embed --model-dir …` (`appwire.RunArgvShim`),
   spawned lazily by whichever process needs vectors and speaking NDJSON on stdin/stdout (batches of at
   most 32; `embed.Client`). The worker exits when its stdin closes: after 5 min idle (so the OS reclaims
   the model, which an in-process `Session.Destroy` does not) and whenever the parent dies. A crash or
