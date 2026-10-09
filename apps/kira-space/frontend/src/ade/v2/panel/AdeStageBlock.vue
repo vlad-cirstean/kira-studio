@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
@@ -11,7 +12,8 @@ import type { StepRun } from '../board/progress';
 import { WAITING_SETUP_NOTES } from '../board/setupGate';
 import { nextStageId, type StageBlock } from '../board/stageBlocks';
 import type { CardModel } from '../plan/usePlanModel';
-import { useApprove, useOpenReviewWindow, useRetryRun, useSetTaskStage } from '../queries';
+import { useApprove, useRetryRun, useSetTaskStage } from '../queries';
+import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS, TONE_TEXT_CLASS } from '../tones';
@@ -27,7 +29,7 @@ const approve = useApprove();
 const retry = useRetryRun();
 const setStage = useSetTaskStage();
 const contextMenu = useContextMenuStore();
-const openReview = useOpenReviewWindow();
+const reviewCode = useReviewCode();
 
 const error = ref('');
 const openLog = ref<string | null>(null);
@@ -122,11 +124,14 @@ const released = computed(() =>
 const reviewRows = computed(() =>
   props.block.stage.id === 'review' ? props.card.rows.filter((r) => r.branch.kind === 'mine') : [],
 );
-const onReview = (branchId: string): void =>
-  openReview.mutate(
-    { branchId },
-    { onError: (err) => (error.value = err instanceof Error ? err.message : String(err)) },
-  );
+const reviewOff = (row: CardModel['rows'][number]): boolean => {
+  const c = reviewCode.choiceOf(row);
+  return reviewCode.pending.value || !c || c.disabled;
+};
+const onReview = (branchId: string): void => {
+  error.value = '';
+  reviewCode.open(props.card.task.id, branchId, null, { onError: (msg) => (error.value = msg) });
+};
 const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 'text-tone-amber' : 'text-muted-foreground');
 </script>
 
@@ -275,17 +280,19 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
     >
       <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
       <span class="min-w-0 flex-1 truncate font-data text-kira-md">{{ row.name }}</span>
-      <AdeTip :text="row.branch.name === '' ? 'Create the branch first' : 'Open the review window'">
-        <Button
-          variant="dialog"
-          size="kira"
-          class="shrink-0"
-          :disabled="row.branch.name === ''"
-          data-testid="ade-review-code"
-          @click="onReview(row.id)"
-        >
-          Review code
-        </Button>
+      <AdeTip :parts="reviewCode.choiceOf(row)?.tip ?? []">
+        <TooltipDisabledTrigger :disabled="reviewOff(row)">
+          <Button
+            variant="dialog"
+            size="kira"
+            class="shrink-0"
+            :disabled="reviewOff(row)"
+            data-testid="ade-review-code"
+            @click="onReview(row.id)"
+          >
+            Review code
+          </Button>
+        </TooltipDisabledTrigger>
       </AdeTip>
     </div>
     <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-stage-block-error">{{ error }}</p>

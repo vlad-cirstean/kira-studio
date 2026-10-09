@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { useClipboard } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { control } from '../../../bridge/control';
@@ -10,8 +11,10 @@ import AdeChip from '../AdeChip.vue';
 import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
+import { baseNameOf } from '../board/reviewCode';
 import { type CardModel, type PlanModel, usePlanModel } from '../plan/usePlanModel';
-import { useOpenReviewWindow, usePrs, useRetrySetup } from '../queries';
+import { usePrs, useRetrySetup } from '../queries';
+import { useReviewCode } from '../review/useReviewCode';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
@@ -34,7 +37,7 @@ const sessionCount = computed(
 const prs = usePrs();
 const repos = useRepos();
 const retrySetup = useRetrySetup();
-const openReview = useOpenReviewWindow();
+const reviewCode = useReviewCode();
 const setupError = ref('');
 const forcePush = ref(false);
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
@@ -42,10 +45,9 @@ const copiedKey = ref('');
 
 const branch = computed(() => props.row.branch);
 const graph = computed(() => props.model.view.graph);
-const baseName = computed(() => {
-  const parent = graph.value.parentOf.get(branch.value.id);
-  return (parent ? graph.value.byBranch.get(parent)?.name : '') || branch.value.base || 'main';
-});
+const baseName = computed(() => baseNameOf(props.row, graph.value));
+const reviewChoice = computed(() => reviewCode.choiceOf(props.row));
+const reviewOff = computed(() => reviewCode.pending.value || !reviewChoice.value || reviewChoice.value.disabled);
 const facts = computed(
   () => `${props.row.repo} · base ${baseName.value} · ↑${branch.value.ahead} ↓${branch.value.behind}`,
 );
@@ -85,10 +87,7 @@ function run(a: HeaderAction): void {
   else if (a.kind === 'start') dialogs.start(id);
   else if (a.kind === 'review') {
     setupError.value = '';
-    openReview.mutate(
-      { branchId: id },
-      { onError: (err) => (setupError.value = err instanceof Error ? err.message : String(err)) },
-    );
+    reviewCode.open(props.card.task.id, id, null, { onError: (msg) => (setupError.value = msg) });
   }
 }
 const actionClass = (a: HeaderAction): string => ACTION_CLASS[a.tone];
@@ -244,18 +243,33 @@ function deployNote(d: Deployment): string {
             Force push
           </Button>
         </AdeTip>
-        <Button
-          v-for="a in actions"
-          :key="a.kind + a.label"
-          size="kira-lg"
-          class="font-semibold"
-          :class="actionClass(a)"
-          :disabled="a.kind === 'created' || rebasing(a)"
-          :data-testid="`ade-panel-action-${a.kind}`"
-          @click="run(a)"
-        >
-          {{ rebasing(a) ? 'Rebasing…' : a.label }}
-        </Button>
+        <template v-for="a in actions" :key="a.kind + a.label">
+          <AdeTip v-if="a.kind === 'review'" :parts="reviewChoice?.tip ?? []">
+            <TooltipDisabledTrigger :disabled="reviewOff">
+              <Button
+                size="kira-lg"
+                class="font-semibold"
+                :class="actionClass(a)"
+                :disabled="reviewOff"
+                :data-testid="`ade-panel-action-${a.kind}`"
+                @click="run(a)"
+              >
+                {{ a.label }}
+              </Button>
+            </TooltipDisabledTrigger>
+          </AdeTip>
+          <Button
+            v-else
+            size="kira-lg"
+            class="font-semibold"
+            :class="actionClass(a)"
+            :disabled="a.kind === 'created' || rebasing(a)"
+            :data-testid="`ade-panel-action-${a.kind}`"
+            @click="run(a)"
+          >
+            {{ rebasing(a) ? 'Rebasing…' : a.label }}
+          </Button>
+        </template>
       </div>
     </template>
 

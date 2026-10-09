@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
-import { computed } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { shortcutFor } from '@workbench/shortcuts/keys';
+import { computed, useTemplateRef } from 'vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
 import AdeClaudeDialog from '../dialog/AdeClaudeDialog.vue';
@@ -9,6 +11,7 @@ import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useBacklog } from '../queries';
+import { useReviewCode } from '../review/useReviewCode';
 import AdeRunDialog from '../run/AdeRunDialog.vue';
 import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
@@ -29,6 +32,46 @@ const backlog = useBacklog();
 const count = computed(() => backlog.data.value?.items.length ?? 0);
 const { model } = usePlanModel();
 const needsCount = computed(() => model.value?.needs.badge ?? 0);
+
+// Review code on the focused branch or card, else the selected one.
+const reviewCode = useReviewCode();
+const planEl = useTemplateRef<HTMLElement>('planEl');
+function reviewTarget(e: KeyboardEvent): { taskId?: string; branchId?: string; el?: HTMLElement } {
+  const t = e.target instanceof Element ? e.target : null;
+  const rowEl = t?.closest<HTMLElement>('[data-testid="ade-branch-row"][data-branch-id]');
+  if (rowEl) return { branchId: rowEl.dataset.branchId, el: rowEl };
+  const cardEl = t?.closest<HTMLElement>('[data-testid="ade-card"][data-task-id]');
+  if (cardEl) {
+    const head = cardEl.querySelector<HTMLElement>('[data-testid="ade-card-head"]');
+    const inside = t instanceof HTMLElement && cardEl.contains(t) ? t : null;
+    return { taskId: cardEl.dataset.taskId, el: inside ?? head ?? cardEl };
+  }
+  if (ui.selectedBranchId) return { branchId: ui.selectedBranchId };
+  return { taskId: ui.selectedTaskId ?? undefined };
+}
+useEventListener(planEl, 'keydown', (e: KeyboardEvent) => {
+  if (e.defaultPrevented || !shortcutFor(e, ['ade.reviewCode'])) return;
+  e.preventDefault();
+  const m = model.value;
+  if (!m) return;
+  const target = reviewTarget(e);
+  if (target.branchId) {
+    const branch = m.board.branches.find((b) => b.id === target.branchId);
+    const card = branch ? m.cardFor(branch.taskId) : null;
+    const row = card?.rows.find((r) => r.id === target.branchId);
+    const choice = row ? reviewCode.choiceOf(row) : null;
+    const anchor =
+      target.el ?? document.querySelector<HTMLElement>(`[data-testid="ade-branch-row"][data-branch-id="${target.branchId}"]`);
+    if (card && choice && !choice.disabled) reviewCode.open(card.task.id, target.branchId, anchor);
+    return;
+  }
+  const card = target.taskId ? m.cardFor(target.taskId) : null;
+  if (!card) return;
+  const head =
+    target.el ??
+    document.querySelector<HTMLElement>(`[data-testid="ade-card"][data-task-id="${card.task.id}"] [data-testid="ade-card-head"]`);
+  reviewCode.openTask(card, head);
+});
 </script>
 
 <template>
@@ -89,10 +132,10 @@ const needsCount = computed(() => model.value?.needs.badge ?? 0);
       <AdeBacklogPage v-if="ui.view === 'backlog'" />
       <AdeNeedsPage v-else-if="ui.view === 'needs'" />
       <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
-      <template v-else>
+      <div v-else ref="planEl" class="contents">
         <AdePlanView />
         <AdePanel v-if="ui.selectedTaskId" />
-      </template>
+      </div>
     </div>
     <AdeRunDialog />
     <AdeClaudeDialog />

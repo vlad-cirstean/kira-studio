@@ -1,6 +1,9 @@
+import type { ShortcutId } from '@shared/domain/shortcuts';
+import type { TextPart } from '@theme/varText';
 import type { CardModel } from '../plan/usePlanModel';
 import type { Plan, Session } from '../wire';
 import { type Calendar, LATER, nextWork } from './calendar';
+import type { ReviewChoice } from './reviewCode';
 import { nextStageId } from './stageBlocks';
 
 // Task context menu (P198): which entries a task shows and what each does. Pure; `useTaskMenu` maps
@@ -16,6 +19,7 @@ export type TaskMenuCmd =
   | { kind: 'park'; parked: boolean }
   | { kind: 'link'; url: string }
   | { kind: 'copy'; text: string }
+  | { kind: 'review'; branchId: string }
   | { kind: 'archive' };
 
 export interface TaskMenuItem {
@@ -23,7 +27,8 @@ export interface TaskMenuItem {
   label: string;
   cmd: TaskMenuCmd;
   disabled?: boolean;
-  hint?: string;
+  hint?: string | readonly TextPart[];
+  shortcut?: ShortcutId;
   checked?: boolean;
   danger?: boolean;
 }
@@ -43,6 +48,8 @@ export interface TaskMenuInput {
   plan: Plan;
   cal: Calendar;
   archivePending: boolean;
+  /** The task's Review code targets; none for a parked task. */
+  choices: readonly ReviewChoice[];
 }
 
 const DONE = 'done';
@@ -121,6 +128,34 @@ function stageEntries(c: CardModel, live: boolean): TaskMenuEntry[] {
   return out;
 }
 
+function reviewEntry(choices: readonly ReviewChoice[]): TaskMenuEntry[] {
+  const item = (c: ReviewChoice, id: string, label: string): TaskMenuItem => ({
+    id,
+    label,
+    cmd: { kind: 'review', branchId: c.branchId },
+    disabled: c.disabled,
+    hint: c.tip,
+  });
+  if (choices.length === 0) return [];
+  if (choices.length === 1) {
+    return [
+      {
+        type: 'item',
+        ...item(choices[0], 'ade-task-review', 'Review code'),
+        shortcut: 'ade.reviewCode',
+      },
+    ];
+  }
+  return [
+    {
+      type: 'submenu',
+      id: 'ade-task-review',
+      label: 'Review code',
+      items: choices.map((c) => item(c, `ade-task-review-${c.branchId}`, c.label)),
+    },
+  ];
+}
+
 function planEntry(i: TaskMenuInput): TaskMenuEntry {
   const day = i.card.entry.day;
   const at = (id: string, label: string, to: number): TaskMenuItem => ({
@@ -145,7 +180,7 @@ function planEntry(i: TaskMenuInput): TaskMenuEntry {
 export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
   const c = i.card;
   const review = c.review;
-  const out: TaskMenuEntry[] = [{ type: 'label', label: c.title }];
+  const out: TaskMenuEntry[] = [{ type: 'label', label: c.title }, ...reviewEntry(i.choices)];
   const live = c.task.runs.some((r) => r.state === 'running');
   const running = i.sessions.filter((s) => s.state === 'running' && s.mode === 'tui');
 

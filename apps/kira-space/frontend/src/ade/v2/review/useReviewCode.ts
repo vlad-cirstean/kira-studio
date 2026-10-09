@@ -1,8 +1,7 @@
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, watch } from 'vue';
-import { reviewChoices } from '../board/reviewCode';
-import type { CardModel } from '../plan/usePlanModel';
-import { usePlanModel } from '../plan/usePlanModel';
+import { type ReviewChoice, reviewChoice, reviewChoices } from '../board/reviewCode';
+import { type BranchRowModel, type CardModel, usePlanModel } from '../plan/usePlanModel';
 import { useOpenReviewWindow } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 
@@ -79,6 +78,16 @@ export function useReviewCode() {
     );
   }
 
+  const choicesOf = (card: CardModel): ReviewChoice[] => {
+    const graph = model.value?.view.graph;
+    return graph ? reviewChoices(card, graph) : [];
+  };
+  const choiceOf = (row: BranchRowModel): ReviewChoice | null => {
+    const graph = model.value?.view.graph;
+    const task = graph?.byTask.get(row.branch.taskId);
+    return graph && task ? reviewChoice(row, task, graph) : null;
+  };
+
   const pending = computed(() => mutation.isPending.value);
-  return { open, openTask, pending };
+  return { open, openTask, choicesOf, choiceOf, pending };
 }

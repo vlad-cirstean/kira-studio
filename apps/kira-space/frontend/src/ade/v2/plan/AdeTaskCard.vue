@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import VarText from '@theme/components/VarText.vue';
+import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import type { BranchAction } from '../board/actions';
+import { taskReviewTip } from '../board/reviewCode';
+import { useReviewCode } from '../review/useReviewCode';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
@@ -19,6 +24,9 @@ const emit = defineEmits<{ select: []; forcePush: [row: BranchRowModel] }>();
 const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
 const taskMenu = useTaskMenu(() => props.card);
+const reviewCode = useReviewCode();
+const choices = computed(() => reviewCode.choicesOf(props.card));
+const reviewTip = computed(() => taskReviewTip(choices.value));
 
 function onMenuKey(ev: KeyboardEvent): void {
   if (ev.currentTarget instanceof Element) taskMenu.openAt(ev.currentTarget);
@@ -149,11 +157,24 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
           <AdeAttention v-if="card.attention" :tip="card.attention" :item="card.attentionItem" />
           <AdeTip :text="card.meta">
             <span
-              class="min-w-0 truncate text-kira-sm leading-3.5 text-subtle"
+              class="min-w-0 flex-1 truncate text-kira-sm leading-3.5 text-subtle"
               data-testid="ade-card-meta"
               >{{ card.meta }}</span
             >
           </AdeTip>
+          <TooltipIconButton
+            v-if="choices.length"
+            icon="git-compare"
+            label="Review code"
+            class="size-4.5 shrink-0"
+            disabled-trigger
+            :disabled="reviewCode.pending.value || choices.every((c) => c.disabled)"
+            data-testid="ade-card-review"
+            @click.stop="(ev: MouseEvent) => reviewCode.openTask(card, ev.currentTarget as HTMLElement)"
+          >
+            <VarText :parts="reviewTip" />
+            <span class="text-muted-foreground"> ({{ formatShortcut('ade.reviewCode') }})</span>
+          </TooltipIconButton>
         </div>
         <AdeTip :text="card.title">
           <Button

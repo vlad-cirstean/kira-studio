@@ -4,6 +4,7 @@ import { type MaybeRefOrGetter, toValue } from 'vue';
 import { control } from '../../../bridge/control';
 import { movePlanArgs } from '../board/dropPlan';
 import { taskPatch } from '../board/panelFacts';
+import { reviewChoices } from '../board/reviewCode';
 import {
   type TaskMenuCmd,
   type TaskMenuEntry,
@@ -11,11 +12,18 @@ import {
   taskMenuModel,
 } from '../board/taskMenu';
 import { useSetPlan, useSetTaskStage, useStopRun, useUpdateTask } from '../queries';
+import { useReviewCode } from '../review/useReviewCode';
 import { useTaskAction } from '../run/useTaskAction';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { type CardModel, usePlanModel } from './usePlanModel';
+
+/** The card box is not focusable; its header is. */
+function focusable(el: Element): HTMLElement | null {
+  if (!(el instanceof HTMLElement)) return null;
+  return el.querySelector<HTMLElement>('[data-testid="ade-card-head"]') ?? el;
+}
 
 /** Opens the task context menu for `card`: on a right-click, or under an anchor element. */
 export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
@@ -30,6 +38,8 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
   const stopRun = useStopRun();
   const update = useUpdateTask();
   const { copy } = useClipboard();
+  const reviewCode = useReviewCode();
+  let anchor: HTMLElement | null = null;
 
   function fail(taskId: string, err: unknown): void {
     ui.select(taskId);
@@ -82,6 +92,8 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
           return await control.linkOpenExternal(cmd.url);
         case 'copy':
           return await copy(cmd.text);
+        case 'review':
+          return reviewCode.open(taskId, cmd.branchId, anchor);
         case 'archive':
           return dialogs.archive(taskId);
       }
@@ -97,6 +109,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
       label: e.label,
       disabled: e.disabled,
       hint: e.hint,
+      shortcut: e.shortcut,
       checked: e.checked,
       danger: e.danger,
       run: () => run(e.cmd),
@@ -120,6 +133,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
       plan: m.board.plan,
       cal: m.cal,
       archivePending: dialogs.pending.has(`archive:${c.task.id}`),
+      choices: reviewChoices(c, m.view.graph),
     }).map(toMenu);
   }
 
@@ -128,6 +142,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
     if (!list) return;
     ev.preventDefault();
     ev.stopPropagation();
+    anchor = ev.currentTarget instanceof Element ? focusable(ev.currentTarget) : null;
     ui.select(toValue(card).task.id);
     contextMenu.openContextMenu(ev, list);
   }
@@ -136,6 +151,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
   function openAt(el: Element): void {
     const list = items();
     if (!list) return;
+    anchor = focusable(el);
     ui.select(toValue(card).task.id);
     const r = el.getBoundingClientRect();
     contextMenu.openContextMenuAt(r.left, r.bottom, list);

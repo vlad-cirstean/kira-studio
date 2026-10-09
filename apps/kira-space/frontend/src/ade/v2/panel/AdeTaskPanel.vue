@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
+import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { ARCHIVE_TIP, STATUS_TONE } from '../board/actions';
 import { dayLabel, LATER } from '../board/calendar';
 import { taskFacts, taskPatch } from '../board/panelFacts';
+import { taskReviewTip } from '../board/reviewCode';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import type { CardModel, PlanModel } from '../plan/usePlanModel';
 import { useTaskMenu } from '../plan/useTaskMenu';
 import { useUpdateTask } from '../queries';
+import { useReviewCode } from '../review/useReviewCode';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useSessionViews } from '../sessions/useSessionViews';
@@ -34,6 +38,10 @@ const taskMenu = useTaskMenu(() => props.card);
 function openMore(ev: MouseEvent): void {
   if (ev.currentTarget instanceof Element) taskMenu.openAt(ev.currentTarget);
 }
+const reviewCode = useReviewCode();
+const choices = computed(() => reviewCode.choicesOf(props.card));
+const reviewTip = computed(() => [...taskReviewTip(choices.value), ` (${formatShortcut('ade.reviewCode')})`]);
+const reviewDisabled = computed(() => reviewCode.pending.value || choices.value.every((c) => c.disabled));
 const notesError = ref('');
 
 /** A finished task shows Archive as its stage action; any other task gets the quiet one. */
@@ -93,6 +101,19 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         >
           Archive
         </Button>
+      </AdeTip>
+      <AdeTip v-if="choices.length" :parts="reviewTip">
+        <TooltipDisabledTrigger :disabled="reviewDisabled">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            :disabled="reviewDisabled"
+            data-testid="ade-panel-review"
+            @click="(ev: MouseEvent) => reviewCode.openTask(card, ev.currentTarget as HTMLElement)"
+          >
+            Review code
+          </Button>
+        </TooltipDisabledTrigger>
       </AdeTip>
       <TooltipIconButton
         icon="ellipsis"

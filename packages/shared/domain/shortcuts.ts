@@ -37,6 +37,8 @@ export const SHORTCUTS = {
   'window.new': { chord: { key: 'N', cmdOrCtrl: true, shift: true } },
   'window.close': { chord: { key: 'W', cmdOrCtrl: true, shift: true } },
 
+  'ade.reviewCode': { chord: { key: 'R', cmdOrCtrl: true, shift: true } },
+
   'grid.copy': { chord: { key: 'C', cmdOrCtrl: true } },
   'grid.paste': { chord: { key: 'V', cmdOrCtrl: true } },
   'grid.edit': { chord: { key: 'Return' } },

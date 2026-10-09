@@ -55,3 +55,8 @@ export function reviewChoice(
 export function reviewChoices(card: CardModel, graph: BranchGraph): ReviewChoice[] {
   return card.rows.flatMap((row) => reviewChoice(row, card.task, graph) ?? []);
 }
+
+/** Tooltip of a task-level control: the branch's own tip when there is one, else a prompt to pick. */
+export function taskReviewTip(choices: readonly ReviewChoice[]): readonly TextPart[] {
+  return choices.length === 1 ? choices[0].tip : ['Pick a branch to review'];
+}

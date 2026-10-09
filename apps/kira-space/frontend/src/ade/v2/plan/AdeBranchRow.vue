@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import VarText from '@theme/components/VarText.vue';
+import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 import { useRepoLinksStore } from '../../../repo/state/repoLinks';
 import { useRepos } from '../../../repo/state/reposQueries';
 import { repoTint } from '../../../state/coderepos';
 import AdeTip from '../AdeTip.vue';
 import { fixItems } from '../board/fixMenu';
-import { useOpenReviewWindow } from '../queries';
+import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { TONE_TAG_CLASS } from '../tones';
@@ -21,7 +24,9 @@ const dialogs = useAdeDialogsStore();
 const contextMenu = useContextMenuStore();
 const { model } = usePlanModel();
 const repos = useRepos();
-const openReview = useOpenReviewWindow();
+const reviewCode = useReviewCode();
+const choice = computed(() => reviewCode.choiceOf(props.row));
+const rowEl = useTemplateRef<HTMLElement>('rowEl');
 const hasChips = computed(() => props.row.chips.merged.length + props.row.chips.deployed.length > 0);
 const selected = computed(() => ui.selectedBranchId === props.row.id);
 
@@ -42,28 +47,24 @@ function onMenu(ev: MouseEvent): void {
         unpushed: m.board.plan.unpushed,
       })
     : null;
-  const created = props.row.branch.name !== '';
   ev.preventDefault();
   ev.stopPropagation();
   const id = props.row.id;
   contextMenu.openContextMenu(ev, [
     { type: 'label', label: `${props.row.repo} · ${props.row.name}` },
-    {
-      type: 'item' as const,
-      id: 'ade-review-code',
-      label: created ? 'Review code' : 'Review code (create the branch first)',
-      disabled: !created,
-      run: () =>
-        openReview.mutate(
-          { branchId: id },
+    ...(choice.value
+      ? [
           {
-            onError: (err) => {
-              ui.select(props.row.branch.taskId);
-              ui.actionError[props.row.branch.taskId] = err instanceof Error ? err.message : String(err);
-            },
+            type: 'item' as const,
+            id: 'ade-review-code',
+            label: 'Review code',
+            disabled: choice.value.disabled,
+            hint: choice.value.tip,
+            shortcut: 'ade.reviewCode' as const,
+            run: () => reviewCode.open(props.row.branch.taskId, id, rowEl.value),
           },
-        ),
-    },
+        ]
+      : []),
     ...(!items
       ? []
       : items.length === 0
@@ -108,7 +109,8 @@ const rowBgClass = computed(() => {
 <template>
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds block content a button cannot. -->
   <div
-    class="box-border flex h-10 w-full cursor-pointer items-center gap-1.5 border-l-3 px-2.5"
+    ref="rowEl"
+    class="group box-border flex h-10 w-full cursor-pointer items-center gap-1.5 border-l-3 px-2.5"
     :class="[
       rowBgClass,
       selected ? 'border-l-focus' : 'border-l-transparent',
@@ -209,5 +211,19 @@ const rowBgClass = computed(() => {
         </AdeTip>
       </span>
     </div>
+    <TooltipIconButton
+      v-if="choice"
+      icon="git-compare"
+      label="Review code"
+      class="size-5 shrink-0"
+      :class="selected ? 'opacity-100' : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'"
+      disabled-trigger
+      :disabled="reviewCode.pending.value || choice.disabled"
+      data-testid="ade-branch-review"
+      @click.stop="reviewCode.open(row.branch.taskId, row.id, rowEl)"
+    >
+      <VarText :parts="choice.tip" />
+      <span class="text-muted-foreground"> ({{ formatShortcut('ade.reviewCode') }})</span>
+    </TooltipIconButton>
   </div>
 </template>
