@@ -41,6 +41,8 @@ type promptInput struct {
 	Extra string
 	// Space adds the Kira Space tools line after the body.
 	Space bool
+	// Context lines (a rebase that did not finish) go after the body.
+	Context []string
 }
 
 // composePrompt builds an agent run's prompt (SPEC2 section 9 "Start step" shape) and always ends
@@ -63,6 +65,9 @@ func composePrompt(in promptInput) string {
 	body = strings.TrimRight(body, "\n")
 	if in.Extra != "" {
 		body += "\n\n" + in.Extra
+	}
+	if len(in.Context) > 0 {
+		body += "\n\n" + strings.Join(in.Context, "\n")
 	}
 	if in.Space {
 		body += "\n\n" + adeagent.SpaceSuffix
@@ -164,7 +169,7 @@ func composeReviewMessage(title, jiraKey, jiraURL, notes string, repos []repoLin
 
 // composeStartMessage is the first message of a branch-level Start session (SPEC2 section 9); step
 // is the first step not done, "" when the stage has none.
-func composeStartMessage(title, jiraKey, jiraURL string, repo repoLine, step string) string {
+func composeStartMessage(title, jiraKey, jiraURL string, repo repoLine, step string, context []string) string {
 	lines := []string{"Task: " + title}
 	if l := jiraLine(jiraKey, jiraURL); l != "" {
 		lines = append(lines, l)
@@ -173,5 +178,6 @@ func composeStartMessage(title, jiraKey, jiraURL string, repo repoLine, step str
 	if step != "" {
 		lines = append(lines, "Step: "+step)
 	}
+	lines = append(lines, context...)
 	return strings.Join(lines, "\n")
 }

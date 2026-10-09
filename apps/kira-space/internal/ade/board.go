@@ -117,18 +117,19 @@ type TaskBoard struct {
 	rebase      map[string]*rebaseCache
 	boardTimer  *time.Timer
 
-	runMu     sync.Mutex             // guards live, setupLive, archiving, taskMus, finishes, stepMsgs
-	live      map[string]*liveRun    // run id -> its process
-	tuiGrants map[string]tuiBinding  // TUI record id -> the agent MCP grant its launch registered
-	setupLive map[string]*liveRun    // branch id -> its running prepare script
-	archiving map[string]int         // task id -> archives in progress; blocks launches
-	taskMus   map[string]*sync.Mutex // task id -> serializes that task's run transitions
-	finishes  map[string]finishCall  // run id -> last finish_step call
-	stepMsgs  map[string]string      // task|stage|step -> the Run dialog's edited message
-	agent     *adeagent.Server
-	wg        sync.WaitGroup // background setups and runs; Close waits
-	closeMu   sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
-	closed    bool
+	runMu            sync.Mutex                 // guards live, setupLive, archiving, taskMus, finishes, stepMsgs
+	live             map[string]*liveRun        // run id -> its process
+	tuiGrants        map[string]tuiBinding      // TUI record id -> the agent MCP grant its launch registered
+	setupLive        map[string]*liveRun        // branch id -> its running prepare script
+	archiving        map[string]int             // task id -> archives in progress; blocks launches
+	taskMus          map[string]*sync.Mutex     // task id -> serializes that task's run transitions
+	finishes         map[string]adeagent.Finish // run id -> last finish_step call
+	recoveredRebases []model.AdeRun             // rebase runs Recover interrupted; Start re-reads git for them
+	stepMsgs         map[string]string          // task|stage|step -> the Run dialog's edited message
+	agent            *adeagent.Server
+	wg               sync.WaitGroup // background setups and runs; Close waits
+	closeMu          sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
+	closed           bool
 
 	ghMu      sync.Mutex             // guards ghLocks, ghPending
 	ghLocks   map[string]*sync.Mutex // branch id -> serializes its GitHub sync
@@ -145,10 +146,10 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiGrants: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
-		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]finishCall{}, stepMsgs: map[string]string{},
+		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]adeagent.Finish{}, stepMsgs: map[string]string{},
 		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
 	}
-	b.agent = adeagent.NewServer(deps.AgentDir, b.recordFinish, b)
+	b.agent = adeagent.NewServer(deps.AgentDir, b.recordFinish, b, b)
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return deps.Credentials.Ask(ctx, boardConnLabel, req)
@@ -508,7 +509,7 @@ func toWireRun(r model.AdeRun) adewire.Run {
 	run := adewire.Run{
 		ID: r.ID, TaskID: r.TaskID, StageID: r.StageID, StepID: r.StepID, BranchID: r.BranchID, Attempt: r.Attempt,
 		State: r.State, Loops: r.Loops, Note: r.Note, Summary: r.Summary, SessionID: r.SessionID,
-		ExitCode: r.ExitCode, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt, Outcome: r.Outcome,
+		ExitCode: r.ExitCode, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt, Outcome: r.Outcome, Purpose: r.Purpose,
 	}
 	return run
 }

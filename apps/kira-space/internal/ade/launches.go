@@ -11,7 +11,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 // launches.go starts interactive Claude Code sessions for a task: Take over a run's session,
@@ -257,6 +256,13 @@ func (b *TaskBoard) finishableRun(tc *taskCtx, rec *model.AdeSession) string {
 	if err != nil || run.State != model.AdeRunStuck && run.State != model.AdeRunFailed {
 		return ""
 	}
+	if run.Purpose == model.AdeRunPurposeRebase {
+		latest, err := b.deps.Tasks.LatestRebaseRun(run.BranchID)
+		if err != nil || latest == nil || latest.ID != run.ID {
+			return ""
+		}
+		return run.ID
+	}
 	if !b.isLatestOfCurrentStage(tc, run) {
 		return ""
 	}
@@ -286,6 +292,7 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 		if runID != "" {
 			tools = append(tools, adeagent.FinishStepTool)
 		}
+		tools = append(tools, adeagent.RunOutcomeTool)
 		if space {
 			tools = append(tools, adeagent.SpaceToolNames...)
 		}
@@ -354,7 +361,7 @@ func (b *TaskBoard) tuiBound(runID string) bool {
 }
 
 // applyTUIFinish applies a finish_step call of a taken-over run at call time (R14).
-func (b *TaskBoard) applyTUIFinish(runID, status, summary string) {
+func (b *TaskBoard) applyTUIFinish(runID string, f adeagent.Finish) {
 	if b.ctx.Err() != nil {
 		return
 	}
@@ -369,16 +376,20 @@ func (b *TaskBoard) applyTUIFinish(runID, status, summary string) {
 	if run, err = b.deps.Tasks.GetRun(runID); err != nil || (run.State != model.AdeRunStuck && run.State != model.AdeRunFailed) {
 		return
 	}
+	if run.Purpose == model.AdeRunPurposeRebase {
+		b.applyRebaseFinish(run, f)
+		return
+	}
 	tc, err := b.loadTaskCtx(run.TaskID)
 	if err != nil || !b.isLatestOfCurrentStage(tc, run) {
 		return
 	}
-	switch status {
+	switch f.Status {
 	case "done", "failed":
-		o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: summary}
-		b.recordOutcomeLocked(run, "", fromOutcome(finishState(&o, status, summary), o))
+		b.recordOutcomeLocked(run, "", fromFinish(f, nil))
 	default: // needs_input: the run keeps waiting for a decision
 		stuck := model.AdeRunStuck
+		summary := cmpNonEmpty(f.Reason, f.Summary)
 		updated, err := b.deps.Tasks.UpdateRun(runID, model.AdeRunPatch{State: &stuck, Note: &summary, Summary: &summary})
 		if err != nil {
 			slog.Warn("ade: taken-over finish", "scope", "ade", "run", runID, "err", err)
@@ -516,10 +527,8 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 	if tr.hasPending(func(p pendingIntent) bool { return p.BranchID == sb.ID }) {
 		return adewire.Launch{}, invalid("a launch is already starting on %s", sb.Name)
 	}
-	if has, err := b.deps.Tasks.HasRunningOn(sb.ID); err != nil {
+	if err := b.checkNoBackgroundRun(sb); err != nil {
 		return adewire.Launch{}, err
-	} else if has {
-		return adewire.Launch{}, invalid("a background run is working on %s", sb.Name)
 	}
 	if err := b.snapshotWorkflow(&tc.task); err != nil {
 		return adewire.Launch{}, err
@@ -529,17 +538,29 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 		return adewire.Launch{}, err
 	}
 	// The gate may have released a held run onto this worktree.
-	if has, err := b.deps.Tasks.HasRunningOn(sb.ID); err != nil {
+	if err := b.checkNoBackgroundRun(sb); err != nil {
 		return adewire.Launch{}, err
-	} else if has {
-		return adewire.Launch{}, invalid("a background run is working on %s", sb.Name)
 	}
 	message := args.Message
 	if message == "" {
 		message = composeStartMessage(taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
-			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc))
+			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc), b.rebaseContext(tc))
 	}
 	return b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message}, "")
+}
+
+// checkNoBackgroundRun refuses a session on a worktree a run or a rebase is working in.
+func (b *TaskBoard) checkNoBackgroundRun(sb model.AdeTaskBranch) error {
+	has, err := b.deps.Tasks.HasRunningOn(sb.ID)
+	if err != nil {
+		return err
+	}
+	if r, err := b.deps.Tasks.RunningRebaseOn(sb.ID); err != nil {
+		return err
+	} else if has || r != nil {
+		return invalid("a background run is working on %s", sb.Name)
+	}
+	return nil
 }
 
 // firstOpenStep names the current agent stage's first step that is not done, "" otherwise.

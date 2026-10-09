@@ -136,6 +136,10 @@ func (b *TaskBoard) Start() {
 				b.folderWMu.Unlock()
 			}
 		}
+		if len(b.recoveredRebases) > 0 {
+			recovered := b.recoveredRebases
+			b.goTracked(func() { b.reverifyRecovered(recovered) })
+		}
 		b.goTracked(func() { b.RunAllEnvScripts(b.ctx) })
 		b.goTracked(b.runLogPurge)
 		folders, err := b.deps.RepoConfig.Folders()

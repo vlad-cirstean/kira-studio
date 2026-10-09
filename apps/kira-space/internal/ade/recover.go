@@ -6,13 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 const appName = "Space"
 
-var restartOutcome = runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndRestart, App: appName})
+var restartOutcome = model.AdeRunOutcome{Outcome: runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndRestart, App: appName})}
 
 // Recover settles what the previous process life left behind (D7, R9): running runs become stuck,
 // running setups failed, session rows stopped, orphaned MCP configs go. Held (pending) runs keep their launch spec and launch when their gate opens. Nothing resumes by itself.
@@ -43,6 +44,11 @@ func (b *TaskBoard) Recover() error {
 			if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
 				slog.Warn("ade: recover: remove mcp config", "scope", "ade", "file", f, "err", err)
 			}
+		}
+	}
+	for _, r := range runs {
+		if r.Purpose == model.AdeRunPurposeRebase {
+			b.recoveredRebases = append(b.recoveredRebases, r)
 		}
 	}
 	b.snapshotStartedTasks()

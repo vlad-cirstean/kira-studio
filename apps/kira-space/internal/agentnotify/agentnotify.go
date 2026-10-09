@@ -219,9 +219,16 @@ func (n *Notifier) HandleRuns(runs []adewire.Run) {
 		if detail == "" {
 			detail = r.Note
 		}
+		title := "ADE run " + r.State
+		if r.Purpose == "rebase" {
+			title = "Rebase " + rebaseVerdict(r)
+			if r.Outcome != nil && r.Outcome.Reason != "" {
+				detail = r.Outcome.Reason
+			}
+		}
 		note := Note{
 			ID: string(KindRunEnded) + ":" + r.ID, Kind: KindRunEnded, TaskID: r.TaskID,
-			Title: "ADE run " + r.State + " · " + name, Body: body(p, detail, bodyRun),
+			Title: title + " · " + name, Body: body(p, detail, bodyRun),
 		}
 		n.mu.Lock()
 		if n.watchedRunLocked(r.TaskID) || !n.admitLocked(note.ID) {
@@ -232,6 +239,19 @@ func (n *Notifier) HandleRuns(runs []adewire.Run) {
 		n.mu.Unlock()
 		n.send(sink, note)
 	}
+}
+
+// rebaseVerdict is the title word of an ended rebase run.
+func rebaseVerdict(r adewire.Run) string {
+	switch {
+	case r.State == "done":
+		return "done"
+	case r.State == "failed":
+		return "failed"
+	case r.Outcome != nil && r.Outcome.Status == "cancelled":
+		return "stopped"
+	}
+	return "needs you"
 }
 
 func runEnded(s adewire.RunState) bool {

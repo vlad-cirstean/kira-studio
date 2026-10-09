@@ -32,21 +32,18 @@ const (
 	settingSourcesAll  = "user,project,local"
 )
 
-// finishCall is a run's last finish_step call.
-type finishCall struct{ status, summary string }
-
 // recordFinish is the MCP server's callback; the last call of a run wins and is applied at exit.
-func (b *TaskBoard) recordFinish(runID, status, summary string) {
+func (b *TaskBoard) recordFinish(runID string, f adeagent.Finish) {
 	if b.tuiBound(runID) {
-		b.goTracked(func() { b.applyTUIFinish(runID, status, summary) }) // a taken-over run: applied at call time (R14)
+		b.goTracked(func() { b.applyTUIFinish(runID, f) }) // a taken-over run: applied at call time (R14)
 		return
 	}
 	b.runMu.Lock()
-	b.finishes[runID] = finishCall{status, summary}
+	b.finishes[runID] = f
 	b.runMu.Unlock()
 }
 
-func (b *TaskBoard) takeFinish(runID string) (finishCall, bool) {
+func (b *TaskBoard) takeFinish(runID string) (adeagent.Finish, bool) {
 	b.runMu.Lock()
 	defer b.runMu.Unlock()
 	f, ok := b.finishes[runID]
@@ -283,7 +280,7 @@ func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map
 	paths := map[string]string{}
 	title := taskTitle(tc.task, tc.branches)
 	space := b.spaceEnabled(tc.task)
-	for _, sb := range tc.branches {
+	for _, sb := range parentsFirst(tc.branches) {
 		if sb.Kind != model.AdeBranchKindMine {
 			continue
 		}
@@ -310,6 +307,40 @@ func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map
 		}
 	}
 	return paths, nil
+}
+
+// parentsFirst orders branches so a stacked branch follows the branch it is based on.
+func parentsFirst(in []model.AdeTaskBranch) []model.AdeTaskBranch {
+	out := make([]model.AdeTaskBranch, 0, len(in))
+	placed := map[string]bool{}
+	for len(out) < len(in) {
+		progressed := false
+		for _, br := range in {
+			if placed[br.ID] {
+				continue
+			}
+			waiting := false
+			for _, p := range in {
+				if p.ID == br.BaseBranchID && !placed[p.ID] && p.ID != br.ID {
+					waiting = true
+				}
+			}
+			if !waiting {
+				placed[br.ID] = true
+				out = append(out, br)
+				progressed = true
+			}
+		}
+		if !progressed { // a cycle cannot be stored; keep the rest in order
+			for _, br := range in {
+				if !placed[br.ID] {
+					out = append(out, br)
+				}
+			}
+			break
+		}
+	}
+	return out
 }
 
 func stepMessageKey(taskID, stageID, stepID string) string {
@@ -404,6 +435,17 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 	if err := b.checkNotArchiving(run.TaskID); err != nil {
 		return run, err
 	}
+	if r, err := b.deps.Tasks.RunningRebaseOn(sb.ID); err != nil {
+		return run, err
+	} else if r != nil { // a rebase is moving this worktree: the run waits for it
+		note := noteWaitingRebase
+		updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{Note: &note})
+		if err != nil {
+			return run, err
+		}
+		b.emitRuns(updated)
+		return updated, nil
+	}
 	out, err := b.startRun(ctx, tc, plan, idx, run, sb, path)
 	if err != nil && !errors.Is(err, errBoardClosed) {
 		b.failLaunch(run, err)
@@ -465,7 +507,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 			prompt = composePrompt(promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
 				Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID), Extra: spec.Extra,
-				Space: b.spaceEnabled(tc.task),
+				Space: b.spaceEnabled(tc.task), Context: b.rebaseContext(tc),
 			})
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
@@ -514,12 +556,12 @@ type outcome struct {
 	state, note, summary string
 	exit                 *int
 	noAdvance            bool // a user stop: the engine does not move the task on
-	out                  runoutcome.Outcome
+	out                  model.AdeRunOutcome
 }
 
 // fromOutcome builds the engine outcome for state from the shared one; the run note is its reason.
 func fromOutcome(state string, o runoutcome.Outcome) outcome {
-	return outcome{state: state, note: o.Reason, summary: o.Summary, exit: o.ExitCode, out: o}
+	return outcome{state: state, note: o.Reason, summary: o.Summary, exit: o.ExitCode, out: model.AdeRunOutcome{Outcome: o}}
 }
 
 // agentEnd is how an agent process ended, for the no-report outcomes.
@@ -543,7 +585,7 @@ func (b *TaskBoard) settingSources() string {
 
 func allowedTools(step []string, space bool) []string {
 	out := slices.Clone(step)
-	want := []string{adeagent.FinishStepTool}
+	want := []string{adeagent.FinishStepTool, adeagent.RunOutcomeTool}
 	if space {
 		want = append(want, adeagent.SpaceToolNames...)
 	}
@@ -557,25 +599,35 @@ func allowedTools(step []string, space bool) []string {
 
 func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def stepDef, sessionID, resume, path, prompt string, timeout time.Duration) {
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
+	rebase := run.Purpose == model.AdeRunPurposeRebase
 	space := false
-	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil {
+	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil && !rebase {
 		space = b.spaceEnabled(task)
 	}
 	cfg, release, err := b.agent.Register(adeagent.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space})
 	if err != nil {
 		sink.add(logStderr, "could not start: "+err.Error())
 		sink.flush()
-		b.completeRun(run, sessionID, fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndStartErr, Err: err})))
+		end := fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndStartErr, Err: err}))
+		if rebase {
+			b.completeRebase(run, sessionID, nil, end)
+			return
+		}
+		b.completeRun(run, sessionID, end)
 		return
 	}
 	bin := b.deps.ClaudeBin
 	if bin == "" {
 		bin = "claude"
 	}
-	cwdEnv := gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: path})
+	vars := gitprepare.Vars{WorktreePath: path}
+	env := gitprepare.BuildEnv(os.Environ(), vars)
+	if rebase {
+		env = append(env, "GIT_EDITOR=true")
+	}
 	exit, runErr := adeagent.Run(ctx, adeagent.Spec{
 		ClaudeBin: bin, Dir: path, Prompt: prompt, SessionID: b.sessionClaudeID(sessionID), Resume: resume, MCPConfigPath: cfg,
-		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space), Timeout: timeout, Env: cwdEnv,
+		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space), Timeout: timeout, Env: env,
 	}, adeagent.Handler{
 		OnLine:       func(l adeagent.Line) { sink.add(l.Stream, l.Text) },
 		OnRateLimits: b.deps.OnRateLimits,
@@ -589,7 +641,24 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 		b.takeFinish(run.ID)
 		code := exit.Code
 		out.exit, out.out.ExitCode = &code, &code
+		if rebase {
+			b.completeRebase(run, sessionID, nil, out)
+			return
+		}
 		b.completeRun(run, sessionID, out)
+		return
+	}
+	if rebase {
+		code := exit.Code
+		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(sink.lastStderr())
+		end := fromOutcome(model.AdeRunFailed, o)
+		end.out.ExitCode = &code
+		f, ok := b.takeFinish(run.ID)
+		var report *adeagent.Finish
+		if ok {
+			report = &f
+		}
+		b.completeRebase(run, sessionID, report, end)
 		return
 	}
 	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def.Timeout, sink.lastStderr()))
@@ -611,22 +680,38 @@ func (b *TaskBoard) agentOutcome(runID string, exit adeagent.Exit, runErr error,
 		o := runoutcome.ForProcess(agentEnd(exit, runErr, timeout)).WithLastError(lastErr)
 		return fromOutcome(model.AdeRunFailed, o)
 	}
-	o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: f.summary, ExitCode: &code}
-	return fromOutcome(finishState(&o, f.status, f.summary), o)
+	return fromFinish(f, &code)
+}
+
+// fromFinish is the outcome of a run whose agent called finish_step.
+func fromFinish(f adeagent.Finish, exit *int) outcome {
+	o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: f.Summary, ExitCode: exit}
+	state := finishState(&o, f)
+	out := fromOutcome(state, o)
+	out.out.Report = reportOf(f)
+	return out
 }
 
 // finishState fills o from a finish_step call and returns the run state.
-func finishState(o *runoutcome.Outcome, status, summary string) string {
-	switch status {
+func finishState(o *runoutcome.Outcome, f adeagent.Finish) string {
+	switch f.Status {
 	case "done":
 		o.Status = runoutcome.StatusDone
 		return model.AdeRunDone
 	case "needs_input":
-		o.Status, o.Reason = runoutcome.StatusBlocked, summary
+		o.Status, o.Reason = runoutcome.StatusBlocked, cmpNonEmpty(f.Reason, f.Summary)
 		return model.AdeRunStuck
 	}
-	o.Status, o.Reason = runoutcome.StatusFailed, cmpNonEmpty(summary, "the agent reported failure without a reason")
+	o.Status, o.Reason = runoutcome.StatusFailed, cmpNonEmpty(f.Reason, cmpNonEmpty(f.Summary, "the agent reported failure without a reason"))
 	return model.AdeRunFailed
+}
+
+// reportOf is the detail a finish_step call carried beyond status and summary, nil when none.
+func reportOf(f adeagent.Finish) *model.AgentReport {
+	if len(f.ConflictedFiles) == 0 && f.LastGitError == "" && f.Tried == "" {
+		return nil
+	}
+	return &model.AgentReport{ConflictedFiles: f.ConflictedFiles, LastGitError: f.LastGitError, Tried: f.Tried}
 }
 
 func (b *TaskBoard) superviseScript(ctx context.Context, run model.AdeRun, def stepDef, rec model.CodeRepo, sb model.AdeTaskBranch, path, command string, timeout time.Duration) {
@@ -824,6 +909,9 @@ func (b *TaskBoard) RetryRun(ctx context.Context, runID string) error {
 	mu := b.taskMu(run.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
+	if run.Purpose == model.AdeRunPurposeRebase {
+		return invalid("retry from the Rebase button: it shows the prompt first")
+	}
 	tc, err := b.loadTaskCtx(run.TaskID)
 	if err != nil {
 		return err
@@ -1125,7 +1213,7 @@ func toWireSession(s model.AdeSession) adewire.Session {
 	return w
 }
 
-func storedOutcome(o runoutcome.Outcome) *runoutcome.Outcome {
+func storedOutcome(o model.AdeRunOutcome) *model.AdeRunOutcome {
 	if !o.Ended() {
 		return nil
 	}
