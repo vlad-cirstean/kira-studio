@@ -136,6 +136,33 @@ func NewPlatformLocator() Locator {
 	return unsupportedLocator{platform: runtime.GOOS}
 }
 
+// pathLocator is NewHostLocator's non-macOS probe: the configured path, then PATH.
+type pathLocator struct{}
+
+func (pathLocator) Locate(configuredPath string) (string, []string, bool) {
+	var probed []string
+	if configuredPath != "" {
+		probed = append(probed, configuredPath)
+		if toolexec.IsExecutable(os.Stat, configuredPath) {
+			return configuredPath, probed, true
+		}
+	}
+	if resolved, err := exec.LookPath("git"); err == nil {
+		return resolved, append(probed, resolved), true
+	}
+	return "", append(probed, "git (on PATH)"), false
+}
+
+// NewHostLocator is the locator for builds that run real git off macOS, the -tags server sandbox
+// build and the flow-test harness: the macOS probe order on darwin, the configured path then PATH
+// elsewhere. Never used by a shipped build.
+func NewHostLocator() Locator {
+	if runtime.GOOS == "darwin" {
+		return NewDarwinLocator()
+	}
+	return pathLocator{}
+}
+
 // parseGitVersion extracts the dotted version token from `git --version`'s stdout — "git version
 // 2.42.0" or "git version 2.42.0 (Apple Git-135)" on macOS. strings.Fields is the whole parser
 // (§0.2: anything more than this is P2's porcelain-parsing territory, not P1's).
