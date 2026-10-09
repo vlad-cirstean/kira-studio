@@ -76,7 +76,18 @@ interface KiraSpaceFixtures {
   kira: KiraSpaceApp;
 }
 
-export const test = base.extend<KiraSpaceFixtures>({
+export const test = base.extend<KiraSpaceFixtures, { prerequisites: true }>({
+  // Worker-scoped with its own timeout: the build can outlast a test's 60s, and a test fixture
+  // would charge it to the first test of every worker.
+  prerequisites: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
+    async ({}, use) => {
+      await buildPrerequisites();
+      await use(true);
+    },
+    { scope: 'worker', auto: true, timeout: 600_000 },
+  ],
+
   // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
   consoleErrors: async ({}, use) => {
     await use([]);
@@ -85,8 +96,6 @@ export const test = base.extend<KiraSpaceFixtures>({
   scenario: [undefined, { option: true }],
 
   kira: async ({ browser, consoleErrors, scenario }, use) => {
-    await buildPrerequisites();
-
     // Short root: unix-socket paths under it must stay below the sun_path limit.
     const root = await mkdtemp(join(tmpdir(), 'ksr-'));
     const home = join(root, 'home');

@@ -80,7 +80,18 @@ interface KiraFixtures {
   flowServers: FlowServers;
 }
 
-export const test = base.extend<KiraFixtures>({
+export const test = base.extend<KiraFixtures, { prerequisites: true }>({
+  // Worker-scoped with its own timeout: the build can outlast a test's 60s, and a test fixture
+  // would charge it to the first test of every worker.
+  prerequisites: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
+    async ({}, use) => {
+      await buildPrerequisites();
+      await use(true);
+    },
+    { scope: 'worker', auto: true, timeout: 600_000 },
+  ],
+
   serverEnv: [{}, { option: true }],
 
   flowServers: [
@@ -111,8 +122,6 @@ export const test = base.extend<KiraFixtures>({
     if (!kiraHome.startsWith(tmpdir())) {
       throw new Error(`KIRA_HOME fixture "${kiraHome}" is not under the OS tmpdir`);
     }
-
-    await buildPrerequisites();
 
     const port = await getFreePort();
     const env: NodeJS.ProcessEnv = {
