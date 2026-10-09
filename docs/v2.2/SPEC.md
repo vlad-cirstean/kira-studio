@@ -27,7 +27,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P229 | Git section (graph, toolbar, detail, stash and other git panes) looks different from the rest of the app: bring it in line with the app's shadcn-vue/Tailwind look (spacing, type, colours, controls, rows). Includes the git UI inside Kira Space. | Done |
 | P230 | Agent module Refresh broken: shows 'never fetched' then a git error. Find root cause, fix, add regression spec. | Done |
 | P231 | Real-flow tests for every main flow of Kira Space, split at the IPC (bridge) level: Go-side tests drive the bound services against real `git` and real temporary git repos (no mocked git, default settings), TS-side tests drive the frontend against the real bridge contract. Covers all modules (git, agents/ADE, memory, terminal, API/quick commands, repos, settings, mobile web). Two parallel streams (A, B) with disjoint file ownership. Then fix every issue the tests find. | Done |
-| P232 | Real-flow tests for Kira Studio, same type as P231 (Go bound-service tests at the IPC level against real git/real services with default settings, plus real-UI `e2e-real` specs): API module (requests, collections, variables/environments, quick commands, gRPC), Docker module, with real API calls over HTTP and gRPC (real local HTTP servers and a real gRPC server with reflection and `.proto` descriptors, no mocked transport) and real Docker commands against a real Docker daemon (containers, images, volumes, networks, logs, exec), skipping with a clear message when no daemon is reachable, and Studio's own terminal wiring (`bridge/terminal.go`, terminal module host, Studio quick commands). Reuses P231's harness patterns; then fix every issue found. | Planned (Commit 0 done: appwire, flowtest, flowharness, e2e-real servers) |
+| P232 | Real-flow tests for Kira Studio, same type as P231 (Go bound-service tests at the IPC level against real git/real services with default settings, plus real-UI `e2e-real` specs): API module (requests, collections, variables/environments, quick commands, gRPC), Docker module, with real API calls over HTTP and gRPC (real local HTTP servers and a real gRPC server with reflection and `.proto` descriptors, no mocked transport) and real Docker commands against a real Docker daemon (containers, images, volumes, networks, logs, exec), skipping with a clear message when no daemon is reachable, and Studio's own terminal wiring (`bridge/terminal.go`, terminal module host, Studio quick commands). Reuses P231's harness patterns; then fix every issue found. | Done |
 | P233 | Claude Code hooks only for sessions Kira Space starts: audit every place Kira Space or Kira Studio changes the user's real Claude Code configuration (`~/.claude/settings.json`, project `.claude/settings.json`, `.claude.json`, MCP registration, hooks), and move each to per-session injection (e.g. `--settings <file>` / `--mcp-config` passed only when Kira Space launches the agent or terminal session, hook shim scoped by an env var set only there). Kira Space must make no change to the user's actual settings files; migrate or remove entries earlier versions wrote, with an explicit user-visible cleanup step. Real-flow test that proves settings.json is byte-identical after the flows. | Done |
 | P234 | Docs refresh: update `docs/ARCHITECTURE.md` (incl. Parallelism, process wiring with `appwire`, stale git-pairing-real line, testing section), `docs/DEV_ENVIRONMENT.md`, the v2.2 README and root `README.md` to match everything shipped in v2.2 (P210-P233). | Done |
 | P235 | Code review (one Opus round, all three dimensions) of everything changed since the P227 close-out `605f63e3f` (P228-P234), then one Sonnet fixer. Findings file `plans/P235-findings.md` committed before the fixer, deleted once fixed. | Planned |
@@ -632,6 +632,27 @@ Deviations:
 - Test git emits `fatal: expected 'acknowledgments'` warnings on push in e2e-real helpers; pushes succeed.
 
 Mac handover: on a desktop build, open a terminal tab and an ADE session and confirm output renders in the right window only (native `EmitTo` is untouched); reload a Review pane with the graph tab closed and confirm it compares.
+
+## P232 result
+
+Tests: 50 Go flow tests (87 with subtests) in `apps/kira-studio/internal/flows/{apiflow,httpflow,grpcflow,dockerflow,termflow}`, 11 P232 `e2e-real` specs (17 in the Studio tier), 4 unit tests for the ordered writer. Every finding test is un-skipped and green. Green: `test:flows:studio`, `test:flows:studio:complete` (`KIRA_FLOW_DOCKER=require`), `test:flows:space`, `test:e2e-real:studio` (17), `test:e2e-real:space` (16), `test:ui:studio`, `test:ui:space`, `test:webview`, `test:unit`, lint, typecheck, `lint:dead`, golangci-lint, `go build` with and without `-tags server`.
+
+Findings fixed:
+
+- A-1: gRPC `Describe`, `Call` and `ServerStream` against a server that accepts TCP and never answers waited 20 s, then failed with a bare transport error. Connect plus handshake now ends at 5 s, reflection at 15 s, a unary call at 30 s (`GrpcCallArgs.timeoutMs` overrides; the UI has no field). Each fails with `E_TIMEOUT` naming target and wait. `Describe` takes an optional `opId` (not persisted); the schema query passes one and cancels it on abort. Streams stay unbounded, Stop ends them.
+- A-2: flow gRPC harness unary handlers skipped the server interceptor. They now run through it; `Calls()` and `WithRequiredMetadata` cover unary, and the stream-only workarounds in `grpcflow` are gone.
+- A-3: the UI could not call a service inside a proto package. `Service.fullName` added (short `name` stays for display); the tab stores and calls by `fullName`.
+- B-1: per-key terminal writes reordered. `createTerminalsStore` keeps one `terminalWrite` in flight per tab and coalesces chunks typed meanwhile (`state/orderedWrites.ts`), no timers.
+
+Deviations:
+
+- B-1 needed no change in `packages/docker-ui/src/control.ts`: the Docker exec store is built by the same `createTerminalsStore`, so one queue covers Studio, Space and Docker exec.
+- Reflection deadline is 15 s, not the finding's single 5 s: 5 s bounds connect plus handshake (the silent-server case); a connected server gets 15 s in total to answer reflection.
+- `docker-real` keeps the `bash:5.2` image (busybox ash can swallow an Enter after a cursor-position reply); that is a test-side workaround, not B-1. It now types key by key.
+- Test bugs fixed on the way: `terminal-real` removed its HOME in `afterAll`, which runs between tests under `fullyParallel`; `flowServers` was worker-scoped so recorded requests leaked between tests (now per test); the unary gRPC spec expected a `grpc-status` header grpc-go strips.
+- Added: Space `terminal-real.spec.ts` (same key-by-key check on the shared store), `TestDescribeCancel`, `TestUnaryDeadline`.
+
+Mac handover: on a desktop build, type a long line fast into a Terminal tab and a Docker exec tab and confirm it arrives in order; Describe a gRPC target at a port that accepts TCP and never answers (`nc -l`) and confirm `E_TIMEOUT` after about 5 s; run the `not-installed` Docker status class with Docker stopped and no `~/.docker`.
 
 ## P233 result
 

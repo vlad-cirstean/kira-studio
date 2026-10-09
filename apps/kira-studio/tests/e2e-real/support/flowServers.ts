@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { acquireBuildLock } from '@workbench/testing/e2eReal';
 
 // The flow harness's real HTTP, HTTPS and gRPC servers (apps/kira-studio/internal/flowharness/cmd/
-// flowservers), built once under the shared build lock and spawned per worker, so the browser tier
+// flowservers), built once under the shared build lock and spawned per test, so the browser tier
 // and the Go flow tests share one server implementation.
 
 const ROOT_DIR = resolve(__dirname, '../../../../..');

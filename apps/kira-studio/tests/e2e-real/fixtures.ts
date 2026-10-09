@@ -74,14 +74,11 @@ interface KiraFixtures {
   /** Extra environment for the spawned server (merged last): `test.use({ serverEnv: { HOME } })`. */
   serverEnv: Record<string, string>;
   kira: KiraApp;
-}
-
-interface KiraWorkerFixtures {
-  /** The flow harness's real HTTP, HTTPS and gRPC servers, one set per worker. */
+  /** The flow harness's real HTTP, HTTPS and gRPC servers, one set per test so recorded requests never leak between tests. */
   flowServers: FlowServers;
 }
 
-export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
+export const test = base.extend<KiraFixtures>({
   serverEnv: [{}, { option: true }],
 
   flowServers: [
@@ -91,7 +88,7 @@ export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
       await use(servers);
       await stop();
     },
-    { scope: 'worker' },
+    { scope: 'test' },
   ],
 
   // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.

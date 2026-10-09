@@ -374,6 +374,20 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 - **In harness scripts never `pkill -f` or `pgrep -f` a pattern that appears in your own command line**
   (e.g. `claude --session-id`): it kills the calling shell. Anchor it (`pgrep -f '^claude --session-id'`).
 
+## Kira Studio flow suites (P232)
+
+- Go flows: `bun run test:flows:studio`. Complete suite: `bun run test:flows:studio:complete`
+  (`KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`, 20 min timeout). Real-backend Playwright:
+  `bun run test:e2e-real:studio`.
+- Docker flows need a daemon; if `docker ps` fails, start one with
+  `setsid nohup dockerd > /tmp/dockerd.log 2>&1 < /dev/null &`. Without one they skip, or fail under
+  `KIRA_FLOW_DOCKER=require`. The `not-installed` status class needs a host without `/var/run/docker.sock`
+  (run it on a Mac with Docker stopped and no `~/.docker`).
+- `docker-real.spec.ts` execs into `mirror.gcr.io/library/bash:5.2`: with alpine, busybox ash can swallow an
+  Enter that follows a cursor-position reply. Test-side workaround, not a product bug.
+- `terminal-real.spec.ts` uses a temp `HOME` removed at process exit, not in `afterAll`: with `fullyParallel`
+  `afterAll` runs between tests of one worker.
+
 ## Kira Space flow suites (P231)
 
 - Go flows: `bun run test:flows:space`. Complete suite: `bun run test:flows:space:complete`
