@@ -1,5 +1,5 @@
 import { buildPackedChunk, type PackedChunkRow } from '@kira/git-core/testing/packedChunk';
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import type { KiraApp, RelaunchOptions } from '../fixtures';
 import { installGitStreamMock } from './gitStreamMock';
 import { buildGraphStreamChunk, type GraphStreamChunkFixture } from './graphStreamFixture';
@@ -194,5 +194,51 @@ export async function restorePortGraph(
       graphStreamChunks: chunks,
     },
   });
+  return page;
+}
+
+const PARAGRAPH =
+  'This paragraph exists only to overflow a two-line clamp reliably regardless of viewport ' +
+  'width or font metrics, so no test has to guess how many words make two lines.';
+
+const file = (kind: string, path: string, additions: number, deletions: number) => ({
+  kind,
+  path,
+  originalPath: undefined,
+  similarity: undefined,
+  additions,
+  deletions,
+  isBinary: false,
+});
+
+/** `commit.detail` for SHA_A: a ten-paragraph body, trailers, distinct author and committer, a
+ *  branch decoration and two files with different extensions. */
+export const COMMIT_DETAIL = {
+  sha: SHA_A,
+  parents: [SHA_B],
+  author: { name: 'Fake Author', email: 'fake@example.com', timestamp: 1_700_000_000 },
+  committer: { name: 'Fake Committer', email: 'committer@example.com', timestamp: 1_700_000_500 },
+  subject: 'A commit with a long message body',
+  body: Array.from({ length: 10 }, (_, i) => `Paragraph ${i + 1}. ${PARAGRAPH}`).join('\n\n'),
+  trailers: [
+    { token: 'Co-authored-by', value: 'Jane Coauthor <jane@example.com>' },
+    { token: 'Signed-off-by', value: 'Fake Author <fake@example.com>' },
+  ],
+  signature: { status: 'N', signer: '' },
+  decoration: [{ kind: 'branch', name: 'main', isHead: true }],
+  parentIndex: 0,
+  files: [file('modified', 'src/example.ts', 3, 1), file('added', 'README.md', 5, 0)],
+};
+
+/** Opens the graph with one commit and selects it, so the detail pane shows `COMMIT_DETAIL`. */
+export async function openCommitDetail(relaunch: Relaunch): Promise<Page> {
+  const page = await openPortGraph(relaunch, {
+    chunks: singleRowChunks([rootRow(SHA_A, COMMIT_DETAIL.subject)]),
+    results: { 'commit.detail': COMMIT_DETAIL },
+  });
+  const row = page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]');
+  await expect(row).toBeVisible();
+  await row.click();
+  await expect(page.locator('.kv-meta-subject')).toBeVisible();
   return page;
 }
