@@ -18,9 +18,8 @@ import { TAB_VIEWS } from './tabViews';
 export { useTabsStore };
 
 // P103 Part 2 (§5.4): the WorkbenchHost instance this app provides once, in App.vue — no
-// `tabBadge`/`tabIndicator`: this app has no TabIncognito store (a Kira Studio-only feature) and no
-// kind of its own declares a `badge()` member, so both stay unwired (TabStrip.vue renders neither
-// element).
+// `tabIndicator`: this app has no TabIncognito store (a Kira Studio-only feature). `tabBadge`
+// shows a script terminal's run state (terminalTabKind's badge()).
 export function createWorkbenchHost(): WorkbenchHost<WorkspaceKey, TabRecord> {
   const tabsStore = useTabsStore();
 
@@ -43,6 +42,9 @@ export function createWorkbenchHost(): WorkbenchHost<WorkspaceKey, TabRecord> {
     },
     railColorFor(tab) {
       return TAB_KINDS[tab.kind].railColor(tab);
+    },
+    tabBadge(tab) {
+      return TAB_KINDS[tab.kind].badge?.(tab) ?? null;
     },
   };
 }
