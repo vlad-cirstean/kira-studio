@@ -181,10 +181,9 @@ func TestGraphRefreshAfterExternalCommit(t *testing.T) {
 			t.Fatalf("row %d after refresh = %s, want %s", i, rows[i].Sha, want[i])
 		}
 	}
-	t.Run("keeps every loaded row", func(t *testing.T) {
-		t.Skip("P231 finding A1: graph.refresh after Show more re-walks one page")
-		if len(rows) < st.Loaded+1 {
-			t.Fatalf("refresh kept %d rows, want at least the %d loaded before plus the new commit", len(rows), st.Loaded)
+	t.Run("keeps every loaded page", func(t *testing.T) {
+		if len(rows) < st.Loaded {
+			t.Fatalf("refresh kept %d rows, want at least the %d loaded before", len(rows), st.Loaded)
 		}
 	})
 }

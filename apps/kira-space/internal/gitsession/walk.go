@@ -32,6 +32,7 @@ type Walk struct {
 	entry    *RepoEntry
 	gitPath  string
 	spec     porcelain.WalkSpec
+	keepRows int // rows to restore on the next first Stream after a reset
 	pageSize int // the underlying log session's own page size — fixed at construction (D6)
 
 	// precomputedTotal is G6 D9's own seam: a rev-list --count already known for this exact range
@@ -132,6 +133,10 @@ func (w *Walk) resetLocked() {
 		w.searchCancel()
 		w.searchCancel = nil
 	}
+	// Rows loaded before the reset; the next Stream re-reads that many so a refresh keeps Show more pages.
+	if w.store != nil && w.store.RowCount() > w.keepRows {
+		w.keepRows = w.store.RowCount()
+	}
 	w.store = gitstore.New()
 	w.marks = map[int]int{0: 0}
 	w.nextSeq = 0
@@ -216,6 +221,7 @@ func (w *Walk) ReadPage(ctx context.Context, pages int) (started bool, err error
 		return false, ErrRepoNotHeld
 	}
 	w.ensureFreshLocked()
+	w.keepRows = 0
 	if w.log.Exhausted() {
 		return false, nil
 	}
@@ -283,6 +289,8 @@ func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int,
 		return ErrRepoNotHeld
 	}
 	w.ensureFreshLocked()
+	keepRows := w.keepRows
+	w.keepRows = 0
 
 	if chunkRows <= 0 {
 		chunkRows = 500
@@ -356,9 +364,12 @@ func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int,
 	if cachedThrough > 0 {
 		return nil
 	}
-	if _, err := w.readPageLocked(ctx); err != nil {
-		return err
-	} else if newTotal := w.store.RowCount(); cursor < newTotal {
+	for first := true; first || (w.store.RowCount() < keepRows && !w.log.Exhausted()); first = false {
+		if _, err := w.readPageLocked(ctx); err != nil {
+			return err
+		}
+	}
+	if newTotal := w.store.RowCount(); cursor < newTotal {
 		for cursor < newTotal {
 			to := cursor + chunkRows
 			if to > newTotal {
