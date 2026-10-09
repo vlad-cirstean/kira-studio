@@ -24,7 +24,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P226 | Consistent colour bars: wherever the left panel shows an item with a coloured left bar (scripts in Kira Studio, git repos, and other module lists), the same colour renders the same way everywhere. One shared bar component and tone mapping instead of per-module variants | Done |
 | P227 | Code review (one Opus round, all three dimensions) of everything changed since the last review close-out `7f626e91a` (P218 to P226), then one Sonnet fixer. Findings file `plans/P227-findings.md` committed before the fixer, deleted once fixed. Also fix the stale Studio visual baselines (all 12 fail on base). | Done |
 | P228 | Git graph still broken after P225; user suspects resizing columns breaks it. Reproduce with real column resizes (every column, drag then scroll, click, Load more), find root cause, fix, add regression spec that resizes columns first. | Done |
-| P229 | Git section (graph, toolbar, detail, stash and other git panes) looks different from the rest of the app: bring it in line with the app's shadcn-vue/Tailwind look (spacing, type, colours, controls, rows). Includes the git UI inside Kira Space. | Planned |
+| P229 | Git section (graph, toolbar, detail, stash and other git panes) looks different from the rest of the app: bring it in line with the app's shadcn-vue/Tailwind look (spacing, type, colours, controls, rows). Includes the git UI inside Kira Space. | Done |
 | P230 | Agent module Refresh broken: shows 'never fetched' then a git error. Find root cause, fix, add regression spec. | Done |
 | P231 | Real-flow tests for every main flow of Kira Space, split at the IPC (bridge) level: Go-side tests drive the bound services against real `git` and real temporary git repos (no mocked git, default settings), TS-side tests drive the frontend against the real bridge contract. Covers all modules (git, agents/ADE, memory, terminal, API/quick commands, repos, settings, mobile web). Two parallel streams (A, B) with disjoint file ownership. Then fix every issue the tests find. | Planned |
 
@@ -543,6 +543,40 @@ Review: 3 Medium, 9 Low, no High (base `7f626e91a`). All fixed; none declined. F
 Checks: lint, lint:dead, typecheck clean; `test:unit` 1812 pass; Go `mobileweb`, `mobileterm`,
 `lannet`, `bridge` pass (`-race` on the first two); `test:visual:studio` 13 pass, `test:visual:space` 5
 pass; full Space UI suite 248 pass, 0 fail.
+
+## P229 result
+
+Facts in `docs/ARCHITECTURE.md` (Git module section, "Git module follows the app look"). All DD1-DD7
+plan defaults taken. 5 feature commits plus the visual baseline commit.
+
+Done: Space surfaces `#1f1f1f`; commit rows 28/22px with Appearance density (live switch checked, 28 to
+22 without remount); badges 1px border plus 15% tint, normal weight; toolbars, search rows, review
+toolbar on the `ViewToolbar` recipe; `Alert` banners; every raw codicon span is `CodiconIcon` 13px;
+`rowVariants` `menu`/`tree`; menus one line with muted 13px icons and trailing detail; `Empty` panels
+and placeholders; detail meta `px-3 py-2` with muted "Show more"; 15 dialogs on the header-close,
+padded-body, Cancel-first recipe.
+
+Deviations from the plan:
+- `FileTree` indent is `8 + depth * --kv-tree-indent`. The host setting stays, so Space shows 8px per
+  level (app tree: 14). No Space source for the setting exists.
+- Separator height is `h-3.5`; `h-control-inline` is a `kv:`-only spacing name.
+- No folder icon added to tree rows: directory rows never had one (chevron only).
+- Cell padding change also covers `CELL_PADDING_PX` (date probe), as planned; strip SVG uses `100%`/`50%`
+  instead of a measured height.
+- `graph-columns.spec.ts` (webview) asserted a transparent tag badge; it now asserts the 0.15 tint.
+- Contrast (fg `#cccccc` on 15% tint, dark): over `--kira-bg` lanes 7.3-9.2, kinds 7.6-8.9; over
+  `bg-select` lanes 5.5-7.4, kinds 5.6-6.7. All above 4.5.
+
+Checks: typecheck, lint, lint:dead clean per commit; `test:unit` 1822 pass; `test:webview` 64 pass;
+`test:visual:space` 8 pass (5 Settings baselines unchanged, 3 new); `test:visual:studio` 13 pass, no
+change; full Space UI suite 251 pass (workers=1). `repo-graph-paging` "columns resized wide"
+drag spec flakes at `--workers=2` under load, passes at 1.
+
+New baselines (`git-module.spec.ts-snapshots/`, linux): `git-graph`, `git-graph-detail`,
+`git-stash-dialog`. Commit times are 3.5h before the run so relative dates stay stable.
+
+Mac handover: record or compare the 3 new git-module baselines on the Mac CI image
+(`test:visual:update:space`); not run on macOS here.
 
 ## P230 result
 

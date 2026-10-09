@@ -3643,6 +3643,21 @@ reads `--vscode-font-size`/`--kv-font-size`, which `--kira-graph-font-size` over
 not a gap: the grid is a data view (P123's own four-value chrome scale explicitly excludes it),
 while a shadcn dialog or the review view is chrome.
 
+**Git module follows the app look (P229).** In Kira Space the graph, detail pane, strip and toolbar
+sit on `--kira-bg` like every other module (`vscode-bridge.css` maps `panel.background` and
+`editorGroupHeader.tabsBackground` to it; selected rows keep `--kira-fg`). Commit row height follows
+Appearance density: `vscode-bridge.css` sets the `--vscode-kiraSpace-rowHeight` hook from
+`--kira-row-height`, and `density.css` makes `--kv-row-height-compact` the larger of the hook and
+`--kv-h-xs + 2px` (28/22px in Space; unset in VS Code, so rows stay font-derived). The webview's
+`kira-bridge.css` maps `--kira-row-height` to `--kv-h-sm` so unprefixed `h-row`/`min-h-row` markup
+works there too. Markup rewritten in P229 uses unprefixed app utilities (`ViewToolbar` recipe,
+`Alert` banners, `Empty` panels, dialog header/body/footer recipe, `rowVariants` `menu`/`tree`
+layouts, 13px `CodiconIcon`). Data surfaces (grid cells, detail meta, `FileTree` and review rows)
+keep `kv:text-*` so Settings > Git graph font size still reaches them. Ref badges are a 1px
+lane/kind border plus a 15% tint of the same colour, `--kv-t-sm` label. `FileTree` indent is `8px +
+depth * --kv-tree-indent` (host setting `workbench.tree.indent`, default 8), not the app tree's 14px.
+Visual baselines: `apps/kira-space/tests/visual/git-module.spec.ts`.
+
 **Checkboxes (P67c), retired (P131 Part 2).** The 14 raw `<input type="checkbox">` elements across
 9 dialogs (RepoSettingsDialog, StashDialog, TagDialog, BranchDialog, RevertDialog, WorktreeDialog,
 CherryPickDialog, ForcePushDialog, ResetDialog) had no checkbox CSS anywhere in this package —
