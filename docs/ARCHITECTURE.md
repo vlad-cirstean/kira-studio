@@ -3669,14 +3669,16 @@ purge. `pr.ts` keeps last-known facts per repo (cap 8), restores them on `setRep
 `CommitGrid` badges a PR only on the commit its head points at (`PrState.prsHeadedAt(sha)`); the
 details pane keeps the ancestry-derived `prForCommit`.
 
-`CommitGrid` auto-sizes the graph column on a first-ever mount (no persisted view state). It sets
-the width from `laneCount` once lanes exist (`laneCount` is 0 until the layout worker answers), then
-widens it as later chunks and Load more pages raise `laneCount`, up to the six-lane default
-(`DEFAULT_GRAPH_LANE_CAP`). Growth only: a refresh restarts `laneCount` at 0 and never shrinks the
-column. The width is not emitted or persisted; a user drag ends auto mode for that mount and is the
-only width that persists. The width floors at the 40px column minimum. The row SVG clips lanes past
-the column's right edge, so too narrow a column hides nodes and lines. Lanes past six clip until the
-user drags wider.
+The graph column never renders narrower than `graphColumnWidth(laneCount)` (at most 12 lanes, 173px) in
+any mode. `CommitGrid` keeps a grow-only lane floor per mount; a refresh restarts `laneCount` at 0 and
+never shrinks it, a repo switch remounts and resets it. On a first-ever mount (no persisted view
+state) the column tracks the floor, even below the stored width, until the user drags it. Stored
+widths are preferences: only a drag writes one. Effective widths come from `columnFit.ts` and always
+fit the viewport: author, then date, shrink to their minimums so the message column keeps 120px; the
+graph never shrinks. Drags stop where the message column reaches 120px (handle `:max`). Stored widths
+return when the window grows. The viewport's `overflow-x` is forced hidden as a last guard against a
+sideways wheel scrolling the graph off screen. `CommitGrid` emits the drawn graph width and
+`UncommittedChangesStrip` sizes its cell from it.
 
 Edge records (`EDGE_STRIDE` 6) carry three lanes: `fromLane` (source node), `EDGE_RUN_LANE` (lane on
 pass-through rows, set at append, never patched), `toLane` (target node). Convergence at the target

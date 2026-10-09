@@ -23,7 +23,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P225 | Git graph regression (new since about yesterday, likely from P220's CommitGrid change): commits disappear from the graph and Show more is broken. Find the root cause, fix it, add a regression test that fails before the fix | Done |
 | P226 | Consistent colour bars: wherever the left panel shows an item with a coloured left bar (scripts in Kira Studio, git repos, and other module lists), the same colour renders the same way everywhere. One shared bar component and tone mapping instead of per-module variants | Done |
 | P227 | Code review (one Opus round, all three dimensions) of everything changed since the last review close-out `7f626e91a` (P218 to P226), then one Sonnet fixer. Findings file `plans/P227-findings.md` committed before the fixer, deleted once fixed. Also fix the stale Studio visual baselines (all 12 fail on base). | Done |
-| P228 | Git graph still broken after P225; user suspects resizing columns breaks it. Reproduce with real column resizes (every column, drag then scroll, click, Load more), find root cause, fix, add regression spec that resizes columns first. | Planned |
+| P228 | Git graph still broken after P225; user suspects resizing columns breaks it. Reproduce with real column resizes (every column, drag then scroll, click, Load more), find root cause, fix, add regression spec that resizes columns first. | Done |
 | P229 | Git section (graph, toolbar, detail, stash and other git panes) looks different from the rest of the app: bring it in line with the app's shadcn-vue/Tailwind look (spacing, type, colours, controls, rows). Includes the git UI inside Kira Space. | Planned |
 | P230 | Agent module Refresh broken: shows 'never fetched' then a git error. Find root cause, fix, add regression spec. | Planned |
 
@@ -457,6 +457,59 @@ Checks: typecheck, lint, lint:dead clean; `test:unit` 1812 pass; `repo-graph-*` 
 Space UI suite 246 pass, 0 fail; `test:webview` 64 pass (the webview renders the same `rowSvg.ts`).
 Not run: `test:visual:space`. Workers=1 was needed locally for the new spec under load; the full suite
 ran with the default config.
+
+## P228 result
+
+Facts in `docs/ARCHITECTURE.md` (commit-grid notes). Resizing did break it; two deterministic causes,
+both engines (WebKit and Chromium).
+
+A. Wide columns overflowed the viewport. `computeMessageWidth` floored the message column at 120px, so
+graph + author + date + 120 could exceed the viewport; SlickGrid sized the canvas to the sum and a
+sideways wheel scrolled the graph column off screen (resize handles stayed put). A row click opened the
+detail pane (compact columns fit) and the graph returned. Fix: `columnFit.ts` computes effective widths
+(author, then date shrink; graph never does; drags stop at a 120px message column via handle `:max`),
+stored widths stay preferences, and the viewport's `overflow-x` is forced hidden as a last guard.
+B. Any graph drag froze the column below what later lanes need. P225's growth only ran in auto mode,
+and a drag, a restored view state, or a repo with 7+ lanes left the column too narrow after Load more.
+Fix: a grow-only lane floor per mount applies in every mode; the six-lane auto cap is gone (12 lanes,
+173px max); the graph handle `:min` follows the floor.
+C. `UncommittedChangesStrip` took the persisted width. `CommitGrid` now emits `graphWidth`; `App.vue`
+binds it (not persisted).
+
+Not reproduced: row gaps, missing rows, lost nodes mid-drag, anything after detail-pane drags. Load more
+completed after every resize sequence. P225's open item (Refresh after Load more re-walks one page) is
+unchanged and still has no row.
+
+Specs: R1 and R2 in `repo-graph-paging.spec.ts` (resize, wheel, click, window shrink, Load more).
+Pre-fix failures, WebKit, same tree minus the fixes:
+- R1: `scrollWidth 1355 > clientWidth 1148` after dragging graph, author and date +300 each.
+- R2: 61 clipped entries: `row 1001: cx 43.5`, `row 1002: cx 56.5`, `row 1003: cx 69.5`,
+  `row 1004: cx 82.5`, `row 1052: cx 43.5`, `row 1053: cx 56.5`, `row 1054: cx 69.5`, `row 1102: cx 43.5`.
+`columnFit.test.ts` covers shrink order, minimums, compact, auto vs user graph width, drag maximums.
+
+Deviations from the plan: `fitColumns` takes `graphAuto` as already combined with "lane floor known"
+(caller passes `laneFloor > 0 && graphAuto`); `effectiveGraphWidth` is exported so the graph formatter
+reads the same rule without a layout read per cell. The `!important` guard is Tailwind
+`@apply kv:overflow-x-hidden!`, because biome flags a literal `!important` and its suppression does not
+apply inside Vue `<style>`. R1 polls after the window resize and scrolls to row 3 before clicking (the
+diagonal wheel had scrolled it away). D1 to D5 took the plan defaults.
+
+Checks: typecheck, lint, lint:dead clean per commit; `test:unit` 1822 pass; `repo-graph-*` specs (13)
+pass in WebKit; R1 and R2 pass in Chromium (temporary `test.use`, not committed); full Space UI suite
+250 pass, 0 fail; `test:webview` 64 pass. R1 failed once under `--workers=2` load alongside other
+work, then passed three times in a row (workers 1 and 2). Not run: `test:visual:space`.
+
+Mac handover, on a repo with 5000+ commits and more than 6 concurrent branches:
+1. Close the detail pane. Drag author and date as wide as they go: the drag stops with the message
+   column about 120px wide; no horizontal scrollbar.
+2. Swipe diagonally over the graph: rows scroll vertically only; graph and dots stay.
+3. Shrink the window: author shrinks first, then date; the graph column keeps its width.
+4. Drag the graph column as narrow as it goes: it stops at the width of the lanes in view. Load more:
+   the column widens as deeper rows add lanes; no dot is cut.
+5. Rows with lane 7 or more: dot visible without any drag.
+6. The uncommitted-changes strip's dot lines up with the first row's lane.
+7. Quit and reopen: widths persist; a column the window cannot fit shrinks, then returns when the
+   window grows.
 
 ## P227 result
 
