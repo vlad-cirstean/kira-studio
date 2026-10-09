@@ -128,8 +128,8 @@ type MobileAccessService struct {
 	Detect func() (lannet.Network, error)
 	Find   func(lannet.Identity) (lannet.Network, error)
 	Poll   time.Duration
-	// isLAN is a test seam passed to the server's Config.IsLAN; nil in production.
-	isLAN func(netip.Addr) bool
+	// IsLAN is a test seam passed to the server's Config.IsLAN (loopback in the flow harness); nil in production.
+	IsLAN func(netip.Addr) bool
 
 	embedded embedded.Service[*mobileweb.Server, MobileStatus]
 	sup      mobileSupervisor
@@ -155,7 +155,7 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 				Reader: s.Reader, AgentSessions: s.AgentSessions, Devices: s.Deps.Repos.MobileDevices,
 				Writer: s.Writer, Terminals: s.Terminals, AgentInputEnabled: s.agentInputEnabled,
 				Hub: s.Hub, Broker: s.Broker, Assets: s.Assets,
-				Port: cfg.Mobile.Port, Network: s.sup.network(), IsLAN: s.isLAN,
+				Port: cfg.Mobile.Port, Network: s.sup.network(), IsLAN: s.IsLAN,
 				OnDevicesChanged: s.emitDevices,
 				OnStatusChanged:  func() { s.emitStatus(s.embedded.Status()) },
 			})

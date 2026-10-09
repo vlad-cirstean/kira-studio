@@ -110,7 +110,7 @@ func TestMobileSupervisor(t *testing.T) {
 			return here, findErr
 		},
 		Poll:  time.Hour,
-		isLAN: func(a netip.Addr) bool { return a.IsLoopback() },
+		IsLAN: func(a netip.Addr) bool { return a.IsLoopback() },
 	})
 	t.Cleanup(func() { StopMobile(svc) })
 	set := func(n lannet.Network, err error) { mu.Lock(); here, findErr = n, err; mu.Unlock() }
