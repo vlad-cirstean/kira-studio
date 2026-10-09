@@ -76,3 +76,43 @@ export async function runTask(page: Page, branch: string): Promise<void> {
   await page.locator('[data-testid="ade-run-branch"]').fill(branch);
   await page.locator('[data-testid="ade-run-send"]').click();
 }
+
+const REBASE_SH = 'git fetch -q origin && git rebase -q origin/main';
+const rebaseAction = (sh: string, finish: Record<string, unknown>) => ({
+  sh,
+  mcp: [{ server: 'kira-ade', tool: 'finish_step', args: finish }],
+});
+
+/** Attempt 1 is the flow step; attempt 2 and on are rebase runs. */
+export const REBASE_DONE_SCENARIO = {
+  claude: {
+    '*': ['done', rebaseAction(REBASE_SH, { status: 'done', summary: 'rebased' })],
+  },
+};
+
+/** The rebase leaves its conflict in the worktree and reports it. */
+export const REBASE_CONFLICT_SCENARIO = {
+  claude: {
+    '*': [
+      'done',
+      rebaseAction(`${REBASE_SH} || true`, {
+        status: 'failed',
+        summary: 'conflict',
+        reason: 'clash.txt conflicts',
+        conflictedFiles: ['clash.txt'],
+        lastGitError: 'CONFLICT (add/add): clash.txt',
+        tried: 'plain rebase',
+      }),
+    ],
+  },
+};
+
+/** Opens the Add task popover, picks `base` for the first repo and files the task. */
+export async function addTaskOnBase(page: Page, title: string, base: string): Promise<void> {
+  await page.locator('[data-testid="ade-add"]').click();
+  await page.locator('[data-testid="ade-nw-title"]').fill(title);
+  await page.locator('[data-testid="ade-nw-base"] [data-testid="ade-base-picker"]').first().click();
+  await page.locator(`[data-testid="ade-base-option-${base}"]`).click();
+  await page.locator('[data-testid="ade-nw-add"]').click();
+  await expect(page.locator('[data-testid="ade-add-popover"]')).toHaveCount(0);
+}
