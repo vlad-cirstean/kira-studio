@@ -35,6 +35,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P237 | Real `claude` test suite: opt-in only (`-tags realclaude` and `KIRA_REAL_CLAUDE=1`; never in default tests, hooks or CI), haiku with a tiny budget, per-area tests (hook injection and payload contract, settings untouched, ADE headless run and TUI session, memory MCP, DB MCP); the existing `claudesmoke` tests move to the same gate; `docs/DEV_ENVIRONMENT.md` table of area to command with cost; one `CLAUDE.md` pointer | Todo |
 | P238 | Desktop notification when a Kira-started Claude Code session finishes (Stop) or needs input (permission or elicitation Notification), and when an ADE headless run ends (run state; headless runs have no hooks): repo or task name plus a bounded message, click focuses the window and tab, suppressed while that tab is focused, cooldown, per-kind settings toggles and a test button in Settings > Claude Code; native via the Wails v3 notifications service on macOS, no-op on Linux and `-tags server` | Todo |
 | P239 | Claude Code usage limits (5-hour and weekly: % used, reset time) in the status bar, ADE module only. Default source: the `rate_limits` Claude Code hands to a status-line command injected per session (user's own status line kept). Opt-in fallback (off by default): read Claude Code's stored OAuth token read-only and call the undocumented usage endpoint, no refresh, no writes. TanStack Query, tooltip, states, off switch | Todo |
+| P240 | One-step review from the ADE Plan: a Review code action on every task card, branch row, task and branch context menu, task panel header and a keyboard shortcut (Cmd/Ctrl+Shift+R on the selected task or branch) opens the existing per-branch review window on the branch and its base, focusing an already open one; a task with several branches picks one; hidden for parked branches, disabled with a reason for an uncreated branch or one with no commits on its base; focus returns to the invoking element. Frontend only, reuses `OpenReviewWindow`. Waits for Stream A (P236 owns `ade/v2/**`) | Todo |
 
 ### Streams for P236-P239 (user override: 3 concurrent streams)
 
@@ -73,6 +74,7 @@ updates `docs/ARCHITECTURE.md` test counts.
 - P237: tests with a real `claude -p`; not run automatically (real tokens); the agent runs them one by one when changes land in that area.
 - P238: notify me through the OS when a Kira Space agent finishes, so I check what it said or whether it has to ask something.
 - P239: in the ADE module status bar, Claude Code usage limits now (5-hour and weekly, % used, reset time); check how Orca ADE does it and how it gets a token without me doing anything.
+- P240: very easy, from a task in the ADE plan window, to open a review window.
 
 ## P210 result
 
@@ -732,3 +734,7 @@ Done. Review findings F1-F6 all fixed; findings file deleted.
 - F6: P233 commit hash replaced with `10852247c`.
 
 Skipped: none. Checks: lint, typecheck, lint:dead, golangci-lint, `go build` (+ `-tags server`), Go tests for bridge/grpcclient/adapterhost/shell, `test:flows:studio`, Studio `grpc-request` and Space `repo-graph-lines`/`repo-workspace` UI specs pass. `TestResolveSource_CancelOnlyAffectsOwnCaller` flaked once under load, passes alone and on the base.
+
+## P240 result
+
+Pending.
