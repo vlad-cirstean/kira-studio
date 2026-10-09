@@ -7,7 +7,10 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 // rig is one booted app plus one git stream connection, default settings.
@@ -102,3 +105,45 @@ func lines(s string) []string {
 }
 
 const wait = 20 * time.Second
+
+// wireErr sends a request expected to fail and returns the wire error.
+func wireErr(t *testing.T, gs *flowharness.GitStream, method string, params any) *flowharness.WireError {
+	t.Helper()
+	err := gs.Request(method, params, nil)
+	if err == nil {
+		t.Fatalf("%s: want a wire error, got success", method)
+	}
+	we, ok := err.(*flowharness.WireError)
+	if !ok {
+		t.Fatalf("%s: error %v is not a wire error", method, err)
+	}
+	return we
+}
+
+func (r *rig) op(id string, op gitsession.OpRequest) gitsession.OpResult {
+	r.t.Helper()
+	return call[gitsession.OpResult](r.t, r.gs, "op.run", gitrpc.OpRunParams{RepoID: id, Op: op})
+}
+
+func (r *rig) mustOp(id string, op gitsession.OpRequest) gitsession.OpResult {
+	r.t.Helper()
+	res := r.op(id, op)
+	if !res.OK {
+		r.t.Fatalf("op.run %s failed: %+v", op.Kind, res.Error)
+	}
+	return res
+}
+
+func (r *rig) status(id string) gitpreflight.StatusSummary {
+	r.t.Helper()
+	return call[gitpreflight.StatusSummary](r.t, r.gs, "status.get", gitrpc.StatusGetParams{RepoID: id})
+}
+
+// external runs a change made outside the app and waits for the real watcher to announce it, the
+// way the UI learns about it.
+func (r *rig) external(fn func()) {
+	r.t.Helper()
+	before := len(r.gs.Events("repo.changed"))
+	fn()
+	testx.WaitUntil(r.t, wait, func() bool { return len(r.gs.Events("repo.changed")) > before })
+}
