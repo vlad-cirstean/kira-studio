@@ -2,6 +2,8 @@ package ade
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -67,5 +69,94 @@ func TestTaskBoard_RefreshNamedRepoWithoutLiveBranches(t *testing.T) {
 	}
 	if len(res.Repos) != 1 || res.Repos[0].Error != nil {
 		t.Fatalf("refresh = %+v, want one row without error", res.Repos)
+	}
+}
+
+func repoState(t *testing.T, h *boardHarness, repoID string) (remote string, fetched *int64) {
+	t.Helper()
+	board, err := h.board.Board(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range board.Repos {
+		if r.CodeRepoID == repoID {
+			return r.Remote, r.LastFetchAt
+		}
+	}
+	t.Fatalf("board has no repo %s", repoID)
+	return "", nil
+}
+
+func TestTaskBoard_RefreshWithDefaultGitPathSetting(t *testing.T) {
+	skipWithoutGitQueue(t)
+	h := newBoardHarness(t)
+	h.board.deps.GitPath = func() string { return "" }
+	_, dir := initQueueRepo(t)
+	h.addRepo("a", dir)
+	runGitQueue(t, dir, "checkout", "-q", "-b", "feat", "main")
+	commitFile(t, dir, "f.txt", "f\n", "f")
+	h.addTask("T1", "task", branchSpec{id: "ba", repo: "a", name: "feat", kind: "mine"})
+	runGitQueue(t, dir, "fetch", "-q")
+
+	remote, fetched := repoState(t, h, "a")
+	if remote != "origin" || fetched == nil {
+		t.Fatalf("board repo remote=%q lastFetchAt=%v, want origin and a fetch time", remote, fetched)
+	}
+	res, err := h.board.Refresh(context.Background(), []string{"a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Repos[0].Error != nil {
+		t.Fatalf("refresh error: %+v", res.Repos[0].Error)
+	}
+}
+
+func TestTaskBoard_RefreshWithoutRemoteIsNotAnError(t *testing.T) {
+	skipWithoutGitQueue(t)
+	h := newBoardHarness(t)
+	dir := t.TempDir()
+	runGitQueue(t, dir, "init", "-q", "-b", "main")
+	runGitQueue(t, dir, "config", "user.name", queueMineName)
+	runGitQueue(t, dir, "config", "user.email", queueMineEmail)
+	commitFile(t, dir, "base.txt", "base\n", "base")
+	runGitQueue(t, dir, "checkout", "-q", "-b", "feat")
+	commitFile(t, dir, "f.txt", "f\n", "f")
+	h.addRepo("r", dir)
+	h.addTask("T1", "task", branchSpec{id: "br", repo: "r", name: "feat", kind: "mine"})
+
+	res, err := h.board.Refresh(context.Background(), []string{"r"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row := res.Repos[0]; row.Error != nil {
+		t.Fatalf("row error = %+v, want none", *row.Error)
+	} else if row.RefsChanged != 0 {
+		t.Fatalf("refsChanged = %d, want 0", row.RefsChanged)
+	}
+	if remote, _ := repoState(t, h, "r"); remote != "" {
+		t.Fatalf("remote = %q, want none", remote)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".git", "FETCH_HEAD")); err == nil {
+		t.Fatal("FETCH_HEAD exists: a no-remote refresh must not fetch")
+	}
+}
+
+func TestTaskBoard_LinkedWorktreeRootShowsFetch(t *testing.T) {
+	skipWithoutGitQueue(t)
+	h := newBoardHarness(t)
+	_, dir := initQueueRepo(t)
+	wt := addQueueWorktree(t, dir, "feat", "main")
+	h.addRepoFromPath("wt", wt)
+	h.addTask("T1", "task", branchSpec{id: "bw", repo: "wt", name: "feat", kind: "mine"})
+
+	res, err := h.board.Refresh(context.Background(), []string{"wt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Repos[0].Error != nil {
+		t.Fatalf("refresh error: %+v", res.Repos[0].Error)
+	}
+	if _, fetched := repoState(t, h, "wt"); fetched == nil {
+		t.Fatal("lastFetchAt is nil after a refresh of a linked worktree root")
 	}
 }

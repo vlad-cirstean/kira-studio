@@ -106,6 +106,31 @@ test('Refresh all sends every repo the plan shows; a chip sends its own', async 
   expect(calls()[1]?.args).toEqual({ codeRepoIds: ['repo-api'] });
 });
 
+test('a repo without a remote reads no remote, never an error', async ({ relaunch }) => {
+  const board = adeFixture<{
+    repos: { codeRepoId: string; remote: string; lastFetchAt: number | null }[];
+  }>('board');
+  const mobile = board.repos.find((r) => r.codeRepoId === 'repo-mobile');
+  if (!mobile) throw new Error('fixture lost repo-mobile');
+  mobile.remote = '';
+  mobile.lastFetchAt = null;
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+    {
+      channel: IPC.adeTaskRefresh,
+      response: {
+        repos: [{ codeRepoId: 'repo-mobile', refsChanged: 0, mergedInto: [], error: null }],
+      },
+    },
+  ]);
+  const chip = page.locator('[data-testid="ade-repo-chip"][data-repo-id="repo-mobile"]');
+  const note = chip.locator('[data-testid="ade-repo-note"]');
+  await expect(note).toHaveText('no remote');
+  await chip.locator('[data-testid="ade-repo-refresh"]').click();
+  await expect(note).toHaveText('no remote · no changes');
+  await expect(note).not.toHaveClass(/text-tone-red/);
+});
+
 test('dragging a card to another day writes the plan once, with no dialog', async ({
   relaunch,
 }) => {
