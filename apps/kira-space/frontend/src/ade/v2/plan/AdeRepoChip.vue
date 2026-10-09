@@ -13,6 +13,7 @@ import { adeAgoOptions } from '../ago';
 const props = defineProps<{
   codeRepoId: string;
   label: string;
+  remote: string;
   lastFetchAt: number | null;
   shown: boolean;
   busy: boolean;
@@ -26,6 +27,7 @@ const ago = useTimeAgo(() => props.lastFetchAt ?? 0, adeAgoOptions);
 const note = computed(() => {
   if (props.busy) return 'fetching…';
   if (props.error) return props.error;
+  if (props.remote === '') return props.summary ? `no remote · ${props.summary}` : 'no remote';
   if (props.lastFetchAt === null) return 'never fetched';
   return props.summary ? `${ago.value} · ${props.summary}` : String(ago.value);
 });
@@ -59,7 +61,7 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
       data-testid="ade-repo-note"
       >{{ note }}</span
     >
-    <AdeTip :text="`Fetch ${label}`">
+    <AdeTip :text="remote === '' ? `Rescan ${label} (no remote to fetch)` : `Fetch ${label}`">
       <Button
         variant="toolbar"
         size="kira-icon"

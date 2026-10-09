@@ -639,10 +639,6 @@ func (b *TaskBoard) refreshRepo(ctx context.Context, id string) adewire.RepoRefr
 		return refreshFailure(id, err)
 	}
 	remote, hasRemote := entry.DefaultRemote(ctx)
-	if !hasRemote {
-		out.Error = &adewire.RemoteOpError{Kind: "NoRemote", Message: "this repository has no remote configured"}
-		return out
-	}
 	before, err := entry.BranchInventory(ctx)
 	if err != nil {
 		return refreshFailure(id, err)
@@ -655,13 +651,15 @@ func (b *TaskBoard) refreshRepo(ctx context.Context, id string) adewire.RepoRefr
 	for _, r := range before {
 		beforeTips[r.Ref] = r.Tip
 	}
-	res, err := entry.RunRemote(ctx, b.conn, gitsession.RemoteOpParams{Kind: "fetch", Remote: remote, Prune: true}, gitsession.RemoteDeps{Askpass: b.deps.Askpass})
-	if err != nil {
-		return refreshFailure(id, err)
-	}
-	if !res.OK {
-		out.Error = remoteOpError(res.Error)
-		return out
+	if hasRemote {
+		res, err := entry.RunRemote(ctx, b.conn, gitsession.RemoteOpParams{Kind: "fetch", Remote: remote, Prune: true}, gitsession.RemoteDeps{Askpass: b.deps.Askpass})
+		if err != nil {
+			return refreshFailure(id, err)
+		}
+		if !res.OK {
+			out.Error = remoteOpError(res.Error)
+			return out
+		}
 	}
 
 	live, err := b.deps.Tasks.BranchesLive()
@@ -674,8 +672,10 @@ func (b *TaskBoard) refreshRepo(ctx context.Context, id string) adewire.RepoRefr
 			mine = append(mine, br)
 		}
 	}
-	if out.RefsChanged, err = countBranchRefsChanged(ctx, entry, mine, beforeTips, remote); err != nil {
-		return refreshFailure(id, err)
+	if hasRemote {
+		if out.RefsChanged, err = countBranchRefsChanged(ctx, entry, mine, beforeTips, remote); err != nil {
+			return refreshFailure(id, err)
+		}
 	}
 
 	facts := b.repoFacts(ctx, id, mine, nil)

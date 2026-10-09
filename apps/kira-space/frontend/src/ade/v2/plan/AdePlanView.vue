@@ -67,6 +67,7 @@ const chips = computed<RepoChipModel[]>(() =>
   (model.value?.board.repos ?? []).map((r) => ({
     codeRepoId: r.codeRepoId,
     label: repoLabel(r.codeRepoId),
+    remote: r.remote,
     lastFetchAt: r.lastFetchAt,
     shown: !ui.hiddenRepoIds.includes(r.codeRepoId),
     busy: busyIds.value.includes(r.codeRepoId),

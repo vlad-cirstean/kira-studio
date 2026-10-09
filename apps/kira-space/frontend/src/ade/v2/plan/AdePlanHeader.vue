@@ -9,6 +9,7 @@ import AdeRepoChip from './AdeRepoChip.vue';
 export interface RepoChipModel {
   codeRepoId: string;
   label: string;
+  remote: string;
   lastFetchAt: number | null;
   shown: boolean;
   busy: boolean;
