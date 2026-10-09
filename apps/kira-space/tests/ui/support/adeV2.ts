@@ -16,6 +16,31 @@ export function adeFixture<T = unknown>(name: string): T {
   return JSON.parse(readFileSync(resolve(FIXTURE_DIR, `${name}.json`), 'utf8')) as T;
 }
 
+const REBASE_PREVIEW = {
+  prompt: 'Rebase feat/billing onto origin/main.',
+  suffix: 'Report the outcome with finish_step.',
+  stack: [],
+  blockers: [],
+  noOp: false,
+};
+
+const REPO_BRANCHES = {
+  mainName: 'main',
+  previous: '',
+  branches: [
+    {
+      name: 'develop',
+      local: true,
+      remote: true,
+      branchId: '',
+      taskId: '',
+      taskTitle: '',
+      draft: false,
+      excluded: '',
+    },
+  ],
+};
+
 function repoRecord(id: string, name: string, order: number) {
   return {
     id,
@@ -114,6 +139,11 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskArchiveTask },
     { channel: IPC.adeTaskRecordMerge },
     { channel: IPC.adeTaskSetQueuedAfter },
+    { channel: IPC.adeTaskRebasePreview, response: REBASE_PREVIEW },
+    { channel: IPC.adeTaskRebase, response: { runId: 'run-rebase', noOp: false } },
+    { channel: IPC.adeTaskAbortRebase },
+    { channel: IPC.adeTaskSetBranchBase },
+    { channel: IPC.adeTaskRepoBranches, response: REPO_BRANCHES },
     { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
   ];
   const overridden = new Set(extra.map((s) => s.channel));

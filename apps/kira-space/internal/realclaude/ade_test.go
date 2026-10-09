@@ -238,3 +238,93 @@ func TestAdeStageSession(t *testing.T) {
 	}
 	waitStops(2)
 }
+
+// TestAdeRebaseRun rebases a pushed task branch in a background run with the real claude: main
+// moved on, the agent rebases and reports through finish_step, and git is the judge.
+func TestAdeRebaseRun(t *testing.T) {
+	cases := []struct {
+		name         string
+		mainFile     string // file main adds; the branch adds a.txt
+		mainBody     string
+		branchBody   string // body of mainFile on the branch; "" = no clash
+		mayConflict  bool
+		wantVerified bool
+	}{
+		{"clean", "m.txt", "m\n", "", false, true},
+		{"one-line conflict", "clash.txt", "main\n", "branch\n", true, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newAdeFixture(t, nil)
+			f.saveWorkflow(t, "flow", agentStageYAML)
+			f.repo.Git("checkout", "-q", "-b", "feat/a", "main")
+			files := map[string]string{"a.txt": "a\n"}
+			if c.branchBody != "" {
+				files[c.mainFile] = c.branchBody
+			}
+			f.repo.Commit("work a", files)
+			f.repo.Git("push", "-q", "origin", "feat/a")
+			f.repo.Checkout("main")
+			added, err := f.W.AdeTask.AddExistingBranch(ctx, adewire.AddExistingBranchArgs{CodeRepoID: f.repoID, Name: "feat/a"})
+			if err != nil {
+				t.Fatalf("AddExistingBranch: %v", err)
+			}
+			f.repo.Commit("main moves", map[string]string{c.mainFile: c.mainBody})
+			f.repo.Git("push", "-q", "origin", "main")
+
+			branch := func() adewire.Branch {
+				b, err := f.W.AdeTask.Board(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, br := range b.Branches {
+					if br.TaskID == added.Task.ID {
+						return br
+					}
+				}
+				t.Fatal("task branch missing")
+				return adewire.Branch{}
+			}
+			br := branch()
+			start, err := f.W.AdeTask.Rebase(ctx, adewire.RebaseArgs{BranchID: br.ID})
+			if err != nil {
+				t.Fatalf("Rebase: %v", err)
+			}
+			var run adewire.Run
+			testx.WaitUntil(t, 4*time.Minute, func() bool {
+				b, err := f.W.AdeTask.Board(ctx)
+				if err != nil {
+					return false
+				}
+				for _, tk := range b.Tasks {
+					for _, r := range tk.Runs {
+						if r.ID == start.RunID {
+							run = r
+							return r.State != "pending" && r.State != "running"
+						}
+					}
+				}
+				return false
+			})
+			o := run.Outcome
+			if o == nil {
+				t.Fatalf("run %+v has no outcome; log:\n%s", run, tail(f.runLog(t, run.ID), 1500))
+			}
+			t.Logf("state=%s status=%s source=%s reason=%q rebase=%+v report=%+v", run.State, o.Status, o.Source, o.Reason, o.Rebase, o.Report)
+			switch {
+			case run.State == "done":
+				if o.Rebase == nil || !o.Rebase.Verified {
+					t.Fatalf("done without a verified rebase: %+v", o.Rebase)
+				}
+			case c.wantVerified:
+				t.Fatalf("clean rebase ended %s: %q; log:\n%s", run.State, o.Reason, tail(f.runLog(t, run.ID), 1500))
+			case c.mayConflict:
+				reported := (o.Report != nil && len(o.Report.ConflictedFiles) > 0) || (o.Rebase != nil && len(o.Rebase.ConflictedFiles) > 0)
+				if !reported && !strings.HasPrefix(o.Reason, "no report") {
+					t.Fatalf("conflict ended %s with neither conflicted files nor a no-report reason: %q", run.State, o.Reason)
+				}
+			}
+			f.requireCostUnder(t)
+		})
+	}
+}
