@@ -9,7 +9,8 @@ import { installPassthrough } from './support/passthrough';
 
 const home = mkdtempSync(join(tmpdir(), 'kira-e2e-home-'));
 test.use({ serverEnv: { HOME: home } });
-test.afterAll(() => rmSync(home, { recursive: true, force: true }));
+// Not afterAll: with fullyParallel it runs between tests of one worker, deleting the HOME the next test uses.
+process.once('exit', () => rmSync(home, { recursive: true, force: true }));
 
 test('a new terminal tab runs a command in a real shell', async ({ kira }) => {
   const page = kira.window;
@@ -17,7 +18,7 @@ test('a new terminal tab runs a command in a real shell', async ({ kira }) => {
   await page.locator('[data-testid="terminal-start-new"]').click();
   await expect(page.locator('.xterm-rows')).toBeVisible();
   await page.locator('.xterm-helper-textarea').focus();
-  // One chunk, then Enter once it echoed: per-key writes can reorder (P232 finding B-1).
+  // One pasted chunk; the next test types key by key.
   await page.keyboard.insertText('echo kira-$((1+1))');
   await expect(page.locator('.xterm-rows')).toContainText('echo kira-$((1+1))');
   await page.keyboard.press('Enter');
@@ -53,10 +54,6 @@ test('a quick command runs in the picked folder', async ({ kira }) => {
 });
 
 test('keystrokes typed one by one reach the shell in order', async ({ kira }) => {
-  test.fixme(
-    true,
-    'P232 finding B-1: per-key terminal writes are unordered concurrent bound calls',
-  );
   const page = kira.window;
   await page.locator('[data-testid="mode-tab"][data-mode="terminal"]').click();
   await page.locator('[data-testid="terminal-start-new"]').click();
@@ -64,4 +61,6 @@ test('keystrokes typed one by one reach the shell in order', async ({ kira }) =>
   await page.locator('.xterm-helper-textarea').focus();
   await page.keyboard.type('echo kira-$((1+1))', { delay: 0 });
   await expect(page.locator('.xterm-rows')).toContainText('echo kira-$((1+1))');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.xterm-rows')).toContainText('kira-2');
 });

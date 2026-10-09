@@ -87,8 +87,7 @@ test('Docker mode lists a compose-labelled container, streams logs, execs and st
     await page.locator('[data-testid="docker-tab-terminal"]').click();
     await expect(page.locator('.xterm-rows')).toBeVisible();
     await page.locator('.xterm-helper-textarea').focus();
-    // One chunk, then Enter once it echoed: per-key writes can reorder (P232 finding B-1).
-    await page.keyboard.insertText('echo kira-$((1+1))');
+    await page.keyboard.type('echo kira-$((1+1))', { delay: 0 });
     await expect(page.locator('.xterm-rows')).toContainText('echo kira-$((1+1))');
     await page.keyboard.press('Enter');
     await expect(page.locator('.xterm-rows')).toContainText('kira-2');

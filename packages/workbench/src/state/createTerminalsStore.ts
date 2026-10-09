@@ -5,6 +5,7 @@ import type { TerminalEvent } from '@shared/protocol/events';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { loadTerminalRenderer } from '../terminal/terminalRendererLoader';
+import { createOrderedWriter } from './orderedWrites';
 
 // P103 Part 2 (§5.3): hoisted from both apps' own state/terminals.ts — byte-identical (P83's
 // Kira Studio Terminal module, P83's Kira Space repo-worktree terminal), once each app's own
@@ -210,13 +211,19 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
       }
     }
 
+    // Concurrent bound calls arrive in any order, so keystrokes go one write at a time per tab.
+    const writer = createOrderedWriter(
+      (tabId, bytes) => control.terminalWrite(tabId, bytesToBase64(bytes)),
+      (tabId, err) => console.error(`terminal ${tabId}: write failed`, err),
+    );
+
     /** A pass-through, not an encoding decision: bytes is already the exact byte sequence to send —
      *  UTF-8 for typed text, a raw Latin1-per-char passthrough for xterm's own onBinary (mouse
      *  reports, Alt-meta) — terminalRenderer.ts picks which, since only it knows which callback the
      *  data came from. base64-encoded here purely because that's the wire format the bound call
      *  takes (keystrokes are not always valid UTF-8). */
     function writeTerminal(tabId: string, bytes: Uint8Array): void {
-      void control.terminalWrite(tabId, bytesToBase64(bytes));
+      writer.write(tabId, bytes);
     }
 
     function resizeTerminal(tabId: string, cols: number, rows: number): void {
@@ -234,6 +241,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
       byTabId.delete(tabId);
       sinks.delete(tabId);
       drainByTabId.delete(tabId);
+      writer.drop(tabId);
       void control.terminalClose(tabId);
     }
 

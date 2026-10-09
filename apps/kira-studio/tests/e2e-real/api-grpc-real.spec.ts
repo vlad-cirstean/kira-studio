@@ -45,8 +45,9 @@ test('a unary call shows message, header and trailer', async ({ kira, flowServer
 
   await page.click('[data-testid="grpc-response-pane-metadata"]');
   const metadata = page.locator('[data-testid="grpc-response-metadata"]');
+  await expect(metadata).toContainText('Header');
   await expect(metadata).toContainText('content-type');
-  await expect(metadata).toContainText('grpc-status');
+  await expect(metadata).toContainText('Trailer');
 });
 
 test('a server stream delivers messages one by one and Stop ends it', async ({

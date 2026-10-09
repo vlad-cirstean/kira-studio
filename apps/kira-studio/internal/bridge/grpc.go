@@ -207,7 +207,7 @@ type GrpcCallArgs struct {
 	// op too (adapterhost/host.go, oplog/wire.go).
 	Incognito bool `json:"incognito"`
 	// TimeoutMs bounds a unary call; zero uses grpcclient's default.
-	TimeoutMs int `json:"timeoutMs"`
+	TimeoutMs int `json:"timeoutMs,omitempty"`
 }
 
 // Call is bridge/http.go's Send with a different payload, deliberately down to the ordering (D7):
