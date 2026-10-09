@@ -1,5 +1,3 @@
-import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { expect, type Page } from '@playwright/test';
 import type { KiraSpaceApp } from '../fixtures';
 
