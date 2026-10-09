@@ -304,9 +304,10 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 }
 
 // reflectionFailure names a deadline expiry as E_TIMEOUT, with the target and the wait; any other
-// failure stays a transport error.
+// failure stays a transport error. gRPC's own deadline timer can fire before ctx.Err() reports the
+// expiry, so the stream's DeadlineExceeded status counts too.
 func reflectionFailure(ctx context.Context, target string, err error) *Error {
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
 		return Timeout(fmt.Sprintf("no reflection answer from %s within %s", target, defaultReflectionTimeout))
 	}
 	return Transport(err.Error())
