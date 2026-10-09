@@ -35,7 +35,7 @@ type Scenario struct {
 	// attempt; the last Action repeats.
 	Claude map[string][]Action `json:"claude,omitempty"`
 	// Prompts answer headless calls by their --system-prompt before any Claude action runs; the
-	// first rule that matches answers.
+	// first rule that matches answers (the call still counts as an attempt for Claude).
 	Prompts []PromptRule `json:"prompts,omitempty"`
 	// Gh rules are tried in order; the first whose Match is a substring of the joined args answers.
 	Gh []GhRule `json:"gh,omitempty"`
@@ -192,28 +192,11 @@ func runClaude(scen Scenario, dir string, args []string) int {
 		}
 	}
 	if headless {
-		prompt, _ := io.ReadAll(os.Stdin)
-		_ = os.WriteFile(stem+".prompt", prompt, 0o644)
-		if doc := promptDoc(prompt); doc != "" {
-			_ = os.Setenv("KIRA_DOC", doc)
-		}
-		if code, answered := answerPrompt(scen, dir, args); answered {
+		if code, done := startHeadless(scen, dir, stem, args); done {
 			return code
 		}
-		// A one-document json caller parses stdout as a single value, so it gets no stream.
-		if argAfter(args, "--output-format") != "json" {
-			emitJSON(map[string]any{"type": "system", "subtype": "init", "session_id": "fake"})
-		}
 	} else {
-		// An interactive TUI session: its stdin is a PTY; keep a record of what the app types.
-		go func() {
-			f, err := os.OpenFile(stem+".prompt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-			if err != nil {
-				return
-			}
-			defer f.Close()
-			_, _ = io.Copy(f, os.Stdin)
-		}()
+		recordTUIInput(stem)
 	}
 
 	if action.Sh != "" {
@@ -322,6 +305,36 @@ func answerPrompt(scen Scenario, dir string, args []string) (code int, answered 
 		return 0, true
 	}
 	return 0, false
+}
+
+// startHeadless records the prompt and plays a matching PromptRule; done is true when the rule
+// answered the whole call.
+func startHeadless(scen Scenario, dir, stem string, args []string) (code int, done bool) {
+	prompt, _ := io.ReadAll(os.Stdin)
+	_ = os.WriteFile(stem+".prompt", prompt, 0o644)
+	if doc := promptDoc(prompt); doc != "" {
+		_ = os.Setenv("KIRA_DOC", doc)
+	}
+	if code, answered := answerPrompt(scen, dir, args); answered {
+		return code, true
+	}
+	// A one-document json caller parses stdout as a single value, so it gets no stream.
+	if argAfter(args, "--output-format") != "json" {
+		emitJSON(map[string]any{"type": "system", "subtype": "init", "session_id": "fake"})
+	}
+	return 0, false
+}
+
+// recordTUIInput keeps what the app types into an interactive TUI session, whose stdin is a PTY.
+func recordTUIInput(stem string) {
+	go func() {
+		f, err := os.OpenFile(stem+".prompt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		_, _ = io.Copy(f, os.Stdin)
+	}()
 }
 
 func emitJSON(v any) {

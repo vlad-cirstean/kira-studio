@@ -113,7 +113,7 @@ func TestGateRejectsOrFails(t *testing.T) {
 	}
 }
 
-func TestSemanticUnavailable(t *testing.T) {
+func TestSemanticNotInstalled(t *testing.T) {
 	t.Setenv("KIRA_ORT_LIB", "")
 	app := flowharness.New(t)
 	gate(t, app, "gate-accept.json")

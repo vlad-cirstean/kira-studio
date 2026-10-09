@@ -3,6 +3,7 @@ package memoryflow_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,7 +38,7 @@ func importApp(t *testing.T, extract ...fakeagent.PromptRule) *flowharness.App {
 	t.Helper()
 	app := flowharness.New(t)
 	finalize := testdata(t, "finalize.json")
-	prompts := append(extract,
+	prompts := append(slices.Clone(extract),
 		fakeagent.PromptRule{System: gateSystem, Doc: "billing.md", Emit: testdata(t, "gate-billing.md.json")},
 		fakeagent.PromptRule{System: gateSystem, Doc: "release.md", Emit: testdata(t, "gate-release.md.json")},
 		fakeagent.PromptRule{System: reconcileSystem, Emit: testdata(t, "reconcile.json")},

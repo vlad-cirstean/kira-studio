@@ -274,6 +274,17 @@ func (w *Walk) readPageLocked(ctx context.Context) (appended int, err error) {
 	return 0, fmt.Errorf("gitsession: walk: refs kept moving across a reclaimed resume")
 }
 
+// readFirstPagesLocked reads one page, then more until the store holds keepRows again (the rows a
+// reset dropped). Caller holds mu.
+func (w *Walk) readFirstPagesLocked(ctx context.Context, keepRows int) error {
+	for first := true; first || (w.store.RowCount() < keepRows && !w.log.Exhausted()); first = false {
+		if _, err := w.readPageLocked(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Stream is D14's own streamGraph transcribed: ensureFresh, clamp resumeThroughRow to the store's
 // row count, resolve the dictionary base from marks (falling back to row 0/base 0 when the
 // clamped row has no mark — a mark only exists for a row a previous Stream call actually packed
@@ -364,10 +375,8 @@ func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int,
 	if cachedThrough > 0 {
 		return nil
 	}
-	for first := true; first || (w.store.RowCount() < keepRows && !w.log.Exhausted()); first = false {
-		if _, err := w.readPageLocked(ctx); err != nil {
-			return err
-		}
+	if err := w.readFirstPagesLocked(ctx, keepRows); err != nil {
+		return err
 	}
 	if newTotal := w.store.RowCount(); cursor < newTotal {
 		for cursor < newTotal {
