@@ -19,6 +19,22 @@
 - Suspected cause: `ade/board.go:268-276` `openRepo` returns the cached `conn.Entry`; `gitsession/registry.go:169` `gitclient.NewRepo(summary, runner, gitPath)` bakes the path at open time, so settings never reach an open repo. Found by read, confirmed by the test.
 - Class: product bug. Fix idea: resolve the path per call (Repo reads the live setting), or drop open entries when `git.gitPath` changes.
 
+## B-3 changing the port does not restart a server stopped by a busy port
+- Test: mobileflow TestEnableTrustPort/a_new_port_starts_a_server_stopped_by_a_busy_one (skipped "P231 finding B-3")
+- Failure: `SetPort off a busy port = {Enabled:true Running:false ... Error:mobileweb: port 38987 is in use ...}, want running with no error`
+- Repro: enabled and trusted; `SetPort` to a port another process holds (server stops, `Error` set); `SetPort` to a free port.
+  Status stays stopped with the stale in-use error naming the old port. Only the next supervisor poll (10s) or an off/on toggle starts it.
+- Suspected cause: `bridge/mobile.go` `SetPort` calls `reconcile` only `if s.embedded.Status().Running`; a server that failed to bind is not running, so the new port is never tried. Found by read, confirmed by the test.
+- Class: product bug. Fix idea: call `reconcile` whenever the supervisor is active, not only when running.
+
+## B-4 phone sessions endpoint leaks the working directory
+- Test: mobileflow TestPhoneReadsRealAde/sessions_carry_no_cwd (skipped "P231 finding B-4")
+- Failure: `GET /api/ade/sessions leaks a cwd: {"sessions":[{... "cwd":"/tmp/.../home/wt/api/api-work","cwdMissing":false ...`
+- Repro: a task branch with a worktree, one finished headless run, one interactive session; paired phone `GET /api/ade/sessions`.
+  `/api/agent/sessions` strips `cwd` (`withoutCwd`), the ADE `sessions` route returns `adewire.Session` as is, `cwd` on every row. Board and the SSE channels carry no `cwd` key (the events are signals).
+- Suspected cause: `mobileweb/routes.go` `read("/api/ade/sessions", readJSON(s, "sessions", false, s.cfg.Reader.Sessions))` has no projection; `server.go` strips only on the agent route and the event table. Found by read, confirmed by the test.
+- Class: product bug. Fix idea: wrap the sessions reader in `withoutCwd` like the agent route. Open question for the fixer: board `branches[].worktree` is also a local path.
+
 ## Harness notes (not product bugs)
 - `WithoutGh` hides gh from PATH only. `ghclient.NewPlatformLocator` also probes `/opt/homebrew/bin/gh` and `/usr/local/bin/gh`, so a host install still answers. `TestGitHubWithoutGh` accepts `ghMissing`, `unauthenticated` or `unavailable`. Fix idea: harness-level locator seam.
 - Archive closes review windows through `appwire` `closeTaskReviewWindows` on the real `shell.WindowRegistry`, not the `WindowManager` recorder. The recorder cannot see it. `TestArchiveRisk` asserts the review window row is gone (`ReviewWindowTarget` nil) instead.
@@ -27,3 +43,4 @@
 - Search without a model on disk reports `notInstalled`, not `unavailable`. `unavailable` needs an installed model and a missing ONNX runtime. `TestSemanticUnavailable` asserts `notInstalled`.
 - Host `pathLocator` falls back to PATH when the configured git path is missing, so a missing file does not yield `notFound` listing the path on Linux. `TestGitPathSettingEverywhere` uses an executable non-git script (`unusable`) as the bad path.
 - `appearance.dateFormat` reaches git only through `app.init` (`dateFormat`), not `commit.detail`. `TestDateFormatReachesGit` asserts `app.init`.
+- `appwire.Options.MobilePoll` is not reachable from `flowharness.New`; the supervisor polls every 10s. Tests drive state changes through the bound calls instead.
