@@ -34,6 +34,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/metrics"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/kirathecat/kira-studio/internal/windowsvc"
@@ -124,6 +125,7 @@ type embeddedWired struct {
 	keepAwakeSvc *bridge.KeepAwakeService
 	windowsSvc   *bridge.WindowsService
 	terminalSvc  *bridge.TerminalService
+	scriptRuns   *bridge.ScriptRunsService
 	dockerSvc    *bridge.DockerService
 	events       *bridge.Events
 	eventsDetach func()
@@ -160,7 +162,15 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
 	// service plus ChannelTerminal's push channel. P128 §2.1: the bound methods live once in
 	// internal/terminal.BoundService; this app's own TerminalService only embeds it.
-	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: terminal.NewRegistry()}}
+	registry := terminal.NewRegistry()
+	runs := &scriptruns.Service{
+		Runs: deps.Repos.ScriptRuns, Scripts: deps.Repos.CustomScripts, Registry: registry, Home: deps.Home, App: "Studio",
+		Emit: func(r scriptruns.Run) { deps.Events.Emit(bridge.ChannelScriptRunsChanged, r) },
+	}
+	if err := runs.Recover(); err != nil {
+		slog.Warn("recover script runs", "scope", "startup", "err", err)
+	}
+	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: registry, Scripts: runs}}
 	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events)}
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
@@ -168,7 +178,8 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 	return embeddedWired{
 		dbMcpSvc: dbMcpSvc, keepAwakeSvc: keepAwakeSvc,
 		windowsSvc: windowsSvc, terminalSvc: terminalSvc, dockerSvc: dockerSvc,
-		events: events, eventsDetach: eventsDetach,
+		scriptRuns: &bridge.ScriptRunsService{Bound: &scriptruns.Bound{Svc: runs}},
+		events:     events, eventsDetach: eventsDetach,
 	}
 }
 

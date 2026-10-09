@@ -39,6 +39,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/metrics"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/kirathecat/kira-studio/internal/windowsvc"
@@ -114,6 +115,7 @@ type Wired struct {
 	Layout         *bridge.LayoutService
 	Tabs           *bridge.TabsService
 	CustomScripts  *bridge.CustomScriptsService
+	ScriptRuns     *bridge.ScriptRunsService
 	Terminal       *bridge.TerminalService
 	AdeTask        *bridge.AdeTaskService
 	Ops            *bridge.OpsService
@@ -150,7 +152,7 @@ func Build(opts Options) *Wired {
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
 	mobileHub := mobileweb.NewHub()
 	emitter := appevent.NewTap(opts.Emitter, mobileHub.Publish)
-	deps := appcore.Deps{Repos: repositories, Events: emitter, GitRegistry: git.registry}
+	deps := appcore.Deps{Repos: repositories, Home: config.KiraSpaceHome(), Events: emitter, GitRegistry: git.registry}
 	events := bridge.NewEvents(emitter)
 	w.Emitter, w.Deps, w.Events = emitter, deps, events
 	w.detachOpLog = events.AttachOpLog(git.opLog)
@@ -197,9 +199,17 @@ func Build(opts Options) *Wired {
 	// claude-code launch through adeTracker.Compose.
 	termBroker := wireTermBroker(adeTracker, terminalRegistry, emitter)
 	w.TermBroker = termBroker
+	runs := &scriptruns.Service{
+		Runs: repositories.ScriptRuns, Scripts: repositories.CustomScripts, Registry: terminalRegistry, Home: deps.Home, App: "Space",
+		Emit: func(r scriptruns.Run) { emitter.Emit(bridge.ChannelScriptRunsChanged, r) },
+	}
+	if err := runs.Recover(); err != nil {
+		slog.Warn("recover script runs", "scope", "startup", "err", err)
+	}
+	w.ScriptRuns = &bridge.ScriptRunsService{Bound: &scriptruns.Bound{Svc: runs}}
 	w.Terminal = &bridge.TerminalService{BoundService: &terminal.BoundService{
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose, AbortAgent: adeTracker.Abort,
-		Arbiter: termBroker,
+		Arbiter: termBroker, Scripts: runs,
 	}}
 	// P116 G5 keep-awake toggle plus P188's agent reason: the live Claude Code session count —
 	// terminal agent tabs and running headless ade sessions — against claudeCode.keepAwakeWithAgents.
@@ -303,7 +313,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.GitClients), application.NewService(w.GitCredential),
 		application.NewService(w.CodeWorkspace), application.NewService(w.GitHub), application.NewService(w.Link),
 		application.NewService(w.Files), application.NewService(w.Settings), application.NewService(w.Layout),
-		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.Terminal),
+		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Terminal),
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
 		application.NewService(w.MemoryImport), application.NewService(w.WindowsSvc), application.NewService(w.Update),

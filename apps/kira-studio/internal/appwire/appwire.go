@@ -1,4 +1,4 @@
-// Package appwire is Kira Studio's composition root: it builds the 27 bound services, the adapter
+// Package appwire is Kira Studio's composition root: it builds the 28 bound services, the adapter
 // router, the embedded modules and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It
 // sits above internal/bridge in the layering, like internal/appshell.
@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
@@ -82,6 +83,7 @@ type Wired struct {
 	KeepAwake       *bridge.KeepAwakeService
 	Terminal        *bridge.TerminalService
 	CustomScripts   *bridge.CustomScriptsService
+	ScriptRuns      *bridge.ScriptRunsService
 	Docker          *bridge.DockerService
 	Update          *bridge.UpdateService
 	Lifecycle       *bridge.LifecycleService
@@ -112,6 +114,7 @@ func Build(opts Options) (*Wired, error) {
 	// reveal grace genuinely shared between a connection-password reveal and a variable reveal.
 	deps := appcore.Deps{
 		DB:        db.DB,
+		Home:      config.KiraHome(),
 		StartedAt: startedAt.UnixMilli(),
 		Repos:     repositories,
 		ApiVars:   apivars.New(repositories.Variables, opts.Authorizer),
@@ -177,6 +180,7 @@ func Build(opts Options) (*Wired, error) {
 		KeepAwake:       embedded.keepAwakeSvc,
 		Terminal:        embedded.terminalSvc,
 		CustomScripts:   &bridge.CustomScriptsService{Deps: deps},
+		ScriptRuns:      embedded.scriptRuns,
 		Docker:          embedded.dockerSvc,
 		Update: &bridge.UpdateService{
 			Checker: updateChecker, Installer: updateInstaller, Quit: lifecycle.quitter.RequestQuit,
@@ -189,7 +193,7 @@ func Build(opts Options) (*Wired, error) {
 	return w, nil
 }
 
-// Bound returns the 27 bound services in registration order.
+// Bound returns the 28 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.App), application.NewService(w.Settings), application.NewService(w.Layout),
@@ -200,7 +204,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.Collections), application.NewService(w.Variables),
 		application.NewService(w.ResponseHistory), application.NewService(w.GrpcHistory),
 		application.NewService(w.DataGrip), application.NewService(w.DbMcp), application.NewService(w.KeepAwake),
-		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.Docker),
+		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker),
 		application.NewService(w.Update), application.NewService(w.Lifecycle),
 	}
 }

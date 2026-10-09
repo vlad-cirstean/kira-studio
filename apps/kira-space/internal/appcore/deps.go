@@ -19,7 +19,9 @@ type Emitter = appevent.Emitter
 
 // Deps is embedded by value into every bound service struct.
 type Deps struct {
-	Repos  *repos.Repos
+	Repos *repos.Repos
+	// Home is the app data folder (KIRA_SPACE_HOME).
+	Home   string
 	Events Emitter
 	// GitRegistry is internal/gitsession's own Registry — bridge/github.go's GitHubService reads
 	// it to build its own known-GitHub-hosts allowlist (the same seam Kira Studio's own Deps

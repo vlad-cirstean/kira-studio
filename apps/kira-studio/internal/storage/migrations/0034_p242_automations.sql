@@ -1,6 +1,4 @@
--- P242 Part 1: stored run outcome for ADE runs, the Automations rename, script folders and the script run store.
-ALTER TABLE ade_runs ADD COLUMN outcome_json TEXT NOT NULL DEFAULT '';
-
+-- P242 Part 1: the Automations rename, script folders and the script run store.
 UPDATE windows SET mode = 'automations' WHERE mode = 'terminal';
 UPDATE tabs SET workspace_id = 'automations' WHERE workspace_id = 'terminal';
 

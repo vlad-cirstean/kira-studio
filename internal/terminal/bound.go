@@ -29,6 +29,27 @@ type BoundService struct {
 	// Kira Space sets it (P212 Part 2, the phone terminal broker); Kira Studio leaves it nil, so
 	// the window always drives. A field, not a method, so nothing new is bound.
 	Arbiter Arbiter
+	// Scripts, when set, records script launches: the host loads the stored script and its folder,
+	// and learns how the session ended. A field, not a method, so nothing new is bound.
+	Scripts ScriptLauncher
+}
+
+// ScriptLaunch is what ScriptLauncher.Begin resolved for one script run.
+type ScriptLaunch struct {
+	RunID   string
+	Cwd     string
+	Command string
+}
+
+// ScriptLauncher is the run store a script-launching Open reports to.
+type ScriptLauncher interface {
+	// Begin loads the script, prepares its folder and records a running run. An error is the
+	// caller's: a blocked folder or an unknown script.
+	Begin(scriptID, terminalID string) (ScriptLaunch, error)
+	// Failed records that the run's session did not spawn.
+	Failed(runID string, err error)
+	// Exited records how the run's session ended.
+	Exited(terminalID string, code int, cause CloseCause)
 }
 
 // Arbiter lets one other party take over an agent terminal's input and size from its window.
@@ -113,6 +134,23 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	// unchanged.
 	agent := args.LaunchKind == LaunchKindClaudeCode
 
+	var scriptRun string
+	if args.ScriptID != "" {
+		if b.Scripts == nil {
+			return OpenResult{}, ipcerr.New("E_INVALID", "scripts are not available")
+		}
+		launch, err := b.Scripts.Begin(args.ScriptID, args.TerminalID)
+		if err != nil {
+			return OpenResult{}, err
+		}
+		scriptRun = launch.RunID
+		args.Cwd, args.Command = launch.Cwd, launch.Command
+		if len(args.Command) > MaxCommandBytes {
+			b.Scripts.Failed(scriptRun, errors.New("command is too long"))
+			return OpenResult{}, ipcerr.New("E_INVALID", "command is too long")
+		}
+	}
+
 	command, env := args.Command, []string(nil)
 	composedAgent := agent && b.ComposeAgent != nil
 	if composedAgent {
@@ -136,6 +174,11 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		tap = func(data []byte) { b.Arbiter.Output(id, data) }
 		onExit = func() { b.Arbiter.Exited(id) }
 	}
+	var onEnd func(int, CloseCause)
+	if scriptRun != "" {
+		id := args.TerminalID
+		onEnd = func(code int, cause CloseCause) { b.Scripts.Exited(id, code, cause) }
+	}
 	sess, err := b.svc().OpenWithCoalescedOutput(OpenParams{
 		ID:        args.TerminalID,
 		WindowKey: args.WindowKey,
@@ -145,10 +188,14 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		Command:   command,
 		Env:       env,
 		Agent:     agent,
+		OnEnd:     onEnd,
 	}, args.WindowKey, args.TerminalID, tap, onExit)
 	if err != nil {
 		if composedAgent {
 			b.abortAgent(args.TerminalID)
+		}
+		if scriptRun != "" {
+			b.Scripts.Failed(scriptRun, err)
 		}
 		if errors.Is(err, ErrDuplicateSession) {
 			return OpenResult{}, ipcerr.New("E_INVALID", "terminalId is already open")

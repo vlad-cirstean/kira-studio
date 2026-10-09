@@ -63,7 +63,7 @@ func TestStudioWindows(t *testing.T) {
 			t.Fatalf("Ensure %s = %+v (%v), want the default mode", key, res, err)
 		}
 	}
-	if err := w.SetMode(windowsvc.SetModeArgs{WindowKey: "A", Mode: "terminal"}); err != nil {
+	if err := w.SetMode(windowsvc.SetModeArgs{WindowKey: "A", Mode: "automations"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.SetMode(windowsvc.SetModeArgs{WindowKey: "B", Mode: "api"}); err != nil {
@@ -72,7 +72,7 @@ func TestStudioWindows(t *testing.T) {
 	if err := w.SetMode(windowsvc.SetModeArgs{Mode: "api"}); err == nil {
 		t.Fatal("SetMode without a key succeeded")
 	}
-	if a, _ := w.Ensure(windowsvc.EnsureArgs{WindowKey: "A"}); a.Mode != "terminal" {
+	if a, _ := w.Ensure(windowsvc.EnsureArgs{WindowKey: "A"}); a.Mode != "automations" {
 		t.Fatalf("window A mode = %q, want terminal", a.Mode)
 	}
 	if b, _ := w.Ensure(windowsvc.EnsureArgs{WindowKey: "B"}); b.Mode != "api" {
@@ -148,7 +148,7 @@ func TestStudioWindows(t *testing.T) {
 	if got := tabIDs("A"); !reflect.DeepEqual(got, []string{"a1", "a2"}) {
 		t.Fatalf("window A tabs after a relaunch %v", got)
 	}
-	if a, _ := app.W.WindowsSvc.Ensure(windowsvc.EnsureArgs{WindowKey: "A"}); a.Mode != "terminal" {
+	if a, _ := app.W.WindowsSvc.Ensure(windowsvc.EnsureArgs{WindowKey: "A"}); a.Mode != "automations" {
 		t.Fatalf("window A mode after a relaunch = %q", a.Mode)
 	}
 	if got, _ := app.W.Layout.GetAll(); got.Panel.Project.Width != wide {

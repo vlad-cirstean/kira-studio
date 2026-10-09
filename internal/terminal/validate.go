@@ -22,6 +22,9 @@ type OpenArgs struct {
 	// inferred from Command (P85 OQ-3's "no heuristic" rule, carried forward). "" is accepted and
 	// treated as LaunchKindShell, so an older caller keeps working.
 	LaunchKind string `json:"launchKind"`
+	// ScriptID, only with LaunchKindScript, makes the host load the stored script: its command and
+	// resolved folder replace Cwd and Command, which are ignored.
+	ScriptID string `json:"scriptId"`
 }
 
 // ValidateOpen is both apps' own TerminalService.Open — identical up to whatever each app's own
@@ -39,6 +42,15 @@ func ValidateOpen(args OpenArgs) error {
 	if !ValidDim(args.Cols) || !ValidDim(args.Rows) {
 		return ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
 	}
+	if !ValidLaunchKind(args.LaunchKind) {
+		return ipcerr.New("E_INVALID", "launchKind must be shell, claude-code or script")
+	}
+	if args.ScriptID != "" {
+		if args.LaunchKind != LaunchKindScript {
+			return ipcerr.New("E_INVALID", "scriptId needs launchKind script")
+		}
+		return nil
+	}
 	if !filepath.IsAbs(args.Cwd) {
 		return ipcerr.New("E_INVALID", "cwd must be an absolute path")
 	}
@@ -48,9 +60,6 @@ func ValidateOpen(args OpenArgs) error {
 	}
 	if len(args.Command) > MaxCommandBytes {
 		return ipcerr.New("E_INVALID", "command is too long")
-	}
-	if !ValidLaunchKind(args.LaunchKind) {
-		return ipcerr.New("E_INVALID", "launchKind must be shell, claude-code or script")
 	}
 	return nil
 }

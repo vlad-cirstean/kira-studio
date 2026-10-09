@@ -25,6 +25,7 @@ type (
 func (s *CustomScriptsService) shared() *scripts.Service {
 	return &scripts.Service{
 		Repo: s.Deps.Repos.CustomScripts,
+		Home: s.Deps.Home,
 		Emit: func(snapshot scripts.Snapshot) {
 			s.Deps.Events.Emit(ChannelCustomScriptsChanged, snapshot)
 		},

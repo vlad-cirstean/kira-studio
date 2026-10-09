@@ -8,6 +8,8 @@ import "github.com/kirathecat/kira-studio/internal/ipcerr"
 type Service struct {
 	Repo *Repo
 	Emit func(snapshot Snapshot)
+	// Home is the app data folder; removing a script deletes its automations folder under it.
+	Home string
 }
 
 func fail(err error) error {
@@ -81,6 +83,9 @@ func (s *Service) Remove(args RemoveArgs) error {
 	}
 	if err := s.Repo.Remove(args.ID); err != nil {
 		return fail(err)
+	}
+	if s.Home != "" {
+		RemoveDir(s.Home, args.ID)
 	}
 	s.broadcast()
 	return nil

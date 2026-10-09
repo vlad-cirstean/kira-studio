@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/internal/appstorage"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
 
@@ -36,6 +37,7 @@ type Repos struct {
 	AdeFacts        *AdeFactsRepo
 	AdeLogs         *AdeLogsRepo
 	CustomScripts   *scripts.Repo
+	ScriptRuns      *scriptruns.Repo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -76,6 +78,7 @@ func New(db *sql.DB) (*Repos, error) {
 		AdeFacts:        &AdeFactsRepo{DB: db},
 		AdeLogs:         &AdeLogsRepo{DB: db},
 		CustomScripts:   &scripts.Repo{DB: db},
+		ScriptRuns:      &scriptruns.Repo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll},
 	}, nil
 }

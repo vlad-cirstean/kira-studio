@@ -14,7 +14,7 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-const selectColumns = `id, name, command, working_dir, color, collection_id, sort_order, created_at, updated_at`
+const selectColumns = `id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at`
 
 // Repo reads and writes the `custom_scripts` table, List ordered deterministically.
 type Repo struct {
@@ -25,7 +25,7 @@ func scanRow(row rowScanner) (CustomScript, error) {
 	var s CustomScript
 	var collectionID sql.NullString
 	if err := row.Scan(
-		&s.ID, &s.Name, &s.Command, &s.WorkingDir, &s.Color, &collectionID, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.Name, &s.Command, &s.WorkingDir, &s.DirMode, &s.Color, &collectionID, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt,
 	); err != nil {
 		return CustomScript{}, err
 	}
@@ -66,6 +66,9 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 	if err := fields.Validate(); err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: %w", err)
 	}
+	if fields.DirMode == DirModeHome {
+		return CustomScript{}, errHomeRetired
+	}
 	if err := r.requireCollection(fields.CollectionID); err != nil {
 		return CustomScript{}, err
 	}
@@ -79,6 +82,7 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 		Name:         fields.Name,
 		Command:      fields.Command,
 		WorkingDir:   fields.WorkingDir,
+		DirMode:      fields.DirMode,
 		Color:        fields.Color,
 		CollectionID: fields.CollectionID,
 		SortOrder:    sortOrder,
@@ -86,9 +90,9 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 		UpdatedAt:    now,
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO custom_scripts (id, name, command, working_dir, color, collection_id, sort_order, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.Color, rec.CollectionID, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
+		`INSERT INTO custom_scripts (id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.DirMode, rec.Color, rec.CollectionID, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
 	); err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: insert: %w", err)
 	}
@@ -105,10 +109,19 @@ func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error
 	if err := r.requireCollection(fields.CollectionID); err != nil {
 		return CustomScript{}, err
 	}
+	if fields.DirMode == DirModeHome {
+		cur, err := r.Get(id)
+		if err != nil {
+			return CustomScript{}, err
+		}
+		if cur != nil && cur.DirMode != DirModeHome {
+			return CustomScript{}, errHomeRetired
+		}
+	}
 	now := kiratime.NowISO()
 	res, err := r.DB.Exec(
-		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, color = ?, collection_id = ?, updated_at = ? WHERE id = ?`,
-		fields.Name, fields.Command, fields.WorkingDir, fields.Color, fields.CollectionID, now, id,
+		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, dir_mode = ?, color = ?, collection_id = ?, updated_at = ? WHERE id = ?`,
+		fields.Name, fields.Command, fields.WorkingDir, fields.DirMode, fields.Color, fields.CollectionID, now, id,
 	)
 	if err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: update %s: %w", id, err)

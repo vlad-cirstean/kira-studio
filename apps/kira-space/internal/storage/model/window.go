@@ -15,7 +15,7 @@ type WindowBounds = appstorage.WindowBounds
 // cascade position instead).
 //
 // This app's own `windows` table gained a `mode` column at P128 §2.2 (migration
-// 0003_p128_window_mode.sql, the git/terminal/ade module registry) — read and written through
+// 0003_p128_window_mode.sql, the git/automations/ade module registry) — read and written through
 // WindowsRepo.GetMode/SetMode below, not through this struct, so WindowRecord itself stays
 // field-for-field identical to appstorage.WindowRecord and a plain alias of it (P107 I2-3),
 // Validate() included; internal/shell/window.go's own Options()/Attach() never read a mode, only
@@ -25,4 +25,4 @@ type WindowRecord = appstorage.WindowRecord
 // WindowModes is this app's own mode vocabulary (workbench/modes.ts's SpaceMode) — an unrecognised
 // or since-removed mode degrades to Default via appstorage.WindowModes.Normalize rather than
 // failing to read/write the row.
-var WindowModes = appstorage.WindowModes{Default: "git", Valid: []string{"git", "terminal", "ade", "memory"}}
+var WindowModes = appstorage.WindowModes{Default: "git", Valid: []string{"git", "automations", "ade", "memory"}}

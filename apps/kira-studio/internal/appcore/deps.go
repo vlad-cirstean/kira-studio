@@ -33,7 +33,9 @@ type Emitter = appevent.Emitter
 // by internal/logging since P55 M0). internal/oplog and the metrics ticker have no bridge service
 // yet (P55 §6.1, §7) so they are wired directly in main.go, not carried here.
 type Deps struct {
-	DB        *sql.DB
+	DB *sql.DB
+	// Home is the app data folder (KIRA_HOME).
+	Home      string
 	StartedAt int64 // unix millis, for appInfo-style diagnostics later
 
 	Repos       *repos.Repos

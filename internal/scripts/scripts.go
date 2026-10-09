@@ -14,6 +14,13 @@ import (
 	"github.com/kirathecat/kira-studio/internal/palette"
 )
 
+// A script's folder: the app's automations folder, a picked folder, or (legacy rows only) $HOME.
+const (
+	DirModeKira  = "kira"
+	DirModeFixed = "fixed"
+	DirModeHome  = "home"
+)
+
 // MaxCollectionRunes caps a script collection name.
 const MaxCollectionRunes = 64
 
@@ -39,6 +46,7 @@ type CustomScript struct {
 	Name       string `json:"name"`
 	Command    string `json:"command"`
 	WorkingDir string `json:"workingDir"`
+	DirMode    string `json:"dirMode"`
 	Color      string `json:"color"`
 	// CollectionID is nil for an ungrouped script.
 	CollectionID *string `json:"collectionId"`
@@ -68,7 +76,9 @@ type CustomScriptFields struct {
 	Name       string `json:"name"`
 	Command    string `json:"command"`
 	WorkingDir string `json:"workingDir"`
-	Color      string `json:"color"`
+	// DirMode is one of the DirMode constants; "" means DirModeKira.
+	DirMode string `json:"dirMode"`
+	Color   string `json:"color"`
 	// CollectionID groups the command in the panel; nil means ungrouped.
 	CollectionID *string `json:"collectionId"`
 }
@@ -85,8 +95,18 @@ func (f *CustomScriptFields) Validate() error {
 	if f.Command == "" {
 		return invalid("scripts: command is required")
 	}
-	if f.WorkingDir != "" && !filepath.IsAbs(f.WorkingDir) {
-		return invalid("scripts: working directory must be an absolute path")
+	if f.DirMode == "" {
+		f.DirMode = DirModeKira
+	}
+	switch f.DirMode {
+	case DirModeKira, DirModeHome:
+		f.WorkingDir = ""
+	case DirModeFixed:
+		if !filepath.IsAbs(f.WorkingDir) {
+			return invalid("scripts: working directory must be an absolute path")
+		}
+	default:
+		return invalid("scripts: invalid directory mode")
 	}
 	if !palette.Valid(f.Color) {
 		return invalid("scripts: invalid colour")
@@ -105,3 +125,6 @@ func validCollectionName(name string) (string, error) {
 	}
 	return name, nil
 }
+
+// errHomeRetired refuses the legacy home folder for a new choice.
+var errHomeRetired = invalid("scripts: the home folder is no longer offered")

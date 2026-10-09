@@ -66,6 +66,8 @@ type Session struct {
 	ptmx   *os.File
 	onData func([]byte)
 	onExit func(code int, err error)
+	onEnd  func(code int, cause CloseCause)
+	cause  CloseCause
 	// unregister removes this session from its Registry — called exactly once, from the reader
 	// goroutine, whether the exit was requested (Close) or spontaneous (the shell exiting on its
 	// own, e.g. `exit`/Ctrl-D).
@@ -131,6 +133,7 @@ func newSession(p OpenParams) (*Session, error) {
 		ptmx:   ptmx,
 		onData: p.OnData,
 		onExit: p.OnExit,
+		onEnd:  p.OnEnd,
 		done:   make(chan struct{}),
 	}, nil
 }
@@ -184,9 +187,13 @@ func (s *Session) readLoop() {
 
 	s.mu.Lock()
 	s.closed = true
+	cause := s.cause
 	s.mu.Unlock()
 
 	_ = s.ptmx.Close()
+	if s.onEnd != nil {
+		s.onEnd(code, cause)
+	}
 	s.onExit(code, waitErr)
 	close(s.done)
 	s.unregister()
@@ -244,13 +251,17 @@ func (s *Session) Resize(cols, rows uint16) error {
 // EOF/EIO and exit on its own in the common case, with SIGKILL and then a forced ptmx.Close as the
 // bound on a shell that ignores SIGHUP or sits outside the signalled process group (job control,
 // §4's own edge case).
-func (s *Session) Close() {
+func (s *Session) Close() { s.closeFor(CauseUser) }
+
+// closeFor is Close recording why; the first closer's cause stands.
+func (s *Session) closeFor(cause CloseCause) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
 		return
 	}
 	s.closed = true
+	s.cause = cause
 	s.mu.Unlock()
 
 	pid := s.cmd.Process.Pid
@@ -285,6 +296,16 @@ func (s *Session) Close() {
 	}
 }
 
+// CloseCause says why a session was closed from outside; CauseNone is a spontaneous exit.
+type CloseCause int
+
+const (
+	CauseNone CloseCause = iota
+	CauseUser
+	CauseWindow
+	CauseQuit
+)
+
 // OpenParams is Registry.Open's own args — terminalId is client-supplied (the tab id), so the
 // renderer can subscribe to its output before this call returns and no output can race the
 // subscription (bridge/terminal.go's own reasoning, §3.2).
@@ -310,6 +331,8 @@ type OpenParams struct {
 	// OnExit is called exactly once, from the reader goroutine, whether the shell exited on its
 	// own or was killed by Close.
 	OnExit func(code int, err error)
+	// OnEnd, when set, runs once just before OnExit with why the session ended.
+	OnEnd func(code int, cause CloseCause)
 }
 
 // AgentSession is one live Claude Code launch's own wire-agnostic shape — Registry.AgentSessions'
@@ -371,7 +394,8 @@ func (r *Registry) Open(p OpenParams) (*Session, error) {
 	sess, err := r.spawn(p)
 	r.mu.Lock()
 	doomed := r.closed
-	if _, ok := r.doomed[p.ID]; ok {
+	_, win := r.doomed[p.ID]
+	if win {
 		doomed = true
 	}
 	delete(r.pending, p.ID)
@@ -385,7 +409,11 @@ func (r *Registry) Open(p OpenParams) (*Session, error) {
 		// Close waits on readLoop's done channel, so the loop must run to reap the shell.
 		sess.unregister = func() {}
 		go sess.readLoop()
-		sess.Close()
+		if win {
+			sess.closeFor(CauseWindow)
+		} else {
+			sess.closeFor(CauseQuit)
+		}
 		return nil, ErrRegistryClosed
 	}
 	sess.unregister = func() { r.remove(p.WindowKey, p.ID) }
@@ -432,9 +460,11 @@ func (r *Registry) Resize(id string, cols, rows uint16) error {
 
 // Close kills id's own session — idempotent, and a no-op when id names no live session (already
 // closed, or never opened).
-func (r *Registry) Close(id string) {
+func (r *Registry) Close(id string) { r.closeFor(id, CauseUser) }
+
+func (r *Registry) closeFor(id string, cause CloseCause) {
 	if sess := r.get(id); sess != nil {
-		sess.Close()
+		sess.closeFor(cause)
 	}
 }
 
@@ -506,7 +536,7 @@ func (r *Registry) CloseWindow(key string) {
 	r.mu.Unlock()
 
 	for _, id := range ids {
-		r.Close(id)
+		r.closeFor(id, CauseWindow)
 	}
 }
 
@@ -530,7 +560,7 @@ func (r *Registry) CloseAll() {
 	for _, id := range ids {
 		go func(id string) {
 			defer wg.Done()
-			r.Close(id)
+			r.closeFor(id, CauseQuit)
 		}(id)
 	}
 	wg.Wait()

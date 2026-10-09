@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/internal/appstorage"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
 
@@ -34,6 +35,7 @@ type Repos struct {
 	MaskRules *MaskRulesRepo
 	// CustomScripts is P85's own launch-target store (custom_scripts).
 	CustomScripts *scripts.Repo
+	ScriptRuns    *scriptruns.Repo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -79,6 +81,7 @@ func New(db *sql.DB) (*Repos, error) {
 		GrpcHistory:     &GrpcHistoryRepo{DB: db},
 		MaskRules:       &MaskRulesRepo{DB: db},
 		CustomScripts:   &scripts.Repo{DB: db},
+		ScriptRuns:      &scriptruns.Repo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll, opsInsert, opsUpdate},
 	}, nil
 }

@@ -23,13 +23,13 @@ type WindowRecord struct {
 }
 
 // WindowModes is this app's own mode vocabulary (packages/shared/domain/mode.ts's AppMode) — P91
-// §3: 'terminal' joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint, no
+// §3: the automations mode (stored as 'terminal' before P242) joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint, no
 // migration needed), so an older binary reading an unrecognised mode still degrades cleanly through
-// appstorage.WindowModes.Normalize; without an entry here, a window closed in the Terminal module
+// appstorage.WindowModes.Normalize; without an entry here, a window closed in the Automations module
 // would silently reopen in Studio. A mode value stored by a since-removed module degrades to
 // DefaultWindowMode the same way, no migration needed for the same reason (P128 §2.2: the
 // vocabulary stays here, GetMode/SetMode's own bodies hoisted to appstorage.WindowRepo).
-var WindowModes = appstorage.WindowModes{Default: DefaultWindowMode, Valid: []string{"studio", "api", "terminal", "docker"}}
+var WindowModes = appstorage.WindowModes{Default: DefaultWindowMode, Valid: []string{"studio", "api", "automations", "docker"}}
 
 // DefaultWindowMode is the app's own default mode — the migration's column DEFAULT and this
 // constant deliberately agree, so there is exactly one place the default lives on each side.
