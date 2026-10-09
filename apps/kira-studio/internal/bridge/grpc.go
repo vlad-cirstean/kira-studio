@@ -162,13 +162,13 @@ func (s *GrpcService) Describe(ctx context.Context, args GrpcDescribeArgs) (grpc
 	if args.OpID == "" {
 		schema, err = grpcclient.Describe(ctx, src)
 	} else {
-		spec := adapterhost.OpSpec{Kind: "grpc", OpID: args.OpID, Incognito: true}
-		_, _, err = s.Deps.Router.Host().RunOp(ctx, spec,
-			func(runCtx context.Context, _ *adapters.OpCtx) (any, error) {
-				var derr error
-				schema, derr = grpcclient.Describe(runCtx, src)
-				return nil, derr
-			})
+		// Cancellable, not RunOp: a describe is no operation worth a row in the Operations panel.
+		runCtx, release, regErr := s.Deps.Router.Host().Cancellable(ctx, args.OpID)
+		if regErr != nil {
+			return grpcclient.Schema{}, mapGrpcError(regErr)
+		}
+		defer release()
+		schema, err = grpcclient.Describe(runCtx, src)
 	}
 	if err != nil {
 		maskGrpcError(err, used)
@@ -206,7 +206,8 @@ type GrpcCallArgs struct {
 	// recordGrpcHistory below and rides along on the op spec so the op log skips persisting this
 	// op too (adapterhost/host.go, oplog/wire.go).
 	Incognito bool `json:"incognito"`
-	// TimeoutMs bounds a unary call; zero uses grpcclient's default.
+	// TimeoutMs bounds a unary call, clamped to 0..3_600_000; absent inherits api.requestTimeoutMs.
+	// Zero means no deadline (the 5 s dial bound still applies).
 	TimeoutMs int `json:"timeoutMs,omitempty"`
 }
 
@@ -226,6 +227,16 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 	if args.Service == "" || args.Method == "" {
 		return grpcclient.CallResult{}, ipcerr.BadRequest("service and method are required")
 	}
+
+	timeoutMs := args.TimeoutMs
+	if timeoutMs == 0 {
+		settings, err := s.Deps.Repos.Settings.GetAll()
+		if err != nil {
+			return grpcclient.CallResult{}, ipcerr.InternalErr(err)
+		}
+		timeoutMs = settings.Api.RequestTimeoutMs
+	}
+	timeoutMs = min(max(timeoutMs, 0), 3_600_000)
 
 	tabID := args.TabID
 	spec := adapterhost.OpSpec{ConnectionID: nil, Kind: "grpc", OpID: args.OpID, TabID: &tabID, Incognito: args.Incognito}
@@ -247,7 +258,7 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 				Target: src.Target, TLS: args.TLS, Source: src,
 				FullMethod:  "/" + args.Service + "/" + args.Method,
 				MessageJSON: resolvedMessage, Metadata: src.Metadata,
-				Timeout: time.Duration(args.TimeoutMs) * time.Millisecond,
+				Timeout: time.Duration(timeoutMs) * time.Millisecond,
 			}
 
 			var result grpcclient.CallResult

@@ -1,7 +1,6 @@
 package grpcclient
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -48,13 +47,11 @@ type CallRequest struct {
 	MessageJSON string
 	Metadata    []MetaPair
 
-	// Timeout bounds a unary call end to end, E_TIMEOUT on expiry; zero means defaultUnaryTimeout.
+	// Timeout bounds a unary call end to end, E_TIMEOUT on expiry; zero means no deadline
+	// (the dial bound still applies), like api.requestTimeoutMs.
 	// A server stream is unbounded by design: the user ends it with Stop.
 	Timeout time.Duration
 }
-
-// defaultUnaryTimeout matches httpclient's default request timeout. A var so tests can lower it.
-var defaultUnaryTimeout = 30 * time.Second
 
 func grpcPath(m protoreflect.MethodDescriptor) string {
 	svc := m.Parent().(protoreflect.ServiceDescriptor)
@@ -152,8 +149,11 @@ func Unary(ctx context.Context, req CallRequest) (CallResult, error) {
 	if err != nil {
 		return CallResult{}, err
 	}
-	timeout := cmp.Or(req.Timeout, defaultUnaryTimeout)
-	callCtx, cancelCall := context.WithTimeout(callCtx, timeout)
+	timeout := req.Timeout
+	cancelCall := context.CancelFunc(func() {})
+	if timeout > 0 {
+		callCtx, cancelCall = context.WithTimeout(callCtx, timeout)
+	}
 	defer cancelCall()
 
 	in := dynamicpb.NewMessage(method.Input())
