@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test as base, type Page } from '@playwright/test';
-import { acquireBuildLock, getFreePort, waitForHealth } from '@workbench/testing/e2eReal';
+import { acquireBuildLock, bound, getFreePort, waitForHealth } from '@workbench/testing/e2eReal';
+import { type FlowServers, startFlowServers } from './support/flowServers';
 
 // The tests/e2e-real/ counterpart to tests/e2e/fixtures.ts's `_electron.launch()`
 // (P57-e2e-revisit.md §8). There is no Electron process and no native window: `relaunch`-equivalent
@@ -14,6 +15,7 @@ import { acquireBuildLock, getFreePort, waitForHealth } from '@workbench/testing
 const ROOT_DIR = resolve(__dirname, '../../../..');
 const APP_DIR = resolve(ROOT_DIR, 'apps/kira-studio');
 const SERVER_BINARY = resolve(APP_DIR, 'bin/kira-server-test');
+const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge';
 
 function goBinDir(): string {
   return `${execFileSync('go', ['env', 'GOPATH'], { encoding: 'utf8' }).trim()}/bin`;
@@ -62,15 +64,36 @@ function buildPrerequisites(): Promise<void> {
 export interface KiraApp {
   window: Page;
   baseURL: string;
+  /** Calls a bound service method on the real server, e.g. `call('VariablesService', 'Upsert', args)`. */
+  call: <T>(service: string, method: string, args?: unknown) => Promise<T>;
 }
 
 interface KiraFixtures {
   kiraHome: string;
   consoleErrors: string[];
+  /** Extra environment for the spawned server (merged last): `test.use({ serverEnv: { HOME } })`. */
+  serverEnv: Record<string, string>;
   kira: KiraApp;
 }
 
-export const test = base.extend<KiraFixtures>({
+interface KiraWorkerFixtures {
+  /** The flow harness's real HTTP, HTTPS and gRPC servers, one set per worker. */
+  flowServers: FlowServers;
+}
+
+export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
+  serverEnv: [{}, { option: true }],
+
+  flowServers: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
+    async ({}, use) => {
+      const { servers, stop } = await startFlowServers();
+      await use(servers);
+      await stop();
+    },
+    { scope: 'worker' },
+  ],
+
   // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
   kiraHome: async ({}, use) => {
     const dir = await mkdtemp(join(tmpdir(), 'kira-e2e-real-'));
@@ -83,7 +106,7 @@ export const test = base.extend<KiraFixtures>({
     await use([]);
   },
 
-  kira: async ({ browser, kiraHome, consoleErrors }, use) => {
+  kira: async ({ browser, kiraHome, consoleErrors, serverEnv }, use) => {
     // Non-negotiable per tests/e2e/fixtures.ts's own precedent (P25 D10): a real ~/.kira-studio
     // must never be touched by a test run.
     if (!kiraHome.startsWith(tmpdir())) {
@@ -106,6 +129,7 @@ export const test = base.extend<KiraFixtures>({
       // loopback, let alone packaged or shipped.
       WAILS_SERVER_HOST: '127.0.0.1',
       WAILS_SERVER_PORT: String(port),
+      ...serverEnv,
     };
 
     const proc = spawn(SERVER_BINARY, [], {
@@ -143,7 +167,11 @@ export const test = base.extend<KiraFixtures>({
     await page.goto(`${baseURL}/`);
     await page.waitForSelector('[data-testid="status-bar"]');
 
-    await use({ window: page, baseURL });
+    await use({
+      window: page,
+      baseURL,
+      call: (service, method, args) => bound(baseURL, BRIDGE_PKG, service, method, args),
+    });
 
     await page.close();
     // SIGKILL, not a graceful shutdown (§8) — this tier does not test lifecycle/quit handshakes
