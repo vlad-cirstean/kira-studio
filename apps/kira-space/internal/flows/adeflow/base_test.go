@@ -67,6 +67,27 @@ func (f *baseFx) refresh(t *testing.T) {
 }
 
 func TestTaskBase(t *testing.T) {
+	t.Run("picker lists remote-only branches and the planner branches", func(t *testing.T) {
+		f := newBaseFx(t)
+		f.pushBranch(t, "develop")
+		f.repo.Git("branch", "-D", "develop")
+		task, br := f.task(t, "Fix login", adewire.BaseChoice{})
+		got, err := f.app.W.AdeTask.RepoBranches(ctx, adewire.RepoBranchesArgs{CodeRepoID: f.repoID, BranchID: br.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		picks := map[string]adewire.BasePick{}
+		for _, p := range got.Branches {
+			picks[p.Name] = p
+		}
+		if got.MainName != "main" || !picks["develop"].Remote || picks["develop"].Local {
+			t.Fatalf("picker = %+v, want main and remote-only develop", got)
+		}
+		if p, ok := picks[br.Name]; ok && p.Excluded == "" {
+			t.Fatalf("picker offers %+v for task %s: a branch cannot be its own base", p, task.ID)
+		}
+	})
+
 	t.Run("new task starts from a remote-only base", func(t *testing.T) {
 		f := newBaseFx(t)
 		f.pushBranch(t, "develop")
