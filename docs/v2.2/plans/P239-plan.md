@@ -17,6 +17,26 @@ Orca source (shallow clone of `github.com/stablyai/orca`, MIT, HEAD `bd85767e`, 
 Claude Code statusline docs (`code.claude.com/docs/en/statusline`), community write-ups, and live
 runs of `claude` 2.1.295 in this sandbox.
 
+## Revision: account source removed (user decision, 2026-10-09)
+
+The user dropped the Keychain/OAuth-token account source entirely. Void in this plan: the "Account
+source" bullets of section 2, `account.go`, `keychain_darwin.go`, `parse.go` and `parse_test.go`
+(3.2), the `usageAccountFallback` setting, `TestAccountFallback`, `TestAccountStates`,
+`TestAccountOffByDefault` (3.1), the account switch and note in the UI, section 4's second and
+third bullets, Mac steps 3 to 5 and D1, commit 4, and the credential greps in section 9. P239 reads no
+credential, calls no Anthropic endpoint and keeps no account setting. Section 1.1 stays as research only.
+
+Empirical check (claude 2.1.295, haiku, `claude -p ... --settings <statusLine capture> --output-format
+stream-json --verbose`): the `statusLine` command is never invoked in a `-p` run (capture file never
+written), so ADE headless runs give no statusline feed. The stream-json output does carry the numbers:
+one `{"type":"rate_limit_event","rate_limit_info":{..."unifiedWindows":{"five_hour":{"utilization":0.24,
+"resetsAt":1791575400},"seven_day":{"utilization":0.47,"resetsAt":1792044000}}}}` line. `utilization` is a
+0..1 fraction (the same account's statusline `used_percentage` read 44 for seven_day with the same
+`resetsAt` earlier; 0.47 now). So a run feeds usage from its own output: `adeagent.Handler.OnRateLimits`
+parses that line and `claudeusage.Service.Ingest` takes it. Sources: interactive Kira session statusline
+(percent, epoch s) and headless run stream (fraction, epoch s); the newest wins and the item shows its age.
+With neither yet: state `waiting`, text `Usage: –`, tooltip "Start a Claude Code session to see usage".
+
 ## 1. Research: what is verified, what is not
 
 ### 1.1 How Orca gets usage (read in its source, verified as code, not run)
