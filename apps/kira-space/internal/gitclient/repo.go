@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
 )
@@ -51,7 +52,7 @@ type Repo struct {
 	Summary RepoSummary
 
 	runner  Runner
-	gitPath string
+	gitPath atomic.Pointer[string]
 
 	mu      sync.Mutex
 	writing bool
@@ -80,15 +81,19 @@ func (r *Repo) Writing() bool {
 }
 
 // GitPath returns the resolved git binary path this repo spawns.
-func (r *Repo) GitPath() string { return r.gitPath }
+func (r *Repo) GitPath() string { return *r.gitPath.Load() }
+
+// SetGitPath repoints later spawns at a changed git.path setting.
+func (r *Repo) SetGitPath(p string) { r.gitPath.Store(&p) }
 
 func NewRepo(summary RepoSummary, runner Runner, gitPath string) *Repo {
-	return &Repo{
+	r := &Repo{
 		Summary: summary,
 		runner:  runner,
-		gitPath: gitPath,
 		waitCh:  make(chan struct{}),
 	}
+	r.SetGitPath(gitPath)
+	return r
 }
 
 // ErrCancelled is returned by Read/Write when ctx is done before access was ever granted —

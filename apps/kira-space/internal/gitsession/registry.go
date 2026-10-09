@@ -153,6 +153,7 @@ func (reg *Registry) acquire(
 			sl.lingerTimer = nil
 		}
 		sl.refs++
+		sl.entry.Repo.SetGitPath(gitPath)
 		// C14-3: a real (non-quiet) Acquire joining an entry AcquireQuiet built (or one that was
 		// already eligible — idempotent either way) makes it eligible for auto-fetch arming from
 		// here on, even though this particular call is only a reuse, not a construction.

@@ -271,6 +271,15 @@ func (b *TaskBoard) openRepo(ctx context.Context, codeRepoID string) (*gitsessio
 	b.mu.Unlock()
 	if known {
 		if entry, ok := b.conn.Entry(gitID); ok {
+			// Follow git.gitPath: the entry bakes the path at open time.
+			// tooOld still reads through the open entry; only the checks fail.
+			switch status := b.deps.GitStatus(ctx); status.Kind {
+			case "ok":
+				entry.Repo.SetGitPath(status.Path)
+			case "tooOld":
+			default:
+				return nil, fmt.Errorf("ade: git is unavailable: %s", status.Kind)
+			}
 			return entry, nil
 		}
 	}

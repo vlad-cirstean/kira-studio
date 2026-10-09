@@ -79,7 +79,6 @@ func TestGitPathSettingEverywhere(t *testing.T) {
 	}
 
 	t.Run("refresh of an open repo follows the setting", func(t *testing.T) {
-		t.Skip("P231 finding B-2")
 		setGitPath(t, app, bad)
 		if got := gitStatusOf(gs).Git; got.Kind != "unusable" {
 			t.Fatalf("git status = %+v, want unusable", got)
