@@ -2343,8 +2343,8 @@ unconditionally, with no on/off setting of its own (P129 Part 1's own posture: a
 `curl` missing, a bind conflict — is logged, never fatal, and sessions still spawn and track with
 activity icons simply absent). `hookEvents` (`internal/agenthooks/config.go`) now also asks Claude
 Code to fire `UserPromptSubmit`, the one hook event P127's own set left out — `reduceAgentActivity`
-(below) is its first consumer. `AgentEvent`'s wire shape is unchanged (`packages/shared/domain/
-agent.ts`) — every field a real hook payload can carry was already there.
+(below) is its first consumer. `AgentEvent` gains `lastAssistantMessage` (P238; Stop's reply text, bounded to 200 bytes on a rune
+boundary like `message`; `packages/shared/domain/agent.ts`).
 
 **Hooks reach only Kira Space sessions (P233).** Nothing in either app writes Claude Code hooks into
 the user's `~/.claude/settings.json`, project `.claude/settings(.local).json` or any other settings
@@ -4093,6 +4093,36 @@ and `docs/v2.0/plans/`.
 - The agent-hooks `Stop` event ends a dialog turn; the renderer's `turnWatch` then calls `RecordMerge`
   (merge dialog) or `ArchiveTask` (send-then-archive). That pending state lives in the renderer.
 
+### Agent notifications (P238)
+
+Desktop notification when a Kira Space agent finishes or needs input. Package `internal/agentnotify`,
+built in `appwire.Build` and fed by two existing callbacks: the hooks `OnEvent` (every Kira-launched
+claude-code PTY) and the board's `OnRuns` (headless runs, which have no hooks).
+
+| Source | Note |
+|---|---|
+| `Stop`, no wake tool armed | `finished`: "Claude finished · name", body is `last_assistant_message` |
+| `Stop` after `PreToolUse` of `Monitor` or `ScheduleWakeup` | none (session waits); `UserPromptSubmit`, `SessionStart`, `Stop` clear the arm |
+| `Notification` `permission_prompt`, `elicitation_dialog`, or untyped with a message | `needs-input` |
+| `Notification` `idle_prompt`, `auth_success` | none |
+| run state `pending` or `running` to `done`, `failed`, `stuck` | `run-ended`; a run first seen already ended records state only |
+
+- Name: ADE task title, else the code repository whose root holds the cwd, else the cwd basename
+  (terminal tabs are not persisted, so no tab title exists to read).
+- Suppressed while the owning window is focused and shows that terminal (`ActiveTerminalID`) or that
+  ADE task. Each window reports this through `AgentNotifyService.ReportFocus` (debounced 150 ms,
+  `state/agentNotify.ts`). Cooldown 10 s per (terminal or run, kind). A note id is `<kind>:<id>` so a
+  newer note replaces the older one.
+- Settings `claudeCode.notifyEnabled` (master), `notifyOnFinished`, `notifyOnNeedsInput`,
+  `notifyOnRunEnded`, `notifyIncludeMessage`, all on by default. `SendTest` ignores focus and cooldown.
+- Click: `Notifier.Click` focuses the window and pushes `kira:agent:reveal-terminal` or
+  `kira:agent:reveal-task` (EmitTo, Space only); an ADE record goes through `FocusSession`.
+- Platform: `notify_darwin.go` (`darwin && !server`) registers the Wails v3 notifications service and
+  `WailsSink`; `notify_other.go` returns no service, so Linux and `-tags server` post nothing.
+  Message text only goes to the local notification centre.
+- `AgentNotifyService` is the 21st Kira Space bound service.
+- Tests: `flows/notifyflow` (hook events through the real shim), `tests/ui/settings-agent-notify.spec.ts`.
+
 ### Worktree setup
 
 - A worktree is created by a run creating branches, Start, Take over in a new worktree or Add existing
@@ -4983,6 +5013,10 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Desktop notifications are unverified on macOS (P238).** Needs a signed bundle and the user's
+  one-time OS permission; a dev build run outside a bundle cannot post (Wails checks the bundle id).
+  The darwin sink compiles only with cgo on a Mac. Linux and `-tags server` builds post nothing.
+  Delete once checked on a signed Mac build.
 - **Mobile agents web is unverified on a real phone (P212).** Covered by Go tests and Playwright
   WebKit/Chromium emulation only. Unchecked: the iOS soft keyboard with xterm (the compose row exists
   for it), the attach WebSocket surviving a backgrounded tab, and touch drag on a real device (tests
