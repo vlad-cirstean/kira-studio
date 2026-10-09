@@ -33,3 +33,11 @@ Findings:
   `TestHistoryClear` saves the surviving tab before the relaunch check.
 - Plan correction (Studio): `DataGrip.Scan` reads a project folder (`.idea/dataSources.xml`), not a
   JetBrains config dir; the test scans a copy of the `project-six` fixture.
+- F6 (fixed in `fix(datagrip)`): every DataGrip import row failed `E_BAD_REQUEST: invalid MCP
+  permission mode`; the importer sent empty MCP modes. Found by the Import step of `TestDataGripScan`.
+- F7 (fixed in `fix(grpcclient)`): a reflection deadline surfaced as a raw `DeadlineExceeded`
+  transport error when gRPC's timer beat `ctx.Err()`. 41 of ~150 failures under `-race`.
+- F8 (fixed in `fix(gitclient)`): `Classify` left `Cause` nil for a cancelled run whose git process
+  exited 0, so `errors.Is(err, context.Canceled)` failed and a search cancel read as `E_INTERNAL`.
+- Flaky specs: three test-side causes fixed (detail pane still open, host git config leak, build
+  charged to the test timeout). `ade-v2-panel.spec.ts:239` did not reproduce in 80 runs; left as is.
