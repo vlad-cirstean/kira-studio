@@ -4666,7 +4666,10 @@ native pieces (dialogs, browser, keep-awake, locator, window hooks), tests suppl
 `internal/flowharness` boots `appwire.Build` in-process on a temp home. Real: SQLite, git (fixed
 dates, `git fast-import` history), the git stream, gitsock, PTY, watchers, mobile HTTP. Faked: the
 `claude` and `gh` CLIs (`flowharness/fakeagent`, scenario JSON), dialogs, browser, keep-awake, LAN
-detection, window manager. Flow tests live in `internal/flows/{gitflow,repoflow,editorflow,adeflow,memoryflow,termflow,appflow,mobileflow}`.
+detection, window manager. `appwire.Options` exposes the test seams `GhLocator`, `TrackerGrace` and
+`MobilePoll` (`flowharness.WithoutGh`, `WithTrackerGrace`, `WithMobilePoll`). The fake `claude` prints
+no stream `init` line under `--output-format json`, accepts an inline `--mcp-config`, and answers
+headless calls by `--system-prompt` through scenario `prompts` rules. Flow tests live in `internal/flows/{gitflow,repoflow,editorflow,adeflow,memoryflow,termflow,appflow,mobileflow}`.
 `bun run test:flows:space` is the general suite. `bun run test:flows:space:complete` sets
 `KIRA_FLOW_COMPLETE=1` and adds the slow permutation coverage.
 
@@ -4674,7 +4677,9 @@ detection, window manager. Flow tests live in `internal/flows/{gitflow,repoflow,
 (`bun run test:e2e-real:space`): a `go build -tags server` binary on a temp home, fake `claude`/`gh`
 first on `PATH`, Chromium on `/?window=<uuid>`. Server build locates git through
 `gitclient.NewHostLocator` (`locator_server.go`), not the darwin-only locator. Limits: no native
-dialogs (`page.route` stub), no terminal output (`EmitTo` needs a native window), no mobile access.
+dialogs (`page.route` stub), no mobile access. The server build's `EmitTo` broadcasts to every
+browser window (`internal/shell/emitto_server.go`); listeners filter by their own ids. The fixture
+writes login-shell profiles that put the fake `claude` first on `PATH`.
 Build lock, port and health helpers are shared with Studio via `packages/workbench/src/testing/e2eReal.ts`.
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
@@ -4930,7 +4935,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **A paired git socket token is a bearer secret, not bound to the peer (P172).** Any same-user process holding the token connects. Pairing shows the kernel-reported process, but reconnects do not re-check it. Options: pin the pairing-time executable or code signature, or accept the same-user threat model. Open user decision; delete when resolved.
 - **Console reads on PostgreSQL and MySQL/MariaDB drain past the cap (P174).** At the cap `rows.Close()` discards the remaining rows off the wire: memory is bounded, server and network time are not. The Stop button ends a long drain. Delete once a driver offers a cheap server-side stop that keeps later statements in the batch intact.
 - **Some Redis console commands are read whole before the cap (P174).** `SUNION`, `SINTER`, `SDIFF`, `EVAL`/`FCALL`, module commands and `GET` of a huge string have no bounded form; go-redis reads the reply whole, then the page is capped. Delete once those commands get bounded rewrites or a streaming reader.
-- **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. The server-tag build also drops terminal output (`EmitTo` needs a native window). Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
+- **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
 - **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
 - **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every

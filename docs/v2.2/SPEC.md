@@ -26,7 +26,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P228 | Git graph still broken after P225; user suspects resizing columns breaks it. Reproduce with real column resizes (every column, drag then scroll, click, Load more), find root cause, fix, add regression spec that resizes columns first. | Done |
 | P229 | Git section (graph, toolbar, detail, stash and other git panes) looks different from the rest of the app: bring it in line with the app's shadcn-vue/Tailwind look (spacing, type, colours, controls, rows). Includes the git UI inside Kira Space. | Done |
 | P230 | Agent module Refresh broken: shows 'never fetched' then a git error. Find root cause, fix, add regression spec. | Done |
-| P231 | Real-flow tests for every main flow of Kira Space, split at the IPC (bridge) level: Go-side tests drive the bound services against real `git` and real temporary git repos (no mocked git, default settings), TS-side tests drive the frontend against the real bridge contract. Covers all modules (git, agents/ADE, memory, terminal, API/quick commands, repos, settings, mobile web). Two parallel streams (A, B) with disjoint file ownership. Then fix every issue the tests find. | Planned. Commit 0 done (shared harness) |
+| P231 | Real-flow tests for every main flow of Kira Space, split at the IPC (bridge) level: Go-side tests drive the bound services against real `git` and real temporary git repos (no mocked git, default settings), TS-side tests drive the frontend against the real bridge contract. Covers all modules (git, agents/ADE, memory, terminal, API/quick commands, repos, settings, mobile web). Two parallel streams (A, B) with disjoint file ownership. Then fix every issue the tests find. | Done |
 | P232 | Real-flow tests for Kira Studio, same type as P231 (Go bound-service tests at the IPC level against real git/real services with default settings, plus real-UI `e2e-real` specs): API module (requests, collections, variables/environments, quick commands, gRPC), Docker module, with real API calls over HTTP and gRPC (real local HTTP servers and a real gRPC server with reflection and `.proto` descriptors, no mocked transport) and real Docker commands against a real Docker daemon (containers, images, volumes, networks, logs, exec), skipping with a clear message when no daemon is reachable, and Studio's own terminal wiring (`bridge/terminal.go`, terminal module host, Studio quick commands). Reuses P231's harness patterns; then fix every issue found. | Planned |
 | P233 | Claude Code hooks only for sessions Kira Space starts: audit every place Kira Space or Kira Studio changes the user's real Claude Code configuration (`~/.claude/settings.json`, project `.claude/settings.json`, `.claude.json`, MCP registration, hooks), and move each to per-session injection (e.g. `--settings <file>` / `--mcp-config` passed only when Kira Space launches the agent or terminal session, hook shim scoped by an env var set only there). Kira Space must make no change to the user's actual settings files; migrate or remove entries earlier versions wrote, with an explicit user-visible cleanup step. Real-flow test that proves settings.json is byte-identical after the flows. | Planned |
 | P234 | Docs refresh: update `docs/ARCHITECTURE.md` (incl. Parallelism, process wiring with `appwire`, stale git-pairing-real line, testing section), `docs/DEV_ENVIRONMENT.md`, the v2.2 README and root `README.md` to match everything shipped in v2.2 (P210-P233). | Planned |
@@ -618,3 +618,30 @@ Mac handover:
 3. Repo with no remote: chip reads `no remote`; `↻` tip reads `Rescan … (no remote to fetch)`; click: `no remote · no changes`, not red.
 4. Repo with a bad remote URL: red classified message stays.
 5. Set Git executable path to a real git (`/opt/homebrew/bin/git`), relaunch, `Refresh all`: same as step 2.
+
+## P231 result
+
+Tests: 76 Go flow tests (48 subtests) in `internal/flows/{gitflow,repoflow,editorflow,adeflow,memoryflow,termflow,appflow,mobileflow}`, 15 `e2e-real` specs. Every finding test is un-skipped and green. Green: `go test ./apps/kira-space/...` with `KIRA_FLOW_COMPLETE=1`, `e2e-real` tier (15), `test:ui:space` (251), `test:webview` (64), lint, typecheck, `lint:dead`, golangci-lint.
+
+Findings fixed:
+
+- A1: `graph.refresh` after Show more kept one page. A walk reset now remembers its loaded rows; the next `graph.stream` re-reads pages until the store holds them again. Design: whole pages, so the new commit shifts the last old row out; test asserts at least the old row count.
+- A2: reloaded Review pane and diff tab compared on a connection holding no repo. The native git transport sends `repo.open` once per repo before the first request or stream naming it. Fixes Retry too.
+- A3: `EmitTo` in the `-tags server` build found no window. It now broadcasts (`internal/shell/emitto_server.go`); native build unchanged. Terminal output and `open-session` share the path; only code search is asserted end to end.
+- B-1: remote-only branch attach. `ensureWorktree` uses `newBranch` from `<remote>/<name>` (origin preferred), so the branch tracks its remote.
+- B-2: open repos ignored a changed `git.gitPath`. `Repo.SetGitPath`; the registry and `TaskBoard.openRepo` re-apply the live setting. `tooOld` still reads through an open entry.
+- B-3: `SetPort` reconciles whenever the supervisor is active, so a server stopped by a busy port retries on the new port.
+- B-4: `/api/ade/sessions` passes through `withoutCwd`; the reads test compares against the bound result minus `cwd`.
+
+Harness: `GhLocator` (`WithoutGh` finds no gh; `TestGitHubWithoutGh` asserts `ghMissing`), archive window closes go through the bound `CloseWindow` hook (`TestArchiveRisk` asserts the recorder), `TrackerGrace` and `MobilePoll` in `appwire.Options` plus `WithTrackerGrace`/`WithMobilePoll` (interactive session wait 60s down to 2s), fake `claude` without `init` line under json output, inline `--mcp-config`, scenario `prompts` rules (gate, reconcile, extract per document, fail budget, hold); `memoryflow` and `memoryGate.ts` shims gone. e2e-real fixture writes login-shell profiles; per-test workaround dropped. Fixed on the way: the e2e-real fake read `KIRA_FAKE_SCEN` as JSON though the fixture sets a path, so every e2e scenario was ignored.
+
+Also fixed: `CommitGrid` threw `RowPlan.entryAt/storeRowAt out of range` on a click or scroll frame landing on an emptied plan (made `repo-graph-paging` flaky); `TestSemanticUnavailable` renamed `TestSemanticNotInstalled`.
+
+Deviations:
+
+- Not changed, by design: `pathLocator` PATH fallback, `appearance.dateFormat` reaching git only through `app.init`, git-ui reading `app.init` git status only once a repo opens. Tests keep their current assertions.
+- Open question from B-4 left as is: board `branches[].worktree` is a local path the phone sees.
+- `repo-graph-paging` still fails about one run in 80 under 8 workers (drag step timeout, test-level load flake, also on the base transport).
+- Test git emits `fatal: expected 'acknowledgments'` warnings on push in e2e-real helpers; pushes succeed.
+
+Mac handover: on a desktop build, open a terminal tab and an ADE session and confirm output renders in the right window only (native `EmitTo` is untouched); reload a Review pane with the graph tab closed and confirm it compares.
