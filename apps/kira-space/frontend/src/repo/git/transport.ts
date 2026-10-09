@@ -127,7 +127,35 @@ const COMMENT_MUTATION_METHODS: ReadonlySet<RequestKey> = new Set([
  *  the same repository. */
 function createNativeGitTransport(codeRepoId: string): Transport {
   const channel = createStreamChannel(Stream('git'));
-  const remote = createRpcClient(channel);
+  const rpc = createRpcClient(channel);
+  // Every consumer shares this connection, but only the graph tab ever sent `repo.open`; a reloaded
+  // Review pane or diff tab would otherwise compare against a connection holding no repo.
+  const opened = new Map<string, Promise<unknown>>();
+  const ensureOpen = (params: unknown): Promise<unknown> | undefined => {
+    const id = (params as { repoId?: unknown } | undefined)?.repoId;
+    if (typeof id !== 'string' || id === '') return undefined;
+    let held = opened.get(id);
+    if (!held) {
+      held = rpc.request('repo.open', { path: id }).catch((err: unknown) => {
+        opened.delete(id);
+        throw err;
+      });
+      opened.set(id, held);
+    }
+    return held;
+  };
+  const remote: typeof rpc = {
+    ...rpc,
+    async request(method, params, signal) {
+      if (method === 'repo.close') opened.delete((params as { repoId: string }).repoId);
+      else if (method !== 'repo.open') await ensureOpen(params);
+      return rpc.request(method, params, signal);
+    },
+    async stream(method, params, onChunk, signal) {
+      await ensureOpen(params);
+      return rpc.stream(method, params, onChunk, signal);
+    },
+  };
   const local = createLocalEmitter();
 
   const host = createHostHandlers({

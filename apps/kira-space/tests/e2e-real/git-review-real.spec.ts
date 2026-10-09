@@ -52,18 +52,13 @@ async function reviewWithComment(kira: KiraSpaceApp) {
 test('a review comment persists across a page reload', async ({ kira }) => {
   const { page } = await reviewWithComment(kira);
   await kira.reload();
-  // The restored Review pane cannot compare until the repo is opened on the new connection (finding
-  // A2); opening the graph tab does that, then Retry compares.
-  await page.locator('[data-testid="tab"]').first().click();
-  await expect(page.locator('[data-testid="commit-grid"] svg.kv-graph-svg').first()).toBeVisible();
   const host = page.locator('[data-testid="repo-review-host"]');
-  await host.getByRole('button', { name: 'Retry' }).click();
   await expect(host.getByRole('button', { name: 'Comments (1)' })).toBeVisible();
   await host.getByRole('button', { name: 'Comments (1)' }).click();
   await expect(host.getByText('why not a const enum?')).toBeVisible();
 });
 
-test.fixme('P231 finding A2: a reloaded Review pane compares without the graph tab being opened first', async ({
+test('a reloaded Review pane compares without the graph tab being opened first', async ({
   kira,
 }) => {
   const { page } = await reviewWithComment(kira);
