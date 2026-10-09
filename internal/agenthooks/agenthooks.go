@@ -52,6 +52,11 @@ type Options struct {
 	// OnEvent is called once per accepted hook request, from that request's own handler goroutine
 	// (net/http's usual one-goroutine-per-request model) — never after Close returns.
 	OnEvent func(Event)
+	// StatusLine reports whether a new launch gets the statusline wrapper (nil means no). Read at
+	// compose time, so a settings toggle applies to the next launch.
+	StatusLine func() bool
+	// OnStatusLine is called once per accepted POST /statusline carrying rate_limits.
+	OnStatusLine func(terminalID string, rl RateLimits)
 }
 
 // Server owns, for its own lifetime: a 0700 temp directory, the generated hooks.json (§2.4), the
@@ -65,7 +70,9 @@ type Server struct {
 	// quoting New already succeeds on above, so quoting this path can never fail either.
 	quotedHooksPath string
 	shimPath        string
+	quotedShim      string
 	onEvent         func(Event)
+	onStatusLine    func(string, RateLimits)
 
 	ln   *localsock.Listener
 	http *http.Server
@@ -104,7 +111,7 @@ func New(opts Options) (*Server, error) {
 		_ = ln.Close()
 		return nil, err
 	}
-	hooksDoc, err := buildHooksDocument(quotedShim)
+	hooksDoc, err := buildHooksDocument(quotedShim, nil)
 	if err != nil {
 		_ = ln.Close()
 		return nil, err
@@ -122,8 +129,8 @@ func New(opts Options) (*Server, error) {
 
 	s := &Server{
 		hooksPath: hooksPath, quotedHooksPath: quotedHooksPath, shimPath: shimPath,
-		onEvent: opts.OnEvent,
-		ln:      ln,
+		quotedShim: quotedShim, onEvent: opts.OnEvent, onStatusLine: opts.OnStatusLine,
+		ln: ln,
 	}
 	s.http = &http.Server{
 		Handler: s.mux(),

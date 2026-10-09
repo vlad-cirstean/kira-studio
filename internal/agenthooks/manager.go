@@ -1,6 +1,9 @@
 package agenthooks
 
-import "sync"
+import (
+	"log/slog"
+	"sync"
+)
 
 // Manager is the host's entry point for the listener's lifecycle and its launch composition. It
 // holds at most one running Server, guarded by mu — a host's own settings-gated toggle (read the
@@ -65,7 +68,7 @@ func (m *Manager) Status() Status {
 	return Status{Running: true, SettingsPath: m.srv.SettingsPath()}
 }
 
-// ComposeLaunch returns command unchanged, with a nil env, while stopped. While running, it
+// ComposeLaunch (cwd locates the project's own statusline setting) returns command unchanged, with a nil env, while stopped. While running, it
 // returns command with " --settings '<hooks.json>'" appended and the three hook env vars a launch's
 // shell needs (Server.Env's own doc). The returned env carries KIRA_AGENT_HOOK_TOKEN in plain
 // text — a host must never return it from a bound method; deciding which launches get hooks at all
@@ -77,5 +80,13 @@ func (m *Manager) ComposeLaunch(terminalID, cwd, command string) (string, []stri
 	if m.srv == nil {
 		return command, nil
 	}
-	return command + " --settings " + m.srv.quotedHooksPath, m.srv.Env(terminalID)
+	env := m.srv.Env(terminalID)
+	if m.opts.StatusLine != nil && m.opts.StatusLine() {
+		quoted, extra, err := m.srv.composeStatusLine(terminalID, cwd)
+		if err == nil {
+			return command + " --settings " + quoted, append(env, extra...)
+		}
+		slog.Warn("agent hooks: statusline settings", "scope", "ade", "err", err)
+	}
+	return command + " --settings " + m.srv.quotedHooksPath, env
 }

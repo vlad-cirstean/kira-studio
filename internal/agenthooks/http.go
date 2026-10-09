@@ -41,6 +41,7 @@ type hookRequest struct {
 func (s *Server) mux() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hook", s.handleHook)
+	mux.HandleFunc("/statusline", s.handleStatusLine)
 	return mux
 }
 

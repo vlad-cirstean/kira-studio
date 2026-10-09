@@ -39,14 +39,15 @@ type hookMatcherEntry struct {
 // hooksDocument is hooks.json's own top-level shape — the settings hook map is
 // partialRecord(enum(events), array(hookMatcherEntry)), read from the installed CLI's own schema.
 type hooksDocument struct {
-	Hooks map[string][]hookMatcherEntry `json:"hooks"`
+	Hooks      map[string][]hookMatcherEntry `json:"hooks"`
+	StatusLine *statusLineEntry              `json:"statusLine,omitempty"`
 }
 
 // buildHooksDocument renders hooks.json (§2.4): one identical command hook — quotedShimCommand,
 // already wrapped in single quotes by ShellSingleQuote — for every event in hookEvents. Generated
 // with encoding/json over a Go struct, never hand-assembled JSON text.
-func buildHooksDocument(quotedShimCommand string) ([]byte, error) {
-	doc := hooksDocument{Hooks: make(map[string][]hookMatcherEntry, len(hookEvents))}
+func buildHooksDocument(quotedShimCommand string, statusLine *statusLineEntry) ([]byte, error) {
+	doc := hooksDocument{Hooks: make(map[string][]hookMatcherEntry, len(hookEvents)), StatusLine: statusLine}
 	for _, event := range hookEvents {
 		doc.Hooks[event] = []hookMatcherEntry{{
 			Hooks: []hookCommand{{Type: "command", Command: quotedShimCommand, Timeout: hookCommandTimeoutSeconds}},
