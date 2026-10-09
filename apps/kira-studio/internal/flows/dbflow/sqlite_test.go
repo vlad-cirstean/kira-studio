@@ -189,7 +189,6 @@ func (j *journey) savedQueries(connID, tablePath string) {
 	}
 
 	for _, w := range []string{"id = 1", "id = 2", "id = 1"} {
-		w := w
 		if err := app.W.Queries.HistoryRecord(bridge.QueriesHistoryRecordArgs{ConnectionID: connID, Path: tablePath, Where: &w}); err != nil {
 			t.Fatalf("HistoryRecord %q: %v", w, err)
 		}

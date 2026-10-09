@@ -22,8 +22,6 @@ import (
 
 const wait = 20 * time.Second
 
-func ptr[T any](v T) *T { return &v }
-
 func tab(id, kind string, order int, active bool) model.TabRecord {
 	return model.TabRecord{ID: id, Path: "p/" + id, Kind: kind, State: json.RawMessage(`{}`), Order: order, Active: active}
 }

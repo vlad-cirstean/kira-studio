@@ -128,7 +128,7 @@ func waitRun(t *testing.T, app *flowharness.App, taskID, stepID string, states .
 			return false
 		}
 		for _, s := range states {
-			if string(got.State) == s {
+			if got.State == s {
 				return true
 			}
 		}
