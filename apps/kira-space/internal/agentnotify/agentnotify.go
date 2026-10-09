@@ -221,7 +221,7 @@ func (n *Notifier) HandleRuns(runs []adewire.Run) {
 		}
 		note := Note{
 			ID: string(KindRunEnded) + ":" + r.ID, Kind: KindRunEnded, TaskID: r.TaskID,
-			Title: "ADE run " + string(r.State) + " · " + name, Body: body(p, detail, bodyRun),
+			Title: "ADE run " + r.State + " · " + name, Body: body(p, detail, bodyRun),
 		}
 		n.mu.Lock()
 		if n.watchedRunLocked(r.TaskID) || !n.admitLocked(note.ID) {

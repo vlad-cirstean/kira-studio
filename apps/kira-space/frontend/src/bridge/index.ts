@@ -1,4 +1,5 @@
 import * as AdeTaskService from '@bindings/adetaskservice.js';
+import * as AgentNotifyService from '@bindings/agentnotifyservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as FilesService from '@bindings/filesservice.js';
@@ -355,7 +356,25 @@ const spaceControl = {
   onAdeTaskSessions: (cb: () => void): (() => void) => on(CHANNEL.adeTaskSessions, cb),
   onAdeTaskOpenSession: (cb: (event: V2.OpenSessionEvent) => void): (() => void) =>
     on(CHANNEL.adeTaskOpenSession, cb),
+
+  // P238: desktop agent notifications. The window reports what it shows; a notification click
+  // pushes the reveal events back to the owning window.
+  agentNotifyReportFocus: (args: Omit<AgentNotifyFocus, 'windowKey'>): Promise<void> =>
+    unwrap(AgentNotifyService.ReportFocus({ windowKey, ...args })),
+  agentNotifySendTest: (): Promise<void> => unwrap(AgentNotifyService.SendTest()),
+  onAgentRevealTerminal: (cb: (event: { terminalId: string }) => void): (() => void) =>
+    on('kira:agent:reveal-terminal', cb),
+  onAgentRevealTask: (cb: (event: { taskId: string }) => void): (() => void) =>
+    on('kira:agent:reveal-task', cb),
 };
+
+interface AgentNotifyFocus {
+  windowKey: string;
+  focused: boolean;
+  module: string;
+  activeTerminalId: string;
+  adeTaskId: string;
+}
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus
 // this app's own remaining ones (spaceControl, above) — every `control.xxx()` call site in the app

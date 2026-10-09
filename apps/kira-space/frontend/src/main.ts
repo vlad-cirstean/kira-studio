@@ -11,6 +11,7 @@ import { adeReaderKey } from './ade/v2/reader';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { controlAdeReader } from './bridge/adeReader';
 import { control } from './bridge/control';
+import { installAgentNotifyFocus } from './state/agentNotify';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCodeReposStore } from './state/coderepos';
@@ -154,6 +155,8 @@ async function mountShell(): Promise<void> {
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
   app.mount('#app');
+  // Review windows show no agent sessions, so only a normal window reports focus.
+  if (!reviewTarget) installAgentNotifyFocus();
   // Off the boot critical path — Kira Studio's own main.ts precedent (an update check gains
   // nothing from blocking first paint, and Go's own cache floor decides what actually fetches).
   useAppUpdateStore().initAppUpdate();
