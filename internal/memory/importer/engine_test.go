@@ -20,7 +20,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-// TestMain doubles as the `memory-mcp` entry point: the claudesmoke test points ClaudeAgent at this
+// TestMain doubles as the `memory-mcp` entry point: the realclaude smoke test points ClaudeAgent at this
 // binary, which Claude Code then starts as the finalize step's MCP server.
 func TestMain(m *testing.M) {
 	if os.Getenv("KIRA_TEST_MEMORY_MCP") == "1" {

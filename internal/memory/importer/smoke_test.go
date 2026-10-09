@@ -1,4 +1,4 @@
-//go:build claudesmoke
+//go:build realclaude
 
 package importer
 
@@ -11,12 +11,15 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
-// Real Claude Code CLI, not in CI:
+// Real Claude Code CLI, opt-in:
 //
-//	go test -tags claudesmoke ./internal/memory/importer/ -run Smoke -v
+//	KIRA_REAL_CLAUDE=1 go test -tags realclaude ./internal/memory/importer/ -run Smoke -v
 //
 // The finalize agent's MCP server is this test binary re-executed as `memory-mcp` (see TestMain).
 func TestSmokeImport(t *testing.T) {
+	if os.Getenv("KIRA_REAL_CLAUDE") != "1" {
+		t.Skip("real claude tests: set KIRA_REAL_CLAUDE=1 (spends real tokens)")
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)

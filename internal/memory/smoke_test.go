@@ -1,16 +1,20 @@
-//go:build claudesmoke
+//go:build realclaude
 
 package memory
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
-// Real Claude Code CLI, not in CI: go test -tags claudesmoke ./internal/memory/ -run Smoke -v
+// Real Claude Code CLI, opt-in: KIRA_REAL_CLAUDE=1 go test -tags realclaude ./internal/memory/ -run Smoke -v
 func TestSmokeRealClaude(t *testing.T) {
+	if os.Getenv("KIRA_REAL_CLAUDE") != "1" {
+		t.Skip("real claude tests: set KIRA_REAL_CLAUDE=1 (spends real tokens)")
+	}
 	store := NewStore(filepath.Join(t.TempDir(), "memory.db"))
 	defer store.Close()
 	svc := NewService(store, NewCLIRunner(), ServiceOptions{})
