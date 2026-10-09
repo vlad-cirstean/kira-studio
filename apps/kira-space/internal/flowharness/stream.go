@@ -20,12 +20,29 @@ import (
 // pipeConn is the in-memory twin of application.StreamConn: whole frames both ways.
 type pipeConn struct {
 	in, out chan []byte
+	mu      sync.RWMutex
+	closed  bool
 }
 
+// Send drops the frame once closeOut ran, as a write to a dead socket would.
 func (c *pipeConn) Send(frame []byte) error {
-	defer func() { _ = recover() }() // a send after the client closed is a lost frame, as on a dead socket
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.closed {
+		return nil
+	}
 	c.out <- append([]byte(nil), frame...)
 	return nil
+}
+
+// closeOut closes the outbound channel once, after in-flight sends finish.
+func (c *pipeConn) closeOut() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.closed {
+		c.closed = true
+		close(c.out)
+	}
 }
 
 func (c *pipeConn) Receive() ([]byte, error) {
@@ -177,7 +194,7 @@ func (a *App) OpenGitStream() *GitStream {
 	go func() {
 		defer s.wg.Done()
 		bridge.ServeGitStream(a.W.GitRouter(), server)
-		close(s.conn.in)
+		server.closeOut()
 	}()
 	go func() {
 		defer s.wg.Done()
@@ -189,7 +206,7 @@ func (a *App) OpenGitStream() *GitStream {
 
 // Close ends the connection and waits for the server loop to return.
 func (s *GitStream) Close() {
-	s.closed.Do(func() { close(s.conn.out) })
+	s.closed.Do(s.conn.closeOut)
 	done := make(chan struct{})
 	go func() { s.wg.Wait(); close(done) }()
 	select {
