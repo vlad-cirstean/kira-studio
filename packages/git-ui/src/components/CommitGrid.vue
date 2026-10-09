@@ -1507,15 +1507,14 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
    unprefixed badge markup would trip it. The rest of the badge look is utilities from
    `badgeClass.ts` (P131 Part 2 §5.1) and the cell builders in `columns.ts`/`refBadges.ts`. */
 .kv-badge {
-  font-size: var(--kv-t-md);
+  font-size: var(--kv-t-sm);
 }
 
 /* P72 §6.3: a step below `.kv-badge`'s own label size — an icon reads as decoration, not text. */
 .kv-badge-icon {
-  font-size: var(--kv-t-sm);
+  font-size: var(--kv-t-xs);
 }
 
-/* P72 §6.3: `--kv-t-xs`, one step further down since a checkmark is even more purely decorative. */
 .kv-badge-current-glyph {
   font-size: var(--kv-t-xs);
 }
