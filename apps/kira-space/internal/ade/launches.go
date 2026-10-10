@@ -283,7 +283,11 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 	space := b.spaceEnabled(tc.task)
 	var release func()
 	if runID != "" || space {
-		cfg, rel, err := b.agent.Register(claudeheadless.Grant{RunID: runID, TaskID: tc.task.ID, Space: space})
+		grant := claudeheadless.Grant{RunID: runID, TaskID: tc.task.ID, Space: space}
+		if runID != "" {
+			grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
+		}
+		cfg, rel, err := b.agent.Register(grant)
 		if err != nil {
 			return adewire.Launch{}, err
 		}
@@ -310,6 +314,19 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 		b.bindTUI(res.RecordID, runID, release)
 	}
 	return launchOf(res), nil
+}
+
+// stepResultsOf are the results of a step of the task's current stage; none when it has no such step.
+func stepResultsOf(tc *taskCtx, stepID string) []adewire.StepResult {
+	if tc.stage == nil {
+		return nil
+	}
+	for _, d := range stageSteps(*tc.stage) {
+		if d.ID == stepID {
+			return d.Results
+		}
+	}
+	return nil
 }
 
 func (b *TaskBoard) isLatestOfCurrentStage(tc *taskCtx, run model.AdeRun) bool {
@@ -385,9 +402,7 @@ func (b *TaskBoard) applyTUIFinish(runID string, f claudeheadless.Finish) {
 		return
 	}
 	switch f.Status {
-	case "done", "failed":
-		b.recordOutcomeLocked(run, "", fromFinish(f, nil))
-	default: // needs_input: the run keeps waiting for a decision
+	case "needs_input": // the run keeps waiting for a decision
 		stuck := model.AdeRunStuck
 		summary := cmpNonEmpty(f.Reason, f.Summary)
 		updated, err := b.deps.Tasks.UpdateRun(runID, model.AdeRunPatch{State: &stuck, Note: &summary, Summary: &summary})
@@ -396,6 +411,8 @@ func (b *TaskBoard) applyTUIFinish(runID string, f claudeheadless.Finish) {
 			return
 		}
 		b.emitRuns(updated)
+	default:
+		b.recordOutcomeLocked(run, "", fromFinish(f, nil, stepResultsOf(tc, run.StepID)))
 	}
 }
 

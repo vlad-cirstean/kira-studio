@@ -45,7 +45,6 @@ func TestNextAction(t *testing.T) {
 	one := []string{"a"}
 	auto := stepDef{ID: "s", Before: "auto", OnFailure: "stop"}
 	gated := stepDef{ID: "g", Before: "approval", OnFailure: "stop"}
-	retry1 := stepDef{ID: "r", Before: "auto", OnFailure: "retry 1"}
 	retry2 := stepDef{ID: "r", Before: "auto", OnFailure: "retry 2"}
 	back := stepDef{ID: "b", Before: "auto", OnFailure: "back:s"}
 	done := view(auto, one, run("a", "done", 1))
@@ -62,10 +61,6 @@ func TestNextAction(t *testing.T) {
 		"stuck waits for a person":          {[]stepView{view(retry2, one, run("a", "stuck", 1))}, action{Kind: actIdle, Step: 0}},
 		"stop leaves failed":                {[]stepView{view(auto, one, run("a", "failed", 1))}, action{Kind: actIdle, Step: 0}},
 		"a capped back failure idles":       {[]stepView{done, view(back, one, run("a", "failed", 1))}, action{Kind: actIdle, Step: 1}},
-		"retry 1 attempt 1 retries":         {[]stepView{view(retry1, one, run("a", "failed", 1))}, action{Kind: actRetry, Step: 0, Retry: []model.AdeRun{run("a", "failed", 1)}}},
-		"retry 1 attempt 2 gives up":        {[]stepView{view(retry1, one, run("a", "failed", 2))}, action{Kind: actIdle, Step: 0}},
-		"retry 2 attempt 2 retries":         {[]stepView{view(retry2, one, run("a", "failed", 2))}, action{Kind: actRetry, Step: 0, Retry: []model.AdeRun{run("a", "failed", 2)}}},
-		"retry 2 attempt 3 gives up":        {[]stepView{view(retry2, one, run("a", "failed", 3))}, action{Kind: actIdle, Step: 0}},
 		"all done completes the stage":      {[]stepView{done, view(auto, one, run("a", "done", 2))}, action{Kind: actStageComplete, Step: 1}},
 		"no steps (user stage) stays idle":  {nil, action{Kind: actIdle}},
 		"done step before a stuck one idle": {[]stepView{done, view(auto, one, run("a", "stuck", 1)), view(auto, one)}, action{Kind: actIdle, Step: 1}},
@@ -152,19 +147,62 @@ func TestChainRerun(t *testing.T) {
 	}
 }
 
-func TestSendBackTarget(t *testing.T) {
-	impl := stepDef{ID: "impl"}
-	tests := stepDef{ID: "tests", OnFailure: "back:impl"}
-	later := stepDef{ID: "ci", OnFailure: "back:deploy"}
-	deploy := stepDef{ID: "deploy"}
-	steps := []stepView{view(impl, nil), view(tests, nil), view(later, nil), view(deploy, nil)}
-	if i, ok := sendBackTarget(steps, 1); !ok || i != 0 {
-		t.Errorf("tests = %d, %v; want step 0", i, ok)
+func routed(branch string, attempt int, route string) model.AdeRun {
+	r := run(branch, "done", attempt)
+	r.Outcome = &model.AdeRunOutcome{Route: route}
+	return r
+}
+
+func TestWalkPath(t *testing.T) {
+	one := []string{"a", "b"}
+	def := func(id string) stepDef { return stepDef{ID: id, Before: "auto"} }
+	for name, tc := range map[string]struct {
+		steps   []stepView
+		path    []int
+		skipped []bool
+	}{
+		"legacy runs go to the next step": {
+			[]stepView{view(def("x"), one, routed("a", 1, ""), routed("b", 1, "")), view(def("y"), one)}, []int{0, 1}, []bool{false, false}},
+		"a forward route skips steps": {
+			[]stepView{view(def("x"), one, routed("a", 1, "z"), routed("b", 1, "z")), view(def("y"), one), view(def("z"), one)}, []int{0, 2}, []bool{false, true, false}},
+		"end completes the stage": {
+			[]stepView{view(def("x"), one, routed("a", 1, "end"), routed("b", 1, "end")), view(def("y"), one)}, []int{0}, []bool{false, true}},
+		"the earliest forward target across branches wins": {
+			[]stepView{view(def("x"), one, routed("a", 1, "z"), routed("b", 1, "next")), view(def("y"), one), view(def("z"), one)}, []int{0, 1}, []bool{false, false, false}},
+		"the path ends at the first step not done": {
+			[]stepView{view(def("x"), one, routed("a", 1, "next"), routed("b", 1, "next")), view(def("y"), one, run("a", "running", 1)), view(def("z"), one)}, []int{0, 1}, []bool{false, false, false}},
+	} {
+		path, skipped := walkPath(tc.steps)
+		if !reflect.DeepEqual(path, tc.path) || !reflect.DeepEqual(skipped, tc.skipped) {
+			t.Errorf("%s: path %v skipped %v, want %v %v", name, path, skipped, tc.path, tc.skipped)
+		}
 	}
-	if _, ok := sendBackTarget(steps, 2); ok {
-		t.Error("a later step is not a send-back target")
+}
+
+func TestNextAction_route(t *testing.T) {
+	one := []string{"a"}
+	def := func(id string) stepDef { return stepDef{ID: id, Before: "auto"} }
+	skipTo := []stepView{view(def("x"), one, routed("a", 1, "z")), view(def("y"), one), view(def("z"), one)}
+	if got := nextAction(skipTo); got != (action{Kind: actStart, Step: 2}) {
+		t.Errorf("a skipped step started: %+v", got)
 	}
-	if _, ok := sendBackTarget(steps, 0); ok {
-		t.Error("a step without the rule has no target")
+	end := []stepView{view(def("x"), one, routed("a", 1, "end")), view(def("y"), one)}
+	if got := nextAction(end); got.Kind != actStageComplete {
+		t.Errorf("end did not complete the stage: %+v", got)
+	}
+}
+
+func TestChainRerun_route(t *testing.T) {
+	one := []string{"a"}
+	def := func(id string) stepDef { return stepDef{ID: id, Before: "auto"} }
+	// review loops back to impl; docs was skipped by impl's route and is never queued again.
+	steps := []stepView{
+		view(def("impl"), one, func() model.AdeRun { r := routed("a", 2, "review"); r.Loops = 1; return r }()),
+		view(def("docs"), one),
+		view(def("review"), one, loopRun("a", "back", 1, 0)),
+	}
+	want := []rerun{{Step: 2, Branch: "a", Attempt: 2, Loops: 1}}
+	if got := chainRerun(steps); !reflect.DeepEqual(got, want) {
+		t.Errorf("reruns = %+v, want %+v", got, want)
 	}
 }

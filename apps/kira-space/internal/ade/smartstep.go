@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
@@ -78,7 +79,7 @@ func (b *TaskBoard) planSmartStep(tc *taskCtx, sb model.AdeTaskBranch, path stri
 		step.dir = dir.Path
 	}
 	body := scripts.PlainText(scripts.Compose(script.Command, rendered))
-	suffix := claudeheadless.FinishStepSuffix
+	suffix := claudeheadless.FinishStepSuffixFor(resultSpecs(def.Results))
 	if b.spaceEnabled(tc.task) {
 		suffix = claudeheadless.SpaceSuffix + "\n\n" + suffix
 	}
@@ -111,11 +112,11 @@ func (s *smartStep) spec(base claudeheadless.Spec, space bool) claudeheadless.Sp
 
 // smartOutcome is a smart step's outcome: a finish_step call wins, then the result event (budget,
 // turn limit, error), then how the process ended. The cost and denials of the result event are added.
-func (b *TaskBoard) smartOutcome(runID string, exit claudeheadless.Exit, runErr error, res *claudeheadless.Result, step *smartStep, lastErr string) outcome {
+func (b *TaskBoard) smartOutcome(runID string, exit claudeheadless.Exit, runErr error, res *claudeheadless.Result, step *smartStep, results []adewire.StepResult, lastErr string) outcome {
 	var out outcome
 	if f, finished := b.takeFinish(runID); finished {
 		code := exit.Code
-		out = fromFinish(f, &code)
+		out = fromFinish(f, &code, results)
 	} else if o, ok := claudeheadless.ResultOutcome(res, exit.Code, step.script.Smart.MaxBudgetUSD); ok {
 		out = fromOutcome(model.AdeRunFailed, o.WithLastError(lastErr))
 	} else {

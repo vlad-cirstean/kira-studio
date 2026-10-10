@@ -490,7 +490,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		claudeID := cmpNonEmpty(spec.ResumeID, b.newID())
 		switch {
 		case spec.ResumeID != "":
-			prompt = composeResumePrompt(spec.Prompt)
+			prompt = composeResumePrompt(spec.Prompt, def.Results)
 		case smart != nil:
 			prompt = smart.prompt
 		default:
@@ -599,6 +599,14 @@ type agentLaunch struct {
 	smart             *smartStep
 }
 
+// grantResults are the results finish_step takes for a run: a rebase run keeps the implicit pair.
+func grantResults(rebase bool, def stepDef) []claudeheadless.ResultSpec {
+	if rebase {
+		return nil
+	}
+	return resultSpecs(def.Results)
+}
+
 func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agentLaunch) {
 	def, sessionID := l.def, l.sessionID
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
@@ -617,7 +625,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		}
 		b.completeRun(run, sessionID, end)
 	}
-	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space})
+	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Results: grantResults(rebase, def)})
 	if err != nil {
 		fail(err)
 		return
@@ -680,10 +688,10 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	if l.smart != nil {
-		b.completeRun(run, sessionID, b.smartOutcome(run.ID, exit, runErr, res, l.smart, sink.lastStderr()))
+		b.completeRun(run, sessionID, b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr()))
 		return
 	}
-	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def.Timeout, sink.lastStderr()))
+	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr()))
 }
 
 // sessionClaudeID reads the Claude session id stored with the ade_sessions row.
@@ -695,37 +703,52 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 	return rec.ClaudeSessionID
 }
 
-func (b *TaskBoard) agentOutcome(runID string, exit claudeheadless.Exit, runErr error, timeout string, lastErr string) outcome {
+func (b *TaskBoard) agentOutcome(runID string, exit claudeheadless.Exit, runErr error, def stepDef, lastErr string) outcome {
 	code := exit.Code
 	f, finished := b.takeFinish(runID)
 	if !finished {
-		o := runoutcome.ForProcess(agentEnd(exit, runErr, timeout)).WithLastError(lastErr)
+		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(lastErr)
 		return fromOutcome(model.AdeRunFailed, o)
 	}
-	return fromFinish(f, &code)
+	return fromFinish(f, &code, def.Results)
 }
 
 // fromFinish is the outcome of a run whose agent called finish_step.
-func fromFinish(f claudeheadless.Finish, exit *int) outcome {
+func fromFinish(f claudeheadless.Finish, exit *int, results []adewire.StepResult) outcome {
 	o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: f.Summary, ExitCode: exit}
-	state := finishState(&o, f)
+	state := finishState(&o, f, results)
 	out := fromOutcome(state, o)
 	out.out.Report = reportOf(f)
 	return out
 }
 
-// finishState fills o from a finish_step call and returns the run state.
-func finishState(o *runoutcome.Outcome, f claudeheadless.Finish) string {
-	switch f.Status {
-	case "done":
-		o.Status = runoutcome.StatusDone
-		return model.AdeRunDone
-	case "needs_input":
+// finishState fills o from a finish_step call and returns the run state: done for an ok result,
+// failed for a not-ok one. results are the step's; none = the implicit done and failed.
+func finishState(o *runoutcome.Outcome, f claudeheadless.Finish, results []adewire.StepResult) string {
+	if f.Status == "needs_input" {
 		o.Status, o.Reason = runoutcome.StatusBlocked, cmpNonEmpty(f.Reason, f.Summary)
 		return model.AdeRunStuck
 	}
+	o.Result = f.Status
+	ok := f.Status == adewire.ResultDone
+	if i := slices.IndexFunc(results, func(r adewire.StepResult) bool { return r.ID == f.Status }); i >= 0 {
+		ok = results[i].OK
+	}
+	if ok {
+		o.Status = runoutcome.StatusDone
+		return model.AdeRunDone
+	}
 	o.Status, o.Reason = runoutcome.StatusFailed, cmpNonEmpty(f.Reason, cmpNonEmpty(f.Summary, "the agent reported failure without a reason"))
 	return model.AdeRunFailed
+}
+
+// resultSpecs are a step's results as the MCP grant takes them.
+func resultSpecs(results []adewire.StepResult) []claudeheadless.ResultSpec {
+	out := make([]claudeheadless.ResultSpec, len(results))
+	for i, r := range results {
+		out[i] = claudeheadless.ResultSpec{ID: r.ID, OK: r.OK, Description: r.Description}
+	}
+	return out
 }
 
 // reportOf is the detail a finish_step call carried beyond status and summary, nil when none.
@@ -784,8 +807,8 @@ func (b *TaskBoard) completeRun(run model.AdeRun, sessionID string, out outcome)
 	b.recordOutcomeLocked(run, sessionID, out)
 }
 
-// recordOutcomeLocked stores a run's outcome and acts on it: a failed `back:` step is sent back, any
-// other outcome moves the task on unless it was a user stop. The task mutex is held.
+// recordOutcomeLocked stores a run's outcome and acts on it: a finished step is routed on its result
+// (route.go), any other outcome moves the task on unless it was a user stop. The task mutex is held.
 func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out outcome) {
 	now := b.deps.Now().UnixMilli()
 	if sessionID != "" {
@@ -794,9 +817,9 @@ func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out 
 		}
 		b.notifySessions()
 	}
-	var back *sendBack
-	if out.state == model.AdeRunFailed && !out.noAdvance {
-		back, out = b.decideSendBack(run, out)
+	var loop *pendingLoop
+	if (out.state == model.AdeRunFailed || out.state == model.AdeRunDone) && !out.noAdvance {
+		loop, out = b.decideRoute(run, out)
 	}
 	updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{
 		State: &out.state, Note: &out.note, Summary: &out.summary, ExitCode: out.exit, FinishedAt: &now,
@@ -808,8 +831,8 @@ func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out 
 	}
 	b.emitRuns(updated)
 	switch {
-	case back != nil:
-		back.queue(b)
+	case loop != nil:
+		loop.queue(b)
 	case !out.noAdvance:
 		b.advanceLocked(b.ctx, run.TaskID)
 	}
@@ -836,16 +859,9 @@ func (b *TaskBoard) advanceLocked(ctx context.Context, taskID string) {
 		return
 	}
 	act := nextAction(plan)
-	switch act.Kind {
-	case actStart:
+	if act.Kind == actStart {
 		if _, err := b.startStep(ctx, tc, plan, act.Step, nil); err != nil {
 			slog.Warn("ade: start step", "scope", "ade", "task", taskID, "err", err)
-		}
-	case actRetry:
-		for _, r := range act.Retry {
-			if _, err := b.queueRun(ctx, tc, plan, act.Step, r.BranchID, r.Attempt+1, "", runOpts{Loops: r.Loops}); err != nil {
-				slog.Warn("ade: retry run", "scope", "ade", "run", r.ID, "err", err)
-			}
 		}
 	}
 }

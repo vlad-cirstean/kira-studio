@@ -107,7 +107,7 @@ func decideRebaseOutcome(f *claudeheadless.Finish, chk rebaseCheck, end outcome)
 		return out
 	}
 	o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: f.Summary, ExitCode: end.out.ExitCode}
-	state := finishState(&o, *f)
+	state := finishState(&o, *f, nil)
 	if state == model.AdeRunDone && chk.failure != "" {
 		o.Status, o.Source, o.Reason = runoutcome.StatusFailed, runoutcome.SourceVerify, "verification failed: "+chk.failure
 		state = model.AdeRunFailed

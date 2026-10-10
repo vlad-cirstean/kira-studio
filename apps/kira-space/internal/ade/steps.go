@@ -3,7 +3,6 @@ package ade
 import (
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
@@ -17,7 +16,9 @@ import (
 // whose Prompt is the command.
 type stepDef struct {
 	ID, Name, RunsOn, Before, OnFailure, Timeout, Prompt string
-	AllowedTools                                         []string
+	// Results are the step's declared (or implicit) results with their routes.
+	Results      []adewire.StepResult
+	AllowedTools []string
 	// SmartScript names the smart script that replaces Prompt; Params are its values.
 	SmartScript string
 	Params      map[string][]string
@@ -35,11 +36,16 @@ func stageSteps(st adewire.Stage) []stepDef {
 		if onFailure == "" {
 			onFailure = "stop"
 		}
-		return []stepDef{{ID: st.ID, Name: st.Name, RunsOn: runsOn, Before: "auto", OnFailure: onFailure, Timeout: st.Timeout, Prompt: st.Command}}
+		return []stepDef{{ID: st.ID, Name: st.Name, RunsOn: runsOn, Before: "auto", OnFailure: onFailure,
+			Results: adewire.ImplicitResults(st.ID, onFailure), Timeout: st.Timeout, Prompt: st.Command}}
 	case "agent":
 		out := make([]stepDef, len(st.Steps))
 		for i, s := range st.Steps {
-			out[i] = stepDef{ID: s.ID, Name: s.Name, RunsOn: s.RunsOn, Before: s.Before, OnFailure: s.OnFailure,
+			results := s.Results
+			if len(results) == 0 { // a snapshot from before results: its on_failure rule
+				results = adewire.ImplicitResults(s.ID, cmpNonEmpty(s.OnFailure, "stop"))
+			}
+			out[i] = stepDef{ID: s.ID, Name: s.Name, RunsOn: s.RunsOn, Before: s.Before, OnFailure: s.OnFailure, Results: results,
 				Timeout: s.Timeout, Prompt: s.Prompt, AllowedTools: s.AllowedTools,
 				SmartScript: s.SmartScript, Params: s.Params}
 		}
@@ -125,31 +131,78 @@ const (
 	actIdle actionKind = iota
 	actStart
 	actAwaitApproval
-	actRetry
 	actStageComplete
 )
 
-// action is nextAction's answer. Step is the index of the step it concerns; Retry lists the failed
-// runs to attempt again.
+// action is nextAction's answer. Step is the index of the step it concerns.
 type action struct {
-	Kind  actionKind
-	Step  int
-	Retry []model.AdeRun
+	Kind actionKind
+	Step int
 }
 
-// sendBackTarget resolves steps[idx]'s `back:<step>` rule to the index of an earlier step of the
-// same stage (D13).
-func sendBackTarget(steps []stepView, idx int) (int, bool) {
-	id, ok := strings.CutPrefix(steps[idx].Def.OnFailure, "back:")
-	if !ok {
-		return 0, false
+// resultOf is the declared result with the id, false when the step has none such.
+func (d stepDef) resultOf(id string) (adewire.StepResult, bool) {
+	i := slices.IndexFunc(d.Results, func(r adewire.StepResult) bool { return r.ID == id })
+	if i < 0 {
+		return adewire.StepResult{}, false
 	}
-	for i := 0; i < idx; i++ {
-		if steps[i].Def.ID == id {
-			return i, true
+	return d.Results[i], true
+}
+
+// routeIndex resolves a run's stored forward route to the index of the step after steps[i]; len(steps)
+// = the stage is complete. A run with no stored route (before results) counts as `next`.
+func routeIndex(steps []stepView, i int, route string) int {
+	switch route {
+	case "", adewire.RouteNext:
+		return i + 1
+	case adewire.RouteEnd:
+		return len(steps)
+	}
+	if j := slices.IndexFunc(steps, func(v stepView) bool { return v.Def.ID == route }); j > i {
+		return j
+	}
+	return i + 1
+}
+
+func runRoute(r model.AdeRun) string {
+	if r.Outcome == nil {
+		return ""
+	}
+	return r.Outcome.Route
+}
+
+// forwardTarget is where the path goes after the done step i: the earliest forward route among its
+// runs on the given branches (the step that skips the least, D8).
+func forwardTarget(steps []stepView, i int, branches []string) int {
+	next := len(steps)
+	for _, id := range branches {
+		if r, ok := steps[i].Runs[id]; ok {
+			next = min(next, routeIndex(steps, i, runRoute(r)))
 		}
 	}
-	return 0, false
+	if next < i+1 {
+		return i + 1
+	}
+	return next
+}
+
+// walkPath follows the stage's routes from the first step: a done step moves to its forward target,
+// the first step not done ends the path. skipped marks the steps the route went past.
+func walkPath(steps []stepView) (path []int, skipped []bool) {
+	skipped = make([]bool, len(steps))
+	i := 0
+	for i < len(steps) {
+		path = append(path, i)
+		if steps[i].state() != model.AdeRunDone {
+			break
+		}
+		next := forwardTarget(steps, i, steps[i].Targets)
+		for j := i + 1; j < next && j < len(steps); j++ {
+			skipped[j] = true
+		}
+		i = next
+	}
+	return path, skipped
 }
 
 // rerun is one step run chainRerun queues again on a branch.
@@ -161,7 +214,7 @@ type rerun struct {
 }
 
 // chainRerun finds, per target branch, the first step that must run again after a send-back fix
-// (R4). Walking the stage's steps in order, round is the highest loops among the done runs so far; a
+// (R4). Walking the branch's route path, round is the highest loops among the done runs so far; a
 // done or `back` run with fewer loops than the round is stale and is queued again with loops =
 // round. A missing, running, pending, stuck or failed run ends the walk.
 func chainRerun(steps []stepView) []rerun {
@@ -179,8 +232,10 @@ func chainRerun(steps []stepView) []rerun {
 walk:
 	for _, bid := range branches {
 		round := 0
-		for i, s := range steps {
+		for i := 0; i < len(steps); {
+			s := steps[i]
 			if !slices.Contains(s.Targets, bid) {
+				i++
 				continue
 			}
 			r, ok := s.Runs[bid]
@@ -194,6 +249,7 @@ walk:
 					continue walk
 				}
 				round = max(round, r.Loops)
+				i = forwardTarget(steps, i, []string{bid})
 			case model.AdeRunBack:
 				if r.Loops < round {
 					out = append(out, rerun{Step: i, Branch: bid, Attempt: r.Attempt + 1, Loops: round})
@@ -207,55 +263,29 @@ walk:
 	return out
 }
 
-// retryLimit is N of `retry N`; 0 for any other rule (stop, back:<step>).
-func retryLimit(onFailure string) int {
-	n, ok := strings.CutPrefix(onFailure, "retry ")
-	if !ok {
-		return 0
-	}
-	v, err := strconv.Atoi(n)
-	if err != nil || v < 0 {
-		return 0
-	}
-	return v
-}
-
-// nextAction looks at the first step that is not done. A running or stuck step waits. A failed step
-// retries the runs whose rule still allows an attempt (a `back:` failure was decided when it was
-// recorded: sent back, or failed for good). A
+// nextAction looks at the last step of the route path: the first one not done. A running, stuck or
+// failed step waits (a failure was routed when it was recorded: looped, continued or stopped). A
 // pending step with runs waits on its worktree gate; without runs it starts (auto) or waits for
-// Approve, except the first, which only StartRun starts. All steps done = the stage is complete;
-// the user moves on with StageDone.
+// Approve, except the first, which only StartRun starts. A path that ends past the last step = the
+// stage is complete; the user moves on with StageDone.
 func nextAction(steps []stepView) action {
-	for i, s := range steps {
-		switch s.state() {
-		case model.AdeRunDone:
-			continue
-		case model.AdeRunFailed:
-			limit := retryLimit(s.Def.OnFailure)
-			var retry []model.AdeRun
-			for _, id := range s.Targets {
-				if r := s.Runs[id]; r.State == model.AdeRunFailed && r.Attempt <= limit {
-					retry = append(retry, r)
-				}
-			}
-			if len(retry) > 0 {
-				return action{Kind: actRetry, Step: i, Retry: retry}
-			}
-			return action{Kind: actIdle, Step: i}
-		case model.AdeRunPending:
-			switch {
-			case s.started() || i == 0:
-				return action{Kind: actIdle, Step: i}
-			case s.Def.Before == "approval":
-				return action{Kind: actAwaitApproval, Step: i}
-			}
-			return action{Kind: actStart, Step: i}
-		}
-		return action{Kind: actIdle, Step: i}
-	}
 	if len(steps) == 0 {
 		return action{Kind: actIdle}
 	}
-	return action{Kind: actStageComplete, Step: len(steps) - 1}
+	path, _ := walkPath(steps)
+	i := path[len(path)-1]
+	s := steps[i]
+	switch s.state() {
+	case model.AdeRunDone:
+		return action{Kind: actStageComplete, Step: i}
+	case model.AdeRunPending:
+		switch {
+		case s.started() || i == 0:
+			return action{Kind: actIdle, Step: i}
+		case s.Def.Before == "approval":
+			return action{Kind: actAwaitApproval, Step: i}
+		}
+		return action{Kind: actStart, Step: i}
+	}
+	return action{Kind: actIdle, Step: i}
 }

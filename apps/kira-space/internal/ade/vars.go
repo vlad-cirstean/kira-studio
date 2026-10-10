@@ -72,12 +72,12 @@ func composePrompt(in promptInput) string {
 	if in.Space {
 		body += "\n\n" + claudeheadless.SpaceSuffix
 	}
-	return body + "\n\n" + claudeheadless.FinishStepSuffix + "\n"
+	return body + "\n\n" + claudeheadless.FinishStepSuffixFor(resultSpecs(in.Def.Results)) + "\n"
 }
 
 // composeResumePrompt is the message a resumed run gets: the line, then the finish_step instruction.
-func composeResumePrompt(line string) string {
-	return line + "\n\n" + claudeheadless.FinishStepSuffix + "\n"
+func composeResumePrompt(line string, results []adewire.StepResult) string {
+	return line + "\n\n" + claudeheadless.FinishStepSuffixFor(resultSpecs(results)) + "\n"
 }
 
 // repoLine is one repo of a launch message.

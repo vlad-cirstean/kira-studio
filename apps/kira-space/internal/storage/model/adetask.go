@@ -148,6 +148,9 @@ type AdeRunOutcome struct {
 	runoutcome.Outcome
 	Report *AgentReport `json:"report,omitempty"`
 	Rebase *RebaseFacts `json:"rebase,omitempty"`
+	// Route is where the run's result sent the step: next, end, stop, a later step id, `back:<step id>`
+	// for a loop to an earlier step or `retry` for one to the step itself.
+	Route string `json:"route,omitempty"`
 }
 
 // AgentReport is the optional detail of a finish_step call.
