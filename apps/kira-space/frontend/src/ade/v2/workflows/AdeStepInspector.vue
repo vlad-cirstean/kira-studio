@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import VarText from '@theme/components/VarText.vue';
 import ParamsForm from '@workbench/automations/run/ParamsForm.vue';
 import { computed, ref, watch } from 'vue';
@@ -14,6 +15,11 @@ import { formatTools, parseTools } from '../board/workflowForm';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { PipelineStep } from '../wire';
 import AdeStepResults from './AdeStepResults.vue';
+
+const MODE_ITEMS = [
+  { value: 'prompt', label: 'Prompt', testid: 'ade-wf-step-mode-prompt' },
+  { value: 'smart', label: 'Smart script', testid: 'ade-wf-step-mode-smart' },
+];
 
 // The selected step: name, run scope, approval gate, timeout, tools, prompt or smart script, results.
 const props = defineProps<{ stageId: string; step: PipelineStep; steps: PipelineStep[]; scopes: string[] }>();
@@ -55,12 +61,12 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
 <template>
   <div class="flex flex-col gap-2.5" data-testid="ade-wf-step" :data-step-id="step.id">
     <div class="flex items-center gap-2">
-      <label :for="id('name')" class="sr-only">Step name</label>
+      <Label :for="id('name')" class="sr-only">Step name</Label>
       <Input
         :id="id('name')"
         :model-value="step.name"
         size="kira"
-        class="min-w-0 flex-1 font-semibold"
+        class="min-w-0 flex-1 font-medium"
         data-testid="ade-wf-step-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
@@ -84,7 +90,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
       </Button>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-      <label :for="id('scope')">Runs on</label>
+      <Label class="font-normal" :for="id('scope')">Runs on</Label>
       <NativeSelect
         :id="id('scope')"
         variant="bordered"
@@ -94,7 +100,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
       >
         <option v-for="s in scopes" :key="s" :value="s">{{ s }}</option>
       </NativeSelect>
-      <label :for="id('gate')">Before it</label>
+      <Label class="font-normal" :for="id('gate')">Before it</Label>
       <NativeSelect
         :id="id('gate')"
         variant="bordered"
@@ -105,28 +111,24 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         <option value="auto">start automatically</option>
         <option value="approval">wait for my approval</option>
       </NativeSelect>
-      <label :for="id('timeout')">Timeout</label>
+      <Label class="font-normal" :for="id('timeout')">Timeout</Label>
       <Input
         :id="id('timeout')"
         :model-value="step.timeout"
         size="kira"
-        class="w-14 px-1.5"
+        class="w-14"
         data-testid="ade-wf-step-timeout"
         @update:model-value="(v: string | number) => patch({ timeout: String(v) })"
       />
     </div>
-    <ToggleGroup
-      type="single"
-      size="kira"
+    <SecondaryTabs
       :model-value="mode"
+      :items="MODE_ITEMS"
       data-testid="ade-wf-step-mode"
-      @update:model-value="(v) => v && setMode(String(v))"
-    >
-      <ToggleGroupItem value="prompt" data-testid="ade-wf-step-mode-prompt">Prompt</ToggleGroupItem>
-      <ToggleGroupItem value="smart" data-testid="ade-wf-step-mode-smart">Smart script</ToggleGroupItem>
-    </ToggleGroup>
+      @update:model-value="setMode"
+    />
     <div v-if="smart" class="flex flex-col gap-2" data-testid="ade-wf-step-smart">
-      <label :for="id('script')" class="text-kira-sm text-muted-foreground">Smart script</label>
+      <Label :for="id('script')" class="font-normal text-kira-sm text-muted-foreground">Smart script</Label>
       <NativeSelect
         :id="id('script')"
         variant="bordered"
@@ -156,25 +158,25 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
     </div>
     <template v-else>
       <div class="flex flex-col gap-1">
-        <label :for="id('tools')" class="text-kira-sm text-muted-foreground"
-          >Allowed tools <span class="text-subtle">Passed as --allowedTools; deny rules still win.</span></label
+        <Label :for="id('tools')" class="font-normal text-kira-sm text-muted-foreground"
+          >Allowed tools <span class="text-subtle">Passed as --allowedTools; deny rules still win.</span></Label
         >
         <Input
           :id="id('tools')"
           :model-value="toolsText"
           placeholder="Bash(git *), Edit"
           size="kira"
-          class="bg-bg font-data"
+          class="font-data"
           data-testid="ade-wf-step-tools"
           @update:model-value="onTools"
         />
       </div>
-      <label :for="id('prompt')" class="sr-only">Prompt</label>
+      <Label :for="id('prompt')" class="sr-only">Prompt</Label>
       <Textarea
         :id="id('prompt')"
         :model-value="step.prompt"
         placeholder="Prompt"
-        class="min-h-24 w-auto resize-y bg-bg px-2 py-1.5 leading-normal"
+        class="min-h-24 w-auto resize-y leading-normal"
         data-testid="ade-wf-step-prompt"
         @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
       />

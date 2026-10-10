@@ -5,6 +5,7 @@ import {
   Empty,
   EmptyContent,
   EmptyDescription,
+  EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from '@theme/components/ui/empty';
@@ -19,13 +20,15 @@ const reposDialog = useReposDialogStore();
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="ade-view">
-    <Empty v-if="codeReposStore.records.length === 0" class="flex-1">
-      <EmptyMedia variant="icon">
-        <CodiconIcon name="robot" :size="20" />
-      </EmptyMedia>
-      <EmptyContent>
+    <Empty v-if="codeReposStore.records.length === 0" class="h-full">
+      <EmptyHeader>
+        <EmptyMedia>
+          <CodiconIcon name="robot" :size="24" />
+        </EmptyMedia>
         <EmptyTitle>No repository imported yet</EmptyTitle>
         <EmptyDescription>Add repositories from the Git module to start planning agent work.</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
         <Button variant="dialog-primary" size="kira-lg" data-testid="ade-import" @click="reposDialog.show()">
           <CodiconIcon name="repo" :size="13" />
           Add repositories…

@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -25,19 +26,19 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
 <template>
   <div class="flex flex-col gap-2.5" data-testid="ade-wf-stage" :data-stage-id="stage.id" :data-skipped="stage.skip">
     <div class="flex items-center gap-2">
-      <label :for="n('name')" class="sr-only">Stage name</label>
+      <Label :for="n('name')" class="sr-only">Stage name</Label>
       <Input
         :id="n('name')"
         :model-value="stage.name"
         size="kira"
-        class="min-w-0 flex-1 font-bold"
+        class="min-w-0 flex-1 font-medium"
         data-testid="ade-wf-stage-name"
         @update:model-value="(v: string | number) => patch({ name: String(v) })"
       />
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button variant="toolbar" size="kira-icon" aria-label="Stage actions" data-testid="ade-wf-stage-menu">
-            <CodiconIcon name="kebab-vertical" :size="14" />
+            <CodiconIcon name="kebab-vertical" :size="13" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -55,7 +56,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
       </DropdownMenu>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-      <label :for="n('kind')">Type</label>
+      <Label class="font-normal" :for="n('kind')">Type</Label>
       <NativeSelect
         :id="n('kind')"
         variant="bordered"
@@ -68,7 +69,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         <option value="agent">agent (background)</option>
         <option value="script">script</option>
       </NativeSelect>
-      <label :for="n('status')">Task status</label>
+      <Label class="font-normal" :for="n('status')">Task status</Label>
       <NativeSelect
         :id="n('status')"
         variant="bordered"
@@ -90,15 +91,15 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
           data-testid="ade-wf-stage-session"
           @update:model-value="(v: boolean) => patch({ session: v, prompt: v ? stage.prompt : '' })"
         />
-        <label :for="n('session')">Opens an interactive Claude Code session</label>
+        <Label class="font-normal" :for="n('session')">Opens an interactive Claude Code session</Label>
       </div>
       <template v-if="stage.session">
-        <label :for="n('prompt')" class="sr-only">Session prompt</label>
+        <Label :for="n('prompt')" class="sr-only">Session prompt</Label>
         <Textarea
           :id="n('prompt')"
           :model-value="stage.prompt"
           placeholder="First message for the session (optional)"
-          class="min-h-12 w-auto resize-y bg-bg px-2 py-1.5 leading-normal"
+          class="min-h-12 w-auto resize-y leading-normal"
           data-testid="ade-wf-stage-prompt"
           @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
         />
@@ -106,23 +107,23 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
     </template>
 
     <div v-else-if="stage.kind === 'script'" class="flex flex-col gap-1.5">
-      <label :for="n('command')" class="text-kira-sm text-muted-foreground"
+      <Label :for="n('command')" class="font-normal text-kira-sm text-muted-foreground"
         >Command
         <span class="text-subtle"
           >(runs in each branch's worktree; non-zero exit = failed; {task} {jira} {repo} {branch} {worktree} are
           shell-quoted when needed)</span
-        ></label
+        ></Label
       >
       <Textarea
         :id="n('command')"
         :model-value="stage.command"
         placeholder="./scripts/release.sh --branch {branch}"
-        class="min-h-12 w-auto resize-y bg-bg px-2 py-1.5 font-data leading-normal"
+        class="min-h-12 w-auto resize-y font-data leading-normal"
         data-testid="ade-wf-stage-command"
         @update:model-value="(v: string | number) => patch({ command: String(v) })"
       />
       <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-        <label :for="n('scope')">Runs on</label>
+        <Label class="font-normal" :for="n('scope')">Runs on</Label>
         <NativeSelect
           :id="n('scope')"
           variant="bordered"
@@ -132,7 +133,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         >
           <option v-for="s in scopes" :key="s" :value="s">{{ s }}</option>
         </NativeSelect>
-        <label :for="n('fail')">On failure</label>
+        <Label class="font-normal" :for="n('fail')">On failure</Label>
         <NativeSelect
           :id="n('fail')"
           variant="bordered"
@@ -142,12 +143,12 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         >
           <option v-for="o in FAILURE_OPTIONS" :key="o" :value="o">{{ o }}</option>
         </NativeSelect>
-        <label :for="n('timeout')">Timeout</label>
+        <Label class="font-normal" :for="n('timeout')">Timeout</Label>
         <Input
           :id="n('timeout')"
           :model-value="stage.timeout"
           size="kira"
-          class="w-14 px-1.5"
+          class="w-14"
           data-testid="ade-wf-stage-timeout"
           @update:model-value="(v: string | number) => patch({ timeout: String(v) })"
         />

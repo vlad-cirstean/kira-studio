@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
@@ -126,12 +127,12 @@ onBeforeUnmount(() => {
     data-testid="ade-wf-yaml-pane"
   >
     <AdeWorkflowSaveBar :dirty="dirty" :saving="save.isPending.value" @save="saveNow" @discard="discard" />
-    <label for="ade-wf-yaml" class="sr-only">Workflow YAML</label>
+    <Label for="ade-wf-yaml" class="sr-only">Workflow YAML</Label>
     <Textarea
       id="ade-wf-yaml"
       :model-value="draft"
       spellcheck="false"
-      class="resize-y bg-bg px-3 py-3 font-data leading-relaxed [tab-size:2]"
+      class="resize-y font-data leading-relaxed [tab-size:2]"
       data-testid="ade-wf-yaml"
       @update:model-value="onInput"
     />

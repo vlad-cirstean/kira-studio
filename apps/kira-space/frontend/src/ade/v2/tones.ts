@@ -23,16 +23,16 @@ export const TONE_TAG_CLASS: Record<Tone, string> = {
 
 /** Solid button (tone solid, fixed ink: a themed ink loses contrast under another theme). */
 export const TONE_SOLID_CLASS: Record<Tone, string> = {
-  amber: 'bg-tone-amber-solid text-tone-ink',
-  red: 'bg-tone-red-solid text-tone-ink',
-  green: 'bg-tone-green-solid text-tone-ink',
-  blue: 'bg-tone-blue-solid text-tone-ink',
-  purple: 'bg-tone-purple-solid text-tone-ink-light',
-  grey: 'bg-tone-grey-solid text-tone-ink',
+  amber: 'bg-tone-amber-solid text-tone-ink border-transparent',
+  red: 'bg-tone-red-solid text-tone-ink border-transparent',
+  green: 'bg-tone-green-solid text-tone-ink border-transparent',
+  blue: 'bg-tone-blue-solid text-tone-ink border-transparent',
+  purple: 'bg-tone-purple-solid text-tone-ink-light border-transparent',
+  grey: 'bg-tone-grey-solid text-tone-ink border-transparent',
 };
 
 /** Solid of a task action: its tone, or the Claude brand colour for a launch (`▶ Run`). */
 export const ACTION_CLASS: Record<TaskAction['tone'] | Tone, string> = {
   ...TONE_SOLID_CLASS,
-  claude: 'bg-claude text-tone-ink',
+  claude: 'bg-claude text-tone-ink border-transparent',
 };

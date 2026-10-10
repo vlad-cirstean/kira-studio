@@ -32,7 +32,7 @@ const tip = (r: StepNodeData['step']['results'][number]): string =>
     <Handle id="loop-in" type="target" :position="Position.Top" class="!size-2 !border-0 !bg-muted-foreground !left-5" />
     <div class="flex items-center gap-1.5 px-2.5 pt-2">
       <span v-if="data.start" class="text-tone-green" title="Start" data-testid="ade-wf-node-start">▶</span>
-      <span class="min-w-0 flex-1 truncate text-kira-md font-semibold" data-testid="ade-wf-node-name">{{ step.name }}</span>
+      <span class="min-w-0 flex-1 truncate text-kira-md font-medium" data-testid="ade-wf-node-name">{{ step.name }}</span>
       <span v-if="step.before === 'approval'" class="shrink-0 text-warn-text" data-testid="ade-wf-node-gate">approval</span>
       <span v-if="step.smartScript" class="shrink-0 text-info">smart</span>
     </div>

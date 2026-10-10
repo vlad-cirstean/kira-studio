@@ -41,8 +41,8 @@ const detail = computed(() => {
       :style="handleStyle"
     />
     <div class="flex items-center gap-1.5 px-3" :class="agent ? 'h-9' : 'pt-2'">
-      <span class="font-bold">{{ data.index + 1 }}.</span>
-      <span class="min-w-0 flex-1 truncate font-bold" :class="stage.skip ? 'line-through' : ''">{{ stage.name }}</span>
+      <span class="font-medium">{{ data.index + 1 }}.</span>
+      <span class="min-w-0 flex-1 truncate font-medium" :class="stage.skip ? 'line-through' : ''">{{ stage.name }}</span>
       <AdeChip :label="stage.kind" :tone="KIND_TONE[stage.kind]" />
     </div>
     <div v-if="!agent" class="truncate px-3 text-kira-sm text-subtle" data-testid="ade-wf-stage-node-detail">{{ detail }}</div>

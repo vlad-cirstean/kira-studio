@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { useClipboard } from '@vueuse/core';
 import { defineAsyncComponent } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -12,6 +12,10 @@ import AdeWorkflowYaml from './AdeWorkflowYaml.vue';
 // One workflow: mode toggle, file path, Copy YAML, then the Graph or YAML pane. The graph editor (Vue Flow)
 // loads on first use so the board bundle does not carry it.
 const AdeWorkflowGraph = defineAsyncComponent(() => import('./AdeWorkflowGraph.vue'));
+const MODE_ITEMS = [
+  { value: 'graph', label: 'Graph', testid: 'ade-wf-mode-graph' },
+  { value: 'yaml', label: 'YAML', testid: 'ade-wf-mode-yaml' },
+];
 const props = defineProps<{ entry: WorkflowEntry }>();
 const wfUi = useAdeWorkflowsUiStore();
 const yaml = useWorkflowYaml(() => props.entry.fileName);
@@ -30,18 +34,15 @@ async function setMode(v: unknown): Promise<void> {
     data-testid="ade-wf-editor"
   >
     <div class="flex flex-wrap items-center gap-2.5">
-      <ToggleGroup
-        type="single"
-        variant="outline"
+      <SecondaryTabs
+        variant="segmented"
         size="kira-lg"
         :model-value="wfUi.workflowMode"
+        :items="MODE_ITEMS"
         aria-label="Editor mode"
         data-testid="ade-wf-mode"
         @update:model-value="setMode"
-      >
-        <ToggleGroupItem value="graph" data-testid="ade-wf-mode-graph">Graph</ToggleGroupItem>
-        <ToggleGroupItem value="yaml" data-testid="ade-wf-mode-yaml">YAML</ToggleGroupItem>
-      </ToggleGroup>
+      />
       <AdeTip :text="entry.path">
         <span class="min-w-0 flex-1 truncate font-data text-kira-sm text-subtle" data-testid="ade-wf-path">{{
           entry.path

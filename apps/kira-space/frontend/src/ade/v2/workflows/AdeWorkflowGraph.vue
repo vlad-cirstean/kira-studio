@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Label } from '@theme/components/ui/label';
 import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
@@ -234,12 +235,12 @@ onBeforeUnmount(() => {
   <div v-if="draft.draft" ref="root" class="flex h-full min-h-0 flex-col gap-3" data-testid="ade-wf-form">
     <AdeWorkflowSaveBar :dirty="draft.dirty" :saving="save.isPending.value" @save="saveNow" @discard="discard" />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <label for="ade-wf-form-name" class="text-kira-sm text-muted-foreground">Name</label>
+      <Label for="ade-wf-form-name" class="font-normal text-kira-sm text-muted-foreground">Name</Label>
       <Input
         id="ade-wf-form-name"
         :model-value="draft.draft.name"
         size="kira-lg"
-        class="w-72 font-semibold"
+        class="w-72 font-medium"
         data-testid="ade-wf-form-name"
         @update:model-value="(v: string | number) => draft.patchWorkflow({ name: String(v) })"
       />
@@ -250,7 +251,7 @@ onBeforeUnmount(() => {
           data-testid="ade-wf-form-space"
           @update:model-value="(v: boolean) => draft.patchWorkflow({ kiraSpaceMcp: v })"
         />
-        <label for="ade-wf-form-space" title="Agent steps can declare repos on the task and request branches and worktrees through Kira Space.">Kira Space tools for agents</label>
+        <Label class="font-normal" for="ade-wf-form-space" title="Agent steps can declare repos on the task and request branches and worktrees through Kira Space.">Kira Space tools for agents</Label>
       </div>
     </div>
     <div class="flex items-center gap-2" data-testid="ade-wf-strip-row">
@@ -276,7 +277,7 @@ onBeforeUnmount(() => {
           :data-skipped="s.skip"
           @click="draft.select({ kind: 'stage', stageId: s.id })"
         >
-          <span class="font-bold">{{ i + 1 }}.</span>
+          <span class="font-medium">{{ i + 1 }}.</span>
           <span :class="s.skip ? 'line-through' : ''">{{ s.name }}</span>
           <AdeChip :label="s.kind" :tone="KIND_TONE[s.kind]" />
         </button>

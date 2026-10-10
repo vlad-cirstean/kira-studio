@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -96,7 +97,7 @@ async function createNew(): Promise<void> {
       <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-auto p-2">
       <div v-if="importOpen" class="flex flex-col gap-1 pb-2" data-testid="ade-wf-import-row">
         <div class="flex gap-1.5">
-          <label for="ade-wf-import-path" class="sr-only">Workflow YAML path</label>
+          <Label for="ade-wf-import-path" class="sr-only">Workflow YAML path</Label>
           <Input
             id="ade-wf-import-path"
             v-model="importPath"
@@ -125,7 +126,7 @@ async function createNew(): Promise<void> {
       >
         No workflows yet. Workflows are YAML files in {{ dir }}.
       </p>
-      <Button
+      <Button size="kira"
         v-for="e in entries"
         :key="e.fileName"
         variant="ghost"
@@ -136,11 +137,11 @@ async function createNew(): Promise<void> {
         @click="pick(e.fileName)"
       >
         <span class="flex w-full items-center gap-1.5">
-          <span class="min-w-0 flex-1 truncate text-kira-lg font-semibold" data-testid="ade-wf-row-name">{{
+          <span class="min-w-0 flex-1 truncate text-kira-lg font-medium" data-testid="ade-wf-row-name">{{
             e.workflow?.name ?? e.fileName
           }}</span>
           <AdeTip v-if="e.error" :text="e.error.message">
-            <span class="shrink-0 text-kira-sm font-bold text-tone-red" data-testid="ade-wf-row-error">✕</span>
+            <span class="shrink-0 text-kira-sm font-medium text-tone-red" data-testid="ade-wf-row-error">✕</span>
           </AdeTip>
         </span>
         <span class="max-w-full truncate text-kira-sm text-muted-foreground" data-testid="ade-wf-row-stages">{{ stages(e) }}</span>

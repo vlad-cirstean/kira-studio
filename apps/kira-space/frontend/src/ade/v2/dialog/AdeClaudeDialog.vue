@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { FieldLabel } from '@theme/components/ui/field';
+import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { Textarea } from '@theme/components/ui/textarea';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import AdeBasePicker from '../AdeBasePicker.vue';
@@ -21,11 +23,6 @@ import { composeDialog, isRebaseKind } from './compose';
 // editable message, push switch and archive risk, then Cancel and the kind's send button.
 const dialogs = useAdeDialogsStore();
 const sending = ref(false);
-// The chosen target chip wears the Claude tone, as the mockup's `chipStyle`. The hover and state
-// variants repeat the colours: the toggle's own variant classes outrank the plain ones.
-const CHIP_ON_CLASS =
-  'border-claude bg-claude/16 text-claude hover:bg-claude/16 hover:text-claude data-[state=on]:bg-claude/16';
-
 // The rebase kinds show the server's own prompt; a pick or a switch asks for it again.
 const previewArgs = computed(() => {
   const s = dialogs.spec;
@@ -110,8 +107,8 @@ async function discard(): Promise<void> {
 
 <template>
   <Dialog v-if="view" :open="true" @update:open="(v) => !v && dialogs.close()">
-    <DialogContent :show-close-button="false" class="flex max-h-4/5 w-140 flex-col gap-0 p-0" data-testid="ade-dialog">
-      <DialogHeader>
+    <DialogContent size="lg" data-testid="ade-dialog">
+      <DialogHeader closable>
         <DialogTitle class="flex items-center gap-2">
           <svg
             width="16"
@@ -127,11 +124,11 @@ async function discard(): Promise<void> {
             <rect x="3" y="4" width="18" height="16" rx="3" />
             <path d="M7 10l3 2-3 2M12 15h5" />
           </svg>
-          <span class="text-kira-lg font-bold" data-testid="ade-dialog-title">{{ view.title }}</span>
+          <span class="text-kira-lg font-medium" data-testid="ade-dialog-title">{{ view.title }}</span>
         </DialogTitle>
       </DialogHeader>
 
-      <div class="flex min-h-0 flex-col gap-3 overflow-auto px-3 py-2 text-kira-md">
+      <DialogBody>
         <Alert v-if="view.headless" variant="destructive" data-testid="ade-dialog-headless">
           <AlertDescription>{{ view.headless }}</AlertDescription>
         </Alert>
@@ -139,7 +136,7 @@ async function discard(): Promise<void> {
           <AlertDescription>
             <div class="flex items-start gap-2.5">
               <div class="flex min-w-0 flex-1 flex-col gap-1">
-                <span class="font-bold">{{ view.busyTitle }}</span>
+                <span class="font-medium">{{ view.busyTitle }}</span>
                 <div v-for="row in view.busy" :key="row.text" class="flex items-center gap-1.5 text-kira-sm" data-testid="ade-dialog-busy-row">
                   <AdeActivityIcon :kind="row.kind" />
                   <span>{{ row.text }}</span>
@@ -147,7 +144,7 @@ async function discard(): Promise<void> {
               </div>
               <Button
                 variant="dialog-danger"
-                size="sm"
+                size="kira-lg"
                 class="shrink-0"
                 data-testid="ade-dialog-override"
                 @click="dialogs.override = !dialogs.override"
@@ -181,10 +178,10 @@ async function discard(): Promise<void> {
         <Alert v-for="b in view.blockers" :key="b.branchId + b.kind" variant="destructive" data-testid="ade-dialog-blocker" :data-kind="b.kind">
           <AlertDescription>{{ b.text }}</AlertDescription>
         </Alert>
-        <label v-if="view.canAutostash" for="ade-dialog-autostash" class="flex items-center gap-2 text-kira-sm">
+        <Label v-if="view.canAutostash" for="ade-dialog-autostash" class="text-kira-sm font-normal">
           <Switch id="ade-dialog-autostash" v-model="dialogs.autostash" data-testid="ade-dialog-autostash" />
           <span>Autostash: stash the uncommitted changes, rebase, then restore them</span>
-        </label>
+        </Label>
         <p v-if="view.noOp" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-dialog-noop">
           The branch already sits on this base: saving only records it.
         </p>
@@ -198,42 +195,32 @@ async function discard(): Promise<void> {
             <AdeRepoTag :code-repo-id="tg.repoId" :label="tg.repo" />
             <span class="min-w-0 flex-1 truncate font-data text-kira-sm">{{ tg.branch }}</span>
           </div>
-          <ToggleGroup
-            type="single"
+          <SecondaryTabs
+            variant="segmented"
             size="kira-lg"
-            class="flex-wrap justify-start gap-1.5"
-            :model-value="tg.options.find((o) => o.on)?.value"
+            :model-value="tg.options.find((o) => o.on)?.value ?? ''"
+            :items="tg.options"
             :data-testid="`ade-dialog-target-${i}`"
-            @update:model-value="(v) => v && dialogs.pick(tg.branchId, String(v))"
-          >
-            <ToggleGroupItem
-              v-for="opt in tg.options"
-              :key="opt.value"
-              :value="opt.value"
-              class="border font-data text-kira-sm"
-              :class="opt.on && CHIP_ON_CLASS"
-            >
-              {{ opt.label }}
-            </ToggleGroupItem>
-          </ToggleGroup>
+            @update:model-value="(v) => dialogs.pick(tg.branchId, v)"
+          />
         </div>
 
-        <label v-if="view.canPush" for="ade-dialog-push" class="flex items-center gap-2 text-kira-sm">
+        <Label v-if="view.canPush" for="ade-dialog-push" class="text-kira-sm font-normal">
           <Switch id="ade-dialog-push" v-model="dialogs.push" data-testid="ade-dialog-push" />
           <span>
             <span data-testid="ade-dialog-push-label">{{ view.pushLabel }}</span>
             <span v-if="!dialogs.push" class="text-subtle"> (off: stays local, push it yourself later)</span>
           </span>
-        </label>
+        </Label>
 
         <div v-if="view.showMessage" class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <label for="ade-dialog-message" class="flex-1 text-muted-foreground">Message to Claude</label>
+            <FieldLabel for="ade-dialog-message" class="flex-1">Message to Claude</FieldLabel>
             <Button
               v-if="view.edited"
-              variant="ghost"
-              size="xs"
-              class="px-2 text-muted-foreground"
+              variant="toolbar"
+              size="kira"
+              class="text-muted-foreground"
               data-testid="ade-dialog-reset"
               @click="dialogs.msg = null"
             >
@@ -262,7 +249,7 @@ async function discard(): Promise<void> {
         <Alert v-if="dialogs.error" variant="destructive" data-testid="ade-dialog-error">
           <AlertDescription>{{ dialogs.error }}</AlertDescription>
         </Alert>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="ade-dialog-cancel" @click="dialogs.close()">Cancel</Button>

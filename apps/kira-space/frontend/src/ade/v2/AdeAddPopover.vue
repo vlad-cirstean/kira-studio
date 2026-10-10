@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
-import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Toggle } from '@theme/components/ui/toggle';
 import { computed, ref, watch } from 'vue';
@@ -29,6 +31,10 @@ const open = computed({
 });
 const attachTo = computed(() => addUi.attachTo);
 const tab = ref('new');
+const tabItems = computed(() => [
+  ...(addUi.attachTo ? [] : [{ value: 'new', label: 'New task', testid: 'ade-add-tab-new' }]),
+  { value: 'branch', label: 'Existing branch', testid: 'ade-add-tab-branch' },
+]);
 const error = ref('');
 
 const repos = useRepos();
@@ -130,28 +136,14 @@ async function pick(b: CandidateBranch): Promise<void> {
         Add task
       </Button>
     </PopoverTrigger>
-    <PopoverContent align="end" class="w-115 gap-0 overflow-hidden p-0" data-testid="ade-add-popover">
-      <Tabs v-model="tab" class="gap-0">
-        <TabsList class="w-full border-b border-border p-1">
-          <TabsTrigger
-            v-if="!attachTo"
-            value="new"
-            :class="tabChipVariants({ active: tab === 'new', size: 'wide' })"
-            data-testid="ade-add-tab-new"
-            >New task</TabsTrigger
-          >
-          <TabsTrigger
-            value="branch"
-            :class="tabChipVariants({ active: tab === 'branch', size: 'wide' })"
-            data-testid="ade-add-tab-branch"
-            >Existing branch</TabsTrigger
-          >
-        </TabsList>
-      </Tabs>
+    <PopoverContent align="end" class="w-120 gap-0 overflow-hidden p-0" data-testid="ade-add-popover">
+      <div class="border-b border-border p-1">
+        <SecondaryTabs v-model="tab" :items="tabItems" size="kira-lg" class="w-full" />
+      </div>
       <div v-if="tab === 'new'" class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 p-3 text-kira-md">
-        <label for="ade-nw-title" class="text-muted-foreground">Title</label>
+        <Label for="ade-nw-title" class="font-normal text-muted-foreground">Title</Label>
         <Input id="ade-nw-title" v-model="title" placeholder="What needs doing" data-testid="ade-nw-title" />
-        <label for="ade-nw-jira" class="text-muted-foreground">Jira</label>
+        <Label for="ade-nw-jira" class="font-normal text-muted-foreground">Jira</Label>
         <Input
           id="ade-nw-jira"
           v-model="jira"
@@ -165,7 +157,7 @@ async function pick(b: CandidateBranch): Promise<void> {
             :key="r.codeRepoId"
             variant="outline"
             size="kira"
-            class="font-semibold text-muted-foreground"
+            class="text-muted-foreground"
             :class="picked.includes(r.codeRepoId) ? tintOf(r.codeRepoId).class : ''"
             :style="picked.includes(r.codeRepoId) ? tintOf(r.codeRepoId).style : undefined"
             :model-value="picked.includes(r.codeRepoId)"
@@ -185,7 +177,7 @@ async function pick(b: CandidateBranch): Promise<void> {
             />
           </div>
         </template>
-        <label for="ade-nw-notes" class="self-start pt-1.5 text-muted-foreground">Notes</label>
+        <Label for="ade-nw-notes" class="font-normal self-start pt-1.5 text-muted-foreground">Notes</Label>
         <Textarea
           id="ade-nw-notes"
           v-model="notes"
@@ -207,16 +199,17 @@ async function pick(b: CandidateBranch): Promise<void> {
           class="truncate border-b border-border px-3 py-1.5 text-kira-sm text-muted-foreground"
           data-testid="ade-add-attach"
         >
-          adding to: <span class="font-semibold text-fg">{{ attachTo.title }}</span>
+          adding to: <span class="font-medium text-fg">{{ attachTo.title }}</span>
         </p>
-        <label for="ade-branch-search" class="sr-only">Search branches</label>
-        <Input
-          id="ade-branch-search"
-          v-model="q"
-          placeholder="Search branches in all repos…"
-          size="kira-lg" class="h-bar rounded-none border-0 border-b border-border bg-transparent px-3"
-          data-testid="ade-branch-search"
-        />
+        <div class="border-b border-border p-1">
+          <SearchField
+            v-model="q"
+            size="kira-lg"
+            placeholder="Search branches in all repos…"
+            aria-label="Search branches"
+            data-testid="ade-branch-search"
+          />
+        </div>
         <div class="max-h-70 overflow-auto p-1">
           <AdeCandidateRow v-for="b in shown" :key="`${b.codeRepoId}/${b.name}`" :branch="b" :repo="repoLabel(b.codeRepoId)" @pick="pick(b)" />
           <div v-if="shown.length === 0" class="p-2.5 text-kira-md text-muted-foreground">No branches</div>

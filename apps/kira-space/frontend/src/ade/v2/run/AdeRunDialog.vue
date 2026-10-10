@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
@@ -103,8 +104,8 @@ async function send(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && close()">
-    <DialogContent :show-close-button="false" class="w-135" data-testid="ade-run-dialog">
-      <DialogHeader>
+    <DialogContent size="lg" data-testid="ade-run-dialog">
+      <DialogHeader closable>
         <DialogTitle class="flex items-center gap-2">
           <svg
             width="16"
@@ -123,11 +124,11 @@ async function send(): Promise<void> {
           Run {{ stage?.name ?? '' }} in the background
         </DialogTitle>
       </DialogHeader>
-      <div class="flex flex-col gap-3 px-3 py-2 text-kira-md">
+      <DialogBody class="flex flex-col gap-3 text-kira-md">
         <div v-if="named.length" class="flex flex-col gap-1.5" data-testid="ade-run-branches">
           <div v-for="r in named" :key="r.id" class="flex items-center gap-2.5">
             <AdeRepoTag :code-repo-id="r.branch.codeRepoId" :label="r.repo" />
-            <label :for="`ade-run-branch-${r.id}`" class="whitespace-nowrap text-muted-foreground">branch</label>
+            <Label :for="`ade-run-branch-${r.id}`" class="font-normal whitespace-nowrap text-muted-foreground">branch</Label>
             <Input
               :id="`ade-run-branch-${r.id}`"
               v-model="names[r.id]"
@@ -161,27 +162,26 @@ async function send(): Promise<void> {
         </div>
         <div v-else class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <label for="ade-run-message" class="flex-1 text-muted-foreground">Message to Claude</label>
+            <Label for="ade-run-message" class="font-normal flex-1 text-muted-foreground">Message to Claude</Label>
             <Button
               v-if="edited"
-              variant="ghost"
-              size="xs"
-              class="px-2 text-muted-foreground"
+              variant="toolbar"
+              size="kira"
               data-testid="ade-run-reset"
               @click="message = initial"
             >
               Reset
             </Button>
           </div>
-          <div class="overflow-hidden rounded-kira border border-border bg-field">
+          <div class="flex flex-col gap-1">
             <Textarea
               id="ade-run-message"
               v-model="message"
-              class="max-h-90 resize-y rounded-none border-0"
+              class="max-h-90 resize-y"
               data-testid="ade-run-message"
             />
             <p
-              class="m-0 border-t border-border px-3 py-2 text-kira-sm text-subtle"
+              class="m-0 text-kira-sm text-subtle"
               data-testid="ade-run-suffix"
             >
               {{ suffix }}
@@ -191,7 +191,7 @@ async function send(): Promise<void> {
         <Alert v-if="error" variant="destructive" data-testid="ade-run-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
-      </div>
+      </DialogBody>
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="ade-run-cancel" @click="close">Cancel</Button>
         <Button
