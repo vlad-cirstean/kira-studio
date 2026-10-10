@@ -79,7 +79,7 @@ defineExpose({ refresh: doRefresh });
       <Button
         variant="toolbar"
         size="kira-icon"
-        class="relative disabled:opacity-70"
+        class="relative"
         :disabled="isBusy"
         aria-label="Refresh"
         @click="doRefresh"

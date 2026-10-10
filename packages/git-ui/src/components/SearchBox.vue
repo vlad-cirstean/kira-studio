@@ -64,6 +64,7 @@ import {
 } from '@theme/components/ui/input-group';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
+import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import type { SearchState } from '../state/search.ts';
 import { MIN_TAIL_QUERY_LENGTH } from '../state/search.ts';
@@ -265,29 +266,12 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
             </InputGroupAddon>
           </InputGroup>
           <section class="flex gap-0.25" aria-label="Search options">
-            <TooltipIconButton
-              icon="case-sensitive"
-              label="Match case"
-              :aria-pressed="search.caseSensitive.value"
-              class="aria-pressed:bg-field aria-pressed:text-fg"
-              data-testid="search-toggle-case"
-              @click="search.caseSensitive.value = !search.caseSensitive.value"
-            />
-            <TooltipIconButton
-              icon="whole-word"
-              label="Match whole word"
-              :aria-pressed="search.wholeWord.value"
-              class="aria-pressed:bg-field aria-pressed:text-fg"
-              data-testid="search-toggle-whole-word"
-              @click="search.wholeWord.value = !search.wholeWord.value"
-            />
-            <TooltipIconButton
-              icon="regex"
-              label="Use regular expression"
-              :aria-pressed="search.regex.value"
-              class="aria-pressed:bg-field aria-pressed:text-fg"
-              data-testid="search-toggle-regex"
-              @click="search.regex.value = !search.regex.value"
+            <SearchOptionToggles
+              v-model:match-case="search.caseSensitive.value"
+              v-model:whole-word="search.wholeWord.value"
+              v-model:regex="search.regex.value"
+              testid-prefix="search-toggle-"
+              match-case-test-id="search-toggle-case"
             />
           </section>
           <NativeSelect

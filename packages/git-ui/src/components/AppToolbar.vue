@@ -30,6 +30,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
+import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
@@ -311,10 +312,7 @@ const stashDisabled = computed(
       <CodiconIcon name="sync" :size="13" class="animate-spin" />
       Restacking…
     </span>
-    <span
-      class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
-      aria-hidden="true"
-    ></span>
+    <Separator orientation="vertical" class="h-3.5 self-center mx-0.5 bg-border-strong" />
     <RefreshButton
       ref="refreshButtonRef"
       :graph-view="graphView"
@@ -323,10 +321,7 @@ const stashDisabled = computed(
     />
 
     <template v-if="hasRemote">
-      <span
-        class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
-        aria-hidden="true"
-      ></span>
+      <Separator orientation="vertical" class="h-3.5 self-center mx-0.5 bg-border-strong" />
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -404,10 +399,7 @@ const stashDisabled = computed(
       <TooltipContent>{{ autoFetchTooltip }}</TooltipContent>
     </Tooltip>
 
-    <span
-      class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
-      aria-hidden="true"
-    ></span>
+    <Separator orientation="vertical" class="h-3.5 self-center mx-0.5 bg-border-strong" />
     <Tooltip>
       <TooltipTrigger as-child>
         <Button
