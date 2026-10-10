@@ -1,6 +1,7 @@
 import type { Transport, UiActionKind } from '@kira/git-ipc';
 import { createApp, shallowRef, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
+import type { RepoHead } from './components/GitViewHead.vue';
 import ReviewView from './components/review/ReviewView.vue';
 import { GRAPH_VISIBLE_KEY } from './graphVisibility.ts';
 import MountRoot from './MountRoot.vue';
@@ -57,6 +58,8 @@ export interface MountOptions {
   /** P173: only meaningful when `view === "graph"` — opens the host's Operations log. Absent where
    *  the host has none; the failure banner then names it in text instead. */
   readonly onShowOperations?: () => void;
+  /** Repo identity for the view head above the toolbar (graph and review views). */
+  readonly repoHead?: RepoHead;
 }
 
 /**
@@ -83,6 +86,7 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     pendingUiAction,
     dateFormat,
     onShowOperations,
+    repoHead,
     ...rest
   } = opts;
   // P131 Part 2 §3.5: MountRoot wraps whichever root this mounts in the one TooltipProvider every
@@ -92,11 +96,17 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     view === 'review'
       ? createApp(MountRoot, {
           root: ReviewView,
-          rootProps: { ...rest, target, reviewFilter, onReviewMarked },
+          rootProps: { ...rest, target, reviewFilter, onReviewMarked, repoHead },
         })
       : createApp(MountRoot, {
           root: AppRoot,
-          rootProps: { ...rest, pendingUiAction, dateFormat, showOperations: onShowOperations },
+          rootProps: {
+            ...rest,
+            pendingUiAction,
+            dateFormat,
+            showOperations: onShowOperations,
+            repoHead,
+          },
         });
   // P79 review fix: scoped to this one app instance, not module-level — several repo workspaces'
   // graphs can be mounted (and independently backgrounded) at once. A no-op provide for a

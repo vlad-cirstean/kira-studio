@@ -15,8 +15,10 @@ import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';
 import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
+import { repoHeadOf } from '../../repo/git/repoHead';
 import { gitTransportFor } from '../../repo/git/transport';
 import { TabViewStateStore } from '../../repo/git/viewStateStore';
+import { useCodeReposStore } from '../../state/coderepos';
 import { useLayoutStore } from '../../state/layout';
 import { useSettingsStore } from '../../state/settings';
 import type { RepoGraphTabRecord } from '../../state/tabDomain';
@@ -31,6 +33,7 @@ let handle: MountHandle | null = null;
 async function mountGraph(): Promise<void> {
   const settingsStore = useSettingsStore();
   const layoutStore = useLayoutStore();
+  const repoHead = repoHeadOf(useCodeReposStore().codeRepoRecord(repoIdOfTab(props.tab)));
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
     errorMessage.value = NO_REPOSITORY_MESSAGE;
@@ -52,6 +55,7 @@ async function mountGraph(): Promise<void> {
     // P72 §9.1: Kira Studio's own app-wide appearance.dateFormat — read once here, at mount time,
     // not reactively (main.ts's own MountOptions.dateFormat doc comment).
     dateFormat: settingsStore.appearance.dateFormat,
+    repoHead,
     pendingUiAction: pendingReveal ? { action: 'revealCommit', target: pendingReveal } : null,
     // P173: the failure banner's "Show in Operations" button.
     onShowOperations: () => {

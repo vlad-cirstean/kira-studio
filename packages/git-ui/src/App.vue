@@ -15,7 +15,7 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
  */
 
 import type { CommitRecord, FileChangeKind, TipRef } from '@kira/git-core';
-import { SETTINGS } from '@kira/git-core';
+import { describeInProgress, SETTINGS } from '@kira/git-core';
 import type { StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { KuiColumnResizeHandle } from '@kira/kira-ui';
@@ -50,6 +50,7 @@ import WorktreeDialog from './components/dialogs/WorktreeDialog.vue';
 import EmptyRepositoryPanel from './components/EmptyRepositoryPanel.vue';
 import FailureBanner from './components/FailureBanner.vue';
 import GitBlockedPanel from './components/GitBlockedPanel.vue';
+import GitViewHead, { type RepoHead } from './components/GitViewHead.vue';
 import LoadMoreButton from './components/LoadMoreButton.vue';
 import NoRepositoryPanel from './components/NoRepositoryPanel.vue';
 import RowContextMenu from './components/RowContextMenu.vue';
@@ -112,6 +113,8 @@ const props = defineProps<{
   dateFormat?: DateFormat;
   /** P173: opens the host's Operations log (`MountOptions.onShowOperations`); absent where the host has none. */
   showOperations?: () => void;
+  /** Repo identity for the Studio-style view head; absent hosts get no head. */
+  repoHead?: RepoHead;
 }>();
 
 const bridge = new BridgeClient(props.transport);
@@ -833,6 +836,20 @@ async function handleSwitchWorktree(path: string): Promise<void> {
 function onCreateWorktree(seed?: WorktreeCreateSeed): void {
   worktreeCreateRequest.value = seed ?? {};
 }
+
+const viewHeadBindings = computed(() => {
+  const repo = repoState.value?.activeRepo.value;
+  const head = repo?.head;
+  const track = refsState.branches.value.find((b) => b.isHead)?.track;
+  const tracked = track !== undefined && track !== 'gone' ? track : undefined;
+  const inProgress = opsState.statusSummary.value?.inProgress;
+  return {
+    headLabel: head === undefined ? undefined : head.kind === 'detached' ? 'detached' : head.name,
+    ahead: tracked?.ahead,
+    behind: tracked?.behind,
+    operation: inProgress ? describeInProgress(inProgress) : undefined,
+  };
+});
 
 // P107 I2-39: the unborn-HEAD and normal branches below bound <AppToolbar> identically — one
 // bindings object instead of two copies of the same 16 props/12 listeners. Read only from inside
@@ -1715,6 +1732,7 @@ onBeforeUnmount(() => {
       />
 
       <template v-else-if="repoState.activeRepo.value.head.kind === 'unborn'">
+        <GitViewHead v-if="repoHead" :repo="repoHead" v-bind="viewHeadBindings" />
         <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
         <div v-if="searchOpen" ref="searchRowEl" class="flex items-center gap-1 py-1 px-2 border-b border-border shrink-0">
           <SearchBox
@@ -1729,6 +1747,7 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-else>
+        <GitViewHead v-if="repoHead" :repo="repoHead" v-bind="viewHeadBindings" />
         <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
         <div v-if="searchOpen" ref="searchRowEl" class="flex items-center gap-1 py-1 px-2 border-b border-border shrink-0">
           <SearchBox

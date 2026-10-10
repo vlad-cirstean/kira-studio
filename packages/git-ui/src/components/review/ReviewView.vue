@@ -48,6 +48,7 @@ import { type ReviewPane, ReviewSessionState, type ReviewTarget } from '../../st
 import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
+import GitViewHead, { type RepoHead } from '../GitViewHead.vue';
 import { buildRefListSections } from '../refListModel.ts';
 import { useLiveRegion } from '../useLiveRegion.ts';
 import BaseSelector from './BaseSelector.vue';
@@ -61,6 +62,7 @@ const props = defineProps<{
   target?: ReviewTarget | null;
   reviewFilter?: 'all' | 'needsReview';
   onReviewMarked?: (path: string) => void;
+  repoHead?: RepoHead;
 }>();
 
 const bridge = new BridgeClient(props.transport);
@@ -763,6 +765,7 @@ watch(
     <div class="sr-only" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
     </div>
+    <GitViewHead v-if="repoHead" :repo="repoHead" />
 
     <template v-if="bootError">
       <div class="flex flex-col gap-2 p-3" data-testid="boot-error">

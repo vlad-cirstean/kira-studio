@@ -9,8 +9,10 @@
 import type { MountHandle } from '@kira/git-ui';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { onMounted, onUnmounted, ref } from 'vue';
+import { useCodeReposStore } from '../state/coderepos';
 import { loadGitUi } from './git/gitUiModule';
 import { takePendingReviewTarget } from './git/hostHandlers';
+import { repoHeadOf } from './git/repoHead';
 import { gitTransportFor } from './git/transport';
 
 const props = defineProps<{ repoId: string }>();
@@ -38,6 +40,7 @@ async function mountReview(): Promise<void> {
     transport: gitTransportFor(props.repoId),
     viewState: new NullViewStateStore(),
     view: 'review',
+    repoHead: repoHeadOf(useCodeReposStore().codeRepoRecord(props.repoId)),
     target,
   });
 }

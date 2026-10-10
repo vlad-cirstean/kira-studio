@@ -1,5 +1,6 @@
 export type { ConnectionState } from './bridge/client.ts';
 export { BridgeClient } from './bridge/client.ts';
+export type { RepoHead } from './components/GitViewHead.vue';
 export { GEOMETRY, graphColumnWidth } from './graph/geometry.ts';
 export type { LayoutClient, WorkerLike } from './graph/layoutClient.ts';
 export { createLayoutClient, LayoutClientStaleError } from './graph/layoutClient.ts';
