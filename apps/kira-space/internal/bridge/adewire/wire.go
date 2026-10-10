@@ -87,15 +87,27 @@ type FolderImportResult struct {
 	Imported []string `json:"imported"`
 }
 
+// StepResult is one result a step may report through finish_step. Next is RouteNext, RouteEnd,
+// RouteStop or a step id of the same stage; Max is the loop budget of a route back to the step or an
+// earlier one, 0 on a forward route.
+type StepResult struct {
+	ID          string `json:"id"`
+	OK          bool   `json:"ok"`
+	Description string `json:"description"`
+	Next        string `json:"next"`
+	Max         int    `json:"max"`
+}
+
 type PipelineStep struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	RunsOn       RunsOn    `json:"runsOn"`
-	Before       string    `json:"before"` // 'auto' | 'approval'
-	OnFailure    OnFailure `json:"onFailure"`
-	Timeout      string    `json:"timeout"`
-	Prompt       string    `json:"prompt"`
-	AllowedTools []string  `json:"allowedTools"`
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	RunsOn       RunsOn       `json:"runsOn"`
+	Before       string       `json:"before"`    // 'auto' | 'approval'
+	OnFailure    OnFailure    `json:"onFailure"` // legacy rule; "" when Results are not expressible as one
+	Results      []StepResult `json:"results"`
+	Timeout      string       `json:"timeout"`
+	Prompt       string       `json:"prompt"`
+	AllowedTools []string     `json:"allowedTools"`
 	// SmartScript runs the named smart script instead of Prompt; Params are its values per param name.
 	SmartScript string              `json:"smartScript"`
 	Params      map[string][]string `json:"params"`

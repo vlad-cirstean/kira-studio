@@ -268,9 +268,11 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		return out
 	}
 	earlier := make(map[string]bool)
+	var nodes []*resultNodes
+	var prefixes []string
 	for i, stepNode := range list.Content {
 		sp := fmt.Sprintf("%sstep %d: ", prefix[:len(prefix)-2]+", ", i+1)
-		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "timeout", "prompt", "allowed_tools", "smart_script", "params")
+		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "results", "timeout", "prompt", "allowed_tools", "smart_script", "params")
 		if v.err != nil {
 			return out
 		}
@@ -291,7 +293,17 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 				v.fail(sm["before"], sp, "before must be auto or approval")
 			}
 		}
-		step.OnFailure = v.onFailure(sm, sp, earlier)
+		var rn *resultNodes
+		if n, has := sm["results"]; has {
+			if _, legacy := sm["on_failure"]; legacy {
+				v.fail(n, sp, "results and on_failure cannot be used together")
+			}
+			rn = v.results(n, sp)
+			step.Results = rn.list
+		} else {
+			step.OnFailure = v.onFailure(sm, sp, earlier)
+			step.Results = adewire.ImplicitResults(step.ID, step.OnFailure)
+		}
 		step.Timeout = v.timeout(sm, sp)
 		v.stepBody(sm, sp, &step)
 		if v.err != nil {
@@ -299,7 +311,10 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		}
 		earlier[step.ID] = true
 		out = append(out, step)
+		nodes = append(nodes, rn)
+		prefixes = append(prefixes, sp)
 	}
+	v.resolveRoutes(out, nodes, prefixes)
 	return out
 }
 
@@ -461,4 +476,154 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+const (
+	maxResults           = 12
+	maxResultDescription = 200
+)
+
+// resultNodes keeps the YAML nodes of a step's declared results so routes can be checked once every
+// step id of the stage is known.
+type resultNodes struct {
+	list []adewire.StepResult
+	next []*yaml.Node
+	max  []*yaml.Node
+	node *yaml.Node
+}
+
+// results reads a step's results list; routes are resolved later by resolveRoutes.
+func (v *validator) results(n *yaml.Node, sp string) *resultNodes {
+	rn := &resultNodes{node: n, list: make([]adewire.StepResult, 0)}
+	if n.Kind != yaml.SequenceNode || len(n.Content) == 0 || len(n.Content) > maxResults {
+		v.fail(n, sp, "results must be a list of 1 to %d results", maxResults)
+		return rn
+	}
+	seen := make(map[string]bool)
+	for i, item := range n.Content {
+		rp := fmt.Sprintf("%sresult %d: ", sp, i+1)
+		m := v.fields(item, rp, "id", "ok", "description", "next", "max")
+		if v.err != nil {
+			return rn
+		}
+		r := adewire.StepResult{ID: v.str(m, rp, "id", true)}
+		if v.err == nil {
+			switch {
+			case !idPattern.MatchString(r.ID):
+				v.fail(m["id"], rp, "id must be lowercase letters, digits, - or _")
+			case r.ID == "needs_input":
+				v.fail(m["id"], rp, "id needs_input is reserved")
+			case seen[r.ID]:
+				v.fail(m["id"], rp, "id %q is already used by another result of this step", r.ID)
+			}
+		}
+		seen[r.ID] = true
+		if _, has := m["ok"]; !has {
+			v.failMissing(rp, "ok")
+		}
+		r.OK = v.boolean(m, rp, "ok")
+		r.Description = v.str(m, rp, "description", false)
+		if v.err == nil && (strings.ContainsAny(r.Description, "\r\n") || utf8.RuneCountInString(r.Description) > maxResultDescription) {
+			v.fail(m["description"], rp, "description must be one line of at most %d characters", maxResultDescription)
+		}
+		r.Next = adewire.DefaultRoute(r.OK)
+		if _, has := m["next"]; has {
+			r.Next = v.str(m, rp, "next", true)
+		}
+		if v.err != nil {
+			return rn
+		}
+		rn.list = append(rn.list, r)
+		rn.next = append(rn.next, m["next"])
+		rn.max = append(rn.max, m["max"])
+	}
+	return rn
+}
+
+// resolveRoutes checks every declared result's route against the stage's step ids and fills the loop
+// budget. Steps without declared results (nil entries) were derived from on_failure and are already valid.
+func (v *validator) resolveRoutes(steps []adewire.PipelineStep, nodes []*resultNodes, prefixes []string) {
+	if v.err != nil {
+		return
+	}
+	index := make(map[string]int, len(steps))
+	for i, s := range steps {
+		index[s.ID] = i
+	}
+	for si, rn := range nodes {
+		if rn == nil {
+			continue
+		}
+		sp := prefixes[si]
+		forward := false
+		for ri := range rn.list {
+			r := &rn.list[ri]
+			rp := fmt.Sprintf("%sresult %d: ", sp, ri+1)
+			node := cmpNode(rn.next[ri], rn.node)
+			loop := false
+			switch r.Next {
+			case adewire.RouteNext, adewire.RouteEnd:
+			case adewire.RouteStop:
+				if r.OK {
+					v.fail(node, rp, "stop is only allowed on a result that is not ok")
+					return
+				}
+			default:
+				target, known := index[r.Next]
+				if !known {
+					v.fail(node, rp, "next must be next, end, stop or a step id of this stage")
+					return
+				}
+				loop = target <= si
+			}
+			forward = forward || !loop
+			if !v.loopMax(r, rn.max[ri], rp, loop) {
+				return
+			}
+		}
+		if !forward {
+			v.fail(rn.node, sp, "at least one result must lead forward, or the stage can never finish")
+			return
+		}
+		if legacy, ok := adewire.LegacyOnFailure(steps[si].ID, rn.list, stepIDs(steps[:si])); ok {
+			steps[si].OnFailure = legacy
+		}
+		steps[si].Results = rn.list
+	}
+}
+
+// loopMax sets r.Max: the declared budget on a loop route, 0 on a forward one (where a budget is an error).
+func (v *validator) loopMax(r *adewire.StepResult, node *yaml.Node, prefix string, loop bool) bool {
+	switch {
+	case node == nil && loop:
+		r.Max = adewire.DefaultLoopMax
+	case node == nil:
+		r.Max = 0
+	case !loop:
+		v.fail(node, prefix, "max is only allowed on a route back to this step or an earlier one")
+		return false
+	default:
+		n, err := strconv.Atoi(node.Value)
+		if node.Kind != yaml.ScalarNode || err != nil || n < 1 || n > adewire.MaxLoopMax {
+			v.fail(node, prefix, "max must be a whole number from 1 to %d", adewire.MaxLoopMax)
+			return false
+		}
+		r.Max = n
+	}
+	return true
+}
+
+func cmpNode(n, fallback *yaml.Node) *yaml.Node {
+	if n != nil {
+		return n
+	}
+	return fallback
+}
+
+func stepIDs(steps []adewire.PipelineStep) []string {
+	out := make([]string, len(steps))
+	for i, s := range steps {
+		out[i] = s.ID
+	}
+	return out
 }

@@ -114,7 +114,7 @@ func TestSave_edits(t *testing.T) {
 		steps := wf.Stages[2].Steps
 		wf.Stages[2].Steps = append(append([]adewire.PipelineStep(nil), steps[:2]...), steps[3:]...)
 		wf.Stages[2].Steps = append(wf.Stages[2].Steps, adewire.PipelineStep{
-			ID: "lint", Name: "Lint", RunsOn: "once", Before: "auto", OnFailure: "stop", Timeout: "10m",
+			ID: "lint", Name: "Lint", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("lint", "stop"), Timeout: "10m",
 			Prompt: "Run lint.\nFix it.", AllowedTools: []string{"Bash(git *)"}, Params: map[string][]string{},
 		})
 		out := saveOK(t, r, "standard.yaml", wf)
@@ -154,7 +154,7 @@ func TestSave_edits(t *testing.T) {
 		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
 		wf.Stages[impl].Steps = append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...)
 		wf.Stages[impl].Steps[0] = adewire.PipelineStep{
-			ID: wf.Stages[impl].Steps[0].ID, Name: "Smart", RunsOn: "once", Before: "auto", OnFailure: "stop", Timeout: "10m", AllowedTools: []string{}, SmartScript: "Summarize",
+			ID: wf.Stages[impl].Steps[0].ID, Name: "Smart", RunsOn: "once", Before: "auto", OnFailure: "stop", Results: adewire.ImplicitResults("plan", "stop"), Timeout: "10m", AllowedTools: []string{}, SmartScript: "Summarize",
 			Params: map[string][]string{"lang": {"go"}, "dirs": {"a", "b"}},
 		}
 		out := saveOK(t, r, "standard.yaml", wf)
@@ -258,5 +258,34 @@ func TestNewAndImport(t *testing.T) {
 	e4, err := r.Import(src2)
 	if err != nil || e4.FileName != "chore.yaml" || e4.Workflow == nil {
 		t.Fatalf("import valid: %+v %v", e4, err)
+	}
+}
+
+func TestSave_results(t *testing.T) {
+	r := newReader(t)
+	orig := seed(t, r, "standard.yaml")
+	wf := load(t, r, "standard.yaml")
+	if out := saveOK(t, r, "standard.yaml", wf); out != orig {
+		t.Fatalf("legacy file changed on an unchanged save:\n%s", out)
+	}
+	impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
+	ci := slices.IndexFunc(wf.Stages[impl].Steps, func(s adewire.PipelineStep) bool { return s.ID == "ci" })
+	step := &wf.Stages[impl].Steps[ci]
+	step.OnFailure = ""
+	step.Results = []adewire.StepResult{
+		{ID: "pass", OK: true, Description: "All green.", Next: "next"},
+		{ID: "flaky", OK: false, Next: "ci", Max: 5},
+		{ID: "broken", OK: false, Next: "impl", Max: 3},
+	}
+	out := saveOK(t, r, "standard.yaml", wf)
+	_, seg, _ := strings.Cut(out, "id: ci")
+	seg, _, _ = strings.Cut(seg, "id: pr")
+	if strings.Contains(seg, "on_failure") || !strings.Contains(seg, "results:") || !strings.Contains(seg, "max: 5") || strings.Contains(seg, "max: 3") {
+		t.Fatalf("results not written as a list:\n%s", seg)
+	}
+	step.OnFailure, step.Results = "back:impl", adewire.ImplicitResults("ci", "back:impl")
+	back := saveOK(t, r, "standard.yaml", wf)
+	if strings.Contains(back, "results:") || !strings.Contains(back, "# my workflow") || !strings.Contains(back, "# long") {
+		t.Fatalf("reverting to the legacy form kept results or lost comments:\n%s", back)
 	}
 }

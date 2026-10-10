@@ -69,12 +69,22 @@ export type OnFailure =
   | 'retry 1'
   | 'retry 2'
   | `back:${string}` /* earlier step id, same stage */;
+/** A result a step may report through finish_step. `next` is 'next' | 'end' | 'stop' or a step id of the same stage; `max` is the loop budget of a route back to the step or an earlier one, 0 on a forward route. */
+export interface StepResult {
+  id: string;
+  ok: boolean;
+  description: string;
+  next: string;
+  max: number;
+}
 export interface PipelineStep {
   id: string;
   name: string;
   runsOn: RunsOn;
   before: 'auto' | 'approval';
-  onFailure: OnFailure;
+  /** Legacy rule; '' when `results` do not reduce to one. */
+  onFailure: OnFailure | '';
+  results: StepResult[];
   timeout: string;
   prompt: string;
   allowedTools: string[] /* D6, [] = none added */;

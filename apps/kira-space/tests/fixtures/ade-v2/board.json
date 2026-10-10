@@ -157,7 +157,23 @@
             "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           },
           {
             "id": "impl",
@@ -169,7 +185,23 @@
             "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
             "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 1
+              }
+            ]
           },
           {
             "id": "tests",
@@ -181,7 +213,23 @@
             "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 3
+              }
+            ]
           },
           {
             "id": "ci",
@@ -193,7 +241,23 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 3
+              }
+            ]
           },
           {
             "id": "pr",
@@ -205,7 +269,23 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": ["Bash(gh pr *)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           }
         ],
         "command": "",
@@ -596,7 +676,23 @@
             "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           },
           {
             "id": "impl",
@@ -608,7 +704,23 @@
             "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
             "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 1
+              }
+            ]
           },
           {
             "id": "tests",
@@ -620,7 +732,23 @@
             "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 3
+              }
+            ]
           },
           {
             "id": "ci",
@@ -632,7 +760,23 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 3
+              }
+            ]
           },
           {
             "id": "pr",
@@ -644,7 +788,23 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": ["Bash(gh pr *)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           }
         ],
         "command": "",
@@ -855,7 +1015,23 @@
             "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           },
           {
             "id": "impl",
@@ -867,7 +1043,23 @@
             "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
             "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 1
+              }
+            ]
           },
           {
             "id": "tests",
@@ -879,7 +1071,23 @@
             "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 3
+              }
+            ]
           },
           {
             "id": "ci",
@@ -891,7 +1099,23 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 3
+              }
+            ]
           },
           {
             "id": "pr",
@@ -903,7 +1127,23 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": ["Bash(gh pr *)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           }
         ],
         "command": "",
@@ -1057,7 +1297,23 @@
             "prompt": "Reproduce {jira} with a failing test on {branch}.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           },
           {
             "id": "fix",
@@ -1069,7 +1325,23 @@
             "prompt": "Make the failing test pass with the smallest change.",
             "allowedTools": ["Bash(npm test)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "fix",
+                "max": 1
+              }
+            ]
           },
           {
             "id": "ci",
@@ -1081,7 +1353,23 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "ci",
+                "max": 2
+              }
+            ]
           },
           {
             "id": "pr",
@@ -1093,7 +1381,23 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           }
         ],
         "command": "",
@@ -1175,7 +1479,23 @@
             "prompt": "Apply the change described in the task on {branch}.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           },
           {
             "id": "ci",
@@ -1187,7 +1507,23 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "ci",
+                "max": 2
+              }
+            ]
           }
         ],
         "command": "",
@@ -1272,7 +1608,23 @@
             "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           },
           {
             "id": "impl",
@@ -1284,7 +1636,23 @@
             "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
             "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 1
+              }
+            ]
           },
           {
             "id": "tests",
@@ -1296,7 +1664,23 @@
             "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 3
+              }
+            ]
           },
           {
             "id": "ci",
@@ -1308,7 +1692,23 @@
             "prompt": "Run the checks for {branch}. Fix failures until they pass.",
             "allowedTools": [],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "impl",
+                "max": 3
+              }
+            ]
           },
           {
             "id": "pr",
@@ -1320,7 +1720,23 @@
             "prompt": "Open a draft PR for {branch} and link {jira}.",
             "allowedTools": ["Bash(gh pr *)"],
             "smartScript": "",
-            "params": {}
+            "params": {},
+            "results": [
+              {
+                "id": "done",
+                "ok": true,
+                "description": "",
+                "next": "next",
+                "max": 0
+              },
+              {
+                "id": "failed",
+                "ok": false,
+                "description": "",
+                "next": "stop",
+                "max": 0
+              }
+            ]
           }
         ],
         "command": "",

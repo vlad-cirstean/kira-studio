@@ -38,6 +38,21 @@ func smartStep(id, extra string) string {
 	return "      - id: " + id + "\n        name: S\n        runs_on: each repo\n        timeout: 1h\n        smart_script: Summarize\n" + extra
 }
 
+// resultsBlock is one result item; the first call of a step opens the results list.
+func resultsBlock(id, ok, next, max string) string {
+	out := "          - id: " + id + "\n            ok: " + ok + "\n"
+	if next != "" {
+		out += "            next: " + next + "\n"
+	}
+	if max != "" {
+		out += "            max: " + max + "\n"
+	}
+	if id == "a" || id == "needs_input" {
+		out = "        results:\n" + out
+	}
+	return out
+}
+
 func TestParse_rules(t *testing.T) {
 	cases := []struct {
 		name string
@@ -72,6 +87,17 @@ func TestParse_rules(t *testing.T) {
 		{"back same step", head + agent + step("s", "        on_failure: back:s\n"), 0, "back: must name an earlier step"},
 		{"back later step", head + agent + step("s", "        on_failure: back:t\n") + step("t", ""), 0, "back: must name an earlier step"},
 		{"back other stage", head + agent + step("s", "") + "  - id: b\n    name: B\n    kind: agent\n    status: In progress\n    steps:\n" + step("t", "        on_failure: back:s\n"), 0, "stage 2, step 1: back: must name"},
+		{"results ok", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "2")), 0, ""},
+		{"results unknown target", head + agent + step("s", resultsBlock("a", "true", "nope", "")), 0, "next must be next, end, stop or a step id"},
+		{"results stop on ok", head + agent + step("s", resultsBlock("a", "true", "stop", "")), 0, "stop is only allowed on a result that is not ok"},
+		{"results max on forward", head + agent + step("s", resultsBlock("a", "true", "end", "2")), 0, "max is only allowed on a route back"},
+		{"results max range", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "s", "11")), 0, "max must be a whole number from 1 to 10"},
+		{"results no forward", head + agent + step("s", resultsBlock("a", "false", "s", "")), 0, "at least one result must lead forward"},
+		{"results with on_failure", head + agent + step("s", "        on_failure: stop\n"+resultsBlock("a", "true", "", "")), 0, "results and on_failure cannot be used together"},
+		{"results duplicate id", head + agent + step("s", resultsBlock("a", "true", "", "")+resultsBlock("b", "false", "", "")+resultsBlock("b", "false", "", "")), 0, "already used by another result"},
+		{"results reserved id", head + agent + step("s", resultsBlock("needs_input", "true", "", "")), 0, "needs_input is reserved"},
+		{"results ok required", head + agent + step("s", "        results:\n          - id: a\n"), 0, "ok is required"},
+		{"results later step", head + agent + step("s", resultsBlock("a", "true", "t", "")) + step("t", ""), 0, ""},
 		{"timeout zero", head + agent + strings.Replace(step("s", ""), "1h", "0s", 1), 0, "timeout must be"},
 		{"timeout over 24h", head + agent + strings.Replace(step("s", ""), "1h", "25h", 1), 0, "timeout must be"},
 		{"timeout garbage", head + agent + strings.Replace(step("s", ""), "1h", "soon", 1), 0, "timeout must be"},

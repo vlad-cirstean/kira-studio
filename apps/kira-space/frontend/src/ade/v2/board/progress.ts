@@ -24,7 +24,7 @@ export interface StepProgress {
   name: string;
   runsOn: RunsOn;
   before: 'auto' | 'approval';
-  onFailure: OnFailure;
+  onFailure: OnFailure | '';
   /** Name of the smart script the step runs, else ''. */
   smartScript: string;
   state: StepState;
@@ -106,7 +106,7 @@ interface StepDef {
   name: string;
   runsOn: RunsOn;
   before: 'auto' | 'approval';
-  onFailure: OnFailure;
+  onFailure: OnFailure | '';
   smartScript: string;
 }
 

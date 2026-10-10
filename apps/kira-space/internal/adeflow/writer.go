@@ -278,12 +278,14 @@ const (
 	kText scalarKind = iota
 	kBlock
 	kBool
+	kInt
 )
 
 var (
-	topOrder   = []string{"id", "name", "kira_space_mcp", "stages"}
-	stageOrder = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
-	stepOrder  = []string{"id", "name", "runs_on", "before", "on_failure", "timeout", "smart_script", "params", "prompt", "allowed_tools"}
+	topOrder    = []string{"id", "name", "kira_space_mcp", "stages"}
+	stageOrder  = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
+	resultOrder = []string{"id", "ok", "description", "next", "max"}
+	stepOrder   = []string{"id", "name", "runs_on", "before", "on_failure", "results", "timeout", "smart_script", "params", "prompt", "allowed_tools"}
 )
 
 func find(m *yaml.Node, key string) (int, *yaml.Node) {
@@ -320,6 +322,8 @@ func newScalar(kind scalarKind, want string) *yaml.Node {
 	switch kind {
 	case kBool:
 		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: want}
+	case kInt:
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: want}
 	case kBlock:
 		if strings.Contains(want, "\n") {
 			return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.LiteralStyle, Value: want + "\n"}
@@ -335,7 +339,7 @@ func sameScalar(kind scalarKind, n *yaml.Node, want string) bool {
 	switch kind {
 	case kBlock:
 		return strings.TrimRight(n.Value, "\n") == want
-	case kBool:
+	case kBool, kInt:
 		return n.Value == want
 	}
 	return strings.TrimSpace(n.Value) == want
@@ -355,7 +359,7 @@ func setScalar(m *yaml.Node, key string, kind scalarKind, want string, add bool,
 		put(m, key, newScalar(kind, want), order)
 	default:
 		fresh := newScalar(kind, want)
-		keepQuote := n.Style&(yaml.DoubleQuotedStyle|yaml.SingleQuotedStyle) != 0 && fresh.Style == 0 && kind != kBool
+		keepQuote := n.Style&(yaml.DoubleQuotedStyle|yaml.SingleQuotedStyle) != 0 && fresh.Style == 0 && kind != kBool && kind != kInt
 		wasBlock := n.Style&(yaml.LiteralStyle|yaml.FoldedStyle) != 0
 		n.Value, n.Tag, n.Alias = fresh.Value, fresh.Tag, nil
 		switch {
@@ -486,7 +490,7 @@ func applyStage(m *yaml.Node, st adewire.Stage) {
 			ids[i] = s.ID
 		}
 		_, old := find(m, "steps")
-		put(m, "steps", syncItems(old, ids, func(i int, item *yaml.Node) { applyStep(item, st.Steps[i]) }), stageOrder)
+		put(m, "steps", syncItems(old, ids, func(i int, item *yaml.Node) { applyStep(item, st.Steps[i], ids[:i]) }), stageOrder)
 	case "script":
 		for _, k := range []string{"command", "runs_on", "on_failure", "timeout"} {
 			keep[k] = true
@@ -499,12 +503,12 @@ func applyStage(m *yaml.Node, st adewire.Stage) {
 	dropOthers(m, keep)
 }
 
-func applyStep(m *yaml.Node, s adewire.PipelineStep) {
+func applyStep(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
 	setScalar(m, "id", kText, s.ID, true, stepOrder)
 	setScalar(m, "name", kText, s.Name, true, stepOrder)
 	setScalar(m, "runs_on", kText, s.RunsOn, true, stepOrder)
 	setScalar(m, "before", kText, defaultStr(s.Before, "auto"), s.Before != "" && s.Before != "auto", stepOrder)
-	setScalar(m, "on_failure", kText, defaultStr(s.OnFailure, "stop"), s.OnFailure != "" && s.OnFailure != "stop", stepOrder)
+	applyResults(m, s, earlier)
 	setScalar(m, "timeout", kText, s.Timeout, true, stepOrder)
 	if s.SmartScript == "" {
 		dropKeys(m, "smart_script", "params")
@@ -515,6 +519,47 @@ func applyStep(m *yaml.Node, s adewire.PipelineStep) {
 	dropKeys(m, "prompt", "allowed_tools")
 	setScalar(m, "smart_script", kText, s.SmartScript, true, stepOrder)
 	setParams(m, s.Params)
+}
+
+// applyResults writes a step's routing: the legacy on_failure rule when the results equal one
+// (an implicit pair), else a results list. A step with no results is read as its on_failure rule.
+func applyResults(m *yaml.Node, s adewire.PipelineStep, earlier []string) {
+	results := s.Results
+	if len(results) == 0 {
+		results = adewire.ImplicitResults(s.ID, defaultStr(s.OnFailure, "stop"))
+	}
+	if rule, ok := adewire.LegacyOnFailure(s.ID, results, earlier); ok {
+		dropKeys(m, "results")
+		setScalar(m, "on_failure", kText, rule, rule != "stop", stepOrder)
+		return
+	}
+	dropKeys(m, "on_failure")
+	ids := make([]string, len(results))
+	for i, r := range results {
+		ids[i] = r.ID
+	}
+	_, old := find(m, "results")
+	put(m, "results", syncItems(old, ids, func(i int, item *yaml.Node) { applyResult(item, results[i]) }), stepOrder)
+}
+
+func applyResult(m *yaml.Node, r adewire.StepResult) {
+	setScalar(m, "id", kText, r.ID, true, resultOrder)
+	setScalar(m, "ok", kBool, fmt.Sprint(r.OK), true, resultOrder)
+	if r.Description != "" {
+		setScalar(m, "description", kText, r.Description, true, resultOrder)
+	} else {
+		dropKeys(m, "description")
+	}
+	if next := defaultStr(r.Next, adewire.DefaultRoute(r.OK)); next != adewire.DefaultRoute(r.OK) {
+		setScalar(m, "next", kText, next, true, resultOrder)
+	} else {
+		dropKeys(m, "next")
+	}
+	if r.Max != 0 && r.Max != adewire.DefaultLoopMax {
+		setScalar(m, "max", kInt, fmt.Sprint(r.Max), true, resultOrder)
+	} else {
+		dropKeys(m, "max")
+	}
 }
 
 // dropKeys removes keys a step of this shape does not allow.

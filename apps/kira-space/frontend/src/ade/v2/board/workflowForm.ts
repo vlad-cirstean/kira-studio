@@ -1,4 +1,5 @@
 import type { OnFailure, PipelineStep, Stage, StageKind, Workflow } from '../wire';
+import { implicitResults } from './stepResults';
 
 // Pure helpers behind the Workflows form editor (SPEC2 section 5.1.1). Stage and step ids are run
 // keys: they are minted once, here, and never follow a rename.
@@ -33,11 +34,13 @@ export function moved<T>(list: readonly T[], index: number, dir: 'up' | 'down'):
 }
 
 export function newStep(steps: readonly PipelineStep[]): PipelineStep {
+  const id = nextId(
+    'step',
+    steps.map((s) => s.id),
+  );
   return {
-    id: nextId(
-      'step',
-      steps.map((s) => s.id),
-    ),
+    id,
+    results: implicitResults(id, 'stop'),
     name: 'New step',
     runsOn: 'each repo',
     before: 'auto',
