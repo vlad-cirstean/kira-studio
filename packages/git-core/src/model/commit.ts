@@ -53,10 +53,6 @@ export interface FileChange {
   readonly originalPath: string | undefined;
   /** Set for `renamed`/`copied` only — the `-M`/`-C` similarity score, 0-100. */
   readonly similarity: number | undefined;
-  /** Undefined when `isBinary` — numstat reports `-` for a binary file's line counts. */
-  readonly additions: number | undefined;
-  readonly deletions: number | undefined;
-  readonly isBinary: boolean;
 }
 
 /** `%G?`'s raw signature-verification code (§4.4, D20): good, bad, unknown key, expired, etc. */

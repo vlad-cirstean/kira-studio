@@ -8,9 +8,6 @@ function fileNode(path: string, fileIndex: number): FileTreeFileNode {
     kind: 'modified',
     originalPath: undefined,
     similarity: undefined,
-    additions: 1,
-    deletions: 1,
-    isBinary: false,
   };
   const slash = path.lastIndexOf('/');
   return {
@@ -32,8 +29,6 @@ function dirNode(
     name: slash === -1 ? path : path.slice(slash + 1),
     path,
     children,
-    additions: 0,
-    deletions: 0,
     fileCount: children.length,
   };
 }

@@ -58,16 +58,13 @@ const rows = SUBJECTS.map((subject, n) => ({
 }));
 
 const FILES = [
-  { kind: 'modified', path: 'src/App.vue', additions: 12, deletions: 3, isBinary: false },
+  { kind: 'modified', path: 'src/App.vue' },
   {
     kind: 'added',
     path: 'src/components/SearchBox.vue',
-    additions: 84,
-    deletions: 0,
-    isBinary: false,
   },
-  { kind: 'deleted', path: 'src/legacy/search.ts', additions: 0, deletions: 41, isBinary: false },
-  { kind: 'modified', path: 'README.md', additions: 2, deletions: 1, isBinary: false },
+  { kind: 'deleted', path: 'src/legacy/search.ts' },
+  { kind: 'modified', path: 'README.md' },
 ].map((f) => ({ ...f, originalPath: undefined, similarity: undefined }));
 
 const ref = (

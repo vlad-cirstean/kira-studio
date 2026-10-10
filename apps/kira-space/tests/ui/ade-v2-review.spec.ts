@@ -20,9 +20,6 @@ const change = (path: string) => ({
   kind: 'modified',
   path,
   similarity: 0,
-  additions: 2,
-  deletions: 1,
-  isBinary: false,
 });
 const status = (kind: 'none' | 'full', changedSinceReview: boolean) => ({
   kind,

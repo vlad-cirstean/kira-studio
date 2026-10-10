@@ -55,8 +55,6 @@ export interface FileTreeDirNode {
    *  share one. */
   readonly path: string;
   readonly children: readonly FileTreeNode[];
-  readonly additions: number;
-  readonly deletions: number;
   readonly fileCount: number;
 }
 
@@ -151,31 +149,23 @@ function finalizeOne(builder: DirBuilder, path: string): FileTreeDirNode {
         name: `${builder.name}/${only.name}`,
         path: only.path,
         children: only.children,
-        additions: only.additions,
-        deletions: only.deletions,
         fileCount: only.fileCount,
       };
     }
   }
-  let additions = 0;
-  let deletions = 0;
   let fileCount = 0;
   for (const child of children) {
     if (child.kind === 'file') {
-      additions += child.change.additions ?? 0;
-      deletions += child.change.deletions ?? 0;
       fileCount += 1;
     } else {
-      additions += child.additions;
-      deletions += child.deletions;
       fileCount += child.fileCount;
     }
   }
-  return { kind: 'directory', name: builder.name, path, children, additions, deletions, fileCount };
+  return { kind: 'directory', name: builder.name, path, children, fileCount };
 }
 
 /** Folds a flat, already-filtered file list into the hierarchical tree §6.4 describes:
- *  directories aggregate their descendants' `+adds/−dels` and file counts, and a chain of
+ *  directories aggregate their descendants' file counts, and a chain of
  *  directories with nothing but one child directory at each level collapses into a single row. */
 export function buildFileTree(files: readonly IndexedFileChange[]): FileTreeNode[] {
   const root = newDir('');

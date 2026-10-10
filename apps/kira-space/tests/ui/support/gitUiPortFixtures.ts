@@ -213,14 +213,11 @@ const PARAGRAPH =
   'This paragraph exists only to overflow a two-line clamp reliably regardless of viewport ' +
   'width or font metrics, so no test has to guess how many words make two lines.';
 
-const file = (kind: string, path: string, additions: number, deletions: number) => ({
+const file = (kind: string, path: string) => ({
   kind,
   path,
   originalPath: undefined,
   similarity: undefined,
-  additions,
-  deletions,
-  isBinary: false,
 });
 
 /** `commit.detail` for SHA_A: a ten-paragraph body, trailers, distinct author and committer, a
@@ -239,7 +236,7 @@ export const COMMIT_DETAIL = {
   signature: { status: 'N', signer: '' },
   decoration: [{ kind: 'branch', name: 'main', isHead: true }],
   parentIndex: 0,
-  files: [file('modified', 'src/example.ts', 3, 1), file('added', 'README.md', 5, 0)],
+  files: [file('modified', 'src/example.ts'), file('added', 'README.md')],
 };
 
 /** Opens the graph with one commit and selects it, so the detail pane shows `COMMIT_DETAIL`. */
@@ -352,9 +349,6 @@ const reviewFile = (path: string, kind: 'none' | 'partial' | 'full') => ({
     path,
     originalPath: undefined,
     similarity: undefined,
-    additions: 2,
-    deletions: 1,
-    isBinary: false,
   },
   review: {
     kind,

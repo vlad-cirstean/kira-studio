@@ -10,9 +10,6 @@ export interface Jira {
 }
 export interface FileChange {
   path: string;
-  added: number | null;
-  deleted: number | null;
-  binary: boolean;
 }
 export interface Commit {
   sha: string;

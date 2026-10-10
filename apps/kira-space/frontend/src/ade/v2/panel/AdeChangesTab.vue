@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { TONE_TAG_CLASS } from '../tones';
-import type { Branch, Commit, DirtyEntry, FileChange } from '../wire';
+import type { Branch, Commit, DirtyEntry } from '../wire';
 
 // Branch Changes tab: base, worktree, rebase conflicts, shared files, uncommitted, commits, files.
 const props = defineProps<{
@@ -26,14 +26,6 @@ const conflicts = computed(() => props.branch.conflictsIfRebased.map(basename).j
 
 const dirtyClass = (d: DirtyEntry): string => (d.code === 'M' ? 'text-tone-amber' : 'text-tone-green');
 const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
-
-function fileDelta(f: FileChange): string {
-  if (f.binary) return 'binary';
-  const parts: string[] = [];
-  if (f.added) parts.push(`+${f.added}`);
-  if (f.deleted) parts.push(`−${f.deleted}`);
-  return parts.join(' ') || '0';
-}
 </script>
 
 <template>
@@ -99,12 +91,11 @@ function fileDelta(f: FileChange): string {
       <div
         v-for="f in branch.files"
         :key="f.path"
-        class="flex justify-between gap-2 rounded-kira-xs px-1.5 py-0.5 font-data text-kira-sm"
+        class="truncate rounded-kira-xs px-1.5 py-0.5 font-data text-kira-sm"
         :class="branch.conflictsIfRebased.includes(f.path) ? TONE_TAG_CLASS.red : 'text-fg'"
         data-testid="ade-changes-file-row"
       >
-        <span class="truncate">{{ f.path }}</span>
-        <span class="shrink-0 text-muted-foreground">{{ fileDelta(f) }}</span>
+        {{ f.path }}
       </div>
     </div>
   </div>

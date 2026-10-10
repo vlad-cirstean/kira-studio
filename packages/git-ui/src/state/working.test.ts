@@ -11,9 +11,6 @@ const oneFile = {
   path: 'a.txt',
   originalPath: undefined,
   similarity: undefined,
-  additions: 1,
-  deletions: 0,
-  isBinary: false,
 };
 
 describe('WorkingDetailState', () => {

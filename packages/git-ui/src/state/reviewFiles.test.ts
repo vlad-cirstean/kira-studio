@@ -11,9 +11,6 @@ function fileChange(path: string): FileChange {
     path,
     originalPath: undefined,
     similarity: undefined,
-    additions: 1,
-    deletions: 0,
-    isBinary: false,
   };
 }
 

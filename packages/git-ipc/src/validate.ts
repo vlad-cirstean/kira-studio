@@ -182,7 +182,8 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'kiraSpace.*' repo settings.
 // P246: 46 -> 47, breaking. 'credential.request' and 'credential.provide' are removed: native git
 // stream credential prompts go through Kira Space's prompt router and credential relay instead.
-export const CONTRACT_VERSION = 47;
+// P257: 47 -> 48, breaking. 'FileChange' loses 'additions', 'deletions' and 'isBinary'.
+export const CONTRACT_VERSION = 48;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

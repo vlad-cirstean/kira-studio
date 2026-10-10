@@ -127,9 +127,6 @@ export interface FileChange {
    *  name both paths in its pathspec or git renders it as a whole-file add (probe P2). */
   readonly originalPath: string | undefined;
   readonly similarity: number | undefined;
-  readonly additions: number | undefined; // undefined when isBinary
-  readonly deletions: number | undefined;
-  readonly isBinary: boolean;
 }
 
 /** `%G?`'s raw signature-verification code (§4.4, D20): good, bad, unknown key, expired, etc. */

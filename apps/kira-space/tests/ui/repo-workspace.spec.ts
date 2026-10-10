@@ -993,18 +993,12 @@ test('a repo workspace: "Open all changes" on a commit opens one multi-diff tab 
         path: 'a.ts',
         originalPath: undefined,
         similarity: undefined,
-        additions: 1,
-        deletions: 1,
-        isBinary: false,
       },
       {
         kind: 'modified',
         path: 'b.ts',
         originalPath: undefined,
         similarity: undefined,
-        additions: 2,
-        deletions: 0,
-        isBinary: false,
       },
     ],
   };

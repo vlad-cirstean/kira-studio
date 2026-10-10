@@ -36,7 +36,6 @@ import { setiIconFor } from '../icons/setiFileIcon.ts';
 import { rowVariants } from '../lib/rowVariants.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
-import { exactCount, formatChangeCount } from './countFormat.ts';
 import {
   buildFileTree,
   buildFlatList,
@@ -610,17 +609,11 @@ const parentSelectId = useId();
           <span class="font-ui truncate">{{ row.node.name }}</span>
           <span class="ml-auto text-subtle font-ui text-graph-sm flex gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="text-ok" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
-              >+{{ formatChangeCount(row.node.additions) }}</span
-            >
-            <span class="text-error" :data-kira-tip="`${exactCount(row.node.deletions)} deletions`"
-              >-{{ formatChangeCount(row.node.deletions) }}</span
-            >
           </span>
         </template>
         <template v-else>
           <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
-               +N/-N counts' own width and crowded the pane's scrollbar. A real Checkbox (not a
+               status column and crowded the pane's scrollbar. A real Checkbox (not a
                toggle button) so the partial state gets a correct `aria-checked="mixed"` for free,
                and `.stop` (not `.prevent` -- reka's own control has no native default to prevent)
                because the server's answer is this control's only state (`ReviewFilesState.mark`
@@ -653,21 +646,6 @@ const parentSelectId = useId();
           <!-- P105: the flat-mode-only directory hint never applies in tree mode (a real
                directory row already carries this path via its own ancestor rows). -->
           <span class="ml-auto flex items-center gap-1 shrink-0">
-            <span
-              v-if="!row.node.change.isBinary"
-              class="font-ui text-graph-sm flex gap-1 shrink-0"
-            >
-              <span
-                class="text-ok"
-                :data-kira-tip="`${exactCount(row.node.change.additions ?? 0)} additions`"
-                >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
-              >
-              <span
-                class="text-error"
-                :data-kira-tip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
-                >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
-              >
-            </span>
             <span
               class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0"
               :class="statusClass(row.node.change)"
@@ -723,17 +701,11 @@ const parentSelectId = useId();
           <span class="font-ui truncate">{{ row.node.name }}</span>
           <span class="ml-auto text-subtle font-ui text-graph-sm flex gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="text-ok" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
-              >+{{ formatChangeCount(row.node.additions) }}</span
-            >
-            <span class="text-error" :data-kira-tip="`${exactCount(row.node.deletions)} deletions`"
-              >-{{ formatChangeCount(row.node.deletions) }}</span
-            >
           </span>
         </template>
         <template v-else>
           <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
-               +N/-N counts' own width and crowded the pane's scrollbar. A real Checkbox (not a
+               status column and crowded the pane's scrollbar. A real Checkbox (not a
                toggle button) so the partial state gets a correct `aria-checked="mixed"` for free,
                and `.stop` (not `.prevent` -- reka's own control has no native default to prevent)
                because the server's answer is this control's only state (`ReviewFilesState.mark`
@@ -769,21 +741,6 @@ const parentSelectId = useId();
             >{{ dirOf(row.node.path) }}</span
           >
           <span class="ml-auto flex items-center gap-1 shrink-0">
-            <span
-              v-if="!row.node.change.isBinary"
-              class="font-ui text-graph-sm flex gap-1 shrink-0"
-            >
-              <span
-                class="text-ok"
-                :data-kira-tip="`${exactCount(row.node.change.additions ?? 0)} additions`"
-                >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
-              >
-              <span
-                class="text-error"
-                :data-kira-tip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
-                >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
-              >
-            </span>
             <span
               class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0"
               :class="statusClass(row.node.change)"
