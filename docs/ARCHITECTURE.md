@@ -614,6 +614,18 @@ a Mac with neither biometry nor a login password), the app falls back to its exi
 `Test`, and `Duplicate` all continue to use the stored secret unprompted, exactly as before — this
 gate is about turning a secret into visible text, not about using it.
 
+**Pasting credentials (P248).** The connection dialog (fields mode, non-file kinds) and the tree
+menu's *Update credentials…* (saved fields-mode network connection) take a pasted block of labelled
+text such as `user: foo  pass: bar`, `PGPASSWORD=…`, `Key=value;` DSN pairs or `psql`/`mysql` flags.
+`project/credentialPaste/parse.ts` parses it in the renderer only: the blob never crosses the bridge
+and never reaches a store, `localStorage`, the op log or the console. Only the resulting fields go
+through the existing create/update secret path. The panel shows a review (masked password, guessed
+badge, candidate picker) and applies nothing until Apply. The panel clears its text and result on
+apply, cancel and unmount; JS strings are immutable, so that drops references and does not zero
+memory. URIs stay in the Connection URI field; no URL, JDBC, JSON, YAML or percent-decoding is
+parsed. *Update credentials…* writes username and password only, keeps every other field, and
+reconnects a live connection on a password-only change (Go already reconnects on a username change).
+
 **A second reveal caller, the same gate (P5).** A collection/environment variable's secret value
 goes through the identical `internal/localauth.Authorizer` — `main.go` constructs exactly one and
 passes it through `appwire.Options` to both `connections.Service` and `internal/apivars.Service`, which is what makes the
