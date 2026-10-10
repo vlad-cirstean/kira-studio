@@ -180,7 +180,7 @@ async function confirmRemove(): Promise<void> {
           <template v-else-if="pendingRemove?.preflight.verdict === 'dirty'">
             <p>
               This worktree has uncommitted changes that will be permanently lost. Type
-              <code>{{ pendingRemove.preflight.confirmToken }}</code> to confirm.
+              <code class="font-data">{{ pendingRemove.preflight.confirmToken }}</code> to confirm.
             </p>
             <Input v-model="typedToken" size="kira" class="w-full" aria-label="Confirmation token" />
           </template>

@@ -18,14 +18,14 @@
  * `StackDialog.vue`'s own parent picker makes), each still driven by an explicit
  * `onXChange`-and-cast handler rather than a plain `v-model`, since `NativeSelect`'s own
  * `modelValue` type (`AcceptableValue`) is wider than any one of these settings' own narrow
- * union. The page-size field is `Input` with a manual `Number(...)` cast on
- * `update:model-value` — `Input`'s internal `v-model` has no `.number` modifier of its own, so a
- * plain `v-model.number` on the wrapping component would silently pass a string through instead
- * (Vue only auto-casts `.number` for a native element's own `v-model`, not a component's).
+ * union. The page-size field is `NumberStepperInput` with a manual `Number(...)` cast on
+ * `update:model-value` — a component `v-model` has no `.number` auto-cast (Vue only applies it to
+ * a native element).
  */
 import { SETTINGS } from '@kira/git-core';
 import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -36,10 +36,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
+import {
+  Field,
+  FieldError,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
+import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { computed, reactive, ref, useId, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
 
@@ -114,6 +120,11 @@ function onPageSizeChange(value: string | number): void {
   draft['kiraSpace.graph.pageSize'] = value === '' ? Number.NaN : Number(value);
 }
 
+const pageSizeText = computed(() => {
+  const size = draft['kiraSpace.graph.pageSize'];
+  return Number.isNaN(size) ? '' : String(size);
+});
+
 const pageSizeValid = computed(() => {
   const size = draft['kiraSpace.graph.pageSize'];
   const { minimum, maximum } = SETTINGS['kiraSpace.graph.pageSize'];
@@ -121,6 +132,10 @@ const pageSizeValid = computed(() => {
 });
 
 const pageSizeId = useId();
+const autoStashId = useId();
+const showInGraphId = useId();
+const includeUntrackedId = useId();
+const githubId = useId();
 const graphScopeId = useId();
 const baseCandidatesId = useId();
 const pullStrategyId = useId();
@@ -189,29 +204,27 @@ async function save(): Promise<void> {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
-        <section class="first:mt-1">
-          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Graph</h3>
-          <label :for="pageSizeId" class="flex flex-col gap-0.5">
-            Load more page size
-            <Input
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+        <FieldSet>
+          <FieldLegend>Graph</FieldLegend>
+          <Field>
+            <FieldLabel :for="pageSizeId">Load more page size</FieldLabel>
+            <NumberStepperInput
               :id="pageSizeId"
-              :model-value="draft['kiraSpace.graph.pageSize']"
-              type="number"
-              size="kira"
-              class="w-24"
+              :model-value="pageSizeText"
+              group-class="h-control w-32"
               :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
               :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
               :aria-invalid="!pageSizeValid"
               @update:model-value="onPageSizeChange"
             />
-            <span v-if="!pageSizeValid" class="text-error text-kira-sm" role="alert">
+            <FieldError v-if="!pageSizeValid">
               Enter a whole number from {{ SETTINGS['kiraSpace.graph.pageSize'].minimum }} to
               {{ SETTINGS['kiraSpace.graph.pageSize'].maximum }}.
-            </span>
-          </label>
-          <label :for="graphScopeId" class="flex flex-col gap-0.5">
-            Scope
+            </FieldError>
+          </Field>
+          <Field>
+            <FieldLabel :for="graphScopeId">Scope</FieldLabel>
             <NativeSelect
               :id="graphScopeId"
               :model-value="draft['kiraSpace.graph.scope']"
@@ -224,54 +237,62 @@ async function save(): Promise<void> {
                 {{ opt.label }}
               </option>
             </NativeSelect>
-          </label>
-        </section>
+          </Field>
+        </FieldSet>
 
-        <section class="first:mt-1">
-          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Checkout</h3>
-          <Label class="flex flex-row items-center gap-1">
-            <Checkbox v-model="draft['kiraSpace.checkout.autoStash']" />
-            Automatically stash local changes that block a branch switch
-          </Label>
-          <p class="text-error">
-            The stash is tagged with the branch you switched FROM and is never popped back
-            automatically — bring it back deliberately from the stash list, even onto a different
-            branch. Off restores the old dialog (discard / stash and carry / cancel).
-          </p>
-        </section>
+        <FieldSet>
+          <FieldLegend>Checkout</FieldLegend>
+          <Field orientation="horizontal">
+            <Checkbox :id="autoStashId" v-model="draft['kiraSpace.checkout.autoStash']" />
+            <FieldLabel :for="autoStashId">
+              Automatically stash local changes that block a branch switch
+            </FieldLabel>
+          </Field>
+          <Alert variant="warn">
+            <AlertDescription>
+              The stash is tagged with the branch you switched FROM and is never popped back
+              automatically — bring it back deliberately from the stash list, even onto a different
+              branch. Off restores the old dialog (discard / stash and carry / cancel).
+            </AlertDescription>
+          </Alert>
+        </FieldSet>
 
-        <section class="first:mt-1">
-          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Stash</h3>
-          <Label class="flex flex-row items-center gap-1">
-            <Checkbox v-model="draft['kiraSpace.stash.showInGraph']" />
-            Show stash entries as nodes in the commit graph
-          </Label>
-          <Label class="flex flex-row items-center gap-1">
-            <Checkbox v-model="draft['kiraSpace.stash.includeUntracked']" />
-            "Include untracked files" starts checked in the Stash dialog
-          </Label>
-        </section>
+        <FieldSet>
+          <FieldLegend>Stash</FieldLegend>
+          <Field orientation="horizontal">
+            <Checkbox :id="showInGraphId" v-model="draft['kiraSpace.stash.showInGraph']" />
+            <FieldLabel :for="showInGraphId">Show stash entries as nodes in the commit graph</FieldLabel>
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox :id="includeUntrackedId" v-model="draft['kiraSpace.stash.includeUntracked']" />
+            <FieldLabel :for="includeUntrackedId">
+              "Include untracked files" starts checked in the Stash dialog
+            </FieldLabel>
+          </Field>
+        </FieldSet>
 
-        <section class="first:mt-1">
-          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Branch review</h3>
-          <label :for="baseCandidatesId" class="flex flex-col gap-0.5">
-            Candidate base branches (one per line, tried in order)
+        <FieldSet>
+          <FieldLegend>Branch review</FieldLegend>
+          <Field>
+            <FieldLabel :for="baseCandidatesId">
+              Candidate base branches (one per line, tried in order)
+            </FieldLabel>
             <Textarea :id="baseCandidatesId" v-model="baseCandidatesText" rows="3" class="w-full" />
-          </label>
-        </section>
+          </Field>
+        </FieldSet>
 
-        <section class="first:mt-1">
-          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">GitHub</h3>
-          <Label class="flex flex-row items-center gap-1">
-            <Checkbox v-model="draft['kiraSpace.github.enabled']" />
-            Show pull request status for this repository
-          </Label>
-        </section>
+        <FieldSet>
+          <FieldLegend>GitHub</FieldLegend>
+          <Field orientation="horizontal">
+            <Checkbox :id="githubId" v-model="draft['kiraSpace.github.enabled']" />
+            <FieldLabel :for="githubId">Show pull request status for this repository</FieldLabel>
+          </Field>
+        </FieldSet>
 
-        <section class="first:mt-1">
-          <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Pull</h3>
-          <label :for="pullStrategyId" class="flex flex-col gap-0.5">
-            Strategy
+        <FieldSet>
+          <FieldLegend>Pull</FieldLegend>
+          <Field>
+            <FieldLabel :for="pullStrategyId">Strategy</FieldLabel>
             <NativeSelect
               :id="pullStrategyId"
               :model-value="draft['kiraSpace.pull.strategy']"
@@ -284,13 +305,13 @@ async function save(): Promise<void> {
                 {{ opt.label }}
               </option>
             </NativeSelect>
-          </label>
-        </section>
-      </div>
+          </Field>
+        </FieldSet>
 
-      <p v-if="saveError" class="m-0 mt-1 text-error" role="alert">
-        Couldn't save settings — {{ saveError }}
-      </p>
+        <Alert v-if="saveError" variant="destructive">
+          <AlertDescription>Couldn't save settings — {{ saveError }}</AlertDescription>
+        </Alert>
+      </div>
 
       <DialogFooter class="justify-end">
         <Button variant="dialog" size="kira-lg" @click="close">Cancel</Button>

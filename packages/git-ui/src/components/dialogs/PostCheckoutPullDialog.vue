@@ -50,11 +50,11 @@ function pullNow(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <DialogDescription>
           <strong>{{ pending.branch }}</strong> is {{ pending.behind }}
           {{ pending.behind === 1 ? 'commit' : 'commits' }} behind
-          <code>{{ pending.upstreamShortName }}</code> — pull now?
+          <code class="font-data">{{ pending.upstreamShortName }}</code> — pull now?
         </DialogDescription>
       </div>
 

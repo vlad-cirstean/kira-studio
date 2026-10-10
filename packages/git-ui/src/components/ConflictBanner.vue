@@ -138,7 +138,7 @@ const PATH_DISPLAY_CAP = 20;
       class="mt-0.5 pl-3 max-h-20 overflow-y-auto font-data text-kira-sm"
     >
       <li v-for="path in inProgress.conflictedPaths.slice(0, PATH_DISPLAY_CAP)" :key="path">
-        <code>{{ path }}</code>
+        <code class="font-data">{{ path }}</code>
       </li>
       <li
         v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP"

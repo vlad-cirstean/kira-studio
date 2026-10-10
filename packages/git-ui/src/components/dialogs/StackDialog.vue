@@ -17,6 +17,7 @@
  */
 import type { RestackPreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -26,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { Field, FieldLabel } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
@@ -160,10 +162,10 @@ function closeDialog(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <template v-if="target?.mode === 'setParent'">
-          <label :for="parentId" class="flex flex-col gap-0.5">
-            Parent branch
+          <Field>
+            <FieldLabel :for="parentId">Parent branch</FieldLabel>
             <NativeSelect
               :id="parentId"
               v-model="selectedParent"
@@ -174,19 +176,19 @@ function closeDialog(): void {
               <option value="">None (remove from stack)</option>
               <option v-for="name in parentCandidates" :key="name" :value="name">{{ name }}</option>
             </NativeSelect>
-          </label>
+          </Field>
         </template>
 
         <template v-else-if="target?.mode === 'restack' && preflight">
-          <p v-if="preflight.verdict === 'blocked'" class="text-error">
-            {{ blockerText(preflight) }}
-          </p>
+          <Alert v-if="preflight.verdict === 'blocked'" variant="warn">
+            <AlertDescription>{{ blockerText(preflight) }}</AlertDescription>
+          </Alert>
           <p v-else-if="preflight.verdict === 'noop'">This stack is already up to date.</p>
           <template v-else>
-            <p>The following branches will be restacked onto <code>{{ preflight.base }}</code>:</p>
+            <p>The following branches will be restacked onto <code class="font-data">{{ preflight.base }}</code>:</p>
             <ul class="max-h-50 overflow-y-auto p-1 bg-bg border border-border text-kira-md">
               <li v-for="entry in preflight.plan" :key="entry.branch">
-                <code>{{ entry.branch }}</code> onto <code>{{ entry.parent }}</code>
+                <code class="font-data">{{ entry.branch }}</code> onto <code class="font-data">{{ entry.parent }}</code>
                 ({{ entry.commits }} commit{{ entry.commits === 1 ? '' : 's' }},
                 {{ entry.reason === 'stale' ? 'stale' : 'ancestor restacked' }},
                 base: {{ entry.baseSource }})

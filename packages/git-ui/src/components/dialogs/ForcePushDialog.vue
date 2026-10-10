@@ -21,6 +21,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  * `<details>` body (in the default slot) rather than moving to `DialogFooter`, since it belongs
  * beside its own disclosure and acknowledgement checkbox, not beside the lease/Cancel pair.
  */
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -32,8 +33,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -45,6 +46,7 @@ const active = computed(() => pending.value !== undefined);
 // component to the native `<input>` it renders, unlike the raw `<input>` this label used to wrap
 // directly -- an explicit for/id pair keeps the same association, verifiably.
 const branchNameId = useId();
+const plainAckId = useId();
 
 const typedBranch = ref('');
 const understandPlain = ref(false);
@@ -103,22 +105,24 @@ function confirmPlain(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <DialogDescription>
-          This will overwrite <code>{{ pending.remote }}/{{ resolvedBranch }}</code>, currently at
-          <code>{{ shortSha(pending.preflight.remoteTip) }}</code>.
+          This will overwrite <code class="font-data">{{ pending.remote }}/{{ resolvedBranch }}</code>, currently at
+          <code class="font-data">{{ shortSha(pending.preflight.remoteTip) }}</code>.
           <template v-if="pending.preflight.behind > 0">
             It is {{ pending.preflight.behind }} commit{{ pending.preflight.behind === 1 ? '' : 's' }}
             ahead of what you last saw.
           </template>
         </DialogDescription>
 
-        <p v-if="protectedBy" class="text-error">
-          <code>{{ resolvedBranch }}</code> matches your protected pattern
-          <code>{{ protectedBy }}</code>. Type the branch name to confirm.
-        </p>
-        <label v-if="protectedBy" :for="branchNameId" class="flex flex-col gap-0.5">
-          Branch name
+        <Alert v-if="protectedBy" variant="warn">
+          <AlertDescription>
+            <code class="font-data">{{ resolvedBranch }}</code> matches your protected pattern
+            <code class="font-data">{{ protectedBy }}</code>. Type the branch name to confirm.
+          </AlertDescription>
+        </Alert>
+        <Field v-if="protectedBy">
+          <FieldLabel :for="branchNameId">Branch name</FieldLabel>
           <Input
             :id="branchNameId"
             v-model="typedBranch"
@@ -128,20 +132,24 @@ function confirmPlain(): void {
             class="w-full"
             data-testid="force-push-confirm-branch"
           />
-        </label>
+        </Field>
 
-        <details class="mt-2 pt-1 border-t border-border">
-          <summary class="cursor-pointer text-muted-foreground">Use plain <code>--force</code> instead</summary>
-          <p class="text-error">
-            This skips the lease check entirely — it will overwrite the remote branch even if someone
-            else has pushed to it since the lease's own tip was read, with no protection against
-            discarding their work.
-          </p>
-          <Label class="flex flex-row items-center gap-1">
-            <Checkbox v-model="understandPlain" data-testid="force-push-plain-ack" />
-            I understand — overwrite the remote branch without checking for other pushes
-          </Label>
-          <div class="flex justify-end mt-1">
+        <details class="pt-2 border-t border-border text-kira-md">
+          <summary class="cursor-pointer text-muted-foreground">Use plain <code class="font-data">--force</code> instead</summary>
+          <Alert variant="warn" class="mt-3">
+            <AlertDescription>
+              This skips the lease check entirely — it will overwrite the remote branch even if someone
+              else has pushed to it since the lease's own tip was read, with no protection against
+              discarding their work.
+            </AlertDescription>
+          </Alert>
+          <Field orientation="horizontal" class="mt-3">
+            <Checkbox :id="plainAckId" v-model="understandPlain" data-testid="force-push-plain-ack" />
+            <FieldLabel :for="plainAckId">
+              I understand — overwrite the remote branch without checking for other pushes
+            </FieldLabel>
+          </Field>
+          <div class="mt-3 flex justify-end">
             <Button
               variant="dialog-danger"
               size="kira-lg"

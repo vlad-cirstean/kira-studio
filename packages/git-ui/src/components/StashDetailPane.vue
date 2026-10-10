@@ -73,7 +73,7 @@ function onOpenFile(index: number, pinned: boolean): void {
             </TooltipTrigger>
             <TooltipContent>{{ formatAbsoluteDate(entry.timestamp) }}</TooltipContent>
           </Tooltip>
-          <span> · based on <code>{{ entry.baseSha.slice(0, 7) }}</code></span>
+          <span> · based on <code class="font-data">{{ entry.baseSha.slice(0, 7) }}</code></span>
           <span v-if="entry.baseSubject"> {{ entry.baseSubject }}</span>
           <span v-if="entry.includedUntracked" class="ml-1 font-data opacity-80">-u</span>
         </p>

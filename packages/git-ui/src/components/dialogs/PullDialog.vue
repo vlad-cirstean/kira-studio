@@ -13,6 +13,7 @@
  */
 import type { PullPreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -54,17 +55,19 @@ function stashAndCarry(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <DialogDescription>
-          Pulling with <code>{{ pending.strategy }}</code> would rewrite history here, and your
+          Pulling with <code class="font-data">{{ pending.strategy }}</code> would rewrite history here, and your
           working tree has uncommitted changes that would be overwritten.
         </DialogDescription>
-        <p class="text-error">
-          Stashing them first keeps them safe: your changes are pushed to a stash, the pull runs,
-          then — if it can be applied back with no conflict — they are popped back automatically. A
-          predicted conflict leaves them stashed instead of forcing a bad pop; nothing is ever
-          discarded.
-        </p>
+        <Alert variant="warn">
+          <AlertDescription>
+            Stashing them first keeps them safe: your changes are pushed to a stash, the pull runs,
+            then — if it can be applied back with no conflict — they are popped back automatically. A
+            predicted conflict leaves them stashed instead of forcing a bad pop; nothing is ever
+            discarded.
+          </AlertDescription>
+        </Alert>
       </div>
 
       <DialogFooter class="justify-end">

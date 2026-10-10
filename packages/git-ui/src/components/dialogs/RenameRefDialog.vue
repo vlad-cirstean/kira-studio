@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
@@ -77,14 +78,14 @@ async function submit(): Promise<void> {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
-        <p class="text-error">Renaming <code>{{ currentName }}</code></p>
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+        <FieldDescription>Renaming <code class="font-data">{{ currentName }}</code></FieldDescription>
 
-        <label :for="nameId" class="flex flex-col gap-0.5">
-          New name
+        <Field>
+          <FieldLabel :for="nameId">New name</FieldLabel>
           <Input :id="nameId" v-model="name" type="text" size="kira" class="w-full" />
-        </label>
-        <p v-if="nameError" class="text-error">{{ nameError }}</p>
+          <FieldError v-if="nameError">{{ nameError }}</FieldError>
+        </Field>
       </div>
 
       <DialogFooter class="justify-end">

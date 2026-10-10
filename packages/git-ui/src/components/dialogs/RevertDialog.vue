@@ -9,6 +9,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -19,13 +20,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { Label } from '@theme/components/ui/label';
+import { Field, FieldLabel } from '@theme/components/ui/field';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import PreflightPrediction from './PreflightPrediction.vue';
 
 const props = defineProps<{ ops: OpsState }>();
+const mainlineId = useId();
 
 const preflight = computed(() => props.ops.pendingRevert.value);
 const active = computed(() => preflight.value !== undefined);
@@ -76,16 +78,18 @@ function confirm(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <DialogDescription>
           Reverting applies the inverse of {{ isMultiSha ? 'each selected commit' : 'this commit' }}
           as a new commit — the original stays in history, so this is safe on branches you've already
           pushed.
         </DialogDescription>
 
-        <p v-if="preflight?.detachedHead" class="text-error">
-          HEAD is detached: the revert commit will not belong to any branch until you create one.
-        </p>
+        <Alert v-if="preflight?.detachedHead" variant="warn">
+          <AlertDescription>
+            HEAD is detached: the revert commit will not belong to any branch until you create one.
+          </AlertDescription>
+        </Alert>
 
         <template v-if="needsMainline">
           <p>
@@ -98,16 +102,22 @@ function confirm(): void {
               :key="entry.sha"
               class="p-1 border border-border rounded-kira-sm"
             >
-              <p class="m-0 mb-0.5 font-semibold"><code>{{ entry.sha.slice(0, 7) }}</code></p>
-              <Label
+              <p class="m-0 mb-0.5 font-semibold"><code class="font-data">{{ entry.sha.slice(0, 7) }}</code></p>
+              <Field
                 v-for="parent in entry.parents"
                 :key="parent.parentNumber"
-                class="flex flex-row items-center gap-1 py-0.5"
+                orientation="horizontal"
+                class="py-0.5"
               >
-                <RadioGroupItem :value="parent.parentNumber" />
-                Parent {{ parent.parentNumber }} — <code>{{ parent.sha.slice(0, 7) }}</code>
-                {{ parent.subject }}
-              </Label>
+                <RadioGroupItem
+                  :id="`${mainlineId}-${entry.sha}-${parent.parentNumber}`"
+                  :value="parent.parentNumber"
+                />
+                <FieldLabel :for="`${mainlineId}-${entry.sha}-${parent.parentNumber}`">
+                  <span>Parent {{ parent.parentNumber }} — <code class="font-data">{{ parent.sha.slice(0, 7) }}</code>
+                  {{ parent.subject }}</span>
+                </FieldLabel>
+              </Field>
             </div>
           </RadioGroup>
         </template>
@@ -119,10 +129,12 @@ function confirm(): void {
             v-model:no-commit="noCommit"
           />
 
-          <p v-if="isMultiSha" class="text-error">
-            This prediction covers only the first of the {{ preflight?.shas.length }} selected
-            commits — the rest may conflict differently.
-          </p>
+          <Alert v-if="isMultiSha" variant="warn">
+            <AlertDescription>
+              This prediction covers only the first of the {{ preflight?.shas.length }} selected
+              commits — the rest may conflict differently.
+            </AlertDescription>
+          </Alert>
         </template>
       </div>
 

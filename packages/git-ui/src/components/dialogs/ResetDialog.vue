@@ -17,6 +17,7 @@
  */
 import type { ResetMode } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -28,8 +29,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
@@ -42,6 +43,8 @@ const active = computed(() => preflight.value !== undefined);
 const typedToken = ref('');
 const stashFirst = ref(false);
 const tokenId = useId();
+const modeId = useId();
+const stashFirstId = useId();
 
 // A genuinely new target resets the typed confirmation and the stash-first choice; a mode-radio
 // change (`previewResetMode`'s own re-classify, same target) must not, or picking a mode would
@@ -92,9 +95,9 @@ function confirm(): void {
     >
       <DialogHeader>
         <DialogTitle>
-          <template v-if="preflight?.branch">Move <code>{{ preflight.branch }}</code> to</template>
+          <template v-if="preflight?.branch">Move <code class="font-data">{{ preflight.branch }}</code> to</template>
           <template v-else>Move HEAD to</template>
-          <code>{{ shortTarget }}</code>
+          <code class="font-data">{{ shortTarget }}</code>
           <template v-if="preflight?.targetSubject">— {{ preflight.targetSubject }}</template>
         </DialogTitle>
         <DialogClose as-child>
@@ -103,10 +106,10 @@ function confirm(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
-        <p v-if="preflight && !preflight.branch" class="text-error">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+        <FieldDescription v-if="preflight && !preflight.branch">
           You are not on a branch, so no branch is changed — this moves HEAD only.
-        </p>
+        </FieldDescription>
 
         <DialogDescription v-if="preflight?.leaving === 0 && preflight.gaining === 0">
           HEAD is already here — this resets your working state only.
@@ -114,12 +117,12 @@ function confirm(): void {
         <template v-else-if="preflight?.gaining === 0">
           <DialogDescription>
             {{ preflight.leaving }} commit{{ preflight.leaving === 1 ? '' : 's' }} will leave
-            <template v-if="preflight.branch"><code>{{ preflight.branch }}</code></template>
+            <template v-if="preflight.branch"><code class="font-data">{{ preflight.branch }}</code></template>
             <template v-else>HEAD</template>:
           </DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="c in preflight.leavingCommits" :key="c.sha">
-              <code>{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
+              <code class="font-data">{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
             </li>
           </ul>
           <p v-if="preflight.leavingTruncated" class="text-muted-foreground italic">and more…</p>
@@ -131,61 +134,71 @@ function confirm(): void {
           leave, {{ preflight.gaining }} arrive.
         </DialogDescription>
 
-        <fieldset class="p-1 border border-border rounded-kira-sm">
-          <legend class="px-0.5 text-muted-foreground">Mode</legend>
+        <FieldSet>
+          <FieldLegend>Mode</FieldLegend>
           <RadioGroup :model-value="mode" @update:model-value="(v) => selectMode(v as ResetMode)">
-            <Label class="flex flex-row items-start gap-1 py-1">
-              <RadioGroupItem value="soft" class="mt-0.5" />
-              <span>
-                <strong>Soft</strong> — Branch pointer moves. Index and working tree untouched; the
-                difference appears as staged changes. Nothing is lost.
-              </span>
-            </Label>
-            <Label class="flex flex-row items-start gap-1 py-1">
-              <RadioGroupItem value="mixed" class="mt-0.5" />
-              <span>
-                <strong>Mixed</strong> — Branch pointer moves, index reset. Changes appear unstaged.
-                Working tree files untouched. Nothing is lost.
-              </span>
-            </Label>
-            <Label class="flex flex-row items-start gap-1 py-1">
-              <RadioGroupItem value="hard" class="mt-0.5" />
-              <span>
-                <strong>Hard</strong> — Branch pointer, index, <strong>and working tree</strong> reset.
-                <strong>Uncommitted changes are destroyed and are not recoverable.</strong> Commits left
-                behind remain in the reflog for about 90 days.
-              </span>
-            </Label>
+            <Field orientation="horizontal" class="items-start py-1">
+              <RadioGroupItem :id="`${modeId}-soft`" value="soft" class="mt-0.5" />
+              <FieldLabel :for="`${modeId}-soft`">
+                <span>
+                  <strong>Soft</strong> — Branch pointer moves. Index and working tree untouched; the
+                  difference appears as staged changes. Nothing is lost.
+                </span>
+              </FieldLabel>
+            </Field>
+            <Field orientation="horizontal" class="items-start py-1">
+              <RadioGroupItem :id="`${modeId}-mixed`" value="mixed" class="mt-0.5" />
+              <FieldLabel :for="`${modeId}-mixed`">
+                <span>
+                  <strong>Mixed</strong> — Branch pointer moves, index reset. Changes appear unstaged.
+                  Working tree files untouched. Nothing is lost.
+                </span>
+              </FieldLabel>
+            </Field>
+            <Field orientation="horizontal" class="items-start py-1">
+              <RadioGroupItem :id="`${modeId}-hard`" value="hard" class="mt-0.5" />
+              <FieldLabel :for="`${modeId}-hard`">
+                <span>
+                  <strong>Hard</strong> — Branch pointer, index, <strong>and working tree</strong> reset.
+                  <strong>Uncommitted changes are destroyed and are not recoverable.</strong> Commits left
+                  behind remain in the reflog for about 90 days.
+                </span>
+              </FieldLabel>
+            </Field>
           </RadioGroup>
-        </fieldset>
+        </FieldSet>
 
         <template v-if="mode === 'hard' && destroys.length > 0">
-          <p class="text-error">This will permanently discard these uncommitted changes:</p>
-          <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-            <li v-for="path in destroys" :key="path"><code>{{ path }}</code></li>
-          </ul>
-          <p class="text-muted-foreground italic">
+          <Alert variant="warn">
+            <AlertDescription>
+              <p>This will permanently discard these uncommitted changes:</p>
+              <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
+                <li v-for="path in destroys" :key="path"><code class="font-data">{{ path }}</code></li>
+              </ul>
+            </AlertDescription>
+          </Alert>
+          <FieldDescription class="italic">
             Untracked and ignored files are <strong>not</strong> affected.
-          </p>
+          </FieldDescription>
 
-          <Label v-if="canStashFirst" class="flex flex-row items-center gap-1">
-            <Checkbox v-model="stashFirst" />
-            Stash these changes first instead of discarding them
-          </Label>
+          <Field v-if="canStashFirst" orientation="horizontal">
+            <Checkbox :id="stashFirstId" v-model="stashFirst" />
+            <FieldLabel :for="stashFirstId">Stash these changes first instead of discarding them</FieldLabel>
+          </Field>
 
-          <template v-if="!stashFirst">
-            <label :for="tokenId" class="flex flex-col gap-0.5">
-              Type <code>{{ shortTarget }}</code> to confirm
-              <Input
-                :id="tokenId"
-                v-model="typedToken"
-                type="text"
-                size="kira"
-                class="w-full"
-                data-testid="reset-confirm-token"
-              />
-            </label>
-          </template>
+          <Field v-if="!stashFirst">
+            <FieldLabel :for="tokenId">
+              <span>Type <code class="font-data">{{ shortTarget }}</code> to confirm</span>
+            </FieldLabel>
+            <Input
+              :id="tokenId"
+              v-model="typedToken"
+              type="text"
+              size="kira"
+              class="w-full"
+              data-testid="reset-confirm-token"
+            />
+          </Field>
         </template>
       </div>
 

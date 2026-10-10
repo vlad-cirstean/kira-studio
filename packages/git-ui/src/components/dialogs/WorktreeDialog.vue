@@ -16,6 +16,7 @@
 import { validateRefName } from '@kira/git-core';
 import type { WorktreeAddPreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -25,8 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
@@ -63,6 +64,7 @@ const branch = ref('');
 const startPoint = ref('');
 const preflight = ref<WorktreeAddPreflight | undefined>(undefined);
 const pathId = useId();
+const modeId = useId();
 const branchId = useId();
 const startPointId = useId();
 let previewToken = 0;
@@ -190,10 +192,10 @@ function onClose(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <template v-if="active">
-          <label :for="pathId" class="flex flex-col gap-0.5">
-            Path
+          <Field>
+            <FieldLabel :for="pathId">Path</FieldLabel>
             <Input
               :id="pathId"
               v-model="path"
@@ -202,27 +204,27 @@ function onClose(): void {
               class="w-full"
               placeholder="../my-repo-feature-x"
             />
-          </label>
-          <fieldset class="flex flex-col gap-0.5">
-            <legend>Start from</legend>
+          </Field>
+          <FieldSet>
+            <FieldLegend>Start from</FieldLegend>
             <RadioGroup v-model="mode">
-              <Label class="flex flex-row items-center gap-1">
-                <RadioGroupItem value="existingBranch" />
-                An existing branch
-              </Label>
-              <Label class="flex flex-row items-center gap-1">
-                <RadioGroupItem value="newBranch" />
-                A new branch
-              </Label>
-              <Label class="flex flex-row items-center gap-1">
-                <RadioGroupItem value="detach" />
-                Detached (no branch)
-              </Label>
+              <Field orientation="horizontal">
+                <RadioGroupItem :id="`${modeId}-existingBranch`" value="existingBranch" />
+                <FieldLabel :for="`${modeId}-existingBranch`">An existing branch</FieldLabel>
+              </Field>
+              <Field orientation="horizontal">
+                <RadioGroupItem :id="`${modeId}-newBranch`" value="newBranch" />
+                <FieldLabel :for="`${modeId}-newBranch`">A new branch</FieldLabel>
+              </Field>
+              <Field orientation="horizontal">
+                <RadioGroupItem :id="`${modeId}-detach`" value="detach" />
+                <FieldLabel :for="`${modeId}-detach`">Detached (no branch)</FieldLabel>
+              </Field>
             </RadioGroup>
-          </fieldset>
+          </FieldSet>
 
-          <label v-if="mode === 'existingBranch'" :for="branchId" class="flex flex-col gap-0.5">
-            Branch
+          <Field v-if="mode === 'existingBranch'">
+            <FieldLabel :for="branchId">Branch</FieldLabel>
             <Input
               :id="branchId"
               v-model="branch"
@@ -235,20 +237,20 @@ function onClose(): void {
             <datalist id="kv-worktree-branches">
               <option v-for="row in refs.branches.value" :key="row.refname" :value="row.shortName" />
             </datalist>
-          </label>
+          </Field>
           <template v-else-if="mode === 'newBranch'">
-            <label :for="branchId" class="flex flex-col gap-0.5">
-              New branch name
+            <Field>
+              <FieldLabel :for="branchId">New branch name</FieldLabel>
               <Input :id="branchId" v-model="branch" type="text" size="kira" class="w-full" placeholder="feature/x" />
-            </label>
-            <p v-if="newBranchNameError" class="text-error">{{ newBranchNameError }}</p>
-            <label :for="startPointId" class="flex flex-col gap-0.5">
-              Start point
+              <FieldError v-if="newBranchNameError">{{ newBranchNameError }}</FieldError>
+            </Field>
+            <Field>
+              <FieldLabel :for="startPointId">Start point</FieldLabel>
               <Input :id="startPointId" v-model="startPoint" type="text" size="kira" class="w-full" placeholder="main" />
-            </label>
+            </Field>
           </template>
-          <label v-else :for="startPointId" class="flex flex-col gap-0.5">
-            Commit-ish
+          <Field v-else>
+            <FieldLabel :for="startPointId">Commit-ish</FieldLabel>
             <Input
               :id="startPointId"
               v-model="startPoint"
@@ -257,32 +259,32 @@ function onClose(): void {
               class="w-full"
               placeholder="a branch, tag or sha"
             />
-          </label>
+          </Field>
 
           <template v-if="preflight">
-            <p v-for="blocker in preflight.blockers" :key="blocker.kind" class="text-error">
+            <Alert v-for="blocker in preflight.blockers" :key="blocker.kind" variant="destructive"><AlertDescription>
               <template v-if="blocker.kind === 'invalidPath'">The path is invalid.</template>
               <template v-else-if="blocker.kind === 'pathExists'">
-                <code>{{ blocker.path }}</code> already exists.
+                <code class="font-data">{{ blocker.path }}</code> already exists.
               </template>
               <template v-else-if="blocker.kind === 'branchCheckedOutElsewhere'">
-                <code>{{ blocker.branch }}</code> is already checked out at
-                <code>{{ blocker.worktreePath }}</code>.
+                <code class="font-data">{{ blocker.branch }}</code> is already checked out at
+                <code class="font-data">{{ blocker.worktreePath }}</code>.
               </template>
               <template v-else-if="blocker.kind === 'branchExists'">
-                A branch named <code>{{ blocker.branch }}</code> already exists.
+                A branch named <code class="font-data">{{ blocker.branch }}</code> already exists.
               </template>
               <template v-else-if="blocker.kind === 'unknownStartPoint'">
-                <code>{{ blocker.startPoint }}</code> does not resolve to a commit.
+                <code class="font-data">{{ blocker.startPoint }}</code> does not resolve to a commit.
               </template>
-            </p>
-            <p v-if="canOfferDetachHere" class="text-error">
-              The new worktree will start with a detached HEAD.
-            </p>
+            </AlertDescription></Alert>
+            <Alert v-if="canOfferDetachHere" variant="warn">
+              <AlertDescription>The new worktree will start with a detached HEAD.</AlertDescription>
+            </Alert>
             <Button v-if="canOfferDetachHere" variant="dialog-primary" size="kira-lg" @click="submitCreateDetached">
               Create it detached at that branch's commit
             </Button>
-            <p v-for="note in preflight.notes" :key="note.kind" class="text-error">
+            <Alert v-for="note in preflight.notes" :key="note.kind" variant="warn"><AlertDescription>
               <template v-if="note.kind === 'pathInsideRepo'">
                 This path is inside the current repository.
               </template>
@@ -292,7 +294,7 @@ function onClose(): void {
               <template v-else-if="note.kind === 'detachedHead'">
                 The new worktree will start with a detached HEAD.
               </template>
-            </p>
+            </AlertDescription></Alert>
           </template>
         </template>
 

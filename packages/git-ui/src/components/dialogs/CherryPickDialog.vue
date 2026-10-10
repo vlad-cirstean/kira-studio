@@ -10,6 +10,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -20,13 +21,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
-import { Label } from '@theme/components/ui/label';
+import { Field, FieldLabel } from '@theme/components/ui/field';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import PreflightPrediction from './PreflightPrediction.vue';
 
 const props = defineProps<{ ops: OpsState }>();
+const mainlineId = useId();
 
 const preflight = computed(() => props.ops.pendingCherryPick.value);
 const active = computed(() => preflight.value !== undefined);
@@ -96,43 +98,47 @@ function confirm(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <DialogDescription>
           Applies this commit's changes here as a new commit — the original stays where it is.
         </DialogDescription>
 
-        <p v-if="preflight?.detachedHead" class="text-error">
-          HEAD is detached: the new commit will not belong to any branch until you create one.
-        </p>
+        <Alert v-if="preflight?.detachedHead" variant="warn">
+          <AlertDescription>
+            HEAD is detached: the new commit will not belong to any branch until you create one.
+          </AlertDescription>
+        </Alert>
 
-        <p v-if="preflight?.alreadyApplied" class="text-error">
-          This change already appears in this branch's history; the pick will probably be empty.
-        </p>
+        <Alert v-if="preflight?.alreadyApplied" variant="warn">
+          <AlertDescription>
+            This change already appears in this branch's history; the pick will probably be empty.
+          </AlertDescription>
+        </Alert>
 
         <template v-if="hasBlocker">
-          <div v-for="(blocker, i) in blockers" :key="i" >
+          <Alert v-for="(blocker, i) in blockers" :key="i" variant="warn"><AlertDescription>
             <template v-if="blocker.kind === 'inProgressOperation'">
               <p>An operation is already in progress. Resolve or abort it first.</p>
             </template>
             <template v-else-if="blocker.kind === 'stagedChanges'">
               <p>Staged changes would be overwritten by this pick — commit or unstage them first:</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
             </template>
             <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
               <p>These local changes would be overwritten by this pick:</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
             </template>
             <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
               <p>These untracked files would be overwritten by this pick:</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
             </template>
-          </div>
+          </AlertDescription></Alert>
         </template>
 
         <template v-if="!hasBlocker && needsMainline">
@@ -141,17 +147,18 @@ function confirm(): void {
             (probe 8: git cannot guess this for you):
           </p>
           <RadioGroup v-model="selectedMainline">
-            <div
+            <Field
               v-for="entry in preflight?.mainlineRequired"
               :key="entry.parentNumber"
+              orientation="horizontal"
               class="py-0.5"
             >
-              <Label class="flex flex-row items-center gap-1">
-                <RadioGroupItem :value="entry.parentNumber" />
-                Parent {{ entry.parentNumber }} — <code>{{ entry.sha.slice(0, 7) }}</code>
-                {{ entry.subject }}
-              </Label>
-            </div>
+              <RadioGroupItem :id="`${mainlineId}-${entry.parentNumber}`" :value="entry.parentNumber" />
+              <FieldLabel :for="`${mainlineId}-${entry.parentNumber}`">
+                <span>Parent {{ entry.parentNumber }} — <code class="font-data">{{ entry.sha.slice(0, 7) }}</code>
+                {{ entry.subject }}</span>
+              </FieldLabel>
+            </Field>
           </RadioGroup>
         </template>
 

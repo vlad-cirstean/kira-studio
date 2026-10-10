@@ -24,6 +24,7 @@
 import { validateRefName } from '@kira/git-core';
 import type { StashBranchPreflight, StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -34,8 +35,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
@@ -89,6 +97,8 @@ const message = ref('');
 const includeUntracked = ref(props.includeUntrackedDefault);
 const keepIndex = ref(false);
 const messageId = useId();
+const untrackedId = useId();
+const keepIndexId = useId();
 /** OQ9: wired from the caller's current changed-files selection when non-empty (`App.vue` passes
  *  it through `createOpen`'s own open call — see that wiring's own comment); empty means "whole
  *  worktree", never a half-wired guess. Shown here as a read-only summary, not an editable field —
@@ -202,6 +212,7 @@ type SaveSource = 'workingTree' | 'entry';
 const saveLabel = ref('');
 const saveSource = ref<SaveSource>('workingTree');
 const saveLabelId = useId();
+const saveSourceId = useId();
 
 watch(
   () => [props.saveOpen, props.saveSourceEntry] as const,
@@ -286,10 +297,10 @@ function onClose(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <template v-if="mode === 'create'">
-          <label :for="messageId" class="flex flex-col gap-0.5">
-            Message (optional)
+          <Field>
+            <FieldLabel :for="messageId">Message (optional)</FieldLabel>
             <Input
               :id="messageId"
               v-model="message"
@@ -298,99 +309,101 @@ function onClose(): void {
               class="w-full"
               placeholder="git's own WIP message"
             />
-          </label>
-          <Label class="flex flex-row items-center gap-1">
-            <Checkbox v-model="includeUntracked" />
-            Include untracked files (<code>-u</code>)
-          </Label>
-          <Label class="flex flex-row items-center gap-1">
-            <Checkbox v-model="keepIndex" />
-            Keep staged changes staged (<code>--keep-index</code>)
-          </Label>
-          <p v-if="pathspec.length > 0" class="text-error">
-            Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
-            stashed, not the whole working tree.
-          </p>
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox :id="untrackedId" v-model="includeUntracked" />
+            <FieldLabel :for="untrackedId">
+              <span>Include untracked files (<code class="font-data">-u</code>)</span>
+            </FieldLabel>
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox :id="keepIndexId" v-model="keepIndex" />
+            <FieldLabel :for="keepIndexId">
+              <span>Keep staged changes staged (<code class="font-data">--keep-index</code>)</span>
+            </FieldLabel>
+          </Field>
+          <Alert v-if="pathspec.length > 0" variant="warn">
+            <AlertDescription>
+              Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
+              stashed, not the whole working tree.
+            </AlertDescription>
+          </Alert>
         </template>
 
         <template v-else-if="mode === 'branch'">
-          <p class="text-error">
-            From <code>{{
+          <FieldDescription>
+            From <code class="font-data">{{
               // A template literal here would put two closing braces back to back, which this Vue
               // parser reads as the mustache's own closing delimiter mid-expression.
               // biome-ignore lint/style/useTemplate: see above
               'stash@{' + (branchTarget?.index ?? '') + '}'
             }}</code>:
             {{ branchTarget?.message }}
-          </p>
-          <label :for="branchNameId" class="flex flex-col gap-0.5">
-            Branch name
+          </FieldDescription>
+          <Field>
+            <FieldLabel :for="branchNameId">Branch name</FieldLabel>
             <Input :id="branchNameId" v-model="branchName" type="text" size="kira" class="w-full" />
-          </label>
-          <p v-if="branchNameLocalError" class="text-error">{{ branchNameLocalError }}</p>
-          <p v-else-if="branchPreflight?.name.error" class="text-error">
-            {{ branchPreflight.name.error }}
-          </p>
-          <div v-if="branchPreflight?.verdict === 'blocked'">
-            <p>
+            <FieldError v-if="branchNameLocalError">{{ branchNameLocalError }}</FieldError>
+            <FieldError v-else-if="branchPreflight?.name.error">{{ branchPreflight.name.error }}</FieldError>
+          </Field>
+          <Alert v-if="branchPreflight?.verdict === 'blocked'" variant="warn">
+            <AlertDescription>
               The branch will be created, but switching to it will not be clean — your working tree
               has changes that would be overwritten. You will stay on your current branch until you
               resolve that yourself.
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
         </template>
 
         <template v-else-if="mode === 'save'">
-          <label :for="saveLabelId" class="flex flex-col gap-0.5">
-            Label
+          <Field>
+            <FieldLabel :for="saveLabelId">Label</FieldLabel>
             <Input :id="saveLabelId" v-model="saveLabel" type="text" size="kira" class="w-full" />
-          </label>
-          <fieldset class="flex flex-col gap-0.5">
-            <legend>Source</legend>
+          </Field>
+          <FieldSet>
+            <FieldLegend>Source</FieldLegend>
             <RadioGroup v-model="saveSource">
-              <Label class="flex flex-row items-center gap-1">
-                <RadioGroupItem value="workingTree" />
-                This working tree
-              </Label>
-              <p v-if="saveSource === 'workingTree' && saveHasUntracked" class="text-error">
-                Untracked files will not be included — <code>git stash create</code> cannot save them.
-                Promote an existing stash entry that already includes them instead if you need to keep
-                those too.
-              </p>
-              <Label v-if="saveSourceEntry" class="flex flex-row items-center gap-1">
-                <RadioGroupItem value="entry" />
-                This stash entry: {{ stashLabel(saveSourceEntry) }}
-              </Label>
+              <Field orientation="horizontal">
+                <RadioGroupItem :id="`${saveSourceId}-workingTree`" value="workingTree" />
+                <FieldLabel :for="`${saveSourceId}-workingTree`">This working tree</FieldLabel>
+              </Field>
+              <Alert v-if="saveSource === 'workingTree' && saveHasUntracked" variant="warn">
+                <AlertDescription>
+                  Untracked files will not be included — <code class="font-data">git stash create</code> cannot save them.
+                  Promote an existing stash entry that already includes them instead if you need to keep
+                  those too.
+                </AlertDescription>
+              </Alert>
+              <Field v-if="saveSourceEntry" orientation="horizontal">
+                <RadioGroupItem :id="`${saveSourceId}-entry`" value="entry" />
+                <FieldLabel :for="`${saveSourceId}-entry`">
+                  This stash entry: {{ stashLabel(saveSourceEntry) }}
+                </FieldLabel>
+              </Field>
             </RadioGroup>
-          </fieldset>
-          <p class="text-error">The source is copied — it is never removed or dropped.</p>
+          </FieldSet>
+          <FieldDescription>The source is copied — it is never removed or dropped.</FieldDescription>
         </template>
 
         <template v-else-if="mode === 'popConfirm' && pending">
           <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
-            <div
-              v-if="blocker.kind === 'untrackedCollision'"
-             
-            >
+            <Alert v-if="blocker.kind === 'untrackedCollision'" variant="warn"><AlertDescription>
               <p>These untracked files already exist in your working tree and would be overwritten:</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
               <p>Remedy: move or remove them yourself, or discard them and try again.</p>
-            </div>
-            <div
-              v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'"
-             
-            >
+            </AlertDescription></Alert>
+            <Alert v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'" variant="warn"><AlertDescription>
               <p>Your uncommitted changes to these files would be overwritten:</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+                <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
               <p>Remedy: commit or discard those changes first.</p>
-            </div>
-            <div v-else>
-              <p>An operation is already in progress — finish or abort it first.</p>
-            </div>
+            </AlertDescription></Alert>
+            <Alert v-else variant="warn">
+              <AlertDescription>An operation is already in progress — finish or abort it first.</AlertDescription>
+            </Alert>
           </template>
 
           <template v-if="pending.preflight.blockers.length === 0">
@@ -400,14 +413,11 @@ function onClose(): void {
             >
               No conflicts predicted.
             </div>
-            <div
-              v-else-if="pending.preflight.prediction.kind === 'conflicts'"
-             
-            >
+            <Alert v-else-if="pending.preflight.prediction.kind === 'conflicts'" variant="warn"><AlertDescription>
               <p>This will likely conflict in:</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in pending.preflight.prediction.paths" :key="path">
-                  <code>{{ path }}</code>
+                  <code class="font-data">{{ path }}</code>
                 </li>
               </ul>
               <p>
@@ -416,10 +426,10 @@ function onClose(): void {
                 }}
                 — nothing is lost.
               </p>
-            </div>
-            <div v-else>
+            </AlertDescription></Alert>
+            <FieldDescription v-else>
               Couldn't predict the outcome: {{ pending.preflight.prediction.reason }}
-            </div>
+            </FieldDescription>
           </template>
         </template>
       </div>

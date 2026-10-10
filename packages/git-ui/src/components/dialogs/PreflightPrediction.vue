@@ -8,9 +8,10 @@
  *
  * P131 Part 1 §6.2: the raw checkbox is shadcn's Checkbox + Label now.
  */
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Label } from '@theme/components/ui/label';
-import { computed } from 'vue';
+import { Field, FieldDescription, FieldLabel } from '@theme/components/ui/field';
+import { computed, useId } from 'vue';
 
 const props = defineProps<{
   prediction:
@@ -21,6 +22,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ 'update:noCommit': [value: boolean] }>();
 
+const noCommitId = useId();
 const noCommitModel = computed({
   get: () => props.noCommit,
   set: (value: boolean) => emit('update:noCommit', value),
@@ -31,17 +33,23 @@ const noCommitModel = computed({
   <div v-if="prediction.kind === 'clean'" class="text-ok">
     No conflicts predicted.
   </div>
-  <div v-else-if="prediction.kind === 'conflicts'">
-    <p>This will likely conflict in:</p>
-    <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-      <li v-for="path in prediction.paths" :key="path"><code>{{ path }}</code></li>
-    </ul>
-    <Label class="flex flex-row items-center gap-1 mt-1">
-      <Checkbox v-model="noCommitModel" />
-      Stop before committing (<code>--no-commit</code>), so I can resolve first
-    </Label>
+  <div v-else-if="prediction.kind === 'conflicts'" class="flex flex-col gap-3">
+    <Alert variant="warn">
+      <AlertDescription>
+        <p>This will likely conflict in:</p>
+        <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
+          <li v-for="path in prediction.paths" :key="path"><code class="font-data">{{ path }}</code></li>
+        </ul>
+      </AlertDescription>
+    </Alert>
+    <Field orientation="horizontal">
+      <Checkbox :id="noCommitId" v-model="noCommitModel" />
+      <FieldLabel :for="noCommitId">
+        <span>Stop before committing (<code class="font-data">--no-commit</code>), so I can resolve first</span>
+      </FieldLabel>
+    </Field>
   </div>
-  <div v-else-if="prediction.kind === 'unknown'">
+  <FieldDescription v-else-if="prediction.kind === 'unknown'">
     Couldn't predict the outcome: {{ prediction.reason }}
-  </div>
+  </FieldDescription>
 </template>

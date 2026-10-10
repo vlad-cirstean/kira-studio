@@ -27,6 +27,7 @@
  */
 import type { CheckoutPreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -91,15 +92,15 @@ function stashAndCarry(): void {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
         <template v-if="headline?.kind === 'inProgressOperation'">
           <DialogDescription>An operation is already in progress. Resolve or abort it first.</DialogDescription>
         </template>
 
         <template v-else-if="headline?.kind === 'worktreeConflict'">
           <DialogDescription>
-            <code>{{ headline.branch }}</code> is already checked out in another worktree
-            (<code>{{ headline.worktreePath }}</code>). Git will not check out the same branch in two
+            <code class="font-data">{{ headline.branch }}</code> is already checked out in another worktree
+            (<code class="font-data">{{ headline.worktreePath }}</code>). Git will not check out the same branch in two
             places at once.
           </DialogDescription>
         </template>
@@ -107,7 +108,7 @@ function stashAndCarry(): void {
         <template v-else-if="headline?.kind === 'blockedByUntracked'">
           <DialogDescription>These untracked files would be overwritten by the checkout:</DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-            <li v-for="path in headline.paths" :key="path"><code>{{ path }}</code></li>
+            <li v-for="path in headline.paths" :key="path"><code class="font-data">{{ path }}</code></li>
           </ul>
           <p>Move or remove them yourself, then try again — there is no safe way to discard them here.</p>
         </template>
@@ -115,12 +116,14 @@ function stashAndCarry(): void {
         <template v-else-if="trackedBlocker">
           <DialogDescription>These local changes would be overwritten by the checkout:</DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
-            <li v-for="path in trackedBlocker.paths" :key="path"><code>{{ path }}</code></li>
+            <li v-for="path in trackedBlocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
           </ul>
-          <p v-if="canDiscard" class="text-error">
-            Discard permanently deletes these changes — this cannot be undone.
-            <template v-if="canStashAndCarry">Stashing them instead keeps them, safely.</template>
-          </p>
+          <Alert v-if="canDiscard" variant="warn">
+            <AlertDescription>
+              Discard permanently deletes these changes — this cannot be undone.
+              <template v-if="canStashAndCarry">Stashing them instead keeps them, safely.</template>
+            </AlertDescription>
+          </Alert>
         </template>
       </div>
 

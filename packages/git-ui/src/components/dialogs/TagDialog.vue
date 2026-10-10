@@ -11,6 +11,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  */
 
 import type { RefRow } from '@kira/git-ipc';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -21,8 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
@@ -42,6 +43,8 @@ const annotated = ref(false);
 const message = ref('');
 const force = ref(false);
 const nameId = useId();
+const forceId = useId();
+const annotatedId = useId();
 const messageId = useId();
 
 watch(
@@ -90,40 +93,42 @@ async function submit(): Promise<void> {
           </Button>
         </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
-        <p class="text-error">Tagging <code>{{ target.slice(0, 7) }}</code></p>
+      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+        <FieldDescription>Tagging <code class="font-data">{{ target.slice(0, 7) }}</code></FieldDescription>
 
-        <label :for="nameId" class="flex flex-col gap-0.5">
-          Name
+        <Field>
+          <FieldLabel :for="nameId">Name</FieldLabel>
           <Input :id="nameId" v-model="name" type="text" size="kira" class="w-full" />
-        </label>
-        <p v-if="state.nameError" class="text-error">{{ state.nameError }}</p>
+          <FieldError v-if="state.nameError">{{ state.nameError }}</FieldError>
+        </Field>
 
         <template v-if="state.verdict === 'blockedByExisting'">
-          <p class="text-error">
-            A tag named "{{ name }}" already exists{{ state.existingIsAnnotated ? ' (annotated)' : '' }}.
-          </p>
-          <Label class="flex flex-row items-center gap-1">
-            <Checkbox v-model="force" />
-            Replace it
-          </Label>
+          <Alert variant="warn">
+            <AlertDescription>
+              A tag named "{{ name }}" already exists{{ state.existingIsAnnotated ? ' (annotated)' : '' }}.
+            </AlertDescription>
+          </Alert>
+          <Field orientation="horizontal">
+            <Checkbox :id="forceId" v-model="force" />
+            <FieldLabel :for="forceId">Replace it</FieldLabel>
+          </Field>
         </template>
 
-        <template v-if="state.verdict === 'movesWithForce' && state.requiresAnnotationToPreserve">
-          <p class="text-error">
+        <Alert v-if="state.verdict === 'movesWithForce' && state.requiresAnnotationToPreserve" variant="warn">
+          <AlertDescription>
             The existing tag is annotated — moving it without a message here would silently downgrade
             it to lightweight. Supply a message below to keep it annotated.
-          </p>
-        </template>
+          </AlertDescription>
+        </Alert>
 
-        <Label class="flex flex-row items-center gap-1">
-          <Checkbox v-model="annotated" />
-          Annotated
-        </Label>
-        <label v-if="annotated" :for="messageId" class="flex flex-col gap-0.5">
-          Message
+        <Field orientation="horizontal">
+          <Checkbox :id="annotatedId" v-model="annotated" />
+          <FieldLabel :for="annotatedId">Annotated</FieldLabel>
+        </Field>
+        <Field v-if="annotated">
+          <FieldLabel :for="messageId">Message</FieldLabel>
           <Textarea :id="messageId" v-model="message" rows="3" class="w-full" />
-        </label>
+        </Field>
       </div>
 
       <DialogFooter class="justify-end">
