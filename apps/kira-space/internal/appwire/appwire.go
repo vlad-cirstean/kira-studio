@@ -206,7 +206,10 @@ func Build(opts Options) *Wired {
 	w.TermBroker = termBroker
 	runs := &scriptruns.Service{
 		Runs: repositories.ScriptRuns, Scripts: repositories.CustomScripts, Registry: terminalRegistry, Home: deps.Home, App: "Space",
-		Emit:         func(r scriptruns.Run) { emitter.Emit(bridge.ChannelScriptRunsChanged, r) },
+		Emit: func(r scriptruns.Run) {
+			emitter.Emit(bridge.ChannelScriptRunsChanged, r)
+			w.AgentNotify.HandleScriptRun(r)
+		},
 		EmitLog:      func(p scriptruns.LogPush) { emitter.Emit(bridge.ChannelScriptRunLog, p) },
 		SmartTimeout: opts.SmartTimeout,
 	}

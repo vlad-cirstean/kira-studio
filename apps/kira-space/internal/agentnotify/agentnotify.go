@@ -11,6 +11,8 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/runoutcome"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 )
 
 // Kind is what a notification is about.
@@ -20,6 +22,7 @@ const (
 	KindFinished   Kind = "finished"
 	KindNeedsInput Kind = "needs-input"
 	KindRunEnded   Kind = "run-ended"
+	KindAutomation Kind = "automation"
 	KindTest       Kind = "test"
 )
 
@@ -29,6 +32,8 @@ type Note struct {
 	ID, Title, Body                         string
 	Kind                                    Kind
 	TerminalID, WindowKey, RecordID, TaskID string
+	// ScriptRunID is set for an automation note; a click opens that run.
+	ScriptRunID string
 }
 
 // Sink posts a Note to the OS.
@@ -50,6 +55,8 @@ type FocusState struct {
 	Module           string
 	ActiveTerminalID string
 	AdeTaskID        string
+	// ActiveScriptRunID is the smart script run the window shows, else empty.
+	ActiveScriptRunID string
 }
 
 // Deps are the seams the Notifier reads.
@@ -75,6 +82,7 @@ const (
 	bodyFinished   = "Open Kira Space to read the reply"
 	bodyInput      = "Open Kira Space to answer"
 	bodyRun        = "Open Kira Space to see the result"
+	bodyAutomation = "Open Kira Space to see the run"
 	bodyTest       = "Notifications are working."
 )
 
@@ -91,6 +99,7 @@ type Notifier struct {
 	focus map[string]FocusState
 	wake  map[string]bool
 	runs  map[string]adewire.RunState
+	smart map[string]bool
 	last  map[string]time.Time
 }
 
@@ -100,7 +109,7 @@ func New(d Deps) *Notifier {
 	}
 	return &Notifier{
 		d: d, focus: map[string]FocusState{}, wake: map[string]bool{},
-		runs: map[string]adewire.RunState{}, last: map[string]time.Time{},
+		runs: map[string]adewire.RunState{}, smart: map[string]bool{}, last: map[string]time.Time{},
 	}
 }
 
@@ -241,6 +250,77 @@ func (n *Notifier) HandleRuns(runs []adewire.Run) {
 	}
 }
 
+// HandleScriptRun reacts to a changed script run. Only smart runs notify, from any trigger:
+// failed under Enabled, blocked under OnNeedsInput, done under OnRunEnded, cancelled never.
+func (n *Notifier) HandleScriptRun(r scriptruns.Run) {
+	if r.Kind != scriptruns.KindSmart {
+		return
+	}
+	n.mu.Lock()
+	if len(n.smart) > maxTrackedRuns {
+		n.smart = map[string]bool{}
+	}
+	if r.State == scriptruns.StateRunning {
+		n.smart[r.ID] = true
+		n.mu.Unlock()
+		return
+	}
+	tracked := n.smart[r.ID]
+	delete(n.smart, r.ID)
+	n.mu.Unlock()
+	if !tracked {
+		return
+	}
+	p := n.d.Prefs()
+	var verb, detail string
+	switch runoutcome.Status(r.State) {
+	case runoutcome.StatusFailed:
+		verb = "failed"
+	case runoutcome.StatusBlocked:
+		if !p.OnNeedsInput {
+			return
+		}
+		verb = "needs you"
+	case runoutcome.StatusDone:
+		if !p.OnRunEnded {
+			return
+		}
+		verb = "done"
+	default:
+		return
+	}
+	if !p.Enabled {
+		return
+	}
+	if o := r.Outcome; o != nil {
+		detail = o.Reason
+		if detail == "" {
+			detail = o.Summary
+		}
+	}
+	note := Note{
+		ID: string(KindAutomation) + ":" + r.ID, Kind: KindAutomation, TaskID: r.TaskID, ScriptRunID: r.ID,
+		Title: "Automation " + verb + " · " + r.ScriptName, Body: body(p, detail, bodyAutomation),
+	}
+	n.mu.Lock()
+	if n.watchedScriptRunLocked(r.ID) || !n.admitLocked(note.ID) {
+		n.mu.Unlock()
+		return
+	}
+	sink := n.sink
+	n.mu.Unlock()
+	n.send(sink, note)
+}
+
+func (n *Notifier) watchedScriptRunLocked(runID string) bool {
+	for key, f := range n.focus {
+		if f.Focused && f.ActiveScriptRunID == runID && (n.d.Alive == nil || n.d.Alive(key)) {
+			return true
+		}
+	}
+	return false
+}
+
 // rebaseVerdict is the title word of an ended rebase run.
 func rebaseVerdict(r adewire.Run) string {
 	switch {
@@ -277,7 +357,7 @@ func (n *Notifier) Click(data map[string]any) {
 	}
 	note := Note{
 		Kind: Kind(str("kind")), TerminalID: str("terminalId"), WindowKey: str("windowKey"),
-		RecordID: str("recordId"), TaskID: str("taskId"),
+		RecordID: str("recordId"), TaskID: str("taskId"), ScriptRunID: str("scriptRunId"),
 	}
 	if n.d.Reveal != nil {
 		n.d.Reveal(note)

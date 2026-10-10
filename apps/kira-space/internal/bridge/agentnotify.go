@@ -18,6 +18,8 @@ type ReportFocusArgs struct {
 	Module           string `json:"module"`
 	ActiveTerminalID string `json:"activeTerminalId"`
 	AdeTaskID        string `json:"adeTaskId"`
+	// ActiveScriptRunID is the smart script run the window shows.
+	ActiveScriptRunID string `json:"activeScriptRunId"`
 }
 
 func (s *AgentNotifyService) ReportFocus(a ReportFocusArgs) error {
@@ -26,6 +28,7 @@ func (s *AgentNotifyService) ReportFocus(a ReportFocusArgs) error {
 	}
 	for name, v := range map[string]string{
 		"windowKey": a.WindowKey, "module": a.Module, "activeTerminalId": a.ActiveTerminalID, "adeTaskId": a.AdeTaskID,
+		"activeScriptRunId": a.ActiveScriptRunID,
 	} {
 		if len(v) > maxNotifyIDBytes {
 			return fmt.Errorf("agentnotify: %s exceeds %d bytes", name, maxNotifyIDBytes)

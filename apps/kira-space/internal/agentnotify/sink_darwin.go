@@ -51,7 +51,7 @@ func (s *WailsSink) Send(n Note) error {
 		ID: n.ID, Title: n.Title, Body: n.Body, ThreadID: "kira-agents",
 		Data: map[string]interface{}{
 			"terminalId": n.TerminalID, "windowKey": n.WindowKey, "recordId": n.RecordID,
-			"taskId": n.TaskID, "kind": string(n.Kind),
+			"taskId": n.TaskID, "scriptRunId": n.ScriptRunID, "kind": string(n.Kind),
 		},
 	})
 }

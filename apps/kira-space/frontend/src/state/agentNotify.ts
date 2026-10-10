@@ -28,6 +28,7 @@ export function installAgentNotifyFocus(): void {
       module: mode.active as string,
       activeTerminalId: activeTerminalId.value,
       adeTaskId: mode.active === 'ade' ? (board.selectedTaskId ?? '') : '',
+      activeScriptRunId: '',
     }),
     (state) => {
       void control.agentNotifyReportFocus(state).catch((err: unknown) => {

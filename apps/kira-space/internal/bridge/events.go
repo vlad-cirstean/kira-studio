@@ -76,6 +76,8 @@ const (
 const (
 	ChannelAgentRevealTerminal = "kira:agent:reveal-terminal"
 	ChannelAgentRevealTask     = "kira:agent:reveal-task"
+	// ChannelAgentRevealScriptRun opens a script run's tab; payload {runId, label}.
+	ChannelAgentRevealScriptRun = "kira:agent:reveal-script-run"
 )
 
 // The five below are P116's own window-chrome-parity channels (G1-G5/G7) — Kira Studio's own

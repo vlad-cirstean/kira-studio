@@ -443,6 +443,10 @@ func (w *Wired) revealNote(n agentnotify.Note) {
 	}
 	if key, ok := w.Windows.AnyRealKey(); ok {
 		focus(key)
+		if n.ScriptRunID != "" {
+			w.Emitter.EmitTo(key, bridge.ChannelAgentRevealScriptRun, map[string]string{"runId": n.ScriptRunID, "label": n.Title})
+			return
+		}
 		if n.TaskID != "" {
 			w.Emitter.EmitTo(key, bridge.ChannelAgentRevealTask, map[string]string{"taskId": n.TaskID})
 		}

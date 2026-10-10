@@ -414,6 +414,8 @@ const spaceControl = {
     on('kira:agent:reveal-terminal', cb),
   onAgentRevealTask: (cb: (event: { taskId: string }) => void): (() => void) =>
     on('kira:agent:reveal-task', cb),
+  onAgentRevealScriptRun: (cb: (event: { runId: string; label: string }) => void): (() => void) =>
+    on('kira:agent:reveal-script-run', cb),
   // P239: Claude Code usage limits for the ADE status bar.
   claudeUsageGet: (): Promise<ClaudeUsageSnapshot> => unwrap(ClaudeUsageService.Get()),
   onClaudeUsage: (cb: (snapshot: ClaudeUsageSnapshot) => void): (() => void) =>
@@ -444,6 +446,7 @@ interface AgentNotifyFocus {
   module: string;
   activeTerminalId: string;
   adeTaskId: string;
+  activeScriptRunId: string;
 }
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus
