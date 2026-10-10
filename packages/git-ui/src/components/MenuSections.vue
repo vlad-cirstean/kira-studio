@@ -43,7 +43,7 @@ const emit = defineEmits<(e: 'select', id: string) => void>();
           class="text-muted-foreground"
         />
       </span>
-      <span class="flex-1 overflow-hidden text-ellipsis">{{ item.label }}</span>
+      <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ item.label }}</span>
       <span v-if="item.detail" class="ml-auto pl-2 text-kira-sm text-muted-foreground whitespace-nowrap">{{ item.detail }}</span>
       <span v-if="item.disabled && item.disabledReason" :id="`${item.id}-reason`" class="sr-only">
         {{ item.disabledReason }}
