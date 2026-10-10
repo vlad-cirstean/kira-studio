@@ -505,24 +505,43 @@ test('engine overview tabulates containers with humanized stats; section tabs sh
   await expect(page.locator('[data-testid="docker-engine-overview"]')).toBeVisible();
 });
 
-test('image registry button opens the derived URL; local-only images get none', async ({
+interface RegistryRow {
+  tags: string[];
+  registryUrl: string;
+}
+
+const openExternalArgs = () =>
+  contract<{ url: string }>('link-open', 'args:LinkService.OpenExternal');
+
+test('contract: image registry button opens the derived URL; local-only images get none', async ({
   relaunch,
 }) => {
-  const { page, control } = await setup(relaunch);
+  const rows = contract<RegistryRow[]>('docker-registry', 'DockerService.Images#registry');
+  const hub = rows.find((r) => r.registryUrl);
+  const none = rows.find((r) => !r.registryUrl);
+  if (!hub || !none) throw new Error('registry contract needs a hub and a local-only image');
+  const images = rows.map((r, i) => ({
+    ...IMAGES[0],
+    id: `sha256:reg${i}`,
+    tags: r.tags,
+    registryUrl: r.registryUrl,
+  }));
+  const { page, control } = await setup(relaunch, { handlers: { Images: () => images } });
   await openDocker(page);
   await page.locator('[data-testid="docker-section-images"]').click();
 
-  const alpine = page.locator('[data-testid="docker-row"]', { hasText: 'alpine:3.20' });
-  const local = page.locator('[data-testid="docker-row"]', { hasText: 'local/app:dev' });
+  const alpine = page.locator('[data-testid="docker-row"]', { hasText: hub.tags[0] });
+  const local = page.locator('[data-testid="docker-row"]', { hasText: none.tags[0] });
   await expect(local.locator('[data-testid="docker-image-registry"]')).toHaveCount(0);
   await alpine.hover();
   await alpine.locator('[data-testid="docker-image-registry"]').click();
   await expect
     .poll(() => control.log().filter((e) => e.channel === IPC.linkOpenExternal))
     .toHaveLength(1);
-  expect(control.log().find((e) => e.channel === IPC.linkOpenExternal)?.args).toMatchObject({
-    url: 'https://hub.docker.com/_/alpine',
-  });
+  expect(hub.registryUrl).toBe(openExternalArgs().url);
+  expect(control.log().find((e) => e.channel === IPC.linkOpenExternal)?.args).toMatchObject(
+    openExternalArgs(),
+  );
 
   await alpine.click();
   await expect(page.locator('[data-testid="docker-resource-registry"]')).toBeVisible();
@@ -530,8 +549,20 @@ test('image registry button opens the derived URL; local-only images get none', 
   await expect(page.locator('[data-testid="docker-resource-registry"]')).toHaveCount(0);
 });
 
-test('container detail shows the registry button next to the image', async ({ relaunch }) => {
-  const { page, control } = await setup(relaunch);
+test('contract: container detail shows the registry button next to the image', async ({
+  relaunch,
+}) => {
+  const rec = contract<RegistryRow>('docker-registry', 'DockerService.InspectContainer#registry');
+  const { page, control } = await setup(relaunch, {
+    handlers: {
+      InspectContainer: (a) => {
+        const c = seedContainers().find((x) => x.id === (a as { id: string }).id);
+        return c
+          ? { ...detail(c), registryUrl: rec.registryUrl }
+          : { error: { code: 'E_NOT_FOUND', message: 'no such container' } };
+      },
+    },
+  });
   await openDocker(page);
   await openContainer(page, 'solo');
 
@@ -539,6 +570,9 @@ test('container detail shows the registry button next to the image', async ({ re
   await expect
     .poll(() => control.log().filter((e) => e.channel === IPC.linkOpenExternal))
     .toHaveLength(1);
+  expect(control.log().find((e) => e.channel === IPC.linkOpenExternal)?.args).toMatchObject(
+    openExternalArgs(),
+  );
 });
 
 test('start is green, stop is red, and a selected row has no bar', async ({ relaunch }) => {

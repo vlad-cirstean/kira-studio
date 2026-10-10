@@ -126,6 +126,7 @@ func TestOpenExternal(t *testing.T) {
 	app := flowharness.New(t)
 	open := func(url string) error { return app.W.Link.OpenExternal(bridge.LinkOpenExternalArgs{URL: url}) }
 
+	app.Contract(t, "link-open", "args:LinkService.OpenExternal", bridge.LinkOpenExternalArgs{URL: "https://hub.docker.com/_/alpine"})
 	for _, ok := range []string{"https://hub.docker.com/_/alpine", "http://localhost:3000/"} {
 		if err := open(ok); err != nil {
 			t.Fatal(err)

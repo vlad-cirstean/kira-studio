@@ -10,6 +10,11 @@ import (
 	"github.com/kirathecat/kira-studio/internal/docker"
 )
 
+type registryImage struct {
+	Tags        []string `json:"tags"`
+	RegistryURL string   `json:"registryUrl"`
+}
+
 func TestImageRegistryURL(t *testing.T) {
 	app, d := boot(t)
 	svc := app.W.Docker
@@ -28,11 +33,20 @@ func TestImageRegistryURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	urls := map[string]string{}
+	var picked []registryImage
 	for _, img := range images {
 		for _, tag := range img.Tags {
 			urls[tag] = img.RegistryURL
+			if tag == flowharness.Image || tag == ref {
+				picked = append(picked, registryImage{Tags: []string{tag}, RegistryURL: img.RegistryURL})
+			}
 		}
 	}
+	opts := []flowharness.ContractOption{
+		flowharness.Replace(d.Prefix(), "kira-flow-"),
+		flowharness.Replace(runIDOf(d), "run"),
+	}
+	app.Contract(t, "docker-registry", "DockerService.Images#registry", picked, opts...)
 	if got := urls[flowharness.Image]; got != hub {
 		t.Fatalf("registry URL of %s = %q, want %q", flowharness.Image, got, hub)
 	}
@@ -47,4 +61,6 @@ func TestImageRegistryURL(t *testing.T) {
 	if detail.RegistryURL != hub {
 		t.Fatalf("container registry URL = %q, want %q", detail.RegistryURL, hub)
 	}
+	app.Contract(t, "docker-registry", "DockerService.InspectContainer#registry",
+		registryImage{Tags: []string{detail.Container.Image}, RegistryURL: detail.RegistryURL}, opts...)
 }

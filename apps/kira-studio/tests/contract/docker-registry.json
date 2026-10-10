@@ -1,0 +1,22 @@
+{
+  "DockerService.Images#registry": [
+    {
+      "registryUrl": "",
+      "tags": [
+        "localhost/kira-flow-committed:latest"
+      ]
+    },
+    {
+      "registryUrl": "https://hub.docker.com/_/alpine",
+      "tags": [
+        "mirror.gcr.io/library/alpine:3.20"
+      ]
+    }
+  ],
+  "DockerService.InspectContainer#registry": {
+    "registryUrl": "https://hub.docker.com/_/alpine",
+    "tags": [
+      "mirror.gcr.io/library/alpine:3.20"
+    ]
+  }
+}
