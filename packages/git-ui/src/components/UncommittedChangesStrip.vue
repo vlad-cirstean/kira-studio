@@ -133,17 +133,17 @@ const tooltipText = computed(() => {
   <button
     v-if="visible"
     type="button"
-    class="kv:shrink-0 kv:flex kv:items-center kv:w-full kv:h-row-compact kv:border-0 kv:border-b kv:border-panel-border kv:bg-panel kv:[font:inherit] kv:text-inherit kv:text-left kv:cursor-pointer kv:hover:bg-hover kv:focus-visible:outline-1 kv:focus-visible:outline-focus kv:focus-visible:-outline-offset-1"
+    class="shrink-0 flex items-center w-full h-graph-row-compact border-0 border-b border-border bg-bg text-inherit text-left cursor-pointer hover:bg-hover focus-visible:outline-1 focus-visible:outline-focus focus-visible:-outline-offset-1"
     data-testid="uncommitted-strip"
     @click="emit('select')"
   >
     <div
-      class="kv:shrink-0 kv:h-full kv:flex kv:items-center kv:overflow-visible"
+      class="shrink-0 h-full flex items-center overflow-visible"
       :style="{ width: `${graphWidth}px` }"
     >
       <svg
         v-if="nodeCx !== undefined"
-        class="kv:overflow-visible"
+        class="overflow-visible"
         aria-hidden="true"
         :width="graphWidth"
         height="100%"
@@ -155,14 +155,14 @@ const tooltipText = computed(() => {
           :class="laneClassName"
           :stroke-width="GEOMETRY.strokeWidth"
           :stroke-dasharray="dashArray"
-          class="kv:fill-none"
+          class="fill-none"
         />
       </svg>
     </div>
     <Tooltip>
       <TooltipTrigger as-child>
         <span
-          class="kv:min-w-0 kv:truncate kv:text-muted-foreground kv:text-sm"
+          class="min-w-0 truncate text-muted-foreground text-graph-sm"
           data-testid="uncommitted-strip-label"
         >
           {{ totalCount }} uncommitted {{ totalCount === 1 ? 'change' : 'changes' }}

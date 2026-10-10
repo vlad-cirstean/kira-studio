@@ -31,3 +31,72 @@
   /* PR merged: no app hue. */
   --color-git-merged: #b180d7;
 }
+
+/* SlickGrid builds these nodes and rewrites their inline styles; no template carries utilities.
+   Its own stylesheets are not imported (Bootstrap/Salesforce palettes). Its dynamic CSS writes only
+   height/left/right, so position must come from here. `outline: 0` and `border: 0` stay raw: the
+   utilities lean on `--tw-*` @property rules. */
+@layer components {
+  .kv-commit-grid .slick-pane {
+    @apply absolute overflow-hidden w-full;
+    outline: 0;
+  }
+
+  .kv-commit-grid .slick-viewport,
+  .kv-commit-grid .grid-canvas {
+    @apply relative bg-bg;
+    outline: 0;
+  }
+
+  /* SlickGrid rewrites inline `overflow-x: auto` on every resizeCanvas. Columns always fit
+     (columnFit.ts); important hidden stops a sideways wheel scrolling the graph off screen. */
+  .kv-commit-grid .slick-viewport {
+    @apply w-full overflow-x-hidden!;
+  }
+
+  /* One stacking context and paint boundary for all rows: no per-row compositing layer. */
+  .kv-commit-grid .grid-canvas {
+    contain: layout paint;
+  }
+
+  /* Opaque, not transparent: a repainted row erases the band it owns. */
+  .kv-commit-grid .slick-row.ui-widget-content {
+    @apply absolute w-full bg-bg cursor-pointer;
+    border: 0;
+  }
+
+  /* Declared before :hover/.kv-row-selected: equal specificity, last wins, so hover and
+     selection still show on a HEAD row. */
+  .kv-commit-grid .slick-row.kv-row-head {
+    @apply font-semibold;
+    background-color: color-mix(in srgb, var(--kira-focus) 9%, transparent);
+    box-shadow: inset 2px 0 0 0 var(--kira-focus);
+  }
+
+  .kv-commit-grid .slick-row:hover {
+    @apply bg-hover;
+  }
+
+  .kv-commit-grid .slick-row.kv-row-selected {
+    @apply bg-select text-fg;
+  }
+
+  .kv-commit-grid .slick-row:focus-visible {
+    @apply focus-ring;
+  }
+
+  /* Placeholder row: the muted tone is the "not a real commit" cue. */
+  .kv-commit-grid .slick-row.kv-row-collapsed {
+    @apply text-muted-foreground;
+  }
+
+  .kv-commit-grid .slick-cell {
+    @apply absolute flex items-center overflow-hidden py-0 px-2;
+    border: none;
+  }
+
+  /* Row overdraw (0.5px past the band, no seam at fractional DPR) draws outside the cell. */
+  .kv-commit-grid .kv-cell-graph {
+    @apply p-0 overflow-visible;
+  }
+}

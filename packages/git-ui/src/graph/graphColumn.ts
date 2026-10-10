@@ -103,7 +103,7 @@ export function readSlice(
  * height varies with badge presence (`CommitGrid.vue`'s `enableVariableRowHeight`), the caller
  * passes `grid.getRowHeight(row)` so this formatter always draws into the row's own real height,
  * not a stale grid-wide default. `compactRowHeight` feeds `rowSvg.ts`'s `nodeCenterY` (the node's
- * y, anchored to the subject line rather than the row's own midpoint — a `--kv-row-height-compact`
+ * y, anchored to the subject line rather than the row's own midpoint — a `--kira-graph-row-h-compact`
  * theme change is reflected on the next render without rebuilding this formatter, same as before).
  *
  * P92 item 1: `columnWidth` is likewise an accessor, not a value — `CommitGrid.vue` passes
@@ -129,7 +129,7 @@ export function createGraphFormatter(
   const reusable: EdgeSegment[] = [];
   return (row) => {
     const wrapper = document.createElement('div');
-    wrapper.className = 'kv:block kv:h-full kv:w-full kv:overflow-visible';
+    wrapper.className = 'block h-full w-full overflow-visible';
     const total = rowHeight(row);
     const nodeCenterY = total - compactRowHeight() / 2;
     const width = columnWidth();

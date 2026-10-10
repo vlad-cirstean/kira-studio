@@ -1,30 +1,26 @@
 /**
- * `docs/plans/P4.md` W8: trivial by design, because SVG reads CSS. This file exports only
- * *which class* a lane or node gets — never a colour value. `scripts/gen-lane-palette.ts` owns
- * the actual `--kv-graph-lane-N` tokens and the `.kv-lane-N`/`.kv-node` CSS rules
- * (`packages/ui/src/theme/vscode-tokens.css`) that turn a class into a colour, so a theme switch,
- * a high-contrast kind, and a user's `workbench.colorCustomizations` override all reach the graph
- * through the cascade with **no JavaScript executed** — the bug §3.4 calls "the most visible
- * possible bug" (the graph keeping its old colours after a theme switch) cannot be expressed here.
+ * `docs/plans/P4.md` W8: this file exports only *which class* a lane gets, never a colour value.
+ * The lane colours are `--color-graph-lane-N` in `theme/git.css`; SVG reads them through the
+ * `stroke-`/`fill-` utilities below, so a theme change reaches the graph with no JavaScript.
  */
 import { DEFAULT_PALETTE_SIZE } from '@kira/git-core';
 
-/** `"kv-lane-0"` … `"kv-lane-7"` by default, wrapping modulo the palette's own size — a colour
- *  index at or past the palette (two open lanes can legally share a colour once `laneCount`
- *  exceeds the palette) reuses an earlier lane's class rather than naming a CSS rule that does
- *  not exist. */
-export function laneClass(colorIndex: number, paletteSize: number = DEFAULT_PALETTE_SIZE): string {
-  return `kv-lane-${colorIndex % paletteSize}`;
-}
+// Every entry is a full literal: Tailwind emits only scanned strings. `kv-lane-N` is a DOM marker.
+const LANE_CLASS = [
+  'kv-lane-0 stroke-graph-lane-0 fill-graph-lane-0',
+  'kv-lane-1 stroke-graph-lane-1 fill-graph-lane-1',
+  'kv-lane-2 stroke-graph-lane-2 fill-graph-lane-2',
+  'kv-lane-3 stroke-graph-lane-3 fill-graph-lane-3',
+  'kv-lane-4 stroke-graph-lane-4 fill-graph-lane-4',
+  'kv-lane-5 stroke-graph-lane-5 fill-graph-lane-5',
+  'kv-lane-6 stroke-graph-lane-6 fill-graph-lane-6',
+  'kv-lane-7 stroke-graph-lane-7 fill-graph-lane-7',
+] as const;
 
-/** The class every *filled* node dot carries in addition to its `laneClass` — defined once here
- *  (`packages/ui/src/theme/vscode-tokens.css`'s generated block) so `rowSvg.ts` never repeats the
- *  literal string, and so a high-contrast kind's outline (`--kv-graph-node-outline*`) applies
- *  uniformly without a second source of truth for which shapes get it. Deliberately **not**
- *  applied to a merge's ring or a stash's ring (`rowSvg.ts`'s `planNode`): those shapes carry
- *  their own always-visible stroke, and `.kv-node`'s own stroke-width defaults to `0` outside a
- *  high-contrast kind, which would silently erase a ring in every ordinary theme. */
-export const NODE_CLASS = 'kv-node';
+/** Wraps modulo the palette size: a colour index past the palette reuses an earlier lane. */
+export function laneClass(colorIndex: number, paletteSize: number = DEFAULT_PALETTE_SIZE): string {
+  return LANE_CLASS[colorIndex % paletteSize] ?? '';
+}
 
 /** The four shapes `rowSvg.ts` draws (§7.6/W8's table, plus P93 §6.1): ordinary, merge (more than
  *  one parent), stash (a `stash` decoration on the row), collapsed (a P93 branch-group

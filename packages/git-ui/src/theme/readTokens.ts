@@ -1,33 +1,22 @@
 /**
- * The getComputedStyle bridge for the token layer holds that JavaScript still needs as a number
- * or a live-updating string, not left purely to the cascade: `--kv-row-height`/
- * `--kv-row-height-compact` (§6.1) have to reach SlickGrid's `rowHeight` option and `rowSvg.ts`'s
- * per-row geometry (W6, W8) as actual pixel values, since neither is something the cascade can
- * hand a value to on its own. Every *colour* token, by contrast, is consumed purely through CSS
- * classes now (W1, §3.4) — `packages/ui/src/graph/` never holds a colour string, so this file has
- * no reason to resolve one. Re-reads on theme change via a `MutationObserver`, in case a density
- * setting ever changes the row height live rather than only at startup.
+ * The getComputedStyle bridge for the tokens JavaScript needs as a number: `--kira-graph-row-h`/
+ * `--kira-graph-row-h-compact` reach SlickGrid's `rowHeight` option and `rowSvg.ts`'s per-row
+ * geometry as pixel values, which the cascade cannot hand over. Colours stay in CSS classes.
+ * Re-reads when `<html>`/`<body>` class or style changes (live font-size settings).
  *
- * Implemented fully in P0, ahead of anything that consumes it, because it is easy to get subtly
- * wrong and a later phase would otherwise write it in a hurry while also writing a renderer.
- *
- * P72 §6.2/§6.3: `--kv-row-height`/`--kv-row-height-compact`/`--kv-font-size` are the *length*
- * tokens — the three of the four below whose value has to reach JavaScript as a real pixel
- * number. `getComputedStyle().getPropertyValue()` on a *custom* property substitutes `var()`
- * references but does not evaluate `calc()` (no `@property` registration gives it a syntax to
- * evaluate against) — once `--kv-row-height` derives from `--kv-h-xs` (`density.css`,
- * `kira-structure.css`) rather than staying a plain literal, that string-parse silently returns
- * `NaN` and the fallback below papers over it, looking correct while every row is sized wrong.
- * Each length token is instead measured through a hidden probe carrying the *real* CSS property
- * (`height`/`font-size`) the browser does resolve `calc()` for — the same precedent
- * `CommitGrid.vue`'s own `.kv-date-width-probe` already established (`dateFormat.ts`'s
- * `measureAbsoluteDateWidth`). `--kv-font-family` stays a plain string read — nothing here ever
- * turns it into a number.
+ * `getComputedStyle().getPropertyValue()` on a custom property substitutes `var()` but does not
+ * evaluate `calc()`, so each length token is measured through a hidden probe carrying the real CSS
+ * property (`height`/`font-size`), same precedent as `dateFormat.ts`'s `measureAbsoluteDateWidth`.
+ * `--kira-font-ui` stays a plain string read.
  */
-const LENGTH_TOKENS = ['--kv-row-height', '--kv-row-height-compact', '--kv-font-size'] as const;
+const LENGTH_TOKENS = [
+  '--kira-graph-row-h',
+  '--kira-graph-row-h-compact',
+  '--kira-graph-t-md',
+] as const;
 type LengthToken = (typeof LENGTH_TOKENS)[number];
 
-const STRING_TOKENS = ['--kv-font-family'] as const;
+const STRING_TOKENS = ['--kira-font-ui'] as const;
 type StringToken = (typeof STRING_TOKENS)[number];
 
 export type TokenName = LengthToken | StringToken;
@@ -42,9 +31,9 @@ export type TokenChangeListener = (tokens: TokenMap) => void;
  *  `rowHeight` option actually needs), `font-size` for the type-scale token (read via
  *  `getComputedStyle`, which resolves a standard property's own `calc()` with no layout needed). */
 const PROBE_PROPERTY: Readonly<Record<LengthToken, 'height' | 'fontSize'>> = {
-  '--kv-row-height': 'height',
-  '--kv-row-height-compact': 'height',
-  '--kv-font-size': 'fontSize',
+  '--kira-graph-row-h': 'height',
+  '--kira-graph-row-h-compact': 'height',
+  '--kira-graph-t-md': 'fontSize',
 };
 
 interface LengthProbe {
@@ -52,8 +41,7 @@ interface LengthProbe {
   read(): string;
 }
 
-/** Tokens are all `:root`-scoped (`kira-structure.css`/`density.css`'s own charter — no component
- *  overrides one locally), so a probe resolves correctly wherever it is mounted — `document.body`
+/** Tokens are all `:root`-scoped (`theme/git.css`; no component overrides one locally), so a probe resolves correctly wherever it is mounted — `document.body`
  *  is used rather than a reader's own `#target` so this never depends on `#target` being a
  *  connected, renderable node (a test double passed to the constructor is not required to be
  *  one). `undefined` outside a real browser (bun's own test environment has no `document` —
@@ -125,21 +113,13 @@ export class TokenReader {
   /**
    * Watches for a live token change. Only notifies listeners when a tracked token's *value*
    * actually moved (P4 W13's own discovery): `CommitGrid.vue`'s one listener does a full
-   * `invalidateAllRows()` + `render()`, correct when `--kv-row-height` genuinely changed but
-   * wasted work on every other class/style mutation a theme switch also makes — which is most of
-   * them. A colour-only theme switch must re-render nothing in JavaScript at all (`palette.ts`'s
-   * own "no JavaScript executed" claim) — the SVGs already recolour purely through the CSS
-   * cascade; forcing every row's DOM node to be destroyed and rebuilt on top of that was pure
-   * overhead, worse the larger the repo.
+   * `invalidateAllRows()` + `render()`, correct when `--kira-graph-row-h` genuinely changed but
+   * wasted work on every other class/style mutation a theme switch also makes. A colour-only theme
+   * switch re-renders nothing in JavaScript: the SVGs recolour through the CSS cascade.
    *
-   * P72 §6.2(ii): one `MutationObserver`, observing two surfaces, not two observers. `body`
-   * (default: `document.body`) is what VS Code mutates on theme switch (the original reason this
-   * existed). Kira Studio mutates a different surface — `applyAppearance`
-   * (`apps/kira-studio/frontend/src/state/settings.ts`) writes `--kira-font-size` onto
-   * `document.documentElement.style`, which is this reader's own `#target` by default — so a live
-   * Appearance font-size change never reached this listener until `#target` was watched too. When
-   * `#target` and `body` are the same element (a caller that passed `document.body` explicitly),
-   * observing it twice would be redundant, not wrong, but is skipped anyway.
+   * One `MutationObserver` watches `body` and `#target` (`<html>` by default): `applyAppearance`
+   * writes `--kira-font-size`/`--kira-graph-font-size` onto `document.documentElement.style`, so a
+   * live font-size change reaches this listener. Observing one element twice is skipped.
    */
   watch(body: HTMLElement = document.body): void {
     if (this.#observer) return;
@@ -166,36 +146,36 @@ export class TokenReader {
   }
 }
 
-/** The default `--kv-row-height` (`density.css`) — the fallback `rowHeightPx` returns if the
+/** The default `--kira-graph-row-h` (`theme/git.css`) — the fallback `rowHeightPx` returns if the
  *  token is unset or unparseable, which only happens outside a real browser (a unit test with no
  *  stylesheet loaded), never in a mounted app. */
 const FALLBACK_ROW_HEIGHT = 36;
 
-/** The default `--kv-row-height-compact` (`density.css`) — `compactRowHeightPx`'s own fallback,
+/** The default `--kira-graph-row-h-compact` (`theme/git.css`) — `compactRowHeightPx`'s own fallback,
  *  same reasoning as `FALLBACK_ROW_HEIGHT`. */
 const FALLBACK_ROW_HEIGHT_COMPACT = 20;
 
 /**
- * `--kv-row-height` as an actual pixel number (W6, W8) — the one numeric read every consumer of
+ * `--kira-graph-row-h` as an actual pixel number (W6, W8) — the one numeric read every consumer of
  * this token needs, so the `parseFloat("22px")` lives in exactly one place rather than once per
  * caller. A malformed or missing value (an environment with no theme CSS loaded) falls back to
- * `density.css`'s own default rather than propagating `NaN` into SlickGrid's `rowHeight` option
+ * `theme/git.css`'s default rather than propagating `NaN` into SlickGrid's `rowHeight` option
  * or the graph column's geometry. P7 (item 1): now the height a row with a ref/PR badge uses —
  * SlickGrid's own grid-level default became `compactRowHeightPx` below, the more common case.
  */
 export function rowHeightPx(reader: TokenReader): number {
-  const parsed = Number.parseFloat(reader.tokens['--kv-row-height']);
+  const parsed = Number.parseFloat(reader.tokens['--kira-graph-row-h']);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT;
 }
 
 /**
- * `--kv-row-height-compact` as an actual pixel number — P7 (item 1)'s own new read, mirroring
+ * `--kira-graph-row-h-compact` as an actual pixel number — P7 (item 1)'s own new read, mirroring
  * `rowHeightPx` exactly. This is the height an undecorated row (no ref/PR badge) uses, and the
  * grid's own default `rowHeight` option now that variable row height is on
  * (`enableVariableRowHeight`, `CommitGrid.vue`) — SlickGrid falls back to the grid-level default
  * for any row `getItemMetadata` does not explicitly give a taller `height` to.
  */
 export function compactRowHeightPx(reader: TokenReader): number {
-  const parsed = Number.parseFloat(reader.tokens['--kv-row-height-compact']);
+  const parsed = Number.parseFloat(reader.tokens['--kira-graph-row-h-compact']);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT_COMPACT;
 }

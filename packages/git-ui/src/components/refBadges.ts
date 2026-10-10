@@ -37,7 +37,7 @@ const MAX_VISIBLE_BADGES = 3;
 
 export interface BadgeSpec {
   readonly icon: string;
-  /** Which `--kv-badge-*` token group this badge draws from — a border-colour utility class (one of
+  /** Which badge colour group this badge draws from — a border-colour utility class (one of
    *  `BADGE_KIND_CLASS`), never a colour value read or computed here (B4: colours live only in the
    *  theme layer). */
   readonly colorClass: string;
@@ -188,7 +188,7 @@ function buildBadgeElement(
   if (laneColor !== undefined) classes.push(laneBorderClass(laneColor));
   // G-UX (item 1): a subtle ring (not a border, which would fight the lane-tint border-color
   // above) on the current-branch badge itself.
-  if (spec.isCurrentBranch) classes.push('shadow-[0_0_0_1px_var(--kv-focus-border)]');
+  if (spec.isCurrentBranch) classes.push('shadow-[0_0_0_1px_var(--kira-focus)]');
   badge.className = refBadgeClass(...classes);
   // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
   // CommitGrid.vue mounts over its grid host — a mouse-hover affordance independent of whether the
@@ -207,7 +207,7 @@ function buildBadgeElement(
   }
 
   const icon = document.createElement('span');
-  icon.className = `codicon ${spec.icon} kv-badge-icon`;
+  icon.className = `codicon ${spec.icon} kv-badge-icon text-graph-xs`;
   // Decorative: the visible label text (or, for the overflow badge, its title) already carries
   // the information — see this file's module doc on "no colour/glyph-only meaning" (§7.9/W14).
   icon.setAttribute('aria-hidden', 'true');
@@ -225,7 +225,7 @@ function buildBadgeElement(
     // "reliably reach the accessibility tree as a second, non-text signal" reasoning the dot it
     // replaces already established (§6.1/§7's own "no colour/shape-only meaning" still applies).
     const check = document.createElement('span');
-    check.className = 'codicon codicon-check kv-badge-current-glyph text-(color:--kv-focus-border)';
+    check.className = 'codicon codicon-check kv-badge-current-glyph text-graph-xs text-focus';
     check.setAttribute('role', 'img');
     check.setAttribute('aria-label', 'current branch');
     badge.appendChild(check);
@@ -323,7 +323,7 @@ export function buildRefBadges(
 
   const plan = planBadges(decorations);
   const container = document.createElement('span');
-  container.className = 'kv:flex kv:items-center kv:gap-1 kv:shrink-0';
+  container.className = 'flex items-center gap-1 shrink-0';
 
   for (const spec of plan.visible) {
     container.appendChild(buildBadgeElement(spec, laneColor, stackInfoFor));

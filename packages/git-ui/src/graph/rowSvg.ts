@@ -19,7 +19,7 @@
 import { type DecorationRef, UNRESOLVED_ROW } from '@kira/git-core';
 import { GEOMETRY } from './geometry.ts';
 import type { EdgeSegment } from './layoutStore.ts';
-import { laneClass, NODE_CLASS, type NodeKind } from './palette.ts';
+import { laneClass, type NodeKind } from './palette.ts';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -203,11 +203,11 @@ export interface NodeShapePlan {
   readonly color: number;
   /** A filled dot (ordinary/merge's inner dot) vs. an unfilled ring (merge's outer ring, the
    *  whole of a stash's shape) — the DOM layer sets `fill: none` on an unfilled shape via inline
-   *  style, never via a CSS class, because `.kv-lane-N` itself sets `fill` (to draw the ordinary
+   *  style, never via a CSS class, because the lane class itself sets `fill` (to draw the ordinary
    *  dot at all) and only an inline style reliably wins that cascade. */
   readonly filled: boolean;
   readonly dashed: boolean;
-  /** G19 D1: the HEAD ring — an unfilled ring in `--kv-focus-border` (the same token the existing
+  /** G19 D1: the HEAD ring — an unfilled ring in `--kira-focus` (the same token the existing
    *  branch-badge dot already uses), drawn in addition to whichever shapes `nodeKind` itself
    *  already returns (stash/merge precedence untouched). `true` only for this one shape; every
    *  other `NodeShapePlan` this module produces leaves it `undefined`, which `buildNodeElement`
@@ -318,7 +318,7 @@ function buildPathElement(plan: EdgePathPlan): SVGPathElement {
   path.setAttribute('class', laneClass(plan.color));
   path.setAttribute('d', plan.d);
   path.setAttribute('stroke-width', String(GEOMETRY.strokeWidth));
-  // `.kv-lane-N` sets `fill` too (so a node's dot can use the same class) — any stylesheet rule
+  // the lane class sets `fill` too (so a node's dot can use the same class) — any stylesheet rule
   // beats a presentation attribute, so only an inline style reliably makes this a line, not a
   // filled shape auto-closed at its own start/end point.
   path.style.fill = 'none';
@@ -335,29 +335,23 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
   circle.setAttribute('r', fmt(plan.r));
 
   // G-UX (item 1): the HEAD halo, like the HEAD ring below, is never lane-coloured —
-  // `kv:fill-focus/18` paints it in `--kv-focus-border` at low opacity.
+  // `fill-focus/18` paints it in `--kira-focus` at low opacity.
   if (plan.isHeadHalo) {
-    circle.setAttribute('class', 'kv:fill-focus/18');
+    circle.setAttribute('class', 'fill-focus/18');
     return circle;
   }
 
-  // G19 D1: the HEAD ring is never lane-coloured — `kv:stroke-focus` paints
-  // it in `--kv-focus-border`, the same token the existing branch-badge dot already uses, so it
-  // never takes `laneClass`/`NODE_CLASS`, both of which are about this row's own lane colour.
+  // G19 D1: the HEAD ring is never lane-coloured — `stroke-focus` paints
+  // it in `--kira-focus`, the same token the existing branch-badge dot already uses, so it
+  // never takes `laneClass`, which is about this row's own lane colour.
   if (plan.isHeadRing) {
-    circle.setAttribute('class', 'kv:stroke-focus');
+    circle.setAttribute('class', 'stroke-focus');
     circle.setAttribute('stroke-width', String(GEOMETRY.headRingStrokeWidth));
     circle.style.fill = 'none';
     return circle;
   }
 
-  const classes = [laneClass(plan.color)];
-  // Only the ordinary filled dot carries NODE_CLASS (the high-contrast outline rule) — see
-  // palette.ts's own doc comment on why a ring must not: `.kv-node`'s stroke-width defaults to
-  // `0` outside a high-contrast kind, which would erase a ring's only visible pixels everywhere
-  // else.
-  if (plan.filled) classes.push(NODE_CLASS);
-  circle.setAttribute('class', classes.join(' '));
+  circle.setAttribute('class', laneClass(plan.color));
   if (!plan.filled) {
     circle.setAttribute('stroke-width', String(GEOMETRY.strokeWidth));
     circle.style.fill = 'none';
@@ -390,10 +384,7 @@ export function buildRowSvg(
   width: number,
 ): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute(
-    'class',
-    'kv-graph-svg kv:block kv:overflow-visible kv:[clip-path:inset(-2px_0)]',
-  );
+  svg.setAttribute('class', 'kv-graph-svg block overflow-visible [clip-path:inset(-2px_0)]');
   svg.setAttribute('width', String(width));
   svg.setAttribute('height', String(rowHeight));
   svg.setAttribute('viewBox', `0 0 ${width} ${rowHeight}`);

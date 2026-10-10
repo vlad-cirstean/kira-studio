@@ -132,7 +132,7 @@ const emit = defineEmits<{
 
 const MIN_COLUMN_WIDTH = 40;
 const MIN_MESSAGE_WIDTH = 120;
-// G21 D6b: mirrors `.slick-cell`'s own horizontal padding (`kv:px-2` in the style block below, 8px) — one
+// G21 D6b: mirrors `.slick-cell`'s own horizontal padding (`px-2` on `.slick-cell` in git.css, 8px) — one
 // side; `measureAbsoluteDateWidth`'s own caller doubles it for both sides of the cell.
 const CELL_PADDING_PX = 8;
 
@@ -196,7 +196,7 @@ function plan(): RowPlan {
 // Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
 // (props.graphView is assumed stable for the life of one CommitGrid — a repo switch remounts
 // this component rather than swapping graphView underneath it) and a rowHeight accessor so a
-// `--kv-row-height` change is picked up on the next render without rebuilding this formatter.
+// `--kira-graph-row-h` change is picked up on the next render without rebuilding this formatter.
 // P7 (item 1): `rowHeight` is now per-row (`grid.getRowHeight(row)`, since rows vary), read
 // through `grid` itself rather than a fixed token — `grid` is declared above and assigned in
 // `onMounted`, before any row is ever actually rendered, so this closure never sees it undefined
@@ -944,7 +944,7 @@ onMounted(() => {
     enableTextSelectionOnCells: true, // subjects/authors are meant to be selectable text
     explicitInitialization: false, // the constructor rendering immediately is what we want here
     minRowBuffer: 3, // render-ahead buffer above/below the viewport, not the whole history
-    rowTopOffsetRenderType: 'transform', // matches how --kv-row-height drives row positioning
+    rowTopOffsetRenderType: 'transform', // matches how --kira-graph-row-h drives row positioning
   });
   grid = instance;
 
@@ -1317,7 +1317,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 
 <template>
   <div
-    class="kv-commit-grid kv:relative kv:h-full kv:w-full kv:min-h-row kv:overflow-hidden kv:text-base kv:text-row-fg kv:[font-family:var(--kv-font-family)]"
+    class="kv-commit-grid relative h-full w-full min-h-graph-row overflow-hidden text-graph-md text-fg font-ui"
     data-testid="commit-grid"
   >
     <!-- SlickGrid's own `init()` (`Utils.emptyElement(this._container)`) wipes out whatever was
@@ -1325,7 +1325,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
          were this element's own children. `host` is SlickGrid's *exclusive* DOM: the handles are
          its siblings, absolutely positioned over it via `.kv-commit-grid`'s own `position:
          relative` above, not descendants a `new SlickGrid(host.value, ...)` call would delete. -->
-    <div ref="host" class="kv-grid-host kv:h-full kv:w-full"></div>
+    <div ref="host" class="kv-grid-host h-full w-full"></div>
     <!-- P131 Part 2 §5.1: ref and PR badges (refBadges.ts) write `data-kira-tip` on plain DOM they
          build outside Vue -- this one hoisted trigger, a sibling of `host` (never inside it:
          SlickGrid's own `init()` empties `host`), covers every badge in every cell. -->
@@ -1335,11 +1335,11 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
          shown, never a fifth grid column. -->
     <span
       ref="dateWidthProbe"
-      class="kv-cell-date kv:tabular-nums kv:absolute kv:invisible kv:pointer-events-none kv:whitespace-nowrap"
+      class="kv-cell-date tabular-nums absolute invisible pointer-events-none whitespace-nowrap"
       aria-hidden="true"
     ></span>
     <KuiColumnResizeHandle
-      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
+      class="absolute top-0 bottom-0 w-1.25 -ml-0.5 cursor-col-resize z-2 bg-transparent hover:bg-focus focus-visible:bg-focus focus-visible:outline-none"
       :style="{ left: `${handleLeftGraph}px` }"
       label="Resize graph column"
       :value="effectiveWidths.graph"
@@ -1349,7 +1349,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
     <KuiColumnResizeHandle
       v-if="!detailOpen"
-      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
+      class="absolute top-0 bottom-0 w-1.25 -ml-0.5 cursor-col-resize z-2 bg-transparent hover:bg-focus focus-visible:bg-focus focus-visible:outline-none"
       :style="{ left: `${handleLeftAuthor}px` }"
       label="Resize author column"
       :value="effectiveWidths.author"
@@ -1359,7 +1359,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
     <KuiColumnResizeHandle
       v-if="!detailOpen"
-      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
+      class="absolute top-0 bottom-0 w-1.25 -ml-0.5 cursor-col-resize z-2 bg-transparent hover:bg-focus focus-visible:bg-focus focus-visible:outline-none"
       :style="{ left: `${handleLeftDate}px` }"
       label="Resize date column"
       :value="effectiveWidths.date"
@@ -1369,159 +1369,3 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
   </div>
 </template>
-
-<style>
-@reference "../theme/tailwind.css";
-
-/*
- * P213: single-declaration properties below are `@apply`'d kv: utilities. `outline: 0` and
- * `border: 0` stay raw (their utilities are composite and lean on `--tw-*` @property rules a
- * @reference file never emits), as do `contain`, the `color-mix` head tint, the inset accent
- * shadow and the focus outline recipe.
- *
- * The ~80 structural lines SlickGrid needs (§6.1): the library's own stylesheets are not
- * imported (they carry Bootstrap/Salesforce/Material palettes), so viewport, row and cell
- * positioning live here, mapped only to the --kv-* token layer. This file is the only place in
- * the repository where a .slick-* selector appears (W6's own "Done when").
- */
-/* P110 A13: `.kv-commit-grid`'s own base box (position/height/width/min-height/overflow/font/
-   color) moved onto the template's own `kv:` utilities — the classname itself stays, here and on
-   the root `<div>`, since every `.kv-commit-grid .xxx` descendant rule below still needs it as a
-   scoping ancestor for SlickGrid's JS-built DOM. `.kv-date-width-probe` had no descendant rule of
-   its own and no other consumer, so it converts and drops its classname entirely.
-   P110 A-fix: `.kv-grid-host` looked like the same case (no CSS rule of its own either) but
-   graph-columns.spec.ts queries it directly (`document.querySelector('[data-testid="commit-grid"]
-   .kv-grid-host')`) — kept as a bare literal on the `host` div for that reason alone. */
-
-/* SlickGrid's own dynamic stylesheet (`createCssRules`, `applyColumnWidths`) only ever writes
-   `height`/`left`/`right` onto these elements — never `position`. Its own upstream CSS (not
-   imported here, see this block's own opening comment) is what makes those declarations do
-   anything at all: a `left` on a statically-positioned cell is a no-op, and a `transform:
-   translateY()` on a statically-positioned row stacks *on top of* normal document flow instead
-   of replacing it, doubling every row's effective offset. These four rules are that minimum,
-   copied from `slick.grid.css`'s own `.slick-pane`/`.slick-viewport`/`.grid-canvas`/`.slick-row`/
-   `.slick-cell` selectors (upstream also gates the row rule on `.ui-widget-content`, the class
-   SlickGrid always adds to every row alongside `.slick-row`, so it's included here rather than
-   widening the selector to something upstream doesn't actually rely on). */
-.kv-commit-grid .slick-pane {
-  @apply kv:absolute kv:overflow-hidden kv:w-full;
-  outline: 0;
-}
-
-.kv-commit-grid .slick-viewport,
-.kv-commit-grid .grid-canvas {
-  @apply kv:relative kv:bg-panel;
-  outline: 0;
-}
-
-.kv-commit-grid .slick-viewport {
-  @apply kv:w-full;
-}
-
-/* SlickGrid rewrites inline `overflow-x: auto` on every resizeCanvas. Columns always fit
-   (columnFit.ts); important hidden is the last guard so a sideways wheel never scrolls the graph
-   off screen. */
-.kv-commit-grid .slick-viewport {
-  @apply kv:overflow-x-hidden!;
-}
-
-/* P162: one stacking context and paint boundary for every row (each row is a stacking context
-   via its translateY transform), so no row can be promoted to its own compositing layer. */
-.kv-commit-grid .grid-canvas {
-  contain: layout paint;
-}
-
-.kv-commit-grid .slick-row.ui-widget-content {
-  @apply kv:absolute kv:w-full kv:bg-panel kv:cursor-pointer;
-  border: 0;
-  /* P92 item 4: opaque, not transparent — the canvas already paints this exact token underneath
-     (`.grid-canvas`, above), so nothing changes visually, but a repainted row now erases the band
-     it owns instead of compositing over whatever was there. */
-  /* G-UX D2 (item 1b): every row opens/toggles the detail pane on click — the whole row reads as
-   *  clickable, not only `.kv-cell-date` (whose own `cursor: pointer` this cascades onto too,
-   *  `cursor` being an inherited property; that per-cell rule is removed once item 8 relocates
-   *  the date-format toggle off the cell entirely). `enableTextSelectionOnCells: true` still lets
-   *  a pointer-cursor row be drag-selected for its text. */
-}
-
-/* G-UX (item 1): the checked-out row's own subtle background tint + left accent bar — placed
-   BEFORE :hover/.kv-row-selected below (equal specificity throughout this file's own rows,
-   (0,3,0) each; the LAST matching rule wins a tie), so hovering or selecting a HEAD row still
-   shows the hover/selection background on top of this one, not the reverse. font-weight has no
-   such ordering concern (hover/selected never set it), so it stays on this same rule rather than
-   splitting into two. */
-.kv-commit-grid .slick-row.kv-row-head {
-  @apply kv:font-semibold;
-  background-color: color-mix(in srgb, var(--kv-focus-border) 9%, transparent);
-  box-shadow: inset 2px 0 0 0 var(--kv-focus-border);
-}
-
-.kv-commit-grid .slick-row:hover {
-  @apply kv:bg-hover;
-}
-
-.kv-commit-grid .slick-row.kv-row-selected {
-  @apply kv:bg-selected kv:text-selected-fg;
-}
-
-/* History: a border-only ref badge originally carried its own decoration colour as both `color`
-   and `border-color`, tuned against the row's *un*selected background — a selected row with, say,
-   a green `v1.0.0` tag badge failed contrast for real (P5 W14's own axe scan), fixed at the time
-   with the row's own selected-foreground for both properties. P7 replaced every kind with an
-   opaque fill instead, which made that override unnecessary (a chip's own contrast against its
-   own fill no longer depended on the row underneath).
-   P92 item 10: back to an outline (no fill) — the label/icon are `--kv-badge-fg`, a fixed,
-   theme-supplied token, not the kind colour P5 W14's fix was tuned against, so that specific
-   selected-row failure cannot recur; legibility now depends on `--kv-badge-fg` against whatever
-   row background sits behind it (unselected, hover, selected), verified by eye in both themes
-   rather than re-adding a selected-row override for a token this file does not otherwise treat as
-   theme-conditional. */
-
-/* W14's roving tabindex focuses a real row node (not a hidden sink) — it needs a visible
-   indicator of its own, the same token every other focusable edge in this grid already uses. */
-.kv-commit-grid .slick-row:focus-visible {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -1px;
-}
-
-/* P93 §4.2: the placeholder row — `columns.ts`'s `rowMetadata` sets `kv-row-collapsed`
-   (`getItemMetadata`'s own `cssClasses`), never `kv-row-selected`/`-head`/`-stash` (its own doc
-   comment on why). The muted tone doubles as the "this is not a real commit" cue the row itself
-   otherwise gives no other visual signal for. */
-.kv-commit-grid .slick-row.kv-row-collapsed {
-  @apply kv:text-muted-foreground;
-}
-
-.kv-commit-grid .slick-cell {
-  @apply kv:absolute kv:flex kv:items-center kv:overflow-hidden kv:py-0 kv:px-2;
-  border: none;
-}
-
-/* The graph cell alone needs overflow: visible — W8's row overdraw (0.5px past the row's own
-   band, so two rows' vertical runs meet without a hairline seam at a fractional DPR) draws
-   slightly outside its own cell bounds by design. */
-.kv-commit-grid .kv-cell-graph {
-  @apply kv:p-0 kv:overflow-visible;
-}
-
-/* Font sizes stay here: `check_font_scale` exempts this file, and the same size as a class on
-   unprefixed badge markup would trip it. The rest of the badge look is utilities from
-   `badgeClass.ts` (P131 Part 2 §5.1) and the cell builders in `columns.ts`/`refBadges.ts`. */
-.kv-badge {
-  font-size: var(--kv-t-sm);
-}
-
-/* P72 §6.3: a step below `.kv-badge`'s own label size — an icon reads as decoration, not text. */
-.kv-badge-icon {
-  font-size: var(--kv-t-xs);
-}
-
-.kv-badge-current-glyph {
-  font-size: var(--kv-t-xs);
-}
-
-.kv-collapsed-chevron {
-  font-size: var(--kv-t-md);
-}
-
-</style>

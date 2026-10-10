@@ -40,22 +40,21 @@ function isStashDecoration(ref: DecorationRef): boolean {
 }
 
 // `kv-cell-date` stays as a marker (tests and the width probe read it); `kv-cell-author` has no reader.
-const CELL_TEXT_CLASS = 'kv:overflow-hidden kv:text-ellipsis kv:whitespace-nowrap';
+const CELL_TEXT_CLASS = 'overflow-hidden text-ellipsis whitespace-nowrap';
 const CELL_AUTHOR_CLASS = CELL_TEXT_CLASS;
-const CELL_DATE_CLASS = `kv-cell-date kv:tabular-nums ${CELL_TEXT_CLASS}`;
+const CELL_DATE_CLASS = `kv-cell-date tabular-nums ${CELL_TEXT_CLASS}`;
 // The message cell is a 2-row grid: a badge track (0 unless the row has badges) over the subject.
 const CELL_MESSAGE_CLASS =
-  'kv-cell-message kv:grid kv:grid-rows-[0_1fr] kv:items-center kv:min-w-0 kv:overflow-hidden';
+  'kv-cell-message grid grid-rows-[0_1fr] items-center min-w-0 overflow-hidden';
 const CELL_MESSAGE_BADGES_CLASS =
-  'kv-cell-message kv:grid kv:grid-rows-[var(--kv-h-xs)_1fr] kv:items-center kv:min-w-0 kv:overflow-hidden';
+  'kv-cell-message grid grid-rows-[var(--kira-graph-h-xs)_1fr] items-center min-w-0 overflow-hidden';
 const CELL_MESSAGE_COLLAPSED_CLASS =
-  'kv-cell-message kv:flex kv:items-center kv:gap-1 kv:min-w-0 kv:overflow-hidden';
+  'kv-cell-message flex items-center gap-1 min-w-0 overflow-hidden';
 const SUBJECT_CLASS =
-  'kv-message-subject kv:row-start-2 kv:min-w-0 kv:overflow-hidden kv:text-ellipsis kv:whitespace-nowrap';
-const SUBJECT_STASH_CLASS = `${SUBJECT_CLASS} kv:italic`;
-const BADGES_ROW_CLASS =
-  'kv:row-start-1 kv:flex kv:items-center kv:gap-1 kv:min-w-0 kv:overflow-hidden';
-const SUBJECT_COLLAPSED_CLASS = `${SUBJECT_CLASS} kv:italic kv:text-muted-foreground`;
+  'kv-message-subject row-start-2 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap';
+const SUBJECT_STASH_CLASS = `${SUBJECT_CLASS} italic`;
+const BADGES_ROW_CLASS = 'row-start-1 flex items-center gap-1 min-w-0 overflow-hidden';
+const SUBJECT_COLLAPSED_CLASS = `${SUBJECT_CLASS} italic text-muted-foreground`;
 
 function textCell(text: string, className: string): HTMLSpanElement {
   const span = document.createElement('span');
@@ -171,7 +170,7 @@ export function collapsedMessageText(hiddenCount: number, label: string | undefi
  *  undecorated commit costs nothing beyond the row's own fixed height. The subject alone gets
  *  `text-overflow: ellipsis` — a utility on `SUBJECT_CLASS`, not something this formatter
  *  computes. When a search pattern is active, the subject's text is split by `searchHighlight.ts`'s
- *  `splitHighlights` into alternating plain text nodes and `kv:bg-search-match` spans
+ *  `splitHighlights` into alternating plain text nodes and `bg-search-match` spans
  *  — `enableHtmlRendering: false` (§5.5) and this building every node with `textContent` mean no
  *  escaping code is introduced and none is needed. */
 function messageFormatter(
@@ -196,7 +195,8 @@ function messageFormatter(
       // pair — a placeholder row only ever means "collapsed" (expanding it replaces the row
       // outright, §4.2), so there is no expanded state for this glyph to reflect.
       const chevron = document.createElement('span');
-      chevron.className = 'codicon codicon-chevron-right kv-collapsed-chevron kv:shrink-0';
+      chevron.className =
+        'codicon codicon-chevron-right kv-collapsed-chevron text-graph-md shrink-0';
       chevron.setAttribute('aria-hidden', 'true');
       cell.appendChild(chevron);
       const text = document.createElement('span');
@@ -243,7 +243,7 @@ function messageFormatter(
           continue;
         }
         const hit = document.createElement('span');
-        hit.className = 'kv:bg-search-match kv:rounded-[2px]';
+        hit.className = 'bg-search-match rounded-[2px]';
         hit.textContent = run.text;
         subject.appendChild(hit);
       }
