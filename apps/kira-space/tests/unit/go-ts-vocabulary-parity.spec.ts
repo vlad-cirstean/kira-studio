@@ -8,6 +8,11 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  FINISH_RESULTS_INTRO,
+  FINISH_RESULTS_TAIL,
+  FINISH_STEP_SUFFIX,
+} from '../../frontend/src/ade/v2/board/runMessage';
 import { SPACE_RENDERABLE_TAB_KINDS } from '../../frontend/src/state/tabDomain';
 
 /** Pulls every `"key": true` entry out of a Go `var <name> = map[string]bool{ ... }` literal —
@@ -34,5 +39,17 @@ describe('Go/TS tab-kind vocabulary parity (P103 Part 2 §5.1)', () => {
     );
     const goKinds = extractGoStringSet(source, 'RenderableTabKinds');
     expect(goKinds).toEqual(new Set(SPACE_RENDERABLE_TAB_KINDS));
+  });
+});
+
+describe('finish_step instruction parity (P247)', () => {
+  test('suffix.go carries the text the editor previews', () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, '../../../../internal/claudeheadless/suffix.go'),
+      'utf8',
+    );
+    for (const part of [FINISH_STEP_SUFFIX, FINISH_RESULTS_INTRO, FINISH_RESULTS_TAIL]) {
+      expect(source).toContain(part);
+    }
   });
 });

@@ -3,6 +3,31 @@
 export const FINISH_STEP_SUFFIX =
   'When this step is done, call the finish_step tool with status "done" and a one-line summary. If it failed, call it with status "failed" and say what failed and give the reason. If you need a decision from me, call it with status "needs_input" and your question.';
 
+export const FINISH_RESULTS_INTRO =
+  'When this step ends, call the finish_step tool once with status set to one of: ';
+export const FINISH_RESULTS_TAIL =
+  '. Add a one-line summary; for a not-ok status give the reason. If you need a decision from me, use status "needs_input" with your question.';
+
+/** The finish instruction for a step's results; mirrors Go `claudeheadless.FinishStepSuffixFor`. The
+ *  implicit pair gives `FINISH_STEP_SUFFIX`. */
+export function finishStepSuffix(
+  results: readonly { id: string; ok: boolean; description: string }[],
+): string {
+  const implicit =
+    results.length === 2 &&
+    results[0]?.id === 'done' &&
+    results[0].ok &&
+    !results[0].description &&
+    results[1]?.id === 'failed' &&
+    !results[1].ok &&
+    !results[1].description;
+  if (results.length === 0 || implicit) return FINISH_STEP_SUFFIX;
+  const parts = results.map(
+    (r) => `${r.id} (${r.ok ? 'ok' : 'not ok'}${r.description ? `: ${r.description}` : ''})`,
+  );
+  return `${FINISH_RESULTS_INTRO}${parts.join(', ')}${FINISH_RESULTS_TAIL}`;
+}
+
 const MAX_BRANCH_SLUG = 40;
 
 /** Branch-name slug of a task title; mirrors Go `slug` (internal/ade/setup.go). */

@@ -42,6 +42,8 @@ type Outcome struct {
 	ExitCode  *int   `json:"exitCode,omitempty"`
 	LastError string `json:"lastError,omitempty"`
 	Summary   string `json:"summary,omitempty"`
+	// Result is the id of the step result an agent reported through finish_step; empty otherwise.
+	Result string `json:"result,omitempty"`
 	// CostUSD is what a Claude run reported spending; nil when it reported none.
 	CostUSD *float64 `json:"costUsd,omitempty"`
 	// PermissionDenials names the tools Claude was denied during the run.

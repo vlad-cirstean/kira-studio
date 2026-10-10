@@ -1,8 +1,32 @@
 package claudeheadless
 
+import "strings"
+
 // FinishStepSuffix ends every agent step prompt (SPEC2 section 5.1.2). It is not in the workflow
 // YAML and cannot be removed.
 const FinishStepSuffix = `When this step is done, call the finish_step tool with status "done" and a one-line summary. If it failed, call it with status "failed" and say what failed and give the reason. If you need a decision from me, call it with status "needs_input" and your question.`
+
+// FinishStepSuffixFor is the finish instruction for a step with results. The implicit pair gives
+// FinishStepSuffix exactly. frontend ade/v2/board/runMessage.ts mirrors it.
+func FinishStepSuffixFor(results []ResultSpec) string {
+	if IsImplicit(results) {
+		return FinishStepSuffix
+	}
+	parts := make([]string, len(results))
+	for i, r := range results {
+		kind := "not ok"
+		if r.OK {
+			kind = "ok"
+		}
+		parts[i] = r.ID + " (" + kind
+		if r.Description != "" {
+			parts[i] += ": " + r.Description
+		}
+		parts[i] += ")"
+	}
+	return "When this step ends, call the finish_step tool once with status set to one of: " + strings.Join(parts, ", ") +
+		`. Add a one-line summary; for a not-ok status give the reason. If you need a decision from me, use status "needs_input" with your question.`
+}
 
 // FinishStepTool is the allowed-tools name of the finish_step MCP tool: server "kira-ade", tool "finish_step".
 const FinishStepTool = "mcp__" + ServerName + "__finish_step"

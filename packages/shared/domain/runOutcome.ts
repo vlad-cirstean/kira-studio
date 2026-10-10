@@ -31,6 +31,7 @@ export const runOutcomeSchema = /*#__PURE__*/ z.object({
   exitCode: z.number().optional(),
   lastError: z.string().optional(),
   summary: z.string().optional(),
+  result: z.string().optional(),
   costUsd: z.number().optional(),
   permissionDenials: z.array(z.string()).optional(),
 });

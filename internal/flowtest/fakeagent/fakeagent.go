@@ -59,7 +59,7 @@ func (s Scenario) Encode() string {
 // Action is one claude attempt. A bare JSON string is shorthand for Action{Name: s}.
 //
 // Named behaviours: "done", "needs_input" and "failed" call finish_step with that status (done also
-// prints one tool_use); "fail" exits 1 with a message on stderr; "nofinish" ends without
+// prints one tool_use); "result:<id>" calls it with the step result id <id>; "fail" exits 1 with a message on stderr; "nofinish" ends without
 // finish_step; "sleep" blocks for an hour. The generic fields run first, in the order below, and
 // compose with a name.
 type Action struct {
@@ -273,6 +273,9 @@ func finishAction(action Action, args []string, headless bool) int {
 		}
 		emitJSON(map[string]any{"type": "result", "subtype": "success", "num_turns": 2})
 		return 0
+	}
+	if id, ok := strings.CutPrefix(action.Name, "result:"); ok {
+		return finish(id)
 	}
 	switch action.Name {
 	case "done":

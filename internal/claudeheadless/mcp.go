@@ -9,10 +9,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -53,12 +56,38 @@ type Grant struct {
 	RunID  string
 	TaskID string
 	Space  bool
+	// Results are the step's declared results; finish_step's status is one of their ids or
+	// needs_input. Empty = the implicit done (ok) and failed (not ok).
+	Results []ResultSpec
+}
+
+// ResultSpec is one result a step may report.
+type ResultSpec struct {
+	ID, Description string
+	OK              bool
+}
+
+// implicitResults are the results of a step that declares none.
+var implicitResults = []ResultSpec{{ID: finishStatusDone, OK: true}, {ID: finishStatusFail}}
+
+// IsImplicit reports whether results are the implicit pair (or none): nothing to restrict or explain.
+func IsImplicit(results []ResultSpec) bool {
+	return len(results) == 0 || slices.Equal(results, implicitResults)
+}
+
+func resultsOrImplicit(r []ResultSpec) []ResultSpec {
+	if len(r) == 0 {
+		return implicitResults
+	}
+	return r
 }
 
 type registration struct {
 	id         uint64 // unique per registration: one run id may register again before the first releases
 	grant      Grant
 	hash, salt []byte
+	// server carries this run's own finish_step schema; nil = the shared server for its flags.
+	server *mcp.Server
 }
 
 const grantPrefix = "g"
@@ -125,17 +154,64 @@ func checkFinish(a finishArgs) string {
 	return ""
 }
 
+// statusIDs are the values finish_step's status takes for results: their ids, then needs_input.
+func statusIDs(results []ResultSpec) []string {
+	results = resultsOrImplicit(results)
+	ids := make([]string, 0, len(results)+1)
+	for _, r := range results {
+		ids = append(ids, r.ID)
+	}
+	return append(ids, finishStatusNeed)
+}
+
+// finishSchema is finish_step's input schema with status restricted to the run's results.
+func finishSchema(results []ResultSpec) (*jsonschema.Schema, error) {
+	sch, err := jsonschema.For[finishArgs](nil)
+	if err != nil {
+		return nil, err
+	}
+	status := sch.Properties["status"]
+	if status == nil {
+		return nil, errors.New("claudeheadless: finish_step schema has no status")
+	}
+	var desc strings.Builder
+	desc.WriteString("How the step ended. ")
+	for _, r := range resultsOrImplicit(results) {
+		kind := "not ok"
+		if r.OK {
+			kind = "ok"
+		}
+		fmt.Fprintf(&desc, "%s (%s)", r.ID, kind)
+		if r.Description != "" {
+			desc.WriteString(": " + r.Description)
+		}
+		desc.WriteString(". ")
+	}
+	desc.WriteString("needs_input when a decision from the user is needed.")
+	status.Description = desc.String()
+	status.Enum = nil
+	for _, id := range statusIDs(results) {
+		status.Enum = append(status.Enum, id)
+	}
+	return sch, nil
+}
+
 // buildMCPServer returns the tool set a grant sees: an agent never lists a tool it cannot call.
-func (s *Server) buildMCPServer(finish, space, outcomes bool) *mcp.Server {
+func (s *Server) buildMCPServer(finish, space, outcomes bool, results []ResultSpec) *mcp.Server {
 	opts := &mcp.ServerOptions{}
 	if space {
 		opts.Instructions = spaceInstructions
 	}
 	srv := mcp.NewServer(&mcp.Implementation{Name: ServerName, Title: "Kira ADE", Version: "1"}, opts)
 	if finish {
+		schema, err := finishSchema(results)
+		if err != nil {
+			panic(err) // the schema derives from a fixed type: a failure is a programming error
+		}
 		mcp.AddTool(srv, &mcp.Tool{
 			Name:        "finish_step",
 			Description: "Report how this pipeline step ended. Call it exactly once, as the last action.",
+			InputSchema: schema,
 		}, s.finishStep)
 	}
 	if space {
@@ -147,23 +223,28 @@ func (s *Server) buildMCPServer(finish, space, outcomes bool) *mcp.Server {
 	return srv
 }
 
-// grant resolves the registration behind a request; a released registration fails at once.
-func (s *Server) grant(info *auth.TokenInfo) (Grant, bool) {
+// registered resolves the registration behind a request; a released registration fails at once.
+func (s *Server) registered(info *auth.TokenInfo) (registration, bool) {
 	if info == nil || len(info.UserID) <= len(grantPrefix) {
-		return Grant{}, false
+		return registration{}, false
 	}
 	id, err := strconv.ParseUint(info.UserID[len(grantPrefix):], 10, 64)
 	if err != nil {
-		return Grant{}, false
+		return registration{}, false
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, t := range s.tokens {
 		if t.id == id {
-			return t.grant, true
+			return t, true
 		}
 	}
-	return Grant{}, false
+	return registration{}, false
+}
+
+func (s *Server) grant(info *auth.TokenInfo) (Grant, bool) {
+	r, ok := s.registered(info)
+	return r.grant, ok
 }
 
 func toolError(text string) *mcp.CallToolResult {
@@ -171,14 +252,6 @@ func toolError(text string) *mcp.CallToolResult {
 }
 
 func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args finishArgs) (*mcp.CallToolResult, any, error) {
-	switch args.Status {
-	case finishStatusDone, finishStatusFail, finishStatusNeed:
-	default:
-		return toolError(`status must be "done", "failed" or "needs_input"`), nil, nil
-	}
-	if msg := checkFinish(args); msg != "" {
-		return toolError(msg), nil, nil
-	}
 	var info *auth.TokenInfo
 	if req.Extra != nil {
 		info = req.Extra.TokenInfo
@@ -186,6 +259,12 @@ func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args fi
 	g, ok := s.grant(info)
 	if !ok || g.RunID == "" {
 		return nil, nil, errors.New("finish_step: no run behind this call")
+	}
+	if allowed := statusIDs(g.Results); !slices.Contains(allowed, args.Status) {
+		return toolError(fmt.Sprintf("status must be one of: %s", strings.Join(allowed, ", "))), nil, nil
+	}
+	if msg := checkFinish(args); msg != "" {
+		return toolError(msg), nil, nil
 	}
 	s.onFinish(g.RunID, Finish{
 		Status: args.Status, Summary: args.Summary, Reason: args.Reason, ConflictedFiles: args.ConflictedFiles,
@@ -223,16 +302,20 @@ func (s *Server) startLocked() error {
 		for _, space := range []bool{false, true} {
 			for _, outcomes := range []bool{false, true} {
 				if finish || space || outcomes {
-					servers[[3]bool{finish, space, outcomes}] = s.buildMCPServer(finish, space, outcomes)
+					servers[[3]bool{finish, space, outcomes}] = s.buildMCPServer(finish, space, outcomes, nil)
 				}
 			}
 		}
 	}
 	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
-		g, ok := s.grant(auth.TokenInfoFromContext(r.Context()))
+		reg, ok := s.registered(auth.TokenInfoFromContext(r.Context()))
 		if !ok {
 			return nil
 		}
+		if reg.server != nil {
+			return reg.server
+		}
+		g := reg.grant
 		return servers[[3]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil}]
 	}, &mcp.StreamableHTTPOptions{Stateless: true})
 	protected := auth.RequireBearerToken(s.verify, nil)(handler)
@@ -253,6 +336,10 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	if g.Space && (g.TaskID == "" || s.space == nil) {
 		return "", nil, errors.New("claudeheadless: space grant needs a task and space tools")
 	}
+	var perRun *mcp.Server
+	if g.RunID != "" && !IsImplicit(g.Results) {
+		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Results)
+	}
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {
 		return "", nil, err
@@ -268,7 +355,7 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	url := "http://" + s.ln.Addr().String() + mcpPath
 	s.seq++
 	id := s.seq
-	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt})
+	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt, server: perRun})
 	s.mu.Unlock()
 
 	cfg, err := json.Marshal(map[string]any{"mcpServers": map[string]any{ServerName: map[string]any{
