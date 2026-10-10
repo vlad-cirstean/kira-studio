@@ -4022,6 +4022,7 @@ and `docs/v2.0/plans/`.
   `tried`. `decideRebaseOutcome` checks git after the run (each branch on its base, no rebase in progress):
   an agent `done` that git disagrees with becomes `failed`, source `verify`. A run without a report gets
   `no report: <why>` and facts from git. Timeout is `Deps.RebaseTimeout`.
+- The rebase agent has no Bash and loads no settings file (`Isolated`). Git runs through the `git` tool on the `kira-ade` MCP server: `worktree` must be a stack worktree, `args` must match an exact shape in `claudeheadless.CheckGitArgs` (no `-c`, `-C`, `--output`, `--exec`, `--upload-pack`; unlisted options fail, abbreviations included). The stack worktrees are `--add-dir`s so child branches restack and edit.
 - `AbortRebase` runs `git rebase --abort` in the worktree; `BranchInventory` keeps the worktree path of a
   branch mid-rebase (detached HEAD, read from `rebase-merge/head-name`) so abort and `rebaseInProgress` work.
 - MCP `run_outcome` (Space grant, same task only) returns the latest ended runs with outcome, so another
