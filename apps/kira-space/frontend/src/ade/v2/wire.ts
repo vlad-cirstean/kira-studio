@@ -8,7 +8,7 @@ export interface Jira {
   key: string;
   url: string;
 }
-export interface FileChange {
+interface FileChange {
   path: string;
 }
 export interface Commit {
