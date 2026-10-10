@@ -601,3 +601,30 @@ Scope `D="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-s
   `grep -rl '<DialogBody' $D | wc -l` ≥ 40, `grep -rl '<SectionHeading' $D | wc -l` ≥ 6.
 - `git diff --stat <foundation-base>..HEAD -- '*.go'` → empty.
 - `docker-edit.spec.ts` asserts `on`/`off`; every `visual` project green on both apps.
+
+## Foundation result
+
+Landed on `v2.0` (not pushed). Commits: dialog parts + `DialogBody`; input/select/textarea/
+input-group/field-group bases; `SecondaryTabs` + `SectionHeading`; reference migrations
+(`ConfirmDialog`, `UpdateDialog`, `SettingsShell`, `TextPromptDialog`, both `SettingsDialog`);
+`check-ui-primitives.sh` + allowlists + lint wiring + ARCHITECTURE paragraph; `SearchField` + U17;
+search addendum; two on-the-spot fixes; baselines.
+
+Allowlists: stream-a 104 files, stream-b 103 files, 2 `permanent` lines (U3 `CommandPalette.vue`,
+U11 `LogsView.vue` ANSI bold). The guard fails on stale entries, so lists only shrink.
+
+Verify: `typecheck`, `lint`, `test:unit` (1793), `test:ui:studio` (420 pass after fixes),
+`test:ui:space` (456 pass after fix), both visual projects clean after re-record.
+
+Deviations and findings:
+- `NativeSelect` default flip to 26px broke 3 Studio specs: `MethodSelect`, `EnvironmentSelect`,
+  `CellEditorView` select now pass `size: 'kira'`, `GenerateDataDialog` constant input uses
+  `h-control-lg`. Stream-A files edited early; streams branch from this tip, no conflict.
+- `repo-commit-meta.spec.ts` failed before this phase (commit `f046f9a12` moved the scroller to an
+  inner div); spec updated. Stream-B owned file edited early.
+- `InputGroup` default is now `kira-lg`, which carries `font-data` (the `kira` variant's string).
+  Streams check number steppers and text groups that should stay UI font.
+- Space `git-graph*` and `workflow-graph*` baselines moved; likely base input/fill changes plus
+  `f046f9a12` layout drift. Not separable without a base re-record.
+- Visual baselines for Studio/Space shared surfaces re-recorded here (Settings, connection,
+  script, git dialogs); streams re-record only what their own chunks move.
