@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/palette"
@@ -332,6 +333,9 @@ func (s *CodeWorkspaceService) SetRepoColor(args CodeWorkspaceSetColorArgs) (mod
 		return model.CodeRepo{}, ipcerr.BadRequest("invalid colour")
 	}
 	rec, err := s.Deps.Repos.CodeRepos.SetColor(args.ID, args.Color)
+	if errors.Is(err, repos.ErrCodeRepoNotFound) {
+		return model.CodeRepo{}, ipcerr.NotFound("code repo not found")
+	}
 	if err == nil {
 		s.reposChanged()
 	}
@@ -344,6 +348,9 @@ func (s *CodeWorkspaceService) SetRepoHidden(args CodeWorkspaceSetHiddenArgs) (m
 		return model.CodeRepo{}, ipcerr.BadRequest("id is required")
 	}
 	rec, err := s.Deps.Repos.CodeRepos.SetHidden(args.ID, args.Hidden)
+	if errors.Is(err, repos.ErrCodeRepoNotFound) {
+		return model.CodeRepo{}, ipcerr.NotFound("code repo not found")
+	}
 	if err == nil {
 		s.reposChanged()
 	}

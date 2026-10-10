@@ -42,6 +42,13 @@ func TestHideRepo(t *testing.T) {
 		}
 	})
 
+	t.Run("unknown id is not found", func(t *testing.T) {
+		_, err := app.W.CodeWorkspace.SetRepoHidden(bridge.CodeWorkspaceSetHiddenArgs{ID: "gone", Hidden: true})
+		if errCode(err) != "E_NOT_FOUND" {
+			t.Fatalf("err = %v, want E_NOT_FOUND", err)
+		}
+	})
+
 	t.Run("importing a hidden repo again shows it", func(t *testing.T) {
 		again, err := app.W.CodeWorkspace.ImportRepo(ctx, bridge.CodeWorkspaceImportArgs{Path: r.Dir})
 		if err != nil || again.ID != rec.ID || again.Hidden {

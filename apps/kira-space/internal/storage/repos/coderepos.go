@@ -101,6 +101,9 @@ func (r *CodeReposRepo) Rename(id, name string) (model.CodeRepo, error) {
 	return *rec, nil
 }
 
+// ErrCodeRepoNotFound means a code repo id has no row (removed in another window).
+var ErrCodeRepoNotFound = errors.New("code repo not found")
+
 // SetColor updates only the palette colour.
 func (r *CodeReposRepo) SetColor(id, color string) (model.CodeRepo, error) {
 	if !palette.Valid(color) {
@@ -114,7 +117,7 @@ func (r *CodeReposRepo) SetColor(id, color string) (model.CodeRepo, error) {
 		return model.CodeRepo{}, err
 	}
 	if rec == nil {
-		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s colour: not found", id)
+		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s colour: %w", id, ErrCodeRepoNotFound)
 	}
 	return *rec, nil
 }
@@ -129,7 +132,7 @@ func (r *CodeReposRepo) SetHidden(id string, hidden bool) (model.CodeRepo, error
 		return model.CodeRepo{}, err
 	}
 	if rec == nil {
-		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s hidden: not found", id)
+		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s hidden: %w", id, ErrCodeRepoNotFound)
 	}
 	return *rec, nil
 }

@@ -350,5 +350,12 @@ func (b *TaskBoard) importFolder(ctx context.Context, path string) ([]string, er
 		}
 		imported = append(imported, rec.ID)
 	}
+	// SetFolderHidden does not wait for a scan: a flag flipped mid-scan is re-applied to the
+	// repos this scan imported, which the flip's own UPDATE could not have seen.
+	if now, err := b.deps.RepoConfig.FolderHidden(path); err == nil && now != folderHidden && len(imported) > 0 {
+		if _, err := b.deps.RepoConfig.SetFolderHidden(path, now); err != nil {
+			return nil, err
+		}
+	}
 	return imported, nil
 }
