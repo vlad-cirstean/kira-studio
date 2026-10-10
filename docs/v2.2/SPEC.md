@@ -47,6 +47,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P245 | Git module visual alignment: make the git module look exactly like the rest of the app, using only Tailwind and mostly default values (drop `kv:` prefix indirection and custom styles) | Todo |
 | P246 | Popup routing across windows plus system notifications: route every app-originated popup or prompt by origin through one central Go prompt router (origin window key or none) and one shared frontend host. Window-triggered shows in that window. Generic (no originating window: cron, MCP, background script or agent event) shows only in the main window (lowest-order real, non-ephemeral window), never in every window, never duplicated; none open queues it for next window open or focus. Each popup also fires a system notification through the P238 sink (click focuses the right window and popup; answering or dismissing anywhere clears it). Covers the P242 Part 4 cron 'run now?' confirm, MCP-initiated prompts, script and automation triggers; Space and Studio (Studio has no ADE or cron windows, apply to its existing prompts). Depends on P238 and P242 Part 3, lands after both | Todo |
 | P247 | Workflow branching overhaul: an agent step declares its results (each ok or not ok, with a route: next step, a later step, an earlier step or itself as a bounded loop, end of stage, or stop); `finish_step` takes exactly one of that step's results (per-run schema enum, plus `needs_input`; P241 reason, conflicted files, last git error, tried kept) and the engine routes on it with per-edge loop limits; existing `on_failure` workflows and task snapshots work unchanged. The Form editor becomes a graph editor (Vue Flow, MIT): no up/down buttons, edges green for ok, red for not ok, neutral when both lead to the same step; `VarText` previews; result and route on board, panel, Needs you and notification | Todo |
+| P248 | Paste credentials into DB connections (Studio only): a Paste credentials panel in the connection dialog (fields mode, non-file kinds) and an Update credentials item on a saved fields-mode network connection (writes only username/password, keeps the rest, reconnects a live connection). Parses labelled key/value text in the renderer only: separators `:` `=` `->` whitespace tabs newlines, quoted values, key aliases (user/username/login/uid/role/account, pass/password/pwd/passwd/secret/token, host/port/database/db/dbname/schema/service/sid), `.env`/env-var lines (PGUSER=, DB_PASSWORD=), plain DSN `Key=value;`, CLI flags (psql/mysql/redis-cli/mongosh -u -p -h); passwords with separators kept by label-based value rules. No URL/URI/JDBC, JSON, YAML or percent-decoding (user cut). Review before apply: recognised fields, masked password with reveal, candidate picker, guessed badge. Blob never logged, stored or sent over the bridge; cleared on close | Todo |
 
 ### Streams for P236-P239 (user override: 3 concurrent streams)
 
@@ -94,6 +95,7 @@ updates `docs/ARCHITECTURE.md` test counts.
 - P245: git module must look exactly like the rest of the app, only Tailwind, mostly default values.
 - P246: popups and prompts the app raises route by origin: window-triggered shows in that window; generic (cron, MCP, background script or agent event) shows only in the main window (lowest-order real, non-ephemeral window), never in all windows, never duplicated; no window open queues it for next open or focus and keeps the system notification. Each popup also fires a system notification via the P238 sink; click focuses the right window and popup; answering or dismissing in one place clears the notification. Requires a central prompt router in Go (origin window key or none) plus a shared frontend host, flow tests per P236 conventions, and an e2e with two windows. Depends on P238 (notifications) and P242 Part 4 (cron popup); lands after both. Part 4's cron popup shows in the main window only until this phase generalizes it. Covers Space and Studio where prompts exist.
 - P247: the kira-ade MCP `finish_step` allows a result for success or not; in workflows a step declares several allowed results (some ok, some not ok) and the MCP tool requests exactly one of those; the workflow branches on the chosen result (go back to another step, retry loops). The workflow editor is cumbersome: overhaul it, drop the up/down buttons, graph-style editor with edges coloured for success and failure; when both outcomes lead to the same next step, the edge keeps a normal colour.
+- P248: DB credentials are temporary and rotate; paste a blob like `user: foo  pass: bar` into the connection form and have fields filled; many key and separator combinations. Later cut: no URLs (fragile, they belong in the URL field), no JSON, YAML or URL-encoding.
 
 ## P210 result
 
@@ -816,5 +818,9 @@ Pending.
 Pending.
 
 ## P247 result
+
+Pending.
+
+## P248 result
 
 Pending.
