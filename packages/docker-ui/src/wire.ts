@@ -138,6 +138,7 @@ export interface DockerImage {
   created: number;
   containers: number;
   dangling: boolean;
+  registryUrl: string;
 }
 
 export interface DockerVolume {
@@ -196,6 +197,7 @@ export interface DockerContainerDetail {
   labels: Record<string, string>;
   networkAttachments: DockerNetworkAttachment[];
   raw: string;
+  registryUrl: string;
 }
 
 export type InspectKind = 'image' | 'volume' | 'network';

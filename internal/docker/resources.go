@@ -92,6 +92,8 @@ type Image struct {
 	Created    int64    `json:"created"`
 	Containers int      `json:"containers"`
 	Dangling   bool     `json:"dangling"`
+	// RegistryURL is the registry web page of the image; empty when none is known.
+	RegistryURL string `json:"registryUrl"`
 }
 
 // Volume is one row of the volume list.
@@ -155,6 +157,8 @@ type ContainerDetail struct {
 	Labels             map[string]string   `json:"labels"`
 	NetworkAttachments []NetworkAttachment `json:"networkAttachments"`
 	Raw                string              `json:"raw"`
+	// RegistryURL is the registry web page of the container's image; empty when none is known.
+	RegistryURL string `json:"registryUrl"`
 }
 
 // InspectResult is the raw inspect JSON of an image, volume or network.
@@ -288,7 +292,7 @@ func (m *Manager) images(ctx context.Context) ([]Image, error) {
 					tags = append(tags, t)
 				}
 			}
-			out = append(out, Image{ID: s.ID, Tags: tags, Size: s.Size, Created: s.Created, Containers: inUse[s.ID], Dangling: len(tags) == 0})
+			out = append(out, Image{ID: s.ID, Tags: tags, Size: s.Size, Created: s.Created, Containers: inUse[s.ID], Dangling: len(tags) == 0, RegistryURL: registryURL(tags, s.RepoDigests)})
 		}
 		return nil
 	})
@@ -385,6 +389,9 @@ func (m *Manager) inspectContainer(ctx context.Context, id string) (ContainerDet
 			return err
 		}
 		out = detailFromInspect(res.Container, res.Raw)
+		if ii, err := cli.ImageInspect(ctx, res.Container.Image); err == nil {
+			out.RegistryURL = registryURL(ii.RepoTags, ii.RepoDigests)
+		}
 		return nil
 	})
 	return out, err
