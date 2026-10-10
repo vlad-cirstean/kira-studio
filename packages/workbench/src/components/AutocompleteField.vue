@@ -95,13 +95,22 @@ const props = withDefaults(
     /** TextField.vue's own opt-in 4-row auto-grow — the control becomes a `<textarea>`. Off by
      *  default: every existing call site renders byte-identically. */
     grow?: boolean;
+    /** A resizable, `rows`-tall `<textarea>` where Enter inserts a newline (unless a suggestion was
+     *  arrowed onto) and Cmd/Ctrl+Enter bubbles, unlike `grow`, which never inserts one. */
+    multiline?: boolean;
+    rows?: number;
+    /** Off for prose/shell bodies, where auto-closing `'` and `"` gets in the way. */
+    autoClose?: boolean;
+    /** Lists every candidate (capped at `MAX_VISIBLE`) as soon as `tokenAt` returns a non-null,
+     *  empty word, e.g. right after typing `{` or `$`. */
+    openOnEmptyToken?: boolean;
     /** P110 B25: routed onto the InputGroup box (this field's own root), never onto the inner
      *  `<input>`/`<textarea>` — matches every other named `:deep(.p-input)` call site's own intent
      *  (a wrapper's width, e.g. `class="w-full"`), which now becomes a plain prop instead of a
      *  scoped descendant rule reaching across the component boundary. */
     class?: HTMLAttributes['class'];
   }>(),
-  { candidates: () => [] },
+  { candidates: () => [], autoClose: true, rows: 4 },
 );
 
 const highlighted = computed(() => !!props.language && props.language !== 'plain');
@@ -114,7 +123,9 @@ const showOverlay = computed(() => highlighted.value || !!props.rangeHighlights)
 // `leading-[normal]`/`leading-[inherit]` are both §1.2-allowlisted for this file's overlay only
 // (Tailwind's own `leading-normal` resolves to a fixed 1.5, not the CSS keyword `normal`).
 const overlayClass = computed(() =>
-  props.grow ? 'block whitespace-pre-wrap wrap-anywhere leading-[inherit]' : 'flex items-center whitespace-pre leading-[normal]',
+  props.grow || props.multiline
+    ? 'block whitespace-pre-wrap wrap-anywhere leading-[inherit]'
+    : 'flex items-center whitespace-pre leading-[normal]',
 );
 // `.input-wrap input.has-overlay`/`textarea.has-overlay`'s own compound (relative/z-1/text-transparent/
 // caret-fg, at higher specificity than the input's own static text-fg) folded the same way — the real
@@ -237,11 +248,19 @@ const resolvedCandidates = computed<readonly Completion[]>(() =>
     : props.candidates,
 );
 
+// Whether the tokenizer matched at the caret (even with an empty word) — `openOnEmptyToken` only.
+const tokenActive = ref(false);
+const listAll = computed(
+  () => forceAll.value || (props.openOnEmptyToken && tokenActive.value && currentWord.value === ''),
+);
 const filtered = computed(() =>
-  forceAll.value
+  listAll.value
     ? resolvedCandidates.value.slice(0, MAX_VISIBLE)
     : rankCandidates(resolvedCandidates.value, currentWord.value),
 );
+const wantsOpen = (): boolean =>
+  (currentWord.value.length > 0 || (!!props.openOnEmptyToken && tokenActive.value)) &&
+  filtered.value.length > 0;
 
 function recompute(el: HTMLInputElement | HTMLTextAreaElement): void {
   const cursor = el.selectionStart ?? el.value.length;
@@ -252,6 +271,7 @@ function recompute(el: HTMLInputElement | HTMLTextAreaElement): void {
   // while the caret is actually inside a reference.
   wordStart.value = token?.from ?? cursor;
   currentWord.value = token?.word ?? '';
+  tokenActive.value = token !== null;
   activeIndex.value = 0;
   hasNavigated.value = false;
 }
@@ -261,7 +281,7 @@ function onInput(e: Event): void {
   emit('update:modelValue', el.value);
   forceAll.value = false;
   recompute(el);
-  open.value = currentWord.value.length > 0 && filtered.value.length > 0;
+  open.value = wantsOpen();
   closeHover();
 }
 
@@ -305,7 +325,7 @@ function onKeydown(e: KeyboardEvent): void {
   // event either one dispatches, same as any other edit.
   const before = (e.target as HTMLInputElement | HTMLTextAreaElement).value;
   wrapSelectionOnType(e);
-  autoClosePairsOnType(e);
+  if (props.autoClose) autoClosePairsOnType(e);
   if ((e.target as HTMLInputElement | HTMLTextAreaElement).value !== before) return;
   // Ctrl+Space / Cmd+Space: explicit "show me everything", matching completionKeymap's own binding
   // so the console and these plain fields share one muscle memory.
@@ -342,9 +362,11 @@ function onKeydown(e: KeyboardEvent): void {
     }
   }
   if (e.key === 'Enter') {
+    open.value = false;
+    // Multiline: a plain Enter is a newline, Cmd/Ctrl+Enter bubbles to the host (dialog save).
+    if (props.multiline) return;
     // No newline is ever inserted under `grow` — growth comes from soft wrapping alone.
     if (props.grow) e.preventDefault();
-    open.value = false;
     emit('enter');
   } else if (e.key === 'Escape') emit('escape');
 }
@@ -519,13 +541,17 @@ const fieldAttrs = computed(
     <InputGroup
       variant="kira"
       class="p-input autocomplete-field relative"
-      :class="[{ 'is-grow': grow }, props.class]"
+      :class="[{ 'is-grow': grow }, multiline ? 'h-auto min-h-control items-start py-1.5 leading-relaxed' : '', props.class]"
       :aria-invalid="invalid"
     >
       <span v-if="prefix" :class="prefixActive ? 'text-state-on' : 'text-muted-foreground'">{{
         prefix
       }}</span>
-      <span class="input-wrap relative flex min-w-0 flex-1 items-center" :data-value="modelValue">
+      <span
+        class="input-wrap relative flex min-w-0 flex-1"
+        :class="multiline ? 'items-stretch' : 'items-center'"
+        :data-value="modelValue"
+      >
         <!-- Paint-only: see `language`'s own doc comment above for why this is a second element
              behind the real input rather than the input itself. `overlayHtml` is built entirely by
              `paintOverlayHtml` — every character of the field's own text, HTML-escaped, wrapped
@@ -560,11 +586,12 @@ const fieldAttrs = computed(
              it). `.p-input.is-grow` (primitives.css, B31 residue) still targets this same literal
              class name unconditionally applied above. -->
         <textarea
-          v-if="grow"
+          v-if="grow || multiline"
           ref="inputRef"
-          rows="1"
+          :rows="multiline ? rows : 1"
           wrap="soft"
           class="min-w-0 flex-1 border-0 bg-transparent font-data text-kira-md outline-none placeholder:text-muted-foreground"
+          :class="multiline ? 'resize-y p-0 whitespace-pre-wrap wrap-anywhere' : ''"
           v-bind="{ ...$attrs, ...fieldAttrs }"
         />
         <!-- §1.2 allowlist: the two `::-webkit-*-spin-button` arbitrary utilities are pre-approved
