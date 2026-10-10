@@ -22,8 +22,18 @@ var (
 )
 
 type importError struct {
-	kind error
-	msg  string
+	kind     error
+	msg      string
+	existing *model.CodeRepo
+}
+
+// ExistingRecord returns the already imported record behind an ErrAlreadyImported failure.
+func ExistingRecord(err error) (model.CodeRepo, bool) {
+	var ie *importError
+	if errors.As(err, &ie) && ie.existing != nil {
+		return *ie.existing, true
+	}
+	return model.CodeRepo{}, false
 }
 
 func (e *importError) Error() string        { return e.msg }
@@ -39,6 +49,8 @@ type RepoStore interface {
 // import a worktree checked out under a scanned folder.
 type ImportOptions struct {
 	RejectLinkedWorktree bool
+	// Hidden stores the new record hidden (a scan of a hidden folder).
+	Hidden bool
 }
 
 // Import identifies path with git (gitPath is the resolved binary), refuses a bare repository, a
@@ -47,13 +59,13 @@ type ImportOptions struct {
 func Import(ctx context.Context, store RepoStore, runner gitclient.Runner, gitPath, path string, opts ImportOptions) (model.CodeRepo, error) {
 	summary, err := gitclient.Identify(ctx, runner, gitPath, path)
 	if err != nil {
-		return model.CodeRepo{}, &importError{ErrNotRepo, "not a git repository: " + err.Error()}
+		return model.CodeRepo{}, &importError{kind: ErrNotRepo, msg: "not a git repository: " + err.Error()}
 	}
 	if summary.IsBare {
-		return model.CodeRepo{}, &importError{ErrBare, "a bare repository has no worktree to browse"}
+		return model.CodeRepo{}, &importError{kind: ErrBare, msg: "a bare repository has no worktree to browse"}
 	}
 	if opts.RejectLinkedWorktree && summary.IsLinkedWorktree {
-		return model.CodeRepo{}, &importError{ErrLinkedWorktree, summary.Root + " is a linked worktree"}
+		return model.CodeRepo{}, &importError{kind: ErrLinkedWorktree, msg: summary.Root + " is a linked worktree"}
 	}
 	existing, err := store.List()
 	if err != nil {
@@ -61,7 +73,7 @@ func Import(ctx context.Context, store RepoStore, runner gitclient.Runner, gitPa
 	}
 	for _, r := range existing {
 		if r.RepoID == summary.RepoID {
-			return model.CodeRepo{}, &importError{ErrAlreadyImported, r.Name + " is already imported"}
+			return model.CodeRepo{}, &importError{kind: ErrAlreadyImported, msg: r.Name + " is already imported", existing: &r}
 		}
 	}
 	name := filepath.Base(summary.Root)
@@ -71,9 +83,10 @@ func Import(ctx context.Context, store RepoStore, runner gitclient.Runner, gitPa
 		Root:      summary.Root,
 		RepoID:    summary.RepoID,
 		CreatedAt: kiratime.NowISO(),
+		Hidden:    opts.Hidden,
 	})
 	if errors.Is(err, repos.ErrCodeRepoExists) {
-		return model.CodeRepo{}, &importError{ErrAlreadyImported, name + " is already imported"}
+		return model.CodeRepo{}, &importError{kind: ErrAlreadyImported, msg: name + " is already imported"}
 	}
 	return rec, err
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const codeReposSelectColumns = `id, name, root, repo_id, sort_order, color, created_at`
+const codeReposSelectColumns = `id, name, root, repo_id, sort_order, color, created_at, hidden`
 
 // CodeReposRepo reads and writes the `code_repos` table (C5 §3.1) — the repo-import store.
 type CodeReposRepo struct {
@@ -19,9 +19,11 @@ type CodeReposRepo struct {
 
 func scanCodeRepoRow(row rowScanner) (model.CodeRepo, error) {
 	var r model.CodeRepo
-	if err := row.Scan(&r.ID, &r.Name, &r.Root, &r.RepoID, &r.SortOrder, &r.Color, &r.CreatedAt); err != nil {
+	var hidden int
+	if err := row.Scan(&r.ID, &r.Name, &r.Root, &r.RepoID, &r.SortOrder, &r.Color, &r.CreatedAt, &hidden); err != nil {
 		return model.CodeRepo{}, err
 	}
+	r.Hidden = hidden != 0
 	return r, nil
 }
 
@@ -70,8 +72,8 @@ func (r *CodeReposRepo) Create(rec model.CodeRepo) (model.CodeRepo, error) {
 		return model.CodeRepo{}, fmt.Errorf("repos: %w", err)
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO code_repos (id, name, root, repo_id, sort_order, color, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.Name, rec.Root, rec.RepoID, rec.SortOrder, rec.Color, rec.CreatedAt,
+		`INSERT INTO code_repos (id, name, root, repo_id, sort_order, color, created_at, hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Name, rec.Root, rec.RepoID, rec.SortOrder, rec.Color, rec.CreatedAt, boolInt(rec.Hidden),
 	); err != nil {
 		if isUniqueViolation(err) {
 			return model.CodeRepo{}, ErrCodeRepoExists
@@ -113,6 +115,21 @@ func (r *CodeReposRepo) SetColor(id, color string) (model.CodeRepo, error) {
 	}
 	if rec == nil {
 		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s colour: not found", id)
+	}
+	return *rec, nil
+}
+
+// SetHidden updates only the hidden flag.
+func (r *CodeReposRepo) SetHidden(id string, hidden bool) (model.CodeRepo, error) {
+	if _, err := r.DB.Exec(`UPDATE code_repos SET hidden = ? WHERE id = ?`, boolInt(hidden), id); err != nil {
+		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s hidden: %w", id, err)
+	}
+	rec, err := r.Get(id)
+	if err != nil {
+		return model.CodeRepo{}, err
+	}
+	if rec == nil {
+		return model.CodeRepo{}, fmt.Errorf("repos: set code repo %s hidden: not found", id)
 	}
 	return *rec, nil
 }

@@ -306,9 +306,13 @@ func (b *TaskBoard) importFolder(ctx context.Context, path string) ([]string, er
 	if status.Kind != "ok" {
 		return nil, errors.New("ade: git is unavailable: " + status.Kind)
 	}
+	folderHidden, err := b.deps.RepoConfig.FolderHidden(path)
+	if err != nil {
+		return nil, err
+	}
 	for _, root := range scan.repos {
 		rec, err := codeworkspace.Import(ctx, b.deps.CodeRepos, b.deps.Runner, status.Path, root,
-			codeworkspace.ImportOptions{RejectLinkedWorktree: true})
+			codeworkspace.ImportOptions{RejectLinkedWorktree: true, Hidden: folderHidden})
 		switch {
 		case err == nil:
 		case errors.Is(err, codeworkspace.ErrAlreadyImported), errors.Is(err, codeworkspace.ErrLinkedWorktree),

@@ -310,7 +310,10 @@ type AdeRepoConfig struct {
 type AdeFolder struct {
 	Path      string
 	Watch     bool
+	Hidden    bool
 	RepoCount int
+	// HiddenCount is how many of the folder's imported repos are hidden.
+	HiddenCount int
 }
 
 // AdeRepoConfigPatch holds only the ade_repo_config leaves the caller changes; nil = unchanged.

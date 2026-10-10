@@ -17,6 +17,7 @@ type CodeRepo struct {
 	SortOrder int    `json:"sortOrder"`
 	Color     string `json:"color"`
 	CreatedAt string `json:"createdAt"`
+	Hidden    bool   `json:"hidden"`
 }
 
 // Validate asserts the identity fields no SQL constraint covers, the same discipline
