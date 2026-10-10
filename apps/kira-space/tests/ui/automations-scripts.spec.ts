@@ -74,6 +74,7 @@ test('the header + adds a two-line script, sent with its newline', async ({ rela
         command: SCRIPT.command,
         kind: 'script',
         params: [],
+        schedule: null,
         smart: null,
         dirMode: 'kira',
         useAdeDir: true,
