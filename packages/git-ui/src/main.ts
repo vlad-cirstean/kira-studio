@@ -6,14 +6,6 @@ import { GRAPH_VISIBLE_KEY } from './graphVisibility.ts';
 import MountRoot from './MountRoot.vue';
 import type { ReviewTarget } from './state/review.ts';
 import type { DateFormat, ViewStateStore } from './state/viewState.ts';
-// P110 A1: the prefixed Tailwind build (theme + utilities under `kv:`). Imported first so its
-// `@theme inline reference` mappings are available to every utility class generated below.
-import './theme/tailwind.css';
-import './icons/codicon.css';
-import './theme/vscode-tokens.css';
-import './theme/density.css';
-// G34 D1: colourless structural tokens — hoisted to :root, the app's one scale for both roots.
-import './theme/kira-structure.css';
 
 export interface MountHandle {
   unmount(): void;
@@ -111,21 +103,12 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   // `"review"` mount (no CommitGrid.vue there to read it) is harmless.
   const graphVisible = shallowRef(true);
   app.provide(GRAPH_VISIBLE_KEY, graphVisible);
-  // G16 D1/D2 (P110 A19): the document-level height chain, as classes applied here rather than
-  // an `html, body` selector. `mount()` owns this chain (this file's own original doc comment:
-  // "a document-owning bootstrap, not a widget factory"). Never removed on unmount: `html`/`body`
-  // are the document's own elements, not scoped to any one mount.
-  document.documentElement.classList.add('kv:h-full', 'kv:m-0', 'kv:p-0', 'kv:overflow-hidden');
-  document.body.classList.add('kv:h-full', 'kv:m-0', 'kv:p-0', 'kv:overflow-hidden');
-  // The other half of the chain — the class and the rule are useless apart, and they live in two
-  // places because the class must follow whatever container the host hands us, not a naming
-  // convention two packages have to agree on.
-  container.classList.add('kv:h-full', 'kv:w-full', 'kv:overflow-hidden');
+  container.classList.add('h-full', 'w-full', 'overflow-hidden');
   app.mount(container);
   return {
     unmount(): void {
       app.unmount();
-      container.classList.remove('kv:h-full', 'kv:w-full', 'kv:overflow-hidden');
+      container.classList.remove('h-full', 'w-full', 'overflow-hidden');
     },
     setVisible(visible: boolean): void {
       graphVisible.value = visible;

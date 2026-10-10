@@ -14,10 +14,9 @@
 # the deliberate exception: every shadcn colour/radius alias that duplicated a kira name was
 # renamed away inside components/ui too (one name per value, repo-wide), so those checks scan it
 # on purpose -- a re-pulled registry file that still says bg-card must fail lint, same as any
-# other file. P131 Part 1 §7: check_alias, check_focus_width and check_font_scale's host pass each
-# gained a second, `kv:`-excluding pass over packages/git-ui/src too -- a migrated dialog's own
-# shadcn component (packages/git-ui/src/components/dialogs/*.vue) speaks this same unprefixed
-# vocabulary, so a retired/forbidden shape there is a real hit, not exempt just for living in GU.
+# other file. check_alias, check_focus_width and check_font_scale's host pass each have a second
+# pass over packages/git-ui/src: git-ui speaks this same unprefixed vocabulary (P245 dropped its
+# own `kv:` Tailwind root), so a retired/forbidden shape there is a real hit.
 #
 # Every commit that retires a class name appends its own `check_class` call here, in the same
 # commit that does the rename/deletion (P110 plan §5.12). Never a batch add at the end.
@@ -96,8 +95,7 @@ if [ -z "$TC_COLLECT" ]; then
       grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
       grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" || true
     grep -rnP --include='*.ts' "" "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
-      grep -v "^${GIT_UI_SRC}/lib/cn.ts:" |
-      grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
+        grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
       grep -P "(?<![-\\w])(?:${alt})(?![-\\w])" || true
   }
   if [ -s "$TC_COLLECT/all" ] && [ -z "$(_family_hits "$(_alt all)" 0)" ]; then
@@ -188,7 +186,6 @@ _gu_ku_hits() {
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
   ts_hits=$(grep -rnP --include='*.ts' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
-    grep -v "^${GIT_UI_SRC}/lib/cn.ts:" |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
   printf '%s\n%s\n' "$vue_hits" "$ts_hits" | grep -v '^$' || true
@@ -263,16 +260,9 @@ check_class_in_attrs_all() {
 
 # check_alias <retired-name-regex> <replacement>
 # P110 I2-37/I2-38: check_class WITHOUT the components/ui exclusion -- one name per value, repo-
-# wide (§3.11.3), so a shadcn alias colour/radius name is retired everywhere PT reaches, including
-# its own registry-authored components. PT-root scan is unconditional (SCAN_DIRS never includes
-# GU/KU) -- the kv root defines none of these shadcn names for colours, and defines its OWN
-# --radius-sm/--radius-lg with different, legitimate meanings, so that scan must never include it.
-# P131 Part 1 §7: a SECOND pass now also scans packages/git-ui/src, but only for an UNPREFIXED hit
-# (a migrated dialog's shadcn component speaks PT's own alias-retirement vocabulary) -- never a
-# `kv:`-prefixed one, git-ui's own root's unrelated names, excluded by the `(?!kv:)` right after
-# the lookbehind (which itself gains `:` so a match can never start mid-token, right after a
-# `kv:` variant prefix the outer alternation's own `(?:[a-z0-9-]+:)*` group would otherwise still
-# capture).
+# wide (§3.11.3), so a shadcn alias colour/radius name is retired everywhere, including its own
+# registry-authored components. A second pass scans packages/git-ui/src (shadcn components there
+# speak the same vocabulary).
 check_alias() {
   if [ -n "$TC_COLLECT" ]; then
     return 0
@@ -282,7 +272,7 @@ check_alias() {
   hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
     -- "(?<![-\\w])(?:[a-z0-9-]+:)*${name}(?![-\\w])" $SCAN_DIRS 2>/dev/null || true)
   gu_hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
-    -- "(?<![\\w:-])(?!kv:)(?:[a-z0-9-]+:)*${name}(?![-\\w])" "$GIT_UI_SRC" 2>/dev/null || true)
+    -- "(?<![\\w:-])(?:[a-z0-9-]+:)*${name}(?![-\\w])" "$GIT_UI_SRC" 2>/dev/null || true)
   hits=$(printf '%s\n%s\n' "$hits" "$gu_hits" | grep -v '^$' || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: retired alias '$name' still used -- replace with '$replacement':" >&2
@@ -296,16 +286,9 @@ check_alias() {
 # ring-error) or a >1px coloured outline -- both replaced by the shared `focus-ring` utility
 # (packages/theme/src/base.css). Modelled on check_alias: SCAN_DIRS *including* components/ui (no
 # shadcn-registry survivor for either shape any more, P122 plan §3.3), plus the GU/KU pass via
-# _gu_ku_hits (kv: roots keep their own 1px --kv-focus-border recipe, a different shape by design).
-# `peer-focus-visible:outline-2` (SwatchRadio.vue, P122 plan §3.5's own named exception) matches
-# neither pattern -- `peer-` sits outside both alternations.
-# P131 Part 1 §7: a THIRD pass scans packages/git-ui/src again, this time for an UNPREFIXED hit
-# (a migrated dialog's own shadcn component) -- _gu_ku_hits above only ever matches a `kv:`-
-# prefixed variant chain (git-ui's own root, a different, allowed recipe), so it would miss an
-# unprefixed shadcn tag carrying this same retired halo. Every caller's own $pattern literally
-# starts with the 10-character `(?<![-\w])` lookbehind (both call sites below), stripped here via
-# `cut -c11-` (POSIX sh has no `${var:n}` substring expansion) and replaced with
-# `(?<![\w:-])(?!kv:)` -- same rewrite check_alias applies inline to its own pattern.
+# _gu_ku_hits and a git-ui pass over every file type. Every caller's own $pattern literally starts
+# with the 10-character `(?<![-\w])` lookbehind, stripped here via `cut -c11-` (POSIX sh has no
+# `${var:n}` substring expansion) and replaced with `(?<![\w:-])`.
 check_focus_width() {
   if [ -n "$TC_COLLECT" ]; then
     return 0
@@ -315,7 +298,7 @@ check_focus_width() {
     -- "$pattern" $SCAN_DIRS 2>/dev/null || true)
   gu_ku_hits=$(_gu_ku_hits "$pattern")
   pattern_tail=$(printf '%s' "$pattern" | cut -c11-)
-  gu_unprefixed_pattern="(?<![\\w:-])(?!kv:)${pattern_tail}"
+  gu_unprefixed_pattern="(?<![\\w:-])${pattern_tail}"
   gu_unprefixed_hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
     -- "$gu_unprefixed_pattern" "$GIT_UI_SRC" 2>/dev/null || true)
   hits=$(printf '%s\n%s\n%s\n' "$hits" "$gu_ku_hits" "$gu_unprefixed_hits" | grep -v '^$' || true)
@@ -345,31 +328,19 @@ _font_scale_anchor() {
 }
 
 # check_font_scale
-# P123 §6.2: chrome speaks only text-kira-sm/md/lg/xl (kv: text-sm/base/lg, kv: text-kui-sm/base) --
-# commit 7 reset both @theme roots (`--text-*: initial`) so every stock Tailwind size and the
-# retired xs step is gone from chrome's own resolution path. Host pass: full-line (not -o) so the
-# comment-marker filter -- which only recognizes a line that itself STARTS with a marker, never a
-# block comment's own continuation line -- works the same way _gu_ku_hits already relies on for the
-# kv passes below; SCAN_DIRS already recurses through components/ui, where P123 §3.2 moved every
-# shadcn primitive onto the scale too, so no separate directory is added the way check_focus_width
-# does for itself. kv pass: GU/KU's own class-attribute/`.ts`-file convention (_gu_ku_hits'
-# shape, not the helper itself -- KV_CSS also needs `.css` files, which _gu_ku_hits never scans).
-# P131 Part 1 §7: the host CLASS pass (only -- not host_css, a raw CSS `font-size:` declaration,
-# which git-ui's own existing kv_css pass below already guards for that root) gains a git-ui-
-# scoped, `kv:`-excluding variant: a migrated dialog's shadcn component follows chrome's own
-# unprefixed scale, so an off-scale `text-*` utility there is a real hit too, distinct from the
-# `kv:`-prefixed one the existing kv pass below already catches.
+# P123 §6.2: chrome speaks only text-kira-sm/md/lg/xl -- the @theme root resets `--text-*`, so every
+# stock Tailwind size and the retired xs step is gone from chrome's own resolution path. Data
+# surfaces in git-ui speak text-graph-xs/sm/md/lg (theme/git.css), which these patterns do not match.
+# Host pass: full-line (not -o) so the comment-marker filter -- which only recognizes a line that
+# itself STARTS with a marker, never a block comment's own continuation line -- works.
 check_font_scale() {
   if [ -n "$TC_COLLECT" ]; then
     return 0
   fi
   host_class='(?<![-\w])text-(?:xs|sm|base|lg|[2-9]?xl|kira-xs|\[(?!#|rgb|hsl|color:|var\()[^\]\s]+\]|\(length:[^)\s]+\))(?![-\w])'
   host_css='(?<![-\w])font-size\s*:(?!\s*var\(--kira-t-(?:sm|md|lg|xl)\)\s*[;}])'
-  kv_class='(?<![-\w])kv:text-(?:xs|kui-xs|\[(?!#|rgb|hsl|color:|var\()[^\]\s]+\])(?![-\w])'
-  kv_css='(?<![-\w])font-size\s*:(?!\s*var\(--kv-t-(?:sm|md|lg)\)\s*[;}])'
-  hint='text-kira-sm/md/lg/xl (kv: text-sm/base/lg) per docs/v1.9/plans/P123-font-size-normalization.md §1.2'
+  hint='text-kira-sm/md/lg/xl (data surfaces: text-graph-sm/md/lg) per docs/v1.9/plans/P123-font-size-normalization.md §1.2'
   slick_theme="${FRONTEND_SRC}/views/shared/slick/slickTheme.css"
-  commit_grid="${GIT_UI_SRC}/components/CommitGrid.vue"
 
   host_hits=$(grep -rnP --include='*.vue' --include='*.ts' --include='*.css' \
     -- "$host_class" $SCAN_DIRS 2>/dev/null |
@@ -385,11 +356,9 @@ check_font_scale() {
     STATUS=1
   fi
 
-  # P131 Part 1 §7: same host_class shape, git-ui-scoped and kv:-excluding (a migrated dialog's own
-  # shadcn component follows chrome's scale unprefixed; its `kv:`-prefixed markup is the separate
-  # kv pass below).
+  # Same host_class shape over packages/git-ui/src.
   host_class_tail=$(printf '%s' "$host_class" | cut -c11-)
-  gu_host_class="(?<![\\w:-])(?!kv:)${host_class_tail}"
+  gu_host_class="(?<![\\w:-])${host_class_tail}"
   gu_host_hits=$(grep -rnP --include='*.vue' --include='*.ts' \
     -- "$gu_host_class" "$GIT_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*|<!--)' || true)
@@ -400,37 +369,12 @@ check_font_scale() {
   fi
 
   host_css_hits=$(grep -rnP --include='*.vue' --include='*.css' \
-    -- "$host_css" $SCAN_DIRS 2>/dev/null |
+    -- "$host_css" $SCAN_DIRS "$GIT_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*|<!--)' |
     grep -v "^${slick_theme}:" || true)
   if [ -n "$host_css_hits" ]; then
     echo "check-theme-classes: chrome font-size: not on the four-value scale -- replace with $hint:" >&2
     echo "$host_css_hits" >&2
-    STATUS=1
-  fi
-
-  kv_vue_hits=$(grep -rnP --include='*.vue' \
-    -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
-    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
-    grep -P "$kv_class" || true)
-  kv_ts_hits=$(grep -rnP --include='*.ts' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
-    grep -v "^${GIT_UI_SRC}/lib/cn.ts:" |
-    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
-    grep -P "$kv_class" || true)
-  kv_hits=$(printf '%s\n%s\n' "$kv_vue_hits" "$kv_ts_hits" | grep -v '^$' | grep -v codicon || true)
-  if [ -n "$kv_hits" ]; then
-    echo "check-theme-classes: kv chrome font size off the four-value scale -- replace with $hint:" >&2
-    echo "$kv_hits" >&2
-    STATUS=1
-  fi
-
-  kv_css_hits=$(grep -rnP --include='*.vue' --include='*.css' \
-    -- "$kv_css" "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
-    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*|<!--)' |
-    grep -v "^${commit_grid}:" || true)
-  if [ -n "$kv_css_hits" ]; then
-    echo "check-theme-classes: kv chrome font-size: not on the four-value scale -- replace with $hint:" >&2
-    echo "$kv_css_hits" >&2
     STATUS=1
   fi
 }
@@ -575,7 +519,7 @@ check_no_kui_class
 # Attribute-scoped for the codicon check: codicon.css's own header comment names the class as
 # prose (see that file's own top-of-file doc comment).
 check_class_all 'animate-kira-spin' 'animate-spin'
-check_class_in_attrs_all 'codicon-modifier-spin' 'kv:inline-block kv:animate-spin' "$GIT_UI_SRC $KIRA_UI_SRC"
+check_class_in_attrs_all 'codicon-modifier-spin' 'inline-block animate-spin' "$GIT_UI_SRC $KIRA_UI_SRC"
 
 # P110 I2-10/11: the "nothing here yet" panel, folded into the shared Empty/EmptyMedia/EmptyTitle/
 # EmptyDescription components (packages/theme/src/components/ui/empty/, a shadcn-vue registry
@@ -710,7 +654,7 @@ check_class_all 'text-error-text' 'text-error'
 
 # P110 I2-37: one colour name per value, repo-wide -- kira names win, including inside
 # PT/components/ui (§3.11.3's own Finding 1/Choice). PT-root only (check_alias never takes a
-# [scan-dirs] override); the kv root defines none of these shadcn names.
+# [scan-dirs] override).
 ALIAS_COLOR_PREFIX='(?:bg|text|border(?:-[xytrblse])?|ring(?:-offset)?|outline|fill|stroke|divide|from|via|to|shadow|caret|decoration|placeholder)'
 check_alias "${ALIAS_COLOR_PREFIX}-background(?:/\\d+)?" 'the -bg equivalent (e.g. bg-background -> bg-bg)'
 check_alias "${ALIAS_COLOR_PREFIX}-(?:foreground|card-foreground|popover-foreground|secondary-foreground|accent-foreground)(?:/\\d+)?" 'the -fg equivalent (e.g. text-foreground -> text-fg)'
@@ -722,9 +666,6 @@ check_alias "${ALIAS_COLOR_PREFIX}-accent(?:/\\d+)?" 'the -hover equivalent (e.g
 check_alias "${ALIAS_COLOR_PREFIX}-destructive(?:/\\d+)?" 'the -error equivalent (e.g. text-destructive -> text-error), never the variant="destructive" prop value'
 
 # P110 I2-38: one radius name per value, repo-wide -- kira names win (§3.11.3's radius half).
-# check_alias's own kv:-excluding git-ui pass (§7 above) covers an unprefixed shadcn radius alias
-# there too; the kv root's own --radius-sm/--radius-lg (packages/git-ui/src/theme/tailwind.css)
-# keep their own, different, legitimate meanings and are never matched by that pass.
 ALIAS_ROUNDED_SIDE='(?:t|r|b|l|tl|tr|bl|br|ss|se|es|ee)'
 check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-sm!?" 'the rounded-kira-xs equivalent (e.g. rounded-sm -> rounded-kira-xs)'
 check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-md!?" 'the rounded-kira-sm equivalent (e.g. rounded-md -> rounded-kira-sm)'
@@ -801,6 +742,22 @@ check_toggle_radius
 # Tailwind size or the retired xs step reaching chrome is always a regression, never a legitimate
 # alternative. Data-view sites keep their own sizes via the exemptions inside check_font_scale.
 check_font_scale
+
+# P245: git-ui is on the app's one Tailwind root and token layer. The
+# `kv:` prefix, `--kv-*` tokens and the VS Code token layer (`--vscode-*`) are gone for good.
+check_no_kv_layer() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
+  hits=$(grep -rnP --include='*.vue' --include='*.ts' --include='*.css' \
+    -- '(?<![\w-])kv:[a-z\[!-]|--kv-|--vscode-' "$GIT_UI_SRC" 2>/dev/null || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: kv:/--kv-/--vscode- layer is retired (P245) -- use app utilities and --kira-* tokens:" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+check_no_kv_layer
 
 if [ -s "$GREP_ERRORS" ]; then
   echo "check-theme-classes: grep failed, results are unreliable:" >&2

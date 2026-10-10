@@ -1637,7 +1637,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="rootEl"
-    class="kv-app kv:flex kv:flex-col kv:h-full kv:w-full kv:bg-bg kv:text-fg kv:overflow-hidden kv:text-base kv:[font-family:var(--kv-font-family)]"
+    class="kv-app flex flex-col h-full w-full bg-bg text-fg overflow-hidden text-graph-md font-ui"
     :data-connection-state="connectionState"
   >
     <!-- Unconditional, present from first paint regardless of which of the four content states
@@ -1645,12 +1645,12 @@ onBeforeUnmount(() => {
          live-data strip carried this testid unconditionally too (inside its own always-rendered
          toolbar), and it is a genuine e2e wait/assert target across all three hosts' specs, not
          merely cosmetic duplicate of the root's own data-connection-state attribute above. -->
-    <span class="kv:sr-only" data-testid="connection-state">{{ connectionState }}</span>
+    <span class="sr-only" data-testid="connection-state">{{ connectionState }}</span>
     <!-- W14's one polite live region (see the `liveAnnouncement` watch above) — unconditional and
          present from first paint, same as connection-state above, since Load-more/Refresh can
          both complete while this file's own v-if chain is on any branch that renders the toolbar. -->
     <div
-      class="kv:sr-only"
+      class="sr-only"
       role="status"
       aria-live="polite"
       data-testid="live-announcements"
@@ -1670,10 +1670,10 @@ onBeforeUnmount(() => {
          got that far — a blank panel is never an acceptable rendering of a failure. -->
     <div
       v-if="bootError && !repoState"
-      class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-center kv:text-fg"
+      class="flex flex-col items-center justify-center gap-2 h-full p-4 text-center text-fg"
       data-testid="boot-error"
     >
-      <p class="kv:m-0 kv:max-w-120 kv:text-muted-foreground">Couldn't load the repository — {{ bootError }}</p>
+      <p class=" max-w-120 text-muted-foreground">Couldn't load the repository — {{ bootError }}</p>
       <Button variant="dialog" size="kira" data-testid="boot-retry" @click="retryBootstrap">
         Retry
       </Button>
@@ -1686,7 +1686,7 @@ onBeforeUnmount(() => {
            them. One banner, above all of them, rather than duplicated into just one branch. -->
       <div
         v-if="bootError"
-        class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-1.5 kv:bg-hover kv:border-b kv:border-panel-border kv:shrink-0 kv:font-ui kv:text-error"
+        class="flex items-center gap-1 py-1 px-1.5 bg-hover border-b border-border shrink-0 font-ui text-error"
         role="status"
         data-testid="boot-error-banner"
       >
@@ -1739,8 +1739,8 @@ onBeforeUnmount(() => {
           />
         </div>
         <ConflictBanner :ops="opsState" />
-        <main class="kv:flex kv:flex-1 kv:min-h-0 kv:min-w-0">
-          <section class="kv:relative kv:flex-1 kv:min-w-0 kv:flex kv:flex-col kv:bg-panel" data-testid="graph-region" aria-label="Commit graph">
+        <main class="flex flex-1 min-h-0 min-w-0">
+          <section class="relative flex-1 min-w-0 flex flex-col bg-bg" data-testid="graph-region" aria-label="Commit graph">
             <UncommittedChangesStrip
               :graph-view="graphView"
               :ops-state="opsState"
@@ -1749,7 +1749,7 @@ onBeforeUnmount(() => {
             />
             <CommitGrid
               ref="commitGridRef"
-              class="kv:flex-1 kv:min-h-0"
+              class="flex-1 min-h-0"
               :graph-view="graphView"
               :order="graphOrder"
               :selection="selection"
@@ -1773,21 +1773,21 @@ onBeforeUnmount(() => {
               @open-pull-request="handleGridOpenPullRequest"
             />
             <LoadMoreButton :graph-view="graphView" :page-size="pageSize" :report-error="reportAsyncError" />
-            <span class="kv:sr-only" data-testid="chunk-source">{{
+            <span class="sr-only" data-testid="chunk-source">{{
               graphView.lastChunkSource.value ?? ""
             }}</span>
           </section>
 
           <aside
             v-if="detailOpen && breakpoint !== 'overlay'"
-            class="kv:relative kv:shrink-0 kv:border-l kv:border-panel-border kv:bg-panel kv:overflow-auto"
+            class="relative shrink-0 border-l border-border bg-bg overflow-auto"
             data-testid="detail-region"
             aria-label="Commit detail"
             :style="{ width: detailWidthPx }"
           >
             <KuiColumnResizeHandle
               v-if="breakpoint === 'wide'"
-              class="kv:absolute kv:top-0 kv:bottom-0 kv:left-0 kv:w-1.25 kv:m-0 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
+              class="absolute top-0 bottom-0 left-0 w-1.25  -ml-0.5 cursor-col-resize z-2 bg-transparent hover:bg-focus focus-visible:bg-focus focus-visible:outline-none"
               label="Resize detail pane"
               direction="reverse"
               :value="detailWidth"
@@ -1823,11 +1823,11 @@ onBeforeUnmount(() => {
 
         <div
           v-if="detailOpen && breakpoint === 'overlay'"
-          class="kv:absolute kv:inset-0 kv:flex kv:justify-end kv:bg-overlay kv:z-20"
+          class="absolute inset-0 flex justify-end bg-black/35 z-20"
         >
           <aside
             ref="overlayDetailRegionEl"
-            class="kv:relative kv:shrink-0 kv:border-l kv:border-panel-border kv:bg-panel kv:overflow-auto kv:w-[min(320px,90vw)] kv:shadow-[-2px_0_8px_var(--kv-widget-shadow)]"
+            class="relative shrink-0 border-l border-border bg-bg overflow-auto w-[min(320px,90vw)] shadow-kira-dialog"
             data-testid="detail-region"
             aria-label="Commit detail"
           >

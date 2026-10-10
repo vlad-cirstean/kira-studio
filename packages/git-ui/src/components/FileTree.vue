@@ -14,9 +14,7 @@
  * geometry `ReviewView.vue` used to restyle from outside under `.kv-skin-kira`, and the
  * dimmed-directory-suffix/context-menu-copy behaviour) is now this component's *only* appearance,
  * everywhere it mounts — `DetailPane.vue`, `StashDetailPane.vue`, `ReviewFilesPane.vue`,
- * `ReviewCommitRow.vue` alike. G34 D1: `kira-structure.css` moved to `:root`, so the class this
- * paragraph refers to (`.kv-skin-kira`) no longer exists — the tokens it used to scope now apply
- * globally, unconditionally, everywhere in the package.
+ * `ReviewCommitRow.vue` alike.
  */
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
@@ -514,13 +512,7 @@ const parentSelectId = useId();
 
 <template>
   <div class="flex flex-col min-h-0 flex-1" data-testid="file-tree">
-    <!-- G21 D11 (superseded by G34 D1): this root used to carry `.kv-skin-kira` to scope
-         kira-structure.css's colour-free, structural-only tokens (spacing/control-height/
-         font-role) to this one component while density.css's own scale governed everywhere else.
-         G34 hoisted kira-structure.css to `:root` and retired density.css's competing scale, so
-         those tokens now apply globally and the class is gone — nothing left to scope here.
-
-         G-UX D7 (item 7): this comment moved from *before* the root `<div>` to *inside* it (same
+    <!-- G-UX D7 (item 7): this comment moved from *before* the root `<div>` to *inside* it (same
          text, new position) — a comment sitting as the root `<div>`'s own template-level sibling
          defeats Vue's single-root detection for THIS toolchain (Vue 3.5.42 /
          @vitejs/plugin-vue 6.0.8: confirmed empirically, not merely suspected), which silently

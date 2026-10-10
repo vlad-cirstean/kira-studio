@@ -1,8 +1,6 @@
-/* P131 Part 1 §3.2: this app's own Tailwind root, on top of @workbench/workbench.css's own
-   base.css import -- adds one more @source so this app's unprefixed root also scans
-   packages/git-ui/src (git-ui mounts into this app's own document, and its migrated dialogs now
-   carry unprefixed shadcn classes alongside their existing kv: ones -- see the plan's §3.2/§4.1
-   for why the two prefixes never collide). Path is relative to this file. */
+/* This app's Tailwind root, on top of @workbench/workbench.css's base.css import. It also scans
+   packages/git-ui/src (the git module mounts into this document) and imports its graph tokens.
+   Paths are relative to this file. */
 @import "@workbench/workbench.css";
 @import "./ade/v2/tones.css";
 @import "../../../../packages/git-ui/src/theme/git.css";

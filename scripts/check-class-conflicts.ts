@@ -17,39 +17,28 @@
  *
  * For each element with a static `class="..."` attribute:
  *   - Skip entirely when the `:class` binding's root expression is a call to `cn(...)`/
- *     `twMergeKv(...)`: the runtime merge already reconciles it (§3.1).
- *   - Otherwise, split both the static tokens and every literal found in the `:class` expression
- *     (every string literal anywhere in the tree, plus every string/identifier object-property key
- *     — a class-toggle map's own class names) into two groups by the `kv:` prefix, since a `kv:`
- *     token merges through git-ui's own `cn()` (`packages/git-ui/src/lib/cn.ts`, P131 Part 3 —
- *     kira-ui's own copy is gone) and every other token merges through theme's own `cn()` (§3.1:
- *     "merge function per token").
- *   - Fail 1 (static-conflict): merging a group's own static tokens against themselves changes the
- *     set (a same-group duplicate/self-conflict already sitting in the static class list).
- *   - Fail 2 (static-vs-conditional): merging a group's static tokens plus one conditional literal
+ *     the runtime merge already reconciles it (§3.1).
+ *   - Otherwise, check the static tokens and every literal found in the `:class` expression (every
+ *     string literal anywhere in the tree, plus every string/identifier object-property key — a
+ *     class-toggle map's own class names) against theme's own `cn()`.
+ *   - Fail 1 (static-conflict): merging the static tokens against themselves changes the set (a
+ *     duplicate/self-conflict already sitting in the static class list).
+ *   - Fail 2 (static-vs-conditional): merging the static tokens plus one conditional literal
  *     token drops one of the static tokens (the literal silently wins the cascade over the base).
  *
  * Registration self-check (§3.1, makes acceptance-2 self-enforcing): every `--text-*`/
  * `--spacing-*`/`--radius-*`/`--shadow-*`/`--animate-*`/`--leading-*` name declared in
- * `PT/base.css`'s and git-ui's own `theme/tailwind.css`'s `@theme inline reference` block must
- * sort into its own twMerge group — asserted directly against the real merge functions, not by
+ * `PT/tailwind-core.css`'s and git-ui's `theme/git.css`'s `@theme` block must sort into its own
+ * twMerge group — asserted directly against the real merge functions, not by
  * reading config.
  *
  * Landed unwired (I2-3): run directly with `bun scripts/check-class-conflicts.ts`. Wired into
  * `bun run lint` at I2-9, once every hit its first run surfaces is fixed.
  *
- * P131 Part 1 §7: a third rule, scoped to `packages/git-ui/src/**\/*.vue` only -- a tag whose local
- * name is imported from `@theme/components/**` (a shadcn component) is a theme-root element, so it
- * must carry no `kv:` token: `kv:` is git-ui's own prefixed root's vocabulary and never merges
- * through the theme's unprefixed `cn()` a shadcn component's own template uses internally. Detected
- * from each file's own `<script setup>` import specifiers (regex, not a full TS parse -- import
- * statements are a fixed enough shape), then matched against template tag names in both PascalCase
- * (as imported) and kebab-case (Vue's own template-tag normalisation).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { parse as parseSFC } from '@vue/compiler-sfc';
-import { cn as cnKv } from '../packages/git-ui/src/lib/cn';
 import { cn } from '../packages/theme/src/lib/utils';
 
 const REPO_ROOT = join(import.meta.dir, '..');
@@ -62,12 +51,10 @@ const SCAN_DIRS = [
   'packages/git-ui/src',
 ];
 
-const GIT_UI_DIR = 'packages/git-ui/src';
-
 interface Hit {
   file: string;
   line: number;
-  kind: 'static-conflict' | 'static-vs-conditional' | 'registration' | 'kv-on-theme-component';
+  kind: 'static-conflict' | 'static-vs-conditional' | 'registration';
   staticTokens: string;
   conditional: string;
 }
@@ -95,20 +82,9 @@ function tokensOf(s: string): string[] {
   return s.trim().split(/\s+/).filter(Boolean);
 }
 
-function splitKv(tokens: string[]): { kv: string[]; plain: string[] } {
-  const kv: string[] = [];
-  const plain: string[] = [];
-  for (const t of tokens) {
-    if (t.startsWith('kv:')) kv.push(t);
-    else plain.push(t);
-  }
-  return { kv, plain };
-}
-
-function mergeGroup(tokens: string[], isKv: boolean): string[] {
+function mergeTokens(tokens: string[]): string[] {
   if (tokens.length === 0) return [];
-  const merged = isKv ? cnKv(tokens.join(' ')) : cn(tokens.join(' '));
-  return tokensOf(merged);
+  return tokensOf(cn(tokens.join(' ')));
 }
 
 function sameSet(a: string[], b: string[]): boolean {
@@ -158,82 +134,7 @@ function isCnRootCall(ast: unknown): boolean {
   const n = ast as Record<string, unknown> | null;
   if (n?.type !== 'CallExpression') return false;
   const callee = n.callee as Record<string, unknown> | undefined;
-  return callee?.type === 'Identifier' && (callee.name === 'cn' || callee.name === 'twMergeKv');
-}
-
-// P131 Part 1 §7: local names a git-ui file imports from a shadcn theme component module --
-// `import { Dialog, DialogContent } from '@theme/components/ui/dialog'` or
-// `import Foo from '@theme/components/ui/foo/Foo.vue'`. Regex over the raw script source: import
-// statements are a fixed enough shape that a full TS parse buys nothing here.
-function themeComponentLocalNames(scriptSrc: string): Set<string> {
-  const names = new Set<string>();
-  const importRe = /import\s+([^;]+?)\s+from\s+['"](@theme\/components\/[^'"]+)['"]/g;
-  let m: RegExpExecArray | null;
-  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex-exec-loop idiom
-  while ((m = importRe.exec(scriptSrc))) {
-    const clause = m[1].trim();
-    const namedMatch = clause.match(/^\{([^}]*)\}$/);
-    if (namedMatch) {
-      for (const part of namedMatch[1].split(',')) {
-        const spec = part.trim();
-        if (!spec) continue;
-        const asMatch = spec.match(/^\S+\s+as\s+(\S+)$/);
-        names.add(asMatch ? asMatch[1] : spec);
-      }
-    } else {
-      // Default import, e.g. `Foo` in `import Foo from '@theme/components/ui/foo/Foo.vue'`.
-      names.add(clause);
-    }
-  }
-  return names;
-}
-
-function pascalToKebab(name: string): string {
-  return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
-}
-
-// Fail 3 (§7): a shadcn theme-component tag in git-ui markup carrying a `kv:` token.
-function checkKvOnThemeComponent(
-  node: TemplateNode,
-  themeNames: Set<string>,
-  relPath: string,
-  hits: Hit[],
-): void {
-  const tag: string = node.tag ?? '';
-  // Exact PascalCase match (`<Dialog>`, as every call site in this repo writes it), or a REAL
-  // kebab-case rendering with an inserted hyphen (`<RadioGroupItem>` -> `radio-group-item`).
-  // Deliberately NOT a bare `.toLowerCase()` of a single-word name -- that would collapse `Label`/
-  // `Dialog`/`Button`/`Input` down to `label`/`dialog`/`button`/`input`, colliding with the native
-  // HTML elements of the same spelling that Vue's compiler always resolves those lowercase tags
-  // to, never to a same-named component (confirmed against ForcePushDialog.vue's own native
-  // `<label>` false-positiving here before this guard was added).
-  const matches =
-    themeNames.has(tag) ||
-    [...themeNames].some((n) => {
-      const kebab = pascalToKebab(n);
-      return kebab.includes('-') && kebab === tag;
-    });
-  if (!matches) return;
-  const { staticClass, classExpAst, line } = findClassAttrs(node);
-  const tokens = tokensOf(staticClass).filter((t) => t.startsWith('kv:'));
-  if (classExpAst) {
-    const lits: string[] = [];
-    collectLiterals(classExpAst, lits);
-    for (const lit of lits) {
-      for (const tok of tokensOf(lit)) {
-        if (tok.startsWith('kv:')) tokens.push(tok);
-      }
-    }
-  }
-  for (const tok of tokens) {
-    hits.push({
-      file: relPath,
-      line,
-      kind: 'kv-on-theme-component',
-      staticTokens: `<${tag}>`,
-      conditional: tok,
-    });
-  }
+  return callee?.type === 'Identifier' && callee.name === 'cn';
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: compiler-sfc's compiled-template AST node shape
@@ -260,37 +161,28 @@ function findClassAttrs(node: TemplateNode): {
   return { staticClass, classExpAst, line };
 }
 
-// Fail 1 (§3.1): merging a group's own static tokens against themselves changes the set.
+// Fail 1 (§3.1): merging the static tokens against themselves changes the set.
 function checkStaticSelfConflict(
-  kvStatic: string[],
-  plainStatic: string[],
+  staticTokens: string[],
   relPath: string,
   line: number,
   hits: Hit[],
 ): void {
-  for (const [group, isKv] of [
-    [kvStatic, true],
-    [plainStatic, false],
-  ] as const) {
-    if (group.length === 0) continue;
-    const merged = mergeGroup(group, isKv);
-    if (!sameSet(merged, group)) {
-      hits.push({
-        file: relPath,
-        line,
-        kind: 'static-conflict',
-        staticTokens: group.join(' '),
-        conditional: '',
-      });
-    }
+  if (!sameSet(mergeTokens(staticTokens), staticTokens)) {
+    hits.push({
+      file: relPath,
+      line,
+      kind: 'static-conflict',
+      staticTokens: staticTokens.join(' '),
+      conditional: '',
+    });
   }
 }
 
-// Fail 2 (§3.1): merging a group's static tokens plus one conditional literal drops a static token.
+// Fail 2 (§3.1): merging the static tokens plus one conditional literal drops a static token.
 function checkStaticVsConditional(
   classExpAst: unknown,
-  kvStatic: string[],
-  plainStatic: string[],
+  staticTokens: string[],
   relPath: string,
   line: number,
   hits: Hit[],
@@ -302,18 +194,13 @@ function checkStaticVsConditional(
     for (const tok of tokensOf(lit)) {
       if (seenTok.has(tok)) continue;
       seenTok.add(tok);
-      const isKv = tok.startsWith('kv:');
-      const group = isKv ? kvStatic : plainStatic;
-      if (group.length === 0) continue;
-      const merged = mergeGroup([...group, tok], isKv);
-      const mergedSet = new Set(merged);
-      const dropped = group.filter((g) => !mergedSet.has(g));
-      if (dropped.length > 0) {
+      const mergedSet = new Set(mergeTokens([...staticTokens, tok]));
+      if (staticTokens.some((g) => !mergedSet.has(g))) {
         hits.push({
           file: relPath,
           line,
           kind: 'static-vs-conditional',
-          staticTokens: group.join(' '),
+          staticTokens: staticTokens.join(' '),
           conditional: tok,
         });
       }
@@ -321,38 +208,23 @@ function checkStaticVsConditional(
   }
 }
 
-function checkElement(
-  node: TemplateNode,
-  relPath: string,
-  themeNames: Set<string>,
-  hits: Hit[],
-): void {
-  // P131 Part 1 §7: independent of the static/conditional checks below (and of whether the tag
-  // carries any static class at all) -- only git-ui's own tree is in scope for this rule.
-  if (themeNames.size > 0 && relPath.startsWith(GIT_UI_DIR)) {
-    checkKvOnThemeComponent(node, themeNames, relPath, hits);
-  }
-
+function checkElement(node: TemplateNode, relPath: string, hits: Hit[]): void {
   const { staticClass, classExpAst, line } = findClassAttrs(node);
   if (!staticClass) return;
   if (classExpAst && isCnRootCall(classExpAst)) return; // merges at runtime, §3.1
 
   const staticTokens = tokensOf(staticClass);
-  const { kv: kvStatic, plain: plainStatic } = splitKv(staticTokens);
-
-  checkStaticSelfConflict(kvStatic, plainStatic, relPath, line, hits);
-  if (classExpAst) {
-    checkStaticVsConditional(classExpAst, kvStatic, plainStatic, relPath, line, hits);
-  }
+  checkStaticSelfConflict(staticTokens, relPath, line, hits);
+  if (classExpAst) checkStaticVsConditional(classExpAst, staticTokens, relPath, line, hits);
 }
 
-function walk(node: TemplateNode, relPath: string, themeNames: Set<string>, hits: Hit[]): void {
+function walk(node: TemplateNode, relPath: string, hits: Hit[]): void {
   if (!node) return;
   if (node.type === 1) {
-    checkElement(node, relPath, themeNames, hits);
+    checkElement(node, relPath, hits);
   }
   for (const child of node.children ?? []) {
-    walk(child, relPath, themeNames, hits);
+    walk(child, relPath, hits);
   }
   // Element nodes can also carry v-if/v-else branch content under `branches` (IfNode) — compiler
   // AST already flattens those into `children` on the containing IfBranchNode, which itself has
@@ -360,7 +232,7 @@ function walk(node: TemplateNode, relPath: string, themeNames: Set<string>, hits
   // ForNode/IfNode are covered by the generic `children` walk above since both node kinds expose
   // a `children` (or `branches[].children`) array. Cover `branches` explicitly for completeness.
   if (Array.isArray(node.branches)) {
-    for (const branch of node.branches) walk(branch, relPath, themeNames, hits);
+    for (const branch of node.branches) walk(branch, relPath, hits);
   }
 }
 
@@ -377,9 +249,7 @@ function checkFile(absPath: string, hits: Hit[]): void {
   }
   const ast = descriptor.template?.ast;
   if (!ast) return;
-  const scriptSrc = (descriptor.scriptSetup?.content ?? '') + (descriptor.script?.content ?? '');
-  const themeNames = themeComponentLocalNames(scriptSrc);
-  walk(ast, relPath, themeNames, hits);
+  walk(ast, relPath, hits);
 }
 
 // --- Registration self-check ---
@@ -431,18 +301,16 @@ const UTILITY_PREFIX: Record<string, string> = {
 function checkDistinctFamily(
   own: string,
   distinctBaseline: string,
-  isKv: boolean,
   cssPath: string,
   hits: Hit[],
 ): void {
-  const base = isKv ? `kv:${distinctBaseline}` : distinctBaseline;
-  const withBase = mergeGroup([base, own], isKv);
-  if (!withBase.includes(base) || !withBase.includes(own)) {
+  const withBase = mergeTokens([distinctBaseline, own]);
+  if (!withBase.includes(distinctBaseline) || !withBase.includes(own)) {
     hits.push({
       file: cssPath,
       line: 0,
       kind: 'registration',
-      staticTokens: `${own} not correctly grouped -- lost against '${base}' (expected both to survive)`,
+      staticTokens: `${own} not correctly grouped -- lost against '${distinctBaseline}' (expected both to survive)`,
       conditional: '',
     });
   }
@@ -454,33 +322,28 @@ function checkSameFamily(
   own: string,
   group: string,
   ambiguous: string,
-  isKv: boolean,
   cssPath: string,
   hits: Hit[],
 ): void {
-  const amb = isKv ? `kv:${ambiguous}` : ambiguous;
-  const withAmb = mergeGroup([amb, own], isKv);
+  const withAmb = mergeTokens([ambiguous, own]);
   if (withAmb.length !== 1) {
     hits.push({
       file: cssPath,
       line: 0,
       kind: 'registration',
-      staticTokens: `${own} not registered in the '${group}' merge group -- '${amb} ${own}' should collapse to one class, got: ${withAmb.join(' ')}`,
+      staticTokens: `${own} not registered in the '${group}' merge group -- '${ambiguous} ${own}' should collapse to one class, got: ${withAmb.join(' ')}`,
       conditional: '',
     });
   }
 }
 
-function checkRegistration(cssPath: string, isKv: boolean, hits: Hit[]): void {
+function checkRegistration(cssPath: string, hits: Hit[]): void {
   for (const { group, ambiguous, distinctBaseline } of REG_CASES) {
     const names = themeTokenNames(cssPath, group);
     for (const name of names) {
-      const tokenName = `${UTILITY_PREFIX[group]}-${name}`;
-      const own = isKv ? `kv:${tokenName}` : tokenName;
-      if (distinctBaseline) {
-        checkDistinctFamily(own, distinctBaseline, isKv, cssPath, hits);
-      }
-      checkSameFamily(own, group, ambiguous, isKv, cssPath, hits);
+      const own = `${UTILITY_PREFIX[group]}-${name}`;
+      if (distinctBaseline) checkDistinctFamily(own, distinctBaseline, cssPath, hits);
+      checkSameFamily(own, group, ambiguous, cssPath, hits);
     }
   }
 }
@@ -495,8 +358,8 @@ function main(): void {
   // P131 Part 1 §3.1 moved every --text-*/--radius-*/--shadow-*/--animate-*/--leading-* name out of
   // base.css into tailwind-core.css -- this self-check must follow, or it silently checks zero
   // names (a for-loop over an empty themeTokenNames() list, no error).
-  checkRegistration('packages/theme/src/tailwind-core.css', false, hits);
-  checkRegistration('packages/git-ui/src/theme/tailwind.css', true, hits);
+  checkRegistration('packages/theme/src/tailwind-core.css', hits);
+  checkRegistration('packages/git-ui/src/theme/git.css', hits);
 
   if (hits.length === 0) {
     console.log('check-class-conflicts: no conflicts found.');
@@ -510,10 +373,6 @@ function main(): void {
     } else if (h.kind === 'static-vs-conditional') {
       console.error(
         `${h.file}:${h.line}  static-vs-conditional  '${h.staticTokens}' vs '${h.conditional}'`,
-      );
-    } else if (h.kind === 'kv-on-theme-component') {
-      console.error(
-        `${h.file}:${h.line}  kv-on-theme-component  ${h.staticTokens} carries '${h.conditional}' -- a shadcn component reads the unprefixed root`,
       );
     } else {
       console.error(`${h.file}:${h.line}  registration  ${h.staticTokens}`);

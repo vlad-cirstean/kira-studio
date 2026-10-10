@@ -1,14 +1,9 @@
 #!/bin/sh
-# P13 D3/OQ-1, extended by G34 D16 to two more token layers: every var(--prefix-...) reference
-# in each layer's own source tree must resolve to a real definition in that layer's own
-# definition files. A grep-and-comm guard, not a dependency (stylelint is not in this repo's
+# P13 D3/OQ-1: every var(--prefix-...) reference in a layer's own source tree must resolve to a
+# real definition in that layer's own definition files. A grep-and-comm guard, not a dependency (stylelint is not in this repo's
 # toolchain) — its one known blind spot is a var() carrying a fallback (var(--x, red)), which is
 # legitimate and is skipped by construction (the pattern below only matches a var() whose closing
 # paren directly follows the property name).
-#
-# G34 D16: this is the guard that would have caught G34's own F5 (packages/git-ui/src/App.vue
-# referencing five --kv-* tokens outside the ancestor that used to define them) — there was no
-# --kv-* or --kui-* equivalent of this script before this phase.
 #
 # P131 Part 3 §6.5: the --kui-* layer (both copies of kira-ui's own token-bridge file, and every
 # Kui* consumer that referenced them) is gone — check_layer's own "resolves to a real definition" shape
@@ -61,10 +56,8 @@ DOCKER_UI_SRC=packages/docker-ui/src
 #
 # P103 Part 1: packages/workbench/src added to the usage scan too — its own moved ContextMenu.vue/
 # AppTooltip.vue/ConfirmDialog.vue reference --kira-* tokens the same way they did inside each app.
-check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC $DOCKER_UI_SRC" \
-  "$THEME_SRC/tokens.css $THEME_SRC/base.css $THEME_SRC/primitives.css" kira
-check_layer 'kv-' "$GIT_UI_SRC" \
-  "$GIT_UI_SRC/theme/vscode-tokens.css $GIT_UI_SRC/theme/density.css $GIT_UI_SRC/theme/kira-structure.css" kv
+check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC $DOCKER_UI_SRC $GIT_UI_SRC" \
+  "$THEME_SRC/tokens.css $THEME_SRC/base.css $THEME_SRC/primitives.css $GIT_UI_SRC/theme/git.css" kira
 
 kui_hits=$(grep -rnE --include='*.vue' --include='*.css' --include='*.ts' \
   -- '--kui-' packages/git-ui/src packages/kira-ui/src packages/theme/src packages/workbench/src || true)
