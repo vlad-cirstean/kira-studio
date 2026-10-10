@@ -72,12 +72,11 @@ test('Show more reveals the full body, trailers, identities and refs, and the pa
   await expect(page.locator('[data-testid="meta-refs"]')).toContainText('main');
   await expect(page.locator('[data-testid="commit-meta-sha"]')).toHaveText('2222222');
 
-  const expanded = await meta.evaluate((el) => ({
-    height: el.clientHeight,
-    overflowY: getComputedStyle(el).overflowY,
-  }));
-  expect(expanded.height).toBeGreaterThan(collapsedHeight);
-  expect(expanded.overflowY).toBe('auto');
+  // The meta root grows; the scroll container is the inner body wrapper (f046f9a12).
+  const expandedHeight = await meta.evaluate((el) => el.clientHeight);
+  expect(expandedHeight).toBeGreaterThan(collapsedHeight);
+  const scroller = page.locator('[data-testid="meta-body"]').locator('xpath=..');
+  expect(await scroller.evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
 });
 
 test('the view head and the detail head are Studio 34px toolbars', async ({ relaunch }) => {
