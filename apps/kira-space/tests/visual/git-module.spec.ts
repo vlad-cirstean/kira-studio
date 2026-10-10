@@ -231,3 +231,19 @@ test('git module: stash dialog (P229)', async ({ relaunch }) => {
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveScreenshot('git-stash-dialog.png');
 });
+
+test('git module: repository settings dialog (P256)', async ({ relaunch }) => {
+  const win = await openGraph(relaunch);
+  await win.locator('[data-testid="repo-settings-button"]').click();
+  const dialog = win.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveScreenshot('git-repo-settings-dialog.png');
+});
+
+test('git module: branch picker (P256)', async ({ relaunch }) => {
+  const win = await openGraph(relaunch);
+  await win.locator('.kv-branch-trigger').click();
+  const picker = win.getByRole('dialog');
+  await expect(picker).toBeVisible();
+  await expect(picker).toHaveScreenshot('git-branch-picker.png');
+});
