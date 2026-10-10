@@ -2807,8 +2807,8 @@ no repo) while `git` is active, the active module's own id otherwise — `host.t
 and `state/tabs.ts`'s tab-stepping actions read it instead of the workspace store directly, so a
 Automations-module tab or `ade`'s own full-area view never shows behind, or is confused for, a repo's
 own tab strip. Opening a repository (`openRepoWorkspace`) forces the mode back to `git`, so opening one
-from any path always shows it; the boot-time fall-forward onto the first restored repo
-(`main.ts`) does not, so a relaunch into a persisted `automations`/`ade` mode stays there even with
+from any path always shows it; the boot-time fall-forward onto the last active repo (persisted per window, `kira.space.lastRepo.<window>`), else the first restored one
+(`main.ts`), does not, so a relaunch into a persisted `automations`/`ade` mode stays there even with
 repositories open behind it.** Every "Kira Studio" below that means *this app, the one whose window
 hosts the git UI* now means Kira Space; every "Kira Studio" that means *the DB/API client, a
 different app entirely* (the Settings dialog's *Git* section) also now means Kira Space, for the same reason — Kira
@@ -2836,7 +2836,7 @@ always three tabs: `AppMode` gained a third member, `'git'` (`packages/shared/do
 every open repository's own workspace lived *inside* it. The repo switcher — the row of
 open/importable repositories, a click opens or activates one — lived in `repo/GitPanel.vue`, the
 Git module's own left panel (mirroring `ProjectPanel.vue` for Studio and `api/CollectionsPanel.vue`
-for Api); `workspaceState.lastRepoKey` (session-only, not persisted) made leaving Git for another
+for Api); `workspaceState.lastRepoKey` made leaving Git for another
 module and clicking back on it return to the same repository, the "return to where you were"
 property the old per-repo tabs gave for free. `moduleOfWorkspace(key)`
 (`packages/shared/domain/workspace.ts`) was the one-line map every repo `WorkspaceKey` folded onto
@@ -4532,7 +4532,7 @@ replies and full terminal attach for Claude Code sessions.
   host free/total disk, no `statfs`, no helper container. Query keys sit under `['docker-disk']`, outside
   `['docker']`, so no Refresh, container action or live-sync invalidation triggers a walk; `enabled: false`
   plus manual `refetch()`. Engine-wide last result persists per engine scope in `localStorage`
-  (`kira.docker.diskUsage`) with its timestamp. Container size is session memory only, never persisted.
+  (`kira.docker.diskUsage`, newest 5 scopes kept) with its timestamp. Container size is session memory only, never persisted.
 - Container origin (P252): `Container.origin`/`originName` inferred from labels, first match wins:
   devcontainer, testcontainers, kind, kubernetes, swarm, buildx (name prefix `buildx_buildkit_`),
   compose. A compose-based devcontainer stays grouped under its project, row shows the devcontainer
@@ -5335,8 +5335,7 @@ Performance:
 - **Semantic model download has no URL seam (P210).** The Hugging Face URLs are constants in `internal/memory/embed/spec.go`, so tests cannot point `Install` at a local server; the flow test covers cancel and not-installed only. Delete once the base URL is injectable.
 - **A missing `claude` shows the shell's raw text (P250).** Kira runs a bare `claude` through the user's shell (`ade/command.go`), so a missing CLI surfaces as the shell's own "command not found" in the tab, with no Kira message. Delete once launch checks the CLI first.
 - **`ui-timing` budgets are load-sensitive (P250).** `perf.spec.ts` and `budgets.spec.ts` fail under load average above ~9 (p95 84 vs 80, 76 vs 50 ms). Run `--project=ui-timing` on an idle machine; no quiet rerun is recorded yet. Delete once one passes quiet.
-- **Docker engine disk cache has no cap (P252).** `kira.docker.diskUsage` in `localStorage` keeps one entry per engine scope, never evicted. Delete once old scopes expire.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
 - **Visual baselines are unchecked on the CI `ui` job image (P227, P229, P242, P245, P247).** All were recorded in the dev container: 13 Studio (P227, P242), 4 Space Settings, 3 git-module (P229, P245) and 1 ADE workflow graph (P247); the suites pass there. If the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
-- **Load-sensitive specs and tests (P230, P231, P236, P243, P247, P251).** Under a loaded machine (load above 20 on 4 CPUs) these fail and pass alone: UI `repo-graph-paging` drag (about 1 run in 80 at 8 workers), `ade-v2-panel` handle-drag width, `repo-review-interaction` 600-commit case, `sql-schema` D3, `tooltips` a11y, `http-timeline` failed-send; Go `adeflow` `TestRebaseRun` (rebase `NoOp:true`, root cause not found) and `TestScheduleADE`. Run suites one at a time; rerun the one test alone before calling it broken. Delete once deflaked.
+- **Load-sensitive specs and tests (P230, P231, P236, P243, P247, P251).** Under a loaded machine (load above 20 on 4 CPUs) these fail and pass alone: UI `repo-graph-paging` drag (about 1 run in 80 at 8 workers), `ade-v2-panel` handle-drag width, `sql-schema` D3, `tooltips` a11y, `http-timeline` failed-send; Go `adeflow` `TestRebaseRun` (rebase `NoOp:true`, root cause not found) and `TestScheduleADE`. Run suites one at a time; rerun the one test alone before calling it broken. Delete once deflaked.
