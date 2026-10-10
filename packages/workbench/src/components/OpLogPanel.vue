@@ -2,10 +2,10 @@
 // biome-ignore lint/correctness/noUnusedImports: resolves the generic="R extends OpLogRecord" attribute above — biome only sees the <script> body, never that tag's own attribute string.
 import type { OpLogRecord } from '@shared/domain/ops';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
-import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref } from 'vue';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
@@ -159,26 +159,20 @@ defineSlots<{
 <template>
   <div class="h-full flex flex-col min-h-0 text-kira-md">
     <div class="shrink-0 flex items-center gap-2 py-1 px-2 border-b border-border">
-      <InputGroup variant="kira" class="flex-none flex w-40">
-        <CodiconIcon name="filter" :size="13" class="shrink-0 text-muted-foreground" />
-        <InputGroupInput
+      <div class="w-40 shrink-0">
+        <SearchField
           v-model="filterTextModel"
           placeholder="Filter"
           aria-label="Filter operations"
-          class="h-full p-0 font-data"
           data-testid="ops-filter"
         />
-      </InputGroup>
-      <ToggleGroup
-        type="single"
-        size="kira"
+      </div>
+      <SecondaryTabs
+        variant="segmented"
         :model-value="statusFilter"
-        @update:model-value="(v) => v && emit('update:statusFilter', v as OpLogStatusFilter)"
-      >
-        <ToggleGroupItem v-for="opt in statusFilterOptions" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </ToggleGroupItem>
-      </ToggleGroup>
+        :items="statusFilterOptions"
+        @update:model-value="(v) => emit('update:statusFilter', v as OpLogStatusFilter)"
+      />
       <span class="ml-auto text-muted-foreground">{{ runningCount }} running</span>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -188,12 +182,12 @@ defineSlots<{
       </Tooltip>
     </div>
 
-    <div v-if="records.length === 0" class="min-h-0 flex-1">
-      <Alert class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
-        <CodiconIcon name="checklist" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted-foreground">No operations yet</AlertTitle>
-      </Alert>
-    </div>
+    <Empty v-if="records.length === 0" class="min-h-0 flex-1">
+      <EmptyHeader>
+        <EmptyMedia><CodiconIcon name="checklist" :size="24" /></EmptyMedia>
+        <EmptyTitle>No operations yet</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
     <template v-else>
       <div
         class="grid items-center gap-2 px-2 shrink-0 uppercase tracking-wider h-4.5 text-muted-foreground border-b border-border"

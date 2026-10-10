@@ -44,7 +44,7 @@ function onRowColoringChange(checked: boolean): void {
 
 const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === 'compact' ? 22 : 28));
 
-// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const fontFamilyId = useId();
 const rowColoringId = useId();
@@ -188,7 +188,7 @@ const rowColoringId = useId();
           data-testid="settings-row-coloring"
           @update:model-value="(v) => onRowColoringChange(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <FieldContent>
           <Label :for="rowColoringId">Row colouring</Label>

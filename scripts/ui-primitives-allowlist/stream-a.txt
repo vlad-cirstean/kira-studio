@@ -1,10 +1,4 @@
 # P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-apps/kira-studio/frontend/src/workbench/settings/AdvancedPane.vue
-apps/kira-studio/frontend/src/workbench/settings/ApiPane.vue
-apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue
-apps/kira-studio/frontend/src/workbench/settings/CachePane.vue
-apps/kira-studio/frontend/src/workbench/settings/DataPane.vue
-apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue
 packages/docker-ui/src/components/ContainerDetail.vue
 packages/docker-ui/src/components/ContainerEditView.vue
 packages/docker-ui/src/components/ContainerList.vue
@@ -33,10 +27,6 @@ packages/workbench/src/automations/runs/ScriptRunView.vue
 packages/workbench/src/automations/schedule/ScheduleConfirmDialog.vue
 packages/workbench/src/automations/smart/McpServerTools.vue
 packages/workbench/src/automations/smart/ToolsField.vue
-packages/workbench/src/components/AutocompleteField.vue
-packages/workbench/src/components/BootFailure.vue
-packages/workbench/src/components/OpLogPanel.vue
-packages/workbench/src/components/TitleBarWindowActions.vue
 packages/workbench/src/memory/AddMemoryDialog.vue
 packages/workbench/src/memory/MemoryPanel.vue
 packages/workbench/src/memory/MemorySetupHint.vue
@@ -46,8 +36,6 @@ packages/workbench/src/memory/import/ImportFileRow.vue
 packages/workbench/src/memory/import/ImportJobDetail.vue
 packages/workbench/src/memory/import/ImportStatus.vue
 packages/workbench/src/memory/import/ImportView.vue
-packages/workbench/src/settings/fields/RowDensityField.vue
-packages/workbench/src/settings/fields/WordWrapField.vue
 permanent U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 §2.2 exempt)
 permanent U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
 packages/docker-ui/src/components/ImageList.vue

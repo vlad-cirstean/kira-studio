@@ -72,7 +72,7 @@ const maxRedirectsError = computed<string | null>(() => {
 });
 props.registerFieldError('api.maxRedirects', maxRedirectsError);
 
-// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const httpVersionId = useId();
 const requestTimeoutMsId = useId();
@@ -179,7 +179,7 @@ const disableCookieJarId = useId();
           data-testid="settings-api-sslVerify"
           @update:model-value="(v) => onSslVerifyChange(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <Label :for="sslVerifyId">Verify SSL certificates</Label>
       </Field>
@@ -209,7 +209,7 @@ const disableCookieJarId = useId();
           data-testid="settings-api-followRedirects"
           @update:model-value="(v) => onFollowRedirectsChange(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <Label :for="followRedirectsId">Follow redirects</Label>
       </Field>
@@ -266,7 +266,7 @@ const disableCookieJarId = useId();
           data-testid="settings-api-disableCookieJar"
           @update:model-value="(v) => onDisableCookieJarChange(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <FieldContent>
           <Label :for="disableCookieJarId">Disable cookie jar</Label>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { AppearanceSettings, RowDensity } from '@shared/domain/settings';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field } from '@theme/components/ui/field';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 
 // I2-18: the row-density button pair (compact/comfortable) was byte-identical between kira-studio's
 // and kira-space's own AppearancePane.vue; each app's own helper text and (kira-studio only) preview
@@ -12,6 +12,11 @@ const props = defineProps<{
   isAtDefault: (section: 'appearance', key: 'rowDensity') => boolean;
   resetLeaf: (section: 'appearance', key: 'rowDensity') => void;
 }>();
+
+const DENSITY_ITEMS = [
+  { value: 'compact', label: 'Compact · 22 px', testid: 'settings-appearance-rowDensity-compact' },
+  { value: 'comfortable', label: 'Comfortable · 28 px', testid: 'settings-appearance-rowDensity-comfortable' },
+];
 
 function setRowDensity(density: RowDensity): void {
   props.appearance.rowDensity = density;
@@ -31,22 +36,12 @@ function setRowDensity(density: RowDensity): void {
         @click="resetLeaf('appearance', 'rowDensity')"
       />
     </div>
-    <!-- P110 B33: .segmented -> ToggleGroup (pre-approved, plan 1.4). data-testid replaces the old
-         `.segmented button` positional CSS locator settings-apply-on-save.spec.ts used. -->
-    <ToggleGroup
-      type="single"
-      variant="outline"
-      size="kira"
+    <SecondaryTabs
+      variant="segmented"
       :model-value="appearance.rowDensity"
-      @update:model-value="(v) => v && setRowDensity(v as RowDensity)"
-    >
-      <ToggleGroupItem value="compact" data-testid="settings-appearance-rowDensity-compact">
-        Compact · 22 px
-      </ToggleGroupItem>
-      <ToggleGroupItem value="comfortable" data-testid="settings-appearance-rowDensity-comfortable">
-        Comfortable · 28 px
-      </ToggleGroupItem>
-    </ToggleGroup>
+      :items="DENSITY_ITEMS"
+      @update:model-value="(v) => setRowDensity(v as RowDensity)"
+    />
     <slot />
   </Field>
 </template>

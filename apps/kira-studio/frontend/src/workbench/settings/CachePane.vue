@@ -50,7 +50,7 @@ async function onClearCaches(): Promise<void> {
   await data.clearCaches();
 }
 
-// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const cacheBudgetMbId = useId();
 const currentUsageId = useId();
@@ -89,7 +89,7 @@ const hitRateId = useId();
       <Input
         :id="currentUsageId"
         type="text"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+        class="font-data"
         :model-value="cacheSizeLabel"
         disabled
       />
@@ -99,7 +99,7 @@ const hitRateId = useId();
       <Input
         :id="hitRateId"
         type="text"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+        class="font-data"
         :model-value="hitRateLabel"
         disabled
       />

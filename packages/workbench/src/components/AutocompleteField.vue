@@ -53,6 +53,8 @@ defineOptions({ inheritAttrs: false });
 // around TextField itself. A completion popup also needs the <input> element itself
 // (selectionStart/setSelectionRange/getBoundingClientRect), which TextField never exposes. Owning
 // the one <input> here keeps accept-vs-apply an explicit, testable branch in one place.
+// Multiline grows with its content; the kira box's fixed height would clip it.
+const MULTILINE_CLASS = 'h-auto min-h-control items-start py-1.5 leading-relaxed';
 const props = withDefaults(
   defineProps<{
     modelValue: string;
@@ -541,7 +543,7 @@ const fieldAttrs = computed(
     <InputGroup
       variant="kira"
       class="p-input autocomplete-field relative"
-      :class="[{ 'is-grow': grow }, multiline ? 'h-auto min-h-control items-start py-1.5 leading-relaxed' : '', props.class]"
+      :class="[{ 'is-grow': grow }, multiline ? MULTILINE_CLASS : '', props.class]"
       :aria-invalid="invalid"
     >
       <span v-if="prefix" :class="prefixActive ? 'text-state-on' : 'text-muted-foreground'">{{

@@ -30,7 +30,7 @@ const keepAwakeTooltip = computed(() => {
     icon="coffee"
     :label="keepAwakeTooltip"
     aria-label="Keep this Mac awake"
-    :icon-size="15"
+    :icon-size="16"
     variant="title"
     size="title"
     :aria-pressed="keepAwake.manual"
@@ -38,7 +38,7 @@ const keepAwakeTooltip = computed(() => {
     @click="emit('toggle-keep-awake')"
   />
   <Button variant="title" size="title-labelled" data-testid="new-window" @click="emit('new-window')">
-    <CodiconIcon name="empty-window" :size="15" />
+    <CodiconIcon name="empty-window" :size="16" />
     <span>New window</span>
   </Button>
 </template>
