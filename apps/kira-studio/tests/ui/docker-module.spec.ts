@@ -372,7 +372,7 @@ test('engine dropdown items do not overlap', async ({ relaunch }) => {
     },
   });
   await openDocker(page);
-  await page.locator('[data-testid="docker-endpoint-chip"]').click();
+  await page.getByTestId('docker-panel').getByTestId('docker-endpoint-chip').click();
   await expect(page.locator('[data-testid="docker-context-option"]')).toHaveCount(3);
 
   const bad = await page
