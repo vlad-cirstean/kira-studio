@@ -17,6 +17,7 @@ const SCRIPT = {
   command: 'make build',
   workingDir: '',
   dirMode: 'kira',
+  useAdeDir: false,
   color: 'blue',
   collectionId: null,
   sortOrder: 0,
@@ -24,7 +25,14 @@ const SCRIPT = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-const DIR = { path: '/kira/automations/script-1', mode: 'kira', base: '/kira', blocker: '' };
+const DIR = {
+  path: '/kira/automations/script-1',
+  mode: 'kira',
+  base: '/kira',
+  blocker: '',
+  branch: '',
+  pending: false,
+};
 
 const BASE: ControlSnapshot[] = [
   { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
@@ -51,6 +59,10 @@ function run(terminalId: string, state: string, extra: Record<string, unknown> =
     createdAt: 1_000,
     startedAt: 1_000,
     finishedAt: finished ? 4_000 : null,
+    taskId: '',
+    taskTitle: '',
+    branchId: '',
+    branchLabel: '',
     ...extra,
   };
 }
@@ -206,7 +218,14 @@ test('a legacy home script offers the automations folder', async ({ relaunch }) 
       { channel: IPC.customScriptsList, response: { collections: [], scripts: [legacy] } },
       {
         channel: IPC.scriptRunsResolveDir,
-        response: { path: '/home/test', mode: 'home', base: '/home/test', blocker: '' },
+        response: {
+          path: '/home/test',
+          mode: 'home',
+          base: '/home/test',
+          blocker: '',
+          branch: '',
+          pending: false,
+        },
       },
     ],
   });

@@ -25,7 +25,7 @@ type smartStep struct {
 // creating the script's own folder when the script does not run in the worktree.
 func (b *TaskBoard) planSmartStep(tc *taskCtx, sb model.AdeTaskBranch, path string, def stepDef) (*smartStep, error) {
 	fail := func(format string, a ...any) (*smartStep, error) {
-		return nil, fmt.Errorf("smart script %q: %s", def.SmartScript, fmt.Sprintf(format, a...))
+		return nil, invalid("smart script %q: %s", def.SmartScript, fmt.Sprintf(format, a...))
 	}
 	if b.deps.CustomScripts == nil {
 		return fail("scripts are not available")

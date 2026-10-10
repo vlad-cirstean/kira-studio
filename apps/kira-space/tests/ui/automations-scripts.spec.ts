@@ -12,6 +12,7 @@ const SCRIPT = {
   command: 'echo one\necho two',
   workingDir: '',
   dirMode: 'kira',
+  useAdeDir: false,
   color: 'none',
   collectionId: null,
   sortOrder: 0,
@@ -26,7 +27,14 @@ const TERMINAL_OPEN_OK: ControlSnapshot = {
 
 const RESOLVED_DIR: ControlSnapshot = {
   channel: IPC.scriptRunsResolveDir,
-  response: { path: '/kira/automations/script-1', mode: 'kira', base: '/kira', blocker: '' },
+  response: {
+    path: '/kira/automations/script-1',
+    mode: 'kira',
+    base: '/kira',
+    blocker: '',
+    branch: '',
+    pending: false,
+  },
 };
 
 function modeTab(page: Page) {
@@ -68,6 +76,7 @@ test('the header + adds a two-line script, sent with its newline', async ({ rela
         params: [],
         smart: null,
         dirMode: 'kira',
+        useAdeDir: true,
         workingDir: '',
         color: 'none',
         collectionId: null,

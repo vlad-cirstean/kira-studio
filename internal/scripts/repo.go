@@ -127,10 +127,10 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 		UseAdeDir:    fields.UseAdeDir,
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO custom_scripts (id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO custom_scripts (id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json, use_ade_dir)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.DirMode, rec.Color, rec.CollectionID, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
-		rec.Kind, paramsJSON, smartJSON,
+		rec.Kind, paramsJSON, smartJSON, rec.UseAdeDir,
 	); err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: insert: %w", err)
 	}

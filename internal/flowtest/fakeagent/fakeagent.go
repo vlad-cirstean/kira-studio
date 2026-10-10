@@ -389,7 +389,7 @@ func argsAfter(args []string, flag string) []string {
 func recordEnv(stem string) {
 	var lines []string
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "KIRA_PARAM_") || strings.HasPrefix(kv, "KIRA_TASK") {
+		if strings.HasPrefix(kv, "KIRA_PARAM_") || strings.HasPrefix(kv, "KIRA_TASK") || strings.HasPrefix(kv, "KIRA_BRANCH") {
 			lines = append(lines, strconv.Quote(kv))
 		}
 	}

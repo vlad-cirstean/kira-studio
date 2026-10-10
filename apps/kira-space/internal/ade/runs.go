@@ -435,7 +435,7 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 // failLaunch records a run that could not start as failed.
 func (b *TaskBoard) failLaunch(run model.AdeRun, cause error) {
 	now := b.deps.Now().UnixMilli()
-	state, note := model.AdeRunFailed, "could not start: "+cause.Error()
+	state, note := model.AdeRunFailed, "could not start: "+trimInvalid(cause)
 	updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{State: &state, Note: &note, FinishedAt: &now})
 	if err != nil {
 		slog.Warn("ade: record launch failure", "scope", "ade", "run", run.ID, "err", err)

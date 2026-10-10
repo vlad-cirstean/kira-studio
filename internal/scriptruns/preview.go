@@ -305,7 +305,7 @@ func (s *Service) Start(args StartArgs) (Started, error) {
 // on it. A normal script only needs the worktree to exist, so its claim is dropped at once. The run
 // is planned again against the created worktree.
 func (s *Service) claimWorktree(args RunArgs, p *planned) (*planned, error) {
-	release, err := s.ADE.ClaimWorktree(context.Background(), args.BranchID, p.script.Name)
+	release, err := s.ADE.ClaimWorktree(context.Background(), p.preview.ADE.BranchID, p.script.Name)
 	if err != nil {
 		return nil, ipcerr.New("E_INVALID", err.Error())
 	}

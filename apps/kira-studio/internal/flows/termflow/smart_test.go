@@ -590,3 +590,16 @@ func TestSmartScript(t *testing.T) {
 		}
 	})
 }
+
+func TestStudioRefusesTaskContext(t *testing.T) {
+	app := flowharness.New(t)
+	rec := newSmart(t, app, "hi", func(f *scripts.CustomScriptFields) { f.UseAdeDir = true })
+	_, err := app.W.ScriptRuns.Preview(scriptruns.RunArgs{ScriptID: rec.ID, TaskID: "t1"})
+	if errCode(err) != "E_INVALID" || !strings.Contains(err.Error(), "tasks exist only in Kira Space") {
+		t.Fatalf("Preview err = %v, want E_INVALID naming Kira Space", err)
+	}
+	snap, err := app.W.CustomScripts.List()
+	if err != nil || len(snap.Scripts) != 1 || !snap.Scripts[0].UseAdeDir {
+		t.Fatalf("scripts = %+v, %v; want useAdeDir kept", snap.Scripts, err)
+	}
+}

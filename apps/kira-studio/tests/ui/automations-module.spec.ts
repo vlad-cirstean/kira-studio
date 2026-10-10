@@ -21,6 +21,7 @@ const SCRIPT = {
   command: 'npm run dev',
   workingDir: '/tmp/demo-repo/frontend',
   dirMode: 'fixed',
+  useAdeDir: false,
   color: 'green',
   collectionId: null,
   sortOrder: 0,
@@ -30,7 +31,14 @@ const SCRIPT = {
 
 const RESOLVED_DIR: ControlSnapshot = {
   channel: IPC.scriptRunsResolveDir,
-  response: { path: SCRIPT.workingDir, mode: 'fixed', base: '', blocker: '' },
+  response: {
+    path: SCRIPT.workingDir,
+    mode: 'fixed',
+    base: '',
+    blocker: '',
+    branch: '',
+    pending: false,
+  },
 };
 
 // terminalId is a client-generated UUID — no `args` here, relying on mockRuntime.ts's
@@ -194,6 +202,7 @@ test('a multiline script is saved as written with Cmd/Ctrl+Enter; the panel row 
         params: [],
         smart: null,
         dirMode: 'kira',
+        useAdeDir: true,
         workingDir: '',
         color: 'none',
         collectionId: null,
@@ -296,6 +305,7 @@ test('the dialog adds a script into a collection chosen from a select', async ({
         params: [],
         smart: null,
         dirMode: 'kira',
+        useAdeDir: true,
         workingDir: '',
         color: 'none',
         collectionId: 'c-be',
@@ -506,6 +516,7 @@ test('Add stays disabled until name and script are filled; it sends the trimmed 
         params: [],
         smart: null,
         dirMode: 'fixed',
+        useAdeDir: true,
         workingDir: SCRIPT.workingDir,
         color: 'green',
         collectionId: null,
@@ -586,6 +597,7 @@ test('Edit… opens the dialog filled in; Save sends every edited field in one u
         params: [],
         smart: null,
         dirMode: 'fixed',
+        useAdeDir: false,
         workingDir: SCRIPT.workingDir,
         color: 'blue',
         collectionId: null,

@@ -50,6 +50,7 @@ const SMART = {
   },
   workingDir: '',
   dirMode: 'kira',
+  useAdeDir: false,
   color: 'none',
   collectionId: null,
   sortOrder: 0,
@@ -57,7 +58,14 @@ const SMART = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-const DIR = { path: '/kira/automations/smart-1', mode: 'kira', base: '/kira', blocker: '' };
+const DIR = {
+  path: '/kira/automations/smart-1',
+  mode: 'kira',
+  base: '/kira',
+  blocker: '',
+  branch: '',
+  pending: false,
+};
 const ALLOWED = ['Read', 'Grep', 'Glob', 'mcp__kira-ade__finish_step'];
 
 const PREVIEW = {
@@ -88,6 +96,8 @@ const PREVIEW = {
   allowedTools: ALLOWED,
   mcpServers: [],
   hash: 'h1',
+  needs: { tasks: [], branches: [] },
+  ade: null,
 };
 
 const BASE: ControlSnapshot[] = [
@@ -115,6 +125,10 @@ function smartRun(state: string, extra: Record<string, unknown> = {}) {
     createdAt: 1_000,
     startedAt: 1_000,
     finishedAt: finished ? 4_000 : null,
+    taskId: '',
+    taskTitle: '',
+    branchId: '',
+    branchLabel: '',
     model: 'sonnet',
     sessionId: 'sess-1',
     prompt: 'Check the build in dev for api.',
@@ -392,4 +406,13 @@ test('a normal script with params starts through a launch token', async ({ relau
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.terminalOpen)?.args)
     .toMatchObject({ scriptId: 'plain-1', scriptLaunchToken: 'tok-1', launchKind: 'script' });
+});
+
+test('the script editor has no worktree Switch in Studio', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: BASE });
+  await openPanel(page);
+  await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
+  await expect(page.locator('[data-testid="script-dialog"]')).toBeVisible();
+  await expect(page.locator('[data-testid="script-use-ade-dir"]')).toHaveCount(0);
 });

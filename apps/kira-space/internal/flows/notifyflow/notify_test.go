@@ -1,6 +1,7 @@
 package notifyflow_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
+	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -282,5 +285,121 @@ func TestSendTest(t *testing.T) {
 	}
 	if len(sink.all()) != 1 {
 		t.Fatalf("notes = %+v, want no test note while the master switch is off", sink.all())
+	}
+}
+
+// smartRun starts a smart script "ask" and returns its run id.
+func smartRun(t *testing.T, app *flowharness.App) string {
+	t.Helper()
+	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
+		Name: "ask", Kind: scripts.KindSmart, Command: "say hi", Color: "blue",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := scriptruns.RunArgs{ScriptID: rec.ID}
+	pv, err := app.W.ScriptRuns.Preview(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := app.W.ScriptRuns.Start(scriptruns.StartArgs{RunArgs: args, Hash: pv.Hash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return st.RunID
+}
+
+func TestAutomationNotifies(t *testing.T) {
+	cases := []struct {
+		name   string
+		action fakeagent.Action
+		title  string
+	}{
+		{"failed", fakeagent.Action{Name: "failed"}, "Automation failed · ask"},
+		{"needs input", fakeagent.Action{Name: "needs_input"}, "Automation needs you · ask"},
+		{"done", fakeagent.Action{Name: "done"}, "Automation done · ask"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			app, sink := newApp(t)
+			claude(app, map[string][]fakeagent.Action{"*": {c.action}})
+			id := smartRun(t, app)
+			testx.WaitUntil(t, waitFor, func() bool { return len(sink.all()) > 0 })
+			n := sink.only(t)
+			if n.Kind != agentnotify.KindAutomation || n.Title != c.title || n.ScriptRunID != id {
+				t.Fatalf("note = %+v, want %q for run %s", n, c.title, id)
+			}
+		})
+	}
+}
+
+func TestAutomationQuietCases(t *testing.T) {
+	t.Run("done off", func(t *testing.T) {
+		app, sink := newApp(t)
+		setNotify(t, app, model.ClaudeCodePatch{NotifyOnRunEnded: off()})
+		claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}}})
+		id := smartRun(t, app)
+		waitScriptState(t, app, id, "done")
+		time.Sleep(200 * time.Millisecond)
+		sink.none(t)
+	})
+	t.Run("stopped", func(t *testing.T) {
+		app, sink := newApp(t)
+		claude(app, map[string][]fakeagent.Action{"*": {{Name: "sleep"}}})
+		id := smartRun(t, app)
+		testx.WaitUntil(t, waitFor, func() bool { return len(fakeEntries(app)) > 0 })
+		if err := app.W.ScriptRuns.Stop(scriptruns.IDArgs{ID: id}); err != nil {
+			t.Fatal(err)
+		}
+		waitScriptState(t, app, id, "cancelled")
+		time.Sleep(200 * time.Millisecond)
+		sink.none(t)
+	})
+	t.Run("focused run", func(t *testing.T) {
+		app, sink := newApp(t)
+		app.W.Windows.Add(window, nil, func() {})
+		gate := filepath.Join(app.Root, "gate")
+		claude(app, map[string][]fakeagent.Action{"*": {{Name: "done", WaitFile: gate}}})
+		id := smartRun(t, app)
+		focus(t, app, bridge.ReportFocusArgs{Focused: true, Module: "automations", ActiveScriptRunID: id})
+		if err := os.WriteFile(gate, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		waitScriptState(t, app, id, "done")
+		time.Sleep(200 * time.Millisecond)
+		sink.none(t)
+	})
+}
+
+func fakeEntries(app *flowharness.App) []os.DirEntry {
+	es, _ := os.ReadDir(app.FakeDir)
+	return es
+}
+
+func waitScriptState(t *testing.T, app *flowharness.App, id, state string) {
+	t.Helper()
+	testx.WaitUntil(t, waitFor, func() bool {
+		r, err := app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: id})
+		return err == nil && r.State == state
+	})
+}
+
+func TestClickRevealsScriptRun(t *testing.T) {
+	app, sink := newApp(t)
+	app.W.Windows.Add(window, nil, func() {})
+	claude(app, map[string][]fakeagent.Action{"*": {{Name: "failed"}}})
+	id := smartRun(t, app)
+	testx.WaitUntil(t, waitFor, func() bool { return len(sink.all()) > 0 })
+	n := sink.only(t)
+	mark := app.Events.Mark()
+	app.W.AgentNotify.Click(map[string]any{"scriptRunId": n.ScriptRunID, "windowKey": n.WindowKey, "kind": string(n.Kind)})
+	evs := app.Events.Since(mark, bridge.ChannelAgentRevealScriptRun)
+	if len(evs) != 1 || evs[0].Window != window {
+		t.Fatalf("reveal events = %+v, want one addressed to %s", evs, window)
+	}
+	var payload struct{ RunID string }
+	evs[0].Decode(t, &payload)
+	if payload.RunID != id {
+		t.Fatalf("reveal payload = %+v, want run %s", payload, id)
 	}
 }
