@@ -2,15 +2,15 @@
 import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
@@ -84,7 +84,7 @@ function onTargetInput(value: string): void {
   patchGrpcRequestTabState(props.tab.id, { target: value });
 }
 
-// D13: the toolbar's own method picker — a plain <select> over the resolved schema, showing
+// D13: the toolbar's own method picker — a plain native select over the resolved schema, showing
 // "Service/Method" with a streaming badge folded into the option label (F23: no new primitive
 // needed for a value list this shape). The full browsable list with per-service grouping lives in
 // the Schema pane (SchemaBrowser.vue) — this is the fast path once a schema is already loaded.
@@ -365,11 +365,9 @@ onUnmounted(() => {
           @enter="onCall"
         />
       </div>
-      <ToggleGroup type="single" size="kira" :model-value="tab.state.tlsMode" data-testid="grpc-tls-toggle" @update:model-value="(v) => v && setTlsMode(v as 'plaintext' | 'tls')">
-        <ToggleGroupItem v-for="opt in TLS_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
-      </ToggleGroup>
+      <SecondaryTabs variant="segmented" :model-value="tab.state.tlsMode" :items="TLS_OPTIONS" data-testid="grpc-tls-toggle" @update:model-value="(v) => setTlsMode(v as 'plaintext' | 'tls')" />
       <!-- P22b D10: the same wrapper idiom .grpc-target-field uses above, for the identical reason
-           — a bare <select> has no width rule of its own, so it shrinks to its widest <option>
+           — a bare native select has no width rule of its own, so it shrinks to its widest option
            label (P110 B24: now a class="w-full" passed straight to NativeSelect, not a scoped
            descendant rule). Both fields are flex: 1 in this one toolbar row, so they share the
            free space evenly and stay responsive at either extreme of window size. -->
@@ -420,9 +418,7 @@ onUnmounted(() => {
     </ViewToolbar>
 
     <ViewToolbar border="none">
-      <ToggleGroup type="single" size="kira" :model-value="tab.state.requestPane" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => v && setRequestPane(v as 'message' | 'metadata' | 'schema')">
-        <ToggleGroupItem v-for="opt in REQUEST_PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
-      </ToggleGroup>
+      <SecondaryTabs :model-value="tab.state.requestPane" :items="REQUEST_PANE_OPTIONS" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => setRequestPane(v as 'message' | 'metadata' | 'schema')" />
       <TooltipIconButton
         v-if="tab.state.requestPane === 'message'"
         icon="expand-all"
@@ -497,15 +493,7 @@ onUnmounted(() => {
           @update:doc="onMessageInput"
         />
         <template v-else-if="tab.state.requestPane === 'metadata'">
-          <InputGroup v-if="fieldFilterOpen">
-            <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-            <InputGroupInput v-model="fieldFilterQuery" placeholder="Filter" data-testid="grpc-field-filter" />
-            <InputGroupAddon v-if="fieldFilterQuery" align="inline-end">
-              <InputGroupButton aria-label="Clear filter" @click="fieldFilterQuery = ''">
-                <CodiconIcon name="close" :size="13" />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
+          <SearchField v-if="fieldFilterOpen" v-model="fieldFilterQuery" placeholder="Filter" data-testid="grpc-field-filter" />
           <GrpcMetadataTable
             :tab="tab"
             :filter-query="fieldFilterQuery"

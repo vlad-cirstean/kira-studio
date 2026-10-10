@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
@@ -68,28 +67,11 @@ function close(): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="edit-raw-dialog"
-      class="flex flex-col p-0 gap-0 w-170 max-h-4/5"
-    >
-      <DialogHeader>
+    <DialogContent size="xl" data-testid="edit-raw-dialog">
+      <DialogHeader closable close-testid="edit-raw-dialog-close">
         <DialogTitle>Edit as raw HTTP</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="edit-raw-dialog-close"
-            @click="close"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="overflow-auto">
-    <div class="flex flex-col gap-2 p-3">
+      <DialogBody>
       <div class="text-kira-sm text-muted-foreground" data-testid="edit-raw-hint">{{ hint }}</div>
 
       <div class="h-80 overflow-hidden rounded-kira border border-border">
@@ -123,12 +105,10 @@ function close(): void {
           </AlertDescription>
         </Alert>
       </template>
-    </div>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="flex items-center gap-1.5 ml-auto">
-          <Button variant="dialog" size="kira-lg" data-testid="edit-raw-cancel" @click="close">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="edit-raw-cancel" @click="close">Cancel</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -138,7 +118,6 @@ function close(): void {
           >
             Apply
           </Button>
-        </span>
       </DialogFooter>
     </DialogContent>
   </Dialog>

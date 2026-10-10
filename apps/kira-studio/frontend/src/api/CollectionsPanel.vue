@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import PanelBar from '@workbench/components/PanelBar.vue';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
@@ -123,15 +125,15 @@ onUnmounted(() => {
 
 <template>
   <!-- P104 §3: PanelShell inlined (no library counterpart). -->
-  <div ref="rootEl" class="flex h-full flex-col">
-    <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
-      <span>Collections</span>
+  <div ref="rootEl" class="flex h-full min-h-0 flex-col">
+    <PanelHeader>
+      Collections
+      <template #actions>
       <TooltipIconButton
         icon="search"
         :label="showSearch ? 'Hide search' : 'Search'"
         aria-label="Search"
-        class="ml-auto"
-        :class="{ 'bg-field text-fg': showSearch }"
+        :pressed="showSearch"
         data-testid="toggle-search"
         @click="toggleSearch"
       />
@@ -160,21 +162,16 @@ onUnmounted(() => {
         data-testid="api-environments"
         @click="onEnvironments"
       />
-    </div>
+      </template>
+    </PanelHeader>
     <template v-if="!empty">
-      <InputGroup v-if="showSearch" data-testid="collections-search-group">
-        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput
+      <PanelBar v-if="showSearch" data-testid="collections-search-group">
+        <SearchField
           :model-value="collectionsStore.search"
           data-testid="tree-search"
-          @update:model-value="onSearch(String($event))"
+          @update:model-value="onSearch"
         />
-        <InputGroupAddon v-if="collectionsStore.search" align="inline-end">
-          <InputGroupButton aria-label="Clear search" @click="onSearch('')">
-            <CodiconIcon name="close" :size="13" />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
+      </PanelBar>
       <div class="min-h-0 flex-1">
         <div class="flex h-full min-h-0 flex-col">
           <ImportReportStrip />
@@ -182,15 +179,13 @@ onUnmounted(() => {
                (a rarer action than environments', which starts collapsed by default) never fights
                environments-category's fixed 40% cap below for space. -->
           <div class="flex flex-1 min-h-0 flex-col" :class="{ collapsed: !collectionsExpanded }">
-            <Button
-              variant="toolbar"
-              class="h-control justify-start gap-1 rounded-none bg-transparent px-1.5 text-kira-sm font-normal uppercase tracking-wider hover:bg-transparent"
+            <SectionHeading
+              label="Collections"
+              collapsible
+              :expanded="collectionsExpanded"
               data-testid="collections-category-toggle"
-              @click="collectionsExpanded = !collectionsExpanded"
-            >
-              <CodiconIcon :name="collectionsExpanded ? 'chevron-down' : 'chevron-right'" :size="13" />
-              <span>Collections</span>
-            </Button>
+              @toggle="collectionsExpanded = !collectionsExpanded"
+            />
             <CollectionsTree v-if="collectionsExpanded" class="flex-1 min-h-0" />
           </div>
           <!-- P28 D16(d) removes P22b D8's environments category from this panel by user request
@@ -201,21 +196,15 @@ onUnmounted(() => {
         </div>
       </div>
     </template>
-    <div v-else class="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 p-4 text-center">
+    <div v-else class="flex min-h-0 flex-1 flex-col">
       <ImportReportStrip />
-      <Empty data-testid="collections-empty">
-        <EmptyMedia><CodiconIcon name="folder-library" :size="24" /></EmptyMedia>
-        <EmptyTitle>No collections yet</EmptyTitle>
-        <EmptyDescription>Create one from the <b>+</b> above, or import a Postman collection.</EmptyDescription>
+      <Empty class="h-full" data-testid="collections-empty">
+        <EmptyHeader>
+          <EmptyMedia><CodiconIcon name="folder-library" :size="24" /></EmptyMedia>
+          <EmptyTitle>No collections yet</EmptyTitle>
+          <EmptyDescription>Create one from the <b>+</b> above, or import a Postman collection.</EmptyDescription>
+        </EmptyHeader>
       </Empty>
     </div>
-    <!-- P110 I2-18: `.panel-category-head`'s `all: unset` + @apply folded directly onto the button
-         above -- `border-0 bg-transparent cursor-pointer` replaces what `all: unset` reset that
-         Preflight's own button normalization doesn't (Preflight zeroes font/margin/padding and sets
-         `appearance: button`, not border/background/cursor). No new primitive (F12): still reuses
-         the definition-section-title idiom (uppercase/muted/t-sm/letter-spacing) the views/
-         definition/*Section.vue components share -- promote to a real component only if a second
-         panel wants this exact category shape (P18's own "promote when a second consumer appears"
-         rule). -->
   </div>
 </template>

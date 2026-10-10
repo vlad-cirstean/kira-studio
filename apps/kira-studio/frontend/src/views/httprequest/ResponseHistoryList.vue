@@ -5,20 +5,16 @@ import {
   type ResponseHistoryEntry,
 } from '@shared/domain/response-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { methodTextClass } from '@theme/methodColor';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, ref } from 'vue';
@@ -116,7 +112,7 @@ async function onClear(): Promise<void> {
 
 <template>
   <div class="flex flex-1 min-h-0 flex-col" data-testid="http-history-list">
-    <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
+    <ViewToolbar>
       <span class="text-kira-sm text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'response' : 'responses' }}</span>
       <span class="ml-auto" />
       <Button
@@ -138,7 +134,7 @@ async function onClear(): Promise<void> {
         <CodiconIcon name="trash" :size="13" />
         Clear history
       </Button>
-    </div>
+    </ViewToolbar>
     <Alert v-if="errorMessage" variant="destructive" data-testid="http-history-error">
       <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
@@ -159,15 +155,7 @@ async function onClear(): Promise<void> {
     </Empty>
 
     <template v-else>
-      <InputGroup>
-        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter history" data-testid="http-history-filter" />
-        <InputGroupAddon v-if="filterQuery" align="inline-end">
-          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
-            <CodiconIcon name="close" :size="13" />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
+      <SearchField v-model="filterQuery" placeholder="Filter history" data-testid="http-history-filter" />
       <Empty
         v-if="isFiltered && filteredEntries.length === 0"
         data-testid="http-history-filter-empty"
@@ -202,7 +190,7 @@ async function onClear(): Promise<void> {
           @click.stop
           @update:model-value="onToggle(entry.id)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <div class="flex min-w-0 flex-1 flex-col gap-0.5">
           <div class="flex items-center gap-1">

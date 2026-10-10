@@ -203,7 +203,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
             data-testid="variable-secret"
             @update:model-value="(v) => onSecretChange(v === true)"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
         </TooltipDisabledTrigger>
       </TooltipTrigger>

@@ -109,7 +109,7 @@ function onEditGlobalDefaults(): void {
 // the DEF_TH/DEF_TD const idiom views/definition/*.vue already uses.
 const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-sm';
 
-// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const httpVersionId = useId();
 const requestTimeoutMsId = useId();
@@ -131,7 +131,7 @@ const disableCookieJarId = useId();
             data-testid="http-settings-httpVersion-inherit"
             @update:model-value="(v) => onHttpVersionInherit(v === true)"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
           Inherit
         </Label>
@@ -160,7 +160,7 @@ const disableCookieJarId = useId();
             data-testid="http-settings-requestTimeoutMs-inherit"
             @update:model-value="(v) => onRequestTimeoutMsInherit(v === true)"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
           Inherit
         </Label>
@@ -190,7 +190,7 @@ const disableCookieJarId = useId();
             data-testid="http-settings-maxResponseMb-inherit"
             @update:model-value="(v) => onMaxResponseMbInherit(v === true)"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
           Inherit
         </Label>
@@ -220,7 +220,7 @@ const disableCookieJarId = useId();
           data-testid="http-settings-sslVerify"
           @update:model-value="(v) => onSslVerifyChange(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <Label :for="sslVerifyId">Verify SSL certificates</Label>
       </Field>
@@ -230,7 +230,7 @@ const disableCookieJarId = useId();
           data-testid="http-settings-sslVerify-inherit"
           @update:model-value="(v) => onSslVerifyInherit(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         Inherit
       </Label>
@@ -246,7 +246,7 @@ const disableCookieJarId = useId();
           data-testid="http-settings-followRedirects"
           @update:model-value="(v) => onFollowRedirectsChange(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <Label :for="followRedirectsId">Follow redirects</Label>
       </Field>
@@ -256,7 +256,7 @@ const disableCookieJarId = useId();
           data-testid="http-settings-followRedirects-inherit"
           @update:model-value="(v) => onFollowRedirectsInherit(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         Inherit
       </Label>
@@ -272,7 +272,7 @@ const disableCookieJarId = useId();
             data-testid="http-settings-maxRedirects-inherit"
             @update:model-value="(v) => onMaxRedirectsInherit(v === true)"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
           Inherit
         </Label>
@@ -303,7 +303,7 @@ const disableCookieJarId = useId();
           data-testid="http-settings-disableCookieJar"
           @update:model-value="(v) => onDisableCookieJarChange(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <Label :for="disableCookieJarId">Disable cookie jar</Label>
       </Field>
@@ -313,7 +313,7 @@ const disableCookieJarId = useId();
           data-testid="http-settings-disableCookieJar-inherit"
           @update:model-value="(v) => onDisableCookieJarInherit(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         Inherit
       </Label>

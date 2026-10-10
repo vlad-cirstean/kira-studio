@@ -1,16 +1,4 @@
 # P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-apps/kira-studio/frontend/src/api/ApiStart.vue
-apps/kira-studio/frontend/src/api/CollectionsPanel.vue
-apps/kira-studio/frontend/src/api/CopyAsCurlDialog.vue
-apps/kira-studio/frontend/src/api/DynamicValuesDialog.vue
-apps/kira-studio/frontend/src/api/EditRawRequestDialog.vue
-apps/kira-studio/frontend/src/api/ImportCurlDialog.vue
-apps/kira-studio/frontend/src/api/MethodSelect.vue
-apps/kira-studio/frontend/src/api/SaveRequestDialog.vue
-apps/kira-studio/frontend/src/api/VariableHistoryMenu.vue
-apps/kira-studio/frontend/src/api/VariableRow.vue
-apps/kira-studio/frontend/src/api/VariableSetView.vue
-apps/kira-studio/frontend/src/api/VariablesOverviewPanel.vue
 apps/kira-studio/frontend/src/views/browse/BrowseView.vue
 apps/kira-studio/frontend/src/views/console/ConsoleView.vue
 apps/kira-studio/frontend/src/views/console/ExplainResultView.vue
@@ -21,15 +9,6 @@ apps/kira-studio/frontend/src/views/grid/ColumnsMenu.vue
 apps/kira-studio/frontend/src/views/grid/DataToolbar.vue
 apps/kira-studio/frontend/src/views/grid/FkPreviewPopover.vue
 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue
-apps/kira-studio/frontend/src/views/grpcrequest/CallHistoryList.vue
-apps/kira-studio/frontend/src/views/grpcrequest/GrpcRequestView.vue
-apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue
-apps/kira-studio/frontend/src/views/grpcrequest/SchemaBrowser.vue
-apps/kira-studio/frontend/src/views/httprequest/HttpRequestView.vue
-apps/kira-studio/frontend/src/views/httprequest/RequestBodyPane.vue
-apps/kira-studio/frontend/src/views/httprequest/RequestSettingsPane.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponseHistoryList.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue
 apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue
 apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue
 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue
@@ -38,8 +17,6 @@ apps/kira-studio/frontend/src/views/shared/page/PagerControls.vue
 apps/kira-studio/frontend/src/views/stream/StreamComposeMessage.vue
 apps/kira-studio/frontend/src/views/stream/StreamSearchToolbar.vue
 apps/kira-studio/frontend/src/views/stream/StreamView.vue
-apps/kira-studio/frontend/src/workbench/panels/ProjectPanel.vue
-apps/kira-studio/frontend/src/workbench/panels/StudioStart.vue
 apps/kira-studio/frontend/src/workbench/settings/AdvancedPane.vue
 apps/kira-studio/frontend/src/workbench/settings/ApiPane.vue
 apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue
@@ -91,12 +68,8 @@ packages/workbench/src/settings/fields/RowDensityField.vue
 packages/workbench/src/settings/fields/WordWrapField.vue
 permanent U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 §2.2 exempt)
 permanent U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
-apps/kira-studio/frontend/src/api/EnvironmentsView.vue
-apps/kira-studio/frontend/src/views/httprequest/CookiesPane.vue
 apps/kira-studio/frontend/src/views/shared/ResponseFindBar.vue
 apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue
-apps/kira-studio/frontend/src/api/CollectionRow.vue
-apps/kira-studio/frontend/src/api/CollectionsTree.vue
 packages/docker-ui/src/components/ImageList.vue
 packages/docker-ui/src/components/NetworkList.vue
 packages/docker-ui/src/components/VirtualList.vue

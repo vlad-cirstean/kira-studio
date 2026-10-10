@@ -2,16 +2,11 @@
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
 import { useMutation } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@theme/components/ui/input-group';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
@@ -117,17 +112,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
     </Empty>
     <template v-else>
       <div class="flex items-center gap-1">
-        <InputGroup>
-          <InputGroupAddon>
-            <CodiconIcon name="search" :size="13" />
-          </InputGroupAddon>
-          <InputGroupInput v-model="filter" placeholder="Filter cookies" data-testid="http-cookies-filter" />
-          <InputGroupAddon v-if="filter" align="inline-end">
-            <InputGroupButton @click="filter = ''">
-              <CodiconIcon name="close" :size="13" />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
+        <SearchField v-model="filter" placeholder="Filter cookies" data-testid="http-cookies-filter" />
         <Button
           variant="dialog"
           size="kira"

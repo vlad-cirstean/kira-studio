@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import type { GrpcSchemaWire } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@theme/components/ui/input-group';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import { control } from '../../bridge/control';
@@ -106,23 +102,8 @@ function selectMethod(service: string, method: string): void {
 
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-auto" data-testid="grpc-schema-browser">
-    <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
-      <ToggleGroup
-        type="single"
-        size="kira"
-        :model-value="tab.state.descriptorMode"
-        data-testid="grpc-source-toggle"
-        @update:model-value="(v) => v && setDescriptorMode(v as 'reflection' | 'proto')"
-      >
-        <ToggleGroupItem
-          v-for="opt in SOURCE_OPTIONS"
-          :key="opt.value"
-          :value="opt.value"
-          :data-testid="opt.testid"
-        >
-          {{ opt.label }}
-        </ToggleGroupItem>
-      </ToggleGroup>
+    <ViewToolbar>
+      <SecondaryTabs variant="segmented" :model-value="tab.state.descriptorMode" :items="SOURCE_OPTIONS" data-testid="grpc-source-toggle" @update:model-value="(v) => setDescriptorMode(v as 'reflection' | 'proto')" />
       <template v-if="tab.state.descriptorMode === 'reflection'">
         <Input
           size="kira"
@@ -156,7 +137,7 @@ function selectMethod(service: string, method: string): void {
         <CodiconIcon name="refresh" :size="13" />
         Reload
       </Button>
-    </div>
+    </ViewToolbar>
 
     <div v-if="tab.state.descriptorMode === 'proto'" class="flex flex-col gap-0.5 border-b border-border px-1.5 py-1" data-testid="grpc-import-paths">
       <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Import paths</span>
@@ -199,21 +180,7 @@ function selectMethod(service: string, method: string): void {
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
 
-    <InputGroup v-if="schema && schema.services.length > 0">
-      <InputGroupAddon>
-        <CodiconIcon name="search" :size="13" />
-      </InputGroupAddon>
-      <InputGroupInput
-        v-model="filterQuery"
-        placeholder="Filter services and methods"
-        data-testid="grpc-schema-filter"
-      />
-      <InputGroupAddon v-if="filterQuery" align="inline-end">
-        <InputGroupButton @click="filterQuery = ''">
-          <CodiconIcon name="close" :size="13" />
-        </InputGroupButton>
-      </InputGroupAddon>
-    </InputGroup>
+    <SearchField v-if="schema && schema.services.length > 0" v-model="filterQuery" placeholder="Filter services and methods" data-testid="grpc-schema-filter" />
     <div class="flex-1 min-h-0 overflow-auto px-1.5 py-1" data-testid="grpc-service-list">
       <template v-if="schema && filteredServices.length > 0">
         <div v-for="svc in filteredServices" :key="svc.fullName" class="mb-1.5">

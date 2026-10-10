@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -13,7 +13,7 @@ import { useSaveRequestDialogStore } from './state/saveRequestDialog';
 const collectionsStore = useCollectionsStore();
 const saveDialogStore = useSaveRequestDialogStore();
 
-// P4 D15: Save as… — one TextField for the name and one indented <select> of every collection and
+// P4 D15: Save as… — one text field for the name and one indented native select of every collection and
 // folder as the target, on the existing DialogFrame. Driven by useSaveRequestDialogStore's own
 // open/suggestedName state (P108 F16) so the request view can open it without importing this
 // component (the same shape state/objectStore.ts's own upload dialog uses).
@@ -73,38 +73,25 @@ function splitTarget(value: string): [string, string | null] {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && saveDialogStore.closeSaveDialog()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="save-request-dialog"
-      class="flex flex-col p-0 gap-0 w-120"
-    >
-      <DialogHeader>
+    <DialogContent size="md" data-testid="save-request-dialog">
+      <DialogHeader closable close-testid="save-request-close">
         <DialogTitle>Save request</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="save-request-close"
-            @click="saveDialogStore.closeSaveDialog"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="overflow-auto">
-    <div class="flex flex-col gap-2 p-3">
-      <Label class="text-muted-foreground mt-1">Name</Label>
-      <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
+      <DialogBody>
+      <Field>
+        <Label class="text-muted-foreground">Name</Label>
+        <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
+      </Field>
 
-      <Label class="text-muted-foreground mt-1">Save to</Label>
-      <NativeSelect v-model="target" variant="bordered" data-testid="save-request-target">
-        <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
-          <option :value="`${c.id}:`">(collection root)</option>
-          <option v-for="f in c.folders" :key="f.id" :value="`${c.id}:${f.id}`">{{ f.label }}</option>
-        </optgroup>
-      </NativeSelect>
+      <Field>
+        <Label class="text-muted-foreground">Save to</Label>
+        <NativeSelect v-model="target" variant="bordered" data-testid="save-request-target">
+          <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
+            <option :value="`${c.id}:`">(collection root)</option>
+            <option v-for="f in c.folders" :key="f.id" :value="`${c.id}:${f.id}`">{{ f.label }}</option>
+          </optgroup>
+        </NativeSelect>
+      </Field>
 
       <Alert v-if="collectionTargets.length === 0" variant="warn" data-testid="save-request-no-target">
         <AlertDescription>
@@ -114,12 +101,10 @@ function splitTarget(value: string): [string, string | null] {
       <Alert v-if="error" variant="destructive" data-testid="save-request-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
-    </div>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="flex items-center gap-1.5 ml-auto">
-          <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">Cancel</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -129,7 +114,6 @@ function splitTarget(value: string): [string, string | null] {
           >
             Save
           </Button>
-        </span>
       </DialogFooter>
     </DialogContent>
   </Dialog>

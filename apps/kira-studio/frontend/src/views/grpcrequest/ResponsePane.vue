@@ -7,13 +7,14 @@ import {
 } from '@shared/domain/grpc';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { formatBytes } from '@workbench/util/format';
@@ -274,7 +275,7 @@ onUnmounted(() => {
          from tab-open — only the response-dependent *contents* below stay conditional. A freshly-
          opened tab used to show no Messages/Metadata/History switcher at all. -->
     <!-- `.response-status-row` stays a bare marker: api-ui-consistency.spec.ts locates it directly. -->
-    <div class="response-status-row h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
+    <ViewToolbar class="response-status-row">
       <template v-if="hasCode">
         <Tooltip v-if="codeHint">
           <TooltipTrigger as-child>
@@ -304,23 +305,8 @@ onUnmounted(() => {
         data-testid="grpc-find-toggle"
         @click="toggleFind"
       />
-      <ToggleGroup
-        type="single"
-        size="kira"
-        :model-value="tab.state.responsePane"
-        data-testid="grpc-response-pane-toggle"
-        @update:model-value="(v) => v && setResponsePane(v as GrpcResponsePane)"
-      >
-        <ToggleGroupItem
-          v-for="opt in RESPONSE_PANE_OPTIONS"
-          :key="opt.value"
-          :value="opt.value"
-          :data-testid="opt.testid"
-        >
-          {{ opt.label }}
-        </ToggleGroupItem>
-      </ToggleGroup>
-    </div>
+      <SecondaryTabs :model-value="tab.state.responsePane" :items="RESPONSE_PANE_OPTIONS" data-testid="grpc-response-pane-toggle" @update:model-value="(v) => setResponsePane(v as GrpcResponsePane)" />
+    </ViewToolbar>
 
     <!-- P18 D13's other half, kept: the server's own statusMessage is a message, not a
          restatement of the code, so it stays on its own line free to wrap. -->

@@ -15,18 +15,13 @@ import {
 } from '@kira/api-core';
 import { type HttpMethod, type HttpRequestPane, httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@theme/components/ui/input-group';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { methodTextClass } from '@theme/methodColor';
@@ -625,17 +620,7 @@ onUnmounted(() => {
     </ViewToolbar>
 
     <ViewToolbar border="none">
-      <ToggleGroup
-        type="single"
-        size="kira"
-        :model-value="tab.state.requestPane"
-        data-testid="http-request-pane-toggle"
-        @update:model-value="(v) => v && setRequestPane(v as HttpRequestPane)"
-      >
-        <ToggleGroupItem v-for="opt in REQUEST_PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
-          {{ opt.label }}
-        </ToggleGroupItem>
-      </ToggleGroup>
+      <SecondaryTabs :model-value="tab.state.requestPane" :items="REQUEST_PANE_OPTIONS" data-testid="http-request-pane-toggle" @update:model-value="(v) => setRequestPane(v as HttpRequestPane)" />
       <TooltipIconButton
         v-if="showFieldFilterToggle"
         icon="search"
@@ -703,15 +688,7 @@ onUnmounted(() => {
         :order="1"
         @resize="onResizeRequestPane"
       >
-        <InputGroup v-if="fieldFilterOpen && showFieldFilterToggle">
-          <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-          <InputGroupInput v-model="fieldFilterQuery" placeholder="Filter" data-testid="http-field-filter" />
-          <InputGroupAddon v-if="fieldFilterQuery" align="inline-end">
-            <InputGroupButton aria-label="Clear filter" @click="fieldFilterQuery = ''">
-              <CodiconIcon name="close" :size="13" />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
+        <SearchField v-if="fieldFilterOpen && showFieldFilterToggle" v-model="fieldFilterQuery" placeholder="Filter" data-testid="http-field-filter" />
         <QueryParamsTable
           v-if="tab.state.requestPane === 'params'"
           :tab="tab"

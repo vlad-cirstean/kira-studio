@@ -4,10 +4,10 @@ import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyOrReportError } from '@workbench/util/clipboard';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, nextTick, ref, useTemplateRef } from 'vue';
-import { useSettingsStore } from '../state/settings';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
@@ -22,12 +22,11 @@ const dynamicValuesStore = useDynamicValuesStore();
 const collectionsStore = useCollectionsStore();
 const importCurlStore = useImportCurlStore();
 const variablesStore = useVariablesStore();
-const settingsStore = useSettingsStore();
 
 // P104 §3.4: TreeHost's own recipe (virtualization + the pinned ancestor band + reveal-scroll),
 // inlined via the shared useTreeVirtualRows composable rather than kept as a wrapper component —
 // the same swap ProjectTree.vue's own call site already made.
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 const scrollEl = ref<HTMLElement | null>(null);
 const { virtualItems, totalSize, band, onScroll, revealKey } = useTreeVirtualRows({
   rows: () => collectionsStore.visibleRows,

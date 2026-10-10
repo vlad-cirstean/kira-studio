@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { copyOrReportError } from '@workbench/util/clipboard';
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -75,37 +75,12 @@ function close(): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="dynamic-values-dialog"
-      class="flex flex-col p-0 gap-0 w-120 max-h-4/5"
-    >
-      <DialogHeader>
+    <DialogContent size="md" data-testid="dynamic-values-dialog">
+      <DialogHeader closable close-testid="dynamic-values-dialog-close">
         <DialogTitle>Dynamic values</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="dynamic-values-dialog-close"
-            @click="close"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="overflow-auto">
-    <div class="flex flex-col gap-0.5 p-1 overflow-y-auto">
-      <InputGroup>
-        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter" data-testid="dynamic-values-filter" />
-        <InputGroupAddon v-if="filterQuery" align="inline-end">
-          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
-            <CodiconIcon name="close" :size="13" />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
+      <DialogBody class="gap-1.5">
+      <SearchField v-model="filterQuery" size="kira-lg" placeholder="Filter" data-testid="dynamic-values-filter" />
       <Alert v-if="error" variant="destructive" data-testid="dynamic-values-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
@@ -120,6 +95,7 @@ function close(): void {
         <TooltipTrigger as-child>
           <Button
             variant="ghost"
+            size="kira"
             class="h-auto min-h-6.5 w-full justify-between gap-1 rounded-kira-sm px-1.5 py-1 text-left text-kira-md font-normal"
             data-testid="dynamic-values-fake-row"
             :data-name="entry.name"
@@ -135,13 +111,10 @@ function close(): void {
         </TooltipTrigger>
         <TooltipContent>Copy</TooltipContent>
       </Tooltip>
-    </div>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="flex items-center gap-1.5 justify-end w-full">
-          <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">Close</Button>
-        </span>
+        <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">Close</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

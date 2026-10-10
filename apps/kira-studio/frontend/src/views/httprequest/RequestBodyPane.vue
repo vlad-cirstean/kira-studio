@@ -8,11 +8,11 @@ import {
   userContentTypeHeader,
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { computed, ref } from 'vue';
 import {
@@ -159,25 +159,25 @@ const caption = computed(() =>
     userContentTypeHeader(props.tab.state.headers),
   ),
 );
+
+const BODY_MODE_ITEMS = BODY_MODE_OPTIONS.map((opt) => ({
+  value: opt.value,
+  label: opt.label,
+  testid: opt.testid,
+  tooltip: opt.title,
+}));
 </script>
 
 <template>
   <div class="flex flex-1 min-h-0 flex-col">
-    <div class="h-bar shrink-0 flex items-center gap-1 overflow-x-auto px-2 border-b border-border">
-      <ToggleGroup
-        type="single"
-        size="kira"
+    <ViewToolbar class="overflow-x-auto">
+      <SecondaryTabs
+        variant="segmented"
         :model-value="selection"
+        :items="BODY_MODE_ITEMS"
         data-testid="http-body-mode"
-        @update:model-value="(v) => v && setSelection(v as HttpBodySelection)"
-      >
-        <Tooltip v-for="opt in BODY_MODE_OPTIONS" :key="opt.value">
-          <TooltipTrigger as-child>
-            <ToggleGroupItem :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
-          </TooltipTrigger>
-          <TooltipContent>{{ opt.title }}</TooltipContent>
-        </Tooltip>
-      </ToggleGroup>
+        @update:model-value="(v) => setSelection(v as HttpBodySelection)"
+      />
       <NativeSelect
         v-if="tab.state.bodyMode === 'code' && tab.state.codeLanguage !== 'json'"
         variant="bordered"
@@ -197,7 +197,7 @@ const caption = computed(() =>
         data-testid="http-body-beautify"
         @click="onBeautifyBody"
       />
-    </div>
+    </ViewToolbar>
 
     <div v-if="caption" class="text-kira-sm text-subtle px-1.5 pt-0 pb-1" data-testid="http-body-content-type-caption">
       {{ caption }}

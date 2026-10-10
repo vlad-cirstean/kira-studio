@@ -58,7 +58,7 @@ function openRecent(entry: RecentTableEntry): void {
   <!-- FirstRun.html — no connections at all: one button, no duplicate engine grid. -->
   <div v-if="!hasConnections" class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="first-run">
     <div class="w-96 flex flex-col items-center text-center gap-4">
-      <span class="start-mark text-subtle"><CodiconIcon name="database" :size="32" /></span>
+      <span class="start-mark text-subtle"><CodiconIcon name="database" :size="24" /></span>
       <!-- P24 D31: no bold text anywhere in the app -- --kira-t-xl (text-kira-xl, the scale's
            largest step) already carries the emphasis a first-run heading needs. -->
       <div class="tracking-normal text-kira-xl text-fg">No connections yet</div>

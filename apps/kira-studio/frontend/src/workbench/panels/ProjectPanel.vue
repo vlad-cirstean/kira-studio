@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@theme/components/ui/empty';
+import PanelBar from '@workbench/components/PanelBar.vue';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, useTemplateRef } from 'vue';
 import CredentialsUpdateDialog from '../../project/CredentialsUpdateDialog.vue';
@@ -33,55 +36,45 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
 </script>
 
 <template>
-  <div ref="rootEl" class="flex h-full flex-col">
-    <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
-      <span>Connections</span>
-      <TooltipIconButton
-        icon="search"
-        :label="showSearch ? 'Hide search' : 'Search'"
-        class="ml-auto"
-        :data-active="showSearch"
-        data-testid="toggle-search"
-        @click="toggleSearch"
-      />
-      <!-- P28 D18: the DataGrip import moved to the menu bar (App → Import DataGrip
-           Connections…). It is a once-per-machine action and did not earn a permanent slot in a
-           four-button header. StudioStart.vue's own first-run button stays: an empty state is
-           exactly when a menu-bar-only affordance is hardest to find. -->
-      <TooltipIconButton
-        icon="add"
-        label="New connection"
-        data-testid="add-connection"
-        @click="connectionDialogStore.openCreateDialog"
-      />
-    </div>
+  <div ref="rootEl" class="flex h-full min-h-0 flex-col">
+    <PanelHeader>
+      Connections
+      <template #actions>
+        <TooltipIconButton
+          icon="search"
+          :label="showSearch ? 'Hide search' : 'Search'"
+          :pressed="showSearch"
+          data-testid="toggle-search"
+          @click="toggleSearch"
+        />
+        <!-- P28 D18: the DataGrip import moved to the menu bar (App → Import DataGrip
+             Connections…). It is a once-per-machine action and did not earn a permanent slot in a
+             four-button header. StudioStart.vue's own first-run button stays: an empty state is
+             exactly when a menu-bar-only affordance is hardest to find. -->
+        <TooltipIconButton
+          icon="add"
+          label="New connection"
+          data-testid="add-connection"
+          @click="connectionDialogStore.openCreateDialog"
+        />
+      </template>
+    </PanelHeader>
     <template v-if="!empty">
-      <div v-if="showSearch" class="shrink-0 border-b border-border px-1.5 py-1">
-        <InputGroup>
-          <InputGroupAddon>
-            <CodiconIcon name="search" :size="13" />
-          </InputGroupAddon>
-          <InputGroupInput v-model="treeStore.search" placeholder="Search" data-testid="tree-search" />
-          <InputGroupAddon v-if="treeStore.search" align="inline-end">
-            <InputGroupButton aria-label="Clear search" @click="treeStore.search = ''">
-              <CodiconIcon name="close" :size="12" />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
-      </div>
+      <PanelBar v-if="showSearch">
+        <SearchField v-model="treeStore.search" data-testid="tree-search" />
+      </PanelBar>
       <div class="min-h-0 flex-1">
         <ProjectTree />
       </div>
     </template>
-    <!-- FirstRun.html's side-empty: says what the panel is for, nothing more — the headline
+    <!-- FirstRun.html's empty pane: says what the panel is for, nothing more — the headline
          already lives on the main start page, so it is not repeated here. -->
-    <div
-      v-else
-      class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
-    >
-      <span class="text-subtle"><CodiconIcon name="database" :size="24" /></span>
-      <span class="text-kira-sm text-subtle leading-normal">Everything you connect to<br />shows up here.</span>
-    </div>
+    <Empty v-else class="h-full">
+      <EmptyHeader>
+        <EmptyMedia><CodiconIcon name="database" :size="24" /></EmptyMedia>
+        <EmptyDescription>Everything you connect to<br />shows up here.</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   </div>
   <FiltersDialog />
   <CredentialsUpdateDialog v-if="credentialsDialogStore.open" />

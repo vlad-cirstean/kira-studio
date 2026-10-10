@@ -2,17 +2,12 @@
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
@@ -516,15 +511,7 @@ function onBulkClose(): void {
          (the band every other view's own filter/search control lives in), the .env-text toggle in
          the trailing group (every other view's own trailing action group). -->
     <ViewToolbar border="none">
-      <InputGroup v-if="!bulkMode" variant="kira" class="w-64">
-        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="variables-filter" />
-        <InputGroupAddon v-if="filterQuery" align="inline-end">
-          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
-            <CodiconIcon name="close" :size="13" />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
+      <div v-if="!bulkMode" class="w-64"><SearchField v-model="filterQuery" placeholder="Filter by name" data-testid="variables-filter" /></div>
       <span class="ml-auto" />
       <RunState :state="runState" />
       <div class="flex items-center gap-1.5 shrink-0">
@@ -601,7 +588,7 @@ function onBulkClose(): void {
         </Label>
         <!-- P104 §3 "ColorPicker -> inline composition": the swatch grid of Buttons inlined at the
              call site rather than kept as a shared primitive component. -->
-        <!-- P105 §7: `role="radio"` on a `<Button>` wants a real radio input (`useSemanticElements`)
+        <!-- P105 §7: `role="radio"` on a Button wants a real radio input (`useSemanticElements`)
              — a visually-hidden native `<input type="radio">` per swatch keeps the circle's own
              styling exactly (an actual `ToggleGroupItem` would swap in `toggleVariants`' own
              rectangular look), with native Tab/Arrow-key/checked behaviour for free. `opacity-0`

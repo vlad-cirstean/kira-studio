@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
@@ -94,15 +94,7 @@ function editEnvironmentVariables(): void {
 <template>
   <PopoverContent align="start" class="w-96 gap-0 p-0" data-testid="variables-overview">
     <div class="flex max-h-105 flex-col">
-      <InputGroup>
-        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="variables-overview-filter" />
-        <InputGroupAddon v-if="filterQuery" align="inline-end">
-          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
-            <CodiconIcon name="close" :size="13" />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
+      <SearchField v-model="filterQuery" placeholder="Filter by name" data-testid="variables-overview-filter" />
 
       <Alert v-if="copyError" variant="destructive" data-testid="variables-overview-copy-error">
         <AlertDescription>{{ copyError }}</AlertDescription>
@@ -145,7 +137,7 @@ function editEnvironmentVariables(): void {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
-                variant="ghost"
+                variant="ghost" size="kira"
                 class="h-auto min-w-0 justify-start overflow-hidden text-ellipsis rounded-none p-0 text-left font-data font-normal hover:bg-transparent"
                 data-testid="variables-overview-name"
                 @click="onCopy(row.name)"
@@ -183,7 +175,7 @@ function editEnvironmentVariables(): void {
       <div class="flex flex-col gap-0.5 border-t border-border p-1">
         <Button
           v-if="canEdit"
-          variant="link"
+          variant="link" size="kira"
           class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle disabled:opacity-60"
           :disabled="!collectionId"
           data-testid="variables-overview-edit-collection"
@@ -193,7 +185,7 @@ function editEnvironmentVariables(): void {
         </Button>
         <Button
           v-if="canEdit"
-          variant="link"
+          variant="link" size="kira"
           class="h-auto justify-start gap-1 p-0 font-normal text-info no-underline hover:no-underline disabled:text-subtle disabled:opacity-60"
           :disabled="!environmentId"
           data-testid="variables-overview-edit-environment"

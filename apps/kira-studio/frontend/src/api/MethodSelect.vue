@@ -14,7 +14,7 @@ import { methodTextClass } from '@theme/methodColor';
 
 // P17 D18/D19, item 1: an app-drawn menu trigger, on the exact P42 D27 precedent
 // (views/shared/celleditor/CellEditorView.vue's own format-select/openFormatMenu, F12) — a native
-// <select>'s per-option colour is `option`-level styling, which lands only under
+// native select's per-option colour is `option`-level styling, which lands only under
 // `appearance: base-select` and only where the engine implements it. The closed state is styled by
 // nativeSelectVariants({variant:'bordered'}) either way (untouched by the element swap), so nothing
 // about height/border/padding changes (P16 D6's own rule stays true) — only the open list gains
@@ -40,7 +40,7 @@ function select(method: unknown): void {
       <DropdownMenuTrigger as-child>
         <button
           type="button"
-          :class="cn(nativeSelectVariants({ variant: 'bordered', size: 'kira' }), 'font-semibold font-data', methodTextClass(httpMethodToken(props.modelValue)))"
+          :class="cn(nativeSelectVariants({ variant: 'bordered', size: 'kira' }), 'font-medium font-data', methodTextClass(httpMethodToken(props.modelValue)))"
           :data-testid="testid"
           :data-value="props.modelValue"
         >
@@ -55,7 +55,7 @@ function select(method: unknown): void {
           v-for="m in HTTP_METHODS"
           :key="m"
           :value="m"
-          :class="cn('h-control font-semibold', methodTextClass(httpMethodToken(m)))"
+          :class="cn('h-control font-medium', methodTextClass(httpMethodToken(m)))"
           :data-testid="`method-menu-item-${m}`"
           :data-value="m"
         >

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed } from 'vue';
 import { useCopyAsCurlStore } from './state/curl';
@@ -66,28 +65,11 @@ function close(): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="copy-as-curl-dialog"
-      class="flex flex-col p-0 gap-0 w-170 max-h-4/5"
-    >
-      <DialogHeader>
+    <DialogContent size="xl" data-testid="copy-as-curl-dialog">
+      <DialogHeader closable close-testid="copy-as-curl-dialog-close">
         <DialogTitle>Copy as curl</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="copy-as-curl-dialog-close"
-            @click="close"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="overflow-auto">
-    <div class="flex flex-col gap-2 p-3">
+      <DialogBody>
       <Textarea
         class="font-data min-h-44"
         :model-value="command"
@@ -124,12 +106,10 @@ function close(): void {
       <Alert v-if="copyAsCurlStore.error" variant="destructive" data-testid="copy-as-curl-error">
         <AlertDescription>{{ copyAsCurlStore.error }}</AlertDescription>
       </Alert>
-    </div>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="flex items-center gap-1.5 ml-auto">
-          <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">Close</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">Close</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -138,7 +118,6 @@ function close(): void {
           >
             Copy
           </Button>
-        </span>
       </DialogFooter>
     </DialogContent>
   </Dialog>

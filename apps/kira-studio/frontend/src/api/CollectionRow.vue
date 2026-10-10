@@ -2,6 +2,7 @@
 import { grpcMethodClass } from '@shared/domain/grpc';
 import { httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
@@ -11,7 +12,7 @@ import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
-// P4 D13: the same 8 + depth × 14 px indent, roving tabindex and twisty as project/TreeRow.vue,
+// P4 D13: the same rowIndent indent, roving tabindex and twisty as project/TreeRow.vue,
 // with three differences that are the whole reason this is a separate file rather than a widened
 // shared row: no connection colour rail, no status dot and no EngineIcon (none of which mean
 // anything here); a leading **method chip** for a request row, which is what Postman itself shows
@@ -31,11 +32,8 @@ const props = withDefaults(
   { sticky: false, tabbable: false },
 );
 
-// P110 I2-14: same ternary as TreeRow.vue's own stateClass -- selected beats hover pre-phase on
-// specificity, so this reproduces that exactly.
-const stateClass = computed(() =>
-  props.selected ? 'bg-select' : props.sticky ? 'bg-bg hover:bg-hover' : 'hover:bg-hover',
-);
+// A pinned band row needs an opaque background; selected still wins (rowVariants selected).
+const stickyClass = computed(() => (props.sticky && !props.selected ? 'bg-bg' : undefined));
 
 const emit = defineEmits<{
   select: [row: CollectionRowVm];
@@ -98,13 +96,9 @@ function onKeydown(e: KeyboardEvent): void {
 <template>
   <div
     :class="
-      cn(
-        'relative flex items-center gap-1 pr-2 h-row text-kira-md whitespace-nowrap select-none cursor-default',
-        stateClass,
-        props.class,
-      )
+      cn(rowVariants({ layout: 'tree', selected }), 'h-row', stickyClass, props.class)
     "
-    :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+    :style="rowIndent(row.depth)"
     :data-testid="sticky ? 'collection-sticky-row' : 'collection-row'"
     :data-kind="row.kind"
     :data-id="row.id"

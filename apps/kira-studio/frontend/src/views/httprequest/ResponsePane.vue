@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@theme/components/ui/input-group';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { formatBytes } from '@workbench/util/format';
@@ -262,7 +258,7 @@ onUnmounted(() => {
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
-    <div class="response-status-row h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
+    <ViewToolbar class="response-status-row">
       <template v-if="response">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -287,18 +283,7 @@ onUnmounted(() => {
           <TooltipContent>See where the time went</TooltipContent>
         </Tooltip>
         <span class="text-kira-sm text-subtle" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
-        <ToggleGroup
-          v-if="tab.state.responsePane === 'body' && prettyFormat !== null"
-          type="single"
-          size="kira"
-          :model-value="tab.state.responseView"
-          data-testid="http-response-view-toggle"
-          @update:model-value="(v) => v && setResponseView(v as 'pretty' | 'raw')"
-        >
-          <ToggleGroupItem v-for="opt in RESPONSE_VIEW_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
-            {{ opt.label }}
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <SecondaryTabs :model-value="tab.state.responseView" :items="RESPONSE_VIEW_OPTIONS" data-testid="http-response-view-toggle" @update:model-value="(v) => setResponseView(v as 'pretty' | 'raw')" />
       </template>
       <span v-else class="ml-auto" />
       <!-- D11: only the two panes with a rangeHighlights compartment free (Body, Raw) get the
@@ -312,23 +297,8 @@ onUnmounted(() => {
         data-testid="http-find-toggle"
         @click="toggleFind"
       />
-      <ToggleGroup
-        type="single"
-        size="kira"
-        :model-value="tab.state.responsePane"
-        data-testid="http-response-pane-toggle"
-        @update:model-value="(v) => v && setResponsePane(v as HttpResponsePane)"
-      >
-        <ToggleGroupItem
-          v-for="opt in RESPONSE_PANE_OPTIONS_WITH_COOKIES"
-          :key="opt.value"
-          :value="opt.value"
-          :data-testid="opt.testid"
-        >
-          {{ opt.label }}
-        </ToggleGroupItem>
-      </ToggleGroup>
-    </div>
+      <SecondaryTabs :model-value="tab.state.responsePane" :items="RESPONSE_PANE_OPTIONS_WITH_COOKIES" data-testid="http-response-pane-toggle" @update:model-value="(v) => setResponsePane(v as HttpResponsePane)" />
+    </ViewToolbar>
 
     <!-- Real-interaction fix (reported bug — the response search bar sat below/at the bottom of
          the response content instead of above it): the app's own established placement for a
@@ -403,15 +373,7 @@ onUnmounted(() => {
     />
     <div v-else-if="tab.state.responsePane === 'headers'" class="flex flex-1 min-h-0 flex-col" data-testid="http-response-headers">
       <template v-if="response">
-        <InputGroup>
-          <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-          <InputGroupInput v-model="headerFilter" placeholder="Filter headers" data-testid="http-response-headers-filter" />
-          <InputGroupAddon v-if="headerFilter" align="inline-end">
-            <InputGroupButton aria-label="Clear filter" @click="headerFilter = ''">
-              <CodiconIcon name="close" :size="13" />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
+        <SearchField v-model="headerFilter" placeholder="Filter headers" data-testid="http-response-headers-filter" />
         <span
           v-if="headerFilter.trim()"
           class="text-kira-sm subtle px-1.5 pt-1 pb-0"

@@ -1,17 +1,12 @@
 <script setup lang="ts">
 import type { ApiEnvironment } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
@@ -240,15 +235,7 @@ useEventListener(listEl, 'keydown', (e) => {
     </ViewToolbar>
     <div :class="colorMarkClass('band', railColor)" />
     <ViewToolbar border="none">
-      <InputGroup v-if="variablesStore.environments.length > 0" variant="kira" class="w-64">
-        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="environments-filter" />
-        <InputGroupAddon v-if="filterQuery" align="inline-end">
-          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
-            <CodiconIcon name="close" :size="13" />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
+      <div v-if="variablesStore.environments.length > 0" class="w-64"><SearchField v-model="filterQuery" placeholder="Filter by name" data-testid="environments-filter" /></div>
       <span class="ml-auto" />
       <RunState :state="runState" />
       <div class="flex items-center gap-1.5 shrink-0">

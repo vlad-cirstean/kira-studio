@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
 import { refDebounced } from '@vueuse/core';
 import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
@@ -39,38 +38,21 @@ function close(): void {
 
 // P105 §8: reka-ui's Dialog, unlike KuiDialog, auto-focuses nothing on its own — focus the textarea
 // explicitly once it renders.
-const bodyEl = useTemplateRef<HTMLElement>('bodyEl');
+const bodyEl = useTemplateRef<{ $el: HTMLElement }>('bodyEl');
 onMounted(() => {
   void nextTick(() => {
-    bodyEl.value?.querySelector<HTMLTextAreaElement>('.curl-textarea')?.focus();
+    bodyEl.value?.$el.querySelector<HTMLTextAreaElement>('.curl-textarea')?.focus();
   });
 });
 </script>
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="import-curl-dialog"
-      class="flex flex-col p-0 gap-0 w-140 max-h-4/5"
-    >
-      <DialogHeader>
+    <DialogContent size="lg" data-testid="import-curl-dialog">
+      <DialogHeader closable close-testid="import-curl-dialog-close">
         <DialogTitle>Import from curl</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="import-curl-dialog-close"
-            @click="close"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="overflow-auto">
-    <div ref="bodyEl" class="flex flex-col gap-2 p-3">
+      <DialogBody ref="bodyEl">
       <Textarea
         v-model="text"
         class="font-data curl-textarea min-h-32"
@@ -96,12 +78,10 @@ onMounted(() => {
           </AlertDescription>
         </Alert>
       </template>
-    </div>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="flex items-center gap-1.5 ml-auto">
-          <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -111,7 +91,6 @@ onMounted(() => {
           >
             Import
           </Button>
-        </span>
       </DialogFooter>
     </DialogContent>
   </Dialog>
