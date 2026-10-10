@@ -102,7 +102,7 @@ function confirm(): void {
               :key="entry.sha"
               class="p-1 border border-border rounded-kira-sm"
             >
-              <p class="m-0 mb-0.5 font-semibold"><code class="font-data">{{ entry.sha.slice(0, 7) }}</code></p>
+              <p class="m-0 mb-0.5"><code class="font-data">{{ entry.sha.slice(0, 7) }}</code></p>
               <Field
                 v-for="parent in entry.parents"
                 :key="parent.parentNumber"

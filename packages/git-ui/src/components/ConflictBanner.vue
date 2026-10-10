@@ -74,16 +74,15 @@ const PATH_DISPLAY_CAP = 20;
 <template>
   <!-- W20: an opaque Alert surface: a translucent modal-backdrop scrim fails
        contrast over a light theme. -->
+  <div v-if="inProgress" class="shrink-0 p-1.5">
   <Alert
-    v-if="inProgress"
     variant="warn"
     role="status"
-    class="shrink-0 block rounded-none border-x-0 border-t-0 py-1 px-2"
     data-testid="conflict-banner"
   >
     <div class="flex items-center gap-1">
-      <CodiconIcon name="warning" :size="13" class="text-warn" />
-      <span class="font-semibold">{{ describeInProgress(inProgress) }}</span>
+      <CodiconIcon name="warning" :size="16" />
+      <span>{{ describeInProgress(inProgress) }}</span>
       <span v-if="inProgress.unmergedCount > 0" class="text-muted-foreground text-kira-sm">
         {{ inProgress.unmergedCount }} unresolved {{ inProgress.unmergedCount === 1 ? "file" : "files" }}
       </span>
@@ -148,4 +147,5 @@ const PATH_DISPLAY_CAP = 20;
       </li>
     </ul>
   </Alert>
+  </div>
 </template>

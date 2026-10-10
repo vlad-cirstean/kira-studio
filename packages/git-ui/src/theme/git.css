@@ -5,7 +5,6 @@
   --kira-graph-t-md: var(--kira-graph-font-size, var(--kira-font-size));
   --kira-graph-t-xs: calc(var(--kira-graph-t-md) - 2px);
   --kira-graph-t-sm: calc(var(--kira-graph-t-md) - 1px);
-  --kira-graph-t-lg: calc(var(--kira-graph-t-md) + 1px);
   --kira-graph-h-xs: calc(var(--kira-graph-t-md) + 6px);
   --kira-graph-row-h: max(var(--kira-row-height), calc(var(--kira-graph-h-xs) + 2px));
 }
@@ -14,7 +13,6 @@
   --text-graph-xs: var(--kira-graph-t-xs);
   --text-graph-sm: var(--kira-graph-t-sm);
   --text-graph-md: var(--kira-graph-t-md);
-  --text-graph-lg: var(--kira-graph-t-lg);
   --spacing-graph-row-compact: var(--kira-graph-row-h);
   --spacing-graph-h-xs: var(--kira-graph-h-xs);
   /* Lanes: the connection palette's categorical hues. */

@@ -34,6 +34,7 @@ import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
@@ -778,7 +779,7 @@ watch(
 
     <template v-else-if="noActiveRepo">
       <div class="flex flex-col gap-1 p-3 min-h-0">
-        <h2 class=" text-graph-lg">Review branch changes</h2>
+        <h2 class="text-kira-md text-fg">Review branch changes</h2>
         <p>Open a repository first, then pick a branch to review.</p>
       </div>
     </template>
@@ -788,7 +789,7 @@ watch(
         class="flex flex-col gap-1 p-3 min-h-0 h-full"
         data-testid="review-no-branch"
       >
-        <h2 class=" text-graph-lg">Review branch changes</h2>
+        <h2 class="text-kira-md text-fg">Review branch changes</h2>
         <p class=" text-muted-foreground">
           Pick a branch to compare its commits against a base you choose or one we detect.
         </p>
@@ -852,48 +853,38 @@ watch(
       <!-- P110 A16: this header used to restyle .p-panel-head's own geometry (height/gap/padding)
            but deliberately never its uppercase/letter-spacing — that primitive styles a short
            section label, and the branch name here is live data, which must never be re-cased. -->
-      <header
-        class="flex flex-col gap-0.5 py-1 px-1.5 border-b border-border shrink-0 min-w-0"
-      >
-        <div class="flex items-center gap-1 min-w-0">
-          <TooltipIconButton
-            icon="chevron-left"
-            label="Back to branch selection"
-            data-testid="review-back-button"
-            @click="goBackToSelection"
-          />
-          <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-            <div class="flex items-center gap-1 min-w-0">
-              <CodiconIcon name="git-branch" :size="13" />
-              <span
-                class="font-data font-semibold truncate"
-                data-testid="review-branch-name"
-                >{{ review.branch.value }}</span
-              >
-            </div>
-            <div class="flex items-center gap-1 min-w-0">
-              <span class="text-muted-foreground shrink-0" aria-hidden="true">↔</span>
-              <BaseSelector
-                :resolution="review.resolution.value"
-                :refs-state="refsState"
-                @select-base="review.setBase($event)"
-              />
-            </div>
-          </div>
-          <TooltipIconButton
-            icon="arrow-swap"
-            label="Swap branch and base"
-            data-testid="review-swap-button"
-            @click="onSwapBaseAndBranch"
-          />
-        </div>
-        <div
+      <ViewToolbar>
+        <TooltipIconButton
+          icon="chevron-left"
+          label="Back to branch selection"
+          data-testid="review-back-button"
+          @click="goBackToSelection"
+        />
+        <CodiconIcon name="git-branch" :size="13" class="shrink-0 text-muted-foreground" />
+        <span
+          class="min-w-0 truncate font-data text-kira-md text-fg"
+          data-testid="review-branch-name"
+          >{{ review.branch.value }}</span
+        >
+        <span class="text-muted-foreground shrink-0" aria-hidden="true">↔</span>
+        <BaseSelector
+          :resolution="review.resolution.value"
+          :refs-state="refsState"
+          @select-base="review.setBase($event)"
+        />
+        <TooltipIconButton
+          icon="arrow-swap"
+          label="Swap branch and base"
+          data-testid="review-swap-button"
+          @click="onSwapBaseAndBranch"
+        />
+        <span
           v-if="review.phase.value === 'listing'"
-          class="font-ui text-muted-foreground text-graph-sm truncate"
+          class="ml-auto min-w-0 truncate text-kira-sm text-subtle"
         >
           {{ comparisonSummaryLabel }}
-        </div>
-      </header>
+        </span>
+      </ViewToolbar>
 
       <!-- G12 D13/D14: one panel-level toolbar, holding the Commits/Files pane toggle, the
            filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
@@ -1005,9 +996,9 @@ watch(
         <template
           v-else-if="review.phase.value === 'listing' && review.pane.value === 'commits' && rowActions"
         >
-          <div
+          <ViewToolbar
             v-if="review.staleReview.value"
-            class="flex items-center gap-1 py-1 px-1.5 bg-hover border-b border-border shrink-0 font-ui"
+            class="font-ui"
             role="status"
             data-testid="review-stale-banner"
           >
@@ -1018,7 +1009,7 @@ watch(
               class="ml-auto"
               @click="review.acknowledgeStaleReview()"
             />
-          </div>
+          </ViewToolbar>
 
           <div
             ref="rowsEl"

@@ -194,7 +194,7 @@ function confirm(): void {
               :id="tokenId"
               v-model="typedToken"
               type="text"
-              size="kira"
+              size="kira-lg"
               class="w-full"
               data-testid="reset-confirm-token"
             />

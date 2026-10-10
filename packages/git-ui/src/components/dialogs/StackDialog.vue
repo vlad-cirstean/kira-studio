@@ -170,7 +170,7 @@ function closeDialog(): void {
               :id="parentId"
               v-model="selectedParent"
               variant="bordered"
-              size="kira"
+              size="kira-lg"
               class="w-full"
             >
               <option value="">None (remove from stack)</option>

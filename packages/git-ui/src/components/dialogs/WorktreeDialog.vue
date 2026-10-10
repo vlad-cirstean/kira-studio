@@ -200,7 +200,7 @@ function onClose(): void {
               :id="pathId"
               v-model="path"
               type="text"
-              size="kira"
+              size="kira-lg"
               class="w-full"
               placeholder="../my-repo-feature-x"
             />
@@ -229,7 +229,7 @@ function onClose(): void {
               :id="branchId"
               v-model="branch"
               type="text"
-              size="kira"
+              size="kira-lg"
               class="w-full"
               list="kv-worktree-branches"
               placeholder="branch name"
@@ -241,12 +241,12 @@ function onClose(): void {
           <template v-else-if="mode === 'newBranch'">
             <Field>
               <FieldLabel :for="branchId">New branch name</FieldLabel>
-              <Input :id="branchId" v-model="branch" type="text" size="kira" class="w-full" placeholder="feature/x" />
+              <Input :id="branchId" v-model="branch" type="text" size="kira-lg" class="w-full" placeholder="feature/x" />
               <FieldError v-if="newBranchNameError">{{ newBranchNameError }}</FieldError>
             </Field>
             <Field>
               <FieldLabel :for="startPointId">Start point</FieldLabel>
-              <Input :id="startPointId" v-model="startPoint" type="text" size="kira" class="w-full" placeholder="main" />
+              <Input :id="startPointId" v-model="startPoint" type="text" size="kira-lg" class="w-full" placeholder="main" />
             </Field>
           </template>
           <Field v-else>
@@ -255,7 +255,7 @@ function onClose(): void {
               :id="startPointId"
               v-model="startPoint"
               type="text"
-              size="kira"
+              size="kira-lg"
               class="w-full"
               placeholder="a branch, tag or sha"
             />

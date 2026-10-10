@@ -173,16 +173,16 @@ async function confirmRemove(): Promise<void> {
             </Button>
           </DialogClose>
         </DialogHeader>
-        <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
+        <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
           <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
-            <p class="text-error">{{ blockerText(pendingRemove.preflight) }}</p>
+            <FieldError>{{ blockerText(pendingRemove.preflight) }}</FieldError>
           </template>
           <template v-else-if="pendingRemove?.preflight.verdict === 'dirty'">
             <p>
               This worktree has uncommitted changes that will be permanently lost. Type
               <code class="font-data">{{ pendingRemove.preflight.confirmToken }}</code> to confirm.
             </p>
-            <Input v-model="typedToken" size="kira" class="w-full" aria-label="Confirmation token" />
+            <Input v-model="typedToken" size="kira-lg" class="w-full" aria-label="Confirmation token" />
           </template>
         </div>
         <DialogFooter class="justify-end">

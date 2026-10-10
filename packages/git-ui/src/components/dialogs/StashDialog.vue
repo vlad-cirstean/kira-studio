@@ -305,7 +305,7 @@ function onClose(): void {
               :id="messageId"
               v-model="message"
               type="text"
-              size="kira"
+              size="kira-lg"
               class="w-full"
               placeholder="git's own WIP message"
             />
@@ -322,12 +322,10 @@ function onClose(): void {
               <span>Keep staged changes staged (<code class="font-data">--keep-index</code>)</span>
             </FieldLabel>
           </Field>
-          <Alert v-if="pathspec.length > 0" variant="warn">
-            <AlertDescription>
-              Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
-              stashed, not the whole working tree.
-            </AlertDescription>
-          </Alert>
+          <FieldDescription v-if="pathspec.length > 0">
+            Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
+            stashed, not the whole working tree.
+          </FieldDescription>
         </template>
 
         <template v-else-if="mode === 'branch'">
@@ -342,7 +340,7 @@ function onClose(): void {
           </FieldDescription>
           <Field>
             <FieldLabel :for="branchNameId">Branch name</FieldLabel>
-            <Input :id="branchNameId" v-model="branchName" type="text" size="kira" class="w-full" />
+            <Input :id="branchNameId" v-model="branchName" type="text" size="kira-lg" class="w-full" />
             <FieldError v-if="branchNameLocalError">{{ branchNameLocalError }}</FieldError>
             <FieldError v-else-if="branchPreflight?.name.error">{{ branchPreflight.name.error }}</FieldError>
           </Field>
@@ -358,7 +356,7 @@ function onClose(): void {
         <template v-else-if="mode === 'save'">
           <Field>
             <FieldLabel :for="saveLabelId">Label</FieldLabel>
-            <Input :id="saveLabelId" v-model="saveLabel" type="text" size="kira" class="w-full" />
+            <Input :id="saveLabelId" v-model="saveLabel" type="text" size="kira-lg" class="w-full" />
           </Field>
           <FieldSet>
             <FieldLegend>Source</FieldLegend>

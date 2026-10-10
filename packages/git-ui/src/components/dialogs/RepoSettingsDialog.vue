@@ -38,6 +38,7 @@ import {
 } from '@theme/components/ui/dialog';
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldLabel,
   FieldLegend,
@@ -229,7 +230,7 @@ async function save(): Promise<void> {
               :id="graphScopeId"
               :model-value="draft['kiraSpace.graph.scope']"
               variant="bordered"
-              size="kira"
+              size="kira-lg"
               class="w-full"
               @update:model-value="(v) => onGraphScopeChange(v as string)"
             >
@@ -248,13 +249,11 @@ async function save(): Promise<void> {
               Automatically stash local changes that block a branch switch
             </FieldLabel>
           </Field>
-          <Alert variant="warn">
-            <AlertDescription>
-              The stash is tagged with the branch you switched FROM and is never popped back
-              automatically — bring it back deliberately from the stash list, even onto a different
-              branch. Off restores the old dialog (discard / stash and carry / cancel).
-            </AlertDescription>
-          </Alert>
+          <FieldDescription>
+            The stash is tagged with the branch you switched FROM and is never popped back
+            automatically — bring it back deliberately from the stash list, even onto a different
+            branch. Off restores the old dialog (discard / stash and carry / cancel).
+          </FieldDescription>
         </FieldSet>
 
         <FieldSet>
@@ -297,7 +296,7 @@ async function save(): Promise<void> {
               :id="pullStrategyId"
               :model-value="draft['kiraSpace.pull.strategy']"
               variant="bordered"
-              size="kira"
+              size="kira-lg"
               class="w-full"
               @update:model-value="(v) => onPullStrategyChange(v as string)"
             >

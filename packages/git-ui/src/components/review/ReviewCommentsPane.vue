@@ -113,7 +113,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
           class="border-t border-border first:border-t-0"
         >
           <div
-            class="pt-1 px-2 pb-0.5 font-data font-semibold text-fg"
+            class="pt-1 px-2 pb-0.5 font-data text-fg"
             aria-hidden="true"
           >
             {{ group.path }}

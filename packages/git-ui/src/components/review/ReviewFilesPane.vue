@@ -22,6 +22,7 @@ import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
 import type { FileListMode } from '../../state/detail.ts';
@@ -131,7 +132,7 @@ function onToggleReviewed(path: string): void {
     <template v-else>
       <!-- G12 D12/D16: which two revisions a click opens in the host's diff editor — the one real
            capability removing DiffView would otherwise have lost. -->
-      <div class="flex items-center gap-1.5 py-0.5 px-2 border-b border-border font-ui">
+      <ViewToolbar class="font-ui">
         <ToggleGroup
           type="single"
           variant="outline"
@@ -150,7 +151,7 @@ function onToggleReviewed(path: string): void {
           </Tooltip>
         </ToggleGroup>
         <span v-if="deltaStatusText" class="ml-auto text-muted-foreground text-graph-sm">{{ deltaStatusText }}</span>
-      </div>
+      </ViewToolbar>
       <p v-if="reviewFiles.diffError.value" class="m-0 p-3 text-error">
         Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
       </p>
@@ -161,7 +162,7 @@ function onToggleReviewed(path: string): void {
         Couldn't update that file's review status — {{ reviewFiles.markError.value }}
       </p>
 
-      <div v-if="hasFilter" class="flex items-center py-0.5 px-2 border-b border-border font-ui">
+      <ViewToolbar v-if="hasFilter" class="font-ui">
         <ToggleGroup
           type="single"
           variant="outline"
@@ -173,7 +174,7 @@ function onToggleReviewed(path: string): void {
           <ToggleGroupItem value="needsReview">Needs review · {{ needsReviewCount }}</ToggleGroupItem>
           <ToggleGroupItem value="all">All</ToggleGroupItem>
         </ToggleGroup>
-      </div>
+      </ViewToolbar>
       <p v-if="nothingToReview" class="m-0 p-3 text-muted-foreground">
         Nothing changed since your last review.
       </p>

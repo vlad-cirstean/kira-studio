@@ -89,7 +89,7 @@ async function submit(): Promise<void> {
 
         <Field>
           <FieldLabel :for="nameId">Name</FieldLabel>
-          <Input :id="nameId" v-model="name" type="text" size="kira" class="w-full" />
+          <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
           <FieldError v-if="nameError">{{ nameError }}</FieldError>
         </Field>
 
