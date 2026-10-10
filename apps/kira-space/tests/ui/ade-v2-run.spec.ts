@@ -229,15 +229,21 @@ test('a send-back shows on the step line with its loop and note', async ({ relau
 
 // Same scenario as the flows/adeflow branching test: a review step whose `changes` result loops back to
 // Implement, here with the stored run outcome the backend writes.
-function branchingWorkflows(): ControlSnapshot {
+function branchingWorkflows(max = 3): ControlSnapshot {
   const fx = adeFixture<{
-    workflows: { workflow: { stages: { steps: { id: string; results: unknown[] }[] }[] } }[];
+    workflows: {
+      workflow: { stages: { steps: { id: string; results: unknown[] }[] }[] };
+    }[];
   }>('workflows');
-  const tests = fx.workflows[0]?.workflow.stages[1]?.steps.find((x) => x.id === 'tests');
+  const steps = fx.workflows[0]?.workflow.stages[1]?.steps ?? [];
+  // The fixture's other back edge to Implement (ci, max 3) would set the budget instead.
+  const ci = steps.find((x) => x.id === 'ci');
+  if (ci) ci.results = [{ id: 'done', ok: true, description: '', next: 'next', max: 0 }];
+  const tests = steps.find((x) => x.id === 'tests');
   if (tests)
     tests.results = [
       { id: 'approved', ok: true, description: '', next: 'next', max: 0 },
-      { id: 'changes', ok: false, description: '', next: 'impl', max: 3 },
+      { id: 'changes', ok: false, description: '', next: 'impl', max },
     ];
   return { channel: IPC.adeTaskWorkflows, response: fx };
 }
@@ -270,29 +276,73 @@ test('a result that loops back shows its route on the step and the sent-back lin
   await expect(impl.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
 });
 
-test('a spent loop shows the result and that the stage stopped', async ({ relaunch }) => {
+interface ContractRun {
+  state: string;
+  loops: number;
+  note: string;
+  summary: string;
+  outcome: Record<string, unknown>;
+}
+
+// Backend values (flows/adeflow TestBranching, contract ade-branching) onto the fixture's b_push runs.
+function placeRun(b: AdeBoardFx, stepId: string, from: ContractRun): void {
+  const run = b.tasks
+    .find((x) => x.id === 'T_push')
+    ?.runs.find((r) => r.stepId === stepId && r.branchId === 'b_push');
+  if (!run) throw new Error(`T_push ${stepId} run missing`);
+  Object.assign(run, {
+    state: from.state,
+    loops: from.loops,
+    note: from.note,
+    summary: from.summary,
+    outcome: from.outcome,
+  });
+}
+
+test("contract: a fix round counts against its result's loop budget", async ({ relaunch }) => {
+  const rerun = contract<ContractRun>('ade-branching', 'AdeTaskService.Run#impl-rerun');
+  const back = contract<ContractRun>('ade-branching', 'AdeTaskService.Run#review-back');
+  const { workflows } = contract<{
+    workflows: {
+      workflow: { stages: { steps: { id: string; results: { max: number }[] }[] }[] };
+    }[];
+  }>('ade-branching', 'AdeTaskService.Workflows');
+  const budget = workflows[0]?.workflow.stages[0]?.steps
+    .find((s) => s.id === 'review')
+    ?.results.find((r) => r.max > 0)?.max;
+  expect(budget).toBe(2);
+  const { window: page } = await openPlan(relaunch, [
+    branchingWorkflows(budget),
+    ...boardWith((b) => {
+      placeRun(b, 'impl', rerun);
+      placeRun(b, 'tests', back);
+    }),
+  ]);
+  await open(page, 'T_push');
+  await expect(
+    stage(page, 'impl').locator(t('ade-run-note')).filter({ hasText: 'fix round 1 of 2' }),
+  ).toHaveCount(1);
+  await expect(
+    stage(page, 'impl').locator(t('ade-run-note')).filter({ hasText: back.note }),
+  ).toHaveCount(1);
+});
+
+test('contract: a spent loop shows the result and that the stage stopped', async ({ relaunch }) => {
+  const spent = contract<ContractRun>('ade-branching', 'AdeTaskService.Run#review-spent');
   const { window: page } = await openPlan(
     relaunch,
     boardWith((b) => {
       const run = b.tasks
         .find((x) => x.id === 'T_cart')
         ?.runs.find((r) => r.id === 'r_T_cart_release_b_cart');
-      if (run)
-        run.outcome = {
-          status: 'failed',
-          reason: 'still failing after 3 rounds',
-          source: 'agent',
-          reported: true,
-          result: 'changes',
-          route: 'stop',
-          report: { tried: 'retry' },
-        };
+      if (run) run.outcome = { ...spent.outcome, report: { tried: 'retry' } };
     }),
   );
   await open(page, 'T_cart');
   const out = page.locator(t('ade-run-outcome'));
   await expect(out.locator(t('ade-outcome-result'))).toHaveText('changes');
   await expect(out.locator(t('ade-outcome-route'))).toHaveText('stopped');
+  await expect(out).toContainText(spent.note);
 });
 
 test('Log opens the run log and appends pushed chunks', async ({ relaunch }) => {

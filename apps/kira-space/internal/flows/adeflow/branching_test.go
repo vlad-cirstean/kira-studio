@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -39,6 +40,8 @@ func stepRuns(t *testing.T, f *runFixture, stepID string) []adewire.Run {
 	}
 	return out
 }
+
+var runMask = flowharness.Mask("startedAt", "finishedAt", "sessionId", "exitCode", "createdAt")
 
 func resultOf(r adewire.Run) (result, route string) {
 	if r.Outcome == nil {
@@ -75,6 +78,31 @@ func TestBranching(t *testing.T) {
 		}
 	})
 
+	t.Run("a fix round counts against its result's loop budget", func(t *testing.T) {
+		f := newRunFixture(t, acts("done", "result:changes", "done", "result:approved"),
+			agentStage("build", agentStep("impl", "")+agentStep("review", reviewResults(2))))
+		f.start(t, "feat/api-work")
+		final := waitRun(t, f.app, f.taskID, "review", "done")
+		if res, _ := resultOf(final); res != "approved" {
+			t.Fatalf("final review = %+v, want approved", final)
+		}
+		impl := stepRuns(t, f, "impl")
+		if len(impl) != 2 || impl[1].State != "done" || impl[1].Loops != 1 || impl[1].Note != "" || impl[1].Outcome.Reason != "" {
+			t.Fatalf("impl runs = %+v, want a done second run on loop 1 without a note", impl)
+		}
+		back := stepRuns(t, f, "review")[0]
+		if back.State != "back" || !strings.Contains(back.Note, "(1 of 2)") {
+			t.Fatalf("first review = %+v, want back with a (1 of 2) note", back)
+		}
+		list, err := f.app.W.AdeTask.Workflows(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.app.Contract(t, "ade-branching", "AdeTaskService.Workflows", list, flowharness.Mask("mtime"))
+		f.app.Contract(t, "ade-branching", "AdeTaskService.Run#impl-rerun", impl[1], runMask)
+		f.app.Contract(t, "ade-branching", "AdeTaskService.Run#review-back", back, runMask)
+	})
+
 	t.Run("a spent loop budget stops the stage", func(t *testing.T) {
 		f := newRunFixture(t, acts("done", "result:changes", "done", "result:changes", "done", "result:changes"),
 			agentStage("build", agentStep("impl", "")+agentStep("review", reviewResults(2))))
@@ -92,6 +120,7 @@ func TestBranching(t *testing.T) {
 		if res != "changes" || route != "stop" || !strings.Contains(last.Note, "sent back 2 times") {
 			t.Fatalf("last review = %+v, want failed with result changes, route stop and the spent note", last)
 		}
+		f.app.Contract(t, "ade-branching", "AdeTaskService.Run#review-spent", last, runMask)
 	})
 
 	t.Run("a forward route skips the steps between", func(t *testing.T) {
@@ -165,7 +194,8 @@ func TestBranching(t *testing.T) {
 			{ID: "approved", OK: true, Next: "next"},
 			{ID: "changes", Description: "Needs work.", Next: "impl", Max: 2},
 		}
-		saved, err := f.app.W.AdeTask.SaveWorkflow(ctx, adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf})
+		args := adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf}
+		saved, err := f.app.W.AdeTask.SaveWorkflow(ctx, args)
 		if err != nil || saved.Error != nil {
 			t.Fatalf("SaveWorkflow = %+v, %v", saved, err)
 		}
@@ -178,6 +208,8 @@ func TestBranching(t *testing.T) {
 				t.Fatalf("saved yaml lacks %q:\n%s", want, y.Yaml)
 			}
 		}
+		f.app.Contract(t, "ade-workflow-results", "args:AdeTaskService.SaveWorkflow", args)
+		f.app.Contract(t, "ade-workflow-results", "AdeTaskService.SaveWorkflow", saved)
 		got := saved.Workflow.Stages[0].Steps[1].Results
 		if len(got) != 2 || got[1].ID != "changes" || got[1].Max != 2 || got[1].Next != "impl" {
 			t.Fatalf("saved results = %+v", got)

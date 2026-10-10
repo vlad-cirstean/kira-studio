@@ -1,0 +1,172 @@
+{
+  "AdeTaskService.Run#impl-rerun": {
+    "attempt": 2,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 1,
+    "note": "",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": true,
+      "result": "done",
+      "route": "next",
+      "source": "agent",
+      "status": "done",
+      "summary": "summary-done"
+    },
+    "purpose": "",
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "done",
+    "stepId": "impl",
+    "summary": "summary-done",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#review-back": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:4>",
+    "loops": 0,
+    "note": "summary-changes → back to impl (1 of 2)",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "summary-changes → back to impl (1 of 2)",
+      "reported": true,
+      "result": "changes",
+      "route": "back:impl",
+      "source": "agent",
+      "status": "failed",
+      "summary": "summary-changes"
+    },
+    "purpose": "",
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "back",
+    "stepId": "review",
+    "summary": "summary-changes",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#review-spent": {
+    "attempt": 3,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 2,
+    "note": "summary-changes (sent back 2 times)",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "summary-changes (sent back 2 times)",
+      "reported": true,
+      "result": "changes",
+      "route": "stop",
+      "source": "agent",
+      "status": "failed",
+      "summary": "summary-changes"
+    },
+    "purpose": "",
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "failed",
+    "stepId": "review",
+    "summary": "summary-changes",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Workflows": {
+    "dir": "<space>/workflows",
+    "workflows": [
+      {
+        "error": null,
+        "fileName": "flow.yaml",
+        "path": "<space>/workflows/flow.yaml",
+        "usedBy": 1,
+        "workflow": {
+          "id": "flow",
+          "kiraSpaceMcp": false,
+          "name": "Flow",
+          "stages": [
+            {
+              "command": "",
+              "id": "build",
+              "kind": "agent",
+              "name": "build",
+              "onFailure": "",
+              "prompt": "",
+              "runsOn": "",
+              "session": false,
+              "skip": false,
+              "status": "In progress",
+              "steps": [
+                {
+                  "allowedTools": [],
+                  "before": "auto",
+                  "id": "impl",
+                  "name": "impl",
+                  "onFailure": "stop",
+                  "params": {},
+                  "prompt": "work on {branch} in {repo}",
+                  "results": [
+                    {
+                      "description": "",
+                      "id": "done",
+                      "max": 0,
+                      "next": "next",
+                      "ok": true
+                    },
+                    {
+                      "description": "",
+                      "id": "failed",
+                      "max": 0,
+                      "next": "stop",
+                      "ok": false
+                    }
+                  ],
+                  "runsOn": "each repo",
+                  "smartScript": "",
+                  "timeout": "1m"
+                },
+                {
+                  "allowedTools": [],
+                  "before": "auto",
+                  "id": "review",
+                  "name": "review",
+                  "onFailure": "",
+                  "params": {},
+                  "prompt": "work on {branch} in {repo}",
+                  "results": [
+                    {
+                      "description": "",
+                      "id": "approved",
+                      "max": 0,
+                      "next": "next",
+                      "ok": true
+                    },
+                    {
+                      "description": "",
+                      "id": "changes",
+                      "max": 2,
+                      "next": "impl",
+                      "ok": false
+                    }
+                  ],
+                  "runsOn": "each repo",
+                  "smartScript": "",
+                  "timeout": "1m"
+                }
+              ],
+              "timeout": ""
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

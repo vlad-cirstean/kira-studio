@@ -17,7 +17,7 @@ interface RunLine {
   glyph: string;
   tone: Tone;
   status: string;
-  /** The run's own note, else `fix round n of 3` for a fix run. */
+  /** The run's own note, else `fix round n of max` for a fix run (`fix round n` without a budget). */
   note: string;
   /** Log (agent) / Output (script) opens the run's log: shown once the run started. */
   hasLog: boolean;
@@ -91,7 +91,17 @@ function runStatus(r: StepRun): string {
   return r.state;
 }
 
-function runLine(r: StepRun): RunLine {
+/** Loop budget of the results that send the stage back to step `id`: the largest `max`, 0 when none. */
+function backMax(steps: readonly StepProgress[], id: string): number {
+  let max = 0;
+  for (const s of steps) {
+    if (s.id === id) continue;
+    for (const r of s.results) if (r.next === id && r.max > max) max = r.max;
+  }
+  return max;
+}
+
+function runLine(r: StepRun, max: number): RunLine {
   const g = RUN_GLYPH[r.state];
   const started = r.state !== 'pending' && r.runId !== '';
   return {
@@ -99,7 +109,7 @@ function runLine(r: StepRun): RunLine {
     glyph: g.glyph,
     tone: g.tone,
     status: runStatus(r),
-    note: r.reason || r.note || (r.loops ? `fix round ${r.loops} of 3` : ''),
+    note: r.reason || r.note || (r.loops ? `fix round ${r.loops}${max ? ` of ${max}` : ''}` : ''),
     hasLog: started,
     canRetry: started && (r.state === 'failed' || r.state === 'stuck'),
   };
@@ -145,7 +155,7 @@ export function buildStageBlocks(
           scope: script ? stage.command : s.runsOn,
           gated: s.before === 'approval',
           routeText: routeText(s, stage),
-          runs: showRuns(s, script) ? s.runs.map(runLine) : [],
+          runs: showRuns(s, script) ? s.runs.map((r) => runLine(r, backMax(steps, s.id))) : [],
         }),
       ),
       count:

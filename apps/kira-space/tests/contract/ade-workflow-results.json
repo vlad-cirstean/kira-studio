@@ -1,0 +1,167 @@
+{
+  "AdeTaskService.SaveWorkflow": {
+    "error": null,
+    "fileName": "flow.yaml",
+    "path": "<space>/workflows/flow.yaml",
+    "usedBy": 1,
+    "workflow": {
+      "id": "flow",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "stages": [
+        {
+          "command": "",
+          "id": "build",
+          "kind": "agent",
+          "name": "build",
+          "onFailure": "",
+          "prompt": "",
+          "runsOn": "",
+          "session": false,
+          "skip": false,
+          "status": "In progress",
+          "steps": [
+            {
+              "allowedTools": [],
+              "before": "auto",
+              "id": "impl",
+              "name": "impl",
+              "onFailure": "stop",
+              "params": {},
+              "prompt": "work on {branch} in {repo}",
+              "results": [
+                {
+                  "description": "",
+                  "id": "done",
+                  "max": 0,
+                  "next": "next",
+                  "ok": true
+                },
+                {
+                  "description": "",
+                  "id": "failed",
+                  "max": 0,
+                  "next": "stop",
+                  "ok": false
+                }
+              ],
+              "runsOn": "each repo",
+              "smartScript": "",
+              "timeout": "1m"
+            },
+            {
+              "allowedTools": [],
+              "before": "auto",
+              "id": "review",
+              "name": "review",
+              "onFailure": "",
+              "params": {},
+              "prompt": "work on {branch} in {repo}",
+              "results": [
+                {
+                  "description": "",
+                  "id": "approved",
+                  "max": 0,
+                  "next": "next",
+                  "ok": true
+                },
+                {
+                  "description": "Needs work.",
+                  "id": "changes",
+                  "max": 2,
+                  "next": "impl",
+                  "ok": false
+                }
+              ],
+              "runsOn": "each repo",
+              "smartScript": "",
+              "timeout": "1m"
+            }
+          ],
+          "timeout": ""
+        }
+      ]
+    }
+  },
+  "args:AdeTaskService.SaveWorkflow": {
+    "fileName": "flow.yaml",
+    "workflow": {
+      "id": "flow",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "stages": [
+        {
+          "command": "",
+          "id": "build",
+          "kind": "agent",
+          "name": "build",
+          "onFailure": "",
+          "prompt": "",
+          "runsOn": "",
+          "session": false,
+          "skip": false,
+          "status": "In progress",
+          "steps": [
+            {
+              "allowedTools": [],
+              "before": "auto",
+              "id": "impl",
+              "name": "impl",
+              "onFailure": "stop",
+              "params": {},
+              "prompt": "work on {branch} in {repo}",
+              "results": [
+                {
+                  "description": "",
+                  "id": "done",
+                  "max": 0,
+                  "next": "next",
+                  "ok": true
+                },
+                {
+                  "description": "",
+                  "id": "failed",
+                  "max": 0,
+                  "next": "stop",
+                  "ok": false
+                }
+              ],
+              "runsOn": "each repo",
+              "smartScript": "",
+              "timeout": "1m"
+            },
+            {
+              "allowedTools": [],
+              "before": "auto",
+              "id": "review",
+              "name": "review",
+              "onFailure": "stop",
+              "params": {},
+              "prompt": "work on {branch} in {repo}",
+              "results": [
+                {
+                  "description": "",
+                  "id": "approved",
+                  "max": 0,
+                  "next": "next",
+                  "ok": true
+                },
+                {
+                  "description": "Needs work.",
+                  "id": "changes",
+                  "max": 2,
+                  "next": "impl",
+                  "ok": false
+                }
+              ],
+              "runsOn": "each repo",
+              "smartScript": "",
+              "timeout": "1m"
+            }
+          ],
+          "timeout": ""
+        }
+      ]
+    }
+  }
+}
