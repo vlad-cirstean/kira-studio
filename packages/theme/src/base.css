@@ -10,9 +10,8 @@
 @import "@theme/review-decorations.css";
 @import "@theme/blame-annotation.css";
 /* P131 Part 1 §3.1: the host-neutral Tailwind core (shadcn-bridge's tokens, the @theme mapping,
-   @utility helpers, the at-rest focus ring) -- split out so the VS Code webview's own unprefixed
-   root can import the same mapping via `theme(inline)` (apps/kira-space-vscode/src/webview/
-   tailwind.css) without also pulling in this app's own --kira-* token definitions or host rules.
+   @utility helpers, the at-rest focus ring) -- split out of this file so a host root can import
+   the mapping without this app's own --kira-* token definitions or host rules.
    Must come after every other @import -- CSS requires @import rules to precede all other at-rules
    (noInvalidPositionAtImportRule) -- and before @source below. */
 @import "@theme/tailwind-core.css";

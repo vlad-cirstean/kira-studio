@@ -166,9 +166,8 @@
     rgba(100, 100, 100, 0.7)
   );
 
-  /* P131 Part 1 §3.3: every colour the webview's own --kira-* bridge
-     (apps/kira-space-vscode/src/webview/kira-bridge.css) needs but has no existing --kv-* tone to
-     alias — real workbench colour ids where VS Code exposes one, this file's own "one invented
+  /* P131 Part 1 §3.3: every colour the --kira-* bridge needs but has
+     no existing --kv-* tone to alias — real workbench colour ids where VS Code exposes one, this file's own "one invented
      literal" precedent (the badge-pr-merged/overlay tokens above) where it does not. Fallback
      literals copy packages/theme/src/tokens.css's own values byte-for-byte, so an unthemed host
      renders the identical tone Kira Studio/Space would. */

@@ -1,8 +1,5 @@
 /* P131 Part 1 §3.1: the host-neutral Tailwind core, split out of base.css. Shared verbatim by
-   Kira Studio's and Kira Space's own unprefixed roots (via base.css's own @import below) and by
-   the VS Code webview's own unprefixed root (apps/kira-space-vscode/src/webview/tailwind.css,
-   imported with `theme(inline)` so every mapping below resolves per element instead of through a
-   :root-computed custom property -- see that file's own header comment).
+   Kira Studio's and Kira Space's own unprefixed roots (via base.css's own @import below).
 
    No `@import "tailwindcss"`, no --kira-* token definitions and no host rule (html/body/#app,
    scrollbars, dark-mode variant) live here -- each host's own root supplies those, since a token
