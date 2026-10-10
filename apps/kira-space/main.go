@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"errors"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -73,7 +72,6 @@ func main() {
 
 	instanceLock := acquireSingleInstance(reporter)
 	_ = instanceLock // kept open for the process's lifetime (AcquireLock's own doc); closing it releases the lock.
-	removeLegacyGitSocket()
 
 	db, err := storage.Open()
 	if err != nil {
@@ -222,16 +220,6 @@ func acquireSingleInstance(reporter *startupfail.Reporter) *os.File {
 		os.Exit(0)
 	}
 	return instanceLock
-}
-
-// removeLegacyGitSocket deletes the git.sock and git.sock.lock a pre-P243 build left in the home.
-// Safe after acquireSingleInstance: the instance lock means no other Space owns this home.
-func removeLegacyGitSocket() {
-	for _, name := range []string{"git.sock", "git.sock.lock"} {
-		if err := os.Remove(filepath.Join(config.KiraSpaceHome(), name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			slog.Warn("remove legacy git socket", "scope", "startup", "file", name, "err", err)
-		}
-	}
 }
 
 // purgeReviewWindows drops review windows a previous run left behind: they are never restored.

@@ -250,6 +250,7 @@ func Build(opts Options) *Wired {
 	w.Settings.OnChanged = func(model.Settings) { bridge.KeepAwakeRecompute(w.KeepAwake) }
 	// memory.db opens on the Memory module's first call.
 	w.Memory = bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}))
+	removeLegacyGitSocket()
 	go removeRetiredModels()
 
 	// Archive closes a task's review windows through the registry.
