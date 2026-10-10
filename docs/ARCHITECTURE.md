@@ -3887,6 +3887,10 @@ and `docs/v2.0/plans/`.
 
 ### Git facts
 
+- File lists carry no line counts (P257). `FileChange` is path, status kind, rename original path and
+  similarity, all from one `--name-status` spawn (`porcelain.ParseNameStatusRecords`); no binary flag.
+  `--numstat` survives only in `stash list` and the global stash log, as record framing for `FileCount`.
+  The FileTree directory row keeps `N files`.
 - Board facts per repo run on `ade-board`: branch inventory, ahead/behind against the base, files,
   commits, dirty state, caches keyed by tip pairs. Refresh fetches the default remote, then derives
   again through the same path; without a remote it rescans locally and the chip reads `no remote`.
@@ -4529,6 +4533,7 @@ replies and full terminal attach for Claude Code sessions.
   devcontainer, testcontainers, kind, kubernetes, swarm, buildx (name prefix `buildx_buildkit_`),
   compose. A compose-based devcontainer stays grouped under its project, row shows the devcontainer
   icon. Only Compose projects group; other origins get a row icon (`OriginIcon.vue`). Compose icon is
+  lucide `Boxes` in Compose blue (`#00b4ff`): no allowed library ships a Compose mark.
 - Container edit (P253): bound `ContainerEditSpec`, `UpdateContainer`, `RecreateContainer`. Spec splits
   in place (limits, restart policy, name, networks) from recreate (everything else). `baseHash` is
   sha256 of canonical spec JSON; apply with a stale hash returns `E_CONFLICT`. One lock per container
@@ -4538,14 +4543,14 @@ replies and full terminal attach for Claude Code sessions.
   and returns `E_RECREATE_FAILED` with details `{step, restored, containers}`. Anonymous volumes are
   detached, not deleted. No image pull. Swarm and Kubernetes containers are read-only. `mapErr` maps
   engine conflict to `E_CONFLICT`, permission denied to `E_INVALID`.
-  lucide `Boxes`: no allowed library ships a Compose mark.
 - P260 polish. Edit view: two shadcn `Tabs` (In place, Recreate), neutral dirty dot, no per-field mode badge;
   an In place field whose mode resolves to recreate shows a plain hint. `Image.registryUrl` and
   `ContainerDetail.registryUrl` are computed in Go (`registry.go`) from tags and RepoDigests; empty means no
-  button. Known limit: with the containerd image store, local-only images also carry a digest, so an
-  unqualified local name (`myapp:dev`) gets a Docker Hub link that may 404. The button opens through
+  button (limit: Known open items). The button opens through
   `LinkService.OpenExternal` (Studio binds it again, 30 services); docker-ui takes `openExternal` in its
   context options. Container size lives in the Stats tab, which also opens for stopped containers.
+  Start uses `text-ok`, stop `text-error` module-wide. Selected rows use neutral `bg-select`. Left-panel
+  section tabs are the git module's `ToggleGroup`.
 
 ## Database MCP server (v1.7)
 
@@ -4698,11 +4703,11 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 
 **As of P100, the next paragraph describes Kira Space's renderer, not Kira Studio's** —
 `packages/git-ui` moved there in full, and `apps/kira-studio/frontend` no longer depends on it at
-all. As of P120, `LinkService`/`link.go` is Kira Space's own too — Kira Studio's copy had no live
-caller (no git-ui commit-body link left to open) and is gone. The `linkOpenExternal` wrapper this
-paragraph used to describe lives in the shared `packages/workbench/src/bridge/createCoreControl.ts`
-— Kira Space is its only caller (`repo/git/hostHandlers.ts:433`), binding its own
-`apps/kira-space/internal/bridge/link.go`.
+all. As of P120, `LinkService`/`link.go` was Kira Space's own; Kira Studio's copy had no live
+caller and was removed. P260 rebinds a Studio `LinkService` (`apps/kira-studio/internal/bridge/link.go`)
+for the Docker registry button, called from `apps/kira-studio/frontend/src/docker/context.ts`. The
+`linkOpenExternal` wrapper lives in the shared `packages/workbench/src/bridge/createCoreControl.ts`;
+the git UI is its only caller (`repo/git/hostHandlers.ts:433`), binding Space's `bridge/link.go`.
 
 **The `<a href>`/`window.open`/`target="_blank"` posture now extends to `packages/git-ui` too
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
@@ -5322,6 +5327,11 @@ Performance:
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
 - **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
+- **Registry button links local images to Docker Hub when the containerd image store keeps a RepoDigest (P260).** `registryURL` (`internal/docker/registry.go`) treats any digest as pushed, so an unqualified local name (`myapp:dev`) gets a Hub link that may 404. Delete once the engine's store type or a pull-origin signal separates local builds.
+- **Semantic model download has no URL seam (P210).** The Hugging Face URLs are constants in `internal/memory/embed/spec.go`, so tests cannot point `Install` at a local server; the flow test covers cancel and not-installed only. Delete once the base URL is injectable.
+- **A missing `claude` shows the shell's raw text (P250).** Kira runs a bare `claude` through the user's shell (`ade/command.go`), so a missing CLI surfaces as the shell's own "command not found" in the tab, with no Kira message. Delete once launch checks the CLI first.
+- **`ui-timing` budgets are load-sensitive (P250).** `perf.spec.ts` and `budgets.spec.ts` fail under load average above ~9 (p95 84 vs 80, 76 vs 50 ms). Run `--project=ui-timing` on an idle machine; no quiet rerun is recorded yet. Delete once one passes quiet.
+- **Docker engine disk cache has no cap (P252).** `kira.docker.diskUsage` in `localStorage` keeps one entry per engine scope, never evicted. Delete once old scopes expire.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
 - **Visual baselines are unchecked on the CI `ui` job image (P227, P229, P242, P245, P247).** All were recorded in the dev container: 13 Studio (P227, P242), 4 Space Settings, 3 git-module (P229, P245) and 1 ADE workflow graph (P247); the suites pass there. If the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
