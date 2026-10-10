@@ -35,6 +35,8 @@ const props = defineProps<{
   params: readonly ScriptParam[];
 }>();
 const schedule = defineModel<ScriptSchedule>({ required: true });
+// False while the cron or zone is refused, so the editor can hold Save.
+const emit = defineEmits<{ valid: [ok: boolean] }>();
 const ctx = useAutomationsModule();
 const idBase = useId();
 
@@ -53,6 +55,8 @@ const cronError = computed(() => {
   const e = fires.error.value;
   return e instanceof Error ? e.message : String(e);
 });
+
+watch(cronError, (e) => emit('valid', e === null), { immediate: true });
 
 const zoneOpen = ref(false);
 const zones = timezones();

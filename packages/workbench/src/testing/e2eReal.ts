@@ -151,5 +151,11 @@ export async function bound<T>(
   });
   const text = await res.text();
   if (!res.ok) throw new BoundError(service, method, res.status, text);
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // Wails returns a bare string result unquoted.
+    return text as T;
+  }
 }

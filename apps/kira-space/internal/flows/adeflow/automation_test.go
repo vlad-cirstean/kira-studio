@@ -46,9 +46,9 @@ func (f *autoFixture) refresh(t *testing.T) {
 
 // newAutoFixture builds the app. Attempt 1 of each repo finishes the first step; attempt 2 and 3 of
 // api wait on the returned gate files, so a test controls when a script or a step ends.
-func newAutoFixture(t *testing.T, extraStep string, draft bool) *autoFixture {
+func newAutoFixture(t *testing.T, extraStep string, draft bool, opts ...flowharness.Opt) *autoFixture {
 	t.Helper()
-	app := flowharness.New(t)
+	app := flowharness.New(t, opts...)
 	gates := t.TempDir()
 	f := &autoFixture{app: app, gateOne: filepath.Join(gates, "one"), gateTwo: filepath.Join(gates, "two")}
 	app.Scenario(fakeagent.Scenario{Claude: map[string][]fakeagent.Action{

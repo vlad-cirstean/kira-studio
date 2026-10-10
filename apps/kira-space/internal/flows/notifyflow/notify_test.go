@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/flowtest/fakeclock"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/testx"
@@ -402,4 +403,91 @@ func TestClickRevealsScriptRun(t *testing.T) {
 	if payload.RunID != id {
 		t.Fatalf("reveal payload = %+v, want run %s", payload, id)
 	}
+}
+
+// recurring creates a normal recurring script "tick" and returns its id.
+func recurring(t *testing.T, app *flowharness.App, command string, confirm bool) string {
+	t.Helper()
+	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
+		Name: "tick", Kind: scripts.KindScript, Command: command, Color: "blue",
+		Schedule: &scripts.Schedule{Cron: "* * * * *", Timezone: "UTC", Enabled: true, Confirm: confirm},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rec.ID
+}
+
+func scheduledStates(t *testing.T, app *flowharness.App, scriptID string) []string {
+	t.Helper()
+	runs, err := app.W.ScriptRuns.List(scriptruns.ListArgs{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, r := range runs {
+		if r.ScriptID == scriptID && r.Trigger == scriptruns.TriggerScheduled {
+			out = append(out, r.State)
+		}
+	}
+	return out
+}
+
+func TestRecurringScriptNotifies(t *testing.T) {
+	start := time.Date(2030, 1, 7, 8, 59, 30, 0, time.UTC)
+	fire := func(t *testing.T, clock *fakeclock.Clock) {
+		t.Helper()
+		if !clock.BlockUntil(1, waitFor) {
+			t.Fatal("the scheduler never armed a timer")
+		}
+		clock.Advance(30 * time.Second)
+	}
+	t.Run("failed posts", func(t *testing.T) {
+		clock := fakeclock.New(start)
+		app, sink := newApp(t, flowharness.WithClock(clock))
+		recurring(t, app, "exit 2", false)
+		fire(t, clock)
+		testx.WaitUntil(t, waitFor, func() bool { return len(sink.all()) > 0 })
+		if n := sink.only(t); n.Title != "Recurring script failed · tick" {
+			t.Fatalf("note = %+v", n)
+		}
+	})
+	for _, c := range []struct {
+		name, command string
+		confirm       bool
+		want          string
+	}{
+		{"done is quiet", "true", false, "done"},
+		{"waiting is quiet", "true", true, "waiting"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			clock := fakeclock.New(start)
+			app, sink := newApp(t, flowharness.WithClock(clock))
+			id := recurring(t, app, c.command, c.confirm)
+			fire(t, clock)
+			testx.WaitUntil(t, waitFor, func() bool {
+				s := scheduledStates(t, app, id)
+				return len(s) == 1 && s[0] == c.want
+			})
+			time.Sleep(200 * time.Millisecond)
+			sink.none(t)
+		})
+	}
+	t.Run("skipped is quiet", func(t *testing.T) {
+		clock := fakeclock.New(start)
+		app, sink := newApp(t, flowharness.WithClock(clock))
+		id := recurring(t, app, "sleep 30", false)
+		fire(t, clock)
+		testx.WaitUntil(t, waitFor, func() bool { return len(scheduledStates(t, app, id)) == 1 })
+		if !clock.BlockUntil(1, waitFor) {
+			t.Fatal("the scheduler never re-armed")
+		}
+		clock.Advance(time.Minute)
+		testx.WaitUntil(t, waitFor, func() bool {
+			s := scheduledStates(t, app, id)
+			return len(s) == 2 && s[0] == "skipped"
+		})
+		time.Sleep(200 * time.Millisecond)
+		sink.none(t)
+	})
 }

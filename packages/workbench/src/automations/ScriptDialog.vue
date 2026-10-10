@@ -78,6 +78,7 @@ const smart = ref<SmartSettings>(
 const schedule = ref<ScriptSchedule | null>(
   structuredClone(toRaw(props.script?.schedule ?? (props.schedule ? newSchedule() : null))),
 );
+const scheduleOk = ref(true);
 const scheduleOn = computed({
   get: () => schedule.value !== null,
   set: (on: boolean) => {
@@ -129,7 +130,7 @@ const canSave = computed(
     name.value.trim() !== '' &&
     command.value.trim() !== '' &&
     (dirMode.value !== 'fixed' || workingDir.value.trim() !== '') &&
-    (schedule.value === null || schedule.value.cron.trim() !== ''),
+    (schedule.value === null || (schedule.value.cron.trim() !== '' && scheduleOk.value)),
 );
 
 async function chooseWorkingDir(): Promise<void> {
@@ -299,6 +300,7 @@ function onOpenAutoFocus(e: Event): void {
         <ScheduleFields
           v-if="schedule"
           v-model="schedule"
+          @valid="(ok) => (scheduleOk = ok)"
           :script-id="script?.id ?? null"
           :kind="kind"
           :params="params"
