@@ -336,6 +336,14 @@ historical prose.
   data-plane stream over a real TCP listener with no webview and no scheme registration at all —
   this repo's established substitute for GUI-driven boot proofs in a sandbox with no display,
   preferred over `xvfb`/`xdotool`/screenshot techniques. `tests/e2e-real/` is built on it.
+- **Debugging a rendered bug (real CSS/layout) with an actual display**: both apps'
+  `build/config.yml` build their `wails3 dev` run with `EXTRA_TAGS=mcp`, which compiles in Wails
+  v3's own MCP server (`js_eval`, `dom_query`, `mouse_click`, `screenshot_dom`, etc. — see
+  `pkg/application/mcp_*.go`). Scoped to `dev_mode`, so production packaging
+  (`wails3 task darwin:package:dmg`) never sees it. Reach it at `http://127.0.0.1:9099/mcp`,
+  either via `claude mcp add --transport http <name> http://127.0.0.1:9099/mcp` (new session
+  needed before the tools show up) or plain `curl` (JSON-RPC, no handshake needed: `tools/list`,
+  `tools/call`).
 
 ## Kira Space real backend in a sandbox — server-tag recipe (P126)
 
