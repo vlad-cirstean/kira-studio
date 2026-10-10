@@ -980,7 +980,7 @@ onUnmounted(() => {
               <TooltipTrigger as-child>
                 <InputGroup
                   variant="kira"
-                  class="flex w-40"
+                  class="flex w-40 font-data"
                   :aria-invalid="!!timestampError"
                 >
                   <span

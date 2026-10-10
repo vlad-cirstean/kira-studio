@@ -542,7 +542,7 @@ const fieldAttrs = computed(
   >
     <InputGroup
       variant="kira"
-      class="p-input autocomplete-field relative"
+      class="p-input autocomplete-field relative font-data"
       :class="[{ 'is-grow': grow }, multiline ? MULTILINE_CLASS : '', props.class]"
       :aria-invalid="invalid"
     >
