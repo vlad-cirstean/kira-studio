@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
@@ -530,20 +531,8 @@ const shas = computed<readonly string[]>(() => {
   return out;
 });
 
-// G32 round-3 performance review, finding #2: `shas` above is every LOADED row (a "Load more"
-// page is up to 5,000, `logsession.DefaultPageSize`) — every other list in this package bounds
-// what it actually MOUNTS (`FILE_TREE_ROW_CAP`, `REF_LIST_SECTION_CAP`), unlike this one, which
-// used to `v-for` over `shas` directly and so mounted one `ReviewCommitRow` (each retaining a
-// full `CommitRecord`, per that component's own doc comment) per loaded row with no cap at all.
-// `renderCap` decouples "how many rows are loaded" from "how many are mounted": the template's
-// own client-side "Show more" button (below the rows) grows it in the same increment with no
-// network round trip, and keyboard End/vertical nav (`focusRow` below) grows it to whatever index
-// is being focused, so nothing becomes reachable-but-unfocusable — only the common case (scrolling
-// linearly from the top of a freshly opened review) is what this actually bounds.
-const REVIEW_ROW_RENDER_CAP = 500;
-const renderCap = ref(REVIEW_ROW_RENDER_CAP);
-const visibleShas = computed<readonly string[]>(() => shas.value.slice(0, renderCap.value));
-
+// The list is virtualized (`useVirtualRows` below): only rows near the viewport mount, however many
+// are loaded.
 const commitCountFormatter = new Intl.NumberFormat();
 const commitCountLabel = computed(() => {
   const resolution = review.value?.resolution.value;
@@ -617,18 +606,6 @@ function handleLoadMore(): void {
   void review.value?.loadMore();
 }
 
-/** The client-side "reveal more of what's already loaded" button's own label/handler — see
- *  `renderCap`'s own doc comment above `shas`. No network round trip; `Math.min` because the
- *  last reveal can be smaller than a full increment. */
-function revealMoreLabel(): string {
-  const hidden = shas.value.length - renderCap.value;
-  return `Show ${commitCountFormatter.format(Math.min(REVIEW_ROW_RENDER_CAP, hidden))} more`;
-}
-
-function revealMore(): void {
-  renderCap.value += REVIEW_ROW_RENDER_CAP;
-}
-
 // ---------------------------------------------------------------------------------------
 // Row expansion, the roving-tabindex cursor, and the diff overlay — one keydown handler at the
 // root (§6.8 step 3's Esc ordering: the diff first, then the row), rather than three components
@@ -637,28 +614,53 @@ function revealMore(): void {
 const rowsEl = ref<HTMLDivElement | null>(null);
 const focusedRow = ref(0);
 
+// Collapsed rows are two lines; an expanded row's real height is measured (`measureRow`). Rows
+// position with `top`, not `transform`: a row's context menu is `position: fixed` and a transformed
+// ancestor would re-anchor it.
+const COLLAPSED_ROW_ESTIMATE = 44;
+const { virtualizer, virtualItems, totalSize, onScroll } = useVirtualRows({
+  count: () => shas.value.length,
+  rowHeight: () => COLLAPSED_ROW_ESTIMATE,
+  scrollElement: rowsEl,
+});
+
+function measureRow(el: unknown): void {
+  if (el instanceof HTMLElement) virtualizer.value.measureElement(el);
+}
+
 watch(shas, (list) => {
   if (focusedRow.value >= list.length) focusedRow.value = Math.max(0, list.length - 1);
-  // A genuine reset (setTarget/setBase/acknowledgeStaleReview) always passes through 0 rows
-  // before the next chunk lands — back to the default cap rather than leaving a stale, possibly
-  // much larger, reveal from the PREVIOUS review's own list.
-  if (list.length < renderCap.value) renderCap.value = REVIEW_ROW_RENDER_CAP;
 });
 
 function rowElId(sha: string): string {
   return `git-review-row-${sha}`;
 }
 
+const focusedRowMounted = computed(() =>
+  virtualItems.value.some((item) => item.index === focusedRow.value),
+);
+
+// Keyboard nav can target a row that is not mounted: scroll it in, then focus it once it renders.
+const pendingFocus = ref<number | null>(null);
+watch(
+  [pendingFocus, virtualItems],
+  () => {
+    const index = pendingFocus.value;
+    const sha = index === null ? undefined : shas.value[index];
+    if (!sha) return;
+    const el = rowsEl.value?.querySelector<HTMLElement>(`#${rowElId(sha)}`);
+    if (!el) return;
+    pendingFocus.value = null;
+    el.focus({ preventScroll: true });
+  },
+  { flush: 'post' },
+);
+
 function focusRow(index: number): void {
   focusedRow.value = index;
-  // Keyboard nav (End, or arrowing past the current render cap) must never land on a row that
-  // isn't mounted — grow the cap to cover it first, same as the "Show more" button below does.
-  if (index >= renderCap.value) renderCap.value = index + 1;
-  const sha = shas.value[index];
-  if (!sha) return;
-  void nextTick(() => {
-    rowsEl.value?.querySelector<HTMLElement>(`#${rowElId(sha)}`)?.focus({ preventScroll: true });
-  });
+  if (!shas.value[index]) return;
+  pendingFocus.value = index;
+  virtualizer.value.scrollToIndex(index);
 }
 
 function onRowsKeydown(event: KeyboardEvent): void {
@@ -1019,37 +1021,35 @@ watch(
             class="flex-1 min-h-0 overflow-auto outline-none"
             role="tree"
             aria-label="Commits"
+            :tabindex="focusedRowMounted ? -1 : 0"
             @keydown="onRowsKeydown"
+            @scroll="onScroll"
           >
-            <ReviewCommitRow
-              v-for="(sha, index) in visibleShas"
-              :id="rowElId(sha)"
-              :key="sha"
-              :sha="sha"
-              :store="review.store"
-              :expanded="review.expandedShas.value.has(sha)"
-              :expansion="review.expansionFor(sha)"
-              :actions="rowActions"
-              :focused="index === focusedRow"
-              :list-mode="listMode"
-              :filter="filter"
-              @toggle="toggleRow(sha)"
-              @focus-row="focusRow(index)"
-            />
-          </div>
-
-          <!-- G32 round-3 performance review, finding #2: reveals more of what is ALREADY
-               loaded (renderCap, above) — no network round trip — before ever offering the real,
-               server-fetching "Load more" below it. Mutually exclusive with that button (v-else-if)
-               so only one affordance shows at a time: reveal the local buffer first, only then ask
-               the server for more. -->
-          <div v-if="shas.length > renderCap" class="flex justify-center py-1 px-1.5 shrink-0">
-            <!-- `review-load-more-button` carries no styling of its own (verified: no rule ever
-                 existed for it) — kept as a plain test-selector hook,
-                 `review-commit-list-cap.spec.ts`'s own precedent. -->
-            <Button data-testid="review-load-more-button" variant="toolbar" size="kira" @click="revealMore">
-              {{ revealMoreLabel() }}
-            </Button>
+            <div class="relative w-full" :style="{ height: `${totalSize}px` }">
+              <div
+                v-for="item in virtualItems"
+                :key="shas[item.index]"
+                :ref="measureRow"
+                role="presentation"
+                :data-index="item.index"
+                :class="VIRTUAL_ROW_CLASS"
+                :style="{ top: `${item.start}px` }"
+              >
+                <ReviewCommitRow
+                  :id="rowElId(shas[item.index] as string)"
+                  :sha="shas[item.index] as string"
+                  :store="review.store"
+                  :expanded="review.expandedShas.value.has(shas[item.index] as string)"
+                  :expansion="review.expansionFor(shas[item.index] as string)"
+                  :actions="rowActions"
+                  :focused="item.index === focusedRow"
+                  :list-mode="listMode"
+                  :filter="filter"
+                  @toggle="toggleRow(shas[item.index] as string)"
+                  @focus-row="focusRow(item.index)"
+                />
+              </div>
+            </div>
           </div>
           <!-- G16 D9: `remaining > 0` guards against F7's empty-range hole — an empty branch
                comparison never emits a chunk, so there is no server-side signal to correct here.
@@ -1057,7 +1057,7 @@ watch(
                P110 A16: "Load more" stays plain text (its label carries a count), so this button
                takes no cancellation classes — Button's own toolbar variant already matches. -->
           <div
-            v-else-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
+            v-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
             class="flex justify-center py-1 px-1.5 shrink-0"
           >
             <Button data-testid="review-load-more-button"

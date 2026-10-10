@@ -19,7 +19,7 @@ import {
 } from './support/gitUiPortFixtures';
 
 // The review sidebar inside Space: row gestures, host-answered actions, the Files pane checkbox and
-// the commit-list render cap. Ported from the VS Code webview suite.
+// the virtualized commit list. Ported from the VS Code webview suite.
 
 const reviewRow = (p: Page, sha = SHA_A) => p.locator(`[data-testid="review-row-${sha}"]`);
 const tabOfKind = (p: Page, kind: string) =>
@@ -103,20 +103,23 @@ test('the back button returns to branch selection', async ({ relaunch }) => {
   await expect(page.locator('[data-testid="review-no-branch"]')).toBeVisible();
 });
 
-test('600 commits mount 500 rows; Show more reveals the rest', async ({ relaunch }) => {
+test('600 commits mount only the viewport rows; End scrolls to and focuses the last', async ({
+  relaunch,
+}) => {
   const total = 600;
   const page = await openReviewListing(relaunch, { chunks: oneChunk(manyRows(total)) });
   const rows = page.locator(
     '[data-testid^="review-row-"]:not([data-testid$="-header"]):not([data-testid$="-actions"])',
   );
-  await expect(rows).toHaveCount(500);
+  await expect(reviewRow(page, manyRowShas(0))).toBeVisible();
+  expect(await rows.count()).toBeLessThan(100);
 
-  const showMore = page.locator('[data-testid="review-load-more-button"]');
-  await expect(showMore).toHaveText(/Show 100 more/);
-  await showMore.click();
-  await expect(rows).toHaveCount(total);
-  await expect(showMore).toBeHidden();
-  await expect(reviewRow(page, manyRowShas(total - 1))).toHaveCount(1);
+  await reviewRow(page, manyRowShas(0)).focus();
+  await page.keyboard.press('End');
+  const last = reviewRow(page, manyRowShas(total - 1));
+  await expect(last).toBeVisible();
+  await expect(last).toBeFocused();
+  expect(await rows.count()).toBeLessThan(100);
 });
 
 test('Review branch changes from the picker opens the Review tab on that branch', async ({
