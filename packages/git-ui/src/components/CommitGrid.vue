@@ -33,7 +33,7 @@ import type { SearchState } from '../state/search.ts';
 import type { SelectionState } from '../state/selection.ts';
 import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
-import { rowHeightPx, TokenReader } from '../theme/readTokens.ts';
+import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readTokens.ts';
 import {
   type ColumnFit,
   type ColumnFitInput,
@@ -195,13 +195,16 @@ function plan(): RowPlan {
 
 // Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
 // (props.graphView is assumed stable for the life of one CommitGrid — a repo switch remounts
-// this component) and a rowHeight accessor so a font-size change is picked up on the next render.
+// this component) and per-row height accessors (`grid.getRowHeight(row)`: decorated rows are taller;
+// the fallback only covers a call racing construction). The node sits `compactRowHeight / 2` above
+// the row bottom, on the subject line.
 const graphFormatter = createGraphFormatter(
   props.graphView.layout,
   props.graphView.store,
   plan,
   () => props.graphView.layoutCurrent,
-  () => rowHeightPx(tokenReader),
+  (row) => grid?.getRowHeight(row) ?? compactRowHeightPx(tokenReader),
+  () => compactRowHeightPx(tokenReader),
   graphWidth,
 );
 
@@ -658,6 +661,7 @@ function scheduleAncestryRebuild(): void {
     ancestryRebuildPending = false;
     // P74 §4.2/§4.3: rebuilds the ancestry derivation the detail pane's `prForCommit` reads.
     if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
+    // A PR resolution can flip a row's height (`rowHasBadges` reads `prsFor`); rebuild the index.
     grid?.invalidateRowHeights();
     grid?.invalidateAllRows();
     grid?.render();
@@ -674,10 +678,12 @@ function raiseLaneFloor(): void {
   if (graphWidth() !== before) rebuildColumns();
 }
 
-/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — re-render it; `raiseLaneFloor` widens the graph column when the new lanes need it.
+/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
+ *  heights; `raiseLaneFloor` widens the graph column when the new lanes need it.
  *
- *  Row heights are uniform, so `invalidateRowHeights()` alone no longer redraws rows; rebuild the
- *  rendered ones. `_range` is unused — kept for the callback signature. */
+ *  `invalidateRowHeights()` rebuilds SlickGrid's row-position index (heights vary with badges);
+ *  it does not redraw rows, so the rendered ones are rebuilt too. `_range` is unused — kept for
+ *  the callback signature. */
 function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
   raiseLaneFloor();
@@ -897,11 +903,15 @@ onMounted(() => {
     // `row` here is already a store row — `rowMetadata` (columns.ts) translates the incoming
     // display row before calling this.
     isSelected: (row) => props.selection.row.value === row,
+    // A row with a ref/PR badge gets the taller height (`rowHasBadges`, columns.ts).
+    expandedRowHeight: () => rowHeightPx(tokenReader),
     prsFor: (sha) => props.pr?.prsHeadedAt(sha),
   });
 
   const instance = new SlickGrid<CommitRecord>(host.value, dataView, currentColumns(), {
-    rowHeight: rowHeightPx(tokenReader), // §6.1 — never a literal in this file
+    // Compact height is the default; `getItemMetadata` asks for the taller one on decorated rows.
+    rowHeight: compactRowHeightPx(tokenReader), // §6.1 — never a literal in this file
+    enableVariableRowHeight: true,
     enableCellNavigation: false, // §6.6 navigates rows, not cells (see handleKeyDown's doc comment)
     enableColumnReorder: false, // §6.2: resizable, not reorderable — no SortableJS in the loop
     enableHtmlRendering: false, // formatters return elements; no innerHTML, nothing to sanitize
@@ -998,7 +1008,8 @@ onMounted(() => {
     // as they left it; `.kira-cell-date`'s own ellipsis is the safety net for that case).
     remeasureDateWidth();
     if (!grid) return;
-    grid.setOptions({ rowHeight: rowHeightPx(tokenReader) });
+    grid.setOptions({ rowHeight: compactRowHeightPx(tokenReader) });
+    // Token change alters heights without a row-count change; rebuild the index.
     grid.invalidateRowHeights();
     grid.invalidateAllRows();
     grid.render();

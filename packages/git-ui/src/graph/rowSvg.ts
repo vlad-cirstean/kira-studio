@@ -108,8 +108,8 @@ export function laneX(lane: number): number {
  *   does): a full-height run in `runLane`, overdrawn at both ends — two adjacent rows' runs must
  *   meet across a fractional `devicePixelRatio` without a hairline seam (§5.3's fifth decision).
  *
- * `nodeCenterY` is the node's own y (the row's midpoint); row-boundary values (`-overdraw`,
- * `rowHeight + overdraw`) are about the row's top/bottom, not the node.
+ * `nodeCenterY` is the node's own y (on the subject line, see `planNode`); row-boundary values
+ * (`-overdraw`, `rowHeight + overdraw`) are the row's top/bottom, not the node.
  */
 export function edgeCommand(
   segment: EdgeSegment,
@@ -220,7 +220,10 @@ export interface NodeShapePlan {
  *  unfilled ring (merge — `store.parentsOf(row).length > 1`), unfilled dashed ring alone (stash —
  *  `decorationAt(row)` carries the `stash` kind). Empty for a row with no layout yet
  *  (`slice.lane === undefined`) — nothing to draw, not a guessed lane.
- */
+ *
+ *  `cy` is `nodeCenterY`, not `rowHeight / 2`: a badge line makes the row taller without moving the
+ *  subject. The caller (`graphColumn.ts`) passes `rowHeight - compactRowHeight / 2`, the subject
+ *  line's centre in both regimes. */
 export function planNode(slice: RowSlice, nodeCenterY: number): readonly NodeShapePlan[] {
   if (slice.lane === undefined) return [];
   const cx = laneX(slice.lane);
@@ -351,13 +354,13 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
 /** Builds one row's `<svg>` — sized to `columnWidth()` (P92 item 1: the column's actual,
  *  user-resizable width, `CommitGrid.vue`'s own `widths.value.graph`, not derived from
  *  `slice.laneCount` — a narrowed column must clip its lanes, not overflow into the message
- *  column) and `rowHeight` (the grid's row height, so lanes and rows cannot drift). Lane x-coordinates
+ *  column) and `rowHeight` (this row's own real height, so lanes and rows cannot drift). Lane x-coordinates
  *  (`laneX`, `planEdgePaths`/`planNode`) are unchanged — only the box around the drawing is the
- *  column's; the `clip-path` utility on `graph-svg` is what actually
- *  cuts a lane at the column's right edge, since `overflow: hidden` cannot do it (one non-visible
- *  axis forces the other to `auto`) while still letting `GEOMETRY.overdraw`'s vertical bleed
- *  through — see that rule's own comment.
- */
+ *  column's; the `clip-path` utility on `graph-svg` cuts a lane at the column's right edge
+ *  (`overflow: hidden` cannot: one non-visible axis forces the other to `auto`) while letting
+ *  `GEOMETRY.overdraw`'s vertical bleed through.
+ *
+ *  `nodeCenterY` is this row's node-anchor y (see `planNode`). */
 export function buildRowSvg(
   slice: RowSlice,
   rowHeight: number,

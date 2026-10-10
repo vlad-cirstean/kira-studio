@@ -99,8 +99,8 @@ export function readSlice(
  * across a scroll session, is exactly the allocation churn `segmentsInRow`'s own contract exists
  * to avoid.
  *
- * `rowHeight` is an accessor so a font-size change is picked up without rebuilding this formatter;
- * the node sits at the row's midpoint.
+ * `rowHeight` is per row (`grid.getRowHeight(row)`; decorated rows are taller). `compactRowHeight`
+ * anchors the node on the subject line, `compactRowHeight / 2` above the row bottom.
  *
  * P92 item 1: `columnWidth` is likewise an accessor, not a value — `CommitGrid.vue` passes
  * `() => widths.value.graph`, so a column drag never rebuilds this formatter (matching
@@ -118,15 +118,16 @@ export function createGraphFormatter(
   store: CommitStore,
   plan: () => RowPlan,
   layoutCurrent: () => boolean,
-  rowHeight: () => number,
+  rowHeight: (row: number) => number,
+  compactRowHeight: () => number,
   columnWidth: () => number,
 ): Formatter<CommitRecord> {
   const reusable: EdgeSegment[] = [];
   return (row) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'block h-full w-full overflow-visible';
-    const total = rowHeight();
-    const nodeCenterY = total / 2;
+    const total = rowHeight(row);
+    const nodeCenterY = total - compactRowHeight() / 2;
     const width = columnWidth();
     const samples = window.__kiraRowBuildSamplesMs;
     if (samples) {
