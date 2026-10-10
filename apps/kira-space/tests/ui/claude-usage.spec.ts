@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
 import { FIXED_NOW, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -20,6 +21,30 @@ function snapshot(five: number | null, seven: number | null, extra: Record<strin
     ...extra,
   };
 }
+
+interface UsageWindow {
+  usedPercent: number;
+  resetsAt: number;
+}
+
+// The backend snapshot (flows/usageflow, contract claude-usage); times are wall-clock there, so
+// the spec dates them from FIXED_NOW.
+function fromContract(key: string) {
+  const snap = contract<{
+    fiveHour: UsageWindow | null;
+    sevenDay: UsageWindow | null;
+    source: string;
+    state: string;
+  }>('claude-usage', key);
+  return {
+    ...snap,
+    fiveHour: snap.fiveHour && { ...snap.fiveHour, resetsAt: FIXED_NOW + 2 * HOUR },
+    sevenDay: snap.sevenDay && { ...snap.sevenDay, resetsAt: FIXED_NOW + 50 * HOUR },
+    updatedAt: FIXED_NOW - 5 * 60_000,
+  };
+}
+
+const pct = (w: UsageWindow | null) => Math.round(w?.usedPercent ?? 0);
 
 const usageControl = (snap: unknown) => [{ channel: IPC.claudeUsageGet, response: snap }];
 const item = (page: Page) => page.locator('[data-testid="claude-usage-status"]');
@@ -44,9 +69,41 @@ test('shows both windows, and the tooltip lists the reset times and the source',
   await expect(tip).toContainText('From a Claude Code session, 5m ago');
 });
 
-test('one window only shows only that window', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch, usageControl(snapshot(null, 12)));
-  await expect(text(page)).toHaveText('wk 12%');
+test('contract: a session snapshot shows both windows and its source', async ({ relaunch }) => {
+  const snap = fromContract('ClaudeUsageService.Get#session');
+  const { window: page } = await openPlan(relaunch, usageControl(snap));
+  await expect(text(page)).toHaveText(`5h ${pct(snap.fiveHour)}% · wk ${pct(snap.sevenDay)}%`);
+  await item(page).hover();
+  await expect(page.locator('[data-testid="claude-usage-tooltip"]')).toContainText(
+    'From a Claude Code session',
+  );
+});
+
+test('contract: a run snapshot names the run source', async ({ relaunch }) => {
+  const snap = fromContract('ClaudeUsageService.Get#run');
+  const { window: page } = await openPlan(relaunch, usageControl(snap));
+  await expect(text(page)).toHaveText(`5h ${pct(snap.fiveHour)}% · wk ${pct(snap.sevenDay)}%`);
+  await item(page).hover();
+  await expect(page.locator('[data-testid="claude-usage-tooltip"]')).toContainText(
+    'From a background ADE run',
+  );
+});
+
+test('contract: one window only shows only that window', async ({ relaunch }) => {
+  const snap = fromContract('ClaudeUsageService.Get#expired');
+  expect(snap.sevenDay).toBeNull();
+  const { window: page } = await openPlan(relaunch, usageControl(snap));
+  await expect(text(page)).toHaveText(`5h ${pct(snap.fiveHour)}%`);
+});
+
+test('the usage item sits in the left group with the dashboard icon', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, usageControl(snapshot(23, 41)));
+  const usage = await item(page).boundingBox();
+  const viewport = page.viewportSize();
+  if (!(usage && viewport)) throw new Error('status bar item not laid out');
+  expect(usage.x).toBeLessThan(24);
+  expect(usage.x + usage.width).toBeLessThan(viewport.width / 2);
+  await expect(item(page).locator('.codicon-dashboard')).toHaveCount(1);
 });
 
 test('warns at 80 percent and errors at 95 percent', async ({ relaunch }) => {

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeBoard, emitOpenSession, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 
 // The Sessions tab of a task and of a branch, Take over and the terminal pane.
@@ -133,9 +134,21 @@ test('a stopped session takes over from the list', async ({ relaunch }) => {
   expect(calls(control, IPC.adeTaskTakeOver)[0]?.args).toMatchObject({ sessionId: 'sp11' });
 });
 
-test('an open-session event selects that session in its Sessions tab', async ({ relaunch }) => {
+test('contract: an open-session event selects that session in its Sessions tab', async ({
+  relaunch,
+}) => {
+  const open = contract<{ taskId: string; branchId: string; sessionId: string }>(
+    'notify-reveal',
+    'event:kira:adetask:open-session',
+  );
+  expect(Object.keys(open).sort()).toEqual(['branchId', 'sessionId', 'taskId']);
   const { window: page } = await openPlan(relaunch);
-  await emitOpenSession(page, { taskId: 'T_bill', branchId: 'b_meter', sessionId: 'm111' });
+  await emitOpenSession(page, {
+    ...open,
+    taskId: 'T_bill',
+    branchId: 'b_meter',
+    sessionId: 'm111',
+  });
   await expect(page.locator(t('ade-session-tab-m111'))).toHaveAttribute('data-selected', 'true');
 });
 

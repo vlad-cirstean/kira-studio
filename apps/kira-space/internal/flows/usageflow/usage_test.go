@@ -9,6 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 )
@@ -32,8 +33,12 @@ func TestStatusLineFeed(t *testing.T) {
 	if snap.SevenDay.UsedPercent != 41.2 || snap.SevenDay.ResetsAt != sevenReset*1000 {
 		t.Fatalf("seven_day = %+v", snap.SevenDay)
 	}
-	app.Events.WaitAfter(t, mark, bridge.ChannelClaudeUsage, func(flowtest.Event) bool { return true }, waitFor)
+	pushed := app.Events.WaitAfter(t, mark, bridge.ChannelClaudeUsage, func(flowtest.Event) bool { return true }, waitFor)
+	app.Contract(t, "claude-usage", "ClaudeUsageService.Get#session", snap, usageMask)
+	app.ContractEvent(t, "claude-usage", pushed, usageMask)
 }
+
+var usageMask = flowharness.Mask("resetsAt", "updatedAt")
 
 func TestUserStatusLinePreserved(t *testing.T) {
 	app := newApp(t)
@@ -104,6 +109,7 @@ func TestExpiredWindowDropped(t *testing.T) {
 	if snap.FiveHour == nil || snap.SevenDay != nil {
 		t.Fatalf("snapshot = %+v, want only the five_hour window", snap)
 	}
+	app.Contract(t, "claude-usage", "ClaudeUsageService.Get#expired", snap, usageMask)
 }
 
 func TestSnapshotSurvivesRestart(t *testing.T) {
@@ -141,4 +147,5 @@ func TestRunStreamFeed(t *testing.T) {
 	if snap.FiveHour.ResetsAt != resetFive*1000 {
 		t.Fatalf("five_hour reset = %d, want %d", snap.FiveHour.ResetsAt, resetFive*1000)
 	}
+	app.Contract(t, "claude-usage", "ClaudeUsageService.Get#run", snap, usageMask)
 }

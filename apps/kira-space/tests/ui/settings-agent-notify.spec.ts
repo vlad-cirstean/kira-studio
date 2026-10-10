@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -63,13 +64,20 @@ test('a window reports its focus at boot', async ({ relaunch }) => {
     .toMatchObject({ module: 'git', activeTerminalId: '', adeTaskId: '' });
 });
 
-test('reveal-task switches to the Agents module', async ({ relaunch }) => {
+test('contract: reveal-task switches to the Agents module', async ({ relaunch }) => {
+  const reveal = contract<{ taskId: string }>('notify-reveal', 'event:kira:agent:reveal-task');
   const { window: page } = await relaunch();
-  await emitWailsEvent(page, IPC.agentRevealTask, { taskId: 'task-1' });
+  await emitWailsEvent(page, IPC.agentRevealTask, reveal);
   await expect(page.locator('[data-testid="mode-tab"][data-mode="ade"]')).toHaveClass(/is-active/);
 });
 
-test('reveal-terminal switches to the Terminal module and shows that tab', async ({ relaunch }) => {
+test('contract: reveal-terminal switches to the Terminal module and shows that tab', async ({
+  relaunch,
+}) => {
+  const reveal = contract<{ terminalId: string }>(
+    'notify-reveal',
+    'event:kira:agent:reveal-terminal',
+  );
   const { window: page, control } = await relaunch({
     control: [{ channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } }],
   });
@@ -88,7 +96,7 @@ test('reveal-terminal switches to the Terminal module and shows that tab', async
 
   await mode('git').click();
   await expect(mode('git')).toHaveClass(/is-active/);
-  await emitWailsEvent(page, IPC.agentRevealTerminal, { terminalId: openedId() });
+  await emitWailsEvent(page, IPC.agentRevealTerminal, { ...reveal, terminalId: openedId() });
   await expect(mode('automations')).toHaveClass(/is-active/);
   await expect(tabs).toHaveCount(1);
 });

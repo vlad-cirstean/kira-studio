@@ -1,0 +1,55 @@
+{
+  "ClaudeUsageService.Get#expired": {
+    "detail": "",
+    "fiveHour": {
+      "resetsAt": 0,
+      "usedPercent": 30
+    },
+    "sevenDay": null,
+    "source": "session",
+    "state": "ok",
+    "updatedAt": 0
+  },
+  "ClaudeUsageService.Get#run": {
+    "detail": "",
+    "fiveHour": {
+      "resetsAt": 0,
+      "usedPercent": 24
+    },
+    "sevenDay": {
+      "resetsAt": 0,
+      "usedPercent": 47
+    },
+    "source": "run",
+    "state": "ok",
+    "updatedAt": 0
+  },
+  "ClaudeUsageService.Get#session": {
+    "detail": "",
+    "fiveHour": {
+      "resetsAt": 0,
+      "usedPercent": 23.5
+    },
+    "sevenDay": {
+      "resetsAt": 0,
+      "usedPercent": 41.2
+    },
+    "source": "session",
+    "state": "ok",
+    "updatedAt": 0
+  },
+  "event:kira:claude:usage": {
+    "detail": "",
+    "fiveHour": {
+      "resetsAt": 0,
+      "usedPercent": 23.5
+    },
+    "sevenDay": {
+      "resetsAt": 0,
+      "usedPercent": 41.2
+    },
+    "source": "session",
+    "state": "ok",
+    "updatedAt": 0
+  }
+}

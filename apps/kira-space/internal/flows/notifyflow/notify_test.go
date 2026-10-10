@@ -236,6 +236,7 @@ func TestClickRevealsTerminal(t *testing.T) {
 	if payload.TerminalID != "tab-1" {
 		t.Fatalf("reveal payload = %+v", payload)
 	}
+	app.ContractEvent(t, "notify-reveal", evs[0])
 }
 
 func TestClickRevealsAdeSession(t *testing.T) {
@@ -267,6 +268,30 @@ func TestClickRevealsAdeSession(t *testing.T) {
 	if len(evs) != 1 || evs[0].Window != window {
 		t.Fatalf("open-session events = %+v, want one addressed to %s", evs, window)
 	}
+	app.ContractEvent(t, "notify-reveal", evs[0])
+}
+
+func TestClickRevealsTask(t *testing.T) {
+	app, sink := newApp(t)
+	app.W.Windows.Add(window, 0, nil, func() {})
+	claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}}})
+	task, rec := adeTask(t, app)
+	startRun(t, app, task, rec.ID)
+	waitRunDone(t, app, task.ID)
+	testx.WaitUntil(t, waitFor, func() bool { return len(sink.all()) > 0 })
+	n := sink.only(t)
+	mark := app.Events.Mark()
+	app.W.AgentNotify.Click(map[string]any{"taskId": n.TaskID, "windowKey": n.WindowKey, "kind": string(n.Kind)})
+	evs := app.Events.Since(mark, bridge.ChannelAgentRevealTask)
+	if len(evs) != 1 || evs[0].Window != window {
+		t.Fatalf("reveal events = %+v, want one addressed to %s", evs, window)
+	}
+	var payload struct{ TaskID string }
+	evs[0].Decode(t, &payload)
+	if payload.TaskID != task.ID {
+		t.Fatalf("reveal payload = %+v, want task %s", payload, task.ID)
+	}
+	app.ContractEvent(t, "notify-reveal", evs[0])
 }
 
 func TestSendTest(t *testing.T) {
