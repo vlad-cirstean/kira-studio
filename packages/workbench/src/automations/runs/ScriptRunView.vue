@@ -69,7 +69,7 @@ async function rerun(): Promise<void> {
     <template v-else>
       <div class="flex items-center gap-2" data-testid="script-run-header">
         <SmartBadge v-if="isSmart" />
-        <span class="min-w-0 truncate font-semibold">{{ run.scriptName }}</span>
+        <span class="min-w-0 truncate font-medium">{{ run.scriptName }}</span>
         <RunStatusBadge :state="run.state" />
         <RunElapsed :run="run" class="text-kira-sm text-muted-foreground" />
         <span v-if="isSmart" class="font-data text-kira-sm text-muted-foreground">{{ run.model }}</span>

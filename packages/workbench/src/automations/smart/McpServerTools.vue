@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -44,7 +45,7 @@ const extra = computed(() => props.chosen.filter((c) => !listed.value.some((t) =
         :data-testid="`smart-mcp-tool-${t.name}`"
         @update:model-value="(v) => emit('tool', t.name, v === true)"
       >
-        <CodiconIcon name="check" :size="10" />
+        <CodiconIcon name="check" :size="12" />
       </Checkbox>
       <Label :for="`${idBase}-${t.name}`" class="flex flex-col items-start">
         <span class="font-data">{{ t.name }}</span>
@@ -53,9 +54,7 @@ const extra = computed(() => props.chosen.filter((c) => !listed.value.some((t) =
     </div>
     <div v-for="name in extra" :key="name" class="flex items-center gap-1.5">
       <span class="font-data">{{ name }}</span>
-      <Button variant="ghost" size="icon-sm" :aria-label="`Remove ${name}`" @click="emit('tool', name, false)">
-        <CodiconIcon name="close" :size="12" />
-      </Button>
+      <TooltipIconButton icon="close" :label="`Remove ${name}`" @click="emit('tool', name, false)" />
     </div>
     <div v-if="tools.isError.value" class="flex items-center gap-1">
       <Input

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ScriptKind, ScriptParam, ScriptParamType } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@theme/components/ui/field';
@@ -113,9 +114,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           <option value="select">Select</option>
           <option value="multiselect">Multiselect</option>
         </NativeSelect>
-        <Button variant="ghost" size="icon-sm" :aria-label="`Remove parameter ${p.name}`" @click="remove(i)">
-          <CodiconIcon name="trash" :size="12" />
-        </Button>
+        <TooltipIconButton icon="trash" :label="`Remove parameter ${p.name}`" @click="remove(i)" />
       </div>
       <FieldError v-for="m in errors?.[i] ?? []" :key="m" :data-testid="`param-error-${i}`">{{ m }}</FieldError>
       <Input
@@ -133,7 +132,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
             :aria-label="`Default ${o}`"
             @update:model-value="(v) => toggleDefault(i, o, v === true)"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
           <Input
             :model-value="o"
@@ -142,15 +141,9 @@ function toggleDefault(i: number, option: string, on: boolean): void {
             :data-testid="`param-option-${i}-${k}`"
             @update:model-value="(v) => setOption(i, k, String(v))"
           />
-          <Button variant="ghost" size="icon-sm" aria-label="Move up" @click="moveOption(i, k, -1)">
-            <CodiconIcon name="arrow-up" :size="12" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Move down" @click="moveOption(i, k, 1)">
-            <CodiconIcon name="arrow-down" :size="12" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Remove option" @click="removeOption(i, k)">
-            <CodiconIcon name="close" :size="12" />
-          </Button>
+          <TooltipIconButton icon="arrow-up" label="Move up" @click="moveOption(i, k, -1)" />
+          <TooltipIconButton icon="arrow-down" label="Move down" @click="moveOption(i, k, 1)" />
+          <TooltipIconButton icon="close" label="Remove option" @click="removeOption(i, k)" />
         </div>
         <Button variant="dialog" size="kira-lg" class="self-start" :data-testid="`param-option-add-${i}`" @click="addOption(i)">
           Add option
@@ -164,7 +157,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
             :model-value="p.required"
             @update:model-value="(v) => patch(i, { required: v === true })"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
           <Label :for="`${idBase}-req-${i}`">Required</Label>
         </div>
@@ -176,7 +169,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
             :data-testid="`param-secret-${i}`"
             @update:model-value="(v) => patch(i, { secret: v === true })"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
           <Label :for="`${idBase}-sec-${i}`">Secret</Label>
         </div>

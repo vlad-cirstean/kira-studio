@@ -10,28 +10,22 @@ import type {
   SmartSettings,
 } from '@shared/domain/scripts';
 import { useQuery } from '@tanstack/vue-query';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { Switch } from '@theme/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
+import { Tabs, TabsContent } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VarText from '@theme/components/VarText.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import type { TextPart } from '@theme/varText';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, reactive, ref, toRaw, useTemplateRef, watch } from 'vue';
 import type { ScriptsSeam } from './module';
@@ -124,6 +118,7 @@ const TABS: readonly { id: EditorTab; label: string }[] = [
   { id: 'schedule', label: 'Schedule' },
 ];
 const tab = ref<EditorTab>(props.initialTab ?? 'script');
+const tabItems = TABS.map((t) => ({ value: t.id, label: t.label, testid: `script-dialog-tab-${t.id}` }));
 
 // Empty-field errors show once the field was edited; Save stays disabled until none remain.
 const shown = reactive({ name: false, body: false, folder: false });
@@ -197,49 +192,38 @@ function onOpenAutoFocus(e: Event): void {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent
-      :show-close-button="false"
+      size="lg"
       data-testid="script-dialog"
-      class="flex flex-col gap-0 p-0 w-150 max-w-[90vw] max-h-4/5"
       @open-auto-focus="onOpenAutoFocus"
       @keydown.meta.enter.prevent="save"
       @keydown.ctrl.enter.prevent="save"
     >
-      <DialogHeader>
+      <DialogHeader closable close-testid="script-dialog-close">
         <DialogTitle>{{ title }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="script-dialog-close"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <Tabs v-model="tab" class="flex min-h-0 flex-1 flex-col gap-0">
-        <TabsList class="w-full border-b border-border px-3 pb-1.5" aria-label="Script editor tabs">
-          <TabsTrigger
-            v-for="t in TABS"
-            :key="t.id"
-            :value="t.id"
-            :class="tabChipVariants({ active: tab === t.id })"
-            :data-testid="`script-dialog-tab-${t.id}`"
+      <Tabs :model-value="tab" class="flex min-h-0 flex-1 flex-col gap-0">
+        <ViewToolbar class="px-3">
+          <SecondaryTabs
+            :model-value="tab"
+            :items="tabItems"
+            aria-label="Script editor tabs"
+            @update:model-value="(v) => (tab = v as typeof tab)"
           >
-            {{ t.label }}
-            <Badge
-              v-if="tabErrorCount(errors, t.id) > 0"
-              variant="err"
-              :data-testid="`script-dialog-tab-${t.id}-errors`"
-              >{{ tabErrorCount(errors, t.id) }}</Badge
-            >
-          </TabsTrigger>
-        </TabsList>
+            <template #item="{ item }">
+              {{ item.label }}
+              <Badge
+                v-if="tabErrorCount(errors, item.value as EditorTab) > 0"
+                variant="err"
+                :data-testid="`script-dialog-tab-${item.value}-errors`"
+                >{{ tabErrorCount(errors, item.value as EditorTab) }}</Badge
+              >
+            </template>
+          </SecondaryTabs>
+        </ViewToolbar>
 
-        <div class="flex min-h-80 flex-1 flex-col gap-3 overflow-auto p-3">
+        <DialogBody class="min-h-80">
           <TabsContent value="script" force-mount class="flex flex-col gap-3 data-[state=inactive]:hidden">
             <Field>
               <FieldLabel for="script-name">Name</FieldLabel>
@@ -369,10 +353,10 @@ function onOpenAutoFocus(e: Event): void {
           </TabsContent>
 
           <FieldError v-if="error" data-testid="script-dialog-error">{{ error }}</FieldError>
-        </div>
+        </DialogBody>
       </Tabs>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <DialogClose as-child>
           <Button variant="dialog" size="kira-lg" data-testid="script-dialog-cancel">Cancel</Button>
         </DialogClose>

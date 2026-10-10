@@ -1,16 +1,8 @@
 <script setup lang="ts">
 import { useMutation, useQuery } from '@tanstack/vue-query';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
 import type { TextPart } from '@theme/varText';
@@ -126,24 +118,18 @@ function run(): void {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent
-      :show-close-button="false"
+      size="lg"
       data-testid="schedule-confirm"
-      class="flex flex-col gap-0 p-0 w-150 max-w-[90vw] max-h-4/5"
       @keydown.meta.enter.prevent="run"
       @keydown.ctrl.enter.prevent="run"
     >
-      <DialogHeader>
+      <DialogHeader closable close-testid="schedule-confirm-close">
         <DialogTitle>Run {{ script?.name ?? 'script' }}?</DialogTitle>
         <SmartBadge v-if="script?.kind === 'smart'" />
         <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-due">{{ due }}</span>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close" data-testid="schedule-confirm-close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="flex flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <Alert v-if="!script" variant="destructive" class="w-auto">
           <AlertDescription>This script no longer exists.</AlertDescription>
         </Alert>
@@ -171,12 +157,12 @@ function run(): void {
             <AlertDescription>{{ error }}</AlertDescription>
           </Alert>
         </template>
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
-        <span v-if="more > 0" class="mr-auto text-kira-sm text-muted-foreground" data-testid="schedule-confirm-more">
-          {{ more }} more waiting
-        </span>
+      <DialogFooter>
+        <template v-if="more > 0" #start>
+          <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-more">{{ more }} more waiting</span>
+        </template>
         <Button
           variant="dialog"
           size="kira-lg"

@@ -2,12 +2,16 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript, ScriptCollection, ScriptKind } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { colorMarkClass } from '@theme/connColor';
+import { cn } from '@theme/lib/utils';
 import { useEventListener, useLocalStorage } from '@vueuse/core';
 import InlineRenameInput from '@workbench/components/InlineRenameInput.vue';
+import PanelBar from '@workbench/components/PanelBar.vue';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -329,43 +333,34 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
 <template>
   <div data-testid="automations-panel">
     <div ref="rootEl" class="flex h-full flex-col">
-      <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
-        <span class="font-semibold">Automations</span>
-        <TooltipIconButton
-          icon="search"
-          :label="showSearch ? 'Hide search' : 'Search'"
-          class="ml-auto"
-          :data-active="showSearch"
-          data-testid="toggle-search"
-          @click="toggleSearch"
-        />
-        <TooltipIconButton
-          icon="add"
-          label="New…"
-          aria-label="New script"
-          data-testid="automations-add"
-          @click="onAddClick"
-        />
-        <TooltipIconButton
-          icon="new-folder"
-          label="New collection"
-          data-testid="automations-new-collection"
-          @click="newCollection"
-        />
-      </div>
-      <div v-if="!empty && showSearch" class="shrink-0 border-b border-border px-1.5 py-1">
-        <InputGroup>
-          <InputGroupAddon>
-            <CodiconIcon name="search" :size="13" />
-          </InputGroupAddon>
-          <InputGroupInput v-model="search" placeholder="Search" data-testid="tree-search" />
-          <InputGroupAddon v-if="search" align="inline-end">
-            <InputGroupButton aria-label="Clear search" @click="search = ''">
-              <CodiconIcon name="close" :size="12" />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
-      </div>
+      <PanelHeader>
+        Automations
+        <template #actions>
+          <TooltipIconButton
+            icon="search"
+            :label="showSearch ? 'Hide search' : 'Search'"
+            :pressed="showSearch"
+            data-testid="toggle-search"
+            @click="toggleSearch"
+          />
+          <TooltipIconButton
+            icon="add"
+            label="New…"
+            aria-label="New script"
+            data-testid="automations-add"
+            @click="onAddClick"
+          />
+          <TooltipIconButton
+            icon="new-folder"
+            label="New collection"
+            data-testid="automations-new-collection"
+            @click="newCollection"
+          />
+        </template>
+      </PanelHeader>
+      <PanelBar v-if="!empty && showSearch">
+        <SearchField v-model="search" data-testid="tree-search" />
+      </PanelBar>
       <div ref="bodyEl" class="flex min-h-0 flex-1 flex-col" data-testid="automations-body">
         <div v-if="!empty" class="flex h-full flex-col overflow-y-auto">
           <span v-if="actionError" class="px-1.5 py-1 text-error text-kira-sm leading-normal" data-testid="script-error">{{ actionError }}</span>
@@ -373,7 +368,9 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
             <template v-for="script in view.ungrouped" :key="script.id">
               <button
                 type="button"
-                                class="relative flex items-center gap-1 py-1 px-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                                
+                :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
+                :style="rowIndent(0)"
                 :title="script.command"
                 :data-testid="`script-${script.id}`"
                 @click="runScript(script)"
@@ -406,7 +403,9 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
             <template v-for="group in view.groups" :key="group.collection.id">
               <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header button toggles by keyboard. -->
               <div
-                class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover"
+                
+                :class="rowVariants({ layout: 'tree' })"
+                :style="rowIndent(0)"
                 data-testid="script-group"
                 :data-id="group.collection.id"
                 :data-name="group.collection.name"
@@ -428,7 +427,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 <button
                   v-else
                   type="button"
-                  class="flex-1 min-w-0 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-semibold text-inherit"
+                  class="flex-1 min-w-0 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-medium text-inherit"
                   :aria-expanded="isOpen(group.collection.id)"
                   @click="toggleGroup(group.collection.id)"
                 >{{ group.collection.name }}</button>
@@ -439,7 +438,9 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   v-for="script in group.rows"
                   :key="script.id"
                   type="button"
-                                    class="relative flex items-center gap-1 py-1 pl-5 pr-1.5 text-left cursor-default select-none hover:bg-hover disabled:opacity-50"
+                                    
+                  :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left disabled:opacity-50')"
+                  :style="rowIndent(1)"
                   :title="script.command"
                   :data-testid="`script-${script.id}`"
                   @click="runScript(script)"
@@ -472,19 +473,14 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
             </template>
           </div>
         </div>
-        <div
-          v-else
-          class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
-        >
+        <Empty v-else class="h-full">
           <span v-if="actionError" class="text-error text-kira-sm leading-normal" data-testid="script-error">{{ actionError }}</span>
-          <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
-            <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md font-normal text-muted-foreground">No scripts</AlertTitle>
-            <AlertDescription class="text-kira-sm text-muted-foreground">
-              Add one with + above.
-            </AlertDescription>
-          </Alert>
-        </div>
+          <EmptyHeader>
+            <EmptyMedia><CodiconIcon name="terminal-bash" :size="24" /></EmptyMedia>
+            <EmptyTitle>No scripts</EmptyTitle>
+            <EmptyDescription>Add one with + above.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
       <RunsSection @rerun="rerun" />
       <ScriptDialog

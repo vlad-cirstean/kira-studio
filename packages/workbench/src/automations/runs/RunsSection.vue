@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { useLocalStorage } from '@vueuse/core';
+import PanelBar from '@workbench/components/PanelBar.vue';
 import { computed, ref } from 'vue';
 import { useAutomationsModule } from '../module';
 import SmartBadge from '../smart/SmartBadge.vue';
@@ -18,6 +19,11 @@ const ctx = useAutomationsModule();
 type Filter = 'all' | 'running' | 'failed';
 const open = useLocalStorage('kira.automations.runsOpen', true);
 const filter = ref<Filter>('all');
+const FILTER_ITEMS = [
+  { value: 'all', label: 'All', testid: 'runs-filter-all' },
+  { value: 'running', label: 'Running', testid: 'runs-filter-running' },
+  { value: 'failed', label: 'Failed', testid: 'runs-filter-failed' },
+];
 const expanded = ref<string | null>(null);
 const { data } = useScriptRuns();
 const stop = useStopScriptRun();
@@ -41,29 +47,23 @@ function toggle(run: ScriptRun): void {
 
 <template>
   <section class="flex min-h-0 shrink-0 flex-col border-t border-border" data-testid="runs-section">
-    <button
-      type="button"
-      class="flex h-bar shrink-0 items-center gap-1 border-0 bg-transparent px-1.5 text-left text-kira-sm font-semibold uppercase tracking-wider text-muted-foreground"
-      :aria-expanded="open"
+    <SectionHeading
+      label="Runs"
+      collapsible
+      :expanded="open"
+      :count="data?.length ?? 0"
       data-testid="runs-toggle"
-      @click="open = !open"
-    >
-      <CodiconIcon :name="open ? 'chevron-down' : 'chevron-right'" :size="12" />
-      Runs
-      <span class="ml-auto font-normal">{{ data?.length ?? 0 }}</span>
-    </button>
+      @toggle="open = !open"
+    />
     <div v-if="open" class="flex max-h-72 min-h-0 flex-col overflow-y-auto">
-      <ToggleGroup
-        type="single"
-        size="kira"
-        class="px-1.5 py-1"
-        :model-value="filter"
-        @update:model-value="(v) => v && (filter = v as Filter)"
-      >
-        <ToggleGroupItem value="all" data-testid="runs-filter-all">All</ToggleGroupItem>
-        <ToggleGroupItem value="running" data-testid="runs-filter-running">Running</ToggleGroupItem>
-        <ToggleGroupItem value="failed" data-testid="runs-filter-failed">Failed</ToggleGroupItem>
-      </ToggleGroup>
+      <PanelBar>
+        <SecondaryTabs
+          variant="segmented"
+          :model-value="filter"
+          :items="FILTER_ITEMS"
+          @update:model-value="(v) => (filter = v as Filter)"
+        />
+      </PanelBar>
       <span v-if="rows.length === 0" class="px-1.5 py-2 text-kira-sm text-muted-foreground" data-testid="runs-empty">
         No runs.
       </span>

@@ -1,17 +1,9 @@
 <script setup lang="ts">
 import type { ScriptRunArgs } from '@shared/domain/scriptRuns';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
@@ -137,23 +129,17 @@ function run(): void {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent
-      :show-close-button="false"
+      size="lg"
       data-testid="run-dialog"
-      class="flex flex-col gap-0 p-0 w-150 max-w-[90vw] max-h-4/5"
       @keydown.meta.enter.prevent="run"
       @keydown.ctrl.enter.prevent="run"
     >
-      <DialogHeader>
+      <DialogHeader closable>
         <DialogTitle>Run {{ script?.name ?? 'script' }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="flex flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <Alert v-if="!script" variant="destructive" class="w-auto">
           <AlertDescription>This script no longer exists.</AlertDescription>
         </Alert>
@@ -208,9 +194,9 @@ function run(): void {
             <AlertDescription>{{ startError }}</AlertDescription>
           </Alert>
         </template>
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <DialogClose as-child>
           <Button variant="dialog" size="kira-lg" data-testid="run-cancel">Cancel</Button>
         </DialogClose>

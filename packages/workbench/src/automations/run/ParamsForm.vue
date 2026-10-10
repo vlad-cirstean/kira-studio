@@ -63,7 +63,7 @@ function summary(p: ScriptParam): string {
             <CodiconIcon name="chevron-down" :size="12" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent class="w-64 p-0">
+        <PopoverContent class="w-80 p-0">
           <Command multiple :model-value="values[p.name] ?? []" @update:model-value="(v) => set(p.name, v as string[])">
             <CommandList>
               <CommandGroup>

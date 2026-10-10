@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { BUILTIN_TOOLS, DEFAULT_TOOLS, type SmartSettings } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
@@ -56,7 +57,7 @@ function resetTools(): void {
           :data-testid="`smart-tool-${tool}`"
           @update:model-value="(v) => toggle(tool, v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <Label :for="`${idBase}-${tool}`">{{ tool }}</Label>
       </div>
@@ -65,9 +66,7 @@ function resetTools(): void {
       <FieldDescription>Bash commands the script may run, such as git status:*. Empty allows any.</FieldDescription>
       <div v-for="p in smart.bashPatterns" :key="p" class="flex items-center gap-1" data-testid="smart-bash-pattern">
         <span class="min-w-0 flex-1 truncate font-data">{{ p }}</span>
-        <Button variant="ghost" size="icon-sm" :aria-label="`Remove ${p}`" @click="removePattern(p)">
-          <CodiconIcon name="close" :size="12" />
-        </Button>
+        <TooltipIconButton icon="close" :label="`Remove ${p}`" @click="removePattern(p)" />
       </div>
       <InputGroup>
         <InputGroupInput

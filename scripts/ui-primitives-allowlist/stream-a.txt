@@ -1,15 +1,4 @@
 # P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-packages/workbench/src/automations/AutomationsPanel.vue
-packages/workbench/src/automations/AutomationsStart.vue
-packages/workbench/src/automations/ParamsEditor.vue
-packages/workbench/src/automations/ScriptDialog.vue
-packages/workbench/src/automations/run/ParamsForm.vue
-packages/workbench/src/automations/run/RunScriptDialog.vue
-packages/workbench/src/automations/runs/RunsSection.vue
-packages/workbench/src/automations/runs/ScriptRunView.vue
-packages/workbench/src/automations/schedule/ScheduleConfirmDialog.vue
-packages/workbench/src/automations/smart/McpServerTools.vue
-packages/workbench/src/automations/smart/ToolsField.vue
 packages/workbench/src/memory/AddMemoryDialog.vue
 packages/workbench/src/memory/MemoryPanel.vue
 packages/workbench/src/memory/MemorySetupHint.vue
