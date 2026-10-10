@@ -21,9 +21,6 @@
     ],
     "files": [
       {
-        "additions": 1,
-        "deletions": 0,
-        "isBinary": false,
         "kind": "added",
         "path": "side.txt"
       }
@@ -60,9 +57,6 @@
     ],
     "files": [
       {
-        "additions": 1,
-        "deletions": 0,
-        "isBinary": false,
         "kind": "added",
         "path": "main.txt"
       }
@@ -92,9 +86,6 @@
     "decoration": [],
     "files": [
       {
-        "additions": 0,
-        "deletions": 0,
-        "isBinary": false,
         "kind": "renamed",
         "originalPath": "old.txt",
         "path": "dir/new.txt",

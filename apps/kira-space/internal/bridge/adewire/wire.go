@@ -30,10 +30,7 @@ type Jira struct {
 }
 
 type FileChange struct {
-	Path    string `json:"path"`
-	Added   *int   `json:"added"`
-	Deleted *int   `json:"deleted"`
-	Binary  bool   `json:"binary"`
+	Path string `json:"path"`
 }
 
 type Commit struct {

@@ -181,7 +181,9 @@ package gitrpc
 // are removed; the server reads the stored kiraSpace.* repo settings.
 // P246: 46 -> 47, breaking. credential.request and credential.provide are removed: a native stream
 // connection's credential prompts go to the app's credential relay, tagged with its window.
-const ContractVersion = 47
+// P257: 47 -> 48, breaking. FileChange loses additions, deletions and isBinary; the file lists
+// (commit.detail, stash.show, working.detail) read --name-status only.
+const ContractVersion = 48
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

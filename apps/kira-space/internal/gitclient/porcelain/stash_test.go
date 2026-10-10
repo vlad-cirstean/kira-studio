@@ -25,26 +25,6 @@ func TestStashListArgs(t *testing.T) {
 	}
 }
 
-func TestStashShowArgs(t *testing.T) {
-	t.Parallel()
-	numstat, nameStatus := porcelain.StashShowArgs("base123", "stash456")
-	wantNumstat := porcelain.NumstatArgs(strPtr("base123"), "stash456")
-	wantNameStatus := porcelain.NameStatusArgs(strPtr("base123"), "stash456")
-	if len(numstat) != len(wantNumstat) || len(nameStatus) != len(wantNameStatus) {
-		t.Fatalf("got %v / %v, want %v / %v", numstat, nameStatus, wantNumstat, wantNameStatus)
-	}
-	for i := range wantNumstat {
-		if numstat[i] != wantNumstat[i] {
-			t.Fatalf("numstat got %v, want %v", numstat, wantNumstat)
-		}
-	}
-	for i := range wantNameStatus {
-		if nameStatus[i] != wantNameStatus[i] {
-			t.Fatalf("nameStatus got %v, want %v", nameStatus, wantNameStatus)
-		}
-	}
-}
-
 func TestStashUntrackedLsTreeArgs(t *testing.T) {
 	t.Parallel()
 	got := porcelain.StashUntrackedLsTreeArgs("abc123")

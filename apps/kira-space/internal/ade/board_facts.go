@@ -405,7 +405,7 @@ func (sc *boardCtx) mainDepth(ctx context.Context, sb model.AdeTaskBranch, row p
 func toWireFiles(changes []porcelain.FileChange) []adewire.FileChange {
 	out := make([]adewire.FileChange, len(changes))
 	for i, c := range changes {
-		out[i] = adewire.FileChange{Path: c.Path, Added: c.Additions, Deleted: c.Deletions, Binary: c.IsBinary}
+		out[i] = adewire.FileChange{Path: c.Path}
 	}
 	return out
 }

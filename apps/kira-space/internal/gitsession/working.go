@@ -33,15 +33,14 @@ func (e *RepoEntry) WorkingDetail(ctx context.Context) ([]porcelain.FileChange, 
 		base = porcelain.ParseEmptyTreeHash(hashRaw)
 	}
 
-	numstat, nameStatus, err := e.fileChanges(ctx, porcelain.WorkingNumstatArgs(base), porcelain.WorkingNameStatusArgs(base))
+	changes, err := e.fileChanges(ctx, porcelain.WorkingNameStatusArgs(base))
 	if err != nil {
 		return nil, err
 	}
 
-	changes := porcelain.CombineFileChanges(numstat, nameStatus)
 	// Untracked files never appear in a plain `git diff` at all (nothing to diff against) — the
 	// same gap gitsession/stash.go's own untracked bucket already has an answer for: a bare
-	// FileChange, no additions/deletions, mirrored verbatim here rather than inventing a second
+	// FileChange, mirrored verbatim here rather than inventing a second
 	// convention.
 	for _, entry := range statusResult.Entries {
 		if entry.Kind != "untracked" {

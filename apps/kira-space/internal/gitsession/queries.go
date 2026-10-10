@@ -104,7 +104,7 @@ func allRecords(raw []byte) ([][]byte, error) {
 }
 
 // runRecords runs one read-only spawn and splits its stdout into records — runOne+allRecords's own
-// shared shape, repeated across every diff-tree/numstat/name-status/ls-tree spawn in this package
+// shared shape, repeated across every diff-tree/name-status/ls-tree spawn in this package
 // (P113 G8).
 func (e *RepoEntry) runRecords(ctx context.Context, args []string) ([][]byte, error) {
 	raw, err := e.runOne(ctx, args)
@@ -114,38 +114,14 @@ func (e *RepoEntry) runRecords(ctx context.Context, args []string) ([][]byte, er
 	return allRecords(raw)
 }
 
-// fileChanges runs a numstat and a name-status spawn concurrently and parses each — the two-way
-// half of CommitDetail/RangeFiles/StashShow/WorkingDetail's own shared fan-out (P113 G8). Neither
-// spawn's error takes deterministic precedence over the other's (no gitsession test pins an order);
-// errgroup.Wait returns whichever of the two errors is observed first.
-func (e *RepoEntry) fileChanges(ctx context.Context, numstatArgs, nameStatusArgs []string) ([]porcelain.NumstatEntry, []porcelain.NameStatusEntry, error) {
-	var (
-		numstat    []porcelain.NumstatEntry
-		nameStatus []porcelain.NameStatusEntry
-		g          errgroup.Group
-	)
-	g.Go(func() error {
-		recs, err := e.runRecords(ctx, numstatArgs)
-		if err != nil {
-			return err
-		}
-		var perr error
-		numstat, perr = porcelain.ParseNumstatRecords(recs)
-		return perr
-	})
-	g.Go(func() error {
-		recs, err := e.runRecords(ctx, nameStatusArgs)
-		if err != nil {
-			return err
-		}
-		var perr error
-		nameStatus, perr = porcelain.ParseNameStatusRecords(recs)
-		return perr
-	})
-	if err := g.Wait(); err != nil {
-		return nil, nil, err
+// fileChanges runs a name-status spawn and parses it — the shared file-list query of
+// CommitDetail/RangeFiles/StashShow/WorkingDetail/PreflightStashPop.
+func (e *RepoEntry) fileChanges(ctx context.Context, nameStatusArgs []string) ([]porcelain.FileChange, error) {
+	recs, err := e.runRecords(ctx, nameStatusArgs)
+	if err != nil {
+		return nil, err
 	}
-	return numstat, nameStatus, nil
+	return porcelain.ParseNameStatusRecords(recs)
 }
 
 // stashUntrackedPaths runs a stash's own untracked ls-tree and turns each record into a path string
@@ -211,12 +187,11 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 	}
 
 	var (
-		sig        porcelain.CommitSignature
-		trailers   []porcelain.CommitTrailer
-		body       string
-		numstat    []porcelain.NumstatEntry
-		nameStatus []porcelain.NameStatusEntry
-		g          errgroup.Group
+		sig      porcelain.CommitSignature
+		trailers []porcelain.CommitTrailer
+		body     string
+		files    []porcelain.FileChange
+		g        errgroup.Group
 	)
 	g.Go(func() error {
 		raw, rerr := e.runOne(ctx, porcelain.ShowBodyAndSignatureArgs(sha))
@@ -228,7 +203,7 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 	})
 	g.Go(func() error {
 		var ferr error
-		numstat, nameStatus, ferr = e.fileChanges(ctx, porcelain.NumstatArgs(from, sha), porcelain.NameStatusArgs(from, sha))
+		files, ferr = e.fileChanges(ctx, porcelain.NameStatusArgs(from, sha))
 		return ferr
 	})
 	if err := g.Wait(); err != nil {
@@ -242,7 +217,7 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 		SHA: meta.SHA, Parents: nonNil(meta.Parents), Author: meta.Author, Committer: meta.Committer,
 		Subject: meta.Subject, Body: body, Trailers: nonNil(trailers), Signature: sig,
 		Decoration: nonNil(meta.Decoration), ParentIndex: parentIndex,
-		Files: porcelain.CombineFileChanges(numstat, nameStatus),
+		Files: files,
 	}
 	if e.cacheGeneration() == gen {
 		e.detail.set(sha, parentIndex, detail)

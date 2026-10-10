@@ -37,14 +37,6 @@ func StashBaseSubjectArgs(shas []string) []string {
 	return append(append(args, shas...), "--")
 }
 
-// StashShowArgs is stash.show's own spawn pair — a thin wrapper over NumstatArgs/NameStatusArgs
-// (already commit.detail's own pair, F9), from the stash's own base to the stash commit itself: a
-// stash commit's own tree diffed against its base is exactly what a commit's fileDiff at
-// parentIndex 0 already means.
-func StashShowArgs(baseSha, sha string) (numstat, nameStatus []string) {
-	return NumstatArgs(&baseSha, sha), NameStatusArgs(&baseSha, sha)
-}
-
 // StashUntrackedLsTreeArgs builds `ls-tree -r --name-only -z <untrackedSha>` — the untracked
 // helper commit's own tree, each path folded into stash.show's FileChange list as FileAdded
 // (untracked content by definition has no "before", contract.ts's own stash.show doc comment).

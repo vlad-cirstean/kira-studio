@@ -21,20 +21,11 @@ func ParseEmptyTreeHash(stdout []byte) string {
 	return strings.TrimSpace(string(stdout))
 }
 
-// WorkingNumstatArgs is NumstatArgs' working-tree twin: plain `git diff` (never `diff-tree`, which
-// operates on two commit trees and cannot reach a working tree at all), combining staged and
+// WorkingNameStatusArgs is NameStatusArgs' working-tree twin: plain `git diff` (never `diff-tree`,
+// which operates on two commit trees and cannot reach a working tree at all), combining staged and
 // unstaged changes against base in one spawn. base is "HEAD" ordinarily, or the empty-tree hash
 // (EmptyTreeHashArgs) when HEAD is unborn — see gitsession.RepoEntry.WorkingDetail, which decides
-// which. -M -C matches
-// NumstatArgs/NameStatusArgs exactly, so CombineFileChanges' own no-rename-branch join is correct
-// here too.
-func WorkingNumstatArgs(base string) []string {
-	return []string{"diff", "--numstat", "-M", "-C", "-z", base, "--"}
-}
-
-// WorkingNameStatusArgs is WorkingNumstatArgs' twin over `--name-status` — CombineFileChanges joins
-// this onto WorkingNumstatArgs' own additions/deletions/isBinary, identically to the commit-detail
-// pair.
+// which.
 func WorkingNameStatusArgs(base string) []string {
 	return []string{"diff", "--name-status", "-M", "-C", "-z", base, "--"}
 }

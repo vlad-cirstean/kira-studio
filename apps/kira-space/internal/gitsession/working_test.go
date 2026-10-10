@@ -61,9 +61,6 @@ func TestWorkingDetail_StagedUnstagedAndUntracked(t *testing.T) {
 	if !ok || untracked.Kind != porcelain.FileAdded {
 		t.Fatalf("untracked.txt = %+v, ok=%v, want added", untracked, ok)
 	}
-	if untracked.Additions != nil || untracked.Deletions != nil {
-		t.Fatalf("untracked.txt = %+v, want nil additions/deletions (stash.go's own precedent)", untracked)
-	}
 }
 
 // TestWorkingDetail_CleanTree proves a clean checkout returns an empty, non-nil-shaped result —

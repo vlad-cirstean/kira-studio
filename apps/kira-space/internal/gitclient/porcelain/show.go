@@ -43,7 +43,7 @@ type CommitTrailer struct {
 }
 
 // CommitDetail is commit.detail's own wire result — structurally matches @kira/git-ipc's
-// 'commit.detail' result field for field (D5). Files is CombineFileChanges's own output, always
+// 'commit.detail' result field for field (D5). Files is ParseNameStatusRecords' output, always
 // in --name-status order (D17).
 type CommitDetail struct {
 	SHA         string          `json:"sha"`

@@ -10,21 +10,16 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
-// TestParseWorkingDiff_Mixed confirms ParseNumstatRecords/ParseNameStatusRecords/CombineFileChanges
+// TestParseWorkingDiff_Mixed confirms ParseNameStatusRecords
 // — established against diff-tree output — parse plain `git diff`'s identical `-z` framing without
-// any change: a staged add and an unstaged modify against HEAD, both combined into one spawn (P7,
+// any change: a staged add and an unstaged modify against HEAD, both in one spawn (P7,
 // item 2's own "one diff HEAD covers both" design).
 func TestParseWorkingDiff_Mixed(t *testing.T) {
 	t.Parallel()
-	numstat, err := porcelain.ParseNumstatRecords(readFixtureRecords(t, "workingDiff/mixed.numstat.bin"))
-	if err != nil {
-		t.Fatalf("ParseNumstatRecords: %v", err)
-	}
-	nameStatus, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "workingDiff/mixed.nameStatus.bin"))
+	combined, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "workingDiff/mixed.nameStatus.bin"))
 	if err != nil {
 		t.Fatalf("ParseNameStatusRecords: %v", err)
 	}
-	combined := porcelain.CombineFileChanges(numstat, nameStatus)
 	if len(combined) != 2 {
 		t.Fatalf("got %d combined rows, want 2 (a.txt modified, staged.txt added)", len(combined))
 	}
@@ -45,15 +40,10 @@ func TestParseWorkingDiff_Mixed(t *testing.T) {
 // there is always already staged into a commit.
 func TestParseWorkingDiff_UnstagedRename(t *testing.T) {
 	t.Parallel()
-	numstat, err := porcelain.ParseNumstatRecords(readFixtureRecords(t, "workingDiff/renamed.numstat.bin"))
-	if err != nil {
-		t.Fatalf("ParseNumstatRecords: %v", err)
-	}
-	nameStatus, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "workingDiff/renamed.nameStatus.bin"))
+	combined, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "workingDiff/renamed.nameStatus.bin"))
 	if err != nil {
 		t.Fatalf("ParseNameStatusRecords: %v", err)
 	}
-	combined := porcelain.CombineFileChanges(numstat, nameStatus)
 	if len(combined) != 1 {
 		t.Fatalf("got %d combined rows, want 1", len(combined))
 	}
@@ -68,15 +58,10 @@ func TestParseWorkingDiff_UnstagedRename(t *testing.T) {
 // branch for statusResult.Branch.Unborn.
 func TestParseWorkingDiff_UnbornHead(t *testing.T) {
 	t.Parallel()
-	numstat, err := porcelain.ParseNumstatRecords(readFixtureRecords(t, "workingDiff/unbornHead.numstat.bin"))
-	if err != nil {
-		t.Fatalf("ParseNumstatRecords: %v", err)
-	}
-	nameStatus, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "workingDiff/unbornHead.nameStatus.bin"))
+	combined, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "workingDiff/unbornHead.nameStatus.bin"))
 	if err != nil {
 		t.Fatalf("ParseNameStatusRecords: %v", err)
 	}
-	combined := porcelain.CombineFileChanges(numstat, nameStatus)
 	if len(combined) != 1 || combined[0].Kind != porcelain.FileAdded || combined[0].Path != "staged.txt" {
 		t.Fatalf("combined = %+v, want one added staged.txt", combined)
 	}

@@ -541,7 +541,7 @@ func (e *RepoEntry) PreflightCherryPick(ctx context.Context, sha string, mainlin
 
 // PreflightStashPop is preflight.stashPop's own orchestration (D3, §7.6): re-resolves the stash
 // entry fresh (resolveStashEntryScoped's own doc comment), gathers stashPaths (stash.show's own
-// numstat), stashUntrackedPaths (an ls-tree over the untracked helper commit, when one exists),
+// name-status), stashUntrackedPaths (an ls-tree over the untracked helper commit, when one exists),
 // dirty/inProgress and D4's own filesystem-stat existingUntrackedPaths, plus the merge-tree
 // prediction against targetSha (defaulting to HEAD — the `stashAndCarry` route's own use of a
 // non-HEAD target, per the contract's own doc comment on preflight.stashPop's targetSha param) —
@@ -578,8 +578,6 @@ func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha
 		return gitpreflight.StashPopPreflight{}, err
 	}
 
-	numstatArgs, _ := porcelain.StashShowArgs(entry.BaseSha, entry.Sha)
-
 	var (
 		statusResult   porcelain.StatusResult
 		inProgress     *gitpreflight.InProgressOperation
@@ -593,17 +591,13 @@ func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha
 		return serr
 	})
 	g.Go(func() error {
-		recs, rerr := e.runRecords(ctx, numstatArgs)
+		changes, rerr := e.fileChanges(ctx, porcelain.NameStatusArgs(&entry.BaseSha, entry.Sha))
 		if rerr != nil {
 			return rerr
 		}
-		numstat, perr := porcelain.ParseNumstatRecords(recs)
-		if perr != nil {
-			return perr
-		}
-		stashPaths = make([]string, len(numstat))
-		for i, n := range numstat {
-			stashPaths[i] = n.Path
+		stashPaths = make([]string, len(changes))
+		for i, c := range changes {
+			stashPaths[i] = c.Path
 		}
 		return nil
 	})

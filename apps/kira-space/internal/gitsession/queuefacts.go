@@ -125,7 +125,7 @@ func (e *RepoEntry) AheadBehind(ctx context.Context, left, right string) (ahead,
 }
 
 // RangeChanges is a branch's own file changes since it diverged from base: the merge base of
-// (base, tip), then numstat/name-status from there to tip, combined — a PR-shaped diff, not a
+// (base, tip), then name-status from there to tip — a PR-shaped diff, not a
 // literal two-dot `base..tip` (which would include base's own unrelated later history too when the
 // two have diverged in both directions). No merge base at all (unrelated histories): diffs against
 // base directly rather than failing outright — the same "always return something" spirit §0.7's
@@ -137,11 +137,7 @@ func (e *RepoEntry) RangeChanges(ctx context.Context, base, tip string) ([]porce
 	} else if ok {
 		from = sha
 	}
-	numstat, nameStatus, err := e.fileChanges(ctx, porcelain.NumstatArgs(&from, tip), porcelain.NameStatusArgs(&from, tip))
-	if err != nil {
-		return nil, err
-	}
-	return porcelain.CombineFileChanges(numstat, nameStatus), nil
+	return e.fileChanges(ctx, porcelain.NameStatusArgs(&from, tip))
 }
 
 // RangeCommits is `log --format=%H%x1f%s -z -N base..tip` (porcelain.RangeSubjectsArgs/

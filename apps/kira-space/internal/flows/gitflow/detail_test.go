@@ -110,9 +110,6 @@ func TestCommitDetailAndDiff(t *testing.T) {
 				if w.from != "" && (f.OriginalPath == nil || *f.OriginalPath != w.from) {
 					t.Fatalf("%q originalPath = %v, want %q", w.path, f.OriginalPath, w.from)
 				}
-				if strings.HasSuffix(w.path, ".dat") && !f.IsBinary {
-					t.Fatalf("%q isBinary = false", w.path)
-				}
 			}
 			if detail.Subject == "" || detail.SHA != tc.sha {
 				t.Fatalf("detail header = %+v", detail)

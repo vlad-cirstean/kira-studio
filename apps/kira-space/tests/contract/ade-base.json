@@ -76,15 +76,9 @@
     ],
     "files": [
       {
-        "added": 1,
-        "binary": false,
-        "deleted": 0,
         "path": "a.txt"
       },
       {
-        "added": 1,
-        "binary": false,
-        "deleted": 0,
         "path": "clash.txt"
       }
     ],

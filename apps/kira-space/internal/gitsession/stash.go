@@ -180,8 +180,8 @@ type StashShowResult struct {
 	Changes []porcelain.FileChange `json:"changes"`
 }
 
-// StashShow is stash.show's own query (D3, F9): the same NumstatArgs/NameStatusArgs pair
-// commit.detail already uses, from the stash's own base to the stash commit itself, plus — when the
+// StashShow is stash.show's own query (D3, F9): the same NameStatusArgs
+// spawn commit.detail already uses, from the stash's own base to the stash commit itself, plus — when the
 // stash has an untracked half — an ls-tree over the untracked helper commit's own tree, each path
 // folded in as FileAdded (untracked content by definition has no "before"). G28 D12: scope-aware
 // (resolveStashEntryScoped) so a global entry's own file tree renders through this exact same
@@ -193,17 +193,14 @@ func (e *RepoEntry) StashShow(ctx context.Context, sha, scope string) (StashShow
 		return StashShowResult{}, err
 	}
 
-	numstatArgs, nameStatusArgs := porcelain.StashShowArgs(entry.BaseSha, entry.Sha)
-
 	var (
-		numstat        []porcelain.NumstatEntry
-		nameStatus     []porcelain.NameStatusEntry
+		changes        []porcelain.FileChange
 		untrackedPaths []string
 		g              errgroup.Group
 	)
 	g.Go(func() error {
 		var ferr error
-		numstat, nameStatus, ferr = e.fileChanges(ctx, numstatArgs, nameStatusArgs)
+		changes, ferr = e.fileChanges(ctx, porcelain.NameStatusArgs(&entry.BaseSha, entry.Sha))
 		return ferr
 	})
 	if entry.UntrackedSha != nil {
@@ -217,7 +214,6 @@ func (e *RepoEntry) StashShow(ctx context.Context, sha, scope string) (StashShow
 		return StashShowResult{}, err
 	}
 
-	changes := porcelain.CombineFileChanges(numstat, nameStatus)
 	for _, p := range untrackedPaths {
 		changes = append(changes, porcelain.FileChange{Kind: porcelain.FileAdded, Path: p})
 	}

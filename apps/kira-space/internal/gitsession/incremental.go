@@ -547,11 +547,10 @@ func (e *RepoEntry) rangeFilesRecords(ctx context.Context, base, branch string) 
 		return RangeFilesResult{}, nil, ErrUnrelatedHistories
 	}
 
-	numstat, nameStatus, err := e.fileChanges(ctx, porcelain.NumstatArgs(&mb, tip), porcelain.NameStatusArgs(&mb, tip))
+	changes, err := e.fileChanges(ctx, porcelain.NameStatusArgs(&mb, tip))
 	if err != nil {
 		return RangeFilesResult{}, nil, err
 	}
-	changes := porcelain.CombineFileChanges(numstat, nameStatus)
 
 	records, err := e.review.Records(ctx, e.Summary.RepoID, branch)
 	if err != nil {

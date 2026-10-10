@@ -28,8 +28,7 @@ func readFixtureRecords(t *testing.T, relPath string) [][]byte {
 func strPtrEq(p *string, want string) bool { return p != nil && *p == want }
 
 // TestParseNumstatRecords_RenameWithEdit proves probe P1's own framing: a rename's own record set
-// is [counts+empty-path, originalPath, path], and the counts are the true +1 -1 of the edit alone
-// — never the +10 -10 a -M-less numstat would report against the whole file.
+// is [counts+empty-path, originalPath, path].
 func TestParseNumstatRecords_RenameWithEdit(t *testing.T) {
 	t.Parallel()
 	entries, err := porcelain.ParseNumstatRecords(readFixtureRecords(t, "diffTree/renameWithEdit.numstat.bin"))
@@ -43,12 +42,6 @@ func TestParseNumstatRecords_RenameWithEdit(t *testing.T) {
 	if e.Path != "new.txt" || e.OriginalPath != "old.txt" {
 		t.Fatalf("entry = %+v, want path=new.txt originalPath=old.txt", e)
 	}
-	if e.Additions != 1 || e.Deletions != 1 {
-		t.Fatalf("entry = %+v, want +1 -1 (not +10 -10)", e)
-	}
-	if e.IsBinary {
-		t.Fatalf("entry = %+v, want isBinary=false", e)
-	}
 }
 
 func TestParseNameStatusRecords_RenameWithEdit(t *testing.T) {
@@ -61,51 +54,27 @@ func TestParseNameStatusRecords_RenameWithEdit(t *testing.T) {
 		t.Fatalf("got %d entries, want 1", len(entries))
 	}
 	e := entries[0]
-	if e.Kind != porcelain.FileRenamed || e.Path != "new.txt" || e.OriginalPath != "old.txt" {
+	if e.Kind != porcelain.FileRenamed || e.Path != "new.txt" || !strPtrEq(e.OriginalPath, "old.txt") {
 		t.Fatalf("entry = %+v, want renamed old.txt -> new.txt", e)
 	}
-	if e.Similarity != 85 {
-		t.Fatalf("similarity = %d, want 85", e.Similarity)
+	if e.Similarity == nil || *e.Similarity != 85 {
+		t.Fatalf("similarity = %v, want 85", e.Similarity)
 	}
 }
 
-// TestParseRecords_Mixed covers every letter one commit can plausibly carry at once: add, modify,
-// delete, a binary file's own "-\t-\t" numstat framing, and a copy (C) whose source was also
-// modified in the same commit — the only way -C finds a copy without --find-copies-harder, which
-// FileDiffArgs/NumstatArgs/NameStatusArgs never pass.
-func TestParseRecords_Mixed(t *testing.T) {
+// TestParseNameStatusRecords_Mixed covers every letter one commit can plausibly carry at once: add,
+// modify, delete, a typechange, and a copy (C) whose source was also modified in the same commit —
+// the only way -C finds a copy without --find-copies-harder, which NameStatusArgs never passes.
+func TestParseNameStatusRecords_Mixed(t *testing.T) {
 	t.Parallel()
-	numstat, err := porcelain.ParseNumstatRecords(readFixtureRecords(t, "diffTree/mixed.numstat.bin"))
-	if err != nil {
-		t.Fatalf("ParseNumstatRecords: %v", err)
-	}
 	nameStatus, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "diffTree/mixed.nameStatus.bin"))
 	if err != nil {
 		t.Fatalf("ParseNameStatusRecords: %v", err)
 	}
 
-	byPath := make(map[string]porcelain.NumstatEntry, len(numstat))
-	for _, e := range numstat {
-		byPath[e.Path] = e
-	}
-	if bin, ok := byPath["bin.dat"]; !ok || !bin.IsBinary {
-		t.Fatalf("bin.dat numstat = %+v, ok=%v, want a binary '-\\t-\\t' entry", bin, ok)
-	}
-	if added, ok := byPath["added.txt"]; !ok || added.Additions != 1 || added.Deletions != 0 {
-		t.Fatalf("added.txt numstat = %+v, ok=%v, want +1 -0", added, ok)
-	}
-	if del, ok := byPath["deleted.txt"]; !ok || del.Additions != 0 || del.Deletions != 1 {
-		t.Fatalf("deleted.txt numstat = %+v, ok=%v, want +0 -1", del, ok)
-	}
-	if cp, ok := byPath["copyDst.txt"]; !ok || cp.OriginalPath != "copySrc.txt" {
-		t.Fatalf("copyDst.txt numstat = %+v, ok=%v, want originalPath=copySrc.txt", cp, ok)
-	}
-
-	kinds := make(map[string]porcelain.FileChangeKind, len(nameStatus))
-	sims := make(map[string]int, len(nameStatus))
+	byPath := make(map[string]porcelain.FileChange, len(nameStatus))
 	for _, e := range nameStatus {
-		kinds[e.Path] = e.Kind
-		sims[e.Path] = e.Similarity
+		byPath[e.Path] = e
 	}
 	want := map[string]porcelain.FileChangeKind{
 		"added.txt":      porcelain.FileAdded,
@@ -117,40 +86,19 @@ func TestParseRecords_Mixed(t *testing.T) {
 		"typechange.txt": porcelain.FileTypeChanged,
 	}
 	for path, kind := range want {
-		if kinds[path] != kind {
-			t.Fatalf("kind[%s] = %q, want %q", path, kinds[path], kind)
+		if byPath[path].Kind != kind {
+			t.Fatalf("kind[%s] = %q, want %q", path, byPath[path].Kind, kind)
 		}
 	}
-	if sims["copyDst.txt"] != 100 {
-		t.Fatalf("copyDst.txt similarity = %d, want 100", sims["copyDst.txt"])
+	cp := byPath["copyDst.txt"]
+	if !strPtrEq(cp.OriginalPath, "copySrc.txt") {
+		t.Fatalf("copyDst.txt = %+v, want copied from copySrc.txt", cp)
 	}
-
-	combined := porcelain.CombineFileChanges(numstat, nameStatus)
-	if len(combined) != len(nameStatus) {
-		t.Fatalf("combined has %d rows, want %d (--name-status order, D17)", len(combined), len(nameStatus))
+	if cp.Similarity == nil || *cp.Similarity != 100 {
+		t.Fatalf("copyDst.txt similarity = %v, want 100", cp.Similarity)
 	}
-	for i, fc := range combined {
-		if fc.Path != nameStatus[i].Path {
-			t.Fatalf("combined[%d].Path = %q, want %q (must preserve --name-status order)", i, fc.Path, nameStatus[i].Path)
-		}
-	}
-	var copyRow *porcelain.FileChange
-	for i := range combined {
-		if combined[i].Path == "copyDst.txt" {
-			copyRow = &combined[i]
-		}
-	}
-	if copyRow == nil {
-		t.Fatal("no combined row for copyDst.txt")
-	}
-	if copyRow.Kind != porcelain.FileCopied || !strPtrEq(copyRow.OriginalPath, "copySrc.txt") {
-		t.Fatalf("copyDst.txt combined = %+v, want copied from copySrc.txt", copyRow)
-	}
-	if copyRow.Similarity == nil || *copyRow.Similarity != 100 {
-		t.Fatalf("copyDst.txt similarity = %v, want 100", copyRow.Similarity)
-	}
-	if copyRow.Additions == nil || copyRow.Deletions == nil {
-		t.Fatalf("copyDst.txt combined = %+v, want additions/deletions set (not binary)", copyRow)
+	if byPath["added.txt"].Similarity != nil || byPath["added.txt"].OriginalPath != nil {
+		t.Fatalf("added.txt = %+v, want no similarity/originalPath", byPath["added.txt"])
 	}
 }
 

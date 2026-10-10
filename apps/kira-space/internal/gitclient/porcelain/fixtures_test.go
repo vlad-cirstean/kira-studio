@@ -305,13 +305,12 @@ func (b *repoBuilder) runAllowingFailure(args ...string) {
 
 func strPtr(s string) *string { return &s }
 
-// captureNumstat/captureNameStatus/captureFileDiff/captureShowBodyAndSignature run the real,
-// production argv builders (porcelain.NumstatArgs/NameStatusArgs/FileDiffArgs/
-// ShowBodyAndSignatureArgs — never a copied argv string, D15) and return raw stdout exactly as the
-// parser is fed.
+// captureNameStatus/captureFileDiff/captureShowBodyAndSignature run the real production argv
+// builders (never a copied argv string, D15) and return raw stdout exactly as the parser is fed.
+// captureNumstat has no production builder; it feeds ParseNumstatRecords' framing test.
 func captureNumstat(t *testing.T, dir string, from *string, to string) []byte {
 	t.Helper()
-	return captureRaw(t, dir, porcelain.NumstatArgs(from, to))
+	return captureRaw(t, dir, []string{"diff-tree", "-r", "--no-commit-id", "--numstat", "-M", "-C", "-z", *from, to})
 }
 
 func captureNameStatus(t *testing.T, dir string, from *string, to string) []byte {
@@ -526,7 +525,6 @@ func TestFixtures_Regenerate(t *testing.T) {
 		b.add("added.txt", "modified.txt", "copySrc.txt", "copyDst.txt", "bin.dat", "typechange.txt")
 		head := b.commitStaged("mixed: add/modify/delete/copy/typechange/binary")
 
-		writeFixture(t, "diffTree/mixed.numstat.bin", captureNumstat(t, b.dir, &parent, head))
 		writeFixture(t, "diffTree/mixed.nameStatus.bin", captureNameStatus(t, b.dir, &parent, head))
 	}
 
@@ -857,7 +855,6 @@ func TestFixtures_Regenerate(t *testing.T) {
 		b.writeFile("a.txt", "a\nmodified\n")
 		b.writeFile("staged.txt", "new\n")
 		b.add("staged.txt")
-		writeFixture(t, "workingDiff/mixed.numstat.bin", captureRaw(t, b.dir, porcelain.WorkingNumstatArgs("HEAD")))
 		writeFixture(t, "workingDiff/mixed.nameStatus.bin", captureRaw(t, b.dir, porcelain.WorkingNameStatusArgs("HEAD")))
 	}
 
@@ -869,7 +866,6 @@ func TestFixtures_Regenerate(t *testing.T) {
 		b := newRepoBuilder(t)
 		b.commit("old.txt", "line one\nline two\nline three\n", "initial")
 		b.mv("old.txt", "renamed.txt")
-		writeFixture(t, "workingDiff/renamed.numstat.bin", captureRaw(t, b.dir, porcelain.WorkingNumstatArgs("HEAD")))
 		writeFixture(t, "workingDiff/renamed.nameStatus.bin", captureRaw(t, b.dir, porcelain.WorkingNameStatusArgs("HEAD")))
 	}
 
@@ -894,7 +890,6 @@ func TestFixtures_Regenerate(t *testing.T) {
 			t.Fatalf("git add: %v\n%s", err, out)
 		}
 		emptyTree := porcelain.ParseEmptyTreeHash(captureRaw(t, dir, porcelain.EmptyTreeHashArgs()))
-		writeFixture(t, "workingDiff/unbornHead.numstat.bin", captureRaw(t, dir, porcelain.WorkingNumstatArgs(emptyTree)))
 		writeFixture(t, "workingDiff/unbornHead.nameStatus.bin", captureRaw(t, dir, porcelain.WorkingNameStatusArgs(emptyTree)))
 	}
 

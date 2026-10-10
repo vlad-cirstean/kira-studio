@@ -2048,10 +2048,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/cart/cart.test.ts",
-          "added": 14,
-          "deleted": 9,
-          "binary": false
+          "path": "src/cart/cart.test.ts"
         }
       ],
       "commits": [
@@ -2109,22 +2106,13 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/payments/client.ts",
-          "added": 40,
-          "deleted": 12,
-          "binary": false
+          "path": "src/payments/client.ts"
         },
         {
-          "path": "src/payments/invoice.ts",
-          "added": 95,
-          "deleted": 8,
-          "binary": false
+          "path": "src/payments/invoice.ts"
         },
         {
-          "path": "src/metering/usage.ts",
-          "added": 132,
-          "deleted": 0,
-          "binary": false
+          "path": "src/metering/usage.ts"
         }
       ],
       "commits": [
@@ -2191,16 +2179,10 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/ui/billing/Dashboard.tsx",
-          "added": 210,
-          "deleted": 0,
-          "binary": false
+          "path": "src/ui/billing/Dashboard.tsx"
         },
         {
-          "path": "src/ui/nav/Sidebar.tsx",
-          "added": 6,
-          "deleted": 1,
-          "binary": false
+          "path": "src/ui/nav/Sidebar.tsx"
         }
       ],
       "commits": [
@@ -2278,16 +2260,10 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/metering/store.ts",
-          "added": 120,
-          "deleted": 0,
-          "binary": false
+          "path": "src/metering/store.ts"
         },
         {
-          "path": "src/routes/usage.ts",
-          "added": 64,
-          "deleted": 0,
-          "binary": false
+          "path": "src/routes/usage.ts"
         }
       ],
       "commits": [
@@ -2357,16 +2333,10 @@
       "conflictsIfRebased": ["src/auth/session.ts"],
       "files": [
         {
-          "path": "src/auth/oauth.ts",
-          "added": 214,
-          "deleted": 0,
-          "binary": false
+          "path": "src/auth/oauth.ts"
         },
         {
-          "path": "src/auth/session.ts",
-          "added": 19,
-          "deleted": 6,
-          "binary": false
+          "path": "src/auth/session.ts"
         }
       ],
       "conflictCheck": "failed",
@@ -2443,10 +2413,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/ui/LoginScreen.tsx",
-          "added": 176,
-          "deleted": 0,
-          "binary": false
+          "path": "src/ui/LoginScreen.tsx"
         }
       ],
       "commits": [
@@ -2534,10 +2501,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/auth/callback.ts",
-          "added": 98,
-          "deleted": 0,
-          "binary": false
+          "path": "src/auth/callback.ts"
         }
       ],
       "commits": [
@@ -2611,16 +2575,10 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/hooks/registry.ts",
-          "added": 120,
-          "deleted": 0,
-          "binary": false
+          "path": "src/hooks/registry.ts"
         },
         {
-          "path": "src/hooks/sign.ts",
-          "added": 40,
-          "deleted": 0,
-          "binary": false
+          "path": "src/hooks/sign.ts"
         }
       ],
       "commits": [
@@ -2688,10 +2646,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/hooks/retry.ts",
-          "added": 88,
-          "deleted": 0,
-          "binary": false
+          "path": "src/hooks/retry.ts"
         }
       ],
       "commits": [
@@ -2754,16 +2709,10 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/payments/client.ts",
-          "added": 120,
-          "deleted": 96,
-          "binary": false
+          "path": "src/payments/client.ts"
         },
         {
-          "path": "src/payments/invoice.ts",
-          "added": 44,
-          "deleted": 51,
-          "binary": false
+          "path": "src/payments/invoice.ts"
         }
       ],
       "commits": [
@@ -2821,10 +2770,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/search/schema.ts",
-          "added": 88,
-          "deleted": 40,
-          "binary": false
+          "path": "src/search/schema.ts"
         }
       ],
       "commits": [
@@ -2882,22 +2828,13 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/search/indexer.ts",
-          "added": 160,
-          "deleted": 0,
-          "binary": false
+          "path": "src/search/indexer.ts"
         },
         {
-          "path": "src/search/schema.ts",
-          "added": 6,
-          "deleted": 2,
-          "binary": false
+          "path": "src/search/schema.ts"
         },
         {
-          "path": "package.json",
-          "added": 1,
-          "deleted": 0,
-          "binary": false
+          "path": "package.json"
         }
       ],
       "commits": [
@@ -2964,10 +2901,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/ui/search/Results.tsx",
-          "added": 40,
-          "deleted": 0,
-          "binary": false
+          "path": "src/ui/search/Results.tsx"
         }
       ],
       "commits": [],
@@ -3020,16 +2954,10 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/notifications/model.ts",
-          "added": 72,
-          "deleted": 0,
-          "binary": false
+          "path": "src/notifications/model.ts"
         },
         {
-          "path": "src/ui/nav/Sidebar.tsx",
-          "added": 3,
-          "deleted": 1,
-          "binary": false
+          "path": "src/ui/nav/Sidebar.tsx"
         }
       ],
       "commits": [
@@ -3087,10 +3015,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "package.json",
-          "added": 23,
-          "deleted": 23,
-          "binary": false
+          "path": "package.json"
         }
       ],
       "commits": [
@@ -3141,10 +3066,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "app/settings/Push.tsx",
-          "added": 140,
-          "deleted": 0,
-          "binary": false
+          "path": "app/settings/Push.tsx"
         }
       ],
       "commits": [
@@ -3208,10 +3130,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/push/tokens.ts",
-          "added": 70,
-          "deleted": 0,
-          "binary": false
+          "path": "src/push/tokens.ts"
         }
       ],
       "commits": [
@@ -3269,10 +3188,7 @@
       "conflictCheckReason": "",
       "files": [
         {
-          "path": "src/ui/Header.tsx",
-          "added": 120,
-          "deleted": 80,
-          "binary": false
+          "path": "src/ui/Header.tsx"
         }
       ],
       "commits": [],
