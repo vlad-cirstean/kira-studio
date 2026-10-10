@@ -43,11 +43,11 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
   <div class="flex h-full flex-col" data-testid="docker-exec">
     <Empty v-if="sessions.length === 0" class="h-full" data-testid="docker-exec-empty">
       <EmptyHeader>
-        <EmptyMedia variant="icon"><CodiconIcon name="terminal" :size="16" /></EmptyMedia>
+        <EmptyMedia><CodiconIcon name="terminal" :size="24" /></EmptyMedia>
         <EmptyTitle>No terminal session</EmptyTitle>
         <EmptyDescription>Start a shell inside this container.</EmptyDescription>
       </EmptyHeader>
-      <Button size="kira" variant="secondary" data-testid="docker-exec-new" @click="openSession">
+      <Button size="kira" variant="toolbar" data-testid="docker-exec-new" @click="openSession">
         <CodiconIcon name="add" :size="12" />
         New session
       </Button>
@@ -69,7 +69,7 @@ const hostTab = (id: string) => ({ id, state: { cwd: '', codeRepoId: '', command
           @click="closeSession(s.id)"
         />
       </span>
-      <Button variant="ghost" size="xs" data-testid="docker-exec-new" @click="openSession">
+      <Button variant="toolbar" size="kira" data-testid="docker-exec-new" @click="openSession">
         <CodiconIcon name="add" :size="12" />
         New session
       </Button>

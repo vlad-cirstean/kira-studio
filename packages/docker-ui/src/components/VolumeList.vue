@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
+import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
 import { useVolumes } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
@@ -32,8 +34,13 @@ const rows = computed(() => {
   <VirtualList v-else :rows="rows" testid="docker-volume-list">
     <template #row="{ row }">
       <div
-        class="group/row flex h-full cursor-default select-none items-center gap-1.5 px-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
-        :class="ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name ? 'bg-select' : 'hover:bg-hover'"
+        :class="
+          cn(
+            rowVariants({ layout: 'tree', selected: ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name }),
+            'group/row h-full gap-1.5',
+          )
+        "
+        :style="rowIndent(0)"
         data-testid="docker-row"
         :data-id="row.volume.name"
         role="option"

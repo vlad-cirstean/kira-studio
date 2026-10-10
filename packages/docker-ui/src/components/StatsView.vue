@@ -24,14 +24,14 @@ const mem = computed(() => history.value.map((s) => s.memUsage));
       <div v-else class="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
         <DetailSection title="CPU">
           <div class="mb-2 flex items-baseline justify-between">
-            <span class="text-kira-xl font-semibold" data-testid="docker-stats-cpu">{{ formatPercent(latest.cpuPercent) }}</span>
+            <span class="text-kira-xl font-medium" data-testid="docker-stats-cpu">{{ formatPercent(latest.cpuPercent) }}</span>
             <span class="text-kira-sm text-muted-foreground">last {{ cpu.length }} samples</span>
           </div>
           <StatsSparkline :values="cpu" height-class="h-24" />
         </DetailSection>
         <DetailSection title="Memory">
           <div class="mb-2 flex items-baseline justify-between">
-            <span class="text-kira-xl font-semibold" data-testid="docker-stats-mem">{{ formatSize(latest.memUsage) }}</span>
+            <span class="text-kira-xl font-medium" data-testid="docker-stats-mem">{{ formatSize(latest.memUsage) }}</span>
             <span class="text-kira-sm text-muted-foreground">of {{ formatSize(latest.memLimit) }} ({{ formatPercent(latest.memPercent) }})</span>
           </div>
           <StatsSparkline :values="mem" :max="latest.memLimit" height-class="h-24" />

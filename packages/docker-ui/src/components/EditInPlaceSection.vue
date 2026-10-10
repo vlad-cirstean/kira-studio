@@ -183,7 +183,7 @@ const netChanged = (name: string): boolean => {
             <option value="">Attach to network…</option>
             <option v-for="n in available" :key="n" :value="n">{{ n }}</option>
           </NativeSelect>
-          <Button size="kira" variant="secondary" :disabled="disabled || networkLocked || !toAdd" data-testid="docker-edit-network-add" @click="addNetwork">Attach</Button>
+          <Button size="kira" variant="toolbar" :disabled="disabled || networkLocked || !toAdd" data-testid="docker-edit-network-add" @click="addNetwork">Attach</Button>
         </div>
       </div>
     </EditField>

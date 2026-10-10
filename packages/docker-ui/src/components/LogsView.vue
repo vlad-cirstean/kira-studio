@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import { Button } from '@theme/components/ui/button';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@theme/components/ui/input-group';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Toggle } from '@theme/components/ui/toggle';
 import { useDebounceFn } from '@vueuse/core';
@@ -152,13 +151,10 @@ function clear(): void {
       <NativeSelect v-model="tail" aria-label="Tail" data-testid="docker-logs-tail">
         <option v-for="t in TAILS" :key="t.value" :value="t.value">{{ t.label }}</option>
       </NativeSelect>
-      <InputGroup class="w-56">
-        <InputGroupAddon><CodiconIcon name="filter" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filter" placeholder="Filter" data-testid="docker-logs-filter" />
-        <InputGroupAddon v-if="needle" align="inline-end">
-          <span class="text-kira-sm text-muted-foreground" data-testid="docker-logs-count">{{ visible.length }}</span>
-        </InputGroupAddon>
-      </InputGroup>
+      <div class="w-56">
+        <SearchField v-model="filter" placeholder="Filter" data-testid="docker-logs-filter" />
+      </div>
+      <span v-if="needle" class="text-kira-sm text-muted-foreground" data-testid="docker-logs-count">{{ visible.length }}</span>
       <Button variant="ghost" size="kira" class="ml-auto" data-testid="docker-logs-clear" @click="clear">Clear</Button>
     </div>
     <div class="relative min-h-0 flex-1">
@@ -213,6 +209,7 @@ function clear(): void {
       </p>
       <Button
         v-if="!atBottom && !follow"
+        variant="toolbar"
         size="kira"
         class="absolute bottom-2 right-4"
         data-testid="docker-logs-jump"

@@ -41,7 +41,7 @@ const copy = computed(() => COPY[props.status.reason ?? 'error']);
 <template>
   <Empty class="h-full" data-testid="docker-unavailable">
     <EmptyHeader>
-      <EmptyMedia variant="icon"><CodiconIcon name="debug-disconnect" :size="20" class="text-error" /></EmptyMedia>
+      <EmptyMedia><CodiconIcon name="debug-disconnect" :size="24" class="text-error" /></EmptyMedia>
       <EmptyTitle data-testid="docker-unavailable-title">{{ copy.title }}</EmptyTitle>
       <EmptyDescription data-testid="docker-unavailable-hint">{{ copy.hint }}</EmptyDescription>
     </EmptyHeader>
@@ -49,7 +49,7 @@ const copy = computed(() => COPY[props.status.reason ?? 'error']);
       <code class="font-data text-kira-sm text-muted-foreground" data-testid="docker-unavailable-endpoint">{{ status.endpoint.host }}</code>
       <p v-if="status.message" class="max-w-md text-kira-sm text-muted-foreground">{{ status.message }}</p>
       <div class="flex items-center gap-2">
-        <Button size="kira" variant="secondary" :disabled="retrying" data-testid="docker-retry" @click="retry">
+        <Button size="kira" variant="toolbar" :disabled="retrying" data-testid="docker-retry" @click="retry">
           <CodiconIcon :name="retrying ? 'loading' : 'refresh'" :size="12" :class="retrying ? 'codicon-modifier-spin' : ''" />Retry
         </Button>
         <EndpointChip />

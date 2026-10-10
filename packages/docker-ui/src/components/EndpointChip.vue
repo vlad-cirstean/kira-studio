@@ -52,7 +52,7 @@ async function onSelect(value: unknown): Promise<void> {
           :data-state="ok ? 'ok' : 'unavailable'"
         />
         <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ endpoint?.context ?? 'docker' }}</span>
-        <CodiconIcon name="chevron-down" :size="11" />
+        <CodiconIcon name="chevron-down" :size="12" />
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" class="w-56" data-testid="docker-context-menu">

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { tabChipVariants } from '@theme/components/ui/tabs';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
@@ -48,6 +49,16 @@ const TABS: ReadonlyArray<{ id: DockerDetailTab; label: string; icon: string; ne
   { id: 'edit', label: 'Edit', icon: 'edit', needsRunning: false },
 ];
 
+const tabItems = computed(() =>
+  TABS.map((t) => ({
+    value: t.id,
+    label: t.label,
+    icon: t.icon,
+    disabled: t.needsRunning && !running.value,
+    testid: `docker-tab-${t.id}`,
+  })),
+);
+
 const stateVariant = computed(() => {
   switch (c.value?.state) {
     case 'running':
@@ -84,15 +95,15 @@ function act(action: 'start' | 'stop' | 'restart'): void {
 <template>
   <div class="flex h-full flex-col" data-testid="docker-container-detail">
     <div v-if="recreating" class="flex items-center gap-2 p-4 text-muted-foreground" data-testid="docker-detail-recreating">
-      <CodiconIcon name="loading" :size="14" class="codicon-modifier-spin" />Recreating…
+      <CodiconIcon name="loading" :size="13" class="codicon-modifier-spin" />Recreating…
     </div>
-    <Empty v-else-if="detail.isError.value" class="p-4" data-testid="docker-detail-error">
+    <Empty v-else-if="detail.isError.value" class="h-full" data-testid="docker-detail-error">
       <EmptyHeader>
-        <EmptyMedia variant="icon"><CodiconIcon name="warning" :size="16" class="text-warn" /></EmptyMedia>
+        <EmptyMedia><CodiconIcon name="warning" :size="24" class="text-warn" /></EmptyMedia>
         <EmptyTitle>Container not found</EmptyTitle>
         <EmptyDescription>It was removed, or the engine changed.</EmptyDescription>
       </EmptyHeader>
-      <Button size="kira" variant="secondary" @click="ui.select(null)">Back to overview</Button>
+      <Button size="kira" variant="toolbar" @click="ui.select(null)">Back to overview</Button>
     </Empty>
     <div v-else-if="!detail.data.value" class="flex flex-col gap-2 p-3" aria-busy="true">
       <div class="h-6 w-1/3 animate-pulse rounded-kira-sm bg-field" />
@@ -102,16 +113,16 @@ function act(action: 'start' | 'stop' | 'restart'): void {
       <div class="flex shrink-0 flex-col gap-1 border-b border-border px-3 py-2">
         <div class="flex min-w-0 items-center gap-2">
           <span class="size-2 shrink-0 rounded-full" :class="stateDotClass(c.state)" />
-          <span class="min-w-0 truncate text-kira-lg font-semibold" data-testid="docker-detail-name">{{ c.name }}</span>
+          <span class="min-w-0 truncate text-kira-lg font-medium" data-testid="docker-detail-name">{{ c.name }}</span>
           <Badge :variant="stateVariant" data-testid="docker-detail-state">{{ c.state }}</Badge>
           <span class="ml-auto flex shrink-0 items-center gap-1">
-            <Button size="kira" variant="secondary" :disabled="busy || running" data-testid="docker-action-start" @click="act('start')">
+            <Button size="kira" variant="toolbar" :disabled="busy || running" data-testid="docker-action-start" @click="act('start')">
               <CodiconIcon name="play" :size="12" class="text-ok" />Start
             </Button>
-            <Button size="kira" variant="secondary" :disabled="busy || !running" data-testid="docker-action-stop" @click="act('stop')">
+            <Button size="kira" variant="toolbar" :disabled="busy || !running" data-testid="docker-action-stop" @click="act('stop')">
               <CodiconIcon name="debug-stop" :size="12" class="text-error" />Stop
             </Button>
-            <Button size="kira" variant="secondary" :disabled="busy || !running" data-testid="docker-action-restart" @click="act('restart')">
+            <Button size="kira" variant="toolbar" :disabled="busy || !running" data-testid="docker-action-restart" @click="act('restart')">
               <CodiconIcon name="debug-restart" :size="12" />Restart
             </Button>
           </span>
@@ -146,23 +157,14 @@ function act(action: 'start' | 'stop' | 'restart'): void {
       <p v-if="actions.error.value || linkError" class="shrink-0 border-b border-border px-3 py-1 text-error" data-testid="docker-action-error">
         {{ actions.error.value ? (actions.error.value as Error).message : linkError }}
       </p>
-      <div class="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-1.5 py-1" role="tablist">
-        <button
-          v-for="t in TABS"
-          :key="t.id"
-          type="button"
-          :class="[tabChipVariants({ active: ui.detailTab === t.id }), t.needsRunning && !running ? 'cursor-default opacity-50' : '']"
-          :disabled="t.needsRunning && !running"
-          role="tab"
-          :aria-selected="ui.detailTab === t.id"
-          :aria-pressed="ui.detailTab === t.id"
-          :data-testid="`docker-tab-${t.id}`"
-          @click="ui.detailTab = t.id"
-        >
-          <CodiconIcon :name="t.icon" :size="13" />
-          {{ t.label }}
-        </button>
-      </div>
+      <ViewToolbar class="overflow-x-auto">
+        <SecondaryTabs
+          :model-value="ui.detailTab"
+          :items="tabItems"
+          aria-label="Container sections"
+          @update:model-value="(v) => (ui.detailTab = v as DockerDetailTab)"
+        />
+      </ViewToolbar>
       <div class="min-h-0 flex-1">
         <ContainerOverview v-if="ui.detailTab === 'overview'" :detail="detail.data.value" />
         <LogsView v-else-if="ui.detailTab === 'logs'" :container-id="containerId" />

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
+import { Tabs, TabsContent } from '@theme/components/ui/tabs';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
 import { fieldErrors, hasNowChanges, inPlaceForApply } from '../lib/editDiff';
@@ -32,6 +33,10 @@ const update = useUpdateContainer();
 const recreate = useRecreateContainer();
 const confirming = ref(false);
 const tab = ref<'inPlace' | 'recreate'>('inPlace');
+const EDIT_TABS = [
+  { value: 'inPlace', label: 'In place', testid: 'docker-edit-tab-inplace' },
+  { value: 'recreate', label: 'Recreate', testid: 'docker-edit-tab-recreate' },
+];
 
 watch(
   () => specQuery.data.value,
@@ -161,7 +166,7 @@ const originNotice = computed(() => {
       <Alert v-if="draft.stale" variant="warn" data-testid="docker-edit-stale">
         <AlertDescription class="flex items-center gap-2">
           The container changed since the editor loaded.
-          <Button size="kira" variant="secondary" data-testid="docker-edit-reload" @click="reload">Reload</Button>
+          <Button size="kira" variant="toolbar" data-testid="docker-edit-reload" @click="reload">Reload</Button>
         </AlertDescription>
       </Alert>
       <Alert v-if="failure" variant="destructive" data-testid="docker-edit-error">
@@ -180,23 +185,28 @@ const originNotice = computed(() => {
         <EditPendingSummary :changes="changes" />
       </DetailSection>
 
-      <Tabs :model-value="tab" class="flex flex-col gap-3" @update:model-value="(v) => (tab = v as typeof tab)">
-        <TabsList class="w-full border-b border-border pb-1.5" aria-label="Edit mode">
-          <TabsTrigger value="inPlace" :class="tabChipVariants({ active: tab === 'inPlace' })" data-testid="docker-edit-tab-inplace">
-            In place
-            <span v-if="inPlaceCount" class="size-1.5 rounded-full bg-muted-foreground" data-testid="docker-edit-tab-dirty" />
-          </TabsTrigger>
-          <TabsTrigger value="recreate" :class="tabChipVariants({ active: tab === 'recreate' })" data-testid="docker-edit-tab-recreate">
-            Recreate
-            <span v-if="recreateCount" class="size-1.5 rounded-full bg-muted-foreground" data-testid="docker-edit-tab-dirty" />
-          </TabsTrigger>
-        </TabsList>
+      <Tabs :model-value="tab" class="flex flex-col gap-3">
+        <SecondaryTabs
+          :model-value="tab"
+          :items="EDIT_TABS"
+          aria-label="Edit mode"
+          @update:model-value="(v) => (tab = v as typeof tab)"
+        >
+          <template #item="{ item }">
+            {{ item.label }}
+            <span
+              v-if="item.value === 'inPlace' ? inPlaceCount : recreateCount"
+              class="size-1.5 rounded-full bg-muted-foreground"
+              data-testid="docker-edit-tab-dirty"
+            />
+          </template>
+        </SecondaryTabs>
 
         <TabsContent value="inPlace" class="flex flex-col gap-3" data-testid="docker-edit-section-inplace">
           <EditInPlaceSection :draft="draft" :errors="errors" :disabled="readOnly || !!applying" :network-locked="networkLocked" :engine-cpus="engineCpus" :all-networks="allNetworks" />
           <div class="flex items-center justify-end gap-1">
             <TooltipIconButton icon="discard" label="Reset" :disabled="!inPlaceCount" data-testid="docker-edit-reset-inplace" @click="store.reset(containerId, 'inPlace')" />
-            <Button v-if="!readOnly" size="kira" variant="secondary" :disabled="!canApplyNow" data-testid="docker-edit-apply-now" @click="applyNow">
+            <Button v-if="!readOnly" size="kira" variant="toolbar" :disabled="!canApplyNow" data-testid="docker-edit-apply-now" @click="applyNow">
               <CodiconIcon v-if="applying === 'inPlace'" name="loading" :size="12" class="codicon-modifier-spin" />Apply
             </Button>
           </div>
@@ -206,7 +216,7 @@ const originNotice = computed(() => {
           <EditRecreateSection :draft="draft" :errors="errors" :disabled="readOnly || !!applying" :preserved="base.preserved" />
           <div class="flex items-center justify-end gap-1">
             <TooltipIconButton icon="discard" label="Reset" :disabled="!recreateCount" data-testid="docker-edit-reset-recreate" @click="store.reset(containerId, 'recreate')" />
-            <Button v-if="!readOnly" size="kira" variant="secondary" :disabled="!canRecreate" data-testid="docker-edit-apply-recreate" @click="confirming = true">
+            <Button v-if="!readOnly" size="kira" variant="toolbar" :disabled="!canRecreate" data-testid="docker-edit-apply-recreate" @click="confirming = true">
               <CodiconIcon v-if="applying === 'recreate'" name="loading" :size="12" class="codicon-modifier-spin" />Recreate…
             </Button>
           </div>

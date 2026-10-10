@@ -166,8 +166,8 @@ test('contract: edit tab splits in-place and recreate into tabs without mode bad
   const { page } = await setup(relaunch);
   await openEdit(page);
 
-  await expect(tid(page, 'docker-edit-tab-inplace')).toHaveAttribute('data-state', 'active');
-  await expect(tid(page, 'docker-edit-tab-recreate')).toHaveAttribute('data-state', 'inactive');
+  await expect(tid(page, 'docker-edit-tab-inplace')).toHaveAttribute('data-state', 'on');
+  await expect(tid(page, 'docker-edit-tab-recreate')).toHaveAttribute('data-state', 'off');
   await expect(tid(page, 'docker-edit-badge')).toHaveCount(0);
   await expect(tid(page, 'docker-edit-name')).toHaveValue('kira-flow-edit');
   await expect(tid(page, 'docker-edit-pending')).toHaveCount(0);

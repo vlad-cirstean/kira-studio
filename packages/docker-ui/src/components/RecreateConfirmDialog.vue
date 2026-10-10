@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import type { PendingChange } from '../lib/editDiff';
 import type { DockerEditSpec } from '../wire';
 import EditPendingSummary from './EditPendingSummary.vue';
@@ -12,14 +12,15 @@ const emit = defineEmits<{ cancel: []; confirm: [] }>();
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('cancel')">
-    <DialogContent class="max-h-[85vh] w-[34rem] max-w-[calc(100vw-2rem)] overflow-auto" data-testid="docker-edit-dialog">
-      <DialogHeader>
+    <DialogContent size="lg" data-testid="docker-edit-dialog">
+      <DialogHeader closable>
         <DialogTitle>Recreate container</DialogTitle>
         <DialogDescription>
           The engine cannot change these settings on a container that exists. A new container replaces this one.
         </DialogDescription>
       </DialogHeader>
 
+      <DialogBody>
       <EditPendingSummary :changes="changes" />
 
       <section class="flex flex-col gap-1" data-testid="docker-edit-lost">
@@ -53,6 +54,7 @@ const emit = defineEmits<{ cancel: []; confirm: [] }>();
           Part of Compose project {{ spec.originName }}. Compose will see a different container.
         </AlertDescription>
       </Alert>
+      </DialogBody>
 
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="docker-edit-cancel" @click="emit('cancel')">Cancel</Button>

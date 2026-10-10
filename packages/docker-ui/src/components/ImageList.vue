@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
+import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
 import { useDocker } from '../context';
 import { formatSize, shortId } from '../lib/format';
@@ -40,8 +42,13 @@ function openRegistry(url: string): void {
   <VirtualList v-else :rows="rows" testid="docker-image-list">
     <template #row="{ row }">
       <div
-        class="group/row flex h-full cursor-default select-none items-center gap-1.5 px-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
-        :class="ui.selection?.kind === 'image' && ui.selection.id === row.image.id ? 'bg-select' : 'hover:bg-hover'"
+        :class="
+          cn(
+            rowVariants({ layout: 'tree', selected: ui.selection?.kind === 'image' && ui.selection.id === row.image.id }),
+            'group/row h-full gap-1.5',
+          )
+        "
+        :style="rowIndent(0)"
         data-testid="docker-row"
         :data-id="row.image.id"
         role="option"

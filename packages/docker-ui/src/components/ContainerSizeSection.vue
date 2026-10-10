@@ -44,7 +44,7 @@ const ago = useTimeAgo(takenAt);
     </div>
     <div v-else-if="!size" class="flex flex-wrap items-center gap-3 text-muted-foreground">
       <span>Not measured. Measuring walks the container's filesystem and can take a while.</span>
-      <Button size="kira" variant="secondary" data-testid="docker-size-measure" @click="refresh">Measure</Button>
+      <Button size="kira" variant="toolbar" data-testid="docker-size-measure" @click="refresh">Measure</Button>
     </div>
     <dl v-else class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
       <dt class="text-muted-foreground">Writable layer</dt>

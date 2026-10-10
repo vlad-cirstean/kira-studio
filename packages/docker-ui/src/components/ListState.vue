@@ -20,17 +20,17 @@ const LOADING_OPACITY = ['opacity-86', 'opacity-72', 'opacity-58', 'opacity-44',
   <div v-if="loading" class="flex flex-col gap-1.5 p-2" data-testid="docker-list-loading" aria-busy="true">
     <div v-for="n in 5" :key="n" class="h-7 animate-pulse rounded-kira-sm bg-field" :class="LOADING_OPACITY[n - 1]" />
   </div>
-  <Empty v-else-if="error" class="p-4" data-testid="docker-list-error">
+  <Empty v-else-if="error" class="h-full" data-testid="docker-list-error">
     <EmptyHeader>
-      <EmptyMedia variant="icon"><CodiconIcon name="error" :size="16" class="text-error" /></EmptyMedia>
+      <EmptyMedia><CodiconIcon name="error" :size="24" class="text-error" /></EmptyMedia>
       <EmptyTitle>Could not load</EmptyTitle>
       <EmptyDescription>The engine did not answer. Retry in a moment.</EmptyDescription>
     </EmptyHeader>
-    <Button size="kira" variant="secondary" @click="$emit('retry')">Retry</Button>
+    <Button size="kira" variant="toolbar" @click="$emit('retry')">Retry</Button>
   </Empty>
-  <Empty v-else class="p-4" data-testid="docker-list-empty">
+  <Empty v-else class="h-full" data-testid="docker-list-empty">
     <EmptyHeader>
-      <EmptyMedia variant="icon"><CodiconIcon :name="icon" :size="16" /></EmptyMedia>
+      <EmptyMedia><CodiconIcon :name="icon" :size="24" /></EmptyMedia>
       <EmptyTitle>{{ emptyTitle }}</EmptyTitle>
       <EmptyDescription v-if="emptyHint">{{ emptyHint }}</EmptyDescription>
     </EmptyHeader>

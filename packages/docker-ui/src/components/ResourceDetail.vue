@@ -92,8 +92,8 @@ const usedByRows = computed(() =>
 <template>
   <div class="flex h-full flex-col overflow-auto" data-testid="docker-resource-detail" :data-kind="kind">
     <div class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-      <CodiconIcon :name="ICONS[kind]" :size="15" class="text-muted-foreground" />
-      <span class="min-w-0 truncate text-kira-lg font-semibold" data-testid="docker-resource-title">{{ title }}</span>
+      <CodiconIcon :name="ICONS[kind]" :size="16" class="text-muted-foreground" />
+      <span class="min-w-0 truncate text-kira-lg font-medium" data-testid="docker-resource-title">{{ title }}</span>
       <TooltipIconButton
         v-if="registryUrl"
         icon="link-external"

@@ -1,21 +1,4 @@
 # P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-packages/docker-ui/src/components/ContainerDetail.vue
-packages/docker-ui/src/components/ContainerEditView.vue
-packages/docker-ui/src/components/ContainerList.vue
-packages/docker-ui/src/components/ContainerSizeSection.vue
-packages/docker-ui/src/components/DockerPanel.vue
-packages/docker-ui/src/components/EditInPlaceSection.vue
-packages/docker-ui/src/components/EditRows.vue
-packages/docker-ui/src/components/EndpointChip.vue
-packages/docker-ui/src/components/EngineDiskSection.vue
-packages/docker-ui/src/components/EngineOverview.vue
-packages/docker-ui/src/components/ExecView.vue
-packages/docker-ui/src/components/ListState.vue
-packages/docker-ui/src/components/LogsView.vue
-packages/docker-ui/src/components/RecreateConfirmDialog.vue
-packages/docker-ui/src/components/ResourceDetail.vue
-packages/docker-ui/src/components/StatsView.vue
-packages/docker-ui/src/components/UnavailableState.vue
 packages/workbench/src/automations/AutomationsPanel.vue
 packages/workbench/src/automations/AutomationsStart.vue
 packages/workbench/src/automations/ParamsEditor.vue
@@ -38,7 +21,3 @@ packages/workbench/src/memory/import/ImportStatus.vue
 packages/workbench/src/memory/import/ImportView.vue
 permanent U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 §2.2 exempt)
 permanent U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
-packages/docker-ui/src/components/ImageList.vue
-packages/docker-ui/src/components/NetworkList.vue
-packages/docker-ui/src/components/VirtualList.vue
-packages/docker-ui/src/components/VolumeList.vue

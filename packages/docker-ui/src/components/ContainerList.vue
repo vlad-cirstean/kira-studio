@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import { computed } from 'vue';
 import { isActiveState, publishedPorts, stateDotClass } from '../lib/format';
 import { useContainerAction, useContainers } from '../queries';
@@ -13,8 +16,7 @@ import ListState from './ListState.vue';
 import OriginIcon from './OriginIcon.vue';
 import VirtualList from './VirtualList.vue';
 
-const GROUP_ROW_HEIGHT = 28;
-const CONTAINER_ROW_HEIGHT = 44;
+const { single: groupRowHeight, double: containerRowHeight } = useRowHeight();
 
 interface GroupRow {
   kind: 'group';
@@ -71,7 +73,7 @@ const rows = computed<Row[]>(() => {
   return out;
 });
 
-const rowHeights = computed(() => rows.value.map((r) => (r.kind === 'group' ? GROUP_ROW_HEIGHT : CONTAINER_ROW_HEIGHT)));
+const rowHeights = computed(() => rows.value.map((r) => (r.kind === 'group' ? groupRowHeight.value : containerRowHeight.value)));
 
 const emptyCopy = computed(() => {
   if (searching.value) return { title: 'No matches', hint: 'No container matches the search.' };
@@ -138,7 +140,8 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
     <template #row="{ row }">
       <div
         v-if="row.kind === 'group'"
-        class="group/row flex h-full cursor-default select-none items-center gap-1 px-1.5 hover:bg-hover"
+        :class="cn(rowVariants({ layout: 'tree' }), 'group/row h-full')"
+        :style="rowIndent(0)"
         data-testid="docker-group"
         :data-project="row.name"
       >
@@ -146,7 +149,7 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         <OriginIcon origin="compose" data-testid="docker-group-icon" />
         <button
           type="button"
-          class="min-w-0 flex-1 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-semibold text-inherit"
+          class="min-w-0 flex-1 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-medium text-inherit"
           :aria-expanded="isOpen(row.name)"
           @click="ui.toggleGroup(row.name)"
         >{{ row.name }}</button>
@@ -158,11 +161,13 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
       </div>
       <div
         v-else
-        class="group/row grid h-full cursor-default select-none grid-cols-[0.5rem_minmax(0,1fr)_auto_1.25rem] grid-rows-[auto_auto] items-center gap-x-1.5 gap-y-0.5 py-1 pr-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
-        :class="[
-          row.grouped ? 'pl-5' : 'pl-1.5',
-          isSelected(row.container) ? 'bg-select' : 'hover:bg-hover',
-        ]"
+        :class="
+          cn(
+            rowVariants({ layout: 'double', selected: isSelected(row.container) }),
+            'group/row grid h-full grid-cols-[0.5rem_minmax(0,1fr)_auto_1.25rem] grid-rows-[auto_auto] items-center gap-x-1.5 gap-y-0.5',
+          )
+        "
+        :style="rowIndent(row.grouped ? 1 : 0)"
         data-testid="docker-row"
         :data-id="row.container.id"
         :data-name="row.container.name"

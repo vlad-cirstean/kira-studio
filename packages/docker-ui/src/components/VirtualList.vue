@@ -1,18 +1,19 @@
 <script setup lang="ts" generic="T extends { key: string }">
+import { useRowHeight } from '@workbench/util/rowHeight';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { ref } from 'vue';
 
 const props = withDefaults(defineProps<{ rows: readonly T[]; rowHeight?: number; rowHeights?: readonly number[]; testid?: string }>(), {
-  rowHeight: 28,
   testid: 'docker-list',
 });
 
 defineSlots<{ row(props: { row: T }): unknown }>();
 
+const { single: defaultRowHeight } = useRowHeight();
 const scrollEl = ref<HTMLElement | null>(null);
 const { virtualItems, totalSize, onScroll } = useVirtualRows({
   count: () => props.rows.length,
-  rowHeight: () => props.rowHeight,
+  rowHeight: () => props.rowHeight ?? defaultRowHeight.value,
   rowHeights: () => props.rowHeights,
   scrollElement: scrollEl,
 });

@@ -116,13 +116,13 @@ function refresh(): Promise<void> {
   <div class="flex h-full flex-col gap-3 overflow-auto p-3" data-testid="docker-engine-overview">
     <template v-if="engine">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 class="text-kira-lg font-semibold">Docker Engine</h2>
+        <h2 class="text-kira-lg font-medium">Docker Engine</h2>
         <Badge variant="info">{{ engine.version }}</Badge>
         <span class="inline-flex items-center gap-1 text-kira-sm text-muted-foreground"><EndpointChip /></span>
         <span class="ml-auto flex items-center gap-1">
           <Button
             size="kira"
-            variant="secondary"
+            variant="toolbar"
             :disabled="anyBusy || stoppedIds.length === 0"
             data-testid="docker-start-stopped"
             @click="runAll(stoppedIds, 'start')"
@@ -131,14 +131,14 @@ function refresh(): Promise<void> {
           </Button>
           <Button
             size="kira"
-            variant="secondary"
+            variant="toolbar"
             :disabled="anyBusy || runningIds.size === 0"
             data-testid="docker-stop-all"
             @click="runAll(runningIds, 'stop')"
           >
             <CodiconIcon name="debug-stop" :size="12" class="text-error" />Stop all
           </Button>
-          <Button size="kira" variant="secondary" data-testid="docker-overview-refresh" @click="refresh">
+          <Button size="kira" variant="toolbar" data-testid="docker-overview-refresh" @click="refresh">
             <CodiconIcon name="refresh" :size="12" />Refresh
           </Button>
         </span>
@@ -148,7 +148,7 @@ function refresh(): Promise<void> {
         <div class="grid grid-cols-1 gap-3 @xl:grid-cols-2 @4xl:grid-cols-4">
           <DetailSection title="Status">
             <div class="flex items-baseline gap-1.5">
-              <span class="text-kira-xl font-semibold" data-testid="docker-engine-count">{{ engine.running }}</span>
+              <span class="text-kira-xl font-medium" data-testid="docker-engine-count">{{ engine.running }}</span>
               <span class="text-muted-foreground">running</span>
             </div>
             <div class="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-field">
@@ -162,7 +162,7 @@ function refresh(): Promise<void> {
           </DetailSection>
           <DetailSection title="CPU">
             <div class="flex items-baseline gap-1.5">
-              <span class="text-kira-xl font-semibold" data-testid="docker-engine-cpu">{{ formatPercent(totals.cpu) }}</span>
+              <span class="text-kira-xl font-medium" data-testid="docker-engine-cpu">{{ formatPercent(totals.cpu) }}</span>
               <span class="text-muted-foreground">of {{ engine.cpus * 100 }}%</span>
             </div>
             <div class="mt-2"><UsageBar :percent="cpuPercentOfCapacity" /></div>
@@ -170,7 +170,7 @@ function refresh(): Promise<void> {
           </DetailSection>
           <DetailSection title="Memory">
             <div class="flex items-baseline gap-1.5">
-              <span class="text-kira-xl font-semibold" data-testid="docker-engine-mem">{{ formatSize(totals.mem) }}</span>
+              <span class="text-kira-xl font-medium" data-testid="docker-engine-mem">{{ formatSize(totals.mem) }}</span>
               <span class="text-muted-foreground">of {{ formatSize(engine.memTotal) }}</span>
             </div>
             <div class="mt-2"><UsageBar :percent="memPercentOfTotal" /></div>

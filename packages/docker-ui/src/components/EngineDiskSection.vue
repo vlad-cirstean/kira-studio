@@ -59,7 +59,7 @@ const sizeText = (n: number): string => (n < 0 ? '-' : formatSize(n));
     </div>
     <div v-else-if="!usage" class="flex flex-wrap items-center gap-3 text-muted-foreground">
       <span>Not measured. Measuring scans the engine's storage and can take a while.</span>
-      <Button size="kira" variant="secondary" data-testid="docker-disk-measure" @click="refresh">Measure</Button>
+      <Button size="kira" variant="toolbar" data-testid="docker-disk-measure" @click="refresh">Measure</Button>
     </div>
     <template v-else>
       <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-6 gap-y-1">
@@ -73,8 +73,8 @@ const sizeText = (n: number): string => (n < 0 ? '-' : formatSize(n));
           <span class="text-right font-data">{{ r.c.count }} ({{ r.c.active }})</span>
           <span class="text-right font-data">{{ formatSize(r.c.reclaimable) }}</span>
         </template>
-        <span class="font-semibold">Used by Docker</span>
-        <span class="text-right font-data font-semibold" data-testid="docker-disk-total">{{ formatSize(usage.total) }}</span>
+        <span class="font-medium">Used by Docker</span>
+        <span class="text-right font-data font-medium" data-testid="docker-disk-total">{{ formatSize(usage.total) }}</span>
         <span />
         <span />
       </div>

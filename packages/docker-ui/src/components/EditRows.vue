@@ -22,7 +22,7 @@ const emit = defineEmits<{ add: []; remove: [index: number] }>();
     </div>
     <Button
       size="kira"
-      variant="secondary"
+      variant="toolbar"
       class="self-start"
       :disabled="disabled"
       data-testid="docker-edit-row-add"
