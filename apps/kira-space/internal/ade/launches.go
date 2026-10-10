@@ -560,6 +560,9 @@ func (b *TaskBoard) checkNoBackgroundRun(sb model.AdeTaskBranch) error {
 	} else if has || r != nil {
 		return invalid("a background run is working on %s", sb.Name)
 	}
+	if name := b.claimOn(sb.ID); name != "" {
+		return invalid("automation %s is running in %s", name, sb.Name)
+	}
 	return nil
 }
 

@@ -23,6 +23,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
+	"github.com/kirathecat/kira-studio/internal/scripts"
 )
 
 // board.go is the ADE v2 engine: tasks hold branches across repos; this type assembles the
@@ -77,6 +79,11 @@ type TaskBoardDeps struct {
 	ReviewWindows      *repos.AdeReviewWindowsRepo
 	GhSynced           *repos.AdeGhSyncedRepo
 	CloseReviewWindows func(taskID string)
+	// ScriptRunsOf lists the script runs started for a task, newest first (run_outcome kind automation).
+	// CustomScripts and ScriptsHome resolve the smart script of a workflow step and its own folder.
+	CustomScripts *scripts.Repo
+	ScriptsHome   string
+	ScriptRunsOf  func(taskID string, limit int) ([]scriptruns.Run, error)
 	// HeadlessSettingSources returns the ade.headlessSettingSources setting, read fresh per run.
 	HeadlessSettingSources func() string
 	// RebaseTimeout bounds a rebase run; 0 = defaultRebaseTimeout.
@@ -126,6 +133,7 @@ type TaskBoard struct {
 	archiving        map[string]int                   // task id -> archives in progress; blocks launches
 	taskMus          map[string]*sync.Mutex           // task id -> serializes that task's run transitions
 	finishes         map[string]claudeheadless.Finish // run id -> last finish_step call
+	claims           map[string]string                // branch id -> the smart script working in its worktree
 	recoveredRebases []model.AdeRun                   // rebase runs Recover interrupted; Start re-reads git for them
 	stepMsgs         map[string]string                // task|stage|step -> the Run dialog's edited message
 	agent            *claudeheadless.Server
@@ -148,7 +156,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiGrants: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
-		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]claudeheadless.Finish{}, stepMsgs: map[string]string{},
+		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]claudeheadless.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
 		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
 	}
 	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b})

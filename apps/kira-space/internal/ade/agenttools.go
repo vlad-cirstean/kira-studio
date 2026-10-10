@@ -16,6 +16,9 @@ import (
 // maxBranchNameBytes is git's ref name limit on common file systems.
 const maxBranchNameBytes = 255
 
+// maxScriptRunScan bounds the script runs run_outcome reads before filtering.
+const maxScriptRunScan = 50
+
 // toolErr turns a caller mistake into text the agent can act on; anything else passes through.
 func toolErr(err error) error {
 	switch {
@@ -414,6 +417,9 @@ func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q claudeheadle
 	if err != nil {
 		return nil, err
 	}
+	if q.Kind == "automation" {
+		return b.automationOutcomes(taskID, q)
+	}
 	runs, err := b.deps.Tasks.RunsOfTask(taskID)
 	if err != nil {
 		return nil, err
@@ -435,6 +441,38 @@ func (b *TaskBoard) RunOutcomes(_ context.Context, taskID string, q claudeheadle
 		entry := claudeheadless.RunOutcomeEntry{
 			RunID: r.ID, Kind: kind, Stage: r.StageID, Step: r.StepID, Repo: tc.nick[br.CodeRepoID], Branch: br.Name,
 			State: r.State, FinishedAt: r.FinishedAt,
+		}
+		if r.Outcome != nil {
+			entry.Outcome = r.Outcome
+		}
+		out = append(out, entry)
+	}
+	return out, nil
+}
+
+// automationOutcomes lists the task's script runs, newest first, for run_outcome kind automation.
+func (b *TaskBoard) automationOutcomes(taskID string, q claudeheadless.OutcomeQuery) ([]claudeheadless.RunOutcomeEntry, error) {
+	out := []claudeheadless.RunOutcomeEntry{}
+	if b.deps.ScriptRunsOf == nil {
+		return out, nil
+	}
+	runs, err := b.deps.ScriptRunsOf(taskID, maxScriptRunScan)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range runs {
+		if len(out) >= q.Limit {
+			break
+		}
+		if q.RunID != "" && r.ID != q.RunID {
+			continue
+		}
+		repo, branch, _ := strings.Cut(r.BranchLabel, " · ")
+		if q.Branch != "" && branch != q.Branch {
+			continue
+		}
+		entry := claudeheadless.RunOutcomeEntry{
+			RunID: r.ID, Kind: "automation", Step: r.ScriptName, Repo: repo, Branch: branch, State: r.State, FinishedAt: r.FinishedAt,
 		}
 		if r.Outcome != nil {
 			entry.Outcome = r.Outcome

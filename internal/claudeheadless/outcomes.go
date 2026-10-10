@@ -8,7 +8,7 @@ import (
 
 const maxOutcomeRuns = 10
 
-// OutcomeQuery filters the runs run_outcome returns. Kind is "", "rebase" or "step".
+// OutcomeQuery filters the runs run_outcome returns. Kind is "", "rebase", "step" or "automation".
 type OutcomeQuery struct {
 	RunID  string
 	Branch string
@@ -39,7 +39,7 @@ type Outcomes interface {
 type runOutcomeArgs struct {
 	RunID  string `json:"runId,omitempty" jsonschema:"One run id, from a prompt or an earlier call."`
 	Branch string `json:"branch,omitempty" jsonschema:"Only runs on this branch name."`
-	Kind   string `json:"kind,omitempty" jsonschema:"rebase for rebase runs, step for pipeline step runs. Default both."`
+	Kind   string `json:"kind,omitempty" jsonschema:"rebase, step or automation (script runs started for this task). Default rebase and step."`
 	Limit  int    `json:"limit,omitempty" jsonschema:"How many runs, 1 to 10. Default 3."`
 }
 
@@ -62,9 +62,9 @@ func (s *Server) addOutcomeTool(srv *mcp.Server) {
 			return toolError("run_outcome is not available for this session."), runOutcomeResult{}, nil
 		}
 		switch args.Kind {
-		case "", "rebase", "step":
+		case "", "rebase", "step", "automation":
 		default:
-			return toolError(`kind must be "rebase" or "step"`), runOutcomeResult{}, nil
+			return toolError(`kind must be "rebase", "step" or "automation"`), runOutcomeResult{}, nil
 		}
 		if args.Limit < 0 || args.Limit > maxOutcomeRuns {
 			return toolError("limit must be 1 to 10."), runOutcomeResult{}, nil

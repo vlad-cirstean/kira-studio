@@ -413,6 +413,18 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 		b.emitRuns(updated)
 		return updated, nil
 	}
+	if name := b.claimOn(sb.ID); name != "" { // a smart script works in this worktree
+		note := noteWaitingAutomation + name
+		if run.Note == note {
+			return run, nil
+		}
+		updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{Note: &note})
+		if err != nil {
+			return run, err
+		}
+		b.emitRuns(updated)
+		return updated, nil
+	}
 	out, err := b.startRun(ctx, tc, plan, idx, run, sb, path)
 	if err != nil && !errors.Is(err, errBoardClosed) {
 		b.failLaunch(run, err)

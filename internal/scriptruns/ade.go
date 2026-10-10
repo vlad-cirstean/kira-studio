@@ -10,7 +10,7 @@ import (
 
 // ADE is Kira Space's task board as script runs see it. Studio leaves Service.ADE nil.
 type ADE interface {
-	// Tasks lists the live tasks, newest first.
+	// Tasks lists the live tasks in board order.
 	Tasks() ([]TaskChoice, error)
 	// Context resolves a task's variables and branch choices; a non-empty branchID picks that branch.
 	Context(taskID, branchID string) (ADEContext, error)

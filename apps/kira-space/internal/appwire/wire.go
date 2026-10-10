@@ -34,6 +34,7 @@ import (
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -151,7 +152,7 @@ func closeTaskReviewWindows(repositories *repos.Repos, closeWindow func(key stri
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
-	notifier *agentnotify.Notifier, usage *claudeusage.Service, rebaseTimeout time.Duration,
+	notifier *agentnotify.Notifier, usage *claudeusage.Service, rebaseTimeout time.Duration, runs *scriptruns.Service,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -198,7 +199,9 @@ func wireAdeTask(
 			bridge.AdeTaskSessionsChanged(events)
 			bridge.KeepAwakeRecompute(keepAwake)
 		},
-		AgentDir: filepath.Join(config.KiraSpaceHome(), "ade", "runs"),
+		CustomScripts: runs.Scripts, ScriptsHome: runs.Home,
+		ScriptRunsOf: func(taskID string, limit int) ([]scriptruns.Run, error) { return runs.List(limit, taskID) },
+		AgentDir:     filepath.Join(config.KiraSpaceHome(), "ade", "runs"),
 		HeadlessSettingSources: func() string {
 			settings, err := repositories.Settings.GetAll()
 			if err != nil {
