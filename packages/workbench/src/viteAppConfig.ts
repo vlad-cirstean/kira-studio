@@ -35,7 +35,22 @@ export function defineAppViteConfig({
     const debugHooks = command === 'serve' || process.env.KIRA_DEBUG_HOOKS === '1';
     return {
       base: './',
-      plugins: [vue(), tailwindcss()],
+      plugins: [
+        {
+          // Generated with `-b`, the bindings import "/wails/runtime.js" — a path Wails' own
+          // asset server resolves inside the webview, not an npm package. `resolveId` returning
+          // `external: true` keeps it literal in both the dev server's transform pipeline and
+          // the production bundle — `build.rollupOptions`/`rolldownOptions.external` below only
+          // covers the latter, so the dev server tried (and failed) to resolve this path itself.
+          name: 'external-wails-runtime',
+          enforce: 'pre',
+          resolveId(id) {
+            if (id.startsWith('/wails/')) return { id, external: true };
+          },
+        },
+        vue(),
+        tailwindcss(),
+      ],
       // `wails3 dev` exports WAILS_VITE_PORT and then proxies the app's asset server at
       // FRONTEND_DEVSERVER_URL to it; the Taskfile passes the same port on the CLI. Both are set
       // so neither path silently picks a different one.
@@ -76,11 +91,6 @@ export function defineAppViteConfig({
       build: {
         outDir: 'dist',
         emptyOutDir: true,
-        rolldownOptions: {
-          // Generated with `-b`, the bindings import "/wails/runtime.js" — a path Wails' own
-          // asset server resolves inside the webview, not an npm package. Keep it literal.
-          external: [/^\/wails\//],
-        },
       },
     };
   });
