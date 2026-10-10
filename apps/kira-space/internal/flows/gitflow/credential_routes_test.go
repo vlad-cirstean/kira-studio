@@ -85,6 +85,7 @@ func TestCredentialRoutes(t *testing.T) {
 	if _, ok := sink.Shown("prompt:git-credential"); !ok {
 		t.Fatal("no credential note")
 	}
+	app.Contract(t, "git-credential-route", "PromptsService.List#credential", e, flowharness.Mask("createdAt", "id", "ref"))
 	answer(t, app, "s3cret")
 	<-done
 	noCredentialEntry(t, app)

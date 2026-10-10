@@ -332,15 +332,35 @@ test('a failed rebase run shows its reason, files and shas, and Copy for agent c
     .toContain('Conflicted files: src/auth/session.ts');
 });
 
-test('Needs you lists the failed rebase and Open selects the branch', async ({ relaunch }) => {
+test('contract: Needs you lists the failed rebase and Open selects the branch', async ({
+  relaunch,
+}) => {
+  const conflict = contract<{
+    outcome: { reason: string; rebase: { branches: object[] } };
+  }>('ade-base', 'AdeTaskService.Run#rebase-conflict');
+  const run = rebaseRun('r_rb1', 'b_auth', 'T_auth', {
+    ...conflict,
+    id: 'r_rb1',
+    taskId: 'T_auth',
+    branchId: 'b_auth',
+    startedAt: 1790060000000,
+    finishedAt: 1790060100000,
+    outcome: {
+      ...conflict.outcome,
+      rebase: {
+        ...conflict.outcome.rebase,
+        branches: conflict.outcome.rebase.branches.map((b) => ({ ...b, branchId: 'b_auth' })),
+      },
+    },
+  });
   const { window: page } = await open(relaunch, (b) => {
     Object.assign(branch(b, 'b_auth'), { base: 'develop', basePendingFrom: 'main' });
-    const task = b.tasks.find((x) => x.id === 'T_auth');
-    task?.runs.push(rebaseRun('r_rb1', 'b_auth', 'T_auth', { outcome: failedOutcome }));
+    b.tasks.find((x) => x.id === 'T_auth')?.runs.push(run);
   });
   await page.locator(t('ade-tab-needs')).click();
   const item = page.locator(`${t('ade-needs-item')}[data-kind="rebase"]`);
   await expect(item).toBeVisible();
+  await expect(item).toContainText(conflict.outcome.reason);
   await item.locator(t('ade-needs-action')).click();
   await expect(page.locator(t('ade-panel'))).toBeVisible();
 });

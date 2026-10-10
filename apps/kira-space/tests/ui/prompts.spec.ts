@@ -1,4 +1,6 @@
+import type { RoutedPrompt } from '@shared/domain/prompts';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import { emitPrompts, routed } from './support/prompts';
@@ -14,6 +16,13 @@ const credential = (requestId: string) => ({
   masked: true,
 });
 
+// The router's credential entry (flows/gitflow TestCredentialRoutes, contract git-credential-route),
+// with the request id of this spec and the window it targets named by this suite's key.
+function credentialEntry(over: Partial<RoutedPrompt> = {}): RoutedPrompt {
+  const entry = contract<RoutedPrompt>('git-credential-route', 'PromptsService.List#credential');
+  return { ...entry, id: 'git-credential:req-1', ref: 'req-1', target: 'main', ...over };
+}
+
 const UPDATE = {
   channel: IPC.updateStatus,
   response: {
@@ -24,14 +33,14 @@ const UPDATE = {
   },
 } as const;
 
-test('a git credential shows only in the window the router targets', async ({ kira }) => {
+test('contract: a git credential shows only in the window the router targets', async ({ kira }) => {
   const { window } = kira;
   const dialog = window.locator('[data-testid="git-credential-dialog"]');
   await emitWailsEvent(window, IPC.gitCredential, [credential('req-1')]);
 
-  await emitPrompts(window, [routed('git-credential', 'req-1', { target: 'other-window' })]);
+  await emitPrompts(window, [credentialEntry({ target: 'other-window' })]);
   await expect(dialog).toHaveCount(0);
-  await emitPrompts(window, [routed('git-credential', 'req-1')]);
+  await emitPrompts(window, [credentialEntry()]);
   await expect(dialog).toBeVisible();
   await emitPrompts(window, []);
   await expect(dialog).toHaveCount(0);
@@ -52,7 +61,7 @@ test('Escape hides a prompt in this window; a reveal push brings it back', async
   await expect(dialog).toBeVisible();
 });
 
-test('the oldest prompt shows first with a count; a reveal push shows another', async ({
+test('contract: the oldest prompt shows first with a count; a reveal push shows another', async ({
   relaunch,
 }) => {
   const { window } = await relaunch({ control: [UPDATE] });
@@ -60,7 +69,7 @@ test('the oldest prompt shows first with a count; a reveal push shows another', 
   const updateDialog = window.locator('[data-testid="update-dialog"]');
   await emitWailsEvent(window, IPC.gitCredential, [credential('req-1')]);
   await emitPrompts(window, [
-    routed('git-credential', 'req-1', { createdAt: 1 }),
+    credentialEntry({ createdAt: 1 }),
     routed('update', '1.3.0', { createdAt: 2 }),
   ]);
 

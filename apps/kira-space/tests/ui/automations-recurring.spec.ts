@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import type { RoutedPrompt } from '@shared/domain/prompts';
 import { scriptRunSchema } from '@shared/domain/scriptRuns';
 import { customScriptSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
@@ -277,11 +278,15 @@ test('a waiting run shows the popup in the main window; Run accepts, Not now dec
     .toMatchObject({ id: 'run-x' });
 });
 
-test('a waiting run shows no popup in a window the router did not target', async ({ relaunch }) => {
+test('contract: a waiting run shows no popup in a window the router did not target', async ({
+  relaunch,
+}) => {
+  const [entry] = contract<RoutedPrompt[]>('prompts-route', 'PromptsService.List#two-waiting');
+  if (!entry) throw new Error('prompts-route has no entries');
   const { window: page } = await relaunch({ control: BASE });
   await openPanel(page);
-  await emitWailsEvent(page, IPC.scriptRunsChanged, run('waiting'));
-  await emitPrompts(page, [routed('schedule', 'run-w', { target: 'other-window' })]);
+  await emitWailsEvent(page, IPC.scriptRunsChanged, run('waiting', { id: entry.ref }));
+  await emitPrompts(page, [{ ...entry, target: 'other-window' }]);
   await expect(page.locator('[data-testid="run-row"][data-state="waiting"]')).toHaveCount(1);
   await expect(page.locator('[data-testid="schedule-confirm"]')).toHaveCount(0);
 });
