@@ -20,11 +20,14 @@ async function addRecurring(page: Page, name: string): Promise<void> {
   await expect(dialog).toHaveCount(0);
 }
 
-test('the confirm popup shows in the main window only; Not now skips in both', async ({ kira }) => {
+test('the confirm popup shows in the main window only; Not now skips in both', async ({
+  kira,
+  browser,
+}) => {
   test.setTimeout(150_000);
   const main = kira.window;
   await openMainWindow(kira);
-  const other = await main.context().newPage();
+  const other = await browser.newPage();
   await other.goto(`${kira.baseURL}/?window=other-${Date.now()}`);
   await other.waitForSelector('[data-testid="status-bar"]');
 
