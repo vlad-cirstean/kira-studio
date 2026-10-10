@@ -40,7 +40,9 @@
                 "onFailure": "stop",
                 "timeout": "20m",
                 "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
-                "allowedTools": []
+                "allowedTools": [],
+                "smartScript": "",
+                "params": {}
               },
               {
                 "id": "impl",
@@ -50,7 +52,9 @@
                 "onFailure": "retry 1",
                 "timeout": "2h",
                 "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
-                "allowedTools": ["Bash(pnpm *)", "Bash(git *)"]
+                "allowedTools": ["Bash(pnpm *)", "Bash(git *)"],
+                "smartScript": "",
+                "params": {}
               },
               {
                 "id": "tests",
@@ -60,7 +64,9 @@
                 "onFailure": "back:impl",
                 "timeout": "1h",
                 "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
-                "allowedTools": []
+                "allowedTools": [],
+                "smartScript": "",
+                "params": {}
               },
               {
                 "id": "ci",
@@ -70,7 +76,9 @@
                 "onFailure": "back:impl",
                 "timeout": "1h",
                 "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-                "allowedTools": []
+                "allowedTools": [],
+                "smartScript": "",
+                "params": {}
               },
               {
                 "id": "pr",
@@ -80,7 +88,9 @@
                 "onFailure": "stop",
                 "timeout": "15m",
                 "prompt": "Open a draft PR for {branch} and link {jira}.",
-                "allowedTools": ["Bash(gh pr *)"]
+                "allowedTools": ["Bash(gh pr *)"],
+                "smartScript": "",
+                "params": {}
               }
             ],
             "command": "",
@@ -160,7 +170,9 @@
                 "onFailure": "stop",
                 "timeout": "30m",
                 "prompt": "Reproduce {jira} with a failing test on {branch}.",
-                "allowedTools": []
+                "allowedTools": [],
+                "smartScript": "",
+                "params": {}
               },
               {
                 "id": "fix",
@@ -170,7 +182,9 @@
                 "onFailure": "retry 1",
                 "timeout": "1h",
                 "prompt": "Make the failing test pass with the smallest change.",
-                "allowedTools": ["Bash(npm test)"]
+                "allowedTools": ["Bash(npm test)"],
+                "smartScript": "",
+                "params": {}
               },
               {
                 "id": "ci",
@@ -180,7 +194,9 @@
                 "onFailure": "retry 2",
                 "timeout": "1h",
                 "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-                "allowedTools": []
+                "allowedTools": [],
+                "smartScript": "",
+                "params": {}
               },
               {
                 "id": "pr",
@@ -190,7 +206,9 @@
                 "onFailure": "stop",
                 "timeout": "15m",
                 "prompt": "Open a draft PR for {branch} and link {jira}.",
-                "allowedTools": []
+                "allowedTools": [],
+                "smartScript": "",
+                "params": {}
               }
             ],
             "command": "",
@@ -242,7 +260,9 @@
                 "onFailure": "stop",
                 "timeout": "1h",
                 "prompt": "Apply the change described in the task on {branch}.",
-                "allowedTools": []
+                "allowedTools": [],
+                "smartScript": "",
+                "params": {}
               },
               {
                 "id": "ci",
@@ -252,7 +272,9 @@
                 "onFailure": "retry 2",
                 "timeout": "1h",
                 "prompt": "Run the checks for {branch}. Fix failures until they pass.",
-                "allowedTools": []
+                "allowedTools": [],
+                "smartScript": "",
+                "params": {}
               }
             ],
             "command": "",

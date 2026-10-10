@@ -21,6 +21,8 @@ const step = (
   timeout: '1h',
   prompt: 'p',
   allowedTools: [],
+  smartScript: '',
+  params: {},
 });
 
 const impl = mkStage({

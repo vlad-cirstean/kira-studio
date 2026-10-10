@@ -78,6 +78,10 @@ export interface PipelineStep {
   timeout: string;
   prompt: string;
   allowedTools: string[] /* D6, [] = none added */;
+  /** Name of the smart script that replaces `prompt`; '' = a prompt step. */
+  smartScript: string;
+  /** The smart script's values per param name. */
+  params: Record<string, string[]>;
 }
 export interface Stage {
   id: string;

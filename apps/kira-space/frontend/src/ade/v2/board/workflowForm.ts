@@ -45,6 +45,8 @@ export function newStep(steps: readonly PipelineStep[]): PipelineStep {
     timeout: '1h',
     prompt: '',
     allowedTools: [],
+    smartScript: '',
+    params: {},
   };
 }
 
