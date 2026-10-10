@@ -15,7 +15,7 @@
       "!apps/kira-studio/tests/contract",
       "!apps/kira-space/tests/contract",
       "!docs/design",
-      "!apps/kira-space/tests/unit/support/fixtures/ade-v2-mockup.html",
+      "!apps/kira-space/tests/unit/support/fixtures/ade-v2-mockup-logic.js",
       "!.claude",
       "!packages/shared/protocol/wire.ts",
       "!packages/shared/protocol/wire",
