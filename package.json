@@ -72,7 +72,7 @@
     "test:visual:update:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.config.ts --project=visual --update-snapshots",
     "test:ipc:fe:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend",
     "test:unit": "bun test apps/kira-studio/tests/unit apps/kira-space/tests/unit packages/api-core/test packages/git-core/src packages/git-ipc/src packages/git-ui/src packages/workbench/src packages/docker-ui/src",
-    "test:e2e-real:studio": "bun run build:studio && node node_modules/.bin/playwright test --config=apps/kira-studio/playwright.config.ts --project=e2e-real",
+    "test:e2e-real:studio": "node node_modules/.bin/playwright test --config=apps/kira-studio/playwright.config.ts --project=e2e-real",
     "prepackage:studio": "bun run setup",
     "package:studio": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task darwin:package:dmg && sh ../../scripts/sign-bundle.sh'",
     "prepackage:space": "bun run setup",

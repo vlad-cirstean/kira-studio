@@ -45,7 +45,9 @@ export default defineConfig({
       fullyParallel: true,
     },
     // Real Go server (-tags server), real SQLite/git/PTY/stream; fake claude/gh. Chromium: the
-    // server build serves a plain browser page, no WebKit embed involved.
+    // server build serves a plain browser page, no WebKit embed involved. Only what cannot split at
+    // the IPC boundary stays here (boot, multi-window routing, keystroke order); the rest is a flow
+    // test plus a tests/ui contract spec.
     {
       name: 'e2e-real',
       testDir: './tests/e2e-real',

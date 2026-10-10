@@ -116,6 +116,8 @@ export default defineConfig({
     // not proxying the packaged app's own webview (`ui`'s job). `fullyParallel`/`workers: 2` is
     // proven safe (§3.5): per-test KIRA_HOME + WAILS_SERVER_PORT gives each instance its own
     // SQLite app-storage, secrets file and engine child.
+    // Only what cannot split at the IPC boundary stays (real Docker adapters, multi-window routing,
+    // the built bundle wiring); the rest is a flow test plus a tests/ui contract spec.
     {
       name: 'e2e-real',
       testDir: './tests/e2e-real',

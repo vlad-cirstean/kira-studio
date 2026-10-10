@@ -41,16 +41,3 @@ export async function createRepo(
     git(dir, 'commit', '-q', '-m', c.subject);
   }
 }
-
-/** Creates a bare remote at `<dir>.git`-style `bareDir`, and a repo at `dir` whose `main` is pushed to it as `origin`. */
-export async function createRepoWithRemote(
-  dir: string,
-  bareDir: string,
-  commits: ReadonlyArray<{ subject: string; files: Record<string, string> }>,
-): Promise<void> {
-  await createRepo(dir, commits);
-  await mkdir(bareDir, { recursive: true });
-  git(bareDir, 'init', '-q', '--bare', '-b', 'main');
-  git(dir, 'remote', 'add', 'origin', bareDir);
-  git(dir, 'push', '-q', '-u', 'origin', 'main');
-}
