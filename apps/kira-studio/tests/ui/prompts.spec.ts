@@ -1,4 +1,6 @@
+import type { RoutedPrompt } from '@shared/domain/prompts';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import { emitPrompts, routed } from './support/prompts';
@@ -18,6 +20,13 @@ const approval = (requestId: string) => ({
   plan: null,
 });
 
+// The router's approval entry (flows/dbmcpflow TestDbMcpApprovalRoutes, contract dbmcp-route), with
+// this spec's request id and the window key of the UI suite.
+function approvalEntry(over: Partial<RoutedPrompt> = {}): RoutedPrompt {
+  const entry = contract<RoutedPrompt>('dbmcp-route', 'PromptsService.List#approval');
+  return { ...entry, id: 'dbmcp:req-1', ref: 'req-1', target: 'main', ...over };
+}
+
 const UPDATE = {
   channel: IPC.updateStatus,
   response: {
@@ -28,20 +37,20 @@ const UPDATE = {
   },
 } as const;
 
-test('an MCP approval shows only in the window the router targets', async ({ kira }) => {
+test('contract: an MCP approval shows only in the window the router targets', async ({ kira }) => {
   const { window } = kira;
   const dialog = window.locator('[data-testid="db-mcp-approval-dialog"]');
   await emitWailsEvent(window, IPC.dbMcpApproval, { pending: approval('req-1'), queued: 1 });
 
-  await emitPrompts(window, [routed('dbmcp', 'req-1', { target: 'other-window' })]);
+  await emitPrompts(window, [approvalEntry({ target: 'other-window' })]);
   await expect(dialog).toHaveCount(0);
-  await emitPrompts(window, [routed('dbmcp', 'req-1')]);
+  await emitPrompts(window, [approvalEntry()]);
   await expect(dialog).toBeVisible();
   await emitPrompts(window, []);
   await expect(dialog).toHaveCount(0);
 });
 
-test('the oldest prompt shows first with a count; a reveal push shows another', async ({
+test('contract: the oldest prompt shows first with a count; a reveal push shows another', async ({
   relaunch,
 }) => {
   const { window } = await relaunch({ control: [UPDATE] });
@@ -49,7 +58,7 @@ test('the oldest prompt shows first with a count; a reveal push shows another', 
   const updateDialog = window.locator('[data-testid="update-dialog"]');
   await emitWailsEvent(window, IPC.dbMcpApproval, { pending: approval('req-1'), queued: 1 });
   await emitPrompts(window, [
-    routed('dbmcp', 'req-1', { createdAt: 1 }),
+    approvalEntry({ createdAt: 1 }),
     routed('update', '1.3.0', { createdAt: 2 }),
   ]);
 

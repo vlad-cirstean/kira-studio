@@ -146,6 +146,7 @@ func TestScheduleConfirmRoutes(t *testing.T) {
 			t.Fatalf("%s targets %q, want b", e.ID, e.Target)
 		}
 	}
+	app.Contract(t, "prompts-route", "PromptsService.List#two-waiting", entries, flowharness.Mask("createdAt"))
 	note, ok := sink.Shown("prompt:schedule")
 	if !ok || note.Title != "2 scripts wait for confirmation" {
 		t.Fatalf("shown note = %+v, %v; want the count title", note, ok)

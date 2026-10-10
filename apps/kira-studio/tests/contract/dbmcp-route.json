@@ -1,0 +1,11 @@
+{
+  "PromptsService.List#approval": {
+    "createdAt": 0,
+    "id": "<masked>",
+    "kind": "dbmcp",
+    "origin": "",
+    "ref": "<masked>",
+    "target": "w1",
+    "title": "Approve this query? · notes db"
+  }
+}

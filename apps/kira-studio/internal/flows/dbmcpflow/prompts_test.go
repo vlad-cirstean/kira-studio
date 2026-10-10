@@ -9,6 +9,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest/notifysink"
 	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/testx"
@@ -60,6 +61,7 @@ func TestDbMcpApprovalRoutes(t *testing.T) {
 	if strings.Contains(e.Title, "insert") || !strings.Contains(e.Title, "notes db") {
 		t.Fatalf("title %q must name the connection and never the statement", e.Title)
 	}
+	f.app.Contract(t, "dbmcp-route", "PromptsService.List#approval", e, flowharness.Mask("createdAt", "id", "ref"))
 	note, ok := sink.Shown("prompt:dbmcp")
 	if !ok || strings.Contains(note.Title+note.Body, "insert") {
 		t.Fatalf("note = %+v, %v; want one without the statement", note, ok)
