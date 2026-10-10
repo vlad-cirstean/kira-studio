@@ -218,6 +218,8 @@ func TestScriptFolders(t *testing.T) {
 	if err != nil || d.Blocker != missing+" does not exist" {
 		t.Fatalf("fixed dir = %+v, %v, want a does-not-exist blocker", d, err)
 	}
+	// Contract script-folders: tests/ui automations-scripts "Choose folder…" reads the fixed record.
+	app.Contract(t, "script-folders", "CustomScriptsService.Create#fixed", fixed, flowharness.Replace(filepath.Dir(missing), "<tmp>"))
 
 	// A symlink where the folder belongs is refused, not followed.
 	target := t.TempDir()
@@ -243,6 +245,8 @@ func TestScriptFolders(t *testing.T) {
 	if err != nil || d.Mode != scripts.DirModeHome || d.Path != app.Home {
 		t.Fatalf("legacy dir = %+v, %v, want the home folder", d, err)
 	}
+	// tests/ui automations-runs "a legacy home script offers the automations folder" reads this.
+	app.Contract(t, "script-folders", "ScriptRunsService.ResolveDir#legacy", d)
 	if _, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
 		Name: "h", Command: "pwd", Color: "blue", DirMode: scripts.DirModeHome,
 	}}); err == nil {

@@ -415,7 +415,10 @@ test('a normal script with params starts through a launch token', async ({ relau
 
 // Contract smart. Backend half: termflow TestSmartScriptSpace stores the same
 // fixture against the fake claude.
-for (const outcome of [{ key: 'done', label: 'Succeeded', summary: 'summary-done' }] as const) {
+for (const outcome of [
+  { key: 'done', label: 'Succeeded', summary: 'summary-done' },
+  { key: 'failed', label: 'Failed', summary: 'summary-failed' },
+] as const) {
   test(`contract: a smart script run ends ${outcome.label} with the agent summary`, async ({
     relaunch,
   }) => {

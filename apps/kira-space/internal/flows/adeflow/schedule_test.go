@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeclock"
@@ -147,4 +148,40 @@ func TestScheduleADE(t *testing.T) {
 		release(t, f.gateOne)
 		release(t, f.gateTwo)
 	})
+}
+
+func TestSchedulePickerListsTasks(t *testing.T) {
+	f := newAutoFixture(t, "", false)
+	rec := f.script(t, scripts.CustomScriptFields{Name: "nightly", Kind: scripts.KindScript, Command: "echo hi"})
+
+	listed := f.preview(t, scriptruns.RunArgs{ScriptID: rec.ID, ListTasks: true})
+	if len(listed.Needs.Tasks) != 1 || listed.Needs.Tasks[0].ID != f.task {
+		t.Fatalf("Needs.Tasks = %+v, want the one task", listed.Needs.Tasks)
+	}
+	f.app.Contract(t, "schedule-task-picker", "ScriptRunsService.Preview#list-tasks", listed, flowharness.Mask("hash"))
+
+	fields := scripts.CustomScriptFields{
+		Name: rec.Name, Kind: rec.Kind, Command: rec.Command, Color: rec.Color,
+		Schedule: &scripts.Schedule{Cron: "0 9 * * 1-5", Timezone: "UTC", Enabled: true, TaskID: listed.Needs.Tasks[0].ID},
+	}
+	args := bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: fields}
+	f.app.Contract(t, "schedule-task-picker", "args:CustomScriptsService.Update#task", args)
+	updated, err := f.app.W.CustomScripts.Update(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Schedule == nil || updated.Schedule.TaskID != f.task {
+		t.Fatalf("stored schedule = %+v, want the task kept", updated.Schedule)
+	}
+
+	// An unsaved script has no id to preview, so the picker has nothing to list.
+	unsaved, err := f.app.W.ScriptRuns.Preview(scriptruns.RunArgs{ListTasks: true})
+	f.app.Contract(t, "schedule-task-picker", "ScriptRunsService.Preview#unsaved", map[string]any{"error": errText(err), "tasks": unsaved.Needs.Tasks})
+}
+
+func errText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

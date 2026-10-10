@@ -119,7 +119,11 @@ test('clicking a script opens a terminal tab titled with its name', async ({ rel
     .toBe(true);
 });
 
-test('Choose folder… switches the script to a fixed folder', async ({ relaunch }) => {
+test('contract: Choose folder… switches the script to a fixed folder', async ({ relaunch }) => {
+  const fixed = contract<{ dirMode: string }>(
+    'script-folders',
+    'CustomScriptsService.Create#fixed',
+  );
   const { window: page, control } = await relaunch({
     control: [
       { channel: IPC.windowsEnsure, response: { mode: 'automations' } },
@@ -127,7 +131,7 @@ test('Choose folder… switches the script to a fixed folder', async ({ relaunch
       { channel: IPC.filesChooseFolder, response: { canceled: false, path: '/tmp/picked' } },
       {
         channel: IPC.customScriptsCreate,
-        response: { ...SCRIPT, dirMode: 'fixed', workingDir: '/tmp/picked' },
+        response: { ...SCRIPT, dirMode: fixed.dirMode, workingDir: '/tmp/picked' },
       },
     ],
   });
@@ -154,7 +158,7 @@ test('Choose folder… switches the script to a fixed folder', async ({ relaunch
   await dialog.locator('[data-testid="script-dialog-save"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.customScriptsCreate)?.args)
-    .toMatchObject({ fields: { dirMode: 'fixed', workingDir: '/tmp/picked' } });
+    .toMatchObject({ fields: { dirMode: fixed.dirMode, workingDir: '/tmp/picked' } });
 });
 
 // Contract commands. Backend half: termflow TestCollectionsMoveAndDelete.

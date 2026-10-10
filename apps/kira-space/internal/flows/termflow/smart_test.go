@@ -81,3 +81,33 @@ func TestSmartScriptSpace(t *testing.T) {
 		t.Fatalf("ReadLog empty: %s", raw)
 	}
 }
+
+func TestSmartScriptFailedSpace(t *testing.T) {
+	app := flowharness.New(t)
+	app.Scenario(fakeagent.Scenario{Claude: map[string][]fakeagent.Action{"*": {{Name: "failed"}}}})
+	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
+		Name: "ask", Kind: scripts.KindSmart, Command: "Say hi", Color: "blue",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := scriptruns.RunArgs{ScriptID: rec.ID}
+	pv, err := app.W.ScriptRuns.Preview(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started, err := app.W.ScriptRuns.Start(scriptruns.StartArgs{RunArgs: args, Hash: pv.Hash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var run scriptruns.Run
+	testx.WaitUntil(t, waitFor, func() bool {
+		run, _ = app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: started.RunID})
+		return run.State == "failed"
+	})
+	if o := run.Outcome; o == nil || o.Status != "failed" || o.Reason != "summary-failed" || !o.Reported || o.Source != "agent" {
+		t.Fatalf("outcome = %+v, want the agent's failure with its summary", o)
+	}
+	app.Contract(t, "smart", "CustomScriptsService.Create#failed", rec)
+	app.Contract(t, "smart", "ScriptRunsService.Get#failed", run, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "costUsd"))
+}

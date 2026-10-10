@@ -291,9 +291,13 @@ test('contract: a waiting run shows no popup in a window the router did not targ
   await expect(page.locator('[data-testid="schedule-confirm"]')).toHaveCount(0);
 });
 
-test('the runs list shows Skipped with its reason; a headless run opens its tab', async ({
+test('contract: the runs list shows Skipped with its reason; a headless run opens its tab', async ({
   relaunch,
 }) => {
+  const overlap = contract<{ outcome: { reason: string } }>(
+    'schedule-overlap',
+    'ScriptRunsService.Get#skipped',
+  );
   const { window: page } = await relaunch({ control: BASE });
   await openPanel(page);
   await emitWailsEvent(
@@ -301,12 +305,7 @@ test('the runs list shows Skipped with its reason; a headless run opens its tab'
     IPC.scriptRunsChanged,
     run('skipped', {
       id: 'run-s',
-      outcome: {
-        status: 'skipped',
-        reason: 'the previous run is still running (started 09:00)',
-        source: 'schedule',
-        reported: false,
-      },
+      outcome: overlap.outcome,
     }),
   );
   const skipped = page.locator('[data-testid="run-row"][data-state="skipped"]');
@@ -314,7 +313,7 @@ test('the runs list shows Skipped with its reason; a headless run opens its tab'
   await expect(skipped.locator('[data-testid="run-trigger"]')).toContainText('scheduled');
   await skipped.locator('button').first().click();
   await expect(skipped.locator('[data-testid="run-outcome-reason"]')).toContainText(
-    'still running (started 09:00)',
+    overlap.outcome.reason,
   );
 
   await emitWailsEvent(page, IPC.scriptRunsChanged, run('running', { id: 'run-h' }));
@@ -325,11 +324,17 @@ test('the runs list shows Skipped with its reason; a headless run opens its tab'
   await expect(view.locator('[data-testid="run-log"]')).toBeVisible();
 });
 
-test('the editor targets an ADE task through the task picker', async ({ relaunch }) => {
-  const adePreview = {
-    ...PREVIEW,
-    needs: { tasks: [{ id: 'task-1', title: 'Fix login' }], branches: [] },
-  };
+test('contract: the editor targets an ADE task through the task picker', async ({ relaunch }) => {
+  const adePreview = contract<{ needs: { tasks: { id: string; title: string }[] } }>(
+    'schedule-task-picker',
+    'ScriptRunsService.Preview#list-tasks',
+  );
+  const sent = contract<{ fields: { schedule: { taskId: string } } }>(
+    'schedule-task-picker',
+    'args:CustomScriptsService.Update#task',
+  );
+  const picked = adePreview.needs.tasks[0];
+  expect(picked?.id).toBe(sent.fields.schedule.taskId);
   const { window: page, control } = await relaunch({
     control: [
       ...BASE,
@@ -342,11 +347,40 @@ test('the editor targets an ADE task through the task picker', async ({ relaunch
   await page.locator('[data-testid="menu-item-edit-schedule"]').click();
   await dialog(page).locator('[data-testid="schedule-where-task"]').click();
   await dialog(page).locator('[data-testid="run-task"]').click();
-  await page.locator('[data-testid="run-task-option-task-1"]').click();
+  await page.locator(`[data-testid="run-task-option-${picked?.id}"]`).click();
   await dialog(page).locator('[data-testid="script-dialog-save"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.customScriptsUpdate)?.args)
-    .toMatchObject({ id: SCRIPT.id, fields: { schedule: { taskId: 'task-1' } } });
+    .toMatchObject({
+      id: SCRIPT.id,
+      fields: { schedule: { taskId: sent.fields.schedule.taskId } },
+    });
+});
+
+test('contract: an unsaved script asks to save before it lists tasks', async ({ relaunch }) => {
+  const unsaved = contract<{ error: string; tasks: unknown }>(
+    'schedule-task-picker',
+    'ScriptRunsService.Preview#unsaved',
+  );
+  expect(unsaved.error).toContain('scriptId is required');
+  const { window: page, control } = await relaunch({
+    control: [
+      ...BASE.filter((s) => s.channel !== IPC.customScriptsList),
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [] } },
+    ],
+  });
+  await openPanel(page);
+  await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-recurring"]').hover();
+  await page.locator('[data-testid="menu-item-new-recurring-script"]').click();
+  await dialog(page).locator('[data-testid="schedule-where-task"]').click();
+  await expect(dialog(page).locator('[data-testid="schedule-task-save"]')).toBeVisible();
+  expect(
+    control
+      .log()
+      .filter((e) => e.channel === IPC.scriptRunsPreview)
+      .filter((e) => (e.args as { listTasks?: boolean } | undefined)?.listTasks),
+  ).toHaveLength(0);
 });
 
 // Contract schedule-confirm and schedule-now. Backend half: termflow TestScheduleConfirm and

@@ -211,7 +211,8 @@ test('a blocked folder shows the reason and opens no terminal', async ({ relaunc
   expect(control.log().some((e) => e.channel === IPC.terminalOpen)).toBe(false);
 });
 
-test('a legacy home script offers the automations folder', async ({ relaunch }) => {
+test('contract: a legacy home script offers the automations folder', async ({ relaunch }) => {
+  const dir = contract<{ path: string }>('script-folders', 'ScriptRunsService.ResolveDir#legacy');
   const legacy = { ...SCRIPT, dirMode: 'home' };
   const { window: page } = await relaunch({
     control: [
@@ -221,14 +222,7 @@ test('a legacy home script offers the automations folder', async ({ relaunch }) 
       { channel: IPC.customScriptsList, response: { collections: [], scripts: [legacy] } },
       {
         channel: IPC.scriptRunsResolveDir,
-        response: {
-          path: '/home/test',
-          mode: 'home',
-          base: '/home/test',
-          blocker: '',
-          branch: '',
-          pending: false,
-        },
+        response: dir,
       },
     ],
   });
@@ -237,9 +231,7 @@ test('a legacy home script offers the automations folder', async ({ relaunch }) 
   await page.locator('[data-testid="menu-item-edit"]').click();
   const dialog = page.locator('[data-testid="script-dialog"]');
   const notice = dialog.locator('[data-testid="script-dialog-home-notice"]');
-  await expect(notice.locator('[data-testid="var-chip"][data-var="HOME"]')).toContainText(
-    '/home/test',
-  );
+  await expect(notice.locator('[data-testid="var-chip"][data-var="HOME"]')).toContainText(dir.path);
   await notice.locator('[data-testid="script-dialog-use-kira"]').click();
   await expect(dialog.locator('[data-testid="script-dialog-dir-preview"]')).toBeVisible();
   await expect(dialog.locator('[data-testid="script-dialog-home-notice"]')).toHaveCount(0);

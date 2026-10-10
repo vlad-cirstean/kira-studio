@@ -1,0 +1,66 @@
+{
+  "ScriptRunsService.Preview#list-tasks": {
+    "ade": null,
+    "allowedTools": [],
+    "blocker": "",
+    "body": "",
+    "command": "echo hi",
+    "dir": {
+      "base": "<space>",
+      "blocker": "",
+      "branch": "",
+      "mode": "kira",
+      "path": "<space>/automations/<id:1>",
+      "pending": false
+    },
+    "env": [],
+    "hash": "<masked>",
+    "kind": "script",
+    "maxBudgetUsd": 0,
+    "mcpServers": [],
+    "missing": [],
+    "model": "",
+    "needs": {
+      "branches": [],
+      "tasks": [
+        {
+          "id": "<id:2>",
+          "title": "Fix login"
+        }
+      ]
+    },
+    "prompt": [],
+    "suffix": "",
+    "timeout": "",
+    "tools": []
+  },
+  "ScriptRunsService.Preview#unsaved": {
+    "error": "{\"code\":\"E_BAD_REQUEST\",\"message\":\"scriptId is required\"}",
+    "tasks": null
+  },
+  "args:CustomScriptsService.Update#task": {
+    "fields": {
+      "collectionId": null,
+      "color": "blue",
+      "command": "echo hi",
+      "dirMode": "",
+      "kind": "script",
+      "name": "nightly",
+      "params": null,
+      "schedule": {
+        "branchId": "",
+        "confirm": false,
+        "cron": "0 9 * * 1-5",
+        "enabled": true,
+        "params": null,
+        "taskId": "<id:2>",
+        "timeout": "",
+        "timezone": "UTC"
+      },
+      "smart": null,
+      "useAdeDir": false,
+      "workingDir": ""
+    },
+    "id": "<id:1>"
+  }
+}

@@ -228,6 +228,7 @@ func TestScheduleOverlap(t *testing.T) {
 		if !strings.Contains(reasonOf(skipped), "the previous run is still running (started 09:00)") || skipped.Outcome.Source != "schedule" {
 			t.Fatalf("skipped = %+v", skipped.Outcome)
 		}
+		app.Contract(t, "schedule-overlap", "ScriptRunsService.Get#skipped", skipped, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "sessionId"))
 		if err := app.W.ScriptRuns.Stop(scriptruns.IDArgs{ID: first.ID}); err != nil {
 			t.Fatal(err)
 		}
