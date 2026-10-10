@@ -30,10 +30,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
+	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/metrics"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -139,13 +141,14 @@ type embeddedWired struct {
 // site here is at or after the point main's own deps.Events assignment (the emitter) has already
 // run — each bridge.XxxService{Deps: deps} literal below is exactly the same value copy the
 // original sequential code made in place.
-func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, opts Options) embeddedWired {
+func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, promptRouter *prompts.Router, opts Options) embeddedWired {
 	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle.
 	// StartIfEnabled's own failure (a bind conflict) is logged, never fatal.
 	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
 	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
 	// restart of the embedded server within one app run.
 	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
+	dbMcpApprovals.Prompts = promptRouter
 	dbMcpSvc := bridge.NewDbMcpService(deps, installer, dbMcpApprovals)
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
@@ -170,6 +173,7 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 		Emit:         func(r scriptruns.Run) { deps.Events.Emit(bridge.ChannelScriptRunsChanged, r) },
 		EmitLog:      func(p scriptruns.LogPush) { deps.Events.Emit(bridge.ChannelScriptRunLog, p) },
 		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout,
+		Prompts: promptRouter,
 	}
 	if opts.Clock != nil {
 		runs.Now = opts.Clock.Now
@@ -206,12 +210,11 @@ type lifecycleWired struct {
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
 // which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
 // -> the quitter built over both.
-func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, sched *scriptruns.Scheduler, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, sched *scriptruns.Scheduler, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
 	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
 	// them, not just the most recently created (P2 R1's finding, generalised past one window).
-	windows := shell.NewWindowRegistry()
 
 	// closeFlush routes each window's own "flush before close" ack back to whichever
 	// shell.AttachCloseFlush hook is waiting for it (P8 C6, F8's fix) — a separate handshake from
@@ -255,4 +258,18 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 	return lifecycleWired{
 		windows: windows, closeFlush: closeFlush, quitter: quitter, beforeFlush: beforeFlush, teardown: teardown,
 	}
+}
+
+// newPromptRouter builds the popup router over the window registry (P246): lists broadcast, a
+// reveal reaches one window, and advanced.notifyPrompts gates the OS notifications.
+func newPromptRouter(windows *shell.WindowRegistry, repositories *repos.Repos, emit appevent.Emitter, reopen func()) *prompts.Router {
+	return prompts.New(prompts.Deps{
+		Windows: windows, App: "Studio", Reopen: reopen,
+		Emit:   func(l []prompts.Routed) { emit.Emit(bridge.ChannelPromptsChanged, l) },
+		Reveal: func(key, id string) { emit.EmitTo(key, bridge.ChannelPromptsReveal, map[string]string{"id": id}) },
+		Enabled: func() bool {
+			s, err := repositories.Settings.GetAll()
+			return err != nil || s.Advanced.NotifyPrompts
+		},
+	})
 }

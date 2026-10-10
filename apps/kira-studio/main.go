@@ -83,7 +83,7 @@ func main() {
 		// version field of its own (pkg/application/menu_manager.go's ShowAbout). So the version
 		// goes in the description, which is the only string that dialog will show.
 		Description: "A visual database client for macOS\n\nVersion " + buildinfo.Version,
-		Services:    w.Bound(),
+		Services:    append(w.Bound(), notifyServices(w)...),
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
@@ -191,6 +191,7 @@ func wireWindowsAndMenu(d postAppDeps) {
 	}
 	openNew := func() { shell.OpenNewWindow(deps) }
 	d.w.WindowsSvc.OpenNewWindow = openNew
+	d.w.SetReopen(func() { shell.ReopenWindows(deps) })
 	shell.AttachReopen(app, func() { shell.ReopenWindows(deps) })
 	// P87 §5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
 	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(d.w.KeepAwake) })

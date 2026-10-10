@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/tokenauth"
 )
 
@@ -42,6 +43,9 @@ type Config struct {
 	Cooldown time.Duration
 	MaxQueue int
 	Now      func() time.Time
+	// Prompts routes each queued request to a window and an OS notification as Kind (P246); nil routes none.
+	Prompts prompts.Sink
+	Kind    prompts.Kind
 }
 
 // Request is one queued request, what a window's prompt renders.
@@ -78,6 +82,8 @@ type pendingEntry[M any] struct {
 // window is open: a request simply sits at the head until someone renders it or it expires.
 type Broker[M any] struct {
 	cfg Config
+	// Title is the routed popup's title for a request; it must not carry the pairing code.
+	Title func(Request[M]) string
 
 	mu       sync.Mutex
 	queue    *notify.PendingQueue[*pendingEntry[M]]
@@ -161,6 +167,8 @@ func (b *Broker[M]) Request(clientID string, meta M, onEnqueued func(Request[M])
 		result: make(chan Outcome, 1),
 	}
 	b.queue.Add(entry.req.RequestID, entry)
+	// Under mu so a fast answer cannot Close before this Open.
+	b.openPromptLocked(entry.req)
 	snap := b.snapshotLocked()
 	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
@@ -194,6 +202,7 @@ func (b *Broker[M]) answer(requestID string, outcome Outcome, isDeny bool) Actio
 		b.mu.Unlock()
 		return AlreadyResolved
 	}
+	b.closePromptLocked(requestID)
 	expired := !b.cfg.Now().Before(entry.req.ExpiresAt)
 	var others []*pendingEntry[M]
 	var mintFailed bool
@@ -253,6 +262,7 @@ func (b *Broker[M]) Cancel(requestID string) {
 		b.mu.Unlock()
 		return
 	}
+	b.closePromptLocked(requestID)
 	snap := b.snapshotLocked()
 	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
@@ -287,6 +297,7 @@ func (b *Broker[M]) ExpireOverdue() {
 	}
 	for _, entry := range overdue {
 		b.queue.Remove(entry.req.RequestID)
+		b.closePromptLocked(entry.req.RequestID)
 	}
 	snap := b.snapshotLocked()
 	seq := b.emitter.NextSeq()
@@ -324,6 +335,9 @@ func (b *Broker[M]) Shutdown() {
 	b.mu.Lock()
 	b.closed = true
 	all := b.queue.Clear()
+	for _, entry := range all {
+		b.closePromptLocked(entry.req.RequestID)
+	}
 	snap := b.snapshotLocked()
 	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
@@ -343,8 +357,29 @@ func (b *Broker[M]) removeAllForClientLocked(clientID string) []*pendingEntry[M]
 	for _, e := range b.queue.Snapshot() {
 		if e.req.ClientID == clientID {
 			b.queue.Remove(e.req.RequestID)
+			b.closePromptLocked(e.req.RequestID)
 			removed = append(removed, e)
 		}
 	}
 	return removed
+}
+
+func (b *Broker[M]) openPromptLocked(req Request[M]) {
+	if b.cfg.Prompts == nil {
+		return
+	}
+	title := string(b.cfg.Kind)
+	if b.Title != nil {
+		title = b.Title(req)
+	}
+	b.cfg.Prompts.Open(prompts.Prompt{
+		ID: prompts.ID(b.cfg.Kind, req.RequestID), Kind: b.cfg.Kind, Ref: req.RequestID,
+		Title: title, CreatedAt: req.EnqueuedAt.UnixMilli(),
+	})
+}
+
+func (b *Broker[M]) closePromptLocked(requestID string) {
+	if b.cfg.Prompts != nil {
+		b.cfg.Prompts.Close(prompts.ID(b.cfg.Kind, requestID))
+	}
 }

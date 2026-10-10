@@ -101,7 +101,7 @@ func TestMobileSupervisor(t *testing.T) {
 		Deps:   appcore.Deps{Repos: rs, Events: events},
 		Reader: idleReader{},
 		Hub:    mobileweb.NewHub(),
-		Broker: mobileweb.NewBroker(time.Now),
+		Broker: mobileweb.NewBroker(time.Now, nil),
 		Assets: fstest.MapFS{"index.html": {Data: []byte("app")}},
 		Detect: func() (lannet.Network, error) { mu.Lock(); defer mu.Unlock(); return here, nil },
 		Find: func(lannet.Identity) (lannet.Network, error) {

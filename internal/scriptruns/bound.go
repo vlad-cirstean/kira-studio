@@ -213,8 +213,3 @@ func (b *Bound) ConfirmDecline(args IDArgs) error {
 	b.Svc.ConfirmDecline(args.ID)
 	return nil
 }
-
-// MainWindow is the window key the confirm popup shows in, "" when none is open.
-func (b *Bound) MainWindow() (string, error) {
-	return b.Svc.MainWindowKey(), nil
-}

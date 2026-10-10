@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/pairing"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 )
 
 // Pairing windows: 120s from enqueue to decide, 60s cooldown after an explicit deny.
@@ -41,10 +42,18 @@ type Broker = pairing.Broker[MobileMeta]
 
 // NewBroker builds the broker the desktop approval dialog subscribes to. It outlives the server:
 // restarting the listener must not drop the dialog's subscription.
-func NewBroker(now func() time.Time) *Broker {
-	return pairing.NewBroker[MobileMeta](pairing.Config{
+func NewBroker(now func() time.Time, sink prompts.Sink) *Broker {
+	b := pairing.NewBroker[MobileMeta](pairing.Config{
 		Timeout: pairTimeout, Cooldown: pairCooldown, MaxQueue: pairMaxQueue, Now: now,
+		Prompts: sink, Kind: prompts.KindMobilePairing,
 	})
+	b.Title = func(r pairing.Request[MobileMeta]) string {
+		if r.Meta.Label == "" {
+			return "A phone asks for access"
+		}
+		return "A phone asks for access · " + r.Meta.Label
+	}
+	return b
 }
 
 type pairRequest struct {

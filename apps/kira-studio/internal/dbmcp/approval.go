@@ -9,6 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 )
 
 // ApprovalTimeout bounds how long a prompt-mode query waits for a human answer before giving up.
@@ -105,6 +106,8 @@ type approvalEntry struct {
 // without any external expiry ticker.
 type ApprovalBroker struct {
 	now func() time.Time
+	// Prompts routes each pending request to a window and an OS notification (P246); nil routes none.
+	Prompts prompts.Sink
 
 	mu    sync.Mutex
 	queue *notify.PendingQueue[*approvalEntry]
@@ -151,6 +154,8 @@ func (b *ApprovalBroker) Request(ctx context.Context, req ApprovalRequest) Appro
 	req.ExpiresAt = now.Add(ApprovalTimeout)
 	entry := &approvalEntry{req: req, result: make(chan ApprovalOutcome, 1)}
 	b.queue.Add(entry.req.RequestID, entry)
+	// Under mu so a fast answer cannot Close before this Open.
+	b.openPrompt(entry.req)
 	snap := b.snapshotLocked()
 	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
@@ -202,6 +207,7 @@ func (b *ApprovalBroker) resolve(requestID string, outcome ApprovalOutcome) Appr
 		b.mu.Unlock()
 		return ApprovalActionAlreadyResolved
 	}
+	b.closePrompt(requestID)
 	snap := b.snapshotLocked()
 	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
@@ -218,6 +224,9 @@ func (b *ApprovalBroker) resolve(requestID string, outcome ApprovalOutcome) Appr
 func (b *ApprovalBroker) AbandonAll() {
 	b.mu.Lock()
 	entries := b.queue.Clear()
+	for _, entry := range entries {
+		b.closePrompt(entry.req.RequestID)
+	}
 	snap := b.snapshotLocked()
 	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
@@ -227,5 +236,26 @@ func (b *ApprovalBroker) AbandonAll() {
 	}
 	if len(entries) > 0 {
 		b.emitter.Emit(seq, snap)
+	}
+}
+
+// openPrompt registers the request with the router. The title never carries the statement.
+func (b *ApprovalBroker) openPrompt(req ApprovalRequest) {
+	if b.Prompts == nil {
+		return
+	}
+	title := "Approve this query?"
+	if req.ConnectionName != "" {
+		title += " · " + req.ConnectionName
+	}
+	b.Prompts.Open(prompts.Prompt{
+		ID: prompts.ID(prompts.KindDbMcp, req.RequestID), Kind: prompts.KindDbMcp, Ref: req.RequestID,
+		Title: title, CreatedAt: req.EnqueuedAt.UnixMilli(),
+	})
+}
+
+func (b *ApprovalBroker) closePrompt(requestID string) {
+	if b.Prompts != nil {
+		b.Prompts.Close(prompts.ID(prompts.KindDbMcp, requestID))
 	}
 }

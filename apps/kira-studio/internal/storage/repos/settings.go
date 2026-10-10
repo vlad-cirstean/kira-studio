@@ -47,6 +47,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	appsettings.LeafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, appsettings.InRange(1, 365))
 	appsettings.LeafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, appsettings.InRange(1_000, 1_000_000_000))
 	appsettings.LeafValid(stored, "advanced.logLevel", &result.Advanced.LogLevel, appsettings.ValidLogLevel)
+	appsettings.Leaf(stored, "advanced.notifyPrompts", &result.Advanced.NotifyPrompts)
 	appsettings.LeafValid(stored, "api.httpVersion", &result.Api.HTTPVersion, model.ValidHTTPVersion)
 	appsettings.LeafValid(stored, "api.requestTimeoutMs", &result.Api.RequestTimeoutMs, appsettings.InRange(0, 3_600_000))
 	appsettings.LeafValid(stored, "api.maxResponseMb", &result.Api.MaxResponseMb, appsettings.InRange(0, 2048))
@@ -82,7 +83,10 @@ func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
 	if err := appsettings.UpsertOptional(tx, "advanced.expensiveQueryRows", a.ExpensiveQueryRows); err != nil {
 		return err
 	}
-	return appsettings.UpsertOptional(tx, "advanced.logLevel", a.LogLevel)
+	if err := appsettings.UpsertOptional(tx, "advanced.logLevel", a.LogLevel); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "advanced.notifyPrompts", a.NotifyPrompts)
 }
 
 func upsertApiSection(tx *sql.Tx, a *model.ApiPatch) error {

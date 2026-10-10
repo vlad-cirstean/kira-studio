@@ -32,7 +32,9 @@ type GitCredentialPrompt struct {
 func toWirePrompts(snap gitcred.Snapshot) []GitCredentialPrompt {
 	out := make([]GitCredentialPrompt, 0, len(snap))
 	for _, p := range snap {
-		out = append(out, GitCredentialPrompt(p))
+		out = append(out, GitCredentialPrompt{
+			RequestID: p.RequestID, Source: p.Source, RepoLabel: p.RepoLabel, Prompt: p.Prompt, Masked: p.Masked,
+		})
 	}
 	return out
 }

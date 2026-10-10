@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -36,8 +37,8 @@ type Service struct {
 	Getenv func(string) string
 	// SmartTimeout, when positive, replaces every smart run's own timeout (a flow test).
 	SmartTimeout time.Duration
-	// MainWindow is the window key a scheduled run's confirm popup shows in; "" when none is open.
-	MainWindow func() string
+	// Prompts routes a waiting run's confirm popup to a window and an OS notification; nil routes none.
+	Prompts prompts.Sink
 	// ScheduleTimeout, when positive, replaces every headless run's own timeout (a flow test).
 	ScheduleTimeout time.Duration
 
@@ -111,13 +112,14 @@ func (s *Service) Begin(scriptID, terminalID, token string) (terminal.ScriptLaun
 	return terminal.ScriptLaunch{RunID: run.ID, Cwd: dir.Path, Command: command, Env: env}, nil
 }
 
-func (s *Service) record(run Run) {
+func (s *Service) record(run Run) bool {
 	if err := s.Runs.Insert(run); err != nil {
 		slog.Warn("scriptruns: record run", "scope", "scriptruns", "err", err)
-		return
+		return false
 	}
 	s.emit(run)
 	s.purge()
+	return true
 }
 
 func (s *Service) purge() {

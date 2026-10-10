@@ -47,6 +47,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Mobile = readMobile(stored)
 	readClaudeCode(stored, &result.ClaudeCode)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
+	appsettings.Leaf(stored, "advanced.notifyPrompts", &result.Advanced.NotifyPrompts)
 	return result, nil
 }
 
@@ -180,7 +181,10 @@ func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
 	if a == nil {
 		return nil
 	}
-	return appsettings.UpsertOptional(tx, "advanced.gitLogLevel", a.GitLogLevel)
+	if err := appsettings.UpsertOptional(tx, "advanced.gitLogLevel", a.GitLogLevel); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "advanced.notifyPrompts", a.NotifyPrompts)
 }
 
 // Set validates the patch, writes only the leaves the caller actually patched in one transaction,

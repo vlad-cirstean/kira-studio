@@ -248,7 +248,9 @@ func (s *Scheduler) fireScript(scriptID string, due time.Time) {
 		run := svc.newRun(p, nil)
 		run.State, run.StartedAt, run.CreatedAt, run.Trigger = StateWaiting, nil, due.UnixMilli(), TriggerScheduled
 		run.SessionID = ""
-		svc.record(run)
+		if svc.record(run) {
+			svc.openPrompt(run)
+		}
 		return
 	}
 	if _, err := svc.startScheduled(p, nil); err != nil {

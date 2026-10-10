@@ -16,7 +16,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -167,7 +166,7 @@ func main() {
 		OpenNewWindow: openNew,
 	})
 	shell.AttachReopen(app, func() { shell.ReopenWindows(winDeps) })
-	surfaceCredentialPrompts(wired.CredentialRelay, windows, winDeps)
+	wired.SetReopen(func() { shell.ReopenWindows(winDeps) })
 	// P116 G5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
 	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(wired.KeepAwake) })
 
@@ -240,21 +239,4 @@ func purgeReviewWindows(repositories *repos.Repos) {
 	if err := repositories.AdeReview.PurgeAll(); err != nil {
 		slog.Warn("ade: purge review windows", "scope", "ade", "err", err)
 	}
-}
-
-// surfaceCredentialPrompts handles a prompt raised away from any window (P178 D4): the user started
-// that git op elsewhere and waits on it, so open a window when none exists, else bring one forward.
-func surfaceCredentialPrompts(relay *gitcred.Relay, windows *shell.WindowRegistry, winDeps shell.WindowOpenerDeps) {
-	var mu sync.Mutex // count-then-open must not interleave: two concurrent prompts would open two windows
-	relay.SetOnAdded(func() {
-		mu.Lock()
-		defer mu.Unlock()
-		if windows.Count() == 0 {
-			shell.ReopenWindows(winDeps)
-			return
-		}
-		if keys := windows.Keys(); len(keys) > 0 {
-			windows.Focus(keys[0])
-		}
-	})
 }

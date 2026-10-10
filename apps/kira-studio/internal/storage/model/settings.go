@@ -25,6 +25,8 @@ type AdvancedSettings struct {
 	// EXPENSIVE_QUERY_ROWS_RANGE comment carries the full argument.
 	ExpensiveQueryRows int    `json:"expensiveQueryRows"`
 	LogLevel           string `json:"logLevel"`
+	// NotifyPrompts posts an OS notification when a popup waits for an answer (P246).
+	NotifyPrompts bool `json:"notifyPrompts"`
 }
 
 // DbMcpSettings is the embedded DB MCP server instance's persisted on/off record
@@ -67,6 +69,7 @@ func DefaultSettings() Settings {
 			OpLogRetentionDays: 30,
 			ExpensiveQueryRows: 100_000,
 			LogLevel:           "info",
+			NotifyPrompts:      true,
 		},
 		// P90 §2.1: three deliberate default changes from pre-P90 httpclient behaviour — timeout
 		// 30s -> none, max response 10 MiB -> 50 MB (P160: -> 5 MB, large bodies freeze the viewer),
@@ -101,6 +104,7 @@ type AdvancedPatch struct {
 	OpLogRetentionDays *int    `json:"opLogRetentionDays,omitempty"`
 	ExpensiveQueryRows *int    `json:"expensiveQueryRows,omitempty"`
 	LogLevel           *string `json:"logLevel,omitempty"`
+	NotifyPrompts      *bool   `json:"notifyPrompts,omitempty"`
 }
 
 // ApiPatch mirrors ApiSettings' own `.partial()` shape (P90 item 1).

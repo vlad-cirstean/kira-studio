@@ -75,11 +75,3 @@ func (s *Service) RunScheduleNow(scriptID, hash string, secrets map[string][]str
 	}
 	return s.startScheduled(p, nil)
 }
-
-// MainWindowKey is the window the confirm popup shows in, "" when none is open.
-func (s *Service) MainWindowKey() string {
-	if s.MainWindow == nil {
-		return ""
-	}
-	return s.MainWindow()
-}

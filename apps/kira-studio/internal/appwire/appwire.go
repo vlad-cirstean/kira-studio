@@ -1,4 +1,4 @@
-// Package appwire is Kira Studio's composition root: it builds the 28 bound services, the adapter
+// Package appwire is Kira Studio's composition root: it builds the 29 bound services, the adapter
 // router, the embedded modules and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It
 // sits above internal/bridge in the layering, like internal/appshell.
@@ -22,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -60,6 +61,7 @@ type Wired struct {
 	Router     *adapterhost.Router
 	Events     *bridge.Events
 	Windows    *shell.WindowRegistry
+	Prompts    *prompts.Router
 	CloseFlush *shell.CloseFlushCoordinator
 	Quitter    *shell.Quitter
 	// TerminalRegistry and OnWindowClosing are the window-close hooks the shell runs.
@@ -94,7 +96,9 @@ type Wired struct {
 	Docker          *bridge.DockerService
 	Update          *bridge.UpdateService
 	Lifecycle       *bridge.LifecycleService
+	PromptsSvc      *bridge.PromptsService
 
+	reopen          func()
 	beforeFlushOnce func()
 	teardownOnce    func()
 }
@@ -151,16 +155,20 @@ func Build(opts Options) (*Wired, error) {
 	// cancels it so a Cmd+Q mid-download aborts the install rather than orphaning a bundle swap.
 	updateInstaller := appupdate.NewInstaller(appupdate.Studio, opts.Version)
 
-	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, opts)
-	lifecycle := wireLifecycle(embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
+	w := &Wired{}
+	windows := shell.NewWindowRegistry()
+	promptRouter := newPromptRouter(windows, repositories, opts.Emitter, w.reopenWindow)
+	windows.OnChange = promptRouter.Reroute
+
+	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, opts)
+	lifecycle := wireLifecycle(windows, embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
 		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
-	embedded.runs.MainWindow = func() string {
-		key, _ := lifecycle.windows.MainKey()
-		return key
-	}
 	embedded.sched.Start()
 
-	w := &Wired{
+	*w = Wired{
+		Prompts:    promptRouter,
+		PromptsSvc: &bridge.PromptsService{Bound: &prompts.Bound{R: promptRouter}},
+
 		StartedAt: startedAt, Repos: repositories, Deps: deps, Router: router, Events: embedded.events,
 		Windows: lifecycle.windows, CloseFlush: lifecycle.closeFlush, Quitter: lifecycle.quitter,
 		TerminalRegistry: embedded.terminalSvc.Registry,
@@ -205,7 +213,16 @@ func Build(opts Options) (*Wired, error) {
 	return w, nil
 }
 
-// Bound returns the 28 bound services in registration order.
+// SetReopen sets what a notification click runs when no window is open (main owns the opener deps).
+func (w *Wired) SetReopen(fn func()) { w.reopen = fn }
+
+func (w *Wired) reopenWindow() {
+	if w.reopen != nil {
+		w.reopen()
+	}
+}
+
+// Bound returns the 29 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.App), application.NewService(w.Settings), application.NewService(w.Layout),
@@ -217,7 +234,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.ResponseHistory), application.NewService(w.GrpcHistory),
 		application.NewService(w.DataGrip), application.NewService(w.DbMcp), application.NewService(w.KeepAwake),
 		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker),
-		application.NewService(w.Update), application.NewService(w.Lifecycle),
+		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc),
 	}
 }
 

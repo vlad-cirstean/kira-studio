@@ -20,6 +20,8 @@ type AdvancedSettings struct {
 	// (renamed from kiraVersion.log.level, P100 Part 3); internal/logging.SetLevel is its actual
 	// mechanism. Validated against the shared appsettings.ValidLogLevel enum.
 	GitLogLevel string `json:"gitLogLevel"`
+	// NotifyPrompts posts an OS notification when a popup waits for an answer (P246).
+	NotifyPrompts bool `json:"notifyPrompts"`
 }
 
 // Appearance embeds appsettings.Appearance for the five leaves both apps share, plus the two only
@@ -157,7 +159,7 @@ func DefaultSettings() Settings {
 			InlineBlame: true,
 			DateFormat:  "relative",
 		},
-		Advanced:   AdvancedSettings{GitLogLevel: "info"},
+		Advanced:   AdvancedSettings{GitLogLevel: "info", NotifyPrompts: true},
 		Git:        DefaultGitSettings(),
 		Ade:        DefaultAdeSettings(),
 		ClaudeCode: DefaultClaudeCodeSettings(),
@@ -167,7 +169,8 @@ func DefaultSettings() Settings {
 
 // AdvancedPatch mirrors AdvancedSettings' own `.partial()` shape.
 type AdvancedPatch struct {
-	GitLogLevel *string `json:"gitLogLevel,omitempty"`
+	GitLogLevel   *string `json:"gitLogLevel,omitempty"`
+	NotifyPrompts *bool   `json:"notifyPrompts,omitempty"`
 }
 
 // AppearancePatch embeds appsettings.AppearancePatch for the five leaves both apps share, plus this

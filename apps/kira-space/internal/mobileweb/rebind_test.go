@@ -13,7 +13,7 @@ func TestServer_RebindsWhenAddressChanges(t *testing.T) {
 	changed := make(chan struct{}, 1)
 	port := freePort(t)
 	s := New(Config{
-		Reader: &fakeReader{}, Devices: newFakeStore(), Hub: NewHub(), Broker: NewBroker(time.Now), Assets: testAssets(),
+		Reader: &fakeReader{}, Devices: newFakeStore(), Hub: NewHub(), Broker: NewBroker(time.Now, nil), Assets: testAssets(),
 		Port: port, Network: loopbackNet(), OnStatusChanged: func() { changed <- struct{}{} },
 	})
 	s.isLAN = loopbackOK

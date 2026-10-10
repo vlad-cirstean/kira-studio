@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
@@ -151,9 +152,25 @@ func (s *Service) skipWaiting(by, value, reason string, src runoutcome.Source) {
 	}
 	for _, r := range runs {
 		s.emit(r)
+		s.closePrompt(r.ID)
 	}
 	if len(runs) > 0 {
 		s.purge()
+	}
+}
+
+func (s *Service) openPrompt(r Run) {
+	if s.Prompts != nil {
+		s.Prompts.Open(prompts.Prompt{
+			ID: prompts.ID(prompts.KindSchedule, r.ID), Kind: prompts.KindSchedule, Ref: r.ID,
+			Title: "Run " + r.ScriptName + "?", CreatedAt: r.CreatedAt,
+		})
+	}
+}
+
+func (s *Service) closePrompt(runID string) {
+	if s.Prompts != nil {
+		s.Prompts.Close(prompts.ID(prompts.KindSchedule, runID))
 	}
 }
 

@@ -28,7 +28,7 @@ func startLive(t *testing.T) *liveServer {
 	changed := make(chan struct{}, 4)
 	s := New(Config{
 		Reader: reader, AgentSessions: func() any { return map[string]any{"sessions": []any{}} },
-		Devices: store, Hub: NewHub(), Broker: NewBroker(time.Now), Assets: testAssets(),
+		Devices: store, Hub: NewHub(), Broker: NewBroker(time.Now, nil), Assets: testAssets(),
 		Port: port, Network: loopbackNet(),
 		OnDevicesChanged: func() { changed <- struct{}{} },
 	})

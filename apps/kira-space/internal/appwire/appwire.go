@@ -1,4 +1,4 @@
-// Package appwire is Kira Space's composition root: it builds the 22 bound services, the git router
+// Package appwire is Kira Space's composition root: it builds the 23 bound services, the git router
 // and socket, the ADE tracker and board, and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It sits
 // above internal/bridge in the layering, like internal/appshell.
@@ -37,6 +37,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/metrics"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -97,6 +98,7 @@ type Wired struct {
 	Events          *bridge.Events
 	Emitter         appevent.Emitter
 	Windows         *shell.WindowRegistry
+	Prompts         *prompts.Router
 	CloseFlush      *shell.CloseFlushCoordinator
 	Quitter         *shell.Quitter
 	CredentialRelay *gitcred.Relay
@@ -132,12 +134,14 @@ type Wired struct {
 	Memory         *bridge.MemoryService
 	MemoryImport   *bridge.MemoryImportService
 	WindowsSvc     *bridge.WindowsService
+	PromptsSvc     *bridge.PromptsService
 	Update         *bridge.UpdateService
 	CodeWorkspace  *bridge.CodeWorkspaceService
 	AgentNotifySvc *bridge.AgentNotifyService
 	ClaudeUsage    *claudeusage.Service
 	ClaudeUsageSvc *bridge.ClaudeUsageService
 
+	reopen          func()
 	detachMetrics   func()
 	detachOpLog     func()
 	detachGitCred   func()
@@ -152,6 +156,7 @@ func Build(opts Options) *Wired {
 	w := &Wired{Repos: repositories}
 
 	credentialRelay := gitcred.New()
+	w.Windows = shell.NewWindowRegistry()
 	git := wireGit(repositories, opts.Locator, opts.GhLocator)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
@@ -161,6 +166,18 @@ func Build(opts Options) *Wired {
 	deps := appcore.Deps{Repos: repositories, Home: config.KiraSpaceHome(), Events: emitter, GitRegistry: git.registry}
 	events := bridge.NewEvents(emitter)
 	w.Emitter, w.Deps, w.Events = emitter, deps, events
+	w.Prompts = prompts.New(prompts.Deps{
+		Windows: w.Windows, App: "Space", Reopen: w.reopenWindow,
+		Emit:   func(l []prompts.Routed) { emitter.Emit(bridge.ChannelPromptsChanged, l) },
+		Reveal: func(key, id string) { emitter.EmitTo(key, bridge.ChannelPromptsReveal, map[string]string{"id": id}) },
+		Enabled: func() bool {
+			s, err := repositories.Settings.GetAll()
+			return err != nil || s.Advanced.NotifyPrompts
+		},
+	})
+	w.Windows.OnChange = w.Prompts.Reroute
+	credentialRelay.Prompts = w.Prompts
+	w.PromptsSvc = &bridge.PromptsService{Bound: &prompts.Bound{R: w.Prompts}}
 	w.detachOpLog = events.AttachOpLog(git.opLog)
 
 	// P119: the update-availability checker and its detached installer.
@@ -208,7 +225,7 @@ func Build(opts Options) *Wired {
 			w.AgentNotify.HandleScriptRun(r)
 		},
 		EmitLog:      func(p scriptruns.LogPush) { emitter.Emit(bridge.ChannelScriptRunLog, p) },
-		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout,
+		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout, Prompts: w.Prompts,
 	}
 	if opts.Clock != nil {
 		runs.Now = opts.Clock.Now
@@ -235,8 +252,7 @@ func Build(opts Options) *Wired {
 	w.Memory = bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}))
 	go removeRetiredModels()
 
-	// windows holds every open window; created here so Archive can close a task's review windows.
-	w.Windows = shell.NewWindowRegistry()
+	// Archive closes a task's review windows through the registry.
 	w.AdeBoard = wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry),
 		closeTaskReviewWindows(repositories, func(key string) bool {
 			// Through the bound hook, so a shell that overrides CloseWindow sees archive closes too.
@@ -246,10 +262,6 @@ func Build(opts Options) *Wired {
 			return w.Windows.Close(key)
 		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage, opts.RebaseTimeout, runs)
 	runs.ADE = w.AdeBoard
-	runs.MainWindow = func() string {
-		key, _ := w.Windows.MainKey()
-		return key
-	}
 	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
 	w.sched.Start()
 	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter}
@@ -276,7 +288,7 @@ func Build(opts Options) *Wired {
 
 	mobileLaunches := &bridge.MobileLaunches{Emit: emitter, Window: w.Windows.MainKey}
 	w.Mobile = bridge.NewMobileAccessService(&bridge.MobileAccessService{
-		Deps: deps, Reader: w.AdeTask, Hub: mobileHub, Broker: mobileweb.NewBroker(time.Now), Assets: opts.MobileAssets,
+		Deps: deps, Reader: w.AdeTask, Hub: mobileHub, Broker: mobileweb.NewBroker(time.Now, w.Prompts), Assets: opts.MobileAssets,
 		AgentSessions: func() any { return w.Terminal.AgentSessions() },
 		Writer:        &bridge.MobileWriter{Svc: w.AdeTask, Launches: mobileLaunches},
 		Launches:      mobileLaunches,
@@ -322,10 +334,19 @@ func (w *Wired) BindShell(h ShellHooks) {
 	w.WindowsSvc.OpenNewWindow = h.OpenNewWindow
 }
 
+// SetReopen sets what a notification click runs when no window is open (main owns the opener deps).
+func (w *Wired) SetReopen(fn func()) { w.reopen = fn }
+
+func (w *Wired) reopenWindow() {
+	if w.reopen != nil {
+		w.reopen()
+	}
+}
+
 // StartMobile starts the phone server when settings enable it; call after the shell is up.
 func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 
-// Bound returns the 22 bound services in registration order.
+// Bound returns the 23 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitCredential),
@@ -336,6 +357,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
 		application.NewService(w.MemoryImport), application.NewService(w.WindowsSvc), application.NewService(w.Update),
 		application.NewService(w.AgentNotifySvc), application.NewService(w.ClaudeUsageSvc),
+		application.NewService(w.PromptsSvc),
 	}
 }
 

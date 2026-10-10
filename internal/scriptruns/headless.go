@@ -62,6 +62,7 @@ func (s *Service) begin(run Run, existing bool) error {
 		return ipcerr.New("E_INVALID", "this run was already answered")
 	}
 	s.emit(run)
+	s.closePrompt(run.ID)
 	return nil
 }
 

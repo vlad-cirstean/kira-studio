@@ -193,7 +193,7 @@ func newTestServer(t *testing.T) (*Server, *fakeStore, *fakeReader) {
 	s := New(Config{
 		Reader: reader, Writer: &fakeWriter{}, Terminals: &fakeTerminals{}, AgentInputEnabled: func() bool { return true },
 		AgentSessions: func() any { return map[string]any{"sessions": []any{}} },
-		Devices:       store, Hub: NewHub(), Broker: NewBroker(time.Now), Assets: testAssets(),
+		Devices:       store, Hub: NewHub(), Broker: NewBroker(time.Now, nil), Assets: testAssets(),
 		Port: 7790, Network: loopbackNet(),
 	})
 	s.isLAN = loopbackOK
