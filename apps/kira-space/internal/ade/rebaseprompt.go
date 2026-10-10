@@ -29,7 +29,7 @@ func composeRebasePrompt(spec model.AdeRebaseSpec) string {
 		fmt.Fprintf(&sb, "%d. In %s: ", i+1, st.Worktree)
 		if i == 0 {
 			if spec.Remote != "" {
-				fmt.Fprintf(&sb, "git fetch %s && ", spec.Remote)
+				fmt.Fprintf(&sb, "git fetch %s, then ", spec.Remote)
 			}
 			fmt.Fprintf(&sb, "git rebase %s%s\n", stash, st.ParentRef)
 			continue

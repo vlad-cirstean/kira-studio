@@ -283,10 +283,33 @@ func TestRebaseRun(t *testing.T) {
 		if len(pv.Stack) != 2 || pv.Stack[0].BranchID != br.ID || pv.Stack[1].BranchID != cb.ID {
 			t.Fatalf("stack = %+v, want parent then child", pv.Stack)
 		}
-		f.agent(rebaseSh+" && git -C '"+cb.Worktree+"' rebase -q --onto feat/a "+oldTip, done())
+		gitCall := func(wt string, args ...string) fakeagent.MCPCall {
+			return fakeagent.MCPCall{Server: claudeheadless.ServerName, Tool: "git", Args: map[string]any{"worktree": wt, "args": args}}
+		}
+		claude(f.app, map[string][]fakeagent.Action{"*": {{Name: "nofinish", MCP: []fakeagent.MCPCall{
+			gitCall(br.Worktree, "fetch", "-q", "origin"),
+			gitCall(br.Worktree, "rebase", "-q", "origin/main"),
+			gitCall(cb.Worktree, "rebase", "-q", "--onto", "feat/a", oldTip),
+			{Server: claudeheadless.ServerName, Tool: "finish_step", Args: done()},
+		}}}})
 		run := f.waitRebase(t, task.ID, f.rebase(t, br, adewire.RebaseArgs{}).RunID)
 		if run.State != "done" || run.Outcome.Rebase == nil || len(run.Outcome.Rebase.Branches) != 2 || !run.Outcome.Rebase.Verified {
 			t.Fatalf("run = %s facts %+v, want both branches verified", run.State, run.Outcome.Rebase)
+		}
+		matches, _ := filepath.Glob(filepath.Join(f.app.FakeDir, "*.args"))
+		var args string
+		for _, m := range matches {
+			if raw, err := os.ReadFile(m); err == nil && strings.Contains(string(raw), claudeheadless.GitTool) {
+				args = string(raw)
+			}
+		}
+		for _, want := range []string{"--add-dir\n" + br.Worktree, cb.Worktree, "--tools\nRead,Edit,Write,Grep,Glob", "--strict-mcp-config", claudeheadless.GitTool} {
+			if !strings.Contains(args, want) {
+				t.Errorf("rebase args lack %q:\n%s", want, args)
+			}
+		}
+		if strings.Contains(args, "Bash") && !strings.Contains(args, "--disallowedTools\nBash") {
+			t.Errorf("rebase args grant Bash:\n%s", args)
 		}
 	})
 

@@ -51,6 +51,8 @@ type Spec struct {
 	Isolated bool
 	// MCPConfigPaths are extra --mcp-config files after MCPConfigPath.
 	MCPConfigPaths []string
+	// AddDirs are extra --add-dir directories the run may read and edit.
+	AddDirs []string
 	// Env is the full child environment; nil = os.Environ().
 	Env []string
 }
@@ -106,6 +108,12 @@ func Script(s Spec) string {
 	words = append(words, "--setting-sources", quotePOSIX(sources))
 	if s.Isolated {
 		words = append(words, "--strict-mcp-config", "--permission-prompts", "none")
+	}
+	if len(s.AddDirs) > 0 {
+		words = append(words, "--add-dir")
+		for _, d := range s.AddDirs {
+			words = append(words, quotePOSIX(d))
+		}
 	}
 	if s.Tools != nil {
 		words = append(words, "--tools", quotePOSIX(strings.Join(s.Tools, ",")))

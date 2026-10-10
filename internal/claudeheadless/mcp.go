@@ -56,6 +56,8 @@ type Grant struct {
 	RunID  string
 	TaskID string
 	Space  bool
+	// Git, when set, adds the git tool for those worktrees.
+	Git *GitGrant
 	// Results are the step's declared results; finish_step's status is one of their ids or
 	// needs_input. Empty = the implicit done (ok) and failed (not ok).
 	Results []ResultSpec
@@ -197,7 +199,7 @@ func finishSchema(results []ResultSpec) (*jsonschema.Schema, error) {
 }
 
 // buildMCPServer returns the tool set a grant sees: an agent never lists a tool it cannot call.
-func (s *Server) buildMCPServer(finish, space, outcomes bool, results []ResultSpec) *mcp.Server {
+func (s *Server) buildMCPServer(finish, space, outcomes, git bool, results []ResultSpec) *mcp.Server {
 	opts := &mcp.ServerOptions{}
 	if space {
 		opts.Instructions = spaceInstructions
@@ -219,6 +221,9 @@ func (s *Server) buildMCPServer(finish, space, outcomes bool, results []ResultSp
 	}
 	if outcomes {
 		s.addOutcomeTool(srv)
+	}
+	if git {
+		s.addGitTool(srv)
 	}
 	return srv
 }
@@ -297,12 +302,14 @@ func (s *Server) startLocked() error {
 	if err != nil {
 		return fmt.Errorf("claudeheadless: bind: %w", err)
 	}
-	servers := map[[3]bool]*mcp.Server{}
+	servers := map[[4]bool]*mcp.Server{}
 	for _, finish := range []bool{false, true} {
 		for _, space := range []bool{false, true} {
 			for _, outcomes := range []bool{false, true} {
-				if finish || space || outcomes {
-					servers[[3]bool{finish, space, outcomes}] = s.buildMCPServer(finish, space, outcomes, nil)
+				for _, git := range []bool{false, true} {
+					if finish || space || outcomes || git {
+						servers[[4]bool{finish, space, outcomes, git}] = s.buildMCPServer(finish, space, outcomes, git, nil)
+					}
 				}
 			}
 		}
@@ -316,7 +323,7 @@ func (s *Server) startLocked() error {
 			return reg.server
 		}
 		g := reg.grant
-		return servers[[3]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil}]
+		return servers[[4]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil}]
 	}, &mcp.StreamableHTTPOptions{Stateless: true})
 	protected := auth.RequireBearerToken(s.verify, nil)(handler)
 	mux := http.NewServeMux()
@@ -336,9 +343,16 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	if g.Space && (g.TaskID == "" || s.space == nil) {
 		return "", nil, errors.New("claudeheadless: space grant needs a task and space tools")
 	}
+	if g.Git != nil {
+		wts := make([]string, len(g.Git.Worktrees))
+		for i, w := range g.Git.Worktrees {
+			wts[i] = filepath.Clean(w)
+		}
+		g.Git = &GitGrant{Worktrees: wts, Push: g.Git.Push}
+	}
 	var perRun *mcp.Server
 	if g.RunID != "" && !IsImplicit(g.Results) {
-		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Results)
+		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Results)
 	}
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {

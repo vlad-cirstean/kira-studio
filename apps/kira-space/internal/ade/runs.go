@@ -597,6 +597,9 @@ type agentLaunch struct {
 	path, prompt      string
 	timeout           time.Duration
 	smart             *smartStep
+	// git, when set, makes the run a sandboxed git agent: only the listed built-ins, no settings files,
+	// the worktrees added as directories and the git tool granted.
+	git *claudeheadless.GitGrant
 }
 
 // grantResults are the results finish_step takes for a run: a rebase run keeps the implicit pair.
@@ -625,7 +628,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		}
 		b.completeRun(run, sessionID, end)
 	}
-	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Results: grantResults(rebase, def)})
+	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Results: grantResults(rebase, def)})
 	if err != nil {
 		fail(err)
 		return
@@ -638,6 +641,9 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	spec.Env = gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: l.path})
 	if rebase {
 		spec.Env = append(spec.Env, "GIT_EDITOR=true")
+	}
+	if l.git != nil {
+		spec.Isolated, spec.Tools, spec.AddDirs = true, rebaseBuiltins, l.git.Worktrees
 	}
 	if l.smart != nil {
 		spec = l.smart.spec(spec, space)
