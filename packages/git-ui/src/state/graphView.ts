@@ -113,6 +113,7 @@ export class GraphViewState {
    *  ran — `#queueLayoutRebuild`'s own doc comment. */
   #pendingLayoutRange: LayoutRange | undefined;
   #layoutDraining = false;
+  #layoutDrain: Promise<void> | undefined;
 
   readonly #unsubscribeChanged: () => void;
   readonly #unsubscribeLoading: () => void;
@@ -187,6 +188,9 @@ export class GraphViewState {
         controller.signal,
       );
     } finally {
+      // The plan lags the store by the in-flight relayout; going idle first would let the
+      // viewport restore on `loading` -> 'idle' (App.vue) run against a plan that is too short.
+      await this.#layoutDrain;
       if (this.#abortController === controller) {
         this.#abortController = undefined;
         if (this.loading.value === 'streaming') this.loading.value = 'idle';
@@ -613,7 +617,7 @@ export class GraphViewState {
         }
       : range;
     if (this.#layoutDraining) return; // an already-running drain picks up the merge on its next loop
-    void this.#drainLayoutRebuilds();
+    this.#layoutDrain = this.#drainLayoutRebuilds();
   }
 
   /** F11: keeps relaying out until no further chunk landed while the last relayout was running —
