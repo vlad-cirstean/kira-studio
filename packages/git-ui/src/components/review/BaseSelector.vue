@@ -109,12 +109,12 @@ function onOpenAutoFocus(e: Event): void {
 </script>
 
 <template>
-  <div class="kv:relative">
+  <div class="relative">
     <Popover modal :open="isOpen" @update:open="(o) => (o ? open() : close())">
       <PopoverTrigger as-child>
         <Button variant="toolbar" size="kira" class="max-w-full" data-testid="base-selector-trigger">
-          <span class="kv:truncate kv:font-semibold">{{ triggerLabel }}</span>
-          <span v-if="triggerReason" class="kv:text-muted-foreground kv:text-sm">{{ triggerReason }}</span>
+          <span class="truncate font-semibold">{{ triggerLabel }}</span>
+          <span v-if="triggerReason" class="text-muted-foreground text-graph-sm">{{ triggerReason }}</span>
           <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
         </Button>
       </PopoverTrigger>
@@ -125,7 +125,7 @@ function onOpenAutoFocus(e: Event): void {
         aria-label="Choose a comparison base"
         @open-auto-focus="onOpenAutoFocus"
       >
-        <div class="kv:max-h-80 kv:flex kv:flex-col kv:min-h-0">
+        <div class="max-h-80 flex flex-col min-h-0">
           <InputGroup variant="kira" class="m-1">
             <InputGroupAddon>
               <CodiconIcon name="search" :size="13" />
@@ -142,9 +142,9 @@ function onOpenAutoFocus(e: Event): void {
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          <div class="kv:overflow-auto kv:min-h-0">
+          <div class="overflow-auto min-h-0">
             <section v-if="suggested.length > 0" aria-label="Suggested">
-              <div class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm kv:uppercase">Suggested</div>
+              <div class="py-0.5 px-2 text-muted-foreground text-graph-sm uppercase">Suggested</div>
               <button
                 v-for="candidate in suggested"
                 :key="candidate.ref"
@@ -152,13 +152,13 @@ function onOpenAutoFocus(e: Event): void {
                 :class="cn(rowVariants(), 'w-full')"
                 @click="pick(candidate.ref)"
               >
-                <span class="kv:truncate">{{ candidate.ref }}</span>
-                <span class="kv:ml-auto kv:text-muted-foreground kv:text-sm">{{ candidateReason(candidate) }}</span>
+                <span class="truncate">{{ candidate.ref }}</span>
+                <span class="ml-auto text-muted-foreground text-graph-sm">{{ candidateReason(candidate) }}</span>
               </button>
             </section>
 
             <section aria-label="All branches">
-              <div class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm kv:uppercase">All branches</div>
+              <div class="py-0.5 px-2 text-muted-foreground text-graph-sm uppercase">All branches</div>
               <button
                 v-for="row in sections.branches.visible"
                 :key="row.refname"
@@ -166,7 +166,7 @@ function onOpenAutoFocus(e: Event): void {
                 :class="cn(rowVariants(), 'w-full')"
                 @click="pick(row.shortName)"
               >
-                <span class="kv:truncate">{{ row.shortName }}</span>
+                <span class="truncate">{{ row.shortName }}</span>
               </button>
               <button
                 v-for="row in sections.remoteBranches.visible"
@@ -176,18 +176,18 @@ function onOpenAutoFocus(e: Event): void {
                 @click="pick(row.shortName)"
               >
                 <CodiconIcon name="cloud" :size="13" />
-                <span class="kv:truncate">{{ row.shortName }}</span>
+                <span class="truncate">{{ row.shortName }}</span>
               </button>
               <div
                 v-if="hiddenCount > 0"
-                class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
+                class="py-0.5 px-2 text-muted-foreground text-graph-sm"
                 data-testid="base-selector-hidden"
               >
                 {{ hiddenCount }} more — type to filter
               </div>
               <div
                 v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
-                class="kv:py-1 kv:px-2 kv:text-muted-foreground"
+                class="py-1 px-2 text-muted-foreground"
               >
                 {{ refsLoading ? 'Loading branches…' : 'No matching branches' }}
               </div>

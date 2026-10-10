@@ -149,7 +149,7 @@ function onToggleReviewed(path: string): void {
             <TooltipContent>{{ o.label }}</TooltipContent>
           </Tooltip>
         </ToggleGroup>
-        <span v-if="deltaStatusText" class="ml-auto text-muted-foreground kv:text-sm">{{ deltaStatusText }}</span>
+        <span v-if="deltaStatusText" class="ml-auto text-muted-foreground text-graph-sm">{{ deltaStatusText }}</span>
       </div>
       <p v-if="reviewFiles.diffError.value" class="m-0 p-3 text-error">
         Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}

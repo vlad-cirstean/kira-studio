@@ -12,10 +12,10 @@ export const rowVariants = cva(
   {
     variants: {
       // P229: `menu` = `DropdownMenuItem`'s recipe (popover pickers); `tree` = the app's tree row
-      // (panes). `kv:text-base` on `tree` keeps Settings > Git graph font size reaching data rows.
+      // (panes). `text-graph-md` on `tree` keeps Settings > Git graph font size reaching data rows.
       layout: {
         menu: 'gap-1.5 rounded-kira-sm px-1.5 py-1 text-kira-md cursor-pointer focus-visible:bg-hover',
-        tree: 'relative gap-1 pr-2 min-h-row kv:text-base select-none cursor-default',
+        tree: 'relative gap-1 pr-2 min-h-row text-graph-md select-none cursor-default',
       },
       selected: {
         true: '',

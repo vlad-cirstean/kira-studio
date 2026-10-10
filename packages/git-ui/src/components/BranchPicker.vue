@@ -244,7 +244,7 @@ function onFilterKeydown(event: KeyboardEvent): void {
  *  branch). `Tab` is left alone: it already reaches the row's own trailing buttons.
  *
  *  P110 A18: `.kv-branch-row`/`.kv-branch-row-main` carry no CSS any more (every row's own styling
- *  moved to `kv:` utilities, here and in TagList/StashRows/WorktreeList/StackList) — both class
+ *  moved to utilities, here and in TagList/StashRows/WorktreeList/StackList) — both class
  *  names stay as bare query-selector hooks for `closest()`/`querySelector()` below, the same
  *  "functional, not stylistic" reason `.kv-branch-rename-input` (line ~636) stays a literal class
  *  for its own `querySelector(...).focus()` call. */
@@ -577,7 +577,7 @@ watch(visibleBranchNames, (names) => {
 </script>
 
 <template>
-  <div class="kv:relative">
+  <div class="relative">
     <Popover :open="isOpen" modal @update:open="onOpenChange">
       <PopoverAnchor as-child>
         <Tooltip>
@@ -585,7 +585,7 @@ watch(visibleBranchNames, (names) => {
             <PopoverTrigger as-child>
               <Button ref="triggerEl" variant="toolbar" size="kira" class="kv-branch-trigger max-w-50">
                 <CodiconIcon name="git-branch" :size="13" />
-                <span class="kv:truncate">{{ triggerLabel }}</span>
+                <span class="truncate">{{ triggerLabel }}</span>
                 <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
               </Button>
             </PopoverTrigger>
@@ -603,7 +603,7 @@ watch(visibleBranchNames, (names) => {
       >
         <div
           ref="panelEl"
-          class="kv:flex kv:flex-col kv:min-h-0 kv:max-h-[min(520px,var(--reka-popover-content-available-height))]"
+          class="flex flex-col min-h-0 max-h-[min(520px,var(--reka-popover-content-available-height))]"
         >
           <ToggleGroup
             type="single"
@@ -650,7 +650,7 @@ watch(visibleBranchNames, (names) => {
 
           <div
             ref="rowsScrollEl"
-            class="kv:overflow-y-auto kv:min-h-0"
+            class="overflow-y-auto min-h-0"
             :aria-label="TAB_LABELS[activeTab]"
           >
             <AttributeTooltip :container="rowsScrollEl" />
@@ -660,8 +660,8 @@ watch(visibleBranchNames, (names) => {
           <div
             v-for="row in model.branchesLocal.visible"
             :key="row.refname"
-            class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
-            :class="{ 'kv:font-semibold': row.isHead }"
+            class="kv-branch-row flex items-center gap-0.5 px-1"
+            :class="{ 'font-semibold': row.isHead }"
             :data-row-id="`branch:${row.refname}`"
             :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
           >
@@ -683,21 +683,21 @@ watch(visibleBranchNames, (names) => {
                 @click="checkoutBranch(row)"
               >
                 <span
-                  class="kv:w-2.5 kv:text-focus"
+                  class="w-2.5 text-focus"
                   :role="row.isHead ? 'img' : undefined"
                   :aria-label="row.isHead ? 'current branch' : undefined"
                   :aria-hidden="!row.isHead"
                   >{{ row.isHead ? "●" : "" }}</span
                 >
-                <span class="kv:truncate">{{ row.shortName }}</span>
+                <span class="truncate">{{ row.shortName }}</span>
                 <span
                   v-if="row.checkedOutIn"
-                  class="kv:text-sm kv:px-0.5 kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm kv:text-muted-foreground"
+                  class="text-graph-sm px-0.5 border border-dashed border-border rounded-kira-sm text-muted-foreground"
                   :data-kira-tip="`Checked out in ${row.checkedOutIn}`"
                 >
                   worktree
                 </span>
-                <span v-if="formatTrack(row.track)" class="kv:text-sm kv:text-muted-foreground">{{ formatTrack(row.track) }}</span>
+                <span v-if="formatTrack(row.track)" class="text-graph-sm text-muted-foreground">{{ formatTrack(row.track) }}</span>
               </button>
               <button
                 v-if="prFor(row.shortName)"
@@ -714,14 +714,14 @@ watch(visibleBranchNames, (names) => {
           </div>
           <div
             v-if="forceDeleteCandidate"
-            class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-overlay kv:text-base"
+            class="flex items-center gap-1 py-1 px-2 bg-black/35 text-graph-md"
           >
             <span>“{{ forceDeleteCandidate }}” is not fully merged.</span>
             <Button variant="danger" size="kira" @click="confirmForceDelete">Force delete</Button>
             <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
           </div>
           <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
-          <div v-if="model.branchesLocal.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No branches</div>
+          <div v-if="model.branchesLocal.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-graph-sm">No branches</div>
         </section>
 
         <section aria-label="Remote branches">
@@ -729,7 +729,7 @@ watch(visibleBranchNames, (names) => {
           <div
             v-for="row in model.branchesRemote.visible"
             :key="row.refname"
-            class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
+            class="kv-branch-row flex items-center gap-0.5 px-1"
             :data-row-id="`remote:${row.refname}`"
             :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
           >
@@ -739,8 +739,8 @@ watch(visibleBranchNames, (names) => {
               @click="checkoutRemote(row)"
             >
               <CodiconIcon name="cloud" :size="13" />
-              <span class="kv:truncate">{{ row.shortName }}</span>
-              <span class="kv:text-sm kv:text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
+              <span class="truncate">{{ row.shortName }}</span>
+              <span class="text-graph-sm text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </button>
             <RowActionsButton
               @click="openRefMenuFromButton(row, $event)"
@@ -748,7 +748,7 @@ watch(visibleBranchNames, (names) => {
             />
           </div>
           <ShowMoreButton :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
-          <div v-if="model.branchesRemote.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">
+          <div v-if="model.branchesRemote.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-graph-sm">
             No remote branches
           </div>
         </section>

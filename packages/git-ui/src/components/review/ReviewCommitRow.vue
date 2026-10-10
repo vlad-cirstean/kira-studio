@@ -209,8 +209,8 @@ function onOpenFile(index: number, pinned: boolean): void {
          collapse the very commit it was clicked inside, since nothing along the way ever called
          stopPropagation()). Only the header itself toggles the row now. -->
     <!-- W17: hover tint scoped to the header, not the whole row — the expanded body's own
-         diff-deleted-fg text drops below 4.5:1 contrast in vscode-dark against the hover tint
-         (axe caught it); the header's own background (--kv-app-bg, unhovered) is what the body
+         diff-deleted-fg text drops below 4.5:1 contrast in the dark theme against the hover tint
+         (axe caught it); the header's own background (`bg-bg`, unhovered) is what the body
          already sits on, and that combination passes. -->
     <div
       ref="headerEl"
@@ -225,7 +225,7 @@ function onOpenFile(index: number, pinned: boolean): void {
            below it. GitLens's own commit-node anatomy. -->
       <span class="flex flex-col gap-0.5 flex-1 min-w-0">
         <span class="truncate">{{ commit.subject }}</span>
-        <span class="flex items-center gap-0.5 text-muted-foreground kv:text-sm whitespace-nowrap overflow-hidden">
+        <span class="flex items-center gap-0.5 text-muted-foreground text-graph-sm whitespace-nowrap overflow-hidden">
           <span class="overflow-hidden text-ellipsis">{{ commit.author.name }}</span>
           <span class="shrink-0" aria-hidden="true">·</span>
           <span class="overflow-hidden text-ellipsis">{{ dateText }}</span>

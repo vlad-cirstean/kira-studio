@@ -753,19 +753,19 @@ watch(
 <template>
   <div
     ref="rootEl"
-    class="kv-review-view kv:flex kv:flex-col kv:h-full kv:w-full kv:relative kv:bg-bg kv:text-fg kv:font-ui kv:text-base kv:overflow-hidden"
+    class="kv-review-view flex flex-col h-full w-full relative bg-bg text-fg font-ui text-graph-md overflow-hidden"
     :data-connection-state="connectionState"
   >
     <!-- P131 Part 3 §5.1: MountRoot.vue's own TooltipProvider (Part 2 §3.5) already wraps this
          root, so no tooltip surface of this component's own is needed. -->
-    <span class="kv:sr-only" data-testid="connection-state">{{ connectionState }}</span>
-    <div class="kv:sr-only" role="status" aria-live="polite" data-testid="live-announcements">
+    <span class="sr-only" data-testid="connection-state">{{ connectionState }}</span>
+    <div class="sr-only" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
     </div>
 
     <template v-if="bootError">
-      <div class="kv:flex kv:flex-col kv:gap-2 kv:p-3" data-testid="boot-error">
-        <p class="kv:m-0 kv:text-muted-foreground">Couldn't load the repository — {{ bootError }}</p>
+      <div class="flex flex-col gap-2 p-3" data-testid="boot-error">
+        <p class=" text-muted-foreground">Couldn't load the repository — {{ bootError }}</p>
         <Button variant="dialog" size="kira" class="self-start" data-testid="boot-retry" @click="retryBootstrap">
           Retry
         </Button>
@@ -773,23 +773,23 @@ watch(
     </template>
 
     <template v-else-if="!review">
-      <p class="kv:p-3 kv:text-muted-foreground">Loading…</p>
+      <p class="p-3 text-muted-foreground">Loading…</p>
     </template>
 
     <template v-else-if="noActiveRepo">
-      <div class="kv:flex kv:flex-col kv:gap-1 kv:p-3 kv:min-h-0">
-        <h2 class="kv:m-0 kv:text-lg">Review branch changes</h2>
+      <div class="flex flex-col gap-1 p-3 min-h-0">
+        <h2 class=" text-graph-lg">Review branch changes</h2>
         <p>Open a repository first, then pick a branch to review.</p>
       </div>
     </template>
 
     <template v-else-if="!review.branch.value">
       <div
-        class="kv:flex kv:flex-col kv:gap-1 kv:p-3 kv:min-h-0 kv:h-full"
+        class="flex flex-col gap-1 p-3 min-h-0 h-full"
         data-testid="review-no-branch"
       >
-        <h2 class="kv:m-0 kv:text-lg">Review branch changes</h2>
-        <p class="kv:m-0 kv:text-muted-foreground">
+        <h2 class=" text-graph-lg">Review branch changes</h2>
+        <p class=" text-muted-foreground">
           Pick a branch to compare its commits against a base you choose or one we detect.
         </p>
         <InputGroup variant="kira">
@@ -808,9 +808,9 @@ watch(
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
-        <div class="kv:flex-1 kv:min-h-0 kv:overflow-auto">
+        <div class="flex-1 min-h-0 overflow-auto">
           <div>
-            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-sm kv:uppercase">Branches</div>
+            <div class="pt-1 pb-0.5 text-muted-foreground text-graph-sm uppercase">Branches</div>
             <button
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
@@ -822,13 +822,13 @@ watch(
             </button>
             <div
               v-if="branchSections.branches.visible.length === 0"
-              class="kv:text-muted-foreground kv:py-0.5 kv:px-1"
+              class="text-muted-foreground py-0.5 px-1"
             >
               No matching branches
             </div>
           </div>
           <div>
-            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-sm kv:uppercase">Remote branches</div>
+            <div class="pt-1 pb-0.5 text-muted-foreground text-graph-sm uppercase">Remote branches</div>
             <button
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
@@ -853,26 +853,26 @@ watch(
            but deliberately never its uppercase/letter-spacing — that primitive styles a short
            section label, and the branch name here is live data, which must never be re-cased. -->
       <header
-        class="kv:flex kv:flex-col kv:gap-0.5 kv:py-1 kv:px-1.5 kv:border-b kv:border-panel-border kv:shrink-0 kv:min-w-0"
+        class="flex flex-col gap-0.5 py-1 px-1.5 border-b border-border shrink-0 min-w-0"
       >
-        <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
+        <div class="flex items-center gap-1 min-w-0">
           <TooltipIconButton
             icon="chevron-left"
             label="Back to branch selection"
             data-testid="review-back-button"
             @click="goBackToSelection"
           />
-          <div class="kv:flex kv:flex-col kv:gap-0.5 kv:flex-1 kv:min-w-0">
-            <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
+          <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+            <div class="flex items-center gap-1 min-w-0">
               <CodiconIcon name="git-branch" :size="13" />
               <span
-                class="kv:font-data kv:font-semibold kv:truncate"
+                class="font-data font-semibold truncate"
                 data-testid="review-branch-name"
                 >{{ review.branch.value }}</span
               >
             </div>
-            <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
-              <span class="kv:text-muted-foreground kv:shrink-0" aria-hidden="true">↔</span>
+            <div class="flex items-center gap-1 min-w-0">
+              <span class="text-muted-foreground shrink-0" aria-hidden="true">↔</span>
               <BaseSelector
                 :resolution="review.resolution.value"
                 :refs-state="refsState"
@@ -889,7 +889,7 @@ watch(
         </div>
         <div
           v-if="review.phase.value === 'listing'"
-          class="kv:font-ui kv:text-muted-foreground kv:text-sm kv:truncate"
+          class="font-ui text-muted-foreground text-graph-sm truncate"
         >
           {{ comparisonSummaryLabel }}
         </div>
@@ -962,16 +962,16 @@ watch(
         </ToggleGroup>
       </div>
 
-      <div class="kv:flex-1 kv:min-h-0 kv:flex kv:flex-col">
-        <p v-if="review.phase.value === 'resolving'" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
+      <div class="flex-1 min-h-0 flex flex-col">
+        <p v-if="review.phase.value === 'resolving'" class=" p-3 text-muted-foreground">
           Resolving comparison…
         </p>
 
         <div
           v-else-if="review.phase.value === 'error'"
-          class="kv:flex kv:flex-col kv:items-start kv:gap-1 kv:p-3"
+          class="flex flex-col items-start gap-1 p-3"
         >
-          <p class="kv:m-0 kv:text-error">Couldn't compare — {{ review.resolveError.value }}</p>
+          <p class=" text-error">Couldn't compare — {{ review.resolveError.value }}</p>
           <Button variant="dialog" size="kira" data-testid="review-retry" @click="retryCompare">
             Retry
           </Button>
@@ -979,7 +979,7 @@ watch(
 
         <div
           v-else-if="review.phase.value === 'ask'"
-          class="kv:m-0 kv:p-3 kv:text-muted-foreground"
+          class=" p-3 text-muted-foreground"
           data-testid="review-ask"
         >
           <p>Nothing was detected for <strong>{{ review.branch.value }}</strong> — pick a base above. We won't guess.</p>
@@ -987,7 +987,7 @@ watch(
 
         <p
           v-else-if="review.phase.value === 'unrelated'"
-          class="kv:m-0 kv:p-3 kv:text-muted-foreground"
+          class=" p-3 text-muted-foreground"
           data-testid="review-unrelated"
         >
           “{{ review.branch.value }}” and “{{ review.resolution.value?.base }}” share no common
@@ -996,7 +996,7 @@ watch(
 
         <p
           v-else-if="review.phase.value === 'empty'"
-          class="kv:m-0 kv:p-3 kv:text-muted-foreground"
+          class=" p-3 text-muted-foreground"
           data-testid="review-empty"
         >
           “{{ review.branch.value }}” adds no commits to “{{ review.resolution.value?.base }}”.
@@ -1007,7 +1007,7 @@ watch(
         >
           <div
             v-if="review.staleReview.value"
-            class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-1.5 kv:bg-hover kv:border-b kv:border-panel-border kv:shrink-0 kv:font-ui"
+            class="flex items-center gap-1 py-1 px-1.5 bg-hover border-b border-border shrink-0 font-ui"
             role="status"
             data-testid="review-stale-banner"
           >
@@ -1022,7 +1022,7 @@ watch(
 
           <div
             ref="rowsEl"
-            class="kv:flex-1 kv:min-h-0 kv:overflow-auto kv:outline-none"
+            class="flex-1 min-h-0 overflow-auto outline-none"
             role="tree"
             aria-label="Commits"
             @keydown="onRowsKeydown"
@@ -1049,7 +1049,7 @@ watch(
                server-fetching "Load more" below it. Mutually exclusive with that button (v-else-if)
                so only one affordance shows at a time: reveal the local buffer first, only then ask
                the server for more. -->
-          <div v-if="shas.length > renderCap" class="kv:flex kv:justify-center kv:py-1 kv:px-1.5 kv:shrink-0">
+          <div v-if="shas.length > renderCap" class="flex justify-center py-1 px-1.5 shrink-0">
             <!-- `kv-review-load-more-button` carries no styling of its own (verified: no rule ever
                  existed for it) — kept as a plain test-selector hook,
                  `review-commit-list-cap.spec.ts`'s own precedent. -->
@@ -1064,7 +1064,7 @@ watch(
                takes no cancellation classes — Button's own toolbar variant already matches. -->
           <div
             v-else-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
-            class="kv:flex kv:justify-center kv:py-1 kv:px-1.5 kv:shrink-0"
+            class="flex justify-center py-1 px-1.5 shrink-0"
           >
             <Button
               variant="toolbar"
@@ -1085,7 +1085,7 @@ watch(
             reviewFiles &&
             filesActions
           "
-          class="kv:flex-1 kv:min-h-0"
+          class="flex-1 min-h-0"
           :review-files="reviewFiles"
           :store="review.store"
           :actions="filesActions"
@@ -1098,7 +1098,7 @@ watch(
           v-else-if="
             review.phase.value === 'listing' && review.pane.value === 'comments' && reviewComments
           "
-          class="kv:flex-1 kv:min-h-0"
+          class="flex-1 min-h-0"
           :review-comments="reviewComments"
           @select-comment="onSelectComment"
         />

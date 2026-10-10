@@ -74,7 +74,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
 <template>
   <div class="flex flex-col min-h-0 h-full">
     <div class="flex items-center gap-1 h-bar px-2 border-b border-border shrink-0 font-ui">
-      <span class="text-muted-foreground kv:text-sm" data-testid="review-comments-count">{{
+      <span class="text-muted-foreground text-graph-sm" data-testid="review-comments-count">{{
         countLabel
       }}</span>
       <TooltipIconButton
@@ -91,7 +91,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
       />
-      <div v-else class="flex items-center gap-1 ml-auto kv:text-base">
+      <div v-else class="flex items-center gap-1 ml-auto text-graph-md">
         <Button variant="toolbar" size="kira" @click="reviewComments.clear()">
           Confirm clear ({{ reviewComments.comments.value.length }})
         </Button>
@@ -127,7 +127,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
               <div class="flex items-center gap-1">
                 <button
                   type="button"
-                  class="font-data text-muted-foreground kv:text-sm bg-transparent border-0 p-0 cursor-pointer after:absolute after:inset-0"
+                  class="font-data text-muted-foreground text-graph-sm bg-transparent border-0 p-0 cursor-pointer after:absolute after:inset-0"
                   :aria-label="`Open ${group.path} ${lineLabel(c.range)}`"
                   @click="emit('select-comment', group.path)"
                 >
@@ -148,7 +148,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
                   @click="reviewComments.remove(c.id)"
                 />
               </div>
-              <p class="m-0 pl-2.5 whitespace-pre-wrap text-fg kv:text-base">{{ c.body }}</p>
+              <p class="m-0 pl-2.5 whitespace-pre-wrap text-fg text-graph-md">{{ c.body }}</p>
             </li>
           </ul>
         </section>
