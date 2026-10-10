@@ -379,7 +379,7 @@ test('the collection menu Delete confirms and deletes it', async ({ relaunch }) 
     .toEqual({ id: 'c-be' });
 });
 
-test('a script moves between collections from its context menu', async ({ relaunch }) => {
+test('contract: a script moves between collections from its context menu', async ({ relaunch }) => {
   const collections = [
     {
       id: 'c-be',
@@ -404,6 +404,11 @@ test('a script moves between collections from its context menu', async ({ relaun
       { channel: IPC.customScriptsCreateCollection, response: collections[1] },
     ],
   });
+  const toCollection = contract<object>(
+    'script-collections',
+    'args:CustomScriptsService.Move#to-collection',
+  );
+  const toNone = contract<object>('script-collections', 'args:CustomScriptsService.Move#to-none');
   const moves = () =>
     control
       .log()
@@ -421,13 +426,13 @@ test('a script moves between collections from its context menu', async ({ relaun
     '',
   );
   await page.locator('[data-testid="menu-item-move-to-c-web"]').click();
-  await expect.poll(moves).toEqual([{ id: script.id, collectionId: 'c-web' }]);
+  await expect.poll(moves).toEqual([{ ...toCollection, id: script.id, collectionId: 'c-web' }]);
 
   await openMoveMenu();
   await page.locator('[data-testid="menu-item-move-to-none"]').click();
   await expect.poll(moves).toEqual([
-    { id: script.id, collectionId: 'c-web' },
-    { id: script.id, collectionId: null },
+    { ...toCollection, id: script.id, collectionId: 'c-web' },
+    { ...toNone, id: script.id, collectionId: null },
   ]);
 
   await openMoveMenu();

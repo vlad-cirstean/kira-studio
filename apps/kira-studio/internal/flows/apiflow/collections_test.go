@@ -482,3 +482,27 @@ func TestMoveRenameGrpcItem(t *testing.T) {
 		t.Fatalf("Export = %+v (%v), want the gRPC item skipped", exp, err)
 	}
 }
+
+func TestMoveRequest(t *testing.T) {
+	app := flowharness.New(t)
+	cs := app.W.Collections
+	from, to := newCollection(t, app, "from"), newCollection(t, app, "to")
+	item, err := cs.CreateItem(bridge.CollectionsCreateItemArgs{CollectionID: from.ID, Kind: model.CollectionItemRequest, Name: "health"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := bridge.CollectionsMoveItemArgs{ItemID: item.ID, CollectionID: to.ID}
+	if err := cs.MoveItem(args); err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, "api-move", "args:CollectionsService.MoveItem", args)
+	all, err := cs.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range all.Items {
+		if it.ID == item.ID && it.CollectionID != to.ID {
+			t.Fatalf("item in %s after the move, want %s", it.CollectionID, to.ID)
+		}
+	}
+}

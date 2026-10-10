@@ -285,9 +285,13 @@ test('a waiting run shows no popup in a window the router did not target', async
   await expect(page.locator('[data-testid="schedule-confirm"]')).toHaveCount(0);
 });
 
-test('the runs list shows Skipped with its reason; a headless run opens its tab', async ({
+test('contract: the runs list shows Skipped with its reason; a headless run opens its tab', async ({
   relaunch,
 }) => {
+  const overlap = contract<{ outcome: { reason: string } }>(
+    'schedule-overlap',
+    'ScriptRunsService.Get#skipped',
+  );
   const { window: page } = await relaunch({ control: BASE });
   await openPanel(page);
   await emitWailsEvent(
@@ -295,12 +299,7 @@ test('the runs list shows Skipped with its reason; a headless run opens its tab'
     IPC.scriptRunsChanged,
     run('skipped', {
       id: 'run-s',
-      outcome: {
-        status: 'skipped',
-        reason: 'the previous run is still running (started 09:00)',
-        source: 'schedule',
-        reported: false,
-      },
+      outcome: overlap.outcome,
     }),
   );
   const skipped = page.locator('[data-testid="run-row"][data-state="skipped"]');
@@ -308,7 +307,7 @@ test('the runs list shows Skipped with its reason; a headless run opens its tab'
   await expect(skipped.locator('[data-testid="run-trigger"]')).toContainText('scheduled');
   await skipped.locator('button').first().click();
   await expect(skipped.locator('[data-testid="run-outcome-reason"]')).toContainText(
-    'still running (started 09:00)',
+    overlap.outcome.reason,
   );
 
   await emitWailsEvent(page, IPC.scriptRunsChanged, run('running', { id: 'run-h' }));

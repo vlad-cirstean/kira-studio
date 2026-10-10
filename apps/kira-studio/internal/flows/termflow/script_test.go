@@ -86,12 +86,16 @@ func TestScriptCollections(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := cs.Move(bridge.CustomScriptsMoveArgs{ID: s1.ID, CollectionID: &b.ID}); err != nil {
+	toB := bridge.CustomScriptsMoveArgs{ID: s1.ID, CollectionID: &b.ID}
+	if err := cs.Move(toB); err != nil {
 		t.Fatal(err)
 	}
-	if err := cs.Move(bridge.CustomScriptsMoveArgs{ID: s2.ID, CollectionID: nil}); err != nil {
+	toNone := bridge.CustomScriptsMoveArgs{ID: s2.ID, CollectionID: nil}
+	if err := cs.Move(toNone); err != nil {
 		t.Fatal(err)
 	}
+	app.Contract(t, "script-collections", "args:CustomScriptsService.Move#to-collection", toB)
+	app.Contract(t, "script-collections", "args:CustomScriptsService.Move#to-none", toNone)
 	if err := cs.RenameCollection(bridge.CustomScriptsRenameCollectionArgs{ID: b.ID, Name: "Renamed"}); err != nil {
 		t.Fatal(err)
 	}

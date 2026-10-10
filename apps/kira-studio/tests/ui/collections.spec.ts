@@ -142,7 +142,7 @@ test('collections — the tree renders and a request opens into the existing tab
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(1);
 });
 
-test('collections — a request moves to another collection from its context menu', async ({
+test('contract: collections — a request moves to another collection from its context menu', async ({
   relaunch,
 }) => {
   const tree = {
@@ -163,6 +163,7 @@ test('collections — a request moves to another collection from its context men
       },
     ],
   });
+  const moveArgs = contract<Record<string, string>>('api-move', 'args:CollectionsService.MoveItem');
   await openHttpMode(page);
   await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
 
@@ -175,7 +176,7 @@ test('collections — a request moves to another collection from its context men
   await page.locator('[data-testid="menu-item-move-to-col-2"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.collectionsMoveItem)?.args)
-    .toEqual({ itemId: 'item-health', collectionId: 'col-2' });
+    .toEqual({ ...moveArgs, itemId: 'item-health', collectionId: 'col-2' });
 
   await row(page, 'item-health').click({ button: 'right' });
   await page.locator('[data-testid="menu-item-move-to-collection"]').hover();
@@ -188,7 +189,7 @@ test('collections — a request moves to another collection from its context men
           .filter((e) => e.channel === IPC.collectionsMoveItem)
           .at(-1)?.args,
     )
-    .toEqual({ itemId: 'item-health', collectionId: 'col-new' });
+    .toEqual({ ...moveArgs, itemId: 'item-health', collectionId: 'col-new' });
   await expect(page.locator('[data-testid="collection-rename-input"]')).toBeFocused();
 });
 

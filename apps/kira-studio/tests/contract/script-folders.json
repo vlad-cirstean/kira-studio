@@ -1,0 +1,10 @@
+{
+  "ScriptRunsService.ResolveDir#legacy": {
+    "base": "<home>",
+    "blocker": "",
+    "branch": "",
+    "mode": "home",
+    "path": "<home>",
+    "pending": false
+  }
+}
