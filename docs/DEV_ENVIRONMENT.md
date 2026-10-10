@@ -44,6 +44,16 @@ means it hasn't been applied yet; don't recreate one that already exists for the
 and don't let this workaround become an excuse to touch workflow files more often than the task
 needs.
 
+**Pending now (apply from an environment with the `workflow` scope, then delete the file in the same
+commit):**
+
+- `docs/pending-changes/.github__workflows__release.yml.patch` — stop stamping the removed extension
+  manifest (`apps/kira-space-vscode/package.json`). **Until applied, `release.yml` fails at its version step.**
+- `docs/pending-changes/.github__workflows__pr.yml.patch` — rename two step names that still say `gitsock`.
+  Cosmetic.
+
+Apply each with `git apply docs/pending-changes/<file>`. No `docs/pending-workflows/` file exists.
+
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`, and Docker flow tests)
 
 - **Claude Code on the web's Linux containers**: `docker` is preinstalled but the daemon isn't
@@ -338,7 +348,7 @@ historical prose.
 ## Kira Space real backend in a sandbox — server-tag recipe (P126)
 
 Build: `go build -tags server ./apps/kira-space/...` (Wails v3/Go's own `server` platform, above),
-temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
+temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-mobile` first: `main.go` embeds `frontend/dist-mobile`.
 
 - **Page boots with `/?window=<uuid>`**: the renderer calls `WindowsService.Ensure`, which creates
   the `windows` row. No seeding. Import repos via `CodeWorkspaceService.ImportRepo`.
@@ -457,6 +467,25 @@ Sandbox notes:
 - Studio's harness fakes the `claude` MCP installer. `TestDbMcpInstallRegisters` forwards the arguments the
   fake records to the real `mcpinstall` installer.
 - `~/.claude.json` is not compared in the settings test: the CLI rewrites it on every run (P233 A13).
+
+## Load, disk and test scope (P236-P251)
+
+- **Run one heavy suite at a time.** The sandbox has 4 CPUs. Two Go suites, or a Go suite beside Playwright,
+  push load above 20 and flake specs that pass alone (list in `ARCHITECTURE.md` Known open items). Rerun
+  the single test alone (`-count=3`, `--repeat-each`) before calling it broken.
+- **`golangci-lint` refuses parallel instances** (two runs fail on the lock). Run it alone. On a lock error
+  wait 60 s and retry. This covers `bun run lint:go`, `lint:claude` and the pre-push hook.
+- **Check `df -h /` before a build.** Aim for 6 GB free. The Go build cache once reached 8 GB and filled the
+  disk (P236). Reclaim regenerable files first: `/tmp/go-build*`, `/tmp/go-link-*`,
+  `/tmp/playwright-transform-cache-*`, `apps/*/test-results`, `playwright-report`. `go clean -cache` only
+  when the disk is full: the next build is cold. Keep the Docker images (`docker image prune` would force a
+  pull before the complete suites).
+- **`e2e-real` keeps only what cannot split at the IPC boundary** (P249): Space `boot-real`, `multiwindow-real`,
+  `prompts-two-windows-real`, `terminal-real`; Studio `docker-real`, `mariadb-real`, `multiwindow-real`,
+  `postgres-real`, `prompts-two-windows-real`, `sqlite-real`, `terminal-real`. Every other scenario is a Go
+  flow test plus a UI spec on the same contract fixtures (section above).
+- **A worktree whose `node_modules` is a symlink to another checkout** writes `bun install` results through
+  it: P251's `@wailsio/runtime` bump changed the shared copy. Run `bun install` in the worktree itself.
 
 ## Playwright UI tier — `webkit` needs fetching explicitly
 

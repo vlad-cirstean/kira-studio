@@ -31,10 +31,10 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P233 | Claude Code hooks only for sessions Kira Space starts: audit every place Kira Space or Kira Studio changes the user's real Claude Code configuration (`~/.claude/settings.json`, project `.claude/settings.json`, `.claude.json`, MCP registration, hooks), and move each to per-session injection (e.g. `--settings <file>` / `--mcp-config` passed only when Kira Space launches the agent or terminal session, hook shim scoped by an env var set only there). Kira Space must make no change to the user's actual settings files; migrate or remove entries earlier versions wrote, with an explicit user-visible cleanup step. Real-flow test that proves settings.json is byte-identical after the flows. | Done |
 | P234 | Docs refresh: update `docs/ARCHITECTURE.md` (incl. Parallelism, process wiring with `appwire`, stale git-pairing-real line, testing section), `docs/DEV_ENVIRONMENT.md`, the v2.2 README and root `README.md` to match everything shipped in v2.2 (P210-P233). | Done |
 | P235 | Code review (one Opus round, all three dimensions) of everything changed since the P227 close-out `605f63e3f` (P228-P234), then one Sonnet fixer. Findings file `plans/P235-findings.md` committed before the fixer, deleted once fixed. | Done |
-| P236 | More real-flow coverage: audit every bound method and git stream request of both apps against the flow tests, add Go flow tests for the gaps plus user journeys (first run, restart and persistence, two windows, error paths, concurrency), new `e2e-real` journey and restart specs, a bound-method coverage gate, and root-cause fixes for the flaky `repo-graph-paging` "columns resized wide", `ade-board-real` and `ade-v2-panel.spec.ts:239` specs. Fix what the tests find | Todo |
-| P237 | Real `claude` test suite: opt-in only (`-tags realclaude` and `KIRA_REAL_CLAUDE=1`; never in default tests, hooks or CI), haiku with a tiny budget, per-area tests (hook injection and payload contract, settings untouched, ADE headless run and TUI session, memory MCP, DB MCP); the existing `claudesmoke` tests move to the same gate; `docs/DEV_ENVIRONMENT.md` table of area to command with cost; one `CLAUDE.md` pointer | Todo |
-| P238 | Desktop notification when a Kira-started Claude Code session finishes (Stop) or needs input (permission or elicitation Notification), and when an ADE headless run ends (run state; headless runs have no hooks): repo or task name plus a bounded message, click focuses the window and tab, suppressed while that tab is focused, cooldown, per-kind settings toggles and a test button in Settings > Claude Code; native via the Wails v3 notifications service on macOS, no-op on Linux and `-tags server` | Todo |
-| P239 | Claude Code usage limits (5-hour and weekly: % used, reset time) in the status bar, ADE module only. Default source: the `rate_limits` Claude Code hands to a status-line command injected per session (user's own status line kept). Opt-in fallback (off by default): read Claude Code's stored OAuth token read-only and call the undocumented usage endpoint, no refresh, no writes. TanStack Query, tooltip, states, off switch | Todo |
+| P236 | More real-flow coverage: audit every bound method and git stream request of both apps against the flow tests, add Go flow tests for the gaps plus user journeys (first run, restart and persistence, two windows, error paths, concurrency), new `e2e-real` journey and restart specs, a bound-method coverage gate, and root-cause fixes for the flaky `repo-graph-paging` "columns resized wide", `ade-board-real` and `ade-v2-panel.spec.ts:239` specs. Fix what the tests find | Done |
+| P237 | Real `claude` test suite: opt-in only (`-tags realclaude` and `KIRA_REAL_CLAUDE=1`; never in default tests, hooks or CI), haiku with a tiny budget, per-area tests (hook injection and payload contract, settings untouched, ADE headless run and TUI session, memory MCP, DB MCP); the existing `claudesmoke` tests move to the same gate; `docs/DEV_ENVIRONMENT.md` table of area to command with cost; one `CLAUDE.md` pointer | Done |
+| P238 | Desktop notification when a Kira-started Claude Code session finishes (Stop) or needs input (permission or elicitation Notification), and when an ADE headless run ends (run state; headless runs have no hooks): repo or task name plus a bounded message, click focuses the window and tab, suppressed while that tab is focused, cooldown, per-kind settings toggles and a test button in Settings > Claude Code; native via the Wails v3 notifications service on macOS, no-op on Linux and `-tags server` | Done |
+| P239 | Claude Code usage limits (5-hour and weekly: % used, reset time) in the status bar, ADE module only. Default source: the `rate_limits` Claude Code hands to a status-line command injected per session (user's own status line kept). Opt-in fallback (off by default): read Claude Code's stored OAuth token read-only and call the undocumented usage endpoint, no refresh, no writes. TanStack Query, tooltip, states, off switch | Done |
 | P240 | One-step review from the ADE Plan: a Review code action on every task card, branch row, task and branch context menu, task panel header and a keyboard shortcut (Cmd/Ctrl+Shift+R on the selected task or branch) opens the existing per-branch review window on the branch and its base, focusing an already open one; a task with several branches picks one; hidden for parked branches, disabled with a reason for an uncreated branch or one with no commits on its base; focus returns to the invoking element. Frontend only, reuses `OpenReviewWindow`. Waits for Stream A (P236 owns `ade/v2/**`) | Done |
 | P241 | Task base branch and headless rebase: pick the base (repo main default, any local or remote branch, or another planner branch to stack on) when creating a task and per branch; a Change base action on a started task stores the new base and rebases the branch and its stacked children. Rebase, Queue after and Change base become one shared button rule across tag, header and fix menu (no popup), run as a headless Claude run through the run engine after the existing prompt dialog. The agent reports through `finish_step` (done, failed or needs_input with reason, conflicted files, last git error, what it tried); Kira Space verifies the result in git, synthesizes `no report` on crash, exit or timeout, stores a structured outcome on the run, shows it on the board, panel, Needs you and the P238 notification, and serves it to other agents via a `run_outcome` MCP tool. Abort rebase as an explicit action. Waits for Streams A and C and for P240 (shared files) | Done |
 | P242 Part 1 | Automations: rename the Terminal module to Automations (mode key, ids, tests, docs; real terminals keep their name); one shared run outcome (done, failed, blocked, cancelled with source and reason) for every ADE run and every script run; script runs in terminal tabs recorded in a run store with live state and elapsed time, a runs list, Stop, Copy for agent, status bar count; working directory per script (picked folder or default `<app home>/automations/<id>`, never `$HOME`; legacy rows keep `$HOME` with a notice). Runs after P241 | Done |
@@ -43,7 +43,7 @@ Branch `v2.0`. Max 2 concurrent streams. Stream A: P210 then P211 (memory, same 
 | P242 Part 4 | Recurring scripts: a cron schedule (5 fields, timezone, next 3 fires shown) on a normal or smart script; enable toggle, run now; due run shows a confirm popup by default, starts only after accept, per-script "run without prompt" option; overlap guard on every recurring script (normal or smart): previous run still running or awaiting accept popup means skip the tick, wait for next schedule, show it as `skipped` with reason in runs list; missed runs (app closed at fire time) skipped, fires only while the app runs; normal scripts run headless; runs in the same run list with a `scheduled` trigger; notification on failure (Space). `adhocore/gronx` | Done |
 | P243 Part 1 | Drop the VS Code extension, prep: carry test coverage off the extension and `git.sock` before deleting them. Audit every `internal/gitsock` Go test and every extension webview interaction/layout spec, classify (transport-only, already covered, uncovered), port the uncovered ones to native-stream flow tests and Space `ui` specs; move the graph-chunk golden fixture and the git stream perf tests to the native stream. Nothing deleted. Runs after P242 Part 4 and after Stream A (P236) has landed | Done |
 | P243 Part 2 | Drop the VS Code extension and the git server it uses: delete `apps/kira-space-vscode`, `internal/gitsock`, `internal/gitvsix`, `GitClientsService`, the Connected editors pane and pairing dialog, `git_clients` (migration), `.vsix` build and packaging, `test:webview`; drop extension-only contract surface (`worktree.prepare*`, host capabilities, `HostKind`, `settings.changed`, `connection.changed`, injected params, socket channel, RPC server, base64 encoding) and the stream allowlist; remove leftover `git.sock` files at startup; pending workflow patches; docs. No restyling (P245) | Done |
-| P244 | Docker page polish: Terminal tab must not auto-open a session (explicit 'New session' button), fix the overlapping text in the engine dropdown, remove CPU and RAM from the left bar | Todo |
+| P244 | Docker page polish: Terminal tab must not auto-open a session (explicit 'New session' button), fix the overlapping text in the engine dropdown, remove CPU and RAM from the left bar | Done |
 | P245 | Git module visual alignment: make the git module look exactly like the rest of the app, using only Tailwind and mostly default values (drop `kv:` prefix indirection and custom styles) | Done |
 | P246 | Popup routing across windows plus system notifications: route every app-originated popup or prompt by origin through one central Go prompt router (origin window key or none) and one shared frontend host. Window-triggered shows in that window. Generic (no originating window: cron, MCP, background script or agent event) shows only in the main window (lowest-order real, non-ephemeral window), never in every window, never duplicated; none open queues it for next window open or focus. Each popup also fires a system notification through the P238 sink (click focuses the right window and popup; answering or dismissing anywhere clears it). Covers the P242 Part 4 cron 'run now?' confirm, MCP-initiated prompts, script and automation triggers; Space and Studio (Studio has no ADE or cron windows, apply to its existing prompts). Depends on P238 and P242 Part 3, lands after both | Done |
 | P247 | Workflow branching overhaul: an agent step declares its results (each ok or not ok, with a route: next step, a later step, an earlier step or itself as a bounded loop, end of stage, or stop); `finish_step` takes exactly one of that step's results (per-run schema enum, plus `needs_input`; P241 reason, conflicted files, last git error, tried kept) and the engine routes on it with per-edge loop limits; existing `on_failure` workflows and task snapshots work unchanged. The Form editor becomes a graph editor (Vue Flow, MIT): no up/down buttons, edges green for ok, red for not ok, neutral when both lead to the same step; `VarText` previews; result and route on board, panel, Needs you and notification | Done |
@@ -762,6 +762,35 @@ Done. Review findings F1-F6 all fixed; findings file deleted.
 
 Skipped: none. Checks: lint, typecheck, lint:dead, golangci-lint, `go build` (+ `-tags server`), Go tests for bridge/grpcclient/adapterhost/shell, `test:flows:studio`, Studio `grpc-request` and Space `repo-graph-lines`/`repo-workspace` UI specs pass. `TestResolveSource_CancelOnlyAffectsOwnCaller` flaked once under load, passes alone and on the base.
 
+## P236 result
+
+Plan `plans/P236-plan.md`; result in `plans/P236-result.md`; findings in `plans/P236-findings.md`.
+Bound-method and git-request coverage gate (`flows/coverage/`, now 0 exemptions in both apps), Go journeys
+(first run, restart and persistence, two windows, error paths, parallel git streams) and `e2e-real` journeys
+with a `relaunch()` fixture. Fixes found on the way: `AttachPush` methods no longer bound (F1), worktree
+preflight on the checked-out branch (F2), a repo deleted while open (F3), DataGrip import MCP modes (F6),
+gRPC reflection deadline (F7), cancelled git run `Cause` (F8). No fix: F4 (`InstallSemanticModel` has no URL
+seam, so no hermetic offline test), F5 (`claude` off `PATH` shows the shell's own text).
+
+## P237 result
+
+Plan `plans/P237-plan.md`; result in `plans/P237-result.md`. Opt-in real `claude` suite: hook injection and
+payload contract, settings untouched, ADE headless runs and TUI stage sessions, memory MCP, install and gate,
+Database MCP. P249 moved it from tagged packages to the nested modules `apps/*/tests/claude/` run by
+`bun run test:claude*` (no tag, no env flag); `docs/DEV_ENVIRONMENT.md` "Real `claude` tests" has the per-area rows.
+
+## P238 result
+
+Plan `plans/P238-plan.md`; result in `plans/P238-result.md`. Desktop notification on a Stop, a permission or
+elicitation prompt and an ADE headless run end. Design facts in `docs/ARCHITECTURE.md` "Agent notifications (P238)".
+
+## P239 result
+
+Plan `plans/P239-plan.md`; result in `plans/P239-result.md`. Usage limits in the ADE status bar from the
+`rate_limits` Claude Code hands to an injected status-line command (interactive tabs) and from stream-json
+`rate_limit_event` (headless runs). User scope change: no account source, no credential read, no network call.
+Design facts in `docs/ARCHITECTURE.md` "Claude Code usage limits (P239)".
+
 ## P240 result
 
 One-step Review code from the ADE Plan. Frontend only; no `internal/**` product change. Detail in
@@ -817,7 +846,7 @@ is applied** (the extension manifest it stamps is gone); push the patch from a s
 
 ## P244 result
 
-Pending.
+Plan `plans/P244-plan.md`; result in `plans/P244-result.md`. Docker Terminal tab opens a session only on New session, engine dropdown no longer overlaps, CPU and RAM gone from the side list (detail header and overview keep them).
 
 ## P245 result
 
@@ -827,15 +856,15 @@ only `theme/git.css` remains. 772 `kv:` tokens converted; `vscode-bridge.css` de
 
 ## P246 result
 
-Pending.
+Plan `plans/P246-plan.md`; result in `plans/P246-result.md`. One prompt router for every popup (schedule confirm, Database MCP approval, git credential, mobile pairing, update) plus system notifications; git stream contract 46 to 47. Design facts in `docs/ARCHITECTURE.md` "Prompt routing (P246)".
 
 ## P247 result
 
-Pending.
+Plan `plans/P247-plan.md`; result in `plans/P247-result.md`. Step results with routes (next, later or earlier step, bounded loop, end, stop) in workflow YAML, per-run `finish_step` schema, route engine, graph editor, result and route on board, panel, Needs you and notification. Launch failures no longer auto-retry. Design facts in `docs/ARCHITECTURE.md` "Workflows" and "Run engine".
 
 ## P248 result
 
-Pending.
+Plan `plans/P248-plan.md`; result in `plans/P248-result.md`. Paste credentials panel in the connection dialog and Update credentials on a saved fields-mode connection. Frontend only; `shell-quote` 1.10.0 added.
 
 ## P249 result
 

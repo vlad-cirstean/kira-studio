@@ -5,7 +5,7 @@
 A native macOS git client and code workspace: a commit graph, branch review and remote operations
 over a VS Code-adjacent workspace (file tree, Monaco viewer, diffs, search), with coding agents, a
 memory store, a terminal and a phone view on your home network — built on Wails (Go)
-and Vue 3. Its modules are Git, Agents, Terminal and Memory.
+and Vue 3. Its modules are Git, Agents, Automations and Memory.
 
 ## Status
 
@@ -43,10 +43,19 @@ and Vue 3. Its modules are Git, Agents, Terminal and Memory.
 
 - **Agents** — a task planner with workflows, runs and interactive Claude Code sessions. Hooks ride
   each session's own `--settings` file, so your Claude Code settings files are never touched.
+  A task picks its base branch (the repo's main, any branch, or another planner branch to stack on); a
+  headless run rebases it when the base changes. **Review code** opens the per-branch review in one step
+  (Cmd/Ctrl+Shift+R). A workflow step declares its results and routes each to the next step, an earlier
+  step (a bounded loop), the end of the stage or a stop; a graph editor draws and edits the routes.
+  A desktop notification fires when a session finishes or needs input, or a headless run ends. The status
+  bar shows Claude Code's 5-hour and weekly usage for the sessions Kira starts.
 - **Memory** — an MCP server for Claude Code with keyword and semantic search. Semantic search needs
   an optional local model of about 35 MB, downloaded when you click the button in Settings > Memory.
   Add memories by hand, or import files or folders in bulk.
-- **Automations** — an Automations module: scripts grouped in collections, each run in its own folder with a status and result, plus terminals.
+- **Automations** — scripts grouped in collections, each run in its own folder with a status and result,
+  plus terminals. A smart script is a prompt run by headless Claude Code with typed parameters and a tool
+  allowlist; run it on a task or branch from Agents (in the task worktree if you choose), as a workflow
+  step, or on a cron schedule that asks you to confirm each due run.
 - **Phone view** — Settings > Mobile access serves the Agents board to a phone. It uses plain HTTP and
   is meant for a trusted home network only: you pair by QR code and approve the code on the desktop,
   device tokens expire after 30 days, and traffic is not encrypted.
@@ -189,6 +198,7 @@ The scripts specific to this app:
 | `bun run test:ui:space-mobile` | Builds the phone bundle, then runs its Playwright tests on iOS (WebKit) and Android (Chromium) profiles |
 | `bun run test:e2e-real:space` | Playwright against a real `-tags server` build of this app |
 | `bun run test:flows:space` | Go flow tests: the real app wiring on a temp home (`test:flows:space:complete` adds the slow permutations) |
+| `bun run test:claude:space` | Opt-in: real `claude` CLI, needs an authenticated install, spends a few cents |
 | `bun run test:visual:space` | Pixel-diff baselines |
 | `bun run package:space` | Builds the native Wails bundle and the `.dmg` around it, ad-hoc signs both — `apps/kira-space/bin/Kira Space.{app,dmg}` |
 
@@ -204,7 +214,7 @@ downloaded `models/`.
 ## Tests
 
 TypeScript suites under `apps/kira-space/tests/` (`unit/`, `ui/`, `mobile/`, `e2e-real/`, `visual/`,
-and an opt-in `perf/`), and the Go
+and an opt-in `perf/`), the shared `contract/` fixtures, the opt-in real-`claude` module `claude/`, and the Go
 suite under `apps/kira-space/`, including the flow tier (`test:flows:space`).
 `packages/db-fixtures/` is not exercised here — that's Kira Studio's own DB fixture corpus.
 
@@ -229,7 +239,9 @@ apps/kira-space/frontend/src    the Vue 3 app (bindings + the built bundle live 
 apps/kira-space/tests/unit      unit suite — no external resource
 apps/kira-space/tests/ui        Playwright against the built bundle, WebKit
 apps/kira-space/tests/mobile    Playwright for the phone bundle
-apps/kira-space/tests/e2e-real  Playwright against a real server build
+apps/kira-space/tests/e2e-real  Playwright against a real server build (only what cannot split at the IPC boundary)
+apps/kira-space/tests/contract  JSON fixtures shared by the Go flow tests and the UI specs
+apps/kira-space/tests/claude    opt-in tests against the real `claude` CLI (own Go module)
 apps/kira-space/tests/visual    pixel-diff baselines
 internal             repo-root Go shared by both apps: `shell`, `appevent`, `rpcstream`, `ipcerr`, `startupfail`, `appstorage`, `memory`, `agenthooks`, and more
 packages/workbench   the shared workbench shell (TitleBar/StatusBar/MainView/TabStrip), Pinia store factories, the Monaco editor bootstrap, both apps' test harnesses

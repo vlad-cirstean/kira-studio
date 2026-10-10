@@ -84,8 +84,10 @@ Per-engine adapter facts).
 - **Project panel** — a lazy, cached connection tree with per-connection colors, live status,
   search and hide/show filters.
 - **Connections** — fields or URI mode, test-connection, a per-connection **read-only guard**
-  enforced in the backend, an optional **pre-connect script** (for example a port-forward), and
-  import from a JetBrains DataGrip project.
+  enforced in the backend, an optional **pre-connect script** (for example a port-forward),
+  import from a JetBrains DataGrip project, and **paste credentials**: paste labelled text (key/value lines, `.env` lines or a `psql`/`mysql`-style
+  command) into the dialog, review what was recognised, and apply. **Update credentials** on a saved
+  connection changes only its username and password.
 - **Tabs** — open the same table any number of times, each with its own paging, sort, filter and
   scroll; session restore reopens tabs without auto-connecting.
 - **Data grid** — virtualized in both directions, page sizes from 10 to 10k, count-all on request,
@@ -107,9 +109,16 @@ Per-engine adapter facts).
   re-run, plus a persisted operation log.
 - **Also** — three-tier caching with no speculative prefetch
   ([`docs/PERF.md`](docs/PERF.md)), Touch ID (or system password) confirmation before revealing a saved password,
-  multiple windows (`⇧⌘N`), a command palette (`⇧⌘P`), an Automations module with scripts
-  grouped in collections, and Settings for appearance, data, cache, Api, Database MCP and advanced
+  multiple windows (`⇧⌘N`), a command palette (`⇧⌘P`), an Automations module (see below), and Settings for appearance, data, cache, Api, Database MCP and advanced
   options.
+
+### Automations
+
+Scripts grouped in collections. Each runs in its own folder under the app home (or a folder you choose)
+and keeps a run history with status, exit code and result. A **smart script** is a prompt run by headless
+Claude Code instead of a shell command: it takes typed parameters (text, select, multi-select, secret),
+a model, a budget and timeout, and a tick list of the tools and MCP servers it may use. A script can also
+**recur** on a cron schedule; a due run asks for confirmation by default and never replays a missed run.
 
 ### Docker
 
@@ -166,7 +175,7 @@ bun run dev:studio       # native window with hot reload (installs dependencies 
 bun run package:studio   # build and ad-hoc sign the .app and .dmg
 ```
 
-Other scripts you'll use most (all but the last two cover Kira Space too):
+Other scripts you'll use most (all but the last three cover Kira Space too):
 
 - `bun run setup` — install dependencies without building or running anything.
 - `bun run lint` and `bun run typecheck` — Biome plus the repo's style guards; TypeScript for every
@@ -177,6 +186,8 @@ Other scripts you'll use most (all but the last two cover Kira Space too):
 - `bun run test:flows:studio` and `bun run test:e2e-real:studio` — the Go flow tests, which run the
   real app wiring against real SQLite, HTTP and gRPC servers and Docker, and the full-stack
   Playwright tier.
+- `bun run test:claude:studio` — opt-in tests against the real `claude` CLI. They need an
+  authenticated `claude` and spend a few cents of tokens.
 
 `package.json` lists every script. `bun install` also installs git hooks: `pre-commit` runs lint and
 typecheck, `pre-push` runs the Go build and linters. The app stores its data in `~/.kira-studio/`

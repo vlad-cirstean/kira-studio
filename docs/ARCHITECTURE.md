@@ -2850,10 +2850,10 @@ home: the process logs and exits 0. A `SIGKILL`ed instance's lock is released by
 stale-pid file or manual cleanup exists.
 
 **Version compatibility is one number.** `gitrpc.ContractVersion` and
-`packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are equal (**46** today, asserted equal by
+`packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are equal (**47** today, asserted equal by
 tests on both sides). `app.init` returns `{contractVersion, serverVersion, git, dateFormat}`;
 `dateFormat` is Space's app-wide `appearance.dateFormat`. Both sides ship in one binary, so a mismatch
-is a build bug, not a runtime state. 46 removed the extension-only surface: `worktree.prepare`,
+is a build bug, not a runtime state. 47 (P246) dropped `credential.request` and `credential.provide` from the stream (credentials go through the relay snapshot and `GitCredentialService.Provide`). 46 removed the extension-only surface: `worktree.prepare`,
 `worktree.cancelPrepare`, `worktree.openWindow`, `editor.resolveConflict`, the `worktree.progress`,
 `settings.changed` and `connection.changed` events, `app.init`'s `host`, `settings` and
 `capabilities`, and the params the extension injected (`scope`, `pageSize`, `baseCandidates`,
@@ -3008,7 +3008,7 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**46**, P243 Part 2), and the wire types |
+| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**47**, P246), and the wire types |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
 | `gitprepare` | The worktree prepare script's execution seam, called by ADE only — the one shell exception, below |
@@ -3782,14 +3782,10 @@ existing `pendingReviewTargetByCodeRepoId`), consumed once by `RepoGraphView.vue
 `MountOptions.pendingUiAction` — the same "bootstrap-island" seam G10 D19's palette commands already
 use.
 
-**The date formatters moved to `@kira/git-core`.** `formatRelativeDate`/`formatAbsoluteDate` lived
-in `packages/git-ui/src/components/dateFormat.ts`, with a second copy in the extension's own
-`blameAge.ts` (git-ui's barrel pulls Vue into an extension-host bundle, so P5 couldn't import the
-original). Neither reason applies to the native app — `@kira/git-core` has no DOM dependency and is
-already eager here (`reviewDecorations.ts`'s own static import) — so both functions now live in
-`packages/git-core/src/util/dateFormat.ts`; git-ui re-exports them (keeping only the DOM-bound
-`measureAbsoluteDateWidth`), and the extension's own `blameAge.ts` copy is deleted in favor of the
-same import. One function, one home, three callers.
+**The date formatters live in `@kira/git-core`.** `formatRelativeDate`/`formatAbsoluteDate` are in
+`packages/git-core/src/util/dateFormat.ts` (no DOM dependency); `packages/git-ui/src/components/dateFormat.ts`
+re-exports them and keeps only the DOM-bound `measureAbsoluteDateWidth`. A second copy in the VS Code
+extension's `blameAge.ts` went away with the extension (P243 Part 2).
 
 **A settings toggle, defaulted on.** `appearance.inlineBlame` gates the inline renderer (the
 status-bar item is unaffected by it, above) — `views/repo/RepoFileView.vue` watches it live, so
