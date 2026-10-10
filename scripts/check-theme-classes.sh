@@ -759,6 +759,21 @@ check_no_kv_layer() {
 }
 check_no_kv_layer
 
+# P256: git-ui forms use Field/FieldLabel and focus uses focus-ring, never a raw <label> or a
+# hand-rolled outline-focus triplet.
+check_git_ui_primitives() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
+  hits=$(grep -rnP --include='*.vue' -- '<label[\s>]|outline-focus' "$GIT_UI_SRC" 2>/dev/null || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: git-ui must use Field/FieldLabel instead of <label> and focus-ring instead of outline-focus (P256):" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+check_git_ui_primitives
+
 if [ -s "$GREP_ERRORS" ]; then
   echo "check-theme-classes: grep failed, results are unreliable:" >&2
   cat "$GREP_ERRORS" >&2
