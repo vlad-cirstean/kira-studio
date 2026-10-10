@@ -50,4 +50,29 @@ func TestScriptEditorSave(t *testing.T) {
 		t.Fatalf("prompt = %+v, want {topic} resolved to its default", pv.Prompt)
 	}
 	app.Contract(t, "script-editor", "ScriptRunsService.Preview", pv, flowharness.Mask("hash"))
+
+	// Edit schedule, uncheck enabled, Save: the schedule stays stored, switched off.
+	offFields := args.Fields
+	offSchedule := *args.Fields.Schedule
+	offSchedule.Enabled = false
+	offFields.Schedule = &offSchedule
+	off := bridge.CustomScriptsUpdateArgs{ID: rec.ID, Fields: offFields}
+	app.Contract(t, "script-editor", "args:CustomScriptsService.Update#schedule-off", off)
+	updated, err := app.W.CustomScripts.Update(off)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Schedule == nil || updated.Schedule.Enabled || updated.Schedule.Cron != "0 9 * * 1-5" || !updated.Schedule.Confirm {
+		t.Fatalf("updated schedule = %+v, want kept and disabled", updated.Schedule)
+	}
+	list, err := app.W.CustomScripts.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range list.Scripts {
+		if s.ID == rec.ID && (s.Schedule == nil || s.Schedule.Enabled) {
+			t.Fatalf("listed schedule = %+v, want disabled", s.Schedule)
+		}
+	}
+	app.Contract(t, "script-editor", "CustomScriptsService.Update#schedule-off", updated)
 }
