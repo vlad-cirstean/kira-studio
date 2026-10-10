@@ -1,8 +1,13 @@
 // P15b D3(b): wholeFieldToken and templateToken are pure, DOM-free tokenizers behind
-// AutocompleteField.vue — completion.ts is app-side (theme/), so this lives here rather
+// AutocompleteField.vue — fieldCompletion.ts is exercised from this app's tests, so this lives here rather
 // than in packages/api-core/test.
 import { describe, expect, test } from 'bun:test';
-import { templateToken, wholeFieldToken } from '@workbench/editor/fieldCompletion';
+import {
+  braceToken,
+  envToken,
+  templateToken,
+  wholeFieldToken,
+} from '@workbench/editor/fieldCompletion';
 
 describe('wholeFieldToken (item 7 — F1: Content-T must not become Content-Content-Type)', () => {
   test('a hyphenated header name is one token, trimmed', () => {
@@ -85,5 +90,49 @@ describe('templateToken with a pipe (P17 D13(a))', () => {
 
   test('before any pipe, the token is still the name run from {{ (unaffected by this change)', () => {
     expect(templateToken('{{tok', 5)).toEqual({ from: 2, to: 5, word: 'tok' });
+  });
+});
+
+describe('braceToken (script prompt {name})', () => {
+  test('identifier run after a brace is the word', () => {
+    expect(braceToken('Look at {to', 11)).toEqual({ from: 9, to: 11, word: 'to' });
+  });
+
+  test('a bare brace is a non-null empty token', () => {
+    expect(braceToken('a {', 3)).toEqual({ from: 3, to: 3, word: '' });
+  });
+
+  test('a closed brace before the caret is null', () => {
+    expect(braceToken('{a} b', 5)).toBeNull();
+  });
+
+  test('a newline or non-identifier char between brace and caret is null', () => {
+    expect(braceToken('{a\nb', 4)).toBeNull();
+    expect(braceToken('{a-b', 4)).toBeNull();
+    expect(braceToken('{a b', 4)).toBeNull();
+  });
+});
+
+describe('envToken (script command $NAME / ${NAME})', () => {
+  test('$ followed by an identifier run', () => {
+    expect(envToken('echo $KIRA_P', 12)).toEqual({ from: 6, to: 12, word: 'KIRA_P' });
+  });
+
+  test('${ starts the token after the brace', () => {
+    expect(envToken('echo ${KIRA_P', 13)).toEqual({ from: 7, to: 13, word: 'KIRA_P' });
+  });
+
+  test('bare $ and ${ are non-null empty tokens', () => {
+    expect(envToken('$', 1)).toEqual({ from: 1, to: 1, word: '' });
+    expect(envToken('${', 2)).toEqual({ from: 2, to: 2, word: '' });
+  });
+
+  test('plain words and a lone brace are null', () => {
+    expect(envToken('echo KIRA', 9)).toBeNull();
+    expect(envToken('{KIRA', 5)).toBeNull();
+  });
+
+  test('a non-identifier char after $ is null', () => {
+    expect(envToken('$a-b', 4)).toBeNull();
   });
 });

@@ -73,6 +73,36 @@ export function templateToken(
   return { from, to: caret, word: text.slice(from, caret) };
 }
 
+const IDENT_RE = /[A-Za-z0-9_]/;
+
+function identStart(text: string, caret: number): number {
+  let from = caret;
+  while (from > 0 && IDENT_RE.test(text[from - 1] ?? '')) from--;
+  return from;
+}
+
+// `{name`: an identifier run directly after a `{` and ending at the caret. A newline, space or any
+// other character between the brace and the caret makes it null, so prose braces never suggest.
+export function braceToken(
+  text: string,
+  caret: number,
+): { from: number; to: number; word: string } | null {
+  const from = identStart(text, caret);
+  if (text[from - 1] !== '{') return null;
+  return { from, to: caret, word: text.slice(from, caret) };
+}
+
+// `$name` or `${name`: an identifier run directly after `$` or `${` and ending at the caret.
+export function envToken(
+  text: string,
+  caret: number,
+): { from: number; to: number; word: string } | null {
+  const from = identStart(text, caret);
+  const lead = text[from - 1] === '{' ? from - 2 : from - 1;
+  if (lead < 0 || text[lead] !== '$') return null;
+  return { from, to: caret, word: text.slice(from, caret) };
+}
+
 // A wider list is a scrollbar nobody reads — also the cap Ctrl+Space's "list everything" applies.
 export const MAX_VISIBLE = 12;
 
