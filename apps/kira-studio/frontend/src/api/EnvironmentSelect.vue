@@ -78,7 +78,7 @@ function manage(): void {
       <DropdownMenuTrigger as-child>
         <button
           type="button"
-          :class="[nativeSelectVariants({ variant: 'bordered' }), 'min-w-0']"
+          :class="[nativeSelectVariants({ variant: 'bordered', size: 'kira' }), 'min-w-0']"
           data-testid="api-environment-select"
           :data-value="activeEnvironmentId"
         >

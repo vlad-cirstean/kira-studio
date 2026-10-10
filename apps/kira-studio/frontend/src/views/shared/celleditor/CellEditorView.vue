@@ -566,7 +566,7 @@ const statusLine = computed(() => {
                    duplicate needed. -->
               <button
                 type="button"
-                :class="[nativeSelectVariants({ variant: 'bordered' }), 'max-w-40 font-ui']"
+                :class="[nativeSelectVariants({ variant: 'bordered', size: 'kira' }), 'max-w-40 font-ui']"
                 data-testid="cell-editor-format"
                 :disabled="isNullValue"
                 @click="openFormatMenu"

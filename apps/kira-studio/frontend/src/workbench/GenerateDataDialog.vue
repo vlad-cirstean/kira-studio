@@ -290,7 +290,7 @@ function onSequenceStartChange(index: number, start: number): void {
           <Input
             v-if="plan.recipe.kind === 'constant'"
             :model-value="plan.recipe.value"
-            class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
             :data-testid="`generate-data-constant-${plan.column.name}`"
             :disabled="running"
             @update:model-value="(v) => onConstantChange(index, String(v))"

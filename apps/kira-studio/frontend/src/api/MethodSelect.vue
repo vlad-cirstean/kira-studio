@@ -40,7 +40,7 @@ function select(method: unknown): void {
       <DropdownMenuTrigger as-child>
         <button
           type="button"
-          :class="cn(nativeSelectVariants({ variant: 'bordered' }), 'font-semibold font-data', methodTextClass(httpMethodToken(props.modelValue)))"
+          :class="cn(nativeSelectVariants({ variant: 'bordered', size: 'kira' }), 'font-semibold font-data', methodTextClass(httpMethodToken(props.modelValue)))"
           :data-testid="testid"
           :data-value="props.modelValue"
         >
