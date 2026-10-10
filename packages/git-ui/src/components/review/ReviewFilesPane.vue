@@ -20,8 +20,7 @@
 import type { CommitStore } from '@kira/git-core';
 import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
@@ -65,6 +64,16 @@ const diffModeOptions: readonly DiffModeOption[] = [
   { id: 'sinceReview', icon: ACTION_ICONS.diffSingle, label: 'Since review' },
   { id: 'range', icon: ACTION_ICONS.diffMultiple, label: 'Full range' },
 ];
+const diffModeItems = diffModeOptions.map((o) => ({
+  value: o.id,
+  label: o.label,
+  icon: codiconName(o.icon),
+  tooltip: o.label,
+}));
+const showingItems = computed(() => [
+  { value: 'needsReview', label: `Needs review · ${needsReviewCount.value}` },
+  { value: 'all', label: 'All' },
+]);
 
 const shown = computed(() =>
   hasFilter.value && showing.value === 'needsReview'
@@ -133,23 +142,18 @@ function onToggleReviewed(path: string): void {
       <!-- G12 D12/D16: which two revisions a click opens in the host's diff editor — the one real
            capability removing DiffView would otherwise have lost. -->
       <ViewToolbar class="font-ui">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="kira"
-          :model-value="reviewFiles.diffMode.value"
+        <SecondaryTabs
+          variant="segmented"
           aria-label="What to compare"
-          @update:model-value="(v) => v && reviewFiles.setDiffMode(v as ReviewDiffMode)"
+          :model-value="reviewFiles.diffMode.value"
+          :items="diffModeItems"
+          @update:model-value="(v) => reviewFiles.setDiffMode(v as ReviewDiffMode)"
         >
-          <Tooltip v-for="o in diffModeOptions" :key="o.id">
-            <TooltipTrigger as-child>
-              <ToggleGroupItem :value="o.id" :aria-label="o.label">
-                <CodiconIcon :name="codiconName(o.icon)" :size="13" />
-              </ToggleGroupItem>
-            </TooltipTrigger>
-            <TooltipContent>{{ o.label }}</TooltipContent>
-          </Tooltip>
-        </ToggleGroup>
+          <template #item="{ item }">
+            <CodiconIcon :name="item.icon ?? ''" :size="13" />
+            <span class="sr-only">{{ item.label }}</span>
+          </template>
+        </SecondaryTabs>
         <span v-if="deltaStatusText" class="ml-auto text-muted-foreground text-graph-sm">{{ deltaStatusText }}</span>
       </ViewToolbar>
       <p v-if="reviewFiles.diffError.value" class="m-0 p-3 text-error">
@@ -163,17 +167,13 @@ function onToggleReviewed(path: string): void {
       </p>
 
       <ViewToolbar v-if="hasFilter" class="font-ui">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="kira"
-          :model-value="showing"
+        <SecondaryTabs
+          variant="segmented"
           aria-label="Which files to list"
-          @update:model-value="(v) => v && (showing = v as 'all' | 'needsReview')"
-        >
-          <ToggleGroupItem value="needsReview">Needs review · {{ needsReviewCount }}</ToggleGroupItem>
-          <ToggleGroupItem value="all">All</ToggleGroupItem>
-        </ToggleGroup>
+          :model-value="showing"
+          :items="showingItems"
+          @update:model-value="(v) => (showing = v as 'all' | 'needsReview')"
+        />
       </ViewToolbar>
       <p v-if="nothingToReview" class="m-0 p-3 text-muted-foreground">
         Nothing changed since your last review.

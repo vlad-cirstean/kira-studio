@@ -11,13 +11,14 @@
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
+import SearchField from '@theme/components/SearchField.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { cn } from '@theme/lib/utils';
 import { computed, ref, useTemplateRef } from 'vue';
 import { codiconName, STATE_ICONS } from '../../icons/index.ts';
-import { rowVariants } from '../../lib/rowVariants.ts';
 import type { RefsState } from '../../state/refs.ts';
 import { buildRefListSections } from '../refListModel.ts';
 
@@ -55,7 +56,7 @@ const filter = ref('');
 // P131 Part 3 §5.2: reka's modal Popover owns focus trap, outside-click and Escape, and returns
 // focus to the trigger on close — the same contract `useModalFocus`/`onClickOutside`/the rootEl
 // Escape listener existed to provide by hand.
-const filterEl = useTemplateRef<{ $el: HTMLElement }>('filterEl');
+const filterEl = useTemplateRef<{ focus: () => void }>('filterEl');
 
 function open(): void {
   isOpen.value = true;
@@ -104,7 +105,7 @@ function pick(ref: string): void {
  *  explicitly, mirroring BranchPicker.vue's own `onOpenAutoFocus`. */
 function onOpenAutoFocus(e: Event): void {
   e.preventDefault();
-  filterEl.value?.$el.focus();
+  filterEl.value?.focus();
 }
 </script>
 
@@ -121,30 +122,22 @@ function onOpenAutoFocus(e: Event): void {
 
       <PopoverContent
         align="start"
-        class="w-70 p-0 gap-0"
+        class="w-80 p-0 gap-0"
         aria-label="Choose a comparison base"
         @open-auto-focus="onOpenAutoFocus"
       >
         <div class="max-h-80 flex flex-col min-h-0">
-          <InputGroup variant="kira" class="m-1">
-            <InputGroupAddon>
-              <CodiconIcon name="search" :size="13" />
-            </InputGroupAddon>
-            <InputGroupInput
+          <div class="m-1">
+            <SearchField
               ref="filterEl"
               v-model="filter"
               placeholder="Filter branches"
               aria-label="Filter branches"
             />
-            <InputGroupAddon v-if="filter" align="inline-end">
-              <InputGroupButton aria-label="Clear filter" @click="filter = ''">
-                <CodiconIcon name="close" :size="13" />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
+          </div>
           <div class="overflow-auto min-h-0">
             <section v-if="suggested.length > 0" aria-label="Suggested">
-              <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">Suggested</div>
+              <SectionHeading label="Suggested" />
               <button
                 v-for="candidate in suggested"
                 :key="candidate.ref"
@@ -158,7 +151,7 @@ function onOpenAutoFocus(e: Event): void {
             </section>
 
             <section aria-label="All branches">
-              <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">All branches</div>
+              <SectionHeading label="All branches" />
               <button
                 v-for="row in sections.branches.visible"
                 :key="row.refname"
@@ -187,7 +180,7 @@ function onOpenAutoFocus(e: Event): void {
               </div>
               <div
                 v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
-                class="py-1 px-2 text-subtle"
+                class="px-1.5 py-1 text-kira-sm text-subtle"
               >
                 {{ refsLoading ? 'Loading branches…' : 'No matching branches' }}
               </div>

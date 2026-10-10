@@ -65,7 +65,7 @@ test('Open in graph activates the graph tab on that commit', async ({ relaunch }
 
 test('the Files pane reviewed control is a checkbox with three states', async ({ relaunch }) => {
   const page = await openReviewListing(relaunch);
-  await page.locator('[data-testid="review-toolbar"] [aria-label^="Files"]').click();
+  await page.locator('[data-testid="review-toolbar"] [data-testid="review-pane-files"]').click();
 
   const box = (path: string) =>
     page
@@ -80,7 +80,7 @@ test('the Files pane reviewed control is a checkbox with three states', async ({
 
 test('Space on the focused reviewed checkbox marks the file', async ({ relaunch }) => {
   const page = await openReviewListing(relaunch);
-  await page.locator('[data-testid="review-toolbar"] [aria-label^="Files"]').click();
+  await page.locator('[data-testid="review-toolbar"] [data-testid="review-pane-files"]').click();
   const box = page
     .locator('[data-testid="review-files-tree"] [data-testid="file-tree-row"]', {
       hasText: base(REVIEW_FILE_NONE),

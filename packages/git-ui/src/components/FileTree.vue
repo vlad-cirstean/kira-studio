@@ -21,19 +21,18 @@ import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import { CheckIcon, MinusIcon } from '@lucide/vue';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, nextTick, ref, useId, watch } from 'vue';
 import { ACTION_ICONS, codiconName } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
-import { rowVariants } from '../lib/rowVariants.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import {
@@ -115,6 +114,12 @@ const listModeOptions: readonly ListModeOption[] = [
   { id: 'tree', icon: ACTION_ICONS.listTree, label: 'Tree view' },
   { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'Flat view' },
 ];
+const listModeItems = listModeOptions.map((option) => ({
+  value: option.id,
+  label: option.label,
+  icon: codiconName(option.icon),
+  tooltip: option.label,
+}));
 
 const filterInput = ref(props.filter);
 watch(
@@ -243,22 +248,14 @@ function rowKey(row: FileTreeRow): string {
   return row.kind === 'directory' ? `dir:${row.node.path}` : `file:${row.node.path}`;
 }
 
-/** P110 A15, retokened onto git-ui's own `rowVariants` (P131 Part 2 §4.2). `rowVariants({
- *  selected })` renders byte-identically to the file's own retired `.kira-row-selected`/hover
- *  rules — no separate selected class needed. `cn()` cancels the variant's own horizontal
- *  padding with this row's real 2px/8px padding (`file-tree-row`'s own padding shorthand
- *  always fully overrode it, unlayered). The focus ring is `group-focus-within` (the container
- *  below carries `group`) applied only to the one row `index === focusedRow` names —
- *  reproducing the old `file-tree-rows:focus-within file-tree-row.kira-row-focused`
- *  compound selector.
- *
- *  `data-testid="file-tree-row"` marks each row — several Playwright specs
- *  outside this package's own tests (file-tree-open/review-interaction/floating-geometry)
- *  select rows by it. */
+/** Theme `rowVariants` tree layout (`data` keeps the Git graph font reaching rows); indent comes
+ *  from `rowIndent`. The focus ring is `group-focus-within` (the container carries `group`) on the
+ *  one row `index === focusedRow` names. `data-testid="file-tree-row"` is selected by several
+ *  Playwright specs. */
 function rowClass(row: FileTreeRow, index: number): string {
   const selected = row.kind === 'file' && row.node.fileIndex === props.selectedFile;
   return cn(
-    rowVariants({ layout: 'tree', selected }),
+    rowVariants({ layout: 'tree', selected, data: true }),
     index === focusedRow.value
       ? 'group-focus-within:focus-ring'
       : '',
@@ -503,7 +500,7 @@ function reviewCheckboxState(path: string): boolean | 'indeterminate' {
 }
 
 // P131 Part 2 §5.6: biome's noLabelWithoutControl can't see through NativeSelect's
-// `inheritAttrs: false` to the native `<select>` it renders -- an explicit for/id pair keeps the
+// `inheritAttrs: false` to the native select element it renders -- an explicit for/id pair keeps the
 // same association (same fix as StackDialog.vue's own parent picker).
 const parentSelectId = useId();
 </script>
@@ -536,34 +533,26 @@ const parentSelectId = useId();
     </div>
 
     <div v-if="showToolbar !== false" class="flex gap-1 px-2 pb-1">
-      <InputGroup variant="kira" class="flex-1 min-w-0">
-        <InputGroupAddon>
-          <CodiconIcon name="search" :size="13" />
-        </InputGroupAddon>
-        <InputGroupInput
+      <div class="min-w-0 flex-1">
+        <SearchField
           :model-value="filterInput"
           placeholder="Filter files"
           aria-label="Filter files"
-          @update:model-value="(value: string | number) => onFilterInput(String(value))"
+          @update:model-value="onFilterInput"
         />
-      </InputGroup>
-      <ToggleGroup
-        type="single"
-        variant="outline"
-        size="kira"
+      </div>
+      <SecondaryTabs
+        variant="segmented"
         aria-label="File list display"
         :model-value="listMode"
-        @update:model-value="(v) => v && emit('update:listMode', v as FileListMode)"
+        :items="listModeItems"
+        @update:model-value="(v) => emit('update:listMode', v as FileListMode)"
       >
-        <Tooltip v-for="option in listModeOptions" :key="option.id">
-          <TooltipTrigger as-child>
-            <ToggleGroupItem :value="option.id" :aria-label="option.label">
-              <CodiconIcon :name="codiconName(option.icon)" :size="13" />
-            </ToggleGroupItem>
-          </TooltipTrigger>
-          <TooltipContent>{{ option.label }}</TooltipContent>
-        </Tooltip>
-      </ToggleGroup>
+        <template #item="{ item }">
+          <CodiconIcon :name="item.icon ?? ''" :size="13" />
+          <span class="sr-only">{{ item.label }}</span>
+        </template>
+      </SecondaryTabs>
     </div>
 
     <div
@@ -585,7 +574,7 @@ const parentSelectId = useId();
         :aria-expanded="row.kind === 'directory' ? row.expanded : undefined"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
-        :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+        :style="rowIndent(row.depth)"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
@@ -679,7 +668,7 @@ const parentSelectId = useId();
         role="option"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
-        :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+        :style="rowIndent(row.depth)"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"

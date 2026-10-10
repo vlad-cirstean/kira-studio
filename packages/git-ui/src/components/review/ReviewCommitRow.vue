@@ -16,7 +16,9 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import { TransportError } from '@kira/git-ipc';
+import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, ref, useTemplateRef } from 'vue';
@@ -214,7 +216,7 @@ function onOpenFile(index: number, pinned: boolean): void {
          already sits on, and that combination passes. -->
     <div data-testid="review-row-header"
       ref="headerEl"
-      class="flex items-center gap-1 py-1 px-2 min-h-row min-w-0 font-ui group-hover:bg-hover"
+      :class="cn(rowVariants({ layout: 'tree' }), 'cursor-pointer py-1 px-2 min-w-0 font-ui')"
     >
       <TreeTwisty
         :expanded="expanded"

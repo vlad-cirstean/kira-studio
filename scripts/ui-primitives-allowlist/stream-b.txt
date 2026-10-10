@@ -79,15 +79,7 @@ apps/kira-space/frontend/src/workbench/settings/ClaudeCodePane.vue
 apps/kira-space/frontend/src/workbench/settings/DateFormatField.vue
 apps/kira-space/frontend/src/workbench/settings/GitPane.vue
 apps/kira-space/frontend/src/workbench/settings/MobileAccessPane.vue
-packages/git-ui/src/components/BranchPicker.vue
-packages/git-ui/src/components/CommitMeta.vue
-packages/git-ui/src/components/FileTree.vue
 packages/git-ui/src/components/SearchBox.vue
-packages/git-ui/src/components/review/BaseSelector.vue
-packages/git-ui/src/components/review/ReviewCommentsPane.vue
-packages/git-ui/src/components/review/ReviewFilesPane.vue
-packages/git-ui/src/components/review/ReviewView.vue
 apps/kira-space/frontend/src/repo/RepoFileTree.vue
 apps/kira-space/frontend/src/repo/RepoSearchRow.vue
 apps/kira-space/frontend/src/repo/RepoTreeRow.vue
-packages/git-ui/src/components/review/ReviewCommitRow.vue

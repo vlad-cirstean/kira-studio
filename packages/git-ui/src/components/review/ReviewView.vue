@@ -25,13 +25,13 @@ import { SETTINGS } from '@kira/git-core';
 import type { ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Input } from '@theme/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -39,7 +39,6 @@ import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
-import { rowVariants } from '../../lib/rowVariants.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import { copyToClipboard } from '../../state/clipboardActions.ts';
 import type { FileListMode } from '../../state/detail.ts';
@@ -276,13 +275,12 @@ function onSwapBaseAndBranch(): void {
 // `filterVisible` gates rendering; the button itself carries an "active" state whenever a filter
 // is applied *or* revealed, so an applied-but-collapsed filter still visibly signals itself.
 const filterVisible = ref(false);
-// P105 §8: not inside any dialog — `autofocus` only fires once, on first render, so it can't
-// catch the input being revealed later by this toggle. Focus it explicitly instead.
-const toolbarFilter = useTemplateRef<{ $el: HTMLElement }>('toolbarFilter');
+// Focus is explicit: `autofocus` is a11y-linted outside modals and fires only on first render.
+const toolbarFilter = useTemplateRef<{ focus: () => void }>('toolbarFilter');
 watch(filterVisible, (visible) => {
   if (!visible) return;
   void nextTick(() => {
-    toolbarFilter.value?.$el.focus();
+    toolbarFilter.value?.focus();
   });
 });
 function toggleFilterVisible(): void {
@@ -488,7 +486,7 @@ watch(
 // rule on the row menu's "Review branch changes" entry).
 // ---------------------------------------------------------------------------------------
 const branchFilter = ref('');
-const branchFilterInputRef = useTemplateRef<{ $el: HTMLElement }>('branchFilter');
+const branchFilterInputRef = useTemplateRef<{ focus: () => void }>('branchFilter');
 const branchSections = computed(() =>
   buildRefListSections(
     {
@@ -505,7 +503,7 @@ const branchSections = computed(() =>
 watch(
   () => !bootError.value && !!review.value && !noActiveRepo.value && !review.value.branch.value,
   (showingPicker) => {
-    if (showingPicker) void nextTick(() => branchFilterInputRef.value?.$el.focus());
+    if (showingPicker) void nextTick(() => branchFilterInputRef.value?.focus());
   },
 );
 
@@ -574,6 +572,23 @@ const listModeOptions: readonly ReviewToggleOption[] = [
   { id: 'tree', icon: ACTION_ICONS.listTree, label: 'Tree view' },
   { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'Flat view' },
 ];
+
+const panelItems = computed(() =>
+  panelOptions.value.map((o) => ({
+    value: o.id,
+    label: o.label,
+    icon: codiconName(o.icon),
+    count: o.badge,
+    tooltip: o.label,
+    testid: `review-pane-${o.id}`,
+  })),
+);
+const listModeItems = listModeOptions.map((o) => ({
+  value: o.id,
+  label: o.label,
+  icon: codiconName(o.icon),
+  tooltip: o.label,
+}));
 
 function onPaneChange(pane: string): void {
   review.value?.setPane(pane as ReviewPane);
@@ -799,48 +814,40 @@ watch(
         <p class=" text-muted-foreground">
           Pick a branch to compare its commits against a base you choose or one we detect.
         </p>
-        <InputGroup variant="kira">
-          <InputGroupAddon>
-            <CodiconIcon name="search" :size="13" />
-          </InputGroupAddon>
-          <InputGroupInput
-            ref="branchFilter"
-            v-model="branchFilter"
-            placeholder="Filter branches"
-            aria-label="Filter branches"
-          />
-          <InputGroupAddon v-if="branchFilter" align="inline-end">
-            <InputGroupButton aria-label="Clear filter" @click="branchFilter = ''">
-              <CodiconIcon name="close" :size="13" />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
+        <SearchField
+          ref="branchFilter"
+          v-model="branchFilter"
+          placeholder="Filter branches"
+          aria-label="Filter branches"
+        />
         <div class="flex-1 min-h-0 overflow-auto">
           <div>
-            <div class="pt-1 pb-0.5 text-muted-foreground text-kira-sm uppercase">Branches</div>
+            <SectionHeading label="Branches" />
             <button
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
               type="button"
-              :class="cn(rowVariants({ layout: 'tree' }), 'w-full pl-2 text-left')"
+              :class="cn(rowVariants({ layout: 'tree' }), 'w-full text-left')"
+              :style="rowIndent(0)"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
             </button>
             <div
               v-if="branchSections.branches.visible.length === 0"
-              class="text-muted-foreground py-0.5 px-1"
+              class="px-1.5 py-1 text-kira-sm text-subtle"
             >
               No matching branches
             </div>
           </div>
           <div>
-            <div class="pt-1 pb-0.5 text-muted-foreground text-kira-sm uppercase">Remote branches</div>
+            <SectionHeading label="Remote branches" />
             <button
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
               type="button"
-              :class="cn(rowVariants({ layout: 'tree' }), 'w-full pl-2 text-left')"
+              :class="cn(rowVariants({ layout: 'tree' }), 'w-full text-left')"
+              :style="rowIndent(0)"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -857,7 +864,7 @@ watch(
            whenever a branch is picked — including the error phase, which is exactly the state a
            resumed session pointing at a deleted branch/base lands in (D11b). -->
       <!-- P110 A16: this header used to restyle .p-panel-head's own geometry (height/gap/padding)
-           but deliberately never its uppercase/letter-spacing — that primitive styles a short
+           but deliberately never its casing/letter-spacing — that primitive styles a short
            section label, and the branch name here is live data, which must never be re-cased. -->
       <ViewToolbar>
         <TooltipIconButton
@@ -895,28 +902,19 @@ watch(
       <!-- G12 D13/D14: one panel-level toolbar, holding the Commits/Files pane toggle, the
            filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
            expanded row plus a third, separately-stateful copy in the Files pane. -->
-      <div data-testid="review-toolbar"
-        v-if="review.phase.value === 'listing'"
-        class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border"
-      >
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="kira"
-          :model-value="review.pane.value"
+      <ViewToolbar v-if="review.phase.value === 'listing'" data-testid="review-toolbar">
+        <SecondaryTabs
           aria-label="Review pane"
-          @update:model-value="(v) => v && onPaneChange(v as string)"
+          :model-value="review.pane.value"
+          :items="panelItems"
+          @update:model-value="onPaneChange"
         >
-          <Tooltip v-for="o in panelOptions" :key="o.id">
-            <TooltipTrigger as-child>
-              <ToggleGroupItem :value="o.id" :aria-label="`${o.label} (${o.badge})`">
-                <CodiconIcon :name="codiconName(o.icon)" :size="13" />
-                <Badge variant="count">{{ o.badge }}</Badge>
-              </ToggleGroupItem>
-            </TooltipTrigger>
-            <TooltipContent>{{ o.label }}</TooltipContent>
-          </Tooltip>
-        </ToggleGroup>
+          <template #item="{ item }">
+            <CodiconIcon :name="item.icon ?? ''" :size="13" />
+            <span class="sr-only">{{ item.label }}</span>
+            <Badge variant="count">{{ item.count }}</Badge>
+          </template>
+        </SecondaryTabs>
         <!-- G19 D6 (item 6): the always-rendered filter input is now gated behind a search-icon
              button — F6 found this the one filter in the app that did not already gate behind
              opening something (BaseSelector.vue's own filter already does). `aria-pressed`
@@ -925,39 +923,32 @@ watch(
         <TooltipIconButton
           icon="search"
           label="Filter files"
-          :aria-pressed="filterVisible || filter.length > 0"
-          class="aria-pressed:bg-field aria-pressed:text-fg"
+          :pressed="filterVisible || filter.length > 0"
           data-testid="review-filter-toggle"
           @click="toggleFilterVisible"
         />
-        <Input
-          v-if="filterVisible"
-          ref="toolbarFilter"
-          size="kira"
-          class="flex-1 min-w-0"
-          placeholder="Filter files"
-          aria-label="Filter files"
-          :model-value="filter"
-          @update:model-value="filter = String($event)"
-        />
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="kira"
-          :model-value="listMode"
+        <div v-if="filterVisible" class="min-w-0 flex-1">
+          <SearchField
+            ref="toolbarFilter"
+            placeholder="Filter files"
+            aria-label="Filter files"
+            :model-value="filter"
+            @update:model-value="filter = $event"
+          />
+        </div>
+        <SecondaryTabs
+          variant="segmented"
           aria-label="File list display"
-          @update:model-value="(v) => v && (listMode = v as FileListMode)"
+          :model-value="listMode"
+          :items="listModeItems"
+          @update:model-value="(v) => (listMode = v as FileListMode)"
         >
-          <Tooltip v-for="o in listModeOptions" :key="o.id">
-            <TooltipTrigger as-child>
-              <ToggleGroupItem :value="o.id" :aria-label="o.label">
-                <CodiconIcon :name="codiconName(o.icon)" :size="13" />
-              </ToggleGroupItem>
-            </TooltipTrigger>
-            <TooltipContent>{{ o.label }}</TooltipContent>
-          </Tooltip>
-        </ToggleGroup>
-      </div>
+          <template #item="{ item }">
+            <CodiconIcon :name="item.icon ?? ''" :size="13" />
+            <span class="sr-only">{{ item.label }}</span>
+          </template>
+        </SecondaryTabs>
+      </ViewToolbar>
 
       <div class="flex-1 min-h-0 flex flex-col">
         <p v-if="review.phase.value === 'resolving'" class=" p-3 text-muted-foreground">

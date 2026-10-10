@@ -11,8 +11,10 @@
  */
 import type { LineRange, ReviewComment } from '@kira/git-ipc';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, useTemplateRef } from 'vue';
 import type { ReviewCommentsState } from '../../state/reviewComments.ts';
 
@@ -73,7 +75,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
 
 <template>
   <div class="flex flex-col min-h-0 h-full">
-    <div class="flex items-center gap-1 h-bar px-2 border-b border-border shrink-0 font-ui">
+    <ViewToolbar class="font-ui">
       <span class="text-muted-foreground text-graph-sm" data-testid="review-comments-count">{{
         countLabel
       }}</span>
@@ -97,7 +99,7 @@ const listEl = useTemplateRef<HTMLElement>('list');
         </Button>
         <Button variant="toolbar" size="kira" @click="reviewComments.cancelClear()">Cancel</Button>
       </div>
-    </div>
+    </ViewToolbar>
 
     <p v-if="reviewComments.loadError.value" class="m-0 p-3 text-error">
       Couldn't load the comment list — {{ reviewComments.loadError.value }}
@@ -122,11 +124,13 @@ const listEl = useTemplateRef<HTMLElement>('list');
             <li
               v-for="c in group.comments"
               :key="c.id"
-              class="relative flex flex-col gap-0.5 pt-0.5 px-2 pb-1 hover:bg-hover"
+              :class="rowVariants({ layout: 'double' })"
+              class="flex-col items-stretch gap-0.5 pt-0.5 px-2 pb-1"
             >
               <div class="flex items-center gap-1">
                 <Button
                   variant="link"
+                  size="kira"
                   class="h-auto p-0 border-0 font-data font-normal text-muted-foreground text-graph-sm after:absolute after:inset-0"
                   :aria-label="`Open ${group.path} ${lineLabel(c.range)}`"
                   @click="emit('select-comment', group.path)"

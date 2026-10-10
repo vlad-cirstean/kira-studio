@@ -17,21 +17,22 @@
 import type { RefRow, StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import { rowVariants } from '@theme/components/rowVariants';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import { codiconName, PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import { enabledNeighbour, firstEnabled, type MenuItem } from '../lib/menuModel.ts';
-import { rowVariants } from '../lib/rowVariants.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
@@ -48,7 +49,6 @@ import {
   type PickerModel,
   type PickerTab,
 } from './pickerModel.ts';
-import RefSectionHeader from './RefSectionHeader.vue';
 import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
 import {
@@ -133,7 +133,7 @@ const TAB_LABELS: Readonly<Record<PickerTab, string>> = {
 const isOpen = ref(false);
 const triggerEl = useTemplateRef<{ $el: HTMLElement }>('triggerEl');
 const panelEl = ref<HTMLElement | null>(null);
-const filterEl = useTemplateRef<{ $el: HTMLElement }>('filterEl');
+const filterEl = useTemplateRef<{ focus: () => void }>('filterEl');
 const filter = ref('');
 const activeTab = ref<PickerTab>('branches');
 // P77 §7.3: the roving-tabindex list's own "current" row — `undefined` until the user presses an
@@ -265,7 +265,7 @@ function onRowsKeydown(event: KeyboardEvent): void {
     case 'ArrowUp':
       event.preventDefault();
       if (currentId === firstEnabled(items)) {
-        filterEl.value?.$el.focus();
+        filterEl.value?.focus();
         return;
       }
       focusedRowId.value = enabledNeighbour(items, currentId, -1);
@@ -332,6 +332,15 @@ const tabOptions = computed<readonly PickerTabOption[]>(() => [
     badge: model.value.counts.stacks,
   },
 ]);
+const tabItems = computed(() =>
+  tabOptions.value.map((tab) => ({
+    value: tab.id,
+    label: tab.label,
+    icon: codiconName(tab.icon),
+    count: tab.badge,
+    tooltip: tab.label,
+  })),
+);
 
 const knownRemotes = computed(() =>
   remoteNamesFrom(props.refs.remoteBranches.value.map((row) => row.shortName)),
@@ -376,7 +385,7 @@ function onOpenChange(value: boolean): void {
  *  filter input wins regardless of where it sits in the panel. */
 function onOpenAutoFocus(e: Event): void {
   e.preventDefault();
-  filterEl.value?.$el.focus();
+  filterEl.value?.focus();
 }
 
 /** W20: reka's own close-auto-focus fires after the panel's exit animation, which could steal
@@ -597,7 +606,7 @@ watch(visibleBranchNames, (names) => {
 
       <PopoverContent
         align="start"
-        class="w-95 p-0 gap-0"
+        class="w-96 p-0 gap-0"
         :aria-label="`${TAB_LABELS[activeTab]} picker`"
         @open-auto-focus="onOpenAutoFocus"
         @close-auto-focus="onCloseAutoFocus"
@@ -606,48 +615,30 @@ watch(visibleBranchNames, (names) => {
           ref="panelEl"
           class="flex flex-col min-h-0 max-h-[min(520px,var(--reka-popover-content-available-height))]"
         >
-          <ToggleGroup data-testid="branch-tabs"
-            type="single"
-            variant="outline"
-            size="kira"
+          <SecondaryTabs
+            data-testid="branch-tabs"
             class="mx-1 mt-1"
             aria-label="Picker section"
             :model-value="activeTab"
-            @update:model-value="(v) => v && (activeTab = v as PickerTab)"
+            :items="tabItems"
+            @update:model-value="(v) => (activeTab = v as PickerTab)"
           >
-            <Tooltip v-for="tab in tabOptions" :key="tab.id">
-              <TooltipTrigger as-child>
-                <ToggleGroupItem :value="tab.id" :aria-label="`${tab.label} (${tab.badge})`">
-                  <CodiconIcon :name="codiconName(tab.icon)" :size="13" />
-                  <Badge variant="count" data-testid="picker-tab-badge">{{ tab.badge }}</Badge>
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent>{{ tab.label }}</TooltipContent>
-            </Tooltip>
-          </ToggleGroup>
+            <template #item="{ item }">
+              <CodiconIcon :name="item.icon ?? ''" :size="13" />
+              <span class="sr-only">{{ item.label }}</span>
+              <Badge variant="count" data-testid="picker-tab-badge">{{ item.count }}</Badge>
+            </template>
+          </SecondaryTabs>
 
-          <InputGroup variant="kira" class="m-1">
-            <InputGroupAddon>
-              <CodiconIcon name="search" :size="13" />
-            </InputGroupAddon>
-            <InputGroupInput
+          <div class="m-1">
+            <SearchField
               ref="filterEl"
               v-model="filter"
               :placeholder="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
               :aria-label="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
               @keydown="onFilterKeydown"
             />
-            <InputGroupAddon v-if="filter" align="inline-end">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <InputGroupButton aria-label="Clear filter" @click="filter = ''">
-                    <CodiconIcon name="close" :size="13" />
-                  </InputGroupButton>
-                </TooltipTrigger>
-                <TooltipContent>Clear filter</TooltipContent>
-              </Tooltip>
-            </InputGroupAddon>
-          </InputGroup>
+          </div>
 
           <div
             ref="rowsScrollEl"
@@ -657,7 +648,7 @@ watch(visibleBranchNames, (names) => {
             <AttributeTooltip :container="rowsScrollEl" />
             <template v-if="activeTab === 'branches'">
         <section aria-label="Branches">
-          <RefSectionHeader label="Branches" />
+          <SectionHeading label="Branches" />
           <div data-testid="branch-row"
             v-for="row in model.branchesLocal.visible"
             :key="row.refname"
@@ -712,11 +703,11 @@ watch(visibleBranchNames, (names) => {
             <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
           </Alert>
           <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
-          <div v-if="model.branchesLocal.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">No branches</div>
+          <div v-if="model.branchesLocal.visible.length === 0" class="px-1.5 py-1 text-kira-sm text-subtle">No branches</div>
         </section>
 
         <section aria-label="Remote branches">
-          <RefSectionHeader label="Remote branches" />
+          <SectionHeading label="Remote branches" />
           <div data-testid="branch-row"
             v-for="row in model.branchesRemote.visible"
             :key="row.refname"
@@ -739,7 +730,7 @@ watch(visibleBranchNames, (names) => {
             />
           </div>
           <ShowMoreButton :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
-          <div v-if="model.branchesRemote.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">
+          <div v-if="model.branchesRemote.visible.length === 0" class="px-1.5 py-1 text-kira-sm text-subtle">
             No remote branches
           </div>
         </section>

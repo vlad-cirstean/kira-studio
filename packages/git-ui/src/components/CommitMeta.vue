@@ -328,6 +328,7 @@ const prIcon = computed(() => {
         <TooltipTrigger as-child>
           <Button
             variant="link"
+            size="kira"
             :class="cn('h-auto p-0 border-0 leading-none ml-auto', PR_ICON_CLASS[prIcon!.state])"
             :aria-label="`Open pull request #${prIcon!.number} on GitHub`"
             data-testid="commit-meta-pr-icon"
@@ -395,6 +396,7 @@ const prIcon = computed(() => {
               </span>
               <Button
                 variant="link"
+                size="kira"
                 :class="cn(LINK_BUTTON_CLASS, 'justify-start text-left whitespace-normal')"
                 @click="openPullRequest(pr.number)"
               >
