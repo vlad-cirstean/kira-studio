@@ -30,7 +30,7 @@ const phones = useMobileTerminalsStore();
     >
       <AdeActivityIcon :kind="v.kind" />
       <span
-        class="shrink-0 rounded-kira-xs px-1 text-kira-sm font-bold"
+        class="shrink-0 rounded-kira-xs px-1 text-kira-sm"
         :class="v.headless ? 'border border-dashed border-border-strong text-muted-foreground' : ACTION_CLASS.claude"
         data-testid="ade-session-badge"
         >{{ v.badge }}</span

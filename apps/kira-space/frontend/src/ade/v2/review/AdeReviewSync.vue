@@ -109,7 +109,7 @@ function short(sha: string): string {
       <TooltipTrigger as-child>
         <span>
           <PopoverTrigger as-child>
-            <Button variant="dialog" size="xs" :disabled="blocked" data-testid="ade-review-sync">
+            <Button variant="dialog" size="kira" :disabled="blocked" data-testid="ade-review-sync">
               Sync to GitHub{{ loadFailed ? '' : ` · ${count}` }}
             </Button>
           </PopoverTrigger>
@@ -117,7 +117,7 @@ function short(sha: string): string {
       </TooltipTrigger>
       <TooltipContent>{{ blockedMessage }}</TooltipContent>
     </Tooltip>
-    <PopoverContent class="w-95 text-kira-md" align="end" data-testid="ade-review-sync-popover">
+    <PopoverContent class="w-96 text-kira-md" align="end" data-testid="ade-review-sync-popover">
       <div class="flex flex-col gap-2">
         <p v-if="data?.account" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-review-sync-account">
           Syncing as {{ data.account }}
@@ -140,7 +140,7 @@ function short(sha: string): string {
 
         <template v-else-if="status === 'headNotFetched'">
           <p class="m-0" data-testid="ade-review-sync-message">{{ data?.message }}</p>
-          <Button variant="dialog" size="xs" :disabled="refresh.isPending.value" data-testid="ade-review-sync-refresh" @click="refreshRepo">
+          <Button variant="dialog" size="kira" :disabled="refresh.isPending.value" data-testid="ade-review-sync-refresh" @click="refreshRepo">
             Refresh repo
           </Button>
         </template>
@@ -165,7 +165,7 @@ function short(sha: string): string {
           <Button
             v-if="count > 0"
             variant="dialog"
-            size="xs"
+            size="kira"
             :disabled="apply.isPending.value"
             data-testid="ade-review-sync-confirm"
             @click="confirm"

@@ -138,7 +138,7 @@ onUnmounted(() => {
       <Tooltip :disabled="!blocked">
         <TooltipTrigger as-child>
           <span>
-            <Button variant="dialog" size="xs" :disabled="!canSend" data-testid="ade-review-send" @click="send">Send</Button>
+            <Button variant="dialog" size="kira" :disabled="!canSend" data-testid="ade-review-send" @click="send">Send</Button>
           </span>
         </TooltipTrigger>
         <TooltipContent>Claude Code is waiting for an answer in its terminal.</TooltipContent>

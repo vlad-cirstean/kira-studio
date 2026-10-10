@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { useTimeAgo } from '@vueuse/core';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
@@ -66,13 +67,13 @@ function saveNotes(_id: string, value: string): void {
     <header class="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2">
       <div class="flex items-center gap-2">
         <AdeChip label="backlog · not planned" tone="grey" />
-        <h3 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-bold" data-testid="ade-backlog-title">{{ item.text }}</h3>
+        <h3 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium" data-testid="ade-backlog-title">{{ item.text }}</h3>
       </div>
       <div class="text-kira-sm text-muted-foreground">captured {{ ago }}</div>
       <div class="flex gap-2">
-        <Button
+        <Button variant="dialog"
           size="kira-lg"
-          class="font-semibold"
+          
           :class="TONE_SOLID_CLASS.amber"
           title="Turn into a task in the Spec phase, unscheduled (Later)"
           data-testid="ade-backlog-panel-promote"
@@ -91,11 +92,11 @@ function saveNotes(_id: string, value: string): void {
       </div>
     </header>
     <div class="grid shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-3 text-kira-md">
-      <label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">Title</label>
+      <Label for="ade-backlog-title-input" class="font-normal text-kira-sm text-muted-foreground">Title</Label>
       <Input
         id="ade-backlog-title-input"
         v-model="title"
-        class="bg-field font-semibold"
+        class="font-medium"
         data-testid="ade-backlog-title-input"
         @blur="commitTitle"
         @keydown.enter="commitTitle"

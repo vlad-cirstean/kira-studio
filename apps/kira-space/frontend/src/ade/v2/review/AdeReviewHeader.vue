@@ -22,7 +22,7 @@ const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
         :style="{ background: taskColor(task?.color ?? 0) }"
         data-testid="ade-review-task-colour"
       />
-      <span class="line-clamp-2 min-w-0 text-kira-lg font-semibold" data-testid="ade-review-title">{{ title }}</span>
+      <span class="line-clamp-2 min-w-0 text-kira-lg font-medium" data-testid="ade-review-title">{{ title }}</span>
       <AdeRepoTag :code-repo-id="target.codeRepoId" :label="repoLabel" />
       <span class="truncate font-data text-kira-sm" data-testid="ade-review-branch">{{ target.branch }}</span>
       <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="ade-review-base">base {{ target.base }}</span>

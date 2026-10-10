@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
+import { cn } from '@theme/lib/utils';
 import { useTimeAgo } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -52,8 +55,8 @@ function commit(): void {
 <template>
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds inputs and buttons a button cannot. -->
   <div
-    class="box-border flex min-h-9 cursor-pointer items-center gap-2 border-b border-border border-l-3 px-3 py-1"
-    :class="selected ? 'bg-select border-l-tone-amber-solid' : 'border-l-transparent hover:bg-hover'"
+    :class="cn(rowVariants({ layout: 'tree', selected }), 'cursor-pointer gap-2 border-b border-border py-1')"
+    :style="rowIndent(0)"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"
@@ -86,9 +89,9 @@ function commit(): void {
       </Button>
     </AdeTip>
     <AdeTip text="Turn into a task (lands in Later on the plan)">
-      <Button
+      <Button variant="dialog"
         size="kira"
-        class="shrink-0 font-semibold"
+        class="shrink-0 "
         :class="TONE_SOLID_CLASS.amber"
         data-testid="ade-backlog-promote"
         @click.stop="emit('promote')"
@@ -109,7 +112,7 @@ function commit(): void {
       </Button>
     </AdeTip>
     <span class="w-16 shrink-0 text-kira-sm text-subtle" data-testid="ade-backlog-ago">{{ ago }}</span>
-    <label :for="`ade-backlog-${item.id}`" class="sr-only">Backlog item</label>
+    <Label :for="`ade-backlog-${item.id}`" class="sr-only">Backlog item</Label>
     <Input
       :id="`ade-backlog-${item.id}`"
       v-model="draft"

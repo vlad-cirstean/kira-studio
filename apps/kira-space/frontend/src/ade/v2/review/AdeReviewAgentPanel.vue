@@ -92,7 +92,7 @@ async function focus(): Promise<void> {
       <AdeTuiPane v-if="here" :view="view" class="min-h-0 flex-1" />
       <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-review-elsewhere">
         <p class="m-0">Review agent is open in another window</p>
-        <Button variant="dialog" size="xs" data-testid="ade-review-focus" @click="focus">Focus</Button>
+        <Button variant="dialog" size="kira" data-testid="ade-review-focus" @click="focus">Focus</Button>
         <p v-if="missing" class="m-0 text-muted-foreground">That window is gone.</p>
       </div>
       <AdeReviewCompose :target="target" :repo-label="repoLabel" :session="session" />
@@ -109,7 +109,7 @@ async function focus(): Promise<void> {
       />
       <Button
         variant="dialog"
-        size="xs"
+        size="kira"
         :disabled="launchM.isPending.value || waitingSetup"
         data-testid="ade-review-start"
         @click="start"

@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -36,7 +37,7 @@ const debouncedFlush = useDebounceFn(flush, 600);
 const PROSE = [
   'ade-notes-prose min-h-full px-3 py-2.5 outline-none',
   '[&_p]:mb-[0.6em] [&_p:last-child]:mb-0',
-  '[&_h1]:my-[0.4em] [&_h1]:font-bold [&_h2]:my-[0.4em] [&_h2]:font-bold [&_h3]:my-[0.4em] [&_h3]:font-bold',
+  '[&_h1]:my-[0.4em] [&_h1]:font-medium [&_h2]:my-[0.4em] [&_h2]:font-medium [&_h3]:my-[0.4em] [&_h3]:font-medium',
   '[&_ul]:mb-[0.6em] [&_ul]:list-disc [&_ul]:pl-[1.4em] [&_ol]:mb-[0.6em] [&_ol]:list-decimal [&_ol]:pl-[1.4em]',
   "[&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:pl-[0.2em]",
   "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:items-start [&_ul[data-type='taskList']_li]:gap-[0.4em]",
@@ -215,13 +216,13 @@ function keepFocus(e: MouseEvent): void {
         <span v-else>{{ btn.glyph }}</span>
       </Button>
       <template v-if="linkOpen">
-        <label for="ade-notes-link" class="sr-only">Link URL</label>
+        <Label for="ade-notes-link" class="sr-only">Link URL</Label>
         <Input
           id="ade-notes-link"
           v-model="linkUrl"
           placeholder="https://"
           size="kira"
-          class="ml-1 w-42.5 border-dashed font-data"
+          class="ml-1 w-42.5 font-data"
           @keydown="onLinkKey"
         />
         <Button variant="dialog" size="kira" class="shrink-0" @mousedown="keepFocus" @click="applyLink"

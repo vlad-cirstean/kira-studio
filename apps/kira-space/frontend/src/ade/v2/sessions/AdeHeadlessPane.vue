@@ -47,10 +47,10 @@ async function onStop(): Promise<void> {
       data-testid="ade-headless-status"
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
-      <Button
+      <Button variant="dialog"
         v-if="!archived"
-        size="xs"
-        class="shrink-0 rounded-kira-sm px-2.5 font-semibold"
+        size="kira"
+        class="shrink-0 rounded-kira-sm px-2.5 "
         :class="ACTION_CLASS.claude"
         :disabled="takeOver.pending.has(view.session.id)"
         title="Continue this run yourself in an interactive Claude Code session"
@@ -62,7 +62,7 @@ async function onStop(): Promise<void> {
       <AdeTip v-if="running && !archived" text="stop this run; it becomes stuck">
         <Button
           variant="dialog"
-          size="xs"
+          size="kira"
           class="shrink-0 rounded-kira-sm px-2.5"
           :disabled="stop.isPending.value"
           data-testid="ade-session-stop"

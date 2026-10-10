@@ -71,13 +71,13 @@ async function show(): Promise<void> {
         <p v-if="!hold.connected" class="m-0 text-muted-foreground" data-testid="ade-tui-phone-offline">
           Phone offline, returns here at {{ returnsAt }}
         </p>
-        <Button variant="dialog" size="xs" class="px-2.5" data-testid="ade-tui-reconnect" @click="phones.reclaim(view.session.terminalId)">
+        <Button variant="dialog" size="kira" class="px-2.5" data-testid="ade-tui-reconnect" @click="phones.reclaim(view.session.terminalId)">
           Reconnect here
         </Button>
       </div>
     </div>
     <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-tui-elsewhere">
-      <Button variant="dialog" size="xs" class="px-2.5" data-testid="ade-tui-show" @click="show">
+      <Button variant="dialog" size="kira" class="px-2.5" data-testid="ade-tui-show" @click="show">
         Show
       </Button>
       <p v-if="missing" class="m-0 text-muted-foreground" data-testid="ade-tui-missing">

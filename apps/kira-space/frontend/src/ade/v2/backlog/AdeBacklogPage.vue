@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
@@ -83,7 +84,7 @@ function onEdit(id: string, value: string): void {
       <PanelHeader>Backlog</PanelHeader>
       <div class="flex shrink-0 flex-col gap-2 border-b border-border p-3">
         <span class="text-kira-md text-muted-foreground">Get it out of your head. Order it later: top is most important. Not on the plan yet.</span>
-      <label for="ade-backlog-add" class="sr-only">Add to backlog</label>
+      <Label for="ade-backlog-add" class="sr-only">Add to backlog</Label>
       <Input
         id="ade-backlog-add"
         v-model="text"
