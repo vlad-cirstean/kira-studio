@@ -149,6 +149,21 @@ export function useInspect(kind: Ref<InspectKind>, id: Ref<string>) {
   });
 }
 
+const DISK_CACHE_MAX_SCOPES = 5;
+
+/** `map` plus `usage` for `scope`, keeping only the newest scopes by `takenAt`. */
+function pruneDiskCache(
+  map: Record<string, DockerDiskUsage>,
+  scope: string,
+  usage: DockerDiskUsage,
+): Record<string, DockerDiskUsage> {
+  const at = (u: DockerDiskUsage) => Date.parse(u.takenAt) || 0;
+  const newest = Object.entries({ ...map, [scope]: usage })
+    .sort(([, a], [, b]) => at(b) - at(a))
+    .slice(0, DISK_CACHE_MAX_SCOPES);
+  return Object.fromEntries(newest);
+}
+
 const storedDisk = useLocalStorage<Record<string, DockerDiskUsage>>('kira.docker.diskUsage', {});
 
 /**
@@ -174,7 +189,7 @@ export function useEngineDiskUsage() {
   });
   watch(query.data, (d) => {
     if (d && storedDisk.value[scope.value]?.takenAt !== d.takenAt) {
-      storedDisk.value = { ...storedDisk.value, [scope.value]: d };
+      storedDisk.value = pruneDiskCache(storedDisk.value, scope.value, d);
     }
   });
   return { query, refresh: () => query.refetch() };
