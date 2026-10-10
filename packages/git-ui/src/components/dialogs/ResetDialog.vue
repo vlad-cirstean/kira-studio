@@ -16,13 +16,12 @@
  * `Checkbox`+`Label`, and the confirm-token field is `Input`.
  */
 import type { ResetMode } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -90,23 +89,17 @@ function confirm(): void {
 <template>
   <Dialog :open="active" @update:open="(v) => !v && cancel()">
     <DialogContent
-      :show-close-button="false"
-      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
+      size="md"
     >
-      <DialogHeader>
+      <DialogHeader closable>
         <DialogTitle>
           <template v-if="preflight?.branch">Move <code class="font-data">{{ preflight.branch }}</code> to</template>
           <template v-else>Move HEAD to</template>
           <code class="font-data">{{ shortTarget }}</code>
           <template v-if="preflight?.targetSubject">— {{ preflight.targetSubject }}</template>
         </DialogTitle>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <FieldDescription v-if="preflight && !preflight.branch">
           You are not on a branch, so no branch is changed — this moves HEAD only.
         </FieldDescription>
@@ -200,9 +193,9 @@ function confirm(): void {
             />
           </Field>
         </template>
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button
           v-if="isHardDestructive && canStashFirst"

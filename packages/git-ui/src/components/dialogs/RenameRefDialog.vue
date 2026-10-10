@@ -13,11 +13,10 @@
  * only supplies its own body/footer content.
  */
 import { validateRefName } from '@kira/git-core';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -66,19 +65,13 @@ async function submit(): Promise<void> {
 <template>
   <Dialog :open="open" @update:open="(v) => !v && cancel()">
     <DialogContent
-      :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
+      size="md"
     >
-      <DialogHeader>
+      <DialogHeader closable>
         <DialogTitle>Rename branch</DialogTitle>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <FieldDescription>Renaming <code class="font-data">{{ currentName }}</code></FieldDescription>
 
         <Field>
@@ -86,9 +79,9 @@ async function submit(): Promise<void> {
           <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
           <FieldError v-if="nameError">{{ nameError }}</FieldError>
         </Field>
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
           Rename branch

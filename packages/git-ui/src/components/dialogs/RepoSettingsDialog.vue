@@ -24,13 +24,12 @@
  */
 import { SETTINGS } from '@kira/git-core';
 import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -193,19 +192,13 @@ async function save(): Promise<void> {
 <template>
   <Dialog :open="open" @update:open="(v) => !v && close()">
     <DialogContent
-      :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
+      size="md"
     >
-      <DialogHeader>
+      <DialogHeader closable>
         <DialogTitle>Repository settings</DialogTitle>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <FieldSet>
           <FieldLegend>Graph</FieldLegend>
           <Field>
@@ -310,9 +303,9 @@ async function save(): Promise<void> {
         <Alert v-if="saveError" variant="destructive">
           <AlertDescription>Couldn't save settings — {{ saveError }}</AlertDescription>
         </Alert>
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <Button variant="dialog" size="kira-lg" @click="close">Cancel</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!pageSizeValid" @click="save">
           Save

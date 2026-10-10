@@ -22,7 +22,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -161,19 +161,13 @@ async function confirmRemove(): Promise<void> {
          modal content there prevents the panel dismissing under this nested Dialog. -->
     <Dialog :open="pendingRemove !== undefined" @update:open="(v) => !v && cancelRemove()">
       <DialogContent
-        :show-close-button="false"
         :aria-describedby="undefined"
-        class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
+        size="md"
       >
-        <DialogHeader>
+        <DialogHeader closable>
           <DialogTitle>{{ pendingRemove ? `Remove ${pendingRemove.entry.path}` : '' }}</DialogTitle>
-          <DialogClose as-child>
-            <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-              <CodiconIcon name="close" :size="13" />
-            </Button>
-          </DialogClose>
         </DialogHeader>
-        <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+        <DialogBody>
           <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
             <FieldError>{{ blockerText(pendingRemove.preflight) }}</FieldError>
           </template>
@@ -184,8 +178,8 @@ async function confirmRemove(): Promise<void> {
             </p>
             <Input v-model="typedToken" size="kira-lg" class="w-full" aria-label="Confirmation token" />
           </template>
-        </div>
-        <DialogFooter class="justify-end">
+        </DialogBody>
+        <DialogFooter>
           <Button variant="dialog" size="kira-lg" @click="cancelRemove">Cancel</Button>
           <Button
             v-if="pendingRemove?.preflight.verdict === 'dirty'"

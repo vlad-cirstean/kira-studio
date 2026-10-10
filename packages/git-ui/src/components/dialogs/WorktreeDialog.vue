@@ -15,12 +15,11 @@
  */
 import { validateRefName } from '@kira/git-core';
 import type { WorktreeAddPreflight } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -180,19 +179,13 @@ function onClose(): void {
 <template>
   <Dialog :open="active" @update:open="(v) => !v && onClose()">
     <DialogContent
-      :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
+      size="md"
     >
-      <DialogHeader>
+      <DialogHeader closable>
         <DialogTitle>{{ title }}</DialogTitle>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <template v-if="active">
           <Field>
             <FieldLabel :for="pathId">Path</FieldLabel>
@@ -298,9 +291,9 @@ function onClose(): void {
           </template>
         </template>
 
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitCreate" @click="submitCreate">
           Create

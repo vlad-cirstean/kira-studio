@@ -16,12 +16,11 @@
  * `DialogTitle`'s default slot, and the parent picker is `NativeSelect`.
  */
 import type { RestackPreflight } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -53,7 +52,7 @@ const open = computed(() => props.target !== undefined);
 
 const selectedParent = ref('');
 // P131 Part 1 §6.2: biome's noLabelWithoutControl can't see through NativeSelect's
-// `inheritAttrs: false` to the native `<select>` it renders -- an explicit for/id pair keeps the
+// `inheritAttrs: false` to the native select element it renders -- an explicit for/id pair keeps the
 // same association, verifiably (same fix as ForcePushDialog.vue's/TagDialog.vue's Input labels).
 const parentId = useId();
 
@@ -144,11 +143,10 @@ function closeDialog(): void {
 <template>
   <Dialog :open="open" @update:open="(v) => !v && closeDialog()">
     <DialogContent
-      :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
+      size="md"
     >
-      <DialogHeader>
+      <DialogHeader closable>
         <DialogTitle>
           {{
             target?.mode === 'setParent'
@@ -156,13 +154,8 @@ function closeDialog(): void {
               : `Restack ${target?.branch ?? ''}`
           }}
         </DialogTitle>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <template v-if="target?.mode === 'setParent'">
           <Field>
             <FieldLabel :for="parentId">Parent branch</FieldLabel>
@@ -209,9 +202,9 @@ function closeDialog(): void {
             </ul>
           </template>
         </template>
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <template v-if="target?.mode === 'setParent'">
           <Button variant="dialog" size="kira-lg" @click="closeDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="submitSetParent">Save</Button>

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * `docs/plans/P6.md` W15: "create tag here" (W14's row menu). Unlike `CheckoutDialog.vue`/
  * `RevertDialog.vue`, this one is not driven by an `OpsState` pending-ref (P6 has no
@@ -16,7 +15,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -81,19 +80,13 @@ async function submit(): Promise<void> {
 <template>
   <Dialog :open="open" @update:open="(v) => !v && cancel()">
     <DialogContent
-      :show-close-button="false"
       :aria-describedby="undefined"
-      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
+      size="md"
     >
-      <DialogHeader>
+      <DialogHeader closable>
         <DialogTitle>Create tag</DialogTitle>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <FieldDescription>Tagging <code class="font-data">{{ target.slice(0, 7) }}</code></FieldDescription>
 
         <Field>
@@ -129,9 +122,9 @@ async function submit(): Promise<void> {
           <FieldLabel :for="messageId">Message</FieldLabel>
           <Textarea :id="messageId" v-model="message" rows="3" class="w-full" />
         </Field>
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
           Create tag

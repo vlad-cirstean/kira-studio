@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * G-UX (item 3): "when checking out a branch that advanced, ask if I want to pull it too" —
  * `OpsState.runCheckout`'s own post-switch confirm step (`#maybePromptPostCheckoutPull`), mirroring
@@ -12,7 +11,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -39,26 +38,20 @@ function pullNow(): void {
 <template>
   <Dialog v-if="pending" :open="active" @update:open="(v) => !v && notNow()">
     <DialogContent
-      :show-close-button="false"
-      class="flex flex-col p-0 gap-0 w-120 max-w-[90vw] max-h-4/5"
+      size="md"
     >
-      <DialogHeader>
+      <DialogHeader closable>
         <DialogTitle>Pull the latest changes?</DialogTitle>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
-      <div class="flex min-h-0 flex-col gap-3 overflow-auto p-3">
+      <DialogBody>
         <DialogDescription>
           <strong>{{ pending.branch }}</strong> is {{ pending.behind }}
           {{ pending.behind === 1 ? 'commit' : 'commits' }} behind
           <code class="font-data">{{ pending.upstreamShortName }}</code> — pull now?
         </DialogDescription>
-      </div>
+      </DialogBody>
 
-      <DialogFooter class="justify-end">
+      <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="post-checkout-pull-not-now" @click="notNow">
           Not now
         </Button>
