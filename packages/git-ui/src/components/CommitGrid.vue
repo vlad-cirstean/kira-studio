@@ -33,7 +33,7 @@ import type { SearchState } from '../state/search.ts';
 import type { SelectionState } from '../state/selection.ts';
 import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
-import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readTokens.ts';
+import { rowHeightPx, TokenReader } from '../theme/readTokens.ts';
 import {
   type ColumnFit,
   type ColumnFitInput,
@@ -195,22 +195,13 @@ function plan(): RowPlan {
 
 // Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
 // (props.graphView is assumed stable for the life of one CommitGrid — a repo switch remounts
-// this component rather than swapping graphView underneath it) and a rowHeight accessor so a
-// `--kira-graph-row-h` change is picked up on the next render without rebuilding this formatter.
-// P7 (item 1): `rowHeight` is now per-row (`grid.getRowHeight(row)`, since rows vary), read
-// through `grid` itself rather than a fixed token — `grid` is declared above and assigned in
-// `onMounted`, before any row is ever actually rendered, so this closure never sees it undefined
-// in practice; the `?? compactRowHeightPx` fallback only matters for a formatter call that could
-// theoretically race construction. `compactRowHeight` feeds `nodeCenterY`'s own formula (§1.3 of
-// the plan): the node's y always sits `compactRowHeight / 2` above the row's own bottom edge,
-// regardless of how tall the row actually is.
+// this component) and a rowHeight accessor so a font-size change is picked up on the next render.
 const graphFormatter = createGraphFormatter(
   props.graphView.layout,
   props.graphView.store,
   plan,
   () => props.graphView.layoutCurrent,
-  (row) => grid?.getRowHeight(row) ?? compactRowHeightPx(tokenReader),
-  () => compactRowHeightPx(tokenReader),
+  () => rowHeightPx(tokenReader),
   graphWidth,
 );
 
@@ -667,11 +658,6 @@ function scheduleAncestryRebuild(): void {
     ancestryRebuildPending = false;
     // P74 §4.2/§4.3: rebuilds the ancestry derivation the detail pane's `prForCommit` reads.
     if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
-    // P72 §5.1: `rowMetadata` (columns.ts) derives a row's `height` from `rowHasBadges`, which
-    // reads `prsFor` — a PR resolution can flip a row between the compact and expanded height
-    // without a row-count change, exactly the case `invalidateRowHeights`'s own doc comment (and
-    // the token-change listener above) calls out as needing this explicit call, or SlickGrid's
-    // row-position index goes stale against the new heights (the scroll-flicker symptom).
     grid?.invalidateRowHeights();
     grid?.invalidateAllRows();
     grid?.render();
@@ -688,15 +674,10 @@ function raiseLaneFloor(): void {
   if (graphWidth() !== before) rebuildColumns();
 }
 
-/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
- *  heights; `raiseLaneFloor` widens the graph column when the new lanes need it.
+/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — re-render it; `raiseLaneFloor` widens the graph column when the new lanes need it.
  *
- *  P92 item 4: `invalidateRowHeights()`, not `invalidateRows(rows)` + `render()` — the latter
- *  marks heights dirty but never rebuilds SlickGrid's row-position index (only `updateRowCount()`
- *  does that), so an already-rendered row below one whose height just changed (a badge/PR
- *  decoration) keeps its stale `translateY()` while the index moves on: two rows land in the same
- *  band and their glyphs double up. `invalidateRowHeights()` is the library's own "index and rows
- *  are both stale" entry point, so `_range` is unused now — kept for the callback signature. */
+ *  `invalidateRowHeights()` is SlickGrid's "index and rows are both stale" entry point, so
+ *  `_range` is unused — kept for the callback signature. */
 function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
   raiseLaneFloor();
@@ -915,18 +896,11 @@ onMounted(() => {
     // `row` here is already a store row — `rowMetadata` (columns.ts) translates the incoming
     // display row before calling this.
     isSelected: (row) => props.selection.row.value === row,
-    // P7 (item 1): a row with a ref/PR badge gets the taller, expanded height —
-    // `rowMetadata`/`rowHasBadges` (columns.ts) are what actually decide "does this row have one".
-    expandedRowHeight: () => rowHeightPx(tokenReader),
     prsFor: (sha) => props.pr?.prsHeadedAt(sha),
   });
 
   const instance = new SlickGrid<CommitRecord>(host.value, dataView, currentColumns(), {
-    // P7 (item 1): the grid-level default is now the COMPACT height — an undecorated row (no
-    // ref/PR badge) is the common case, and `getItemMetadata` only ever asks for the taller,
-    // expanded one explicitly (`enableVariableRowHeight` below).
-    rowHeight: compactRowHeightPx(tokenReader), // §6.1 — never a literal in this file
-    enableVariableRowHeight: true, // P7 (item 1): height varies with whether a row has a badge
+    rowHeight: rowHeightPx(tokenReader), // §6.1 — never a literal in this file
     enableCellNavigation: false, // §6.6 navigates rows, not cells (see handleKeyDown's doc comment)
     enableColumnReorder: false, // §6.2: resizable, not reorderable — no SortableJS in the loop
     enableHtmlRendering: false, // formatters return elements; no innerHTML, nothing to sanitize
@@ -1023,10 +997,7 @@ onMounted(() => {
     // as they left it; `.kv-cell-date`'s own ellipsis is the safety net for that case).
     remeasureDateWidth();
     if (!grid) return;
-    grid.setOptions({ rowHeight: compactRowHeightPx(tokenReader) });
-    // P7 (item 1): the token driving `rowHeightProvider` (via `getItemMetadata`'s `height`) just
-    // changed for every row that has one, without a row-count change — exactly the case
-    // `invalidateRowHeights`'s own doc comment calls out as needing an explicit call.
+    grid.setOptions({ rowHeight: rowHeightPx(tokenReader) });
     grid.invalidateRowHeights();
     grid.invalidateAllRows();
     grid.render();
@@ -1307,7 +1278,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 
 <template>
   <div
-    class="kv-commit-grid relative h-full w-full min-h-graph-row overflow-hidden text-graph-md text-fg font-ui"
+    class="kv-commit-grid relative h-full w-full min-h-graph-row-compact overflow-hidden text-graph-md text-fg font-ui"
     data-testid="commit-grid"
   >
     <!-- SlickGrid's own `init()` (`Utils.emptyElement(this._container)`) wipes out whatever was

@@ -1,6 +1,5 @@
 /**
- * The getComputedStyle bridge for the tokens JavaScript needs as a number: `--kira-graph-row-h`/
- * `--kira-graph-row-h-compact` reach SlickGrid's `rowHeight` option and `rowSvg.ts`'s per-row
+ * The getComputedStyle bridge for the tokens JavaScript needs as a number: `--kira-graph-row-h` reaches SlickGrid's `rowHeight` option and `rowSvg.ts`'s per-row
  * geometry as pixel values, which the cascade cannot hand over. Colours stay in CSS classes.
  * Re-reads when `<html>`/`<body>` class or style changes (live font-size settings).
  *
@@ -9,11 +8,7 @@
  * property (`height`/`font-size`), same precedent as `dateFormat.ts`'s `measureAbsoluteDateWidth`.
  * `--kira-font-ui` stays a plain string read.
  */
-const LENGTH_TOKENS = [
-  '--kira-graph-row-h',
-  '--kira-graph-row-h-compact',
-  '--kira-graph-t-md',
-] as const;
+const LENGTH_TOKENS = ['--kira-graph-row-h', '--kira-graph-t-md'] as const;
 type LengthToken = (typeof LENGTH_TOKENS)[number];
 
 const STRING_TOKENS = ['--kira-font-ui'] as const;
@@ -26,13 +21,12 @@ const ALL_TOKENS: readonly TokenName[] = [...LENGTH_TOKENS, ...STRING_TOKENS];
 
 export type TokenChangeListener = (tokens: TokenMap) => void;
 
-/** Which real CSS property a length token's probe is measured through — `height` for the two row
- *  tokens (read via `getBoundingClientRect`, since a box's rendered height is what SlickGrid's
+/** Which real CSS property a length token's probe is measured through — `height` for the row
+ *  token (read via `getBoundingClientRect`, since a box's rendered height is what SlickGrid's
  *  `rowHeight` option actually needs), `font-size` for the type-scale token (read via
  *  `getComputedStyle`, which resolves a standard property's own `calc()` with no layout needed). */
 const PROBE_PROPERTY: Readonly<Record<LengthToken, 'height' | 'fontSize'>> = {
   '--kira-graph-row-h': 'height',
-  '--kira-graph-row-h-compact': 'height',
   '--kira-graph-t-md': 'fontSize',
 };
 
@@ -146,36 +140,15 @@ export class TokenReader {
   }
 }
 
-/** The default `--kira-graph-row-h` (`theme/git.css`) — the fallback `rowHeightPx` returns if the
- *  token is unset or unparseable, which only happens outside a real browser (a unit test with no
- *  stylesheet loaded), never in a mounted app. */
-const FALLBACK_ROW_HEIGHT = 36;
-
-/** The default `--kira-graph-row-h-compact` (`theme/git.css`) — `compactRowHeightPx`'s own fallback,
- *  same reasoning as `FALLBACK_ROW_HEIGHT`. */
-const FALLBACK_ROW_HEIGHT_COMPACT = 20;
+/** `rowHeightPx`'s fallback outside a real browser (no stylesheet loaded). */
+const FALLBACK_ROW_HEIGHT = 28;
 
 /**
- * `--kira-graph-row-h` as an actual pixel number (W6, W8) — the one numeric read every consumer of
- * this token needs, so the `parseFloat("22px")` lives in exactly one place rather than once per
- * caller. A malformed or missing value (an environment with no theme CSS loaded) falls back to
- * `theme/git.css`'s default rather than propagating `NaN` into SlickGrid's `rowHeight` option
- * or the graph column's geometry. P7 (item 1): now the height a row with a ref/PR badge uses —
- * SlickGrid's own grid-level default became `compactRowHeightPx` below, the more common case.
+ * `--kira-graph-row-h` as a pixel number: the one numeric read every consumer needs, so the
+ * `parseFloat` lives in one place. A malformed or missing value falls back rather than putting
+ * `NaN` into SlickGrid's `rowHeight` option.
  */
 export function rowHeightPx(reader: TokenReader): number {
   const parsed = Number.parseFloat(reader.tokens['--kira-graph-row-h']);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT;
-}
-
-/**
- * `--kira-graph-row-h-compact` as an actual pixel number — P7 (item 1)'s own new read, mirroring
- * `rowHeightPx` exactly. This is the height an undecorated row (no ref/PR badge) uses, and the
- * grid's own default `rowHeight` option now that variable row height is on
- * (`enableVariableRowHeight`, `CommitGrid.vue`) — SlickGrid falls back to the grid-level default
- * for any row `getItemMetadata` does not explicitly give a taller `height` to.
- */
-export function compactRowHeightPx(reader: TokenReader): number {
-  const parsed = Number.parseFloat(reader.tokens['--kira-graph-row-h-compact']);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT_COMPACT;
 }

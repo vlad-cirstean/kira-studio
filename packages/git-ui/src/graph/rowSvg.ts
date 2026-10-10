@@ -108,13 +108,8 @@ export function laneX(lane: number): number {
  *   does): a full-height run in `runLane`, overdrawn at both ends — two adjacent rows' runs must
  *   meet across a fractional `devicePixelRatio` without a hairline seam (§5.3's fifth decision).
  *
- * P7 (item 1): every "the node's own y" reference below (there is no other kind of `rowHeight/2`
- * read in this function — each one is confirmed by its own local variable name: `yEnd`/`yStart`/
- * `yTop`/`yBottom` at the node, never at a row boundary) is `nodeCenterY`, a second, separate
- * parameter — the node no longer sits at the row's literal midpoint once row height varies with
- * badge presence (`planNode`'s own doc comment has the full formula). Row-boundary values
- * (`-overdraw`, `rowHeight + overdraw`) are untouched — those are genuinely about the row's own
- * top/bottom, not the node.
+ * `nodeCenterY` is the node's own y (the row's midpoint); row-boundary values (`-overdraw`,
+ * `rowHeight + overdraw`) are about the row's top/bottom, not the node.
  */
 export function edgeCommand(
   segment: EdgeSegment,
@@ -225,16 +220,7 @@ export interface NodeShapePlan {
  *  unfilled ring (merge — `store.parentsOf(row).length > 1`), unfilled dashed ring alone (stash —
  *  `decorationAt(row)` carries the `stash` kind). Empty for a row with no layout yet
  *  (`slice.lane === undefined`) — nothing to draw, not a guessed lane.
- *
- *  P7 (item 1): `cy` is `nodeCenterY`, not `rowHeight / 2` — the row's own true midpoint stopped
- *  being where the commit-message subject sits the moment a badge could make the row taller
- *  without moving the subject (`CommitGrid.vue`'s `.kv-cell-message`: the subject is always the
- *  LAST grid track, always 18px, always the same distance from the row's own bottom edge no
- *  matter what — if anything — sits above it). The caller (`graphColumn.ts`) computes
- *  `nodeCenterY = rowHeight - compactRowHeight / 2`: algebraically this is exactly the subject's
- *  own vertical centre in both regimes (reduces to `compactRowHeight / 2` — today's already-
- *  correct single-line case — when `rowHeight === compactRowHeight`), so this module stays
- *  ignorant of which CSS regime produced the number it's handed. */
+ */
 export function planNode(slice: RowSlice, nodeCenterY: number): readonly NodeShapePlan[] {
   if (slice.lane === undefined) return [];
   const cx = laneX(slice.lane);
@@ -365,18 +351,13 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
 /** Builds one row's `<svg>` — sized to `columnWidth()` (P92 item 1: the column's actual,
  *  user-resizable width, `CommitGrid.vue`'s own `widths.value.graph`, not derived from
  *  `slice.laneCount` — a narrowed column must clip its lanes, not overflow into the message
- *  column) and `rowHeight` (this row's own real height — `CommitGrid.vue`'s
- *  `grid.getRowHeight(row)`, P7 (item 1) — so lanes and rows cannot drift). Lane x-coordinates
+ *  column) and `rowHeight` (the grid's row height, so lanes and rows cannot drift). Lane x-coordinates
  *  (`laneX`, `planEdgePaths`/`planNode`) are unchanged — only the box around the drawing is the
  *  column's; the `clip-path` utility on `kv-graph-svg` is what actually
  *  cuts a lane at the column's right edge, since `overflow: hidden` cannot do it (one non-visible
  *  axis forces the other to `auto`) while still letting `GEOMETRY.overdraw`'s vertical bleed
  *  through — see that rule's own comment.
- *
- *  `nodeCenterY` (P7, item 1) is this row's own node-anchor y (`planNode`'s own doc comment has
- *  the formula) — passed in rather than derived here so a caller only ever computes it once per
- *  row, from values (`rowHeight`, the compact token) this module has no other reason to know
- *  about. */
+ */
 export function buildRowSvg(
   slice: RowSlice,
   rowHeight: number,

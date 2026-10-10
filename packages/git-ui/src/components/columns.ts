@@ -17,10 +17,6 @@
 import type { CommitRecord, CommitStore, DecorationRef, RowPlan } from '@kira/git-core';
 import type { PrRecord } from '@kira/git-ipc';
 import type { Column, CustomDataView, Formatter, ItemMetadata } from 'slickgrid';
-// G19 D1: isHeadDecoration is promoted to rowSvg.ts (the graph column's own module), imported
-// from there rather than defined here — mirroring isStashRow's already-established precedent for
-// crossing this exact boundary.
-import { isHeadDecoration } from '../graph/rowSvg.ts';
 import type { ColumnWidths, DateFormat } from '../state/viewState.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { buildPrBadge, buildRefBadges, type StackBadgeInfo } from './refBadges.ts';
@@ -41,19 +37,15 @@ function isStashDecoration(ref: DecorationRef): boolean {
 
 // `kv-cell-date` stays as a marker (tests and the width probe read it); `kv-cell-author` has no reader.
 const CELL_TEXT_CLASS = 'overflow-hidden text-ellipsis whitespace-nowrap';
-const CELL_AUTHOR_CLASS = CELL_TEXT_CLASS;
-const CELL_DATE_CLASS = `kv-cell-date tabular-nums ${CELL_TEXT_CLASS}`;
-// The message cell is a 2-row grid: a badge track (0 unless the row has badges) over the subject.
-const CELL_MESSAGE_CLASS =
-  'kv-cell-message grid grid-rows-[0_1fr] items-center min-w-0 overflow-hidden';
-const CELL_MESSAGE_BADGES_CLASS =
-  'kv-cell-message grid grid-rows-[var(--kira-graph-h-xs)_1fr] items-center min-w-0 overflow-hidden';
-const CELL_MESSAGE_COLLAPSED_CLASS =
-  'kv-cell-message flex items-center gap-1 min-w-0 overflow-hidden';
+const CELL_AUTHOR_CLASS = `text-muted-foreground ${CELL_TEXT_CLASS}`;
+const CELL_DATE_CLASS = `kv-cell-date tabular-nums text-muted-foreground ${CELL_TEXT_CLASS}`;
+// One flex row: badge strip (capped at half the cell), then the subject.
+const CELL_MESSAGE_CLASS = 'kv-cell-message flex items-center gap-1 min-w-0 overflow-hidden';
+const CELL_MESSAGE_COLLAPSED_CLASS = CELL_MESSAGE_CLASS;
 const SUBJECT_CLASS =
-  'kv-message-subject row-start-2 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap';
+  'kv-message-subject min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap';
 const SUBJECT_STASH_CLASS = `${SUBJECT_CLASS} italic`;
-const BADGES_ROW_CLASS = 'row-start-1 flex items-center gap-1 min-w-0 overflow-hidden';
+const BADGES_ROW_CLASS = 'flex items-center gap-1 shrink min-w-0 max-w-1/2 overflow-hidden';
 const SUBJECT_COLLAPSED_CLASS = `${SUBJECT_CLASS} italic text-muted-foreground`;
 
 function textCell(text: string, className: string): HTMLSpanElement {
@@ -149,18 +141,11 @@ export function collapsedMessageText(hiddenCount: number, label: string | undefi
     : `${hiddenCount} more ${commits} on ${label}`;
 }
 
-/** G-UX (item 2b): the message cell is a 2-row CSS grid now (`CELL_MESSAGE_CLASS`), not a
- *  single flex row — `refBadges.ts`'s badge strip and `buildPrBadge`'s own badge, when either is
- *  present, share one `grid-row: 1` wrapper (`BADGES_ROW_CLASS`) above the subject's own
- *  `grid-row: 2`, rather than sitting inline before it. A row with neither never gets that wrapper
- *  at all (mirroring `buildRefBadges`'s own "no empty wrapper" rule) — the subject's explicit
- *  `grid-row: 2` still lands it on the same baseline as every other row regardless, so an
- *  undecorated commit costs nothing beyond the row's own fixed height. The subject alone gets
- *  `text-overflow: ellipsis` — a utility on `SUBJECT_CLASS`, not something this formatter
- *  computes. When a search pattern is active, the subject's text is split by `searchHighlight.ts`'s
- *  `splitHighlights` into alternating plain text nodes and `bg-search-match` spans
- *  — `enableHtmlRendering: false` (§5.5) and this building every node with `textContent` mean no
- *  escaping code is introduced and none is needed. */
+/** The message cell is one flex row: `refBadges.ts`'s badge strip and `buildPrBadge`'s badge, when
+ *  present, share one wrapper (`BADGES_ROW_CLASS`) before the subject. A row with neither never gets
+ *  that wrapper. The subject alone ellipsizes. With an active search pattern, the subject splits via
+ *  `searchHighlight.ts`'s `splitHighlights` into plain text nodes and `bg-search-match` spans;
+ *  `enableHtmlRendering: false` (§5.5) and `textContent` everywhere mean no escaping is needed. */
 function messageFormatter(
   ctx: MessageSearchContext,
   prCtx: PrContext = NO_PR_CONTEXT,
@@ -196,14 +181,10 @@ function messageFormatter(
     }
 
     const badges = buildRefBadges(dataContext.decoration, stackCtx.stackInfoFor);
-    // G24 D9: the PR badge shares the same row-1 strip, placed after the ref badges.
+    // G24 D9: the PR badge shares the badge strip, placed after the ref badges.
     const prs = prCtx.prsFor(dataContext.sha);
     const prBadge = prs !== undefined ? buildPrBadge(prs) : null;
     if (badges !== null || prBadge !== null) {
-      // P7 (item 1): the same condition that decides whether the badges-row element exists at
-      // all also decides whether the row is tall enough to show it — `rowMetadata` below makes
-      // the identical `decoration.length > 0 || hasPr` check, cheaply, without building this DOM.
-      cell.className = CELL_MESSAGE_BADGES_CLASS;
       const badgesRow = document.createElement('span');
       badgesRow.className = BADGES_ROW_CLASS;
       if (badges !== null) badgesRow.appendChild(badges);
@@ -391,11 +372,6 @@ export function buildColumns(
  *  second heuristic" — in particular, never a guess from the subject line, which an ordinary
  *  commit could coincidentally match).
  *
- *  P7 (item 1): also `getItemMetadata`'s `height`, now that `CommitGrid.vue` turns on
- *  `enableVariableRowHeight` — `expandedRowHeight`/`prsFor` are optional so every existing caller
- *  of `rowMetadata` that only needs the class behaviour keeps compiling; only `CommitGrid.vue`
- *  passes real ones.
- *
  *  P93 §7: `plan` translates the incoming row (SlickGrid's own display-row indexing) into the
  *  store row every other field here reads — `isSelected`/`prsFor` still take/answer for a STORE
  *  row (`SelectionState`'s own coordinate system, §1's "rows are one coordinate system" no longer
@@ -405,32 +381,14 @@ interface RowMetadataContext {
   readonly store: CommitStore;
   readonly plan: () => RowPlan;
   readonly isSelected: (row: number) => boolean;
-  readonly expandedRowHeight?: () => number;
   readonly prsFor?: (sha: string) => readonly PrRecord[] | undefined;
-}
-
-/** P7 (item 1): whether row `row` renders a ref/PR badge strip at all — the exact condition
- *  `messageFormatter` above uses to decide whether to build `BADGES_ROW_CLASS`'s row (and use
- *  `CELL_MESSAGE_BADGES_CLASS`), recomputed here cheaply (no DOM: `planBadges`'s own exhaustive
- *  `badgeSpecFor` switch means every decoration kind, `head` included, always produces a visible
- *  badge, so `decoration.length > 0` alone is a complete proxy) rather than calling
- *  `buildRefBadges`/`buildPrBadge` a second time just to check emptiness. */
-function rowHasBadges(
-  ctx: RowMetadataContext,
-  row: number,
-  decoration: readonly DecorationRef[],
-): boolean {
-  if (decoration.length > 0) return true;
-  if (ctx.prsFor === undefined) return false;
-  const sha = ctx.store.shaAt(row);
-  return (ctx.prsFor(sha)?.length ?? 0) > 0;
 }
 
 function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata | null {
   const entry = ctx.plan().entryAt(displayRow);
   if (entry.kind === 'collapsed') {
     // P93 §4.2: "the compact height... A placeholder never carries badges" — nor is it ever
-    // `kv-row-selected`/`-head`/`-stash`: `entry.storeRow` is only the placeholder's first
+    // `kv-row-selected`/`-stash`: `entry.storeRow` is only the placeholder's first
     // contracted row (a shape `getItem` needs, §4.2's own note), not a fact about the placeholder
     // itself, so `store.decorationAt`/`isSelected` are never consulted for it.
     return { cssClasses: 'kv-row-collapsed' };
@@ -439,14 +397,8 @@ function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata 
   const classes: string[] = [];
   if (ctx.isSelected(row)) classes.push('kv-row-selected');
   const decoration = ctx.store.decorationAt(row);
-  if (decoration.some(isHeadDecoration)) classes.push('kv-row-head');
   if (decoration.some(isStashDecoration)) classes.push('kv-row-stash');
-  const hasBadges = ctx.expandedRowHeight !== undefined && rowHasBadges(ctx, row, decoration);
-  if (classes.length === 0 && !hasBadges) return null;
-  return {
-    cssClasses: classes.length > 0 ? classes.join(' ') : undefined,
-    height: hasBadges ? ctx.expandedRowHeight?.() : undefined,
-  };
+  return classes.length > 0 ? { cssClasses: classes.join(' ') } : null;
 }
 
 /** SlickGrid's row-height index rebuild calls `getItem` for every loaded row (to hand the item to
