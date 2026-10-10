@@ -351,7 +351,7 @@ onUnmounted(() => {
 .md-reading :deep(h4),
 .md-reading :deep(h5),
 .md-reading :deep(h6) {
-  @apply font-semibold leading-tight mt-4 mx-0 mb-1.5;
+  @apply font-medium leading-tight mt-4 mx-0 mb-1.5;
 }
 /* P73 §7(b): em, not --kira-t-xl (tokens.css: deliberately a 20px literal that ignores Appearance)
    — resolves against .md-reading's own font-size, so the scale tracks the Appearance font-size

@@ -58,6 +58,7 @@ THEME_SRC=packages/theme/src
 WORKBENCH_SRC=packages/workbench/src
 GIT_UI_SRC=packages/git-ui/src
 SPACE_REPO_SRC=apps/kira-space/frontend/src/repo
+SPACE_REPO_VIEWS_SRC=apps/kira-space/frontend/src/views/repo
 KIRA_UI_SRC=packages/kira-ui/src
 DOCKER_UI_SRC=packages/docker-ui/src
 
@@ -775,13 +776,13 @@ check_git_ui_primitives() {
 }
 check_git_ui_primitives
 
-# P258: git-ui and Space's repo views follow Studio's weight scale (400/500), never semibold/bold,
-# and have no `text-graph-lg` heading size.
+# P258: the git module (git-ui, Space's repo/ and views/repo/) uses weights 400/500, never
+# semibold/bold, and has no `text-graph-lg` heading size.
 check_git_ui_type_scale() {
   if [ -n "$TC_COLLECT" ]; then
     return 0
   fi
-  hits=$(grep -rnP --include='*.vue' --include='*.ts' -- 'font-semibold|font-bold|text-graph-lg' "$GIT_UI_SRC" "$SPACE_REPO_SRC" 2>/dev/null || true)
+  hits=$(grep -rnP --include='*.vue' --include='*.ts' -- 'font-semibold|font-bold|text-graph-lg' "$GIT_UI_SRC" "$SPACE_REPO_SRC" "$SPACE_REPO_VIEWS_SRC" 2>/dev/null || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: git-ui and Space repo views must not use font-semibold/font-bold/text-graph-lg (P258):" >&2
     echo "$hits" >&2
