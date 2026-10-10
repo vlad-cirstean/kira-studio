@@ -1,21 +1,16 @@
 /**
- * The Kira-Studio-native channel (C10 §3.4) — a `MessageChannelLike` over a Wails stream, the
- * in-process peer of `socketChannel.ts`'s socket channel. `internal/bridge/gitstream.go` hands
- * `*application.StreamConn` straight to `rpcstream.NewSession` with no length prefix at all (a
- * Wails stream is message-framed already — the prefix `gitsock/frame.go` adds exists only because
- * a `net.Conn` is a byte stream with no message boundaries of its own), so this file has none of
- * `socketChannel.ts`'s `recvBuffer`/drain-loop/`MAX_PENDING_FRAMES` machinery: every inbound
- * message here is already one whole frame body.
- *
- * `bufferEncoding: 'native'` — a Wails stream carries real `ArrayBuffer`s, like the socket and
- * unlike a VS Code `WebviewView` (`socketChannel.ts`'s own doc comment).
+ * The native channel (C10 §3.4) — a `MessageChannelLike` over a Wails stream.
+ * `internal/bridge/gitstream.go` hands `*application.StreamConn` straight to
+ * `rpcstream.NewSession` with no length prefix at all (a Wails stream is message-framed already),
+ * so every inbound message here is one whole frame body. A Wails stream carries real
+ * `ArrayBuffer`s.
  *
  * The frame *body* shape is the one `blobFrame.ts` (C10 S1) already owns: a `0x00` first byte is a
  * blob frame (`0x00 | uint32BE headerLen | headerJSON | blob…`), anything else is a plain JSON
- * frame. One implementation of that layout shared with `socketChannel.ts`, not a second copy.
+ * frame. One implementation of that layout.
  *
  * `post` never encodes a blob — the client here never sends one, only
- * `internal/bridge/rpcstream` does (same as `socketChannel.ts`).
+ * `internal/bridge/rpcstream` does.
  */
 import {
   BLOB_FRAME_DISCRIMINANT,
@@ -25,7 +20,7 @@ import {
 import type { MessageChannelLike } from './rpc.ts';
 
 // Re-exported so a caller can `instanceof`-check a close reason without importing blobFrame.ts
-// directly — the same shape socketChannel.ts's own re-export follows.
+// directly.
 export { MalformedBlobFrameError };
 
 /**
@@ -67,7 +62,7 @@ export interface StreamChannel extends MessageChannelLike {
 }
 
 /** Thrown when an inbound frame's body cannot be decoded as JSON and is not a valid blob frame
- *  either — the stream channel's counterpart of `socketChannel.ts`'s `FrameDeliveryError`. */
+ *  either */
 export class StreamFrameDeliveryError extends Error {
   constructor(reason: string) {
     super(`streamChannel: frame delivery failed: ${reason}`);
@@ -114,13 +109,13 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
   };
 
   socket.onmessage = (ev: { data: ArrayBuffer }) => {
-    // F3: decode and delivery share one try/catch, matching socketChannel.ts's own deliverFrame —
+    // F3: decode and delivery share one try/catch —
     // a synchronous throw from the handler (the RPC client's own ContractVersionMismatchError/
     // ContractShapeError/TransportError) must destroy the connection the same way a malformed
     // frame does, never escape uncaught and silently drop the frame.
     try {
       const message = decodeFrame(ev.data);
-      // No pending-frame queue (unlike socketChannel.ts): the transport's own createRpcClient
+      // No pending-frame queue: the transport's own createRpcClient
       // subscribes with onMessage before the socket can have delivered anything, and this channel
       // has exactly one subscriber for its whole life — there is no resubscribe-across-an-await
       // gap to lose a frame in.

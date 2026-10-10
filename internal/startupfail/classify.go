@@ -40,9 +40,8 @@ type schemaTooNew interface {
 }
 
 // collapse turns a possibly multi-line, possibly huge error string into one line bounded to max
-// bytes — gitvsix.firstLineBounded's instinct (bound what a child process said before it reaches a
-// UI string), applied here to every newline rather than only the first, since a Go error's own
-// text can carry embedded newlines anywhere.
+// bytes, so what a child process said never reaches a UI string unbounded. Every newline is
+// collapsed, not only the first, since a Go error's own text can carry embedded newlines anywhere.
 func collapse(s string, max int) string {
 	s = strings.ReplaceAll(s, "\r\n", " ")
 	s = strings.ReplaceAll(s, "\n", " ")

@@ -2,12 +2,12 @@ import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// P178: a VS Code client's (or the ADE board's) git credential prompt reaches Kira Space through
+// P178: the ADE board's git credential prompt reaches Kira Space through
 // the Go relay; the native dialog shows it, answers it, and closes when the relay withdraws it.
 
 const prompt = {
   requestId: 'req-1',
-  source: 'VS Code',
+  source: 'ADE board',
   repoLabel: 'demo-repo',
   prompt: "Password for 'https://example.com':",
   masked: true,
@@ -25,7 +25,7 @@ test('relay prompt shows its label and text; submit calls GitCredentialService.P
   await emitWailsEvent(window, IPC.gitCredential, [prompt]);
   await expect(dialog).toBeVisible();
   await expect(window.locator('[data-testid="git-credential-repo"]')).toHaveText(
-    'VS Code · demo-repo',
+    'ADE board · demo-repo',
   );
   await expect(window.locator('[data-testid="git-credential-prompt"]')).toHaveText(prompt.prompt);
 

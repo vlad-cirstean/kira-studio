@@ -161,8 +161,7 @@ export class GraphViewState {
   /**
    * Opens `graph.stream` for `repoId`. `resumeThroughRow` defaults to this store's own current
    * row count, which is exactly what a post-remount rehydration needs: a freshly constructed
-   * `GraphViewState` (the only kind that exists right after a VS Code webview is recreated,
-   * §2.1) starts at 0, so the default asks the host to replay every row it still has cached
+   * `GraphViewState` (the only kind that exists right after a remount, §2.1) starts at 0, so the default asks the host to replay every row it still has cached
    * from row 0 — the single round trip that is "rehydrates without re-running git" from the
    * UI's side (§5.4). The same default also makes a same-session reconnect (the store already
    * holds N rows) resume from N instead of re-fetching them.

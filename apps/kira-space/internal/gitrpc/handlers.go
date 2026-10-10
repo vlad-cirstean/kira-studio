@@ -32,11 +32,11 @@ type Deps struct {
 
 // Handlers is gitrpc's own two-function method table — deliberately not rpcstream.Handlers: gitrpc
 // must not import internal/bridge/rpcstream (a domain package must stay under the layering line,
-// SPEC §7), so gitsock is the one that adapts these two functions onto rpcstream.Handlers.
+// SPEC §7), so internal/bridge adapts these two functions onto rpcstream.Handlers.
 type Handlers struct {
 	Request func(ctx context.Context, method string, params json.RawMessage) (any, error)
 	// Stream mirrors rpcstream.Handlers.Stream structurally (D5) — gitrpc still does not import
-	// internal/bridge/rpcstream (SPEC §7's layering rule); gitsock is what adapts the two.
+	// internal/bridge/rpcstream (SPEC §7's layering rule); internal/bridge adapts the two.
 	Stream func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error
 }
 
@@ -56,15 +56,14 @@ type Router struct {
 	// repoSettingsChanged is G18 D4/D7's own fan-out: every currently connected client gets
 	// repoSettings.set's own result, not only the connection that made the change (§3.18's own
 	// cross-connection regression guard) — the same internal/notify.Emitter[T] mechanism
-	// gitsock.Server's own clientsChanged already uses, one Router-wide instance rather than a new
-	// pub/sub of its own.
+	// dbmcp and gitcred use, one Router-wide instance rather than a new pub/sub of its own.
 	repoSettingsChanged notify.Emitter[RepoSettingsChangedPayload]
 }
 
 // New constructs a Router over deps.
 func New(deps Deps) *Router { return &Router{deps: deps} }
 
-// ForConn returns the two-function Handlers gitsock hands to one connection's rpcstream.Session —
+// ForConn returns the two-function Handlers internal/bridge hands to one connection's rpcstream.Session —
 // c is closed over by repo.open/repo.close, exactly the shape the wire contract itself does not
 // change at all (D18): params, results and CONTRACT_VERSION are untouched, only what repo.close
 // means does (evict globally -> release this connection's hold).
@@ -73,7 +72,7 @@ func New(deps Deps) *Router { return &Router{deps: deps} }
 // via c.Done() rather than repo.close, since repoSettings.changed is not scoped to any one repo
 // being held open. c.Emit (gitsession.Conn) is a
 // mutex-guarded accessor, not a bare field (P108 Part 17 review F9) — c.SetEmit is not called until
-// just after ForConn returns (gitsock's own handleConn), so an event landing in that narrow window
+// just after ForConn returns (bridge's ServeGitStream), so an event landing in that narrow window
 // safely no-ops rather than racing gitsession.Conn's own unguarded field the way it used to: an
 // event here is never this connection's OWN repoSettings.set (nothing can call it before this
 // connection's own Handlers exist to dispatch it), but it CAN be a different, already-connected

@@ -299,8 +299,7 @@ func TestOutputCollector_FlushDeliversPendingUnconditionally(t *testing.T) {
 // onBatch — a gap where two batches formed back-to-back under mu (batch1 strictly before batch2,
 // since mu itself serializes formation) could still have their onBatch calls run in the OPPOSITE
 // order if goroutine scheduling let the second caller reach deliver() first. onBatch's own contract
-// is an ordered stream of lines; a caller (gitsession's own conn.Emit, forwarding worktree.progress
-// events) has no way to detect or recover from a later batch's lines arriving before an earlier
+// is an ordered stream of lines; a caller (an ADE log sink) has no way to detect or recover from a later batch's lines arriving before an earlier
 // one's.
 //
 // This exercises reserveDelivery/finishDelivery directly (the exact pair write/flush/tick call)

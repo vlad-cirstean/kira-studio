@@ -15,8 +15,8 @@ type CreatesTracking struct {
 }
 
 // CheckoutBlocker mirrors @kira/git-ipc's own CheckoutBlocker discriminated union, flattened into
-// one struct with omitempty on every kind-specific field (gitsock/handshake.go's own "one struct,
-// a kind discriminant" convention) — Paths for blockedByTracked/blockedByUntracked, Operation for
+// one struct with omitempty on every kind-specific field ("one struct,
+// a kind discriminant") — Paths for blockedByTracked/blockedByUntracked, Operation for
 // inProgressOperation, Branch/WorktreePath for worktreeConflict.
 type CheckoutBlocker struct {
 	Kind         string               `json:"kind"`

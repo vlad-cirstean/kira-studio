@@ -6,7 +6,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
-// TestOrderedEmitter_DropsStaleEmit is dbmcp.ApprovalBroker's and gitsock.Broker's own former
+// TestOrderedEmitter_DropsStaleEmit is dbmcp.ApprovalBroker's and the former git broker's own
 // TestApprovalBroker_EmitOrdered_DropsStaleSnapshot / TestBroker_EmitOrdered_DropsStaleSnapshot
 // (M7 finding #10 / #23), hoisted here as OrderedEmitter's one authoritative test (P107 T2-8): a
 // caller takes NextSeq under its own lock, builds a snapshot, releases the lock, then Emits — so

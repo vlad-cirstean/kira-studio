@@ -65,7 +65,7 @@ test('seeded records render repo, source, kind and command', async ({ relaunch }
           kind: 'fetch',
           repoName: 'beta',
           repoRoot: '/work/beta',
-          source: 'VS Code',
+          source: 'ADE board',
           command: 'git fetch origin',
         }),
       ],
@@ -79,7 +79,7 @@ test('seeded records render repo, source, kind and command', async ({ relaunch }
   await expect(rows.filter({ hasText: 'alpha' })).toContainText('Kira Space');
   await expect(rows.filter({ hasText: 'alpha' })).toContainText('branchCreate');
   await expect(rows.filter({ hasText: 'alpha' })).toContainText('git branch feat main');
-  await expect(rows.filter({ hasText: 'beta' })).toContainText('VS Code');
+  await expect(rows.filter({ hasText: 'beta' })).toContainText('ADE board');
   await expect(rows.filter({ hasText: 'beta' })).toContainText('git fetch origin');
 });
 

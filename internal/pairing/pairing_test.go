@@ -481,6 +481,6 @@ func TestBroker_UnknownRequestID_ReportsAlreadyResolved(t *testing.T) {
 	}
 }
 
-// The emitOrdered stale-snapshot-drop guarantee (M7 finding #10 / #23's gitsock side) is now
+// The emitOrdered stale-snapshot-drop guarantee (M7 finding #10 / #23) is now
 // OrderedEmitter's own, hoisted with the rest of the queue/emit machinery to internal/notify
 // (P107 T2-8) — see notify.TestOrderedEmitter_DropsStaleEmit, the one authoritative test for it.

@@ -120,7 +120,7 @@ func (r *Router) setRepoSettings(repoID string, patch model.GitRepoSettingsPatch
 
 // SetRepoSettings is repoSettings.set's write-and-fan-out path for in-process callers (ADE), so
 // connected git-ui clients see the change. The only writer of the prepare script, never reachable
-// from the wire (P172): a socket client cannot choose what worktree.prepare runs.
+// from the wire (P172): a stream client cannot choose what the ADE prepare script runs.
 func (r *Router) SetRepoSettings(repoID string, patch model.GitRepoSettingsPatch) error {
 	_, err := r.setRepoSettings(gitpath.CleanNFC(repoID), patch)
 	return err

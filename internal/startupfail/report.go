@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Deps are the seams a Reporter needs, Deps-shaped exactly like internal/gitvsix's own (D8):
+// Deps are the seams a Reporter needs, Deps-shaped exactly like internal/toolexec's own (D8):
 // zero-value fields fall back to the real OS (NewReporter, below), and a fake Run is what lets a
 // Linux test assert "the correct argv was built and the correct body was passed" with no macOS
 // present and no real subprocess spawned.
@@ -53,7 +53,7 @@ type Reporter struct {
 
 // NewReporter constructs a Reporter over d, substituting the real OS implementation for any
 // zero-value field — the same shape every seam-carrying constructor in this codebase uses
-// (gitvsix.New, gitclient.NewRunner).
+// (gitclient.NewRunner).
 func NewReporter(d Deps) *Reporter {
 	r := &Reporter{
 		lookPath: d.LookPath, stat: d.Stat, run: d.Run, getenv: d.Getenv,

@@ -688,7 +688,7 @@ function toggleRow(sha: string): void {
 }
 
 // G12 D12: the diff overlay (and W17's modal-focus wiring for it) is gone — every diff opens in
-// VS Code now, so there is nothing left in the webview for Escape's first stage to close. Only
+// the host editor now, so there is nothing left in the webview for Escape's first stage to close. Only
 // the second stage (collapse the focused row) remains.
 //
 // P108 F12: Kira Space mounts this alongside one or more graph tabs in the same document (kept

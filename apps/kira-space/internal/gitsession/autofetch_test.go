@@ -17,8 +17,7 @@ import (
 
 // §8.1(e)'s own TestIntegration_AutoFetchNeverPrompts, at the package that can actually drive it
 // without waiting out a real one-minute timer (D23's own interval unit): autoFetchTick is called
-// directly against a REAL git repository and a REAL HTTP 401 stand-in (D24, matching gitsock's own
-// credential-relay fixture) — the tick's own conn is always nil, so "never prompts" is checked by
+// directly against a REAL git repository and a REAL HTTP 401 stand-in (D24) — the tick's own conn is always nil, so "never prompts" is checked by
 // the tick simply completing at all (a nil Conn's Prompter would have nothing to relay to) rather
 // than by asserting the absence of an event on a connection that was never given one.
 

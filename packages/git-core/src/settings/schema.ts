@@ -18,18 +18,15 @@ export interface SettingDef<T> {
   readonly key: string;
   readonly type: SettingType;
   readonly default: T;
-  /** Becomes the VS Code setting description verbatim. */
+  /** Shown as the setting's description. */
   readonly description: string;
   readonly enum?: readonly string[];
   readonly minimum?: number;
   readonly maximum?: number;
   readonly scope?: 'window' | 'resource';
-  /** G14 D6/G18 D10: where a setting's value comes from. `"extension"` (the default, when
-   *  omitted) is a key this extension contributes and owns; `"host"` is a key the *editor* owns,
-   *  which we only read; `"repo"` (G18) is a key stored server-side, per repository, edited from
-   *  the git-ui RepoSettingsDialog rather than VS Code settings.json. The extension's
-   *  `package.json` contributes no configuration for either. */
-  readonly source?: 'extension' | 'host' | 'repo';
+  /** G18 D10: `"repo"` is a key stored server-side, per repository, edited from the git-ui
+   *  RepoSettingsDialog. */
+  readonly source?: 'repo';
 }
 
 export const SETTINGS = {
@@ -41,7 +38,7 @@ export const SETTINGS = {
   // declaration here after wiring the real one would recreate the exact "a setting that silently
   // does nothing" anti-pattern this fix exists to close out.
   //
-  // G18 D1/D10: the keys below all moved from VS Code settings.json into a new per-repo
+  // G18 D1/D10: the keys below all moved from per-window settings into a new per-repo
   // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
   // `source: 'repo'` marks each as server-owned.
   // G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for

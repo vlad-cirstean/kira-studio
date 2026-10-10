@@ -6,7 +6,7 @@
 // instead of paying that cost against a grid nobody can see. Provided at the `createApp` level in
 // `main.ts`'s own `mount()` — scoped per mount, since more than one repo workspace's graph can be
 // open (and independently backgrounded) at once. Not provided at all (every other `mount()` caller
-// — VS Code's own webview host, `ReviewView`, this package's own tests) means always visible,
+// — `ReviewView`, this package's own tests) means always visible,
 // unchanged from before this fix.
 import { type InjectionKey, inject, type ShallowRef, shallowRef } from 'vue';
 

@@ -6,7 +6,7 @@ import (
 )
 
 // OrderedEmitter wraps Emitter[T] with the emitSeq/lastEmitted "never publish a stale snapshot"
-// guard dbmcp.ApprovalBroker and gitsock.Broker each hand-rolled identically (P107 T2-8): every
+// guard dbmcp.ApprovalBroker and gitcred.Relay each hand-rolled identically (P107 T2-8): every
 // state change that produces a value to emit takes NextSeq (typically while still holding
 // whatever lock protects that state), builds its snapshot, releases the lock, then calls Emit(seq,
 // v) — a call whose seq is not strictly greater than the highest already emitted is dropped, so
@@ -18,7 +18,7 @@ type OrderedEmitter[T any] struct {
 	seq         atomic.Uint64
 	lastEmitted atomic.Uint64
 	// emitMu serializes Emit's whole check-and-deliver sequence (F8/P108 Part 2 — reported as F7
-	// against dbmcp.ApprovalBroker/gitsock.Broker, the two callers): the original CAS-then-deliver
+	// against dbmcp.ApprovalBroker/gitcred.Relay, the two callers): the original CAS-then-deliver
 	// had a gap between winning the CAS and calling e.emitter.Emit(v) where a second, actually
 	// newer Emit call could win its own CAS and deliver first, so the first call's now-stale value
 	// still went out last. Holding one lock across both steps (separate from whatever lock each
@@ -59,7 +59,7 @@ func (e *OrderedEmitter[T]) Emit(seq uint64, v T) {
 }
 
 // PendingQueue is a FIFO of pending, id-keyed entries — dbmcp.ApprovalBroker's queue/byID pair and
-// gitsock.Broker's own, restated once (P107 T2-8). R is whatever entry type the caller stores;
+// gitcred.Relay's own, restated once (P107 T2-8). R is whatever entry type the caller stores;
 // both existing callers store a pointer to their own request-plus-result-channel struct, keyed by
 // a RequestID they mint themselves before calling Add. Not safe for concurrent use on its own —
 // both callers already hold their own mutex across every call, the same as the queue/byID fields
@@ -74,7 +74,7 @@ func NewPendingQueue[R any]() *PendingQueue[R] {
 	return &PendingQueue[R]{byID: map[string]R{}}
 }
 
-// Len reports how many entries are queued — dbmcp's maxPendingApprovals/gitsock's maxQueueLen own
+// Len reports how many entries are queued — dbmcp's maxPendingApprovals/gitcred's maxQueueLen own
 // cap check.
 func (q *PendingQueue[R]) Len() int { return len(q.order) }
 

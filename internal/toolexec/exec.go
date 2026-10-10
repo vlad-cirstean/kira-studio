@@ -1,5 +1,5 @@
 // Package toolexec is the argv-only, bounded-output local-tool runner mcpinstall's `claude mcp
-// add` spawn and gitvsix's `code`/`open` spawns both carried verbatim (P107 T2-6): the
+// add` spawn and the former editor-install spawns both carried verbatim (P107 T2-6): the
 // SIGTERM-then-SIGKILL process-group cancellation, bounded stderr capture, and the PATH-then-
 // candidates executable probe every discovery package in this codebase repeats.
 package toolexec
@@ -20,7 +20,7 @@ import (
 )
 
 // GracefulStopDelay bounds Run's own cmd.Cancel SIGTERM-then-SIGKILL escalation and cmd.WaitDelay
-// — a var, not a const (gitvsix/exec_test.go's own precedent), so a test can shrink it rather than
+// — a var, not a const (a test seam), so a test can shrink it rather than
 // costing real wall-clock time.
 var GracefulStopDelay = 2 * time.Second
 

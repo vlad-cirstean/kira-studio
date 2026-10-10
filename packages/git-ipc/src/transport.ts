@@ -26,8 +26,7 @@ export class TransportError extends Error {
 }
 
 /**
- * Both hosts (VS Code postMessage, Electron ipcRenderer+MessagePort) and the harness's
- * mock bridge implement this. The UI's bridge client (`packages/ui/src/bridge/client.ts`,
+ * Kira Space's native transport and the test fakes implement this. The UI's bridge client (`packages/ui/src/bridge/client.ts`,
  * P1+) depends only on this interface, never on a concrete transport.
  */
 export interface Transport {

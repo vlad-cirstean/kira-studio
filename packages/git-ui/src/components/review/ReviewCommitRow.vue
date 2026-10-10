@@ -144,9 +144,8 @@ async function openAllChanges(): Promise<void> {
 }
 
 // G14 D8 row action 3 / D10, replaced P75 §2.3: was a `command:kiraSpace.openCommitInGraph`
-// anchor (VS Code's own webview escape hatch) — inert in Kira Space, which mounts this same
-// component in a Wails WebView with no `command:` handler at any layer. Now a real request both
-// hosts answer locally.
+// anchor (a webview escape hatch) — inert in a Wails WebView with no `command:` handler at any
+// layer. Now a real request the host answers locally.
 async function revealInGraph(): Promise<void> {
   try {
     const { revealed } = await props.actions.revealInGraph({ sha: props.sha });
@@ -167,7 +166,7 @@ async function revealInGraph(): Promise<void> {
   }
 }
 
-// G12 D12: opens VS Code's native diff directly — no in-webview diff mode to flip into. `sha`'s
+// G12 D12: opens the host's diff directly — no in-webview diff mode to flip into. `sha`'s
 // own parentIndex is this row's current merge-parent selection, exactly what commit.detail was
 // fetched against. G21 D13: `pinned` comes straight from FileTree's own `openFile` emit — a
 // click (or arrow-key move) is `false`, a double click/`Enter` is `true`.
@@ -253,7 +252,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           label="Open all changes"
           @click="openAllChanges"
         />
-        <!-- P75 §2.3: a real button now — no more command: anchor VS Code's own bubble-phase
+        <!-- P75 §2.3: a real button now — no more command: anchor a bubble-phase
              link interceptor needed to observe directly, since the reveal is a bridge request.
              onRowClick's own .kv-review-row-actions guard above still keeps this click from also
              toggling the row. -->

@@ -144,7 +144,7 @@ type GraphStreamParams struct {
 }
 
 // commitsBlob marshals as {"$fb":"gitwire/1","d":{"$blob":true}} — D4's own marker naming where
-// the frame's out-of-band FlatBuffer belongs once rpcstream/socketChannel.ts substitutes it.
+// the frame's out-of-band FlatBuffer belongs once rpcstream substitutes it.
 // rpcstream never learns what a graph chunk is (session.go:1-9's own module doc); this is the one
 // place that shape is stated.
 type commitsBlob struct{}
@@ -162,7 +162,7 @@ func (commitsBlob) MarshalJSON() ([]byte, error) {
 // ---------------------------------------------------------------------------------------
 
 // MaxResultBytes is D2(b)'s own cap on commit.fileDiff/file.read's *encoded* result — comfortably
-// under gitsock's frame cap, far above anything a 1 MiB patch (gitsession.MaxPatchBytes)
+// under rpcstream's frame cap, far above anything a 1 MiB patch (gitsession.MaxPatchBytes)
 // produces in practice (F9: ~2.5 MiB worst realistic case). Not measured against a real budget —
 // there is no decision this number would change.
 const MaxResultBytes = 6 << 20
@@ -598,9 +598,8 @@ type RepoSettingsSetParams struct {
 
 // RepoSettingsChangedPayload is repoSettings.changed's own event payload (D4/D7) — emitted to
 // every currently connected client, not only the one that made the change, via
-// internal/notify.Emitter[T] (the same mechanism gitsock.Server's own clientsChanged already
-// uses), regardless of which key changed. RepoID names which repo's own write triggered the emit;
-// a viewer decides for itself whether that repoId is relevant.
+// internal/notify.Emitter[T] (the same mechanism dbmcp and gitcred use), regardless of which key
+// changed. RepoID names which repo's own write triggered the emit; a viewer decides for itself whether that repoId is relevant.
 type RepoSettingsChangedPayload struct {
 	RepoID   string               `json:"repoId"`
 	Settings RepoSettingsSnapshot `json:"settings"`

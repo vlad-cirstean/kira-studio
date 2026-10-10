@@ -7,7 +7,7 @@ import type { RepoCandidate } from '@kira/git-ipc';
  * is a Git repository, this panel says so plainly instead of offering a folder-picking dialog.
  * P72: this is now the only repo-switch affordance git-ui ships (the toolbar dropdown, which
  * duplicated this list behind a popup, was removed — redundant with Studio's own left sidebar and
- * VS Code's one-repo-per-window model).
+ * the one-repo-per-workspace model).
  */
 import { TransportError } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';

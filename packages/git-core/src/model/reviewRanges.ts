@@ -1,24 +1,22 @@
 /**
  * G15 D5/D6 — pure interval algebra plus the two coordinate mappings the editor-side marking
  * controller needs (`selectionToRange`, `hunkChangeBlock`). Imports only `./diff.ts` and
- * `./review.ts`, nothing from `@kira/git-ipc` or `vscode`, which is what lets this run under plain `bun test` (D10) and be shared
- * by `reviewMarking.ts` without pulling an extension host into either.
+ * `./review.ts`, nothing from `@kira/git-ipc` or an editor API, which is what lets this run under plain `bun test` (D10).
  *
  * This algebra is presentation-only (F9): it decides which icon a hunk gets, which of the two
  * toolbar buttons shows, and what a hover says. G11 D10's server-side union/subtract is what
  * actually computes the stored state — the client never predicts it and never writes
  * `reviewedRanges` from this module's output.
  *
- * C11 S1: moved here from `apps/kira-studio-vscode/src/reviewRanges.ts`, unchanged, so both the
- * extension and the native app share one implementation. `DiffHunk`/`LineRange` are this
+ * `DiffHunk`/`LineRange` are this
  * package's own model types (structural copies of `@kira/git-ipc`'s wire shapes) rather than an
  * import of the wire package itself — no behaviour change.
  */
 import type { DiffHunk } from './diff.ts';
 import type { LineRange } from './review.ts';
 
-/** A plain `{start,end}×{line,character}` shape — `vscode.Selection` narrowed to what
- *  `selectionToRange` needs, so this module needs no `vscode` import. */
+/** A plain `{start,end}×{line,character}` shape — an editor selection narrowed to what
+ *  `selectionToRange` needs, so this module needs no editor import. */
 export interface SelectionShape {
   readonly start: { readonly line: number; readonly character: number };
   readonly end: { readonly line: number; readonly character: number };
@@ -45,7 +43,7 @@ export function normalizeRanges(ranges: readonly LineRange[]): readonly LineRang
 }
 
 /** Clamps every range into `1..lineCount`, dropping any that fall entirely outside it — a
- *  selection past the last line of a document VS Code padded is not a range the server should be
+ *  selection past the last line of a document an editor padded is not a range the server should be
  *  asked to store (D5). */
 export function clampRanges(ranges: readonly LineRange[], lineCount: number): readonly LineRange[] {
   const clamped: LineRange[] = [];
@@ -93,9 +91,8 @@ export function coverage(
  *  coordinates, so there is no projection to do. */
 export function selectionToRange(sel: SelectionShape): LineRange {
   const startLine0 = sel.start.line;
-  // A downward drag that lands at column 0 of the next line does not include that line — VS Code's
-  // own convention for a full-line selection, and what git.stageSelectedRanges does with the same
-  // gesture. A single-line selection is never collapsed away by this rule.
+  // A downward drag that lands at column 0 of the next line does not include that line — the usual
+  // convention for a full-line selection. A single-line selection is never collapsed away by this rule.
   const endLine0 =
     sel.end.character === 0 && sel.end.line > sel.start.line ? sel.end.line - 1 : sel.end.line;
   return { start: startLine0 + 1, end: Math.max(endLine0, startLine0) + 1 };

@@ -89,7 +89,7 @@ const emit = defineEmits<{
    *  `DetailState`/`StashState`'s own `selectFile`, which only moves the highlight. */
   (e: 'selectFile', fileIndex: number): void;
   /** G21 D13: a file row was opened — a click or arrow-key move (`pinned: false`, navigational:
-   *  VS Code's own preview-tab convention governs, the next such open replaces it) or a double
+   *  the preview-tab convention governs, the next such open replaces it) or a double
    *  click/`Enter` (`pinned: true`, an explicit "keep this" that pins a real, permanent tab).
    *  Always paired with a `selectFile` for the same `fileIndex` when it originates from
    *  `selectRow` (a click or arrow-key move); a double click/`Enter` fires this alone, since the
@@ -270,7 +270,7 @@ function rowClass(row: FileTreeRow, index: number): string {
 }
 
 /** G21 D13: every selection change — a click or an arrow-key move alike — also opens the file,
- *  never pinned (VS Code's own preview-tab convention governs). This is not new behaviour, only
+ *  never pinned (the preview-tab convention governs). This is not new behaviour, only
  *  its mechanism: before D12, moving the cursor here already flipped `DetailState.mode` to
  *  `'diff'` immediately, showing the (then in-webview) diff — this is that same "select = open a
  *  preview" behaviour, now expressed as a second emit rather than a mode flip, and now something
@@ -306,9 +306,8 @@ function onRowSpace(event: KeyboardEvent, index: number): void {
 
 /** G21 D13: the explicit "keep this" gesture — pins a real, permanent tab. Deliberately relies on
  *  the browser firing `click` first (`selectRow` above, via `onRowClick`): a double click opens
- *  the preview and then immediately re-opens the same diff pinned, and VS Code converts the
- *  existing preview tab into a permanent one rather than opening a second — matching VS Code's
- *  own Explorer, and why no click-delay debounce is introduced here (a debounce would add a
+ *  the preview and then immediately re-opens the same diff pinned, and the host converts the
+ *  existing preview tab into a permanent one rather than opening a second, which is why no click-delay debounce is introduced here (a debounce would add a
  *  visible lag to every single click to serve the rarer gesture). */
 function onRowDblClick(index: number): void {
   const row = capped.value.visible[index];

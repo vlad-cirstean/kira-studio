@@ -143,10 +143,10 @@ export class ReviewFilesState {
     });
   }
 
-  /** Opens path in VS Code's native diff (G12 D12) — a no-op re-selection of the file already
+  /** Opens path in the host's native diff (G12 D12) — a no-op re-selection of the file already
    *  open re-opens it anyway, since the editor tab may since have been closed. `#loadDiff` runs
    *  alongside, independently: it fetches metadata this pane still renders (the delta status
-   *  line, the per-file reviewed marks), never the diff body VS Code now owns.
+   *  line, the per-file reviewed marks), never the diff body the host owns.
    *
    *  G21 D13: `opts.pinned` — `false`/omitted for a click or arrow-key move (navigational, the
    *  default here matches every other "selecting = opening" caller in this file), `true` for a

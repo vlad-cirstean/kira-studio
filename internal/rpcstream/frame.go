@@ -51,10 +51,10 @@ const blobFrameDiscriminant = 0x00
 //	0x00 | uint32BE headerLen | headerJSON | blob…to the end of the frame
 //
 // Exactly one blob per frame, and it is the rest of the frame — the outer length-prefixed framing
-// (gitsock/frame.go, unchanged by this package) already bounds it, so no second length is
+// (the stream's own message framing) already bounds it, so no second length is
 // written. Where the blob belongs *inside* the JSON payload is the payload's own business, not
 // this function's: rpcstream never inspects env's contents at all, and a caller (gitrpc) marks
-// the position with its own marker (commitsBlob's `{"$blob":true}`) that only socketChannel.ts's
+// the position with its own marker (commitsBlob's `{"$blob":true}`) that only streamChannel.ts's
 // reader needs to recognise.
 func encodeBody(env envelope, blob []byte) ([]byte, error) {
 	headerJSON, err := json.Marshal(env)

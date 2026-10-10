@@ -1,5 +1,5 @@
-// Package gitcred holds git credential prompts that have no window of their own — a socket
-// client's (VS Code) or the ADE board's — until a Kira Space window answers them (P178 D2). The
+// Package gitcred holds git credential prompts that have no window of their own — the ADE
+// board's (ADE) — until a Kira Space window answers them (P178 D2). The
 // native git stream keeps its own per-workspace path: its prompt always has a window.
 package gitcred
 
@@ -32,7 +32,7 @@ type entry struct {
 	answer chan string // buffered 1; at most one send or close over the entry's lifetime.
 }
 
-// Relay is a FIFO of pending prompts fanned out as ordered snapshots (gitsock.Broker's own pair).
+// Relay is a FIFO of pending prompts fanned out as ordered snapshots (notify.OrderedEmitter).
 type Relay struct {
 	mu      sync.Mutex
 	queue   *notify.PendingQueue[*entry]

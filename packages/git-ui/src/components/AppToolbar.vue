@@ -13,8 +13,8 @@
  * component).
  *
  * G34 D13 (P229: now `ViewToolbar.vue`'s recipe, restated since `@workbench` is not importable here): this bar's own metrics used to be a literal 35px (`--kv-toolbar-height`), argued as
- * matching the panel title bar's — which does not hold, since that title bar is VS Code chrome
- * outside this webview's iframe and there is no shared edge to align to. It is now `--kv-bar-h`
+ * matching the panel title bar's — which does not hold, since that title bar is host chrome
+ * outside this view and there is no shared edge to align to. It is now `--kv-bar-h`
  * (34px at the default font size, growing with it, Kira's own toolbar/tab-bar/title-bar token —
  * already what the review sidebar's toolbar uses), 4px-rounded controls (Kira's radius tier, not
  * `--kv-radius: 0`'s square corners), and Kira's own shadow tier where a shadow is drawn at all.

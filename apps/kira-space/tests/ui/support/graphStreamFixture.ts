@@ -17,9 +17,8 @@ import { encodeStreamPayload } from '@kira/git-ipc/codec';
 
 const WIDEST_SAMPLE_TIMESTAMP = Date.UTC(2024, 11, 30, 22, 48) / 1000;
 
-/** A single-commit, zero-parent `PackedCommitChunk` at row 0 — `fakeGraphHost.ts`'s own analogous
- *  fixture (the VS Code interaction suite) builds the same shape via the shared
- *  `@kira/git-core/testing/packedChunk` (P107 I2-27). */
+/** A single-commit, zero-parent `PackedCommitChunk` at row 0 — the shared
+ *  `@kira/git-core/testing/packedChunk` builds the same shape (P107 I2-27). */
 export function buildOneCommitChunk(sha: string, subject: string): PackedCommitChunk {
   return buildPackedChunk([{ sha, subject }]);
 }

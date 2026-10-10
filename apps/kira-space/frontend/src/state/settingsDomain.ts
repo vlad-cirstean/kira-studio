@@ -22,7 +22,7 @@ export const FETCH_AUTO_INTERVAL_MINUTES_RANGE = { min: 0, max: 1440 } as const;
 
 // G7 D16: server-owned — two windows disagreeing about either is a correctness/safety issue (a
 // force-push confirmation only one window enforces, an auto-fetch cadence that differs per
-// viewer), edited only in this dialog, never as a per-window VS Code setting. Not exported —
+// viewer), edited only in this dialog, never as a per-window setting. Not exported —
 // nothing outside this file references the raw schema object; `Settings['git']` covers real
 // consumers.
 const gitSettingsSchema = /*#__PURE__*/ z.object({
@@ -36,7 +36,7 @@ const gitSettingsSchema = /*#__PURE__*/ z.object({
   // G18 D15: git.path was already classified server-owned (it answers "where is the git binary
   // on this machine", not a per-repo or per-window preference) but its wiring was dead until that
   // phase — a third leaf of this same trio, fixed the same way, not a redesign. Empty means "auto-
-  // discover" (VS Code's own git.path, then PATH) — gitclient.Discovery's own existing contract.
+  // discover" (PATH lookup) — gitclient.Discovery's own existing contract.
   gitPath: z.string().default(''),
   // P92 item 9: 0 = follow appearance.fontSize. Reaches every embedded git-ui surface (graph,
   // diff, review) through --vscode-font-size, which nothing else in this app consumes.

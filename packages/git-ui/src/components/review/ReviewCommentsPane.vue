@@ -2,7 +2,7 @@
 /**
  * G13 D10 — the review sidebar's Comments pane, and the only new component this phase adds to
  * `packages/git-ui`: the centralized list, the copy-for-AI action and clear-all. The webview never
- * adds a comment (D9) — that gesture lives entirely in VS Code's own Comments API — so this pane is
+ * adds a comment (D9) — that gesture lives entirely in the editor's gutter — so this pane is
  * read, remove and clear-all only.
  *
  * Comments render in the server's own order (D13: path, then line, then created_at, then id) —

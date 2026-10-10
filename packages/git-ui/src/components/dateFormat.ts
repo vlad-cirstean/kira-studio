@@ -23,7 +23,7 @@ let measureCanvas: HTMLCanvasElement | OffscreenCanvas | undefined;
  * The pixel width of the widest string `formatAbsoluteDate` can produce, rendered in `font` (a
  * CSS font shorthand — `CommitGrid.vue` reads this from a live `.kv-cell-date` probe's own
  * computed style). Item 6's second gap (F6): a hard-coded pixel width is only correct at one
- * font size, and G14 already made the type scale follow VS Code's own settings, so this measures
+ * font size, and G14 already made the type scale follow the host's own settings, so this measures
  * rather than assumes.
  *
  * Bun's own test environment has no DOM — no `document`, no `OffscreenCanvas` (the same reason

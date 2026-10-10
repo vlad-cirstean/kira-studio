@@ -47,7 +47,7 @@ export class StashState {
 
   // -------------------------------------------------------------------------------------
   // W14's detail pane. G21 D12: no more `mode`/`diff`/`diffError` — `StashDetailPane.vue`'s tree
-  // opens VS Code's own native diff editor now (`actions.openInEditor`, with `fallbackSha:
+  // opens the host's native diff editor now (`actions.openInEditor`, with `fallbackSha:
   // entry.untrackedSha` for the untracked-file case `#requestFileDiff` used to retry, F12),
   // exactly like `DetailState` since the same phase. `selectedFile` survives: it still drives the
   // tree's own selected-row highlight and file cursor.

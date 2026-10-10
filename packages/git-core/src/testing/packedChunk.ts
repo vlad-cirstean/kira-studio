@@ -37,8 +37,7 @@ export interface BuildPackedChunkOptions {
 }
 
 /**
- * Builds a `PackedCommitChunk` test fixture from `rows` — the VS Code interaction/layout suites'
- * and Space's UI suite's own shared shape (P107 I2-27), each of which previously hand-rolled its
+ * Builds a `PackedCommitChunk` test fixture from `rows` — Space's UI suite's own shared shape (P107 I2-27), each of which previously hand-rolled its
  * own copy of this packing logic (a single-row root commit, or a whole multi-branch chunk whose
  * every parent link resolves within it). A row with no `parents` is a root commit; a later row
  * naming an earlier row's own `sha` as a parent resolves within this same chunk, same as

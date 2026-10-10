@@ -30,7 +30,7 @@ export interface PendingCredential {
   /** git's own text, rendered verbatim — never reformatted, never parsed. */
   readonly prompt: string;
   readonly masked: boolean;
-  /** Set for a prompt the Go relay holds (a VS Code client's or the ADE board's, P178): its
+  /** Set for a prompt the Go relay holds (the ADE board's, P178): its
    *  server-side request id. Such an entry has no code repo (`codeRepoId` ''). */
   readonly relayId?: string;
   /** Shown instead of the code repo's name: "<source> · <repo folder>". */

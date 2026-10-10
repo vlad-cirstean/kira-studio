@@ -68,14 +68,12 @@ export interface MountOptions {
 }
 
 /**
- * Mounts the app shell into `container`, wired to `transport` and `viewState`, Hosts and the harness call this rather than each owning their
- * own bootstrap — the UI is mounted unchanged everywhere (§8.4), only these pieces differ.
- * `viewState` is what P3 W9 adds: without it, the panel would have to keep
- * `retainContextWhenHidden` on to avoid losing scroll/selection/loaded-row state every time a
- * VS Code webview is hidden and recreated (§2.1). `view` is what P7 W9 adds: one build, one
+ * Mounts the app shell into `container`, wired to `transport` and `viewState`, Kira Space's mounts call this rather than each owning their
+ * own bootstrap. `viewState` is what P3 W9 adds: it keeps
+ * scroll/selection/loaded-row state across an unmount (§2.1). `view` is what P7 W9 adds: one build, one
  * entry (§6.8/D41) — the host's own injected initial state says which root this call mounts,
- * never a second bundle. Both are breaking changes to the one function every host and the
- * harness calls, and both were made the same way: every call site moves in the same commit.
+ * never a second bundle. Both are breaking changes to the one function every mount calls, and both were made the same
+ * way: every call site moves in the same commit.
  */
 export function mount(container: Element, opts: MountOptions): MountHandle {
   // §5.1 perf budgets are measured from navigation start (the implicit start of a

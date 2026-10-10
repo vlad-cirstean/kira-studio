@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * `docs/plans/P11.md` W11/W12: §6.2's search box. One text input, three toggle buttons
- * (case-sensitive / whole-word / regex) as `aria-pressed` icon buttons with VS Code's own
+ * (case-sensitive / whole-word / regex) as `aria-pressed` icon buttons with
  * icon-button styling, a Commits/Refs/Both scope `<select>` living *inside* the box (OQ6: §6.2
  * gave the toolbar one slot and §6.3's 600px breakpoint had no room for a second control — G-UX
  * D9/item 9 later moved this whole component out of the toolbar into its own row below it, but
@@ -42,8 +42,8 @@
  * mounts inside is now conditionally rendered (`App.vue`'s `searchOpen`), so a listener mounted
  * for "this component's own whole lifetime" would only ever fire while the row is already open —
  * exactly backwards for a shortcut whose whole job is opening it. `App.vue` owns that listener
- * now, alongside the toggle-closed gesture (`Ctrl/Cmd+F` a second time) and the new
- * `Ctrl+Alt+F` VS Code keybinding, none of which this component needs to know about.
+ * now, alongside the toggle-closed gesture (`Ctrl/Cmd+F` a second time) and the host's
+ * `Ctrl+Alt+F` keybinding, none of which this component needs to know about.
  *
  * P131 Part 2 §5.3: the dropdown and the regex error now share one non-modal shadcn `Popover`
  * (mutually exclusive — the error means `compiled.kind` failed, the dropdown needs it `'ok'`),

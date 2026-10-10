@@ -24,7 +24,7 @@ var ErrRepoTornDown = errors.New("gitsession: repository entry has been torn dow
 
 // Watcher is the minimal seam RepoEntry needs from a repo watcher — gitclient.RepoWatcher
 // satisfies it structurally. Declared here (not imported as a concrete type) and exported so both
-// registry_test.go (same package) and gitsock's own integration test (a different package,
+// registry_test.go (same package) and the flow harness (a different package,
 // injecting a counting fake through Registry.NewWatcher) can drive refcount/linger logic with no
 // filesystem and no real git (§3.5/§3.9).
 type Watcher interface {

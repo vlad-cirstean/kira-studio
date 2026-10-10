@@ -313,7 +313,7 @@ func TestConcurrent_AutoFetchArmsOnOpen(t *testing.T) {
 }
 
 // TestConcurrent_RemoteOpSlotAdmitsExactlyOne is F9's own pin: opSlot.claim is a
-// mutex-guarded CAS, and the existing gitsession/gitsock coverage already drives it with a
+// mutex-guarded CAS, and the existing gitflow coverage already drives it with a
 // genuinely in-flight op — what nothing exercises is N goroutines calling claim at the SAME
 // instant. Already correct today; this locks it in under real concurrency rather than a sequential
 // fake.

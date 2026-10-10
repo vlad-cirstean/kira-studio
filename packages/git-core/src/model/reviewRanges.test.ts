@@ -3,7 +3,7 @@
  * vs. a subtraction that splits one range into two), `selectionToRange` is boundary arithmetic
  * with an off-by-one rule that is wrong in both directions if misread, and `hunkChangeBlock`'s
  * `newLine === undefined` handling is the difference between a correct block and a silently
- * shifted one. All pure, no `vscode` import, runs under plain `bun test`.
+ * shifted one. All pure, no editor import, runs under plain `bun test`.
  */
 import { describe, expect, test } from 'bun:test';
 import type { DiffHunk, DiffLine } from './diff.ts';

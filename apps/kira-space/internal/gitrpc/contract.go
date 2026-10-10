@@ -7,7 +7,7 @@ package gitrpc
 // ContractVersion is the sole compatibility authority (SPEC §3.4, D20) — a structural copy of
 // packages/git-ipc/src/validate.ts:7's CONTRACT_VERSION, kept honest by both sides reading the
 // same upstream source rather than by codegen (a single integer does not justify one). A mismatch
-// in gitsock's handshake is a hard, loud stop, not a silent drop.
+// in the stream handshake is a hard, loud stop, not a silent drop.
 // G7 D2: 15 -> 16, for exactly three additions — credential.request (a new event), credential.
 // provide (a new request), and remote.pullPreflight's own optional strategySetting param.
 // G10 D9: 16 -> 17, for one new event, ui.action — the palette's route into an already-mounted

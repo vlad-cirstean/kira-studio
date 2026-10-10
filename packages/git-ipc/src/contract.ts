@@ -40,7 +40,7 @@ export type DecorationRef =
   | { readonly kind: 'stash'; readonly index: number };
 
 /** G18 D4: the per-repo display settings, server-stored, edited from the new in-app dialog
- *  (`RepoSettingsDialog.vue`) rather than VS Code's settings.json — every leaf here is genuinely
+ *  (`RepoSettingsDialog.vue`) rather than per-window settings — every leaf here is genuinely
  *  scoped by repoId. */
 export interface RepoSettingsSnapshot {
   readonly 'kiraSpace.graph.pageSize': number;
@@ -606,11 +606,8 @@ export interface WorktreeRemovePreflight {
 // These nine types ARE structural copies of `internal/gitpreflight/stack.go`'s wire types
 // (`StackBranch`/`StackSummary`/`RestackPreflight`) and `internal/gitsession/stack.go`'s
 // (`RestackResult`/`RestackProgress`) — kept honest by hand (this repo carries no
-// `wireConformance.test.ts`; see G24's own commit message for why) rather than by the plan's
-// own `apps/kira-space-vscode/tests/unit/ipc/wireConformance.test.ts` (G26 plan §4.24), which
-// does not exist here for the same reason G24's equivalent copy doesn't: `test:unit`'s own
-// `bun test` invocation (root `package.json`) globs `apps/kira-space-vscode/src`, never
-// `apps/kira-space-vscode/tests` — a file there would never run.
+// `wireConformance.test.ts`; see G24's own commit message for why) rather than by a
+// conformance test.
 // ---------------------------------------------------------------------------------------
 
 export type StackBranchState = 'upToDate' | 'needsRestack' | 'parentMissing';
@@ -726,8 +723,8 @@ export interface RestackResult {
 }
 
 /** `stack.progress`'s own event payload (D6 step 4) — emitted BEFORE each branch's own rebase
- *  spawn, the same "coalesce, never withhold past a bound" family `remote.progress`/
- *  `worktree.progress` already established, though a restack's own per-branch granularity needs
+ *  spawn, the same "coalesce, never withhold past a bound" family `remote.progress`
+ *  already established, though a restack's own per-branch granularity needs
  *  no throttling of its own (there is at most one event per branch, never a stream within one). */
 export interface RestackProgress {
   readonly repoId: string;
@@ -807,7 +804,7 @@ export interface PushPreflight {
 /** `remote.run`'s params — one request key for all five `RemoteOpKind`s (D51). `confirmToken`
  *  is present only for a protected-branch force-push/delete: the typed branch name, checked
  *  server-side against Kira Space's own server-owned `protectedBranches` setting (G7 D16/D17,
- *  superseding D52's `kiraSpace.protectedBranches` — moved out of VS Code's settings because
+ *  superseding D52's `kiraSpace.protectedBranches` — moved out of per-window settings because
  *  two windows disagreeing about it is a safety issue, not a preference) — never trusted from the
  *  UI alone. */
 export interface RemoteOpParams {
@@ -1371,14 +1368,9 @@ export type SearchRunResult =
    *  walked tail (and therefore any body-only match) is missing. */
   | { readonly kind: 'unsupportedPattern'; readonly message: string };
 
-/** G10 D9: the palette's own route into an already-mounted webview. `RpcServer.emit` is the only
- *  way the extension host can reach a live webview (contract-gated exactly like the socket), so
- *  every mutating palette command that isn't a fresh host-side implementation of `OpsState`'s own
- *  logic funnels through this one event — the palette is an entry point, never a second
- *  implementation. One member per served kind in
- *  `apps/kira-space-vscode/src/commands.ts`'s `MUTATING_COMMANDS` table, plus `refresh` for the
- *  one non-mutating palette addition (F15). A later phase (G13/G14/G15) that serves a currently-
- *  `pending` kind adds its own member here alongside its own table entry and manifest command. */
+/** G10 D9: the host's route into an already-mounted git-ui — every mutating command that isn't a
+ *  fresh host-side implementation of `OpsState`'s own logic funnels through this one event, so a
+ *  command is an entry point, never a second implementation. */
 export type UiActionKind =
   | 'openBranchPicker'
   /** P77: the same panel, opened on its Tags / Stashes / Worktrees / Stacks tab. Before this, all
@@ -1409,12 +1401,11 @@ export type UiActionKind =
   | 'toggleFileReviewed'
   /** G13 D19: the palette's own route to the Comments pane's copy-for-AI action. */
   | 'copyReviewComments'
-  /** G13 D19: extension -> the Comments pane, emitted after an editor-side comment add/delete so
-   *  the sidebar's list updates without the user switching panes — the reverse direction needs no
-   *  event, since a webview-side mutation already travels through proxyHandlers.ts. */
+  /** G13 D19: host -> the Comments pane, emitted after an editor-side comment add/delete so
+   *  the sidebar's list updates without the user switching panes. */
   | 'refreshReviewComments'
   /** G14 D10: "Open in graph" from the review diff toolbar — reveals and selects a commit named
-   *  by `ui.action`'s optional `target`. Extension -> webview only. */
+   *  by `ui.action`'s optional `target`. Host -> webview only. */
   | 'revealCommit'
   /** G17 D9: the palette's own route to `StashDialog.vue`'s create mode — the same assignment the
    *  toolbar's own "Stash changes…" button already makes (`App.vue`'s `@stash-changes` handler),
@@ -1457,9 +1448,8 @@ export type UiActionKind =
    *  instead, the same convention the five ordinary stash commands already established. */
   | 'saveGlobalStash'
   /** G-UX D9: the palette's own route to toggling the graph panel's search row — the same
-   *  assignment the in-webview `/`/`Ctrl+F` shortcuts already make. Not a `MUTATING_COMMANDS`
-   *  member (it maps to no OpRequest/RemoteOpParams kind) — `commands.ts`'s own `OTHER_COMMANDS`
-   *  carries it instead, the same shape `toggleFileReviewed` above already established. */
+   *  assignment the in-webview `/`/`Ctrl+F` shortcuts already make. It maps to no
+   *  OpRequest/RemoteOpParams kind. */
   | 'toggleSearch';
 
 // ---------------------------------------------------------------------------------------
@@ -1529,8 +1519,7 @@ export type Contract = {
     };
     /**
      * §6.8's entry point, from the *panel* webview: reveal the sidebar view on this branch. The
-     * host reveals the view and either seeds a cold resolve (`html.ts`'s bootstrap island) or
-     * pushes `review.target` to an already-open one. Returns nothing — the panel does not wait
+     * host reveals the view and pushes `review.target` to it. Returns nothing — the panel does not wait
      * on, and is not told about, what the review view then finds.
      */
     'review.open': {
@@ -1647,7 +1636,7 @@ export type Contract = {
      * pair, `CONTRACT_VERSION` 23's own one reason to move. Not commit or diff data, only the
      * identifiers needed to re-ask `setTarget`/`setBase`'s own question fresh on the next resume
      * (every resume re-runs `review.resolveBase` for real — there is no cached resolution to go
-     * stale). Answered entirely inside the extension against `context.workspaceState`, exactly
+     * stale). Answered entirely host-side, exactly
      * like `editor.openDiff` itself never reaching the Go backend for its own local concerns.
      * `session: null` clears the stored session for `repoId` — sent by `clearTarget()` itself, so
      * an explicit "go back" never leaves a stale resume-point the next cold boot would silently
@@ -1661,9 +1650,8 @@ export type Contract = {
       result: Record<string, never>;
     };
     /** G19 D11b: the read half — its own round trip, not carried on the bootstrap island, because
-     *  `resolveWebviewView` runs before the webview has told the extension host which repo it is
-     *  even looking at (a cold reveal's `repoId` is only known once the webview's own `repo.list`
-     *  call resolves) — see `ReviewView.vue`'s own doc comment on `bootstrap()`'s resume path. A
+     *  a cold reveal's `repoId` is only known once the view's own `repo.list`
+     *  call resolves — see `ReviewView.vue`'s own doc comment on `bootstrap()`'s resume path. A
      *  snapshot older than 14 days (`savedAt`, matching G11's own `review.db` idle-purge number)
      *  is treated as expired and answered as `{session: null}`. */
     'review.session.load': {
@@ -1717,12 +1705,10 @@ export type Contract = {
       result: { readonly files: readonly FileChange[] };
     };
     /** P7 (item 2): opens the working-tree diff for one file — the one path this whole contract
-     *  intentionally sends a LIVE on-disk `vscode.Uri.file(...)` for (every other `editor.*`
-     *  method's own left/right documents are immutable history). Answered entirely inside the
-     *  extension, exactly like `editor.openRangeDiff` — the Go server never sees this method, so it
-     *  needed no `CONTRACT_VERSION` bump of its own. `status === 'deleted'` (no live file exists to
-     *  diff against) falls back to revealing the file in VS Code's own Source Control view instead
-     *  of opening a diff. */
+     *  intentionally sends a LIVE on-disk path for (every other `editor.*`
+     *  method's own left/right documents are immutable history). Answered entirely host-side,
+     *  exactly like `editor.openRangeDiff` — the Go server never sees this method.
+     *  `status === 'deleted'` (no live file exists to diff against) opens no diff. */
     'editor.openWorkingDiff': {
       params: {
         repoId: string;
@@ -1756,10 +1742,7 @@ export type Contract = {
      *
      *  G21 D12/D13: two additive params. `pinned` (optional so a caller that forgets it is a
      *  type error at the transport-building call site, never a silent default) —
-     *  `ports/editorIntegration.ts`'s `openDiff` maps `true` to `{ preview: false }` (G19 D8's
-     *  own fix, kept, scoped to a caller that wants a real, permanent tab) and `false` to
-     *  omitting the fourth `vscode.diff` argument entirely, so VS Code's own preview-tab
-     *  convention (and a user's `workbench.editor.enablePreview` setting) governs. `fallbackSha`
+     *  `true` opens a real, permanent tab and `false` a preview tab. `fallbackSha`
      *  (D12) is the stash tree's own need: a stash's `-u` untracked files live only in its third
      *  parent (`entry.untrackedSha`), which has no `baseSha` of its own — the handler retries the
      *  whole `commit.detail`-composition against `fallbackSha` when `path` is not among `sha`'s
@@ -1779,7 +1762,7 @@ export type Contract = {
     };
     /** G12 D1, reshaped G13 D8 — the review sidebar's own diff request: a two-revision comparison
      *  for one path, which (unlike editor.openDiff) is not one commit's parent-child pair.
-     *  Answered entirely inside the extension, exactly like editor.openDiff — the server never
+     *  Answered entirely host-side, exactly like editor.openDiff — the server never
      *  sees this method. `status` is carried rather than re-derived because the caller
      *  (review.files) already knows which side is `{kind: 'empty'}` (an added file has no
      *  base-side blob).
@@ -1788,7 +1771,7 @@ export type Contract = {
      *  is carried so the right-hand document can be marked as that branch's tip — the fourth
      *  virtual-key field (`virtualKey.ts`) that is what lets G13 anchor a comment exactly, and
      *  G14 anchor a hunk mark, rather than approximately. This closes three defects at once: a
-     *  branch-addressed document's content used to be cached by VS Code per URI and never
+     *  branch-addressed document's content used to be cached per URI and never
      *  invalidated (a stale tab could silently mis-anchor a comment against content that had
      *  since moved); `range` mode's left side used to be `base` even though the file list beside
      *  it is the three-dot (merge-base) set, so the diff and the file list could disagree about
@@ -1820,14 +1803,8 @@ export type Contract = {
      * G21 D8a (item 8): "Open all changes" — composes the whole file list from **one**
      * `commit.detail` (collapsing what used to be N separate `editor.openDiff` round trips, one
      * per file, into one), reusing the exact `DocumentRef` derivation `editor.openDiff`'s own
-     * handler already performs. Prefers VS Code's built-in multi-file diff editor
-     * (`vscode.changes`, probed once via `getCommands(true)` since it is a built-in command with
-     * no entry in `@types/vscode`) and falls back to a sequenced, error-aware loop over the same
-     * per-file open `editor.openDiff` uses when that command is absent or rejects — see
-     * `ports/editorIntegration.ts`'s own `openAllChanges` doc comment for the full fallback
-     * shape — VS Code's own two branches stay pinned/multi-diff, untouched since G19 D8. The
-     * desktop's own `editor.openAllChanges` handler (`hostHandlers.ts`) opens every file as a
-     * preview-cohort tab instead (P74 §5.2) — a bulk open item 8's original bug was about, and
+     * handler already performs. Space's `editor.openAllChanges` handler (`hostHandlers.ts`) opens every file as a
+     * preview-cohort tab (P74 §5.2) — a bulk open item 8's original bug was about, and
      * that bug is never regressed by D13's own per-file preview/pin split, but a whole commit's
      * files permanently pinning the strip was never the ask either.
      */
@@ -1971,9 +1948,8 @@ export type Contract = {
        *  fault. */
       result: { readonly cancelled: boolean };
     };
-    /** G7 D2/D4: answers exactly one `credential.request` by id. Only the native stream (Kira
-     *  Space's own window) sends it: a socket client's op prompts in Kira Space instead (P178), and
-     *  `git.sock` refuses this key with `E_READ_ONLY`. `secret` is `null` for a dismissal, never
+    /** G7 D2/D4: answers exactly one `credential.request` by id. Only Kira Space's own window
+     *  sends it. `secret` is `null` for a dismissal, never
      *  omitted — a value the wire carries, not an absence the server has to infer (the same
      *  discipline G4 D5 set for this chapter). Answering twice, or presenting an id this connection
      *  never received, is a no-op, never an error (D4's own anti-abuse rules). */
@@ -1994,14 +1970,8 @@ export type Contract = {
       result: SearchRunResult;
     };
     // ---- G4 (v1.3 chapter): server-only methods -------------------------------------------
-    // Neither of these is ever called by the webview — both exist solely for the extension's own
-    // use (the virtual-document source, "Go to file"'s server half), and would otherwise need a
-    // second, untyped request surface on `ConnectionManager` (G4 plan F12) for two methods. Each
-    // still gets a `forward(...)` entry in `proxyHandlers` (`ServerHandlers.requests` is total
-    // over `RequestKey`) even though nothing ever reaches it from that direction.
-    /** The blob at `<rev>:<path>`, for the extension's own virtual-document provider (G4 D14).
-     *  Text only: a binary blob is refused rather than encoded, because the only consumer is a
-     *  read-only text document. */
+    /** The blob at `<rev>:<path>`, for read-only text documents (G4 D14). Text only: a binary
+     *  blob is refused rather than encoded. */
     'file.read': {
       params: { repoId: string; rev: string; path: string };
       result:
@@ -2010,7 +1980,7 @@ export type Contract = {
         | { readonly kind: 'binary' }
         | { readonly kind: 'tooLarge'; readonly bytes: number; readonly limitBytes: number };
     };
-    /** D14a's decision procedure, minus the part only VS Code can do (G4 D4). The extension maps
+    /** D14a's decision procedure, minus the part only the editor host can do (G4 D4). The host maps
      *  `line` through `hunks` with `@kira/git-core`'s `mapLineAcrossDiff` and then reveals; it
      *  never asks the filesystem or the object database anything itself. */
     'file.goToTarget': {
@@ -2046,7 +2016,7 @@ export type Contract = {
     // ---- G24: GitHub PR links (D9/D14) ------------------------------------------------------
     /** Per-commit PR lookup, driven by the graph indicator and the detail pane's own selection
      *  (D9): `PrState.select`'s 300ms-debounced, abort-and-recheck request. Answered entirely by
-     *  the Go server — never proxied to the extension. */
+     *  the Go server */
     'commit.resolvePr': {
       params: { repoId: string; sha: string };
       result: PrLookupResult;
@@ -2062,13 +2032,13 @@ export type Contract = {
     /** Server-composed: the renderer names a PR by number, never a URL (the boundary
      *  `GitHubService.OpenPullRequestURL`'s own host/path check already defends). `null` when
      *  GitHub is disabled or there is no GitHub remote — the same "disabled collapses to nothing"
-     *  posture `PrLookupResult` already takes. Go-served, never proxied to the extension. */
+     *  posture `PrLookupResult` already takes. Go-served. */
     'pr.browserUrl': {
       params: { repoId: string; number: number };
       result: { readonly url: string } | { readonly url: null };
     };
-    /** Host-answered (extension-answered like every `editor.*` request before it, D3.3):
-     *  requests `pr.browserUrl` over the socket and hands the URL to the host's own
+    /** Host-answered (like every `editor.*` request before it, D3.3):
+     *  requests `pr.browserUrl` and hands the URL to the host's own
      *  browser-open path — never answered by the Go server itself. */
     'pr.openExternal': {
       params: { repoId: string; number: number };
@@ -2138,13 +2108,11 @@ export type Contract = {
       result: { readonly cancelled: boolean };
     };
     // ---- P75 §2.3: reveal a review commit in the graph, from either host -------------------
-    /** Replaces the review row's old `command:kiraSpace.openCommitInGraph?…` anchor (VS Code's
-     *  own webview link escape hatch, unreachable outside a VS Code webview — `RepoReviewView.vue`
-     *  mounts the same row component in a Wails WebView, where no `command:` handler exists at any
-     *  layer). Host-answered in both hosts, never reaching Go (like `review.open`/
+    /** Replaces the review row's old `command:kiraSpace.openCommitInGraph?…` anchor (a webview link
+     *  escape hatch — `RepoReviewView.vue` mounts the row component in a Wails WebView, where no
+     *  `command:` handler exists at any layer). Host-answered, never reaching Go (like `review.open`/
      *  `editor.openRangeDiff`): the desktop answers by emitting/stashing `ui.action`'s own
-     *  `revealCommit` onto the pinned graph tab; the extension answers via
-     *  `graphProvider.runUiAction('revealCommit', …)`. `revealed: false` is a real, non-stub
+     *  `revealCommit` onto the pinned graph tab. `revealed: false` is a real, non-stub
      *  answer — the desktop genuinely cannot reveal when this window has no record of the
      *  repository, or its workspace has no pinned graph tab open. */
     'graph.revealCommit': {
@@ -2160,8 +2128,7 @@ export type Contract = {
     'repoSettings.changed': { repoId: string; settings: RepoSettingsSnapshot };
     /** P173: auto-fetch stopped (non-null) or re-armed (`null`) for a held repository. */
     'autoFetch.changed': { repoId: string; autoFetch: AutoFetchStatus | null };
-    /** Host -> the review webview only: "review this branch instead". Never emitted to the
-     *  panel's own server — the two views hold separate `RpcServer`s over separate channels. */
+    /** Host -> the review view only: "review this branch instead". */
     'review.target': { repoId: string; branch: string };
     /** Throttled to 100ms (OQ10) — live progress for whichever `remote.run` is in flight. */
     'remote.progress': RemoteProgress;
@@ -2190,7 +2157,7 @@ export type Contract = {
      *  already drives — the palette is an entry point, never a second implementation. */
     'ui.action': {
       readonly action: UiActionKind;
-      /** G14 D10: present only for actions that name a commit ('revealCommit'). Extension ->
+      /** G14 D10: present only for actions that name a commit ('revealCommit'). Host ->
        *  webview only; the Go server neither emits nor parses ui.action. */
       readonly target?: { readonly repoId: string; readonly sha: string };
     };

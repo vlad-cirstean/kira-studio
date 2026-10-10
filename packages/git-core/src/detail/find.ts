@@ -10,9 +10,7 @@ export interface DetailFileLookup<F extends { readonly path: string }> {
 /** Looks `path` up in an already-fetched `commit.detail` result — `undefined` (not a throw) when
  *  `path` is not one of that commit's changed files, so a caller composing `editor.openDiff`'s
  *  `sha`/`fallbackSha` retry can try the fallback next without exception-driven control flow.
- *  Space's `hostHandlers.ts` and the VS Code extension's `proxyHandlers.ts` each fetched the
- *  detail their own way (a raw `Transport['request']` vs a `ConnectionManager`) and duplicated
- *  only this lookup — the fetch itself stays with each caller. */
+ *  Space's `hostHandlers.ts` fetches the detail itself; only this lookup is shared. */
 export function findChangeInDetail<F extends { readonly path: string }>(
   detail: DetailFileLookup<F>,
   path: string,

@@ -105,7 +105,7 @@ describe('state/gitCredential — the FIFO queue', () => {
   describe('relay sync (P178)', () => {
     const prompt = (requestId: string) => ({
       requestId,
-      source: 'VS Code',
+      source: 'ADE board',
       repoLabel: 'repo',
       prompt: `Password ${requestId}`,
       masked: true,
@@ -125,7 +125,7 @@ describe('state/gitCredential — the FIFO queue', () => {
       const store = useGitCredentialStore();
       store.syncRelayPrompts([prompt('x1'), prompt('x2'), prompt('x3')]);
       expect(store.active?.relayId).toBe('x1');
-      expect(store.active?.label).toBe('VS Code · repo');
+      expect(store.active?.label).toBe('ADE board · repo');
 
       store.syncRelayPrompts([prompt('x2'), prompt('x3')]);
       expect(store.active?.relayId).toBe('x2');

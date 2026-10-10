@@ -175,14 +175,13 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     },
 
     // Bug fix (live-reported): one transport is already bound to exactly one repo workspace
-    // (this file's own class doc comment, "one transport per repo workspace") — unlike VS Code's
-    // multi-root case candidates/activeRepoId were designed for, there is no real ambiguity to
-    // resolve here. Returning every imported repo made `App.vue`'s bootstrap() candidates loop
+    // (this file's own class doc comment, "one transport per repo workspace") — there is no
+    // multi-root ambiguity to resolve here. Returning every imported repo made `App.vue`'s bootstrap() candidates loop
     // (which tries each in import order and stops at the first that opens, never reading
     // activeRepoId) open whichever repo was imported first, not this transport's own — the graph
     // appeared "stuck" on that first repo whenever a different repo's tab mounted for the first
     // time. Scoping candidates to this transport's own repo makes the loop open the right one
-    // unconditionally, with no change needed to the shared (VS Code too) bootstrap logic itself.
+    // unconditionally, with no change needed to the shared bootstrap logic itself.
     'repo.list': async () => {
       const own = useCodeReposStore().codeRepoRecord(deps.codeRepoId);
       const candidates = own ? [{ path: own.root, label: own.name }] : [];
@@ -239,9 +238,9 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     },
 
     // §6.1/P92 item 5: "N tabs instead" of a single multi-diff editor was §13's own gap — now one
-    // `repo-multi-diff` tab, VS Code's own multi-file diff editor's counterpart. `mode: 'tabs'`
+    // `repo-multi-diff` tab, the multi-file diff view. `mode: 'tabs'`
     // stays, byte-identical to before this phase: detailActions.ts's own result shape (`:54`)
-    // still means "opened via tabs, not the extension's native multi-diff editor", which remains
+    // still means "opened via tabs, not a native multi-diff editor", which remains
     // true — one Kira tab, not N.
     'editor.openAllChanges': async (params, signal) => {
       const { repoId: gitRepoId, sha, parentIndex } = params;
@@ -336,7 +335,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       return {};
     },
 
-    // P75 §2.3: the review row's own "Open in graph" — replaces the old VS Code-only `command:`
+    // P75 §2.3: the review row's own "Open in graph" — replaces the old `command:`
     // URI anchor. Absorbs P62 §4.5's blameAnnotation.ts::revealBlameCommit body verbatim (this
     // file already owns the pending-reveal map that logic stashes into): emit live first, stash
     // only if nothing was listening (Group 6, P68 review — stashing unconditionally left a

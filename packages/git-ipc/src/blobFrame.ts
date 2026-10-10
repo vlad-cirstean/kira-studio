@@ -1,7 +1,5 @@
 /**
- * The blob-frame body shape (G3 plan D4), lifted out of `socketChannel.ts` (C10 S1) so
- * `streamChannel.ts` can share one implementation instead of holding a second copy of the same
- * layout. Environment-agnostic on purpose — no `node:net`/`Buffer` — since the Wails stream side
+ * The blob-frame body shape (G3 plan D4), used by `streamChannel.ts`. Environment-agnostic on purpose — no `node:net`/`Buffer` — since the Wails stream side
  * runs in a browser context with no Node globals.
  *
  * Layout: `0x00 | uint32BE headerLen | headerJSON | blob…to the end of the frame`. A frame's first
@@ -65,7 +63,7 @@ function substituteBlobRoot(message: unknown, blob: ArrayBuffer): unknown {
  * Parses one whole blob-frame body (starting at the `0x00` discriminant byte, running to the end
  * of the frame) into the substituted message. Throws `MalformedBlobFrameError` for a structurally
  * bad frame, or the `JSON.parse` `SyntaxError` for invalid header JSON — callers decide how to
- * report each (`socketChannel.ts` destroys the socket either way).
+ * report each.
  */
 export function parseBlobFrameBody(body: Uint8Array): unknown {
   if (body.byteLength < BLOB_HEADER_START) {

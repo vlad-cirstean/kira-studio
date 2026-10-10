@@ -1,7 +1,7 @@
 /**
  * P5 W7's message-body URL linkification (§6.4). `docs/plans/P5.md`'s own decision: "v1 P5
  * renders URLs as `<a href>` and lets the host's own webview link handling take them" — no
- * `ExternalOpener` port, because VS Code already opens a webview link natively. Issue references
+ * `ExternalOpener` port, because the host already opens a webview link natively. Issue references
  * (`#123`) are deliberately left as plain text: without §6.7's repository resolution there is
  * nothing to link them to, and a link that goes nowhere is worse than plain text (recorded as an
  * open item for P12).

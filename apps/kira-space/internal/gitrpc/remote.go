@@ -82,7 +82,7 @@ func (r *Router) handleRemoteRun(ctx context.Context, c *gitsession.Conn, params
 			// D8 (see validRefArg, review.go): remote.run is the one write path that spawns `git
 			// fetch`/`push` with a client-supplied remote name as its own argv token — unguarded, a
 			// remote beginning with "-" is read as an option (e.g. `--upload-pack=<cmd>`) rather
-			// than a remote name, letting a paired client run arbitrary commands via a local-path
+			// than a remote name, letting a client run arbitrary commands via a local-path
 			// remote.
 			if err := validRefArg("remote", p.Remote); err != nil {
 				return "", err

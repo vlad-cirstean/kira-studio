@@ -7,7 +7,7 @@
  * small header says the one thing worth saying about a stash (message, base commit, date, `-u`
  * marker) instead.
  *
- * G21 D12 (item 12): no longer also composes `DiffView.vue` — opens VS Code's own native diff
+ * G21 D12 (item 12): no longer also composes `DiffView.vue` — opens the host's native diff
  * editor now, exactly like `DetailPane.vue` since the same phase. The one real technical wrinkle
  * `StashState` used to handle itself (F12): a stash's `-u` untracked files live only in its third
  * parent (`entry.untrackedSha`), which has no `baseSha` of its own — `editor.openDiff`'s own

@@ -11,7 +11,7 @@ import (
 
 // G26 — stack.list/preflight.restack are reads and stay on the request ctx, matching refs.go/
 // worktree.go's own shape for this category of handler. stack.restack detaches (D6/G5 D8's
-// precedent, applied again exactly as remote.run/worktree.prepare already do): a restack already
+// precedent, applied again exactly as remote.run already does): a restack already
 // running must never be killed by a client disconnect or a bare `cancel` frame —
 // stack.cancelRestack is the one deliberate, in-band way to end it early. stack.cancelRestack is a
 // fast, synchronous state mutation and needs no detaching of its own. stackSet itself needs no

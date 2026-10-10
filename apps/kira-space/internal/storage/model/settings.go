@@ -35,7 +35,7 @@ type Appearance struct {
 
 // GitSettings mirrors G7 D16's two server-owned git leaves: two windows disagreeing about either
 // is a correctness/safety issue (a force-push confirmation that only one window enforces, an
-// auto-fetch cadence that differs per viewer), so both live here rather than as VS Code settings.
+// auto-fetch cadence that differs per viewer), so both live here rather than per-window settings.
 type GitSettings struct {
 	ProtectedBranches []string `json:"protectedBranches"`
 	// FetchAutoIntervalMinutes is minutes between automatic background fetches; 0 disables it.

@@ -349,7 +349,7 @@ func TestConn_DisableAutoFetch_OptsThisConnOutOfArming(t *testing.T) {
 		t.Fatal("a DisableAutoFetch'd Conn's own Open armed the auto-fetch timer anyway")
 	}
 
-	ordinary := NewConn("paired", "gitsock-client", "Some editor", nil)
+	ordinary := NewConn("ordinary", "client", "Some editor", nil)
 	summary2, err := ordinary.Open(context.Background(), reg, "/usr/bin/git", "/repo-ordinary")
 	if err != nil {
 		t.Fatalf("Open (ordinary): %v", err)
@@ -368,7 +368,7 @@ func TestConn_DisableAutoFetch_OptsThisConnOutOfArming(t *testing.T) {
 	// that already-constructed, still-unarmed entry) must still arm it -- EnsureAutoFetch's own
 	// existing off→on path (F4/D5), untouched by AcquireQuiet, which only ever affects the one
 	// moment a brand-new entry is constructed.
-	ordinary2 := NewConn("paired-2", "gitsock-client", "Some editor", nil)
+	ordinary2 := NewConn("ordinary-2", "client", "Some editor", nil)
 	summary3, err := ordinary2.Open(context.Background(), reg, "/usr/bin/git", "/repo-native")
 	if err != nil {
 		t.Fatalf("Open (ordinary, reusing the native Conn's own entry): %v", err)
@@ -422,9 +422,9 @@ func TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry(t *testing.T) {
 		t.Fatal("ReconcileAutoFetch armed a repository the native (quiet-only) UI alone has ever opened")
 	}
 
-	// A real, paired connection (e.g. a VS Code extension) now also opens the SAME repository —
+	// An ordinary connection (not quiet-only) now also opens the SAME repository —
 	// the entry becomes eligible for arming from this point on.
-	paired := NewConn("paired", "gitsock-client", "Some editor", nil)
+	paired := NewConn("ordinary", "client", "Some editor", nil)
 	summary2, err := paired.Open(context.Background(), reg, "/usr/bin/git", "/repo-quiet-only")
 	if err != nil {
 		t.Fatalf("Open (paired): %v", err)
@@ -447,9 +447,9 @@ func TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry(t *testing.T) {
 }
 
 // TestConn_EmitSetEmitConcurrentAccessIsRace_Free is P108 Part 17 review F9's own regression
-// guard: gitsock's handleConn and bridge's ServeGitStream both construct a Conn with no Emit yet,
+// guard: bridge's ServeGitStream constructs a Conn with no Emit yet,
 // start a goroutine that can call Emit (gitrpc.Router.ForConn's own repoSettings.changed
-// forwarding goroutine, started as soon as ForConn is called) before their own SetEmit call
+// forwarding goroutine, started as soon as ForConn is called) before its own SetEmit call
 // installs the real function moments later — an unguarded bare field there is a genuine read/write
 // data race under the Go memory model, caught here directly rather than via the much harder to
 // reproduce cross-connection timing `go test -race` would otherwise need. Confirmed to fail (race
@@ -478,8 +478,8 @@ func TestConn_EmitSetEmitConcurrentAccessIsRaceFree(t *testing.T) {
 		}
 	}()
 
-	// The "sess exists now" write, on its own goroutine too — gitsock's real handleConn/bridge's
-	// ServeGitStream call SetEmit from a different point in the same connection's own setup, not
+	// The "sess exists now" write, on its own goroutine too — bridge's ServeGitStream
+	// calls SetEmit from a different point in the same connection's own setup, not
 	// from whatever goroutine ForConn's forwarding loop runs on, so this mirrors that separation
 	// rather than serializing the two through the test's own single goroutine.
 	wg.Add(1)

@@ -1,6 +1,6 @@
 // Package rpcstream is the protocol-generic half of a correlated-RPC-with-credits frame protocol
 // carried over one connection — req/res/evt/open/chunk/end/credit/cancel, wrapped in a versioned
-// envelope. It is a Go transcription of @kira/ipc-core's own createRpcServer state machine (the
+// envelope. It is the Go server half of the protocol @kira/git-ipc's rpc.ts client speaks (the
 // frame union, the delete-before-respond race guard against a request racing its own cancellation,
 // the aborted-vs-real-error split on a stream's own 'end') kept field-for-field faithful, so this
 // package's correctness is checkable by reading rpc.ts beside it, not by re-deriving the protocol
@@ -40,7 +40,7 @@ type Handlers struct {
 	// should let that error end the stream with a real `end` frame, not swallow it.
 	Stream func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error
 	// MaxFrameBytes caps how large one encoded frame body (JSON header plus blob) may be before
-	// emit refuses it — set by gitsock from its own frame cap. Zero means unbounded, which is what
+	// emit refuses it — set by bridge from its own frame cap. Zero means unbounded, which is what
 	// session_test.go's existing fixtures get.
 	MaxFrameBytes int
 }
@@ -78,7 +78,7 @@ type activeEntry struct {
 
 // NewSession constructs a Session over conn — Serve (below) is what actually runs it; a caller
 // that only needs the handle to Emit from elsewhere while Serve loops in its own goroutine is
-// exactly gitsock's own use (D19).
+// exactly bridge's own use.
 func NewSession(conn Conn, h Handlers) *Session {
 	s := &Session{
 		h:           h,
@@ -136,7 +136,7 @@ func (s *Session) sendChunk(f frame, blob []byte) error {
 
 // sendResult queues a successful 'res' frame — the response path's own twin of sendChunk's guard
 // (D2a/F8): an oversize encoded body is refused with an error res carrying E_FRAME_TOO_LARGE
-// instead of being silently dropped by writeFrame further down (gitsock/frame.go), which would
+// instead of being silently dropped by writeFrame further down, which would
 // otherwise leave the client waiting on a response that never arrives, forever. Only the success
 // path needs the check — an error res is always small (a code plus a message).
 func (s *Session) sendResult(id int, resultBytes json.RawMessage) {
@@ -157,9 +157,8 @@ func (s *Session) sendResult(id int, resultBytes json.RawMessage) {
 	}
 }
 
-// Emit sends an 'evt' frame — the Go half of rpc.ts's RpcServer.emit. Its production caller is
-// gitsession's subscriber fan-out (G2 plan D14/D17), reached through gitsock's Conn.Emit closure
-// (D19); session_test.go's own TestSession_Emit_EventCrosses is what first proved the wire shape.
+// Emit sends an 'evt' frame — the server side of an event push. Its production caller is
+// gitsession's subscriber fan-out (G2 plan D14/D17), reached through bridge's Conn.Emit closure; session_test.go's own TestSession_Emit_EventCrosses is what first proved the wire shape.
 func (s *Session) Emit(method string, payload any) {
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -351,8 +350,8 @@ func (s *Session) close() {
 }
 
 // Serve runs for the life of one connection and returns when the peer's side closes, closing the
-// session on return. Call NewSession first and keep the handle to Emit from elsewhere (gitsock
-// does exactly this, D19) — Serve itself takes no arguments precisely so there is one Session, not
+// session on return. Call NewSession first and keep the handle to Emit from elsewhere (bridge
+// does exactly this) — Serve itself takes no arguments precisely so there is one Session, not
 // a second copy constructed internally that Emit could never reach.
 func (s *Session) Serve() {
 	defer s.close()

@@ -429,8 +429,7 @@ export function attachReviewDecorations(
     // C14-6: review.comment.list is scoped to the whole review SESSION (every file on the
     // branch), not this editor's own file -- without this filter, a comment on another file could
     // paint as a phantom glyph/hover/thread here if that file happened to have a line at the same
-    // number. (The VS Code extension's own reviewComments.ts:renderThreads has the identical gap,
-    // left unfixed there -- out of this chapter's scope.)
+    // number.
     comments = commentsResult.comments.filter((c) => c.path === deps.path);
     if (commentsLoadFailed) {
       commentsLoadFailed = false;

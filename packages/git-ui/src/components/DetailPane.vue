@@ -3,8 +3,8 @@
  * `docs/plans/P5.md` W11: composes `CommitMeta.vue` (twice — see its own doc comment on why) and
  * `FileTree.vue` over one `DetailState`, replacing `App.vue`'s P4 placeholder block.
  *
- * G21 D12 (item 12): no longer also composes `DiffView.vue` — the graph panel opens VS Code's own
- * native diff editor now, exactly like the review panel already did since G12 D12. A file row's
+ * G21 D12 (item 12): no longer also composes `DiffView.vue` — the graph panel opens the host's
+ * diff editor now, exactly like the review panel already did since G12 D12. A file row's
  * `openFile` emit (D13: a click/arrow-key move previews, a double click/`Enter` pins) is wired
  * straight to `actions.openInEditor`; `DetailState` no longer owns a `mode`/`diff` to drive, so
  * this component no longer needs the breakpoint-aware "diff takes over the pane" layout its own

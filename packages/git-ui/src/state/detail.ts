@@ -16,7 +16,7 @@ export type { FileListMode } from './fileListCursor.ts';
  * themselves.
  *
  * G21 D12: `mode`/`diff`/`diffError`/`showTree()` and the `commit.fileDiff` fetch are gone — the
- * graph tree opens VS Code's own native diff editor now (`DetailPane.vue`'s own wiring to
+ * graph tree opens the host's diff editor now (`DetailPane.vue`'s own wiring to
  * `actions.openInEditor`), so this class no longer owns an embedded diff to drive. `selectedFile`
  * survives: it still drives the tree's own selected-row highlight and file cursor, both still
  * meaningful with no diff attached to them.

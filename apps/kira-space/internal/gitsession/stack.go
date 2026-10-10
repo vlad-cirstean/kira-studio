@@ -523,7 +523,7 @@ type RestackProgress struct {
 // CancelRestack is stack.cancelRestack's own executor (D9) — false, never an error, when nothing
 // is running (a cancel racing a just-finished restack is ordinary, not a fault). No palette command
 // serves this directly (D13: cancel is a button on the surface that started the work, matching
-// worktree.cancelPrepare's own precedent).
+// the ADE run-cancel precedent).
 func (e *RepoEntry) CancelRestack() bool {
 	return e.restack.tryCancel()
 }

@@ -8,7 +8,7 @@ import (
 )
 
 // GitRepoSettings is G18 D3's display settings a user edits from the git graph's own dialog,
-// moved out of VS Code's contributes.configuration entirely (D1). Every leaf is an ordinary
+// stored server-side per repository (D1). Every leaf is an ordinary
 // per-repository fact.
 type GitRepoSettings struct {
 	GraphPageSize         int      `json:"graphPageSize"`

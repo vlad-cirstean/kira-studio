@@ -171,6 +171,5 @@ export type { ShaTableOptions } from './store/shaTable.ts';
 export { bytesToHex, hexToBytes, ShaTable } from './store/shaTable.ts';
 export { AssertionError, assert, assertDefined } from './util/assert.ts';
 export { formatAbsoluteDate, formatRelativeDate } from './util/dateFormat.ts';
-export { nfcPath } from './util/nfcPath.ts';
 export type { WorktreeLabelInput } from './worktree/label.ts';
 export { worktreeLabel } from './worktree/label.ts';

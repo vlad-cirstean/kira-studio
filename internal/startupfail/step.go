@@ -9,8 +9,8 @@
 // (assigned inside New, pkg/application/application.go), while a.impl — also dereferenced along
 // that path — is assigned only inside Run(). Every boot-failure site in main.go runs before one or
 // both of those exist (G29 plan F4). So the mechanism here is a plain os/exec spawn of macOS's own
-// /usr/bin/osascript (D3), the same argv-only, no-shell discipline internal/gitvsix already uses
-// for `code`/`open`: title and body always travel as argv items, never interpolated into any
+// /usr/bin/osascript (D3), the same argv-only, no-shell discipline internal/toolexec already uses
+// for its spawns: title and body always travel as argv items, never interpolated into any
 // AppleScript source string (D4) — the error text this package renders can be anything an
 // underlying library chose to put in an error, including quotes, backslashes and newlines, and none
 // of it is trusted to be safe inside a script.

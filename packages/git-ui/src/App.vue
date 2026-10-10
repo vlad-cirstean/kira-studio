@@ -1294,7 +1294,7 @@ async function bootstrap(): Promise<void> {
   );
 
   const persisted = props.viewState.read();
-  // Kira Space's app-wide date format (mount option, or the server's app.init under VS Code) wins
+  // Kira Space's app-wide date format (mount option, else the server's app.init) wins
   // over what this webview persisted for itself.
   const serverDateFormat = props.dateFormat ?? init.dateFormat;
   if (serverDateFormat) dateFormat.value = serverDateFormat;
@@ -1395,8 +1395,7 @@ function breakpointFor(width: number): Breakpoint {
 
 const rootEl = ref<HTMLDivElement | null>(null);
 // P108 F12: `main.ts`'s own `mount()` provides this per instance only for a Kira Space graph tab
-// (a `KeepAlive`d sibling among possibly several) — always `true` everywhere else (VS Code's own
-// webview host, this package's own tests), so `onDocumentKeydown` below behaves exactly as before
+// (a `KeepAlive`d sibling among possibly several) — always `true` everywhere else (this package's own tests), so `onDocumentKeydown` below behaves exactly as before
 // wherever only one instance ever exists.
 const graphVisible = useGraphVisible();
 const overlayDetailRegionEl = ref<HTMLElement | null>(null);
@@ -1459,8 +1458,8 @@ function openDetail(): void {
  *
  *  G21 D12: the "diff view first" stage this function used to have — `Esc` closing the embedded
  *  diff and going back to the tree, before a second `Esc` closed the whole pane — is gone along
- *  with the embedded diff itself. `Esc` now always closes the pane in one step; the native diff
- *  editor VS Code now owns has its own, unrelated `Esc` handling. */
+ *  with the embedded diff itself. `Esc` now always closes the pane in one step; the host's native diff
+ *  editor has its own, unrelated `Esc` handling. */
 const selectionIsStash = computed(() => stashState.selected.value !== undefined);
 // P7 (item 2): the strip's own selection wins over a stale row selection — checked first in the
 // template's own v-else-if chain, mirroring selectionIsStash's own priority pattern.
@@ -1515,7 +1514,7 @@ function onSearchShortcut(event: KeyboardEvent): boolean {
   if (event.key !== '/' && !isFindCombo) return false;
   if (event.key === '/' && isEditableTarget(event.target)) return false;
   // `Ctrl/Cmd+F` while the row is already open AND focus is inside it closes it — mirroring
-  // VS Code's own find-widget second-press-closes gesture. `/` never closes, only opens/focuses.
+  // the usual find-widget second-press-closes gesture. `/` never closes, only opens/focuses.
   if (
     isFindCombo &&
     searchOpen.value &&

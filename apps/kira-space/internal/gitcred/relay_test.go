@@ -57,7 +57,7 @@ func TestCtxCancelWithdrawsAndEmits(t *testing.T) {
 		mu.Unlock()
 	})
 	ctx, cancel := context.WithCancel(context.Background())
-	ch := ask(ctx, r, "vscode", "Password:")
+	ch := ask(ctx, r, "ade", "Password:")
 	waitPending(t, r, 1)
 	cancel()
 	if got := result(t, ch); got.ok {
@@ -76,7 +76,7 @@ func TestConcurrentAsksAllResolve(t *testing.T) {
 	const n = 20
 	chans := make([]<-chan askResult, n)
 	for i := range chans {
-		chans[i] = ask(context.Background(), r, "vscode", "Password:")
+		chans[i] = ask(context.Background(), r, "ade", "Password:")
 	}
 	snap := waitPending(t, r, n)
 	secret := "s"

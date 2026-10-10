@@ -5,7 +5,7 @@
  * `DetailState`: the rebase/squash/amend case SPEC wrote this phase for makes every commit in the
  * Commits tab unfamiliar, so a file-level view of the range is the surface that survives it (F10).
  *
- * G12 D12: selecting a file no longer opens an in-webview `DiffView` — it opens VS Code's native
+ * G12 D12: selecting a file no longer opens an in-webview `DiffView` — it opens the host's native
  * diff editor (`ReviewFilesState.selectFile`'s own `editor.openRangeDiff` call). This component
  * keeps the file list on screen throughout and renders only the Since-review/Full-range toggle
  * and the delta status line as feedback, never a diff body.
@@ -129,7 +129,7 @@ function onToggleReviewed(path: string): void {
     </p>
 
     <template v-else>
-      <!-- G12 D12/D16: which two revisions a click opens in VS Code's diff editor — the one real
+      <!-- G12 D12/D16: which two revisions a click opens in the host's diff editor — the one real
            capability removing DiffView would otherwise have lost. -->
       <div class="flex items-center gap-1.5 py-0.5 px-2 border-b border-border font-ui">
         <ToggleGroup

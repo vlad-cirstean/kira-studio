@@ -1,8 +1,6 @@
 /**
- * §2.1's reason the panel does not use `retainContextWhenHidden` (P3 W9): a VS Code webview
- * view is destroyed and recreated on every hide/reveal, so anything the UI needs to survive
- * that has to go through `getState`/`setState` (or the platform's equivalent) rather than live
- * JS heap. `PersistedViewState` is that survivor — deliberately small, versioned, and, per
+ * §2.1 (P3 W9): a view can be destroyed and recreated on a tab switch, so anything the UI needs
+ * to survive that has to go through a `ViewStateStore` rather than live JS heap. `PersistedViewState` is that survivor — deliberately small, versioned, and, per
  * §5.4, read back on mount to re-open `graph.stream` against the host's still-cached rows.
  *
  * §5.4's full list lands at P4 W5 (version 2): scroll position and selection survive a re-walk
@@ -157,8 +155,7 @@ export function parsePersistedViewState(raw: unknown): PersistedViewState | null
 }
 
 /**
- * The harness's `ViewStateStore` (§3.1 lists the interface here; the harness is one of the two
- * hosts choosing an implementation at mount, alongside VS Code's `getState`/`setState`) — and a
+ * The in-memory `ViewStateStore` (§3.1 lists the interface here) — and a
  * convenient fake for `state/` unit tests, since it needs no platform API.
  */
 export class InMemoryViewStateStore implements ViewStateStore {

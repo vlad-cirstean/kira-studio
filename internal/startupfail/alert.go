@@ -7,7 +7,7 @@ const (
 	// hold a dying app open longer than this. Short enough that an unattended machine is not stuck
 	// forever; long enough that a human at the keyboard has time to read and dismiss the alert.
 	alertTimeout = 60 * time.Second
-	// gracefulStopDelay mirrors gitvsix/exec.go's own bound: the fixed grace window cmd.WaitDelay
+	// gracefulStopDelay mirrors toolexec.GracefulStopDelay: the fixed grace window cmd.WaitDelay
 	// gives a spawned process after context cancellation before its process group is killed
 	// outright.
 	gracefulStopDelay = 2 * time.Second

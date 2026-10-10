@@ -2,13 +2,9 @@
  * C10 §3.5/§8 (S12) — the native `Transport` git-ui's `mount()` is handed, and the per-repo-
  * workspace cache over it (§8: "one transport per repo workspace, not per mount").
  *
- * VS Code has three tiers: webview -> (postMessage) -> extension host -> (socket) -> Go. The
- * middle tier's *job* still exists here — `editor.openDiff`, `clipboard.write`, `app.init`'s host
- * half and `repo.list` are host concerns the Go server has no case for — but its *process* does
- * not: this app has two tiers, not three. So this implements `Transport` directly, dispatching
- * per method to `hostHandlers.ts`'s own map or forwarding to the git stream, rather than stacking
- * a second `createRpcClient`/`createRpcServer` correlation layer inside one JS context to move
- * objects between two halves of the same heap that never needed splitting in the first place.
+ * This implements `Transport` directly, dispatching per method to `hostHandlers.ts`'s own map
+ * (`editor.openDiff`, `clipboard.write`, `app.init`'s host half and `repo.list` are host concerns
+ * the Go server has no case for) or forwarding to the git stream.
  *
  * No length prefix, no pairing, no trust store: `streamChannel.ts` (S2) is message-framed already,
  * and `internal/bridge/gitstream.go`'s own doc comment states why there is no handshake — the peer

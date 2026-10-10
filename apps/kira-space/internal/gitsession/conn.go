@@ -17,8 +17,7 @@ import (
 // repo.open must precede any graph.* call, exactly as it must for every other per-repo request.
 var ErrRepoNotHeld = errors.New("gitsession: repository is not open on this connection")
 
-// ConnID identifies one accepted connection — the handshake's own minted session id (gitsock D19),
-// opaque here.
+// ConnID identifies one accepted connection — the stream's own minted session id, opaque here.
 type ConnID string
 
 // autoFetchEvent is autoFetch.changed's wire payload.
@@ -46,19 +45,19 @@ type walkPair struct {
 }
 
 // Conn is one connection's private session state — SPEC §6's Conn box, minus Walk (G6). Emit is
-// supplied by gitsock so this package never imports bridge or rpcstream (SPEC §7's layering rule);
+// supplied by bridge so this package never imports bridge or rpcstream (SPEC §7's layering rule);
 // it is called from a subscriber's own goroutine (D14), never from the watcher's.
 type Conn struct {
 	ID       ConnID
 	ClientID string
-	// ClientLabel is the handshake's own clamped label (gitsock's clampLabel) — G5's own addition
+	// ClientLabel is the connection's own clamped label — G5's own addition
 	// (F11), threaded through so the undo slot can attribute a record to "this window" for every
 	// OTHER connection's reader (D7's SnapshotFor).
 	ClientLabel string
 
 	// emitMu guards emitFn (P108 Part 17 review F9): gitrpc.Router.ForConn's own
 	// repoSettings.changed forwarding goroutine starts as soon as ForConn is called — before
-	// gitsock's handleConn/bridge's ServeGitStream reach their own "gconn.SetEmit(sess.Emit)" line
+	// bridge's ServeGitStream reaches its own "gconn.SetEmit(sess.Emit)" line
 	// — so a bare, unguarded field here was a genuine read/write data race under the Go memory
 	// model (another connection's concurrent repoSettings.set could deliver its notification right
 	// inside that window). The nil-check every call site used to do individually now lives once,
@@ -73,8 +72,7 @@ type Conn struct {
 	// docs/ARCHITECTURE.md's "provably read-only" claim for that surface specifically. Set once,
 	// before this Conn is handed to anything that could call Open concurrently (a plain field, not
 	// mutex-guarded, on that basis) — see DisableAutoFetch's own doc comment. Every other Conn
-	// (gitsock's own external, paired clients) leaves this false and keeps today's behaviour
-	// unchanged: RepoEntry is shared per-repository across every connection regardless, so any
+	// leaves this false and keeps today's behaviour unchanged: RepoEntry is shared per-repository across every connection regardless, so any
 	// OTHER already-open connection on the same repository can still have armed its timer — this
 	// only stops the native mount's OWN repo.open from being what arms it.
 	noAutoFetch bool
@@ -91,7 +89,7 @@ type Conn struct {
 
 	// done is G7 D20/D21's own disconnect signal — closed once, in Close, so a blocked credential
 	// waiter (AskCredential's own select) can observe this connection going away without ever
-	// reaching into rpcstream or gitsock, which this package must stay under (SPEC §7's layering
+	// reaching into rpcstream, which this package must stay under (SPEC §7's layering
 	// rule).
 	done chan struct{}
 	// credMu/creds are G7 D4/D21's credential relay: one waiter per in-flight credential.request,
@@ -113,8 +111,8 @@ func NewConn(id ConnID, clientID, clientLabel string, emit func(method string, p
 	}
 }
 
-// SetEmit installs (or replaces) this connection's Emit function — gitsock's handleConn and
-// bridge's ServeGitStream both call this once, right after their own rpcstream.Session exists,
+// SetEmit installs (or replaces) this connection's Emit function — bridge's
+// ServeGitStream calls this once, right after its own rpcstream.Session exists,
 // exactly where they used to assign the bare field directly (F9's own doc comment on emitMu).
 func (c *Conn) SetEmit(fn func(method string, payload any)) {
 	c.emitMu.Lock()
@@ -375,7 +373,7 @@ func (c *Conn) CloseRepo(repoID string) bool {
 	return true
 }
 
-// Close releases every hold this connection has — gitsock's own disconnect teardown (SPEC §6:
+// Close releases every hold this connection has — bridge's disconnect teardown (SPEC §6:
 // "release its RepoEntry refcounts"). Every walk (both slots of every pair) is disposed first
 // (D13), same ordering as CloseRepo.
 func (c *Conn) Close() {

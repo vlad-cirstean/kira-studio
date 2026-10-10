@@ -1,7 +1,7 @@
 // Package gitsession owns SPEC §6's session model: Registry (a refcounted, per-repo set of shared
 // RepoEntry state) and Conn (one accepted connection's private holds and event delivery). It
 // imports gitclient, gitpreflight, gitreview, ghclient, storage/model, oplog and stdlib only — no
-// bridge, no rpcstream, no gitsock — so it stays a domain package internal/layering_test.go's
+// bridge, no rpcstream — so it stays a domain package internal/layering_test.go's
 // auto-enumerated check covers without an exemption. G11 adds Registry.Review (a *gitreview.Store, D3): the one place this package
 // reaches beyond gitclient's own family, and still nowhere near bridge.
 package gitsession
@@ -38,9 +38,9 @@ type slot struct {
 type Registry struct {
 	runner gitclient.Runner
 	// NewWatcher is the watcher construction seam (D12/§3.5): defaulted to gitclient.NewRepoWatcher,
-	// overridable so registry_test.go/conn_test.go/subscriber_test.go, and gitsock's own
-	// integration test across the package boundary, need no filesystem or real git — the real
-	// watcher is proven in gitclient/watcher_test.go and end to end in gitsock's integration tests.
+	// overridable so registry_test.go/conn_test.go/subscriber_test.go, and the flow
+	// harness across the package boundary, need no filesystem or real git — the real
+	// watcher is proven in gitclient/watcher_test.go.
 	// Exported so a test can inject a counting fake without a production-only accessor (§3.9).
 	NewWatcher func(gitclient.RepoSummary) (Watcher, error)
 	// LingerFor is the refcount-zero grace period (D12), a field rather than a constant so tests
@@ -284,7 +284,7 @@ func (reg *Registry) ReconcileAutoFetch() {
 	}
 }
 
-// Close tears down every entry immediately, linger notwithstanding — for gitsock.Server.Close(), a
+// Close tears down every entry immediately, linger notwithstanding — for app shutdown, a
 // real shutdown rather than a viewer going away for a moment (D12 step 5). Also closes Review
 // (G11 D3) — idempotent and safe even when review.db was never opened.
 func (reg *Registry) Close() {

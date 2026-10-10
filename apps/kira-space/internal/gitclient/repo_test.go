@@ -456,7 +456,7 @@ func TestIdentify_NotARepository(t *testing.T) {
 
 // Client.OpenRepo/CloseRepo no longer exist (D18): repo lifecycle is gitrpc+gitsession's job now.
 // The equivalent behaviour (gitUnavailable short-circuit, ok, notARepository) is proven end to end
-// over the real socket in gitsock's integration tests.
+// by the gitflow flow tests.
 
 // --- G27 D5a: Identify normalizes Root/GitDir/CommonDir (and therefore RepoID) to NFC ----------
 

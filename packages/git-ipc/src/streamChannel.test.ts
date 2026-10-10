@@ -57,7 +57,7 @@ function jsonFrame(value: unknown): ArrayBuffer {
   return toArrayBuffer(new TextEncoder().encode(JSON.stringify(value)));
 }
 
-// buildBlobFrame constructs the same wire body streamChannel.ts and socketChannel.ts both parse —
+// buildBlobFrame constructs the same wire body streamChannel.ts parses —
 // 0x00 | uint32BE headerLen | headerJSON | blob — with no outer length prefix, since a Wails
 // stream is message-framed already (§3.4).
 function buildBlobFrame(header: unknown, blob: Uint8Array): ArrayBuffer {

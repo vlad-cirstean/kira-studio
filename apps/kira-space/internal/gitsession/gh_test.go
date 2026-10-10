@@ -17,7 +17,7 @@ import (
 
 // githubRemoteRunner wraps identifyRunner (registry_test.go, same package) so a fake-git repo also
 // answers `git remote get-url origin` — the ONE git spawn G24 D15 ever needs — with a stubbed
-// GitHub URL, with no filesystem and no real git.sock behind it.
+// GitHub URL, with no filesystem behind it.
 type githubRemoteRunner struct{ url string }
 
 func (r githubRemoteRunner) Start(ctx context.Context, path string, spec gitclient.Spec) (gitclient.Process, error) {

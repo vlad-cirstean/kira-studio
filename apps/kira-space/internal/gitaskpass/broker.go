@@ -24,7 +24,7 @@ import (
 const DefaultTimeout = 120 * time.Second
 
 // Options configures a Broker. HelperCommand is the test seam (D8): defaulted in production to
-// {os.Executable(), "askpass"}; gitaskpass's own tests and gitsock's integration tier set it to
+// {os.Executable(), "askpass"}; tests set it to
 // the stdlib os/exec "helper process" idiom instead, so the whole broker is provable with no app
 // binary at all.
 type Options struct {

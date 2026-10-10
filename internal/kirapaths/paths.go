@@ -1,9 +1,8 @@
 // Package kirapaths is the repo-root generalization of the on-disk layout logic
 // apps/kira-studio/internal/config/paths.go used to own outright (KiraHome/DbPath/LogsDir/
 // EnsureLayout): P100 Part 1 needed the same shape for apps/kira-space's own, separate home
-// directory (KIRA_SPACE_HOME/~/.kira-space, never sharing a home, a database or a socket with
-// Kira Studio — see gitsock.Server's exclusive lock on git.sock.lock for why two processes
-// pointed at the same home would silently make the loser not listen). Rather than duplicate this
+// directory (KIRA_SPACE_HOME/~/.kira-space, never sharing a home, or a database with
+// Kira Studio). Rather than duplicate this
 // logic per app, each app's own internal/config becomes a thin wrapper parameterized by its own
 // env-var name and directory name, calling straight through to the functions here.
 package kirapaths
