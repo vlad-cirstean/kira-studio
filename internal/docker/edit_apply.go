@@ -74,10 +74,16 @@ type inPlaceRun struct {
 	cur  EditSpec
 	want InPlaceSpec
 	res  UpdateResult
+	// restored is set when a failed alias change tried to reattach the old endpoint.
+	restored *bool
 }
 
 func (x *inPlaceRun) fail(step string, err error) error {
-	return x.m.stepErr(x.ep, step, err, map[string]any{"applied": x.res.Applied})
+	d := map[string]any{"applied": x.res.Applied}
+	if x.restored != nil {
+		d["restored"] = *x.restored
+	}
+	return x.m.stepErr(x.ep, step, err, d)
 }
 
 func (m *Manager) updateContainer(args UpdateArgs) (UpdateResult, error) {
@@ -179,11 +185,29 @@ func (x *inPlaceRun) network(n string, had, want, aliasesDiffer bool, aliases []
 		return true, nil
 	}
 	e := &network.EndpointSettings{Aliases: aliases}
-	if o := x.r.NetworkSettings.Networks[n]; o != nil && had {
+	o := x.r.NetworkSettings.Networks[n]
+	if o != nil && had {
 		e.IPAMConfig, e.DriverOpts = o.IPAMConfig.Copy(), o.DriverOpts
 	}
 	_, err := x.cli.NetworkConnect(x.ctx, n, client.NetworkConnectOptions{Container: x.r.ID, EndpointConfig: e})
+	if err != nil && had {
+		x.reattach(n, o)
+	}
 	return true, err
+}
+
+// reattach puts the container back on n with its original endpoint after a failed alias change.
+// It runs on a fresh context so a timed-out edit still restores.
+func (x *inPlaceRun) reattach(n string, orig *network.EndpointSettings) {
+	ctx, cancel := context.WithTimeout(context.Background(), actionTimeout)
+	defer cancel()
+	e := &network.EndpointSettings{Aliases: netIndex(x.cur.InPlace.Networks)[n].Aliases}
+	if orig != nil {
+		e.IPAMConfig, e.DriverOpts = orig.IPAMConfig.Copy(), orig.DriverOpts
+	}
+	_, err := x.cli.NetworkConnect(ctx, n, client.NetworkConnectOptions{Container: x.r.ID, EndpointConfig: e})
+	ok := err == nil
+	x.restored = &ok
 }
 
 func netIndex(nets []EditNetwork) map[string]EditNetwork {
