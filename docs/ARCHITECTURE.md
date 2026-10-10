@@ -4500,6 +4500,15 @@ replies and full terminal attach for Claude Code sessions.
   devcontainer, testcontainers, kind, kubernetes, swarm, buildx (name prefix `buildx_buildkit_`),
   compose. A compose-based devcontainer stays grouped under its project, row shows the devcontainer
   icon. Only Compose projects group; other origins get a row icon (`OriginIcon.vue`). Compose icon is
+- Container edit (P253): bound `ContainerEditSpec`, `UpdateContainer`, `RecreateContainer`. Spec splits
+  in place (limits, restart policy, name, networks) from recreate (everything else). `baseHash` is
+  sha256 of canonical spec JSON; apply with a stale hash returns `E_CONFLICT`. One lock per container
+  (`Manager.editing`). In place: ContainerUpdate treats zero as unchanged, so clearing a limit needs
+  recreate. Alias changes need network disconnect then connect. Recreate: create `-kira-new-<hex>`,
+  rename old to `-kira-old-<hex>`, stop old, rename new, start new, remove old. Any failure rolls back
+  and returns `E_RECREATE_FAILED` with details `{step, restored, containers}`. Anonymous volumes are
+  detached, not deleted. No image pull. Swarm and Kubernetes containers are read-only. `mapErr` maps
+  engine conflict to `E_CONFLICT`, permission denied to `E_INVALID`.
   lucide `Boxes`: no allowed library ships a Compose mark.
 
 ## Database MCP server (v1.7)
