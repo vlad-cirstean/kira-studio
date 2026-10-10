@@ -15,8 +15,11 @@
  * composition against it when `path` is not among the primary sha's changed files.
  */
 import type { CommitStore } from '@kira/git-core';
-import { Empty, EmptyDescription } from '@theme/components/ui/empty';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { StashState } from '../state/stash.ts';
@@ -64,20 +67,22 @@ function onOpenFile(index: number, pinned: boolean): void {
     </p>
 
     <template v-if="entry">
-      <div class="py-2 px-3 border-b border-border">
-        <p class="m-0 mb-0.5 font-semibold break-words">{{ entry.message }}</p>
-        <p class="m-0 text-graph-sm text-muted-foreground">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <span>{{ formatRelativeDate(entry.timestamp) }}</span>
-            </TooltipTrigger>
-            <TooltipContent>{{ formatAbsoluteDate(entry.timestamp) }}</TooltipContent>
-          </Tooltip>
-          <span> · based on <code class="font-data">{{ entry.baseSha.slice(0, 7) }}</code></span>
-          <span v-if="entry.baseSubject"> {{ entry.baseSubject }}</span>
-          <span v-if="entry.includedUntracked" class="ml-1 font-data text-subtle">-u</span>
-        </p>
-      </div>
+      <ViewToolbar data-testid="detail-head">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="min-w-0 truncate text-kira-md text-fg">{{ entry.message }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ entry.message }}</TooltipContent>
+        </Tooltip>
+        <Badge>{{ entry.baseSha.slice(0, 7) }}</Badge>
+        <Badge v-if="entry.includedUntracked">-u</Badge>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="shrink-0 text-kira-sm text-subtle">{{ formatRelativeDate(entry.timestamp) }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ formatAbsoluteDate(entry.timestamp) }}</TooltipContent>
+        </Tooltip>
+      </ViewToolbar>
       <FileTree
         class="flex-auto min-h-0 border-y border-border"
         :files="files"
@@ -95,6 +100,9 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <Empty v-else-if="!stash.error.value" class="p-6"><EmptyDescription>Loading…</EmptyDescription></Empty>
+    <Empty v-else-if="!stash.error.value" class="p-6">
+      <EmptyMedia><CodiconIcon name="loading" :size="24" /></EmptyMedia>
+      <EmptyTitle>Loading…</EmptyTitle>
+    </Empty>
   </div>
 </template>

@@ -16,7 +16,7 @@ defineProps<{ branchName: string }>();
 
 <template>
   <Empty class="h-full p-6" data-testid="empty-repository-panel">
-    <EmptyMedia variant="icon">
+    <EmptyMedia>
       <CodiconIcon :name="codiconName(STATE_ICONS.commit)" :size="24" />
     </EmptyMedia>
     <EmptyDescription class="max-w-105">

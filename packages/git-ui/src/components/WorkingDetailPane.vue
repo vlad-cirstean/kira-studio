@@ -12,6 +12,7 @@
  * keeps "copy path"/announcements consistent across every pane in the app.
  */
 import type { CommitStore, FileChangeKind } from '@kira/git-core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { WorkingDetailState } from '../state/working.ts';
@@ -51,9 +52,9 @@ function onOpenFile(index: number, pinned: boolean): void {
 
 <template>
   <div class="flex flex-col min-h-0 h-full">
-    <div class="flex-none p-3 font-semibold border-b border-border">
-      Uncommitted Changes
-    </div>
+    <ViewToolbar data-testid="detail-head">
+      <span class="min-w-0 truncate text-kira-md text-fg">Uncommitted Changes</span>
+    </ViewToolbar>
     <p v-if="workingState.error.value" class="m-0 p-3 text-error">
       Couldn't load uncommitted changes — {{ workingState.error.value }}
     </p>

@@ -603,11 +603,11 @@ const parentSelectId = useId();
           />
           <CodiconIcon
             :name="row.expanded ? 'folder-opened' : 'folder'"
-            :size="16"
+            :size="13"
             class="shrink-0 text-muted-foreground"
           />
           <span class="font-ui truncate">{{ row.node.name }}</span>
-          <span class="ml-auto text-subtle font-ui text-graph-sm flex gap-1">
+          <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
           </span>
         </template>
@@ -630,11 +630,12 @@ const parentSelectId = useId();
             <MinusIcon v-if="reviewCheckboxState(row.node.change.path) === 'indeterminate'" />
             <CheckIcon v-else />
           </Checkbox>
-          <span
-            class="kv-file-tree-icon shrink-0 size-4 mask-contain mask-no-repeat mask-center"
-            :style="fileIconStyle(row.node.path)"
-            aria-hidden="true"
-          ></span>
+          <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
+            <span
+              class="kv-file-tree-icon size-3.25 mask-contain mask-no-repeat mask-center"
+              :style="fileIconStyle(row.node.path)"
+            ></span>
+          </span>
           <span class="overflow-hidden text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
@@ -647,7 +648,7 @@ const parentSelectId = useId();
                directory row already carries this path via its own ancestor rows). -->
           <span class="ml-auto flex items-center gap-1 shrink-0">
             <span
-              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0"
+              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -695,11 +696,11 @@ const parentSelectId = useId();
           />
           <CodiconIcon
             :name="row.expanded ? 'folder-opened' : 'folder'"
-            :size="16"
+            :size="13"
             class="shrink-0 text-muted-foreground"
           />
           <span class="font-ui truncate">{{ row.node.name }}</span>
-          <span class="ml-auto text-subtle font-ui text-graph-sm flex gap-1">
+          <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
           </span>
         </template>
@@ -722,11 +723,12 @@ const parentSelectId = useId();
             <MinusIcon v-if="reviewCheckboxState(row.node.change.path) === 'indeterminate'" />
             <CheckIcon v-else />
           </Checkbox>
-          <span
-            class="kv-file-tree-icon shrink-0 size-4 mask-contain mask-no-repeat mask-center"
-            :style="fileIconStyle(row.node.path)"
-            aria-hidden="true"
-          ></span>
+          <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
+            <span
+              class="kv-file-tree-icon size-3.25 mask-contain mask-no-repeat mask-center"
+              :style="fileIconStyle(row.node.path)"
+            ></span>
+          </span>
           <span class="overflow-hidden text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
@@ -742,7 +744,7 @@ const parentSelectId = useId();
           >
           <span class="ml-auto flex items-center gap-1 shrink-0">
             <span
-              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0"
+              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span

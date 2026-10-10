@@ -21,10 +21,10 @@ const copy = computed(() => {
 
 <template>
   <Empty v-if="copy" class="h-full p-6" role="alert" data-testid="git-blocked-panel">
-    <EmptyMedia variant="icon">
+    <EmptyMedia>
       <CodiconIcon :name="codiconName(STATE_ICONS.warning)" :size="24" class="text-error" />
     </EmptyMedia>
-    <EmptyTitle class="font-semibold text-fg">{{ copy.title }}</EmptyTitle>
+    <EmptyTitle>{{ copy.title }}</EmptyTitle>
     <EmptyDescription class="max-w-120">{{ copy.detail }}</EmptyDescription>
   </Empty>
 </template>

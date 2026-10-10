@@ -22,7 +22,8 @@
  * `<FileTree>` here is `flex-auto` and takes the remainder.
  */
 import type { CommitStore } from '@kira/git-core';
-import { Empty, EmptyDescription } from '@theme/components/ui/empty';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { computed } from 'vue';
 import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -97,6 +98,9 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <Empty v-else-if="!detailState.error.value" class="h-full p-6"><EmptyDescription>Loading…</EmptyDescription></Empty>
+    <Empty v-else-if="!detailState.error.value" class="h-full p-6">
+      <EmptyMedia><CodiconIcon name="loading" :size="24" /></EmptyMedia>
+      <EmptyTitle>Loading…</EmptyTitle>
+    </Empty>
   </div>
 </template>

@@ -55,10 +55,10 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
 
 <template>
   <Empty class="h-full p-6" data-testid="no-repository-panel">
-    <EmptyMedia variant="icon">
+    <EmptyMedia>
       <CodiconIcon :name="codiconName(STATE_ICONS.repo)" :size="24" />
     </EmptyMedia>
-    <EmptyTitle class="font-semibold text-fg">Open a repository</EmptyTitle>
+    <EmptyTitle>Open a repository</EmptyTitle>
     <ul
       v-if="repoState.candidates.value.length > 0"
       class="flex flex-col gap-0.5 m-0 p-0 list-none max-w-105 w-full"

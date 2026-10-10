@@ -23,9 +23,11 @@ import type { PrLookupResult, PrRecord } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -308,44 +310,40 @@ const prIcon = computed(() => {
     v-if="detail"
     :class="
       expanded
-        ? 'kv-detail-pane-meta flex flex-col gap-1 px-3 py-2 flex-initial min-h-[min(220px,60%)] max-h-7/10 overflow-auto'
-        : 'kv-detail-pane-meta flex flex-col gap-1 px-3 py-2 flex-none max-h-1/5 overflow-hidden'
+        ? 'kv-detail-pane-meta flex flex-col flex-initial min-h-[min(220px,60%)] max-h-7/10 overflow-auto'
+        : 'kv-detail-pane-meta flex flex-col flex-none max-h-1/5 overflow-hidden'
     "
     data-testid="commit-meta"
   >
     <AttributeTooltip :container="decorationEl" />
 
-    <div class="flex items-start justify-between gap-1">
-      <h2 class="kv-meta-subject text-graph-lg font-semibold">{{ detail.subject }}</h2>
-      <TooltipIconButton
-        icon="diff-multiple"
-        label="Open all changes"
-        data-testid="open-all-changes-button"
-        @click="openAllChanges"
-      />
-    </div>
-
-    <p class="flex items-center gap-1 text-muted-foreground text-graph-sm">
+    <ViewToolbar data-testid="detail-head">
       <Tooltip>
         <TooltipTrigger as-child>
-          <span>{{ formatRelativeDate(detail.committer.timestamp) }}</span>
+          <span class="kv-meta-subject min-w-0 truncate text-kira-md text-fg">{{ detail.subject }}</span>
         </TooltipTrigger>
-        <TooltipContent>{{ formatAbsoluteDate(detail.committer.timestamp) }}</TooltipContent>
+        <TooltipContent>{{ detail.subject }}</TooltipContent>
       </Tooltip>
-      <span class="shrink-0" aria-hidden="true">·</span>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button
-            variant="link"
-            :class="cn(LINK_BUTTON_CLASS, 'font-data')"
+          <Badge
+            as="button"
+            type="button"
+            class="cursor-pointer"
             aria-label="Copy full SHA"
             data-testid="commit-meta-sha"
             @click="copySha"
           >
             {{ shortSha }}
-          </Button>
+          </Badge>
         </TooltipTrigger>
         <TooltipContent>Copy full SHA</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <span class="shrink-0 text-kira-sm text-subtle">{{ formatRelativeDate(detail.committer.timestamp) }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ formatAbsoluteDate(detail.committer.timestamp) }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="prIcon">
         <TooltipTrigger as-child>
@@ -363,8 +361,16 @@ const prIcon = computed(() => {
           `#${prIcon!.number} ${prIcon!.title} — ${prIcon!.stateLabel}`
         }}</TooltipContent>
       </Tooltip>
-    </p>
+      <TooltipIconButton
+        class="ml-auto"
+        icon="diff-multiple"
+        label="Open all changes"
+        data-testid="open-all-changes-button"
+        @click="openAllChanges"
+      />
+    </ViewToolbar>
 
+    <div class="flex flex-col gap-1 px-3 py-2">
     <p
       v-if="bodyParagraphs.length > 0"
       ref="bodyEl"
@@ -439,6 +445,7 @@ const prIcon = computed(() => {
           </dd>
         </template>
       </dl>
+    </div>
     </div>
   </div>
 </template>
