@@ -117,6 +117,9 @@ func importDir(t *testing.T) string {
 	return abs
 }
 
+// importMask hides what differs per run: the checkout path, times and spend.
+var importMask = flowharness.Mask("roots", "base", "createdAt", "startedAt", "finishedAt", "costUsd")
+
 func TestImportLifecycle(t *testing.T) {
 	held := filepath.Join(t.TempDir(), "release")
 	app := importApp(t, fakeagent.PromptRule{System: extractSystem, Doc: "ops.md", WaitFile: held, Emit: testdata(t, "extract-billing.md.json")})
@@ -125,6 +128,8 @@ func TestImportLifecycle(t *testing.T) {
 	if awaiting.Job.Estimate.Files != 2 || len(awaiting.Files) != 2 {
 		t.Fatalf("scanned job = %+v, want the two documents", awaiting)
 	}
+	// Contract memory-import: tests/ui/memory-import.spec.ts reads the estimate and the finished job.
+	app.Contract(t, "memory-import", "MemoryImportService.Job#awaiting", awaiting, importMask)
 	mark := app.Events.Mark()
 	if err := app.W.MemoryImport.Start(bridge.MemoryImportJobArgs{ID: awaiting.Job.ID}); err != nil {
 		t.Fatal(err)
@@ -139,6 +144,7 @@ func TestImportLifecycle(t *testing.T) {
 		}
 	}
 	app.Events.WaitAfter(t, mark, bridge.ChannelMemoryImport, nil, waitFor)
+	app.Contract(t, "memory-import", "MemoryImportService.Job#done", done, importMask)
 
 	hits, err := app.W.Memory.Search(ctx, bridge.MemorySearchArgs{Query: "invoices"})
 	if err != nil || len(hits) == 0 || hits[0].Author != memory.AuthorAgent {
@@ -225,6 +231,7 @@ func TestImportRetries(t *testing.T) {
 	if rel.State != importer.FileFailed || failed.Job.Totals.FailedFiles != 1 || fileNamed(t, failed, "billing.md").State != importer.FileDone {
 		t.Fatalf("job = %+v files %+v, want release.md failed and billing.md done", failed.Job, failed.Files)
 	}
+	app.Contract(t, "memory-import", "MemoryImportService.Job#failed", failed, importMask)
 	if err := app.W.MemoryImport.RetryFile(bridge.MemoryImportFileArgs{FileID: rel.ID}); err != nil {
 		t.Fatal(err)
 	}

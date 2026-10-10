@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -19,24 +20,19 @@ async function openMemorySettings(page: Page): Promise<void> {
   await page.locator('[data-testid="settings-section-Memory"]').click();
 }
 
-test('Connect Claude Code shows the registration command', async ({ relaunch }) => {
-  const command =
-    "claude mcp remove --scope user 'kira-memory' 2>/dev/null; claude mcp add-json --scope user 'kira-memory' '{}'";
+// Contract memory-settings. Backend half: memoryflow TestConnectClaudeCode, TestSemanticNotInstalled
+// and TestInstallSemanticModelCancelled.
+test('contract: Connect Claude Code shows the registration command', async ({ relaunch }) => {
+  const status = contract<{ command: string }>('memory-settings', 'MemoryService.McpStatus');
+  const installed = contract<{ outcome: string }>(
+    'memory-settings',
+    'MemoryService.InstallClaudeCode',
+  );
+  expect(installed.outcome).toBe('installed');
   const { window: page } = await relaunch({
     control: [
-      {
-        channel: IPC.memoryMcpStatus,
-        response: {
-          command,
-          executable: '/Applications/Kira Space',
-          claudeAvailable: true,
-          probed: [],
-        },
-      },
-      {
-        channel: IPC.memoryMcpInstall,
-        response: { outcome: 'installed', detail: '', probed: [] },
-      },
+      { channel: IPC.memoryMcpStatus, response: status },
+      { channel: IPC.memoryMcpInstall, response: installed },
     ],
   });
   await openMemorySettings(page);
@@ -47,21 +43,28 @@ test('Connect Claude Code shows the registration command', async ({ relaunch }) 
   );
 });
 
-test('semantic not installed: download logs the install', async ({ relaunch }) => {
-  const { window: page, control } = await relaunch({
-    control: [
-      semantic('notInstalled'),
-      { channel: IPC.memorySemanticInstall, response: undefined },
-    ],
+for (const key of ['not-installed', 'cancelled'] as const) {
+  test(`contract: semantic ${key}: download logs the install`, async ({ relaunch }) => {
+    const status = contract<{ state: string }>(
+      'memory-settings',
+      `MemoryService.SemanticStatus#${key}`,
+    );
+    expect(status.state).toBe('notInstalled');
+    const { window: page, control } = await relaunch({
+      control: [
+        { channel: IPC.memorySemanticStatus, response: status },
+        { channel: IPC.memorySemanticInstall, response: undefined },
+      ],
+    });
+    await openMemorySettings(page);
+    const download = page.locator('[data-testid="memory-semantic-download"]');
+    await expect(download).toContainText('35 MB');
+    await download.click();
+    await expect
+      .poll(() => control.log().some((e) => e.channel === IPC.memorySemanticInstall))
+      .toBe(true);
   });
-  await openMemorySettings(page);
-  const download = page.locator('[data-testid="memory-semantic-download"]');
-  await expect(download).toContainText('35 MB');
-  await download.click();
-  await expect
-    .poll(() => control.log().some((e) => e.channel === IPC.memorySemanticInstall))
-    .toBe(true);
-});
+}
 
 test('semantic unavailable: shows the reason and a retry', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({

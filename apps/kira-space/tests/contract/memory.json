@@ -5,7 +5,7 @@
       "createdAt": "<masked>",
       "fact": "Deploys to staging run every weekday at 09:00 UTC.",
       "historical": false,
-      "id": "<id:1>",
+      "id": "<id:2>",
       "keywords": [
         "deploy",
         "staging",
@@ -13,7 +13,7 @@
         "release",
         "weekday"
       ],
-      "lineageId": "<id:1>",
+      "lineageId": "<id:2>",
       "reason": "The release calendar says so.",
       "status": "current",
       "supersededAt": null,
@@ -27,7 +27,7 @@
       "createdAt": "<masked>",
       "fact": "The billing service uses PostgreSQL 16.",
       "historical": false,
-      "id": "<id:2>",
+      "id": "<id:1>",
       "keywords": [
         "billing",
         "postgres",
@@ -35,7 +35,7 @@
         "database",
         "db"
       ],
-      "lineageId": "<id:2>",
+      "lineageId": "<id:1>",
       "reason": "Stated by the maintainer in the migration notes.",
       "status": "current",
       "supersededAt": null,
@@ -51,7 +51,7 @@
       "createdAt": "<masked>",
       "fact": "The billing service uses PostgreSQL 16.",
       "historical": false,
-      "id": "<id:2>",
+      "id": "<id:1>",
       "keywords": [
         "billing",
         "postgres",
@@ -59,7 +59,7 @@
         "database",
         "db"
       ],
-      "lineageId": "<id:2>",
+      "lineageId": "<id:1>",
       "match": "keyword",
       "reason": "Stated by the maintainer in the migration notes.",
       "status": "current",
@@ -69,5 +69,66 @@
       "version": 1,
       "versions": 1
     }
-  ]
+  ],
+  "MemoryService.Store#challenged": {
+    "challenges": [
+      {
+        "fact": "billing runs postgres",
+        "index": 0,
+        "questions": [
+          "Which service is meant by 'billing'?"
+        ]
+      },
+      {
+        "fact": "staging deploys at 09:00",
+        "index": 1,
+        "questions": [
+          "Staging of which project?"
+        ]
+      }
+    ],
+    "outcomes": [],
+    "status": "challenged"
+  },
+  "MemoryService.Store#stored": {
+    "challenges": [],
+    "outcomes": [
+      {
+        "action": "add",
+        "error": "",
+        "fact": "The billing service uses PostgreSQL 16.",
+        "id": "<id:1>",
+        "lineageId": "<id:1>",
+        "previousId": "",
+        "reason": "Stated by the maintainer in the migration notes.",
+        "version": 1,
+        "why": "No related memory."
+      },
+      {
+        "action": "add",
+        "error": "",
+        "fact": "Deploys to staging run every weekday at 09:00 UTC.",
+        "id": "<id:2>",
+        "lineageId": "<id:2>",
+        "previousId": "",
+        "reason": "The release calendar says so.",
+        "version": 1,
+        "why": "No related memory."
+      }
+    ],
+    "status": "stored"
+  },
+  "args:MemoryService.Store#free-text": {
+    "clarifications": null,
+    "items": [
+      {
+        "fact": "billing runs postgres",
+        "reason": "migration notes"
+      },
+      {
+        "fact": "staging deploys at 09:00",
+        "reason": "release calendar"
+      }
+    ]
+  }
 }

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -49,6 +50,18 @@ function file(over: Record<string, unknown>) {
   };
 }
 
+// Backend values (flows/memoryflow import tests, contract memory-import); paths and times stay the
+// spec's own, and the paused reason is the usage limit the fake agent cannot produce.
+interface ImportDetail {
+  job: Record<string, unknown>;
+  files: Record<string, unknown>[];
+}
+const scanned = contract<ImportDetail>('memory-import', 'MemoryImportService.Job#awaiting');
+const retried = contract<ImportDetail>('memory-import', 'MemoryImportService.Job#failed');
+const est = scanned.job.estimate as { files: number; chunks: number; calls: number };
+const failedFile = retried.files.find((f) => f.state === 'failed');
+if (!failedFile) throw new Error('memory-import has no failed file');
+
 const PAUSED = job({
   id: 'J2',
   state: 'paused',
@@ -60,21 +73,18 @@ const PAUSED = job({
 const PAUSED_DETAIL = {
   job: PAUSED,
   files: [
-    file({}),
-    file({
-      id: 'f2',
-      relPath: 'releases.md',
-      state: 'failed',
-      reason: 'Claude returned invalid output.',
-      chunksDone: 0,
-      added: 0,
-      updated: 0,
-    }),
+    file(retried.files.find((f) => f.state === 'done') ?? {}),
+    file({ ...failedFile, id: 'f2', relPath: 'releases.md' }),
     file({ id: 'f3', relPath: 'logo.txt', state: 'skipped', reason: 'empty', chunkCount: 0 }),
   ],
 };
 
-const SCANNED = job({});
+const SCANNED = job({
+  estimate: scanned.job.estimate,
+  progress: scanned.job.progress,
+  totals: scanned.job.totals,
+  ignoredCount: scanned.job.ignoredCount,
+});
 
 const BASE: ControlSnapshot[] = [
   {
@@ -99,7 +109,7 @@ async function openMemory(page: Page): Promise<void> {
   await expect(page.locator('[data-testid="memory-panel"]')).toBeVisible();
 }
 
-test('import: pick a folder, confirm the estimate, start', async ({ relaunch }) => {
+test('contract: import: pick a folder, confirm the estimate, start', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({
     control: [...BASE, { channel: IPC.memoryImportJobs, response: [SCANNED] }],
   });
@@ -110,9 +120,11 @@ test('import: pick a folder, confirm the estimate, start', async ({ relaunch }) 
 
   const dialog = page.locator('[data-testid="import-confirm-dialog"]');
   await expect(dialog.locator('[data-testid="import-estimate"]')).toContainText(
-    '3 files, 5 chunks',
+    `${est.files} files, ${est.chunks} chunks`,
   );
-  await expect(dialog.locator('[data-testid="import-estimate"]')).toContainText('8 Claude calls');
+  await expect(dialog.locator('[data-testid="import-estimate"]')).toContainText(
+    `${est.calls} Claude calls`,
+  );
 
   await dialog.locator('[data-testid="import-confirm-start"]').click();
   await expect(dialog).toHaveCount(0);
@@ -120,7 +132,7 @@ test('import: pick a folder, confirm the estimate, start', async ({ relaunch }) 
   expect(control.log().filter((e) => e.channel === IPC.memoryImportStart)).toHaveLength(1);
 });
 
-test('import: a paused job shows its reason, per-file results, retry and resume', async ({
+test('contract: import: a paused job shows its reason, per-file results, retry and resume', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({
@@ -150,7 +162,9 @@ test('import: a paused job shows its reason, per-file results, retry and resume'
   );
 
   await files.locator('[data-testid="import-file-releases.md"] button').first().click();
-  await expect(page.locator('[data-testid="import-file-reason"]')).toContainText('invalid output');
+  await expect(page.locator('[data-testid="import-file-reason"]')).toContainText(
+    String(failedFile.reason),
+  );
 
   await files.locator('[data-testid="import-retry-file-releases.md"]').click();
   await expect

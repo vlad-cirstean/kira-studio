@@ -1,0 +1,227 @@
+{
+  "MemoryImportService.Job#awaiting": {
+    "files": [
+      {
+        "added": 0,
+        "chunkCount": 1,
+        "chunksDone": 0,
+        "costUsd": 0,
+        "dropped": [],
+        "factCount": 0,
+        "id": "<id:1>",
+        "kind": "markdown",
+        "noop": 0,
+        "reason": "",
+        "relPath": "billing.md",
+        "size": 117,
+        "state": "pending",
+        "title": "Billing",
+        "unresolved": [],
+        "updated": 0
+      },
+      {
+        "added": 0,
+        "chunkCount": 1,
+        "chunksDone": 0,
+        "costUsd": 0,
+        "dropped": [],
+        "factCount": 0,
+        "id": "<id:2>",
+        "kind": "markdown",
+        "noop": 0,
+        "reason": "",
+        "relPath": "release.md",
+        "size": 102,
+        "state": "pending",
+        "title": "Release",
+        "unresolved": [],
+        "updated": 0
+      }
+    ],
+    "job": {
+      "base": "<masked>",
+      "calls": 0,
+      "costUsd": 0,
+      "createdAt": "<masked>",
+      "estimate": {
+        "calls": 8,
+        "chunks": 2,
+        "files": 2,
+        "seconds": 98,
+        "tokens": 73
+      },
+      "finishedAt": null,
+      "id": "<id:3>",
+      "ignoredCount": 0,
+      "progress": {
+        "chunksDone": 0,
+        "chunksTotal": 2,
+        "filesDone": 0,
+        "filesTotal": 2
+      },
+      "reason": "",
+      "roots": [],
+      "startedAt": null,
+      "state": "awaiting",
+      "totals": {
+        "added": 0,
+        "failedFiles": 0,
+        "noop": 0,
+        "skippedFiles": 0,
+        "unresolved": 0,
+        "updated": 0
+      },
+      "truncated": false
+    }
+  },
+  "MemoryImportService.Job#done": {
+    "files": [
+      {
+        "added": 2,
+        "chunkCount": 1,
+        "chunksDone": 1,
+        "costUsd": 0,
+        "dropped": [],
+        "factCount": 2,
+        "id": "<id:1>",
+        "kind": "markdown",
+        "noop": 0,
+        "reason": "",
+        "relPath": "billing.md",
+        "size": 117,
+        "state": "done",
+        "title": "Billing",
+        "unresolved": [],
+        "updated": 0
+      },
+      {
+        "added": 2,
+        "chunkCount": 1,
+        "chunksDone": 1,
+        "costUsd": 0,
+        "dropped": [],
+        "factCount": 2,
+        "id": "<id:2>",
+        "kind": "markdown",
+        "noop": 0,
+        "reason": "",
+        "relPath": "release.md",
+        "size": 102,
+        "state": "done",
+        "title": "Release",
+        "unresolved": [],
+        "updated": 0
+      }
+    ],
+    "job": {
+      "base": "<masked>",
+      "calls": 4,
+      "costUsd": 0,
+      "createdAt": "<masked>",
+      "estimate": {
+        "calls": 8,
+        "chunks": 2,
+        "files": 2,
+        "seconds": 98,
+        "tokens": 73
+      },
+      "finishedAt": "<masked>",
+      "id": "<id:3>",
+      "ignoredCount": 0,
+      "progress": {
+        "chunksDone": 2,
+        "chunksTotal": 2,
+        "filesDone": 2,
+        "filesTotal": 2
+      },
+      "reason": "",
+      "roots": [],
+      "startedAt": "<masked>",
+      "state": "done",
+      "totals": {
+        "added": 4,
+        "failedFiles": 0,
+        "noop": 0,
+        "skippedFiles": 0,
+        "unresolved": 0,
+        "updated": 0
+      },
+      "truncated": false
+    }
+  },
+  "MemoryImportService.Job#failed": {
+    "files": [
+      {
+        "added": 2,
+        "chunkCount": 1,
+        "chunksDone": 1,
+        "costUsd": 0,
+        "dropped": [],
+        "factCount": 2,
+        "id": "<id:1>",
+        "kind": "markdown",
+        "noop": 0,
+        "reason": "",
+        "relPath": "billing.md",
+        "size": 117,
+        "state": "done",
+        "title": "Billing",
+        "unresolved": [],
+        "updated": 0
+      },
+      {
+        "added": 0,
+        "chunkCount": 1,
+        "chunksDone": 0,
+        "costUsd": 0,
+        "dropped": [],
+        "factCount": 0,
+        "id": "<id:2>",
+        "kind": "markdown",
+        "noop": 0,
+        "reason": "Chunk 1 of 1: Claude Code call exceeded its cost budget.",
+        "relPath": "release.md",
+        "size": 102,
+        "state": "failed",
+        "title": "Release",
+        "unresolved": [],
+        "updated": 0
+      }
+    ],
+    "job": {
+      "base": "<masked>",
+      "calls": 3,
+      "costUsd": 0,
+      "createdAt": "<masked>",
+      "estimate": {
+        "calls": 8,
+        "chunks": 2,
+        "files": 2,
+        "seconds": 98,
+        "tokens": 73
+      },
+      "finishedAt": "<masked>",
+      "id": "<id:3>",
+      "ignoredCount": 0,
+      "progress": {
+        "chunksDone": 1,
+        "chunksTotal": 2,
+        "filesDone": 2,
+        "filesTotal": 2
+      },
+      "reason": "",
+      "roots": [],
+      "startedAt": "<masked>",
+      "state": "done",
+      "totals": {
+        "added": 2,
+        "failedFiles": 1,
+        "noop": 0,
+        "skippedFiles": 0,
+        "unresolved": 0,
+        "updated": 0
+      },
+      "truncated": false
+    }
+  }
+}

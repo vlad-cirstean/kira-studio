@@ -135,14 +135,28 @@ test('selecting a memory shows its reason and version trail', async ({ relaunch 
   await expect(trail.locator('[data-testid="memory-version-2"]')).toContainText('Port corrected.');
 });
 
-test('Add memory: free text, a challenge shows questions, resubmit sends clarifications, stored lists outcomes', async ({
+test('contract: Add memory: free text, a challenge shows questions, resubmit sends clarifications, stored lists outcomes', async ({
   relaunch,
 }) => {
+  const sent = contract<{ items: { fact: string; reason: string }[] }>(
+    'memory',
+    'args:MemoryService.Store#free-text',
+  );
+  const challenged = contract<{
+    status: string;
+    challenges: { index: number; fact: string; questions: string[] }[];
+  }>('memory', 'MemoryService.Store#challenged');
+  const stored = contract<{ status: string; outcomes: { action: string }[] }>(
+    'memory',
+    'MemoryService.Store#stored',
+  );
   const item = {
     fact: 'it uses port 8080 and deploys on Fridays',
     reason: 'Stated by the user, added manually in the Memory module.',
   };
-  const answer = { question: 'Which service?', answer: 'billing-api' };
+  expect(Object.keys(sent.items[0] ?? {}).sort()).toEqual(Object.keys(item).sort());
+  const question = challenged.challenges[0]?.questions[0] ?? '';
+  const answer = { question, answer: 'billing-api' };
   const { window: page, control } = await relaunch({
     control: [
       ...BASE,
@@ -150,42 +164,14 @@ test('Add memory: free text, a challenge shows questions, resubmit sends clarifi
         channel: IPC.memoryStore,
         args: { items: [item], clarifications: [] },
         response: {
-          status: 'challenged',
-          challenges: [{ index: 0, fact: item.fact, questions: [answer.question] }],
-          outcomes: [],
+          ...challenged,
+          challenges: [{ index: 0, fact: item.fact, questions: [question] }],
         },
       },
       {
         channel: IPC.memoryStore,
         args: { items: [item], clarifications: [answer] },
-        response: {
-          status: 'stored',
-          challenges: [],
-          outcomes: [
-            {
-              fact: 'billing-api uses port 8080',
-              reason: item.reason,
-              action: 'add',
-              id: 'm9',
-              lineageId: 'm9',
-              version: 1,
-              previousId: '',
-              why: '',
-              error: '',
-            },
-            {
-              fact: 'billing-api deploys on Fridays',
-              reason: item.reason,
-              action: 'noop',
-              id: 'm10',
-              lineageId: 'm10',
-              version: 1,
-              previousId: '',
-              why: '',
-              error: '',
-            },
-          ],
-        },
+        response: stored,
       },
     ],
   });
@@ -196,14 +182,15 @@ test('Add memory: free text, a challenge shows questions, resubmit sends clarifi
   await dialog.locator('[data-testid="add-memory-text"]').fill(item.fact);
   await dialog.locator('[data-testid="add-memory-submit"]').click();
 
-  await expect(dialog.locator('[data-testid="add-memory-challenge"]')).toContainText(
-    answer.question,
-  );
+  await expect(dialog.locator('[data-testid="add-memory-challenge"]')).toContainText(question);
   await dialog.locator('[data-testid="add-memory-answer"]').fill(answer.answer);
   await dialog.locator('[data-testid="add-memory-submit"]').click();
 
-  await expect(dialog.locator('[data-testid="add-memory-outcome-0"]')).toHaveText('Added');
-  await expect(dialog.locator('[data-testid="add-memory-outcome-1"]')).toHaveText('Already known');
+  for (const [i, o] of stored.outcomes.entries()) {
+    await expect(dialog.locator(`[data-testid="add-memory-outcome-${i}"]`)).toHaveText(
+      o.action === 'add' ? 'Added' : 'Already known',
+    );
+  }
   const stores = control.log().filter((e) => e.channel === IPC.memoryStore);
   expect(stores).toHaveLength(2);
   expect(stores[1]?.args).toMatchObject({ clarifications: [answer] });

@@ -51,6 +51,8 @@ func TestStoreThroughGate(t *testing.T) {
 	if res.Status != "stored" || len(res.Outcomes) != 2 || res.Outcomes[0].Action != "add" || res.Outcomes[1].Action != "add" {
 		t.Fatalf("Store = %+v, want two adds", res)
 	}
+	app.Contract(t, "memory", "args:MemoryService.Store#free-text", bridge.MemoryStoreArgs{Items: twoItems})
+	app.Contract(t, "memory", "MemoryService.Store#stored", res)
 	app.Events.WaitAfter(t, mark, bridge.ChannelMemoryChanged, nil, waitFor)
 
 	recent, err := app.W.Memory.Recent(ctx)
@@ -94,6 +96,7 @@ func TestGateRejectsOrFails(t *testing.T) {
 	if res.Status != "challenged" || len(res.Challenges) != 2 || len(res.Challenges[0].Questions) != 1 || len(res.Outcomes) != 0 {
 		t.Fatalf("rejecting gate result = %+v, want two challenges with questions and no outcome", res)
 	}
+	app.Contract(t, "memory", "MemoryService.Store#challenged", res)
 	empty("a challenge")
 
 	gate(t, app, "gate-malformed.json")
@@ -129,6 +132,7 @@ func TestSemanticNotInstalled(t *testing.T) {
 	if st.State != memory.SemanticNotInstalled {
 		t.Fatalf("semantic status = %+v, want notInstalled: no model on disk, no ONNX runtime", st)
 	}
+	app.Contract(t, "memory-settings", "MemoryService.SemanticStatus#not-installed", st)
 	hits, err := app.W.Memory.Search(ctx, bridge.MemorySearchArgs{Query: "staging"})
 	if err != nil || len(hits) != 1 || hits[0].Match == "semantic" {
 		t.Fatalf("keyword search = %+v, %v, want the staging fact by keyword", hits, err)
@@ -147,6 +151,8 @@ func TestConnectClaudeCode(t *testing.T) {
 	app := flowharness.New(t)
 	gate(t, app, "", fakeagent.Action{})
 	before := app.W.Memory.McpStatus()
+	exe := flowharness.Replace(before.Executable, "<bin>/kira-space")
+	app.Contract(t, "memory-settings", "MemoryService.McpStatus", before, exe)
 	if !before.ClaudeAvailable || !filepath.IsAbs(before.Executable) || !strings.Contains(before.Command, "memory-mcp") {
 		t.Fatalf("McpStatus = %+v, want claude found and an absolute executable", before)
 	}
@@ -154,6 +160,7 @@ func TestConnectClaudeCode(t *testing.T) {
 	if res.Outcome != mcpinstall.OutcomeInstalled {
 		t.Fatalf("InstallClaudeCode = %+v, want installed", res)
 	}
+	app.Contract(t, "memory-settings", "MemoryService.InstallClaudeCode", res, exe)
 	argv := recordedArgs(t, app)
 	if len(argv) != 2 {
 		t.Fatalf("claude ran %d times, want the remove and add-json pair: %q", len(argv), argv)

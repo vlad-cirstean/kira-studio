@@ -27,6 +27,9 @@ func TestInstallSemanticModelCancelled(t *testing.T) {
 		if st.State == memory.SemanticDownloading || st.Done != 0 {
 			t.Fatalf("attempt %d: failed install left download state: %+v", i, st)
 		}
+		if i == 1 {
+			app.Contract(t, "memory-settings", "MemoryService.SemanticStatus#cancelled", st)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(app.MemoryHome, "models")); err == nil {
 		m, _ := filepath.Glob(filepath.Join(app.MemoryHome, "models", "*", "installed.json"))

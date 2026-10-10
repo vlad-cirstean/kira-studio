@@ -1,0 +1,31 @@
+{
+  "MemoryService.InstallClaudeCode": {
+    "detail": "",
+    "outcome": "installed",
+    "probed": [
+      "<bin>/claude"
+    ]
+  },
+  "MemoryService.McpStatus": {
+    "claudeAvailable": true,
+    "command": "claude mcp remove --scope user 'kira-memory' 2>/dev/null; claude mcp add-json --scope user 'kira-memory' '{\"type\":\"stdio\",\"command\":\"<bin>/kira-space\",\"args\":[\"memory-mcp\"]}'",
+    "executable": "<bin>/kira-space",
+    "probed": [
+      "<bin>/claude"
+    ]
+  },
+  "MemoryService.SemanticStatus#cancelled": {
+    "done": 0,
+    "message": "",
+    "model": "arctic-embed-s-int8-e596f50",
+    "state": "notInstalled",
+    "total": 0
+  },
+  "MemoryService.SemanticStatus#not-installed": {
+    "done": 0,
+    "message": "",
+    "model": "arctic-embed-s-int8-e596f50",
+    "state": "notInstalled",
+    "total": 0
+  }
+}
