@@ -4035,11 +4035,47 @@ claude-code PTY) and the board's `OnRuns` (headless runs, which have no hooks).
   `notifyOnRunEnded`, `notifyIncludeMessage`, all on by default. `SendTest` ignores focus and cooldown.
 - Click: `Notifier.Click` focuses the window and pushes `kira:agent:reveal-terminal` or
   `kira:agent:reveal-task` (EmitTo, Space only); an ADE record goes through `FocusSession`.
-- Platform: `notify_darwin.go` (`darwin && !server`) registers the Wails v3 notifications service and
-  `WailsSink`; `notify_other.go` returns no service, so Linux and `-tags server` post nothing.
+- Platform: `notify_darwin.go` (`darwin && !server`) registers the Wails v3 notifications service; the
+  sink (`WailsSink`) lives in `internal/desknotify`, shared with prompt notifications (P246).
+  `notify_other.go` returns no service, so Linux and `-tags server` post nothing.
   Message text only goes to the local notification centre.
 - `AgentNotifyService` is the 21st Kira Space bound service (`ClaudeUsageService`, P239, is the 22nd).
 - Tests: `flows/notifyflow` (hook events through the real shim), `tests/ui/settings-agent-notify.spec.ts`.
+
+### Prompt routing (P246)
+
+One router decides which window shows every app-originated popup. Package `internal/prompts` holds
+metadata only (`Prompt{ID, Kind, Ref, Origin, Title, CreatedAt}`); the owner keeps its queue and
+answers. Bound as `PromptsService` (`List`, `MainWindow`, `Claim`, `Raise`, `Dismiss`, `SendTest`).
+
+| Kind | Owner | Origin |
+|---|---|---|
+| `schedule` | `scriptruns` waiting insert (cron confirm) | none |
+| `dbmcp` | `dbmcp.ApprovalBroker` (Studio) | none |
+| `git-credential` | `gitcred.Relay` (Space) | stream window key, else none |
+| `mobile-pairing` | `pairing.Broker` (Space) | none |
+| `update` | renderer, through `Raise` and `Dismiss` | the raising window |
+
+- Target: the claimed window if still registered, else the origin if registered, else the main window,
+  else `""` (queued). Main window = `shell.Registry.MainKey`: lowest open order, ties by key, never an
+  ephemeral window. A registry change calls `Reroute`, so a queued prompt lands on the next window.
+- Push `kira:prompts:changed` carries the full routed list; `kira:prompts:reveal` carries one id for a
+  window. `Claim(id, windowKey)` pins a prompt to a window (`Review and run`).
+- Frontend: `PromptHost` (`packages/workbench/src/prompts/`), mounted once in each `App.vue`, shows the
+  oldest prompt whose `target` is its window. A kind dialog takes `entry`, renders its owner's state
+  and emits `hide` on Escape. Hidden prompts stay in the list until the owner closes them.
+- Notifications: per kind, id `prompt:<kind>`, thread `kira-prompts`. Sent on open when the target
+  window is not focused, count title when several wait, removed when the last of the kind closes.
+  Gate: `advanced.notifyPrompts` (default on). A click calls `RevealKind`: reopen a window when none is
+  open, focus the target, push reveal. Answering in the app removes the note. No action buttons.
+- Sink: `internal/desknotify` (`Sink`, `WailsSink`), shared with `internal/agentnotify`. Darwin only,
+  like P238.
+- Git credentials: the stream no longer carries `credential.request` or `credential.provide` (contract
+  47). The relay snapshot (`kira:git:credential`) plus `GitCredentialService.Provide` is the only path.
+- Tests: `flows/promptflow` in both apps, `dbmcpflow` `TestDbMcpApprovalRoutes`, Space
+  `gitflow` `TestCredentialRoutes`, `mobileflow` `TestMobilePairingRoutes`, `tests/ui/prompts.spec.ts`,
+  `tests/e2e-real/prompts-two-windows-real.spec.ts`. The recording sink is
+  `internal/flowtest/notifysink`.
 
 ### Claude Code usage limits (P239)
 
@@ -4960,13 +4996,13 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
-- **The recurring-script confirm popup shows in the main window only, with no system notification (P246).** A waiting run raised while no window is focused stays in the runs list and the status bar until the main window opens.
 - **Claude Code usage limits show only what Kira-started sessions report (P239).** Claude Code sends
   `rate_limits` only for claude.ai Pro and Max plans and only after the first API response of a
   session, so the item reads `Usage: –` until then. A session in another terminal is invisible.
   Unverified on a real Mac build and on Team or Enterprise seats.
 
-- **Desktop notifications are unverified on macOS (P238).** Needs a signed bundle and the user's
+- **Desktop notifications are unverified on macOS (P238, P246).** Covers agent notes in Space and
+  prompt notifications in both apps. Needs a signed bundle and the user's
   one-time OS permission; a dev build run outside a bundle cannot post (Wails checks the bundle id).
   The darwin sink compiles only with cgo on a Mac. Linux and `-tags server` builds post nothing.
   Delete once checked on a signed Mac build.

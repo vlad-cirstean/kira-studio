@@ -401,6 +401,13 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 - Coverage gate (P236): `apps/<app>/internal/flows/coverage/` fails on a bound method with no flow call.
   Exempt one with a reason in `exempt.txt`.
 
+## e2e-real: a plain page is not the main window (P246)
+
+Prompts route to the main window key. A Chromium page opened by the fixture has a random key, so a
+popup never shows there. Call `openMainWindow(kira)` (`@workbench/testing/e2eReal`) first: it reads
+`PromptsService.MainWindow` and reloads the page under that key. Open a second window with
+`browser.newPage()` and `?window=<key>`, not `page.context().newPage()`.
+
 ## Real `claude` tests (P237)
 
 Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-commit or pre-push.
