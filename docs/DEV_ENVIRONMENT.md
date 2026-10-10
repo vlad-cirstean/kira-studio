@@ -44,15 +44,7 @@ means it hasn't been applied yet; don't recreate one that already exists for the
 and don't let this workaround become an excuse to touch workflow files more often than the task
 needs.
 
-**Pending now (apply from an environment with the `workflow` scope, then delete the file in the same
-commit):**
-
-- `docs/pending-changes/.github__workflows__release.yml.patch` — stop stamping the removed extension
-  manifest (`apps/kira-space-vscode/package.json`). **Until applied, `release.yml` fails at its version step.**
-- `docs/pending-changes/.github__workflows__pr.yml.patch` — rename two step names that still say `gitsock`.
-  Cosmetic.
-
-Apply each with `git apply docs/pending-changes/<file>`. No `docs/pending-workflows/` file exists.
+Nothing pending now — no file under `docs/pending-changes/` or `docs/pending-workflows/`.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`, and Docker flow tests)
 

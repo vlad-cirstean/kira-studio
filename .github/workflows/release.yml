@@ -134,13 +134,6 @@ jobs:
             echo "$CONFIG version set to $TAG (from tag $GITHUB_REF_NAME)"
           done
 
-          # G10 D21: the extension ships inside Kira Space's bundle (P100 Part 3), so its manifest
-          # version tracks Kira Space's config.yml — S9 asserts the two agree.
-          VSCODE_PKG=apps/kira-space-vscode/package.json
-          perl -i -pe 's/^(  "version": )"[^"]*"/$1"'"$TAG"'"/' "$VSCODE_PKG"
-          test "$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)" = "$TAG"
-          echo "extension version set to $TAG (from tag $GITHUB_REF_NAME)"
-
       - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
         run: sh scripts/setup.sh
 
