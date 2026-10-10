@@ -163,10 +163,85 @@ func (r *Repo) FailRunning(out runoutcome.Outcome, now int64) ([]Run, error) {
 	})
 }
 
+// Active returns the newest running or waiting run of a script, (nil, nil) when none.
+func (r *Repo) Active(scriptID string) (*Run, error) {
+	run, err := scan(r.DB.QueryRow(`SELECT `+columns+` FROM script_runs WHERE script_id = ? AND state IN ('running', 'waiting')
+		ORDER BY created_at DESC, id DESC LIMIT 1`, scriptID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("scriptruns: active run of %s: %w", scriptID, err)
+	}
+	return &run, nil
+}
+
+// Waiting returns the runs waiting for the user's answer, oldest first.
+func (r *Repo) Waiting() ([]Run, error) {
+	rows, err := r.DB.Query(`SELECT ` + columns + ` FROM script_runs WHERE state = 'waiting' ORDER BY created_at ASC, id ASC`)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (Run, bool, error) {
+		run, err := scan(rows)
+		return run, true, err
+	})
+}
+
+// BeginWaiting turns a waiting run into a running one with the fields the start resolved. It
+// reports false when the run was already answered.
+func (r *Repo) BeginWaiting(id string, run Run) (bool, error) {
+	params, err := json.Marshal(nonNilParams(run.Params))
+	if err != nil {
+		return false, fmt.Errorf("scriptruns: encode params: %w", err)
+	}
+	tools, err := json.Marshal(run.Tools.nonNil())
+	if err != nil {
+		return false, fmt.Errorf("scriptruns: encode tools: %w", err)
+	}
+	res, err := r.DB.Exec(`UPDATE script_runs SET state = 'running', started_at = ?, cwd = ?, command = ?, prompt = ?, params_json = ?,
+		tools_json = ?, model = ?, session_id = ?, task_id = ?, task_title = ?, branch_id = ?, branch_label = ?
+		WHERE id = ? AND state = 'waiting'`, run.StartedAt, run.Cwd, run.Command, run.Prompt, string(params), string(tools),
+		run.Model, run.SessionID, run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel, id)
+	if err != nil {
+		return false, fmt.Errorf("scriptruns: begin waiting %s: %w", id, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("scriptruns: begin waiting %s: %w", id, err)
+	}
+	return n > 0, nil
+}
+
+// What SkipWaiting matches: one run, every waiting run of a script, or all of them.
+const (
+	skipByID     = "id"
+	skipByScript = "script_id"
+	skipAll      = ""
+)
+
+// SkipWaiting ends the waiting runs matched by by/value (value is ignored for skipAll) as skipped
+// with reason and returns them.
+func (r *Repo) SkipWaiting(by, value, reason string, src runoutcome.Source, now int64) ([]Run, error) {
+	out := runoutcome.Skipped(reason, src)
+	outcome, err := encode(&out)
+	if err != nil {
+		return nil, err
+	}
+	query := `UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ? WHERE state = 'waiting'`
+	args := []any{string(out.Status), outcome, now}
+	if by != skipAll {
+		query += ` AND ` + by + ` = ?`
+		args = append(args, value)
+	}
+	rows, err := r.DB.Query(query+` RETURNING `+columns, args...)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (Run, bool, error) {
+		run, err := scan(rows)
+		return run, true, err
+	})
+}
+
 // Purge keeps only the newest keepFinished finished runs and drops the logs of the rest.
 func (r *Repo) Purge() error {
-	if _, err := r.DB.Exec(`DELETE FROM script_runs WHERE state <> 'running' AND id NOT IN
-		(SELECT id FROM script_runs WHERE state <> 'running' ORDER BY created_at DESC, id DESC LIMIT ?)`, keepFinished); err != nil {
+	if _, err := r.DB.Exec(`DELETE FROM script_runs WHERE state NOT IN ('running', 'waiting') AND id NOT IN
+		(SELECT id FROM script_runs WHERE state NOT IN ('running', 'waiting') ORDER BY created_at DESC, id DESC LIMIT ?)`, keepFinished); err != nil {
 		return fmt.Errorf("scriptruns: purge: %w", err)
 	}
 	if _, err := r.DB.Exec(`DELETE FROM script_run_logs WHERE run_id NOT IN (SELECT id FROM script_runs)`); err != nil {

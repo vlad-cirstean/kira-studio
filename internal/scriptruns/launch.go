@@ -66,8 +66,11 @@ func (s *Service) takeLaunch(token, scriptID string) (launch, bool) {
 	return l, true
 }
 
-// runTrigger is ade for a run started for a task, else manual.
+// runTrigger is what started the run: the caller's choice, else ade for a task, else manual.
 func runTrigger(p *planned) Trigger {
+	if p.trigger != "" {
+		return p.trigger
+	}
 	if p.preview.ADE != nil {
 		return TriggerADE
 	}

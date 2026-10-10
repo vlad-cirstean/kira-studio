@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
@@ -94,8 +95,13 @@ type planned struct {
 	smart   scripts.Smart
 	mcp     []string
 	preview Preview
-	// release drops the board's worktree claim a smart run holds; nil when none.
+	// release drops the board's worktree claim a run holds; nil when none.
 	release func()
+	// trigger overrides runTrigger when the caller says what started the run.
+	trigger Trigger
+	// timeout and timeoutText bound a headless normal run.
+	timeout     time.Duration
+	timeoutText string
 }
 
 func (s *Service) getenv(k string) string {

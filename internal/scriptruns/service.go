@@ -36,14 +36,18 @@ type Service struct {
 	Getenv func(string) string
 	// SmartTimeout, when positive, replaces every smart run's own timeout (a flow test).
 	SmartTimeout time.Duration
+	// ScheduleTimeout, when positive, replaces every headless run's own timeout (a flow test).
+	ScheduleTimeout time.Duration
 
 	mu        sync.Mutex
 	closed    bool
-	smart     map[string]*smartRun
+	smart     map[string]*bgRun
+	bg        map[string]*bgRun
 	finishes  map[string]claudeheadless.Finish
 	launches  map[string]launch
 	server    *claudeheadless.Server
 	smartWait sync.WaitGroup
+	bgWait    sync.WaitGroup
 }
 
 var _ terminal.ScriptLauncher = (*Service)(nil)
@@ -177,11 +181,14 @@ func (s *Service) Stop(id string) error {
 	if run.State != StateRunning {
 		return nil
 	}
-	if run.Kind == KindSmart {
+	switch {
+	case run.Kind == KindSmart:
 		s.stopSmart(id)
-		return nil
+	case run.TerminalID == "":
+		s.stopHeadless(id)
+	default:
+		s.Registry.Close(run.TerminalID)
 	}
-	s.Registry.Close(run.TerminalID)
 	return nil
 }
 

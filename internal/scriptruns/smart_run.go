@@ -16,20 +16,20 @@ import (
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
 
-// How a smart run was ended from outside, set before its context is cancelled.
+// How a background (smart or headless) run was ended from outside, set before its context is cancelled.
 const (
 	endNone = iota
 	endUser
 	endQuit
 )
 
-type smartRun struct {
+type bgRun struct {
 	cancel context.CancelFunc
 	mu     sync.Mutex
 	end    int
 }
 
-func (r *smartRun) stop(end int) {
+func (r *bgRun) stop(end int) {
 	r.mu.Lock()
 	if r.end == endNone {
 		r.end = end
@@ -38,7 +38,7 @@ func (r *smartRun) stop(end int) {
 	r.cancel()
 }
 
-func (r *smartRun) endedBy() int {
+func (r *bgRun) endedBy() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.end
@@ -76,7 +76,7 @@ func (s *Service) takeFinish(runID string) (claudeheadless.Finish, bool) {
 func (s *Service) startSmart(p *planned) (Started, error) {
 	runID, sessionID := uuid.NewString(), uuid.NewString()
 	ctx, cancel := context.WithCancel(context.Background())
-	sr := &smartRun{cancel: cancel}
+	sr := &bgRun{cancel: cancel}
 
 	s.mu.Lock()
 	switch {
@@ -90,7 +90,7 @@ func (s *Service) startSmart(p *planned) (Started, error) {
 		return Started{}, ipcerr.New("E_INVALID", fmt.Sprintf("%d smart scripts are running: wait for one to finish", maxSmartRuns))
 	}
 	if s.smart == nil {
-		s.smart = map[string]*smartRun{}
+		s.smart = map[string]*bgRun{}
 	}
 	s.smart[runID] = sr
 	s.smartWait.Add(1)
@@ -206,12 +206,24 @@ func (s *Service) stopSmart(id string) {
 	}
 }
 
-// Close ends every smart run as interrupted by the quit and waits until each is recorded.
+func (s *Service) stopHeadless(id string) {
+	s.mu.Lock()
+	br := s.bg[id]
+	s.mu.Unlock()
+	if br != nil {
+		br.stop(endUser)
+	}
+}
+
+// Close ends every smart and headless run as interrupted by the quit and waits until each is recorded.
 func (s *Service) Close() {
 	s.mu.Lock()
 	s.closed = true
-	runs := make([]*smartRun, 0, len(s.smart))
+	runs := make([]*bgRun, 0, len(s.smart)+len(s.bg))
 	for _, r := range s.smart {
+		runs = append(runs, r)
+	}
+	for _, r := range s.bg {
 		runs = append(runs, r)
 	}
 	srv := s.server
@@ -220,6 +232,7 @@ func (s *Service) Close() {
 		r.stop(endQuit)
 	}
 	s.smartWait.Wait()
+	s.bgWait.Wait()
 	if srv != nil {
 		if err := srv.Close(); err != nil {
 			slog.Warn("scriptruns: close report server", "scope", "scriptruns", "err", err)

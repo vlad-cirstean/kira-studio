@@ -20,8 +20,12 @@ const (
 	KindSmart  = "smart"
 )
 
-// States are the outcome statuses plus Running.
-const StateRunning = "running"
+// States are the outcome statuses plus Running and Waiting. Waiting is a scheduled run that asks
+// the user before it starts; both are live.
+const (
+	StateRunning = "running"
+	StateWaiting = "waiting"
+)
 
 // RunParam is a param as a run shows it; a secret value is stored as the mask.
 type RunParam struct {
