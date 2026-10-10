@@ -13,7 +13,7 @@ export interface DockerContext {
   execContainers: Map<string, string>;
 }
 
-export interface DockerContextOptions {
+interface DockerContextOptions {
   appearance(): { fontFamily: string; fontSize: number };
 }
 
