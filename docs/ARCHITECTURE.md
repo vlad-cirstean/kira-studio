@@ -1315,17 +1315,24 @@ Distilled facts about how the workbench is put together — not a restatement of
 §8's per-dialog field lists or its mockup-vs-shipped narrative, which stay where they are as the
 phase-by-phase record. These are the structural rules a future session needs to not reinvent.
 
-**One UI language (P262).** Dialogs are `DialogContent size="sm|md|lg|xl|2xl"` (+ `fixed-height`)
-with `DialogHeader closable`, `DialogBody`, `DialogFooter` (`#start` slot for left-side extras,
-buttons right: dismiss, then primary). Secondary tabs and segmented pickers are `SecondaryTabs`
-(`variant="tabs|segmented"`), never raw `ToggleGroup`/`TabsList`; primary tab bars keep
-`tabChipVariants`. Dialog and form controls are `kira-lg` (26px), toolbar controls `kira` (22px),
-all `rounded-kira-sm bg-field`. Buttons use `dialog*`/`toolbar*` variants with `kira*` sizes;
-weights are 400/500 (`font-semibold` only in `PanelHeader`); icon sizes 12, 13, 16, 24. Panel
-bars use `PanelHeader`/`ViewToolbar`, section headings `SectionHeading`. `scripts/check-ui-primitives.sh`
-(part of `bun run lint`) enforces this; side panels (`scripts/ui-primitives-side-panels.txt`) use
-`PanelHeader`, `PanelBar`, `SectionHeading`, `rowVariants`/`rowIndent` and `useRowHeight`; files not yet migrated sit in
-`scripts/ui-primitives-allowlist/`. Full rules: `docs/v2.2/plans/P262-ui-unification.md` §2.
+**One UI language (P262).** Dialogs are `DialogContent size="sm|md|lg|xl|2xl"` (`size` required, plus
+`fixed-height`) with `DialogHeader` (close button on by default; `:closable="false"` only while a
+blocking op runs), `DialogBody`, `DialogFooter` (`#start` slot for left-side extras, buttons right:
+dismiss, then primary). `CommandDialog` is the one exempt surface and renders reka content directly.
+Secondary tabs and segmented pickers are `SecondaryTabs` (`variant="tabs|segmented"`), never raw
+`ToggleGroup`/`TabsList`; primary tab bars keep `tabChipVariants`. Dialog and form controls are
+`kira-lg` (26px, the `Input`/`NativeSelect`/`InputGroup` default), toolbar controls `kira` (22px), all
+`rounded-kira-sm bg-field`; `font-data` is opt-in per control, never part of an `InputGroup` variant.
+Search and filter boxes are `SearchField` (focus through its exposed `focus()`; biome forbids
+`autofocus`). Stacked fields are `Field`/`FieldLabel`; labels stay medium weight. Buttons use
+`dialog*`/`toolbar*` variants with `kira*` sizes (the retired shadcn variants and sizes no longer
+exist); weights are 400/500 (`font-semibold` only in `PanelHeader`, `font-bold` only for ANSI log
+data); icon sizes 12, 13, 16, 24. Panel bars use `PanelHeader`/`ViewToolbar`, section headings
+`SectionHeading`. Side panels use `PanelHeader`, `PanelBar`, `SectionHeading`, `rowVariants`/`rowIndent`
+and `useRowHeight`. `scripts/check-ui-primitives.sh` (part of `bun run lint`) enforces all of this; it
+holds the side-panel file list and the named exemptions (CommandPalette, LogsView ANSI bold,
+`AdeBacklogRow` inline edit, mobile 44px touch inputs, git-ui `SearchBox` two-stage Escape), and an
+exemption that stops matching fails the run. Full rules: `docs/v2.2/plans/P262-ui-unification.md` §2.
 
 **A view is chosen by page kind, never by database type.** `Page` is a discriminated union
 (`TabularPage`, `DocumentPage`, `KeyValuePage`, `StreamPage`); UI reads the page's own `kind`

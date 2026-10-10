@@ -890,3 +890,25 @@ Branch `p262-b`, B1-B9 one commit each (2ccebe1ea, 18c14b721, 0e0d0ffe2, 09fd588
 - Lint, typecheck, `test:unit` (1793) green. Space `ui` minus A-owned specs: 401 tests, 395 pass first run; 6 failures were spec selectors tied to old markup, fixed in specs. Mobile: 53 pass.
 - Visual: 6 baselines re-recorded (workflow-graph, workflow-graph-branches, git-branch-picker, git-graph-detail, git-repos-dialog, settings-appearance); diffs are weight, tab, search, dialog and tree-row changes from section 2.
 - Deviations and foundation bugs: `P262-stream-b-findings.md`.
+
+## Close-out result
+
+Landed on `v2.0` (not pushed). Findings files of both streams fixed and deleted.
+
+Fixed:
+- `SecondaryTabs` label in its own span (no whitespace in item text); tooltip wrap and `data-state` clobber were already fixed in A1.
+- `Label` base unchanged (`flex gap-2 text-kira-md font-medium`); all 30 migrated `font-normal` overrides dropped, labels are 500 everywhere per §2.1. Moves Space workflow graph baselines.
+- `InputGroup` `kira`/`kira-lg` no longer carry `font-data`; callers opt in (StreamView, git-ui `SearchBox`, `AutocompleteField`). Number stepper and command input use the `default` variant (box without padding). Invalid inputs inside a kira group now colour the box border (find bars, `SearchField`).
+- `SearchField` `autofocus` prop deleted (no caller; biome `noAutofocus`); callers focus via exposed `focus()`.
+- `ConnectionDialog` stacked field divs now `Field`/`FieldLabel`.
+- Accepted as shipped, no change: `PagerControls` bordered page box and `w-14` (§2.5 one input look), `AdeClaudeDialog` plain segmented chips (plan), `AdePanelResizeHandle` foundation 4px handle (plan text `w-0.5` was wrong), toggle-style buttons with `bg-field text-fg`, indentation left by scripted edits (biome does not format Vue templates).
+
+Legacy paths removed: `DialogContent` requires `size` (legacy grid path, `showCloseButton`, `DialogScrollContent`, unused footer close prop deleted); `DialogHeader` `closable` default true (bare `closable` dropped from 43 callers, `:closable="false"` for `UpdateDialog` installing and the sr-only `CommandDialog` header; mobile `ReplySheet` and `ConfirmDialog` gain the close button); `Input` `default` size deleted; `Button` variants `default`/`secondary`/`outline`/`destructive` and sizes `default`/`xs`/`sm`/`lg`/`icon`/`icon-xs`/`icon-lg` deleted (default is now `toolbar`/`kira`; dev prototype buttons and the Monaco retry button moved to `toolbar`/`kira`). `CommandDialog` renders reka content directly.
+
+Guard: `scripts/ui-primitives-allowlist/` and `scripts/ui-primitives-side-panels.txt` deleted; the script holds the side-panel list and 6 named exemptions (U3 CommandPalette, U11 LogsView ANSI bold, U9 `AdeBacklogRow` and two mobile screens, U17 git-ui `SearchBox`). The 3 remaining `font-semibold`/`font-bold` uses are `PanelHeader` (exempt) and 2 in `LogsView` (exempt).
+
+Flake root cause, `repo-graph-widths.spec.ts`: commit grid sized its columns for the pre-scrollbar viewport when the row-count change landed after the `loadedRows` rAF (no host resize, so no relayout; 12px horizontal overflow, handles 12px off their cells). `CommitGrid` now observes the SlickGrid viewport too. The spec also asserted cells and handles mid-relayout after `setViewportSize`; it now polls until they settle. 60 of 60 under 4 parallel workers (was 8 of 30 failing).
+
+Also fixed: `AutocompleteField` grow textarea lost its data font with the `font-data` removal (`http-request.spec.ts:813`).
+
+Verify: `typecheck`, `lint`, `test:unit` (1793), `test:ui:studio` (425 incl. ui-timing; `slick-grid.spec.ts:1233` fails once under full-suite load, passes alone and on re-run), `test:ui:space` (457), `test:ui:space-mobile` (53, 1 skipped), both visual projects clean after re-record. Re-recorded after viewing: Studio connection-dialog, settings advanced/api/appearance/cache (number stepper text aligns with other inputs); Space workflow-graph, workflow-graph-branches (labels 500), git-branch-picker (filter placeholder UI font), git-repo-settings-dialog, settings appearance/git (stepper).
