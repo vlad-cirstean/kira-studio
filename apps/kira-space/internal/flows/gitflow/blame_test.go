@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 )
@@ -41,6 +42,9 @@ func TestBlameLine(t *testing.T) {
 		}
 		if got.AuthorTimeSeconds <= 0 {
 			t.Fatalf("line %d authorTimeSeconds = %d", line, got.AuthorTimeSeconds)
+		}
+		if line == 2 {
+			r.app.Contract(t, "git-blame", "git:blame.line#line-2", got, flowharness.Mask("sha", "authorTimeSeconds"))
 		}
 		authors[got.Author] = true
 	}

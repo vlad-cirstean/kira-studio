@@ -1,5 +1,6 @@
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { gitStreamRequests, installGitStreamMock } from './support/gitStreamMock';
 import {
   buildGraphStreamChunk,
@@ -92,32 +93,14 @@ const WORKTREE_REPO = {
   createdAt: '2026-01-02T00:00:00.000Z',
 };
 const WORKTREE_LIST_RESULT = {
-  worktrees: [
-    {
-      path: REPO.repoId,
-      head: '0'.repeat(40),
-      branch: 'refs/heads/main',
-      isBare: false,
-      isDetached: false,
-      isMain: true,
-      isCurrent: true,
-      locked: null,
-      prunable: null,
-      openElsewhere: false,
-    },
-    {
-      path: WORKTREE_PATH,
-      head: '1'.repeat(40),
-      branch: 'refs/heads/feature',
-      isBare: false,
-      isDetached: false,
-      isMain: false,
-      isCurrent: false,
-      locked: null,
-      prunable: null,
-      openElsewhere: false,
-    },
-  ],
+  worktrees: contract<{ worktrees: Record<string, unknown>[] }>(
+    'git-worktree',
+    'git:worktree.list#after-add',
+  ).worktrees.map((w, i) => ({
+    ...w,
+    path: i === 0 ? REPO.repoId : WORKTREE_PATH,
+    head: String(i).repeat(40),
+  })),
 };
 
 function treeRow(page: import('@playwright/test').Page, path: string) {
@@ -449,14 +432,13 @@ test('a repo workspace: the blame annotation stays off with no git record, and i
 // way the test above proves its guard — a resolvable trap, not an absent one. Both `repo.open` and
 // `blame.line` answer in each relaunch below; if `blameable` ever again omitted `rev === null`
 // (§2's fix), the revision-pinned half would call them too and the item would wrongly appear.
-test('a repo workspace: the status bar blame item follows the cursor, and never shows on a revision-pinned tab (P76)', async ({
+test('contract: a repo workspace: the status bar blame item follows the cursor, and never shows on a revision-pinned tab (P76)', async ({
   relaunch,
 }) => {
   const BLAME_RESULT = {
+    ...contract<{ author: string; summary: string }>('git-blame', 'git:blame.line#line-2'),
     sha: 'a'.repeat(40),
-    author: 'Ada Lovelace',
     authorTimeSeconds: 1_700_000_000,
-    summary: 'Fix the frobnicator',
   };
 
   {
@@ -481,8 +463,8 @@ test('a repo workspace: the status bar blame item follows the cursor, and never 
     await page.keyboard.press('ArrowDown');
 
     await expect(blameStatus).toBeVisible();
-    await expect(blameStatus).toContainText('Ada Lovelace');
-    await expect(blameStatus).toContainText('Fix the frobnicator');
+    await expect(blameStatus).toContainText(BLAME_RESULT.author);
+    await expect(blameStatus).toContainText(BLAME_RESULT.summary);
   }
 
   {
@@ -599,7 +581,7 @@ test('closing the active repo workspace from its row menu falls back to the empt
 // @click.stop, §8.1), and clicking a linked worktree switches to it — importing it as its own
 // code_repos row first, since this app has none for that root yet — the same premise
 // WorktreeList.vue's own switch rests on, not a second worktree-switching path (§5).
-test('a repo workspace: expanding a row lists its worktrees, and switching to one opens its own workspace', async ({
+test('contract: a repo workspace: expanding a row lists its worktrees, and switching to one opens its own workspace', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({
@@ -636,7 +618,7 @@ test('a repo workspace: expanding a row lists its worktrees, and switching to on
   const linkedRow = page.locator(
     `[data-testid="repo-worktree-row"][data-worktree-path="${WORKTREE_PATH}"]`,
   );
-  await expect(linkedRow).toContainText('feature');
+  await expect(linkedRow).toContainText('wt-branch');
 
   await linkedRow.click();
 

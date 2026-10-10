@@ -181,6 +181,7 @@ func TestWorktreeAddRemove(t *testing.T) {
 		t.Fatalf("git worktree list lacks %s", path)
 	}
 	list := call[gitrpc.WorktreeListResult](t, r.gs, "worktree.list", gitrpc.WorktreeListParams{RepoID: id})
+	r.app.Contract(t, "git-worktree", "git:worktree.list#after-add", list, flowharness.Mask("head"), flowharness.Replace(r.app.Work, "<work>"))
 	var listed *gitsession.WorktreeEntry
 	for i, w := range list.Worktrees {
 		if w.Path == path {

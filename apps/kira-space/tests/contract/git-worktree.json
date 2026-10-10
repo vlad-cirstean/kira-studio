@@ -1,0 +1,30 @@
+{
+  "git:worktree.list#after-add": {
+    "worktrees": [
+      {
+        "branch": "refs/heads/main",
+        "head": "<masked>",
+        "isBare": false,
+        "isCurrent": true,
+        "isDetached": false,
+        "isMain": true,
+        "locked": null,
+        "openElsewhere": false,
+        "path": "<work>/proj",
+        "prunable": null
+      },
+      {
+        "branch": "refs/heads/wt-branch",
+        "head": "<masked>",
+        "isBare": false,
+        "isCurrent": false,
+        "isDetached": false,
+        "isMain": false,
+        "locked": null,
+        "openElsewhere": false,
+        "path": "<work>/wt1",
+        "prunable": null
+      }
+    ]
+  }
+}
