@@ -9,7 +9,7 @@ export { default as Input } from '@theme/components/ui/input/Input.vue';
 // control-scale tokens, for a caller that renders inside 22px/28px chrome instead of shadcn's
 // stock 32px.
 export const inputVariants = cva(
-  'dark:bg-border-strong/30 border-border-strong focus-visible:border-focus aria-invalid:ring-error/20 dark:aria-invalid:ring-error/40 aria-invalid:border-error dark:aria-invalid:border-error/50 disabled:bg-border-strong/50 dark:disabled:bg-border-strong/80 rounded-kira border bg-transparent transition-colors text-kira-md file:h-6 file:text-kira-md file:font-medium aria-invalid:ring-3 w-full min-w-0 file:inline-flex file:border-0 file:bg-transparent file:text-fg placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+  'border-border-strong focus-visible:border-focus aria-invalid:ring-error/20 dark:aria-invalid:ring-error/40 aria-invalid:border-error dark:aria-invalid:border-error/50 disabled:bg-border-strong/50 dark:disabled:bg-border-strong/80 rounded-kira-sm border bg-field transition-colors text-kira-md file:h-6 file:text-kira-md file:font-medium aria-invalid:ring-3 w-full min-w-0 file:inline-flex file:border-0 file:bg-transparent file:text-fg placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
   {
     variants: {
       size: {
@@ -19,7 +19,7 @@ export const inputVariants = cva(
       },
     },
     defaultVariants: {
-      size: 'default',
+      size: 'kira-lg',
     },
   },
 );

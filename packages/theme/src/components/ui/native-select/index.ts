@@ -36,7 +36,7 @@ export const nativeSelectVariants = cva(
     },
     defaultVariants: {
       variant: 'bordered',
-      size: 'kira',
+      size: 'kira-lg',
     },
   },
 );

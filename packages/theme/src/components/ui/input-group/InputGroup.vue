@@ -12,7 +12,7 @@ const props = withDefaults(
     class?: HTMLAttributes['class']
     variant?: InputGroupBoxVariants['variant']
   }>(),
-  { variant: 'default' },
+  { variant: 'kira-lg' },
 )
 </script>
 

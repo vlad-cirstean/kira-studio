@@ -46,12 +46,14 @@ export const inputGroupVariants = cva('', {
   variants: {
     variant: {
       default:
-        'm-0 min-w-0 border-border-strong dark:bg-border-strong/30 has-[[data-slot=input-group-control]:focus-visible]:border-focus has-[[data-slot][aria-invalid=true]]:ring-error/20 has-[[data-slot][aria-invalid=true]]:border-error dark:has-[[data-slot][aria-invalid=true]]:ring-error/40 has-disabled:bg-border-strong/50 dark:has-disabled:bg-border-strong/80 h-8 rounded-kira border transition-colors has-disabled:opacity-50 has-[[data-slot=input-group-control]:focus-visible]:focus-ring has-[[data-slot][aria-invalid=true]]:ring-3 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 group/input-group relative flex w-full items-center p-0 outline-none has-[>textarea]:h-auto',
+        'm-0 min-w-0 border-border-strong bg-field has-[[data-slot=input-group-control]:focus-visible]:border-focus has-[[data-slot][aria-invalid=true]]:ring-error/20 has-[[data-slot][aria-invalid=true]]:border-error dark:has-[[data-slot][aria-invalid=true]]:ring-error/40 has-disabled:bg-border-strong/50 dark:has-disabled:bg-border-strong/80 h-8 rounded-kira border transition-colors has-disabled:opacity-50 has-[[data-slot=input-group-control]:focus-visible]:focus-ring has-[[data-slot][aria-invalid=true]]:ring-3 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 group/input-group relative flex w-full items-center p-0 outline-none has-[>textarea]:h-auto',
       kira: 'm-0 min-w-0 inline-flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-field px-2 py-0 text-fg font-data text-kira-md focus-within:border-focus focus-within:focus-ring aria-invalid:border-error',
+      'kira-lg':
+        'm-0 min-w-0 inline-flex items-center gap-1 h-control-lg rounded-kira-sm border border-border-strong bg-field px-2 py-0 text-fg font-data text-kira-md focus-within:border-focus focus-within:focus-ring aria-invalid:border-error',
     },
   },
   defaultVariants: {
-    variant: 'default',
+    variant: 'kira-lg',
   },
 });
 
