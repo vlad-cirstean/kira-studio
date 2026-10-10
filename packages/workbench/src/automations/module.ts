@@ -51,6 +51,24 @@ export interface ScriptRunsSeam {
   start(args: ScriptRunArgs, hash: string): Promise<ScriptRunStarted>;
   readLog(id: string, afterSeq: number): Promise<ScriptRunLogPage>;
   onLog(cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void): () => void;
+  /** Next fire instants (unix ms) of a cron in a timezone; rejects with the Go validation text. */
+  nextFires(cron: string, timezone: string, count?: number): Promise<number[]>;
+  /** The run a script's schedule would start; `secrets` fills secret params the schedule never stores. */
+  schedulePreview(scriptId: string, secrets: Record<string, string[]>): Promise<ScriptRunPreview>;
+  runScheduleNow(
+    scriptId: string,
+    hash: string,
+    secrets: Record<string, string[]>,
+  ): Promise<ScriptRunStarted>;
+  /** Starts a waiting scheduled run; `hash` is the schedule preview's. */
+  confirmAccept(
+    runId: string,
+    hash: string,
+    secrets: Record<string, string[]>,
+  ): Promise<ScriptRunStarted>;
+  confirmDecline(runId: string): Promise<void>;
+  /** Window key the confirm popup shows in; '' when none. */
+  mainWindow(): Promise<string>;
   /** Servers of the user's Claude config. */
   mcpServers(): Promise<ScriptMcpServer[]>;
   mcpTools(server: string): Promise<ScriptMcpTool[]>;

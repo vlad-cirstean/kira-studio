@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
 // Mirrors internal/runoutcome.Outcome.
-export const runStatusSchema = /*#__PURE__*/ z.enum(['done', 'failed', 'blocked', 'cancelled']);
+export const runStatusSchema = /*#__PURE__*/ z.enum([
+  'done',
+  'failed',
+  'blocked',
+  'cancelled',
+  'skipped',
+]);
 export type RunStatus = z.infer<typeof runStatusSchema>;
 
 export const runSourceSchema = /*#__PURE__*/ z.enum([
@@ -13,6 +19,7 @@ export const runSourceSchema = /*#__PURE__*/ z.enum([
   'restart',
   'verify',
   'budget',
+  'schedule',
 ]);
 export type RunSource = z.infer<typeof runSourceSchema>;
 

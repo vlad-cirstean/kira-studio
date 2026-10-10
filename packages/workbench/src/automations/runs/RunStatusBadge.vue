@@ -13,6 +13,8 @@ const VARIANT: Record<ScriptRunState, NonNullable<BadgeVariants['variant']>> = {
   failed: 'err',
   cancelled: 'default',
   blocked: 'warn',
+  waiting: 'warn',
+  skipped: 'default',
 };
 const variant = computed(() => VARIANT[props.state]);
 </script>

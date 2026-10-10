@@ -47,6 +47,14 @@ export function createAutomationsModule(): AutomationsModuleContext {
       start: (args, hash) => control.scriptRunsStart(args, hash),
       readLog: (id, afterSeq) => control.scriptRunsReadLog(id, afterSeq),
       onLog: (cb) => control.onScriptRunLog(cb),
+      nextFires: (cron, timezone, count) => control.scriptRunsNextFires(cron, timezone, count),
+      schedulePreview: (scriptId, secrets) => control.scriptRunsSchedulePreview(scriptId, secrets),
+      runScheduleNow: (scriptId, hash, secrets) =>
+        control.scriptRunsRunScheduleNow(scriptId, hash, secrets),
+      confirmAccept: (runId, hash, secrets) =>
+        control.scriptRunsConfirmAccept(runId, hash, secrets),
+      confirmDecline: (runId) => control.scriptRunsConfirmDecline(runId),
+      mainWindow: () => control.scriptRunsMainWindow(),
       mcpServers: () => control.scriptRunsMcpServers(),
       mcpTools: (server) => control.scriptRunsMcpTools(server),
     },

@@ -61,6 +61,23 @@ export const smartSettingsSchema = /*#__PURE__*/ z.object({
 });
 export type SmartSettings = z.infer<typeof smartSettingsSchema>;
 
+// Mirrors scripts.Schedule: makes a script recurring.
+export const scriptScheduleSchema = /*#__PURE__*/ z.object({
+  cron: z.string(),
+  timezone: z.string(),
+  enabled: z.boolean(),
+  // Ask before each run.
+  confirm: z.boolean(),
+  // A normal script's headless run limit; '' = the default.
+  timeout: z.string(),
+  // Fixed non-secret param values.
+  params: z.record(z.string(), z.array(z.string())),
+  // Kira Space: the ADE task and branch a run targets; '' for none.
+  taskId: z.string(),
+  branchId: z.string(),
+});
+export type ScriptSchedule = z.infer<typeof scriptScheduleSchema>;
+
 // customScriptFieldsSchema mirrors scripts.CustomScriptFields — what the Create/Update bound calls
 // accept. The Go check (scripts.CustomScriptFields.Validate) is the authority; this is
 // only the dialog's own affordance for disabling Add before a round trip.
@@ -72,6 +89,8 @@ export const customScriptFieldsSchema = /*#__PURE__*/ z.object({
   params: z.array(scriptParamSchema),
   // null for a normal script.
   smart: smartSettingsSchema.nullable(),
+  // null for a script that is not recurring.
+  schedule: scriptScheduleSchema.nullable(),
   dirMode: scriptDirModeSchema,
   // The picked folder when dirMode is 'fixed'; '' otherwise.
   workingDir: z.string(),

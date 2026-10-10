@@ -54,7 +54,7 @@ async function copyForAgent(): Promise<void> {
       </span>
     </template>
     <span v-if="copyError" class="text-error">{{ copyError }}</span>
-    <div v-if="run.state !== 'running'" class="flex gap-1">
+    <div v-if="run.state !== 'running' && run.state !== 'waiting'" class="flex gap-1">
       <Button variant="dialog" size="kira-lg" data-testid="run-copy" @click="copyForAgent">
         {{ copied ? 'Copied' : 'Copy for agent' }}
       </Button>

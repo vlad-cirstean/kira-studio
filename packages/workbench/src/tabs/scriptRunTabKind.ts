@@ -1,3 +1,4 @@
+import type { ScriptRunState } from '@shared/domain/scriptRuns';
 import {
   type ScriptRunTabState,
   scriptRunTabStateSchema,
@@ -15,7 +16,7 @@ export function scriptRunTabKind<
   Menu,
 >(
   mode: TabScope,
-  runState: (runId: string) => 'running' | 'done' | 'failed' | 'cancelled' | 'blocked' | undefined,
+  runState: (runId: string) => ScriptRunState | undefined,
 ): TabKindDef<K, R, Icon, Color, Menu> {
   type RunRecord = Extract<R, { kind: K }> & { state: ScriptRunTabState };
   type RunState = Extract<R, { kind: K }>['state'];
@@ -39,6 +40,8 @@ export function scriptRunTabKind<
           return { icon: 'error', tooltip: 'Failed' };
         case 'blocked':
           return { icon: 'warning', tooltip: 'Needs you' };
+        case 'waiting':
+          return { icon: 'bell', tooltip: 'Waiting for you' };
         default:
           return null;
       }

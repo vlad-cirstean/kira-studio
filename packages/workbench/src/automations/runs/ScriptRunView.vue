@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useMutation } from '@tanstack/vue-query';
 import { Button } from '@theme/components/ui/button';
+import { queryClient } from '@workbench/state/queryClient';
 import { computed, onMounted, ref } from 'vue';
 import { useAutomationsModule } from '../module';
 import { useRerun } from '../runScript';
+import { useScheduleConfirmStore } from '../schedule/confirmDialog';
 import SmartBadge from '../smart/SmartBadge.vue';
 import RunElapsed from './RunElapsed.vue';
 import RunLog from './RunLog.vue';
@@ -15,12 +18,19 @@ const props = defineProps<{ tab: { id: string; state: { runId: string; label?: s
 const ctx = useAutomationsModule();
 const { run, query } = useScriptRun(() => props.tab.state.runId);
 const stop = useStopScriptRun();
+const decline = useMutation(
+  { mutationKey: ['scriptRuns', 'decline'], mutationFn: (id: string) => ctx.runs.confirmDecline(id) },
+  queryClient,
+);
 const rerunRun = useRerun();
 const error = ref<string | null>(null);
 const { markSeen } = useSeenRuns();
 onMounted(() => markSeen(props.tab.state.runId));
 
-const ended = computed(() => run.value !== null && run.value.state !== 'running');
+const confirmStore = useScheduleConfirmStore();
+const isSmart = computed(() => run.value?.kind === 'smart');
+const live = computed(() => run.value?.state === 'running' || run.value?.state === 'waiting');
+const ended = computed(() => run.value !== null && !live.value);
 const canContinue = computed(
   () =>
     run.value !== null &&
@@ -58,11 +68,30 @@ async function rerun(): Promise<void> {
     </div>
     <template v-else>
       <div class="flex items-center gap-2" data-testid="script-run-header">
-        <SmartBadge />
+        <SmartBadge v-if="isSmart" />
         <span class="min-w-0 truncate font-semibold">{{ run.scriptName }}</span>
         <RunStatusBadge :state="run.state" />
         <RunElapsed :run="run" class="text-kira-sm text-muted-foreground" />
-        <span class="font-data text-kira-sm text-muted-foreground">{{ run.model }}</span>
+        <span v-if="isSmart" class="font-data text-kira-sm text-muted-foreground">{{ run.model }}</span>
+        <Button
+          v-if="run.state === 'waiting'"
+          variant="dialog-primary"
+          size="kira-lg"
+          class="ml-auto"
+          data-testid="run-review"
+          @click="confirmStore.openRun(run)"
+        >
+          Review and run
+        </Button>
+        <Button
+          v-if="run.state === 'waiting'"
+          variant="dialog"
+          size="kira-lg"
+          data-testid="run-decline"
+          @click="decline.mutate(run.id)"
+        >
+          Decline
+        </Button>
         <Button
           v-if="run.state === 'running'"
           variant="dialog"
@@ -88,11 +117,14 @@ async function rerun(): Promise<void> {
         </Button>
         <span v-if="error" class="text-kira-sm text-error">{{ error }}</span>
       </div>
-      <details class="text-kira-sm" data-testid="script-run-prompt">
+      <div v-if="!isSmart" class="font-data text-kira-sm whitespace-pre-wrap break-words" data-testid="script-run-command">
+        {{ run.command }}
+      </div>
+      <details v-if="isSmart" class="text-kira-sm" data-testid="script-run-prompt">
         <summary class="cursor-default text-muted-foreground">Prompt sent</summary>
         <pre class="mt-1 whitespace-pre-wrap break-words font-data">{{ run.prompt }}</pre>
       </details>
-      <RunLog :run-id="run.id" />
+      <RunLog v-if="run.state !== 'waiting' && run.state !== 'skipped'" :run-id="run.id" />
     </template>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useEventListener } from '@vueuse/core';
 import RunScriptDialogHost from '@workbench/automations/run/RunScriptDialogHost.vue';
+import ScheduleConfirmHost from '@workbench/automations/schedule/ScheduleConfirmHost.vue';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import WorkbenchShellBase from '@workbench/components/WorkbenchShell.vue';
@@ -85,6 +86,7 @@ const fullView = computed(() => (def.value.layout === 'full' ? def.value.view : 
     <template #status>
       <StatusBar />
       <RunScriptDialogHost />
+      <ScheduleConfirmHost />
     </template>
   </WorkbenchShellBase>
 </template>

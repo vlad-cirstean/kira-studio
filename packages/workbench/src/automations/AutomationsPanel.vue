@@ -20,7 +20,9 @@ import RunElapsed from './runs/RunElapsed.vue';
 import RunsSection from './runs/RunsSection.vue';
 import { useScriptRuns } from './runs/runsQueries';
 import ScriptDialog from './ScriptDialog.vue';
-import { useRemoveScript } from './scriptActions';
+import { useScheduleConfirmStore } from './schedule/confirmDialog';
+import ScriptScheduleLine from './schedule/ScriptScheduleLine.vue';
+import { toggleSchedule, useRemoveScript } from './scriptActions';
 import SmartBadge from './smart/SmartBadge.vue';
 
 const contextMenuStore = useContextMenuStore();
@@ -39,6 +41,7 @@ const editor = ref<{
   script: CustomScript | null;
   kind: ScriptKind;
   collectionId: string | null;
+  schedule?: boolean;
 } | null>(null);
 
 const search = ref('');
@@ -182,6 +185,32 @@ function newScriptItems(collectionId: string | null): MenuItem[] {
         editor.value = { script: null, kind: 'smart', collectionId };
       },
     },
+    {
+      type: 'submenu',
+      id: 'new-recurring',
+      label: 'New recurring script',
+      icon: 'watch',
+      items: [
+        {
+          type: 'item',
+          id: 'new-recurring-script',
+          label: 'Script',
+          icon: 'add',
+          run: () => {
+            editor.value = { script: null, kind: 'script', collectionId, schedule: true };
+          },
+        },
+        {
+          type: 'item',
+          id: 'new-recurring-smart-script',
+          label: 'Smart script',
+          icon: 'sparkle',
+          run: () => {
+            editor.value = { script: null, kind: 'smart', collectionId, schedule: true };
+          },
+        },
+      ],
+    },
   ];
 }
 
@@ -196,6 +225,7 @@ function firstLine(command: string): string {
   return rest.length > 0 ? `${first}…` : first;
 }
 
+const confirmStore = useScheduleConfirmStore();
 const startScript = useRunScript();
 async function runScript(script: CustomScript): Promise<void> {
   actionError.value = await startScript(script);
@@ -229,6 +259,24 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       icon: 'play',
       run: () => runScript(script),
     },
+    ...(script.schedule
+      ? ([
+          {
+            type: 'item',
+            id: 'run-now',
+            label: 'Run now',
+            icon: 'debug-start',
+            run: () => confirmStore.openNow(script.id),
+          },
+          {
+            type: 'item',
+            id: 'toggle-schedule',
+            label: script.schedule.enabled ? 'Turn schedule off' : 'Turn schedule on',
+            icon: 'watch',
+            run: () => guarded(() => toggleSchedule(scripts, script)),
+          },
+        ] satisfies MenuItem[])
+      : []),
     {
       type: 'item',
       id: 'edit',
@@ -367,6 +415,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
                   </span>
                   <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
+                  <ScriptScheduleLine v-if="script.schedule" :script="script" />
                 </div>
                 <RunElapsed
                   v-if="liveRunByScript.get(script.id)"
@@ -430,6 +479,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
                   </span>
                     <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ firstLine(script.command) }}</span>
+                  <ScriptScheduleLine v-if="script.schedule" :script="script" />
                   </div>
                   <RunElapsed
                     v-if="liveRunByScript.get(script.id)"
@@ -465,6 +515,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
         :choose-folder="ctx.chooseFolder"
         :resolve-dir="ctx.runs.resolveDir"
         :ade="ctx.ade"
+        :schedule="editor.schedule"
         @close="editor = null"
       />
     </div>

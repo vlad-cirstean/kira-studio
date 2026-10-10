@@ -30,7 +30,8 @@ const rows = computed(() => {
 });
 
 function toggle(run: ScriptRun): void {
-  if (run.kind === 'smart') {
+  // A run without a terminal (smart or headless) lives in its own tab; a skipped one only has a reason.
+  if (run.state !== 'skipped' && (run.kind === 'smart' || run.terminalId === '')) {
     ctx.openRunTab(run.id, run.scriptName);
     return;
   }
@@ -80,6 +81,9 @@ function toggle(run: ScriptRun): void {
               {{ run.scriptName }}
               <span v-if="run.trigger === 'ade'" class="text-muted-foreground" data-testid="run-trigger">
                 · ADE · {{ run.taskTitle }}
+              </span>
+              <span v-else-if="run.trigger === 'scheduled'" class="text-muted-foreground" data-testid="run-trigger">
+                · scheduled
               </span>
             </span>
             <RunElapsed :run="run" class="text-kira-sm text-muted-foreground" />

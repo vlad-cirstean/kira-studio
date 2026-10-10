@@ -6,6 +6,8 @@ const STATE_LABEL: Record<ScriptRun['state'], string> = {
   failed: 'Failed',
   cancelled: 'Cancelled',
   blocked: 'Needs you',
+  waiting: 'Waiting for you',
+  skipped: 'Skipped',
 };
 
 export function stateLabel(state: ScriptRun['state']): string {

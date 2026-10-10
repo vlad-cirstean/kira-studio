@@ -390,9 +390,13 @@ const studioControl = {
   onScriptRunsChanged: (cb: (run: ScriptRun) => void): (() => void) =>
     on(CHANNEL.scriptRunsChanged, (r) => cb(trust<ScriptRun>(r))),
   scriptRunsPreview: (args: ScriptRunArgs): Promise<ScriptRunPreview> =>
-    unwrap(ScriptRunsService.Preview(args)).then((r) => trust<ScriptRunPreview>(r)),
+    unwrap(ScriptRunsService.Preview({ ...args, listTasks: args.listTasks ?? false })).then((r) =>
+      trust<ScriptRunPreview>(r),
+    ),
   scriptRunsStart: (args: ScriptRunArgs, hash: string): Promise<ScriptRunStarted> =>
-    unwrap(ScriptRunsService.Start({ ...args, hash })).then((r) => trust<ScriptRunStarted>(r)),
+    unwrap(ScriptRunsService.Start({ ...args, listTasks: args.listTasks ?? false, hash })).then(
+      (r) => trust<ScriptRunStarted>(r),
+    ),
   scriptRunsReadLog: (id: string, afterSeq: number): Promise<ScriptRunLogPage> =>
     unwrap(ScriptRunsService.ReadLog({ id, afterSeq })).then((r) => {
       const page = trust<Partial<ScriptRunLogPage>>(r);
@@ -402,6 +406,36 @@ const studioControl = {
     cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void,
   ): (() => void) =>
     on(CHANNEL.scriptRunLog, (r) => cb(trust<{ runId: string; chunks: ScriptRunLogChunk[] }>(r))),
+  scriptRunsNextFires: (cron: string, timezone: string, count?: number): Promise<number[]> =>
+    unwrap(ScriptRunsService.NextFires({ cron, timezone, count: count ?? 0 })).then((r) =>
+      trust<number[]>(r ?? []),
+    ),
+  scriptRunsSchedulePreview: (
+    scriptId: string,
+    secrets: Record<string, string[]>,
+  ): Promise<ScriptRunPreview> =>
+    unwrap(ScriptRunsService.SchedulePreview({ scriptId, secrets })).then((r) =>
+      trust<ScriptRunPreview>(r),
+    ),
+  scriptRunsRunScheduleNow: (
+    scriptId: string,
+    hash: string,
+    secrets: Record<string, string[]>,
+  ): Promise<ScriptRunStarted> =>
+    unwrap(ScriptRunsService.RunScheduleNow({ scriptId, hash, secrets })).then((r) =>
+      trust<ScriptRunStarted>(r),
+    ),
+  scriptRunsConfirmAccept: (
+    runId: string,
+    hash: string,
+    secrets: Record<string, string[]>,
+  ): Promise<ScriptRunStarted> =>
+    unwrap(ScriptRunsService.ConfirmAccept({ runId, hash, secrets })).then((r) =>
+      trust<ScriptRunStarted>(r),
+    ),
+  scriptRunsConfirmDecline: (runId: string): Promise<void> =>
+    unwrap(ScriptRunsService.ConfirmDecline({ id: runId })),
+  scriptRunsMainWindow: (): Promise<string> => unwrap(ScriptRunsService.MainWindow()),
   scriptRunsMcpServers: (): Promise<ScriptMcpServer[]> =>
     unwrap(ScriptRunsService.McpServers()).then((r) => trust<ScriptMcpServer[]>(r ?? [])),
   scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>

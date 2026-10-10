@@ -9,6 +9,8 @@ export const scriptRunStateSchema = /*#__PURE__*/ z.enum([
   'failed',
   'cancelled',
   'blocked',
+  'waiting',
+  'skipped',
 ]);
 export type ScriptRunState = z.infer<typeof scriptRunStateSchema>;
 
@@ -146,6 +148,8 @@ export interface ScriptRunArgs {
   // Kira Space: the ADE task and branch to run for; '' when none is chosen.
   taskId: string;
   branchId: string;
+  // Fills `needs.tasks` even when no ADE variable is used (the schedule's task picker).
+  listTasks?: boolean;
 }
 
 export const scriptRunStartedSchema = /*#__PURE__*/ z.object({

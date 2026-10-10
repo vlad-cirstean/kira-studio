@@ -6,6 +6,7 @@ import type {
   ScriptDirMode,
   ScriptKind,
   ScriptParam,
+  ScriptSchedule,
   SmartSettings,
 } from '@shared/domain/scripts';
 import { useQuery } from '@tanstack/vue-query';
@@ -34,6 +35,8 @@ import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref, toRaw, useTemplateRef } from 'vue';
 import type { ScriptsSeam } from './module';
 import ParamsEditor from './ParamsEditor.vue';
+import ScheduleFields from './schedule/ScheduleFields.vue';
+import { newSchedule } from './schedule/scheduleText';
 import McpToolsField from './smart/McpToolsField.vue';
 import SmartBadge from './smart/SmartBadge.vue';
 import SmartSettingsFields from './smart/SmartSettingsFields.vue';
@@ -53,6 +56,8 @@ const props = defineProps<{
   resolveDir: (scriptId: string) => Promise<ScriptDir>;
   /** Kira Space: offers the task-worktree switch. */
   ade?: boolean;
+  /** A new script starts recurring (`New recurring script`). */
+  schedule?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -69,6 +74,17 @@ const params = ref<ScriptParam[]>(structuredClone(toRaw(props.script?.params ?? 
 const smart = ref<SmartSettings>(
   structuredClone(toRaw(props.script?.smart ?? defaultSmart())),
 );
+// null: not recurring. Turning the switch off keeps the edits until Save.
+const schedule = ref<ScriptSchedule | null>(
+  structuredClone(toRaw(props.script?.schedule ?? (props.schedule ? newSchedule() : null))),
+);
+const scheduleOn = computed({
+  get: () => schedule.value !== null,
+  set: (on: boolean) => {
+    if (!on) schedule.value = null;
+    else schedule.value ??= newSchedule();
+  },
+});
 const usedVars = computed(() => (isSmart ? varsUsed(command.value) : []));
 const usesParts = computed<TextPart[]>(() => {
   const parts: TextPart[] = ['Uses: '];
@@ -112,7 +128,8 @@ const canSave = computed(
   () =>
     name.value.trim() !== '' &&
     command.value.trim() !== '' &&
-    (dirMode.value !== 'fixed' || workingDir.value.trim() !== ''),
+    (dirMode.value !== 'fixed' || workingDir.value.trim() !== '') &&
+    (schedule.value === null || schedule.value.cron.trim() !== ''),
 );
 
 async function chooseWorkingDir(): Promise<void> {
@@ -137,6 +154,7 @@ async function save(): Promise<void> {
     kind,
     params: params.value,
     smart: isSmart ? smart.value : null,
+    schedule: schedule.value,
     dirMode: dirMode.value,
     workingDir: dirMode.value === 'fixed' ? workingDir.value.trim() : '',
     color: color.value,
@@ -273,6 +291,18 @@ function onOpenAutoFocus(e: Event): void {
           <Switch id="script-use-ade-dir" v-model="useAdeDir" data-testid="script-use-ade-dir" />
           <Label for="script-use-ade-dir">Run in the task's worktree when started from ADE</Label>
         </Field>
+
+        <Field orientation="horizontal">
+          <Switch id="script-schedule" v-model="scheduleOn" data-testid="script-schedule" />
+          <Label for="script-schedule">Run on a schedule</Label>
+        </Field>
+        <ScheduleFields
+          v-if="schedule"
+          v-model="schedule"
+          :script-id="script?.id ?? null"
+          :kind="kind"
+          :params="params"
+        />
 
         <div class="flex items-end gap-3">
           <Field class="flex-1 min-w-0">
