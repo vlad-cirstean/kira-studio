@@ -105,3 +105,11 @@ apps/kira-studio/frontend/src/api/EnvironmentsView.vue
 apps/kira-studio/frontend/src/views/httprequest/CookiesPane.vue
 apps/kira-studio/frontend/src/views/shared/ResponseFindBar.vue
 apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue
+apps/kira-studio/frontend/src/api/CollectionRow.vue
+apps/kira-studio/frontend/src/api/CollectionsTree.vue
+apps/kira-studio/frontend/src/project/ProjectTree.vue
+apps/kira-studio/frontend/src/project/TreeRow.vue
+packages/docker-ui/src/components/ImageList.vue
+packages/docker-ui/src/components/NetworkList.vue
+packages/docker-ui/src/components/VirtualList.vue
+packages/docker-ui/src/components/VolumeList.vue

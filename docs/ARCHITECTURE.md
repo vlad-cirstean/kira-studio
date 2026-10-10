@@ -1323,7 +1323,8 @@ buttons right: dismiss, then primary). Secondary tabs and segmented pickers are 
 all `rounded-kira-sm bg-field`. Buttons use `dialog*`/`toolbar*` variants with `kira*` sizes;
 weights are 400/500 (`font-semibold` only in `PanelHeader`); icon sizes 12, 13, 16, 24. Panel
 bars use `PanelHeader`/`ViewToolbar`, section headings `SectionHeading`. `scripts/check-ui-primitives.sh`
-(part of `bun run lint`) enforces this; files not yet migrated sit in
+(part of `bun run lint`) enforces this; side panels (`scripts/ui-primitives-side-panels.txt`) use
+`PanelHeader`, `PanelBar`, `SectionHeading`, `rowVariants`/`rowIndent` and `useRowHeight`; files not yet migrated sit in
 `scripts/ui-primitives-allowlist/`. Full rules: `docs/v2.2/plans/P262-ui-unification.md` §2.
 
 **A view is chosen by page kind, never by database type.** `Page` is a discriminated union

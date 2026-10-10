@@ -26,6 +26,7 @@ fi
 
 DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src packages/kira-ui/src"
 ALLOW_DIR=scripts/ui-primitives-allowlist
+SIDE_PANELS=scripts/ui-primitives-side-panels.txt
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -35,7 +36,7 @@ trap 'rm -rf "$TMP"' EXIT
 PRE='(?(DEFINE)(?<t>(?:"[^"]*"|'"'"'[^'"'"']*'"'"'|[^>"'"'"'])*))'
 TOK='(?<![\w-])'
 
-# id@@files(v=.vue, vt=.vue+.ts)@@built-in exempt path substrings (|)@@message@@regex
+# id@@files(v=.vue, vt=.vue+.ts, s=.vue+.ts in SIDE_PANELS only)@@built-in exempt path substrings (|)@@message@@regex
 cat >"$TMP/guards" <<GUARDS
 U1@@v@@@@<DialogContent without size=@@<DialogContent\b(?!(?&t)\bsize=)
 U2@@v@@@@<DialogContent class sets width, height, padding or gap (size= owns them)@@<DialogContent\b(?&t)\bclass="[^"]*${TOK}(?:w|h|max-w|max-h|min-w|min-h|p|gap)-
@@ -54,6 +55,10 @@ U14@@v@@@@EmptyMedia variant="icon", or Alert faking an empty state@@<EmptyMedia
 U15@@v@@@@PopoverContent width outside w-56/w-80/w-96/w-120/w-auto@@<PopoverContent\b(?&t)\s:?class="[^"]*${TOK}w-(?!(?:56|80|96|120|auto)(?![\w.\[(-]))
 U16@@v@@@@DialogClose wrapping an icon-sm Button (use DialogHeader closable)@@<DialogClose\b(?&t)>\s*<Button\b(?&t)\ssize="icon-sm"
 U17@@v@@@@search/filter text box outside SearchField (use <SearchField>)@@<(?:Input|InputGroupInput|input)\\b(?&t)\\s:?placeholder="[^"]*(?:[Ss]earch|[Ff]ilter|[Ff]ind)|<InputGroupAddon\\b(?&t)>\\s*<CodiconIcon\\b(?&t)\\sname="search"
+U18@@s@@@@hand-rolled row state (use rowVariants selected/muted)@@${TOK}(?:hover:)?bg-(?:select|hover)(?![\w-])
+U19@@s@@@@hand-rolled indent or row height (use rowIndent, useRowHeight, rowVariants)@@depth\s*\*\s*\d+|rowDensity\s*===|(?:ROW_HEIGHT|rowHeight)\s*[:=]\s*\d+|${TOK}(?:h-5\.5|min-h-9)(?![\w-])
+U20@@s@@@@hand-rolled panel chrome (use Empty class="h-full", PanelBar)@@side-empty|<Empty\b(?&t)\sclass="[^"]*${TOK}(?:p|px|py)-|shrink-0 border-b border-border px-1\.5 py-1
+U21@@s@@PanelHeader.vue@@hand-rolled uppercase heading (use PanelHeader/SectionHeading)@@${TOK}uppercase(?![\w-])
 GUARDS
 
 # hits: "U<n> path"
@@ -65,9 +70,14 @@ while IFS= read -r line; do
   rest=${rest#*@@}
   regex=$rest
   if [ "$kinds" = vt ]; then inc="--include=*.vue --include=*.ts"; else inc="--include=*.vue"; fi
+  scan=$DIRS; flag=-r
+  if [ "$kinds" = s ]; then
+    inc=""; flag=""
+    scan=$(grep -v '^[[:space:]]*\(#\|$\)' "$SIDE_PANELS")
+  fi
   set +e
   # shellcheck disable=SC2086
-  "$GNU_GREP" -rPzl $inc -e "$PRE$regex" $DIRS >"$TMP/out" 2>"$TMP/err"
+  "$GNU_GREP" $flag -Pzl $inc -e "$PRE$regex" $scan >"$TMP/out" 2>"$TMP/err"
   rc=$?
   set -e
   if [ "$rc" -gt 1 ]; then
