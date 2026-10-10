@@ -119,7 +119,7 @@ async function openPanel(page: Page): Promise<void> {
   await expect(page.locator('[data-testid="automations-panel"]')).toBeVisible();
 }
 
-test('New recurring script opens the editor with the schedule on', async ({ relaunch }) => {
+test('the Schedule tab of a new script turns the schedule on', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({
     control: [
       ...BASE.filter((s) => s.channel !== IPC.customScriptsList),
@@ -129,13 +129,14 @@ test('New recurring script opens the editor with the schedule on', async ({ rela
   });
   await openPanel(page);
   await page.locator('[data-testid="automations-add"]').click();
-  await page.locator('[data-testid="menu-item-new-recurring"]').hover();
-  await page.locator('[data-testid="menu-item-new-recurring-script"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
 
+  await dialog(page).locator('[data-testid="script-dialog-tab-schedule"]').click();
   await expect(dialog(page).locator('[data-testid="script-schedule"]')).toHaveAttribute(
     'aria-checked',
-    'true',
+    'false',
   );
+  await dialog(page).locator('[data-testid="script-schedule"]').click();
   const fields = dialog(page).locator('[data-testid="schedule-fields"]');
   await fields.locator('[data-testid="schedule-preset"]').selectOption('0 9 * * 1-5');
   await expect(fields.locator('[data-testid="schedule-cron"]')).toHaveValue('0 9 * * 1-5');
@@ -149,6 +150,7 @@ test('New recurring script opens the editor with the schedule on', async ({ rela
   );
   await expect(fields.locator('[data-testid="schedule-where"]')).toHaveCount(0);
 
+  await dialog(page).locator('[data-testid="script-dialog-tab-script"]').click();
   await dialog(page).locator('[data-testid="script-dialog-name"]').fill('Nightly build');
   await dialog(page).locator('[data-testid="script-dialog-command"]').fill('make build');
   await dialog(page).locator('[data-testid="script-dialog-save"]').click();
@@ -210,7 +212,7 @@ test('Run without asking is locked while the script has a secret param', async (
   );
 });
 
-test('a recurring row shows the clock and next fire; the menu turns the schedule off', async ({
+test('a recurring row shows the clock and next fire; Edit schedule opens the Schedule tab and pauses it', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({
@@ -222,7 +224,10 @@ test('a recurring row shows the clock and next fire; the menu turns the schedule
   await expect(row.locator('[data-testid="script-next"]')).toContainText('next');
 
   await row.click({ button: 'right' });
-  await page.locator('[data-testid="menu-item-toggle-schedule"]').click();
+  await page.locator('[data-testid="menu-item-edit-schedule"]').click();
+  await expect(dialog(page).locator('[data-testid="schedule-fields"]')).toBeVisible();
+  await dialog(page).locator('[data-testid="schedule-enabled"]').click();
+  await dialog(page).locator('[data-testid="script-dialog-save"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.customScriptsUpdate)?.args)
     .toMatchObject({ id: SCRIPT.id, fields: { schedule: { enabled: false } } });

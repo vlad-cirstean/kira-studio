@@ -9,11 +9,12 @@ import { expect, test } from './fixtures';
 async function addRecurring(page: Page, name: string): Promise<void> {
   await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
   await page.locator('[data-testid="automations-add"]').click();
-  await page.locator('[data-testid="menu-item-new-recurring"]').hover();
-  await page.locator('[data-testid="menu-item-new-recurring-script"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
   const dialog = page.locator('[data-testid="script-dialog"]');
   await dialog.locator('[data-testid="script-dialog-name"]').fill(name);
   await dialog.locator('[data-testid="script-dialog-command"]').fill('echo prompt-routing');
+  await dialog.locator('[data-testid="script-dialog-tab-schedule"]').click();
+  await dialog.locator('[data-testid="script-schedule"]').click();
   await dialog.locator('[data-testid="schedule-cron"]').fill('* * * * *');
   await expect(dialog.locator('[data-testid="schedule-next"]')).toContainText('Next:');
   await dialog.locator('[data-testid="script-dialog-save"]').click();

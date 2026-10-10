@@ -210,12 +210,14 @@ test('New smart script: tools, Bash patterns, MCP and params in the editor', asy
     'mcp__fake__echo',
   );
 
+  await dialog.locator('[data-testid="script-dialog-tab-params"]').click();
   await dialog.locator('[data-testid="param-add"]').click();
   await dialog.locator('[data-testid="param-name-0"]').fill('topic');
   await dialog.locator('[data-testid="param-type-0"]').selectOption('select');
   await dialog.locator('[data-testid="param-option-add-0"]').click();
   await dialog.locator('[data-testid="param-option-0-0"]').fill('dev');
 
+  await dialog.locator('[data-testid="script-dialog-tab-script"]').click();
   await dialog.locator('[data-testid="script-dialog-name"]').fill('Ask Claude');
   await dialog.locator('[data-testid="script-dialog-command"]').fill('Look at {topic}');
   await expect(
