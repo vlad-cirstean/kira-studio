@@ -1,4 +1,5 @@
 <script setup lang="ts" generic="T extends Record<string, Record<string, unknown>>">
+import { rowVariants } from '@theme/components/rowVariants';
 import {
   Dialog,
   DialogBody,
@@ -192,8 +193,8 @@ async function onSave(): Promise<void> {
             v-for="section in sections"
             :key="section"
             type="button"
-            class="text-left rounded-kira-sm border-none cursor-pointer h-control-lg px-2 text-kira-md"
-            :class="activeSection === section ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground hover:bg-hover'"
+            class="text-left border-none cursor-pointer"
+            :class="rowVariants({ layout: 'nav', selected: activeSection === section })"
             :aria-current="activeSection === section ? 'page' : undefined"
             :data-testid="`settings-section-${section}`"
             @click="activeSection = section"

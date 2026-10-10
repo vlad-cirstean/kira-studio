@@ -16,7 +16,7 @@ import { computed, useTemplateRef } from 'vue';
 // this component has no single root element to inherit onto.
 defineOptions({ inheritAttrs: false });
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     icon: string;
     label: string;
@@ -25,6 +25,7 @@ withDefaults(
     disabledTrigger?: boolean;
     variant?: ButtonVariants['variant'];
     size?: ButtonVariants['size'];
+    pressed?: boolean;
   }>(),
   {
     ariaLabel: undefined,
@@ -32,8 +33,11 @@ withDefaults(
     disabledTrigger: false,
     variant: 'toolbar',
     size: 'kira-icon',
+    pressed: undefined,
   },
 );
+
+const pressedClass = computed(() => (props.pressed ? 'bg-field text-fg' : undefined));
 
 // fix: a handful of call sites (TimestampPane.vue's calendar trigger, FilterToolbar.vue's history
 // trigger, StreamView.vue's ×3, DocumentView.vue's ×2) put `ref="x"` on this component expecting
@@ -50,11 +54,11 @@ defineExpose({ $el: computed(() => buttonRef.value?.$el) });
   <Tooltip>
     <TooltipTrigger as-child>
       <TooltipDisabledTrigger v-if="disabledTrigger" :disabled="$attrs.disabled !== undefined && $attrs.disabled !== false">
-        <Button ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" v-bind="$attrs">
+        <Button ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" :aria-pressed="pressed" :class="pressedClass" v-bind="$attrs">
           <CodiconIcon :name="icon" :size="iconSize" />
         </Button>
       </TooltipDisabledTrigger>
-      <Button v-else ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" v-bind="$attrs">
+      <Button v-else ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" :aria-pressed="pressed" :class="pressedClass" v-bind="$attrs">
         <CodiconIcon :name="icon" :size="iconSize" />
       </Button>
     </TooltipTrigger>
