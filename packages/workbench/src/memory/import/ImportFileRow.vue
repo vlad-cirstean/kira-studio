@@ -46,8 +46,8 @@ const variant = computed(() => {
     </button>
     <Button
       v-if="file.state === 'failed'"
-      size="xs"
-      variant="outline"
+      size="kira"
+      variant="toolbar"
       :data-testid="`import-retry-file-${file.relPath}`"
       @click="emit('retry')"
     >

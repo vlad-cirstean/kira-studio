@@ -40,7 +40,7 @@ function open(): void {
         {{ job.state === 'paused' ? 'Import paused' : job.state === 'running' ? 'Importing' : 'Import ready' }}:
         {{ jobTitle(job) }} · {{ job.progress.filesDone }} / {{ job.progress.filesTotal }} files
       </span>
-      <Button size="xs" variant="outline" data-testid="memory-import-open" @click="open">View</Button>
+      <Button variant="toolbar" size="kira" data-testid="memory-import-open" @click="open">View</Button>
     </div>
     <Progress v-if="job.state === 'running'" :model-value="percent" />
   </div>

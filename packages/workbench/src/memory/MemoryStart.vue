@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
-import { Empty, EmptyDescription, EmptyTitle } from '@theme/components/ui/empty';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import ImportView from './import/ImportView.vue';
@@ -33,9 +33,11 @@ function when(iso: string): string {
     <Alert v-if="history.isError.value" variant="destructive" class="m-3 w-auto">
       <AlertDescription>{{ history.error.value?.message }}</AlertDescription>
     </Alert>
-    <Empty v-else-if="!selectedId" class="p-6" data-testid="memory-detail-empty">
-      <EmptyTitle class="text-kira-md font-normal text-muted-foreground">Search or add a memory</EmptyTitle>
-      <EmptyDescription>Select a result to see its reason and history.</EmptyDescription>
+    <Empty v-else-if="!selectedId" class="h-full" data-testid="memory-detail-empty">
+      <EmptyHeader>
+        <EmptyTitle>Search or add a memory</EmptyTitle>
+        <EmptyDescription>Select a result to see its reason and history.</EmptyDescription>
+      </EmptyHeader>
     </Empty>
     <div v-else-if="selected" class="flex flex-col gap-3 p-4" data-testid="memory-detail">
       <div class="flex flex-col gap-1.5">
@@ -46,14 +48,14 @@ function when(iso: string): string {
         </div>
         <p class="m-0 text-kira-md whitespace-pre-wrap" data-testid="memory-detail-fact">{{ selected.fact }}</p>
         <p class="m-0 text-kira-md text-muted-foreground whitespace-pre-wrap">
-          <span class="font-semibold">Reason: </span>{{ selected.reason }}
+          <span class="font-medium">Reason: </span>{{ selected.reason }}
         </p>
         <div v-if="selected.keywords.length" class="flex flex-wrap gap-1">
           <Badge v-for="k in selected.keywords" :key="k">{{ k }}</Badge>
         </div>
       </div>
       <div v-if="trail.length > 1" class="flex flex-col gap-1.5" data-testid="memory-trail">
-        <span class="text-kira-sm font-semibold uppercase tracking-wider text-muted-foreground">Versions</span>
+        <span class="text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">Versions</span>
         <div
           v-for="version in trail"
           :key="version.id"

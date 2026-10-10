@@ -56,23 +56,23 @@ async function discard(): Promise<void> {
   <div v-if="job" class="flex h-full min-h-0 flex-col" data-testid="import-job" :data-state="job.state">
     <div class="flex shrink-0 flex-col gap-1.5 border-b border-border p-3">
       <div class="flex items-center gap-1.5">
-        <span class="min-w-0 flex-1 truncate text-kira-md font-semibold" :title="job.roots.join(', ')">{{ jobTitle(job) }}</span>
+        <span class="min-w-0 flex-1 truncate text-kira-md font-medium" :title="job.roots.join(', ')">{{ jobTitle(job) }}</span>
         <span class="text-kira-sm uppercase tracking-wider text-muted-foreground" data-testid="import-job-state">{{ job.state }}</span>
-        <Button v-if="job.state === 'awaiting'" size="xs" variant="outline" data-testid="import-start" @click="run('start')">Start</Button>
-        <Button v-if="job.state === 'running'" size="xs" variant="outline" data-testid="import-pause" @click="run('pause')">Pause</Button>
-        <Button v-if="job.state === 'paused'" size="xs" variant="outline" data-testid="import-resume" @click="run('resume')">Resume</Button>
-        <Button v-if="job.state === 'running' || job.state === 'paused'" size="xs" variant="outline" data-testid="import-cancel" @click="run('cancel')">Cancel</Button>
+        <Button v-if="job.state === 'awaiting'" variant="toolbar" size="kira" data-testid="import-start" @click="run('start')">Start</Button>
+        <Button v-if="job.state === 'running'" variant="toolbar" size="kira" data-testid="import-pause" @click="run('pause')">Pause</Button>
+        <Button v-if="job.state === 'paused'" variant="toolbar" size="kira" data-testid="import-resume" @click="run('resume')">Resume</Button>
+        <Button v-if="job.state === 'running' || job.state === 'paused'" variant="toolbar" size="kira" data-testid="import-cancel" @click="run('cancel')">Cancel</Button>
         <Button
           v-if="job.totals.failedFiles > 0 && job.state !== 'running'"
-          size="xs"
-          variant="outline"
+          size="kira"
+          variant="toolbar"
           data-testid="import-retry-failed"
           @click="run('retryFailed')"
         >
           Retry failed
         </Button>
-        <Button v-if="job.state === 'done' || job.state === 'cancelled' || job.state === 'failed'" size="xs" variant="outline" data-testid="import-dismiss" @click="run('dismiss')">Dismiss</Button>
-        <Button v-if="job.state !== 'running'" size="xs" variant="outline" data-testid="import-discard" @click="discard">Discard</Button>
+        <Button v-if="job.state === 'done' || job.state === 'cancelled' || job.state === 'failed'" variant="toolbar" size="kira" data-testid="import-dismiss" @click="run('dismiss')">Dismiss</Button>
+        <Button v-if="job.state !== 'running'" variant="toolbar" size="kira" data-testid="import-discard" @click="discard">Discard</Button>
       </div>
       <Alert v-if="job.reason && (job.state === 'paused' || job.state === 'failed')" variant="destructive" data-testid="import-reason">
         <AlertDescription>{{ job.reason }}</AlertDescription>
@@ -110,7 +110,7 @@ async function discard(): Promise<void> {
       </div>
     </div>
     <div v-if="selectedFile" class="flex max-h-1/3 shrink-0 flex-col gap-1 overflow-y-auto border-t border-border p-3 text-kira-md" data-testid="import-file-detail">
-      <span class="font-semibold">{{ selectedFile.title || selectedFile.relPath }}</span>
+      <span class="font-medium">{{ selectedFile.title || selectedFile.relPath }}</span>
       <p v-if="selectedFile.reason" class="m-0 text-muted-foreground" data-testid="import-file-reason">{{ selectedFile.reason }}</p>
       <div v-for="(u, i) in selectedFile.unresolved" :key="`u${i}`" class="flex flex-col rounded-kira-sm bg-warn/10 p-1.5">
         <span>{{ u.fact }}</span>

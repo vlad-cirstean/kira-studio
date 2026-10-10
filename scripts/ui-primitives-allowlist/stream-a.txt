@@ -1,12 +1,3 @@
 # P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-packages/workbench/src/memory/AddMemoryDialog.vue
-packages/workbench/src/memory/MemoryPanel.vue
-packages/workbench/src/memory/MemorySetupHint.vue
-packages/workbench/src/memory/MemoryStart.vue
-packages/workbench/src/memory/import/ImportConfirmDialog.vue
-packages/workbench/src/memory/import/ImportFileRow.vue
-packages/workbench/src/memory/import/ImportJobDetail.vue
-packages/workbench/src/memory/import/ImportStatus.vue
-packages/workbench/src/memory/import/ImportView.vue
 permanent U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 §2.2 exempt)
 permanent U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome

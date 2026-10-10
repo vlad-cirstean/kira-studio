@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import { formatDuration } from './importFormat';
@@ -49,11 +49,11 @@ async function dismiss(): Promise<void> {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && dismiss()">
-    <DialogContent :show-close-button="false" data-testid="import-confirm-dialog" class="flex flex-col p-0 gap-0 w-120">
-      <DialogHeader>
+    <DialogContent size="md" data-testid="import-confirm-dialog">
+      <DialogHeader closable>
         <DialogTitle>Import documents</DialogTitle>
       </DialogHeader>
-      <div class="flex flex-col gap-2 p-3 text-kira-md">
+      <DialogBody class="text-kira-md">
         <Alert v-if="act.isError.value" variant="destructive" data-testid="import-confirm-error">
           <AlertDescription>{{ act.error.value?.message }}</AlertDescription>
         </Alert>
@@ -78,10 +78,10 @@ async function dismiss(): Promise<void> {
             Too many files: only the first {{ job.estimate.files }} are included.
           </p>
         </template>
-      </div>
+      </DialogBody>
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="import-confirm-cancel" @click="dismiss">Cancel</Button>
-        <Button variant="dialog-primary" size="kira-lg" class="ml-auto" :disabled="!ready || act.isPending.value" data-testid="import-confirm-start" @click="start">
+        <Button variant="dialog-primary" size="kira-lg" :disabled="!ready || act.isPending.value" data-testid="import-confirm-start" @click="start">
           Start import
         </Button>
       </DialogFooter>

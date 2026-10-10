@@ -2,7 +2,7 @@
 import type { MemoryClarification, MemoryStoreResult } from '@shared/domain/memory';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed, reactive, ref } from 'vue';
@@ -82,11 +82,11 @@ function select(id: string): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent :show-close-button="false" data-testid="add-memory-dialog" class="flex flex-col p-0 gap-0 w-150 max-h-4/5">
-      <DialogHeader>
+    <DialogContent size="lg" data-testid="add-memory-dialog">
+      <DialogHeader closable>
         <DialogTitle>Add memory</DialogTitle>
       </DialogHeader>
-      <div class="flex flex-col gap-2 overflow-auto p-3">
+      <DialogBody>
         <Alert v-if="store.isError.value" variant="destructive" data-testid="add-memory-error">
           <AlertDescription>{{ store.error.value?.message }}</AlertDescription>
         </Alert>
@@ -134,15 +134,15 @@ function select(id: string): void {
           </div>
           <p v-if="busy" class="m-0 text-kira-sm text-muted-foreground" data-testid="add-memory-busy">Checking with Claude…</p>
         </template>
-      </div>
+      </DialogBody>
       <DialogFooter>
         <template v-if="stored">
-          <Button variant="dialog-primary" size="kira-lg" class="ml-auto" data-testid="add-memory-done" @click="emit('close')">Done</Button>
+          <Button variant="dialog-primary" size="kira-lg" data-testid="add-memory-done" @click="emit('close')">Done</Button>
         </template>
         <template v-else>
           <Button v-if="busy" variant="dialog" size="kira-lg" data-testid="add-memory-cancel" @click="cancel">Cancel</Button>
           <Button v-else variant="dialog" size="kira-lg" @click="emit('close')">Close</Button>
-          <Button variant="dialog-primary" size="kira-lg" class="ml-auto" :disabled="!canSubmit" data-testid="add-memory-submit" @click="submit">
+          <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" data-testid="add-memory-submit" @click="submit">
             {{ challenged ? 'Resubmit' : 'Add' }}
           </Button>
         </template>

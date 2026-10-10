@@ -299,7 +299,7 @@ test('creating offers New script and New smart script once; Edit schedule opens 
   await expect(dialog(page).locator('[data-testid="schedule-fields"]')).toBeVisible();
   await expect(dialog(page).locator('[data-testid="script-dialog-tab-schedule"]')).toHaveAttribute(
     'data-state',
-    'active',
+    'on',
   );
 });
 
