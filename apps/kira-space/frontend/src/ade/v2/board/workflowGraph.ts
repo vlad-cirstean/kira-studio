@@ -10,15 +10,16 @@ import { newStep } from './workflowForm';
 
 type EdgeTone = 'ok' | 'fail' | 'neutral';
 
-const NODE_W = 248;
-const STEP_H = 112;
-const LEAF_H = 72;
-const END_W = 112;
-const END_H = 32;
-const GROUP_PAD = 16;
-const GROUP_HEAD = 40;
-const STAGE_GAP = 72;
-const RANK_SEP = 56;
+export const NODE_W = 256;
+export const NODE_H = 104;
+export const RANK_SEP = 64;
+const NODE_SEP = 56;
+const EDGE_SEP = 24;
+const STAGE_GAP = 48;
+const GROUP_PAD = 20;
+const GROUP_HEAD = 36;
+const LOOP_LANE = 20;
+const SPINE_WEIGHT = 8;
 
 const endNodeId = (stageId: string): string => `end:${stageId}`;
 const stageNodeId = (stageId: string): string => `stage:${stageId}`;
@@ -35,6 +36,13 @@ export interface GraphNode {
   y: number;
   w: number;
   h: number;
+  /** Stage frame only: x of the spine column inside the frame, where its handles sit. */
+  spineX?: number;
+}
+
+export interface Point {
+  x: number;
+  y: number;
 }
 
 export interface GraphEdge {
@@ -49,11 +57,20 @@ export interface GraphEdge {
   tone: EdgeTone;
   loop: boolean;
   max: number;
+  /** On the main success path: drawn straight. */
+  spine?: boolean;
+  /** Absolute route of a forward edge that skips ranks. */
+  points?: Point[];
+  /** Loop edge: gutter lane index and its absolute x. */
+  lane?: number;
+  laneX?: number;
 }
 
 export interface Graph {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  width: number;
+  height: number;
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -98,70 +115,252 @@ export function aggregateEdges(
   });
 }
 
-function layoutAgent(
-  stage: Stage,
-  offsetX: number,
-): { nodes: GraphNode[]; edges: GraphEdge[]; w: number } {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'TB', ranksep: RANK_SEP, nodesep: 40, marginx: 0, marginy: 0 });
-  g.setDefaultEdgeLabel(() => ({}));
-  const end = endNodeId(stage.id);
-  for (const s of stage.steps)
-    g.setNode(stepNodeId(stage.id, s.id), { width: NODE_W, height: STEP_H });
-  g.setNode(end, { width: END_W, height: END_H });
-  const edges = stage.steps.flatMap((_, i) => aggregateEdges(stage.id, stage.steps, i));
-  for (const e of edges) if (!e.loop) g.setEdge(e.source, e.target);
-  dagre.layout(g);
-  const graph = g.graph();
-  const innerW = Math.max(NODE_W, graph.width ?? NODE_W);
-  const innerH = graph.height ?? STEP_H;
-  const gid = stageNodeId(stage.id);
-  const nodes: GraphNode[] = [
-    {
-      id: gid,
-      kind: 'stage',
-      stageId: stage.id,
-      x: offsetX,
-      y: 0,
-      w: innerW + GROUP_PAD * 2,
-      h: GROUP_HEAD + GROUP_PAD * 2 + innerH,
-    },
-  ];
-  const place = (id: string, kind: 'step' | 'end', stepId?: string): void => {
-    const p = g.node(id);
-    nodes.push({
-      id,
-      kind,
-      stageId: stage.id,
-      stepId,
-      parent: gid,
-      x: GROUP_PAD + p.x - p.width / 2,
-      y: GROUP_HEAD + GROUP_PAD + p.y - p.height / 2,
-      w: p.width,
-      h: p.height,
-    });
-  };
-  for (const s of stage.steps) place(stepNodeId(stage.id, s.id), 'step', s.id);
-  place(end, 'end');
-  return { nodes, edges, w: innerW + GROUP_PAD * 2 };
+/** The main success path: from the start step, the first `ok` forward result each step; ends at `end`. */
+function spineIds(stage: Stage): Set<string> {
+  const out = new Set<string>();
+  const steps = stage.steps;
+  let i = 0;
+  while (i >= 0 && i < steps.length) {
+    const step = steps[i] as PipelineStep;
+    if (out.has(stepNodeId(stage.id, step.id))) break;
+    out.add(stepNodeId(stage.id, step.id));
+    const r = step.results.find((x) => x.ok && routeIndex(steps, i, x.next) > i);
+    i = r ? routeIndex(steps, i, r.next) : -1;
+  }
+  if (i === steps.length) out.add(endNodeId(stage.id));
+  return out;
 }
 
-/** Stage groups left to right, steps ranked top to bottom inside each; loop edges do not rank. */
+/** Lane per loop edge: intervals over the step rows, inner loops nearest the nodes. */
+function loopLanes(
+  loops: readonly GraphEdge[],
+  rowOf: (nodeId: string) => number,
+): { lanes: Map<string, number>; count: number } {
+  const span = (e: GraphEdge): [number, number] => [rowOf(e.target), rowOf(e.source)];
+  const sorted = [...loops].sort((a, b) => {
+    const [a0, a1] = span(a);
+    const [b0, b1] = span(b);
+    return a1 - a0 - (b1 - b0) || a1 - b1;
+  });
+  const taken: [number, number][][] = [];
+  const lanes = new Map<string, number>();
+  for (const e of sorted) {
+    const [lo, hi] = span(e);
+    let k = taken.findIndex((l) => l.every(([a, b]) => hi < a || lo > b));
+    if (k < 0) {
+      taken.push([]);
+      k = taken.length - 1;
+    }
+    (taken[k] as [number, number][]).push([lo, hi]);
+    lanes.set(e.id, k);
+  }
+  return { lanes, count: taken.length };
+}
+
+/**
+ * Dagre centres a parent between its children, which bends the main path. Pin each spine node on the
+ * start step's column and push the other nodes and edge waypoints of its rank outward to keep their gaps.
+ */
+function snapSpine(
+  node: (id: string) => Point,
+  ids: readonly string[],
+  spine: ReadonlySet<string>,
+  waypoints: Point[],
+): void {
+  interface Item {
+    x: number;
+    node: boolean;
+    target: { x: number };
+  }
+  const column = node(ids[0] as string).x;
+  const layers = new Map<number, { items: Item[]; pin?: Item }>();
+  const layer = (y: number): { items: Item[]; pin?: Item } => {
+    const k = Math.round(y * 10);
+    const l = layers.get(k) ?? { items: [] };
+    layers.set(k, l);
+    return l;
+  };
+  for (const id of ids) {
+    const n = node(id);
+    const item: Item = { x: n.x, node: true, target: n };
+    const l = layer(n.y);
+    l.items.push(item);
+    if (spine.has(id)) l.pin = item;
+  }
+  for (const q of waypoints) layer(q.y).items.push({ x: q.x, node: false, target: q });
+  const gap = (a: Item, b: Item): number =>
+    (a.node ? NODE_W / 2 : 0) +
+    (b.node ? NODE_W / 2 : 0) +
+    (a.node && b.node ? NODE_SEP : EDGE_SEP);
+  for (const { items, pin } of layers.values()) {
+    if (!pin) continue;
+    items.sort((a, b) => a.x - b.x);
+    const at = items.indexOf(pin);
+    pin.target.x = column;
+    let prev = pin;
+    let px = column;
+    for (const it of items.slice(at + 1)) {
+      px = Math.max(it.x, px + gap(prev, it));
+      it.target.x = px;
+      prev = it;
+    }
+    prev = pin;
+    px = column;
+    for (const it of items.slice(0, at).reverse()) {
+      px = Math.min(it.x, px - gap(it, prev));
+      it.target.x = px;
+      prev = it;
+    }
+  }
+}
+
+interface AgentLayout {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  /** Inner content size, without padding or gutter. */
+  innerW: number;
+  innerH: number;
+  spineX: number;
+  lanes: number;
+}
+
+/** Inner layout relative to the content origin (left of the leftmost node, top of the first rank). */
+function layoutAgent(stage: Stage): AgentLayout {
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({
+    rankdir: 'TB',
+    ranksep: RANK_SEP,
+    nodesep: NODE_SEP,
+    edgesep: EDGE_SEP,
+    marginx: 0,
+    marginy: 0,
+  });
+  g.setDefaultEdgeLabel(() => ({}));
+  const end = endNodeId(stage.id);
+  const ids = [...stage.steps.map((s) => stepNodeId(stage.id, s.id)), end];
+  for (const id of ids) g.setNode(id, { width: NODE_W, height: NODE_H });
+  const spine = spineIds(stage);
+  const edges = stage.steps.flatMap((_, i) => aggregateEdges(stage.id, stage.steps, i));
+  for (const e of edges) {
+    if (e.loop) continue;
+    e.spine = spine.has(e.source) && spine.has(e.target);
+    g.setEdge(e.source, e.target, { weight: e.spine ? SPINE_WEIGHT : 1, minlen: 1 });
+  }
+  dagre.layout(g);
+
+  const forward = edges.filter((e) => !e.loop);
+  const route = (e: GraphEdge): Point[] => {
+    const src = g.node(e.source);
+    const dst = g.node(e.target);
+    return (g.edge(e.source, e.target)?.points ?? []).filter(
+      (q: Point) => q.y > src.y + NODE_H / 2 + 0.5 && q.y < dst.y - NODE_H / 2 - 0.5,
+    );
+  };
+  const via = new Map(forward.map((e) => [e.id, route(e)]));
+  snapSpine(
+    (id) => g.node(id),
+    ids,
+    spine,
+    forward.flatMap((e) => via.get(e.id) ?? []),
+  );
+
+  const centre = (id: string): Point => {
+    const p = g.node(id);
+    return { x: p.x, y: p.y };
+  };
+  const pts = [...via.values()].flat();
+  const minX = Math.min(...ids.map((id) => centre(id).x - NODE_W / 2), ...pts.map((p) => p.x));
+  const maxX = Math.max(...ids.map((id) => centre(id).x + NODE_W / 2), ...pts.map((p) => p.x));
+  const maxY = Math.max(...ids.map((id) => centre(id).y + NODE_H / 2));
+  const rowOf = (id: string): number => (id === end ? stage.steps.length : ids.indexOf(id));
+  const { lanes, count } = loopLanes(
+    edges.filter((e) => e.loop),
+    rowOf,
+  );
+  const startId = ids[0] as string;
+  const nodes: GraphNode[] = ids.map((id) => {
+    const c = centre(id);
+    const stepId = id === end ? undefined : stage.steps[ids.indexOf(id)]?.id;
+    return {
+      id,
+      kind: id === end ? 'end' : 'step',
+      stageId: stage.id,
+      stepId,
+      parent: stageNodeId(stage.id),
+      x: c.x - NODE_W / 2 - minX,
+      y: c.y - NODE_H / 2,
+      w: NODE_W,
+      h: NODE_H,
+    };
+  });
+  for (const e of edges) {
+    if (e.loop) e.lane = lanes.get(e.id);
+    else {
+      const p = via.get(e.id) ?? [];
+      if (p.length > 0) e.points = p.map((q: Point) => ({ x: q.x - minX, y: q.y }));
+    }
+  }
+  return {
+    nodes,
+    edges,
+    innerW: maxX - minX,
+    innerH: maxY,
+    spineX: centre(startId).x - minX,
+    lanes: count,
+  };
+}
+
+/**
+ * Stages stacked top to bottom, steps ranked top to bottom inside each; every stage's spine sits on one
+ * column, loop edges run in a left gutter and do not rank.
+ */
 export function layoutWorkflow(wf: Workflow): Graph {
+  const parts = wf.stages.map((stage) => ({
+    stage,
+    agent: stage.kind === 'agent' ? layoutAgent(stage) : null,
+  }));
+  const gutter = (l: AgentLayout | null): number => (l ? l.lanes * LOOP_LANE : 0);
+  const spineOf = (l: AgentLayout | null): number => (l ? l.spineX : NODE_W / 2);
+  const widthOf = (l: AgentLayout | null): number => (l ? l.innerW : NODE_W);
+  const column = Math.max(
+    GROUP_PAD + NODE_W / 2,
+    ...parts.map((p) => GROUP_PAD + gutter(p.agent) + spineOf(p.agent)),
+  );
+  const frameW = Math.max(
+    column + NODE_W / 2 + GROUP_PAD,
+    ...parts.map((p) => column - spineOf(p.agent) + widthOf(p.agent) + GROUP_PAD),
+  );
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
-  let x = 0;
+  let y = 0;
   let prev: string | null = null;
-  for (const stage of wf.stages) {
+  for (const { stage, agent } of parts) {
     const id = stageNodeId(stage.id);
-    let w = NODE_W;
-    if (stage.kind === 'agent') {
-      const l = layoutAgent(stage, x);
-      nodes.push(...l.nodes);
-      edges.push(...l.edges);
-      w = l.w;
+    let h = NODE_H;
+    if (agent) {
+      h = GROUP_HEAD + GROUP_PAD * 2 + agent.innerH;
+      const ox = column - agent.spineX;
+      nodes.push({
+        id,
+        kind: 'stage',
+        stageId: stage.id,
+        x: 0,
+        y,
+        w: frameW,
+        h,
+        spineX: column,
+      });
+      for (const n of agent.nodes)
+        nodes.push({ ...n, x: ox + n.x, y: GROUP_HEAD + GROUP_PAD + n.y });
+      const abs = (p: Point): Point => ({ x: ox + p.x, y: y + GROUP_HEAD + GROUP_PAD + p.y });
+      for (const e of agent.edges)
+        edges.push({
+          ...e,
+          points: e.points?.map(abs),
+          laneX: e.lane === undefined ? undefined : ox - (e.lane + 1) * LOOP_LANE,
+        });
     } else {
-      nodes.push({ id, kind: 'leaf', stageId: stage.id, x, y: 0, w, h: LEAF_H });
+      nodes.push({ id, kind: 'leaf', stageId: stage.id, x: column - NODE_W / 2, y, w: NODE_W, h });
     }
     if (prev)
       edges.push({
@@ -173,11 +372,12 @@ export function layoutWorkflow(wf: Workflow): Graph {
         tone: 'neutral',
         loop: false,
         max: 0,
+        spine: true,
       });
     prev = id;
-    x += w + STAGE_GAP;
+    y += h + STAGE_GAP;
   }
-  return { nodes, edges };
+  return { nodes, edges, width: frameW, height: Math.max(0, y - STAGE_GAP) };
 }
 
 function mapStage(
@@ -442,6 +642,7 @@ export interface StageNodeData {
   selected: boolean;
   w: number;
   h: number;
+  spineX?: number;
 }
 export interface EdgeData {
   tone: EdgeTone;
@@ -449,6 +650,10 @@ export interface EdgeData {
   max: number;
   results: string[];
   selected: boolean;
+  spine: boolean;
+  points?: Point[];
+  lane?: number;
+  laneX?: number;
   /** Stage-to-stage edge: no label, never editable. */
   stage: boolean;
 }

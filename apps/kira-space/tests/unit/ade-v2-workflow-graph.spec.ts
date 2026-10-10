@@ -4,8 +4,12 @@ import {
   addStep,
   aggregateEdges,
   clearRoute,
+  type Graph,
+  type GraphNode,
   layoutWorkflow,
   moveStage,
+  NODE_H,
+  NODE_W,
   normalizeOrder,
   removeStep,
   setRoute,
@@ -178,17 +182,93 @@ describe('edits', () => {
 });
 
 describe('layoutWorkflow', () => {
-  test('ranks a stage top to bottom, ends it with the end node, lays stages left to right', () => {
+  const abs = (g: Graph, id: string): { x: number; y: number } => {
+    const n = g.nodes.find((x) => x.id === id) as GraphNode;
+    const parent = g.nodes.find((x) => x.id === n.parent);
+    return { x: n.x + (parent?.x ?? 0), y: n.y + (parent?.y ?? 0) };
+  };
+  const cx = (g: Graph, id: string): number => abs(g, id).x + NODE_W / 2;
+  const stepGraph = (steps: PipelineStep[]): Graph => layoutWorkflow(wfOf(steps));
+
+  test('stages stack top to bottom on one spine column; step, leaf and end nodes share one size', () => {
     const wf = wfOf([step('a'), step('b')]);
-    wf.stages.push(mkStage({ id: 't', kind: 'user' }));
-    const { nodes, edges } = layoutWorkflow(wf);
-    const y = (id: string): number => nodes.find((n) => n.id === id)?.y ?? -1;
+    wf.stages.push(
+      mkStage({ id: 't', kind: 'user' }),
+      mkStage({ id: 'u', kind: 'agent', steps: [step('c')] }),
+    );
+    const g = layoutWorkflow(wf);
+    const frames = g.nodes.filter((n) => n.kind === 'stage');
+    expect(new Set(frames.map((n) => n.w)).size).toBe(1);
+    const order = ['stage:s', 'stage:t', 'stage:u'].map(
+      (id) => g.nodes.find((n) => n.id === id) as GraphNode,
+    );
+    expect(order[0]?.y).toBeLessThan(order[1]?.y ?? 0);
+    expect(order[1]?.y).toBeLessThan(order[2]?.y ?? 0);
+    expect((order[0]?.y ?? 0) + (order[0]?.h ?? 0)).toBeLessThan(order[1]?.y ?? 0);
+    for (const n of g.nodes.filter((x) => x.kind !== 'stage'))
+      expect([n.w, n.h]).toEqual([NODE_W, NODE_H]);
+    const column = [
+      cx(g, 'step:s:a'),
+      cx(g, 'step:s:b'),
+      cx(g, 'end:s'),
+      cx(g, 'stage:t'),
+      cx(g, 'step:u:c'),
+    ];
+    expect(new Set(column).size).toBe(1);
+    expect(frames[0]?.spineX).toBe(column[0]);
+    expect(g.height).toBeGreaterThan(0);
+  });
+
+  test('a linear stage ends with the end node, strictly downward', () => {
+    const g = stepGraph([step('a'), step('b')]);
+    const y = (id: string): number => abs(g, id).y;
     expect(y('step:s:a')).toBeLessThan(y('step:s:b'));
     expect(y('step:s:b')).toBeLessThan(y('end:s'));
-    expect(
-      (nodes.find((n) => n.id === 'stage:t')?.x ?? 0) >
-        (nodes.find((n) => n.id === 'stage:s')?.x ?? 0),
-    ).toBe(true);
-    expect(edges.some((e) => e.source === 'stage:s' && e.target === 'stage:t')).toBe(true);
+    expect(g.edges.some((e) => e.id === 's:x')).toBe(false);
+  });
+
+  test('a diamond fans out: branches share a rank, the join stays on the spine, nothing points up', () => {
+    const g = stepGraph([
+      step('a', [res('left', true, 'b'), res('right', false, 'c')]),
+      step('b', [res('done', true, 'd'), res('failed', false)]),
+      step('c', [res('done', true, 'd'), res('failed', false)]),
+      step('d'),
+    ]);
+    const p = (id: string): { x: number; y: number } => abs(g, `step:s:${id}`);
+    expect(p('b').y).toBe(p('c').y);
+    expect(p('b').x).not.toBe(p('c').x);
+    expect(p('d').y).toBeGreaterThan(p('b').y);
+    expect(cx(g, 'step:s:a')).toBe(cx(g, 'step:s:b'));
+    expect(cx(g, 'step:s:b')).toBe(cx(g, 'step:s:d'));
+    for (const e of g.edges.filter((x) => !x.loop && x.results.length > 0))
+      expect(abs(g, e.target).y).toBeGreaterThan(abs(g, e.source).y);
+  });
+
+  test('a forward edge that skips a rank carries a route around the nodes between', () => {
+    const g = stepGraph([step('a', [res('done', true), res('skip', false, 'end')]), step('b')]);
+    const skip = g.edges.find((e) => e.target === 'end:s' && e.source === 'step:s:a');
+    expect(skip?.points?.length).toBeGreaterThan(0);
+  });
+
+  test('nested and overlapping loops get distinct lanes, disjoint loops share one, no loop has a route', () => {
+    const g = stepGraph([
+      step('a', [res('done', true), res('redo', false, 'a', 2)]),
+      step('b', [res('done', true), res('redo', false, 'b', 2)]),
+      step('c', [res('done', true), res('redo', false, 'b', 2)]),
+      step('d', [res('done', true), res('redo', false, 'b', 2), res('all', false, 'a', 2)]),
+    ]);
+    const lane = (source: string, target: string): number | undefined =>
+      g.edges.find(
+        (e) => e.loop && e.source === `step:s:${source}` && e.target === `step:s:${target}`,
+      )?.lane;
+    expect(lane('a', 'a')).toBe(lane('b', 'b'));
+    expect(lane('c', 'b')).not.toBe(lane('b', 'b'));
+    expect(lane('d', 'b')).not.toBe(lane('c', 'b'));
+    expect(lane('d', 'a')).not.toBe(lane('d', 'b'));
+    expect(lane('d', 'a')).toBeDefined();
+    const loops = g.edges.filter((e) => e.loop);
+    expect(loops.every((e) => e.points === undefined && e.laneX !== undefined)).toBe(true);
+    const left = Math.min(...g.nodes.filter((n) => n.kind === 'step').map((n) => abs(g, n.id).x));
+    expect(loops.every((e) => (e.laneX ?? left) < left)).toBe(true);
   });
 });
