@@ -1,10 +1,12 @@
 import type { Page } from '@playwright/test';
+import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
 import { gitStreamRelease } from './support/gitStreamMock';
 import {
   manyRowShas,
   manyRows,
   openPortGraph,
+  PORT_CONTROL,
   type Relaunch,
   refsAtTip,
   rootRow,
@@ -12,6 +14,7 @@ import {
   SHA_B,
   singleRowChunks,
 } from './support/gitUiPortFixtures';
+import { IPC } from './support/ipcChannels';
 
 // Grid-shape facts the shared git-ui grid must keep inside Space: column set, row geometry, the
 // compact detail layout, scrollbars and tab order. Ported from the VS Code webview suite.
@@ -31,9 +34,10 @@ async function closeDetail(p: Page): Promise<void> {
 async function bootGrid(
   relaunch: Relaunch,
   rows: Parameters<typeof singleRowChunks>[0],
-  options: { holdAfter?: number; tip?: string } = {},
+  options: { holdAfter?: number; tip?: string; control?: typeof PORT_CONTROL } = {},
 ): Promise<Page> {
   const page = await openPortGraph(relaunch, {
+    control: options.control,
     chunks: singleRowChunks(rows),
     holdAfter: options.holdAfter,
     results: options.tip ? { 'refs.list': refsAtTip(options.tip) } : undefined,
@@ -107,6 +111,27 @@ test('a decorated row is taller, and each row graph node sits on its own subject
     }, n);
     expect(Math.abs(nodeY - subjectY)).toBeLessThanOrEqual(2);
   }
+});
+
+test('Git graph font size scales grid text and decorated row height', async ({ relaunch }) => {
+  const page = await bootGrid(relaunch, TAGGED, {
+    control: [
+      ...PORT_CONTROL,
+      {
+        channel: IPC.settingsGetAll,
+        response: { ...defaultSettings, git: { ...defaultSettings.git, graphFontSize: 20 } },
+      },
+    ],
+  });
+  await expect(row(page, 1)).toBeVisible();
+
+  const fontSize = await row(page, 0)
+    .locator('.kv-cell-message')
+    .evaluate((el) => getComputedStyle(el).fontSize);
+  expect(fontSize).toBe('20px');
+  // compact = max(row-height 28, h-xs 25 + 2), decorated = compact + h-xs (13px default gives 45).
+  const height = await row(page, 1).evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBe(53);
 });
 
 test('a tag badge is a translucent tint with a coloured border and a matching icon', async ({
