@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
@@ -74,7 +73,12 @@ func (s *Service) takeFinish(runID string) (claudeheadless.Finish, bool) {
 }
 
 func (s *Service) startSmart(p *planned) (Started, error) {
-	runID, sessionID := uuid.NewString(), uuid.NewString()
+	return s.launchSmart(p, s.newRun(p, nil), false)
+}
+
+// launchSmart runs a smart script headless. existing means run is a waiting row to turn running.
+func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, error) {
+	runID, sessionID := run.ID, run.SessionID
 	ctx, cancel := context.WithCancel(context.Background())
 	sr := &bgRun{cancel: cancel}
 
@@ -103,22 +107,15 @@ func (s *Service) startSmart(p *planned) (Started, error) {
 		s.smartWait.Done()
 	}
 
-	now := s.now()
 	pv := p.preview
-	run := Run{
-		ID: runID, ScriptID: p.script.ID, ScriptName: p.script.Name, Color: p.script.Color, Kind: KindSmart,
-		Trigger: runTrigger(p), State: StateRunning, Cwd: p.dir.Path, CreatedAt: now, StartedAt: &now,
-		Model: pv.Model, SessionID: sessionID, Prompt: p.sent, Params: p.params,
-		Tools: RunTools{Tools: pv.Tools, AllowedTools: pv.Allowed, McpServers: pv.MCP},
-	}
-	if a := pv.ADE; a != nil {
-		run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel = a.TaskID, a.TaskTitle, a.BranchID, a.BranchLabel
-	}
 	if err := scripts.PrepareDir(p.dir); err != nil {
 		abandon()
-		o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndStartErr, Err: err})
-		run.State, run.Outcome, run.FinishedAt = string(o.Status), &o, &now
-		s.record(run)
+		if !existing {
+			now := s.now()
+			o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndStartErr, Err: err})
+			run.State, run.Outcome, run.FinishedAt = string(o.Status), &o, &now
+			s.record(run)
+		}
 		return Started{}, ipcerr.New("E_INVALID", err.Error())
 	}
 	s.mu.Lock()
@@ -140,13 +137,12 @@ func (s *Service) startSmart(p *planned) (Started, error) {
 		}
 		extra, releaseUser = []string{path}, rel
 	}
-	if err := s.Runs.Insert(run); err != nil {
+	if err := s.begin(run, existing); err != nil {
 		releaseGrant()
 		releaseUser()
 		abandon()
-		return Started{}, ipcerr.InternalErr(err)
+		return Started{}, err
 	}
-	s.emit(run)
 
 	timeout := p.smart.TimeoutDuration()
 	timeoutText := p.smart.Timeout

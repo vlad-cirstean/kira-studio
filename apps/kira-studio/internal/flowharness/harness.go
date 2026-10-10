@@ -33,6 +33,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/flowtest"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -49,7 +50,9 @@ const EnvComplete = flowtest.EnvComplete
 func Complete(t testing.TB) { flowtest.Complete(t) }
 
 type options struct {
-	smartTimeout time.Duration
+	smartTimeout    time.Duration
+	scheduleTimeout time.Duration
+	clock           scriptruns.Clock
 }
 
 // Opt tweaks New.
@@ -57,6 +60,12 @@ type Opt func(*options)
 
 // WithSmartTimeout replaces every smart script's own timeout.
 func WithSmartTimeout(d time.Duration) Opt { return func(o *options) { o.smartTimeout = d } }
+
+// WithScheduleTimeout replaces every headless scheduled run's own timeout.
+func WithScheduleTimeout(d time.Duration) Opt { return func(o *options) { o.scheduleTimeout = d } }
+
+// WithClock drives the scheduler and the run times with c.
+func WithClock(c scriptruns.Clock) Opt { return func(o *options) { o.clock = c } }
 
 // App is one booted Kira Studio.
 type App struct {
@@ -159,6 +168,7 @@ func (a *App) build() {
 		Authorizer: localauth.New(time.Now, a.OSAuth.evaluate, a.OSAuth.isAvailable),
 		Emitter:    a.Events, Dialogs: a.Dialogs, KeepAwakeDriver: a.KeepAwake, McpInstaller: a.McpInstaller,
 		AppName: "Kira Studio", Version: "flowtest", SmartTimeout: a.opts.smartTimeout,
+		ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock,
 	})
 	if err != nil {
 		a.t.Fatalf("appwire.Build: %v", err)

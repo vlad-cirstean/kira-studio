@@ -22,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -45,6 +46,10 @@ type Options struct {
 	Version         string
 	// SmartTimeout replaces every smart script's own timeout (a flow-test seam); production leaves it zero.
 	SmartTimeout time.Duration
+	// ScheduleTimeout replaces every headless scheduled run's own timeout and Clock drives the
+	// scheduler and the run times (flow-test seams); production leaves both zero.
+	ScheduleTimeout time.Duration
+	Clock           scriptruns.Clock
 }
 
 // Wired is the built object graph.
@@ -146,9 +151,14 @@ func Build(opts Options) (*Wired, error) {
 	// cancels it so a Cmd+Q mid-download aborts the install rather than orphaning a bundle swap.
 	updateInstaller := appupdate.NewInstaller(appupdate.Studio, opts.Version)
 
-	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, opts.SmartTimeout)
+	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, opts)
 	lifecycle := wireLifecycle(embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, repositories, db)
+		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
+	embedded.runs.MainWindow = func() string {
+		key, _ := lifecycle.windows.AnyRealKey()
+		return key
+	}
+	embedded.sched.Start()
 
 	w := &Wired{
 		StartedAt: startedAt, Repos: repositories, Deps: deps, Router: router, Events: embedded.events,
@@ -181,7 +191,7 @@ func Build(opts Options) (*Wired, error) {
 		DbMcp:           embedded.dbMcpSvc,
 		KeepAwake:       embedded.keepAwakeSvc,
 		Terminal:        embedded.terminalSvc,
-		CustomScripts:   &bridge.CustomScriptsService{Deps: deps},
+		CustomScripts:   &bridge.CustomScriptsService{Deps: deps, Changed: embedded.sched.Reload},
 		ScriptRuns:      embedded.scriptRuns,
 		Docker:          embedded.dockerSvc,
 		Update: &bridge.UpdateService{

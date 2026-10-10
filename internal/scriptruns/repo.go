@@ -163,10 +163,11 @@ func (r *Repo) FailRunning(out runoutcome.Outcome, now int64) ([]Run, error) {
 	})
 }
 
-// Active returns the newest running or waiting run of a script, (nil, nil) when none.
-func (r *Repo) Active(scriptID string) (*Run, error) {
-	run, err := scan(r.DB.QueryRow(`SELECT `+columns+` FROM script_runs WHERE script_id = ? AND state IN ('running', 'waiting')
-		ORDER BY created_at DESC, id DESC LIMIT 1`, scriptID))
+// Active returns the newest running or waiting run of a script other than exceptID, (nil, nil)
+// when none.
+func (r *Repo) Active(scriptID, exceptID string) (*Run, error) {
+	run, err := scan(r.DB.QueryRow(`SELECT `+columns+` FROM script_runs WHERE script_id = ? AND id <> ? AND state IN ('running', 'waiting')
+		ORDER BY created_at DESC, id DESC LIMIT 1`, scriptID, exceptID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

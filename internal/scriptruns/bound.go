@@ -2,6 +2,7 @@ package scriptruns
 
 import (
 	"context"
+	"time"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -123,4 +124,97 @@ func (b *Bound) McpTools(args McpToolsArgs) ([]claudeheadless.UserTool, error) {
 		return nil, ipcerr.BadRequest("server is required")
 	}
 	return ipcerr.InternalResult(b.Svc.McpTools(context.Background(), args.Server))
+}
+
+// NextFiresArgs asks for the next fire instants of a cron expression.
+type NextFiresArgs struct {
+	Cron     string `json:"cron"`
+	Timezone string `json:"timezone"`
+	Count    int    `json:"count"`
+}
+
+// NextFires answers the next Count (default 3) fire instants as unix milliseconds.
+func (b *Bound) NextFires(args NextFiresArgs) ([]int64, error) {
+	count := args.Count
+	if count <= 0 {
+		count = 3
+	}
+	fires, err := scripts.NextFires(args.Cron, args.Timezone, time.UnixMilli(b.Svc.now()), count)
+	if err != nil {
+		return nil, ipcerr.New("E_INVALID", err.Error())
+	}
+	out := make([]int64, 0, len(fires))
+	for _, f := range fires {
+		out = append(out, f.UnixMilli())
+	}
+	return out, nil
+}
+
+// ScheduleArgs names a scheduled script; Secrets fill its secret params for this call only.
+type ScheduleArgs struct {
+	ScriptID string              `json:"scriptId"`
+	Secrets  map[string][]string `json:"secrets"`
+}
+
+// SchedulePreview resolves the run a script's schedule would start.
+func (b *Bound) SchedulePreview(args ScheduleArgs) (Preview, error) {
+	if args.ScriptID == "" {
+		return Preview{}, ipcerr.BadRequest("scriptId is required")
+	}
+	pv, err := b.Svc.SchedulePreview(args.ScriptID, args.Secrets)
+	if err != nil {
+		return Preview{}, ipcerr.Wrap(err)
+	}
+	return pv, nil
+}
+
+// ScheduleStartArgs is ScheduleArgs plus the hash of the preview the user confirmed.
+type ScheduleStartArgs struct {
+	ScheduleArgs
+	Hash string `json:"hash"`
+}
+
+// RunScheduleNow starts a script's scheduled run at once.
+func (b *Bound) RunScheduleNow(args ScheduleStartArgs) (Started, error) {
+	if args.ScriptID == "" {
+		return Started{}, ipcerr.BadRequest("scriptId is required")
+	}
+	started, err := b.Svc.RunScheduleNow(args.ScriptID, args.Hash, args.Secrets)
+	if err != nil {
+		return Started{}, ipcerr.Wrap(err)
+	}
+	return started, nil
+}
+
+// ConfirmArgs answers a waiting run: its id, the preview hash and the secret values asked.
+type ConfirmArgs struct {
+	RunID   string              `json:"runId"`
+	Hash    string              `json:"hash"`
+	Secrets map[string][]string `json:"secrets"`
+}
+
+// ConfirmAccept starts a waiting scheduled run.
+func (b *Bound) ConfirmAccept(args ConfirmArgs) (Started, error) {
+	if args.RunID == "" {
+		return Started{}, ipcerr.BadRequest("runId is required")
+	}
+	started, err := b.Svc.ConfirmAccept(args.RunID, args.Hash, args.Secrets)
+	if err != nil {
+		return Started{}, ipcerr.Wrap(err)
+	}
+	return started, nil
+}
+
+// ConfirmDecline ends a waiting scheduled run without running it.
+func (b *Bound) ConfirmDecline(args IDArgs) error {
+	if args.ID == "" {
+		return ipcerr.BadRequest("id is required")
+	}
+	b.Svc.ConfirmDecline(args.ID)
+	return nil
+}
+
+// MainWindow is the window key the confirm popup shows in, "" when none is open.
+func (b *Bound) MainWindow() (string, error) {
+	return b.Svc.MainWindowKey(), nil
 }

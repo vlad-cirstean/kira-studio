@@ -28,6 +28,8 @@ type RunArgs struct {
 	// TaskID and BranchID run the script for an ADE task and branch (Kira Space); "" for none.
 	TaskID   string `json:"taskId"`
 	BranchID string `json:"branchId"`
+	// ListTasks fills Needs.Tasks even when no ADE variable is used (a schedule's task picker).
+	ListTasks bool `json:"listTasks"`
 }
 
 // EnvVar is one variable the run gets. A secret's Value is empty here. FromVar names the param the
@@ -97,12 +99,18 @@ type planned struct {
 	preview Preview
 	// release drops the board's worktree claim a run holds; nil when none.
 	release func()
+	args    RunArgs
+	opts    planOpts
 	// trigger overrides runTrigger when the caller says what started the run.
 	trigger Trigger
 	// timeout and timeoutText bound a headless normal run.
 	timeout     time.Duration
 	timeoutText string
 }
+
+// planOpts tunes plan: claimed says the caller already holds the worktree claim, so the busy
+// check skips it; headless says the run is unattended, so a normal script also needs the branch free.
+type planOpts struct{ claimed, headless bool }
 
 func (s *Service) getenv(k string) string {
 	if s.Getenv != nil {
@@ -112,9 +120,7 @@ func (s *Service) getenv(k string) string {
 }
 
 // plan resolves a run the one way Preview shows it and Start executes it.
-//
-// claimed says the caller already holds the worktree claim, so the busy check skips it.
-func (s *Service) plan(args RunArgs, claimed bool) (*planned, error) {
+func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
 	rec, err := s.Scripts.Get(args.ScriptID)
 	if err != nil {
 		return nil, ipcerr.InternalErr(err)
@@ -126,7 +132,7 @@ func (s *Service) plan(args RunArgs, claimed bool) (*planned, error) {
 	if err != nil {
 		return nil, ipcerr.New("E_INVALID", err.Error())
 	}
-	p := &planned{script: *rec, dir: scripts.ResolveDir(*rec, s.Home)}
+	p := &planned{script: *rec, dir: scripts.ResolveDir(*rec, s.Home), args: args, opts: o}
 	pv := Preview{
 		Kind: rec.Kind, Missing: nonNilStrings(missing), Dir: p.dir, Env: []EnvVar{}, MCP: []string{}, Tools: []string{},
 		Allowed: []string{}, Prompt: []scripts.Part{}, Needs: Needs{Tasks: []TaskChoice{}, Branches: []BranchChoice{}},
@@ -146,7 +152,7 @@ func (s *Service) plan(args RunArgs, claimed bool) (*planned, error) {
 	}
 	if rec.Kind != scripts.KindSmart {
 		pv.Command = rec.Command
-		if err := s.planADE(args, p, &pv, rec.Command, rendered, claimed); err != nil {
+		if err := s.planADE(args, p, &pv, rec.Command, rendered); err != nil {
 			return nil, err
 		}
 		p.preview = finishPreview(pv, p)
@@ -163,7 +169,7 @@ func (s *Service) plan(args RunArgs, claimed bool) (*planned, error) {
 			pv.Blocker = blocker
 		}
 	}
-	if err := s.planADE(args, p, &pv, body, rendered, claimed); err != nil {
+	if err := s.planADE(args, p, &pv, body, rendered); err != nil {
 		return nil, err
 	}
 	pv.Prompt = scripts.Compose(body, rendered)
@@ -281,7 +287,7 @@ func hashOf(pv Preview, p *planned) string {
 
 // Preview resolves a run without starting anything.
 func (s *Service) Preview(args RunArgs) (Preview, error) {
-	p, err := s.plan(args, false)
+	p, err := s.plan(args, planOpts{})
 	if err != nil {
 		return Preview{}, err
 	}
@@ -290,13 +296,13 @@ func (s *Service) Preview(args RunArgs) (Preview, error) {
 
 // Start runs what Preview showed. A script that changed since the preview is refused.
 func (s *Service) Start(args StartArgs) (Started, error) {
-	p, err := s.plan(args.RunArgs, false)
+	p, err := s.plan(args.RunArgs, planOpts{})
 	if err != nil {
 		return Started{}, err
 	}
 	if p.dir.Mode == scripts.DirModeWorktree && p.preview.Blocker == "" && len(p.preview.Missing) == 0 &&
 		(p.script.Kind == scripts.KindSmart || p.dir.Pending) {
-		if p, err = s.claimWorktree(args.RunArgs, p); err != nil {
+		if p, err = s.claimWorktree(p, p.script.Kind == scripts.KindSmart); err != nil {
 			return Started{}, err
 		}
 	}
@@ -307,36 +313,32 @@ func (s *Service) Start(args StartArgs) (Started, error) {
 	return started, err
 }
 
-// claimWorktree creates the branch's missing worktree and, for a smart run, keeps the board's claim
-// on it. A normal script only needs the worktree to exist, so its claim is dropped at once. The run
-// is planned again against the created worktree.
-func (s *Service) claimWorktree(args RunArgs, p *planned) (*planned, error) {
+// claimWorktree creates the branch's missing worktree and takes the board's claim on it. keep holds
+// the claim until the run ends (p.release); otherwise it drops at once, since a normal terminal
+// script only needs the worktree to exist. The run is planned again against the created worktree.
+func (s *Service) claimWorktree(p *planned, keep bool) (*planned, error) {
 	release, err := s.ADE.ClaimWorktree(context.Background(), p.preview.ADE.BranchID, p.script.Name)
 	if err != nil {
 		return nil, ipcerr.New("E_INVALID", err.Error())
 	}
-	if p.script.Kind != scripts.KindSmart {
+	if !keep {
 		release()
-		return s.plan(args, false)
+		return s.plan(p.args, p.opts)
 	}
-	np, err := s.plan(args, true)
+	o := p.opts
+	o.claimed = true
+	np, err := s.plan(p.args, o)
 	if err != nil {
 		release()
 		return nil, err
 	}
-	np.release = release
+	np.release, np.trigger = release, p.trigger
 	return np, nil
 }
 
 func (s *Service) startPlanned(p *planned, hash string) (Started, error) {
-	if p.preview.Hash != hash {
-		return Started{}, ipcerr.New("E_CONFLICT", "the script changed since the preview: check it again")
-	}
-	if p.preview.Blocker != "" {
-		return Started{}, ipcerr.New("E_INVALID", p.preview.Blocker)
-	}
-	if len(p.preview.Missing) > 0 {
-		return Started{}, ipcerr.New("E_INVALID", "fill in "+strings.Join(p.preview.Missing, ", "))
+	if err := checkStart(p, hash); err != nil {
+		return Started{}, err
 	}
 	if p.script.Kind == scripts.KindSmart {
 		return s.startSmart(p)

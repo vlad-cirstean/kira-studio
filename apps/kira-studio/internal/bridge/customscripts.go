@@ -10,6 +10,8 @@ import (
 // It reaches s.Deps.Repos.CustomScripts directly, so main.go needs no extra wiring.
 type CustomScriptsService struct {
 	Deps appcore.Deps
+	// Changed runs after every mutation (the scheduler reloads).
+	Changed func()
 }
 
 type (
@@ -25,7 +27,7 @@ type (
 func (s *CustomScriptsService) shared() *scripts.Service {
 	return &scripts.Service{
 		Repo: s.Deps.Repos.CustomScripts,
-		Home: s.Deps.Home,
+		Home: s.Deps.Home, OnChange: s.Changed,
 		Emit: func(snapshot scripts.Snapshot) {
 			s.Deps.Events.Emit(ChannelCustomScriptsChanged, snapshot)
 		},

@@ -127,6 +127,7 @@ type embeddedWired struct {
 	terminalSvc  *bridge.TerminalService
 	scriptRuns   *bridge.ScriptRunsService
 	runs         *scriptruns.Service
+	sched        *scriptruns.Scheduler
 	dockerSvc    *bridge.DockerService
 	events       *bridge.Events
 	eventsDetach func()
@@ -138,7 +139,7 @@ type embeddedWired struct {
 // site here is at or after the point main's own deps.Events assignment (the emitter) has already
 // run — each bridge.XxxService{Deps: deps} literal below is exactly the same value copy the
 // original sequential code made in place.
-func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, smartTimeout time.Duration) embeddedWired {
+func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, opts Options) embeddedWired {
 	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle.
 	// StartIfEnabled's own failure (a bind conflict) is logged, never fatal.
 	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
@@ -168,7 +169,10 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 		Runs: deps.Repos.ScriptRuns, Scripts: deps.Repos.CustomScripts, Registry: registry, Home: deps.Home, App: "Studio",
 		Emit:         func(r scriptruns.Run) { deps.Events.Emit(bridge.ChannelScriptRunsChanged, r) },
 		EmitLog:      func(p scriptruns.LogPush) { deps.Events.Emit(bridge.ChannelScriptRunLog, p) },
-		SmartTimeout: smartTimeout,
+		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout,
+	}
+	if opts.Clock != nil {
+		runs.Now = opts.Clock.Now
 	}
 	if err := runs.Recover(); err != nil {
 		slog.Warn("recover script runs", "scope", "startup", "err", err)
@@ -182,6 +186,7 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 		dbMcpSvc: dbMcpSvc, keepAwakeSvc: keepAwakeSvc,
 		windowsSvc: windowsSvc, terminalSvc: terminalSvc, dockerSvc: dockerSvc,
 		scriptRuns: &bridge.ScriptRunsService{Bound: &scriptruns.Bound{Svc: runs}}, runs: runs,
+		sched:  &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock},
 		events: events, eventsDetach: eventsDetach,
 	}
 }
@@ -201,7 +206,7 @@ type lifecycleWired struct {
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
 // which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
 // -> the quitter built over both.
-func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, sched *scriptruns.Scheduler, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
 	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
@@ -236,6 +241,7 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 		// controller's release is independent of the PTY registry terminal.ShutdownBound(terminalSvc.BoundService) stops.
 		bridge.StopKeepAwake(keepAwakeSvc)
 		terminal.ShutdownBound(terminalSvc.BoundService)
+		sched.Close()
 		runs.Close()
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)

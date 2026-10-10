@@ -76,6 +76,10 @@ type Options struct {
 	RebaseTimeout time.Duration
 	// SmartTimeout replaces every smart script's own timeout (a flow-test seam); 0 keeps each script's.
 	SmartTimeout time.Duration
+	// ScheduleTimeout replaces every headless scheduled run's own timeout and Clock drives the
+	// scheduler and the run times (flow-test seams); production leaves both zero.
+	ScheduleTimeout time.Duration
+	Clock           scriptruns.Clock
 }
 
 // ShellHooks completes the window-manager seams once the shell exists. CloseWindow, FocusWindow and
@@ -121,6 +125,7 @@ type Wired struct {
 	CustomScripts  *bridge.CustomScriptsService
 	ScriptRuns     *bridge.ScriptRunsService
 	runs           *scriptruns.Service
+	sched          *scriptruns.Scheduler
 	Terminal       *bridge.TerminalService
 	AdeTask        *bridge.AdeTaskService
 	Ops            *bridge.OpsService
@@ -211,7 +216,10 @@ func Build(opts Options) *Wired {
 			w.AgentNotify.HandleScriptRun(r)
 		},
 		EmitLog:      func(p scriptruns.LogPush) { emitter.Emit(bridge.ChannelScriptRunLog, p) },
-		SmartTimeout: opts.SmartTimeout,
+		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout,
+	}
+	if opts.Clock != nil {
+		runs.Now = opts.Clock.Now
 	}
 	w.runs = runs
 	if err := runs.Recover(); err != nil {
@@ -246,6 +254,12 @@ func Build(opts Options) *Wired {
 			return w.Windows.Close(key)
 		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage, opts.RebaseTimeout, runs)
 	runs.ADE = w.AdeBoard
+	runs.MainWindow = func() string {
+		key, _ := w.Windows.AnyRealKey()
+		return key
+	}
+	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
+	w.sched.Start()
 	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -289,7 +303,7 @@ func Build(opts Options) *Wired {
 	w.Quitter = shell.NewQuitter(events, w.beforeFlushOnce, w.teardownOnce, 2*time.Second, w.Windows.Keys)
 
 	w.Files = &bridge.FilesService{Dialogs: opts.Dialogs}
-	w.CustomScripts = &bridge.CustomScriptsService{Deps: deps}
+	w.CustomScripts = &bridge.CustomScriptsService{Deps: deps, Changed: w.sched.Reload}
 	w.Ops = &bridge.OpsService{Log: git.opLog}
 	w.Lifecycle = &bridge.LifecycleService{Flusher: w.Quitter, WindowFlusher: w.CloseFlush}
 	w.MemoryImport = bridge.NewMemoryImportService(w.Memory, opts.Dialogs)
@@ -358,6 +372,7 @@ func (w *Wired) teardown(db io.Closer) {
 	// (Reconcile marks its row stopped) while the DB is still open. Then shutdownTracker flushes
 	// whatever last-active time is still only in memory and stops the hooks listener.
 	terminal.ShutdownBound(w.Terminal.BoundService)
+	w.sched.Close()
 	w.runs.Close()
 	shutdownTracker(w.Tracker, w.AgentHooks)
 	w.AdeBoard.Close()

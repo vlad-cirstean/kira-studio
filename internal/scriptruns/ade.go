@@ -71,7 +71,7 @@ var branchVars = map[string]bool{"repo": true, "branch": true, "base": true, "wo
 
 // planADE resolves the ADE variables, the folder and the pickers of a run. text is the command or
 // prompt body the run uses. Without ADE (Studio) a task is refused and the variables stay literal.
-func (s *Service) planADE(args RunArgs, p *planned, pv *Preview, text string, rendered map[string]string, claimed bool) error {
+func (s *Service) planADE(args RunArgs, p *planned, pv *Preview, text string, rendered map[string]string) error {
 	if s.ADE == nil {
 		if args.TaskID != "" {
 			return ipcerr.New("E_INVALID", "tasks exist only in Kira Space")
@@ -80,7 +80,7 @@ func (s *Service) planADE(args RunArgs, p *planned, pv *Preview, text string, re
 	}
 	used := scripts.VarsUsed(text, nil)
 	if args.TaskID == "" {
-		return s.askTask(pv, used)
+		return s.askTask(pv, used, args.ListTasks)
 	}
 	c, err := s.ADE.Context(args.TaskID, args.BranchID)
 	if err != nil {
@@ -96,14 +96,14 @@ func (s *Service) planADE(args RunArgs, p *planned, pv *Preview, text string, re
 	}
 	pv.ADE.BranchID, pv.ADE.BranchLabel = c.Branch.ID, c.Branch.Label
 	if p.script.UseAdeDir {
-		s.useWorktree(p, pv, c, claimed)
+		s.useWorktree(p, pv, c)
 	}
 	return nil
 }
 
-// askTask asks for a task when the text uses an ADE variable.
-func (s *Service) askTask(pv *Preview, used []string) error {
-	if len(used) == 0 {
+// askTask asks for a task when the text uses an ADE variable; list only fills the choices.
+func (s *Service) askTask(pv *Preview, used []string, list bool) error {
+	if len(used) == 0 && !list {
 		return nil
 	}
 	tasks, err := s.ADE.Tasks()
@@ -113,7 +113,9 @@ func (s *Service) askTask(pv *Preview, used []string) error {
 	if tasks != nil {
 		pv.Needs.Tasks = tasks
 	}
-	pv.Missing = append(pv.Missing, "task")
+	if len(used) > 0 {
+		pv.Missing = append(pv.Missing, "task")
+	}
 	return nil
 }
 
@@ -158,8 +160,8 @@ func applyVars(p *planned, pv *Preview, c ADEContext, rendered map[string]string
 	pv.ADE = &RunADE{TaskID: c.TaskID, TaskTitle: c.TaskTitle}
 }
 
-// useWorktree runs the script in the chosen branch's worktree, which a smart run also needs free.
-func (s *Service) useWorktree(p *planned, pv *Preview, c ADEContext, claimed bool) {
+// useWorktree runs the script in the chosen branch's worktree, which a smart or headless run also needs free.
+func (s *Service) useWorktree(p *planned, pv *Preview, c ADEContext) {
 	if pv.Blocker == p.dir.Blocker {
 		pv.Blocker = ""
 	}
@@ -168,7 +170,7 @@ func (s *Service) useWorktree(p *planned, pv *Preview, c ADEContext, claimed boo
 	if c.Preparing != "" {
 		setBlocker(pv, c.Preparing)
 	}
-	if p.script.Kind == scripts.KindSmart && !claimed {
+	if (p.script.Kind == scripts.KindSmart || p.opts.headless) && !p.opts.claimed {
 		if why := s.ADE.Busy(c.Branch.ID); why != "" {
 			setBlocker(pv, why)
 		}

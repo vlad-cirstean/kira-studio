@@ -36,16 +36,19 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 type options struct {
-	smartTimeout  time.Duration
-	noGh          bool
-	noClaude      bool
-	trackerGrace  time.Duration
-	rebaseTimeout time.Duration
-	mobilePoll    time.Duration
+	smartTimeout    time.Duration
+	scheduleTimeout time.Duration
+	clock           scriptruns.Clock
+	noGh            bool
+	noClaude        bool
+	trackerGrace    time.Duration
+	rebaseTimeout   time.Duration
+	mobilePoll      time.Duration
 }
 
 // Opt tweaks New.
@@ -63,6 +66,12 @@ func WithTrackerGrace(d time.Duration) Opt { return func(o *options) { o.tracker
 
 // WithSmartTimeout replaces every smart script's own timeout.
 func WithSmartTimeout(d time.Duration) Opt { return func(o *options) { o.smartTimeout = d } }
+
+// WithScheduleTimeout replaces every headless scheduled run's own timeout.
+func WithScheduleTimeout(d time.Duration) Opt { return func(o *options) { o.scheduleTimeout = d } }
+
+// WithClock drives the scheduler and the run times with c.
+func WithClock(c scriptruns.Clock) Opt { return func(o *options) { o.clock = c } }
 
 // WithMobilePoll sets how often the phone server's network supervisor re-checks (10s by default).
 func WithMobilePoll(d time.Duration) Opt { return func(o *options) { o.mobilePoll = d } }
@@ -244,7 +253,7 @@ func (a *App) build() {
 		ghLocator = noGhLocator{}
 	}
 	a.W = appwire.Build(appwire.Options{
-		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, MobilePoll: a.opts.mobilePoll,
+		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},

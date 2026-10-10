@@ -36,6 +36,8 @@ type Service struct {
 	Getenv func(string) string
 	// SmartTimeout, when positive, replaces every smart run's own timeout (a flow test).
 	SmartTimeout time.Duration
+	// MainWindow is the window key a scheduled run's confirm popup shows in; "" when none is open.
+	MainWindow func() string
 	// ScheduleTimeout, when positive, replaces every headless run's own timeout (a flow test).
 	ScheduleTimeout time.Duration
 
@@ -178,6 +180,10 @@ func (s *Service) Stop(id string) error {
 	if err != nil {
 		return err
 	}
+	if run.State == StateWaiting {
+		s.skipWaiting(skipByID, id, "stopped by you", runoutcome.SourceUser)
+		return nil
+	}
 	if run.State != StateRunning {
 		return nil
 	}
@@ -208,7 +214,7 @@ func (s *Service) ResolveDir(scriptID string) (scripts.Dir, error) {
 	return scripts.ResolveDir(*rec, s.Home), nil
 }
 
-// Recover ends every run the previous process left running. Call it before the bound services register.
+// Recover ends every run the previous process left running or waiting. Call it before the bound services register.
 func (s *Service) Recover() error {
 	o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndRestart, App: s.App})
 	runs, err := s.Runs.FailRunning(o, s.now())
@@ -218,6 +224,7 @@ func (s *Service) Recover() error {
 	for _, r := range runs {
 		s.emit(r)
 	}
+	s.skipWaiting(skipAll, "", "Kira "+s.App+" closed before you answered", runoutcome.SourceRestart)
 	return s.Runs.Purge()
 }
 
