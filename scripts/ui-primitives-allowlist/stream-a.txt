@@ -101,3 +101,7 @@ packages/workbench/src/settings/fields/RowDensityField.vue
 packages/workbench/src/settings/fields/WordWrapField.vue
 permanent U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 §2.2 exempt)
 permanent U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
+apps/kira-studio/frontend/src/api/EnvironmentsView.vue
+apps/kira-studio/frontend/src/views/httprequest/CookiesPane.vue
+apps/kira-studio/frontend/src/views/shared/ResponseFindBar.vue
+apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue

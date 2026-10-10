@@ -53,6 +53,7 @@ U13@@v@@PanelHeader.vue@@hand-rolled panel header/toolbar bar (use PanelHeader/V
 U14@@v@@@@EmptyMedia variant="icon", or Alert faking an empty state@@<EmptyMedia\b(?&t)\svariant="icon"|<Alert\b(?&t)\sclass="[^"]*${TOK}bg-transparent
 U15@@v@@@@PopoverContent width outside w-56/w-80/w-96/w-120/w-auto@@<PopoverContent\b(?&t)\s:?class="[^"]*${TOK}w-(?!(?:56|80|96|120|auto)(?![\w.\[(-]))
 U16@@v@@@@DialogClose wrapping an icon-sm Button (use DialogHeader closable)@@<DialogClose\b(?&t)>\s*<Button\b(?&t)\ssize="icon-sm"
+U17@@v@@@@search/filter text box outside SearchField (use <SearchField>)@@<(?:Input|InputGroupInput|input)\\b(?&t)\\s:?placeholder="[^"]*(?:[Ss]earch|[Ff]ilter|[Ff]ind)|<InputGroupAddon\\b(?&t)>\\s*<CodiconIcon\\b(?&t)\\sname="search"
 GUARDS
 
 # hits: "U<n> path"
