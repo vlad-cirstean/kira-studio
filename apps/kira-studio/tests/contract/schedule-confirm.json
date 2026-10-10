@@ -1,0 +1,141 @@
+{
+  "CustomScriptsService.Create": {
+    "collectionId": null,
+    "color": "blue",
+    "command": "echo hello",
+    "createdAt": "<time>",
+    "dirMode": "kira",
+    "id": "<id:1>",
+    "kind": "script",
+    "name": "tick",
+    "params": [],
+    "schedule": {
+      "branchId": "",
+      "confirm": true,
+      "cron": "* * * * *",
+      "enabled": true,
+      "params": {},
+      "taskId": "",
+      "timeout": "30m",
+      "timezone": "UTC"
+    },
+    "smart": null,
+    "sortOrder": 0,
+    "updatedAt": "<time>",
+    "useAdeDir": false,
+    "workingDir": ""
+  },
+  "ScriptRunsService.ConfirmAccept": {
+    "runId": "<id:2>",
+    "terminal": null
+  },
+  "ScriptRunsService.Get#done": {
+    "branchId": "",
+    "branchLabel": "",
+    "color": "blue",
+    "command": "echo hello",
+    "createdAt": 0,
+    "cwd": "<kira>/automations/<id:1>",
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "kind": "script",
+    "model": "",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": false,
+      "source": "exit",
+      "status": "done"
+    },
+    "params": [],
+    "prompt": "",
+    "scriptId": "<id:1>",
+    "scriptName": "tick",
+    "sessionId": "",
+    "startedAt": 0,
+    "state": "done",
+    "taskId": "",
+    "taskTitle": "",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": [],
+      "mcpServers": [],
+      "tools": []
+    },
+    "trigger": "scheduled"
+  },
+  "ScriptRunsService.Get#waiting": {
+    "branchId": "",
+    "branchLabel": "",
+    "color": "blue",
+    "command": "echo hello",
+    "createdAt": 0,
+    "cwd": "<kira>/automations/<id:1>",
+    "finishedAt": null,
+    "id": "<id:2>",
+    "kind": "script",
+    "model": "",
+    "outcome": null,
+    "params": [],
+    "prompt": "",
+    "scriptId": "<id:1>",
+    "scriptName": "tick",
+    "sessionId": "",
+    "startedAt": null,
+    "state": "waiting",
+    "taskId": "",
+    "taskTitle": "",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": [],
+      "mcpServers": [],
+      "tools": []
+    },
+    "trigger": "scheduled"
+  },
+  "ScriptRunsService.ReadLog": {
+    "chunks": [
+      {
+        "seq": 1,
+        "stream": "stdout",
+        "text": "hello"
+      }
+    ],
+    "truncated": false
+  },
+  "ScriptRunsService.SchedulePreview": {
+    "ade": null,
+    "allowedTools": [],
+    "blocker": "",
+    "body": "",
+    "command": "echo hello",
+    "dir": {
+      "base": "<kira>",
+      "blocker": "",
+      "branch": "",
+      "mode": "kira",
+      "path": "<kira>/automations/<id:1>",
+      "pending": false
+    },
+    "env": [],
+    "hash": "<masked>",
+    "kind": "script",
+    "maxBudgetUsd": 0,
+    "mcpServers": [],
+    "missing": [],
+    "model": "",
+    "needs": {
+      "branches": [],
+      "tasks": []
+    },
+    "prompt": [],
+    "suffix": "",
+    "timeout": "",
+    "tools": []
+  },
+  "args:ScriptRunsService.ConfirmAccept": {
+    "hash": "<masked>",
+    "runId": "<id:2>",
+    "secrets": null
+  }
+}

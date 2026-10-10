@@ -1,6 +1,7 @@
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -607,4 +608,87 @@ test('Edit… opens the dialog filled in; Save sends every edited field in one u
         collectionId: null,
       },
     });
+});
+
+// Contract terminal. Backend half: termflow TestShellTab and TestScriptInPickedFolder.
+test('contract: an unscoped terminal opens at the default directory', async ({ relaunch }) => {
+  const home = contract<{ path: string }>('terminal', 'TerminalService.DefaultCwd');
+  const opened = contract<{ cwd: string; command: string }>(
+    'terminal',
+    'args:TerminalService.Open',
+  );
+  const { window: page, control } = await relaunch({
+    control: [{ channel: IPC.terminalDefaultCwd, response: home }, TERMINAL_OPEN_OK],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="tab-strip-new"]').click();
+  await page.locator('[data-testid="menu-item-new-terminal"]').click();
+  await expect
+    .poll(
+      () =>
+        control.log().find((e) => e.channel === IPC.terminalOpen)?.args as
+          | { cwd?: string; command?: string }
+          | undefined,
+    )
+    .toMatchObject({ cwd: opened.cwd, command: opened.command });
+});
+
+test('contract: Choose… fills a fixed folder and the command saves it', async ({ relaunch }) => {
+  const picked = contract<{ canceled: boolean; path: string }>(
+    'terminal',
+    'FilesService.ChooseFolder#picked',
+  );
+  const saved = contract<{ name: string; command: string; dirMode: string; workingDir: string }>(
+    'terminal',
+    'CustomScriptsService.Create#fixed',
+  );
+  const { window: page, control } = await relaunch({
+    control: [
+      RESOLVED_DIR,
+      { channel: IPC.filesChooseFolder, response: picked },
+      { channel: IPC.customScriptsCreate, response: { ...SCRIPT, ...saved } },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
+  await dialog(page).locator('[data-testid="script-dialog-name"]').fill(saved.name);
+  await dialog(page).locator('[data-testid="script-dialog-command"]').fill(saved.command);
+  await pickFixed(page);
+  await dialog(page).locator(CHOOSE).click();
+  await expect(dialog(page).locator('[data-testid="script-dialog-workingdir"]')).toHaveText(
+    saved.workingDir,
+  );
+  await dialog(page).locator('[data-testid="script-dialog-save"]').click();
+  await expect
+    .poll(
+      () =>
+        (
+          control.log().find((e) => e.channel === IPC.customScriptsCreate)?.args as {
+            fields?: Record<string, unknown>;
+          }
+        )?.fields,
+    )
+    .toMatchObject({
+      dirMode: saved.dirMode,
+      workingDir: saved.workingDir,
+      command: saved.command,
+    });
+});
+
+test('contract: a cancelled folder dialog returns no path', async ({ relaunch }) => {
+  const cancelled = contract('terminal', 'FilesService.ChooseFolder#cancelled');
+  const { window: page } = await relaunch({
+    control: [RESOLVED_DIR, { channel: IPC.filesChooseFolder, response: cancelled }],
+  });
+  await openTerminalModule(page);
+  await page.locator('[data-testid="automations-add"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
+  await pickFixed(page);
+  await dialog(page).locator(CHOOSE).click();
+  await expect(dialog(page).locator('[data-testid="script-dialog-workingdir"]')).toHaveText(
+    'No folder chosen',
+  );
 });

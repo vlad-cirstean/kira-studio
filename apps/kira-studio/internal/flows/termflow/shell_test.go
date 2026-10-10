@@ -19,6 +19,11 @@ func TestShellTab(t *testing.T) {
 	if cwd != app.Home {
 		t.Fatalf("DefaultCwd = %q, want the temp HOME %q", cwd, app.Home)
 	}
+	// Contract terminal: tests/ui/automations-module.spec.ts "contract: an unscoped terminal opens".
+	app.Contract(t, "terminal", "TerminalService.DefaultCwd", svc.DefaultCwd())
+	app.Contract(t, "terminal", "args:TerminalService.Open", terminal.OpenArgs{
+		TerminalID: "t1", WindowKey: "main", Cwd: cwd, Cols: 80, Rows: 24,
+	})
 	mark := app.Events.Mark()
 	open(t, app, "w1", "t1", cwd)
 	write(t, app, "t1", "pwd; echo $TERM_PROGRAM\n")

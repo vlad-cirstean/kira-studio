@@ -262,8 +262,13 @@ func TestScheduleConfirm(t *testing.T) {
 		f.Command = "echo hello"
 		f.Schedule.Confirm = true
 	})
+	// Contract schedule-confirm: tests/ui/automations-recurring.spec.ts "contract: a waiting run asks,
+	// Run starts it headless" reads the same fixture.
+	const sc = "schedule-confirm"
+	app.Contract(t, sc, "CustomScriptsService.Create", rec)
 	advance(t, clock, 30*time.Second)
 	waiting := waitSched(t, app, rec.ID, 0, "waiting")
+	app.Contract(t, sc, "ScriptRunsService.Get#waiting", waiting, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash"))
 	if waiting.TerminalID != "" || waiting.StartedAt != nil || waiting.Outcome != nil {
 		t.Fatalf("waiting = %+v", waiting)
 	}
@@ -274,6 +279,7 @@ func TestScheduleConfirm(t *testing.T) {
 	if pv.Dir.Path != waiting.Cwd || pv.Command != waiting.Command || pv.Command != "echo hello" {
 		t.Fatalf("preview dir %q command %q, waiting cwd %q command %q", pv.Dir.Path, pv.Command, waiting.Cwd, waiting.Command)
 	}
+	app.Contract(t, sc, "ScriptRunsService.SchedulePreview", pv, flowharness.Mask("hash"))
 
 	rearmed(t, clock)
 	advance(t, clock, time.Minute)
@@ -281,12 +287,22 @@ func TestScheduleConfirm(t *testing.T) {
 		t.Fatalf("reason = %q", reasonOf(r))
 	}
 
-	started, err := app.W.ScriptRuns.ConfirmAccept(scriptruns.ConfirmArgs{RunID: waiting.ID, Hash: pv.Hash})
+	accept := scriptruns.ConfirmArgs{RunID: waiting.ID, Hash: pv.Hash}
+	app.Contract(t, sc, "args:ScriptRunsService.ConfirmAccept", accept, flowharness.Mask("hash"))
+	started, err := app.W.ScriptRuns.ConfirmAccept(accept)
 	if err != nil || started.RunID != waiting.ID {
 		t.Fatalf("ConfirmAccept = %+v, %v", started, err)
 	}
+	app.Contract(t, sc, "ScriptRunsService.ConfirmAccept", started)
 	if r := waitSmart(t, app, waiting.ID, "done"); r.Trigger != scriptruns.TriggerScheduled || !strings.Contains(logText(t, app, r.ID), "hello") {
 		t.Fatalf("accepted run = %+v", r)
+	} else {
+		app.Contract(t, sc, "ScriptRunsService.Get#done", r, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash"))
+		page, err := app.W.ScriptRuns.ReadLog(scriptruns.ReadLogArgs{ID: r.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		app.Contract(t, sc, "ScriptRunsService.ReadLog", page)
 	}
 	if _, err := app.W.ScriptRuns.ConfirmAccept(scriptruns.ConfirmArgs{RunID: waiting.ID, Hash: pv.Hash}); errCode(err) != "E_INVALID" ||
 		!strings.Contains(err.Error(), "already answered") {
@@ -387,11 +403,18 @@ func TestRunScheduleNow(t *testing.T) {
 		t.Fatal(err)
 	}
 	args := scriptruns.ScheduleStartArgs{ScheduleArgs: scriptruns.ScheduleArgs{ScriptID: rec.ID}, Hash: pv.Hash}
+	// Contract schedule-now, read by tests/ui/automations-recurring.spec.ts "contract: Run now starts
+	// the schedule run at once".
+	app.Contract(t, "schedule-now", "CustomScriptsService.Create", rec)
+	app.Contract(t, "schedule-now", "ScriptRunsService.SchedulePreview", pv, flowharness.Mask("hash"))
+	app.Contract(t, "schedule-now", "args:ScriptRunsService.RunScheduleNow", args, flowharness.Mask("hash"))
 	started, err := app.W.ScriptRuns.RunScheduleNow(args)
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Contract(t, "schedule-now", "ScriptRunsService.RunScheduleNow", started)
 	run := waitSmart(t, app, started.RunID, "running")
+	app.Contract(t, "schedule-now", "ScriptRunsService.Get#running", run, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash"))
 	if run.Trigger != scriptruns.TriggerScheduled || run.TerminalID != "" {
 		t.Fatalf("run = %+v", run)
 	}

@@ -201,6 +201,11 @@ func TestSmartScript(t *testing.T) {
 		mark := app.Events.Mark()
 		args := scriptruns.RunArgs{ScriptID: rec.ID, Params: map[string][]string{"topic": {"cats"}}}
 		id, pv := startSmart(t, app, args)
+		// Contract smart: tests/ui/automations-smart.spec.ts "contract: a smart script runs to Succeeded
+		// ..." reads the same fixture.
+		app.Contract(t, "smart", "CustomScriptsService.Create", rec)
+		app.Contract(t, "smart", "ScriptRunsService.Preview", pv, flowharness.Mask("hash"))
+		app.Contract(t, "smart", "args:ScriptRunsService.Start", startArgs(args, pv), flowharness.Mask("hash"))
 
 		waitCall(t, app, 1)
 		running, err := app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: id})
@@ -211,6 +216,7 @@ func TestSmartScript(t *testing.T) {
 			t.Fatal(err)
 		}
 		done := waitSmart(t, app, id, "done")
+		app.Contract(t, "smart", "ScriptRunsService.Get#done", done, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "costUsd"))
 		o := done.Outcome
 		if o == nil || o.Status != "done" || !o.Reported || o.Source != "agent" || o.Summary != "summary-done" {
 			t.Fatalf("outcome = %+v", o)
@@ -239,6 +245,7 @@ func TestSmartScript(t *testing.T) {
 		if err != nil || page.Truncated {
 			t.Fatalf("ReadLog = %+v, %v", page, err)
 		}
+		app.Contract(t, "smart", "ScriptRunsService.ReadLog", page)
 		texts := make([]string, 0, len(page.Chunks))
 		for _, c := range page.Chunks {
 			texts = append(texts, c.Text)
@@ -278,7 +285,10 @@ func TestSmartScript(t *testing.T) {
 			r, _ := app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: id})
 			return r
 		}
-		if o := run().Outcome; o.Status != "failed" || o.Reason != "summary-failed" || !o.Reported || o.Source != "agent" {
+		failed := run()
+		app.Contract(t, "smart", "CustomScriptsService.Create#failed", rec)
+		app.Contract(t, "smart", "ScriptRunsService.Get#failed", failed, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "costUsd"))
+		if o := failed.Outcome; o.Status != "failed" || o.Reason != "summary-failed" || !o.Reported || o.Source != "agent" {
 			t.Errorf("failed = %+v", o)
 		}
 		if r := run(); r.State != "blocked" || r.Outcome.Reason != "summary-needs_input" {

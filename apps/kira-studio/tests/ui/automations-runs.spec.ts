@@ -1,7 +1,10 @@
 import type { Page } from '@playwright/test';
+import { scriptRunSchema } from '@shared/domain/scriptRuns';
+import { customScriptSchema } from '@shared/domain/scripts';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab as studioModeTab } from './support/apiMode';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -258,3 +261,68 @@ test('the Runs filter narrows to failed runs', async ({ relaunch }) => {
   await page.locator('[data-testid="runs-filter-running"]').click();
   await expect(page.locator('[data-testid="runs-empty"]')).toBeVisible();
 });
+
+// Contract automations. Backend half: termflow TestScriptRunLifecycle, TestScriptRunNonZeroExit and
+// TestScriptRunStopAndClose store the script and its finished run for each outcome.
+const CONTRACT_OUTCOMES = [
+  { key: 'done', label: 'Succeeded', reason: undefined },
+  { key: 'failed', label: 'Failed', reason: 'exited with status 3' },
+  { key: 'cancelled', label: 'Cancelled', reason: 'stopped by you' },
+] as const;
+
+for (const outcome of CONTRACT_OUTCOMES) {
+  test(`contract: a script run ends ${outcome.label}`, async ({ relaunch }) => {
+    const script = contract('automations', `CustomScriptsService.Create#${outcome.key}`, {
+      schema: customScriptSchema,
+    });
+    const finished = contract('automations', `ScriptRunsService.Get#${outcome.key}`, {
+      schema: scriptRunSchema,
+    });
+    const { window: page, control } = await relaunch({
+      control: [
+        { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
+        {
+          channel: IPC.scriptRunsResolveDir,
+          response: { ...DIR, path: finished.cwd },
+        },
+        { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
+      ],
+    });
+    await modeTab(page).click();
+    await page.locator(`[data-testid="script-${script.id}"]`).click();
+    let terminalId = '';
+    await expect
+      .poll(() => {
+        const e = control.log().find((x) => x.channel === IPC.terminalOpen);
+        terminalId = (e?.args as { terminalId?: string } | undefined)?.terminalId ?? '';
+        return terminalId;
+      })
+      .not.toBe('');
+
+    const times = { createdAt: 1_000, startedAt: 1_000 };
+    await emitWailsEvent(page, IPC.scriptRunsChanged, {
+      ...finished,
+      ...times,
+      terminalId,
+      state: 'running',
+      outcome: null,
+      finishedAt: null,
+    });
+    await expect(page.locator('[data-testid="status-runs"]')).toContainText('1 running');
+    await emitWailsEvent(page, IPC.scriptRunsChanged, {
+      ...finished,
+      ...times,
+      terminalId,
+      finishedAt: 4_000,
+    });
+    await expect(page.locator('[data-testid="status-runs"]')).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid="script-run-strip"] [data-testid="run-status"]'),
+    ).toHaveText(outcome.label);
+    if (outcome.reason) {
+      await expect(
+        page.locator('[data-testid="script-run-outcome"] [data-testid="run-outcome-reason"]'),
+      ).toHaveText(outcome.reason);
+    }
+  });
+}

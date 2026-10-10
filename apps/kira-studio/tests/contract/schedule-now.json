@@ -1,0 +1,96 @@
+{
+  "CustomScriptsService.Create": {
+    "collectionId": null,
+    "color": "blue",
+    "command": "sleep 30",
+    "createdAt": "<time>",
+    "dirMode": "kira",
+    "id": "<id:1>",
+    "kind": "script",
+    "name": "tick",
+    "params": [],
+    "schedule": {
+      "branchId": "",
+      "confirm": false,
+      "cron": "0 9 * * *",
+      "enabled": false,
+      "params": {},
+      "taskId": "",
+      "timeout": "30m",
+      "timezone": "UTC"
+    },
+    "smart": null,
+    "sortOrder": 0,
+    "updatedAt": "<time>",
+    "useAdeDir": false,
+    "workingDir": ""
+  },
+  "ScriptRunsService.Get#running": {
+    "branchId": "",
+    "branchLabel": "",
+    "color": "blue",
+    "command": "sleep 30",
+    "createdAt": 0,
+    "cwd": "<kira>/automations/<id:1>",
+    "finishedAt": null,
+    "id": "<id:2>",
+    "kind": "script",
+    "model": "",
+    "outcome": null,
+    "params": [],
+    "prompt": "",
+    "scriptId": "<id:1>",
+    "scriptName": "tick",
+    "sessionId": "",
+    "startedAt": 0,
+    "state": "running",
+    "taskId": "",
+    "taskTitle": "",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": [],
+      "mcpServers": [],
+      "tools": []
+    },
+    "trigger": "scheduled"
+  },
+  "ScriptRunsService.RunScheduleNow": {
+    "runId": "<id:2>",
+    "terminal": null
+  },
+  "ScriptRunsService.SchedulePreview": {
+    "ade": null,
+    "allowedTools": [],
+    "blocker": "",
+    "body": "",
+    "command": "sleep 30",
+    "dir": {
+      "base": "<kira>",
+      "blocker": "",
+      "branch": "",
+      "mode": "kira",
+      "path": "<kira>/automations/<id:1>",
+      "pending": false
+    },
+    "env": [],
+    "hash": "<masked>",
+    "kind": "script",
+    "maxBudgetUsd": 0,
+    "mcpServers": [],
+    "missing": [],
+    "model": "",
+    "needs": {
+      "branches": [],
+      "tasks": []
+    },
+    "prompt": [],
+    "suffix": "",
+    "timeout": "",
+    "tools": []
+  },
+  "args:ScriptRunsService.RunScheduleNow": {
+    "hash": "<masked>",
+    "scriptId": "<id:1>",
+    "secrets": null
+  }
+}

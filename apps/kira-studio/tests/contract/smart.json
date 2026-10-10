@@ -1,0 +1,216 @@
+{
+  "CustomScriptsService.Create": {
+    "collectionId": null,
+    "color": "blue",
+    "command": "Say hi about {topic}",
+    "createdAt": "<time>",
+    "dirMode": "kira",
+    "id": "<id:1>",
+    "kind": "smart",
+    "name": "ask",
+    "params": [
+      {
+        "default": [],
+        "label": "",
+        "name": "topic",
+        "options": [],
+        "required": false,
+        "secret": false,
+        "type": "text"
+      }
+    ],
+    "schedule": null,
+    "smart": {
+      "bashPatterns": [],
+      "maxBudgetUsd": 1,
+      "mcp": [],
+      "model": "sonnet",
+      "timeout": "15m",
+      "tools": ["Read", "Grep", "Glob"]
+    },
+    "sortOrder": 0,
+    "updatedAt": "<time>",
+    "useAdeDir": false,
+    "workingDir": ""
+  },
+  "CustomScriptsService.Create#failed": {
+    "collectionId": null,
+    "color": "blue",
+    "command": "go",
+    "createdAt": "<time>",
+    "dirMode": "kira",
+    "id": "<id:1>",
+    "kind": "smart",
+    "name": "ask",
+    "params": [],
+    "schedule": null,
+    "smart": {
+      "bashPatterns": [],
+      "maxBudgetUsd": 1,
+      "mcp": [],
+      "model": "sonnet",
+      "timeout": "15m",
+      "tools": ["Read", "Grep", "Glob"]
+    },
+    "sortOrder": 0,
+    "updatedAt": "<time>",
+    "useAdeDir": false,
+    "workingDir": ""
+  },
+  "ScriptRunsService.Get#done": {
+    "branchId": "",
+    "branchLabel": "",
+    "color": "blue",
+    "command": "",
+    "createdAt": 0,
+    "cwd": "<kira>/automations/<id:1>",
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "kind": "smart",
+    "model": "sonnet",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": true,
+      "source": "agent",
+      "status": "done",
+      "summary": "summary-done"
+    },
+    "params": [
+      {
+        "name": "topic",
+        "value": "cats"
+      }
+    ],
+    "prompt": "Say hi about cats\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "scriptId": "<id:1>",
+    "scriptName": "ask",
+    "sessionId": "<id:3>",
+    "startedAt": 0,
+    "state": "done",
+    "taskId": "",
+    "taskTitle": "",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": ["Read", "Grep", "Glob", "mcp__kira-ade__finish_step"],
+      "mcpServers": [],
+      "tools": ["Read", "Grep", "Glob"]
+    },
+    "trigger": "manual"
+  },
+  "ScriptRunsService.Get#failed": {
+    "branchId": "",
+    "branchLabel": "",
+    "color": "blue",
+    "command": "",
+    "createdAt": 0,
+    "cwd": "<kira>/automations/<id:1>",
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "kind": "smart",
+    "model": "sonnet",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "summary-failed",
+      "reported": true,
+      "source": "agent",
+      "status": "failed",
+      "summary": "summary-failed"
+    },
+    "params": [],
+    "prompt": "go\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "scriptId": "<id:1>",
+    "scriptName": "ask",
+    "sessionId": "<id:3>",
+    "startedAt": 0,
+    "state": "failed",
+    "taskId": "",
+    "taskTitle": "",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": ["Read", "Grep", "Glob", "mcp__kira-ade__finish_step"],
+      "mcpServers": [],
+      "tools": ["Read", "Grep", "Glob"]
+    },
+    "trigger": "manual"
+  },
+  "ScriptRunsService.Preview": {
+    "ade": null,
+    "allowedTools": ["Read", "Grep", "Glob", "mcp__kira-ade__finish_step"],
+    "blocker": "",
+    "body": "Say hi about {topic}",
+    "command": "",
+    "dir": {
+      "base": "<kira>",
+      "blocker": "",
+      "branch": "",
+      "mode": "kira",
+      "path": "<kira>/automations/<id:1>",
+      "pending": false
+    },
+    "env": [
+      {
+        "fromVar": "topic",
+        "name": "KIRA_PARAM_TOPIC",
+        "secret": false,
+        "value": "cats"
+      }
+    ],
+    "hash": "<masked>",
+    "kind": "smart",
+    "maxBudgetUsd": 1,
+    "mcpServers": [],
+    "missing": [],
+    "model": "sonnet",
+    "needs": {
+      "branches": [],
+      "tasks": []
+    },
+    "prompt": [
+      {
+        "text": "Say hi about ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "cats",
+        "var": "topic"
+      }
+    ],
+    "suffix": "When you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "timeout": "15m",
+    "tools": ["Read", "Grep", "Glob"]
+  },
+  "ScriptRunsService.ReadLog": {
+    "chunks": [
+      {
+        "seq": 1,
+        "stream": "event",
+        "text": "session fake"
+      },
+      {
+        "seq": 2,
+        "stream": "stdout",
+        "text": "▸ Bash git status"
+      },
+      {
+        "seq": 3,
+        "stream": "event",
+        "text": "result: success · 2 turns"
+      }
+    ],
+    "truncated": false
+  },
+  "args:ScriptRunsService.Start": {
+    "branchId": "",
+    "hash": "<masked>",
+    "listTasks": false,
+    "params": {
+      "topic": ["cats"]
+    },
+    "prompt": null,
+    "scriptId": "<id:1>",
+    "taskId": ""
+  }
+}

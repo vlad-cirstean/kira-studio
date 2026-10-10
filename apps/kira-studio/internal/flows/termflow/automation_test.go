@@ -89,6 +89,10 @@ func TestScriptRunLifecycle(t *testing.T) {
 	waitMatch(t, app, mark, "w1", "ok", line("started"))
 	write(t, app, "ok", "\n")
 	done := waitRun(t, app, "ok", "done")
+	// Contract automations: tests/ui/automations-runs.spec.ts "contract: a run ends Succeeded, Failed
+	// or Cancelled" reads the same fixture.
+	app.Contract(t, "automations", "CustomScriptsService.Create#done", rec)
+	app.Contract(t, "automations", "ScriptRunsService.Get#done", done, flowharness.Mask("createdAt", "startedAt", "finishedAt"))
 	if done.Outcome == nil || done.Outcome.Status != "done" || done.Outcome.ExitCode == nil || *done.Outcome.ExitCode != 0 || done.FinishedAt == nil {
 		t.Fatalf("finished run = %+v", done)
 	}
@@ -102,6 +106,8 @@ func TestScriptRunNonZeroExit(t *testing.T) {
 	rec := newScript(t, app, scripts.CustomScriptFields{Command: "echo boom >&2; exit 3"})
 	openScript(t, app, "w1", "bad", rec.ID)
 	r := waitRun(t, app, "bad", "failed")
+	app.Contract(t, "automations", "CustomScriptsService.Create#failed", rec)
+	app.Contract(t, "automations", "ScriptRunsService.Get#failed", r, flowharness.Mask("createdAt", "startedAt", "finishedAt"))
 	if r.Outcome.Reason != "exited with status 3" || r.Outcome.Source != "exit" || *r.Outcome.ExitCode != 3 {
 		t.Fatalf("outcome = %+v, want exit 3", r.Outcome)
 	}
@@ -127,6 +133,9 @@ func TestScriptRunStopAndClose(t *testing.T) {
 	}
 	if r := waitRun(t, app, "b", "cancelled"); r.Outcome.Reason != "stopped by you" {
 		t.Fatalf("Stop outcome = %+v", r.Outcome)
+	} else {
+		app.Contract(t, "automations", "CustomScriptsService.Create#cancelled", rec)
+		app.Contract(t, "automations", "ScriptRunsService.Get#cancelled", r, flowharness.Mask("createdAt", "startedAt", "finishedAt"))
 	}
 	if err := app.W.ScriptRuns.Stop(scriptruns.IDArgs{ID: r.ID}); err != nil {
 		t.Fatalf("Stop of a finished run = %v, want a no-op", err)
