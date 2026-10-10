@@ -449,12 +449,7 @@ function onRowContextMenu(event: MouseEvent, row: FileTreeRow): void {
   fileMenuState.value = { x: event.clientX, y: event.clientY, path: row.node.change.path };
 }
 
-const fileMenuSections = computed(() =>
-  buildFileRowMenu(
-    props.actions.capabilities.clipboard,
-    props.actions.capabilities.goToFile && props.sha !== undefined,
-  ),
-);
+const fileMenuSections = computed(() => buildFileRowMenu(props.sha !== undefined));
 
 // P74 §7.4: line 1 — a tree row has no cursor, so "go to file" is the row's own job; "go to
 // line" is the editor's (RepoDiffView.vue's own `repo.goToFileFromDiff` command). Announces

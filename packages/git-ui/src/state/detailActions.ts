@@ -1,19 +1,13 @@
-import type { GoToFileOutcome, ResultOf } from '@kira/git-ipc';
+import type { GoToFileOutcome } from '@kira/git-ipc';
 import type { BridgeClient } from '../bridge/client.ts';
 import { copyToClipboard } from './clipboardActions.ts';
 
-export type Capabilities = ResultOf<'app.init'>['capabilities'];
-
 /**
  * P5 W10's single bundle of "things the detail pane's components can *do*", passed down as one
- * prop rather than threading `BridgeClient` + `capabilities` + `DetailState.announce` separately
- * through `CommitMeta.vue`/`FileTree.vue`/`DiffView.vue`. `capabilities` is read once per render
- * (it never changes after `app.init` resolves for a given session — a host does not grow a port
- * mid-session), which is why every one of them gates on `actions.capabilities.*` directly rather
- * than through another accessor.
+ * prop rather than threading `BridgeClient` + `DetailState.announce` separately through
+ * `CommitMeta.vue`/`FileTree.vue`/`DiffView.vue`.
  */
 export interface DetailActions {
-  readonly capabilities: Capabilities;
   /** Copies `text` via `clipboard.write` and feeds the resulting announcement into the shared
    *  live region — fire-and-forget from the caller's own perspective (a button click handler),
    *  since every copy site's feedback is the same live-region text plus its own local ~1.5s
@@ -25,8 +19,7 @@ export interface DetailActions {
    *  test asserting which `clipboard.write` calls actually happened. */
   announce(text: string): void;
   /** "Open in editor" (§6.4/D14a's sibling action) — hands the same two blobs to the host's
-   *  native diff. A no-op (never called) when `capabilities.openInEditor` is false; callers gate
-   *  the button on that themselves rather than this method re-checking it.
+   *  native diff.
    *
    *  G21 D13: `pinned` is required, not optional — the caller (`FileTree.vue`'s `openFile` emit)
    *  always knows which of the two this is; no default is applied here, so a call site that
@@ -63,15 +56,12 @@ export interface DetailActions {
   goToFile(params: { rev: string; path: string; line: number }): Promise<GoToFileOutcome>;
   /** P74 §3.3: opens a pull request in the external browser, never in place — the renderer never
    *  supplies a URL (`pr.openExternal`'s own doc comment); it names the PR by number and the host
-   *  composes/opens the URL itself. A no-op (never called) when `capabilities.openExternal` is
-   *  false; callers gate the button on that themselves, same convention `openInEditor` uses. */
+   *  composes/opens the URL itself. */
   openPullRequest(params: { number: number }): Promise<void>;
   /** P79 finding 4: opens an arbitrary URL found in a commit message body (`linkify.ts`) in the
    *  external browser. Unlike `openPullRequest`, this URL is genuinely renderer-supplied — it is
    *  the untrusted commit message text itself, not something the host composes — so each host
-   *  validates the URL's own shape rather than trusting it outright. A no-op (never called) when
-   *  `capabilities.openExternal` is false; callers gate on that themselves, same convention
-   *  `openPullRequest`/`openInEditor` use. */
+   *  validates the URL's own shape rather than trusting it outright. */
   openExternalLink(url: string): Promise<void>;
   /** P75 §2.3: reveals and selects `sha` in the graph — review-row-only today
    *  (`ReviewCommitRow.vue`'s "Open in graph"), implemented in every bundle because
@@ -89,11 +79,9 @@ export interface DetailActions {
 export function createDetailActions(
   bridge: BridgeClient,
   announce: (text: string) => void,
-  capabilities: Capabilities,
   repoId: () => string | undefined,
 ): DetailActions {
   return {
-    capabilities,
     copy(text, whatCopied) {
       void copyToClipboard(bridge, text, whatCopied).then((outcome) => {
         announce(outcome.message);

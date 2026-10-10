@@ -14,12 +14,10 @@ import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { computed, useTemplateRef } from 'vue';
-import type { Capabilities } from '../../state/detailActions.ts';
 import type { ReviewCommentsState } from '../../state/reviewComments.ts';
 
 const props = defineProps<{
   reviewComments: ReviewCommentsState;
-  capabilities: Capabilities;
 }>();
 
 // Reuses ReviewFilesState.selectFile rather than a second editor.openRangeDiff call site (D10) —
@@ -80,7 +78,6 @@ const listEl = useTemplateRef<HTMLElement>('list');
         countLabel
       }}</span>
       <TooltipIconButton
-        v-if="capabilities.clipboard"
         icon="copy"
         label="Copy for AI"
         class="ml-auto"
@@ -91,7 +88,6 @@ const listEl = useTemplateRef<HTMLElement>('list');
         v-if="!reviewComments.confirmingClear.value"
         icon="clear-all"
         label="Clear all comments"
-        :class="capabilities.clipboard ? '' : 'ml-auto'"
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
       />

@@ -16,7 +16,7 @@ import RefSectionHeader from './RefSectionHeader.vue';
 import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
 import type { RefListSection } from './refListModel.ts';
-import { buildReadOnlyRefMenu, buildRefMenu } from './rowMenuModel.ts';
+import { buildRefMenu } from './rowMenuModel.ts';
 import ShowMoreButton from './ShowMoreButton.vue';
 import { useRowMenu } from './useRowMenu.ts';
 
@@ -25,9 +25,6 @@ const props = defineProps<{
   ops: OpsState;
   knownRemotes: readonly string[];
   inProgress: InProgressOperation | null;
-  /** C10 §4.2/§4.3 (S6): `false` under the native read-only graph — the row menu falls back to
-   *  `buildReadOnlyRefMenu` (empty) instead of `buildRefMenu`. */
-  writeCapability: boolean;
   /** P77 §6.3: raises this tab's own cap by `REF_LIST_SECTION_CAP` for the current panel-open —
    *  `BranchPicker.vue` owns the `capSteps` state every tab's own button reaches through this. */
   showMore: () => void;
@@ -39,13 +36,7 @@ const props = defineProps<{
 
 const emit = defineEmits<(e: 'checked-out') => void>();
 
-// C12-6: the row's own main click handler — same gap BranchPicker.vue's own branch/remote rows
-// had (see that file's own comment on `checkoutBranch`): unlike the ref-scoped context menu
-// (gated below via `buildReadOnlyRefMenu`), nothing stopped this from running under
-// `writeCapability: false`, issuing a `preflight.checkout` the native read-only stream refuses
-// with an unhandled promise rejection.
 async function checkout(row: RefRow): Promise<void> {
-  if (!props.writeCapability) return;
   emit('checked-out');
   await props.ops.runCheckout(row.shortName, 'switch');
 }
@@ -63,15 +54,13 @@ const { menu: refMenu, open: openRefMenu, openFromButton: openRefMenuFromButton 
 const refMenuSections = computed(() => {
   const entry = refMenu.value;
   if (!entry) return [];
-  return props.writeCapability
-    ? buildRefMenu({
-        kind: 'tag',
-        shortName: entry.row.shortName,
-        isHead: false,
-        knownRemotes: props.knownRemotes,
-        inProgress: props.inProgress,
-      })
-    : buildReadOnlyRefMenu();
+  return buildRefMenu({
+    kind: 'tag',
+    shortName: entry.row.shortName,
+    isHead: false,
+    knownRemotes: props.knownRemotes,
+    inProgress: props.inProgress,
+  });
 });
 
 async function onRefMenuSelect(id: string): Promise<void> {
@@ -81,14 +70,6 @@ async function onRefMenuSelect(id: string): Promise<void> {
   const { row } = entry;
   if (id === 'checkoutRef') {
     await checkout(row);
-    return;
-  }
-  // C12-6: buildReadOnlyRefMenu's own "Review branch changes" item (rowMenuModel.ts) — reachable
-  // from here via the `!props.writeCapability` branch above despite that function's own doc
-  // comment claiming "a tag entry never reaches this function" (fixed alongside this). Mirrors
-  // BranchPicker.vue's identical case for its own branch/remote rows.
-  if (id === 'reviewBranch') {
-    await props.ops.openReview(row.shortName);
     return;
   }
   if (id === 'deleteRef') {

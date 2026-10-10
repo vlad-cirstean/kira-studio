@@ -281,27 +281,20 @@ export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
  *  P74 §3: never a real `<a href>` — under Wails an anchor click navigates the app's own window
  *  itself rather than opening a browser tab (there is no separate tab to open one in), the same
  *  defect class `CommitMeta.vue`/`BranchPicker.vue`/`StackList.vue`'s own PR links carried before
- *  §3's fix. `openExternalCapability` gates a `<button data-pr-number>` (click routed through
+ *  §3's fix. A `<button data-pr-number>` (click routed through
  *  `CommitGrid.vue`'s own `onClick` delegation to `DetailActions.openPullRequest`, which composes
- *  and opens the URL host-side) vs. a plain, inert `<span>` — the same button/span split
- *  `BranchPicker.vue`/`StackList.vue` already use, applied here since this file has no `v-if` of
- *  its own. The PR's state is carried as a border colour class, never as text (`prBadgeClass`) —
+ *  and opens the URL host-side). The PR's state is carried as a border colour class, never as text (`prBadgeClass`) —
  *  width is scarce, and the tooltip already names the state in words. */
-export function buildPrBadge(
-  prs: readonly PrRecord[],
-  openExternalCapability: boolean,
-): HTMLElement | null {
+export function buildPrBadge(prs: readonly PrRecord[]): HTMLElement | null {
   const best = pickBestPr(prs);
   if (best === undefined) return null;
 
-  const badge = document.createElement(openExternalCapability ? 'button' : 'span');
-  badge.className = prBadgeClass(best.state, openExternalCapability);
-  if (badge instanceof HTMLButtonElement) {
-    badge.type = 'button';
-    // Not a Tab stop inside the roving-tabindex grid; Enter on it would toggle the detail pane.
-    badge.tabIndex = -1;
-    badge.dataset.prNumber = String(best.number);
-  }
+  const badge = document.createElement('button');
+  badge.className = prBadgeClass(best.state);
+  badge.type = 'button';
+  // Not a Tab stop inside the roving-tabindex grid; Enter on it would toggle the detail pane.
+  badge.tabIndex = -1;
+  badge.dataset.prNumber = String(best.number);
   const extra = prs.length > 1 ? ` (+${prs.length - 1} more)` : '';
   badge.setAttribute('data-kira-tip', `${best.title} — ${PR_STATE_LABEL[best.state]}${extra}`);
 

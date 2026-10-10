@@ -19,7 +19,6 @@ import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
 import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
-import { buildReadOnlyStashMenu } from './rowMenuModel.ts';
 import ShowMoreButton from './ShowMoreButton.vue';
 
 export interface StashRowModel {
@@ -42,13 +41,11 @@ export interface StashRowModel {
 const props = defineProps<{
   section: PickerList<StashEntry>;
   stash: StashState;
-  writeCapability: boolean;
   showMore: () => void;
   focusedRowId?: string;
   emptyMessage: string;
   rowModel: (entry: StashEntry) => StashRowModel;
-  /** The write-capable menu's own sections — the read-only fallback (`buildReadOnlyStashMenu`) is
-   *  the same for both buckets and stays here. */
+  /** The row menu's sections for each bucket. */
   menuFor: (entry: StashEntry) => MenuSection[];
   menuLabel: (entry: StashEntry) => string;
 }>();
@@ -78,7 +75,7 @@ function openMenuFromButton(entry: StashEntry, event: MouseEvent): void {
 const stashMenuSections = computed(() => {
   const entry = stashMenu.value?.entry;
   if (!entry) return [];
-  return props.writeCapability ? props.menuFor(entry) : buildReadOnlyStashMenu();
+  return props.menuFor(entry);
 });
 
 function onMenuSelect(id: string): void {

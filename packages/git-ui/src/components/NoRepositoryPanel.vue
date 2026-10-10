@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HostKind, RepoCandidate } from '@kira/git-ipc';
+import type { RepoCandidate } from '@kira/git-ipc';
 /**
  * §6.2's "no repository open" state: "the repo picker, prompted, and nothing else." The main
  * content area itself when there is nothing else to show — renders the candidate list inline.
@@ -17,7 +17,7 @@ import { onMounted, ref } from 'vue';
 import { codiconName, STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
 
-const props = defineProps<{ repoState: RepoState; host: HostKind }>();
+const props = defineProps<{ repoState: RepoState }>();
 const emit = defineEmits<(event: 'repo-opened', repoId: string) => void>();
 
 // P108 F8: this panel's own refreshList() call (independent of bootstrap()'s own) can fail too —
@@ -87,12 +87,8 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
       >
         Couldn't check this workspace's folders for a Git repository — {{ refreshError }}.
       </EmptyDescription>
-      <EmptyDescription v-else-if="host === 'kira'" class="max-w-105">
-        This workspace's folder is not a Git repository.
-      </EmptyDescription>
       <EmptyDescription v-else class="max-w-105">
-        Kira Space follows the folders open in this VS Code window. None of them is a Git
-        repository — open one with File → Open Folder.
+        This workspace's folder is not a Git repository.
       </EmptyDescription>
       <Button
         v-if="refreshError"

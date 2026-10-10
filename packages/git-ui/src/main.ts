@@ -1,4 +1,4 @@
-import type { EventPayload, HostKind, Transport, UiActionKind } from '@kira/git-ipc';
+import type { Transport, UiActionKind } from '@kira/git-ipc';
 import { createApp, shallowRef, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import ReviewView from './components/review/ReviewView.vue';
@@ -21,7 +21,7 @@ export interface MountHandle {
    *  `CommitGrid.vue`'s own generation-triggered rebuild defer to a single catch-up on the next
    *  `true`, instead of paying that cost once per missed bump against a grid nobody can see. Only
    *  meaningful for `view: "graph"` — a no-op call for a `"review"` mount, which has no
-   *  `CommitGrid.vue` at all. Optional so every existing caller (VS Code's own webview host, this
+   *  `CommitGrid.vue` at all. Optional so every existing caller (this
    *  package's own tests) that never calls it keeps today's always-visible behavior exactly. See
    *  `graphVisibility.ts`. */
   setVisible?(visible: boolean): void;
@@ -30,7 +30,6 @@ export interface MountHandle {
 export interface MountOptions {
   readonly transport: Transport;
   readonly viewState: ViewStateStore;
-  readonly host: HostKind;
   /** `docs/plans/P7.md` W9: which root to mount — `AppRoot` (the panel, P0-P6) or `ReviewView`
    *  (the sidebar, §6.8). Defaults to `"graph"` so every pre-P7 call site (and every test that
    *  constructs `MountOptions` without this field) keeps mounting exactly what it always did. */
@@ -53,34 +52,23 @@ export interface MountOptions {
     action: UiActionKind;
     target?: { repoId: string; sha: string };
   } | null;
-  /** G-UX (item 13): the connection state as of the host's own cold resolve — meaningful for
-   *  BOTH views (unlike `target`/`pendingUiAction` above), so it flows through `mount()`'s own
-   *  `...rest` spread into whichever root is mounted, rather than being picked apart per branch.
-   *  `App.vue`/`ReviewView.vue` each construct their own `BridgeClient` seeded with this, then keep
-   *  it live via the `connection.changed` event — see that class's own doc comment. Named
-   *  `hostConnectionState`, not `connectionState`: both root components already have an unrelated
-   *  local of that name (`BridgeClient.connectionState`, the cold-boot `app.init` success/failure
-   *  signal), and a same-named prop would collide with it as a Vue template key. */
-  readonly hostConnectionState: EventPayload<'connection.changed'>['state'];
   /** P72 §9.1: only meaningful when `view === "graph"` — Kira Space's own app-wide
    *  `appearance.dateFormat` (`packages/shared/domain/settings.ts`), read once at mount time and
    *  preferred over `PersistedViewState.dateFormat` when present (`App.vue`'s own `bootstrap()`).
    *  `undefined`/absent keeps today's behaviour: `PersistedViewState`'s own stored value, or its
    *  `'relative'` default — the shape every pre-P72 call site (and every test that constructs
-   *  `MountOptions` without this field) already gets for free. Not reactive: like
-   *  `hostConnectionState` above, this is the value as of this webview's cold mount, not a live
-   *  prop — a later change to the app-wide setting reaches an already-mounted graph on its next
+   *  `MountOptions` without this field) already gets for free. Not reactive: this is the value as
+   *  of this webview's cold mount, not a live prop — a later change to the app-wide setting reaches an already-mounted graph on its next
    *  remount (a closed tab, or a KeepAlive `:max` eviction, `RepoGraphView.vue`), not while it
    *  stays cached. */
   readonly dateFormat?: DateFormat;
   /** P173: only meaningful when `view === "graph"` — opens the host's Operations log. Absent where
-   *  the host has none (the VS Code webview); the failure banner then names it in text instead. */
+   *  the host has none; the failure banner then names it in text instead. */
   readonly onShowOperations?: () => void;
 }
 
 /**
- * Mounts the app shell into `container`, wired to `transport` and `viewState`, told which
- * `host` it is running under. Hosts and the harness call this rather than each owning their
+ * Mounts the app shell into `container`, wired to `transport` and `viewState`, Hosts and the harness call this rather than each owning their
  * own bootstrap — the UI is mounted unchanged everywhere (§8.4), only these pieces differ.
  * `viewState` is what P3 W9 adds: without it, the panel would have to keep
  * `retainContextWhenHidden` on to avoid losing scroll/selection/loaded-row state every time a
@@ -125,15 +113,10 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   // `"review"` mount (no CommitGrid.vue there to read it) is harmless.
   const graphVisible = shallowRef(true);
   app.provide(GRAPH_VISIBLE_KEY, graphVisible);
-  // G16 D1/D2 (P110 A19): the document-level height chain, converted from app-shell.css's bare
-  // `html, body` selector to classes applied here rather than in the extension host's emitted
-  // document (`webviewDocument.ts`) — that file lives in `apps/kira-space-vscode/src`, outside
-  // `theme/tailwind.css`'s own `@source` scan (`packages/git-ui/src` only, P131 Part 3 §6.2: the
-  // kira-ui `@source` is gone, no surviving kira-ui file carries a utility class), so a class
-  // literal there would never compile. `mount()` already owns this chain (this file's own
-  // original doc comment: "a document-owning bootstrap, not a widget factory"); JS classes here
-  // are the same ownership, not a new one. Never removed on unmount: `html`/`body` are the
-  // document's own elements, not scoped to any one mount — the same permanence the CSS rule had.
+  // G16 D1/D2 (P110 A19): the document-level height chain, as classes applied here rather than
+  // an `html, body` selector. `mount()` owns this chain (this file's own original doc comment:
+  // "a document-owning bootstrap, not a widget factory"). Never removed on unmount: `html`/`body`
+  // are the document's own elements, not scoped to any one mount.
   document.documentElement.classList.add('kv:h-full', 'kv:m-0', 'kv:p-0', 'kv:overflow-hidden');
   document.body.classList.add('kv:h-full', 'kv:m-0', 'kv:p-0', 'kv:overflow-hidden');
   // The other half of the chain — the class and the rule are useless apart, and they live in two

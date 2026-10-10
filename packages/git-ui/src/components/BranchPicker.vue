@@ -57,7 +57,7 @@ import {
   remoteCheckoutLabel,
   remoteCheckoutTarget,
 } from './refListModel.ts';
-import { buildReadOnlyRefMenu, buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
+import { buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
 import ShowMoreButton from './ShowMoreButton.vue';
 import StackList from './StackList.vue';
 import StashList from './StashList.vue';
@@ -73,20 +73,9 @@ const props = defineProps<{
   worktrees: WorktreeState;
   /** G26 D3 — see `StackList.vue`'s own doc comment. */
   stack: StackState;
-  /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
-  openWorktreeWindowCapability: boolean;
-  /** C10 §4.2/§4.3 (S6/S7): `false` under the native read-only graph — this picker's own ref menu
-   *  falls back to `buildReadOnlyRefMenu`, and the flag threads on into every child tab
-   *  (`TagList`/`StashList`/`GlobalStashList`/`WorktreeList`/`StackList`) that owns a write
-   *  affordance of its own. */
-  writeCapability: boolean;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a plain,
    *  badge-free picker (mirrors `CommitGrid.vue`'s own `pr` prop). */
   pr?: PrState;
-  /** P74 §3.3: whether this host can open a URL in the external browser — gates this picker's own
-   *  PR badge, and `StackList.vue`'s, on the same capability `CommitMeta.vue`'s PR row/icon gate
-   *  on. `false` renders the number as plain, non-interactive text. */
-  openExternalCapability: boolean;
   /** P74 §3.3: `AppToolbar.vue`'s own `openPullRequest` — threaded down rather than reimplemented
    *  here or in `StackList.vue`. */
   openPullRequest: (number: number) => void;
@@ -125,7 +114,6 @@ const emit = defineEmits<{
    *  (`StashList.vue`'s own "Save to global stash…" row action). */
   (e: 'saveEntryToGlobalStash', entry: StashEntry): void;
   (e: 'switchWorktree', path: string): void;
-  (e: 'openWorktreeWindow', path: string): void;
   /** P76 §9.3: widened to carry an optional seed — `undefined` from `WorktreeList.vue`'s own
    *  create button, a seed from this picker's own "Create worktree here…" row action. */
   (e: 'createWorktree', seed?: WorktreeCreateSeed): void;
@@ -414,21 +402,12 @@ function closeForCheckout(): void {
   close();
 }
 
-// C12-6: this is the row's own MAIN click handler, unlike every other write-capable affordance
-// in this file (the ref-scoped context menu, gated by `refMenuSections` falling back to
-// `buildReadOnlyRefMenu` above) — nothing upstream of this function stops it from running under
-// `writeCapability: false`. Before this guard, clicking a branch row on the native read-only graph
-// issued `preflight.checkout`, which `gitstream.go`'s allowlist correctly refuses with
-// `E_READ_ONLY` — but `OpsState.runCheckout`'s own `try/finally` has no `catch`, so the rejection
-// surfaced as an unhandled promise rejection and the row looked like a dead, broken click.
 async function checkoutBranch(row: RefRow): Promise<void> {
-  if (!props.writeCapability) return;
   closeForCheckout();
   await props.ops.runCheckout(row.shortName, 'switch');
 }
 
 async function checkoutRemote(row: RefRow): Promise<void> {
-  if (!props.writeCapability) return;
   closeForCheckout();
   await props.ops.runCheckout(remoteCheckoutTarget(row, props.refs.branches.value), 'switch');
 }
@@ -448,7 +427,6 @@ const refMenuSections = computed(() => {
   // never a stack member (buildRefMenu itself already returns before reading `stack` for those
   // two kinds, but computing it only for `branch` here keeps `parentOf`/`childOf` from ever
   // running against a row that could not possibly answer anything).
-  if (!props.writeCapability) return buildReadOnlyRefMenu();
   const stackResult = { stacks: props.stack.stacks.value, orphans: props.stack.orphans.value };
   return buildRefMenu({
     kind: entry.row.kind,
@@ -722,18 +700,12 @@ watch(visibleBranchNames, (names) => {
                 <span v-if="formatTrack(row.track)" class="kv:text-sm kv:text-muted-foreground">{{ formatTrack(row.track) }}</span>
               </button>
               <button
-                v-if="prFor(row.shortName) && openExternalCapability"
+                v-if="prFor(row.shortName)"
                 type="button"
-                :class="prBadgeClass(prFor(row.shortName)!.state, true)"
+                :class="prBadgeClass(prFor(row.shortName)!.state)"
                 :data-kira-tip="prTooltip(row.shortName)"
                 @click.stop="openPullRequest(prFor(row.shortName)!.number)"
               >#{{ prFor(row.shortName)!.number }}</button>
-              <span
-                v-else-if="prFor(row.shortName)"
-                :class="prBadgeClass(prFor(row.shortName)!.state)"
-                :data-kira-tip="prTooltip(row.shortName)"
-                >#{{ prFor(row.shortName)!.number }}</span
-              >
               <RowActionsButton
                 @click="openRefMenuFromButton(row, $event)"
                 @contextmenu="openRefMenu(row, $event)"
@@ -788,7 +760,6 @@ watch(visibleBranchNames, (names) => {
           :ops="ops"
           :known-remotes="knownRemotes"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
-          :write-capability="writeCapability"
           :show-more="() => showMore('tags')"
           :focused-row-id="activeRowId"
           @checked-out="close"
@@ -801,7 +772,6 @@ watch(visibleBranchNames, (names) => {
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :current-branch="refs.currentBranchName.value ?? null"
-          :write-capability="writeCapability"
           :show-more="() => showMore('stashStack')"
           :focused-row-id="activeRowId"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
@@ -815,7 +785,6 @@ watch(visibleBranchNames, (names) => {
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :current-branch="refs.currentBranchName.value ?? null"
-          :write-capability="writeCapability"
           :show-more="() => showMore('stashGlobal')"
           :focused-row-id="activeRowId"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
@@ -829,12 +798,9 @@ watch(visibleBranchNames, (names) => {
           :section="model.worktrees"
           :worktrees="worktrees"
           :ops="ops"
-          :open-worktree-window-capability="openWorktreeWindowCapability"
-          :write-capability="writeCapability"
           :show-more="() => showMore('worktrees')"
           :focused-row-id="activeRowId"
           @switch-worktree="(path) => emit('switchWorktree', path)"
-          @open-worktree-window="(path) => emit('openWorktreeWindow', path)"
           @create-worktree="emit('createWorktree')"
         />
 
@@ -844,8 +810,6 @@ watch(visibleBranchNames, (names) => {
           :orphans="model.orphans"
           :ops="ops"
           :pr="pr"
-          :write-capability="writeCapability"
-          :open-external-capability="openExternalCapability"
           :open-pull-request="openPullRequest"
           :show-more="() => showMore('stacks')"
           :focused-row-id="activeRowId"

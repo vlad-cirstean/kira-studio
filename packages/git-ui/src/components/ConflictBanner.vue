@@ -28,27 +28,12 @@ import type { OpsState } from '../state/ops.ts';
 
 const props = defineProps<{
   ops: OpsState;
-  writeCapability: boolean;
-  resolveConflictEnabled: boolean;
-  resolveConflict: (path: string) => Promise<void>;
 }>();
 
 const inProgress = computed(() => props.ops.statusSummary.value?.inProgress ?? null);
-const busyAction = ref<'resolve' | 'continue' | 'skip' | 'abort' | undefined>(undefined);
+const busyAction = ref<'continue' | 'skip' | 'abort' | undefined>(undefined);
 
 const CONTINUE_REASON_ID = 'kv-conflict-continue-reason';
-
-async function onResolve(): Promise<void> {
-  const op = inProgress.value;
-  const path = op?.conflictedPaths[0];
-  if (!path || busyAction.value) return;
-  busyAction.value = 'resolve';
-  try {
-    await props.resolveConflict(path);
-  } finally {
-    busyAction.value = undefined;
-  }
-}
 
 async function onContinue(): Promise<void> {
   if (busyAction.value) return;
@@ -106,16 +91,7 @@ const PATH_DISPLAY_CAP = 20;
       <span class="flex-1"></span>
 
       <Button
-        v-if="resolveConflictEnabled"
-        variant="toolbar"
-        size="kira"
-        :disabled="inProgress.unmergedCount === 0 || busyAction !== undefined"
-        @click="onResolve"
-      >
-        Resolve in VS Code
-      </Button>
-      <Button
-        v-if="writeCapability && inProgress.canContinue"
+        v-if="inProgress.canContinue"
         variant="toolbar"
         size="kira"
         :disabled="inProgress.unmergedCount > 0 || busyAction !== undefined"
@@ -125,7 +101,7 @@ const PATH_DISPLAY_CAP = 20;
         Continue
       </Button>
       <Button
-        v-if="writeCapability && inProgress.canSkip"
+        v-if="inProgress.canSkip"
         variant="toolbar"
         size="kira"
         :disabled="busyAction !== undefined"
@@ -134,7 +110,7 @@ const PATH_DISPLAY_CAP = 20;
         Skip
       </Button>
       <Button
-        v-if="writeCapability && inProgress.canAbort"
+        v-if="inProgress.canAbort"
         variant="danger"
         size="kira"
         :disabled="busyAction !== undefined"
@@ -145,17 +121,7 @@ const PATH_DISPLAY_CAP = 20;
     </div>
 
     <p
-      v-if="inProgress.unmergedCount > 0 && resolveConflictEnabled"
-      :id="CONTINUE_REASON_ID"
-      class="mt-0.5 text-kira-sm text-muted-foreground"
-    >
-      Resolve the remaining {{ inProgress.unmergedCount }}
-      {{ inProgress.unmergedCount === 1 ? "file" : "files" }} first, then Continue{{
-        inProgress.canSkip ? ", or Skip this commit and move on." : "."
-      }}
-    </p>
-    <p
-      v-else-if="inProgress.unmergedCount > 0"
+      v-if="inProgress.unmergedCount > 0"
       :id="CONTINUE_REASON_ID"
       class="mt-0.5 text-kira-sm text-muted-foreground"
     >

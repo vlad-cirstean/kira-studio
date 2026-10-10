@@ -17,7 +17,6 @@ export { RepoState } from './state/repo.ts';
 export type { ReviewExpansion, ReviewPhase, ReviewTarget } from './state/review.ts';
 export { ReviewSessionState } from './state/review.ts';
 export { SelectionState } from './state/selection.ts';
-export { SettingsState } from './state/settings.ts';
 export type {
   ColumnWidths,
   DateFormat,

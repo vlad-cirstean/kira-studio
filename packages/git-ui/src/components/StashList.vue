@@ -39,9 +39,6 @@ const props = defineProps<{
   /** G28 D5: the currently checked-out branch — `undefined`/`null` for a detached HEAD. Drives
    *  the origin-branch chip and `buildStashMenu`'s own cross-branch Apply label/Pop suppression. */
   currentBranch?: string | null;
-  /** C10 §4.2/§4.3 (S6): `false` under the native read-only graph — the row menu falls back to
-   *  `buildReadOnlyStashMenu` (Show changes only) instead of `buildStashMenu`. */
-  writeCapability: boolean;
   /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
   showMore: () => void;
   /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
@@ -116,7 +113,6 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
     <StashRows
       :section="section"
       :stash="stash"
-      :write-capability="writeCapability"
       :show-more="showMore"
       :focused-row-id="focusedRowId"
       empty-message="No stashes"

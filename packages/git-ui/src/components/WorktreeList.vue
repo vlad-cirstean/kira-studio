@@ -40,14 +40,6 @@ const props = defineProps<{
   section: PickerList<WorktreeEntry>;
   worktrees: WorktreeState;
   ops: OpsState;
-  /** Gates the "Open in New Window" row action (D6/D14) — `false` in the harness. */
-  openWorktreeWindowCapability: boolean;
-  /** C10 §4.2/§4.3: `false` under the native read-only graph — hides create/switch/remove, every
-   *  one of which is a write (create/remove are `op.run`; switch is a checkout). The worktree
-   *  list itself stays visible (a read); "Open in New Window" is already `false` natively via
-   *  `openWorktreeWindowCapability` above, and-ed with this one for the same reason that row is
-   *  hidden even where a future host reported both true independently. */
-  writeCapability: boolean;
   /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
   showMore: () => void;
   /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
@@ -56,17 +48,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'switch-worktree', path: string): void;
-  (e: 'open-worktree-window', path: string): void;
   (e: 'create-worktree'): void;
 }>();
 
 function switchTo(entry: WorktreeEntry): void {
   if (entry.isCurrent) return;
   emit('switch-worktree', entry.path);
-}
-
-function openInNewWindow(entry: WorktreeEntry): void {
-  emit('open-worktree-window', entry.path);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -131,13 +118,7 @@ async function confirmRemove(): Promise<void> {
 <template>
   <section aria-label="Worktrees">
     <RefSectionHeader label="Worktrees">
-      <Button
-        v-if="writeCapability"
-        variant="toolbar"
-        size="kira"
-        class="ml-auto"
-        @click="emit('create-worktree')"
-      >
+      <Button variant="toolbar" size="kira" class="ml-auto" @click="emit('create-worktree')">
         Create Worktree…
       </Button>
     </RefSectionHeader>
@@ -161,19 +142,13 @@ async function confirmRemove(): Promise<void> {
         <span class="flex-1 min-w-0 truncate text-kira-sm text-muted-foreground">{{ entry.path }}</span>
       </div>
       <TooltipIconButton
-        v-if="writeCapability && !entry.isCurrent"
+        v-if="!entry.isCurrent"
         icon="arrow-swap"
         label="Switch to this worktree"
         @click="switchTo(entry)"
       />
       <TooltipIconButton
-        v-if="writeCapability && openWorktreeWindowCapability"
-        icon="empty-window"
-        label="Open in new window"
-        @click="openInNewWindow(entry)"
-      />
-      <TooltipIconButton
-        v-if="writeCapability && !entry.isMain && !entry.isCurrent"
+        v-if="!entry.isMain && !entry.isCurrent"
         icon="trash"
         label="Remove worktree"
         @click="requestRemove(entry)"

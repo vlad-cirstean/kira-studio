@@ -27,8 +27,7 @@ onMounted(async () => {
     handle = mount(container.value, {
       transport,
       viewState: new NullViewStateStore(),
-      host: 'kira',
-      view: 'review',
+        view: 'review',
       target: {
         repoId: props.target.gitRepoId,
         branch: props.target.branch,
@@ -37,7 +36,6 @@ onMounted(async () => {
       },
       reviewFilter: 'needsReview',
       onReviewMarked: (path) => emit('marked', path),
-      hostConnectionState: { kind: 'connected' },
     });
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : String(err);

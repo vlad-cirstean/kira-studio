@@ -13,8 +13,6 @@
  * three modes do, so this is a second file in that shape, not a fourth mode grafted onto
  * `StashDialog.vue` itself (a settings dialog and a stash workflow share no state).
  *
- * Mounted only when `capabilities.editRepoSettings` (Kira Space native); VS Code never shows it.
- *
  * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now. Every
  * `KuiSelect` is `NativeSelect` (git-ui has no fancier dropdown primitive — same choice
  * `StackDialog.vue`'s own parent picker makes), each still driven by an explicit
@@ -48,11 +46,6 @@ import type { RepoSettingsState } from '../../state/repoSettings.ts';
 const props = defineProps<{
   open: boolean;
   repoSettingsState: RepoSettingsState;
-  /** C10 §4.4: `false` under the native read-only graph — hides the Pull section (`strategy`
-   *  configures `remote.pull`, a write this host's transport never issues). Graph scope/page size
-   *  stay: genuine read-side controls, and `repoSettings.set` itself stays allowed at layer 1
-   *  (§4.4) since it only ever writes Kira's own SQLite, never the repository. */
-  writeCapability: boolean;
 }>();
 
 const emit = defineEmits<(e: 'close') => void>();
@@ -275,7 +268,7 @@ async function save(): Promise<void> {
           </Label>
         </section>
 
-        <section v-if="writeCapability" class="first:mt-1">
+        <section class="first:mt-1">
           <h3 class="m-0 mb-0.5 text-kira-lg font-semibold text-fg">Pull</h3>
           <label :for="pullStrategyId" class="flex flex-col gap-0.5">
             Strategy

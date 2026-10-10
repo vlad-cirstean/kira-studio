@@ -26,11 +26,9 @@ import type {
   StashPopPreflight,
   StatusSummary,
   UndoSlotSnapshot,
-  WorktreePrepareLine,
-  WorktreePrepareResult,
 } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import { computed, type Ref, type ShallowRef, shallowRef, triggerRef } from 'vue';
+import { type Ref, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { stashLabel } from '../components/stashListModel.ts';
 import { composeFailureNotice, type FailureNotice } from './failureNotice.ts';
@@ -67,12 +65,6 @@ export type { StashPredictionMismatch } from './liveAnnouncements.ts';
  *  at each of its two call sites rather than given its own top-level name — §7.10/§7.6 both do
  *  this). */
 type StashPrediction = StashPopPreflight['prediction'];
-
-/** F7: mirrors the server's own retained-transcript bound (`maxRetainedLines`,
- *  `apps/kira-space/internal/gitprepare/output.go`) — the live `worktree.progress` stream forwards
- *  every line for up to `PrepareTimeout` (15 minutes) with no cap of its own, so a chatty script
- *  otherwise grows `worktreePrepareOutput` without bound. */
-const WORKTREE_PREPARE_OUTPUT_LIMIT = 500;
 
 const STASHED_NOTE = ' Your changes are stashed — see the stash list.';
 
@@ -268,42 +260,6 @@ export class OpsState {
   readonly pendingPostCheckoutPull: ShallowRef<PostCheckoutPullPrompt | undefined> =
     shallowRef(undefined);
 
-  // -------------------------------------------------------------------------------------
-  // G25 D13: worktree.prepare's own lifecycle — a sibling to the remote-op fields above, not
-  // folded into `busy`/`activeRemoteOp`: a prepare run holds neither the read nor the write gate
-  // server-side (F3), and this app's own UI must not disable every other action while one is in
-  // flight either. `activeWorktreePreparePath` is the worktree path currently preparing, or
-  // `undefined` — the toolbar's own strip and the dialog's own "preparing" phase both key off this,
-  // not `busy`.
-  // -------------------------------------------------------------------------------------
-
-  readonly activeWorktreePreparePath: ShallowRef<string | undefined> = shallowRef(undefined);
-  /** Every sanitized line seen so far for the run named by `activeWorktreePreparePath` — appended
-   *  as `worktree.progress` batches arrive, then REPLACED wholesale by the final result's own
-   *  `output` once `runWorktreePrepare` resolves (a very fast script can finish before its own
-   *  streamed batches are ever throttled out at all, D12's own ~100ms cadence, so the final,
-   *  authoritative transcript always wins over whatever partial view streamed in). */
-  readonly worktreePrepareOutput: ShallowRef<readonly WorktreePrepareLine[]> = shallowRef([]);
-  readonly worktreePrepareResult: ShallowRef<WorktreePrepareResult | undefined> =
-    shallowRef(undefined);
-  /** Epoch ms the latest run started and ended; the toolbar strip and dialog show elapsed time
-   *  from these. The path outlives `activeWorktreePreparePath` so the strip can name the folder. */
-  readonly worktreePrepareStartedAt: ShallowRef<number | undefined> = shallowRef(undefined);
-  readonly worktreePrepareFinishedAt: ShallowRef<number | undefined> = shallowRef(undefined);
-  readonly worktreePrepareLastPath: ShallowRef<string | undefined> = shallowRef(undefined);
-  /** `running` while a run is active; `ready` or `failed` once it ends. A user cancel and a
-   *  dismissed result read `undefined`. */
-  readonly worktreePrepareStatus = computed<'running' | 'ready' | 'failed' | undefined>(() => {
-    if (this.activeWorktreePreparePath.value !== undefined) return 'running';
-    const result = this.worktreePrepareResult.value;
-    if (result === undefined || result.cancelled) return undefined;
-    return result.ok ? 'ready' : 'failed';
-  });
-  /** F7: the SAME array `worktreePrepareOutput.value` currently points to — appended into and
-   *  trimmed in place (`#setWorktreePrepareOutput`/the `worktree.progress` handler below), so a
-   *  batch never re-copies everything seen so far the way `[...prev, ...batch]` did. */
-  #worktreePrepareBuffer: WorktreePrepareLine[] = [];
-
   readonly #bridge: BridgeClient;
   readonly #refs: RefsState;
   /** G26 D13/4.16: `runRestack`/`cancelRestack` DELEGATE to this instance's own execution
@@ -320,7 +276,6 @@ export class OpsState {
   #resolvePull: ((proceed: boolean) => void) | undefined;
   #resolvePostCheckoutPull: ((proceed: boolean) => void) | undefined;
   readonly #unsubscribeProgress: () => void;
-  readonly #unsubscribeWorktreeProgress: () => void;
   readonly #unsubscribeAutoFetch: () => void;
   /** F5: the server runs one goroutine per request, so two `refreshStatus`/`refreshUndo` calls in
    *  quick succession (two `repo.changed` events back to back) can reply out of order — each its
@@ -361,27 +316,6 @@ export class OpsState {
       if (this.#repo.repoId !== event.repoId) return;
       this.#setAutoFetch(event.autoFetch);
     });
-    this.#unsubscribeWorktreeProgress = bridge.on('worktree.progress', (event) => {
-      if (this.#repo.repoId !== event.repoId) return;
-      if (this.activeWorktreePreparePath.value === undefined) return;
-      // F7: appended and trimmed in place — a full `[...prev, ...batch]` spread per batch (every
-      // ~100ms, for up to `PrepareTimeout`) is itself O(n) per batch and, with no cap, unbounded
-      // memory over a long run; `triggerRef` since mutating `#worktreePrepareBuffer` in place
-      // never changes the ref's own value identity.
-      this.#worktreePrepareBuffer.push(...event.lines);
-      const overflow = this.#worktreePrepareBuffer.length - WORKTREE_PREPARE_OUTPUT_LIMIT;
-      if (overflow > 0) this.#worktreePrepareBuffer.splice(0, overflow);
-      triggerRef(this.worktreePrepareOutput);
-    });
-  }
-
-  /** F7: the one place that replaces `worktreePrepareOutput` wholesale (a fresh run starting, or
-   *  the final authoritative transcript replacing the streamed partial view) — keeps
-   *  `#worktreePrepareBuffer` the same array `worktreePrepareOutput.value` points to, so the next
-   *  `worktree.progress` batch appends onto the right buffer instead of a stale or aliased one. */
-  #setWorktreePrepareOutput(lines: readonly WorktreePrepareLine[]): void {
-    this.#worktreePrepareBuffer = [...lines];
-    this.worktreePrepareOutput.value = this.#worktreePrepareBuffer;
   }
 
   setRepoId(repoId: string | undefined): void {
@@ -389,12 +323,6 @@ export class OpsState {
     this.activeRemoteOp.value = undefined;
     this.remoteProgress.value = undefined;
     this.pullStrategy.value = undefined;
-    this.activeWorktreePreparePath.value = undefined;
-    this.#setWorktreePrepareOutput([]);
-    this.worktreePrepareResult.value = undefined;
-    this.worktreePrepareStartedAt.value = undefined;
-    this.worktreePrepareFinishedAt.value = undefined;
-    this.worktreePrepareLastPath.value = undefined;
     // F6: every `run*` method that opens a confirm dialog sets `busy = true` then awaits its own
     // slot's `ask()` — nothing else ever settles that Promise. Without abandoning it here, a repo
     // switch mid-dialog leaves the OLD repo's dialog open over the new repo, and `busy` stuck true
@@ -1199,9 +1127,6 @@ export class OpsState {
   // G25: worktree support. runWorktreeAdd/runWorktreeRemove are `#runSimple` one-liners like
   // every branch/tag mutation above — `WorktreeDialog.vue`'s own create phase and the Remove
   // confirmation have already collected/confirmed their input by the time either is called.
-  // runWorktreePrepare/cancelWorktreePrepare are the exception: `worktree.prepare` is long,
-  // cancellable and streaming (D13), so it gets the same kind of dedicated lifecycle `#runRemote`
-  // gives remote ops, not `#runSimple`'s single-request shape.
   // -------------------------------------------------------------------------------------
 
   async runWorktreeAdd(params: {
@@ -1230,61 +1155,11 @@ export class OpsState {
     );
   }
 
-  /**
-   * `worktree.prepare`'s own executor (D9-D14). `scriptSha256` is the hash of the script text the
-   * dialog just showed the user — computed client-side (`WorktreeDialog.vue`'s own
-   * `crypto.subtle.digest`) over the SAME string this class never itself reads or stores, so the
-   * script text passes through this method only as a hash, never as a value logged or held here.
-   * The server independently re-hashes whatever is CURRENTLY stored and refuses with
-   * `ScriptChanged` on any mismatch before spawning anything (D11) — this method surfaces that
-   * refusal exactly like any other `WorktreePrepareResult`, never specially.
-   */
-  async runWorktreePrepare(
-    path: string,
-    scriptSha256: string,
-  ): Promise<WorktreePrepareResult | undefined> {
-    const repoId = this.#repo.repoId;
-    if (repoId === undefined || this.activeWorktreePreparePath.value !== undefined) {
-      return undefined;
-    }
-    this.activeWorktreePreparePath.value = path;
-    this.worktreePrepareLastPath.value = path;
-    this.worktreePrepareStartedAt.value = Date.now();
-    this.worktreePrepareFinishedAt.value = undefined;
-    this.#setWorktreePrepareOutput([]);
-    this.worktreePrepareResult.value = undefined;
-    try {
-      const result = await this.#bridge.request('worktree.prepare', {
-        repoId,
-        path,
-        scriptSha256,
-      });
-      if (this.#repo.repoId !== repoId) return result;
-      // The final, capped/sanitized transcript always wins over whatever partial view streamed
-      // in (this method's own doc comment on worktreePrepareOutput's field).
-      this.#setWorktreePrepareOutput(result.output);
-      this.worktreePrepareResult.value = result;
-      return result;
-    } catch (error) {
-      this.#announceRejection('Worktree setup', error);
-      return undefined;
-    } finally {
-      this.worktreePrepareFinishedAt.value = Date.now();
-      this.activeWorktreePreparePath.value = undefined;
-    }
-  }
-
-  /** Hides a finished run's toolbar strip; the next run or a repo switch also clears it. */
-  dismissWorktreePrepareResult(): void {
-    this.worktreePrepareResult.value = undefined;
-  }
-
   // -------------------------------------------------------------------------------------
   // G26 D10/D13: stackSet is an ordinary #runSimple one-liner (StackDialog's own set-parent mode
   // has already collected the target branch/parent by the time this is called). runRestack/
   // cancelRestack delegate to StackState (see #stack's own doc comment above) and layer this
-  // class's own busy/announcement lifecycle on top — the same split runWorktreePrepare would use
-  // if WorktreeState held its own reactive progress, which it does not; StackState does.
+  // class's own busy/announcement lifecycle on top — StackState holds the reactive progress.
   // -------------------------------------------------------------------------------------
 
   async runStackSet(branch: string, parent: string | undefined): Promise<OpResult> {
@@ -1348,19 +1223,10 @@ export class OpsState {
   }
 
   /** `stack.cancelRestack` — always safe to call, mirroring `cancelRemote`'s/
-   *  `cancelWorktreePrepare`'s own doc comment exactly: `false` (never an error) when there was
+   *  `cancelRemote`'s own doc comment: `false` (never an error) when there was
    *  nothing to cancel. */
   async cancelRestack(): Promise<boolean> {
     return (await this.#stack?.cancelRestack()) ?? false;
-  }
-
-  /** `worktree.cancelPrepare` — always safe to call, mirroring `cancelRemote`'s own doc comment
-   *  exactly: `false` (never an error) when there was nothing to cancel. */
-  async cancelWorktreePrepare(): Promise<boolean> {
-    const repoId = this.#repo.repoId;
-    if (repoId === undefined) return false;
-    const { cancelled } = await this.#bridge.request('worktree.cancelPrepare', { repoId });
-    return cancelled;
   }
 
   /**
@@ -1985,8 +1851,8 @@ export class OpsState {
    *  (`App.vue`'s "Open in graph" calls `repo.open` directly, independent of any op's own `busy`
    *  hold). Applying a stale op's own head/inProgress/undo into `RefsState`/`statusSummary` after
    *  such a switch would silently corrupt the NOW-displayed repo's state with another repo's own
-   *  result — the same identity check `refreshStatus`/`refreshUndo`/`#runRemote`/
-   *  `runWorktreePrepare` already apply to their own writes. */
+   *  result — the same identity check `refreshStatus`/`refreshUndo`/`#runRemote`
+   *  already apply to their own writes. */
   #applyResult(repoId: string, result: OpResult): void {
     if (this.#repo.repoId !== repoId) return;
     if (result.ok) this.lastFailure.value = undefined;
@@ -2010,7 +1876,6 @@ export class OpsState {
   dispose(): void {
     this.#repo.dispose();
     this.#unsubscribeProgress();
-    this.#unsubscribeWorktreeProgress();
     this.#unsubscribeAutoFetch();
     this.#statusRequest.abort();
     this.#undoRequest.abort();

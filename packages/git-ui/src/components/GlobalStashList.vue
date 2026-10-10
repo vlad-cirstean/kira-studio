@@ -30,10 +30,6 @@ const props = defineProps<{
   ops: OpsState;
   inProgress: InProgressOperation | null;
   currentBranch?: string | null;
-  /** C10 §4.2/§4.3 (S6): `false` under the native read-only graph — hides the header's "Save to
-   *  global stash…" button (`globalStashSave`, a write) and falls the row menu back to
-   *  `buildReadOnlyStashMenu` (Show changes only) instead of `buildGlobalStashMenu`. */
-  writeCapability: boolean;
   /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
   showMore: () => void;
   /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
@@ -93,17 +89,11 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 <template>
   <section aria-label="Global stash">
     <RefSectionHeader label="Global stash">
-      <TooltipIconButton
-        v-if="writeCapability"
-        icon="add"
-        label="Save to global stash…"
-        @click="emit('saveGlobalStash')"
-      />
+      <TooltipIconButton icon="add" label="Save to global stash…" @click="emit('saveGlobalStash')" />
     </RefSectionHeader>
     <StashRows
       :section="section"
       :stash="stash"
-      :write-capability="writeCapability"
       :show-more="showMore"
       :focused-row-id="focusedRowId"
       empty-message="No saved entries"

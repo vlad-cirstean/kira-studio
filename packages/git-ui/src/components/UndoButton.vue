@@ -19,11 +19,7 @@ import type { OpsState } from '../state/ops.ts';
 
 const props = defineProps<{
   ops: OpsState;
-  clipboardEnabled: boolean;
   copy: (text: string, whatCopied: string) => void;
-  /** C10 §4.2/§4.3: `false` under the native read-only graph — undo (`undo.run`) is a write, and
-   *  SPEC names it explicitly as one to hide. */
-  writeCapability: boolean;
 }>();
 
 async function undo(): Promise<void> {
@@ -32,7 +28,7 @@ async function undo(): Promise<void> {
 </script>
 
 <template>
-  <div v-if="writeCapability && ops.undoSlot.value" class="flex items-center gap-0.5">
+  <div v-if="ops.undoSlot.value" class="flex items-center gap-0.5">
     <Tooltip>
       <TooltipTrigger as-child>
         <Button variant="toolbar" size="kira" :disabled="ops.busy.value" @click="undo">
@@ -46,7 +42,7 @@ async function undo(): Promise<void> {
          predates both real classes) — it is not: the slot holds real multi-character sha text, not
          an icon, so an icon-only button's fixed square width would clip it. Dropped to the plain
          default, the same call the "Show more"/"Show less" toggle gets for the identical reason. -->
-    <Tooltip v-if="clipboardEnabled">
+    <Tooltip>
       <TooltipTrigger as-child>
         <Button
           variant="toolbar"
@@ -59,8 +55,5 @@ async function undo(): Promise<void> {
       </TooltipTrigger>
       <TooltipContent>Copy recovery SHA {{ ops.undoSlot.value.recoverySha }}</TooltipContent>
     </Tooltip>
-    <span v-else class="font-data text-kira-sm text-muted-foreground cursor-copy">{{
-      ops.undoSlot.value.recoverySha.slice(0, 7)
-    }}</span>
   </div>
 </template>

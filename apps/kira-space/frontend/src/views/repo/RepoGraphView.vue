@@ -48,19 +48,11 @@ async function mountGraph(): Promise<void> {
   handle = mount(container.value, {
     transport: gitTransportFor(repoId),
     viewState: new TabViewStateStore(props.tab.id, parsePersistedViewState),
-    host: 'kira',
     view: 'graph', // never 'review' — the C11 boundary (§9): this excludes the whole review layer.
     // P72 §9.1: Kira Studio's own app-wide appearance.dateFormat — read once here, at mount time,
     // not reactively (main.ts's own MountOptions.dateFormat doc comment).
     dateFormat: settingsStore.appearance.dateFormat,
     pendingUiAction: pendingReveal ? { action: 'revealCommit', target: pendingReveal } : null,
-    // §14 OQ4: no wire event maps onto this natively. Go's gitrpc emits no 'connection.changed'
-    // analogue at all — that event is composed entirely by the VS Code extension host
-    // (proxyHandlers.ts's own ConnectionManager.onStateChange push), not something a raw
-    // rpcstream naturally has. A dropped renderer stream (a reload) tears this whole mount down
-    // regardless, so there is no lesser-failure state worth inventing a synthetic event for.
-    // Left unconditionally 'connected' rather than wired to nothing.
-    hostConnectionState: { kind: 'connected' },
     // P173: the failure banner's "Show in Operations" button.
     onShowOperations: () => {
       if (!layoutStore.panel.operations.visible) layoutStore.toggleOperationsPanel();

@@ -68,17 +68,13 @@ function renderBody(): void {
   const container = bodyEl.value;
   if (!container) return;
   container.replaceChildren();
-  // P79 finding 4: undefined (renders inert text) unless this host can open external URLs at
-  // all — the same `actions.capabilities.openExternal` gate the PR row's own button/span split
-  // already uses below.
-  const onOpenExternal = props.actions.capabilities.openExternal ? openLink : undefined;
   for (const [index, paragraph] of bodyParagraphs.value.entries()) {
     if (index > 0) container.appendChild(document.createElement('br'));
     if (index > 0) container.appendChild(document.createElement('br'));
     const lines = paragraph.split('\n');
     lines.forEach((line, lineIndex) => {
       if (lineIndex > 0) container.appendChild(document.createElement('br'));
-      appendLinkifiedText(container, line, onOpenExternal);
+      appendLinkifiedText(container, line, openLink);
     });
   }
 }
@@ -334,7 +330,7 @@ const prIcon = computed(() => {
         <TooltipContent>{{ formatAbsoluteDate(detail.committer.timestamp) }}</TooltipContent>
       </Tooltip>
       <span class="kv:shrink-0" aria-hidden="true">·</span>
-      <Tooltip v-if="actions.capabilities.clipboard">
+      <Tooltip>
         <TooltipTrigger as-child>
           <button
             type="button"
@@ -348,8 +344,7 @@ const prIcon = computed(() => {
         </TooltipTrigger>
         <TooltipContent>Copy full SHA</TooltipContent>
       </Tooltip>
-      <code v-else class="kv:font-data" data-testid="commit-meta-sha">{{ shortSha }}</code>
-      <Tooltip v-if="prIcon && actions.capabilities.openExternal">
+      <Tooltip v-if="prIcon">
         <TooltipTrigger as-child>
           <button
             type="button"
@@ -427,18 +422,12 @@ const prIcon = computed(() => {
                 {{ pr.stateLabel }}
               </span>
               <button
-                v-if="actions.capabilities.openExternal"
                 type="button"
                 class="kv:bg-transparent kv:border-0 kv:p-0 kv:text-inherit kv:[font:inherit] kv:text-left kv:cursor-pointer kv:hover:underline"
                 @click="openPullRequest(pr.number)"
               >
                 #{{ pr.number }} {{ pr.title }}
               </button>
-              <span
-                v-else
-                class="kv:bg-transparent kv:border-0 kv:p-0 kv:text-inherit kv:[font:inherit] kv:text-left"
-                >#{{ pr.number }} {{ pr.title }}</span
-              >
             </div>
           </dd>
           <dd v-else-if="prDetail.kind === 'none'" class="kv:m-0">No pull request</dd>

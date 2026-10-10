@@ -15,7 +15,7 @@ import { Empty, EmptyDescription } from '@theme/components/ui/empty';
 
 import type { CommitRecord, FileChangeKind, TipRef } from '@kira/git-core';
 import { SETTINGS } from '@kira/git-core';
-import type { EventPayload, HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
+import type { StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import { Button } from '@theme/components/ui/button';
@@ -31,7 +31,6 @@ import { BridgeClient } from './bridge/client.ts';
 import AppToolbar from './components/AppToolbar.vue';
 import CommitGrid from './components/CommitGrid.vue';
 import ConflictBanner from './components/ConflictBanner.vue';
-import ConnectionBanner from './components/ConnectionBanner.vue';
 import DetailPane from './components/DetailPane.vue';
 import BranchDialog from './components/dialogs/BranchDialog.vue';
 import CheckoutDialog from './components/dialogs/CheckoutDialog.vue';
@@ -55,9 +54,6 @@ import NoRepositoryPanel from './components/NoRepositoryPanel.vue';
 import RowContextMenu from './components/RowContextMenu.vue';
 import { localNameForRemoteBranch, remoteCheckoutTarget } from './components/refListModel.ts';
 import {
-  buildReadOnlyRefMenu,
-  buildReadOnlyRowMenu,
-  buildReadOnlyStashMenu,
   buildRefMenu,
   buildRowMenu,
   buildStashMenu,
@@ -88,7 +84,6 @@ import { RepoState } from './state/repo.ts';
 import { createRepoStates } from './state/repoStates.ts';
 import { SearchState } from './state/search.ts';
 import { SelectionState } from './state/selection.ts';
-import { SettingsState } from './state/settings.ts';
 import { StashState } from './state/stash.ts';
 import {
   type ColumnWidths,
@@ -104,31 +99,21 @@ import { type WorktreeCreateSeed, WorktreeState } from './state/worktrees.ts';
 const props = defineProps<{
   transport: Transport;
   viewState: ViewStateStore;
-  host: HostKind;
   /** G10 D19: a palette command that fired while this webview was cold — see `main.ts`'s own
    *  `MountOptions.pendingUiAction` doc comment. `undefined`/`null` means none is pending. G14
    *  D10: renamed from `pendingAction` and grown an optional `target`, mirroring `ui.action`'s own
    *  shape — this is the extension's own cold-boot document, not the wire, so it is a rename
    *  rather than a contract change. */
   pendingUiAction?: { action: UiActionKind; target?: { repoId: string; sha: string } } | null;
-  /** G-UX (item 13): the host's own connection state as of this webview's cold resolve — see
-   *  `main.ts`'s own `MountOptions.hostConnectionState` doc comment. Threaded straight into
-   *  `BridgeClient`'s constructor as its seed; this component reads the live value back off
-   *  `bridge.hostConnection`, never this prop directly, past that one call. Named
-   *  `hostConnectionState`, not `connectionState`, to avoid colliding with the local const of that
-   *  name below (`BridgeClient`'s OWN, differently-scoped `connectionState` — cold-boot `app.init`
-   *  success/failure, not the host's live socket state; see that class's own doc comment on why
-   *  the two are kept separate). */
-  hostConnectionState: EventPayload<'connection.changed'>['state'];
   /** P72 §9.1: Kira Space's own app-wide `appearance.dateFormat`, read once at mount time — see
    *  `main.ts`'s own `MountOptions.dateFormat` doc comment (not reactive). Preferred over
    *  `app.init`'s `dateFormat` and the persisted value whenever present. */
   dateFormat?: DateFormat;
-  /** P173: opens the host's Operations log (`MountOptions.onShowOperations`); absent in VS Code. */
+  /** P173: opens the host's Operations log (`MountOptions.onShowOperations`); absent where the host has none. */
   showOperations?: () => void;
 }>();
 
-const bridge = new BridgeClient(props.transport, props.hostConnectionState);
+const bridge = new BridgeClient(props.transport);
 const connectionState = bridge.connectionState;
 // P93 §7: one `GraphOrderState` for the life of this component, exactly like `graphView` itself
 // — threaded into it so `graphView.rebuildOrder()` has an order to rebuild against. Reset
@@ -141,10 +126,9 @@ const graphView = new GraphViewState(bridge, undefined, graphOrder);
 const selection = new SelectionState(graphView.store);
 // `docs/plans/P5.md` W7/W11: one `DetailState` for the life of this component, exactly like
 // `graphView`/`selection` above — a repo switch resets it (via `setRepoId` below) rather than
-// replacing the instance. `actions` starts `undefined` and is built once, in `bootstrap()`, the
-// moment `capabilities` comes back from `app.init` — every template site that reads it is inside
-// the same `v-if="repoState"`/`v-else` branches that only render once a repo has actually opened,
-// which cannot happen before that same `bootstrap()` call has already resolved `capabilities`.
+// replacing the instance. `actions` starts `undefined` and is built once, in `bootstrap()`, after
+// `app.init` resolves — every template site that reads it is inside the same
+// `v-if="repoState"`/`v-else` branches that only render once a repo has actually opened.
 const detailState = new DetailState(bridge);
 const actions = shallowRef<DetailActions | undefined>(undefined);
 
@@ -168,11 +152,9 @@ const worktreeState = new WorktreeState(bridge);
 // `refsState`/`graphView` in directly (both already exist above), matching the plan's own "threads
 // RefsState and GraphViewState into it".
 const searchState = new SearchState(bridge, refsState, graphView, prState);
-// G18 D13: `repoSettingsState` (from `createRepoStates`) backs `RepoSettingsDialog.vue`;
-// `pageSize`/`stashIncludeUntrackedDefault` below are re-sourced from it instead of `settingsState`.
+// G18 D13: `repoSettingsState` (from `createRepoStates`) backs `RepoSettingsDialog.vue`.
 
 const repoState = shallowRef<RepoState | undefined>(undefined);
-const settingsState = shallowRef<SettingsState | undefined>(undefined);
 // G12 D6: a failed bootstrap() used to leave repoState undefined forever — the whole template is
 // v-if="repoState", so that rendered nothing at all (F7). Set in the catch below, outside that
 // v-if, with a Retry that clears it and re-runs bootstrap() — the ordinary case this guards is a
@@ -203,26 +185,16 @@ const collapseBranches = ref(true);
  *  nowhere in particular, which is correct: there is no prior position to restore. */
 const initialScrollRow = ref<number | undefined>(undefined);
 
-// G18 D13: pageSize used to read off `settingsState` (the VS-Code-owned SettingsSnapshot); the
-// setting itself moved to the new per-repo store (D1), so this now reads `repoSettingsState`
-// instead — `RepoSettingsState`'s own constructor already seeds it with the schema's own default
-// before any repo is open, so the `??` fallback below is defence in depth, not the primary path.
+// `RepoSettingsState`'s own constructor seeds the schema's own default before any repo is open, so
+// the `??` fallback below is defence in depth, not the primary path.
 const FALLBACK_PAGE_SIZE = SETTINGS['kiraSpace.graph.pageSize'].default;
 
 const pageSize = computed(
   () => repoSettingsState.settings.value['kiraSpace.graph.pageSize'] ?? FALLBACK_PAGE_SIZE,
 );
 
-/** G14 D6: VS Code's own `workbench.tree.indent`, mirrored into the settings snapshot (host-owned,
- *  never contributed by this extension) and bound as `--kv-tree-indent` on `.kv-app` below — the
- *  same "read the schema's own default as the fallback" shape as `pageSize` above. */
-const FALLBACK_TREE_INDENT = SETTINGS['workbench.tree.indent'].default;
-const treeIndent = computed(
-  () => `${settingsState.value?.settings.value['workbench.tree.indent'] ?? FALLBACK_TREE_INDENT}px`,
-);
-
 /** `StashDialog.vue`'s create mode default — same "read the schema's own default as the fallback"
- *  shape as `pageSize` above; re-sourced from `repoSettingsState` for the same reason (G18 D13). */
+ *  shape as `pageSize` above. */
 const FALLBACK_INCLUDE_UNTRACKED = SETTINGS['kiraSpace.stash.includeUntracked'].default;
 const stashIncludeUntrackedDefault = computed(
   () =>
@@ -238,13 +210,6 @@ const worktreeBasePathDefault = computed(
     repoSettingsState.settings.value['kiraSpace.worktree.basePath'] ??
     FALLBACK_WORKTREE_BASE_PATH,
 );
-const FALLBACK_PREPARE_SCRIPT = SETTINGS['kiraSpace.worktree.prepareScript'].default;
-const worktreePrepareScript = computed(
-  () =>
-    repoSettingsState.settings.value['kiraSpace.worktree.prepareScript'] ??
-    FALLBACK_PREPARE_SCRIPT,
-);
-
 const commitGridRef = ref<InstanceType<typeof CommitGrid> | null>(null);
 const toolbarRef = ref<InstanceType<typeof AppToolbar> | null>(null);
 
@@ -538,37 +503,6 @@ function applyRepoIdToStates(repoId: string | undefined): void {
 
 watch(() => repoState.value?.activeRepo.value?.repoId, applyRepoIdToStates, { immediate: true });
 
-/** F2: the host's socket just reconnected (`BridgeClient.onReconnect`'s own doc comment) — the
- *  server's new `Conn` holds no repo, so every request against the currently-held `repoId` would
- *  otherwise fail `ErrRepoNotHeld` forever and leave the graph/status/refs/review frozen on
- *  stale data. Re-opens the same root path (a no-op-shaped, always-safe call — `repo.open` is
- *  what a fresh mount already does) and runs the exact reset+reopen `handleRepoOpened` runs for
- *  a brand new open, then explicitly re-seeds every other state (`applyRepoIdToStates` above),
- *  since `repoId` itself is (almost always) unchanged. A repo that no longer opens (deleted,
- *  moved) is left as-is — same as any other `repo.open` failure elsewhere in this file, nothing
- *  new to handle here. */
-async function handleReconnect(): Promise<void> {
-  const repo = repoState.value;
-  const active = repo?.activeRepo.value;
-  if (!repo || !active) return;
-  // P108 F5: `handleRepoOpened` below unconditionally clears both `pendingSelectionSha` and
-  // `selection` — correct for a genuine repo switch (§6.2's own doc comment), wrong for a
-  // reconnect, which re-opens the *same* repo and should re-resolve the same commit exactly like
-  // a plain refresh does (`watch(graphView.generation)` above). Captured before the reopen, then
-  // re-armed after, so the same `watch(graphView.loadedRows)` re-select+scroll this file's own
-  // refresh path already relies on picks it back up once the re-walk's rows land.
-  const sha = selection.sha.value;
-  const outcome = await repo.open(active.root); // F4: 'superseded' here also bails, same as 'ok' check below.
-  if (outcome.kind !== 'ok') return;
-  await handleRepoOpened(outcome.repo.repoId);
-  applyRepoIdToStates(outcome.repo.repoId);
-  if (sha !== null) pendingSelectionSha.value = sha;
-}
-
-const unsubscribeReconnect = bridge.onReconnect(() => {
-  handleReconnect().catch((err: unknown) => reportAsyncError(err, "Couldn't reconnect"));
-});
-
 watch(detailState.announcement, announce, { deep: true });
 
 watch(opsState.announcement, announce, { deep: true });
@@ -711,13 +645,6 @@ function handleGridContextMenu(detail: { row: number; x: number; y: number }): v
   contextMenuState.value = { commit: graphView.store.commitAt(detail.row), x: detail.x, y: detail.y };
 }
 
-/** P74 §3.3: mirrors `AppToolbar.vue`'s own `openExternalCapability` computed — the same
- *  capability, read here too since `CommitGrid.vue`'s inline PR badge needs it independently of
- *  the toolbar's branch picker. */
-const gridOpenExternalCapability = computed(
-  () => actions.value?.capabilities.openExternal ?? false,
-);
-
 function handleGridOpenPullRequest(number: number): void {
   actions.value
     ?.openPullRequest({ number })
@@ -727,15 +654,11 @@ function handleGridOpenPullRequest(number: number): void {
 const commitMenuSections = computed<MenuSection[]>(() => {
   const state = contextMenuState.value;
   if (!state) return [];
-  const clipboardEnabled = actions.value?.capabilities.clipboard ?? false;
-  return actions.value?.capabilities.write
-    ? buildRowMenu({
-        sha: state.commit.sha,
-        decorations: state.commit.decoration,
-        inProgress: opsState.statusSummary.value?.inProgress ?? null,
-        clipboardEnabled,
-      })
-    : buildReadOnlyRowMenu(clipboardEnabled);
+  return buildRowMenu({
+    sha: state.commit.sha,
+    decorations: state.commit.decoration,
+    inProgress: opsState.statusSummary.value?.inProgress ?? null,
+  });
 });
 
 async function onCommitMenuSelect(id: string): Promise<void> {
@@ -810,13 +733,11 @@ function handleStashContextMenu(detail: { row: number; x: number; y: number }): 
 const stashMenuSections = computed<MenuSection[]>(() => {
   const state = stashContextMenuState.value;
   if (!state) return [];
-  return actions.value?.capabilities.write
-    ? buildStashMenu(
-        opsState.statusSummary.value?.inProgress ?? null,
-        state.entry,
-        refsState.currentBranchName.value,
-      )
-    : buildReadOnlyStashMenu();
+  return buildStashMenu(
+    opsState.statusSummary.value?.inProgress ?? null,
+    state.entry,
+    refsState.currentBranchName.value,
+  );
 });
 
 async function onStashMenuSelect(id: string): Promise<void> {
@@ -906,16 +827,6 @@ async function handleSwitchWorktree(path: string): Promise<void> {
   await handleRepoOpened(outcome.repo.repoId);
 }
 
-/** `WorktreeList.vue`'s own "Open in new window" row action (D6) — the one worktree action that
- *  needs the extension: `worktree.openWindow` is answered entirely inside it, never reaching the
- *  Go server (this file's own `bridge` is the only thing here with a `request` method to reach
- *  it with). */
-async function handleOpenWorktreeWindow(path: string): Promise<void> {
-  const repoId = repoState.value?.activeRepo.value?.repoId;
-  if (repoId === undefined) return;
-  await bridge.request('worktree.openWindow', { repoId, path });
-}
-
 /** `WorktreeList.vue`'s own create button emits no seed (`undefined`); a ref/commit row action
  *  (§9.3) emits one. `{}` keeps `WorktreeDialog.vue`'s existing defaults either way (P76 §9.1). */
 function onCreateWorktree(seed?: WorktreeCreateSeed): void {
@@ -934,8 +845,6 @@ const toolbarBindings = computed(() => ({
   stashState,
   worktreeState,
   stackState,
-  openWorktreeWindowCapability: actions.value?.capabilities.openWorktreeWindow ?? false,
-  editRepoSettingsCapability: actions.value?.capabilities.editRepoSettings ?? false,
   actions: actions.value,
   prState,
   searchOpen: searchOpen.value,
@@ -949,7 +858,6 @@ const toolbarBindings = computed(() => ({
   },
   onSaveEntryToGlobalStash: handleSaveEntryToGlobalStash,
   onSwitchWorktree: handleSwitchWorktree,
-  onOpenWorktreeWindow: handleOpenWorktreeWindow,
   onCreateWorktree,
   onOpenRestackDialog: handleOpenRestackDialog,
   onOpenSetStackParentDialog: handleOpenSetStackParentDialog,
@@ -993,7 +901,6 @@ function handleGridRefContextMenu(detail: {
 const refMenuSections = computed<MenuSection[]>(() => {
   const state = refContextMenuState.value;
   if (!state) return [];
-  if (!actions.value?.capabilities.write) return buildReadOnlyRefMenu();
   const isHead =
     state.kind === 'branch' &&
     refsState.branches.value.some((row) => row.shortName === state.name && row.isHead);
@@ -1059,12 +966,6 @@ async function confirmForceDeleteRef(): Promise<void> {
   const candidate = forceDeleteRefCandidate.value;
   forceDeleteRefCandidate.value = undefined;
   if (candidate !== undefined) await opsState.branchDelete(candidate.name, true);
-}
-
-async function resolveConflictInEditor(path: string): Promise<void> {
-  const repoId = repoState.value?.activeRepo.value?.repoId;
-  if (!repoId) return;
-  await bridge.request('editor.resolveConflict', { repoId, path });
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1379,20 +1280,16 @@ watch(
 
 async function bootstrap(): Promise<void> {
   // P108 F7: a retry re-enters here after an earlier run already got this far — dispose that
-  // run's own `SettingsState`/`RepoState` (each holds a live `bridge.on(...)` subscription) before
-  // replacing them, so a failed run never leaks a subscription forever.
+  // run's own `RepoState` (which holds a live `bridge.on(...)` subscription) before
+  // replacing it, so a failed run never leaks a subscription forever.
   repoState.value?.dispose();
-  settingsState.value?.dispose();
   const init = await bridge.init();
-  settingsState.value = new SettingsState(bridge, init.settings);
   const repo = new RepoState(bridge, init.git);
   repoState.value = repo;
-  // W10/W11: `capabilities` never changes after `app.init` resolves (see `DetailActions`'s own
-  // doc comment), so `actions` is built exactly once, here, rather than reactively re-derived.
+  // `actions` is built exactly once, here, rather than reactively re-derived.
   actions.value = createDetailActions(
     bridge,
     (text) => detailState.announce(text),
-    init.capabilities,
     () => repoState.value?.activeRepo.value?.repoId,
   );
 
@@ -1723,7 +1620,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
   unsubscribeUiAction();
-  unsubscribeReconnect();
   graphView.dispose();
   refsState.dispose();
   opsState.dispose();
@@ -1735,7 +1631,6 @@ onBeforeUnmount(() => {
   repoSettingsState.dispose();
   prState.dispose();
   repoState.value?.dispose();
-  settingsState.value?.dispose();
   bridge.dispose();
 });
 </script>
@@ -1745,7 +1640,6 @@ onBeforeUnmount(() => {
     ref="rootEl"
     class="kv-app kv:flex kv:flex-col kv:h-full kv:w-full kv:bg-bg kv:text-fg kv:overflow-hidden kv:text-base kv:[font-family:var(--kv-font-family)]"
     :data-connection-state="connectionState"
-    :style="{ '--kv-tree-indent': treeIndent }"
   >
     <!-- Unconditional, present from first paint regardless of which of the four content states
          below is showing (or whether bootstrap() has resolved a repoState at all yet) — the old
@@ -1764,11 +1658,6 @@ onBeforeUnmount(() => {
     >
       {{ liveAnnouncement }}
     </div>
-    <!-- G-UX (item 13): unconditional, above every content state below (including the boot-error
-         branches immediately following) — a live disconnect can happen regardless of which of
-         those the rest of the panel is currently showing, and each of them fully replaces the
-         panel's own content, which would otherwise hide this exactly when it matters most. -->
-    <ConnectionBanner :state="bridge.hostConnection.value" />
     <!-- P173: the visible half of every failure the live region announces — outside the v-if chain
          below, same host-agnostic slot as the banners around it. -->
     <FailureBanner
@@ -1817,13 +1706,11 @@ onBeforeUnmount(() => {
       <GitBlockedPanel
         v-if="repoState.git.value.kind !== 'ok'"
         :status="repoState.git.value"
-        :host="props.host"
       />
 
       <NoRepositoryPanel
         v-else-if="!repoState.activeRepo.value"
         :repo-state="repoState"
-        :host="props.host"
         @repo-opened="handleRepoOpened"
       />
 
@@ -1852,12 +1739,7 @@ onBeforeUnmount(() => {
             @close="closeSearch"
           />
         </div>
-        <ConflictBanner
-          :ops="opsState"
-          :write-capability="actions?.capabilities.write ?? false"
-          :resolve-conflict-enabled="actions?.capabilities.resolveConflict ?? false"
-          :resolve-conflict="resolveConflictInEditor"
-        />
+        <ConflictBanner :ops="opsState" />
         <main class="kv:flex kv:flex-1 kv:min-h-0 kv:min-w-0">
           <section class="kv:relative kv:flex-1 kv:min-w-0 kv:flex kv:flex-col kv:bg-panel" data-testid="graph-region" aria-label="Commit graph">
             <UncommittedChangesStrip
@@ -1878,7 +1760,6 @@ onBeforeUnmount(() => {
               :search="searchState"
               :pr="prState"
               :stack="stackState"
-              :open-external-capability="gridOpenExternalCapability"
               v-bind="initialScrollRowProp"
               @update:column-widths="columnWidths = $event"
               @graph-width="gridGraphWidth = $event"
@@ -2006,12 +1887,6 @@ onBeforeUnmount(() => {
           @close="stashContextMenuState = undefined"
           @restore-focus="commitGridRef?.focusGrid()"
         />
-        <!-- C10 §4.2/§4.3: every dialog below except RepoSettingsDialog exists to confirm one
-             write. With every entry point that could open one hidden (the read-only menu
-             builders, the toolbar's write buttons above), mounting them is dead code — removed
-             from this template under this v-if, not from the package, so VS Code (write: true)
-             keeps every one of them unchanged. -->
-        <template v-if="actions?.capabilities.write">
           <!-- P131 Part 2 §5.5: Popover replaces the hand-rolled fixed-position panel + watch
                (G20 D4) — reka's own flip/shift positioning, plus outside-click and Escape
                dismissal it did not have before. Open auto-focus lands on Cancel, never on the
@@ -2096,8 +1971,6 @@ onBeforeUnmount(() => {
             :refs="refsState"
             :create-request="worktreeCreateRequest"
             :base-path-default="worktreeBasePathDefault"
-            :prepare-script="worktreePrepareScript"
-            :run-prepare-script-capability="actions?.capabilities.runPrepareScript ?? false"
             @close-create="worktreeCreateRequest = undefined"
           />
           <StackDialog
@@ -2107,12 +1980,9 @@ onBeforeUnmount(() => {
             :target="stackDialogTarget"
             @close="stackDialogTarget = undefined"
           />
-        </template>
         <RepoSettingsDialog
-          v-if="actions?.capabilities.editRepoSettings"
           :open="repoSettingsDialogOpen"
           :repo-settings-state="repoSettingsState"
-          :write-capability="actions?.capabilities.write ?? false"
           @close="repoSettingsDialogOpen = false"
         />
       </template>

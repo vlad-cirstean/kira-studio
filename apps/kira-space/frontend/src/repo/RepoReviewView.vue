@@ -37,12 +37,8 @@ async function mountReview(): Promise<void> {
   handle = mount(container.value, {
     transport: gitTransportFor(props.repoId),
     viewState: new NullViewStateStore(),
-    host: 'kira',
     view: 'review',
     target,
-    // §14 OQ4's own reasoning (RepoGraphView.vue) applies here identically — no native
-    // 'connection.changed' analogue exists to wire this to.
-    hostConnectionState: { kind: 'connected' },
   });
 }
 

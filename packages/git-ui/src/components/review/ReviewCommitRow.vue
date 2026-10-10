@@ -112,9 +112,7 @@ function onContextMenu(event: MouseEvent): void {
 // is `undefined` until the row has been expanded at least once, so building this menu from
 // `expansion?.actions` left Copy SHA/Copy message disabled (or a no-op) on every never-expanded
 // row, the same bug `openAllChanges` above was already fixed for.
-const menuSections = computed(() =>
-  buildReadOnlyRowMenu(props.actions.capabilities.clipboard),
-);
+const menuSections = computed(() => buildReadOnlyRowMenu());
 
 function onMenuSelect(id: string): void {
   menuState.value = undefined;

@@ -22,13 +22,7 @@
  * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
  */
 import { SETTINGS } from '@kira/git-core';
-import type {
-  EventPayload,
-  HostKind,
-  ReviewSessionSnapshot,
-  Transport,
-  UiActionKind,
-} from '@kira/git-ipc';
+import type { ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -47,14 +41,12 @@ import { rowVariants } from '../../lib/rowVariants.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import { copyToClipboard } from '../../state/clipboardActions.ts';
 import type { FileListMode } from '../../state/detail.ts';
-import type { Capabilities, DetailActions } from '../../state/detailActions.ts';
+import type { DetailActions } from '../../state/detailActions.ts';
 import { RefsState } from '../../state/refs.ts';
 import { type ReviewPane, ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
 import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
-import { SettingsState } from '../../state/settings.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
-import ConnectionBanner from '../ConnectionBanner.vue';
 import { buildRefListSections } from '../refListModel.ts';
 import { useLiveRegion } from '../useLiveRegion.ts';
 import BaseSelector from './BaseSelector.vue';
@@ -65,34 +57,17 @@ import ReviewFilesPane from './ReviewFilesPane.vue';
 const props = defineProps<{
   transport: Transport;
   viewState: ViewStateStore;
-  host: HostKind;
   target?: ReviewTarget | null;
   reviewFilter?: 'all' | 'needsReview';
   onReviewMarked?: (path: string) => void;
-  /** G-UX (item 13): the host's own connection state as of this webview's cold resolve — see
-   *  `App.vue`'s own copy of this doc comment (`main.ts`'s `MountOptions.hostConnectionState`,
-   *  including why this is named `hostConnectionState`, not `connectionState` — the latter
-   *  collides with the differently-scoped local const of that name just below). */
-  hostConnectionState: EventPayload<'connection.changed'>['state'];
 }>();
 
-const bridge = new BridgeClient(props.transport, props.hostConnectionState);
+const bridge = new BridgeClient(props.transport);
 const connectionState = bridge.connectionState;
 const refsState = new RefsState(bridge);
 const review = shallowRef<ReviewSessionState | undefined>(undefined);
 const reviewFiles = shallowRef<ReviewFilesState | undefined>(undefined);
 const reviewComments = shallowRef<ReviewCommentsState | undefined>(undefined);
-const capabilities = shallowRef<Capabilities | undefined>(undefined);
-// G14 D6: this view has no SettingsState today (unlike App.vue, which already needs one for
-// pageSize/stash defaults) — constructed here from `init.settings` (bootstrap() already awaits
-// it) purely so the sidebar's file trees can honour a *live* workbench.tree.indent change, not
-// only the value at boot.
-const settingsState = shallowRef<SettingsState | undefined>(undefined);
-const FALLBACK_TREE_INDENT = SETTINGS['workbench.tree.indent'].default;
-const treeIndent = computed(
-  () => `${settingsState.value?.settings.value['workbench.tree.indent'] ?? FALLBACK_TREE_INDENT}px`,
-);
-
 // P108 F12: this instance's own root, so a document-level handler below can tell a key/click that
 // landed inside it from one that landed in a sibling mount (a graph tab, another review sidebar).
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
@@ -106,11 +81,10 @@ watch(repoId, (id) => refsState.setRepoId(id));
 
 let unsubscribeTarget: (() => void) | undefined;
 let unsubscribeUiAction: (() => void) | undefined;
-let unsubscribeReconnect: (() => void) | undefined;
 
 // P108 F6: one target-sequence token, bumped by every `applyTarget` call — the one place every
 // "which repoId/branch is this view now reviewing" transition funnels through (a `review.target`
-// push, a user's own branch/base pick, `handleReconnect`, `resumeSession`, cold bootstrap). Each
+// push, a user's own branch/base pick, `recompare`, `resumeSession`, cold bootstrap). Each
 // caller that applies further state after its own additional awaits (`setBase`, `setPane`,
 // `listMode`/`filter`/`diffMode` restores) captures the token `applyTarget` returns and re-checks
 // it before every one of those later writes, skipping any whose token has gone stale — a newer
@@ -143,16 +117,12 @@ async function applyTarget(
   return token;
 }
 
-/** F2: the host's socket just reconnected (`BridgeClient.onReconnect`'s own doc comment) — the
- *  server's new `Conn` holds no repo and no walk, so every request against the currently-held
- *  `repoId` would otherwise fail `ErrRepoNotHeld` forever and leave this whole sidebar frozen. A
- *  no-op with no review target open yet (nothing held to re-establish). `applyTarget` re-runs
- *  `setTarget` against the *same* branch, which re-resolves the base and re-streams the range
- *  from scratch against the new connection; a manually-chosen base (an `'override'` resolution)
- *  is re-applied after, mirroring `resumeSession`'s own `baseOverride` restore. `repoId` itself
- *  is unchanged, so `refsState`'s own `watch(repoId, ...)` above never re-fires on its own —
- *  re-seeded explicitly here, same as `App.vue`'s `applyRepoIdToStates`. */
-async function handleReconnect(): Promise<void> {
+/** Re-runs `setTarget` against the same branch: re-resolves the base and re-streams the range from
+ *  scratch. A manually-chosen base (an `'override'` resolution) is re-applied after, mirroring
+ *  `resumeSession`'s own `baseOverride` restore. `repoId` itself is unchanged, so `refsState`'s own
+ *  `watch(repoId, ...)` above never re-fires on its own — re-seeded explicitly here, same as
+ *  `App.vue`'s `applyRepoIdToStates`. A no-op with no review target open yet. */
+async function recompare(): Promise<void> {
   const id = repoId.value;
   const branch = review.value?.branch.value;
   if (!id || !branch) return;
@@ -161,7 +131,7 @@ async function handleReconnect(): Promise<void> {
       ? review.value.resolution.value.base
       : undefined;
   const token = await applyTarget(id, branch);
-  // P108 F6: a `review.target` push (or another reconnect) landed during `applyTarget`'s own
+  // P108 F6: a `review.target` push (or another recompare) landed during `applyTarget`'s own
   // await — that newer target already owns `review`/`repoId` now; applying this stale override
   // base or re-seeding `refsState` with this call's own (now old) `id` would stomp on it.
   if (token !== targetSequence) return;
@@ -171,26 +141,22 @@ async function handleReconnect(): Promise<void> {
 }
 
 function retryCompare(): void {
-  handleReconnect().catch((err: unknown) => reportAsyncError(err, "Couldn't compare"));
+  recompare().catch((err: unknown) => reportAsyncError(err, "Couldn't compare"));
 }
 
 async function bootstrap(): Promise<void> {
   // P108 F7: a retry re-enters here after an earlier run already subscribed and constructed
   // states — unsubscribe and dispose that run's own before replacing them, so a failed run never
-  // leaves a `review.target`/`ui.action`/reconnect handler firing twice, or a state object leaking
+  // leaves a `review.target`/`ui.action` handler firing twice, or a state object leaking
   // its own subscription forever.
   unsubscribeTarget?.();
   unsubscribeUiAction?.();
-  unsubscribeReconnect?.();
   review.value?.dispose();
   reviewFiles.value?.dispose();
   reviewComments.value?.dispose();
-  settingsState.value?.dispose();
 
-  const init = await bridge.init();
-  capabilities.value = init.capabilities;
-  settingsState.value = new SettingsState(bridge, init.settings);
-  review.value = new ReviewSessionState(bridge, init.capabilities);
+  await bridge.init();
+  review.value = new ReviewSessionState(bridge);
   reviewFiles.value = new ReviewFilesState(bridge);
   reviewFiles.value.onMarked = (path) => props.onReviewMarked?.(path);
   reviewComments.value = new ReviewCommentsState(bridge);
@@ -204,9 +170,6 @@ async function bootstrap(): Promise<void> {
   // currently open in the Files pane, or announces there is none to toggle.
   unsubscribeUiAction = bridge.on('ui.action', (event) => {
     onUiAction(event.action);
-  });
-  unsubscribeReconnect = bridge.onReconnect(() => {
-    handleReconnect().catch((err: unknown) => reportAsyncError(err, "Couldn't reconnect"));
   });
 
   if (props.target) {
@@ -416,11 +379,8 @@ const rowActions = computed<DetailActions | undefined>(() => review.value?.rowAc
 // capabilities for its own DiffView, since neither has an honest meaning against a branch-review
 // delta with no single commit sha; FileTree's own copy-path button is the one thing this bundle
 // really serves here.
-const filesActions = computed<DetailActions | undefined>(() => {
-  const caps = capabilities.value;
-  if (!caps) return undefined;
+const filesActions = computed<DetailActions>(() => {
   return {
-    capabilities: caps,
     copy(text, whatCopied) {
       void copyToClipboard(bridge, text, whatCopied).then((outcome) => {
         announce(outcome.message);
@@ -486,11 +446,9 @@ function retryBootstrap(): void {
 onBeforeUnmount(() => {
   unsubscribeTarget?.();
   unsubscribeUiAction?.();
-  unsubscribeReconnect?.();
   review.value?.dispose();
   reviewFiles.value?.dispose();
   reviewComments.value?.dispose();
-  settingsState.value?.dispose();
   refsState.dispose();
   bridge.dispose();
 });
@@ -797,7 +755,6 @@ watch(
     ref="rootEl"
     class="kv-review-view kv:flex kv:flex-col kv:h-full kv:w-full kv:relative kv:bg-bg kv:text-fg kv:font-ui kv:text-base kv:overflow-hidden"
     :data-connection-state="connectionState"
-    :style="{ '--kv-tree-indent': treeIndent }"
   >
     <!-- P131 Part 3 §5.1: MountRoot.vue's own TooltipProvider (Part 2 §3.5) already wraps this
          root, so no tooltip surface of this component's own is needed. -->
@@ -805,11 +762,6 @@ watch(
     <div class="kv:sr-only" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
     </div>
-
-    <!-- G-UX (item 13): unconditional, outside the v-if/v-else-if chain below (`App.vue`'s own
-         copy of this reasoning) — each of those branches fully replaces the panel's own content,
-         which would otherwise hide a live disconnect exactly when it matters most. -->
-    <ConnectionBanner :state="bridge.hostConnection.value" />
 
     <template v-if="bootError">
       <div class="kv:flex kv:flex-col kv:gap-2 kv:p-3" data-testid="boot-error">
@@ -1144,11 +1096,10 @@ watch(
 
         <ReviewCommentsPane
           v-else-if="
-            review.phase.value === 'listing' && review.pane.value === 'comments' && reviewComments && capabilities
+            review.phase.value === 'listing' && review.pane.value === 'comments' && reviewComments
           "
           class="kv:flex-1 kv:min-h-0"
           :review-comments="reviewComments"
-          :capabilities="capabilities"
           @select-comment="onSelectComment"
         />
       </div>

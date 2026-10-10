@@ -3,7 +3,7 @@ import { TransportError } from '@kira/git-ipc';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { DetailState } from './detail.ts';
-import { type Capabilities, createDetailActions, type DetailActions } from './detailActions.ts';
+import { createDetailActions, type DetailActions } from './detailActions.ts';
 import { createAnnouncementRef } from './liveAnnouncements.ts';
 import { PackedStreamState } from './packedStream.ts';
 
@@ -94,7 +94,6 @@ export class ReviewSessionState {
 
   readonly #packed: PackedStreamState;
   readonly #bridge: BridgeClient;
-  readonly #capabilities: Capabilities;
   readonly #expansions = new Map<string, ReviewExpansion>();
   readonly #unsubscribeChanged: () => void;
   #resolveController: AbortController | undefined;
@@ -115,9 +114,8 @@ export class ReviewSessionState {
   #base: string | undefined;
   #pendingResolution: BaseResolution | undefined;
 
-  constructor(bridge: BridgeClient, capabilities: Capabilities) {
+  constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
-    this.#capabilities = capabilities;
     this.#packed = new PackedStreamState();
     this.#unsubscribeChanged = bridge.on('repo.changed', (event) => {
       if (event.kind !== 'refsChanged') return;
@@ -468,7 +466,6 @@ export class ReviewSessionState {
       (text) => {
         this.announcement.value = text;
       },
-      this.#capabilities,
       () => repoId,
     );
   }

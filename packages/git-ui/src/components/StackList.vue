@@ -33,14 +33,8 @@ const props = defineProps<{
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a
    *  plain, badge-free list (mirrors `BranchPicker.vue`'s own `pr` prop). */
   pr?: PrState;
-  /** C10 §4.2/§4.3: `false` under the native read-only graph — hides Restack/Set stack parent/
-   *  Remove from stack, all writes (`stackSet`/`stack.restack`), the same fate the row-menu
-   *  precedent (`buildReadOnlyRefMenu`) gives the identical actions reached from a ref's own
-   *  context menu. The list itself (base/branch/PR/track/stale) stays visible — a read. */
-  writeCapability: boolean;
-  /** P74 §3.3 — see `BranchPicker.vue`'s own doc comment on these two props, threaded straight
-   *  through from `AppToolbar.vue`. */
-  openExternalCapability: boolean;
+  /** P74 §3.3 — see `BranchPicker.vue`'s own doc comment, threaded straight through from
+   *  `AppToolbar.vue`. */
   openPullRequest: (number: number) => void;
   /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop.
    *  `stacks`/`orphans` share one `capSteps` key (`pickerModel.ts`'s own `capFor('stacks')`), so
@@ -96,7 +90,6 @@ async function removeFromStack(branch: string): Promise<void> {
       <div class="flex items-center gap-0.5 py-0.5 px-1 font-semibold text-muted-foreground">
         <span class="flex-1 min-w-0 truncate" :data-kira-tip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
         <Button
-          v-if="writeCapability"
           variant="toolbar"
           size="kira"
           class="ml-auto"
@@ -126,35 +119,26 @@ async function removeFromStack(branch: string): Promise<void> {
             stale
           </span>
           <button
-            v-if="row.pr && openExternalCapability"
+            v-if="row.pr"
             type="button"
-            :class="prBadgeClass(row.pr.state, true)"
+            :class="prBadgeClass(row.pr.state)"
             :data-kira-tip="row.pr.title"
             @click="openPullRequest(row.pr.number)"
           >
             {{ prBadgeLabel(row.pr) }}
           </button>
-          <span
-            v-else-if="row.pr"
-            :class="prBadgeClass(row.pr.state)"
-            :data-kira-tip="row.pr.title"
-          >
-            {{ prBadgeLabel(row.pr) }}
-          </span>
           <span v-if="row.trackText" class="text-kira-sm text-muted-foreground">{{ row.trackText }}</span>
           <span v-if="row.checkedOutIn" class="text-kira-sm opacity-80" :data-kira-tip="row.checkedOutIn">
             <CodiconIcon name="repo" :size="13" />
           </span>
         </div>
         <TooltipIconButton
-          v-if="writeCapability"
           icon="list-tree"
           label="Set stack parent…"
           aria-label="Set stack parent"
           @click="requestSetParent(row.name)"
         />
         <TooltipIconButton
-          v-if="writeCapability"
           icon="close"
           label="Remove from stack"
           @click="removeFromStack(row.name)"
@@ -178,7 +162,6 @@ async function removeFromStack(branch: string): Promise<void> {
           <span class="truncate text-kira-sm text-error">{{ row.orphanReason }}</span>
         </div>
         <TooltipIconButton
-          v-if="writeCapability"
           icon="list-tree"
           label="Set stack parent…"
           aria-label="Set stack parent"

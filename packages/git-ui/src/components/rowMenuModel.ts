@@ -48,7 +48,6 @@ export interface CommitMenuContext {
   readonly sha: string;
   readonly decorations: readonly DecorationRef[];
   readonly inProgress: InProgressOperation | null;
-  readonly clipboardEnabled: boolean;
 }
 
 /**
@@ -57,9 +56,7 @@ export interface CommitMenuContext {
  * create branch/tag here (never gated — git does not refuse either mid-op), revert this commit
  * (gated). `docs/plans/P10.md` W15 fills in the two items P6's own comment here used to call
  * "open question 2/absent-by-plan": reset and cherry-pick, both gated the same way, placed after
- * revert. Copy sha/copy message reuse P5's `clipboardActions.ts` and are absent (not disabled)
- * when the host has no clipboard port, matching `FileTree.vue`'s own
- * `actions.capabilities.clipboard` gate.
+ * revert. Copy sha/copy message reuse P5's `clipboardActions.ts`.
  */
 export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
   const mutating: MenuItem[] = [
@@ -101,31 +98,28 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
       'codicon-git-commit',
     ),
   ];
-  const sections: MenuSection[] = [{ items: mutating }];
-  if (ctx.clipboardEnabled) {
-    sections.push({
+  return [
+    { items: mutating },
+    {
       items: [
         plainItem('copySha', 'Copy SHA', 'codicon-copy'),
         plainItem('copyMessage', 'Copy commit message', 'codicon-copy'),
       ],
-    });
-  }
-  return sections;
+    },
+  ];
 }
 
 /**
- * `docs/plans/P7.md` W13, C10 §4.3/§6 (S6) — the read-only per-commit menu, shared by the review
- * view's row and the native read-only graph: copy sha and copy message *only* (§6.8's
+ * `docs/plans/P7.md` W13 — the read-only per-commit menu of the review view's row: copy sha and
+ * copy message *only* (§6.8's
  * "Read-only" — no checkout/branch/tag/revert, never gated on `canRunOp`, since none of these
  * items are operations git could refuse mid-op; C10 hides the mutating items rather than
  * disabling them, `docs/v1.5/plans/C10-git-graph-native.md` §4.2 layer 3). Kept
  * separate from `buildRowMenu` rather than that function gated down to nothing by a flag, so a
  * reader never has to check "which of these does the review row actually get" against a table of
- * conditions — there is no table, there is a second, smaller function. Absent (not disabled, same
- * convention `buildRowMenu` already uses) when the host has no clipboard port.
+ * conditions — there is no table, there is a second, smaller function.
  */
-export function buildReadOnlyRowMenu(clipboardEnabled: boolean): MenuSection[] {
-  if (!clipboardEnabled) return [];
+export function buildReadOnlyRowMenu(): MenuSection[] {
   return [
     {
       items: [
@@ -143,18 +137,14 @@ export function buildReadOnlyRowMenu(clipboardEnabled: boolean): MenuSection[] {
  * matching every other menu-building function in this file. G21 D11: this is now the one copy-
  * path affordance in every tree, not only the review-styled ones it started out scoped to.
  *
- * P74 §7.4: `goToFileEnabled` adds "Go to file" — absent (not disabled), the same convention
- * `clipboardEnabled` already uses, for a caller with no commit sha to resolve (`FileTree.vue`'s
- * own `sha` prop is optional) or a host with `capabilities.goToFile` false.
+ * P74 §7.4: `goToFileEnabled` adds "Go to file" — absent (not disabled) for a caller with no
+ * commit sha to resolve (`FileTree.vue`'s own `sha` prop is optional).
  */
-export function buildFileRowMenu(
-  clipboardEnabled: boolean,
-  goToFileEnabled: boolean,
-): MenuSection[] {
+export function buildFileRowMenu(goToFileEnabled: boolean): MenuSection[] {
   const items: MenuItem[] = [];
   if (goToFileEnabled) items.push(plainItem('goToFile', 'Go to file', 'codicon-go-to-file'));
-  if (clipboardEnabled) items.push(plainItem('copyPath', 'Copy path', 'codicon-copy'));
-  return items.length === 0 ? [] : [{ items }];
+  items.push(plainItem('copyPath', 'Copy path', 'codicon-copy'));
+  return [{ items }];
 }
 
 export interface RefMenuContext {
@@ -291,35 +281,6 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
     sections.push({ items: stackItems });
   }
   return sections;
-}
-
-/**
- * C10 §4.3 (S6), C11 §12 (S12): the native read-only graph's own ref-badge menu (branch,
- * remote-tracking branch, or tag). Every item `buildRefMenu` offers is a write (checkout/rename/
- * delete/push tag/delete on remote/stack set-parent-or-remove-or-restack/go to parent-or-child
- * branch, the last two because both resolve a branch and call `runCheckout` despite the
- * navigational name) EXCEPT "Review branch changes" — a read, never gated on `canRunOp`
- * (`buildRefMenu`'s own comment just above), which C10 dropped only because `review.open` had no
- * native surface yet (§9 there). C11 builds that surface, so this is the one item restored; every
- * other write stays hidden. Reached from two call sites' own `!writeCapability` branch:
- * `BranchPicker.vue`'s branch/remote-branch rows (its own `'reviewBranch'` case routes to
- * `OpsState.openReview`) AND `TagList.vue`'s tag rows (C12-6: its own doc comment here used to
- * claim "a tag entry never reaches this function", which was wrong — `TagList.vue` falls back to
- * this exact function for its own ref menu and needed the identical `'reviewBranch'` case added).
- * Takes no context: there is nothing here that varies by ref kind or stack membership to gate.
- */
-export function buildReadOnlyRefMenu(): MenuSection[] {
-  return [{ items: [plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple')] }];
-}
-
-/**
- * C10 §4.3 (S6): the native read-only graph's own stash-row menu — "Show changes" only, for both
- * a per-branch stash row (`buildStashMenu`) and a global-stash row (`buildGlobalStashMenu`); the
- * two differ only in their mutating items (apply/pop/drop/create branch/save-to-global vs.
- * apply/create-branch/remove-from-global), all hidden here.
- */
-export function buildReadOnlyStashMenu(): MenuSection[] {
-  return [{ items: [plainItem('stashShow', 'Show changes', 'codicon-eye')] }];
 }
 
 /**

@@ -2,9 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import {
   buildGlobalStashMenu,
-  buildReadOnlyRefMenu,
   buildReadOnlyRowMenu,
-  buildReadOnlyStashMenu,
   buildRefMenu,
   buildRowMenu,
   buildStashMenu,
@@ -234,16 +232,13 @@ describe('createWorktreeHere — un-gated, offered on branch/remoteBranch/commit
       sha: 'a'.repeat(40),
       decorations: [],
       inProgress: MERGE_IN_PROGRESS,
-      clipboardEnabled: false,
     });
     const item = sections[0]?.items.find((i) => i.id === 'createWorktreeHere');
     expect(item?.disabled).toBe(false);
   });
 
-  test('absent from buildReadOnlyRefMenu and buildReadOnlyRowMenu', () => {
-    const refIds = buildReadOnlyRefMenu().flatMap((s) => s.items.map((i) => i.id));
-    const rowIds = buildReadOnlyRowMenu(true).flatMap((s) => s.items.map((i) => i.id));
-    expect(refIds).not.toContain('createWorktreeHere');
+  test('absent from buildReadOnlyRowMenu', () => {
+    const rowIds = buildReadOnlyRowMenu().flatMap((s) => s.items.map((i) => i.id));
     expect(rowIds).not.toContain('createWorktreeHere');
   });
 });
@@ -261,44 +256,13 @@ const WRITE_CAPABLE_ROW_IDS = [
   'resetToThisCommit',
   'cherryPickThisCommit',
 ];
-const WRITE_CAPABLE_STASH_IDS = [
-  'stashApply',
-  'stashPop',
-  'stashDrop',
-  'stashBranch',
-  'stashSaveGlobal',
-  'globalStashRemove',
-];
 
 describe('C10 read-only menu builders emit no write-capable item', () => {
   test('buildReadOnlyRowMenu: only Copy SHA / Copy commit message', () => {
-    const sections = buildReadOnlyRowMenu(true);
+    const sections = buildReadOnlyRowMenu();
     const ids = sections.flatMap((s) => s.items.map((i) => i.id));
     expect(ids).toEqual(['copySha', 'copyMessage']);
     for (const writeId of WRITE_CAPABLE_ROW_IDS) {
-      expect(ids).not.toContain(writeId);
-    }
-  });
-
-  // C11 §12 (S12): "Review branch changes" is restored — a read, never gated on `canRunOp`
-  // (buildRefMenu's own comment) — now that review.open has a native surface. Every other write
-  // buildRefMenu offers stays hidden.
-  test('buildReadOnlyRefMenu: only Review branch changes, for any ref kind', () => {
-    for (const kind of ['branch', 'remoteBranch', 'tag'] as const) {
-      const sections = buildReadOnlyRefMenu();
-      const ids = sections.flatMap((s) => s.items.map((i) => i.id));
-      expect(ids).toEqual(['reviewBranch']);
-      // kind is unused by the function itself (it takes no context) — looping over it here just
-      // documents that the result holds regardless of which row a caller invokes it for.
-      void kind;
-    }
-  });
-
-  test('buildReadOnlyStashMenu: only Show changes', () => {
-    const sections = buildReadOnlyStashMenu();
-    const ids = sections.flatMap((s) => s.items.map((i) => i.id));
-    expect(ids).toEqual(['stashShow']);
-    for (const writeId of WRITE_CAPABLE_STASH_IDS) {
       expect(ids).not.toContain(writeId);
     }
   });

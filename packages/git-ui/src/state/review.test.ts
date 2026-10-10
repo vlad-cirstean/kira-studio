@@ -2,20 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { BaseResolution } from '@kira/git-ipc';
 import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
-import type { Capabilities } from './detailActions.ts';
 import { ReviewSessionState } from './review.ts';
-
-const CAPABILITIES: Capabilities = {
-  openInEditor: true,
-  goToFile: true,
-  clipboard: true,
-  resolveConflict: false,
-  openWorktreeWindow: false,
-  runPrepareScript: false,
-  editRepoSettings: false,
-  write: true,
-  openExternal: true,
-};
 
 const REPO_A = '/repos/a';
 const BRANCH = 'feature';
@@ -85,7 +72,7 @@ describe('ReviewSessionState — F8 #checkForChange race', () => {
     // biome-ignore lint/suspicious/noExplicitAny: the fake only implements the subset of Transport this test drives.
     const transport = new ReviewRaceTransport() as any;
     const bridge = new BridgeClient(transport);
-    const review = new ReviewSessionState(bridge, CAPABILITIES);
+    const review = new ReviewSessionState(bridge);
 
     // setTarget's own initial resolve — lands on 'main'.
     const setTargetPromise = review.setTarget(REPO_A, BRANCH);

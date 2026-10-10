@@ -75,11 +75,6 @@ const props = defineProps<{
   /** G24 D9: the graph indicator's own PR source — optional so a caller with nothing to show yet
    *  gets a plain, badge-free message column, mirroring `search`'s own default. */
   pr?: PrState;
-  /** P74 §3.3: same capability `AppToolbar.vue` threads into `BranchPicker.vue`/`StackList.vue` —
-   *  gates whether the inline PR badge (`refBadges.ts`'s `buildPrBadge`) is a clickable button or
-   *  a plain, inert span. Required, not optional: a caller with no PR source at all still passes
-   *  `false` explicitly, the same posture `detailOpen` already takes. */
-  openExternalCapability: boolean;
   /** G26 D-4.13: the message column's own stack-decoration source — optional so a caller with no
    *  stack view mounted gets plain, undecorated branch badges, mirroring `pr`'s own default. */
   stack?: StackState;
@@ -380,7 +375,6 @@ function currentColumns(): Column<CommitRecord>[] {
       // — `columns.ts`'s own `messageFormatter` already treats both as "render nothing".
       // Badge only the commit a PR's head points at; the detail pane keeps the ancestry answer.
       prsFor: (sha) => props.pr?.prsHeadedAt(sha),
-      openExternalCapability: props.openExternalCapability,
     },
     { stackInfoFor },
     { compact: props.detailOpen },
@@ -491,8 +485,8 @@ function handleClick(displayRow: number): void {
   else emit('openDetail');
 }
 
-/** P74 §3.3: a click landing on the inline PR badge (`refBadges.ts`'s `data-pr-number`, present
- *  only when `openExternalCapability` gated it to a real `<button>`) opens that PR instead of
+/** P74 §3.3: a click landing on the inline PR badge (`refBadges.ts`'s `data-pr-number`, always a
+ *  real `<button>`) opens that PR instead of
  *  selecting the row — the same "hit-test ahead of the ordinary click" shape
  *  `handleContextMenu`'s own `data-ref-kind` check already uses for a right-click. Returns the PR
  *  number when it claimed the click, `undefined` when the click should fall through to

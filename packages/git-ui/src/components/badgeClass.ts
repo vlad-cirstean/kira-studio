@@ -48,12 +48,8 @@ const PR_BADGE_CLASS: Record<string, string> = {
 };
 
 /** `kv-badge-pr` stays as a marker: tests and `CommitGrid.vue`'s click delegation read it. */
-export function prBadgeClass(state: string, clickable = false): string {
-  return refBadgeClass(
-    'kv-badge-pr no-underline',
-    PR_BADGE_CLASS[state] ?? '',
-    clickable ? 'cursor-pointer' : '',
-  );
+export function prBadgeClass(state: string): string {
+  return refBadgeClass('kv-badge-pr no-underline', PR_BADGE_CLASS[state] ?? '', 'cursor-pointer');
 }
 
 export function refBadgeClass(...extra: string[]): string {

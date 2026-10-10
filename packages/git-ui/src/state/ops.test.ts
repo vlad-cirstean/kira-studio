@@ -8,7 +8,6 @@ import type {
   RevertPreflight,
   StashEntry,
   StatusSummary,
-  WorktreePrepareResult,
 } from '@kira/git-ipc';
 import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
@@ -499,63 +498,5 @@ describe('OpsState — runPull carries rebaseMerges from the preflight, not a cl
     const { ops, transport } = setUp();
     await ops.runPull('origin', 'main', 'rebase');
     expect(remoteRunRebaseMerges(transport)).toBe(false);
-  });
-});
-
-describe('OpsState — worktree prepare status', () => {
-  function setup(result: WorktreePrepareResult) {
-    const transport = new FakeTransport();
-    const ops = new OpsState(
-      new BridgeClient(transport),
-      new RefsState(new BridgeClient(transport)),
-      new RepoSettingsState(new BridgeClient(transport)),
-    );
-    transport.onRequest = (method) => {
-      switch (method) {
-        case 'status.get':
-          return STATUS;
-        case 'undo.peek':
-          return { slot: null };
-        case 'worktree.prepare':
-          return result;
-        default:
-          throw new Error(`unscripted request: ${method}`);
-      }
-    };
-    ops.setRepoId(REPO);
-    return ops;
-  }
-  const base: WorktreePrepareResult = {
-    ok: true,
-    error: undefined,
-    exitCode: 0,
-    timedOut: false,
-    cancelled: false,
-    output: [],
-    truncated: false,
-  };
-
-  test('a failed run reads failed until dismissed, a cancel reads nothing', async () => {
-    const failed = setup({ ...base, ok: false, exitCode: 2 });
-    await failed.runWorktreePrepare('/wt/a', 'sha');
-    expect(failed.worktreePrepareStatus.value).toBe('failed');
-    expect(failed.worktreePrepareFinishedAt.value).toBeGreaterThanOrEqual(
-      failed.worktreePrepareStartedAt.value ?? Number.POSITIVE_INFINITY,
-    );
-    failed.dismissWorktreePrepareResult();
-    expect(failed.worktreePrepareStatus.value).toBeUndefined();
-
-    const cancelled = setup({ ...base, ok: false, cancelled: true });
-    await cancelled.runWorktreePrepare('/wt/a', 'sha');
-    expect(cancelled.worktreePrepareStatus.value).toBeUndefined();
-  });
-
-  test('a repo switch clears the finished run', async () => {
-    const ops = setup(base);
-    await ops.runWorktreePrepare('/wt/a', 'sha');
-    expect(ops.worktreePrepareStatus.value).toBe('ready');
-    ops.setRepoId('/repos/b');
-    expect(ops.worktreePrepareStatus.value).toBeUndefined();
-    expect(ops.worktreePrepareLastPath.value).toBeUndefined();
   });
 });

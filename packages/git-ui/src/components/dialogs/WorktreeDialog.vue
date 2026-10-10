@@ -1,37 +1,22 @@
 <script setup lang="ts">
 /**
  * G25 D2-D4/D9-D14: "Create Worktree…" (`AppToolbar.vue`'s own button, and the palette's
- * `createWorktree` action) plus the prepare-script run that can immediately follow it.
+ * `createWorktree` action).
  *
- * Two phases, at most one active at a time (`phase` below):
- * - **create** — the three explicit modes (D3): `existingBranch` (pick a branch already in
- *   `refs`), `newBranch` (name + start point), `detach` (a bare commit-ish). `preflight.
- *   worktreeAdd`'s own live pre-flight (D4) re-runs on every keystroke, exactly like
- *   `RevertDialog.vue`'s mainline picker re-runs `previewRevertMainline` — this dialog never lets
- *   `runWorktreeAdd` spawn against a blocked combination the user can already see is blocked.
- * - **prepare** — shown automatically right after a successful create, IFF `prepareScript` (this
- *   repository's own stored `kiraSpace.worktree.prepareScript`) is non-empty. The full script
- *   text is always shown here before it can run (D11's own "never runs anything the user has not
- *   seen"). The server's own approval record is a security-critical implementation detail this
- *   dialog structurally cannot read (D11/F15: the sha is server-only, absent from every wire
- *   shape) — so `sessionApprovedHash` tracks, PURELY CLIENT-SIDE and only for THIS webview's own
- *   lifetime, which exact script text this session has already run successfully at least once;
- *   the "Run" checkbox defaults on only when the CURRENT script's own hash matches that value,
- *   otherwise it defaults off and the user must tick it explicitly — never assuming a state this
- *   dialog cannot actually observe. Once running, output streams live (`ops.
- *   worktreePrepareOutput`) with a Cancel button; dismissing the dialog while it runs does not
- *   cancel it — `AppToolbar.vue`'s own strip takes over as the visible indicator (D13).
+ * The three explicit modes (D3): `existingBranch` (pick a branch already in `refs`), `newBranch`
+ * (name + start point), `detach` (a bare commit-ish). `preflight.worktreeAdd`'s own live
+ * pre-flight (D4) re-runs on every keystroke, exactly like `RevertDialog.vue`'s mainline picker
+ * re-runs `previewRevertMainline` — this dialog never lets `runWorktreeAdd` spawn against a
+ * blocked combination the user can already see is blocked.
  *
  * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
- * `DialogTitle`'s default slot, and the create phase's mode picker/text fields/checkbox are
- * RadioGroup/Input/Checkbox.
+ * `DialogTitle`'s default slot, and the create phase's mode picker/text fields are
+ * RadioGroup/Input.
  */
 import { validateRefName } from '@kira/git-core';
 import type { WorktreeAddPreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import { Button } from '@theme/components/ui/button';
-import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   Dialog,
   DialogClose,
@@ -47,7 +32,6 @@ import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../../state/worktrees.ts';
-import PrepareOutput from '../PrepareOutput.vue';
 
 const props = defineProps<{
   worktrees: WorktreeState;
@@ -55,35 +39,20 @@ const props = defineProps<{
   refs: RefsState;
   /** Set by `AppToolbar.vue`'s "Create Worktree…" button, the `createWorktree` palette action, or
    *  a "Create worktree here…" row action (P76 §8/§9), via `App.vue`. A fresh object (even `{}`)
-   *  opens the create phase and re-seeds it; `undefined` closes it. Watched by reference rather
+   *  opens the dialog and re-seeds it; `undefined` closes it. Watched by reference rather
    *  than a boolean so a second row action re-seeds even while the dialog is already open. */
   createRequest: WorktreeCreateSeed | undefined;
   /** `kiraSpace.worktree.basePath`'s current value — pre-fills the path field's own directory
    *  (D10); pure UX, never validated as an existing directory. */
   basePathDefault: string;
-  /** This repository's own stored `kiraSpace.worktree.prepareScript` — "" means the feature is
-   *  off, and the prepare phase is skipped entirely after a successful create. */
-  prepareScript: string;
-  /** `capabilities.runPrepareScript` (D14) — false when the host (Kira Space's native window)
-   *  refuses running arbitrary scripts outright. When false, the prepare phase still shows the
-   *  script (transparency costs nothing) but offers no way to run it. */
-  runPrepareScriptCapability: boolean;
 }>();
 
 const emit = defineEmits<(e: 'close-create') => void>();
 
-type Phase = 'create' | 'prepare' | undefined;
-
-const worktreeCreated = ref<string | undefined>(undefined);
-const phase = computed<Phase>(() => {
-  if (worktreeCreated.value !== undefined) return 'prepare';
-  if (props.createRequest !== undefined) return 'create';
-  return undefined;
-});
-const active = computed(() => phase.value !== undefined);
+const active = computed(() => props.createRequest !== undefined);
 
 // ---------------------------------------------------------------------------------------
-// create phase
+// state
 // ---------------------------------------------------------------------------------------
 
 type Mode = 'existingBranch' | 'newBranch' | 'detach';
@@ -109,7 +78,6 @@ watch(
       seed.startPoint ??
       (props.refs.head.value?.kind === 'branch' ? props.refs.head.value.name : '');
     preflight.value = undefined;
-    worktreeCreated.value = undefined;
   },
 );
 
@@ -170,11 +138,7 @@ async function submitCreate(): Promise<void> {
     startPoint: mode.value === 'existingBranch' ? undefined : startPoint.value.trim() || undefined,
   });
   if (!result.ok) return; // the failure is already announced (opsState.announcement) — stay open.
-  if (props.prepareScript.trim() === '') {
-    emit('close-create');
-    return;
-  }
-  worktreeCreated.value = trimmedPath;
+  emit('close-create');
 }
 
 /** G28 D7: closes G25 §9's own named hand-forward — OFFERED, never taken automatically (unlike
@@ -201,97 +165,13 @@ async function submitCreateDetached(): Promise<void> {
     startPoint: branchName,
   });
   if (!result.ok) return;
-  if (props.prepareScript.trim() === '') {
-    emit('close-create');
-    return;
-  }
-  worktreeCreated.value = trimmedPath;
-}
-
-// ---------------------------------------------------------------------------------------
-// prepare phase (D9-D14)
-// ---------------------------------------------------------------------------------------
-
-/** Purely client-side, purely this session's own memory (this file's own doc comment above) —
- *  never persisted, never read from or written to any server-side state. */
-const sessionApprovedHash = ref<string | undefined>(undefined);
-const scriptHash = ref<string | undefined>(undefined);
-const runChecked = ref(false);
-const started = ref(false);
-
-async function sha256Hex(text: string): Promise<string> {
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-watch(worktreeCreated, async (createdPath) => {
-  if (createdPath === undefined) {
-    started.value = false;
-    scriptHash.value = undefined;
-    return;
-  }
-  const hash = await sha256Hex(props.prepareScript);
-  scriptHash.value = hash;
-  runChecked.value = props.runPrepareScriptCapability && sessionApprovedHash.value === hash;
-});
-
-const preparing = computed(
-  () => props.ops.activeWorktreePreparePath.value === worktreeCreated.value,
-);
-const prepareResult = computed(() => props.ops.worktreePrepareResult.value);
-
-const prepareState = computed<'running' | 'ready' | 'failed'>(() => {
-  if (preparing.value) return 'running';
-  return prepareResult.value?.ok === true ? 'ready' : 'failed';
-});
-const prepareTitle = computed(() => {
-  const r = prepareResult.value;
-  if (preparing.value) return 'Running prepare script';
-  if (r?.ok) return 'Prepare script finished';
-  if (r?.cancelled) return 'Prepare script cancelled';
-  return 'Prepare script failed';
-});
-const prepareNote = computed(() => {
-  const r = prepareResult.value;
-  if (r === undefined || r.ok || r.cancelled) return undefined;
-  if (r.timedOut) return 'Timed out';
-  return r.error?.message || `Exited with status ${r.exitCode}`;
-});
-
-async function startPrepare(): Promise<void> {
-  const createdPath = worktreeCreated.value;
-  const hash = scriptHash.value;
-  if (createdPath === undefined || hash === undefined || !runChecked.value) return;
-  started.value = true;
-  const result = await props.ops.runWorktreePrepare(createdPath, hash);
-  if (result?.ok) sessionApprovedHash.value = hash;
-}
-
-function cancelPrepare(): void {
-  void props.ops.cancelWorktreePrepare();
-}
-
-function skipPrepare(): void {
   emit('close-create');
 }
 
-function finishPrepare(): void {
-  props.ops.dismissWorktreePrepareResult();
-  emit('close-create');
-}
-
-const title = computed(() => {
-  if (phase.value === 'create') return 'Create worktree';
-  if (phase.value === 'prepare') return 'Run prepare script';
-  return '';
-});
+const title = 'Create worktree';
 
 function onClose(): void {
-  if (phase.value === 'create') cancelCreate();
-  // Dismissing during 'prepare' — running or not — never cancels the script (this file's own doc
-  // comment above); it just closes the dialog, same as clicking through it normally.
-  else emit('close-create');
+  cancelCreate();
 }
 </script>
 
@@ -311,7 +191,7 @@ function onClose(): void {
         </DialogClose>
       </DialogHeader>
       <div class="flex min-h-0 flex-col gap-2 overflow-auto px-3 py-2">
-        <template v-if="phase === 'create'">
+        <template v-if="active">
           <label :for="pathId" class="flex flex-col gap-0.5">
             Path
             <Input
@@ -416,57 +296,13 @@ function onClose(): void {
           </template>
         </template>
 
-        <template v-else-if="phase === 'prepare'">
-          <p class="text-error">Worktree created at <code>{{ worktreeCreated }}</code>.</p>
-          <template v-if="!started">
-            <p>This repository has a prepare script:</p>
-            <pre class="max-h-60 overflow-y-auto p-1 bg-bg border border-border font-data text-kira-sm whitespace-pre-wrap break-all">{{ prepareScript }}</pre>
-            <p v-if="!runPrepareScriptCapability" class="text-error">
-              Running scripts is disabled here.
-            </p>
-            <Label v-else class="flex flex-row items-center gap-1">
-              <Checkbox v-model="runChecked" />
-              Run this script now, as your own shell, with your own permissions
-            </Label>
-          </template>
-          <template v-else>
-            <ScriptProgress
-              :state="prepareState"
-              :title="prepareTitle"
-              :started-at="ops.worktreePrepareStartedAt.value ?? 0"
-              :finished-at="ops.worktreePrepareFinishedAt.value"
-              :note="prepareNote"
-            >
-              <PrepareOutput :lines="ops.worktreePrepareOutput.value" />
-            </ScriptProgress>
-          </template>
-        </template>
       </div>
 
       <DialogFooter class="justify-end">
-        <template v-if="phase === 'create'">
-          <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
-          <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitCreate" @click="submitCreate">
-            Create
-          </Button>
-        </template>
-        <template v-else-if="phase === 'prepare' && !started">
-          <Button variant="dialog" size="kira-lg" @click="skipPrepare">Skip</Button>
-          <Button
-            variant="dialog-primary"
-            size="kira-lg"
-            :disabled="!runChecked || !runPrepareScriptCapability"
-            @click="startPrepare"
-          >
-            Run
-          </Button>
-        </template>
-        <template v-else-if="phase === 'prepare' && preparing">
-          <Button variant="dialog" size="kira-lg" @click="cancelPrepare">Cancel</Button>
-        </template>
-        <template v-else-if="phase === 'prepare'">
-          <Button variant="dialog-primary" size="kira-lg" @click="finishPrepare">Close</Button>
-        </template>
+        <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
+        <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitCreate" @click="submitCreate">
+          Create
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

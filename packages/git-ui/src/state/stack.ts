@@ -137,8 +137,8 @@ export class StackState {
   }
 
   /** `stack.cancelRestack`'s own client — never an error, a cancel racing a just-finished restack
-   *  is an ordinary outcome (the same `{cancelled: boolean}` shape `remote.cancel`/
-   *  `worktree.cancelPrepare` already use). */
+   *  is an ordinary outcome (the same `{cancelled: boolean}` shape `remote.cancel`
+   *  already uses). */
   async cancelRestack(): Promise<boolean> {
     const repoId = this.#repo.repoId;
     if (repoId === undefined) return false;

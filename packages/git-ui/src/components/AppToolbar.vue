@@ -28,7 +28,6 @@
  */
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import ScriptProgress from '@theme/components/ScriptProgress.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -36,10 +35,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useTimeoutFn } from '@vueuse/core';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
@@ -62,7 +59,6 @@ import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 // caller.
 import BranchPicker from './BranchPicker.vue';
 import MenuSections from './MenuSections.vue';
-import PrepareOutput from './PrepareOutput.vue';
 import PullStrategyPicker from './PullStrategyPicker.vue';
 import type { PickerTab } from './pickerModel.ts';
 import RefreshButton from './RefreshButton.vue';
@@ -78,10 +74,6 @@ const props = defineProps<{
   worktreeState: WorktreeState;
   /** G26 D3 — see `StackList.vue`'s own doc comment. */
   stackState: StackState;
-  /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
-  openWorktreeWindowCapability: boolean;
-  /** P178: the repository settings gear shows only where the host edits them (Kira Space). */
-  editRepoSettingsCapability: boolean;
   actions: DetailActions | undefined;
   /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
    *  other G24 prop threaded through this toolbar's own children. */
@@ -109,7 +101,6 @@ const emit = defineEmits<{
   /** G25: forwarded straight from `BranchPicker.vue` -> `WorktreeList.vue`'s own emits — see
    *  `WorktreeList.vue`'s own doc comment on why this toolbar does not act on them itself. */
   (event: 'switch-worktree', path: string): void;
-  (event: 'open-worktree-window', path: string): void;
   (event: 'create-worktree', seed?: WorktreeCreateSeed): void;
   /** G26: forwarded straight from `BranchPicker.vue` -> `StackList.vue`'s own emits — `App.vue`
    *  owns `StackDialog.vue`'s actual open state, the same "toolbar owns no dialog state itself"
@@ -139,7 +130,6 @@ function copy(text: string, whatCopied: string): void {
 function openPullRequest(number: number): void {
   void props.actions?.openPullRequest({ number });
 }
-const openExternalCapability = computed(() => props.actions?.capabilities.openExternal ?? false);
 
 const refreshButtonRef = ref<InstanceType<typeof RefreshButton> | null>(null);
 const branchPickerRef = ref<InstanceType<typeof BranchPicker> | null>(null);
@@ -180,7 +170,7 @@ const autoFetchTooltip = computed(() => {
 });
 
 async function onAutoFetchMarkerClick(): Promise<void> {
-  if (write.value && hasRemote.value && !fetchDisabled.value) await doFetch();
+  if (hasRemote.value && !fetchDisabled.value) await doFetch();
 }
 
 const isForcePushMenuOpen = ref(false);
@@ -270,51 +260,6 @@ async function doCancel(): Promise<void> {
   await props.opsState.cancelRemote();
 }
 
-const prepareStatus = computed(() => props.opsState.worktreePrepareStatus.value);
-const readyFading = ref(false);
-const { start: startReadyFade, stop: stopReadyFade } = useTimeoutFn(
-  () => {
-    readyFading.value = true;
-  },
-  5000,
-  { immediate: false },
-);
-watch(prepareStatus, (status) => {
-  readyFading.value = false;
-  stopReadyFade();
-  if (status === 'ready') startReadyFade();
-});
-const prepareVisible = computed(
-  () => prepareStatus.value !== undefined && !(prepareStatus.value === 'ready' && readyFading.value),
-);
-const prepareFolder = computed(() => {
-  const path = props.opsState.worktreePrepareLastPath.value ?? '';
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-});
-const prepareNote = computed(() => {
-  const r = props.opsState.worktreePrepareResult.value;
-  if (r === undefined || r.ok || r.cancelled) return undefined;
-  if (r.timedOut) return 'Timed out';
-  return r.error?.message || `Exited with status ${r.exitCode}`;
-});
-const prepareTitle = computed(() => {
-  if (prepareStatus.value === 'running') return `Preparing ${prepareFolder.value}`;
-  return prepareStatus.value === 'ready' ? 'Worktree ready' : 'Prepare script failed';
-});
-const prepareText = computed(() => {
-  if (prepareStatus.value === 'running') {
-    const lines = props.opsState.worktreePrepareOutput.value;
-    const last = lines[lines.length - 1]?.text.trim();
-    return last ? `Preparing ${prepareFolder.value}: ${last}` : `Preparing ${prepareFolder.value}…`;
-  }
-  if (prepareStatus.value === 'ready') return 'Worktree ready';
-  return `Prepare script failed: ${prepareNote.value ?? 'see output'}`;
-});
-
-async function doCancelWorktreePrepare(): Promise<void> {
-  await props.opsState.cancelWorktreePrepare();
-}
-
 // G10 D17/F15: forwarded so App.vue's palette dispatcher can drive the same affordances a click
 // already does — one implementation, reached from two inputs, exactly like `refresh` above. Each
 // is a one-line delegation to a handler this file already has, or to a nested component's own
@@ -334,12 +279,6 @@ defineExpose({
 const stashDisabled = computed(
   () => (props.opsState.statusSummary.value?.isClean ?? true) || props.opsState.busy.value,
 );
-
-// C10 §4.2/§4.3 (S7): `false` under the native read-only graph — hides Fetch/Pull/Push/Stash/
-// cancel-remote-op/cancel-worktree-prepare/Undo below, every one of them a write. Defaults to
-// `false` (the conservative value, same as every other capability gate in this file) while
-// `actions` has not resolved yet.
-const write = computed(() => props.actions?.capabilities.write ?? false);
 </script>
 
 <template>
@@ -359,16 +298,12 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       :stash="stashState"
       :worktrees="worktreeState"
       :stack="stackState"
-      :open-worktree-window-capability="openWorktreeWindowCapability"
-      :write-capability="write"
       :pr="prState"
-      :open-external-capability="openExternalCapability"
       :open-pull-request="openPullRequest"
       @branch-from-stash="(entry) => emit('branch-from-stash', entry)"
       @save-global-stash="emit('save-global-stash')"
       @save-entry-to-global-stash="(entry) => emit('save-entry-to-global-stash', entry)"
       @switch-worktree="(path) => emit('switch-worktree', path)"
-      @open-worktree-window="(path) => emit('open-worktree-window', path)"
       @create-worktree="(seed) => emit('create-worktree', seed)"
       @open-restack-dialog="(branch) => emit('open-restack-dialog', branch)"
       @open-set-stack-parent-dialog="(branch) => emit('open-set-stack-parent-dialog', branch)"
@@ -395,7 +330,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       :report-error="reportError"
     />
 
-    <template v-if="write && hasRemote">
+    <template v-if="hasRemote">
       <span
         class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
         aria-hidden="true"
@@ -477,39 +412,25 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       <TooltipContent>{{ autoFetchTooltip }}</TooltipContent>
     </Tooltip>
 
-    <template v-if="write">
-      <span
-        class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
-        aria-hidden="true"
-      ></span>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira"
-            :disabled="stashDisabled"
-            data-testid="stash-changes-button"
-            @click="emit('stash-changes')"
-          >
-            <CodiconIcon name="inbox" :size="13" />
-            Stash
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Stash changes</TooltipContent>
-      </Tooltip>
-    </template>
-
-    <!-- C10 §4.3/§14 OQ2: the toolbar hides every write affordance uniformly rather than
-         disabling any of them with a reason (§4.2 layer 3) — this note is the one place that
-         explains why, for a user arriving from the VS Code extension who might otherwise wonder
-         where Fetch/Pull/Push/Stash/Undo went. -->
     <span
-      v-if="!write"
-      class="text-muted-foreground text-kira-sm whitespace-nowrap overflow-hidden text-ellipsis"
-      data-testid="read-only-note"
-    >
-      Read-only view — use the VS Code extension to make changes
-    </span>
+      class="w-px h-3.5 self-center mx-0.5 bg-border shrink-0"
+      aria-hidden="true"
+    ></span>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira"
+          :disabled="stashDisabled"
+          data-testid="stash-changes-button"
+          @click="emit('stash-changes')"
+        >
+          <CodiconIcon name="inbox" :size="13" />
+          Stash
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Stash changes</TooltipContent>
+    </Tooltip>
 
     <span class="flex-1" aria-hidden="true"></span>
 
@@ -532,7 +453,6 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     />
 
     <TooltipIconButton
-      v-if="editRepoSettingsCapability"
       icon="gear"
       label="Repository settings"
       data-testid="repo-settings-button"
@@ -540,7 +460,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     />
 
     <div
-      v-if="write && remoteBusy"
+      v-if="remoteBusy"
       class="inline-flex items-center h-control-sm px-1.5 rounded-kira-sm gap-1 text-muted-foreground text-kira-sm"
       data-testid="remote-progress"
     >
@@ -558,54 +478,8 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       />
     </div>
 
-    <!-- G25 D13: visible once the dialog that started a prepare run is dismissed (dismissing never
-         cancels the run). A failed run stays until dismissed; a finished one fades after 5 s. -->
-    <Popover v-if="write && prepareVisible">
-      <div
-        class="inline-flex items-center h-control-sm px-1.5 rounded-kira-sm gap-1 text-kira-sm"
-        :class="prepareStatus === 'failed' ? 'text-error' : 'text-muted-foreground'"
-        :data-state="prepareStatus"
-        data-testid="worktree-prepare-progress"
-      >
-        <CodiconIcon v-if="prepareStatus === 'running'" name="loading" :size="13" class="animate-spin" />
-        <CodiconIcon v-else-if="prepareStatus === 'ready'" name="check" :size="13" />
-        <CodiconIcon v-else name="error" :size="13" />
-        <span class="whitespace-nowrap overflow-hidden text-ellipsis max-w-65" data-testid="worktree-prepare-text">{{ prepareText }}</span>
-        <PopoverTrigger as-child>
-          <Button variant="ghost" size="xs" data-testid="worktree-prepare-output">Output</Button>
-        </PopoverTrigger>
-        <TooltipIconButton
-          v-if="prepareStatus === 'running'"
-          icon="close"
-          label="Cancel"
-          data-testid="worktree-prepare-cancel"
-          @click="doCancelWorktreePrepare"
-        />
-        <TooltipIconButton
-          v-else
-          icon="close"
-          label="Dismiss"
-          data-testid="worktree-prepare-dismiss"
-          @click="opsState.dismissWorktreePrepareResult()"
-        />
-      </div>
-      <PopoverContent class="w-96" align="start">
-        <ScriptProgress
-          :state="prepareStatus ?? 'ready'"
-          :title="prepareTitle"
-          :started-at="opsState.worktreePrepareStartedAt.value ?? 0"
-          :finished-at="opsState.worktreePrepareFinishedAt.value"
-          :note="prepareNote"
-        >
-          <PrepareOutput :lines="opsState.worktreePrepareOutput.value" />
-        </ScriptProgress>
-      </PopoverContent>
-    </Popover>
-
     <UndoButton
       :ops="opsState"
-      :clipboard-enabled="actions?.capabilities.clipboard ?? false"
-      :write-capability="write"
       :copy="copy"
     />
   </div>
