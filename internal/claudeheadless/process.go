@@ -11,12 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kirathecat/kira-studio/internal/linewriter"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
-
-// maxStreamLine caps one stream-json line; stream-json lines get large (tool results, thinking).
-const maxStreamLine = 16 << 20
 
 // gracefulStopDelay is SIGTERM's grace window before SIGKILL; a var so a test can shorten it.
 var gracefulStopDelay = 2 * time.Second
@@ -145,7 +143,7 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 			h.OnLine(l)
 		}
 	}
-	cmd.Stdout = newLineWriter(func(line string) {
+	cmd.Stdout = linewriter.New(func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
 		if h.OnRateLimits != nil {
@@ -162,7 +160,7 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 			emit(l)
 		}
 	})
-	cmd.Stderr = newLineWriter(func(line string) {
+	cmd.Stderr = linewriter.New(func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
 		if strings.TrimSpace(line) != "" {
@@ -175,8 +173,8 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 	}
 	waitErr := cmd.Wait()
 	stopEscalate()
-	cmd.Stdout.(*lineWriter).flush()
-	cmd.Stderr.(*lineWriter).flush()
+	cmd.Stdout.(*linewriter.Writer).Flush()
+	cmd.Stderr.(*linewriter.Writer).Flush()
 
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
 	cancelled := !timedOut && ctx.Err() != nil
@@ -199,78 +197,4 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 		return exit, nil
 	}
 	return Exit{}, waitErr
-}
-
-// lineWriter splits a byte stream into lines; a line over maxStreamLine is cut and marked.
-type lineWriter struct {
-	mu      sync.Mutex
-	buf     []byte
-	dropped bool
-	onLine  func(string)
-}
-
-func newLineWriter(onLine func(string)) *lineWriter { return &lineWriter{onLine: onLine} }
-
-func (w *lineWriter) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	var lines []string
-	rest := p
-	for len(rest) > 0 {
-		i := indexNL(rest)
-		if i < 0 {
-			w.accumulate(rest)
-			break
-		}
-		w.accumulate(rest[:i])
-		lines = append(lines, w.take())
-		rest = rest[i+1:]
-	}
-	w.mu.Unlock()
-	for _, l := range lines {
-		w.onLine(l)
-	}
-	return len(p), nil
-}
-
-func indexNL(b []byte) int {
-	for i, c := range b {
-		if c == '\n' {
-			return i
-		}
-	}
-	return -1
-}
-
-func (w *lineWriter) accumulate(b []byte) {
-	if w.dropped {
-		return
-	}
-	if len(w.buf)+len(b) > maxStreamLine {
-		w.buf = append(w.buf, b[:maxStreamLine-len(w.buf)]...)
-		w.dropped = true
-		return
-	}
-	w.buf = append(w.buf, b...)
-}
-
-func (w *lineWriter) take() string {
-	s := string(w.buf)
-	if w.dropped {
-		s += "…"
-	}
-	w.buf, w.dropped = w.buf[:0], false
-	return s
-}
-
-func (w *lineWriter) flush() {
-	w.mu.Lock()
-	var line string
-	has := len(w.buf) > 0
-	if has {
-		line = w.take()
-	}
-	w.mu.Unlock()
-	if has {
-		w.onLine(line)
-	}
 }

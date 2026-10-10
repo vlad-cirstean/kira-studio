@@ -49,19 +49,6 @@ func TestParserDenialAndOversize(t *testing.T) {
 	}
 }
 
-func TestLineWriterCapsLongLine(t *testing.T) {
-	var got []string
-	w := newLineWriter(func(s string) { got = append(got, s) })
-	chunk := strings.Repeat("x", 1<<20)
-	for i := 0; i < maxStreamLine>>20+2; i++ {
-		_, _ = w.Write([]byte(chunk))
-	}
-	_, _ = w.Write([]byte("\nnext\n"))
-	if len(got) != 2 || got[1] != "next" || !strings.HasSuffix(got[0], "…") || len(got[0]) > maxStreamLine+4 {
-		t.Fatalf("got %d lines, first len %d", len(got), len(got[0]))
-	}
-}
-
 func joinLines(lines []Line) string {
 	var sb strings.Builder
 	for _, l := range lines {
