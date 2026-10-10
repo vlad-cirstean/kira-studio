@@ -41,7 +41,7 @@ const notice = computed(() => {
 
 <template>
   <main class="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 px-4 py-8" data-testid="pair-screen">
-    <h1 class="m-0 text-kira-xl font-semibold">Kira Space Agents</h1>
+    <h1 class="m-0 text-kira-xl font-semibold">Kira Space</h1>
     <p class="m-0 text-muted-foreground">
       View your agents from this phone. The computer must approve this phone first.
     </p>
