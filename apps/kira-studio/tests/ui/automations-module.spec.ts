@@ -122,6 +122,14 @@ test('running a script opens a terminal titled with its name, at its own working
   });
 
   await openTerminalModule(page);
+  const nameBox = await page
+    .locator(`[data-testid="script-${SCRIPT.id}"]`)
+    .getByText(SCRIPT.name, { exact: true })
+    .boundingBox();
+  const slotBox = await page
+    .locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-run-slot"]`)
+    .boundingBox();
+  expect(slotBox?.x ?? 0).toBeGreaterThan((nameBox?.x ?? 0) + (nameBox?.width ?? 0));
   await page.locator(`[data-testid="script-${SCRIPT.id}"]`).click();
 
   const terminalTab = tab(page);

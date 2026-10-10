@@ -380,12 +380,6 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 @contextmenu.prevent.stop="onContextMenu($event, script)"
               >
                 <span :class="colorMarkClass('rail', script.color)" data-testid="script-rail" aria-hidden="true" />
-                <span
-                  v-if="liveRunByScript.get(script.id)"
-                  class="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary border-r-transparent"
-                  data-testid="script-running"
-                />
-                <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
                 <div class="flex-1 min-w-0 flex flex-col">
                   <span class="flex min-w-0 items-center gap-1">
                     <SmartBadge v-if="script.kind === 'smart'" />
@@ -399,6 +393,14 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   :run="liveRunByScript.get(script.id)!"
                   class="shrink-0 text-kira-sm text-muted-foreground"
                 />
+                <span class="flex w-5 shrink-0 items-center justify-center" data-testid="script-run-slot">
+                  <span
+                    v-if="liveRunByScript.get(script.id)"
+                    class="h-3 w-3 animate-spin rounded-full border-2 border-primary border-r-transparent"
+                    data-testid="script-running"
+                  />
+                  <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
+                </span>
               </button>
             </template>
             <template v-for="group in view.groups" :key="group.collection.id">
@@ -444,12 +446,6 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   @contextmenu.prevent.stop="onContextMenu($event, script)"
                 >
                   <span :class="colorMarkClass('rail', script.color)" data-testid="script-rail" aria-hidden="true" />
-                  <span
-                  v-if="liveRunByScript.get(script.id)"
-                  class="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary border-r-transparent"
-                  data-testid="script-running"
-                />
-                <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
                   <div class="flex-1 min-w-0 flex flex-col">
                     <span class="flex min-w-0 items-center gap-1">
                     <SmartBadge v-if="script.kind === 'smart'" />
@@ -463,6 +459,14 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                     :run="liveRunByScript.get(script.id)!"
                     class="shrink-0 text-kira-sm text-muted-foreground"
                   />
+                  <span class="flex w-5 shrink-0 items-center justify-center" data-testid="script-run-slot">
+                    <span
+                      v-if="liveRunByScript.get(script.id)"
+                      class="h-3 w-3 animate-spin rounded-full border-2 border-primary border-r-transparent"
+                      data-testid="script-running"
+                    />
+                    <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
+                  </span>
                 </button>
               </div>
             </template>
