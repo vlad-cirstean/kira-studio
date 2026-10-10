@@ -71,6 +71,9 @@ function installInBrowser({
   let wireVersion = 0;
   let releaseHeld: (() => void) | undefined;
   (window as unknown as { __kiraGitRelease: () => void }).__kiraGitRelease = () => releaseHeld?.();
+  let releaseOne: (() => void) | undefined;
+  (window as unknown as { __kiraGitReleaseNext: () => void }).__kiraGitReleaseNext = () =>
+    releaseOne?.();
   const openSockets: MockSocket[] = [];
   (
     window as unknown as { __kiraGitEmit: (method: string, payload: unknown) => void }
@@ -187,11 +190,18 @@ function installInBrowser({
           for (const chunk of now) {
             deliverGraphStreamChunk(socket, envelope.version, id, chunk);
           }
+          const held = openChunks.slice(now.length);
           const finish = (): void => {
-            for (const chunk of openChunks.slice(now.length)) {
+            for (const chunk of held.splice(0)) {
               deliverGraphStreamChunk(socket, envelope.version, id, chunk);
             }
             deliver(socket, { version: envelope.version, body: { t: 'end', id } });
+          };
+          releaseOne = (): void => {
+            const chunk = held.shift();
+            if (chunk) deliverGraphStreamChunk(socket, envelope.version, id, chunk);
+            if (held.length === 0)
+              deliver(socket, { version: envelope.version, body: { t: 'end', id } });
           };
           if (hold === undefined) finish();
           else releaseHeld = finish;
@@ -335,5 +345,12 @@ export async function gitStreamEmit(page: Page, method: string, payload: unknown
 export async function gitStreamRelease(page: Page): Promise<void> {
   await page.evaluate(() =>
     (window as unknown as { __kiraGitRelease: () => void }).__kiraGitRelease(),
+  );
+}
+
+/** Delivers the next held chunk; the stream ends once the last one is out. */
+export async function gitStreamReleaseNext(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    (window as unknown as { __kiraGitReleaseNext: () => void }).__kiraGitReleaseNext(),
   );
 }

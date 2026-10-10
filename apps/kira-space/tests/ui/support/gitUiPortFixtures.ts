@@ -95,6 +95,27 @@ export function singleRowChunks(rows: readonly PackedChunkRow[]): GraphStreamChu
   );
 }
 
+/** `size` rows per chunk; the first declares the identities, the rest reuse them. */
+export function chunkedRows(
+  rows: readonly PackedChunkRow[],
+  size: number,
+): GraphStreamChunkFixture[] {
+  const count = Math.ceil(rows.length / size);
+  return Array.from({ length: count }, (_, i) =>
+    buildGraphStreamChunk(
+      PORT_REPO.repoId,
+      i,
+      buildPackedChunk(
+        rows.slice(i * size, (i + 1) * size),
+        i === 0
+          ? { from: 0, dictionary: IDENTITIES }
+          : { from: i * size, dictionary: [], dictionaryBase: IDENTITIES.length },
+      ),
+      { exhausted: i === count - 1, remaining: count - 1 - i },
+    ),
+  );
+}
+
 /** Every row in one chunk, as the daemon sends a full page. */
 export function oneChunk(rows: readonly PackedChunkRow[]): GraphStreamChunkFixture[] {
   return [
@@ -123,6 +144,51 @@ export const manyRows = (count: number): PackedChunkRow[] =>
     subject: `Row ${n}`,
     parents: n < count - 1 ? [manyRowShas(n + 1)] : [],
   }));
+
+const LONG_BRANCHES = [
+  'feature/graph-badge-clipping-regression-investigation',
+  'feature/very-long-branch-name-for-the-second-lane',
+  'release/2026-10-candidate-with-an-unreasonably-long-suffix',
+  'bugfix/stream-lanes-empty-while-history-loads',
+  'chore/dependency-refresh-for-the-fourth-quarter',
+  'feature/column-widths-persist-per-repository-tab',
+];
+
+/**
+ * A realistic history, newest first: a merge every 12 rows, six long branch names, tags, remote
+ * refs, and row 0 carrying six refs (current branch first). Row n's sha is `manyRowShas(n)`.
+ */
+export const realisticRows = (count: number): PackedChunkRow[] =>
+  Array.from({ length: count }, (_, n) => {
+    const parents: string[] = [];
+    if (n < count - 1) parents.push(manyRowShas(n + 1));
+    if (n % 12 === 0 && n + 7 < count) parents.push(manyRowShas(n + 7));
+    const decoration: NonNullable<PackedChunkRow['decoration']>[number][] = [];
+    if (n === 0) {
+      decoration.push(
+        { kind: 'branch', name: 'main', isHead: true },
+        { kind: 'remoteBranch', name: 'origin/main' },
+        { kind: 'branch', name: LONG_BRANCHES[0], isHead: false },
+        { kind: 'remoteBranch', name: `origin/${LONG_BRANCHES[0]}` },
+        { kind: 'tag', name: 'v2.0.0-rc.1' },
+        { kind: 'branch', name: LONG_BRANCHES[1], isHead: false },
+      );
+    } else if (n % 12 === 0) {
+      const branch = LONG_BRANCHES[(n / 12) % LONG_BRANCHES.length];
+      decoration.push(
+        { kind: 'branch', name: branch, isHead: false },
+        { kind: 'remoteBranch', name: `origin/${branch}` },
+      );
+    } else if (n % 30 === 5) {
+      decoration.push({ kind: 'tag', name: `v1.${n}.0` });
+    }
+    return {
+      sha: manyRowShas(n),
+      subject: `Realistic commit ${n}: wire the thing`,
+      parents,
+      decoration,
+    };
+  });
 
 export const refsAtTip = (sha: string) => ({
   ...MAIN_REFS,

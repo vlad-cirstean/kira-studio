@@ -85,14 +85,16 @@ test('the grid has the four columns and no SHA cell, and the date column fits it
   expect(cellWidth).toBeGreaterThanOrEqual(widest);
 });
 
-test('decorated and plain rows share one height, and each graph node sits on its subject line', async ({
+test('a decorated row is a plain row plus the badge line, and each graph node sits on its subject line', async ({
   relaunch,
 }) => {
   const page = await bootGrid(relaunch, TAGGED);
   await expect(row(page, 1)).toBeVisible();
 
   const height = (n: number) => row(page, n).evaluate((el) => el.getBoundingClientRect().height);
-  expect(await height(1)).toBe(await height(0));
+  const badge = row(page, 1).locator('[data-testid="badge-tag"]');
+  const badgeHeight = await badge.evaluate((el) => el.getBoundingClientRect().height);
+  expect(Math.abs((await height(1)) - ((await height(0)) + badgeHeight))).toBeLessThanOrEqual(1);
 
   await expect(row(page, 0).locator('[data-testid="graph-svg"] circle')).toBeVisible();
   await expect(row(page, 1).locator('[data-testid="graph-svg"] circle')).toBeVisible();
@@ -131,9 +133,10 @@ test('Git graph font size scales grid text and row height', async ({ relaunch })
     .locator('.kira-cell-message')
     .evaluate((el) => getComputedStyle(el).fontSize);
   expect(fontSize).toBe('20px');
-  // row = max(row-height 28, h-xs (t+6) + 2) = max(28, t+8); one height for all rows.
-  const height = await row(page, 1).evaluate((el) => el.getBoundingClientRect().height);
-  expect(height).toBe(28);
+  // plain row = max(row-height 28, h-xs (t+6) + 2); decorated adds the badge line (h-xs).
+  const height = (n: number) => row(page, n).evaluate((el) => el.getBoundingClientRect().height);
+  expect(await height(0)).toBe(28);
+  expect(await height(1)).toBe(28 + 26);
 });
 
 test('a tag badge is a filled Studio Badge with a matching icon', async ({ relaunch }) => {
