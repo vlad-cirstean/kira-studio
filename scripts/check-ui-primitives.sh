@@ -3,10 +3,8 @@
 # (dialog structure, secondary tabs, buttons, form controls, weights, icon sizes, bars, popovers).
 # Scans app/package sources, never packages/theme/src/components/ui (the primitives themselves).
 #
-# Allowlists in scripts/ui-primitives-allowlist/*.txt, one entry per line, `#` comments:
-#   path                                  whole file exempt while unmigrated (stream work in progress)
-#   permanent U<n> path # reason          one guard exempt for a real requirement
-# An entry that no longer exempts anything fails the run, so lists only shrink.
+# Named exemptions (PERMANENT below) cover a real requirement a primitive cannot meet. One that no
+# longer exempts anything fails the run, so the list only shrinks.
 # Needs GNU grep -P like check-theme-classes.sh.
 set -e
 
@@ -25,11 +23,68 @@ if [ -z "$GNU_GREP" ]; then
 fi
 
 DIRS="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-space/frontend/mobile packages/workbench/src packages/git-ui/src packages/docker-ui/src packages/kira-ui/src"
-ALLOW_DIR=scripts/ui-primitives-allowlist
-SIDE_PANELS=scripts/ui-primitives-side-panels.txt
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+
+# Guard kind `s` scans only these side-panel files (the P262 section 1.6 inventory).
+cat >"$TMP/side_panels" <<'PANELS'
+apps/kira-studio/frontend/src/workbench/panels/ProjectPanel.vue
+apps/kira-studio/frontend/src/api/CollectionsPanel.vue
+packages/docker-ui/src/components/DockerPanel.vue
+packages/workbench/src/automations/AutomationsPanel.vue
+packages/workbench/src/memory/MemoryPanel.vue
+apps/kira-space/frontend/src/repo/GitPanel.vue
+apps/kira-studio/frontend/src/project/ProjectTree.vue
+apps/kira-studio/frontend/src/project/TreeRow.vue
+apps/kira-studio/frontend/src/api/CollectionsTree.vue
+apps/kira-studio/frontend/src/api/CollectionRow.vue
+packages/docker-ui/src/components/ContainerList.vue
+packages/docker-ui/src/components/ImageList.vue
+packages/docker-ui/src/components/VolumeList.vue
+packages/docker-ui/src/components/NetworkList.vue
+packages/docker-ui/src/components/VirtualList.vue
+packages/docker-ui/src/components/ListState.vue
+apps/kira-space/frontend/src/repo/RepoFileTree.vue
+apps/kira-space/frontend/src/repo/RepoTreeRow.vue
+apps/kira-space/frontend/src/repo/RepoSearchView.vue
+apps/kira-space/frontend/src/repo/RepoSearchRow.vue
+apps/kira-space/frontend/src/repo/RepoReviewView.vue
+packages/git-ui/src/components/review/ReviewView.vue
+packages/git-ui/src/components/review/ReviewCommitRow.vue
+packages/git-ui/src/components/review/ReviewFilesPane.vue
+packages/git-ui/src/components/review/ReviewCommentsPane.vue
+packages/git-ui/src/components/FileTree.vue
+apps/kira-space/frontend/src/ade/v2/review/AdeReviewWindow.vue
+apps/kira-space/frontend/src/ade/v2/review/AdeReviewFiles.vue
+apps/kira-space/frontend/src/ade/v2/review/AdeReviewAgentPanel.vue
+apps/kira-space/frontend/src/ade/v2/panel/AdePanel.vue
+apps/kira-space/frontend/src/ade/v2/panel/AdePanelFrame.vue
+apps/kira-space/frontend/src/ade/v2/panel/AdePanelResizeHandle.vue
+apps/kira-space/frontend/src/ade/v2/panel/AdeTaskPanel.vue
+apps/kira-space/frontend/src/ade/v2/panel/AdeBranchPanel.vue
+apps/kira-space/frontend/src/ade/v2/panel/AdeArchivedPanel.vue
+apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPage.vue
+apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPanel.vue
+apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue
+apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedList.vue
+apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedRow.vue
+apps/kira-space/frontend/src/repo/ReposDialog.vue
+packages/workbench/src/components/WorkbenchShell.vue
+packages/workbench/src/components/PanelHeader.vue
+packages/workbench/src/components/TreeTwisty.vue
+packages/workbench/src/components/SettingsShell.vue
+PANELS
+
+# "U<n> path # reason": one guard exempt for one file.
+cat >"$TMP/perm" <<'PERMANENT'
+U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 section 2.2 exempt)
+U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
+U9 apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue # inline edit input blends into the row until focused
+U17 packages/git-ui/src/components/SearchBox.vue # combobox owns two-stage Escape (dismiss dropdown keeps query); SearchField clears on first Esc
+U9 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue # h-11 is the 44px touch height
+U9 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # h-11 is the 44px touch height
+PERMANENT
 
 # `(?&t)` = the inside of one tag, quote-aware so `=>` or `a > b` inside an attribute value does not
 # end the tag early.
@@ -73,7 +128,7 @@ while IFS= read -r line; do
   scan=$DIRS; flag=-r
   if [ "$kinds" = s ]; then
     inc=""; flag=""
-    scan=$(grep -v '^[[:space:]]*\(#\|$\)' "$SIDE_PANELS")
+    scan=$(cat "$TMP/side_panels")
   fi
   set +e
   # shellcheck disable=SC2086
@@ -100,35 +155,14 @@ while IFS= read -r line; do
 done <"$TMP/guards"
 sort -u "$TMP/hits" -o "$TMP/hits"
 
-# allowlist
-: >"$TMP/whole"
-: >"$TMP/perm"
-if [ -d "$ALLOW_DIR" ]; then
-  for list in "$ALLOW_DIR"/*.txt; do
-    [ -f "$list" ] || continue
-    while IFS= read -r raw; do
-      entry=$(printf '%s' "$raw" | sed 's/[[:space:]]*#.*$//; s/^[[:space:]]*//; s/[[:space:]]*$//')
-      if [ -z "$entry" ]; then continue; fi
-      case "$entry" in
-        permanent\ *)
-          set -- $entry
-          echo "$2 $3" >>"$TMP/perm" ;;
-        *) echo "$entry" >>"$TMP/whole" ;;
-      esac
-    done <"$list"
-  done
-fi
-sort -u "$TMP/whole" -o "$TMP/whole"
-sort -u "$TMP/perm" -o "$TMP/perm"
+sed 's/[[:space:]]*#.*$//' "$TMP/perm" | sort -u >"$TMP/perm_ids"
+mv "$TMP/perm_ids" "$TMP/perm"
 
 STATUS=0
-: >"$TMP/used_whole"
 : >"$TMP/used_perm"
 while read -r id f; do
   if grep -qxF "$id $f" "$TMP/perm"; then
     echo "$id $f" >>"$TMP/used_perm"
-  elif grep -qxF "$f" "$TMP/whole"; then
-    echo "$f" >>"$TMP/used_whole"
   else
     msg=$(grep "^$id@@" "$TMP/guards" | head -1 | awk -F'@@' '{print $4}')
     echo "check-ui-primitives: $f: $id $msg" >&2
@@ -136,17 +170,10 @@ while read -r id f; do
   fi
 done <"$TMP/hits"
 
-sort -u "$TMP/used_whole" -o "$TMP/used_whole"
 sort -u "$TMP/used_perm" -o "$TMP/used_perm"
-while read -r f; do
-  if ! grep -qxF "$f" "$TMP/used_whole"; then
-    echo "check-ui-primitives: stale allowlist entry (file passes every guard or is gone): $f" >&2
-    STATUS=1
-  fi
-done <"$TMP/whole"
 while read -r id f; do
   if ! grep -qxF "$id $f" "$TMP/used_perm"; then
-    echo "check-ui-primitives: stale permanent entry: $id $f" >&2
+    echo "check-ui-primitives: stale exemption: $id $f" >&2
     STATUS=1
   fi
 done <"$TMP/perm"

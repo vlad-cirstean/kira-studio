@@ -1,5 +1,0 @@
-# P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-permanent U9 apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue # inline edit input blends into the row until focused
-permanent U17 packages/git-ui/src/components/SearchBox.vue # combobox owns two-stage Escape (dismiss dropdown keeps query); SearchField clears on first Esc
-permanent U9 apps/kira-space/frontend/mobile/screens/BacklogScreen.vue # h-11 is the 44px touch height
-permanent U9 apps/kira-space/frontend/mobile/screens/TerminalScreen.vue # h-11 is the 44px touch height

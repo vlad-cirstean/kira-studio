@@ -1,3 +1,0 @@
-# P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-permanent U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 §2.2 exempt)
-permanent U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
