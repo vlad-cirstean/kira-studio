@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Input } from '@theme/components/ui/input';
 import { unrefElement, useEventListener } from '@vueuse/core';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
 
 // P28 D11: the three option toggles the data views' own SearchToolbar has always had — match
@@ -42,7 +41,6 @@ export interface FindBarTarget {
 const props = defineProps<{ targets: readonly FindBarTarget[] }>();
 const emit = defineEmits<{ close: [] }>();
 
-const findInput = ref<{ $el: HTMLElement } | null>(null);
 
 const query = ref('');
 // 0-based, across every target's matches concatenated in order.
@@ -124,10 +122,6 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
-onMounted(() => {
-  void nextTick(() => findInput.value?.$el.focus());
-});
-
 // P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
 const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
 useEventListener(
@@ -140,19 +134,8 @@ useEventListener(
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="http-find-bar">
-    <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground">
-      <CodiconIcon name="search" :size="13" />
-    </span>
     <div class="w-52 shrink-0">
-      <Input
-        ref="findInput"
-        v-model="query"
-        size="kira"
-        placeholder="Find"
-        :aria-invalid="invalid"
-        class="w-full"
-        data-testid="http-find-input"
-      />
+      <SearchField v-model="query" placeholder="Find" :aria-invalid="invalid" data-testid="http-find-input" />
     </div>
     <!-- Three independent toggles (all three can be on at once), not a single-value picker — the
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical

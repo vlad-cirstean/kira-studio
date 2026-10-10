@@ -38,6 +38,7 @@ import {
 } from '@shared/protocol/page';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
@@ -46,7 +47,6 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
@@ -224,6 +224,7 @@ function memoryText(bytes: number | null): string {
 
 // --- page size (P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap) -
 const PAGE_SIZE_OPTIONS = pageSizeOptions('keyvalue-');
+const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label, testid: o.testid }));
 function onPageSize(size: PageSize): void {
   void keyValueViewStore.setPageSize(props.viewKey, size);
 }
@@ -821,17 +822,7 @@ onUnmounted(() => {
 
           <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
                DataToolbar.vue's own page-size segmented control occupies. -->
-          <ToggleGroup
-            type="single"
-            size="kira"
-            :model-value="String(host?.pageSize ?? 100)"
-            data-testid="keyvalue-page-size-picker"
-            @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"
-          >
-            <ToggleGroupItem v-for="opt in PAGE_SIZE_OPTIONS" :key="opt.value" :value="String(opt.value)" :data-testid="opt.testid">
-              {{ opt.label }}
-            </ToggleGroupItem>
-          </ToggleGroup>
+          <SecondaryTabs variant="segmented" :model-value="String(host?.pageSize ?? 100)" :items="PAGE_SIZE_ITEMS" data-testid="keyvalue-page-size-picker" @update:model-value="(v) => onPageSize(Number(v) as PageSize)" />
         </template>
 
         <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />

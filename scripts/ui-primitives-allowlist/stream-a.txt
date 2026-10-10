@@ -1,12 +1,4 @@
 # P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue
-apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue
-apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue
-apps/kira-studio/frontend/src/views/shared/keyvalue/KeyValuePane.vue
-apps/kira-studio/frontend/src/views/shared/page/PagerControls.vue
-apps/kira-studio/frontend/src/views/stream/StreamComposeMessage.vue
-apps/kira-studio/frontend/src/views/stream/StreamSearchToolbar.vue
-apps/kira-studio/frontend/src/views/stream/StreamView.vue
 apps/kira-studio/frontend/src/workbench/settings/AdvancedPane.vue
 apps/kira-studio/frontend/src/workbench/settings/ApiPane.vue
 apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue
@@ -58,8 +50,6 @@ packages/workbench/src/settings/fields/RowDensityField.vue
 packages/workbench/src/settings/fields/WordWrapField.vue
 permanent U3 apps/kira-studio/frontend/src/shortcuts/CommandPalette.vue # CommandDialog is the command surface, theme-owned (P262 §2.2 exempt)
 permanent U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
-apps/kira-studio/frontend/src/views/shared/ResponseFindBar.vue
-apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue
 packages/docker-ui/src/components/ImageList.vue
 packages/docker-ui/src/components/NetworkList.vue
 packages/docker-ui/src/components/VirtualList.vue

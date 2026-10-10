@@ -1,11 +1,10 @@
 <script setup lang="ts" generic="M extends { row: number }">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Input } from '@theme/components/ui/input';
 import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
 import { usePageSearchFilterStore } from './searchFilter';
@@ -46,11 +45,6 @@ function toggleFilter(): void {
   pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
 }
 
-// Typed as the bare $el shape (rather than InstanceType<typeof Input>) so this ref doesn't read
-// as a type-only use of the Input import above — it's a real component, bound as a value by the
-// template below. Input's own root *is* the `<input>` itself, so `$el` is the focus target
-// directly, no inner-element lookup needed.
-const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
 const query = ref('');
 const matchCase = ref(false);
@@ -240,13 +234,6 @@ useEventListener(
   onKeydown,
 );
 
-onMounted(() => {
-  // This component is mounted fresh each time its host toolbar opens (both from the toolbar
-  // button and from Cmd+F), so onMounted fires exactly then — the right place to autofocus so
-  // typing can start immediately without an extra click into the field.
-  void nextTick(() => searchInput.value?.$el.focus());
-});
-
 onUnmounted(() => {
   startSearchDebounced.cancel();
   handle?.cancel();
@@ -266,21 +253,8 @@ onUnmounted(() => {
     class="bg-elevated"
     :data-testid="`${testidPrefix}search-toolbar`"
   >
-    <span
-      class="size-4 flex items-center justify-center shrink-0"
-      :class="errorMessage ? 'text-error' : 'text-muted-foreground'"
-    >
-      <CodiconIcon name="search" :size="13" />
-    </span>
     <div class="w-52 shrink-0">
-      <Input
-        ref="searchInput"
-        v-model="query"
-        placeholder="Find"
-        class="w-full"
-        :data-testid="`${testidPrefix}search-input`"
-        :aria-invalid="!!errorMessage"
-      />
+      <SearchField v-model="query" placeholder="Find" :data-testid="`${testidPrefix}search-input`" :aria-invalid="!!errorMessage" />
     </div>
     <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
          single-value picker, so each is its own icon button rather than a <SegmentedControl> (which

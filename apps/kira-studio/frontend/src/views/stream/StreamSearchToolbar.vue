@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Input } from '@theme/components/ui/input';
 import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
 import { useStreamSearchStore } from './search';
@@ -36,11 +35,6 @@ function toggleFilter(): void {
 const query = ref('');
 const entry = computed(() => streamSearchStore.searchState[props.tabId]);
 
-// See views/shared/page/SearchToolbar.vue's identical ref/onMounted pair for why onMounted is the
-// right place to autofocus (this component is mounted fresh each time the toolbar opens). $el is
-// already the <input> itself — ui/input's root IS the <input> element, unlike the old TextField's
-// wrapping <span>.
-const searchInput = ref<{ $el: HTMLInputElement } | null>(null);
 
 // Debounced like views/shared/page/SearchToolbar.vue: the scan decodes every cell of the page
 // synchronously, so one per keystroke would stall typing on a large page. Clearing is immediate.
@@ -104,10 +98,6 @@ useEventListener(
   onKeydown,
 );
 
-onMounted(() => {
-  void nextTick(() => searchInput.value?.$el.focus());
-});
-
 onUnmounted(() => {
   searchDebounced.cancel();
   streamSearchStore.clearSearchState(props.tabId);
@@ -120,16 +110,8 @@ onUnmounted(() => {
 <template>
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="stream-search-toolbar">
-    <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="search" :size="13" /></span>
     <div class="w-52 shrink-0">
-      <Input
-        ref="searchInput"
-        :model-value="query"
-        placeholder="Find"
-        class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
-        data-testid="stream-search-input"
-        @update:model-value="(v) => (query = String(v))"
-      />
+      <SearchField v-model="query" placeholder="Find" data-testid="stream-search-input" />
     </div>
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">

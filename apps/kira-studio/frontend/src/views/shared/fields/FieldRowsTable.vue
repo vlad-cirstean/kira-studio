@@ -204,7 +204,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
     return;
   }
   const el = e.target;
-  // Only real text inputs participate — a <select> (form-data's kind picker) or a <button> (Choose
+  // Only real text inputs participate — a native select (form-data's kind picker) or a <button> (Choose
   // file, Remove) stays Tab-reachable and keeps its own native arrow behaviour untouched. `.type`
   // exists on both element types (a textarea's own is always the constant 'textarea'), so this one
   // check still excludes only the enabled-checkbox column.
@@ -289,7 +289,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
         :data-testid="`${testidPrefix}-enabled`"
         @update:model-value="toggleEnabled(entry.index)"
       >
-        <CodiconIcon name="check" :size="10" />
+        <CodiconIcon name="check" :size="12" />
       </Checkbox>
       <div class="min-w-0">
         <!-- P28 D10: a name is as legal a place for a {{reference}} as a value is

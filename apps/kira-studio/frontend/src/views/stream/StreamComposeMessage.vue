@@ -75,7 +75,8 @@ async function submit(): Promise<void> {
         <Input
           :model-value="key"
           placeholder="(none)"
-          class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+          size="kira"
+          class="font-data"
           data-testid="stream-add-message-key"
           @update:model-value="(v) => (key = String(v))"
         />

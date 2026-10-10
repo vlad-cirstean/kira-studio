@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import DateTimePicker from '../DateTimePicker.vue';
@@ -116,17 +116,7 @@ watch(calendarOpen, (open) => {
     </Alert>
 
     <div class="flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2">
-      <ToggleGroup
-        type="single"
-        size="kira"
-        :model-value="zone"
-        data-testid="cell-editor-timestamp-zone"
-        @update:model-value="(v) => v && setZone(v as string)"
-      >
-        <ToggleGroupItem v-for="opt in ZONE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
-          {{ opt.label }}
-        </ToggleGroupItem>
-      </ToggleGroup>
+      <SecondaryTabs variant="segmented" :model-value="zone" :items="ZONE_OPTIONS" data-testid="cell-editor-timestamp-zone" @update:model-value="(v) => setZone(v)" />
       <div class="flex-1 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>

@@ -416,7 +416,7 @@ function setFormat(format: CellFormat | null): void {
   cellEditorFormatStore.setOverride(selectedCell.value, format);
 }
 
-// P42 D27: an app-drawn picker, not a native <select> — the only way a per-row hover explanation
+// P42 D27: an app-drawn picker, not a native select — the only way a per-row hover explanation
 // (item 16) can exist at all, since a native <option> is drawn outside the DOM elementFromPoint
 // can reach. An "Auto — X" row first, then FORMAT_GROUPS' own three groups separated, `checked`
 // on whichever is effective right now.
@@ -556,7 +556,7 @@ const statusLine = computed(() => {
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
-              <!-- P42 D27: an app-drawn menu trigger, not a native <select> — border/background/
+              <!-- P42 D27: an app-drawn menu trigger, not a native select — border/background/
                    padding/cursor still come from nativeSelectVariants({variant: 'bordered'})
                    (P110 B24, applied directly as a class function since this is a <button>, not a
                    NativeSelect component); its appearance:base-select/::picker(select)/option
@@ -598,7 +598,7 @@ const statusLine = computed(() => {
               />
               <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
             </span>
-            <PopoverContent align="start" class="w-52 gap-0 p-0" data-testid="cell-editor-generate-popover">
+            <PopoverContent align="start" class="w-56 gap-0 p-0" data-testid="cell-editor-generate-popover">
               <div class="flex flex-col gap-px p-1">
                 <Tooltip v-for="gen in GENERATORS" :key="gen.id">
                   <TooltipTrigger as-child>
