@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -17,8 +15,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
-
-const maxDenials = 50
 
 // How a smart run was ended from outside, set before its context is cancelled.
 const (
@@ -256,14 +252,8 @@ func decide(d decision) runoutcome.Outcome {
 			out.Status = runoutcome.StatusFailed
 			out.Reason = firstNonEmpty(d.finish.Reason, d.finish.Summary, "the agent reported failure without a reason")
 		}
-	case d.res != nil && d.res.Subtype == "error_max_budget_usd":
-		out = runoutcome.Outcome{Status: runoutcome.StatusFailed, Source: runoutcome.SourceBudget, ExitCode: &code,
-			Reason: fmt.Sprintf("stopped at the budget of %g USD", d.budget)}
-	case d.res != nil && d.res.Subtype == "error_max_turns":
-		out = runoutcome.Outcome{Status: runoutcome.StatusFailed, Source: runoutcome.SourceAgent, ExitCode: &code, Reason: "stopped at the turn limit"}
-	case d.res != nil && d.res.IsError:
-		out = runoutcome.Outcome{Status: runoutcome.StatusFailed, Source: runoutcome.SourceAgent, ExitCode: &code,
-			Reason: firstNonEmpty(d.res.Text, "Claude reported an error")}
+	case resultEnds(d):
+		out, _ = claudeheadless.ResultOutcome(d.res, code, d.budget)
 	default:
 		p := runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: code, Timeout: d.timeout}
 		switch {
@@ -274,28 +264,13 @@ func decide(d decision) runoutcome.Outcome {
 		}
 		out = runoutcome.ForProcess(p)
 	}
-	if d.res != nil {
-		out.CostUSD = d.res.CostUSD
-		if len(d.res.Denials) > 0 {
-			denials := d.res.Denials
-			if len(denials) > maxDenials {
-				denials = denials[:maxDenials]
-			}
-			sort.Strings(denials)
-			out.PermissionDenials = denials
-			if out.Status != runoutcome.StatusDone {
-				out.Reason = strings.TrimSpace(out.Reason + " (denied: " + strings.Join(denials, ", ") + ")")
-			}
-		}
-	}
+	out = claudeheadless.ApplyResult(out, d.res)
 	return out.WithLastError(d.lastErr)
 }
 
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if strings.TrimSpace(v) != "" {
-			return v
-		}
-	}
-	return ""
+func resultEnds(d decision) bool {
+	_, ok := claudeheadless.ResultOutcome(d.res, d.exit.Code, d.budget)
+	return ok
 }
+
+func firstNonEmpty(vals ...string) string { return claudeheadless.FirstNonEmpty(vals...) }
