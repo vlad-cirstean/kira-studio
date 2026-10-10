@@ -1,6 +1,6 @@
 // Package agentnotify turns Claude Code hook events and ADE headless run changes into desktop
 // notifications. It decides whether to notify (preferences, wake tracking, focus, cooldown) and
-// builds the text; a Sink posts it. The macOS sink lives in sink_darwin.go.
+// builds the text; a Sink posts it (the macOS sink is internal/desknotify).
 package agentnotify
 
 import (
@@ -11,6 +11,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/desknotify"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 )
@@ -38,6 +39,21 @@ type Note struct {
 
 // Sink posts a Note to the OS.
 type Sink interface{ Send(Note) error }
+
+// SinkFor adapts a shared desktop sink; ids stay in Data under the keys a click reads back.
+func SinkFor(d desknotify.Sink) Sink { return deskSink{d} }
+
+type deskSink struct{ d desknotify.Sink }
+
+func (s deskSink) Send(n Note) error {
+	return s.d.Send(desknotify.Note{
+		ID: n.ID, Title: n.Title, Body: n.Body, Thread: "kira-agents",
+		Data: map[string]string{
+			"terminalId": n.TerminalID, "windowKey": n.WindowKey, "recordId": n.RecordID,
+			"taskId": n.TaskID, "scriptRunId": n.ScriptRunID, "kind": string(n.Kind),
+		},
+	})
+}
 
 // Prefs are the claudeCode.notify* settings.
 type Prefs struct {
