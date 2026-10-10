@@ -356,8 +356,9 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
   throwaway `Locate` patch.
 - **A fresh or reused worktree needs `bun run setup` before typecheck, unit tests, knip or a push.**
   Bindings are gitignored; a stale set (e.g. a removed `SetAgentAware`, a new `DockerService`) breaks
-  `typecheck`, `test:unit` and the pre-push `lint:dead` (knip). Run it in the worktree you push from,
-  then push again if the hook failed on missing bindings.
+  `typecheck`, `test:unit` and the pre-push `lint:dead` (knip reports unlisted `@bindings/*`). Run
+  `bash scripts/setup.sh` in the worktree you push from, in a fresh worktree and after adding a bound
+  service, then push again if the hook failed on missing bindings.
 - **The ADE v2 flows need no `Locate` patch** (P148 live run): seed `code_repos`, `windows('main')` and
   `git.path` rows, and the board, runs, Take over, archive and dialogs all work.
 - **`claude -p` blocks a standalone `sleep N` and backgrounds it**, so the run ends `ended without
@@ -478,6 +479,12 @@ Sandbox notes:
   the single test alone (`-count=3`, `--repeat-each`) before calling it broken.
 - **`golangci-lint` refuses parallel instances** (two runs fail on the lock). Run it alone. On a lock error
   wait 60 s and retry. This covers `bun run lint:go`, `lint:claude` and the pre-push hook.
+- **`bun run lint:go` needs `bun run build:space-mobile` once per checkout** (`main.go` embeds
+  `frontend/dist-mobile`; absent, typecheck of the Go module fails).
+- **`ui-timing` needs an idle machine.** `--project=ui-timing` also runs the whole `ui` project; with load
+  above ~9 `perf.spec.ts` and `budgets.spec.ts` fail on p95 budgets that pass quiet. Start it alone.
+- **Docker flow tests need `dockerd` started by hand** (section above) and `KIRA_FLOW_DOCKER=require`, or
+  they skip and report green.
 - **Check `df -h /` before a build.** Aim for 6 GB free. The Go build cache once reached 8 GB and filled the
   disk (P236). Reclaim regenerable files first: `/tmp/go-build*`, `/tmp/go-link-*`,
   `/tmp/playwright-transform-cache-*`, `apps/*/test-results`, `playwright-report`. `go clean -cache` only
