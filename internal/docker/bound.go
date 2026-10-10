@@ -196,3 +196,20 @@ func (b *BoundService) DiskUsage() (DiskUsage, error) { return b.m.diskUsage() }
 func (b *BoundService) ContainerSize(args IDArgs) (ContainerSize, error) {
 	return b.m.containerSize(args.ID)
 }
+
+// ContainerEditSpec returns the editable config of one container, split into what applies in place
+// and what needs a recreate.
+func (b *BoundService) ContainerEditSpec(args IDArgs) (EditSpec, error) {
+	return b.m.editSpec(context.Background(), args.ID)
+}
+
+// UpdateContainer applies the in-place section: rename, limits, restart policy, network attachments.
+func (b *BoundService) UpdateContainer(args UpdateArgs) (UpdateResult, error) {
+	return b.m.updateContainer(args)
+}
+
+// RecreateContainer replaces a container with one built from the edited spec, restoring the
+// original if any step fails.
+func (b *BoundService) RecreateContainer(args RecreateArgs) (RecreateResult, error) {
+	return b.m.recreateContainer(args)
+}

@@ -76,6 +76,8 @@ type Manager struct {
 	execs  *execRegistry
 
 	flight singleflight.Group
+	// editing holds the container IDs with an edit in flight.
+	editing sync.Map
 }
 
 // NewManager builds a Manager reading the real process environment.

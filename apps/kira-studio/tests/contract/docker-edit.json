@@ -1,0 +1,251 @@
+{
+  "DockerService.ContainerEditSpec": {
+    "anonymousVolumes": [
+      {
+        "destination": "/anon",
+        "name": "anon-volume"
+      }
+    ],
+    "autoRemove": false,
+    "baseHash": "<masked>",
+    "dependents": [],
+    "id": "<masked>",
+    "inPlace": {
+      "name": "kira-flow-edit",
+      "networks": [
+        {
+          "aliases": [],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "bridge"
+        },
+        {
+          "aliases": [
+            "svc"
+          ],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "kira-flow-edit"
+        }
+      ],
+      "resources": {
+        "blkioWeight": 0,
+        "cpuPeriod": 0,
+        "cpuQuota": 0,
+        "cpuShares": 0,
+        "cpusetCpus": "",
+        "cpusetMems": "",
+        "memory": 67108864,
+        "memoryReservation": 0,
+        "memorySwap": 134217728,
+        "nanoCpus": 0,
+        "pidsLimit": 0
+      },
+      "restart": {
+        "maxRetries": 3,
+        "name": "on-failure"
+      }
+    },
+    "managed": "",
+    "networkMode": "bridge",
+    "origin": "",
+    "originName": "",
+    "preserved": [
+      "workdir /"
+    ],
+    "recreate": {
+      "capAdd": [
+        "CAP_NET_ADMIN"
+      ],
+      "capDrop": [],
+      "cmd": [
+        "sh",
+        "-c",
+        "echo hello > /data/hello; echo ready; exec sleep 300"
+      ],
+      "entrypoint": [],
+      "env": [
+        "A=1",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "hostname": "edit-host",
+      "image": "mirror.gcr.io/library/alpine:3.20",
+      "labels": {
+        "edit": "1",
+        "kira.flowtest": "run"
+      },
+      "mounts": [
+        {
+          "key": "mount:0",
+          "readOnly": false,
+          "source": "kira-flow-edit",
+          "target": "/data",
+          "type": "volume"
+        }
+      ],
+      "ports": [
+        {
+          "containerPort": 8080,
+          "hostIp": "",
+          "hostPort": "",
+          "proto": "tcp"
+        }
+      ],
+      "user": ""
+    },
+    "state": "running"
+  },
+  "DockerService.RecreateContainer": {
+    "id": "<masked>",
+    "name": "kira-flow-edit",
+    "oldId": "<masked>",
+    "warnings": []
+  },
+  "DockerService.RecreateContainer#rollback": {
+    "code": "E_RECREATE_FAILED",
+    "details": {
+      "restored": true,
+      "step": "start"
+    },
+    "message": "<masked>"
+  },
+  "DockerService.UpdateContainer": {
+    "applied": [
+      "rename",
+      "resources",
+      "restart",
+      "network:kira-flow-edit",
+      "network:kira-flow-edit2"
+    ],
+    "warnings": []
+  },
+  "args:DockerService.RecreateContainer": {
+    "baseHash": "<masked>",
+    "id": "<masked>",
+    "inPlace": {
+      "name": "kira-flow-edit",
+      "networks": [
+        {
+          "aliases": [],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "bridge"
+        },
+        {
+          "aliases": [
+            "svc"
+          ],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "kira-flow-edit"
+        }
+      ],
+      "resources": {
+        "blkioWeight": 0,
+        "cpuPeriod": 0,
+        "cpuQuota": 0,
+        "cpuShares": 0,
+        "cpusetCpus": "",
+        "cpusetMems": "",
+        "memory": 67108864,
+        "memoryReservation": 0,
+        "memorySwap": 134217728,
+        "nanoCpus": 0,
+        "pidsLimit": 0
+      },
+      "restart": {
+        "maxRetries": 3,
+        "name": "on-failure"
+      }
+    },
+    "recreate": {
+      "capAdd": [
+        "CAP_NET_ADMIN"
+      ],
+      "capDrop": [],
+      "cmd": [
+        "sh",
+        "-c",
+        "echo again; exec sleep 300"
+      ],
+      "entrypoint": [],
+      "env": [
+        "A=1",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "B=2"
+      ],
+      "hostname": "edit-host",
+      "image": "kira-flowtest-run/edit:latest",
+      "labels": {
+        "edit": "1",
+        "edit2": "yes",
+        "kira.flowtest": "run"
+      },
+      "mounts": [
+        {
+          "key": "mount:0",
+          "readOnly": false,
+          "source": "kira-flow-edit",
+          "target": "/data",
+          "type": "volume"
+        }
+      ],
+      "ports": [
+        {
+          "containerPort": 8081,
+          "hostIp": "",
+          "hostPort": "",
+          "proto": "tcp"
+        }
+      ],
+      "user": ""
+    }
+  },
+  "args:DockerService.UpdateContainer": {
+    "baseHash": "<masked>",
+    "id": "<masked>",
+    "spec": {
+      "name": "kira-flow-edit-renamed",
+      "networks": [
+        {
+          "aliases": [],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "bridge"
+        },
+        {
+          "aliases": [
+            "svc",
+            "api"
+          ],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "kira-flow-edit"
+        },
+        {
+          "aliases": [],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "kira-flow-edit2"
+        }
+      ],
+      "resources": {
+        "blkioWeight": 0,
+        "cpuPeriod": 0,
+        "cpuQuota": 0,
+        "cpuShares": 512,
+        "cpusetCpus": "",
+        "cpusetMems": "",
+        "memory": 100663296,
+        "memoryReservation": 33554432,
+        "memorySwap": 201326592,
+        "nanoCpus": 500000000,
+        "pidsLimit": 64
+      },
+      "restart": {
+        "maxRetries": 0,
+        "name": "unless-stopped"
+      }
+    }
+  }
+}

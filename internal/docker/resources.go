@@ -229,8 +229,10 @@ func (m *Manager) mapErr(ep Endpoint, err error) error {
 	switch {
 	case cerrdefs.IsNotFound(err):
 		return ipcerr.NotFound(err.Error())
-	case cerrdefs.IsInvalidArgument(err):
+	case cerrdefs.IsInvalidArgument(err), cerrdefs.IsPermissionDenied(err):
 		return ipcerr.New("E_INVALID", err.Error())
+	case cerrdefs.IsConflict(err):
+		return ipcerr.New("E_CONFLICT", err.Error())
 	}
 	if !ep.Remote || isConnErr(err) {
 		if reason := m.classify(ep, err); reason != reasonError {
