@@ -123,6 +123,7 @@ export interface WorkflowEntry {
   workflow: Workflow | null /* last valid version; null if never valid */;
   error: WorkflowError | null /* current file's error */;
   usedBy: number;
+  hash: string /* identifies the file text; Save sends it back as baseHash */;
 }
 export interface WorkflowsResult {
   dir: string;
@@ -662,6 +663,7 @@ export interface FileNameArgs {
 export interface SaveWorkflowArgs {
   fileName: string;
   workflow: Workflow;
+  baseHash: string /* the entry hash the draft was built on; '' skips the check */;
 }
 export interface SaveWorkflowYamlArgs {
   fileName: string;

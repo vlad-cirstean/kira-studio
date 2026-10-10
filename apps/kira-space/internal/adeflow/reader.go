@@ -97,6 +97,7 @@ func (r *Reader) entryFor(name string, lv *lastValid) adewire.WorkflowEntry {
 	var wf adewire.Workflow
 	var werr *adewire.WorkflowError
 	src, err := readCapped(entry.Path)
+	entry.Hash = textHash(src)
 	switch {
 	case err != nil:
 		werr = &adewire.WorkflowError{Message: "cannot read the file: " + err.Error()}

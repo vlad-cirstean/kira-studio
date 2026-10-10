@@ -419,3 +419,28 @@ test('leaving Agents with unsaved edits asks first', async ({ relaunch }) => {
   await page.locator(t('confirm-dialog-confirm')).click();
   await expect(terminal).toHaveClass(/is-active/);
 });
+
+test('a save refused for a changed file offers Reload and Overwrite', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch, [
+    {
+      channel: IPC.adeTaskSaveWorkflow,
+      error: { code: 'E_CONFLICT', message: 'the workflow changed since it was loaded' },
+    },
+  ]);
+  await page.locator(t('ade-wf-form-name')).fill('Renamed');
+  await page.locator(t('ade-wf-save')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskSaveWorkflow)[0]?.args).toMatchObject({
+    fileName: 'standard.yaml',
+    baseHash: 'hash-standard.yaml',
+  });
+  await expect(page.locator(t('ade-wf-save-error'))).toContainText('changed since it was loaded');
+  await expect(page.locator(t('ade-wf-switch-yaml'))).toHaveCount(0);
+
+  await page.locator(t('ade-wf-overwrite')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(2);
+
+  await page.locator(t('ade-wf-reload')).click();
+  await expect(page.locator(t('ade-wf-save-error'))).toHaveCount(0);
+  await expect(page.locator(t('ade-wf-save'))).toBeDisabled();
+});

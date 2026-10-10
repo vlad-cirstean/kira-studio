@@ -79,6 +79,8 @@ func adeTaskError(err error) error {
 		return nil
 	case errors.Is(err, ade.ErrStale):
 		return ipcerr.New("E_STALE", err.Error())
+	case errors.Is(err, ade.ErrWorkflowChanged):
+		return ipcerr.New("E_CONFLICT", err.Error())
 	case errors.Is(err, ade.ErrSetupPending):
 		return ipcerr.New("E_PREPARING", err.Error())
 	case errors.Is(err, ade.ErrInvalidInput), errors.Is(err, repos.ErrEstimateShrink),

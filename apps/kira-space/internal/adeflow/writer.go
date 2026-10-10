@@ -2,6 +2,8 @@ package adeflow
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -19,6 +21,10 @@ import (
 // ErrInvalid marks a caller mistake: a bad file name, an invalid workflow, a YAML syntax error in
 // the file being edited. The ade engine maps it to E_INVALID.
 var ErrInvalid = errors.New("adeflow: invalid")
+
+// ErrConflict marks a save built on a file text that has since changed. The ade engine maps it to
+// E_CONFLICT.
+var ErrConflict = errors.New("adeflow: conflict")
 
 func invalidf(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...))
@@ -80,7 +86,9 @@ func (r *Reader) SaveYaml(file, src string) (adewire.WorkflowEntry, error) {
 
 // Save rewrites the file from the structured workflow, keeping comments, key order and the user's
 // scalar styles wherever the content is unchanged. wf.ID must equal the file name stem.
-func (r *Reader) Save(file string, wf adewire.Workflow) (adewire.WorkflowEntry, error) {
+//
+// baseHash, when set, must match the file's current text (see textHash), else ErrConflict.
+func (r *Reader) Save(file, baseHash string, wf adewire.Workflow) (adewire.WorkflowEntry, error) {
 	p, err := r.path(file)
 	if err != nil {
 		return adewire.WorkflowEntry{}, err
@@ -91,7 +99,11 @@ func (r *Reader) Save(file string, wf adewire.Workflow) (adewire.WorkflowEntry, 
 	r.wmu.Lock()
 	defer r.wmu.Unlock()
 	var doc yaml.Node
-	switch src, err := os.ReadFile(p); {
+	src, err := os.ReadFile(p)
+	if baseHash != "" && textHash(src) != baseHash {
+		return adewire.WorkflowEntry{}, fmt.Errorf("%w: the workflow changed since it was loaded", ErrConflict)
+	}
+	switch {
 	case err == nil:
 		if err := yaml.Unmarshal(src, &doc); err != nil {
 			return adewire.WorkflowEntry{}, invalidf("fix the YAML error on line %d first", yamlErrLineOf(err))
@@ -174,6 +186,15 @@ func (r *Reader) New(name string) (adewire.WorkflowEntry, error) {
 		return adewire.WorkflowEntry{}, err
 	}
 	return r.entry(file, filepath.Join(r.Dir, file))
+}
+
+// textHash identifies a workflow file's text; "" for no file.
+func textHash(src []byte) string {
+	if len(src) == 0 {
+		return ""
+	}
+	sum := sha256.Sum256(src)
+	return hex.EncodeToString(sum[:])
 }
 
 func (r *Reader) entry(file, path string) (adewire.WorkflowEntry, error) {

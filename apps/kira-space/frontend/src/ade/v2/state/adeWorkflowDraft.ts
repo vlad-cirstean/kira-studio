@@ -19,11 +19,16 @@ export type Selection =
   | { kind: 'step'; stageId: string; stepId: string };
 
 // The graph editor's draft: a local copy of the last valid workflow that every canvas and inspector
-// edit changes. Save writes it whole, Discard drops it; a pushed workflow never replaces unsaved edits.
+// edit changes. Save writes it whole (with the file hash it was built on, so a change made elsewhere
+// is refused), Discard drops it; a pushed workflow never replaces unsaved edits.
 export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
   const draft = ref<Workflow | null>(null);
   const dirty = ref(false);
   const error = ref('');
+  /** The file hash the draft was built on. */
+  const baseHash = ref('');
+  /** The last save was refused because the file changed since `baseHash`. */
+  const conflict = ref(false);
   const selection = ref<Selection | null>(null);
 
   const stage = computed(
@@ -37,18 +42,28 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
   });
   const canSkip = computed(() => runnableCount(draft.value?.stages ?? []) > 1);
 
-  function open(wf: Workflow | null): void {
+  function open(wf: Workflow | null, hash = ''): void {
     draft.value = wf ? cloneWorkflow(wf) : null;
+    baseHash.value = hash;
+    conflict.value = false;
     dirty.value = false;
     error.value = '';
     selection.value = null;
   }
   /** A pushed workflow: taken only while nothing is unsaved. */
-  function push(wf: Workflow | null): void {
-    if (!dirty.value && wf) draft.value = cloneWorkflow(wf);
+  function push(wf: Workflow | null, hash: string): void {
+    if (dirty.value || !wf) return;
+    draft.value = cloneWorkflow(wf);
+    baseHash.value = hash;
   }
-  function discard(wf: Workflow | null): void {
-    open(wf);
+  function discard(wf: Workflow | null, hash: string): void {
+    open(wf, hash);
+  }
+  /** Overwrite: rebuild on the file as it is now while keeping the draft's edits. */
+  function rebase(hash: string): void {
+    baseHash.value = hash;
+    conflict.value = false;
+    error.value = '';
   }
   function edit(next: Workflow): void {
     draft.value = next;
@@ -62,8 +77,10 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
       selection.value = { kind: 'stage', stageId: sel.stageId };
   }
   /** After a save: clean only when nothing changed while it was in flight. */
-  function saved(sent: string): void {
+  function saved(sent: string, hash: string): void {
     error.value = '';
+    conflict.value = false;
+    baseHash.value = hash;
     if (JSON.stringify(draft.value) === sent) dirty.value = false;
   }
   function select(sel: Selection | null): void {
@@ -154,6 +171,8 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
     draft,
     dirty,
     error,
+    baseHash,
+    conflict,
     selection,
     stage,
     step,
@@ -162,6 +181,7 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
     push,
     discard,
     saved,
+    rebase,
     select,
     patchWorkflow,
     patchStage,

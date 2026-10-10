@@ -209,7 +209,8 @@
         ]
       },
       "error": null,
-      "usedBy": 8
+      "usedBy": 8,
+      "hash": "hash-standard.yaml"
     },
     {
       "fileName": "bugfix.yaml",
@@ -377,7 +378,8 @@
         ]
       },
       "error": null,
-      "usedBy": 2
+      "usedBy": 2,
+      "hash": "hash-bugfix.yaml"
     },
     {
       "fileName": "chore.yaml",
@@ -475,7 +477,8 @@
         ]
       },
       "error": null,
-      "usedBy": 1
+      "usedBy": 1,
+      "hash": "hash-chore.yaml"
     },
     {
       "fileName": "broken.yaml",
@@ -485,7 +488,8 @@
         "line": 11,
         "message": "step \"impl\": runs_on must be once, each repo or only <repo>"
       },
-      "usedBy": 0
+      "usedBy": 0,
+      "hash": "hash-broken.yaml"
     }
   ]
 }

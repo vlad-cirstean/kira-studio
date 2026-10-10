@@ -1,6 +1,7 @@
 package adeflow_test
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -194,7 +196,7 @@ func TestBranching(t *testing.T) {
 			{ID: "approved", OK: true, Next: "next"},
 			{ID: "changes", Description: "Needs work.", Next: "impl", Max: 2},
 		}
-		args := adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf}
+		args := adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf, BaseHash: entry.Hash}
 		saved, err := f.app.W.AdeTask.SaveWorkflow(ctx, args)
 		if err != nil || saved.Error != nil {
 			t.Fatalf("SaveWorkflow = %+v, %v", saved, err)
@@ -208,11 +210,43 @@ func TestBranching(t *testing.T) {
 				t.Fatalf("saved yaml lacks %q:\n%s", want, y.Yaml)
 			}
 		}
-		f.app.Contract(t, "ade-workflow-results", "args:AdeTaskService.SaveWorkflow", args)
-		f.app.Contract(t, "ade-workflow-results", "AdeTaskService.SaveWorkflow", saved)
+		f.app.Contract(t, "ade-workflow-results", "args:AdeTaskService.SaveWorkflow", args, flowharness.Mask("baseHash"))
+		f.app.Contract(t, "ade-workflow-results", "AdeTaskService.SaveWorkflow", saved, flowharness.Mask("hash"))
 		got := saved.Workflow.Stages[0].Steps[1].Results
 		if len(got) != 2 || got[1].ID != "changes" || got[1].Max != 2 || got[1].Next != "impl" {
 			t.Fatalf("saved results = %+v", got)
+		}
+	})
+
+	t.Run("a save built on an older file text is refused", func(t *testing.T) {
+		f := newRunFixture(t, acts("done"), agentStage("build", agentStep("impl", "")))
+		list, err := f.app.W.AdeTask.Workflows(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var entry adewire.WorkflowEntry
+		for _, e := range list.Workflows {
+			if e.FileName == "flow.yaml" {
+				entry = e
+			}
+		}
+		if entry.Hash == "" {
+			t.Fatalf("entry %+v has no hash", entry)
+		}
+		wf := *entry.Workflow
+		wf.Name = "Renamed"
+		first, err := f.app.W.AdeTask.SaveWorkflow(ctx, adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf, BaseHash: entry.Hash})
+		if err != nil || first.Hash == "" || first.Hash == entry.Hash {
+			t.Fatalf("first save = %+v, %v, want a new hash", first, err)
+		}
+		wf.Name = "Other window"
+		_, err = f.app.W.AdeTask.SaveWorkflow(ctx, adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf, BaseHash: entry.Hash})
+		var ie *ipcerr.Error
+		if !errors.As(err, &ie) || ie.Code != "E_CONFLICT" {
+			t.Fatalf("stale save err = %v, want E_CONFLICT", err)
+		}
+		if _, err := f.app.W.AdeTask.SaveWorkflow(ctx, adewire.SaveWorkflowArgs{FileName: "flow.yaml", Workflow: wf, BaseHash: first.Hash}); err != nil {
+			t.Fatalf("save on the current hash: %v", err)
 		}
 	})
 }

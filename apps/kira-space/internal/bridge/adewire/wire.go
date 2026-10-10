@@ -146,6 +146,8 @@ type WorkflowEntry struct {
 	Workflow *Workflow      `json:"workflow"`
 	Error    *WorkflowError `json:"error"`
 	UsedBy   int            `json:"usedBy"`
+	// Hash identifies the file's current text; Save refuses a draft built on another one.
+	Hash string `json:"hash"`
 }
 
 type WorkflowsResult struct {
@@ -548,6 +550,8 @@ type FileNameArgs struct {
 type SaveWorkflowArgs struct {
 	FileName string   `json:"fileName"`
 	Workflow Workflow `json:"workflow"`
+	// BaseHash is the WorkflowEntry.Hash the draft was built on; "" skips the check.
+	BaseHash string `json:"baseHash"`
 }
 
 type SaveWorkflowYamlArgs struct {

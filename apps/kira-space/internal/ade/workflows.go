@@ -16,7 +16,14 @@ import (
 const workflowsEmitDelay = 250 * time.Millisecond
 
 // wfErr maps the writer's caller mistakes to ErrInvalidInput.
+// ErrWorkflowChanged marks a workflow save built on text that has since changed; the bridge maps it
+// to E_CONFLICT.
+var ErrWorkflowChanged = errors.New("ade: workflow changed")
+
 func wfErr(err error) error {
+	if errors.Is(err, adeflow.ErrConflict) {
+		return fmt.Errorf("%w: %s", ErrWorkflowChanged, strings.TrimPrefix(err.Error(), "adeflow: conflict: "))
+	}
 	if errors.Is(err, adeflow.ErrInvalid) {
 		return fmt.Errorf("%w: %s", ErrInvalidInput, strings.TrimPrefix(err.Error(), "adeflow: invalid: "))
 	}
@@ -84,7 +91,7 @@ func (b *TaskBoard) ValidateWorkflowYaml(_ context.Context, src string) adewire.
 // SaveWorkflow rewrites a file from the structured workflow. Running tasks keep the stage snapshot
 // they started with; an edit applies from the next stage or step on.
 func (b *TaskBoard) SaveWorkflow(_ context.Context, args adewire.SaveWorkflowArgs) (adewire.WorkflowEntry, error) {
-	e, err := b.deps.Workflows.Save(args.FileName, args.Workflow)
+	e, err := b.deps.Workflows.Save(args.FileName, args.BaseHash, args.Workflow)
 	if err != nil {
 		return adewire.WorkflowEntry{}, wfErr(err)
 	}

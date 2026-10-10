@@ -58,7 +58,7 @@ func read(t *testing.T, r *Reader, name string) string {
 
 func saveOK(t *testing.T, r *Reader, name string, wf adewire.Workflow) string {
 	t.Helper()
-	if _, err := r.Save(name, wf); err != nil {
+	if _, err := r.Save(name, "", wf); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 	if got := load(t, r, name); !reflect.DeepEqual(got, wf) {
@@ -202,7 +202,7 @@ func TestSave_refusals(t *testing.T) {
 	}
 	wf := adewire.Workflow{ID: "w", Name: "W", Stages: []adewire.Stage{{ID: "u", Name: "U", Kind: "user", Status: "To do", Steps: []adewire.PipelineStep{}}}}
 	before := read(t, r, "w.yaml")
-	if _, err := r.Save("w.yaml", wf); err == nil || !strings.Contains(err.Error(), "fix the YAML error on line") {
+	if _, err := r.Save("w.yaml", "", wf); err == nil || !strings.Contains(err.Error(), "fix the YAML error on line") {
 		t.Fatalf("syntax error: %v", err)
 	}
 	if read(t, r, "w.yaml") != before {
@@ -210,12 +210,12 @@ func TestSave_refusals(t *testing.T) {
 	}
 	bad := wf
 	bad.ID = "other"
-	if _, err := r.Save("w.yaml", bad); err == nil {
+	if _, err := r.Save("w.yaml", "", bad); err == nil {
 		t.Fatal("id/stem mismatch accepted")
 	}
 	bad = wf
 	bad.Stages = []adewire.Stage{{ID: "s", Name: "S", Kind: "script", Status: "To do", Steps: []adewire.PipelineStep{}}}
-	if _, err := r.Save("fresh.yaml", bad); err == nil {
+	if _, err := r.Save("fresh.yaml", "", bad); err == nil {
 		t.Fatal("invalid workflow accepted")
 	}
 	if _, err := os.Stat(filepath.Join(r.Dir, "fresh.yaml")); !os.IsNotExist(err) {

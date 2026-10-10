@@ -44,10 +44,10 @@ const save = useSaveWorkflow();
 const confirm = useConfirmDialogStore();
 const { setViewport } = useVueFlow();
 
-draft.open(props.entry.workflow);
+draft.open(props.entry.workflow, props.entry.hash);
 watch(
-  () => props.entry.workflow,
-  (w) => draft.push(w),
+  () => props.entry,
+  (e) => draft.push(e.workflow, e.hash),
 );
 watch(
   () => draft.dirty,
@@ -67,13 +67,22 @@ async function saveNow(): Promise<void> {
   if (!draft.dirty || !current) return;
   const sent = JSON.stringify(current);
   try {
-    await save.mutateAsync({ fileName: props.entry.fileName, workflow: current });
-    draft.saved(sent);
+    const entry = await save.mutateAsync({
+      fileName: props.entry.fileName,
+      workflow: current,
+      baseHash: draft.baseHash,
+    });
+    draft.saved(sent, entry.hash);
   } catch (err) {
     draft.error = err instanceof Error ? err.message : String(err);
+    draft.conflict = (err as { code?: string }).code === 'E_CONFLICT';
   }
 }
-const discard = (): void => draft.discard(props.entry.workflow);
+const discard = (): void => draft.discard(props.entry.workflow, props.entry.hash);
+function overwrite(): void {
+  draft.rebase(props.entry.hash);
+  void saveNow();
+}
 
 const KIND_TONE: Record<StageKind, Tone> = { user: 'blue', agent: 'amber', script: 'green' };
 const strip = computed(() => [...(draft.draft?.stages ?? [])]);
@@ -360,7 +369,16 @@ onBeforeUnmount(() => {
     </ResizablePanelGroup>
     <p v-if="draft.error" class="m-0 text-kira-sm text-error" data-testid="ade-wf-save-error">
       {{ draft.error }}
+      <template v-if="draft.conflict">
+        <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-reload" @click="discard">
+          Reload
+        </Button>
+        <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-overwrite" @click="overwrite">
+          Overwrite
+        </Button>
+      </template>
       <Button
+        v-else
         variant="link"
         size="kira"
         class="px-1 text-kira-sm text-info"

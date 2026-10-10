@@ -86,6 +86,7 @@
       {
         "error": null,
         "fileName": "flow.yaml",
+        "hash": "c5304efc287f9e182b3325ad686f454f4bfc5802ce9d1757ce624c590d3c1b5d",
         "path": "<space>/workflows/flow.yaml",
         "usedBy": 1,
         "workflow": {
