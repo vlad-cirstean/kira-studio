@@ -173,6 +173,25 @@ func TestAdeHeadlessRun(t *testing.T) {
 	}
 }
 
+// TestAdeStepResults runs a step that declares its own results: the real claude must pick one of them
+// from the finish_step schema, and the run keeps the chosen id.
+func TestAdeStepResults(t *testing.T) {
+	f := newAdeFixture(t, nil)
+	stage := "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n" +
+		"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 2m\n" +
+		"        prompt: This step has no work. Call finish_step with status pass and summary ok.\n" +
+		"        results:\n" +
+		"          - id: pass\n            ok: true\n            description: The step has nothing left to do.\n" +
+		"          - id: retry_later\n            ok: false\n            description: Something is missing.\n"
+	f.saveWorkflow(t, "flow", stage+userStageYAML)
+	run := f.startRun(t, f.createTask(t, "flow"), "feat/real-claude")
+	log := f.runLog(t, run.ID)
+	if run.State != "done" || run.Outcome == nil || run.Outcome.Result != "pass" || run.Outcome.Route != "next" {
+		t.Fatalf("run = %+v, want done with result pass routed next; log:\n%s", run, tail(log, 1500))
+	}
+	f.requireCostUnder(t)
+}
+
 // TestAdeStageSession opens a stage's TUI session in the real claude, drives it with Send and
 // follows it through the hooks.
 func TestAdeStageSession(t *testing.T) {

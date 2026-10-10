@@ -4,7 +4,7 @@ import { adeFixture, openPlan } from './support/adeV2';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
-// The Workflows page: list, Form and YAML editors, import and new.
+// The Workflows page: list, Graph and YAML editors, import and new.
 
 interface WorkflowsFx {
   dir: string;
@@ -25,6 +25,35 @@ async function openWorkflows(
 
 function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
   return control.log().filter((e) => e.channel === channel);
+}
+
+interface SavedWorkflow {
+  workflow: {
+    stages: {
+      id: string;
+      skip: boolean;
+      steps: {
+        id: string;
+        allowedTools: string[];
+        results: { id: string; ok: boolean; next: string; max: number; description: string }[];
+      }[];
+    }[];
+  };
+}
+
+const node = (page: Page, step: string) =>
+  page.locator(`${t('ade-wf-node')}[data-step-id="${step}"]`);
+const chip = (page: Page, stage: string) =>
+  page.locator(`${t('ade-wf-strip-chip')}[data-stage-id="${stage}"]`);
+
+async function saved(
+  page: Page,
+  control: Parameters<typeof calls>[0],
+  n: number,
+): Promise<SavedWorkflow> {
+  await page.locator(t('ade-wf-save')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(n);
+  return calls(control, IPC.adeTaskSaveWorkflow)[n - 1]?.args as SavedWorkflow;
 }
 
 async function openYaml(page: Page): Promise<void> {
@@ -54,7 +83,7 @@ test('the list shows each file with its stages and flags a broken one', async ({
   await expect(page.locator(t('ade-wf-yaml'))).toBeVisible();
 });
 
-test('the form saves on Save, never on its own, with ids unchanged', async ({ relaunch }) => {
+test('the graph saves on Save, never on its own, with ids unchanged', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
   await expect(page.locator(t('ade-wf-form'))).toBeVisible();
   const name = page.locator(t('ade-wf-form-name'));
@@ -82,25 +111,14 @@ test('the form saves on Save, never on its own, with ids unchanged', async ({ re
 
 test('a new step gets a fresh id and Allowed tools becomes allowedTools', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
-  const stage = page.locator(t('ade-wf-stage')).nth(1);
-  await stage.locator(t('ade-wf-add-step')).click();
-  await page.locator(t('ade-wf-save')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
-  const added = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
-    workflow: { stages: { steps: { id: string }[] }[] };
-  };
+  await chip(page, 'impl').click();
+  await page.locator(t('ade-wf-add-step')).click();
+  const added = await saved(page, control, 1);
   expect(added.workflow.stages[1]?.steps.at(-1)?.id).toMatch(/^step-[0-9a-f]{8}$/);
 
-  await stage
-    .locator(t('ade-wf-step'))
-    .first()
-    .locator(t('ade-wf-step-tools'))
-    .fill('Read, Grep, Bash(git diff:*)');
-  await page.locator(t('ade-wf-save')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(2);
-  const tools = calls(control, IPC.adeTaskSaveWorkflow)[1]?.args as {
-    workflow: { stages: { steps: { allowedTools: string[] }[] }[] };
-  };
+  await node(page, 'plan').click();
+  await page.locator(t('ade-wf-step-tools')).fill('Read, Grep, Bash(git diff:*)');
+  const tools = await saved(page, control, 2);
   expect(tools.workflow.stages[1]?.steps[0]?.allowedTools).toEqual([
     'Read',
     'Grep',
@@ -108,16 +126,102 @@ test('a new step gets a fresh id and Allowed tools becomes allowedTools', async 
   ]);
 });
 
-test('a later step can send back to an earlier one', async ({ relaunch }) => {
+test('the canvas has no up or down buttons', async ({ relaunch }) => {
+  const { window: page } = await openWorkflows(relaunch);
+  await node(page, 'plan').click();
+  await expect(page.locator(t('ade-wf-step'))).toBeVisible();
+  for (const id of ['ade-wf-step-up', 'ade-wf-step-down', 'ade-wf-stage-up', 'ade-wf-stage-down']) {
+    await expect(page.locator(t(id))).toHaveCount(0);
+  }
+});
+
+test('edges are green for ok results, red for not ok, and a loop is dashed', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openWorkflows(relaunch);
+  await expect(page.locator(`${t('ade-wf-edge')}[data-tone="ok"]`).first()).toBeVisible();
+  const loop = page.locator(`${t('ade-wf-edge')}[data-loop="true"]`);
+  await expect(loop).toHaveCount(3);
+  for (const e of await loop.all()) {
+    await expect(e).toHaveAttribute('data-tone', 'fail');
+    await expect(e).toHaveAttribute('data-results', 'failed');
+  }
+});
+
+test('the route select sets where a result goes and saves it in results', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
-  const steps = page.locator(t('ade-wf-stage')).nth(1).locator(t('ade-wf-step'));
-  await steps.nth(4).locator(t('ade-wf-step-fail')).selectOption('back:plan');
-  await page.locator(t('ade-wf-save')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
-  const saved = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
-    workflow: { stages: { steps: { id: string; onFailure: string }[] }[] };
-  };
-  expect(saved.workflow.stages[1]?.steps.find((x) => x.id === 'pr')?.onFailure).toBe('back:plan');
+  await node(page, 'pr').click();
+  const failed = page.locator(`${t('ade-wf-result')}[data-result="failed"]`);
+  await failed.locator(t('ade-wf-result-route')).selectOption('plan');
+  await expect(failed.locator(t('ade-wf-result-max'))).toHaveValue('3');
+  await expect(page.locator(`${t('ade-wf-edge')}[data-loop="true"][data-tone="fail"]`)).toHaveCount(
+    4,
+  );
+  const out = await saved(page, control, 1);
+  const pr = out.workflow.stages[1]?.steps.find((x) => x.id === 'pr');
+  expect(pr?.results.find((r) => r.id === 'failed')).toMatchObject({
+    ok: false,
+    next: 'plan',
+    max: 3,
+  });
+});
+
+test('dragging a result dot to another step sets its route', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  const dot = node(page, 'pr').locator(
+    `${t('ade-wf-node-result')}[data-result="failed"] .vue-flow__handle`,
+  );
+  const target = node(page, 'impl').locator('.vue-flow__handle.target');
+  await dot.dragTo(target);
+  const out = await saved(page, control, 1);
+  const pr = out.workflow.stages[1]?.steps.find((x) => x.id === 'pr');
+  expect(pr?.results.find((r) => r.id === 'failed')).toMatchObject({ next: 'impl', max: 3 });
+});
+
+test('a result added in the inspector gets its own connector', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  await node(page, 'ci').click();
+  await expect(node(page, 'ci').locator(t('ade-wf-node-result'))).toHaveCount(2);
+  await page.locator(t('ade-wf-add-result')).click();
+  await expect(node(page, 'ci').locator(t('ade-wf-node-result'))).toHaveCount(3);
+  const row = page.locator(t('ade-wf-result')).nth(2);
+  await row.locator(t('ade-wf-result-id')).fill('flaky');
+  await row.locator(t('ade-wf-result-route')).selectOption('end');
+  const out = await saved(page, control, 1);
+  const ci = out.workflow.stages[1]?.steps.find((x) => x.id === 'ci');
+  expect(ci?.results.map((r) => [r.id, r.next])).toEqual([
+    ['done', 'next'],
+    ['failed', 'impl'],
+    ['flaky', 'end'],
+  ]);
+});
+
+test('Delete removes the selected step after asking', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  await node(page, 'ci').click();
+  await page.locator(t('ade-wf-graph')).press('Delete');
+  await page.locator(t('confirm-dialog-confirm')).click();
+  await expect(node(page, 'ci')).toHaveCount(0);
+  const out = await saved(page, control, 1);
+  expect(out.workflow.stages[1]?.steps.map((x) => x.id)).toEqual(['plan', 'impl', 'tests', 'pr']);
+});
+
+test('dragging a stage chip reorders the stages', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  const from = await chip(page, 'review').boundingBox();
+  const to = await chip(page, 'impl').boundingBox();
+  if (!from || !to) throw new Error('stage chips not laid out');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++)
+    await page.mouse.move(from.x + ((to.x - from.x) * i) / 10 + 4, to.y + to.height / 2);
+  await page.mouse.up();
+  await expect(page.locator(t('ade-wf-strip-chip')).nth(1)).toHaveAttribute(
+    'data-stage-id',
+    'review',
+  );
+  const out = await saved(page, control, 1);
+  expect(out.workflow.stages.map((x) => x.id)).toEqual(['spec', 'review', 'impl', 'release']);
 });
 
 test('a refused save shows the error and a Switch to YAML link', async ({ relaunch }) => {
@@ -203,7 +307,7 @@ test('Import sends the typed path and opens YAML mode', async ({ relaunch }) => 
   await expect(page.locator(t('ade-wf-yaml'))).toBeVisible();
 });
 
-test('+ New creates a workflow and opens its form', async ({ relaunch }) => {
+test('+ New creates a workflow and opens its graph', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
   await page.locator(t('ade-wf-new')).click();
   await expect.poll(() => calls(control, IPC.adeTaskNewWorkflow)).toHaveLength(1);
@@ -242,27 +346,25 @@ test('Ctrl+S saves the open editor', async ({ relaunch }) => {
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
 });
 
-test('right-clicking a stage skips it, and the last runnable stage cannot be skipped', async ({
+test('the stage menu skips a stage, and the last runnable stage cannot be skipped', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openWorkflows(relaunch);
-  const stages = page.locator(t('ade-wf-stage'));
-  const skipItem = page.locator(t('menu-item-ade-wf-stage-skip'));
-  await stages.nth(1).click({ button: 'right', position: { x: 10, y: 10 } });
-  await skipItem.click();
-  await expect(stages.nth(1).locator(t('ade-wf-stage-skipped'))).toBeVisible();
-  await page.locator(t('ade-wf-save')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
-  const saved = calls(control, IPC.adeTaskSaveWorkflow)[0]?.args as {
-    workflow: { stages: { id: string; skip: boolean }[] };
-  };
-  expect(saved.workflow.stages.map((s) => s.skip)).toEqual([false, true, false, false]);
-
-  for (const i of [0, 2]) {
-    await stages.nth(i).click({ button: 'right', position: { x: 10, y: 10 } });
+  const skipItem = page.locator(t('ade-wf-stage-skip'));
+  const skip = async (id: string): Promise<void> => {
+    await chip(page, id).click();
+    await page.locator(t('ade-wf-stage-menu')).click();
     await skipItem.click();
-  }
-  await stages.nth(3).click({ button: 'right', position: { x: 10, y: 10 } });
+  };
+  await skip('impl');
+  await expect(chip(page, 'impl')).toHaveAttribute('data-skipped', 'true');
+  const out = await saved(page, control, 1);
+  expect(out.workflow.stages.map((s) => s.skip)).toEqual([false, true, false, false]);
+
+  await skip('spec');
+  await skip('review');
+  await chip(page, 'release').click();
+  await page.locator(t('ade-wf-stage-menu')).click();
   await expect(skipItem).toHaveAttribute('data-disabled', '');
 });
 

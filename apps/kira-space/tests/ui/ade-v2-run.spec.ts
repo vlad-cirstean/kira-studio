@@ -226,6 +226,74 @@ test('a send-back shows on the step line with its loop and note', async ({ relau
   ).not.toHaveCount(0);
 });
 
+// Same scenario as the flows/adeflow branching test: a review step whose `changes` result loops back to
+// Implement, here with the stored run outcome the backend writes.
+function branchingWorkflows(): ControlSnapshot {
+  const fx = adeFixture<{
+    workflows: { workflow: { stages: { steps: { id: string; results: unknown[] }[] }[] } }[];
+  }>('workflows');
+  const tests = fx.workflows[0]?.workflow.stages[1]?.steps.find((x) => x.id === 'tests');
+  if (tests)
+    tests.results = [
+      { id: 'approved', ok: true, description: '', next: 'next', max: 0 },
+      { id: 'changes', ok: false, description: '', next: 'impl', max: 3 },
+    ];
+  return { channel: IPC.adeTaskWorkflows, response: fx };
+}
+
+test('a result that loops back shows its route on the step and the sent-back line', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch, [
+    branchingWorkflows(),
+    ...boardWith((b) => {
+      const run = b.tasks
+        .find((x) => x.id === 'T_push')
+        ?.runs.find((r) => r.stepId === 'tests' && r.state === 'back');
+      if (run)
+        run.outcome = {
+          status: 'failed',
+          reason: '2 failing tests',
+          source: 'agent',
+          reported: true,
+          result: 'changes',
+          route: 'back:impl',
+        };
+    }),
+  ]);
+  await open(page, 'T_push');
+  const impl = stage(page, 'impl');
+  await expect(
+    impl.locator(t('ade-step-route')).filter({ hasText: 'changes ↩ Implement (max 3)' }),
+  ).toHaveCount(1);
+  await expect(impl.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
+});
+
+test('a spent loop shows the result and that the stage stopped', async ({ relaunch }) => {
+  const { window: page } = await openPlan(
+    relaunch,
+    boardWith((b) => {
+      const run = b.tasks
+        .find((x) => x.id === 'T_cart')
+        ?.runs.find((r) => r.id === 'r_T_cart_release_b_cart');
+      if (run)
+        run.outcome = {
+          status: 'failed',
+          reason: 'still failing after 3 rounds',
+          source: 'agent',
+          reported: true,
+          result: 'changes',
+          route: 'stop',
+          report: { tried: 'retry' },
+        };
+    }),
+  );
+  await open(page, 'T_cart');
+  const out = page.locator(t('ade-run-outcome'));
+  await expect(out.locator(t('ade-outcome-result'))).toHaveText('changes');
+  await expect(out.locator(t('ade-outcome-route'))).toHaveText('stopped');
+});
+
 test('Log opens the run log and appends pushed chunks', async ({ relaunch }) => {
   const page0 = await openPlan(relaunch);
   const page = page0.window;

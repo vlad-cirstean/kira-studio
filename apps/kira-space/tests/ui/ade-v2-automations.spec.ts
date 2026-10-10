@@ -323,13 +323,14 @@ test('the ADE Run dialog shows a smart step body read-only', async ({ relaunch }
   await expect(dialog.locator(t('ade-run-message'))).toHaveCount(0);
 });
 
-test('the step card toggles to a smart script and saves smart_script with params', async ({
+test('the step inspector toggles to a smart script and saves smart_script with params', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openPlan(relaunch, [SCRIPTS]);
   await page.locator(t('ade-tab-workflows')).click();
   await page.locator(t('ade-workflows')).waitFor();
-  const step = page.locator(t('ade-wf-step')).first();
+  await page.locator(`${t('ade-wf-node')}[data-step-id="plan"]`).click();
+  const step = page.locator(t('ade-wf-step'));
   await expect(step.locator(t('ade-wf-step-tools'))).toBeVisible();
   await step.locator(t('ade-wf-step-mode-smart')).click();
   await expect(step.locator(t('ade-wf-step-script'))).toHaveValue('Review diff');

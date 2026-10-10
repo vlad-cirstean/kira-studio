@@ -20,9 +20,9 @@ const detail = computed(() => {
 
 <template>
   <div
-    class="rounded-kira-pill border bg-bg/60"
+    class="rounded-kira-pill border bg-elevated/60"
     :class="[
-      data.selected ? 'border-info' : 'border-border',
+      data.selected ? 'border-info' : 'border-muted-foreground/50',
       agent ? 'border-dashed' : 'border-solid',
       stage.skip ? 'opacity-60' : '',
     ]"

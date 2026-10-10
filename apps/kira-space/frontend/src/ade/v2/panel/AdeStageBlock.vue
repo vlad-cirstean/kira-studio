@@ -193,7 +193,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           >{{ sv.step.name }}</span
         >
         <SmartBadge v-if="sv.step.smartScript" />
-        <span v-if="sv.routeText" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-blue">{{ sv.routeText }}</span>
+        <span v-if="sv.routeText" data-testid="ade-step-route" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-blue">{{ sv.routeText }}</span>
         <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">needs approval</span>
         <AdeTip :text="sv.scope">
           <span
