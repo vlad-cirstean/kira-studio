@@ -37,6 +37,9 @@ test('relay prompt shows its label and text; submit calls GitCredentialService.P
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.gitCredentialProvide)?.args)
     .toEqual({ requestId: 'req-1', secret: 'hunter2' });
+  // Backend withdraws the answered prompt; the router pushes the empty list.
+  await emitWailsEvent(window, IPC.gitCredential, []);
+  await emitPrompts(window, []);
   await expect(dialog).toHaveCount(0);
 });
 
