@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Input } from '@theme/components/ui/input';
 import { useEventListener } from '@vueuse/core';
+import PanelBar from '@workbench/components/PanelBar.vue';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref, useTemplateRef } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
-import { useSettingsStore } from '../state/settings';
 import RepoSearchRow from './RepoSearchRow.vue';
 import { type RepoSearchRowVm, useRepoSearchStore } from './state/search';
 
@@ -16,9 +17,8 @@ import { type RepoSearchRowVm, useRepoSearchStore } from './state/search';
 // Search/Stop button, and the streamed results list.
 const props = defineProps<{ repoId: string }>();
 const repoSearchStore = useRepoSearchStore();
-const settingsStore = useSettingsStore();
 
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 const selected = ref<string | null>(null);
 
 const query = computed({
@@ -76,8 +76,8 @@ function onQueryKeydown(e: KeyboardEvent): void {
 
 // P105 §5.1: the toolbar div itself is not interactive -- binds via VueUse instead of a raw
 // template @keydown on it.
-const toolbarEl = useTemplateRef<HTMLElement>('toolbarEl');
-useEventListener(toolbarEl, 'keydown', onQueryKeydown);
+const toolbar = useTemplateRef<{ $el: HTMLElement }>('toolbar');
+useEventListener(() => toolbar.value?.$el, 'keydown', onQueryKeydown);
 
 function onSelect(row: RepoSearchRowVm): void {
   selected.value = row.key;
@@ -101,15 +101,13 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 
 <template>
   <div class="h-full flex flex-col min-h-0">
-    <div ref="toolbarEl" class="flex items-center gap-1 py-1 px-2">
+    <PanelBar ref="toolbar" class="flex-row items-center">
       <div class="flex-1 min-w-0">
-        <Input
+        <SearchField
           :model-value="query"
-          placeholder="Search"
-          class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2"
           data-testid="repo-search-query"
           :aria-invalid="!!error"
-          @update:model-value="(v) => (query = String(v))"
+          @update:model-value="(v) => (query = v)"
         />
       </div>
       <!-- Case/Word/Regex: three independent toggles, not a single-value picker — the same three
@@ -141,7 +139,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
         data-testid="repo-search-run"
         @click="runSearch"
       />
-    </div>
+    </PanelBar>
     <!-- Note-tinted background, error-tinted text -- the span carries text-error directly rather
          than on AlertDescription itself: the note variant's own
          `*:data-[slot=alert-description]:text-note-text` selector out-specifies a bare class on

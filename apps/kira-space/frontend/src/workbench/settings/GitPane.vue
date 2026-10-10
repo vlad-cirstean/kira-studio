@@ -72,7 +72,7 @@ const graphFontSizeError = computed<string | null>(() => {
 });
 props.registerFieldError('git.graphFontSize', graphFontSizeError);
 
-// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const protectedBranchesId = useId();
 const fetchAutoIntervalMinutesId = useId();
@@ -160,7 +160,7 @@ const graphFontSizeId = useId();
       <Input
         :id="gitPathId"
         type="text"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+        class="w-full font-data"
         data-testid="settings-git-path"
         v-model="draft.git.gitPath"
       />

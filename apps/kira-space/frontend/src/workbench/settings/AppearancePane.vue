@@ -21,7 +21,7 @@ function onInlineBlameChange(checked: boolean): void {
   props.draft.appearance.inlineBlame = checked;
 }
 
-// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const inlineBlameId = useId();
 </script>
@@ -53,7 +53,7 @@ const inlineBlameId = useId();
           data-testid="settings-inline-blame"
           @update:model-value="(v) => onInlineBlameChange(v === true)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         <FieldContent>
           <Label :for="inlineBlameId">Inline blame</Label>

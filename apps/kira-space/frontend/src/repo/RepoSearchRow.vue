@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
@@ -17,7 +18,6 @@ const props = defineProps<{
 
 // P110 I2-14: no sticky branch -- this row is never rendered inside a sticky layer, unlike
 // TreeRow.vue/CollectionRow.vue/RepoTreeRow.vue, which all take a `sticky` prop.
-const stateClass = computed(() => (props.selected ? 'bg-select' : 'hover:bg-hover'));
 
 const emit = defineEmits<{
   select: [row: RepoSearchRowVm];
@@ -78,11 +78,12 @@ function onKeydown(e: KeyboardEvent): void {
     v-if="row.kind === 'file'"
     :class="
       cn(
-        'flex items-center gap-1 pl-1 pr-2 h-row text-kira-md whitespace-nowrap select-none cursor-default',
-        stateClass,
+        rowVariants({ layout: 'tree', selected }),
+        'h-row',
         props.class,
       )
     "
+    :style="rowIndent(0)"
     data-testid="repo-search-file-row"
     :data-path="row.path"
     role="option"
@@ -126,11 +127,12 @@ function onKeydown(e: KeyboardEvent): void {
     v-else
     :class="
       cn(
-        'flex items-center gap-1 pl-6 pr-2 font-data h-row text-kira-md whitespace-nowrap select-none cursor-default',
-        stateClass,
+        rowVariants({ layout: 'tree', selected }),
+        'h-row font-data',
         props.class,
       )
     "
+    :style="rowIndent(1)"
     data-testid="repo-search-match-row"
     :data-path="row.path"
     :data-line="row.line"
@@ -148,7 +150,5 @@ function onKeydown(e: KeyboardEvent): void {
       >{{ previewParts.after }}</span
     >
   </div>
-  <!-- P110 I2-14: hover/selected ternary (stateClass, above) moved onto both root bindings --
-       see packages/theme/src/base.css's own pointer comment for the retired `@utility tree-row`.
-       P110 I2-13: the twisty moved to TreeTwisty.vue. -->
+  <!-- Row state and indent come from `rowVariants`/`rowIndent` (match rows sit one level in). -->
 </template>

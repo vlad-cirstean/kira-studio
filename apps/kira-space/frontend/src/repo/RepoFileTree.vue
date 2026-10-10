@@ -1,22 +1,21 @@
 <script setup lang="ts">
 import { useDebounceFn, useEventListener } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
-import { useSettingsStore } from '../state/settings';
 import { menuForRepoRow } from './menus';
 import RepoTreeRow from './RepoTreeRow.vue';
 import { type RepoTreeRowVm, useFileTreeStore } from './state/fileTree';
 
 const contextMenuStore = useContextMenuStore();
 const fileTreeStore = useFileTreeStore();
-const settingsStore = useSettingsStore();
 
 const props = defineProps<{ repoId: string; search: string }>();
 
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 const selected = ref<string | null>(null);
 
 onMounted(() => fileTreeStore.ensureRepoTreeLoaded(props.repoId));

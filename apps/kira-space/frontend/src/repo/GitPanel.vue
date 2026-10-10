@@ -3,14 +3,18 @@ import type { WorktreeEntry } from '@kira/git-ipc';
 import { PALETTE_COLOR_CHOICES } from '@shared/domain/color';
 import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { cn } from '@theme/lib/utils';
+import PanelBar from '@workbench/components/PanelBar.vue';
+import PanelHeader from '@workbench/components/PanelHeader.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
@@ -293,6 +297,11 @@ const view = computed({
   get: () => repoSearchStore.repoSearchView(repoId.value),
   set: (v: 'files' | 'search') => repoSearchStore.setRepoSearchView(repoId.value, v),
 });
+const panelTabItems = [
+  { value: 'repos', label: 'Repos', testid: 'git-panel-tab-repos' },
+  { value: 'files', label: 'Files', testid: 'git-panel-tab-files' },
+  { value: 'review', label: 'Review', testid: 'git-panel-tab-review' },
+];
 const viewOptions = [
   { value: 'files' as const, label: 'Files', testid: 'repo-view-files' },
   { value: 'search' as const, label: 'Search', testid: 'repo-view-search' },
@@ -370,94 +379,79 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="rootEl" class="flex h-full flex-col">
-    <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border">
+  <div ref="rootEl" class="flex h-full min-h-0 flex-col">
+    <PanelHeader>
       <!-- P84 §8.1/§9: replaces the old repo-name title — the tabs already say what's open.
            P92 item 6: Review joins Repos/Files as a third tab, off the Files body's own segment. -->
-      <ToggleGroup
-        type="single"
-        size="kira"
-        :model-value="tab"
-        @update:model-value="(v) => v && (tab = v as 'repos' | 'files' | 'review')"
-      >
-        <ToggleGroupItem value="repos" data-testid="git-panel-tab-repos">Repos</ToggleGroupItem>
-        <ToggleGroupItem value="files" data-testid="git-panel-tab-files">Files</ToggleGroupItem>
-        <ToggleGroupItem value="review" data-testid="git-panel-tab-review">Review</ToggleGroupItem>
-      </ToggleGroup>
-      <TooltipIconButton
-        icon="search"
-        :label="showSearch ? 'Hide search' : 'Search'"
-        class="ml-auto"
-        :data-active="showSearch"
-        data-testid="toggle-search"
-        @click="toggleSearch"
-      />
-      <TooltipIconButton
-        v-if="tab === 'repos' && (visibility.hasHidden || visibility.showHidden)"
-        :icon="visibility.showHidden ? 'eye' : 'eye-closed'"
-        :label="visibility.showHidden ? 'Hide hidden repositories' : 'Show hidden repositories'"
-        :aria-pressed="visibility.showHidden"
-        :data-active="visibility.showHidden"
-        data-testid="repos-show-hidden"
-        @click="visibility.showHidden = !visibility.showHidden"
-      />
-      <TooltipIconButton
-        v-if="tab === 'repos'"
-        icon="repo"
-        label="Manage repositories…"
-        data-testid="manage-repos"
-        @click="reposDialog.show()"
-      />
-      <!-- Files mode only: in Search mode the panel's own tree filter is meaningless, and a tree
-           refresh has nothing to do with a search result list. -->
-      <TooltipIconButton
-        v-if="tab === 'files' && view === 'files'"
-        icon="refresh"
-        label="Refresh file tree"
-        aria-label="Refresh"
-        data-testid="repo-refresh"
-        @click="onRefresh"
-      />
-    </div>
+      <template #start>
+        <SecondaryTabs
+          :model-value="tab"
+          :items="panelTabItems"
+          @update:model-value="(v) => (tab = v as 'repos' | 'files' | 'review')"
+        />
+      </template>
+      <template #actions>
+        <TooltipIconButton
+          icon="search"
+          :label="showSearch ? 'Hide search' : 'Search'"
+          :pressed="showSearch"
+          data-testid="toggle-search"
+          @click="toggleSearch"
+        />
+        <TooltipIconButton
+          v-if="tab === 'repos' && (visibility.hasHidden || visibility.showHidden)"
+          :icon="visibility.showHidden ? 'eye' : 'eye-closed'"
+          :label="visibility.showHidden ? 'Hide hidden repositories' : 'Show hidden repositories'"
+          :pressed="visibility.showHidden"
+          data-testid="repos-show-hidden"
+          @click="visibility.showHidden = !visibility.showHidden"
+        />
+        <TooltipIconButton
+          v-if="tab === 'repos'"
+          icon="repo"
+          label="Manage repositories…"
+          data-testid="manage-repos"
+          @click="reposDialog.show()"
+        />
+        <!-- Files mode only: in Search mode the panel's own tree filter is meaningless, and a tree
+             refresh has nothing to do with a search result list. -->
+        <TooltipIconButton
+          v-if="tab === 'files' && view === 'files'"
+          icon="refresh"
+          label="Refresh file tree"
+          aria-label="Refresh"
+          data-testid="repo-refresh"
+          @click="onRefresh"
+        />
+      </template>
+    </PanelHeader>
     <template v-if="!panelEmpty">
-      <div v-if="panelSearchable && showSearch" class="shrink-0 border-b border-border px-1.5 py-1">
-        <InputGroup>
-          <InputGroupAddon>
-            <CodiconIcon name="search" :size="13" />
-          </InputGroupAddon>
-          <InputGroupInput
-            v-model="panelSearch"
-            placeholder="Search"
-            data-testid="tree-search"
-          />
-          <InputGroupAddon v-if="panelSearch" align="inline-end">
-            <InputGroupButton aria-label="Clear search" @click="panelSearch = ''">
-              <CodiconIcon name="close" :size="12" />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
-      </div>
+      <PanelBar v-if="panelSearchable && showSearch">
+        <SearchField v-model="panelSearch" data-testid="tree-search" />
+      </PanelBar>
       <div class="min-h-0 flex-1">
         <div class="h-full flex flex-col min-h-0">
         <section v-if="tab === 'repos'" class="flex-1 min-h-0 overflow-y-auto" data-testid="repo-section">
-          <Empty v-if="allHidden" class="p-6" data-testid="repos-all-hidden">
+          <Empty v-if="allHidden" class="h-full" data-testid="repos-all-hidden">
             <EmptyHeader>
               <EmptyMedia><CodiconIcon name="eye-closed" :size="24" /></EmptyMedia>
               <EmptyTitle>All repositories are hidden</EmptyTitle>
               <EmptyDescription>They stay imported and usable.</EmptyDescription>
             </EmptyHeader>
-            <Button variant="dialog" size="kira-lg" data-testid="repos-show-hidden-empty" @click="visibility.showHidden = true">
-              Show hidden
-            </Button>
+            <EmptyContent>
+              <Button variant="dialog" size="kira-lg" data-testid="repos-show-hidden-empty" @click="visibility.showHidden = true">
+                Show hidden
+              </Button>
+            </EmptyContent>
           </Empty>
           <div v-else class="flex flex-col" role="listbox" aria-label="Repositories">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <div
-                class="relative h-row flex items-center gap-1 px-1.5 cursor-default select-none"
                 :class="[
-                  isActive(repo.id) ? 'bg-select' : 'hover:bg-hover',
-                  { active: isActive(repo.id), 'text-muted-foreground': repo.hidden },
+                  cn(rowVariants({ layout: 'tree', selected: isActive(repo.id), muted: repo.hidden }), 'h-row'),
+                  { active: isActive(repo.id) },
                 ]"
+                :style="rowIndent(0)"
                 data-testid="repo-row"
                 :data-repo-id="repo.id"
                 role="option"
@@ -479,7 +473,7 @@ onUnmounted(() => {
                 />
                 <CodiconIcon
                   name="source-control"
-                  :size="16"
+                  :size="13"
                   class="shrink-0"
                   :class="repoIconClass(repo)"
                 />
@@ -533,18 +527,22 @@ onUnmounted(() => {
                 data-testid="repo-worktrees"
                 aria-label="Worktrees"
               >
-                <!-- Indent to the repo name's own left edge: the row's padding, plus the twisty and
-                     its gap. pl-6 (24px) is --kira-s-3 (6px) + the twisty's own 14px + --kira-s-2
-                     (4px); pr-1.5 is --kira-s-3 alone, the row's own right padding. -->
+                <!-- Children of a twisty row sit one indent level in (`rowIndent(1)`). -->
                 <div
                   v-for="wt in worktreesStore.worktreeEntries(repo.id)"
                   :key="wt.path"
-                  class="relative h-row flex items-center gap-1 cursor-default select-none text-kira-md pr-1.5 pl-6"
                   :class="[
-                    isActive(worktreeRecordId(wt.path)) ? 'bg-select' : 'hover:bg-hover',
-                    wt.isCurrent || isOpen(worktreeRecordId(wt.path)) ? 'text-fg' : 'text-muted-foreground',
+                    cn(
+                      rowVariants({
+                        layout: 'tree',
+                        selected: isActive(worktreeRecordId(wt.path)),
+                        muted: !(wt.isCurrent || isOpen(worktreeRecordId(wt.path))),
+                      }),
+                      'h-row',
+                    ),
                     { active: isActive(worktreeRecordId(wt.path)) },
                   ]"
+                  :style="rowIndent(1)"
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
                   role="option"
@@ -556,7 +554,7 @@ onUnmounted(() => {
                   @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
                   <span :class="colorMarkClass('rail', repo.color)" data-testid="repo-worktree-rail" aria-hidden="true" />
-                  <CodiconIcon name="git-branch" :size="14" class="shrink-0" />
+                  <CodiconIcon name="git-branch" :size="13" class="shrink-0" />
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ worktreeLabel(wt) }}</span>
@@ -589,21 +587,23 @@ onUnmounted(() => {
                     <TooltipContent>{{ wt.locked?.reason }}</TooltipContent>
                   </Tooltip>
                 </div>
-                <!-- Same indent as the worktree row above -- pl-6/pr-1.5. -->
+                <!-- Same indent as the worktree row above. -->
                 <div
                   v-if="worktreesStore.worktreesError(repo.id)"
-                  class="text-kira-sm text-error pr-1.5 pl-6"
+                  class="py-1 pr-1.5 text-kira-sm text-error"
+                  :style="rowIndent(1)"
                   data-testid="repo-worktree-error"
                 >
                   {{ worktreesStore.worktreesError(repo.id) }}
                 </div>
                 <div
                   v-else-if="worktreesStore.worktreesLoading(repo.id) && worktreesStore.worktreeEntries(repo.id).length === 0"
-                  class="text-kira-sm text-subtle pr-1.5 pl-6"
+                  class="py-1 pr-1.5 text-kira-sm text-subtle"
+                  :style="rowIndent(1)"
                 >
                   Loading…
                 </div>
-                <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="text-kira-sm text-subtle pr-1.5 pl-6">
+                <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="py-1 pr-1.5 text-kira-sm text-subtle" :style="rowIndent(1)">
                   No worktrees
                 </div>
               </section>
@@ -613,23 +613,13 @@ onUnmounted(() => {
         <template v-else>
           <template v-if="repoId">
             <template v-if="tab === 'files'">
-              <div class="shrink-0 px-1.5 border-b border-border flex items-center h-row">
-                <ToggleGroup
-                  type="single"
-                  size="kira"
+              <PanelBar>
+                <SecondaryTabs
                   :model-value="view"
-                  @update:model-value="(v) => v && (view = v as 'files' | 'search')"
-                >
-                  <ToggleGroupItem
-                    v-for="opt in viewOptions"
-                    :key="opt.value"
-                    :value="opt.value"
-                    :data-testid="opt.testid"
-                  >
-                    {{ opt.label }}
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
+                  :items="viewOptions"
+                  @update:model-value="(v) => (view = v as 'files' | 'search')"
+                />
+              </PanelBar>
               <template v-if="view === 'files'">
                 <!-- Note-tinted background, error-tinted text -- the span carries text-error
                      directly rather than on AlertDescription itself: the note variant's own
@@ -669,26 +659,22 @@ onUnmounted(() => {
               :repo-id="repoId"
             />
           </template>
-          <Alert
-            v-else
-            class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-          >
-            <CodiconIcon name="source-control" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md font-normal text-muted-foreground">No repository open</AlertTitle>
-          </Alert>
+          <Empty v-else class="h-full">
+            <EmptyHeader>
+              <EmptyMedia><CodiconIcon name="source-control" :size="24" /></EmptyMedia>
+              <EmptyTitle>No repository open</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
         </template>
       </div>
       </div>
     </template>
-    <div
-      v-else
-      class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
-    >
-      <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
-        <CodiconIcon name="source-control" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted-foreground">Import a repository to get started.</AlertTitle>
-      </Alert>
-    </div>
+    <Empty v-else class="h-full">
+      <EmptyHeader>
+        <EmptyMedia><CodiconIcon name="source-control" :size="24" /></EmptyMedia>
+        <EmptyTitle>Import a repository to get started.</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
   </div>
 
   <TextPromptDialog
@@ -700,15 +686,7 @@ onUnmounted(() => {
     @cancel="cancelPrompt"
   />
   <ReposDialog />
-  <!-- P110 I2-19: `.repo-row`/`.worktree-row`'s own hover/active/open/current rules folded into
-       `:class` ternaries above -- pre-phase cascade order (both `:hover` and the state class at
-       equal 0,2,0 specificity) meant the later-declared rule won on a tie: `.active`/`.bg-select`
-       beats `:hover`/`bg-hover` on background; `.current`/`.open` both drove the same `text-fg`
-       override on color, so `wt.isCurrent || isOpen(...)` merges them with no real precedence
-       question (same value either way). `.repo-icon`'s open-state color is now a ternary directly
-       on the icon. `.repo-row`/`.worktree-row`/`.repo-icon`/`.worktree-note`/`.open`/`.current`/
-       `.error` were marker-only (no test dependency); `active` stays a real conditional class
-       (repo-workspace.spec.ts:153/629 assert `toHaveClass(/active/)` on both rows) alongside its
-       own `bg-select` utility. `.repo-head`/`.worktree-badge` stay real classes too
-       (repo-workspace.spec.ts locates them by class). -->
+  <!-- Row state comes from `rowVariants` (selected/muted). `active` stays a real class on both
+       rows (repo-workspace.spec.ts asserts `toHaveClass(/active/)`); `.repo-head`/`.worktree-badge`
+       stay real classes too (the same spec locates them by class). -->
 </template>

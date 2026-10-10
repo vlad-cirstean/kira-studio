@@ -101,8 +101,8 @@ function setKeepAwake(on: boolean): void {
     </Field>
     <Field>
       <Button
-        variant="outline"
-        size="sm"
+        variant="dialog"
+        size="kira-lg"
         class="self-start"
         :disabled="!draft.claudeCode.notifyEnabled"
         data-testid="settings-claude-code-notify-test"

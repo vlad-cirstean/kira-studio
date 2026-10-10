@@ -150,7 +150,7 @@ const activeDevices = computed(() =>
     </Alert>
 
     <section class="flex flex-col gap-1" data-testid="mobile-access-network">
-      <h3 class="m-0 text-kira-sm font-semibold">Trusted network</h3>
+      <h3 class="m-0 text-kira-md font-medium">Trusted network</h3>
       <p v-if="trusted" class="m-0 text-kira-sm" data-testid="mobile-access-trusted">
         {{ trusted.subnet }}, router {{ trusted.routerIp }} ({{ trusted.routerMac }}), trusted on
         {{ trusted.interface }}
@@ -198,7 +198,7 @@ const activeDevices = computed(() =>
     </section>
 
     <section v-if="store.status.running" class="flex flex-col gap-1" data-testid="mobile-access-step-app">
-      <h3 class="m-0 text-kira-sm font-semibold">Open the app</h3>
+      <h3 class="m-0 text-kira-md font-medium">Open the app</h3>
       <figure class="m-0 flex flex-col gap-0.5">
         <MobileQr :url="store.status.appUrl" />
         <figcaption class="font-data text-kira-sm break-all select-all">{{ store.status.appUrl }}</figcaption>
@@ -247,7 +247,7 @@ const activeDevices = computed(() =>
     </Field>
 
     <section class="flex flex-col gap-1">
-      <h3 class="m-0 text-kira-sm font-semibold">Paired phones</h3>
+      <h3 class="m-0 text-kira-md font-medium">Paired phones</h3>
       <p v-if="activeDevices.length === 0" class="text-subtle text-kira-sm" data-testid="mobile-devices-empty">
         No phones are paired.
       </p>

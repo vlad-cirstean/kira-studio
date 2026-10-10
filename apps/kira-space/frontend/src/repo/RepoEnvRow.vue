@@ -2,6 +2,7 @@
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { onMounted, useTemplateRef } from 'vue';
 import type { Environment } from '../ade/v2/wire';
 import { useCommitField } from './useCommitField';
@@ -33,7 +34,7 @@ const script = useCommitField(
 <template>
   <div class="flex flex-col gap-1" data-testid="repo-env">
     <div class="flex items-center gap-1.5">
-      <label :for="`repo-env-name-${index}`" class="sr-only">Environment name</label>
+      <Label :for="`repo-env-name-${index}`" class="sr-only">Environment name</Label>
       <Input
         :id="`repo-env-name-${index}`"
         ref="nameInput"
@@ -45,7 +46,7 @@ const script = useCommitField(
         @blur="name.onCommit"
         @keydown.enter="name.onCommit"
       />
-      <label :for="`repo-env-script-${index}`" class="sr-only">Deployed SHA script</label>
+      <Label :for="`repo-env-script-${index}`" class="sr-only">Deployed SHA script</Label>
       <Input
         :id="`repo-env-script-${index}`"
         :model-value="script.text.value"

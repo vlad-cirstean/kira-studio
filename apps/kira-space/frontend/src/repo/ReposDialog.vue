@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,
@@ -101,30 +103,22 @@ function parentDir(root: string): string {
 function baseName(path: string): string {
   return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path;
 }
+
+function repoRowClass(r: { id: string; hidden: boolean }): string {
+  return rowVariants({ layout: 'nav', selected: showRepos.value && selected.value?.id === r.id, muted: r.hidden });
+}
 </script>
 
 <template>
   <Dialog v-model:open="dialog.open">
-    <DialogContent
-      :show-close-button="false"
-      class="flex h-140 max-h-[85vh] w-190 max-w-[90vw] flex-col gap-0 p-0"
-      data-testid="repos-dialog"
-    >
-      <DialogHeader>
-        <span class="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-          <CodiconIcon name="repo" :size="13" />
-        </span>
+    <DialogContent size="xl" fixed-height data-testid="repos-dialog">
+      <DialogHeader icon="repo" closable close-testid="repos-dialog-close">
         <DialogTitle>Repositories</DialogTitle>
         <DialogDescription class="sr-only">Import repositories, configure them and manage scan folders.</DialogDescription>
-        <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close" data-testid="repos-dialog-close">
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="flex min-h-0 flex-1">
-        <nav class="flex w-52 shrink-0 flex-col border-r border-border">
+      <DialogBody flush class="flex-row overflow-hidden">
+        <nav class="flex w-44 shrink-0 flex-col border-r border-border">
           <div class="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 py-1.5" role="listbox" aria-label="Repositories" data-testid="repos-dialog-repos">
             <p v-if="codeRepos.records.length === 0" class="m-0 px-1.5 py-1 text-kira-md text-muted-foreground">No repositories imported.</p>
             <button
@@ -132,11 +126,8 @@ function baseName(path: string): string {
               :key="r.id"
               type="button"
               role="option"
-              class="relative flex h-5.5 shrink-0 cursor-pointer items-center gap-1.5 rounded-kira-sm border-none px-1.5 text-left text-kira-md"
-              :class="[
-                showRepos && selected?.id === r.id ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground hover:bg-hover',
-                { 'opacity-60': r.hidden },
-              ]"
+              class="relative flex w-full shrink-0 cursor-pointer items-center gap-1.5 border-none text-left"
+              :class="repoRowClass(r)"
               :aria-selected="showRepos && selected?.id === r.id"
               :title="r.root"
               data-testid="repos-dialog-repo"
@@ -152,8 +143,8 @@ function baseName(path: string): string {
           <div class="flex flex-col gap-px border-t border-border px-1 py-1.5">
             <button
               type="button"
-              class="flex h-5.5 cursor-pointer items-center gap-1.5 rounded-kira-sm border-none px-1.5 text-left text-kira-md"
-              :class="dialog.tab === 'folders' ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground hover:bg-hover'"
+              class="flex w-full cursor-pointer items-center gap-1.5 border-none text-left"
+              :class="rowVariants({ layout: 'nav', selected: dialog.tab === 'folders' })"
               :aria-current="dialog.tab === 'folders' ? 'page' : undefined"
               data-testid="repos-dialog-tab-folders"
               @click="dialog.tab = 'folders'"
@@ -263,12 +254,14 @@ function baseName(path: string): string {
             </div>
           </div>
         </section>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <p v-if="!showRepos && note" class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{ note }}</p>
+        <template v-if="!showRepos && note" #start>
+          <p class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{ note }}</p>
+        </template>
         <DialogClose as-child>
-          <Button variant="dialog" size="kira-lg" class="ml-auto" data-testid="repos-dialog-footer-close">Close</Button>
+          <Button variant="dialog" size="kira-lg" data-testid="repos-dialog-footer-close">Close</Button>
         </DialogClose>
       </DialogFooter>
     </DialogContent>

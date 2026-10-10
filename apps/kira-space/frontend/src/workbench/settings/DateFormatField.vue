@@ -22,8 +22,8 @@ function onDateFormatChange(value: unknown): void {
   props.appearance.dateFormat = String(value) as AppearanceSettings['dateFormat'];
 }
 
-// F3: a native `<label>` delegates its click to its first labelable descendant -- with the Reset
-// `<Button>` living inside the label (the old markup), that was the button, not the select, so
+// F3: a native label delegates its click to its first labelable descendant -- with the Reset
+// button living inside the label (the old markup), that was the button, not the select, so
 // clicking the title/helper text reset the field instead of focusing the control. `for` + `id`
 // ties the label to the select explicitly instead, with the button as a sibling outside it.
 const fieldId = useId();

@@ -67,19 +67,4 @@ apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowEditor.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowYaml.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowsPage.vue
-apps/kira-space/frontend/src/repo/GitPanel.vue
-apps/kira-space/frontend/src/repo/RepoEnvRow.vue
-apps/kira-space/frontend/src/repo/RepoSearchView.vue
-apps/kira-space/frontend/src/repo/ReposDialog.vue
-apps/kira-space/frontend/src/views/repo/RepoFileView.vue
-apps/kira-space/frontend/src/workbench/GitCredentialDialog.vue
-apps/kira-space/frontend/src/workbench/PairingRequestDialog.vue
-apps/kira-space/frontend/src/workbench/settings/AppearancePane.vue
-apps/kira-space/frontend/src/workbench/settings/ClaudeCodePane.vue
-apps/kira-space/frontend/src/workbench/settings/DateFormatField.vue
-apps/kira-space/frontend/src/workbench/settings/GitPane.vue
-apps/kira-space/frontend/src/workbench/settings/MobileAccessPane.vue
 permanent U17 packages/git-ui/src/components/SearchBox.vue # combobox owns two-stage Escape (dismiss dropdown keeps query); SearchField clears on first Esc
-apps/kira-space/frontend/src/repo/RepoFileTree.vue
-apps/kira-space/frontend/src/repo/RepoSearchRow.vue
-apps/kira-space/frontend/src/repo/RepoTreeRow.vue

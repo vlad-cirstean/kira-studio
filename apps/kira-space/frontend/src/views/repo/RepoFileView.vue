@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -273,22 +273,12 @@ onUnmounted(() => {
   <template v-if="state === 'loading' || state === 'found'">
     <div v-if="isMarkdown" class="flex flex-col h-full w-full">
       <ViewToolbar border="none">
-        <ToggleGroup
-          type="single"
-          size="kira"
+        <SecondaryTabs
           :model-value="view"
+          :items="VIEW_OPTIONS"
           data-testid="repo-file-view-toggle"
-          @update:model-value="(v) => v && onViewChange(v as 'source' | 'reading')"
-        >
-          <ToggleGroupItem
-            v-for="opt in VIEW_OPTIONS"
-            :key="opt.value"
-            :value="opt.value"
-            :data-testid="opt.testid"
-          >
-            {{ opt.label }}
-          </ToggleGroupItem>
-        </ToggleGroup>
+          @update:model-value="(v) => onViewChange(v as 'source' | 'reading')"
+        />
       </ViewToolbar>
       <!-- D11: `v-show`, never `v-if` — the editor widget must never be disposed/recreated by this
            toggle, only hidden, so scroll position/selection/find state survive a round trip.

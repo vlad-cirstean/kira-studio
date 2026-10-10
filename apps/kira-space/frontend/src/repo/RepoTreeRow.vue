@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
@@ -17,11 +18,6 @@ const props = withDefaults(
   { sticky: false },
 );
 
-// P110 I2-14: same ternary as TreeRow.vue's own stateClass -- selected beats hover pre-phase on
-// specificity, so this reproduces that exactly.
-const stateClass = computed(() =>
-  props.selected ? 'bg-select' : props.sticky ? 'bg-bg hover:bg-hover' : 'hover:bg-hover',
-);
 const emit = defineEmits<{
   select: [row: RepoTreeRowVm];
   toggle: [row: RepoTreeRowVm];
@@ -92,12 +88,13 @@ function onKeydown(e: KeyboardEvent): void {
   <div
     :class="
       cn(
-        'relative flex items-center gap-1 pr-2 h-row text-kira-md whitespace-nowrap select-none cursor-default',
-        stateClass,
+        rowVariants({ layout: 'tree', selected }),
+        'h-row',
+        sticky && !selected && 'bg-bg',
         props.class,
       )
     "
-    :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+    :style="rowIndent(row.depth)"
     :data-testid="sticky ? 'repo-tree-sticky-row' : 'repo-tree-row'"
     :data-path="row.path"
     :data-status="statusAttr"
@@ -133,11 +130,5 @@ function onKeydown(e: KeyboardEvent): void {
       </TooltipTrigger>
       <TooltipContent>{{ row.name }}</TooltipContent>
     </Tooltip>
-    <!-- P110 I2-14: hover/selected ternary moved onto the root binding (stateClass, above) --
-         .node-icon's own mask-size/mask-repeat/mask-position (+ -webkit- prefixed) became
-         Tailwind's own mask-contain/mask-no-repeat/mask-center (confirmed via compile check to
-         emit both prefixed and unprefixed forms); the three data-status attribute-selector rules
-         became labelStatusClass, a computed bound directly onto the label span (data-status
-         itself stays on the row, for tests/other styling hooks). -->
   </div>
 </template>
