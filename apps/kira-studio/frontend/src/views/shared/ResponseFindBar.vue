@@ -4,7 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { unrefElement, useEventListener } from '@vueuse/core';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, ref, useTemplateRef, watch } from 'vue';
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
 
 // P28 D11: the three option toggles the data views' own SearchToolbar has always had — match
@@ -129,13 +129,19 @@ useEventListener(
   'keydown',
   onKeydown,
 );
+
+// Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
+const searchField = useTemplateRef<{ focus: () => void }>('searchField');
+onMounted(() => {
+  searchField.value?.focus();
+});
 </script>
 
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="http-find-bar">
     <div class="w-52 shrink-0">
-      <SearchField v-model="query" placeholder="Find" :aria-invalid="invalid" data-testid="http-find-input" />
+      <SearchField ref="searchField" v-model="query" @keydown.escape.stop="close" placeholder="Find" :aria-invalid="invalid" data-testid="http-find-input" />
     </div>
     <!-- Three independent toggles (all three can be on at once), not a single-value picker — the
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical

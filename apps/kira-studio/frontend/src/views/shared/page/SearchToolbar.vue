@@ -4,7 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
 import { usePageSearchFilterStore } from './searchFilter';
@@ -243,6 +243,12 @@ onUnmounted(() => {
   // above — the toggle must reset here too.
   pageSearchFilterStore.setSearchFiltering(props.tabId, false);
 });
+
+// Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
+const searchField = useTemplateRef<{ focus: () => void }>('searchField');
+onMounted(() => {
+  searchField.value?.focus();
+});
 </script>
 
 <template>
@@ -254,7 +260,7 @@ onUnmounted(() => {
     :data-testid="`${testidPrefix}search-toolbar`"
   >
     <div class="w-52 shrink-0">
-      <SearchField v-model="query" placeholder="Find" :data-testid="`${testidPrefix}search-input`" :aria-invalid="!!errorMessage" />
+      <SearchField ref="searchField" v-model="query" @keydown.escape.stop="close" placeholder="Find" :data-testid="`${testidPrefix}search-input`" :aria-invalid="!!errorMessage" />
     </div>
     <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
          single-value picker, so each is its own icon button rather than a <SegmentedControl> (which

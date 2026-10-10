@@ -300,7 +300,7 @@ test('the environments filter sits at --kira-control-h, and New environment neve
   const controlH = await rootVar(page, '--kira-control-h');
   const filterHeight = await page
     .locator('[data-testid="environments-filter"]')
-    .locator('xpath=ancestor::fieldset[@data-slot="input-group"][1]')
+    .locator('xpath=ancestor::fieldset[@data-slot="search-field"][1]')
     .evaluate((el) => el.getBoundingClientRect().height);
   expect(filterHeight).toBeCloseTo(controlH, 0);
 
@@ -384,10 +384,7 @@ test('a raw <button> with no outline utility renders the shared 1px focus ring (
   await expectFocusRing(page.locator('[data-testid="settings-section-Appearance"]'));
 });
 
-// P121 §6.2: a default-variant ToggleGroup is no longer connected (spacing 0.5, not 0) -- every
-// item keeps its own full 4px radius on all four corners, 2px apart, instead of rendering as one
-// square-cornered connected segment row.
-test('the page-size ToggleGroup renders rounded, 2px-spaced chips (P121 S23)', async ({
+test('the page-size picker renders as one connected segmented row (P121 S23, P262)', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
@@ -399,12 +396,17 @@ test('the page-size ToggleGroup renders rounded, 2px-spaced chips (P121 S23)', a
     page.locator('[data-testid="page-size-1000"]'),
     page.locator('[data-testid="page-size-10000"]'),
   ];
-  for (const item of items) {
-    expect(await item.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('4px');
-  }
+  // Segmented picker (P262): one connected row, only the outer corners rounded.
+  const radii = await Promise.all(
+    items.map((item) => item.evaluate((el) => getComputedStyle(el).borderRadius)),
+  );
+  expect(radii[0]).toBe('4px 0px 0px 4px');
+  expect(radii[1]).toBe('0px');
+  expect(radii[2]).toBe('0px');
+  expect(radii[3]).toBe('0px 4px 4px 0px');
   const [firstBox, secondBox] = await Promise.all([items[0].boundingBox(), items[1].boundingBox()]);
   if (!firstBox || !secondBox) throw new Error('expected both page-size chips to be measurable');
-  expect(secondBox.x - (firstBox.x + firstBox.width)).toBeCloseTo(2, 0);
+  expect(Math.abs(secondBox.x - (firstBox.x + firstBox.width))).toBeLessThanOrEqual(1);
 });
 
 // P121 §6.2: same shape as S23, a different default-variant ToggleGroup (P117 A1's own "kira"
@@ -523,9 +525,12 @@ test('connection detail tabs: hover, 2px gap, and arrow-key roving focus (P121 T
   if (!generalBox || !advancedBox) throw new Error('expected both tabs to be measurable');
   expect(advancedBox.x - (generalBox.x + generalBox.width)).toBeCloseTo(2, 0);
 
+  // SecondaryTabs is a ToggleGroup: arrows rove focus, Enter/Space selects.
   await general.focus();
   await page.keyboard.press('ArrowRight');
-  await expect(advanced).toHaveClass(/is-active/);
+  await expect(advanced).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(advanced).toHaveAttribute('data-state', 'on');
 });
 
 function intColumnPage(column: string, values: string[]): LogicalPage {

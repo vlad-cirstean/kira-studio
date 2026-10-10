@@ -3,7 +3,7 @@ import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
 import { useStreamSearchStore } from './search';
@@ -105,13 +105,19 @@ onUnmounted(() => {
   // above — the toggle must reset here too (mirrors views/shared/page/SearchToolbar.vue's own note).
   pageSearchFilterStore.setSearchFiltering(props.tabId, false);
 });
+
+// Mounted fresh each time the bar opens, so mount is the moment to hand it focus.
+const searchField = useTemplateRef<{ focus: () => void }>('searchField');
+onMounted(() => {
+  searchField.value?.focus();
+});
 </script>
 
 <template>
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
   <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="stream-search-toolbar">
     <div class="w-52 shrink-0">
-      <SearchField v-model="query" placeholder="Find" data-testid="stream-search-input" />
+      <SearchField ref="searchField" v-model="query" @keydown.escape.stop="close" placeholder="Find" data-testid="stream-search-input" />
     </div>
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">

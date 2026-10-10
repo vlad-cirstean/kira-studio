@@ -12,7 +12,7 @@ import { refDebounced } from '@vueuse/core';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { storeToRefs } from 'pinia';
-import { computed, useId, } from 'vue';
+import { computed, onMounted, useId, useTemplateRef } from 'vue';
 import AddMemoryDialog from './AddMemoryDialog.vue';
 import ImportConfirmDialog from './import/ImportConfirmDialog.vue';
 import ImportMenu from './import/ImportMenu.vue';
@@ -33,6 +33,10 @@ useMemoryChangeSync();
 useImportChangeSync();
 const imports = useImportUiStore();
 
+const searchField = useTemplateRef<{ focus: () => void }>('searchField');
+onMounted(() => {
+  searchField.value?.focus();
+});
 const semanticStatus = useMemorySemanticStatus();
 const semanticState = computed(() => semanticStatus.data.value?.state);
 const semanticNeedsSetup = computed(() => semanticState.value === 'notInstalled' || semanticState.value === 'unavailable');
@@ -60,7 +64,7 @@ const historyToggleId = useId();
       </template>
     </PanelHeader>
     <PanelBar>
-      <SearchField v-model="query" placeholder="Search memories" data-testid="memory-search" />
+      <SearchField ref="searchField" v-model="query" placeholder="Search memories" data-testid="memory-search" />
       <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground">
         <Switch :id="historyToggleId" v-model="includeHistory" data-testid="memory-include-history" />
         <Label :for="historyToggleId">Include history</Label>
