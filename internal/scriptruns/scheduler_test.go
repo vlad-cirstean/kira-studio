@@ -38,6 +38,26 @@ func TestNextFiresDST(t *testing.T) {
 	if got[0].In(ny).Day() != 1 || got[1].In(ny).Day() != 2 {
 		t.Errorf("fires %v: want one on Nov 1, then Nov 2", got)
 	}
+	// Every minute fires once per wall minute: the repeated 01:00-01:59 hour is 60 fires, not 120.
+	at, rep := time.Date(2026, 11, 1, 0, 59, 0, 0, ny), 0
+	for {
+		next, err := scripts.NextFires("* * * * *", "America/New_York", at, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		at = next[len(next)-1]
+		for _, n := range next {
+			if n.In(ny).Hour() == 1 {
+				rep++
+			}
+		}
+		if at.In(ny).Hour() >= 2 {
+			break
+		}
+	}
+	if rep != 60 {
+		t.Errorf("fires in the repeated hour = %d, want 60", rep)
+	}
 	// 96 quarter hours in a UTC day.
 	count, at := 0, time.Date(2026, 5, 31, 23, 59, 0, 0, time.UTC)
 	for at.Month() == time.May || at.Day() == 1 {

@@ -68,22 +68,28 @@ func NextFires(expr, tz string, after time.Time, n int) ([]time.Time, error) {
 	n = min(max(n, 0), MaxNextFires)
 	expr = strings.TrimSpace(expr)
 	out := make([]time.Time, 0, n)
-	t, lastWall := after.In(loc), ""
+	t := after.In(loc)
 	for tries := 0; len(out) < n && tries < n*8+16; tries++ {
 		next, err := gronx.NextTickAfter(expr, t, false)
 		if err != nil {
 			return nil, invalid("cron: %v", err)
 		}
 		t = next.In(loc)
-		wall := t.Format("2006-01-02 15:04")
 		// Go shifts a nonexistent wall time forward: the shifted instant no longer matches the cron.
-		if due, _ := gronx.New().IsDue(expr, t); !due || wall == lastWall {
+		if due, _ := gronx.New().IsDue(expr, t); !due || repeatedWall(t) {
 			continue
 		}
-		lastWall = wall
 		out = append(out, t)
 	}
 	return out, nil
+}
+
+// repeatedWall reports whether t is the second occurrence of its wall time (a clock set back).
+// time.Date resolves an ambiguous wall time to the first instant.
+func repeatedWall(t time.Time) bool {
+	y, mo, d := t.Date()
+	h, mi, _ := t.Clock()
+	return !time.Date(y, mo, d, h, mi, 0, 0, t.Location()).Equal(t.Truncate(time.Minute))
 }
 
 // validSchedule checks and normalises s against the script it belongs to.

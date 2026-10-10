@@ -19,8 +19,8 @@ Linewriter move; schedule on script plus migrations (Studio 0037, Space 0030) an
 ## Notes
 
 - The ADE task picker in the schedule fields needs a saved script (it previews with `listTasks`).
-- Archived-task reason text includes the task id ("task <id> is archived").
-- A DST wildcard cron (e.g. `* * * * *` at a fall-back hour) can fire twice in the repeated hour.
+- An archived task reads as "the task no longer exists", same as a deleted one.
+- A repeated wall time fires once: `NextFires` drops the second occurrence (`repeatedWall`), so `* * * * *` fires 60 times in the fall-back hour.
 - Space e2e-real opens the page with the server's main window key (`MainWindow`) so the popup shows.
 
 ## Not done

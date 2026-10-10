@@ -116,7 +116,7 @@ func TestScheduleADE(t *testing.T) {
 			t.Fatal(err)
 		}
 		tick(t, clock, 30*time.Second)
-		if r := scheduledRun(t, f, rec.ID, 0, "skipped"); !strings.HasSuffix(reasonOf(r), " is archived") {
+		if r := scheduledRun(t, f, rec.ID, 0, "skipped"); reasonOf(r) != "the task no longer exists" {
 			t.Fatalf("reason = %q", reasonOf(r))
 		}
 	})

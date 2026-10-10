@@ -51,10 +51,16 @@ func (b *TaskBoard) Tasks() ([]scriptruns.TaskChoice, error) {
 	return out, nil
 }
 
+// archived reports whether the task is archived: a run for it sees the same as a deleted task.
+func (b *TaskBoard) archived(taskID string) bool {
+	task, err := b.deps.Tasks.GetTask(taskID)
+	return err == nil && task.ArchivedAt != nil
+}
+
 // Context implements scriptruns.ADE.
 func (b *TaskBoard) Context(taskID, branchID string) (scriptruns.ADEContext, error) {
 	tc, err := b.loadTaskCtx(taskID)
-	if errors.Is(err, repos.ErrTaskNotFound) {
+	if errors.Is(err, repos.ErrTaskNotFound) || b.archived(taskID) {
 		return scriptruns.ADEContext{}, errors.New("the task no longer exists")
 	}
 	if err != nil {

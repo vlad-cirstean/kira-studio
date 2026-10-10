@@ -22,15 +22,12 @@ func (realClock) Now() time.Time                         { return time.Now() }
 func (realClock) After(d time.Duration) <-chan time.Time { return time.After(d) }
 
 const (
-	wallFormat = "2006-01-02 15:04"
 	// defaultLate is how late a timer may fire before its fire is treated as missed (sleep, clock jump).
 	defaultLate = 60 * time.Second
 )
 
 type entry struct {
 	next time.Time
-	// wall is next's wall time in the zone, to drop a repeated wall time after a DST change.
-	wall string
 	cron string
 	tz   string
 }
@@ -178,16 +175,8 @@ func (s *Scheduler) reload(now time.Time) {
 			delete(s.entries, id)
 			continue
 		}
-		s.entries[id] = entry{next: next[0], wall: wallOf(next[0], sch.Timezone), cron: sch.Cron, tz: sch.Timezone}
+		s.entries[id] = entry{next: next[0], cron: sch.Cron, tz: sch.Timezone}
 	}
-}
-
-func wallOf(t time.Time, tz string) string {
-	loc, err := time.LoadLocation(tz)
-	if err != nil {
-		return ""
-	}
-	return t.In(loc).Format(wallFormat)
 }
 
 // tick fires every due entry in order of its fire time, then moves each to its next one.
@@ -211,13 +200,10 @@ func (s *Scheduler) tick(now time.Time) {
 	}
 }
 
-// advance moves an entry past its fire: the next instant, skipping a repeated wall time, and from
+// advance moves an entry past its fire: the next instant, and from
 // now when that is still in the past (a long sleep).
 func (s *Scheduler) advance(id string, e entry, now time.Time) {
-	nexts, err := scripts.NextFires(e.cron, e.tz, e.next, 2)
-	if err == nil && len(nexts) > 0 && wallOf(nexts[0], e.tz) == e.wall && len(nexts) > 1 {
-		nexts = nexts[1:]
-	}
+	nexts, err := scripts.NextFires(e.cron, e.tz, e.next, 1)
 	if err == nil && (len(nexts) == 0 || !nexts[0].After(now)) {
 		nexts, err = scripts.NextFires(e.cron, e.tz, now, 1)
 	}
@@ -225,7 +211,7 @@ func (s *Scheduler) advance(id string, e entry, now time.Time) {
 		delete(s.entries, id)
 		return
 	}
-	e.next, e.wall = nexts[0], wallOf(nexts[0], e.tz)
+	e.next = nexts[0]
 	s.entries[id] = e
 }
 
