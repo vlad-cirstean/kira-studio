@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button'
 import { cn } from '@theme/lib/utils'
 import { DialogClose } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
+import { dialogFooterClass } from '.'
 
 const props = withDefaults(defineProps<{
   class?: HTMLAttributes['class']
@@ -15,19 +16,16 @@ const props = withDefaults(defineProps<{
 <template>
   <div
     data-slot="dialog-footer"
-    :class="cn('flex items-center gap-1.5 border-t border-border px-3 py-2', props.class)"
+    :class="cn(dialogFooterClass, props.class)"
   >
+    <div v-if="$slots.start" class="mr-auto flex min-w-0 items-center gap-1.5">
+      <slot name="start" />
+    </div>
     <slot />
     <DialogClose v-if="showCloseButton" as-child>
-      <Button variant="outline">
+      <Button variant="dialog" size="kira-lg">
         Close
       </Button>
     </DialogClose>
   </div>
-  <!-- P110 I2-21 (§3.10, M9): the old base's `-mx-4 -mb-4` bled the footer 16px past
-       DialogContent's own padded box on all three measured edges (left/right/bottom), measured
-       against the real connection-dialog harness before this change. Mirrors DialogHeader's own
-       base instead, per §1.4's overshoot-conditional disclosure. Affected dialog visual baselines
-       re-recorded in this commit. ConfirmDialog.vue's own bare usage (the one no-override
-       consumer) keeps its old look via an explicit compensating class. -->
 </template>
