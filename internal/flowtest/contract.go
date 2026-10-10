@@ -23,7 +23,11 @@ var (
 	timeRe = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})`)
 
 	contractMu sync.Mutex
+	// numbering keeps <id:n> consistent across the keys one test stores in one file.
+	numbering = map[string]*numbers{}
 )
+
+type numbers struct{ ids map[string]int }
 
 // ContractOption tunes one Contract call.
 type ContractOption func(*contractCfg)
@@ -31,6 +35,7 @@ type ContractOption func(*contractCfg)
 type contractCfg struct {
 	replace [][2]string
 	mask    map[string]bool
+	omit    map[string]bool
 }
 
 // Replace rewrites every occurrence of from inside string values with the placeholder to. Longer
@@ -43,12 +48,24 @@ func Replace(from, to string) ContractOption {
 	}
 }
 
-// Mask replaces the value under each named object key, at any depth, with "<masked>": durations,
-// pids, ports and other volatile fields the automatic rules miss.
+// Mask replaces the value under each named object key, at any depth, with a typed placeholder
+// ("<masked>", 0, false, [] or {}): durations, pids, ports and other volatile fields the automatic
+// rules miss.
 func Mask(keys ...string) ContractOption {
 	return func(c *contractCfg) {
 		for _, k := range keys {
 			c.mask[k] = true
+		}
+	}
+}
+
+// Omit drops each named object key, at any depth, from the stored value: large or volatile
+// fields (a response's timeline, an echo body) the scenario does not depend on. The renderer
+// treats the key as absent.
+func Omit(keys ...string) ContractOption {
+	return func(c *contractCfg) {
+		for _, k := range keys {
+			c.omit[k] = true
 		}
 	}
 }
@@ -59,14 +76,26 @@ func Mask(keys ...string) ContractOption {
 // file is regenerated, and a regenerated file shows the UI specs the new shape.
 //
 // Normalisation keeps the file stable and machine independent: UUIDs become <id:n> and RFC3339
-// timestamps <time:n>, numbered by first appearance in the value (equal inputs stay equal); Replace
-// swaps paths and URLs for placeholders.
+// timestamps <time> (second resolution makes equality between two of them run-dependent); ids are
+// numbered by first appearance across everything the test stores in that file, so equal ids stay
+// equal, also between keys. Replace swaps paths and URLs for placeholders.
 func Contract(t testing.TB, dir, scenario, key string, got any, opts ...ContractOption) {
 	t.Helper()
-	norm := NormalizeContract(t, got, opts...)
 	path := filepath.Join(dir, scenario+".json")
 	contractMu.Lock()
 	defer contractMu.Unlock()
+	nk := path + "\x00" + strings.SplitN(t.Name(), "/", 2)[0]
+	nums := numbering[nk]
+	if nums == nil {
+		nums = &numbers{ids: map[string]int{}}
+		numbering[nk] = nums
+		t.Cleanup(func() {
+			contractMu.Lock()
+			delete(numbering, nk)
+			contractMu.Unlock()
+		})
+	}
+	norm := normalizeContract(t, got, nums, opts)
 	doc := map[string]any{}
 	raw, err := os.ReadFile(path)
 	switch {
@@ -96,10 +125,16 @@ func Contract(t testing.TB, dir, scenario, key string, got any, opts ...Contract
 	}
 }
 
-// NormalizeContract returns got marshalled, decoded and normalised the way Contract stores it.
+// NormalizeContract returns got marshalled, decoded and normalised the way Contract stores it,
+// numbering from scratch.
 func NormalizeContract(t testing.TB, got any, opts ...ContractOption) any {
 	t.Helper()
-	cfg := contractCfg{mask: map[string]bool{}}
+	return normalizeContract(t, got, &numbers{ids: map[string]int{}}, opts)
+}
+
+func normalizeContract(t testing.TB, got any, nums *numbers, opts []ContractOption) any {
+	t.Helper()
+	cfg := contractCfg{mask: map[string]bool{}, omit: map[string]bool{}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -114,14 +149,13 @@ func NormalizeContract(t testing.TB, got any, opts ...ContractOption) any {
 	if err := dec.Decode(&v); err != nil {
 		t.Fatalf("contract: decode: %v", err)
 	}
-	n := &normalizer{cfg: cfg, ids: map[string]int{}, times: map[string]int{}}
+	n := &normalizer{cfg: cfg, ids: nums.ids}
 	return n.walk(v)
 }
 
 type normalizer struct {
-	cfg   contractCfg
-	ids   map[string]int
-	times map[string]int
+	cfg contractCfg
+	ids map[string]int
 }
 
 func (n *normalizer) walk(v any) any {
@@ -134,8 +168,11 @@ func (n *normalizer) walk(v any) any {
 		sort.Strings(keys)
 		out := make(map[string]any, len(x))
 		for _, k := range keys {
+			if n.cfg.omit[k] {
+				continue
+			}
 			if n.cfg.mask[k] {
-				out[k] = "<masked>"
+				out[k] = zero(x[k])
 				continue
 			}
 			out[k] = n.walk(x[k])
@@ -165,7 +202,24 @@ func (n *normalizer) str(s string) string {
 		s = strings.ReplaceAll(s, r[0], r[1])
 	}
 	s = uuidRe.ReplaceAllStringFunc(s, func(m string) string { return number(n.ids, "id", strings.ToLower(m)) })
-	return timeRe.ReplaceAllStringFunc(s, func(m string) string { return number(n.times, "time", m) })
+	return timeRe.ReplaceAllString(s, "<time>")
+}
+
+// zero keeps the JSON type of a masked value so the renderer still parses it.
+func zero(v any) any {
+	switch v.(type) {
+	case string:
+		return "<masked>"
+	case json.Number:
+		return float64(0)
+	case bool:
+		return false
+	case []any:
+		return []any{}
+	case map[string]any:
+		return map[string]any{}
+	}
+	return nil
 }
 
 func number(seen map[string]int, kind, m string) string {

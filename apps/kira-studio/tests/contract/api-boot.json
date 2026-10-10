@@ -1,0 +1,56 @@
+{
+  "HttpService.Send": {
+    "bodyBytes": 0,
+    "bodyEncoding": "utf8",
+    "bodyTruncated": false,
+    "elapsedMs": 0,
+    "finalUrl": "<http>/echo?from=ui",
+    "proto": "HTTP/1.1",
+    "redirects": [],
+    "status": 200,
+    "statusText": "OK"
+  },
+  "VariablesService.List": [
+    {
+      "description": "",
+      "id": "<id:2>",
+      "isSecret": false,
+      "name": "base",
+      "ownerId": "<id:1>",
+      "scope": "environment",
+      "sortOrder": 0,
+      "value": "<http>"
+    }
+  ],
+  "VariablesService.ListEnvironments": [
+    {
+      "color": "blue",
+      "description": "",
+      "id": "<id:1>",
+      "isActive": true,
+      "name": "Flow",
+      "sortOrder": 0
+    }
+  ],
+  "args:HttpService.Send": {
+    "body": {
+      "code": "",
+      "codeLanguage": "",
+      "file": "",
+      "formData": null,
+      "mode": "",
+      "raw": "",
+      "urlEncoded": null
+    },
+    "collectionId": "",
+    "environmentId": "<id:1>",
+    "headers": null,
+    "incognito": false,
+    "itemId": "",
+    "method": "GET",
+    "opId": "<masked>",
+    "options": {},
+    "tabId": "tab-1",
+    "url": "<http>/echo?from=ui"
+  }
+}

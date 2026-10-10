@@ -3,6 +3,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab, openHttpModeAndNewRequest as openHttpMode } from './support/apiMode';
 import { installFakeTimers } from './support/clock';
+import { contract } from './support/contract';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
@@ -359,4 +360,46 @@ test('a dynamic value is frozen across the reveal, and stays distinct per occurr
   const after = await command.inputValue();
   const uuidsAfter = [...after.matchAll(new RegExp(UUID_RE, 'gi'))].map((m) => m[0]);
   expect(uuidsAfter).toEqual(uuids);
+});
+
+// ---- 9. Import, send, copy as curl (contract: api-curl) ----
+
+// Backend half: httpflow.TestCurlReplayMatchesSend sends the same request, replays the generated
+// command with real curl and asserts the server saw the same request twice.
+test('an imported curl sends as written, and copy-as-curl yields the contract command', async ({
+  relaunch,
+}) => {
+  const origins = { http: 'http://flow.test' };
+  const importText = contract<string>('api-curl', 'curl:import', { origins });
+  const generated = contract<string>('api-curl', 'curl:generated', { origins });
+  const sent = contract<{ method: string; url: string; headers: unknown[]; body: unknown }>(
+    'api-curl',
+    'args:HttpService.Send',
+    { origins },
+  );
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: { collections: [], items: [] } },
+    { channel: IPC.httpSend, response: contract('api-curl', 'HttpService.Send', { origins }) },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await modeTab(page, 'api').click();
+  await page.click('[data-testid="import-curl-start"]');
+  await page.fill('[data-testid="import-curl-textarea"]', importText);
+  await page.click('[data-testid="import-curl-submit"]');
+  await expect(page.locator('[data-testid="http-method-chip"]')).toHaveText(sent.method);
+
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+  const sendCalls = control.log().filter((e) => e.channel === IPC.httpSend);
+  expect(sendCalls).toHaveLength(1);
+  expect(sendCalls[0].args).toMatchObject({
+    method: sent.method,
+    url: sent.url,
+    headers: sent.headers,
+    body: sent.body,
+  });
+
+  await page.click('[data-testid="http-copy-as-curl"]');
+  await expect(page.locator('[data-testid="copy-as-curl-command"]')).toHaveValue(generated);
 });

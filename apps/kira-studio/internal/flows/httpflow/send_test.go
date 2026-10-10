@@ -39,7 +39,23 @@ func TestSendResolvesSecretsOnlyOnTheWire(t *testing.T) {
 	args := get(srv.URL + "/status?code=200&t={{token}}")
 	args.CollectionID, args.EnvironmentID = col.ID, env.ID
 	args.Headers = []httpclient.Header{{Name: "Authorization", Value: "Bearer {{token}}"}}
+	// Contract api-http, read by tests/ui/http-variables.spec.ts "a secret reference stays literal
+	// in the send args and the history list".
+	const sc = "api-http"
+	opts := flowharness.Replace(srv.URL, "<http>")
+	envs, err := app.W.Variables.ListEnvironments()
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, sc, "VariablesService.ListEnvironments", envs)
+	vars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeEnvironment, OwnerID: env.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, sc, "VariablesService.List", vars)
+	app.Contract(t, sc, "args:HttpService.Send", args, flowharness.Mask("opId", "tabId"), opts)
 	res := send(t, app, args)
+	app.Contract(t, sc, "HttpService.Send", res, opts, flowharness.Mask("elapsedMs", "bodyBytes"), flowharness.Omit("body", "headers", "timeline", "wire"))
 
 	reqs := srv.Requests()
 	if len(reqs) != 1 {
@@ -68,6 +84,7 @@ func TestSendResolvesSecretsOnlyOnTheWire(t *testing.T) {
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("history entries = %d, err %v; want 1", len(entries), err)
 	}
+	app.Contract(t, sc, "ResponseHistoryService.List", entries, opts, flowharness.Mask("elapsedMs", "bodyBytes", "storedBytes"))
 	snap, err := app.W.ResponseHistory.Get(bridge.ResponseHistoryIDArgs{ID: entries[0].ID})
 	if err != nil {
 		t.Fatal(err)

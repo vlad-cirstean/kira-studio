@@ -23,9 +23,9 @@ func TestNormalizeContract(t *testing.T) {
 	norm := NormalizeContract(t, got, Replace("/tmp/x/home", "<home>"), Replace("/tmp/x", "<tmp>"), Mask("Pid"))
 	raw, _ := json.Marshal(norm)
 	var wantV any
-	want := `[{"At":"<time:1>","ID":"<id:1>","N":7,"Parent":"","Path":"<home>/a.txt","Pid":"<masked>","Tags":["<id:2>","<id:1>"]},` +
-		`{"At":"<time:1>","ID":"<id:2>","N":0,"Parent":"<id:1>","Path":"<home>","Pid":"<masked>","Tags":null},` +
-		`{"At":"<time:2>","ID":"<id:3>","N":0,"Parent":"","Path":"","Pid":"<masked>","Tags":null}]`
+	want := `[{"At":"<time>","ID":"<id:1>","N":7,"Parent":"","Path":"<home>/a.txt","Pid":0,"Tags":["<id:2>","<id:1>"]},` +
+		`{"At":"<time>","ID":"<id:2>","N":0,"Parent":"<id:1>","Path":"<home>","Pid":0,"Tags":null},` +
+		`{"At":"<time>","ID":"<id:3>","N":0,"Parent":"","Path":"","Pid":0,"Tags":null}]`
 	_ = json.Unmarshal([]byte(want), &wantV)
 	if !reflect.DeepEqual(wantV, norm) {
 		t.Fatalf("got\n%s\nwant\n%s", raw, want)

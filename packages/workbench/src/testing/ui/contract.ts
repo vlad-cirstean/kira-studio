@@ -7,7 +7,7 @@ import { join } from 'node:path';
  * exact shape the real Go services return.
  */
 
-const BASE_TIME = Date.parse('2026-01-01T00:00:00.000Z');
+const BASE_ISO = '2026-01-01T00:00:00.000Z';
 
 const FIXED: Record<string, string> = {
   '<home>': '/home/test',
@@ -35,9 +35,7 @@ function hydrateString(s: string, origins: ContractOptions<unknown>['origins']):
   if (origins?.grpc) map['<grpc>'] = origins.grpc;
   return s
     .replace(/<id:(\d+)>/g, (_, n: string) => `00000000-0000-4000-8000-${n.padStart(12, '0')}`)
-    .replace(/<time:(\d+)>/g, (_, n: string) =>
-      new Date(BASE_TIME + Number(n) * 1000).toISOString(),
-    )
+    .replace(/<time>/g, BASE_ISO)
     .replace(/<[a-z]+>/g, (m) => map[m] ?? m);
 }
 

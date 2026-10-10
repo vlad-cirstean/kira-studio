@@ -11,9 +11,10 @@ import (
 // ContractOption tunes Contract; see flowtest.Contract.
 type ContractOption = flowtest.ContractOption
 
-// Mask and Replace re-export the flowtest options.
+// Mask, Omit and Replace re-export the flowtest options.
 var (
 	Mask    = flowtest.Mask
+	Omit    = flowtest.Omit
 	Replace = flowtest.Replace
 )
 

@@ -149,10 +149,14 @@ func TestRestartKeepsApiState(t *testing.T) {
 	if !reflect.DeepEqual(before, after) {
 		t.Errorf("tree changed across restart:\n before %+v\n after  %+v", before, after)
 	}
+	// Contract api-restart, read by tests/ui/collections.spec.ts "after a restart the tree and the
+	// active environment come back".
+	app.Contract(t, "api-restart", "CollectionsService.List", after, flowharness.Replace(srv.URL, "<http>"))
 	envs, err := app.W.Variables.ListEnvironments()
 	if err != nil || len(envs) != 1 || !envs[0].IsActive || envs[0].ID != env.ID {
 		t.Fatalf("environments after restart = %+v (%v), want dev still active", envs, err)
 	}
+	app.Contract(t, "api-restart", "VariablesService.ListEnvironments", envs)
 	vars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeEnvironment, OwnerID: env.ID})
 	if err != nil || len(vars) != 1 {
 		t.Fatalf("variables = %+v (%v)", vars, err)

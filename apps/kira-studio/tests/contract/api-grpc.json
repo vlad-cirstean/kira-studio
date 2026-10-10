@@ -1,0 +1,138 @@
+{
+  "GrpcService.Call": {
+    "code": 0,
+    "codeName": "OK",
+    "elapsedMs": 0,
+    "header": [
+      {
+        "name": "content-type",
+        "value": "application/grpc"
+      },
+      {
+        "name": "echo-x-trace",
+        "value": "abc-123"
+      }
+    ],
+    "messageBytes": 0,
+    "messageCount": 1,
+    "messages": [
+      {
+        "json": "{\"text\":\"hello\",\"index\":7,\"count\":0,\"intervalMs\":0,\"payloadBytes\":0,\"meta\":null,\"at\":\"<time>\"}",
+        "offsetMs": 0,
+        "seq": 0,
+        "wireBytes": 0
+      }
+    ],
+    "statusMessage": "",
+    "trailer": [
+      {
+        "name": "trailer-x-trace",
+        "value": "abc-123"
+      }
+    ]
+  },
+  "GrpcService.Describe": {
+    "mode": "reflection-v1",
+    "services": [
+      {
+        "fullName": "kira.flow.v1.Flow",
+        "methods": [
+          {
+            "clientStreaming": false,
+            "fullName": "kira.flow.v1.Flow.Unary",
+            "inputType": "kira.flow.v1.Msg",
+            "name": "Unary",
+            "outputType": "kira.flow.v1.Msg",
+            "requestTemplate": "{\n  \"text\": \"\",\n  \"index\": 0,\n  \"count\": 0,\n  \"intervalMs\": 0,\n  \"payloadBytes\": 0,\n  \"meta\": null,\n  \"at\": null\n}",
+            "serverStreaming": false
+          },
+          {
+            "clientStreaming": false,
+            "fullName": "kira.flow.v1.Flow.ServerStream",
+            "inputType": "kira.flow.v1.Msg",
+            "name": "ServerStream",
+            "outputType": "kira.flow.v1.Msg",
+            "requestTemplate": "{\n  \"text\": \"\",\n  \"index\": 0,\n  \"count\": 0,\n  \"intervalMs\": 0,\n  \"payloadBytes\": 0,\n  \"meta\": null,\n  \"at\": null\n}",
+            "serverStreaming": true
+          },
+          {
+            "clientStreaming": true,
+            "fullName": "kira.flow.v1.Flow.ClientStream",
+            "inputType": "kira.flow.v1.Msg",
+            "name": "ClientStream",
+            "outputType": "kira.flow.v1.Msg",
+            "requestTemplate": "{\n  \"text\": \"\",\n  \"index\": 0,\n  \"count\": 0,\n  \"intervalMs\": 0,\n  \"payloadBytes\": 0,\n  \"meta\": null,\n  \"at\": null\n}",
+            "serverStreaming": false
+          },
+          {
+            "clientStreaming": true,
+            "fullName": "kira.flow.v1.Flow.Bidi",
+            "inputType": "kira.flow.v1.Msg",
+            "name": "Bidi",
+            "outputType": "kira.flow.v1.Msg",
+            "requestTemplate": "{\n  \"text\": \"\",\n  \"index\": 0,\n  \"count\": 0,\n  \"intervalMs\": 0,\n  \"payloadBytes\": 0,\n  \"meta\": null,\n  \"at\": null\n}",
+            "serverStreaming": true
+          },
+          {
+            "clientStreaming": false,
+            "fullName": "kira.flow.v1.Flow.Fail",
+            "inputType": "kira.flow.v1.FailRequest",
+            "name": "Fail",
+            "outputType": "kira.flow.v1.Msg",
+            "requestTemplate": "{\n  \"code\": 0,\n  \"message\": \"\"\n}",
+            "serverStreaming": false
+          },
+          {
+            "clientStreaming": false,
+            "fullName": "kira.flow.v1.Flow.Slow",
+            "inputType": "kira.flow.v1.Msg",
+            "name": "Slow",
+            "outputType": "kira.flow.v1.Msg",
+            "requestTemplate": "{\n  \"text\": \"\",\n  \"index\": 0,\n  \"count\": 0,\n  \"intervalMs\": 0,\n  \"payloadBytes\": 0,\n  \"meta\": null,\n  \"at\": null\n}",
+            "serverStreaming": false
+          }
+        ],
+        "name": "Flow"
+      }
+    ],
+    "warnings": null
+  },
+  "event:kira:grpc:call#cancelled": {
+    "callId": "<masked>",
+    "done": true,
+    "error": {
+      "code": "E_GRPC_CANCELLED",
+      "message": "context canceled"
+    },
+    "messages": [],
+    "seq": 0,
+    "status": {
+      "code": 1,
+      "codeName": "Canceled",
+      "elapsedMs": 0,
+      "header": [
+        {
+          "name": "content-type",
+          "value": "application/grpc"
+        }
+      ],
+      "messageBytes": 0,
+      "messageCount": 0,
+      "statusMessage": "context canceled",
+      "trailer": null
+    }
+  },
+  "event:kira:grpc:call#message": {
+    "callId": "<masked>",
+    "done": false,
+    "messages": [
+      {
+        "json": "{\"text\":\"s\",\"index\":0,\"count\":0,\"intervalMs\":0,\"payloadBytes\":0,\"meta\":null,\"at\":\"<time>\"}",
+        "offsetMs": 0,
+        "seq": 0,
+        "wireBytes": 0
+      }
+    ],
+    "seq": 0
+  }
+}

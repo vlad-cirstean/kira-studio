@@ -278,15 +278,23 @@ func TestPostmanImportSendExport(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Contract api-postman, read by tests/ui/collections.spec.ts "Postman import builds the tree
+	// and export asks for a save path".
+	const sc = "api-postman"
+	pathOpts := []flowharness.ContractOption{flowharness.Replace(dir, "<tmp>"), flowharness.Replace(srv.URL, "<http>")}
 	app.Dialogs.QueueOpenFile(imported)
 	chosen, err := app.W.Files.ChooseOpen(bridge.FilesChooseOpenArgs{})
 	if err != nil || chosen.File == nil {
 		t.Fatalf("ChooseOpen = %+v (%v)", chosen, err)
 	}
-	rep, err := app.W.Collections.Import(bridge.CollectionsImportArgs{Path: chosen.File.Path})
+	app.Contract(t, sc, "FilesService.ChooseOpen", chosen, append(pathOpts, flowharness.Mask("size"))...)
+	importArgs := bridge.CollectionsImportArgs{Path: chosen.File.Path}
+	app.Contract(t, sc, "args:CollectionsService.Import", importArgs, pathOpts...)
+	rep, err := app.W.Collections.Import(importArgs)
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Contract(t, sc, "CollectionsService.Import", rep, pathOpts...)
 	if rep.Name != "Flow Orders" || rep.Folders != 1 || rep.Requests != 4 {
 		t.Errorf("report = %+v, want Flow Orders with 1 folder and 4 requests", rep)
 	}
@@ -308,6 +316,7 @@ func TestPostmanImportSendExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Contract(t, sc, "CollectionsService.List", items, pathOpts...)
 	var create model.CollectionItem
 	for _, it := range items.Items {
 		if it.Name == "Create order" && it.CollectionID == rep.CollectionID {
@@ -346,10 +355,14 @@ func TestPostmanImportSendExport(t *testing.T) {
 	if err != nil || dest.FilePath == nil {
 		t.Fatalf("ChooseSave = %+v (%v)", dest, err)
 	}
-	exp, err := app.W.Collections.Export(bridge.CollectionsExportArgs{CollectionID: rep.CollectionID, Path: *dest.FilePath})
+	app.Contract(t, sc, "FilesService.ChooseSave", dest, pathOpts...)
+	exportArgs := bridge.CollectionsExportArgs{CollectionID: rep.CollectionID, Path: *dest.FilePath}
+	app.Contract(t, sc, "args:CollectionsService.Export", exportArgs, pathOpts...)
+	exp, err := app.W.Collections.Export(exportArgs)
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Contract(t, sc, "CollectionsService.Export", exp, pathOpts...)
 	if exp.SecretCount != 1 || exp.SkippedGrpc != 1 {
 		t.Errorf("export = %+v, want 1 secret and 1 skipped gRPC item", exp)
 	}

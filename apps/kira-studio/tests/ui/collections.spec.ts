@@ -3,6 +3,7 @@ import { CHANNEL } from '@shared/protocol/events';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -486,4 +487,79 @@ test('environments reorder by dragging the grip; refused while filtered (P140)',
   await page.waitForTimeout(300);
   expect(reorderCalls()).toHaveLength(1);
   expect(await rowIds()).toEqual(['env-prod', 'env-preview']);
+});
+
+// Contract api-postman. Backend half: apiflow.TestPostmanImportSendExport stores the same fixture.
+test('collections — Postman import builds the contract tree and export asks for a save path', async ({
+  relaunch,
+}) => {
+  const tree = contract<{ collections: { id: string; name: string }[] }>(
+    'api-postman',
+    'CollectionsService.List',
+  );
+  const report = contract<{ name: string; requests: number; folders: number }>(
+    'api-postman',
+    'CollectionsService.Import',
+  );
+  const importArgs = contract('api-postman', 'args:CollectionsService.Import');
+  const exportArgs = contract<{ collectionId: string }>(
+    'api-postman',
+    'args:CollectionsService.Export',
+  );
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: tree },
+    { channel: IPC.filesChooseOpen, response: contract('api-postman', 'FilesService.ChooseOpen') },
+    { channel: IPC.collectionsImport, response: report },
+    { channel: IPC.filesChooseSave, response: contract('api-postman', 'FilesService.ChooseSave') },
+    {
+      channel: IPC.collectionsExport,
+      response: contract('api-postman', 'CollectionsService.Export'),
+    },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+  await openHttpMode(page);
+
+  await emitWailsEvent(page, CHANNEL.importPostman, undefined);
+  await expect(page.locator('[data-testid="import-report-summary"]')).toHaveText(
+    `Imported ${report.name} — ${report.requests} requests, ${report.folders} folder.`,
+  );
+  const importCalls = control.log().filter((e) => e.channel === IPC.collectionsImport);
+  expect(importCalls).toHaveLength(1);
+  expect(importCalls[0].args).toEqual(importArgs);
+
+  const root = row(page, tree.collections[0].id);
+  await expect(root).toContainText(tree.collections[0].name);
+  await root.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-export"]');
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.collectionsExport))
+    .toHaveLength(1);
+  expect(control.log().find((e) => e.channel === IPC.collectionsExport)?.args).toEqual(exportArgs);
+});
+
+// Contract api-restart. Backend half: apiflow.TestRestartKeepsApiState stores the post-restart state.
+test('collections — after a restart the tree and the active environment come back', async ({
+  relaunch,
+}) => {
+  const tree = contract<{ collections: { id: string }[]; items: { id: string; name: string }[] }>(
+    'api-restart',
+    'CollectionsService.List',
+  );
+  const envs = contract<{ id: string; name: string; isActive: boolean }[]>(
+    'api-restart',
+    'VariablesService.ListEnvironments',
+  );
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: tree },
+    { channel: IPC.variablesListEnvironments, response: envs },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await openHttpMode(page);
+
+  await expect(row(page, tree.collections[0].id)).toBeVisible();
+  await page.click('[data-testid="api-environments"]');
+  const active = envs.find((e) => e.isActive);
+  expect(active).toBeDefined();
+  const activeRow = page.locator(`[data-testid="environment-row"][data-id="${active?.id}"]`);
+  await expect(activeRow.locator('input[type="radio"]')).toBeChecked();
 });

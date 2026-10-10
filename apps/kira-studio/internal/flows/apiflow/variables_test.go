@@ -113,3 +113,44 @@ func TestEnvironmentLifecycle(t *testing.T) {
 		t.Fatalf("environments after relaunch = %v", got)
 	}
 }
+
+// Same scenario as tests/ui/http-variables.spec.ts "the active environment's base variable reaches
+// the wire": both halves read tests/contract/api-boot.json. The renderer substitutes plain
+// variables before sending; the backend only resolves secrets.
+func TestActiveEnvironmentResolvesBase(t *testing.T) {
+	app := flowharness.New(t)
+	srv := flowharness.HTTP(t)
+	const sc = "api-boot"
+	env, err := app.W.Variables.CreateEnvironment(bridge.VariablesCreateEnvironmentArgs{Name: "Flow", Color: "blue"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.W.Variables.Upsert(bridge.VariablesUpsertArgs{
+		Scope: model.VariableScopeEnvironment, OwnerID: env.ID, Name: "base", Value: ptr(srv.URL),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.W.Variables.SetActiveEnvironment(bridge.VariablesEnvironmentIDArgs{ID: env.ID}); err != nil {
+		t.Fatal(err)
+	}
+	envs, err := app.W.Variables.ListEnvironments()
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, sc, "VariablesService.ListEnvironments", envs)
+	vars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeEnvironment, OwnerID: env.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := flowharness.Replace(srv.URL, "<http>")
+	app.Contract(t, sc, "VariablesService.List", vars, opts)
+
+	args := get(srv.URL + "/echo?from=ui")
+	args.EnvironmentID = env.ID
+	app.Contract(t, sc, "args:HttpService.Send", args, flowharness.Mask("opId"), opts)
+	res := send(t, app, args)
+	app.Contract(t, sc, "HttpService.Send", res, opts, flowharness.Mask("elapsedMs", "bodyBytes"), flowharness.Omit("body", "headers", "timeline", "wire"))
+	if got := lastRequest(srv); got.Path != "/echo" || got.Query != "from=ui" {
+		t.Errorf("server saw %s?%s, want /echo?from=ui", got.Path, got.Query)
+	}
+}

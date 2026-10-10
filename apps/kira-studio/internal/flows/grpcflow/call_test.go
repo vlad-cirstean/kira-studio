@@ -18,6 +18,7 @@ func TestUnaryMetadataAndStatus(t *testing.T) {
 	args := callArgs(srv.Addr, "Unary", `{"text":"hello","index":7}`)
 	args.Metadata = []grpcclient.MetaPair{{Name: "x-trace", Value: "abc-123"}}
 	res := call(t, app, args)
+	app.Contract(t, "api-grpc", "GrpcService.Call", res, flowharness.Mask("elapsedMs", "offsetMs", "wireBytes", "messageBytes"), flowharness.Replace(srv.Addr, "<grpc>"))
 	if res.Code != 0 || res.CodeName != "OK" || res.MessageCount != 1 {
 		t.Fatalf("result = %+v, want OK with one message", res)
 	}
@@ -139,6 +140,10 @@ func TestServerStreamAndCancel(t *testing.T) {
 		if !sawDone {
 			t.Error("no terminal event")
 		}
+		// Batching decides how many messages one event carries; the contract is one message.
+		first := callEvents(t, app, mark)[0]
+		first.Messages = first.Messages[:1]
+		app.Contract(t, "api-grpc", "event:"+bridge.ChannelGrpcCall+"#message", first, flowharness.Mask("callId", "offsetMs", "wireBytes"))
 		for i, s := range seqs {
 			if s != i {
 				t.Errorf("message seqs = %v, want 0..4 in order", seqs)
@@ -202,6 +207,12 @@ func TestServerStreamAndCancel(t *testing.T) {
 		if !final.Done || final.Error == nil || final.Error.Code != grpcclient.CodeCancelled {
 			t.Errorf("terminal event = %+v, want done with %s", final, grpcclient.CodeCancelled)
 		}
+		// How many messages arrived before the cancel varies run to run.
+		partialStatus := *final.Status
+		partialStatus.Messages = nil
+		final.Status = &partialStatus
+		app.Contract(t, "api-grpc", "event:"+bridge.ChannelGrpcCall+"#cancelled", final,
+			flowharness.Mask("callId", "seq", "elapsedMs", "messageCount", "messageBytes", "wireBytes"))
 	})
 }
 

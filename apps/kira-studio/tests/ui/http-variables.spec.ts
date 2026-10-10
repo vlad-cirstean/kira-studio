@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
+import { contract } from './support/contract';
 import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 
@@ -592,4 +593,104 @@ test('deleting a variable row does not scroll (D16 guard)', async ({ relaunch })
     .evaluate((el: HTMLElement) => el.click());
   await expect(rows).toHaveCount(30);
   await expect(list.evaluate((el) => el.scrollTop)).resolves.toBe(0);
+});
+
+// ---- 8. The active environment's base variable reaches the wire (contract: api-boot) ----
+
+// Backend half: apiflow.TestActiveEnvironmentResolvesBase stores the same fixture.
+test("the active environment's base variable reaches the wire", async ({ relaunch }) => {
+  const origins = { http: 'http://flow.test' };
+  const envs = contract<{ id: string; isActive: boolean }[]>(
+    'api-boot',
+    'VariablesService.ListEnvironments',
+  );
+  const vars = contract('api-boot', 'VariablesService.List', { origins });
+  const sent = contract<{ url: string; environmentId: string }>(
+    'api-boot',
+    'args:HttpService.Send',
+    {
+      origins,
+    },
+  );
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: { collections: [], items: [] } },
+    { channel: IPC.variablesListEnvironments, response: envs },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'environment', ownerId: envs[0].id },
+      response: vars,
+    },
+    { channel: IPC.httpSend, response: contract('api-boot', 'HttpService.Send', { origins }) },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await openHttpMode(page);
+  await page.click('[data-testid="new-request"]');
+  await page.fill('[data-testid="http-url"]', '{{base}}/echo?from=ui');
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+
+  const sendCalls = control.log().filter((e) => e.channel === IPC.httpSend);
+  expect(sendCalls).toHaveLength(1);
+  expect(sendCalls[0].args).toMatchObject({
+    url: sent.url,
+    environmentId: sent.environmentId,
+  });
+});
+
+// ---- 9. A secret reference stays literal in the send args and the history list (contract: api-http) ----
+
+// Backend half: httpflow.TestSendResolvesSecretsOnlyOnTheWire stores the same fixture and proves the
+// server gets the plaintext while history and the op log keep the placeholder.
+test('a secret reference stays literal in the send args and the history list', async ({
+  relaunch,
+}) => {
+  const origins = { http: 'http://flow.test' };
+  const envs = contract<{ id: string }[]>('api-http', 'VariablesService.ListEnvironments');
+  const vars = contract('api-http', 'VariablesService.List');
+  const sent = contract<{ url: string; headers: unknown[]; environmentId: string }>(
+    'api-http',
+    'args:HttpService.Send',
+    { origins },
+  );
+  const history = contract<{ url: string }[]>('api-http', 'ResponseHistoryService.List', {
+    origins,
+  });
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: { collections: [], items: [] } },
+    { channel: IPC.variablesListEnvironments, response: envs },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'environment', ownerId: envs[0].id },
+      response: vars,
+    },
+    { channel: IPC.httpSend, response: contract('api-http', 'HttpService.Send') },
+    { channel: IPC.historyList, response: history },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await openHttpMode(page);
+  await page.click('[data-testid="new-request"]');
+  await page.fill('[data-testid="http-url"]', sent.url);
+  await page.click('[data-testid="http-request-pane-headers"]');
+  const row = page.locator('[data-testid="http-header-row"]').first();
+  const header = sent.headers[0] as { name: string; value: string };
+  await row.locator('[data-testid="http-header-name"]').fill(header.name);
+  await row.locator('[data-testid="http-header-value"]').fill(header.value);
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+
+  const sendCalls = control.log().filter((e) => e.channel === IPC.httpSend);
+  expect(sendCalls).toHaveLength(1);
+  expect(sendCalls[0].args).toMatchObject({
+    url: sent.url,
+    headers: sent.headers,
+    environmentId: sent.environmentId,
+  });
+
+  await page.click('[data-testid="http-response-pane-history"]');
+  const rows = page.locator('[data-testid="http-history-row"]');
+  await expect(rows).toHaveCount(history.length);
+  await expect(rows.first()).toContainText('200');
+  await expect(rows.first()).not.toContainText('sekret');
 });

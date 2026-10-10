@@ -3,6 +3,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { grpcTab as buildGrpcTab, modeTab } from './support/apiMode';
 import { installFakeTimers } from './support/clock';
+import { contract } from './support/contract';
 import { acceptConfirm } from './support/dialogs';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
@@ -1263,4 +1264,112 @@ test('gRPC request — deleting a metadata row does not scroll (D16 guard)', asy
     .evaluate((el: HTMLElement) => el.click());
   await expect(rows).toHaveCount(30);
   await expect(table.evaluate((el) => el.scrollTop)).resolves.toBe(0);
+});
+
+// ---- Contract: api-grpc (backend half: grpcflow TestDescribeReflection, TestUnaryMetadataAndStatus,
+// TestServerStreamAndCancel store the same fixture) ----
+
+interface ContractSchema {
+  services: { name: string; fullName: string; methods: { name: string }[] }[];
+}
+interface ContractStatus {
+  codeName: string;
+  header: { name: string }[];
+  trailer: { name: string }[];
+  messages: { json: string }[];
+}
+
+const GRPC_ORIGINS = { grpc: 'flow.test:50051' };
+
+test('gRPC contract — reflection lists every method of the service', async ({ relaunch }) => {
+  const schema = contract<ContractSchema>('api-grpc', 'GrpcService.Describe');
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.grpcDescribe, response: schema }];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewGrpcRequest(page);
+  await page.fill('[data-testid="grpc-target"]', GRPC_ORIGINS.grpc);
+  await page.click('[data-testid="grpc-request-pane-schema"]');
+  await expect(page.locator('[data-testid="grpc-service-name"]')).toHaveCount(
+    schema.services.length,
+  );
+  const methods = schema.services.flatMap((svc) => svc.methods.map((m) => m.name));
+  await expect(page.locator('[data-testid="grpc-method-row"]')).toHaveCount(methods.length);
+  await expect(
+    page.locator('[data-testid="grpc-method-row"]').getByText('ServerStream', { exact: true }),
+  ).toBeVisible();
+});
+
+test('gRPC contract — a unary call shows message, header and trailer', async ({ relaunch }) => {
+  const schema = contract<ContractSchema>('api-grpc', 'GrpcService.Describe');
+  const result = contract<ContractStatus>('api-grpc', 'GrpcService.Call', {
+    origins: GRPC_ORIGINS,
+  });
+  const svc = schema.services[0];
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [
+        grpcTab({
+          target: GRPC_ORIGINS.grpc,
+          service: svc.fullName,
+          method: 'Unary',
+          message: '{"text":"hello"}',
+        }),
+      ],
+    },
+    { channel: IPC.grpcDescribe, response: schema },
+    { channel: IPC.grpcCall, response: result },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="grpc-call"]');
+  await expect(page.locator('[data-testid="grpc-status-chip"]')).toContainText('OK (0)');
+  const entry = page.locator('[data-testid="grpc-message-entry"]');
+  await expect(entry).toHaveCount(1);
+  expect(await editorText(entry)).toContain('hello');
+
+  await page.click('[data-testid="grpc-response-pane-metadata"]');
+  const metadata = page.locator('[data-testid="grpc-response-metadata"]');
+  await expect(metadata).toContainText('Header');
+  await expect(metadata).toContainText(result.header[0].name);
+  await expect(metadata).toContainText('Trailer');
+  await expect(metadata).toContainText(result.trailer[0].name);
+});
+
+test('gRPC contract — a server stream delivers messages and Stop ends it', async ({ relaunch }) => {
+  const schema = contract<ContractSchema>('api-grpc', 'GrpcService.Describe');
+  const message = contract<Record<string, unknown>>('api-grpc', 'event:kira:grpc:call#message');
+  const cancelled = contract<Record<string, unknown>>('api-grpc', 'event:kira:grpc:call#cancelled');
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [
+        grpcTab({
+          target: GRPC_ORIGINS.grpc,
+          service: schema.services[0].fullName,
+          method: 'ServerStream',
+          message: '{"text":"s","count":50,"intervalMs":200}',
+        }),
+      ],
+    },
+    { channel: IPC.grpcDescribe, response: schema },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+  const getOpId = await holdGrpcCallPending(page);
+
+  await page.click('[data-testid="grpc-call"]');
+  await expect.poll(getOpId).toBeTruthy();
+  const callId = getOpId() as string;
+
+  await emitWailsEvent(page, IPC.grpcCall, { ...message, callId });
+  await expect(page.locator('[data-testid="grpc-message-entry"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="grpc-request-stop"]')).toBeEnabled();
+
+  await page.click('[data-testid="grpc-request-stop"]');
+  await expect.poll(() => control.log().some((e) => e.channel === IPC.opsCancel)).toBe(true);
+  await emitWailsEvent(page, IPC.grpcCall, { ...cancelled, callId });
+
+  await expect(page.locator('[data-testid="grpc-request-stop"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="grpc-stopped-strip"]')).toContainText('Stopped after');
+  await expect(page.locator('[data-testid="grpc-message-entry"]')).toHaveCount(1);
 });
