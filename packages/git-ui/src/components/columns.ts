@@ -196,7 +196,7 @@ function messageFormatter(
       // outright, §4.2), so there is no expanded state for this glyph to reflect.
       const chevron = document.createElement('span');
       chevron.className =
-        'codicon codicon-chevron-right kv-collapsed-chevron text-graph-md shrink-0';
+        'codicon codicon-chevron-right kv-collapsed-chevron text-graph-md! shrink-0';
       chevron.setAttribute('aria-hidden', 'true');
       cell.appendChild(chevron);
       const text = document.createElement('span');

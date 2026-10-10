@@ -44,12 +44,10 @@ const emit = defineEmits<{
 const isEmpty = computed(() => props.model.sections.length === 0);
 
 /** P110 A17: `.kv-search-option`'s own gap/px are already exactly `rowVariants()`'s own
- *  `gap-1`/`px-1.5` (P110 I2-29: the default spacing scale directly, not the retired
- *  `gap-kui-2`/`px-kui-3` names — same values, kira-ui's own kui-space-2/kui-space-3 custom
- *  properties bridged to the same `--kv-s-2`/`--kv-s-3` steps the default scale already equals).
+ *  `gap-1`/`px-1.5` (P110 I2-29: the default spacing scale directly).
  *  Only the vertical padding and the "active" (keyboard-highlighted, not a real `:hover`)
  *  background need adding —
- *  through `cn()` since `kv:px-2` below replaces the variant's own `px-1.5` (different value,
+ *  through `cn()` since `px-2` below replaces the variant's own `px-1.5` (different value,
  *  same property; §1.3). */
 function optionClass(option: SearchOption): string {
   return cn(
@@ -68,15 +66,15 @@ function optionClass(option: SearchOption): string {
     <div :id="SEARCH_LISTBOX_ID" role="listbox" aria-label="Search results">
       <div
         v-if="searching"
-        class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
+        class="py-0.5 px-2 text-muted-foreground text-graph-sm"
         data-testid="search-status"
       >
         Searching…
       </div>
 
       <template v-for="section in model.sections" :key="section.title">
-        <div class="kv:py-0.5 kv:px-2 kv:text-sm kv:font-semibold kv:text-muted-foreground">
-          {{ section.title }} <span class="kv:font-normal">({{ section.options.length }})</span>
+        <div class="py-0.5 px-2 text-graph-sm font-semibold text-muted-foreground">
+          {{ section.title }} <span class="font-normal">({{ section.options.length }})</span>
         </div>
 
         <template v-for="option in section.options" :key="option.id">
@@ -100,52 +98,52 @@ function optionClass(option: SearchOption): string {
                 }"
                 aria-hidden="true"
               ></span>
-              <span class="kv:flex-1 kv:min-w-0 kv:truncate">{{ option.hit.ref.shortName }}</span>
+              <span class="flex-1 min-w-0 truncate">{{ option.hit.ref.shortName }}</span>
               <span
                 v-if="fieldLabel(option.hit.fields)"
-                class="kv:px-0.5 kv:text-muted-foreground kv:text-sm kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm"
+                class="px-0.5 text-muted-foreground text-graph-sm border border-dashed border-border rounded-kira-sm"
               >
                 {{ fieldLabel(option.hit.fields) }}
               </span>
             </template>
             <template v-else>
-              <span class="kv:font-data kv:text-muted-foreground">{{ option.hit.sha.slice(0, 7) }}</span>
-              <span class="kv:flex-1 kv:min-w-0 kv:truncate">{{ option.hit.subject }}</span>
-              <span class="kv:text-muted-foreground kv:text-sm">{{ option.hit.authorName }}</span>
-              <span class="kv:text-muted-foreground kv:text-sm">{{ formatRelativeDate(option.hit.authorTime) }}</span>
+              <span class="font-data text-muted-foreground">{{ option.hit.sha.slice(0, 7) }}</span>
+              <span class="flex-1 min-w-0 truncate">{{ option.hit.subject }}</span>
+              <span class="text-muted-foreground text-graph-sm">{{ option.hit.authorName }}</span>
+              <span class="text-muted-foreground text-graph-sm">{{ formatRelativeDate(option.hit.authorTime) }}</span>
               <span
                 v-if="fieldLabel(option.hit.fields)"
-                class="kv:px-0.5 kv:text-muted-foreground kv:text-sm kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm"
+                class="px-0.5 text-muted-foreground text-graph-sm border border-dashed border-border rounded-kira-sm"
               >
                 {{ fieldLabel(option.hit.fields) }}
               </span>
             </template>
           </div>
         </template>
-        <div v-if="section.hiddenCount > 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">
+        <div v-if="section.hiddenCount > 0" class="py-0.5 px-2 text-muted-foreground text-graph-sm">
           {{ section.hiddenCount }} more — refine your search
         </div>
       </template>
 
-      <div v-if="isEmpty" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No results</div>
+      <div v-if="isEmpty" class="py-0.5 px-2 text-muted-foreground text-graph-sm">No results</div>
     </div>
 
     <div
       v-if="tailStale"
-      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
+      class="py-0.5 px-2 text-muted-foreground text-graph-sm"
       data-testid="search-tail-stale"
     >
       Refs changed since this search ran
     </div>
-    <div v-if="model.loadedFooter" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">
+    <div v-if="model.loadedFooter" class="py-0.5 px-2 text-muted-foreground text-graph-sm">
       {{ model.loadedFooter }}
     </div>
-    <div v-if="model.tailFooter" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">
+    <div v-if="model.tailFooter" class="py-0.5 px-2 text-muted-foreground text-graph-sm">
       {{ model.tailFooter }}
     </div>
     <div
       v-if="model.tailNotice"
-      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
+      class="py-0.5 px-2 text-muted-foreground text-graph-sm"
       data-testid="search-tail-notice"
     >
       {{ model.tailNotice }}

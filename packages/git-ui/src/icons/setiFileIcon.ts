@@ -29,7 +29,7 @@ const themed = themeIcons({
   grey: '#4d5a5e',
   'grey-light': '#6d8086',
   ignore: '#41535b',
-  white: 'var(--kv-description-fg)',
+  white: 'var(--kira-fg-muted)',
 });
 
 export interface SetiFileIcon {

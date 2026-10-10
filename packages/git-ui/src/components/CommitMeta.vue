@@ -20,10 +20,12 @@
  * facts row's SHA button covers the one copy path this pane itself offers.
  */
 import type { PrLookupResult, PrRecord } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -155,14 +157,18 @@ const PR_STATE_LABEL: Readonly<Record<string, string>> = {
   closed: 'Closed',
 };
 
-// P110 A14 (§1.3): a lookup map, not string interpolation, so every kv:text-badge-pr-* class
+// P110 A14 (§1.3): a lookup map, not string interpolation, so every text-badge-pr-* class
 // Tailwind must scan appears as a complete literal below. Replaces the old dynamic
 // `kv-meta-pr-icon--${state}` class, whose own colour rule lived in this file's deleted <style>.
+// Inline link: no button chrome, ambient colour, graph font.
+const LINK_BUTTON_CLASS =
+  'h-auto p-0 border-0 font-normal text-inherit text-graph-md';
+
 const PR_ICON_CLASS: Readonly<Record<string, string>> = {
-  open: 'kv:text-badge-pr-open',
-  draft: 'kv:text-badge-pr-draft',
-  merged: 'kv:text-badge-pr-merged',
-  closed: 'kv:text-badge-pr-closed',
+  open: 'text-ok',
+  draft: 'text-muted-foreground',
+  merged: 'text-git-merged',
+  closed: 'text-error',
 };
 
 interface PrDetailView {
@@ -305,15 +311,15 @@ const prIcon = computed(() => {
     v-if="detail"
     :class="
       expanded
-        ? 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 px-3 py-2 kv:flex-initial kv:min-h-[min(220px,60%)] kv:max-h-7/10 kv:overflow-auto'
-        : 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 px-3 py-2 kv:flex-none kv:max-h-1/5 kv:overflow-hidden'
+        ? 'kv-detail-pane-meta flex flex-col gap-1 px-3 py-2 flex-initial min-h-[min(220px,60%)] max-h-7/10 overflow-auto'
+        : 'kv-detail-pane-meta flex flex-col gap-1 px-3 py-2 flex-none max-h-1/5 overflow-hidden'
     "
     data-testid="commit-meta"
   >
     <AttributeTooltip :container="decorationEl" />
 
-    <div class="kv:flex kv:items-start kv:justify-between kv:gap-1">
-      <h2 class="kv-meta-subject kv:m-0 kv:text-lg kv:font-semibold">{{ detail.subject }}</h2>
+    <div class="flex items-start justify-between gap-1">
+      <h2 class="kv-meta-subject text-graph-lg font-semibold">{{ detail.subject }}</h2>
       <TooltipIconButton
         icon="diff-multiple"
         label="Open all changes"
@@ -322,39 +328,39 @@ const prIcon = computed(() => {
       />
     </div>
 
-    <p class="kv:m-0 kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-sm">
+    <p class="flex items-center gap-0.5 text-muted-foreground text-graph-sm">
       <Tooltip>
         <TooltipTrigger as-child>
           <span>{{ formatRelativeDate(detail.committer.timestamp) }}</span>
         </TooltipTrigger>
         <TooltipContent>{{ formatAbsoluteDate(detail.committer.timestamp) }}</TooltipContent>
       </Tooltip>
-      <span class="kv:shrink-0" aria-hidden="true">·</span>
+      <span class="shrink-0" aria-hidden="true">·</span>
       <Tooltip>
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="kv:font-data kv:text-inherit kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:hover:underline"
+          <Button
+            variant="link"
+            :class="cn(LINK_BUTTON_CLASS, 'font-data')"
             aria-label="Copy full SHA"
             data-testid="commit-meta-sha"
             @click="copySha"
           >
             {{ shortSha }}
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Copy full SHA</TooltipContent>
       </Tooltip>
       <Tooltip v-if="prIcon">
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="codicon codicon-github kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:text-lg kv:leading-none"
-            :class="PR_ICON_CLASS[prIcon!.state]"
+          <Button
+            variant="link"
+            :class="cn('h-auto p-0 border-0 leading-none', PR_ICON_CLASS[prIcon!.state])"
             :aria-label="`Open pull request #${prIcon!.number} on GitHub`"
             data-testid="commit-meta-pr-icon"
             @click="openPullRequest(prIcon!.number)"
           >
-          </button>
+            <CodiconIcon name="github" />
+          </Button>
         </TooltipTrigger>
         <TooltipContent>{{
           `#${prIcon!.number} ${prIcon!.title} — ${prIcon!.stateLabel}`
@@ -366,7 +372,7 @@ const prIcon = computed(() => {
       v-if="bodyParagraphs.length > 0"
       ref="bodyEl"
       v-show="expanded"
-      class="kv-meta-body kv:m-0 kv:mt-1 kv:whitespace-normal"
+      class="kv-meta-body mt-1 whitespace-normal"
     ></p>
 
     <Button
@@ -378,60 +384,60 @@ const prIcon = computed(() => {
       {{ expanded ? 'Show less' : 'Show more' }}
     </Button>
 
-    <div v-if="expanded" class="kv-meta-expanded kv:flex kv:flex-col kv:gap-1 kv:mt-1">
-      <p class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted-foreground">
+    <div v-if="expanded" class="kv-meta-expanded flex flex-col gap-1 mt-1">
+      <p class="kv-meta-identity text-graph-sm text-muted-foreground">
         {{ detail.author.name }} &lt;{{ detail.author.email }}&gt;
       </p>
-      <p v-if="committerDiffersFromAuthor" class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted-foreground">
+      <p v-if="committerDiffersFromAuthor" class="kv-meta-identity text-graph-sm text-muted-foreground">
         {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
-        <span class="kv:text-sm">committer</span>
+        <span class="text-graph-sm">committer</span>
       </p>
       <dl
         v-if="trailerRows.length > 0"
-        class="kv-meta-trailers kv:m-0 kv:grid kv:grid-cols-[max-content_1fr] kv:gap-y-0.5 kv:gap-x-2 kv:text-sm"
+        class="kv-meta-trailers grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
       >
         <template v-for="(row, index) in trailerRows" :key="index">
-          <dt class="kv:text-muted-foreground">{{ row.token }}</dt>
-          <dd v-if="row.name !== undefined" class="kv:m-0">
-            {{ row.name }} <span class="kv:text-muted-foreground">&lt;{{ row.email }}&gt;</span>
+          <dt class="text-muted-foreground">{{ row.token }}</dt>
+          <dd v-if="row.name !== undefined">
+            {{ row.name }} <span class="text-muted-foreground">&lt;{{ row.email }}&gt;</span>
           </dd>
-          <dd v-else class="kv:m-0">{{ row.raw }}</dd>
+          <dd v-else>{{ row.raw }}</dd>
         </template>
       </dl>
       <dl
         v-if="hasDetails"
-        class="kv:m-0 kv:grid kv:grid-cols-[max-content_1fr] kv:gap-y-0.5 kv:gap-x-2 kv:text-sm"
+        class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
       >
         <template v-if="detail.decoration.length > 0">
-          <dt class="kv:text-muted-foreground">Refs</dt>
-          <dd ref="decorationEl" class="kv-meta-refs kv:m-0 kv:flex kv:flex-wrap kv:gap-0.5"></dd>
+          <dt class="text-muted-foreground">Refs</dt>
+          <dd ref="decorationEl" class="kv-meta-refs flex flex-wrap gap-0.5"></dd>
         </template>
         <template v-if="signatureText">
-          <dt class="kv:text-muted-foreground">Signature</dt>
-          <dd class="kv:m-0">{{ signatureText }}</dd>
+          <dt class="text-muted-foreground">Signature</dt>
+          <dd>{{ signatureText }}</dd>
         </template>
         <template v-if="prDetail">
-          <dt class="kv:text-muted-foreground">Pull request</dt>
-          <dd v-if="prDetail.kind === 'prs'" class="kv:m-0 kv:flex kv:flex-col kv:gap-0.5">
+          <dt class="text-muted-foreground">Pull request</dt>
+          <dd v-if="prDetail.kind === 'prs'" class="flex flex-col gap-0.5">
             <div
               v-for="pr in prDetail.prs"
               :key="pr.number"
-              class="kv:flex kv:items-center kv:gap-0.5"
+              class="flex items-center gap-0.5"
             >
               <span :class="prBadgeClass(pr.state)">
                 {{ pr.stateLabel }}
               </span>
-              <button
-                type="button"
-                class="kv:bg-transparent kv:border-0 kv:p-0 kv:text-inherit kv:[font:inherit] kv:text-left kv:cursor-pointer kv:hover:underline"
+              <Button
+                variant="link"
+                :class="cn(LINK_BUTTON_CLASS, 'justify-start text-left whitespace-normal')"
                 @click="openPullRequest(pr.number)"
               >
                 #{{ pr.number }} {{ pr.title }}
-              </button>
+              </Button>
             </div>
           </dd>
-          <dd v-else-if="prDetail.kind === 'none'" class="kv:m-0">No pull request</dd>
-          <dd v-else class="kv:m-0 kv:text-muted-foreground" data-testid="pr-unavailable">
+          <dd v-else-if="prDetail.kind === 'none'">No pull request</dd>
+          <dd v-else class="text-muted-foreground" data-testid="pr-unavailable">
             {{ prDetail.reason }}
           </dd>
         </template>

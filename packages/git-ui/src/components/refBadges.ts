@@ -207,7 +207,7 @@ function buildBadgeElement(
   }
 
   const icon = document.createElement('span');
-  icon.className = `codicon ${spec.icon} kv-badge-icon text-graph-xs`;
+  icon.className = `codicon ${spec.icon} kv-badge-icon text-graph-xs!`;
   // Decorative: the visible label text (or, for the overflow badge, its title) already carries
   // the information — see this file's module doc on "no colour/glyph-only meaning" (§7.9/W14).
   icon.setAttribute('aria-hidden', 'true');
@@ -225,7 +225,7 @@ function buildBadgeElement(
     // "reliably reach the accessibility tree as a second, non-text signal" reasoning the dot it
     // replaces already established (§6.1/§7's own "no colour/shape-only meaning" still applies).
     const check = document.createElement('span');
-    check.className = 'codicon codicon-check kv-badge-current-glyph text-graph-xs text-focus';
+    check.className = 'codicon codicon-check kv-badge-current-glyph text-graph-xs! text-focus';
     check.setAttribute('role', 'img');
     check.setAttribute('aria-label', 'current branch');
     badge.appendChild(check);

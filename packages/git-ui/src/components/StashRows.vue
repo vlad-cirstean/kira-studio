@@ -105,13 +105,13 @@ function onMenuSelect(id: string): void {
       <span v-if="rowModel(entry).badge" class="whitespace-nowrap font-data">{{ rowModel(entry).badge }}</span>
       <span
         v-if="rowModel(entry).origin"
-        class="whitespace-nowrap text-kira-sm px-1 rounded-kira-sm kv:bg-stash-origin kv:text-stash-origin-fg"
+        class="whitespace-nowrap text-kira-sm px-1 rounded-kira-sm bg-info text-fg"
         :data-kira-tip="rowModel(entry).originTooltip"
         >{{ rowModel(entry).origin }}</span
       >
       <span
         v-if="rowModel(entry).auto"
-        class="whitespace-nowrap text-kira-sm px-1 rounded-kira-sm kv:bg-stash-auto kv:text-stash-auto-fg"
+        class="whitespace-nowrap text-kira-sm px-1 rounded-kira-sm bg-muted-foreground text-fg"
         data-kira-tip="Created automatically by an auto-stashed checkout"
         >auto</span
       >

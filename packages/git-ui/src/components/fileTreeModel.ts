@@ -18,22 +18,22 @@ export const STATUS_LETTERS: Readonly<Record<FileChangeKind, string>> = {
   unmerged: 'U',
 };
 
-/** The `--color-diff-*` (`--kv-diff-*-fg`) Tailwind text-colour class per kind (§6.1: "the same
+/** The `--color-diff-*` (`--kira-ok`/`--kira-warn`/`--kira-error`) Tailwind text-colour class per kind (§6.1: "the same
  *  colour as in the Explorer"), applied by `FileTree.vue`'s template — never a colour value
  *  computed or read here.
  *
- *  P110 A15 (§1.3): a lookup map, not string interpolation — every `kv:text-diff-*` class
+ *  P110 A15 (§1.3): a lookup map, not string interpolation — every `text-diff-*` class
  *  Tailwind must scan appears as a complete literal below. Replaces the old bespoke
  *  `.kv-status-*` rules (`FileTree.vue`'s own deleted `<style>`); the `diff-*` colour tokens were
  *  already mapped in A1's `tailwind.css`. */
 export const STATUS_COLOR_CLASS: Readonly<Record<FileChangeKind, string>> = {
-  added: 'kv:text-diff-added',
-  modified: 'kv:text-diff-modified',
-  deleted: 'kv:text-diff-deleted',
-  renamed: 'kv:text-diff-renamed',
-  copied: 'kv:text-diff-copied',
-  typeChanged: 'kv:text-diff-typechanged',
-  unmerged: 'kv:text-diff-unmerged',
+  added: 'text-ok',
+  modified: 'text-warn',
+  deleted: 'text-error',
+  renamed: 'text-ok',
+  copied: 'text-ok',
+  typeChanged: 'text-warn',
+  unmerged: 'text-error',
 };
 
 export interface FileTreeFileNode {

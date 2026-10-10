@@ -12,12 +12,7 @@
  * toggled rather than always rendered (`App.vue` owns it now, alongside `AppToolbar`, not this
  * component).
  *
- * G34 D13 (P229: now `ViewToolbar.vue`'s recipe, restated since `@workbench` is not importable here): this bar's own metrics used to be a literal 35px (`--kv-toolbar-height`), argued as
- * matching the panel title bar's — which does not hold, since that title bar is host chrome
- * outside this view and there is no shared edge to align to. It is now `--kv-bar-h`
- * (34px at the default font size, growing with it, Kira's own toolbar/tab-bar/title-bar token —
- * already what the review sidebar's toolbar uses), 4px-rounded controls (Kira's radius tier, not
- * `--kv-radius: 0`'s square corners), and Kira's own shadow tier where a shadow is drawn at all.
+ * Chrome: `ViewToolbar` (the app's bar height, border and padding), Kira's radius and shadow tiers.
  *
  * There is no `remotes.list` endpoint (P6/P8 both skip it, per `rowMenuModel.ts`'s own
  * `remoteNamesFrom` doc comment) and remote *management* is out of scope entirely (§10's scope
@@ -36,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -286,11 +282,7 @@ const stashDisabled = computed(
        allows overriding a `<header>`'s own implicit "banner" role with — a plain `<div>` carries
        no implicit role of its own to conflict with the explicit one, which is all this element
        ever wanted (§6.2's own layout, not a page banner). -->
-  <div
-    class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border"
-    role="toolbar"
-    aria-label="Kira Space toolbar"
-  >
+  <ViewToolbar role="toolbar" aria-label="Kira Space toolbar">
     <BranchPicker
       ref="branchPickerRef"
       :refs="refsState"
@@ -482,5 +474,5 @@ const stashDisabled = computed(
       :ops="opsState"
       :copy="copy"
     />
-  </div>
+  </ViewToolbar>
 </template>

@@ -72,8 +72,8 @@ const PATH_DISPLAY_CAP = 20;
 </script>
 
 <template>
-  <!-- W20: an opaque Alert surface, not `--kv-overlay-bg` — that token is a translucent
-       modal-backdrop scrim, which fails contrast over a light theme. -->
+  <!-- W20: an opaque Alert surface: a translucent modal-backdrop scrim fails
+       contrast over a light theme. -->
   <Alert
     v-if="inProgress"
     variant="warn"

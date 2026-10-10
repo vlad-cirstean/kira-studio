@@ -104,7 +104,7 @@ async function removeFromStack(branch: string): Promise<void> {
         v-for="row in rowsFor(group.branches)"
         :key="row.name"
         class="kv-branch-row flex items-center gap-0.5 px-1"
-        :style="{ paddingLeft: `calc(var(--kv-s-2) + ${row.depth} * var(--kv-s-4))` }"
+        :style="{ paddingLeft: `${4 + row.depth * 8}px` }"
         :data-row-id="`stack:${row.name}`"
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
@@ -113,7 +113,7 @@ async function removeFromStack(branch: string): Promise<void> {
           <span class="truncate">{{ row.name }}</span>
           <span
             v-if="row.stale"
-            :class="refBadgeClass('bg-(--kv-stack-stale-bg) text-(color:--kv-stack-stale-fg)')"
+            :class="refBadgeClass('bg-warn text-bg')"
             :data-kira-tip="row.staleText"
           >
             stale

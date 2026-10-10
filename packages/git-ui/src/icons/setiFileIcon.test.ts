@@ -11,9 +11,9 @@ describe('setiIconFor — Go tooling filenames route to the .go icon', () => {
   const goIcon = setiIconFor('main.go');
 
   test('a plain .go file resolves to a real (non-default) icon', () => {
-    // The default/unknown icon's own colour is `var(--kv-description-fg)` (setiFileIcon.ts's own
+    // The default/unknown icon's own colour is `var(--kira-fg-muted)` (setiFileIcon.ts's own
     // module doc comment) — a real language icon never resolves to that.
-    expect(goIcon.color).not.toBe('var(--kv-description-fg)');
+    expect(goIcon.color).not.toBe('var(--kira-fg-muted)');
   });
 
   for (const name of ['go.mod', 'go.sum', 'go.work', 'go.work.sum']) {

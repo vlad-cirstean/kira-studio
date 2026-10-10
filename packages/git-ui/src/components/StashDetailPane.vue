@@ -66,7 +66,7 @@ function onOpenFile(index: number, pinned: boolean): void {
     <template v-if="entry">
       <div class="py-2 px-3 border-b border-border">
         <p class="m-0 mb-0.5 font-semibold break-words">{{ entry.message }}</p>
-        <p class="m-0 kv:text-sm text-muted-foreground">
+        <p class="m-0 text-graph-sm text-muted-foreground">
           <Tooltip>
             <TooltipTrigger as-child>
               <span>{{ formatRelativeDate(entry.timestamp) }}</span>

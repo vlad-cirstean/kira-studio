@@ -250,7 +250,7 @@ function rowKey(row: FileTreeRow): string {
  *  rules — no separate selected class needed. `cn()` cancels the variant's own horizontal
  *  padding with this row's real 2px/8px padding (`.kv-file-tree-row`'s own padding shorthand
  *  always fully overrode it, unlayered). The focus ring is `group-focus-within` (the container
- *  below carries `kv:group`) applied only to the one row `index === focusedRow` names —
+ *  below carries `group`) applied only to the one row `index === focusedRow` names —
  *  reproducing the old `.kv-file-tree-rows:focus-within .kv-file-tree-row.kv-row-focused`
  *  compound selector.
  *
@@ -513,7 +513,7 @@ const parentSelectId = useId();
 </script>
 
 <template>
-  <div class="kv:flex kv:flex-col kv:min-h-0 kv:flex-1" data-testid="file-tree">
+  <div class="flex flex-col min-h-0 flex-1" data-testid="file-tree">
     <!-- G21 D11 (superseded by G34 D1): this root used to carry `.kv-skin-kira` to scope
          kira-structure.css's colour-free, structural-only tokens (spacing/control-height/
          font-role) to this one component while density.css's own scale governed everywhere else.
@@ -525,12 +525,12 @@ const parentSelectId = useId();
          defeats Vue's single-root detection for THIS toolchain (Vue 3.5.42 /
          @vitejs/plugin-vue 6.0.8: confirmed empirically, not merely suspected), which silently
          drops every attrs-fallthrough class a caller passes — `DetailPane.vue`'s own `class` prop
-         on its `<FileTree>` usage (P110 A15: now `kv:flex-auto kv:min-h-0 kv:border-y
-         kv:border-panel-border`) never reached this component's root at all before this move. -->
+         on its `<FileTree>` usage (P110 A15: now `flex-auto min-h-0 border-y
+         border-border`) never reached this component's root at all before this move. -->
     <!-- P131 Part 2 §5.6: one hoisted AttributeTooltip for every row's data-kira-tip span --
          treeEl always names whichever of the two row containers below is currently mounted. -->
     <AttributeTooltip :container="treeEl" />
-    <div v-if="parentOptions.length > 1" class="kv:flex kv:flex-col kv:gap-0.5 kv:px-3 kv:pb-2 kv:text-base">
+    <div v-if="parentOptions.length > 1" class="flex flex-col gap-0.5 px-3 pb-2 text-graph-md">
       <Label :for="parentSelectId">Diffing against</Label>
       <NativeSelect
         :id="parentSelectId"
@@ -545,7 +545,7 @@ const parentSelectId = useId();
       </NativeSelect>
     </div>
 
-    <div v-if="showToolbar !== false" class="kv:flex kv:gap-1 kv:px-2 kv:pb-1">
+    <div v-if="showToolbar !== false" class="flex gap-1 px-2 pb-1">
       <InputGroup variant="kira" class="flex-1 min-w-0">
         <InputGroupAddon>
           <CodiconIcon name="search" :size="13" />
@@ -579,7 +579,7 @@ const parentSelectId = useId();
     <div
       v-if="listMode === 'tree'"
       ref="treeEl"
-      class="kv:flex-1 kv:min-h-0 kv:overflow-auto kv:outline-none kv:group"
+      class="flex-1 min-h-0 overflow-auto outline-none group"
       aria-label="File tree"
       role="tree"
       @keydown="onKeydown"
@@ -594,7 +594,7 @@ const parentSelectId = useId();
         :aria-expanded="row.kind === 'directory' ? row.expanded : undefined"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
-        :style="{ paddingLeft: `calc(8px + var(--kv-tree-indent) * ${row.depth})` }"
+        :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
@@ -609,13 +609,13 @@ const parentSelectId = useId();
             :size="13"
             class="size-3.5 shrink-0 text-center text-muted-foreground"
           />
-          <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
-          <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-sm kv:flex kv:gap-1">
+          <span class="font-ui font-semibold truncate">{{ row.node.name }}</span>
+          <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="kv:text-diff-added" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
+            <span class="text-ok" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
             >
-            <span class="kv:text-diff-deleted" :data-kira-tip="`${exactCount(row.node.deletions)} deletions`"
+            <span class="text-error" :data-kira-tip="`${exactCount(row.node.deletions)} deletions`"
               >-{{ formatChangeCount(row.node.deletions) }}</span
             >
           </span>
@@ -644,7 +644,7 @@ const parentSelectId = useId();
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
-          <span class="kv:overflow-hidden kv:text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
+          <span class="overflow-hidden text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
               <CodiconIcon name="arrow-small-right" :size="13" />
@@ -654,24 +654,24 @@ const parentSelectId = useId();
           </span>
           <!-- P105: the flat-mode-only directory hint never applies in tree mode (a real
                directory row already carries this path via its own ancestor rows). -->
-          <span class="kv:ml-auto kv:flex kv:items-center kv:gap-1 kv:shrink-0">
+          <span class="ml-auto flex items-center gap-1 shrink-0">
             <span
               v-if="!row.node.change.isBinary"
-              class="kv:font-ui kv:text-sm kv:flex kv:gap-1 kv:shrink-0"
+              class="font-ui text-graph-sm flex gap-1 shrink-0"
             >
               <span
-                class="kv:text-diff-added"
+                class="text-ok"
                 :data-kira-tip="`${exactCount(row.node.change.additions ?? 0)} additions`"
                 >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
               >
               <span
-                class="kv:text-diff-deleted"
+                class="text-error"
                 :data-kira-tip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
                 >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
               >
             </span>
             <span
-              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-sm kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
+              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0 saturate-160 contrast-115"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -679,7 +679,7 @@ const parentSelectId = useId();
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            class="kv:shrink-0 kv:size-1 kv:rounded-full kv:bg-diff-modified"
+            class="shrink-0 size-1 rounded-full bg-warn"
             data-kira-tip="Changed since you reviewed it"
             aria-hidden="true"
           ></span>
@@ -689,7 +689,7 @@ const parentSelectId = useId();
     <div
       v-else
       ref="treeEl"
-      class="kv:flex-1 kv:min-h-0 kv:overflow-auto kv:outline-none kv:group"
+      class="flex-1 min-h-0 overflow-auto outline-none group"
       aria-label="File list"
       role="listbox"
       @keydown="onKeydown"
@@ -702,7 +702,7 @@ const parentSelectId = useId();
         role="option"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
-        :style="{ paddingLeft: `calc(8px + var(--kv-tree-indent) * ${row.depth})` }"
+        :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
@@ -717,13 +717,13 @@ const parentSelectId = useId();
             :size="13"
             class="size-3.5 shrink-0 text-center text-muted-foreground"
           />
-          <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
-          <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-sm kv:flex kv:gap-1">
+          <span class="font-ui font-semibold truncate">{{ row.node.name }}</span>
+          <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="kv:text-diff-added" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
+            <span class="text-ok" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
             >
-            <span class="kv:text-diff-deleted" :data-kira-tip="`${exactCount(row.node.deletions)} deletions`"
+            <span class="text-error" :data-kira-tip="`${exactCount(row.node.deletions)} deletions`"
               >-{{ formatChangeCount(row.node.deletions) }}</span
             >
           </span>
@@ -752,7 +752,7 @@ const parentSelectId = useId();
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
-          <span class="kv:overflow-hidden kv:text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
+          <span class="overflow-hidden text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
               <CodiconIcon name="arrow-small-right" :size="13" />
@@ -762,27 +762,27 @@ const parentSelectId = useId();
           </span>
           <span
             v-if="dirOf(row.node.path)"
-            class="kv:overflow-hidden kv:text-ellipsis kv:text-muted-foreground kv:text-sm"
+            class="overflow-hidden text-ellipsis text-muted-foreground text-graph-sm"
             >{{ dirOf(row.node.path) }}</span
           >
-          <span class="kv:ml-auto kv:flex kv:items-center kv:gap-1 kv:shrink-0">
+          <span class="ml-auto flex items-center gap-1 shrink-0">
             <span
               v-if="!row.node.change.isBinary"
-              class="kv:font-ui kv:text-sm kv:flex kv:gap-1 kv:shrink-0"
+              class="font-ui text-graph-sm flex gap-1 shrink-0"
             >
               <span
-                class="kv:text-diff-added"
+                class="text-ok"
                 :data-kira-tip="`${exactCount(row.node.change.additions ?? 0)} additions`"
                 >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
               >
               <span
-                class="kv:text-diff-deleted"
+                class="text-error"
                 :data-kira-tip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
                 >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
               >
             </span>
             <span
-              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-sm kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
+              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0 saturate-160 contrast-115"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -790,7 +790,7 @@ const parentSelectId = useId();
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            class="kv:shrink-0 kv:size-1 kv:rounded-full kv:bg-diff-modified"
+            class="shrink-0 size-1 rounded-full bg-warn"
             data-kira-tip="Changed since you reviewed it"
             aria-hidden="true"
           ></span>
