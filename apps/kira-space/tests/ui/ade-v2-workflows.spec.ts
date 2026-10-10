@@ -171,7 +171,7 @@ test('dragging a result dot to another step sets its route', async ({ relaunch }
   const dot = node(page, 'pr').locator(
     `${t('ade-wf-node-result')}[data-result="failed"] .vue-flow__handle`,
   );
-  const target = node(page, 'impl').locator('.vue-flow__handle.target');
+  const target = node(page, 'impl').locator('[data-handleid="in"]');
   await dot.dragTo(target);
   const out = await saved(page, control, 1);
   const pr = out.workflow.stages[1]?.steps.find((x) => x.id === 'pr');
