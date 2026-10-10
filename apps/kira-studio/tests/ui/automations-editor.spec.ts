@@ -4,6 +4,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // P254: the three-tab script editor on the mocked bridge. Backend half: termflow
 // TestScriptEditorSave stores the contract script-editor fixtures.
@@ -294,4 +295,37 @@ test('creating offers New script and New smart script once; Edit schedule opens 
     'data-state',
     'active',
   );
+});
+
+test('contract: Edit schedule turns the schedule off on Save', async ({ relaunch }) => {
+  const script = contract('script-editor', 'CustomScriptsService.Create', {
+    schema: customScriptSchema,
+  });
+  const sent = contract<{
+    fields: { schedule: { cron: string; enabled: boolean; confirm: boolean } };
+  }>('script-editor', 'args:CustomScriptsService.Update#schedule-off');
+  const updated = contract('script-editor', 'CustomScriptsService.Update#schedule-off', {
+    schema: customScriptSchema,
+  });
+  const { window: page, control } = await relaunch({
+    control: [
+      ...COMMON,
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
+      { channel: IPC.customScriptsUpdate, response: updated },
+    ],
+  });
+  await openPanel(page);
+  const row = page.locator(`[data-testid="script-${script.id}"]`);
+  await expect(row.locator('[data-testid="script-next"]')).toContainText('next');
+
+  await row.click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-edit-schedule"]').click();
+  await dialog(page).locator('[data-testid="schedule-enabled"]').click();
+  await dialog(page).locator('[data-testid="script-dialog-save"]').click();
+
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.customScriptsUpdate)?.args)
+    .toMatchObject({ id: script.id, fields: { schedule: sent.fields.schedule } });
+  await emitWailsEvent(page, IPC.customScriptsChanged, { collections: [], scripts: [updated] });
+  await expect(row.locator('[data-testid="script-next"]')).toHaveText('off');
 });

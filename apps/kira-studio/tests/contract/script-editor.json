@@ -48,6 +48,55 @@
     "useAdeDir": false,
     "workingDir": ""
   },
+  "CustomScriptsService.Update#schedule-off": {
+    "collectionId": "<id:1>",
+    "color": "blue",
+    "command": "Look at {topic}",
+    "createdAt": "<time>",
+    "dirMode": "kira",
+    "id": "<id:2>",
+    "kind": "smart",
+    "name": "triage",
+    "params": [
+      {
+        "default": [
+          "auth"
+        ],
+        "label": "Topic",
+        "name": "topic",
+        "options": [],
+        "required": false,
+        "secret": false,
+        "type": "text"
+      }
+    ],
+    "schedule": {
+      "branchId": "",
+      "confirm": true,
+      "cron": "0 9 * * 1-5",
+      "enabled": false,
+      "params": {},
+      "taskId": "",
+      "timeout": "",
+      "timezone": "UTC"
+    },
+    "smart": {
+      "bashPatterns": [],
+      "maxBudgetUsd": 1,
+      "mcp": [],
+      "model": "sonnet",
+      "timeout": "15m",
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
+    },
+    "sortOrder": 0,
+    "updatedAt": "<time>",
+    "useAdeDir": false,
+    "workingDir": ""
+  },
   "ScriptRunsService.Preview": {
     "ade": null,
     "allowedTools": [
@@ -147,5 +196,49 @@
       "useAdeDir": false,
       "workingDir": ""
     }
+  },
+  "args:CustomScriptsService.Update#schedule-off": {
+    "fields": {
+      "collectionId": "<id:1>",
+      "color": "blue",
+      "command": "Look at {topic}",
+      "dirMode": "",
+      "kind": "smart",
+      "name": "triage",
+      "params": [
+        {
+          "default": [
+            "auth"
+          ],
+          "label": "Topic",
+          "name": "topic",
+          "options": [],
+          "required": false,
+          "secret": false,
+          "type": "text"
+        }
+      ],
+      "schedule": {
+        "branchId": "",
+        "confirm": true,
+        "cron": "0 9 * * 1-5",
+        "enabled": false,
+        "params": {},
+        "taskId": "",
+        "timeout": "",
+        "timezone": "UTC"
+      },
+      "smart": {
+        "bashPatterns": null,
+        "maxBudgetUsd": 0,
+        "mcp": null,
+        "model": "",
+        "timeout": "",
+        "tools": null
+      },
+      "useAdeDir": false,
+      "workingDir": ""
+    },
+    "id": "<id:2>"
   }
 }
