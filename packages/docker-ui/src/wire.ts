@@ -99,7 +99,7 @@ export interface DockerContainer {
   networks: string[];
 }
 
-export interface DockerDiskCategory {
+interface DockerDiskCategory {
   count: number;
   active: number;
   size: number;
@@ -107,7 +107,7 @@ export interface DockerDiskCategory {
 }
 
 /** `size` is -1 when the engine did not compute it. */
-export interface DockerVolumeDisk {
+interface DockerVolumeDisk {
   name: string;
   size: number;
   refCount: number;
