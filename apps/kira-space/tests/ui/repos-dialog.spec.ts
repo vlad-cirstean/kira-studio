@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { type RepoSummary, repoSummarySchema } from '@shared/domain/repo';
 import { expect, test } from './fixtures';
 import { adeFixture, adeV2Control, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
@@ -11,6 +12,12 @@ import type { ControlSnapshot } from './support/types';
 interface ReposFx {
   repos: { codeRepoId: string; nickname: string }[];
   folders: { path: string; watch: boolean }[];
+}
+
+interface FolderFx {
+  hidden: boolean;
+  repoCount: number;
+  hiddenCount: number;
 }
 
 const t = (id: string) => `[data-testid="${id}"]`;
@@ -118,16 +125,92 @@ test('selecting a repo shows its settings', async ({ relaunch }) => {
   await expect(page.locator(t('repo-nick'))).toHaveValue(fx.repos[1]?.nickname ?? '');
 });
 
-test('removing a repository asks first', async ({ relaunch }) => {
+test('removing a repository asks first, from the repo head', async ({ relaunch }) => {
   const { window: page, control } = await openDialog(relaunch, [
     { channel: IPC.codeWorkspaceRemoveRepo },
   ]);
+  await expect(page.locator(t('repos-dialog-repo-remove'))).toHaveCount(1);
+  await expect(
+    page.locator(`${t('repos-dialog-repo-head')} ${t('repos-dialog-repo-remove')}`),
+  ).toHaveCount(1);
   await page.locator(t('repos-dialog-repo-remove')).click();
   await page.locator(t('confirm-dialog-cancel')).click();
   expect(calls(control, IPC.codeWorkspaceRemoveRepo)).toHaveLength(0);
   await page.locator(t('repos-dialog-repo-remove')).click();
   await page.locator(t('confirm-dialog-confirm')).click();
   await expect.poll(() => calls(control, IPC.codeWorkspaceRemoveRepo)).toHaveLength(1);
+});
+
+test('removing a folder-sourced repository names the folder in the confirm', async ({
+  relaunch,
+}) => {
+  const fx = adeFixture<ReposFx & { repos: { source: string }[] }>('repos');
+  const { window: page } = await openDialog(relaunch);
+  await page.locator(t('repos-dialog-repo-remove')).click();
+  await expect(page.locator(t('confirm-dialog-message'))).toContainText(
+    `A rescan of ${fx.repos[0]?.source} imports it again`,
+  );
+});
+
+// Contract repos-hidden. Backend half: repoflow TestHideRepo / adeflow TestHideFolder.
+test('contract: hiding from the repo head sends SetRepoHidden and the nav row turns hidden', async ({
+  relaunch,
+}) => {
+  const rec = contract<RepoSummary>('repos-hidden', 'CodeWorkspaceService.SetRepoHidden', {
+    schema: repoSummarySchema,
+  });
+  const { window: page, control } = await openDialog(relaunch, [
+    {
+      channel: IPC.codeWorkspaceSetRepoHidden,
+      response: { ...rec, id: 'repo-web-app', name: 'acme-customer-dashboard-web-frontend' },
+    },
+  ]);
+  const row = page.locator(`${t('repos-dialog-repo')}[data-repo-id="repo-web-app"]`);
+  await expect(row).toHaveAttribute('data-hidden', 'false');
+  await page.locator(t('repos-dialog-repo-hide')).click();
+  await expect.poll(() => calls(control, IPC.codeWorkspaceSetRepoHidden)).toHaveLength(1);
+  expect(calls(control, IPC.codeWorkspaceSetRepoHidden)[0]?.args).toEqual({
+    id: 'repo-web-app',
+    hidden: rec.hidden,
+  });
+  await expect(row).toHaveAttribute('data-hidden', 'true');
+  await expect(page.locator(t('repos-dialog-repo-hide'))).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator(t('repos-dialog-repo-hidden-badge'))).toBeVisible();
+});
+
+test('contract: folder Hide all sends SetFolderHidden', async ({ relaunch }) => {
+  const fx = adeFixture<ReposFx>('repos');
+  const folder = contract<FolderFx>('repos-hidden', 'AdeTaskService.SetFolderHidden');
+  const { window: page, control } = await openFolders(relaunch);
+  await page.locator(t('repos-dialog-folder-hide')).first().click();
+  await expect.poll(() => calls(control, IPC.adeTaskSetFolderHidden)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskSetFolderHidden)[0]?.args).toEqual({
+    path: fx.folders[0]?.path,
+    hidden: folder.hidden,
+  });
+});
+
+test('contract: a folder row counts its hidden repos', async ({ relaunch }) => {
+  const fx = adeFixture<ReposFx>('repos');
+  const folder = contract<FolderFx>('repos-hidden', 'AdeTaskService.SetFolderHidden');
+  const { window: page } = await relaunch({
+    control: adeV2Control([
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      {
+        channel: IPC.adeTaskRepos,
+        response: { ...fx, folders: [{ ...fx.folders[0], ...folder, path: fx.folders[0]?.path }] },
+      },
+    ]),
+  });
+  await page.locator(t('manage-repos')).click();
+  await page.locator(t('repos-dialog-tab-folders')).click();
+  await expect(page.locator(t('repos-dialog-folder-count')).first()).toHaveText(
+    `${folder.repoCount} repos · ${folder.hiddenCount} hidden`,
+  );
+  await expect(page.locator(t('repos-dialog-folder-hide')).first()).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 
 async function commit(page: Page, id: string, value: string): Promise<void> {
@@ -202,6 +285,7 @@ test('picking a swatch sends SetRepoColor and the nav dot follows', async ({ rel
         sortOrder: 1,
         color: 'red',
         createdAt: '2026-01-01T00:00:00.000Z',
+        hidden: false,
       },
     },
   ]);
