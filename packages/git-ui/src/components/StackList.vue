@@ -87,7 +87,7 @@ async function removeFromStack(branch: string): Promise<void> {
     <RefSectionHeader label="Stacks" />
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="mb-1">
-      <div class="flex items-center gap-0.5 py-0.5 px-1 font-semibold text-muted-foreground">
+      <div class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
         <span class="flex-1 min-w-0 truncate" :data-kira-tip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
         <Button
           variant="toolbar"
@@ -147,7 +147,7 @@ async function removeFromStack(branch: string): Promise<void> {
     </div>
 
     <div v-if="orphans.visible.length > 0" class="mb-1">
-      <div class="flex items-center gap-0.5 py-0.5 px-1 font-semibold text-muted-foreground">
+      <div class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
         <span class="flex-1 min-w-0 truncate">Needs attention</span>
       </div>
       <div
@@ -174,7 +174,7 @@ async function removeFromStack(branch: string): Promise<void> {
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
-      class="py-0.5 px-2 text-muted-foreground text-kira-sm"
+      class="text-kira-sm text-subtle py-1 px-1.5"
     >
       No stacked branches
     </div>

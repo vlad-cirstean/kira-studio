@@ -155,7 +155,7 @@ async function confirmRemove(): Promise<void> {
       />
     </div>
     <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-    <div v-if="section.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-kira-sm">No worktrees</div>
+    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">No worktrees</div>
 
     <!-- P131 Part 2 §5: opens inside BranchPicker's own modal Popover panel (§5.2) -- reka's
          modal content there prevents the panel dismissing under this nested Dialog. -->

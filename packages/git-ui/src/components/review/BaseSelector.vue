@@ -113,7 +113,7 @@ function onOpenAutoFocus(e: Event): void {
     <Popover modal :open="isOpen" @update:open="(o) => (o ? open() : close())">
       <PopoverTrigger as-child>
         <Button variant="toolbar" size="kira" class="max-w-full" data-testid="base-selector-trigger">
-          <span class="truncate font-semibold">{{ triggerLabel }}</span>
+          <span class="truncate">{{ triggerLabel }}</span>
           <span v-if="triggerReason" class="text-muted-foreground text-kira-sm">{{ triggerReason }}</span>
           <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
         </Button>
@@ -144,7 +144,7 @@ function onOpenAutoFocus(e: Event): void {
           </InputGroup>
           <div class="overflow-auto min-h-0">
             <section v-if="suggested.length > 0" aria-label="Suggested">
-              <div class="py-0.5 px-2 text-muted-foreground text-kira-sm uppercase">Suggested</div>
+              <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">Suggested</div>
               <button
                 v-for="candidate in suggested"
                 :key="candidate.ref"
@@ -158,7 +158,7 @@ function onOpenAutoFocus(e: Event): void {
             </section>
 
             <section aria-label="All branches">
-              <div class="py-0.5 px-2 text-muted-foreground text-kira-sm uppercase">All branches</div>
+              <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">All branches</div>
               <button
                 v-for="row in sections.branches.visible"
                 :key="row.refname"
@@ -180,7 +180,7 @@ function onOpenAutoFocus(e: Event): void {
               </button>
               <div
                 v-if="hiddenCount > 0"
-                class="py-0.5 px-2 text-subtle text-kira-sm"
+                class="text-kira-sm text-subtle py-1 px-1.5"
                 data-testid="base-selector-hidden"
               >
                 {{ hiddenCount }} more — type to filter

@@ -662,7 +662,6 @@ watch(visibleBranchNames, (names) => {
             v-for="row in model.branchesLocal.visible"
             :key="row.refname"
             class="kv-branch-row flex items-center gap-0.5 px-1"
-            :class="{ 'font-semibold': row.isHead }"
             :data-row-id="`branch:${row.refname}`"
             :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
           >
@@ -713,7 +712,7 @@ watch(visibleBranchNames, (names) => {
             <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
           </Alert>
           <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
-          <div v-if="model.branchesLocal.visible.length === 0" class="py-0.5 px-2 text-subtle text-kira-sm">No branches</div>
+          <div v-if="model.branchesLocal.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">No branches</div>
         </section>
 
         <section aria-label="Remote branches">
@@ -740,7 +739,7 @@ watch(visibleBranchNames, (names) => {
             />
           </div>
           <ShowMoreButton :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
-          <div v-if="model.branchesRemote.visible.length === 0" class="py-0.5 px-2 text-subtle text-kira-sm">
+          <div v-if="model.branchesRemote.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">
             No remote branches
           </div>
         </section>

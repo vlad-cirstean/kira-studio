@@ -124,7 +124,7 @@ function onMenuSelect(id: string): void {
     />
   </div>
   <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-  <div v-if="section.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-kira-sm">{{ emptyMessage }}</div>
+  <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptyMessage }}</div>
 
   <RowContextMenu
     v-if="stashMenu"

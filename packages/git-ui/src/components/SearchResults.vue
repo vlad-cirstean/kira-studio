@@ -67,14 +67,14 @@ function optionClass(option: SearchOption): string {
     <div :id="SEARCH_LISTBOX_ID" role="listbox" aria-label="Search results">
       <div
         v-if="searching"
-        class="py-0.5 px-2 text-subtle text-kira-sm"
+        class="text-kira-sm text-subtle py-1 px-1.5"
         data-testid="search-status"
       >
         Searching…
       </div>
 
       <template v-for="section in model.sections" :key="section.title">
-        <div class="py-0.5 px-2 text-kira-sm font-semibold text-muted-foreground">
+        <div class="h-control-sm flex items-center px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
           {{ section.title }} <span class="font-normal">({{ section.options.length }})</span>
         </div>
 
@@ -111,30 +111,30 @@ function optionClass(option: SearchOption): string {
             </template>
           </div>
         </template>
-        <div v-if="section.hiddenCount > 0" class="py-0.5 px-2 text-subtle text-kira-sm">
+        <div v-if="section.hiddenCount > 0" class="text-kira-sm text-subtle py-1 px-1.5">
           {{ section.hiddenCount }} more — refine your search
         </div>
       </template>
 
-      <div v-if="isEmpty" class="py-0.5 px-2 text-subtle text-kira-sm">No results</div>
+      <div v-if="isEmpty" class="text-kira-sm text-subtle py-1 px-1.5">No results</div>
     </div>
 
     <div
       v-if="tailStale"
-      class="py-0.5 px-2 text-subtle text-kira-sm"
+      class="text-kira-sm text-subtle py-1 px-1.5"
       data-testid="search-tail-stale"
     >
       Refs changed since this search ran
     </div>
-    <div v-if="model.loadedFooter" class="py-0.5 px-2 text-subtle text-kira-sm">
+    <div v-if="model.loadedFooter" class="text-kira-sm text-subtle py-1 px-1.5">
       {{ model.loadedFooter }}
     </div>
-    <div v-if="model.tailFooter" class="py-0.5 px-2 text-subtle text-kira-sm">
+    <div v-if="model.tailFooter" class="text-kira-sm text-subtle py-1 px-1.5">
       {{ model.tailFooter }}
     </div>
     <div
       v-if="model.tailNotice"
-      class="py-0.5 px-2 text-subtle text-kira-sm"
+      class="text-kira-sm text-subtle py-1 px-1.5"
       data-testid="search-tail-notice"
     >
       {{ model.tailNotice }}

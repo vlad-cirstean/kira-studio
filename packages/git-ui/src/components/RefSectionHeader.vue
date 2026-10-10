@@ -10,7 +10,7 @@ defineProps<{ label: string }>();
 
 <template>
   <div
-    class="flex items-center justify-between h-control-sm px-1.5 text-kira-sm font-semibold text-muted-foreground uppercase tracking-wider"
+    class="flex items-center justify-between h-control-sm px-1.5 text-kira-sm text-subtle uppercase tracking-wider"
   >
     <span>{{ label }}</span>
     <slot />

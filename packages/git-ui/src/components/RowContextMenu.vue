@@ -73,7 +73,7 @@ function onCloseAutoFocus(e: Event): void {
       align="start"
       :side-offset="0"
       prioritize-position
-      class="min-w-45 max-w-80"
+      class="min-w-45"
       :aria-label="title ?? label"
       @close-auto-focus="onCloseAutoFocus"
     >
