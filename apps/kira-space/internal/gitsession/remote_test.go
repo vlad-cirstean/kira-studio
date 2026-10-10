@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
@@ -74,18 +73,6 @@ func TestRemoteOpSlot_ForceCancelIgnoresKillable(t *testing.T) {
 	if !cancelled {
 		t.Fatal("forceCancel (teardown's own) must cancel regardless of killable")
 	}
-}
-
-func waitFor(t *testing.T, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(2 * time.Millisecond)
-	}
-	t.Fatal("condition never became true")
 }
 
 // TestResolveUpstreamRemoteBranch is G32 round-3 functional-correctness review finding #1/#3's own
