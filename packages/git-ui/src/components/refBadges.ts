@@ -159,7 +159,7 @@ function buildBadgeElement(
   const classes: string[] = [];
   // G-UX (item 1): a subtle ring (not a border, which would fight the lane-tint border-color
   // above) on the current-branch badge itself.
-  if (spec.isCurrentBranch) classes.push('ring-1 ring-focus');
+  if (spec.isCurrentBranch) classes.push('ring-1 ring-inset ring-focus');
   badge.className = refBadgeClass(variant, 'shrink min-w-0', ...classes);
   if (spec.icon === BADGE_ICONS.tag) badge.dataset.testid = 'badge-tag';
   // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
