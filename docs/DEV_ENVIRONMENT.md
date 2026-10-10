@@ -388,6 +388,16 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 - `terminal-real.spec.ts` uses a temp `HOME` removed at process exit, not in `afterAll`: with `fullyParallel`
   `afterAll` runs between tests of one worker.
 
+## Contract fixtures (P249)
+
+- Fixtures live in `apps/<app>/tests/contract/*.json`, written by Go flow tests and read by UI specs.
+- Regenerate: `KIRA_CONTRACT=write go test -p 2 ./internal/flows/<pkg> -run <Test>` from the app
+  dir, then rerun without the variable with `-count=2` to confirm stability. Write merges; delete
+  stale keys by hand. Inspect the diff for secrets and machine paths.
+- Run one UI half: `npx playwright test --config=apps/<app>/playwright.config.ts --project=ui <spec> -g "contract:"`.
+- Biome ignores the directories; never hand-format them.
+- Complete-gated flow tests that write contracts need `KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`.
+
 ## Kira Space flow suites (P231)
 
 - Go flows: `bun run test:flows:space`. Complete suite: `bun run test:flows:space:complete`

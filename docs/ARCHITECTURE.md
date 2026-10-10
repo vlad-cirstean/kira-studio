@@ -4746,6 +4746,21 @@ browser window (`internal/shell/emitto_server.go`); listeners filter by their ow
 writes login-shell profiles that put the fake `claude` first on `PATH`.
 Build lock, port and health helpers are shared with Studio via `packages/workbench/src/testing/e2eReal.ts`.
 
+**Split at the IPC boundary, shared contract fixtures (P249).** A scenario that does not need the
+built bundle talking to the real backend runs twice. The Go flow test calls
+`app.Contract(t, scenario, key, got, opts...)` (`flowtest.Contract`); the Playwright UI spec calls
+`contract(scenario, key)` (`@workbench/testing/ui/contract`) and drives the UI from the same values.
+Both read `apps/<app>/tests/contract/<scenario>.json`. A backend change that moves a value fails
+the flow test; a hand edit of the JSON fails both halves. Keys: `Service.Method[#variant]`,
+`args:Service.Method`, `git:<rpc method>[#variant]`, `event:<channel>`. Volatile values: auto
+placeholders (`<home>`, `<tmp>`, `<work>`, `<bin>`, UUIDs as `<id:n>`, RFC3339 as `<time>`) plus
+`flowharness.Mask`/`Omit`/`Replace` options. `KIRA_CONTRACT=write` rewrites the files (merge; delete
+stale keys by hand). `e2e-real` keeps only what cannot split: Studio Docker, MariaDB, SQLite
+wiring, Postgres connection tests, multi-window routing, terminal keystroke order; Space boot,
+multi-window routing, terminal keystroke order. The graph chunk golden
+(`gitflow.TestFixtures_CaptureGraphChunkFrame`) compares by default and writes under
+`KIRA_CONTRACT=write`. Biome ignores the contract directories (generated JSON).
+
 **Studio flow tier (Go, P232).** `apps/kira-studio/internal/flowharness.New` boots `appwire.Build`
 in-process with temp `HOME`/`KIRA_HOME`, `TZ=UTC` and `KIRA_INSECURE_SECRETS=1`; `Restart` rebuilds the
 app, `Quit` runs `ServiceShutdown` like Wails. Real: SQLite, HTTP/HTTPS servers with a per-binary test CA
