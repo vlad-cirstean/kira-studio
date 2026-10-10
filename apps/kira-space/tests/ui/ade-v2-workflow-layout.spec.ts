@@ -1,13 +1,18 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { openPlan } from './support/adeV2';
+import { contract } from './support/contract';
+import { IPC } from './support/ipcChannels';
 
 // P255: the workflow graph is locked: one direction, one node size, vertical scroll only, no zoom.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 
-async function open(relaunch: Parameters<typeof openPlan>[0]): Promise<Page> {
-  const { window: page } = await openPlan(relaunch, []);
+async function open(
+  relaunch: Parameters<typeof openPlan>[0],
+  extra: Parameters<typeof openPlan>[1] = [],
+): Promise<Page> {
+  const { window: page } = await openPlan(relaunch, extra);
   await page.setViewportSize({ width: 1400, height: 700 });
   await page.locator(t('ade-tab-workflows')).click();
   await page.locator(t('ade-wf-form')).waitFor();
@@ -113,4 +118,35 @@ test('an edit lays the graph out again', async ({ relaunch }) => {
   expect(added.y).toBeGreaterThan(pr.y);
   expect(Math.round(added.x + added.width / 2)).toBe(Math.round(pr.x + pr.width / 2));
   expect((await box(end)).y).toBeGreaterThan(endBefore.y);
+});
+
+test('contract: a backend workflow with a result loop lays out on one spine', async ({
+  relaunch,
+}) => {
+  const page = await open(relaunch, [
+    {
+      channel: IPC.adeTaskWorkflows,
+      response: contract('ade-branching', 'AdeTaskService.Workflows'),
+    },
+  ]);
+  await expect(page.locator(`${t('ade-wf-stage-node')}[data-stage-id="build"]`)).toBeVisible();
+  await expect(page.locator(t('ade-wf-node'))).toHaveCount(2);
+
+  const sizes = new Set<string>();
+  for (const el of await page.locator(t('ade-wf-node')).all()) {
+    const b = await box(el);
+    sizes.add(`${Math.round(b.width)}x${Math.round(b.height)}`);
+  }
+  expect(sizes.size).toBe(1);
+
+  const impl = await box(node(page, 'impl'));
+  const review = await box(node(page, 'review'));
+  expect(impl.y).toBeLessThan(review.y);
+  expect(Math.abs(impl.x + impl.width / 2 - (review.x + review.width / 2))).toBeLessThanOrEqual(1);
+
+  const loops = page.locator(`${t('ade-wf-edge')}[data-loop="true"]`);
+  await expect(loops).toHaveCount(1);
+  const edge = await box(loops.first().locator('path').first());
+  expect(edge.x).toBeLessThan(Math.min(impl.x, review.x));
+  expect(await scale(page)).toBe(1);
 });
