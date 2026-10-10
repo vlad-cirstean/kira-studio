@@ -848,3 +848,26 @@ Deviations and findings:
   `f046f9a12` layout drift. Not separable without a base re-record.
 - Visual baselines for Studio/Space shared surfaces re-recorded here (Settings, connection,
   script, git dialogs); streams re-record only what their own chunks move.
+
+## Foundation addendum result
+
+Landed on `v2.0` (not pushed). Commits: `rowVariants`/`rowIndent`/`useRowHeight`/`PanelBar` plus
+`PanelHeader` `#start`, `SectionHeading` collapsible/count, `TooltipIconButton` `pressed`,
+SettingsShell nav migration (one commit, `f9d1da72d`; an earlier hook-failed attempt left the
+second group staged, so the two groups merged); side-panel list + guards U18-U21 + allowlists +
+ARCHITECTURE sentence (`7f9fe8e63`).
+
+Allowlists: stream-a +8 (`CollectionRow`, `CollectionsTree`, `ProjectTree`, `TreeRow`,
+`ImageList`, `NetworkList`, `VirtualList`, `VolumeList`), stream-b +4 (`RepoFileTree`,
+`RepoSearchRow`, `RepoTreeRow`, `ReviewCommitRow`). All named in §4.1 chunks; no plan gap. The 4
+foundation-owned files pass. `rowVariants` lives at `packages/theme/src/components/rowVariants.ts`;
+git-ui's copy stays until B3.
+
+Verify: `typecheck`, `lint`, `test:unit` (1793), `test:visual:studio` (13) and
+`test:visual:space` (13) clean without re-recording, `test:ui:studio` 422 pass, `test:ui:space`
+456 pass. Two failures in the full parallel runs (`data-view.spec.ts:1047`,
+`repo-graph-widths.spec.ts:78`) pass in isolation: load flakes, no addendum file involved.
+
+Deviations: `rowVariants` `menu` layout carries git-ui's base classes inline (no shared cva base)
+so `nav`/`tree` avoid `text-fg` conflicts; `nav` selected-false adds `bg-transparent` (the old
+inline string had it). No pixel moved.
