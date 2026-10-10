@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -30,7 +31,38 @@ const (
 
 const defaultRebaseTimeout = 20 * time.Minute
 
-var rebaseTools = []string{"Bash(git:*)", "Read", "Edit", "Write", "Grep", "Glob", claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool}
+// rebaseGit is the git the rebase agent may run. Never a bare `git:*`: that allows `git -c
+// alias.x='!sh ...'`, `git config core.hooksPath` and any push.
+var rebaseGit = []string{
+	"Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)",
+	"Bash(git rev-parse:*)", "Bash(git merge-base:*)", "Bash(git ls-files:*)",
+	"Bash(git fetch:*)", "Bash(git rebase:*)", "Bash(git add:*)", "Bash(git rm:*)",
+	"Bash(git checkout --ours:*)", "Bash(git checkout --theirs:*)",
+}
+
+// rebaseGitDenied wins over the allow list and the user's own settings.
+var rebaseGitDenied = []string{
+	"Bash(git -c:*)", "Bash(git config:*)", "Bash(git rebase --exec:*)", "Bash(git rebase -x:*)",
+	"Bash(git rebase * --exec:*)", "Bash(git rebase * -x:*)",
+}
+
+const rebasePush = "Bash(git push --force-with-lease:*)"
+
+func rebaseTools(push bool) []string {
+	out := slices.Clone(rebaseGit)
+	if push {
+		out = append(out, rebasePush)
+	}
+	return append(out, "Read", "Edit", "Write", "Grep", "Glob", claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool)
+}
+
+func rebaseDeniedTools(push bool) []string {
+	out := slices.Clone(rebaseGitDenied)
+	if !push {
+		out = append(out, "Bash(git push:*)")
+	}
+	return out
+}
 
 func (b *TaskBoard) rebaseTimeout() time.Duration {
 	if b.deps.RebaseTimeout > 0 {
@@ -39,8 +71,8 @@ func (b *TaskBoard) rebaseTimeout() time.Duration {
 	return defaultRebaseTimeout
 }
 
-func (b *TaskBoard) rebaseDef() stepDef {
-	return stepDef{ID: rebaseStepID, Name: "Rebase", AllowedTools: rebaseTools, Timeout: formatTimeout(b.rebaseTimeout())}
+func (b *TaskBoard) rebaseDef(push bool) stepDef {
+	return stepDef{ID: rebaseStepID, Name: "Rebase", AllowedTools: rebaseTools(push), DisallowedTools: rebaseDeniedTools(push), Timeout: formatTimeout(b.rebaseTimeout())}
 }
 
 func formatTimeout(d time.Duration) string {
@@ -522,7 +554,7 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 	go func() {
 		defer b.wg.Done()
 		defer endRun()
-		b.superviseAgent(runCtx, updated, agentLaunch{def: b.rebaseDef(), sessionID: sessionID, path: root.Worktree, prompt: prompt, timeout: b.rebaseTimeout()})
+		b.superviseAgent(runCtx, updated, agentLaunch{def: b.rebaseDef(spec.Push), sessionID: sessionID, path: root.Worktree, prompt: prompt, timeout: b.rebaseTimeout()})
 	}()
 	return updated, nil
 }

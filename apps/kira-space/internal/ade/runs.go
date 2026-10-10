@@ -632,7 +632,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	}
 	spec := claudeheadless.Spec{
 		ClaudeBin: cmpNonEmpty(b.deps.ClaudeBin, "claude"), Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
-		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space),
+		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space), DisallowedTools: def.DisallowedTools,
 		Timeout: l.timeout,
 	}
 	spec.Env = gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: l.path})

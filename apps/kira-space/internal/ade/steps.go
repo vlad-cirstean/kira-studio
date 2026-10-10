@@ -19,6 +19,8 @@ type stepDef struct {
 	// Results are the step's declared (or implicit) results with their routes.
 	Results      []adewire.StepResult
 	AllowedTools []string
+	// DisallowedTools become --disallowedTools; only the rebase step sets them.
+	DisallowedTools []string
 	// SmartScript names the smart script that replaces Prompt; Params are its values.
 	SmartScript string
 	Params      map[string][]string

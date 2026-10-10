@@ -37,7 +37,9 @@ type Spec struct {
 	SettingSources string
 	// AllowedTools become --allowedTools; the caller adds the finish_step tool.
 	AllowedTools []string
-	Timeout      time.Duration
+	// DisallowedTools become --disallowedTools; a deny beats every allow.
+	DisallowedTools []string
+	Timeout         time.Duration
 	// Model is --model; "" omits it.
 	Model string
 	// MaxBudgetUSD is --max-budget-usd; 0 omits it.
@@ -111,6 +113,12 @@ func Script(s Spec) string {
 	if len(s.AllowedTools) > 0 {
 		words = append(words, "--allowedTools")
 		for _, t := range s.AllowedTools {
+			words = append(words, quotePOSIX(t))
+		}
+	}
+	if len(s.DisallowedTools) > 0 {
+		words = append(words, "--disallowedTools")
+		for _, t := range s.DisallowedTools {
 			words = append(words, quotePOSIX(t))
 		}
 	}
