@@ -1315,6 +1315,17 @@ Distilled facts about how the workbench is put together — not a restatement of
 §8's per-dialog field lists or its mockup-vs-shipped narrative, which stay where they are as the
 phase-by-phase record. These are the structural rules a future session needs to not reinvent.
 
+**One UI language (P262).** Dialogs are `DialogContent size="sm|md|lg|xl|2xl"` (+ `fixed-height`)
+with `DialogHeader closable`, `DialogBody`, `DialogFooter` (`#start` slot for left-side extras,
+buttons right: dismiss, then primary). Secondary tabs and segmented pickers are `SecondaryTabs`
+(`variant="tabs|segmented"`), never raw `ToggleGroup`/`TabsList`; primary tab bars keep
+`tabChipVariants`. Dialog and form controls are `kira-lg` (26px), toolbar controls `kira` (22px),
+all `rounded-kira-sm bg-field`. Buttons use `dialog*`/`toolbar*` variants with `kira*` sizes;
+weights are 400/500 (`font-semibold` only in `PanelHeader`); icon sizes 12, 13, 16, 24. Panel
+bars use `PanelHeader`/`ViewToolbar`, section headings `SectionHeading`. `scripts/check-ui-primitives.sh`
+(part of `bun run lint`) enforces this; files not yet migrated sit in
+`scripts/ui-primitives-allowlist/`. Full rules: `docs/v2.2/plans/P262-ui-unification.md` §2.
+
 **A view is chosen by page kind, never by database type.** `Page` is a discriminated union
 (`TabularPage`, `DocumentPage`, `KeyValuePage`, `StreamPage`); UI reads the page's own `kind`
 to decide grid vs. document view vs. key/value view vs. stream view. This is why a Postgres

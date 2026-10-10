@@ -36,7 +36,7 @@
     "perf:probe:proto": "bun run proto:build:grid && bun run proto:build:grid:hooks && playwright test --config=apps/kira-studio/playwright.perf.config.ts proto-grid-scroll",
     "proto:preview:grid": "cd apps/kira-studio/frontend && vite preview --config vite.proto.config.ts",
     "build:test:space": "cd apps/kira-space/frontend && bun run build:test",
-    "lint": "biome check . && sh scripts/check-tokens.sh && sh scripts/check-theme-classes.sh && sh scripts/check-ade-colours.sh && bun scripts/check-class-conflicts.ts",
+    "lint": "biome check . && sh scripts/check-tokens.sh && sh scripts/check-theme-classes.sh && sh scripts/check-ui-primitives.sh && sh scripts/check-ade-colours.sh && bun scripts/check-class-conflicts.ts",
     "lint:go": "sh scripts/install-golangci-lint.sh && \"$(go env GOPATH)/bin/golangci-lint\" run",
     "lint:dead": "knip",
     "lint:all": "bun run lint && bun run lint:go && bun run lint:dead",
