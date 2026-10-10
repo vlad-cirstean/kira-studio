@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -307,34 +307,22 @@ onUnmounted(() => {
     </div>
     <div v-else ref="container" class="monaco-host h-full w-full" data-testid="repo-file-editor" />
   </template>
-  <Alert
-    v-else-if="state === 'binary'"
-    class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-  >
-    <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
-    <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is binary and can't be previewed.</AlertTitle>
-  </Alert>
-  <Alert
-    v-else-if="state === 'tooLarge'"
-    class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-  >
-    <CodiconIcon name="warning" :size="24" class="text-subtle" />
-    <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is too large to preview (over 8 MB).</AlertTitle>
-  </Alert>
-  <Alert
-    v-else-if="state === 'missing'"
-    class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-  >
-    <CodiconIcon name="warning" :size="24" class="text-subtle" />
-    <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file no longer exists.</AlertTitle>
-  </Alert>
-  <Alert
-    v-else
-    class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-  >
-    <CodiconIcon name="warning" :size="24" class="text-subtle" />
-    <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ errorMessage || 'Could not open this file.' }}</AlertTitle>
-  </Alert>
+  <Empty v-else-if="state === 'binary'" class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file is binary and can't be previewed.</EmptyTitle>
+    </Empty>
+  <Empty v-else-if="state === 'tooLarge'" class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file is too large to preview (over 8 MB).</EmptyTitle>
+    </Empty>
+  <Empty v-else-if="state === 'missing'" class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file no longer exists.</EmptyTitle>
+    </Empty>
+  <Empty v-else class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>{{ errorMessage || 'Could not open this file.' }}</EmptyTitle>
+    </Empty>
 </template>
 
 <style scoped>

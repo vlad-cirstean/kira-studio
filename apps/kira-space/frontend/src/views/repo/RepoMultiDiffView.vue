@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
 // P92 item 5/§7.3: one commit's whole changed-file set, one tab — VS Code's own multi-file diff
 // editor's counterpart. A scrolling column of per-file sections; each section's own diff editor
@@ -120,22 +121,22 @@ onUnmounted(() => {
 
 <template>
   <div v-if="!repoId" class="h-full overflow-y-auto flex flex-col">
-    <Alert class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
-      <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ NO_REPOSITORY_MESSAGE }}</AlertTitle>
-    </Alert>
+    <Empty class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>{{ NO_REPOSITORY_MESSAGE }}</EmptyTitle>
+    </Empty>
   </div>
   <div v-else class="h-full overflow-y-auto flex flex-col" data-testid="repo-multi-diff-view">
     <div v-for="section in sections" :key="section.path" class="flex flex-none flex-col border-b border-border">
-      <div class="flex flex-none items-center gap-1 py-1 px-1.5">
+      <ViewToolbar border="none">
         <TooltipIconButton
           :icon="section.expanded ? 'chevron-down' : 'chevron-right'"
           :label="section.expanded ? 'Collapse' : 'Expand'"
           data-testid="repo-multi-diff-toggle"
           @click="toggle(section)"
         />
-        <span class="font-semibold overflow-hidden text-ellipsis whitespace-nowrap" :title="section.path">{{ basename(section.path) }}</span>
-        <span class="path-dir flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm" :title="section.path">{{ section.path }}</span>
+        <span class="shrink-0 text-kira-md text-fg whitespace-nowrap" :title="section.path">{{ basename(section.path) }}</span>
+        <span class="path-dir flex-auto min-w-0 truncate text-kira-md text-subtle" :title="section.path">{{ section.path }}</span>
         <Button
           v-if="section.expanded && sectionState[section.path] === 'found'"
           variant="toolbar"
@@ -146,7 +147,7 @@ onUnmounted(() => {
           <CodiconIcon name="go-to-file" :size="13" />
           Go to file
         </Button>
-      </div>
+      </ViewToolbar>
       <template v-if="section.expanded">
         <div
           v-if="sectionState[section.path] === 'loading' || sectionState[section.path] === 'found'"
@@ -154,42 +155,27 @@ onUnmounted(() => {
           class="monaco-host flex-none h-[60vh] w-full"
           data-testid="repo-multi-diff-editor"
         />
-        <Alert
-          v-else-if="sectionState[section.path] === 'binary'"
-          class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
-        >
-          <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is binary and can't be compared.</AlertTitle>
-        </Alert>
-        <Alert
-          v-else-if="sectionState[section.path] === 'tooLarge'"
-          class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
-        >
-          <CodiconIcon name="warning" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is too large to compare (over 8 MB).</AlertTitle>
-        </Alert>
-        <Alert
-          v-else-if="sectionState[section.path] === 'bothMissing'"
-          class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
-        >
-          <CodiconIcon name="warning" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file no longer exists.</AlertTitle>
-        </Alert>
-        <Alert
-          v-else
-          class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
-        >
-          <CodiconIcon name="warning" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ sectionError[section.path] || 'Could not open this diff.' }}</AlertTitle>
-        </Alert>
+        <Empty v-else-if="sectionState[section.path] === 'binary'" class="p-4">
+      <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file is binary and can't be compared.</EmptyTitle>
+    </Empty>
+        <Empty v-else-if="sectionState[section.path] === 'tooLarge'" class="p-4">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file is too large to compare (over 8 MB).</EmptyTitle>
+    </Empty>
+        <Empty v-else-if="sectionState[section.path] === 'bothMissing'" class="p-4">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file no longer exists.</EmptyTitle>
+    </Empty>
+        <Empty v-else class="p-4">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>{{ sectionError[section.path] || 'Could not open this diff.' }}</EmptyTitle>
+    </Empty>
       </template>
     </div>
-    <Alert
-      v-if="sections.length === 0"
-      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-    >
-      <CodiconIcon name="git-compare" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted-foreground">No changed files.</AlertTitle>
-    </Alert>
+    <Empty v-if="sections.length === 0" class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="git-compare" :size="24" /></EmptyMedia>
+      <EmptyTitle>No changed files.</EmptyTitle>
+    </Empty>
   </div>
 </template>

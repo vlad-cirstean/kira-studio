@@ -11,7 +11,7 @@
 // through TabViewStateStore.
 import type { MountHandle } from '@kira/git-ui';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';
 import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
@@ -84,8 +84,8 @@ onUnmounted(() => {
     class="h-full w-full"
     data-testid="repo-graph-host"
   />
-  <Alert v-else class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
-    <CodiconIcon name="warning" :size="24" class="text-subtle" />
-    <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ errorMessage }}</AlertTitle>
-  </Alert>
+  <Empty v-else class="h-full">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>{{ errorMessage }}</EmptyTitle>
+    </Empty>
 </template>

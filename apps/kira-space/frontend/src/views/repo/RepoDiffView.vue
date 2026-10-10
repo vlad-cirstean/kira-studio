@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useAdeReviewWindowStore } from '../../ade/v2/state/adeReviewWindow';
@@ -126,45 +127,33 @@ onUnmounted(() => {
   <div class="h-full flex flex-col">
     <!-- P92 item 7: the same action the repo.goToFileFromDiff palette command runs — P74 built the
          behaviour and gave it no other affordance. -->
-    <div v-if="state === 'found'" class="flex flex-none border-b border-border py-1 px-1.5">
+    <ViewToolbar v-if="state === 'found'">
       <Button variant="toolbar" size="kira" data-testid="repo-diff-go-to-file" @click="onGoToFile">
         <CodiconIcon name="go-to-file" :size="13" />
         Go to file
       </Button>
-    </div>
+    </ViewToolbar>
     <div
       v-if="state === 'loading' || state === 'found'"
       ref="container"
       class="monaco-host flex-auto min-h-0 w-full"
       data-testid="repo-diff-editor"
     />
-    <Alert
-      v-else-if="state === 'binary'"
-      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-    >
-      <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is binary and can't be compared.</AlertTitle>
-    </Alert>
-    <Alert
-      v-else-if="state === 'tooLarge'"
-      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-    >
-      <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is too large to compare (over 8 MB).</AlertTitle>
-    </Alert>
-    <Alert
-      v-else-if="state === 'bothMissing'"
-      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-    >
-      <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file no longer exists.</AlertTitle>
-    </Alert>
-    <Alert
-      v-else
-      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-    >
-      <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ errorMessage || 'Could not open this diff.' }}</AlertTitle>
-    </Alert>
+    <Empty v-else-if="state === 'binary'" class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file is binary and can't be compared.</EmptyTitle>
+    </Empty>
+    <Empty v-else-if="state === 'tooLarge'" class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file is too large to compare (over 8 MB).</EmptyTitle>
+    </Empty>
+    <Empty v-else-if="state === 'bothMissing'" class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>This file no longer exists.</EmptyTitle>
+    </Empty>
+    <Empty v-else class="flex-1 min-h-0">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>{{ errorMessage || 'Could not open this diff.' }}</EmptyTitle>
+    </Empty>
   </div>
 </template>

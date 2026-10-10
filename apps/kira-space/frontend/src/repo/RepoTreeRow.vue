@@ -118,15 +118,15 @@ function onKeydown(e: KeyboardEvent): void {
     <CodiconIcon
       v-if="row.isDir"
       :name="dirIcon"
-      :size="16"
-      class="node-icon shrink-0 w-4 h-4 text-muted-foreground mask-contain mask-no-repeat mask-center"
+      :size="13"
+      class="node-icon shrink-0 text-muted-foreground"
     />
-    <span
-      v-else
-      class="node-icon shrink-0 w-4 h-4 text-muted-foreground mask-contain mask-no-repeat mask-center"
-      :style="fileIconStyle(row.path)"
-      aria-hidden="true"
-    ></span>
+    <span v-else class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
+      <span
+        class="node-icon size-3.25 text-muted-foreground mask-contain mask-no-repeat mask-center"
+        :style="fileIconStyle(row.path)"
+      ></span>
+    </span>
     <Tooltip>
       <TooltipTrigger as-child>
         <span class="overflow-hidden text-ellipsis min-w-0" :class="labelStatusClass">{{ row.name }}</span>
