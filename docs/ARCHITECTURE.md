@@ -3828,7 +3828,7 @@ one.
 ## ADE: Kira Space task planner (v2.0)
 
 Kira Space's `ade` module plans tasks across repositories and runs Claude Code on them. It is a
-rewrite of the P129 agent merge queue (design: `docs/v2.0/design/ade-v2/SPEC2.md`). v1 data is not
+rewrite of the P129 agent merge queue. v1 data is not
 migrated (D5); history of the removal is migration `0011`. Phase detail: `docs/v2.0/SPEC.md` P143-P149
 and `docs/v2.0/plans/`.
 
@@ -3929,7 +3929,7 @@ and `docs/v2.0/plans/`.
   watched (`fsnotify`); a broken edit keeps the last valid version and reports `line` plus a message.
   The writer keeps key order and comments. Aliases `manual`/`automated` map to `user`/`agent`.
   Step `allowed_tools` feeds the headless `--allowedTools` list.
-- Sample workflows (`docs/v2.0/design/ade-v2/workflows/`) import and validate in the app.
+- Sample workflows (`apps/kira-space/internal/adeflow/testdata/`) import and validate in the app.
 - Step results (P247): an agent step may declare `results:` (1 to 12): `id`, `ok` (required), `description`
   (one line, at most 200), `next` (`next|end|stop|<step id>`, default `next` for ok and `stop` for not ok),
   `max` (1..10, loop edges only, default 3). `needs_input` is reserved; `results` and `on_failure` on one

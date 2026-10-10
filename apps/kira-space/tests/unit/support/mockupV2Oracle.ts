@@ -2,18 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 
-// Parity oracle for the v2 board logic: `docs/v2.0/design/ade-v2/mockup.html` run unmodified, same
-// mechanism as the v1 `mockupOracle.ts`. Extracts the inline script from `class DCLogic` up to (not
-// including) `const comp = new Component({})`, evaluates it in a `node:vm` context and exposes the
-// mockup's own `renderVals()` output. `renderVals()` never touches the DOM synchronously, so the
-// stubs are inert. The mockup's `TODAY` is a local-time `new Date(2026, 8, 22)`; `TZ=UTC` keeps it
-// equal to the calendar helpers' UTC arithmetic.
+// Parity oracle for the v2 board logic: the frozen P129 design mockup (fixtures/ade-v2-mockup.html,
+// formerly docs/v2.0/design/ade-v2/mockup.html), run unmodified, same mechanism as the v1
+// `mockupOracle.ts`. Extracts the inline script from `class DCLogic` up to (not including) `const
+// comp = new Component({})`, evaluates it in a `node:vm` context and exposes the mockup's own
+// `renderVals()` output. `renderVals()` never touches the DOM synchronously, so the stubs are inert.
+// The mockup's `TODAY` is a local-time `new Date(2026, 8, 22)`; `TZ=UTC` keeps it equal to the
+// calendar helpers' UTC arithmetic.
 process.env.TZ = 'UTC';
 
-const MOCKUP_PATH = path.join(
-  import.meta.dir,
-  '../../../../../docs/v2.0/design/ade-v2/mockup.html',
-);
+const MOCKUP_PATH = path.join(import.meta.dir, 'fixtures/ade-v2-mockup.html');
 const START_MARKER = 'class DCLogic';
 const END_MARKER = 'const comp = new Component({})';
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const samplesDir = "../../../../docs/v2.0/design/ade-v2/workflows"
+const samplesDir = "testdata"
 
 func TestParse_designSamples(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join(samplesDir, "*.yaml"))

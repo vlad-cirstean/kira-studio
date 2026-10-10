@@ -13,5 +13,7 @@ focus-ring colour flash on inputs (P130), the git graph and review view moved on
   own result section.
 - **`plans/`** — one plan per phase (or part/iteration), committed before implementation starts.
   None is written as part of this chapter's opening spec.
-- **`design/`** — user-supplied design for P129's `ade` module (`SPEC.md`, `mockup.html`), placed
-  here before P129's planning pass.
+- `design/` — user-supplied design for P129's `ade` module (`SPEC.md`, `mockup.html`), placed here
+  before P129's planning pass, removed once superseded by the shipped implementation. The two
+  fixtures still read by tests moved to `apps/kira-space/internal/adeflow/testdata/` and
+  `apps/kira-space/tests/unit/support/fixtures/ade-v2-mockup.html`.
