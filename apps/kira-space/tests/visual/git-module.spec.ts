@@ -53,9 +53,28 @@ const rows = SUBJECTS.map((subject, n) => ({
         ]
       : n === 1
         ? [{ kind: 'branch' as const, name: 'feature/search', isHead: false }]
-        : n === 6
-          ? [{ kind: 'tag' as const, name: 'v1.0.0' }]
-          : [],
+        : n === 4
+          ? [
+              {
+                kind: 'branch' as const,
+                name: 'feature/column-widths-persist-per-tab',
+                isHead: false,
+              },
+              {
+                kind: 'remoteBranch' as const,
+                name: 'origin/feature/column-widths-persist-per-tab',
+              },
+              {
+                kind: 'branch' as const,
+                name: 'release/2026-10-candidate-with-long-name',
+                isHead: false,
+              },
+              { kind: 'tag' as const, name: 'v2.0.0-rc.1' },
+              { kind: 'remoteBranch' as const, name: 'origin/release/2026-10-candidate' },
+            ]
+          : n === 6
+            ? [{ kind: 'tag' as const, name: 'v1.0.0' }]
+            : [],
 }));
 
 const FILES = [
