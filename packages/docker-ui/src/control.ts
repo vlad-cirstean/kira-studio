@@ -9,11 +9,16 @@ import {
   type DockerContainerSize,
   type DockerContextInfo,
   type DockerDiskUsage,
+  type DockerEditSpec,
   type DockerImage,
   type DockerLogsEvent,
   type DockerNetwork,
+  type DockerRecreateArgs,
+  type DockerRecreateResult,
   type DockerStatsEvent,
   type DockerStatus,
+  type DockerUpdateArgs,
+  type DockerUpdateResult,
   type DockerVolume,
   type InspectKind,
   type LogsOpenOptions,
@@ -32,6 +37,9 @@ export interface DockerBindings {
   Inspect(a: { kind: string; id: string }): Promise<unknown>;
   DiskUsage(): Promise<unknown>;
   ContainerSize(a: { id: string }): Promise<unknown>;
+  ContainerEditSpec(a: { id: string }): Promise<unknown>;
+  UpdateContainer(a: DockerUpdateArgs): Promise<unknown>;
+  RecreateContainer(a: DockerRecreateArgs): Promise<unknown>;
   Start(a: { id: string }): Promise<void>;
   Stop(a: { id: string }): Promise<void>;
   Restart(a: { id: string }): Promise<void>;
@@ -72,6 +80,9 @@ export interface DockerControl {
   inspect(kind: InspectKind, id: string): Promise<{ raw: string }>;
   diskUsage(): Promise<DockerDiskUsage>;
   containerSize(id: string): Promise<DockerContainerSize>;
+  editSpec(id: string): Promise<DockerEditSpec>;
+  updateContainer(args: DockerUpdateArgs): Promise<DockerUpdateResult>;
+  recreateContainer(args: DockerRecreateArgs): Promise<DockerRecreateResult>;
   start(id: string): Promise<void>;
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
@@ -128,6 +139,11 @@ export function createDockerControl(
     diskUsage: () => unwrap(b.DiskUsage()).then((r) => trust<DockerDiskUsage>(r)),
     containerSize: (id) =>
       unwrap(b.ContainerSize({ id })).then((r) => trust<DockerContainerSize>(r)),
+    editSpec: (id) => unwrap(b.ContainerEditSpec({ id })).then((r) => trust<DockerEditSpec>(r)),
+    updateContainer: (args) =>
+      unwrap(b.UpdateContainer(args)).then((r) => trust<DockerUpdateResult>(r)),
+    recreateContainer: (args) =>
+      unwrap(b.RecreateContainer(args)).then((r) => trust<DockerRecreateResult>(r)),
     start: (id) => unwrap(b.Start({ id })),
     stop: (id) => unwrap(b.Stop({ id })),
     restart: (id) => unwrap(b.Restart({ id })),

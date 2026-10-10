@@ -11,7 +11,14 @@ import {
   watch,
 } from 'vue';
 import { useDocker } from './context';
-import type { DockerDiskUsage, DockerStatus, InspectKind, ResourceKind } from './wire';
+import type {
+  DockerDiskUsage,
+  DockerRecreateArgs,
+  DockerStatus,
+  DockerUpdateArgs,
+  InspectKind,
+  ResourceKind,
+} from './wire';
 
 const STATUS_KEY = ['docker', 'status'] as const;
 const UNAVAILABLE_POLL_MS = 5000;
@@ -103,6 +110,35 @@ export function useContainerDetail(id: Ref<string>) {
   });
 }
 
+export function useContainerEditSpec(id: Ref<string>) {
+  const { control } = useDocker();
+  const { scope, ready } = useScope();
+  return useQuery({
+    queryKey: computed(() => ['docker', scope.value, 'edit-spec', id.value] as const),
+    queryFn: () => control.editSpec(id.value),
+    enabled: computed(() => ready.value && id.value !== ''),
+  });
+}
+
+/** In-place apply; a partial failure still refetches so the spec shows what landed. */
+export function useUpdateContainer() {
+  const { control } = useDocker();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: DockerUpdateArgs) => control.updateContainer(args),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['docker'] }),
+  });
+}
+
+export function useRecreateContainer() {
+  const { control } = useDocker();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: DockerRecreateArgs) => control.recreateContainer(args),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['docker'] }),
+  });
+}
+
 export function useInspect(kind: Ref<InspectKind>, id: Ref<string>) {
   const { control } = useDocker();
   const { scope, ready } = useScope();
@@ -188,10 +224,13 @@ function invalidateKinds(qc: ReturnType<typeof useQueryClient>, kinds: readonly 
   const wanted = new Set<string>();
   for (const k of kinds) {
     if (k === 'container') {
-      for (const w of ['containers', 'container', 'images', 'volumes', 'networks']) wanted.add(w);
+      for (const w of ['containers', 'container', 'edit-spec', 'images', 'volumes', 'networks']) {
+        wanted.add(w);
+      }
     } else {
       wanted.add(`${k}s`);
       wanted.add('inspect');
+      if (k === 'network') wanted.add('edit-spec');
     }
   }
   void qc.invalidateQueries({

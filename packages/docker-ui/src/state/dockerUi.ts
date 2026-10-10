@@ -4,7 +4,7 @@ import { ref } from 'vue';
 import type { ResourceKind } from '../wire';
 
 export type DockerSection = 'containers' | 'images' | 'volumes' | 'networks';
-export type DockerDetailTab = 'overview' | 'logs' | 'terminal' | 'stats' | 'inspect';
+export type DockerDetailTab = 'overview' | 'logs' | 'terminal' | 'stats' | 'inspect' | 'edit';
 
 export interface DockerSelection {
   kind: ResourceKind;

@@ -245,3 +245,115 @@ export interface LogsOpenOptions {
   timestamps: boolean;
   follow: boolean;
 }
+
+export interface DockerResources {
+  cpuShares: number;
+  nanoCpus: number;
+  cpuQuota: number;
+  cpuPeriod: number;
+  cpusetCpus: string;
+  cpusetMems: string;
+  memory: number;
+  /** -1 unlimited, 0 engine default (2x memory). */
+  memorySwap: number;
+  memoryReservation: number;
+  blkioWeight: number;
+  /** 0 unlimited. */
+  pidsLimit: number;
+}
+
+export type RestartPolicyName = 'no' | 'always' | 'on-failure' | 'unless-stopped';
+
+interface DockerRestartPolicy {
+  name: RestartPolicyName;
+  maxRetries: number;
+}
+
+export interface DockerEditNetwork {
+  name: string;
+  aliases: string[];
+  ipv4: string;
+  ipv6: string;
+}
+
+export interface DockerInPlaceSpec {
+  name: string;
+  resources: DockerResources;
+  restart: DockerRestartPolicy;
+  networks: DockerEditNetwork[];
+}
+
+interface DockerPortBinding {
+  containerPort: number;
+  proto: 'tcp' | 'udp' | 'sctp';
+  hostIp: string;
+  hostPort: string;
+}
+
+interface DockerEditMount {
+  key: string;
+  type: 'bind' | 'volume';
+  source: string;
+  target: string;
+  readOnly: boolean;
+}
+
+export interface DockerRecreateSpec {
+  image: string;
+  cmd: string[];
+  entrypoint: string[];
+  env: string[];
+  labels: Record<string, string>;
+  user: string;
+  hostname: string;
+  ports: DockerPortBinding[];
+  mounts: DockerEditMount[];
+  capAdd: string[];
+  capDrop: string[];
+}
+
+interface DockerAnonVolume {
+  name: string;
+  destination: string;
+}
+
+export interface DockerEditSpec {
+  id: string;
+  state: ContainerState;
+  baseHash: string;
+  inPlace: DockerInPlaceSpec;
+  recreate: DockerRecreateSpec;
+  networkMode: string;
+  managed: '' | 'swarm' | 'kubernetes';
+  autoRemove: boolean;
+  origin: ContainerOrigin;
+  originName: string;
+  anonymousVolumes: DockerAnonVolume[];
+  dependents: string[];
+  preserved: string[];
+}
+
+export interface DockerUpdateArgs {
+  id: string;
+  baseHash: string;
+  spec: DockerInPlaceSpec;
+}
+
+export interface DockerUpdateResult {
+  applied: string[];
+  warnings: string[];
+}
+
+export interface DockerRecreateArgs {
+  id: string;
+  baseHash: string;
+  inPlace: DockerInPlaceSpec;
+  recreate: DockerRecreateSpec;
+}
+
+export interface DockerRecreateResult {
+  id: string;
+  name: string;
+  oldId: string;
+  warnings: string[];
+}
