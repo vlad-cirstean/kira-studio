@@ -5,4 +5,5 @@
    for why the two prefixes never collide). Path is relative to this file. */
 @import "@workbench/workbench.css";
 @import "./ade/v2/tones.css";
+@import "../../../../packages/git-ui/src/theme/git.css";
 @source "../../../../packages/git-ui/src";

@@ -9,13 +9,26 @@ import { extendTailwindMerge } from 'tailwind-merge';
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ['kira-xs', 'kira-sm', 'kira-md', 'kira-lg', 'kira-xl'],
+      text: [
+        'kira-xs',
+        'kira-sm',
+        'kira-md',
+        'kira-lg',
+        'kira-xl',
+        'graph-xs',
+        'graph-sm',
+        'graph-md',
+        'graph-lg',
+      ],
       spacing: [
         'control',
         'control-lg',
         'control-sm',
         'row',
         'bar',
+        'graph-row',
+        'graph-row-compact',
+        'graph-h-xs',
         // P110 B6
         'titlebar',
         'tabbar',
