@@ -39,7 +39,8 @@ export interface ScriptsSeam {
 
 /** The run store's bound calls and push channel (ScriptRunsService), the same in both apps. */
 export interface ScriptRunsSeam {
-  list(limit?: number): Promise<ScriptRun[]>;
+  /** A task id narrows to that task's runs (Kira Space). */
+  list(limit?: number, taskId?: string): Promise<ScriptRun[]>;
   stop(id: string): Promise<void>;
   /** Where a saved script runs; an empty id answers the app home as `base`, for an unsaved script. */
   resolveDir(scriptId: string): Promise<ScriptDir>;
@@ -65,6 +66,8 @@ export interface AutomationsModuleContext {
   runs: ScriptRunsSeam;
   /** Focuses the Automations module, e.g. from the status bar. */
   showAutomations(): void;
+  /** Kira Space: scripts can run for an ADE task. */
+  ade: boolean;
   /** Native folder dialog; null when cancelled. */
   chooseFolder(title: string): Promise<string | null>;
 }

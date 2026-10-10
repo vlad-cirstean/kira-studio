@@ -5,6 +5,11 @@ import { ref } from 'vue';
 export interface RunDialogRequest {
   scriptId: string;
   prefill?: Record<string, string[]>;
+  /** Kira Space: the task, and branch, the run is for; both fixed when set. */
+  taskId?: string;
+  branchId?: string;
+  /** Where it was opened from; a plain script started from ADE then shows the Automations module. */
+  from?: 'automations' | 'ade';
 }
 
 // One concern: the single open run-dialog request. Any module opens it; the host in each app's

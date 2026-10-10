@@ -21,10 +21,17 @@ import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
 import { useAutomationsModule } from '../module';
 import SmartBadge from '../smart/SmartBadge.vue';
+import AdeContextFields from './AdeContextFields.vue';
 import ParamsForm from './ParamsForm.vue';
 import RunPreview from './RunPreview.vue';
 
-const props = defineProps<{ scriptId: string; prefill?: Record<string, string[]> }>();
+const props = defineProps<{
+  scriptId: string;
+  prefill?: Record<string, string[]>;
+  taskId?: string;
+  branchId?: string;
+  from?: 'automations' | 'ade';
+}>();
 const emit = defineEmits<{ close: [] }>();
 const ctx = useAutomationsModule();
 
@@ -38,13 +45,15 @@ const values = ref<Record<string, string[]>>(
 );
 // null: use the saved prompt. A string is this run's own prompt; never saved.
 const oneOff = ref<string | null>(null);
+const taskId = ref(props.taskId ?? '');
+const branchId = ref(props.branchId ?? '');
 
 const args = computed<ScriptRunArgs>(() => ({
   scriptId: props.scriptId,
   params: values.value,
   prompt: oneOff.value,
-  taskId: '',
-  branchId: '',
+  taskId: taskId.value,
+  branchId: branchId.value,
 }));
 const debounced = refDebounced(args, 250);
 
@@ -76,6 +85,7 @@ const start = useMutation(
       const s = script.value;
       if (!s) return;
       if (started.terminal) {
+        if (props.from === 'ade') ctx.showAutomations();
         ctx.openTerminalTab({
           cwd: started.terminal.cwd,
           launch: {
@@ -177,6 +187,14 @@ function run(): void {
             <FieldLabel class="mt-1 text-muted-foreground">Added by Kira</FieldLabel>
             <div class="font-data text-kira-sm text-muted-foreground" data-testid="run-suffix">{{ pv.suffix }}</div>
           </Field>
+
+          <AdeContextFields
+            v-if="pv && (pv.needs.tasks.length > 0 || pv.needs.branches.length > 0 || pv.ade)"
+            v-model:task-id="taskId"
+            v-model:branch-id="branchId"
+            :needs="pv.needs"
+            :ade="pv.ade"
+          />
 
           <RunPreview v-if="pv" :preview="pv" />
           <Alert v-if="preview.isError.value" variant="destructive" class="w-auto" data-testid="run-preview-error">

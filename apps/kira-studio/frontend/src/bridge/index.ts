@@ -380,8 +380,10 @@ const studioControl = {
   onCustomScriptsChanged: (cb: (snapshot: ScriptsSnapshot) => void): (() => void) =>
     on(CHANNEL.customScriptsChanged, (r) => cb(scriptsSnapshotOf(r))),
 
-  scriptRunsList: (limit?: number): Promise<ScriptRun[]> =>
-    unwrap(ScriptRunsService.List({ limit: limit ?? 0 })).then((r) => trust<ScriptRun[]>(r ?? [])),
+  scriptRunsList: (limit?: number, taskId?: string): Promise<ScriptRun[]> =>
+    unwrap(ScriptRunsService.List({ limit: limit ?? 0, taskId: taskId ?? '' })).then((r) =>
+      trust<ScriptRun[]>(r ?? []),
+    ),
   scriptRunsStop: (id: string): Promise<void> => unwrap(ScriptRunsService.Stop({ id })),
   scriptRunsResolveDir: (scriptId: string): Promise<ScriptDir> =>
     unwrap(ScriptRunsService.ResolveDir({ scriptId })).then((r) => trust<ScriptDir>(r)),

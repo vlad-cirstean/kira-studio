@@ -1,7 +1,7 @@
 import type { ScriptRun, ScriptRunLogChunk, ScriptRunLogPage } from '@shared/domain/scriptRuns';
 import type { ScriptDir } from '@shared/domain/scripts';
 import { useMutation, useQuery } from '@tanstack/vue-query';
-import { tryOnScopeDispose } from '@vueuse/core';
+import { tryOnScopeDispose, useStorage } from '@vueuse/core';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import { useAutomationsModule } from '../module';
@@ -36,6 +36,40 @@ export function useScriptRuns() {
     },
     queryClient,
   );
+}
+
+/** The runs of one ADE task, kept live by the same push channel. */
+export function useTaskScriptRuns(taskId: MaybeRefOrGetter<string>) {
+  const { runs } = useAutomationsModule();
+  const key = () => ['scriptRuns', 'task', toValue(taskId)] as const;
+  const off = runs.onChanged((run) => {
+    if (run.taskId !== toValue(taskId)) return;
+    queryClient.setQueryData<ScriptRun[]>(key(), (old) => upsert(old ?? [], run));
+  });
+  tryOnScopeDispose(off);
+  return useQuery(
+    {
+      queryKey: computed(key),
+      queryFn: () => runs.list(LIST_LIMIT, toValue(taskId)),
+      enabled: computed(() => toValue(taskId) !== ''),
+      staleTime: Number.POSITIVE_INFINITY,
+    },
+    queryClient,
+  );
+}
+
+const SEEN_LIMIT = 200;
+
+/** Run ids the person has opened; an ended run not in it still wants a look. Per-viewer, so local. */
+export function useSeenRuns() {
+  const seen = useStorage<string[]>('kira.automations.seenRuns', []);
+  return {
+    seen,
+    markSeen(id: string): void {
+      if (seen.value.includes(id)) return;
+      seen.value = [...seen.value, id].slice(-SEEN_LIMIT);
+    },
+  };
 }
 
 /** The run a terminal tab belongs to; the tab id is the terminal id. */

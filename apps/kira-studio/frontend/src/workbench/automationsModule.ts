@@ -39,7 +39,7 @@ export function createAutomationsModule(): AutomationsModuleContext {
       resizeTerminal: terminalsStore.resizeTerminal,
     },
     runs: {
-      list: (limit) => control.scriptRunsList(limit),
+      list: (limit, taskId) => control.scriptRunsList(limit, taskId),
       stop: (id) => control.scriptRunsStop(id),
       resolveDir: (scriptId) => control.scriptRunsResolveDir(scriptId),
       onChanged: (cb) => control.onScriptRunsChanged(cb),
@@ -50,6 +50,7 @@ export function createAutomationsModule(): AutomationsModuleContext {
       mcpServers: () => control.scriptRunsMcpServers(),
       mcpTools: (server) => control.scriptRunsMcpTools(server),
     },
+    ade: false,
     showAutomations: () => modeStore.setMode('automations'),
     chooseFolder: async (title) => {
       const chosen = await control.filesChooseFolder(title);

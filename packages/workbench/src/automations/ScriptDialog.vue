@@ -24,6 +24,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
+import { Switch } from '@theme/components/ui/switch';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VarText from '@theme/components/VarText.vue';
@@ -50,6 +51,8 @@ const props = defineProps<{
   collectionId?: string | null;
   chooseFolder: (title: string) => Promise<string | null>;
   resolveDir: (scriptId: string) => Promise<ScriptDir>;
+  /** Kira Space: offers the task-worktree switch. */
+  ade?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -264,6 +267,11 @@ function onOpenAutoFocus(e: Event): void {
             <VarText :parts="folderParts" />
           </FieldDescription>
           <FieldError v-if="blocker" data-testid="script-dialog-dir-blocker">{{ blocker }}</FieldError>
+        </Field>
+
+        <Field v-if="ade" orientation="horizontal">
+          <Switch id="script-use-ade-dir" v-model="useAdeDir" data-testid="script-use-ade-dir" />
+          <Label for="script-use-ade-dir">Run in the task's worktree when started from ADE</Label>
         </Field>
 
         <div class="flex items-end gap-3">

@@ -6,11 +6,20 @@ import { computed } from 'vue';
 
 const props = defineProps<{ preview: ScriptRunPreview }>();
 
-const MODE_LABEL = { kira: 'Kira automations folder', fixed: 'Chosen folder', home: 'Home folder', worktree: 'Worktree' } as const;
-const folderParts = computed<TextPart[]>(() => [
-  `${MODE_LABEL[props.preview.dir.mode]}: `,
-  { name: 'folder', value: props.preview.dir.path },
-]);
+const MODE_LABEL = { kira: 'Kira automations folder', fixed: 'Chosen folder', home: 'Home folder' } as const;
+const folderParts = computed<TextPart[]>(() => {
+  const d = props.preview.dir;
+  if (d.mode === 'worktree') {
+    return [
+      'Worktree of ',
+      { name: 'branch', value: d.branch },
+      ': ',
+      { name: 'folder', value: d.path },
+      ...(d.pending ? [' (created on Run)'] : []),
+    ];
+  }
+  return [`${MODE_LABEL[d.mode]}: `, { name: 'folder', value: d.path }];
+});
 function envParts(e: ScriptRunPreview['env'][number]): TextPart[] {
   return [`${e.name}=`, ...(e.secret ? ['••••'] : [{ name: e.fromVar, value: e.value }])];
 }

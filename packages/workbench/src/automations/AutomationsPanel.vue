@@ -464,6 +464,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
         :collection-id="editor.collectionId"
         :choose-folder="ctx.chooseFolder"
         :resolve-dir="ctx.runs.resolveDir"
+        :ade="ctx.ade"
         @close="editor = null"
       />
     </div>

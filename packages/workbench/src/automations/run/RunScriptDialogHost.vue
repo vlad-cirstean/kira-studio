@@ -10,9 +10,12 @@ const { request } = storeToRefs(store);
 <template>
   <RunScriptDialog
     v-if="request"
-    :key="request.scriptId"
+    :key="`${request.scriptId}:${request.taskId ?? ''}:${request.branchId ?? ''}`"
     :script-id="request.scriptId"
     :prefill="request.prefill"
+    :task-id="request.taskId"
+    :branch-id="request.branchId"
+    :from="request.from"
     @close="store.close()"
   />
 </template>

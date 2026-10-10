@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useAutomationsModule } from '../module';
 import { useRerun } from '../runScript';
 import SmartBadge from '../smart/SmartBadge.vue';
@@ -8,7 +8,7 @@ import RunElapsed from './RunElapsed.vue';
 import RunLog from './RunLog.vue';
 import RunOutcomeBlock from './RunOutcomeBlock.vue';
 import RunStatusBadge from './RunStatusBadge.vue';
-import { useScriptRun, useStopScriptRun } from './runsQueries';
+import { useScriptRun, useSeenRuns, useStopScriptRun } from './runsQueries';
 
 // The tab of one smart script run: status, result, the prompt sent, and the live log.
 const props = defineProps<{ tab: { id: string; state: { runId: string; label?: string } } }>();
@@ -17,6 +17,8 @@ const { run, query } = useScriptRun(() => props.tab.state.runId);
 const stop = useStopScriptRun();
 const rerunRun = useRerun();
 const error = ref<string | null>(null);
+const { markSeen } = useSeenRuns();
+onMounted(() => markSeen(props.tab.state.runId));
 
 const ended = computed(() => run.value !== null && run.value.state !== 'running');
 const canContinue = computed(
