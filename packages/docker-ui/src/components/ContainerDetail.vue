@@ -9,8 +9,10 @@ import { copyText } from '@workbench/util/clipboard';
 import { computed, watch } from 'vue';
 import { formatPercent, formatSize, publishedPorts, shortId, stateDotClass } from '../lib/format';
 import { useContainerAction, useContainerDetail } from '../queries';
+import { useDockerEditStore } from '../state/dockerEdit';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { type DockerDetailTab, useDockerUiStore } from '../state/dockerUi';
+import ContainerEditView from './ContainerEditView.vue';
 import ContainerOverview from './ContainerOverview.vue';
 import ExecView from './ExecView.vue';
 import InspectView from './InspectView.vue';
@@ -22,6 +24,7 @@ const props = defineProps<{ containerId: string }>();
 
 const ui = useDockerUiStore();
 const stats = useDockerStatsStore();
+const edits = useDockerEditStore();
 const id = computed(() => props.containerId);
 const detail = useContainerDetail(id);
 const actions = useContainerAction();
@@ -29,7 +32,8 @@ const actions = useContainerAction();
 const c = computed(() => detail.data.value?.container);
 const running = computed(() => c.value?.state === 'running');
 const live = computed(() => (running.value ? stats.latest.get(props.containerId) : undefined));
-const busy = computed(() => actions.isBusy(props.containerId));
+const recreating = computed(() => edits.applying[props.containerId] === 'recreate');
+const busy = computed(() => actions.isBusy(props.containerId) || edits.applying[props.containerId] !== undefined);
 
 const TABS: ReadonlyArray<{ id: DockerDetailTab; label: string; icon: string; needsRunning: boolean }> = [
   { id: 'overview', label: 'Overview', icon: 'info', needsRunning: false },
@@ -37,6 +41,7 @@ const TABS: ReadonlyArray<{ id: DockerDetailTab; label: string; icon: string; ne
   { id: 'terminal', label: 'Terminal', icon: 'terminal', needsRunning: true },
   { id: 'stats', label: 'Stats', icon: 'graph', needsRunning: true },
   { id: 'inspect', label: 'Inspect', icon: 'json', needsRunning: false },
+  { id: 'edit', label: 'Edit', icon: 'edit', needsRunning: false },
 ];
 
 const stateVariant = computed(() => {
@@ -67,7 +72,10 @@ function act(action: 'start' | 'stop' | 'restart'): void {
 
 <template>
   <div class="flex h-full flex-col" data-testid="docker-container-detail">
-    <Empty v-if="detail.isError.value" class="p-4" data-testid="docker-detail-error">
+    <div v-if="recreating" class="flex items-center gap-2 p-4 text-muted-foreground" data-testid="docker-detail-recreating">
+      <CodiconIcon name="loading" :size="14" class="codicon-modifier-spin" />Recreating…
+    </div>
+    <Empty v-else-if="detail.isError.value" class="p-4" data-testid="docker-detail-error">
       <EmptyHeader>
         <EmptyMedia variant="icon"><CodiconIcon name="warning" :size="16" class="text-warn" /></EmptyMedia>
         <EmptyTitle>Container not found</EmptyTitle>
@@ -143,6 +151,7 @@ function act(action: 'start' | 'stop' | 'restart'): void {
         <ExecView v-else-if="ui.detailTab === 'terminal' && running" :container-id="containerId" />
         <StatsView v-else-if="ui.detailTab === 'stats' && running" :container-id="containerId" />
         <InspectView v-else-if="ui.detailTab === 'inspect'" :raw="detail.data.value.raw" />
+        <ContainerEditView v-else-if="ui.detailTab === 'edit'" :container-id="containerId" />
       </div>
     </template>
   </div>
