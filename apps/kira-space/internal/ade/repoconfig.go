@@ -211,6 +211,10 @@ func validateEnvironments(in []adewire.Environment) ([]model.AdeRepoEnv, error) 
 
 // --- folders -------------------------------------------------------------------------------------
 
+func wireFolder(f model.AdeFolder) adewire.Folder {
+	return adewire.Folder{Path: f.Path, Watch: f.Watch, Hidden: f.Hidden, RepoCount: f.RepoCount, HiddenCount: f.HiddenCount}
+}
+
 func (b *TaskBoard) folderByPath(path string) (adewire.Folder, bool, error) {
 	folders, err := b.deps.RepoConfig.Folders()
 	if err != nil {
@@ -218,7 +222,7 @@ func (b *TaskBoard) folderByPath(path string) (adewire.Folder, bool, error) {
 	}
 	for _, f := range folders {
 		if f.Path == path {
-			return adewire.Folder{Path: f.Path, Watch: f.Watch, RepoCount: f.RepoCount}, true, nil
+			return wireFolder(f), true, nil
 		}
 	}
 	return adewire.Folder{}, false, nil
@@ -268,6 +272,25 @@ func (b *TaskBoard) SetFolderWatch(_ context.Context, path string, watch bool) (
 		b.startFolderWatch(path)
 	} else {
 		b.stopFolderWatch(path)
+	}
+	folder, _, err := b.folderByPath(path)
+	if err != nil {
+		return adewire.Folder{}, err
+	}
+	b.notifyRepos()
+	return folder, nil
+}
+
+// SetFolderHidden hides or shows every repo imported from path; later discoveries in the folder
+// import hidden while the flag is set.
+func (b *TaskBoard) SetFolderHidden(_ context.Context, path string, hidden bool) (adewire.Folder, error) {
+	path = filepath.Clean(path)
+	ok, err := b.deps.RepoConfig.SetFolderHidden(path, hidden)
+	if err != nil {
+		return adewire.Folder{}, err
+	}
+	if !ok {
+		return adewire.Folder{}, invalid("folder %s is not in the list", path)
 	}
 	folder, _, err := b.folderByPath(path)
 	if err != nil {

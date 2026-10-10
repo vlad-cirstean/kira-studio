@@ -620,6 +620,14 @@ func (s *AdeTaskService) SetFolderWatch(ctx context.Context, args adewire.Folder
 	return r, adeTaskError(err)
 }
 
+func (s *AdeTaskService) SetFolderHidden(ctx context.Context, args adewire.FolderHiddenArgs) (adewire.Folder, error) {
+	if err := validateAdePath(args.Path, "path"); err != nil {
+		return adewire.Folder{}, err
+	}
+	r, err := s.Engine.SetFolderHidden(ctx, args.Path, args.Hidden)
+	return r, adeTaskError(err)
+}
+
 func (s *AdeTaskService) RemoveFolder(ctx context.Context, args adewire.PathArgs) error {
 	if err := validateAdePath(args.Path, "path"); err != nil {
 		return err

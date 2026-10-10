@@ -641,7 +641,7 @@ func (b *TaskBoard) Repos(_ context.Context) (adewire.ReposResult, error) {
 		out.Repos = append(out.Repos, r)
 	}
 	for _, f := range folders {
-		out.Folders = append(out.Folders, adewire.Folder{Path: f.Path, Watch: f.Watch, RepoCount: f.RepoCount})
+		out.Folders = append(out.Folders, wireFolder(f))
 	}
 	return out, nil
 }

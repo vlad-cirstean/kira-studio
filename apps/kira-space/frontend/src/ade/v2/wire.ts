@@ -46,7 +46,9 @@ export interface Repo {
 export interface Folder {
   path: string;
   watch: boolean;
+  hidden: boolean;
   repoCount: number;
+  hiddenCount: number;
 }
 export interface ReposResult {
   repos: Repo[];
@@ -689,6 +691,10 @@ export interface UpdateRepoArgs {
 export interface FolderArgs {
   path: string;
   watch: boolean;
+}
+export interface FolderHiddenArgs {
+  path: string;
+  hidden: boolean;
 }
 export interface PathArgs {
   path: string;

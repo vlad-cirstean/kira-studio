@@ -236,6 +236,8 @@ const spaceControl = {
     unwrap(CodeWorkspaceService.ImportRepo({ path })).then((r) => trust<RepoSummary>(r)),
   codeWorkspaceRenameRepo: (id: string, name: string): Promise<RepoSummary> =>
     unwrap(CodeWorkspaceService.RenameRepo({ id, name })).then((r) => trust<RepoSummary>(r)),
+  codeWorkspaceSetRepoHidden: (id: string, hidden: boolean): Promise<RepoSummary> =>
+    unwrap(CodeWorkspaceService.SetRepoHidden({ id, hidden })).then((r) => trust<RepoSummary>(r)),
   codeWorkspaceSetRepoColor: (id: string, color: PaletteColor): Promise<RepoSummary> =>
     unwrap(CodeWorkspaceService.SetRepoColor({ id, color })).then((r) => trust<RepoSummary>(r)),
   codeWorkspaceReorderRepos: (ids: string[]): Promise<RepoSummary[]> =>
@@ -344,6 +346,8 @@ const spaceControl = {
     unwrap(AdeTaskService.AddFolder(args)).then((r) => trust<V2.FolderImportResult>(r)),
   adeTaskSetFolderWatch: (args: V2.FolderArgs): Promise<V2.Folder> =>
     unwrap(AdeTaskService.SetFolderWatch(args)).then((r) => trust<V2.Folder>(r)),
+  adeTaskSetFolderHidden: (args: V2.FolderHiddenArgs): Promise<V2.Folder> =>
+    unwrap(AdeTaskService.SetFolderHidden(args)).then((r) => trust<V2.Folder>(r)),
   adeTaskRemoveFolder: (args: V2.PathArgs): Promise<void> =>
     unwrap(AdeTaskService.RemoveFolder(args)),
   adeTaskRecordMerge: (args: V2.RecordMergeArgs): Promise<void> =>

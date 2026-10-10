@@ -105,7 +105,9 @@
     {
       "path": "~/code/acme",
       "watch": true,
-      "repoCount": 5
+      "hidden": false,
+      "repoCount": 5,
+      "hiddenCount": 0
     }
   ]
 }

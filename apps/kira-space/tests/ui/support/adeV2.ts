@@ -50,6 +50,7 @@ function repoRecord(id: string, name: string, order: number) {
     sortOrder: order,
     color: 'none',
     createdAt: '2026-01-01T00:00:00.000Z',
+    hidden: false,
   };
 }
 

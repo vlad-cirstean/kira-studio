@@ -1,0 +1,19 @@
+{
+  "AdeTaskService.SetFolderHidden": {
+    "hidden": true,
+    "hiddenCount": 2,
+    "path": "<work>/folder",
+    "repoCount": 2,
+    "watch": false
+  },
+  "CodeWorkspaceService.SetRepoHidden": {
+    "color": "blue",
+    "createdAt": "<masked>",
+    "hidden": true,
+    "id": "<id:1>",
+    "name": "proj",
+    "repoId": "<work>/proj",
+    "root": "<work>/proj",
+    "sortOrder": 0
+  }
+}

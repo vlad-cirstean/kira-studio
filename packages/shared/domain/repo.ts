@@ -12,6 +12,7 @@ export const repoSummarySchema = /*#__PURE__*/ z.object({
   sortOrder: z.number(),
   color: paletteColorSchema,
   createdAt: z.string(),
+  hidden: z.boolean(),
 });
 export type RepoSummary = z.infer<typeof repoSummarySchema>;
 

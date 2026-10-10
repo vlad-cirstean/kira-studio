@@ -59,6 +59,11 @@ type CodeWorkspaceSetColorArgs struct {
 	Color string `json:"color"`
 }
 
+type CodeWorkspaceSetHiddenArgs struct {
+	ID     string `json:"id"`
+	Hidden bool   `json:"hidden"`
+}
+
 type CodeWorkspaceReorderArgs struct {
 	IDs []string `json:"ids"`
 }
@@ -290,6 +295,13 @@ func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspac
 	case errors.Is(err, codeworkspace.ErrNotRepo), errors.Is(err, codeworkspace.ErrBare):
 		return model.CodeRepo{}, ipcerr.New("E_INVALID", err.Error())
 	case errors.Is(err, codeworkspace.ErrAlreadyImported):
+		if existing, ok := codeworkspace.ExistingRecord(err); ok && existing.Hidden {
+			shown, serr := s.Deps.Repos.CodeRepos.SetHidden(existing.ID, false)
+			if serr == nil {
+				s.reposChanged()
+			}
+			return ipcerr.InternalResult(shown, serr)
+		}
 		return model.CodeRepo{}, ipcerr.New("E_ALREADY_IMPORTED", err.Error())
 	}
 	if err == nil {
@@ -320,6 +332,18 @@ func (s *CodeWorkspaceService) SetRepoColor(args CodeWorkspaceSetColorArgs) (mod
 		return model.CodeRepo{}, ipcerr.BadRequest("invalid colour")
 	}
 	rec, err := s.Deps.Repos.CodeRepos.SetColor(args.ID, args.Color)
+	if err == nil {
+		s.reposChanged()
+	}
+	return ipcerr.InternalResult(rec, err)
+}
+
+// SetRepoHidden hides a repo from the Git panel list; the repo stays imported and usable.
+func (s *CodeWorkspaceService) SetRepoHidden(args CodeWorkspaceSetHiddenArgs) (model.CodeRepo, error) {
+	if args.ID == "" {
+		return model.CodeRepo{}, ipcerr.BadRequest("id is required")
+	}
+	rec, err := s.Deps.Repos.CodeRepos.SetHidden(args.ID, args.Hidden)
 	if err == nil {
 		s.reposChanged()
 	}

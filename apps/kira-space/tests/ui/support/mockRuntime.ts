@@ -61,6 +61,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceImportRepo: 'CodeWorkspaceService.ImportRepo',
   codeWorkspaceRenameRepo: 'CodeWorkspaceService.RenameRepo',
   codeWorkspaceSetRepoColor: 'CodeWorkspaceService.SetRepoColor',
+  codeWorkspaceSetRepoHidden: 'CodeWorkspaceService.SetRepoHidden',
   codeWorkspaceRemoveRepo: 'CodeWorkspaceService.RemoveRepo',
   codeWorkspaceReorderRepos: 'CodeWorkspaceService.ReorderRepos',
   codeWorkspaceListFiles: 'CodeWorkspaceService.ListFiles',
@@ -157,6 +158,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskUpdateRepo: 'AdeTaskService.UpdateRepo',
   adeTaskAddFolder: 'AdeTaskService.AddFolder',
   adeTaskSetFolderWatch: 'AdeTaskService.SetFolderWatch',
+  adeTaskSetFolderHidden: 'AdeTaskService.SetFolderHidden',
   adeTaskRemoveFolder: 'AdeTaskService.RemoveFolder',
   adeTaskStartRun: 'AdeTaskService.StartRun',
   adeTaskSetTaskWorkflow: 'AdeTaskService.SetTaskWorkflow',
@@ -381,6 +383,7 @@ const ADE_TASK_PUSHES: Readonly<Record<string, readonly string[]>> = {
   [IPC.adeTaskUpdateRepo]: [IPC.adeTaskReposChanged],
   [IPC.adeTaskAddFolder]: [IPC.adeTaskReposChanged],
   [IPC.adeTaskSetFolderWatch]: [IPC.adeTaskReposChanged],
+  [IPC.adeTaskSetFolderHidden]: [IPC.adeTaskReposChanged],
   [IPC.adeTaskRemoveFolder]: [IPC.adeTaskReposChanged],
 };
 

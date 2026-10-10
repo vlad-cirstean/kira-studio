@@ -46,6 +46,7 @@ function freshRepoPair(): { codeRepoId: string; gitRepoId: string } {
     sortOrder: repoCounter,
     color: 'none',
     createdAt: '2024-01-01T00:00:00Z',
+    hidden: false,
   });
   return { codeRepoId, gitRepoId };
 }

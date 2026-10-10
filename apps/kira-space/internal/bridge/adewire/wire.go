@@ -70,8 +70,10 @@ type Repo struct {
 
 type Folder struct {
 	Path      string `json:"path"`
-	Watch     bool   `json:"watch"`
-	RepoCount int    `json:"repoCount"`
+	Watch       bool   `json:"watch"`
+	Hidden      bool   `json:"hidden"`
+	RepoCount   int    `json:"repoCount"`
+	HiddenCount int    `json:"hiddenCount"`
 }
 
 type ReposResult struct {
@@ -582,6 +584,11 @@ type UpdateRepoArgs struct {
 type FolderArgs struct {
 	Path  string `json:"path"`
 	Watch bool   `json:"watch"`
+}
+
+type FolderHiddenArgs struct {
+	Path   string `json:"path"`
+	Hidden bool   `json:"hidden"`
 }
 
 type PathArgs struct {
