@@ -249,4 +249,24 @@ func TestBranching(t *testing.T) {
 			t.Fatalf("save on the current hash: %v", err)
 		}
 	})
+
+	t.Run("a YAML save built on an older file text is refused", func(t *testing.T) {
+		f := newRunFixture(t, acts("done"), agentStage("build", agentStep("impl", "")))
+		read, err := f.app.W.AdeTask.WorkflowYaml(ctx, adewire.FileNameArgs{FileName: "flow.yaml"})
+		if err != nil || read.Hash == "" {
+			t.Fatalf("WorkflowYaml = %+v, %v, want a hash", read, err)
+		}
+		first, err := f.app.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: "flow.yaml", Yaml: read.Yaml + "# one\n", BaseHash: read.Hash})
+		if err != nil || first.Hash == "" || first.Hash == read.Hash {
+			t.Fatalf("first save = %+v, %v, want a new hash", first, err)
+		}
+		_, err = f.app.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: "flow.yaml", Yaml: read.Yaml + "# other window\n", BaseHash: read.Hash})
+		var ie *ipcerr.Error
+		if !errors.As(err, &ie) || ie.Code != "E_CONFLICT" {
+			t.Fatalf("stale save err = %v, want E_CONFLICT", err)
+		}
+		if _, err := f.app.W.AdeTask.SaveWorkflowYaml(ctx, adewire.SaveWorkflowYamlArgs{FileName: "flow.yaml", Yaml: read.Yaml + "# two\n", BaseHash: first.Hash}); err != nil {
+			t.Fatalf("save on the current hash: %v", err)
+		}
+	})
 }

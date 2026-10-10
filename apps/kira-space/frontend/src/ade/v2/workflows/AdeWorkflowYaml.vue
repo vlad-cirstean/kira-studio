@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
 import { Textarea } from '@theme/components/ui/textarea';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
@@ -9,7 +10,9 @@ import AdeWorkflowSaveBar from './AdeWorkflowSaveBar.vue';
 import { useSaveShortcut } from './useSaveShortcut';
 
 // YAML mode (R27): validates 300 ms after a keystroke; Save writes the draft, Discard restores the
-// saved text. The draft is the source while it has unsaved edits, so a push never resets it.
+// saved text. The draft is the source while it has unsaved edits, so a push never resets it. Save
+// sends the hash of the text the draft was edited from; a file changed elsewhere is refused with
+// Reload and Overwrite, as in the graph editor.
 const props = defineProps<{ entry: WorkflowEntry }>();
 
 const wfUi = useAdeWorkflowsUiStore();
@@ -20,12 +23,16 @@ const save = useSaveWorkflowYaml();
 const draft = ref('');
 const dirty = ref(false);
 const saveError = ref('');
+const baseHash = ref('');
+const conflict = ref(false);
 const checked = ref<{ error: WorkflowError | null } | null>(null);
 
 watch(
-  () => yaml.data.value?.yaml,
-  (text) => {
-    if (text !== undefined && !dirty.value) draft.value = text;
+  () => yaml.data.value,
+  (data) => {
+    if (!data || dirty.value) return;
+    draft.value = data.yaml;
+    baseHash.value = data.hash;
   },
   { immediate: true },
 );
@@ -58,19 +65,44 @@ async function saveNow(): Promise<void> {
   if (!dirty.value) return;
   const text = draft.value;
   try {
-    await save.mutateAsync({ fileName: props.entry.fileName, yaml: text });
+    const entry = await save.mutateAsync({
+      fileName: props.entry.fileName,
+      yaml: text,
+      baseHash: baseHash.value,
+    });
     saveError.value = '';
+    conflict.value = false;
+    baseHash.value = entry.hash;
     if (draft.value === text) dirty.value = false;
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : String(err);
+    conflict.value = (err as { code?: string }).code === 'E_CONFLICT';
   }
 }
 
-function discard(): void {
-  draft.value = yaml.data.value?.yaml ?? '';
+function resetTo(data: { yaml: string; hash: string } | undefined): void {
+  draft.value = data?.yaml ?? '';
+  baseHash.value = data?.hash ?? '';
   dirty.value = false;
   saveError.value = '';
+  conflict.value = false;
   checked.value = null;
+}
+
+function discard(): void {
+  resetTo(yaml.data.value);
+}
+
+async function reload(): Promise<void> {
+  resetTo((await yaml.refetch()).data);
+}
+
+async function overwrite(): Promise<void> {
+  const fresh = (await yaml.refetch()).data;
+  if (!fresh) return;
+  baseHash.value = fresh.hash;
+  conflict.value = false;
+  await saveNow();
 }
 
 function onInput(v: string | number): void {
@@ -107,6 +139,16 @@ onBeforeUnmount(() => {
       ✓ valid · the form and the plan use this file
     </div>
     <div v-else role="alert" class="font-data text-kira-sm text-error" data-testid="ade-wf-yaml-msg">{{ message }}</div>
-    <div v-if="saveError" class="text-kira-sm text-error" data-testid="ade-wf-save-error">{{ saveError }}</div>
+    <div v-if="saveError" class="text-kira-sm text-error" data-testid="ade-wf-save-error">
+      {{ saveError }}
+      <template v-if="conflict">
+        <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-reload" @click="reload">
+          Reload
+        </Button>
+        <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-overwrite" @click="overwrite">
+          Overwrite
+        </Button>
+      </template>
+    </div>
   </div>
 </template>

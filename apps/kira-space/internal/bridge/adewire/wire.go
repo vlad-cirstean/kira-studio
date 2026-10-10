@@ -159,6 +159,8 @@ type WorkflowYaml struct {
 	FileName string `json:"fileName"`
 	Path     string `json:"path"`
 	Yaml     string `json:"yaml"`
+	// Hash identifies Yaml; SaveWorkflowYamlArgs.BaseHash sends it back.
+	Hash string `json:"hash"`
 }
 
 type WorkflowValidation struct {
@@ -557,6 +559,8 @@ type SaveWorkflowArgs struct {
 type SaveWorkflowYamlArgs struct {
 	FileName string `json:"fileName"`
 	Yaml     string `json:"yaml"`
+	// BaseHash is the WorkflowYaml.Hash the text was edited from; "" skips the check.
+	BaseHash string `json:"baseHash"`
 }
 
 type ValidateWorkflowYamlArgs struct {

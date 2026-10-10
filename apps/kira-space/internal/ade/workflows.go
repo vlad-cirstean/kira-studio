@@ -101,7 +101,7 @@ func (b *TaskBoard) SaveWorkflow(_ context.Context, args adewire.SaveWorkflowArg
 
 // SaveWorkflowYaml writes the text as given, valid or not.
 func (b *TaskBoard) SaveWorkflowYaml(_ context.Context, args adewire.SaveWorkflowYamlArgs) (adewire.WorkflowEntry, error) {
-	e, err := b.deps.Workflows.SaveYaml(args.FileName, args.Yaml)
+	e, err := b.deps.Workflows.SaveYaml(args.FileName, args.BaseHash, args.Yaml)
 	if err != nil {
 		return adewire.WorkflowEntry{}, wfErr(err)
 	}

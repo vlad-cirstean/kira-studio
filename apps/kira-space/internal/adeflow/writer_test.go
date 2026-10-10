@@ -27,7 +27,7 @@ func seed(t *testing.T, r *Reader, name string) string {
 	text := "# my workflow\n" + strings.Replace(string(src), "stages:\n", "stages:\n  # stage list\n", 1)
 	text = strings.Replace(text, "    kind: agent\n", "    kind: automated # alias stays\n", 1)
 	text = strings.Replace(text, "        timeout: 2h\n", "        timeout: 2h # long\n", 1)
-	if _, err := r.SaveYaml(name, text); err != nil {
+	if _, err := r.SaveYaml(name, "", text); err != nil {
 		t.Fatal(err)
 	}
 	return text
@@ -197,7 +197,7 @@ func TestSave_edits(t *testing.T) {
 
 func TestSave_refusals(t *testing.T) {
 	r := newReader(t)
-	if _, err := r.SaveYaml("w.yaml", "id: w\nname: [\n"); err != nil {
+	if _, err := r.SaveYaml("w.yaml", "", "id: w\nname: [\n"); err != nil {
 		t.Fatal(err)
 	}
 	wf := adewire.Workflow{ID: "w", Name: "W", Stages: []adewire.Stage{{ID: "u", Name: "U", Kind: "user", Status: "To do", Steps: []adewire.PipelineStep{}}}}
@@ -221,7 +221,7 @@ func TestSave_refusals(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(r.Dir, "fresh.yaml")); !os.IsNotExist(err) {
 		t.Fatal("invalid workflow written")
 	}
-	if _, err := r.SaveYaml("../x.yaml", "x"); err == nil {
+	if _, err := r.SaveYaml("../x.yaml", "", "x"); err == nil {
 		t.Fatal("path traversal accepted")
 	}
 }

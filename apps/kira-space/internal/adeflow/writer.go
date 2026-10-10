@@ -63,12 +63,14 @@ func (r *Reader) ReadYaml(file string) (adewire.WorkflowYaml, error) {
 		}
 		return adewire.WorkflowYaml{}, fmt.Errorf("adeflow: read %s: %w", file, err)
 	}
-	return adewire.WorkflowYaml{FileName: file, Path: p, Yaml: string(src)}, nil
+	return adewire.WorkflowYaml{FileName: file, Path: p, Yaml: string(src), Hash: textHash(src)}, nil
 }
 
 // SaveYaml writes src as the file's content, valid or not: the user's text is never refused, and
 // the last valid version stays in use while the file is broken.
-func (r *Reader) SaveYaml(file, src string) (adewire.WorkflowEntry, error) {
+//
+// baseHash, when set, must match the file's current text (see textHash), else ErrConflict.
+func (r *Reader) SaveYaml(file, baseHash, src string) (adewire.WorkflowEntry, error) {
 	p, err := r.path(file)
 	if err != nil {
 		return adewire.WorkflowEntry{}, err
@@ -78,6 +80,15 @@ func (r *Reader) SaveYaml(file, src string) (adewire.WorkflowEntry, error) {
 	}
 	r.wmu.Lock()
 	defer r.wmu.Unlock()
+	if baseHash != "" {
+		cur, err := os.ReadFile(p)
+		if err != nil && !os.IsNotExist(err) {
+			return adewire.WorkflowEntry{}, fmt.Errorf("adeflow: read %s: %w", file, err)
+		}
+		if textHash(cur) != baseHash {
+			return adewire.WorkflowEntry{}, fmt.Errorf("%w: the workflow changed since it was loaded", ErrConflict)
+		}
+	}
 	if err := writeAtomic(r.Dir, file, []byte(src)); err != nil {
 		return adewire.WorkflowEntry{}, err
 	}

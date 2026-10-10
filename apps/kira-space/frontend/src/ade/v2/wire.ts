@@ -133,6 +133,7 @@ export interface WorkflowYaml {
   fileName: string;
   path: string;
   yaml: string;
+  hash: string /* identifies yaml; Save sends it back as baseHash */;
 }
 export interface WorkflowValidation {
   workflow: Workflow | null;
@@ -668,6 +669,7 @@ export interface SaveWorkflowArgs {
 export interface SaveWorkflowYamlArgs {
   fileName: string;
   yaml: string;
+  baseHash: string /* the yaml hash the text was edited from; '' skips the check */;
 }
 export interface ValidateWorkflowYamlArgs {
   yaml: string;

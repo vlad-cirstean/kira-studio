@@ -285,6 +285,32 @@ test('YAML mode validates while typing and saves the text on Save', async ({ rel
   });
 });
 
+test('a YAML save refused for a changed file offers Reload and Overwrite', async ({ relaunch }) => {
+  const { window: page, control } = await openWorkflows(relaunch, [
+    {
+      channel: IPC.adeTaskSaveWorkflowYaml,
+      error: { code: 'E_CONFLICT', message: 'the workflow changed since it was loaded' },
+    },
+  ]);
+  await openYaml(page);
+  const area = page.locator(t('ade-wf-yaml'));
+  await area.fill(`${await area.inputValue()}\n# note\n`);
+  await page.locator(t('ade-wf-save')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflowYaml)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskSaveWorkflowYaml)[0]?.args).toMatchObject({
+    fileName: 'standard.yaml',
+    baseHash: 'hash-standard.yaml',
+  });
+  await expect(page.locator(t('ade-wf-save-error'))).toContainText('changed since it was loaded');
+
+  await page.locator(t('ade-wf-overwrite')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflowYaml)).toHaveLength(2);
+
+  await page.locator(t('ade-wf-reload')).click();
+  await expect(page.locator(t('ade-wf-save-error'))).toHaveCount(0);
+  await expect(page.locator(t('ade-wf-save'))).toBeDisabled();
+});
+
 test('an invalid YAML shows its line and keeps the last valid version', async ({ relaunch }) => {
   const { window: page } = await openWorkflows(relaunch, [
     {
