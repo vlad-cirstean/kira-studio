@@ -69,7 +69,7 @@ type Repo struct {
 }
 
 type Folder struct {
-	Path      string `json:"path"`
+	Path        string `json:"path"`
 	Watch       bool   `json:"watch"`
 	Hidden      bool   `json:"hidden"`
 	RepoCount   int    `json:"repoCount"`
