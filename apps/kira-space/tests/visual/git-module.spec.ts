@@ -244,3 +244,13 @@ test('git module: branch picker (P256)', async ({ relaunch }) => {
   await expect(picker).toBeVisible();
   await expect(picker).toHaveScreenshot('git-branch-picker.png');
 });
+
+test('git module: row context menu (P258)', async ({ relaunch }) => {
+  const win = await openGraph(relaunch);
+  await win
+    .locator('[data-testid="commit-grid"] .slick-row[data-row="1"]')
+    .click({ button: 'right' });
+  const menu = win.getByRole('menu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toHaveScreenshot('git-row-menu.png');
+});

@@ -79,7 +79,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         :pr-result="pr?.selected.value"
         :pr-for-commit="pr?.prForCommit(detailState.sha.value ?? '')"
       />
-      <FileTree data-testid="detail-pane-tree"
+      <FileTree
         class="flex-auto min-h-0 border-y border-border"
         :files="detail.files"
         :selected-file="detailState.selectedFile.value"

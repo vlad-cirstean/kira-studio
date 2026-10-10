@@ -676,12 +676,13 @@ function raiseLaneFloor(): void {
 
 /** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — re-render it; `raiseLaneFloor` widens the graph column when the new lanes need it.
  *
- *  `invalidateRowHeights()` is SlickGrid's "index and rows are both stale" entry point, so
- *  `_range` is unused — kept for the callback signature. */
+ *  Row heights are uniform, so `invalidateRowHeights()` alone no longer redraws rows; rebuild the
+ *  rendered ones. `_range` is unused — kept for the callback signature. */
 function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
   raiseLaneFloor();
-  grid.invalidateRowHeights();
+  grid.invalidateAllRows();
+  grid.render();
   if (!layoutCompleteMarked) {
     layoutCompleteMarked = true;
     performance.mark('kira:layout-complete');

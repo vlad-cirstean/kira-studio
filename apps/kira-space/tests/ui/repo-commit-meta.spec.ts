@@ -27,7 +27,7 @@ test('collapsed, the pane shows the title, a short SHA and Open all changes, and
       document.querySelector(sel)?.getBoundingClientRect().height ?? 0;
     return {
       pane: height('[data-testid="detail-pane"]'),
-      tree: height('[data-testid="detail-pane-tree"]'),
+      tree: height('[data-testid="file-tree"]'),
     };
   });
   expect(pane).toBeGreaterThan(0);
@@ -71,4 +71,16 @@ test('Show more reveals the full body, trailers, identities and refs, and the pa
   }));
   expect(expanded.height).toBeGreaterThan(collapsedHeight);
   expect(expanded.overflowY).toBe('auto');
+});
+
+test('the view head and the detail head are Studio 34px toolbars', async ({ relaunch }) => {
+  const page = await openCommitDetail(relaunch);
+  const viewHead = page.locator('[data-testid="git-view-head"]');
+  await expect(viewHead).toBeVisible();
+  await expect(page.locator('[data-testid="git-view-head-branch"]')).toBeVisible();
+  const detailHead = page.locator('[data-testid="detail-head"]');
+  await expect(detailHead).toBeVisible();
+  for (const head of [viewHead, detailHead]) {
+    expect(await head.evaluate((el) => el.getBoundingClientRect().height)).toBe(34);
+  }
 });

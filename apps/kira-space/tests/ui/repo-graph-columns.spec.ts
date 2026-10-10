@@ -85,15 +85,17 @@ test('the grid has the four columns and no SHA cell, and the date column fits it
   expect(cellWidth).toBeGreaterThanOrEqual(widest);
 });
 
-test('a decorated row is taller, and each row graph node sits on its own subject line', async ({
+test('decorated and plain rows share one height, and each graph node sits on its subject line', async ({
   relaunch,
 }) => {
   const page = await bootGrid(relaunch, TAGGED);
   await expect(row(page, 1)).toBeVisible();
 
   const height = (n: number) => row(page, n).evaluate((el) => el.getBoundingClientRect().height);
-  expect(await height(1)).toBeGreaterThan(await height(0));
+  expect(await height(1)).toBe(await height(0));
 
+  await expect(row(page, 0).locator('[data-testid="graph-svg"] circle')).toBeVisible();
+  await expect(row(page, 1).locator('[data-testid="graph-svg"] circle')).toBeVisible();
   for (const n of [0, 1]) {
     const { nodeY, subjectY } = await page.evaluate((index) => {
       const rowEl = document.querySelector(
@@ -113,7 +115,7 @@ test('a decorated row is taller, and each row graph node sits on its own subject
   }
 });
 
-test('Git graph font size scales grid text and decorated row height', async ({ relaunch }) => {
+test('Git graph font size scales grid text and row height', async ({ relaunch }) => {
   const page = await bootGrid(relaunch, TAGGED, {
     control: [
       ...PORT_CONTROL,
@@ -129,14 +131,12 @@ test('Git graph font size scales grid text and decorated row height', async ({ r
     .locator('.kira-cell-message')
     .evaluate((el) => getComputedStyle(el).fontSize);
   expect(fontSize).toBe('20px');
-  // compact = max(row-height 28, h-xs 25 + 2), decorated = compact + h-xs (13px default gives 45).
+  // row = max(row-height 28, h-xs (t+6) + 2) = max(28, t+8); one height for all rows.
   const height = await row(page, 1).evaluate((el) => el.getBoundingClientRect().height);
-  expect(height).toBe(53);
+  expect(height).toBe(28);
 });
 
-test('a tag badge is a translucent tint with a coloured border and a matching icon', async ({
-  relaunch,
-}) => {
+test('a tag badge is a filled Studio Badge with a matching icon', async ({ relaunch }) => {
   const page = await bootGrid(relaunch, TAGGED);
   const badge = row(page, 1).locator('[data-testid="badge-tag"]').first();
   await expect(badge).toBeVisible();
@@ -152,8 +152,7 @@ test('a tag badge is a translucent tint with a coloured border and a matching ic
       icon: getComputedStyle(icon).color,
     };
   });
-  expect(style.bg).toMatch(/\/ 0\.15\)$|,\s*0\.15\)$/);
-  expect(style.border).not.toMatch(/^(rgba\(0,\s*0,\s*0,\s*0\)|transparent)$/);
+  expect(style.bg).not.toMatch(/^(rgba\(0,\s*0,\s*0,\s*0\)|transparent)$/);
   expect(style.icon).toBe(style.color);
 });
 

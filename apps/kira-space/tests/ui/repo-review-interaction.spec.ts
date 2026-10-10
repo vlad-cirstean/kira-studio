@@ -106,7 +106,9 @@ test('the back button returns to branch selection', async ({ relaunch }) => {
 test('600 commits mount 500 rows; Show more reveals the rest', async ({ relaunch }) => {
   const total = 600;
   const page = await openReviewListing(relaunch, { chunks: oneChunk(manyRows(total)) });
-  const rows = page.locator('[data-testid^="review-row-"]');
+  const rows = page.locator(
+    '[data-testid^="review-row-"]:not([data-testid$="-header"]):not([data-testid$="-actions"])',
+  );
   await expect(rows).toHaveCount(500);
 
   const showMore = page.locator('[data-testid="review-load-more-button"]');
