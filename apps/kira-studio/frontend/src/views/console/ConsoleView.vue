@@ -922,7 +922,7 @@ const statusLine = computed(() => {
              than stacking every statement's page — D2. Each chip is a result *set*, addressed by
              its stable key (state.ts's resultPageKey/nextSeq), not by position, so closing one
              doesn't re-key its siblings. -->
-        <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
+        <ViewToolbar>
           <div
             ref="resultStripRef"
             class="flex items-center flex-1 min-w-0 overflow-x-auto gap-0.5 scrollbar-none"
@@ -981,7 +981,7 @@ const statusLine = computed(() => {
               @click="onCollapseAllResults"
             />
           </template>
-        </div>
+        </ViewToolbar>
         <SearchToolbar
           v-if="rt.searchOpen && !activeResultIsPlan"
           :tab-id="tab.id"

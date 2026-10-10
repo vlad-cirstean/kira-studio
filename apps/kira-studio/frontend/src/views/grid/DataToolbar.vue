@@ -2,10 +2,10 @@
 import type { PageSize } from '@shared/domain/tabs';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
@@ -36,6 +36,7 @@ const props = defineProps<{ tab: DataTabRecord }>();
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
 // (kept only because two leaks.spec.ts assertions read .active, since fixed) can be the primitive.
 const PAGE_SIZE_OPTIONS = pageSizeOptions('');
+const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label, testid: o.testid }));
 
 const rt = computed(() => gridViewStore.runtime[props.tab.id]);
 
@@ -257,22 +258,7 @@ function onDeleteRow(): void {
     @jump="onJump"
   />
 
-  <ToggleGroup
-    type="single"
-    size="kira"
-    :model-value="String(tab.state.pageSize)"
-    data-testid="page-size-picker"
-    @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"
-  >
-    <ToggleGroupItem
-      v-for="opt in PAGE_SIZE_OPTIONS"
-      :key="opt.value"
-      :value="String(opt.value)"
-      :data-testid="opt.testid"
-    >
-      {{ opt.label }}
-    </ToggleGroupItem>
-  </ToggleGroup>
+  <SecondaryTabs variant="segmented" :model-value="String(tab.state.pageSize)" :items="PAGE_SIZE_ITEMS" data-testid="page-size-picker" @update:model-value="(v) => onPageSize(Number(v) as PageSize)" />
 
   <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 

@@ -137,11 +137,11 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
   // tab 2 is active: change its page size to 1000.
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await page.click('[data-testid="page-size-1000"]');
-  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveAttribute('data-state', 'on');
 
   // Switch to tab 1: untouched (page size 100).
   await tabLocator(page, tab1Id).click();
-  await expect(page.locator('[data-testid="page-size-100"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="page-size-100"]')).toHaveAttribute('data-state', 'on');
 
   // --- tab context menu: exact item id list, then exercise each action --------------------
   await tabLocator(page, tab1Id).click({ button: 'right' });
@@ -164,7 +164,7 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
   await expect(tabs).toHaveCount(3);
   const tab3Id = await tabs.nth(2).getAttribute('data-tab-id');
   if (!tab3Id) throw new Error('expected a third tab id');
-  await expect(page.locator('[data-testid="page-size-100"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="page-size-100"]')).toHaveAttribute('data-state', 'on');
 
   // Reveal in project panel: collapse the tree, then assert the action re-expands and selects
   // the originating row.

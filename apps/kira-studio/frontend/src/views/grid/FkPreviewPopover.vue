@@ -133,7 +133,7 @@ onUnmounted(() => {
   <div class="fixed inset-0 z-(--kira-z-popover)" data-testid="fk-preview-backdrop">
     <div ref="panelEl" class="fixed w-80 flex flex-col max-h-[var(--kira-float-max-h,none)] max-w-[var(--kira-float-max-w,none)] bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden" data-testid="fk-preview" :style="style">
       <div class="flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5">
-        <span class="font-semibold overflow-hidden text-ellipsis whitespace-nowrap">{{ tableLabel }}</span>
+        <span class="font-medium overflow-hidden text-ellipsis whitespace-nowrap">{{ tableLabel }}</span>
         <Badge
           v-if="state.status === 'ready' && state.hasMore"
           variant="info"
@@ -154,7 +154,7 @@ onUnmounted(() => {
            content height, and the panel overflows its own max-height instead of scrolling here. -->
       <div class="flex-1 min-h-0 overflow-y-auto p-1.5">
         <div v-if="state.status === 'loading'" class="flex items-center justify-center h-10 text-muted-foreground">
-          <CodiconIcon name="loading" class="animate-spin" :size="14" />
+          <CodiconIcon name="loading" class="animate-spin" :size="12" />
         </div>
         <Badge v-else-if="state.status === 'error'" variant="err">{{ state.message }}</Badge>
         <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="note" data-testid="fk-preview-empty">

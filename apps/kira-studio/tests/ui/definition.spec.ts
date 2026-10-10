@@ -163,8 +163,9 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   await expect(definitionView).toHaveAttribute('data-path', ORDER_ITEMS_PATH);
   await expect(definitionView).toHaveAttribute('data-origin', 'composed', { timeout: 15_000 });
   await expect(definitionView).toHaveAttribute('data-source', 'server');
-  await expect(definitionView.locator('[data-testid="definition-pane-structure"]')).toHaveClass(
-    /on/,
+  await expect(definitionView.locator('[data-testid="definition-pane-structure"]')).toHaveAttribute(
+    'data-state',
+    'on',
   );
   await expect(definitionView.locator('.monaco-host')).toHaveCount(0);
 
@@ -227,7 +228,10 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
 
   // --- scenario 4: highlighting is live (Source pane) ---------------------------------------
   await switchToSource(definitionView);
-  await expect(definitionView.locator('[data-testid="definition-pane-source"]')).toHaveClass(/on/);
+  await expect(definitionView.locator('[data-testid="definition-pane-source"]')).toHaveAttribute(
+    'data-state',
+    'on',
+  );
   expect(await editorText(definitionView)).toContain('CREATE TABLE app.order_items');
   expect(await definitionView.locator('.view-lines span').count()).toBeGreaterThan(0);
 

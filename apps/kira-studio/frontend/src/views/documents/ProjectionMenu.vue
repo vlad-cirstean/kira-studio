@@ -96,7 +96,7 @@ onUnmounted(() => {
           data-testid="document-projection-menu-item"
           @update:model-value="toggle(name)"
         >
-          <CodiconIcon name="check" :size="10" />
+          <CodiconIcon name="check" :size="12" />
         </Checkbox>
         {{ name }}
       </Label>

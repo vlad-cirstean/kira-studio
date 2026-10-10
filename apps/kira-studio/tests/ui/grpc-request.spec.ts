@@ -959,7 +959,10 @@ test('gRPC request — the history list refreshes after a call made while anothe
 
   // Both calls happen with the Messages pane showing (the default) — never opening History in
   // between, so both take the lazy branch.
-  await expect(page.locator('[data-testid="grpc-response-pane-messages"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="grpc-response-pane-messages"]')).toHaveAttribute(
+    'data-state',
+    'on',
+  );
   await page.click('[data-testid="grpc-call"]');
   await expect(page.locator('[data-testid="grpc-status-chip"]')).toContainText('OK (0)');
   await page.click('[data-testid="grpc-call"]');

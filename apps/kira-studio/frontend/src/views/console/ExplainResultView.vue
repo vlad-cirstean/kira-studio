@@ -103,7 +103,7 @@ const rawLanguage = computed(() =>
           data-testid="explain-verdict"
           :data-over-threshold="plan.overThreshold"
         >
-          <CodiconIcon :name="plan.overThreshold ? 'warning' : 'check'" :size="14" />
+          <CodiconIcon :name="plan.overThreshold ? 'warning' : 'check'" :size="12" />
           <span>{{ verdict }}</span>
         </div>
         <Tooltip v-if="nativeCostLabel">

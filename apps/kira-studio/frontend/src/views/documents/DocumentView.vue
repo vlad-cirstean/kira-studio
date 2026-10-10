@@ -3,13 +3,13 @@ import type { SortSpec } from '@shared/domain/queries';
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty } from '@theme/components/ui/empty';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
@@ -283,6 +283,7 @@ function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null):
 
 // P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
 const PAGE_SIZE_OPTIONS = pageSizeOptions('document-');
+const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label, testid: o.testid }));
 
 function onPageSize(size: PageSize): void {
   documentViewStore.setPageSize(props.tab.id, size);
@@ -787,22 +788,7 @@ onUnmounted(() => {
         @last="documentViewStore.goLast(tab.id)"
         @jump="onJump"
       />
-      <ToggleGroup
-        type="single"
-        size="kira"
-        :model-value="String(tab.state.pageSize)"
-        data-testid="document-page-size-picker"
-        @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"
-      >
-        <ToggleGroupItem
-          v-for="opt in PAGE_SIZE_OPTIONS"
-          :key="opt.value"
-          :value="String(opt.value)"
-          :data-testid="opt.testid"
-        >
-          {{ opt.label }}
-        </ToggleGroupItem>
-      </ToggleGroup>
+      <SecondaryTabs variant="segmented" :model-value="String(tab.state.pageSize)" :items="PAGE_SIZE_ITEMS" data-testid="document-page-size-picker" @update:model-value="(v) => onPageSize(Number(v) as PageSize)" />
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
       <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
            the exact count, the fields/projection menu, and expand/collapse-all. -->
@@ -857,7 +843,7 @@ onUnmounted(() => {
                (hidden) never matters for positioning. -->
           <Popover :open="projectionOpen" @update:open="(v) => (projectionOpen = v)">
             <PopoverAnchor :reference="(projectionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
-            <PopoverContent align="end" class="w-52 p-0" data-testid="document-projection-menu">
+            <PopoverContent align="end" class="w-56 p-0" data-testid="document-projection-menu">
               <ProjectionMenu :tab-id="tab.id" :caps="caps" />
             </PopoverContent>
           </Popover>
@@ -1032,32 +1018,27 @@ onUnmounted(() => {
     </div>
 
     <div class="flex-1 min-h-0 overflow-y-auto" data-testid="document-list">
-      <Alert
-        v-if="!rt || rt.rowCount === 0"
-        class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-      >
-        <CodiconIcon :name="rt ? 'json' : 'loading'" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ rt ? 'No documents' : 'Loading…' }}</AlertTitle>
-      </Alert>
+      <Empty v-if="!rt || rt.rowCount === 0" class="h-full">
+        <EmptyHeader>
+          <EmptyMedia><CodiconIcon :name="rt ? 'json' : 'loading'" :size="24" /></EmptyMedia>
+          <EmptyTitle>{{ rt ? 'No documents' : 'Loading…' }}</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
            from "no documents loaded". -->
-      <Alert
-        v-else-if="displayRows && displayRows.length === 0"
-        class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
-        data-testid="document-no-matching-rows"
-      >
-        <CodiconIcon name="search" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted-foreground">No matching rows</AlertTitle>
-        <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
-          <Button
-            variant="toolbar"
-            size="kira"
-            data-testid="document-show-all-rows"
-            @click="pageSearchFilterStore.setSearchFiltering(tab.id, false)"
-            >Show all rows</Button
-          >
-        </AlertAction>
-      </Alert>
+      <Empty v-else-if="displayRows && displayRows.length === 0" class="h-full" data-testid="document-no-matching-rows">
+        <EmptyHeader>
+          <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+          <EmptyTitle>No matching rows</EmptyTitle>
+        </EmptyHeader>
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="document-show-all-rows"
+          @click="pageSearchFilterStore.setSearchFiltering(tab.id, false)"
+          >Show all rows</Button
+        >
+      </Empty>
       <!-- D1/D19: the row shows only its `_id` and two facts (field count, size) — no part of
            the body — until expanded; an expanded document renders through DocumentTree.vue's
            flat line list, never a per-row CodeMirror instance, which is what makes "every

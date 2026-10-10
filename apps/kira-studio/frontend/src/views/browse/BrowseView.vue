@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
-import { Empty } from '@theme/components/ui/empty';
-import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
@@ -335,23 +335,7 @@ onMounted(() => {
     </ViewToolbar>
 
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
-          <InputGroup variant="kira" class="flex w-full font-ui">
-            <CodiconIcon name="search" :size="13" class="shrink-0 text-muted-foreground" />
-            <InputGroupInput
-              :model-value="filterText"
-              placeholder="Filter"
-              class="h-full p-0 font-ui"
-              data-testid="browse-filter"
-              @update:model-value="(v: string | number) => (filterText = String(v))"
-            />
-            <TooltipIconButton
-              v-if="filterText"
-              icon="close"
-              label="Clear search"
-              data-testid="browse-filter-clear"
-              @click="filterText = ''"
-            />
-          </InputGroup>
+          <div class="flex w-full font-ui"><SearchField :model-value="filterText" placeholder="Filter" data-testid="browse-filter" @update:model-value="(v: string | number) => (filterText = String(v))" /></div>
         </div>
         <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="browse-error">
           <AlertDescription>{{ rt.error.message }}</AlertDescription>
@@ -504,14 +488,12 @@ onMounted(() => {
 
         <ResizablePanel class="min-w-0 flex flex-col min-h-0" data-testid="browse-detail-pane" :order="2">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
-          <Alert
-            v-else
-            class="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
-            data-testid="browse-preview-empty"
-          >
-            <CodiconIcon :name="emptyPreviewIcon" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ emptyPreviewLabel }}</AlertTitle>
-          </Alert>
+          <Empty v-else class="min-h-0 flex-1" data-testid="browse-preview-empty">
+            <EmptyHeader>
+              <EmptyMedia><CodiconIcon :name="emptyPreviewIcon" :size="24" /></EmptyMedia>
+              <EmptyTitle>{{ emptyPreviewLabel }}</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
         </ResizablePanel>
       </ResizablePanelGroup>
   </div>

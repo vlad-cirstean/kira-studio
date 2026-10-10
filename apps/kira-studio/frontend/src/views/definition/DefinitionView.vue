@@ -2,13 +2,13 @@
 import { definitionText } from '@shared/domain/definition';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
@@ -259,11 +259,7 @@ const breadcrumb = computed(() => {
       </div>
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <div class="flex items-center gap-1.5 min-w-0">
-        <ToggleGroup type="single" size="kira" :model-value="pane" data-testid="definition-pane" @update:model-value="(v) => v && setPane(v as 'structure' | 'source')">
-          <ToggleGroupItem v-for="opt in PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
-            {{ opt.label }}
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <SecondaryTabs :model-value="pane" :items="PANE_OPTIONS" data-testid="definition-pane" @update:model-value="(v) => setPane(v as 'structure' | 'source')" />
       </div>
       <!-- P22b D14: the single largest searchable document in Studio (F21) had no search at
            all — a find-in-document bar for Source, a plain substring filter for Structure. -->
@@ -322,19 +318,7 @@ const breadcrumb = computed(() => {
         </ul>
       </AlertDescription>
     </Alert>
-    <InputGroup v-if="searchOpen && pane === 'structure'">
-      <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-      <InputGroupInput
-        v-model="structureFilterQuery"
-        placeholder="Filter columns, indexes, constraints"
-        data-testid="definition-structure-filter"
-      />
-      <InputGroupAddon v-if="structureFilterQuery" align="inline-end">
-        <InputGroupButton aria-label="Clear filter" @click="structureFilterQuery = ''">
-          <CodiconIcon name="close" :size="13" />
-        </InputGroupButton>
-      </InputGroupAddon>
-    </InputGroup>
+    <SearchField v-if="searchOpen && pane === 'structure'" v-model="structureFilterQuery" placeholder="Filter columns, indexes, constraints" data-testid="definition-structure-filter" />
 
     <!-- Item 4: the reconnect gate used to replace this whole view chrome (header, toolbar and
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency

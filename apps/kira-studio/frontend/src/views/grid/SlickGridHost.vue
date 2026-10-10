@@ -6,8 +6,8 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
@@ -2706,21 +2706,17 @@ defineExpose({
   >
     <div ref="rootRef" class="slick-grid-mount h-full w-full"></div>
     <AttributeTooltip :container="headerRowEls" />
-    <Alert
-      v-if="showNoRows"
-      class="no-rows absolute inset-0 flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
-      data-testid="grid-no-rows"
-    >
-      <CodiconIcon name="table" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">No rows</AlertTitle>
-    </Alert>
-    <Alert
-      v-else-if="showNoMatchingRows"
-      class="no-rows absolute inset-0 flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
-      data-testid="grid-no-matching-rows"
-    >
-      <CodiconIcon name="search" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matching rows</AlertTitle>
+    <Empty v-if="showNoRows" class="no-rows absolute inset-0" data-testid="grid-no-rows">
+      <EmptyHeader>
+        <EmptyMedia><CodiconIcon name="table" :size="24" /></EmptyMedia>
+        <EmptyTitle>No rows</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
+    <Empty v-else-if="showNoMatchingRows" class="no-rows absolute inset-0" data-testid="grid-no-matching-rows">
+      <EmptyHeader>
+        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+        <EmptyTitle>No matching rows</EmptyTitle>
+      </EmptyHeader>
       <Button
         variant="toolbar"
         size="kira"
@@ -2729,7 +2725,7 @@ defineExpose({
       >
         Show all rows
       </Button>
-    </Alert>
+    </Empty>
     <FkPreviewPopover
       v-if="fkPreview"
       :x="fkPreview.x"

@@ -471,7 +471,10 @@ test('Http history — the list refreshes after a send made while another pane w
 
   // Both sends happen with the Body pane showing (the default, and where a user is after every
   // send) — never opening History in between, so both take the lazy branch (F3's exact repro).
-  await expect(page.locator('[data-testid="http-response-pane-body"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="http-response-pane-body"]')).toHaveAttribute(
+    'data-state',
+    'on',
+  );
   await page.click('[data-testid="http-send"]');
   await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
   await page.click('[data-testid="http-send"]');

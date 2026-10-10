@@ -1,14 +1,4 @@
 # P262 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-apps/kira-studio/frontend/src/views/browse/BrowseView.vue
-apps/kira-studio/frontend/src/views/console/ConsoleView.vue
-apps/kira-studio/frontend/src/views/console/ExplainResultView.vue
-apps/kira-studio/frontend/src/views/definition/DefinitionView.vue
-apps/kira-studio/frontend/src/views/documents/DocumentView.vue
-apps/kira-studio/frontend/src/views/documents/ProjectionMenu.vue
-apps/kira-studio/frontend/src/views/grid/ColumnsMenu.vue
-apps/kira-studio/frontend/src/views/grid/DataToolbar.vue
-apps/kira-studio/frontend/src/views/grid/FkPreviewPopover.vue
-apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue
 apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue
 apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue
 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue

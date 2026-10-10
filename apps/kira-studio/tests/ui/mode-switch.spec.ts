@@ -92,7 +92,7 @@ test('mode switch — four mode tabs, an empty Http mode, and Studio state that 
   await orderItemsRow.dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await page.click('[data-testid="page-size-1000"]');
-  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveAttribute('data-state', 'on');
 
   const studioTab = page.locator('[data-testid="tab"]');
   await expect(studioTab).toHaveCount(1);
@@ -146,7 +146,7 @@ test('mode switch — four mode tabs, an empty Http mode, and Studio state that 
   await expect(restoredTab).toHaveAttribute('data-tab-id', studioTabId ?? '');
   await expect(restoredTab).toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
-  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveAttribute('data-state', 'on');
 
   // 4. the left panel's width is preserved across the switch (D8: both modes share one width).
   const panelWidthAfter = (await page.locator('[data-testid="project-panel"]').boundingBox())
@@ -198,7 +198,7 @@ test('a window-close flush saves pending tab state at once, then acks (P168 Part
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await page.click('[data-testid="page-size-1000"]');
-  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveAttribute('data-state', 'on');
 
   // A save carrying the new page size must land before the ack; the debounce may or may not have
   // fired first, so no exact count.

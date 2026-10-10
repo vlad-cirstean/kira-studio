@@ -119,7 +119,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <PopoverContent align="end" class="w-52 gap-0 p-0" data-testid="columns-menu">
+  <PopoverContent align="end" class="w-56 gap-0 p-0" data-testid="columns-menu">
     <div class="max-h-80 flex flex-col">
       <div class="flex border-b border-border gap-1 p-1">
         <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">All</Button>
@@ -147,7 +147,7 @@ onBeforeUnmount(() => {
                 data-testid="columns-menu-item"
                 @update:model-value="toggle(name)"
               >
-                <CodiconIcon name="check" :size="10" />
+                <CodiconIcon name="check" :size="12" />
               </Checkbox>
             </TooltipTrigger>
             <TooltipContent>Primary key — always shown</TooltipContent>
@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
             data-testid="columns-menu-item"
             @update:model-value="toggle(name)"
           >
-            <CodiconIcon name="check" :size="10" />
+            <CodiconIcon name="check" :size="12" />
           </Checkbox>
           {{ name }}
         </Label>

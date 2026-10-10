@@ -198,7 +198,10 @@ test('the body-mode segmented control has a JSON segment (D6)', async ({ relaunc
   await page.click('[data-testid="http-request-pane-body"]');
 
   await page.click('[data-testid="http-body-mode-json"]');
-  await expect(page.locator('[data-testid="http-body-mode-json"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="http-body-mode-json"]')).toHaveAttribute(
+    'data-state',
+    'on',
+  );
   // Same segmented control the request pane's own toggle uses for the Body segment's count/kind
   // badge — selecting JSON is reflected there end to end, without asserting storage directly.
   await expect(page.locator('[data-testid="http-request-pane-body"]')).toHaveText('Body (JSON)');
