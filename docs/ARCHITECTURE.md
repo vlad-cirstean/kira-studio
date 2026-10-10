@@ -4482,6 +4482,17 @@ replies and full terminal attach for Claude Code sessions.
 - Streams are per window (`windowKey`); `WindowOpenerDeps.OnWindowClosing`, service shutdown and quit
   end them; they run only while the module is visible. Stats share one engine stream per container
   across windows. `ModeDef.tabStrip: false` hides the tab strip.
+- Storage metrics (P252), on demand only. `DiskUsage` (`/system/df`, verbose) and `ContainerSize`
+  (inspect `Size`) are bound methods; singleflight dedupes concurrent calls. Docker API data only: no
+  host free/total disk, no `statfs`, no helper container. Query keys sit under `['docker-disk']`, outside
+  `['docker']`, so no Refresh, container action or live-sync invalidation triggers a walk; `enabled: false`
+  plus manual `refetch()`. Engine-wide last result persists per engine scope in `localStorage`
+  (`kira.docker.diskUsage`) with its timestamp. Container size is session memory only, never persisted.
+- Container origin (P252): `Container.origin`/`originName` inferred from labels, first match wins:
+  devcontainer, testcontainers, kind, kubernetes, swarm, buildx (name prefix `buildx_buildkit_`),
+  compose. A compose-based devcontainer stays grouped under its project, row shows the devcontainer
+  icon. Only Compose projects group; other origins get a row icon (`OriginIcon.vue`). Compose icon is
+  lucide `Boxes`: no allowed library ships a Compose mark.
 
 ## Database MCP server (v1.7)
 

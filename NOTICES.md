@@ -7,7 +7,7 @@ license terms call for a notice beyond the standard MIT/BSD/Apache-2.0 attributi
 ## simple-icons
 
 Kira Studio imports database/service engine marks (Postgres, MariaDB, MySQL, SQLite, MongoDB,
-Redis, Apache Kafka, ClickHouse) from the [Simple Icons](https://simpleicons.org/) icon
+Redis, Apache Kafka, ClickHouse) and the Kubernetes mark (Docker module origin icons) from the [Simple Icons](https://simpleicons.org/) icon
 set (`simple-icons` on npm), via `import { siX } from 'simple-icons'` and each icon's `path` and
 `hex` fields.
 
