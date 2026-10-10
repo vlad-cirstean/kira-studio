@@ -113,7 +113,7 @@ describe('braceToken (script prompt {name})', () => {
   });
 });
 
-describe('envToken (script command $NAME / ${NAME})', () => {
+describe(`envToken (script command $NAME / \${NAME})`, () => {
   test('$ followed by an identifier run', () => {
     expect(envToken('echo $KIRA_P', 12)).toEqual({ from: 6, to: 12, word: 'KIRA_P' });
   });

@@ -119,9 +119,11 @@ test('contract: save a smart script from the three tabs; the run dialog resolves
   await expect(suggestions(page)).toContainText('topic');
   await command(page).press('Tab');
   await expect(command(page)).toHaveValue('Look at {topic}');
-  await expect(d.locator('[data-testid="script-dialog-uses"] [data-var="topic"]')).toContainText(
-    'auth',
-  );
+  const used = preview.prompt.find((p) => p.var);
+  if (!used) throw new Error('script-editor preview has no variable');
+  await expect(
+    d.locator(`[data-testid="script-dialog-uses"] [data-var="${used.var}"]`),
+  ).toContainText(used.value);
 
   await d.locator('[data-testid="script-dialog-tab-schedule"]').click();
   await d.locator('[data-testid="script-schedule"]').click();
