@@ -1,6 +1,7 @@
 package gitflow_test
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitwire"
+	"github.com/kirathecat/kira-studio/internal/flowtest"
 )
 
 type fixtureEnvelope struct {
@@ -123,12 +125,10 @@ func packedChunkToFixture(t *testing.T, blob []byte) fixturePackedChunk {
 	}
 }
 
-// Regenerates the golden corpus packages/git-ipc/src/streamChannel.test.ts (D16) decodes: the
-// Go encoder and the TypeScript decoder must agree byte for byte.
+// The golden corpus packages/git-ipc/src/streamChannel.test.ts (D16) decodes: the Go encoder and the
+// TypeScript decoder must agree byte for byte. The test compares the encoder's frame with the
+// committed corpus; KIRA_CONTRACT=write regenerates it.
 func TestFixtures_CaptureGraphChunkFrame(t *testing.T) {
-	if os.Getenv("KIRA_GIT_FIXTURES") != "write" {
-		t.Skip("set KIRA_GIT_FIXTURES=write to regenerate the golden corpus")
-	}
 	r := newRig(t)
 	repo := r.app.NewRepo("fixture")
 	for _, n := range []string{"0", "1", "2"} {
@@ -141,16 +141,13 @@ func TestFixtures_CaptureGraphChunkFrame(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("first chunk frame: ok=%v err=%v", ok, err)
 	}
-	if len(raw) == 0 || raw[0] != 0x00 {
-		t.Fatalf("first chunk frame is not a blob frame: %v", raw)
-	}
-	headerLen := int(binary.BigEndian.Uint32(raw[1:5]))
+	header, blob := splitBlobFrame(t, raw)
 	var env struct {
 		Body struct {
 			Chunk json.RawMessage `json:"chunk"`
 		} `json:"body"`
 	}
-	if err := json.Unmarshal(raw[5:5+headerLen], &env); err != nil {
+	if err := json.Unmarshal(header, &env); err != nil {
 		t.Fatalf("unmarshal header: %v", err)
 	}
 	var meta fixtureEnvelope
@@ -160,21 +157,43 @@ func TestFixtures_CaptureGraphChunkFrame(t *testing.T) {
 	if meta.RepoID != id {
 		t.Fatalf("chunk.repoId = %q, want %q", meta.RepoID, id)
 	}
-	fixture := fixtureFile{Envelope: meta, Commits: packedChunkToFixture(t, raw[5+headerLen:])}
+	fixture := fixtureFile{Envelope: meta, Commits: packedChunkToFixture(t, blob)}
 
 	outDir := filepath.Join("..", "..", "..", "..", "..", "packages", "git-ipc", "testdata")
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		t.Fatal(err)
+	binPath := filepath.Join(outDir, "graphChunkFrame.bin")
+	if os.Getenv(flowtest.EnvContract) == "write" {
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(binPath, raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		out, err := json.MarshalIndent(fixture, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(outDir, "graphChunkFrame.json"), append(out, '\n'), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("captured graphChunkFrame.bin (%d bytes)", len(raw))
+		return
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "graphChunkFrame.bin"), raw, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	out, err := json.MarshalIndent(fixture, "", "  ")
+	golden, err := os.ReadFile(binPath)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("read golden: %v (regenerate with %s=write)", err, flowtest.EnvContract)
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "graphChunkFrame.json"), append(out, '\n'), 0o644); err != nil {
-		t.Fatal(err)
+	_, goldenBlob := splitBlobFrame(t, golden)
+	if !bytes.Equal(blob, goldenBlob) {
+		t.Fatalf("graph chunk frame differs from %s; rerun with %s=write if the encoder change is intended", binPath, flowtest.EnvContract)
 	}
-	t.Logf("captured graphChunkFrame.bin (%d bytes)", len(raw))
+}
+
+// splitBlobFrame returns the JSON header and the FlatBuffers blob of one blob frame.
+func splitBlobFrame(t *testing.T, raw []byte) (header, blob []byte) {
+	t.Helper()
+	if len(raw) < 5 || raw[0] != 0x00 {
+		t.Fatalf("frame is not a blob frame: %v", raw)
+	}
+	n := int(binary.BigEndian.Uint32(raw[1:5]))
+	return raw[5 : 5+n], raw[5+n:]
 }

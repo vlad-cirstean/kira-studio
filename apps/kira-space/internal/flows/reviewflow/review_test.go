@@ -81,9 +81,11 @@ func TestReviewSessionRoundTrip(t *testing.T) {
 	gs = app.OpenGitStream()
 	id = openRepo(t, gs, repo.Dir)
 	list := call[gitsession.CommentListResult](t, gs, "review.comment.list", gitrpc.ReviewCommentListParams{RepoID: id, Branch: "feat"})
+	app.Contract(t, "git-review", "git:review.comment.list#after-restart", list, flowharness.Mask("at", "createdAt", "anchorSha"))
 	if len(list.Comments) != 2 {
 		t.Fatalf("comments after restart = %+v, want 2", list.Comments)
 	}
+	app.Contract(t, "git-review", "git:review.fileDiff#range", first, flowharness.Mask("baseSha", "headSha", "body"))
 	if snap3 := call[gitsession.ReviewSnapshotResult](t, gs, "review.snapshot", gitrpc.ReviewSnapshotParams{RepoID: id, Branch: "feat", Path: "edit.txt"}); snap3.Kind != "text" {
 		t.Fatalf("snapshot after restart = %+v", snap3)
 	}

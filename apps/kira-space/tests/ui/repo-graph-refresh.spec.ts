@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { gitStreamEmit, gitStreamRequests } from './support/gitStreamMock';
 import {
   manyRowShas,
@@ -143,4 +144,22 @@ test('a restored scrollRow beyond the history clamps to the last row', async ({ 
     .poll(() => viewport(page).evaluate((el) => el.scrollTop), { timeout: 15_000 })
     .toBeGreaterThan(0);
   expect(errors).toEqual([]);
+});
+
+// Contract git-remote. Backend half: gitflow TestRemoteFetchPullPush. After a fetch the branch is
+// behind by one; the picker marks the branch row with the ahead/behind counts.
+test('contract: the branch picker marks a branch behind its upstream', async ({ relaunch }) => {
+  const refs = contract<{
+    branches: { shortName: string; track?: { ahead: number; behind: number } }[];
+  }>('git-remote', 'git:refs.list#behind');
+  const main = refs.branches.find((b) => b.shortName === 'main');
+  if (!main?.track) throw new Error('contract lost the tracking counts');
+  const page = await openPortGraph(relaunch, {
+    chunks: singleRowChunks([rootRow(SHA_A, 'Add the graph column fixture')]),
+    results: { 'refs.list': refs },
+  });
+  await expect(row(page, 0)).toBeVisible();
+  await page.locator('.kv-branch-trigger').click();
+  const branchRow = page.locator('.kv-branch-row-main', { hasText: 'main' }).first();
+  await expect(branchRow).toContainText(`\u2193${main.track.behind}`);
 });

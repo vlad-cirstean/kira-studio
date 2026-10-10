@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
@@ -35,6 +36,7 @@ func TestCheckoutDirtyAutostash(t *testing.T) {
 	id := r.open(repo.Dir).RepoID
 
 	pf := call[gitpreflight.CheckoutPreflight](t, r.gs, "preflight.checkout", gitrpc.PreflightCheckoutParams{RepoID: id, Target: "feature", Mode: "switch"})
+	r.app.Contract(t, "git-stash", "git:preflight.checkout#dirty", pf)
 	if pf.Verdict != "blocked" || !contains(pf.Routes, "autoStash") {
 		t.Fatalf("preflight = verdict %q routes %v, want blocked with the autoStash route", pf.Verdict, pf.Routes)
 	}
@@ -57,6 +59,7 @@ func TestCheckoutDirtyAutostash(t *testing.T) {
 		t.Fatalf("f.txt = %q, want the feature version", got)
 	}
 	stashes := call[gitrpc.StashListResult](t, r.gs, "stash.list", gitrpc.StashListParams{RepoID: id})
+	r.app.Contract(t, "git-stash", "git:stash.list#autostash", stashes, flowharness.Mask("sha", "baseSha", "indexSha", "timestamp"))
 	if len(stashes.Entries) != 1 || stashes.Entries[0].Branch == nil || *stashes.Entries[0].Branch != "main" {
 		t.Fatalf("stash.list = %+v, want one entry tagged with main", stashes.Entries)
 	}

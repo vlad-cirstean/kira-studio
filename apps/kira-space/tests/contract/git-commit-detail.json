@@ -1,0 +1,114 @@
+{
+  "git:commit.detail#merge-parent-0": {
+    "author": {
+      "email": "author@example.com",
+      "name": "Test Author",
+      "timestamp": 0
+    },
+    "body": "",
+    "committer": {
+      "email": "author@example.com",
+      "name": "Test Author",
+      "timestamp": 0
+    },
+    "decoration": [
+      {
+        "index": 0,
+        "isHead": true,
+        "kind": "branch",
+        "name": "main"
+      }
+    ],
+    "files": [
+      {
+        "additions": 1,
+        "deletions": 0,
+        "isBinary": false,
+        "kind": "added",
+        "path": "side.txt"
+      }
+    ],
+    "parentIndex": 0,
+    "parents": [],
+    "sha": "<masked>",
+    "signature": {
+      "signer": "",
+      "status": "N"
+    },
+    "subject": "merge side",
+    "trailers": []
+  },
+  "git:commit.detail#merge-parent-1": {
+    "author": {
+      "email": "author@example.com",
+      "name": "Test Author",
+      "timestamp": 0
+    },
+    "body": "",
+    "committer": {
+      "email": "author@example.com",
+      "name": "Test Author",
+      "timestamp": 0
+    },
+    "decoration": [
+      {
+        "index": 0,
+        "isHead": true,
+        "kind": "branch",
+        "name": "main"
+      }
+    ],
+    "files": [
+      {
+        "additions": 1,
+        "deletions": 0,
+        "isBinary": false,
+        "kind": "added",
+        "path": "main.txt"
+      }
+    ],
+    "parentIndex": 1,
+    "parents": [],
+    "sha": "<masked>",
+    "signature": {
+      "signer": "",
+      "status": "N"
+    },
+    "subject": "merge side",
+    "trailers": []
+  },
+  "git:commit.detail#rename": {
+    "author": {
+      "email": "author@example.com",
+      "name": "Test Author",
+      "timestamp": 0
+    },
+    "body": "",
+    "committer": {
+      "email": "author@example.com",
+      "name": "Test Author",
+      "timestamp": 0
+    },
+    "decoration": [],
+    "files": [
+      {
+        "additions": 0,
+        "deletions": 0,
+        "isBinary": false,
+        "kind": "renamed",
+        "originalPath": "old.txt",
+        "path": "dir/new.txt",
+        "similarity": 100
+      }
+    ],
+    "parentIndex": 0,
+    "parents": [],
+    "sha": "<masked>",
+    "signature": {
+      "signer": "",
+      "status": "N"
+    },
+    "subject": "rename old",
+    "trailers": []
+  }
+}

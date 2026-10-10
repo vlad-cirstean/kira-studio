@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { gitStreamParams } from './support/gitStreamMock';
 import {
   manyRowShas,
@@ -128,4 +129,17 @@ test('Review branch changes from the picker opens the Review tab on that branch'
   await page.getByText('Review branch changes').click();
 
   await expect(page.locator('[data-testid="review-branch-name"]')).toHaveText('feature-auth');
+});
+
+// Contract git-review. Backend half: reviewflow TestReviewSessionRoundTrip. The comments the
+// server returns after a relaunch show in the Review pane without opening the graph tab first.
+test('contract: stored review comments come back in the Review pane', async ({ relaunch }) => {
+  const list = contract<{ comments: { body: string }[] }>(
+    'git-review',
+    'git:review.comment.list#after-restart',
+  );
+  const page = await openReviewListing(relaunch, { results: { 'review.comment.list': list } });
+  const host = page.locator('[data-testid="repo-review-host"]');
+  await host.getByRole('button', { name: `Comments (${list.comments.length})` }).click();
+  await expect(host.getByText(list.comments[0].body)).toBeVisible();
 });

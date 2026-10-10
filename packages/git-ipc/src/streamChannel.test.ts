@@ -214,7 +214,7 @@ test('sets binaryType to arraybuffer so inbound frames are never delivered as a 
 });
 
 // D16: the golden graph.stream chunk frame, captured from the native stream by
-// flows/gitflow TestFixtures_CaptureGraphChunkFrame (KIRA_GIT_FIXTURES=write). Catches the Go
+// flows/gitflow TestFixtures_CaptureGraphChunkFrame (KIRA_CONTRACT=write). Catches the Go
 // encoder and the decode path disagreeing: a field in the wrong slot, a big-endian column.
 interface GraphChunkFixture {
   readonly envelope: {

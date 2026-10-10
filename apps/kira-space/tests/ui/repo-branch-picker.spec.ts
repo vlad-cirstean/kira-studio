@@ -1,5 +1,13 @@
 import { expect, test } from './fixtures';
-import { openBranchPicker } from './support/gitUiPortFixtures';
+import { contract } from './support/contract';
+import {
+  openBranchPicker,
+  openPortGraph,
+  PICKER_RESULTS,
+  rootRow,
+  SHA_A,
+  singleRowChunks,
+} from './support/gitUiPortFixtures';
 
 // The branch picker's five-tab fold inside Space. Ported from the VS Code webview suite.
 
@@ -48,4 +56,24 @@ test('the filter takes focus on open; ArrowDown enters the rows, ArrowUp returns
 
   await page.keyboard.press('ArrowUp');
   await expect(filter).toBeFocused();
+});
+
+// Contract git-stash. Backend half: gitflow TestCheckoutDirtyAutostash. The entry is what an
+// auto-stash on a blocked checkout leaves; the picker lists it under Stashes.
+test('contract: the Stashes tab lists the entry an auto-stash leaves', async ({ relaunch }) => {
+  const list = contract<{ entries: { message: string; branch: string }[] }>(
+    'git-stash',
+    'git:stash.list#autostash',
+  );
+  const [entry] = list.entries;
+  const page = await openPortGraph(relaunch, {
+    chunks: singleRowChunks([rootRow(SHA_A, 'A commit')]),
+    results: { ...PICKER_RESULTS, 'stash.list': list },
+  });
+  await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')).toBeVisible();
+  await page.locator('.kv-branch-trigger').click();
+  await page.getByRole('button', { name: /^Stashes/ }).click();
+  await expect(
+    page.locator('.kv-branch-section[aria-label="Stashes"] .kv-stash-message'),
+  ).toHaveText(entry.message.replace(/^On [^:]+: /, ''));
 });

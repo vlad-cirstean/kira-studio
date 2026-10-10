@@ -61,11 +61,13 @@ func TestRemoteFetchPullPush(t *testing.T) {
 	if !fetch.OK || len(fetch.Updates) == 0 {
 		t.Fatalf("fetch = %+v, want ok with ref updates", fetch)
 	}
+	r.app.Contract(t, "git-remote", "git:refs.list#behind", r.refs(id), flowharness.Mask("objectId", "committerDate"))
 	if ahead, behind := trackOf(t, r.refs(id), "main"); ahead != 0 || behind != 1 {
 		t.Fatalf("main ahead/behind = %d/%d after fetch, want 0/1", ahead, behind)
 	}
 
 	pf := call[gitpreflight.PullPreflight](t, r.gs, "remote.pullPreflight", gitrpc.RemotePullPreflightParams{RepoID: id, Branch: "main"})
+	r.app.Contract(t, "git-remote", "git:remote.pullPreflight#behind", pf)
 	if pf.Behind != 1 || pf.Ahead != 0 || pf.Strategy != gitpreflight.PullStrategy("ff-only") {
 		t.Fatalf("pull preflight = %+v, want behind 1 with ff-only", pf)
 	}
@@ -76,6 +78,7 @@ func TestRemoteFetchPullPush(t *testing.T) {
 
 	xTip := p.x.Commit("from x", map[string]string{"x.txt": "x\n"})
 	push := call[gitpreflight.PushPreflight](t, r.gs, "remote.pushPreflight", gitrpc.RemotePushPreflightParams{RepoID: id, Branch: "main", Remote: "origin"})
+	r.app.Contract(t, "git-remote", "git:remote.pushPreflight#ahead", push, flowharness.Mask("remoteTip", "localTip"))
 	if push.Ahead != 1 || push.Behind != 0 || !push.FastForward {
 		t.Fatalf("push preflight = %+v, want ahead 1, fast-forward", push)
 	}

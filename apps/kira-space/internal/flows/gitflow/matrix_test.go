@@ -137,6 +137,7 @@ func TestCommitDetailMergeParentSelector(t *testing.T) {
 
 	paths := func(parent int) []string {
 		d := call[porcelain.CommitDetail](t, r.gs, "commit.detail", gitrpc.CommitDetailParams{RepoID: id, SHA: merge, ParentIndex: &parent})
+		r.app.Contract(t, "git-commit-detail", "git:commit.detail#merge-parent-"+strconv.Itoa(parent), d, flowharness.Mask("sha", "parents", "timestamp"))
 		var out []string
 		for _, f := range d.Files {
 			out = append(out, f.Path)

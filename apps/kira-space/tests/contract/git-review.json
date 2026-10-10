@@ -1,0 +1,39 @@
+{
+  "git:review.comment.list#after-restart": {
+    "at": "<masked>",
+    "comments": [
+      {
+        "anchor": "exact",
+        "anchorSha": "<masked>",
+        "body": "why TWO?",
+        "createdAt": 0,
+        "id": 1,
+        "path": "edit.txt",
+        "range": {
+          "end": 2,
+          "start": 2
+        }
+      },
+      {
+        "anchor": "exact",
+        "anchorSha": "<masked>",
+        "body": "and four?",
+        "createdAt": 0,
+        "id": 2,
+        "path": "edit.txt",
+        "range": {
+          "end": 2,
+          "start": 2
+        }
+      }
+    ]
+  },
+  "git:review.fileDiff#range": {
+    "body": {},
+    "deltaSource": "noSnapshot",
+    "lineCount": 3,
+    "path": "edit.txt",
+    "reviewedAtSha": null,
+    "reviewedRanges": []
+  }
+}
