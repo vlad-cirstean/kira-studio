@@ -622,6 +622,7 @@ const { virtualizer, virtualItems, totalSize, onScroll } = useVirtualRows({
   count: () => shas.value.length,
   rowHeight: () => COLLAPSED_ROW_ESTIMATE,
   scrollElement: rowsEl,
+  pinned: () => focusedRow.value,
 });
 
 function measureRow(el: unknown): void {
@@ -1043,6 +1044,8 @@ watch(
                   :expansion="review.expansionFor(shas[item.index] as string)"
                   :actions="rowActions"
                   :focused="item.index === focusedRow"
+                  :aria-setsize="shas.length"
+                  :aria-posinset="item.index + 1"
                   :list-mode="listMode"
                   :filter="filter"
                   @toggle="toggleRow(shas[item.index] as string)"

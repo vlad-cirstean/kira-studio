@@ -122,6 +122,30 @@ test('600 commits mount only the viewport rows; End scrolls to and focuses the l
   expect(await rows.count()).toBeLessThan(100);
 });
 
+test('the focused commit row stays mounted and keyboard navigation works after a wheel scroll', async ({
+  relaunch,
+}) => {
+  const total = 600;
+  const page = await openReviewListing(relaunch, { chunks: oneChunk(manyRows(total)) });
+  const first = reviewRow(page, manyRowShas(0));
+  await expect(first).toBeVisible();
+  await expect(first).toHaveAttribute('aria-setsize', String(total));
+  await expect(first).toHaveAttribute('aria-posinset', '1');
+
+  await first.focus();
+  await page
+    .locator('[role="tree"][aria-label="Commits"]')
+    .first()
+    .evaluate((el) => {
+      el.scrollTop = 20000;
+    });
+  await expect(reviewRow(page, manyRowShas(455))).toBeAttached();
+  await expect(first).toBeFocused();
+
+  await page.keyboard.press('ArrowDown');
+  await expect(reviewRow(page, manyRowShas(1))).toBeFocused();
+});
+
 test('Review branch changes from the picker opens the Review tab on that branch', async ({
   relaunch,
 }) => {

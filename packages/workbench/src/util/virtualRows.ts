@@ -1,4 +1,4 @@
-import { useVirtualizer } from '@tanstack/vue-virtual';
+import { defaultRangeExtractor, type Range, useVirtualizer } from '@tanstack/vue-virtual';
 import { useResizeObserver } from '@vueuse/core';
 import { computed, onMounted, type Ref, ref, watch } from 'vue';
 
@@ -31,6 +31,8 @@ export interface UseVirtualRowsOptions {
   scrollElement: Ref<HTMLElement | null>;
   /** Rows rendered beyond the viewport on each side; a getter lets a caller size it from row heights. Default 8. */
   overscan?: number | (() => number);
+  /** An index that stays mounted outside the window, so a focused row keeps focus while it scrolls away. */
+  pinned?: () => number | null;
 }
 
 export function useVirtualRows(opts: UseVirtualRowsOptions) {
@@ -42,6 +44,15 @@ export function useVirtualRows(opts: UseVirtualRowsOptions) {
     estimateSize: (index: number) => opts.rowHeights?.()?.[index] ?? opts.rowHeight(),
     get overscan() {
       return typeof opts.overscan === 'function' ? opts.overscan() : (opts.overscan ?? 8);
+    },
+    get rangeExtractor() {
+      const pin = opts.pinned?.();
+      if (pin === undefined) return undefined;
+      return (range: Range): number[] => {
+        const indexes = defaultRangeExtractor(range);
+        if (pin === null || pin < 0 || pin >= range.count || indexes.includes(pin)) return indexes;
+        return [...indexes, pin].sort((a, b) => a - b);
+      };
     },
   });
 
