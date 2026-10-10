@@ -19,7 +19,7 @@ import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const GIT_UI_SRC = join(import.meta.dir, '..', '..', '..', 'packages', 'git-ui', 'src');
+const GIT_UI_SRC = import.meta.dir;
 
 // Matches `import type X from '…something.vue'` (a *default* type-only import of a component),
 // but not `import type { X } from '…something.vue'` (a named type import, which is legitimate).

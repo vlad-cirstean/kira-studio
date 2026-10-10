@@ -52,11 +52,6 @@
       "tests": ["packages/git-ui/src"],
       "excludeTests": []
     },
-    "kira-space-vscode": {
-      "mutate": ["apps/kira-space-vscode/src/**/*.ts"],
-      "tests": ["apps/kira-space-vscode/src"],
-      "excludeTests": []
-    },
     "cross": {
       "mutate": ["packages/shared/**/*.ts", "packages/workbench/src/**/*.ts"],
       "tests": [
@@ -65,7 +60,6 @@
         "packages/api-core/test",
         "packages/git-core/src",
         "packages/git-ipc/src",
-        "apps/kira-space-vscode/src",
         "packages/git-ui/src",
         "packages/workbench/src"
       ],

@@ -106,25 +106,6 @@ else
   fail "main.go missing" "$MAIN_GO not found — this check needs updating along with it"
 fi
 
-# --- S9: the extension manifest's version agrees with build/config.yml -------------------------
-# G10 D21: both are "0.0.0" today, so this passes immediately; release.yml's version step writes
-# both files from the same tag, so they stay in agreement after a real release. Static (not an
-# artifact check) so it runs on Linux and in every CI job, not only when a bundle exists.
-# P100 Part 3: the extension ships inside Kira Space's bundle now, not Kira Studio's — checked
-# against apps/kira-space/build/config.yml, the file create:app:bundle actually stamps the .vsix
-# alongside.
-VSCODE_PKG="apps/kira-space-vscode/package.json"
-CONFIG_YML="apps/kira-space/build/config.yml"
-if [ -f "$VSCODE_PKG" ] && [ -f "$CONFIG_YML" ]; then
-  EXT_VERSION="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)"
-  APP_VERSION="$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG_YML" | head -1)"
-  if [ "$EXT_VERSION" != "$APP_VERSION" ]; then
-    fail "extension/app version mismatch" "$VSCODE_PKG's version ('$EXT_VERSION') != $CONFIG_YML's info.version ('$APP_VERSION')"
-  fi
-else
-  fail "version files missing" "$VSCODE_PKG or $CONFIG_YML not found — this check needs updating along with it"
-fi
-
 # --- S10: no app code downloads a release asset itself -------------------------------------
 # Rescoped by P119 (was: apps/ packages/ only) — internal/appupdate now lives at internal/, and
 # the invariant still holds for every line of app code: only scripts/install.sh, run by the user's
@@ -206,8 +187,6 @@ APP="apps/kira-studio/bin/Kira Studio.app"
 DMG="apps/kira-studio/bin/Kira Studio.dmg"
 
 # --- Artifact checks (only if the bundle exists) -----------------------------------------------
-# P100 Part 3: no A6 here — Kira Studio's bundle no longer carries a .vsix (that moved to Kira
-# Space's own bundle, checked separately below).
 if [ ! -d "$APP" ]; then
   note "skipped A1/A3/A5/N2 — \"$APP\" not present (run 'bun run package:studio' first)"
 else
@@ -284,7 +263,7 @@ SPACE_APP="apps/kira-space/bin/Kira Space.app"
 SPACE_DMG="apps/kira-space/bin/Kira Space.dmg"
 
 if [ ! -d "$SPACE_APP" ]; then
-  note "skipped A1/A3/A5/A6/N2 — \"$SPACE_APP\" not present (run 'bun run package:space' first)"
+  note "skipped A1/A3/A5/N2 — \"$SPACE_APP\" not present (run 'bun run package:space' first)"
 else
   # A1: ad-hoc signature.
   if command -v codesign >/dev/null 2>&1; then
@@ -320,27 +299,6 @@ else
     fi
   else
     note "skipped A5 — PlistBuddy not available on this runner"
-  fi
-
-  # A6: the bundled .vsix (G10 D8/D21, retargeted here by P100 Part 3) — present, non-empty, and a
-  # real zip archive ("PK" is a zip's own magic number), so a truncated or missing copy is caught
-  # here rather than the Install button silently reporting "not bundled" or failing to install a
-  # corrupt file.
-  SPACE_VSIX="$SPACE_APP/Contents/Resources/kira-space.vsix"
-  if [ ! -f "$SPACE_VSIX" ]; then
-    fail "vsix not bundled" "\"$SPACE_VSIX\" not present — create:app:bundle must copy it before codesign:adhoc"
-  else
-    SPACE_VSIX_SIZE="$(wc -c < "$SPACE_VSIX" | tr -d ' ')"
-    if [ "$SPACE_VSIX_SIZE" -eq 0 ]; then
-      fail "vsix empty" "\"$SPACE_VSIX\" is empty"
-    elif [ "$(dd if="$SPACE_VSIX" bs=1 count=2 2>/dev/null)" != "PK" ]; then
-      fail "vsix not a zip" "\"$SPACE_VSIX\" does not start with the zip \"PK\" signature"
-    elif command -v unzip >/dev/null 2>&1 && ! unzip -l "$SPACE_VSIX" | grep -qi 'extension/readme\.md'; then
-      # G12 D15: the extension's own README ships with no packaging edit (.vscodeignore is an
-      # exclusion list) — this is the one line that proves it actually landed in the archive.
-      # vsce lowercases the entry to extension/readme.md, hence -i rather than a literal case.
-      fail "vsix missing README" "\"$SPACE_VSIX\" does not contain extension/readme.md"
-    fi
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------

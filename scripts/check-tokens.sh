@@ -76,15 +76,4 @@ else
   echo "check-tokens: no --kui-* reference anywhere."
 fi
 
-# P131 Part 1 §3.3: the VS Code webview's own second unprefixed Tailwind root imports
-# packages/theme/src/tailwind-core.css's @theme block (and every shadcn component under
-# packages/theme/src/components) via `theme(inline)` -- every --kira-* either one references must
-# resolve in that webview's own bridge, or a shadcn primitive would silently read an empty custom
-# property there. This layer's own "usage" tree is PT-root's --kira-* *definition* files
-# themselves (tailwind-core.css/components), not FRONTEND_SRC/SPACE_SRC -- the first check_layer
-# call above already guards those against Kira Studio's/Space's own tokens.css.
-VSCODE_WEBVIEW_SRC=apps/kira-space-vscode/src/webview
-check_layer 'kira-' "$THEME_SRC/tailwind-core.css $THEME_SRC/components" \
-  "$VSCODE_WEBVIEW_SRC/kira-bridge.css" kira-webview
-
 exit $STATUS

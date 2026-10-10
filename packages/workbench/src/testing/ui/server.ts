@@ -31,10 +31,7 @@ export interface UiServer {
 
 /**
  * Serves one static file under `distDir` for `pathname` — the shared tail every fixture server in
- * this repo ends on once it has ruled out its own dynamic routes (P107 I2-27: previously a
- * separate copy in `apps/kira-space-vscode/tests/{interaction,layout}/support/server.ts`). Maps
- * `/` to `index.html`, same as before consolidation; the vscode webview server never requests a
- * bare `/`, so that mapping is a no-op there.
+ * this repo ends on once it has ruled out its own dynamic routes. Maps `/` to `index.html`.
  */
 export async function serveStatic(
   distDir: string,

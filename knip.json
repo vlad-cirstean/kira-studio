@@ -6,15 +6,9 @@
   // its `--include` filter and turned the `binaries` rule on.
   "ignoreBinaries": ["go"],
   "ignoreDependencies": [
-    // Ambient VS Code API types, resolved through tsconfig's own `"types"` array
-    // (apps/kira-space-vscode/tsconfig.json), never a static import.
-    "@types/vscode",
     // CSS class-name references only (`codicon-*`), never imported as a JS/TS module — used in
     // both the root devDependency and packages/git-ui's own dependency.
     "@vscode/codicons",
-    // Invoked by scripts/package-vscode.ts through a constructed filesystem path
-    // (`node_modules/@vscode/vsce/vsce`), never a static import.
-    "@vscode/vsce",
     // Consumed transitively through @tailwindcss/vite's plugin and `@tailwind` CSS directives —
     // never imported by name in TS.
     "tailwindcss",
@@ -58,17 +52,6 @@
       // Mirrors apps/kira-studio/frontend's own block above.
       "entry": ["index.html", "mobile/index.html"],
       "project": ["src/**/*.{ts,vue}", "mobile/**/*.{ts,vue}"]
-    },
-    "apps/kira-space-vscode": {
-      "entry": [
-        "src/extension.ts",
-        "src/webview/main.ts",
-        "tests/**/*.spec.ts",
-        "tests/**/*.entry.ts"
-        // playwright.config.ts dropped (P94 pass 3 §3.2): knip's own Playwright plugin already
-        // reaches it — a redundant entry pattern.
-      ],
-      "project": ["src/**/*.ts", "tests/**/*.ts"]
     },
     "packages/shared": { "entry": ["**/*.ts"], "project": ["**/*.ts"] },
     "packages/theme": {
