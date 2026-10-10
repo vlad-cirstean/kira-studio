@@ -6,8 +6,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { tabChipVariants } from '@theme/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
 import {
@@ -46,11 +45,11 @@ const { retrying, retry } = useRetryStatus();
 
 const ok = computed(() => status.data.value?.state === 'ok');
 
-const sections = computed<{ id: DockerSection; label: string; icon: string; count: number }[]>(() => [
-  { id: 'containers', label: 'Containers', icon: 'server', count: containers.data.value?.length ?? 0 },
-  { id: 'images', label: 'Images', icon: 'package', count: images.data.value?.length ?? 0 },
-  { id: 'volumes', label: 'Volumes', icon: 'database', count: volumes.data.value?.length ?? 0 },
-  { id: 'networks', label: 'Networks', icon: 'globe', count: networks.data.value?.length ?? 0 },
+const sections = computed<{ id: DockerSection; label: string; count: number }[]>(() => [
+  { id: 'containers', label: 'Containers', count: containers.data.value?.length ?? 0 },
+  { id: 'images', label: 'Images', count: images.data.value?.length ?? 0 },
+  { id: 'volumes', label: 'Volumes', count: volumes.data.value?.length ?? 0 },
+  { id: 'networks', label: 'Networks', count: networks.data.value?.length ?? 0 },
 ]);
 
 const running = computed(() => (containers.data.value ?? []).filter((c) => c.state === 'running').length);
@@ -111,25 +110,19 @@ async function refresh(): Promise<void> {
       </InputGroup>
     </div>
     <template v-if="ok">
-      <div class="flex shrink-0 items-center gap-0.5 overflow-hidden border-b border-border px-1.5 py-1" role="tablist" aria-label="Docker resources">
-        <Tooltip v-for="s in sections" :key="s.id">
-          <TooltipTrigger as-child>
-            <button
-              type="button"
-              role="tab"
-              :class="[tabChipVariants({ active: ui.section === s.id }), 'min-w-0 shrink']"
-              :data-testid="`docker-section-${s.id}`"
-              :aria-selected="ui.section === s.id"
-              :aria-pressed="ui.section === s.id"
-              @click="ui.setSection(s.id)"
-            >
-              <CodiconIcon :name="s.icon" :size="13" class="shrink-0" />
-              <span :class="ui.section === s.id ? 'truncate' : 'sr-only'">{{ s.label }}</span>
-              <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="docker-section-count">{{ s.count }}</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ s.label }}</TooltipContent>
-        </Tooltip>
+      <div class="flex shrink-0 items-center border-b border-border px-1.5 py-1">
+        <ToggleGroup
+          type="single"
+          size="kira"
+          :model-value="ui.section"
+          aria-label="Docker resources"
+          @update:model-value="(v) => v && ui.setSection(v as DockerSection)"
+        >
+          <ToggleGroupItem v-for="s in sections" :key="s.id" :value="s.id" :data-testid="`docker-section-${s.id}`">
+            {{ s.label }}
+            <span class="text-kira-sm text-muted-foreground" data-testid="docker-section-count">{{ s.count }}</span>
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
       <div
         v-if="ui.section === 'containers'"

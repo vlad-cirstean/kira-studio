@@ -110,8 +110,8 @@ function groupAction(g: GroupRow, action: 'start' | 'stop'): void {
 function onContextMenu(e: MouseEvent, c: DockerContainer): void {
   const running = c.state === 'running';
   const items: MenuItem[] = [
-    { type: 'item', id: 'start', label: 'Start', icon: 'play', disabled: running, run: () => act(c, 'start') },
-    { type: 'item', id: 'stop', label: 'Stop', icon: 'debug-stop', disabled: !isActiveState(c.state), run: () => act(c, 'stop') },
+    { type: 'item', id: 'start', label: 'Start', icon: 'play', iconClass: 'text-ok', disabled: running, run: () => act(c, 'start') },
+    { type: 'item', id: 'stop', label: 'Stop', icon: 'debug-stop', iconClass: 'text-error', disabled: !isActiveState(c.state), run: () => act(c, 'stop') },
     { type: 'item', id: 'restart', label: 'Restart', icon: 'debug-restart', disabled: !running, run: () => act(c, 'restart') },
     { type: 'separator' },
     { type: 'item', id: 'logs', label: 'Logs', icon: 'output', run: () => ui.select({ kind: 'container', id: c.id }, 'logs') },
@@ -152,8 +152,8 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         >{{ row.name }}</button>
         <span class="text-kira-sm text-muted-foreground group-hover/row:hidden">{{ runningCount(row) }}/{{ row.members.length }}</span>
         <span class="hidden items-center group-hover/row:flex">
-          <TooltipIconButton icon="play" label="Start all" data-testid="docker-group-start" @click="groupAction(row, 'start')" />
-          <TooltipIconButton icon="debug-stop" label="Stop all" data-testid="docker-group-stop" @click="groupAction(row, 'stop')" />
+          <TooltipIconButton icon="play" label="Start all" class="text-ok hover:text-ok" data-testid="docker-group-start" @click="groupAction(row, 'start')" />
+          <TooltipIconButton icon="debug-stop" label="Stop all" class="text-error hover:text-error" data-testid="docker-group-stop" @click="groupAction(row, 'stop')" />
         </span>
       </div>
       <div
@@ -161,7 +161,7 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         class="group/row grid h-full cursor-default select-none grid-cols-[0.5rem_minmax(0,1fr)_auto_1.25rem] grid-rows-[auto_auto] items-center gap-x-1.5 gap-y-0.5 py-1 pr-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
         :class="[
           row.grouped ? 'pl-5' : 'pl-1.5',
-          isSelected(row.container) ? 'bg-select shadow-[inset_2px_0_0_var(--color-focus)]' : 'hover:bg-hover',
+          isSelected(row.container) ? 'bg-select' : 'hover:bg-hover',
         ]"
         data-testid="docker-row"
         :data-id="row.container.id"
@@ -197,6 +197,7 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
               v-if="row.container.state !== 'running'"
               icon="play"
               label="Start"
+              class="text-ok hover:text-ok"
               data-testid="docker-row-start"
               @click.stop="act(row.container, 'start')"
             />
@@ -204,6 +205,7 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
               v-else
               icon="debug-stop"
               label="Stop"
+              class="text-error hover:text-error"
               data-testid="docker-row-stop"
               @click.stop="act(row.container, 'stop')"
             />

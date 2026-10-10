@@ -9,6 +9,8 @@ export type MenuItem =
       id: string;
       label: string;
       icon?: string;
+      /** Replaces the default muted icon colour (a Tailwind text-colour class). */
+      iconClass?: string;
       /** Renders a small color swatch instead of an icon — used by the Color submenu. */
       swatch?: string;
       danger?: boolean;

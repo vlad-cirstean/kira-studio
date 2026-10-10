@@ -127,7 +127,7 @@ function refresh(): Promise<void> {
             data-testid="docker-start-stopped"
             @click="runAll(stoppedIds, 'start')"
           >
-            <CodiconIcon name="play" :size="12" />Start stopped
+            <CodiconIcon name="play" :size="12" class="text-ok" />Start stopped
           </Button>
           <Button
             size="kira"
@@ -136,7 +136,7 @@ function refresh(): Promise<void> {
             data-testid="docker-stop-all"
             @click="runAll(runningIds, 'stop')"
           >
-            <CodiconIcon name="debug-stop" :size="12" />Stop all
+            <CodiconIcon name="debug-stop" :size="12" class="text-error" />Stop all
           </Button>
           <Button size="kira" variant="secondary" data-testid="docker-overview-refresh" @click="refresh">
             <CodiconIcon name="refresh" :size="12" />Refresh

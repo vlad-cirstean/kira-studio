@@ -33,7 +33,7 @@ const rows = computed(() => {
     <template #row="{ row }">
       <div
         class="group/row flex h-full cursor-default select-none items-center gap-1.5 px-1.5 outline-none focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
-        :class="ui.selection?.kind === 'network' && ui.selection.id === row.network.id ? 'bg-select shadow-[inset_2px_0_0_var(--color-focus)]' : 'hover:bg-hover'"
+        :class="ui.selection?.kind === 'network' && ui.selection.id === row.network.id ? 'bg-select' : 'hover:bg-hover'"
         data-testid="docker-row"
         :data-id="row.network.id"
         role="option"

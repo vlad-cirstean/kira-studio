@@ -95,7 +95,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                           v-else-if="sub.icon"
                           :name="sub.icon"
                           :size="13"
-                          class="text-muted-foreground"
+                          :class="(sub.type === 'item' && sub.iconClass) || 'text-muted-foreground'"
                         />
                       </span>
                       <span class="flex-1 overflow-hidden text-ellipsis">{{ sub.label }}</span>
@@ -136,7 +136,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                   class="w-2.5 h-2.5 rounded-full shrink-0"
                   :class="item.swatch === 'none' ? 'border border-disabled' : connBgClass(item.swatch)"
                 />
-                <CodiconIcon v-else-if="item.icon" :name="item.icon" :size="13" class="text-muted-foreground" />
+                <CodiconIcon v-else-if="item.icon" :name="item.icon" :size="13" :class="item.iconClass ?? 'text-muted-foreground'" />
               </span>
               <span class="flex-1 overflow-hidden text-ellipsis">{{ item.label }}</span>
               <DropdownMenuShortcut v-if="item.shortcut" :data-testid="`menu-item-${item.id}-shortcut`">{{

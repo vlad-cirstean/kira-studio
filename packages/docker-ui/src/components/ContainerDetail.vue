@@ -106,10 +106,10 @@ function act(action: 'start' | 'stop' | 'restart'): void {
           <Badge :variant="stateVariant" data-testid="docker-detail-state">{{ c.state }}</Badge>
           <span class="ml-auto flex shrink-0 items-center gap-1">
             <Button size="kira" variant="secondary" :disabled="busy || running" data-testid="docker-action-start" @click="act('start')">
-              <CodiconIcon name="play" :size="12" />Start
+              <CodiconIcon name="play" :size="12" class="text-ok" />Start
             </Button>
             <Button size="kira" variant="secondary" :disabled="busy || !running" data-testid="docker-action-stop" @click="act('stop')">
-              <CodiconIcon name="debug-stop" :size="12" />Stop
+              <CodiconIcon name="debug-stop" :size="12" class="text-error" />Stop
             </Button>
             <Button size="kira" variant="secondary" :disabled="busy || !running" data-testid="docker-action-restart" @click="act('restart')">
               <CodiconIcon name="debug-restart" :size="12" />Restart

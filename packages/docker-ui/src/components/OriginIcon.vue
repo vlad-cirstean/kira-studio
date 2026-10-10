@@ -46,7 +46,7 @@ const label = computed(() => {
         :aria-label="label"
         v-bind="$attrs"
       >
-        <BoxesIcon v-if="origin === 'compose'" :size="size" />
+        <BoxesIcon v-if="origin === 'compose'" :size="size" style="color: #00b4ff" />
         <svg v-else-if="origin === 'kubernetes' || origin === 'kind'" :width="size" :height="size" viewBox="0 0 24 24" aria-hidden="true">
           <path :fill="`#${siKubernetes.hex}`" :d="siKubernetes.path" />
         </svg>

@@ -101,8 +101,8 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
         <CodiconIcon v-if="actions.isBusy(c.id)" name="loading" :size="12" class="codicon-modifier-spin" />
         <span v-else class="invisible flex group-hover/row:visible group-focus-within/row:visible">
           <TooltipIconButton icon="output" label="Logs" @click.stop="open(c, 'logs')" />
-          <TooltipIconButton v-if="c.state === 'running'" icon="debug-stop" label="Stop" @click.stop="act(c, 'stop')" />
-          <TooltipIconButton v-else icon="play" label="Start" @click.stop="act(c, 'start')" />
+          <TooltipIconButton v-if="c.state === 'running'" icon="debug-stop" label="Stop" class="text-error hover:text-error" data-testid="docker-table-stop" @click.stop="act(c, 'stop')" />
+          <TooltipIconButton v-else icon="play" label="Start" class="text-ok hover:text-ok" data-testid="docker-table-start" @click.stop="act(c, 'start')" />
         </span>
       </span>
     </div>
