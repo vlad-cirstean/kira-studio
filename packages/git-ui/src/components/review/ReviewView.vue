@@ -810,7 +810,7 @@ watch(
         </InputGroup>
         <div class="flex-1 min-h-0 overflow-auto">
           <div>
-            <div class="pt-1 pb-0.5 text-muted-foreground text-graph-sm uppercase">Branches</div>
+            <div class="pt-1 pb-0.5 text-muted-foreground text-kira-sm uppercase">Branches</div>
             <button
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
@@ -828,7 +828,7 @@ watch(
             </div>
           </div>
           <div>
-            <div class="pt-1 pb-0.5 text-muted-foreground text-graph-sm uppercase">Remote branches</div>
+            <div class="pt-1 pb-0.5 text-muted-foreground text-kira-sm uppercase">Remote branches</div>
             <button
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"

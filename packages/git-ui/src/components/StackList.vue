@@ -109,7 +109,7 @@ async function removeFromStack(branch: string): Promise<void> {
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
         <div class="kv-branch-row-main flex items-center gap-0.5 flex-1 min-w-0 text-left">
-          <span v-if="row.isHead" class="text-kira-sm opacity-80" data-kira-tip="Current branch">●</span>
+          <span v-if="row.isHead" class="text-kira-sm text-subtle" data-kira-tip="Current branch">●</span>
           <span class="truncate">{{ row.name }}</span>
           <span
             v-if="row.stale"
@@ -128,7 +128,7 @@ async function removeFromStack(branch: string): Promise<void> {
             {{ prBadgeLabel(row.pr) }}
           </button>
           <span v-if="row.trackText" class="text-kira-sm text-muted-foreground">{{ row.trackText }}</span>
-          <span v-if="row.checkedOutIn" class="text-kira-sm opacity-80" :data-kira-tip="row.checkedOutIn">
+          <span v-if="row.checkedOutIn" class="text-kira-sm text-subtle" :data-kira-tip="row.checkedOutIn">
             <CodiconIcon name="repo" :size="13" />
           </span>
         </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { cn } from '@theme/lib/utils';
 /**
  * I2-21: `StashList.vue`'s and `GlobalStashList.vue`'s own row list, selection and row-menu
@@ -103,20 +104,17 @@ function onMenuSelect(id: string): void {
     >
       <CodiconIcon name="archive" :size="13" />
       <span v-if="rowModel(entry).badge" class="whitespace-nowrap font-data">{{ rowModel(entry).badge }}</span>
-      <span
+      <Badge
         v-if="rowModel(entry).origin"
-        class="whitespace-nowrap text-kira-sm px-1 rounded-kira-sm bg-info text-fg"
+        variant="info"
         :data-kira-tip="rowModel(entry).originTooltip"
-        >{{ rowModel(entry).origin }}</span
+        >{{ rowModel(entry).origin }}</Badge
       >
-      <span
-        v-if="rowModel(entry).auto"
-        class="whitespace-nowrap text-kira-sm px-1 rounded-kira-sm bg-muted-foreground text-fg"
-        data-kira-tip="Created automatically by an auto-stashed checkout"
-        >auto</span
+      <Badge v-if="rowModel(entry).auto" data-kira-tip="Created automatically by an auto-stashed checkout"
+        >auto</Badge
       >
       <span class="kv-stash-message flex-1 min-w-0 truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
-      <span v-if="entry.includedUntracked" class="font-data text-kira-sm opacity-80" data-kira-tip="Includes untracked files">-u</span>
+      <span v-if="entry.includedUntracked" class="font-data text-kira-sm text-subtle" data-kira-tip="Includes untracked files">-u</span>
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </button>

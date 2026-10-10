@@ -30,7 +30,7 @@ import {
 } from './badgeClass.ts';
 
 // §6.2: badge text truncates at ~190px (full name in the tooltip); the icon keeps its size.
-const BADGE_LABEL_CLASS = 'max-w-[190px] overflow-hidden text-ellipsis';
+const BADGE_LABEL_CLASS = 'max-w-47.5 overflow-hidden text-ellipsis';
 
 /** §6.2: "a row with more than three badges collapses the overflow into a +N badge". */
 const MAX_VISIBLE_BADGES = 3;
@@ -188,7 +188,7 @@ function buildBadgeElement(
   if (laneColor !== undefined) classes.push(laneBorderClass(laneColor));
   // G-UX (item 1): a subtle ring (not a border, which would fight the lane-tint border-color
   // above) on the current-branch badge itself.
-  if (spec.isCurrentBranch) classes.push('shadow-[0_0_0_1px_var(--kira-focus)]');
+  if (spec.isCurrentBranch) classes.push('ring-1 ring-focus');
   badge.className = refBadgeClass(...classes);
   // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
   // CommitGrid.vue mounts over its grid host — a mouse-hover affordance independent of whether the

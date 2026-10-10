@@ -75,7 +75,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           </Tooltip>
           <span> · based on <code class="font-data">{{ entry.baseSha.slice(0, 7) }}</code></span>
           <span v-if="entry.baseSubject"> {{ entry.baseSubject }}</span>
-          <span v-if="entry.includedUntracked" class="ml-1 font-data opacity-80">-u</span>
+          <span v-if="entry.includedUntracked" class="ml-1 font-data text-subtle">-u</span>
         </p>
       </div>
       <FileTree

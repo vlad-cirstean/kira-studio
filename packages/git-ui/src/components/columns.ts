@@ -242,7 +242,7 @@ function messageFormatter(
           continue;
         }
         const hit = document.createElement('span');
-        hit.className = 'bg-search-match rounded-[2px]';
+        hit.className = 'bg-search-match rounded-kira-xs';
         hit.textContent = run.text;
         subject.appendChild(hit);
       }

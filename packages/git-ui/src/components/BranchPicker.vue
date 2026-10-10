@@ -18,6 +18,7 @@ import type { RefRow, StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
@@ -690,14 +691,8 @@ watch(visibleBranchNames, (names) => {
                   >{{ row.isHead ? "●" : "" }}</span
                 >
                 <span class="truncate">{{ row.shortName }}</span>
-                <span
-                  v-if="row.checkedOutIn"
-                  class="text-graph-sm px-0.5 border border-dashed border-border rounded-kira-sm text-muted-foreground"
-                  :data-kira-tip="`Checked out in ${row.checkedOutIn}`"
-                >
-                  worktree
-                </span>
-                <span v-if="formatTrack(row.track)" class="text-graph-sm text-muted-foreground">{{ formatTrack(row.track) }}</span>
+                <Badge v-if="row.checkedOutIn" :data-kira-tip="`Checked out in ${row.checkedOutIn}`">worktree</Badge>
+                <span v-if="formatTrack(row.track)" class="text-kira-sm text-muted-foreground">{{ formatTrack(row.track) }}</span>
               </button>
               <button
                 v-if="prFor(row.shortName)"
@@ -712,16 +707,13 @@ watch(visibleBranchNames, (names) => {
               />
             </template>
           </div>
-          <div
-            v-if="forceDeleteCandidate"
-            class="flex items-center gap-1 py-1 px-2 bg-black/35 text-graph-md"
-          >
-            <span>“{{ forceDeleteCandidate }}” is not fully merged.</span>
+          <Alert v-if="forceDeleteCandidate" variant="warn" class="flex items-center gap-1 rounded-none border-x-0">
+            <AlertDescription>“{{ forceDeleteCandidate }}” is not fully merged.</AlertDescription>
             <Button variant="danger" size="kira" @click="confirmForceDelete">Force delete</Button>
             <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
-          </div>
+          </Alert>
           <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
-          <div v-if="model.branchesLocal.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-graph-sm">No branches</div>
+          <div v-if="model.branchesLocal.visible.length === 0" class="py-0.5 px-2 text-subtle text-kira-sm">No branches</div>
         </section>
 
         <section aria-label="Remote branches">
@@ -740,7 +732,7 @@ watch(visibleBranchNames, (names) => {
             >
               <CodiconIcon name="cloud" :size="13" />
               <span class="truncate">{{ row.shortName }}</span>
-              <span class="text-graph-sm text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
+              <span class="text-kira-sm text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </button>
             <RowActionsButton
               @click="openRefMenuFromButton(row, $event)"
@@ -748,7 +740,7 @@ watch(visibleBranchNames, (names) => {
             />
           </div>
           <ShowMoreButton :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
-          <div v-if="model.branchesRemote.visible.length === 0" class="py-0.5 px-2 text-muted-foreground text-graph-sm">
+          <div v-if="model.branchesRemote.visible.length === 0" class="py-0.5 px-2 text-subtle text-kira-sm">
             No remote branches
           </div>
         </section>

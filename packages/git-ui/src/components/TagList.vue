@@ -103,7 +103,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
       >
         <span
           class="codicon codicon-tag"
-          :class="{ 'opacity-60': !row.annotation }"
+          :class="{ 'text-subtle': !row.annotation }"
           aria-hidden="true"
         ></span>
         <span class="truncate">{{ row.shortName }}</span>

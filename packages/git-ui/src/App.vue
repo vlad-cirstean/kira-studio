@@ -1823,11 +1823,11 @@ onBeforeUnmount(() => {
 
         <div
           v-if="detailOpen && breakpoint === 'overlay'"
-          class="absolute inset-0 flex justify-end bg-black/35 z-20"
+          class="absolute inset-0 flex justify-end bg-black/10 z-20"
         >
           <aside
             ref="overlayDetailRegionEl"
-            class="relative shrink-0 border-l border-border bg-bg overflow-auto w-[min(320px,90vw)] shadow-kira-dialog"
+            class="relative shrink-0 border-l border-border bg-bg overflow-auto w-80 max-w-[90vw] shadow-kira-dialog"
             data-testid="detail-region"
             aria-label="Commit detail"
           >

@@ -130,12 +130,12 @@ async function confirmRemove(): Promise<void> {
       :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
     >
       <div class="kv-branch-row-main flex items-center gap-0.5 flex-1 min-w-0 text-left">
-        <span v-if="entry.isCurrent" class="text-kira-sm opacity-80" data-kira-tip="This window">●</span>
-        <span v-if="entry.isMain" class="text-kira-sm opacity-80" data-kira-tip="Main worktree">M</span>
-        <span v-if="entry.locked" class="text-kira-sm opacity-80" :data-kira-tip="entry.locked.reason">
+        <span v-if="entry.isCurrent" class="text-kira-sm text-subtle" data-kira-tip="This window">●</span>
+        <span v-if="entry.isMain" class="text-kira-sm text-subtle" data-kira-tip="Main worktree">M</span>
+        <span v-if="entry.locked" class="text-kira-sm text-subtle" :data-kira-tip="entry.locked.reason">
           <CodiconIcon name="lock" :size="13" />
         </span>
-        <span v-if="entry.openElsewhere" class="text-kira-sm opacity-80" data-kira-tip="Open in another window">
+        <span v-if="entry.openElsewhere" class="text-kira-sm text-subtle" data-kira-tip="Open in another window">
           <CodiconIcon name="window" :size="13" />
         </span>
         <span class="truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>

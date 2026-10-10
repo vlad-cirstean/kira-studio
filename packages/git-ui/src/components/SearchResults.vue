@@ -18,6 +18,7 @@
  * classes, `w-105`/`max-h-90`/`overflow-y-auto`/`py-0.5`, moved onto `PopoverContent` there too),
  * rendering only the inner listbox content.
  */
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
@@ -66,14 +67,14 @@ function optionClass(option: SearchOption): string {
     <div :id="SEARCH_LISTBOX_ID" role="listbox" aria-label="Search results">
       <div
         v-if="searching"
-        class="py-0.5 px-2 text-muted-foreground text-graph-sm"
+        class="py-0.5 px-2 text-subtle text-kira-sm"
         data-testid="search-status"
       >
         Searching…
       </div>
 
       <template v-for="section in model.sections" :key="section.title">
-        <div class="py-0.5 px-2 text-graph-sm font-semibold text-muted-foreground">
+        <div class="py-0.5 px-2 text-kira-sm font-semibold text-muted-foreground">
           {{ section.title }} <span class="font-normal">({{ section.options.length }})</span>
         </div>
 
@@ -99,51 +100,41 @@ function optionClass(option: SearchOption): string {
                 aria-hidden="true"
               ></span>
               <span class="flex-1 min-w-0 truncate">{{ option.hit.ref.shortName }}</span>
-              <span
-                v-if="fieldLabel(option.hit.fields)"
-                class="px-0.5 text-muted-foreground text-graph-sm border border-dashed border-border rounded-kira-sm"
-              >
-                {{ fieldLabel(option.hit.fields) }}
-              </span>
+              <Badge v-if="fieldLabel(option.hit.fields)">{{ fieldLabel(option.hit.fields) }}</Badge>
             </template>
             <template v-else>
               <span class="font-data text-muted-foreground">{{ option.hit.sha.slice(0, 7) }}</span>
               <span class="flex-1 min-w-0 truncate">{{ option.hit.subject }}</span>
-              <span class="text-muted-foreground text-graph-sm">{{ option.hit.authorName }}</span>
-              <span class="text-muted-foreground text-graph-sm">{{ formatRelativeDate(option.hit.authorTime) }}</span>
-              <span
-                v-if="fieldLabel(option.hit.fields)"
-                class="px-0.5 text-muted-foreground text-graph-sm border border-dashed border-border rounded-kira-sm"
-              >
-                {{ fieldLabel(option.hit.fields) }}
-              </span>
+              <span class="text-muted-foreground text-kira-sm">{{ option.hit.authorName }}</span>
+              <span class="text-muted-foreground text-kira-sm">{{ formatRelativeDate(option.hit.authorTime) }}</span>
+              <Badge v-if="fieldLabel(option.hit.fields)">{{ fieldLabel(option.hit.fields) }}</Badge>
             </template>
           </div>
         </template>
-        <div v-if="section.hiddenCount > 0" class="py-0.5 px-2 text-muted-foreground text-graph-sm">
+        <div v-if="section.hiddenCount > 0" class="py-0.5 px-2 text-subtle text-kira-sm">
           {{ section.hiddenCount }} more — refine your search
         </div>
       </template>
 
-      <div v-if="isEmpty" class="py-0.5 px-2 text-muted-foreground text-graph-sm">No results</div>
+      <div v-if="isEmpty" class="py-0.5 px-2 text-subtle text-kira-sm">No results</div>
     </div>
 
     <div
       v-if="tailStale"
-      class="py-0.5 px-2 text-muted-foreground text-graph-sm"
+      class="py-0.5 px-2 text-subtle text-kira-sm"
       data-testid="search-tail-stale"
     >
       Refs changed since this search ran
     </div>
-    <div v-if="model.loadedFooter" class="py-0.5 px-2 text-muted-foreground text-graph-sm">
+    <div v-if="model.loadedFooter" class="py-0.5 px-2 text-subtle text-kira-sm">
       {{ model.loadedFooter }}
     </div>
-    <div v-if="model.tailFooter" class="py-0.5 px-2 text-muted-foreground text-graph-sm">
+    <div v-if="model.tailFooter" class="py-0.5 px-2 text-subtle text-kira-sm">
       {{ model.tailFooter }}
     </div>
     <div
       v-if="model.tailNotice"
-      class="py-0.5 px-2 text-muted-foreground text-graph-sm"
+      class="py-0.5 px-2 text-subtle text-kira-sm"
       data-testid="search-tail-notice"
     >
       {{ model.tailNotice }}

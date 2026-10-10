@@ -114,7 +114,7 @@ function onOpenAutoFocus(e: Event): void {
       <PopoverTrigger as-child>
         <Button variant="toolbar" size="kira" class="max-w-full" data-testid="base-selector-trigger">
           <span class="truncate font-semibold">{{ triggerLabel }}</span>
-          <span v-if="triggerReason" class="text-muted-foreground text-graph-sm">{{ triggerReason }}</span>
+          <span v-if="triggerReason" class="text-muted-foreground text-kira-sm">{{ triggerReason }}</span>
           <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
         </Button>
       </PopoverTrigger>
@@ -144,7 +144,7 @@ function onOpenAutoFocus(e: Event): void {
           </InputGroup>
           <div class="overflow-auto min-h-0">
             <section v-if="suggested.length > 0" aria-label="Suggested">
-              <div class="py-0.5 px-2 text-muted-foreground text-graph-sm uppercase">Suggested</div>
+              <div class="py-0.5 px-2 text-muted-foreground text-kira-sm uppercase">Suggested</div>
               <button
                 v-for="candidate in suggested"
                 :key="candidate.ref"
@@ -153,12 +153,12 @@ function onOpenAutoFocus(e: Event): void {
                 @click="pick(candidate.ref)"
               >
                 <span class="truncate">{{ candidate.ref }}</span>
-                <span class="ml-auto text-muted-foreground text-graph-sm">{{ candidateReason(candidate) }}</span>
+                <span class="ml-auto text-muted-foreground text-kira-sm">{{ candidateReason(candidate) }}</span>
               </button>
             </section>
 
             <section aria-label="All branches">
-              <div class="py-0.5 px-2 text-muted-foreground text-graph-sm uppercase">All branches</div>
+              <div class="py-0.5 px-2 text-muted-foreground text-kira-sm uppercase">All branches</div>
               <button
                 v-for="row in sections.branches.visible"
                 :key="row.refname"
@@ -180,14 +180,14 @@ function onOpenAutoFocus(e: Event): void {
               </button>
               <div
                 v-if="hiddenCount > 0"
-                class="py-0.5 px-2 text-muted-foreground text-graph-sm"
+                class="py-0.5 px-2 text-subtle text-kira-sm"
                 data-testid="base-selector-hidden"
               >
                 {{ hiddenCount }} more — type to filter
               </div>
               <div
                 v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
-                class="py-1 px-2 text-muted-foreground"
+                class="py-1 px-2 text-subtle"
               >
                 {{ refsLoading ? 'Loading branches…' : 'No matching branches' }}
               </div>
