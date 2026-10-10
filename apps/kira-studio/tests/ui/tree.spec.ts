@@ -301,6 +301,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     'disconnect',
     'refresh',
     'edit',
+    'update-credentials',
     'duplicate',
     'copy-name',
     'copy-uri',
