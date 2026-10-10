@@ -102,16 +102,9 @@ export function openRepoDiffTab(repoId: string, path: string): OpenTabResult {
 // `review: null` selects openRepoCommitDiffTab's own commit-diff match/build; non-null selects
 // openRepoReviewDiffTab's review-diff ones — the two are otherwise identical.
 //
-// The audit that named this dedup (P107) also checked review's own reuse branch against P79's fix
-// (a preview-type reuse skipping openTab's own preview-cohort eviction, since the reuse path never
-// reaches openTab at all): review's branch had no `evictPreviewCohort` call for the
-// `!pinned && !previewCohort` case, only `removeFromPreviewCohort` for `pinned`. No caller anywhere
-// passes `previewCohort` to either function today (`hostHandlers.ts`'s `editor.openDiff`/
-// `editor.openRangeDiff` both omit it), so `!previewCohort` is always true at every live call site —
-// this was a live gap for review diffs, not a deliberate difference; review's own doc comment
-// already claims "same shape" as commit's. Fixed here, not preserved: both reuse branches now
-// evict/remove-from-cohort before activateTab (P79's own ordering — its save must land before
-// activateTab's).
+// Reuse branches skip openTab, so they replicate its cohort rules: a pinned open promotes the
+// tab out of the cohort; a preview open of a current preview member makes it the sole member; a
+// permanent tab is only activated, never demoted into the cohort.
 function reuseOrOpenRepoDiffTab(opts: {
   repoId: string;
   path: string;
@@ -145,16 +138,9 @@ function reuseOrOpenRepoDiffTab(opts: {
       // openTab's own reuse branch does this; this wrapper's own reuse path needs the identical
       // rule since it never reaches openTab's.
       tabsStore.removeFromPreviewCohort(workspaceId, existing.id);
-    } else if (!opts.previewCohort) {
-      // P79 review fix (Functional, LOW): this reuse path short-circuits past openTab entirely,
-      // so a preview-type open (not a cohort-joining one) never reached openTab's own §5.2 rule 3
-      // eviction — "Open all changes" reusing file 0's own already-open (permanent) tab left
-      // whatever preview cohort/slot preceded it (an unrelated previewed tab) untouched instead
-      // of being replaced. Mirrors openTab's own `previewIdsByWorkspace[key] = [id]` outcome for a
-      // freshly created preview tab: `existing.id` becomes the sole surviving cohort member,
-      // exactly as it would if a fresh tab had been created here instead of reused. Ordered before
-      // activateTab below so its own saveNow() call persists the eviction too, not a later,
-      // unrelated save.
+    } else if (!opts.previewCohort && tabsStore.isPreview(existing.id)) {
+      // A permanent tab reused by a preview open stays permanent: only a current preview member
+      // becomes the sole cohort member. Ordered before activateTab so its saveNow() persists this.
       tabsStore.evictPreviewCohort(workspaceId, existing.id);
     }
     tabsStore.activateTab(existing.id);

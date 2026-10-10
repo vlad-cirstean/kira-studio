@@ -187,31 +187,36 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
   });
 });
 
-describe('P79 review fix: openRepoCommitDiffTab reuse still evicts the preview cohort', () => {
-  test("reusing file 0's existing permanent tab still evicts a stale cohort, and later files join fresh", () => {
+describe('openRepoCommitDiffTab reuse and the preview cohort', () => {
+  test('reusing a permanent tab as a preview keeps it permanent and leaves the cohort alone', () => {
     const repoId = freshRepoId();
     const ws = repoWorkspaceKey(repoId);
     const diffLabels = { left: 'base', right: 'sha1' };
 
-    // file 0's diff tab already exists as a permanent (pinned) tab.
     const file0 = openRepoCommitDiffTab(repoId, 'a.ts', 'base', 'sha1', diffLabels, true);
-    expect(tabsStore.isPreview(file0.id)).toBe(false);
-
-    // An unrelated preview tab is open in the same workspace beforehand.
     const stale = openRepoFileTab(repoId, 'unrelated.ts', { preview: true });
-    expect(tabsStore.isPreview(stale.id)).toBe(true);
 
-    // "Open all changes": file 0 reuses its existing permanent tab (pinned: false,
-    // previewCohort unset) — the reuse short-circuit must still evict the stale cohort.
     const reused = openRepoCommitDiffTab(repoId, 'a.ts', 'base', 'sha1', diffLabels, false);
     expect(reused.id).toBe(file0.id);
     expect(reused.reused).toBe(true);
-    expect(tabsStore.tabs.find((t) => t.id === stale.id)).toBeUndefined();
-    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([file0.id]);
+    expect(tabsStore.isPreview(file0.id)).toBe(false);
+    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([stale.id]);
 
-    // file 1 joins the cohort file 0 just started.
-    const file1 = openRepoCommitDiffTab(repoId, 'b.ts', 'base', 'sha1', diffLabels, false, true);
-    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([file0.id, file1.id]);
+    // A later preview open replaces the stale preview and leaves file0 open.
+    openRepoFileTab(repoId, 'other.ts', { preview: true });
+    expect(tabsStore.tabs.find((t) => t.id === file0.id)).toBeDefined();
+    expect(tabsStore.tabs.find((t) => t.id === stale.id)).toBeUndefined();
+  });
+
+  test('reusing a preview tab as a preview makes it the sole cohort member', () => {
+    const repoId = freshRepoId();
+    const ws = repoWorkspaceKey(repoId);
+    const diffLabels = { left: 'base', right: 'sha1' };
+
+    const file0 = openRepoCommitDiffTab(repoId, 'a.ts', 'base', 'sha1', diffLabels, false);
+    const reused = openRepoCommitDiffTab(repoId, 'a.ts', 'base', 'sha1', diffLabels, false);
+    expect(reused.id).toBe(file0.id);
+    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([file0.id]);
   });
 });
 
