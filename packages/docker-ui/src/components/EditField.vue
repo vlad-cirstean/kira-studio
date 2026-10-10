@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Badge } from '@theme/components/ui/badge';
+import { computed, inject } from 'vue';
 import type { EditMode } from '../lib/editDiff';
+import { inPlaceSectionKey } from '../lib/editSection';
 
-defineProps<{
+const props = defineProps<{
   field: string;
   label: string;
   mode: EditMode;
@@ -10,6 +11,9 @@ defineProps<{
   error?: string;
   hint?: string;
 }>();
+
+const inPlaceTab = inject(inPlaceSectionKey, undefined);
+const needsRecreate = computed(() => inPlaceTab === true && props.mode === 'recreate');
 </script>
 
 <template>
@@ -21,13 +25,11 @@ defineProps<{
   >
     <div class="flex items-center gap-2">
       <span class="text-muted-foreground">{{ label }}</span>
-      <span v-if="changed" class="size-1.5 rounded-full bg-focus" title="Changed" />
-      <Badge :variant="mode === 'now' ? 'info' : 'warn'" data-testid="docker-edit-badge" :data-mode="mode">
-        {{ mode === 'now' ? 'applies now' : 'recreates container' }}
-      </Badge>
+      <span v-if="changed" class="size-1.5 rounded-full bg-muted-foreground" title="Changed" />
     </div>
     <slot />
     <p v-if="error" class="text-error" data-testid="docker-edit-field-error">{{ error }}</p>
+    <p v-else-if="needsRecreate" class="text-muted-foreground" data-testid="docker-edit-field-recreate-hint">This change needs a recreate.</p>
     <p v-else-if="hint" class="text-muted-foreground">{{ hint }}</p>
   </fieldset>
 </template>

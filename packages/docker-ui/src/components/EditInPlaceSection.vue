@@ -3,8 +3,9 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { computed, ref } from 'vue';
+import { computed, provide, ref } from 'vue';
 import { resourceMode, toNumber } from '../lib/editDiff';
+import { inPlaceSectionKey } from '../lib/editSection';
 import type { EditDraft } from '../state/dockerEdit';
 import type { DockerResources, RestartPolicyName } from '../wire';
 import EditField from './EditField.vue';
@@ -18,6 +19,8 @@ const props = defineProps<{
   engineCpus?: number;
   allNetworks: string[];
 }>();
+
+provide(inPlaceSectionKey, true);
 
 const ip = computed(() => props.draft.inPlace);
 const baseIp = computed(() => props.draft.base.inPlace);
