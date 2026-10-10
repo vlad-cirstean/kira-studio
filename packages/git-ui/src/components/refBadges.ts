@@ -24,7 +24,7 @@ import { BADGE_ICONS } from '../icons/index.ts';
 import { prBadgeClass, type RefBadgeVariant, refBadgeClass } from './badgeClass.ts';
 
 // §6.2: badge text truncates at ~190px (full name in the tooltip); the icon keeps its size.
-const BADGE_LABEL_CLASS = 'max-w-47.5 overflow-hidden text-ellipsis';
+const BADGE_LABEL_CLASS = 'min-w-0 max-w-47.5 truncate';
 
 /** §6.2: "a row with more than three badges collapses the overflow into a +N badge". */
 const MAX_VISIBLE_BADGES = 3;
@@ -160,7 +160,7 @@ function buildBadgeElement(
   // G-UX (item 1): a subtle ring (not a border, which would fight the lane-tint border-color
   // above) on the current-branch badge itself.
   if (spec.isCurrentBranch) classes.push('ring-1 ring-focus');
-  badge.className = refBadgeClass(variant, ...classes);
+  badge.className = refBadgeClass(variant, 'shrink min-w-0', ...classes);
   if (spec.icon === BADGE_ICONS.tag) badge.dataset.testid = 'badge-tag';
   // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
   // CommitGrid.vue mounts over its grid host — a mouse-hover affordance independent of whether the
@@ -179,7 +179,7 @@ function buildBadgeElement(
   }
 
   const icon = document.createElement('span');
-  icon.className = `codicon ${spec.icon}`;
+  icon.className = `codicon shrink-0 ${spec.icon}`;
   icon.dataset.testid = 'badge-icon';
   // Decorative: the visible label text (or, for the overflow badge, its title) already carries
   // the information — see this file's module doc on "no colour/glyph-only meaning" (§7.9/W14).
@@ -198,7 +198,7 @@ function buildBadgeElement(
     // "reliably reach the accessibility tree as a second, non-text signal" reasoning the dot it
     // replaces already established (§6.1/§7's own "no colour/shape-only meaning" still applies).
     const check = document.createElement('span');
-    check.className = 'codicon codicon-check text-focus';
+    check.className = 'codicon codicon-check shrink-0 text-focus';
     check.setAttribute('role', 'img');
     check.setAttribute('aria-label', 'current branch');
     badge.appendChild(check);
@@ -209,7 +209,7 @@ function buildBadgeElement(
 
 function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
   const badge = document.createElement('span');
-  badge.className = refBadgeClass('default');
+  badge.className = refBadgeClass('default', 'shrink-0');
   badge.setAttribute('data-kira-tip', overflow.title);
   badge.textContent = `+${overflow.count}`;
   return badge;
@@ -294,7 +294,7 @@ export function buildRefBadges(
 
   const plan = planBadges(decorations);
   const container = document.createElement('span');
-  container.className = 'flex items-center gap-1 shrink-0';
+  container.className = 'flex items-center gap-1 min-w-0';
 
   for (const spec of plan.visible) {
     container.appendChild(buildBadgeElement(spec, stackInfoFor));
