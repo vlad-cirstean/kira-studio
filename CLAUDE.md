@@ -233,6 +233,7 @@ duplicated here; this file only points at them.
   `packages/db-fixtures/*.spec.ts` files — nothing else exercises a Go adapter capability by
   capability (`tests/e2e-real/` only spot-checks a scenario or two per kind). Keep per-capability
   coverage there even where it reads like a CRUD round-trip; prune only genuine duplication.
+- **New feature tests behave like a full e2e, split at the IPC boundary:** same scenario runs once on the backend (flow test, assert the result) and once on the frontend (UI spec, assert the same result). Together they prove the feature end to end; each half stays easy to validate. Applies to every new feature from now on. Keep `e2e-real` for what cannot be split.
 - **Real-container adapter tests split into two suites, by design (P25).** A *general* suite runs
   frequently in the normal dev/CI loop — basic per-adapter connectivity sanity, not the full
   permutation matrix. A *complete* suite runs only on-demand and in CI — the full auth/config
