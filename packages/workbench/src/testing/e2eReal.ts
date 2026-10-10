@@ -159,3 +159,25 @@ export async function bound<T>(
     return text as T;
   }
 }
+
+/** What `openMainWindow` needs from the e2e-real `kira` fixture (both apps' fixtures satisfy it). */
+interface MainWindowApp {
+  baseURL: string;
+  window: {
+    goto(url: string): Promise<unknown>;
+    waitForSelector(selector: string): Promise<unknown>;
+  };
+  call<T>(service: string, method: string, args?: unknown): Promise<T>;
+}
+
+/**
+ * Reloads the fixture page as the app's main window. The prompt router (P246) shows a popup only
+ * in the window it targets, and a plain browser page has a random key unless it asks for this one.
+ */
+export async function openMainWindow(kira: MainWindowApp): Promise<string> {
+  const main = await kira.call<string>('PromptsService', 'MainWindow');
+  if (!main) throw new Error('PromptsService.MainWindow returned no window key');
+  await kira.window.goto(`${kira.baseURL}/?window=${encodeURIComponent(main)}`);
+  await kira.window.waitForSelector('[data-testid="status-bar"]');
+  return main;
+}

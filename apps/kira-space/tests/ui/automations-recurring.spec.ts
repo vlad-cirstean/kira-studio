@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
+import { emitPrompts, routed } from './support/prompts';
 import type { ControlSnapshot } from './support/types';
 
 // P242 Part 4: recurring scripts on the mocked bridge: the editor's schedule, rows, the confirm popup.
@@ -102,7 +103,6 @@ const BASE: ControlSnapshot[] = [
   { channel: IPC.customScriptsList, response: { collections: [], scripts: [SCRIPT] } },
   { channel: IPC.scriptRunsResolveDir, response: DIR },
   { channel: IPC.scriptRunsNextFires, response: FIRES },
-  { channel: IPC.scriptRunsMainWindow, response: 'main' },
   { channel: IPC.scriptRunsSchedulePreview, response: PREVIEW },
   { channel: IPC.scriptRunsConfirmAccept, response: { runId: 'run-w', terminal: null } },
   { channel: IPC.scriptRunsRunScheduleNow, response: { runId: 'run-n', terminal: null } },
@@ -250,6 +250,7 @@ test('a waiting run shows the popup in the main window; Run accepts, Not now dec
   });
   await openPanel(page);
   await emitWailsEvent(page, IPC.scriptRunsChanged, run('waiting'));
+  await emitPrompts(page, [routed('schedule', 'run-w')]);
   const popup = page.locator('[data-testid="schedule-confirm"]');
   await expect(popup).toBeVisible();
   await expect(popup.locator('[data-testid="schedule-confirm-due"]')).toContainText('Due');
@@ -260,6 +261,7 @@ test('a waiting run shows the popup in the main window; Run accepts, Not now dec
   await expect(popup).toHaveCount(0);
 
   await emitWailsEvent(page, IPC.scriptRunsChanged, run('waiting', { id: 'run-x' }));
+  await emitPrompts(page, [routed('schedule', 'run-x')]);
   await expect(popup).toBeVisible();
   await popup.locator('[data-testid="schedule-confirm-decline"]').click();
   await expect
@@ -267,15 +269,11 @@ test('a waiting run shows the popup in the main window; Run accepts, Not now dec
     .toMatchObject({ id: 'run-x' });
 });
 
-test('a waiting run shows no popup in a window that is not the main one', async ({ relaunch }) => {
-  const { window: page } = await relaunch({
-    control: [
-      ...BASE.filter((s) => s.channel !== IPC.scriptRunsMainWindow),
-      { channel: IPC.scriptRunsMainWindow, response: 'other-window' },
-    ],
-  });
+test('a waiting run shows no popup in a window the router did not target', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: BASE });
   await openPanel(page);
   await emitWailsEvent(page, IPC.scriptRunsChanged, run('waiting'));
+  await emitPrompts(page, [routed('schedule', 'run-w', { target: 'other-window' })]);
   await expect(page.locator('[data-testid="run-row"][data-state="waiting"]')).toHaveCount(1);
   await expect(page.locator('[data-testid="schedule-confirm"]')).toHaveCount(0);
 });

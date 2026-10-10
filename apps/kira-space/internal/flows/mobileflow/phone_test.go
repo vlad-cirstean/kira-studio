@@ -153,9 +153,8 @@ type pairResult struct {
 	err   error
 }
 
-// requestPairing starts a parked POST /api/pair and returns the desktop prompt that appears for it.
-func (p *phone) requestPairing(app *flowharness.App, label, code string) (<-chan pairResult, bridge.MobilePairingRequest) {
-	p.t.Helper()
+// startPairing parks a POST /api/pair; the result arrives once the desktop answers.
+func (p *phone) startPairing(label, code string) <-chan pairResult {
 	done := make(chan pairResult, 1)
 	go func() {
 		raw, _ := json.Marshal(map[string]string{"label": label, "code": code})
@@ -171,6 +170,13 @@ func (p *phone) requestPairing(app *flowharness.App, label, code string) (<-chan
 		body, _ := io.ReadAll(resp.Body)
 		done <- pairResult{reply: reply{Status: resp.StatusCode, Header: resp.Header, Body: body}}
 	}()
+	return done
+}
+
+// requestPairing starts a parked POST /api/pair and returns the desktop prompt that appears for it.
+func (p *phone) requestPairing(app *flowharness.App, label, code string) (<-chan pairResult, bridge.MobilePairingRequest) {
+	p.t.Helper()
+	done := p.startPairing(label, code)
 	var pending bridge.MobilePairingRequest
 	testx.WaitUntil(p.t, waitFor, func() bool {
 		snap := app.W.Mobile.PendingPairing()

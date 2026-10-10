@@ -24,7 +24,7 @@ export const EMPTY_BOOT_SNAPSHOTS: readonly ControlSnapshot[] = [
   { channel: IPC.tabsList, response: [] },
   { channel: IPC.customScriptsList, response: { collections: [], scripts: [] } },
   { channel: IPC.scriptRunsList, response: [] },
-  { channel: IPC.scriptRunsMainWindow, response: 'main' },
+  { channel: IPC.promptsList, response: [] },
 ];
 
 /** A spec's own snapshot for a channel replaces the default outright, rather than being appended

@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
+import { emitPrompts, routed } from './support/prompts';
 
 // P212: the Mobile access settings pane and the phone pairing prompt.
 
@@ -282,6 +283,7 @@ test('the pairing prompt shows the code and origin; approve and deny call the bo
   await expect(dialog).toHaveCount(0);
 
   await emitWailsEvent(window, IPC.mobilePairing, { pending: request, queued: 1 });
+  await emitPrompts(window, [routed('mobile-pairing', 'req-1')]);
   await expect(dialog).toBeVisible();
   await expect(window.locator('[data-testid="mobile-pairing-code"]')).toHaveText('4821');
   await expect(window.locator('[data-testid="mobile-pairing-origin"]')).toContainText(
@@ -297,6 +299,7 @@ test('the pairing prompt shows the code and origin; approve and deny call the bo
     pending: { ...request, requestId: 'req-2' },
     queued: 1,
   });
+  await emitPrompts(window, [routed('mobile-pairing', 'req-2')]);
   await window.locator('[data-testid="mobile-pairing-deny"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.mobilePairingDeny)?.args)

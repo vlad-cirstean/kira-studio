@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { openMainWindow } from '@workbench/testing/e2eReal';
 import { expect, test } from './fixtures';
 
 // A real MCP client over HTTP against the real server: a write to an exposed connection parks on
@@ -71,8 +72,7 @@ test('a write tool call waits for UI approval, then lands', async ({ kira, kiraH
     });
 
     const page = kira.window;
-    await page.reload();
-    await page.waitForSelector('[data-testid="status-bar"]');
+    await openMainWindow(kira);
     await page.click('[data-testid="open-settings"]');
     await page.click('[data-testid="settings-section-Database MCP"]');
     await page.locator('[data-testid="settings-db-mcp-enabled"]').click();

@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { openMainWindow } from '@workbench/testing/e2eReal';
 import { expect, test } from './fixtures';
 
 // P242 Part 4: a recurring script against the real backend and the real clock: the confirm popup
@@ -23,9 +24,7 @@ test('a due recurring script asks, then runs headless and ends Succeeded', async
   test.setTimeout(150_000);
   const page = kira.window;
   // The popup shows in the main window only: open this page as that window.
-  const main = await kira.call<string>('ScriptRunsService', 'MainWindow');
-  await page.goto(`${kira.baseURL}/?window=${main}`);
-  await page.waitForSelector('[data-testid="status-bar"]');
+  await openMainWindow(kira);
   await addRecurring(page, 'Scheduled echo', 'echo scheduled-ok', false);
   const popup = page.locator('[data-testid="schedule-confirm"]');
   await expect(popup).toBeVisible({ timeout: 75_000 });
