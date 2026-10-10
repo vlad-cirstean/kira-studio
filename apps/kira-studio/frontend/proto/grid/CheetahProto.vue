@@ -553,14 +553,14 @@ onMounted(async () => {
         data-testid="find-input"
         @keydown.enter="find"
       />
-      <Button size="kira" variant="outline" data-testid="find-run" @click="find">Find</Button>
-      <Button size="kira" variant="outline" data-testid="find-prev" @click="goToMatch(-1)">Prev</Button>
-      <Button size="kira" variant="outline" data-testid="find-next" @click="goToMatch(1)">Next</Button>
+      <Button size="kira" variant="toolbar" data-testid="find-run" @click="find">Find</Button>
+      <Button size="kira" variant="toolbar" data-testid="find-prev" @click="goToMatch(-1)">Prev</Button>
+      <Button size="kira" variant="toolbar" data-testid="find-next" @click="goToMatch(1)">Next</Button>
       <span class="text-fg-muted" data-testid="find-count">{{ matchCount }}</span>
-      <Button size="kira" variant="outline" data-testid="find-hide" @click="setHideNonMatching(!hideNonMatching)">
+      <Button size="kira" variant="toolbar" data-testid="find-hide" @click="setHideNonMatching(!hideNonMatching)">
         {{ hideNonMatching ? 'Show all' : 'Hide others' }}
       </Button>
-      <Button size="kira" variant="outline" data-testid="add-row" @click="actions.insertRow()">Add row</Button>
+      <Button size="kira" variant="toolbar" data-testid="add-row" @click="actions.insertRow()">Add row</Button>
     </div>
     <div
       ref="rootRef"

@@ -31,7 +31,7 @@ function onConfirm(): void {
        trade-off for correct stacking when nested under another open dialog. -->
   <Dialog v-if="confirmDialogStore.open" :open="true" @update:open="(v) => !v && onCancel()">
     <DialogContent size="sm" data-testid="confirm-dialog">
-      <DialogHeader closable close-testid="confirm-dialog-close">
+      <DialogHeader close-testid="confirm-dialog-close">
         <DialogTitle>Confirm</DialogTitle>
       </DialogHeader>
 

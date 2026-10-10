@@ -39,7 +39,7 @@ function onOpenChange(open: boolean): void {
 <template>
   <Dialog :open="true" @update:open="onOpenChange">
     <DialogContent size="md" data-testid="credentials-update-dialog">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Update credentials — {{ record?.name }}</DialogTitle>
       </DialogHeader>
       <DialogBody>

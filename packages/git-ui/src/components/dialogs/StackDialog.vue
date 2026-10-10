@@ -146,7 +146,7 @@ function closeDialog(): void {
       :aria-describedby="undefined"
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>
           {{
             target?.mode === 'setParent'

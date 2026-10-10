@@ -183,7 +183,7 @@ async function onSave(): Promise<void> {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onDismiss()">
     <DialogContent size="xl" fixed-height data-testid="settings-dialog">
-      <DialogHeader icon="gear" closable close-testid="settings-dialog-close">
+      <DialogHeader icon="gear" close-testid="settings-dialog-close">
         <DialogTitle>Settings</DialogTitle>
       </DialogHeader>
 

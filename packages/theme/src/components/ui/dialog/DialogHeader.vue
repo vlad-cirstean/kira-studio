@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<{
   closable?: boolean
   closeTestid?: string
 }>(), {
-  closable: false,
+  closable: true,
 })
 </script>
 

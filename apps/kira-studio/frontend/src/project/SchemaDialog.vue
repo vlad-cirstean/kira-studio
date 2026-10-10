@@ -116,7 +116,7 @@ async function onSave(): Promise<void> {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && schemaDialogStore.closeSchemaDialog()">
     <DialogContent size="xl" data-testid="schema-dialog">
-      <DialogHeader closable close-testid="schema-dialog-close">
+      <DialogHeader close-testid="schema-dialog-close">
         <DialogTitle
           >Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
         >

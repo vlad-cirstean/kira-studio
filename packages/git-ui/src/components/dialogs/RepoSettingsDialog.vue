@@ -195,7 +195,7 @@ async function save(): Promise<void> {
       :aria-describedby="undefined"
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Repository settings</DialogTitle>
       </DialogHeader>
       <DialogBody>

@@ -34,7 +34,7 @@ async function toggle(): Promise<void> {
     class="fixed bottom-2 right-4 z-50 flex items-center gap-2 rounded-kira bg-elevated px-2 py-1 text-kira-md shadow-md"
     data-testid="trace-hud"
   >
-    <Button size="kira" variant="outline" data-testid="trace-toggle" @click="toggle">
+    <Button size="kira" variant="toolbar" data-testid="trace-toggle" @click="toggle">
       {{ running ? 'Stop trace' : 'Start trace' }}
     </Button>
     <span class="text-fg-muted" data-testid="trace-summary">{{ summary }}</span>

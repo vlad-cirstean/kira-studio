@@ -218,7 +218,7 @@ export function attachReviewDecorations(
     if (retryable) {
       const retry = document.createElement('button');
       retry.type = 'button';
-      retry.className = buttonVariants({ variant: 'dialog-danger', size: 'xs' });
+      retry.className = buttonVariants({ variant: 'dialog-danger', size: 'kira' });
       retry.textContent = 'Retry';
       retry.addEventListener('click', () => void load());
       domNode.append(retry);

@@ -68,7 +68,7 @@ function confirm(): void {
     <DialogContent
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Revert</DialogTitle>
       </DialogHeader>
       <DialogBody>

@@ -182,7 +182,7 @@ function onClose(): void {
       :aria-describedby="undefined"
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
       </DialogHeader>
       <DialogBody>

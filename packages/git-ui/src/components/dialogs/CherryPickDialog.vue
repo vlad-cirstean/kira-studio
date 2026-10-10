@@ -88,7 +88,7 @@ function confirm(): void {
     <DialogContent
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Cherry-pick</DialogTitle>
       </DialogHeader>
       <DialogBody>

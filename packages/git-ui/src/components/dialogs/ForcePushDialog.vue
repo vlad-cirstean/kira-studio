@@ -95,7 +95,7 @@ function confirmPlain(): void {
     <DialogContent
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Force push {{ pending.branch }} to {{ pending.remote }}?</DialogTitle>
       </DialogHeader>
       <DialogBody>

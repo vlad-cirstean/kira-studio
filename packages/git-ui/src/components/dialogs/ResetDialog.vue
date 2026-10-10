@@ -91,7 +91,7 @@ function confirm(): void {
     <DialogContent
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>
           <template v-if="preflight?.branch">Move <code class="font-data">{{ preflight.branch }}</code> to</template>
           <template v-else>Move HEAD to</template>

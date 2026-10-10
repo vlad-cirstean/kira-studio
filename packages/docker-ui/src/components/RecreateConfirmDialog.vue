@@ -13,7 +13,7 @@ const emit = defineEmits<{ cancel: []; confirm: [] }>();
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('cancel')">
     <DialogContent size="lg" data-testid="docker-edit-dialog">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Recreate container</DialogTitle>
         <DialogDescription>
           The engine cannot change these settings on a container that exists. A new container replaces this one.

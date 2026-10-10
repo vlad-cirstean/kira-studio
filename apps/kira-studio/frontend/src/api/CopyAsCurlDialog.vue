@@ -66,7 +66,7 @@ function close(): void {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
     <DialogContent size="xl" data-testid="copy-as-curl-dialog">
-      <DialogHeader closable close-testid="copy-as-curl-dialog-close">
+      <DialogHeader close-testid="copy-as-curl-dialog-close">
         <DialogTitle>Copy as curl</DialogTitle>
       </DialogHeader>
       <DialogBody>

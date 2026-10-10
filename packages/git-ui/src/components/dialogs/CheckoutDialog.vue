@@ -82,7 +82,7 @@ function stashAndCarry(): void {
     <DialogContent
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Can't check out {{ preflight?.target.name }}</DialogTitle>
       </DialogHeader>
       <DialogBody>

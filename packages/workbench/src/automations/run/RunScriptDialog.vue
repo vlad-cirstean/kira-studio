@@ -134,7 +134,7 @@ function run(): void {
       @keydown.meta.enter.prevent="run"
       @keydown.ctrl.enter.prevent="run"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Run {{ script?.name ?? 'script' }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
       </DialogHeader>

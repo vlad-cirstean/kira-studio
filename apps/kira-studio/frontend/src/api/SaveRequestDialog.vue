@@ -74,7 +74,7 @@ function splitTarget(value: string): [string, string | null] {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && saveDialogStore.closeSaveDialog()">
     <DialogContent size="md" data-testid="save-request-dialog">
-      <DialogHeader closable close-testid="save-request-close">
+      <DialogHeader close-testid="save-request-close">
         <DialogTitle>Save request</DialogTitle>
       </DialogHeader>
       <DialogBody>

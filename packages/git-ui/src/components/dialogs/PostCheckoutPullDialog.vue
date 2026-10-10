@@ -40,7 +40,7 @@ function pullNow(): void {
     <DialogContent
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Pull the latest changes?</DialogTitle>
       </DialogHeader>
       <DialogBody>

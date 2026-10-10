@@ -74,7 +74,7 @@ async function submit(): Promise<void> {
       :aria-describedby="undefined"
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Create branch</DialogTitle>
       </DialogHeader>
       <DialogBody>

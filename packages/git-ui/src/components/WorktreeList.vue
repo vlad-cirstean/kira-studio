@@ -164,7 +164,7 @@ async function confirmRemove(): Promise<void> {
         :aria-describedby="undefined"
         size="md"
       >
-        <DialogHeader closable>
+        <DialogHeader>
           <DialogTitle>{{ pendingRemove ? `Remove ${pendingRemove.entry.path}` : '' }}</DialogTitle>
         </DialogHeader>
         <DialogBody>

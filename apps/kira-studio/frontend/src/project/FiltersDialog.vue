@@ -178,7 +178,7 @@ const connectionName = computed(
 <template>
   <Dialog v-if="filtersDialogStore.open" :open="true" @update:open="(v) => !v && filtersDialogStore.closeFiltersDialog()">
     <DialogContent size="lg" data-testid="filters-dialog">
-      <DialogHeader icon="filter" closable close-testid="filters-dialog-close">
+      <DialogHeader icon="filter" close-testid="filters-dialog-close">
         <DialogTitle
           >Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
         >

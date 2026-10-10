@@ -45,7 +45,7 @@ function stashAndCarry(): void {
     <DialogContent
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Can't pull — local changes in the way</DialogTitle>
       </DialogHeader>
       <DialogBody>

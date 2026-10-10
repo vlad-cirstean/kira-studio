@@ -100,7 +100,7 @@ watch(
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onClose()">
     <DialogContent size="md" data-testid="upload-dialog">
-      <DialogHeader closable close-testid="upload-close">
+      <DialogHeader close-testid="upload-close">
         <DialogTitle>Upload file</DialogTitle>
       </DialogHeader>
 

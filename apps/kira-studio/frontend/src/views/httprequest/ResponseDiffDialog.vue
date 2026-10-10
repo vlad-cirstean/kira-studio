@@ -227,7 +227,7 @@ onUnmounted(() => {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent size="2xl" fixed-height data-testid="http-diff-dialog">
-      <DialogHeader closable close-testid="http-diff-close">
+      <DialogHeader close-testid="http-diff-close">
         <DialogTitle>Compare responses</DialogTitle>
       </DialogHeader>
       <DialogBody flush>

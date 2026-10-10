@@ -68,7 +68,7 @@ function close(): void {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
     <DialogContent size="xl" data-testid="edit-raw-dialog">
-      <DialogHeader closable close-testid="edit-raw-dialog-close">
+      <DialogHeader close-testid="edit-raw-dialog-close">
         <DialogTitle>Edit as raw HTTP</DialogTitle>
       </DialogHeader>
       <DialogBody>

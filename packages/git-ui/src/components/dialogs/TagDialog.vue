@@ -83,7 +83,7 @@ async function submit(): Promise<void> {
       :aria-describedby="undefined"
       size="md"
     >
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Create tag</DialogTitle>
       </DialogHeader>
       <DialogBody>

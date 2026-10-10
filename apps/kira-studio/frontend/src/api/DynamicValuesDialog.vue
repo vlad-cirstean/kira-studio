@@ -76,7 +76,7 @@ function close(): void {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
     <DialogContent size="md" data-testid="dynamic-values-dialog">
-      <DialogHeader closable close-testid="dynamic-values-dialog-close">
+      <DialogHeader close-testid="dynamic-values-dialog-close">
         <DialogTitle>Dynamic values</DialogTitle>
       </DialogHeader>
       <DialogBody class="gap-1.5">

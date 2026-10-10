@@ -49,7 +49,7 @@ onMounted(() => {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && close()">
     <DialogContent size="lg" data-testid="import-curl-dialog">
-      <DialogHeader closable close-testid="import-curl-dialog-close">
+      <DialogHeader close-testid="import-curl-dialog-close">
         <DialogTitle>Import from curl</DialogTitle>
       </DialogHeader>
       <DialogBody ref="bodyEl">

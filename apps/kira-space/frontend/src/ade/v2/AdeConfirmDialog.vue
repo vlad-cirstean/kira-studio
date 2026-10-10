@@ -50,7 +50,7 @@ async function onYes(): Promise<void> {
 <template>
   <Dialog :open="open" @update:open="(v) => !v && emit('close')">
     <DialogContent size="sm" data-testid="ade-confirm-dialog">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle class="break-all">{{ title }}</DialogTitle>
       </DialogHeader>
       <DialogBody>

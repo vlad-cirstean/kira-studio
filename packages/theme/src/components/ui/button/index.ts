@@ -8,25 +8,13 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground [a]:hover:bg-primary/80',
-        outline:
-          'border-border bg-bg hover:bg-field hover:text-fg dark:bg-border-strong/30 dark:border-border-strong dark:hover:bg-border-strong/50 aria-expanded:bg-field aria-expanded:text-fg',
-        secondary:
-          'bg-field text-fg hover:bg-field/80 aria-expanded:bg-field aria-expanded:text-fg',
         ghost:
           'hover:bg-field hover:text-fg dark:hover:bg-field/50 aria-expanded:bg-field aria-expanded:text-fg',
-        // P130: outline-error at rest (not focus-visible:outline-error) -- the base-layer rest
-        // rule holds every element's outline colour at --kira-focus (blue) until outline-style
-        // flips, so a focus-visible-only override here would still flash blue-to-red on focus.
-        destructive:
-          'bg-error/10 hover:bg-error/20 dark:bg-error/20 text-error outline-error dark:hover:bg-error/30',
         link: 'text-primary underline-offset-4 hover:underline',
         // P104 §3: AppButton's `kind`/`variant` vocabulary, collapsed onto this cva's own
         // `variant` axis instead of a second wrapper prop layer (§0's "no hand-rolled fallback").
         // Geometry stays on the `kira`/`kira-lg`/`kira-icon` sizes below (design-system tokens,
-        // runtime-adjustable via @theme's --spacing-control* -- see base.css §7.2), never this
-        // set's own fixed h-8/h-7 scale, which would shift every control's height against those
-        // tokens.
+        // runtime-adjustable via @theme's --spacing-control* -- see base.css §7.2).
         toolbar: 'rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg',
         'toolbar-primary':
           'rounded-kira-sm bg-primary text-primary-foreground hover:bg-primary/80 disabled:opacity-45',
@@ -42,20 +30,10 @@ export const buttonVariants = cva(
           'rounded-kira-sm border border-transparent bg-transparent text-muted-foreground hover:bg-hover wails-no-drag aria-pressed:bg-elevated aria-pressed:border-border-strong aria-pressed:text-fg aria-pressed:hover:bg-hover',
       },
       size: {
-        default:
-          'h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
-        xs: 'h-6 gap-1 rounded-[min(var(--kira-radius-sm),10px)] px-2 in-data-[slot=button-group]:rounded-kira has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*=size-])]:size-3',
-        sm: 'h-7 gap-1 rounded-[min(var(--kira-radius-sm),12px)] px-2.5 in-data-[slot=button-group]:rounded-kira has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*=size-])]:size-3.5',
-        lg: 'h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
-        icon: 'size-8',
-        'icon-xs':
-          'size-6 rounded-[min(var(--kira-radius-sm),10px)] in-data-[slot=button-group]:rounded-kira [&_svg:not([class*=size-])]:size-3',
         'icon-sm':
           'size-7 rounded-[min(var(--kira-radius-sm),12px)] in-data-[slot=button-group]:rounded-kira',
-        'icon-lg': 'size-9',
         // P104 §3: AppButton/IconButton's own runtime-adjustable control heights (base.css's
-        // --spacing-control*, an @theme-indirected --kira-control-h*) -- never this set's fixed
-        // h-8/h-7 steps, which don't track the Appearance density setting.
+        // --spacing-control*, an @theme-indirected --kira-control-h*) track the Appearance density.
         kira: 'h-control gap-1.5 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
         'kira-lg':
           'h-control-lg gap-1.5 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
@@ -66,8 +44,8 @@ export const buttonVariants = cva(
       },
     },
     defaultVariants: {
-      variant: 'default',
-      size: 'default',
+      variant: 'toolbar',
+      size: 'kira',
     },
   },
 );

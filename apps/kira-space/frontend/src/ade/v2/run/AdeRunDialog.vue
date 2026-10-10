@@ -105,7 +105,7 @@ async function send(): Promise<void> {
 <template>
   <Dialog :open="open" @update:open="(v) => !v && close()">
     <DialogContent size="lg" data-testid="ade-run-dialog">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <svg
             width="16"
@@ -128,7 +128,7 @@ async function send(): Promise<void> {
         <div v-if="named.length" class="flex flex-col gap-1.5" data-testid="ade-run-branches">
           <div v-for="r in named" :key="r.id" class="flex items-center gap-2.5">
             <AdeRepoTag :code-repo-id="r.branch.codeRepoId" :label="r.repo" />
-            <Label :for="`ade-run-branch-${r.id}`" class="font-normal whitespace-nowrap text-muted-foreground">branch</Label>
+            <Label :for="`ade-run-branch-${r.id}`" class="whitespace-nowrap text-muted-foreground">branch</Label>
             <Input
               :id="`ade-run-branch-${r.id}`"
               v-model="names[r.id]"
@@ -162,7 +162,7 @@ async function send(): Promise<void> {
         </div>
         <div v-else class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <Label for="ade-run-message" class="font-normal flex-1 text-muted-foreground">Message to Claude</Label>
+            <Label for="ade-run-message" class="flex-1 text-muted-foreground">Message to Claude</Label>
             <Button
               v-if="edited"
               variant="toolbar"

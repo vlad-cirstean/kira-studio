@@ -37,7 +37,7 @@ function onCancel(): void {
 <template>
   <Dialog v-if="prompt" :open="true" @update:open="(v) => !v && emit('hide')">
     <DialogContent size="sm" data-testid="git-credential-dialog">
-      <DialogHeader closable close-testid="git-credential-dialog-close">
+      <DialogHeader close-testid="git-credential-dialog-close">
         <DialogTitle>Git credentials</DialogTitle>
       </DialogHeader>
 

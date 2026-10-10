@@ -210,7 +210,7 @@ function onSequenceStartChange(index: number, start: number): void {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onClose()">
     <DialogContent size="xl" data-testid="generate-data-dialog">
-      <DialogHeader closable close-testid="generate-data-close">
+      <DialogHeader close-testid="generate-data-close">
         <DialogTitle>Generate data</DialogTitle>
       </DialogHeader>
 

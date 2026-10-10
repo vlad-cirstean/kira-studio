@@ -83,7 +83,7 @@ function select(id: string): void {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
     <DialogContent size="lg" data-testid="add-memory-dialog">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Add memory</DialogTitle>
       </DialogHeader>
       <DialogBody>

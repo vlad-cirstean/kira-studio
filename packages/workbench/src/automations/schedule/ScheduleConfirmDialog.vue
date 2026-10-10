@@ -123,7 +123,7 @@ function run(): void {
       @keydown.meta.enter.prevent="run"
       @keydown.ctrl.enter.prevent="run"
     >
-      <DialogHeader closable close-testid="schedule-confirm-close">
+      <DialogHeader close-testid="schedule-confirm-close">
         <DialogTitle>Run {{ script?.name ?? 'script' }}?</DialogTitle>
         <SmartBadge v-if="script?.kind === 'smart'" />
         <span class="text-kira-sm text-muted-foreground" data-testid="schedule-confirm-due">{{ due }}</span>

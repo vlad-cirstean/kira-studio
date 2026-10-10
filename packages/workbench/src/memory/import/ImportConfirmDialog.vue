@@ -50,7 +50,7 @@ async function dismiss(): Promise<void> {
 <template>
   <Dialog :open="true" @update:open="(v) => !v && dismiss()">
     <DialogContent size="md" data-testid="import-confirm-dialog">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>Import documents</DialogTitle>
       </DialogHeader>
       <DialogBody class="text-kira-md">

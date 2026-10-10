@@ -112,7 +112,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
 <template>
   <Dialog v-model:open="dialog.open">
     <DialogContent size="xl" fixed-height data-testid="repos-dialog">
-      <DialogHeader icon="repo" closable close-testid="repos-dialog-close">
+      <DialogHeader icon="repo" close-testid="repos-dialog-close">
         <DialogTitle>Repositories</DialogTitle>
         <DialogDescription class="sr-only">Import repositories, configure them and manage scan folders.</DialogDescription>
       </DialogHeader>

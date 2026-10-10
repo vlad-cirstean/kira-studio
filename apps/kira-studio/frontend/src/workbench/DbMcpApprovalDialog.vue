@@ -77,7 +77,7 @@ const DETAIL_CLASS = 'm-0 text-subtle';
     @update:open="(v) => !v && onDeny(dbMcpStore.approval.pending!.requestId)"
   >
     <DialogContent size="lg" data-testid="db-mcp-approval-dialog">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>{{ dialogTitle }}</DialogTitle>
       </DialogHeader>
 

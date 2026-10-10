@@ -139,7 +139,7 @@ async function onConfirm(): Promise<void> {
 <template>
   <Dialog v-if="datagripImportStore.open" :open="true" @update:open="(v) => !v && datagripImportStore.closeDataGripImportDialog()">
     <DialogContent size="xl" fixed-height data-testid="datagrip-import-dialog">
-      <DialogHeader icon="database" closable close-testid="datagrip-import-dialog-close">
+      <DialogHeader icon="database" close-testid="datagrip-import-dialog-close">
         <DialogTitle>{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</DialogTitle>
       </DialogHeader>
 

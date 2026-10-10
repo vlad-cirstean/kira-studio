@@ -198,7 +198,7 @@ function onOpenAutoFocus(e: Event): void {
       @keydown.meta.enter.prevent="save"
       @keydown.ctrl.enter.prevent="save"
     >
-      <DialogHeader closable close-testid="script-dialog-close">
+      <DialogHeader close-testid="script-dialog-close">
         <DialogTitle>{{ title }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
       </DialogHeader>

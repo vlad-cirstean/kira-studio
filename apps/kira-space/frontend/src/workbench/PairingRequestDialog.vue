@@ -24,7 +24,7 @@ const { remainingSeconds } = usePendingDecision({
 <template>
   <Dialog v-if="requestId" :open="true" @update:open="(v) => !v && emit('hide')">
     <DialogContent size="sm" :data-testid="`${testidPrefix}-dialog`">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
       </DialogHeader>
 

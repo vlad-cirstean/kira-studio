@@ -108,7 +108,7 @@ async function discard(): Promise<void> {
 <template>
   <Dialog v-if="view" :open="true" @update:open="(v) => !v && dialogs.close()">
     <DialogContent size="lg" data-testid="ade-dialog">
-      <DialogHeader closable>
+      <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <svg
             width="16"
@@ -178,7 +178,7 @@ async function discard(): Promise<void> {
         <Alert v-for="b in view.blockers" :key="b.branchId + b.kind" variant="destructive" data-testid="ade-dialog-blocker" :data-kind="b.kind">
           <AlertDescription>{{ b.text }}</AlertDescription>
         </Alert>
-        <Label v-if="view.canAutostash" for="ade-dialog-autostash" class="text-kira-sm font-normal">
+        <Label v-if="view.canAutostash" for="ade-dialog-autostash" class="text-kira-sm">
           <Switch id="ade-dialog-autostash" v-model="dialogs.autostash" data-testid="ade-dialog-autostash" />
           <span>Autostash: stash the uncommitted changes, rebase, then restore them</span>
         </Label>
@@ -205,7 +205,7 @@ async function discard(): Promise<void> {
           />
         </div>
 
-        <Label v-if="view.canPush" for="ade-dialog-push" class="text-kira-sm font-normal">
+        <Label v-if="view.canPush" for="ade-dialog-push" class="text-kira-sm">
           <Switch id="ade-dialog-push" v-model="dialogs.push" data-testid="ade-dialog-push" />
           <span>
             <span data-testid="ade-dialog-push-label">{{ view.pushLabel }}</span>
