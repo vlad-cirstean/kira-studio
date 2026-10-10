@@ -4,8 +4,12 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Textarea } from '@theme/components/ui/textarea';
+import VarText from '@theme/components/VarText.vue';
+import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
 import { computed, ref, watch } from 'vue';
+import { useCustomScriptsStore } from '../../../state/customScripts';
 import AdeRepoTag from '../AdeRepoTag.vue';
+import { smartBodyParts } from '../automation/smartStepBody';
 import { branchSlug, defaultRunMessage, FINISH_STEP_SUFFIX } from '../board/runMessage';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { usePlanModel } from '../plan/usePlanModel';
@@ -29,6 +33,19 @@ const initial = computed(() =>
     ? defaultRunMessage({ title: card.value.title, jira: card.value.task.jira, stage: stage.value })
     : '',
 );
+// A smart first step runs its script's body: shown read-only, and no message is sent.
+const scripts = useCustomScriptsStore();
+const smartStep = computed(() => {
+  const first = stage.value?.steps[0];
+  return first && first.smartScript !== '' ? first : null;
+});
+const smartBody = computed(() => {
+  const step = smartStep.value;
+  const c = card.value;
+  const script = step ? scripts.records.find((r) => r.name === step.smartScript) : undefined;
+  if (!step || !c || !script) return null;
+  return smartBodyParts(script.command, step.params, { task: c.title, jira: c.task.jira?.key ?? '' });
+});
 const spaceTools = useSpaceTools(() => card.value?.task.workflowId ?? '');
 const pending = computed(() => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? []);
 // With the Kira Space tools on the agent names its branches (request_branch), so no name is asked.
@@ -71,7 +88,7 @@ async function send(): Promise<void> {
     await start.mutateAsync({
       taskId: card.value.task.id,
       branchNames,
-      message: edited.value ? message.value : '',
+      message: edited.value && !smartStep.value ? message.value : '',
     });
     close();
   } catch (err) {
@@ -125,7 +142,22 @@ async function send(): Promise<void> {
           :repo="r.repo"
           data-testid="ade-run-setup"
         />
-        <div class="flex flex-col gap-1">
+        <div v-if="smartStep" class="flex flex-col gap-1" data-testid="ade-run-smart">
+          <div class="flex items-center gap-2 text-muted-foreground">
+            <SmartBadge />
+            <span>{{ smartStep.smartScript }}</span>
+          </div>
+          <div
+            v-if="smartBody"
+            class="whitespace-pre-wrap rounded-kira border border-border bg-field px-3 py-2 font-data text-kira-sm"
+            data-testid="ade-run-smart-body"
+          >
+            <VarText :parts="smartBody" />
+          </div>
+          <p v-else class="m-0 text-error" data-testid="ade-run-smart-missing">This smart script was not found.</p>
+          <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">{{ FINISH_STEP_SUFFIX }}</p>
+        </div>
+        <div v-else class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
             <label for="ade-run-message" class="flex-1 text-muted-foreground">Message to Claude</label>
             <Button

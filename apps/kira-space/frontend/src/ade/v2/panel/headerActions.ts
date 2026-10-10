@@ -10,6 +10,7 @@ export type HeaderAction =
   | { kind: 'rebase'; label: string; tone: Tone; act: RebaseAct }
   | { kind: 'remerge'; label: string; tone: Tone; target: string }
   | { kind: 'start'; label: string; tone: 'claude' }
+  | { kind: 'automation'; label: string; tone: 'grey' }
   | { kind: 'review'; label: string; tone: 'grey' }
   | { kind: 'created'; label: string; tone: 'grey' };
 
@@ -69,6 +70,6 @@ export function headerActions(i: HeaderInput): HeaderAction[] {
   }
   const setupOk = b.setup === null || b.setup.state === 'ready';
   if (!i.hadSession && setupOk) out.push({ kind: 'start', label: '▶ Start agent', tone: 'claude' });
-  out.push(review);
+  out.push({ kind: 'automation', label: 'Run automation…', tone: 'grey' }, review);
   return out;
 }

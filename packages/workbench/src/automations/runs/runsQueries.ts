@@ -16,14 +16,30 @@ function upsert(runs: readonly ScriptRun[], run: ScriptRun): ScriptRun[] {
   return [run, ...rest].sort((a, b) => b.createdAt - a.createdAt);
 }
 
+let feeds = 0;
+let stopFeed: (() => void) | null = null;
+
+/** One push subscription shared by every live run list in the window. */
+function useRunsFeed(): void {
+  const { runs } = useAutomationsModule();
+  if (feeds++ === 0) {
+    stopFeed = runs.onChanged((run) => {
+      mirrorRuns([run]);
+      queryClient.setQueryData<ScriptRun[]>(RUNS_KEY, (old) => upsert(old ?? [], run));
+    });
+  }
+  tryOnScopeDispose(() => {
+    if (--feeds === 0) {
+      stopFeed?.();
+      stopFeed = null;
+    }
+  });
+}
+
 /** The run list, kept live by the push channel: each event replaces its run in the cache. */
 export function useScriptRuns() {
   const { runs } = useAutomationsModule();
-  const off = runs.onChanged((run) => {
-    mirrorRuns([run]);
-    queryClient.setQueryData<ScriptRun[]>(RUNS_KEY, (old) => upsert(old ?? [], run));
-  });
-  tryOnScopeDispose(off);
+  useRunsFeed();
   return useQuery(
     {
       queryKey: RUNS_KEY,

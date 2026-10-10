@@ -25,6 +25,8 @@ export interface StepProgress {
   runsOn: RunsOn;
   before: 'auto' | 'approval';
   onFailure: OnFailure;
+  /** Name of the smart script the step runs, else ''. */
+  smartScript: string;
   state: StepState;
   /** One entry per target branch, in task branch order; a branch without a run is `pending`. */
   runs: StepRun[];
@@ -105,6 +107,7 @@ interface StepDef {
   runsOn: RunsOn;
   before: 'auto' | 'approval';
   onFailure: OnFailure;
+  smartScript: string;
 }
 
 function stepDefs(stage: Stage): StepDef[] {
@@ -117,6 +120,7 @@ function stepDefs(stage: Stage): StepDef[] {
         runsOn: stage.runsOn || 'once',
         before: 'auto',
         onFailure: stage.onFailure || 'stop',
+        smartScript: '',
       },
     ];
   }
@@ -126,6 +130,7 @@ function stepDefs(stage: Stage): StepDef[] {
     runsOn: s.runsOn,
     before: s.before,
     onFailure: s.onFailure,
+    smartScript: s.smartScript,
   }));
 }
 

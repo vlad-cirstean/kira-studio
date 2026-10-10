@@ -1,4 +1,6 @@
+import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { useDocumentVisibility, useWindowFocus, watchDebounced } from '@vueuse/core';
+import { queryClient } from '@workbench/state/queryClient';
 import { computed } from 'vue';
 import { useAdeBoardUiStore } from '../ade/v2/state/adeBoardUi';
 import { control } from '../bridge/control';
@@ -22,13 +24,20 @@ export function installAgentNotifyFocus(): void {
     return id && tabs.tabs.some((t) => t.id === id && t.kind === 'terminal') ? id : '';
   });
 
+  const activeScriptRunId = computed(() => {
+    if (mode.active !== 'automations') return '';
+    const id = tabs.activeIdByWorkspace[visibleWorkspace()];
+    const tab = tabs.tabs.find((t) => t.id === id);
+    return tab?.kind === 'script-run' ? tab.state.runId : '';
+  });
+
   watchDebounced(
     () => ({
       focused: focused.value && visibility.value === 'visible',
       module: mode.active as string,
       activeTerminalId: activeTerminalId.value,
       adeTaskId: mode.active === 'ade' ? (board.selectedTaskId ?? '') : '',
-      activeScriptRunId: '',
+      activeScriptRunId: activeScriptRunId.value,
     }),
     (state) => {
       void control.agentNotifyReportFocus(state).catch((err: unknown) => {
@@ -49,6 +58,16 @@ export function installAgentNotifyFocus(): void {
       mode.setMode('git');
     }
     tabs.activateTab(terminalId);
+  });
+
+  control.onAgentRevealScriptRun(({ runId, label }) => {
+    mode.setMode('automations');
+    const cached = queryClient.getQueryData<ScriptRun[]>(['scriptRuns', 'list']);
+    const name = cached?.find((r) => r.id === runId)?.scriptName ?? label;
+    tabs.openTab('script-run', null, runId, () => ({ runId, label: name }), {
+      reuse: true,
+      workspaceId: 'automations',
+    });
   });
 
   control.onAgentRevealTask(({ taskId }) => {

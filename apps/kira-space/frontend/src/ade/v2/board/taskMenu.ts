@@ -17,6 +17,7 @@ export type TaskMenuCmd =
   | { kind: 'stopRuns' }
   | { kind: 'openSession'; session: Session }
   | { kind: 'showSessions' }
+  | { kind: 'automation'; scriptId: string }
   | { kind: 'plan'; day: number }
   | { kind: 'park'; parked: boolean }
   | { kind: 'link'; url: string }
@@ -28,6 +29,7 @@ export type TaskMenuCmd =
 export interface TaskMenuItem {
   id: string;
   label: string;
+  icon?: string;
   cmd: TaskMenuCmd;
   disabled?: boolean;
   hint?: string | readonly TextPart[];
@@ -55,6 +57,8 @@ export interface TaskMenuInput {
   choices: readonly ReviewChoice[];
   /** The task's Change base targets. */
   baseChoices: readonly ChangeBaseChoice[];
+  /** The Run automation submenu items. */
+  automations: readonly TaskMenuItem[];
 }
 
 const DONE = 'done';
@@ -250,6 +254,12 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
     id: 'ade-task-sessions',
     label: 'Show sessions',
     cmd: { kind: 'showSessions' },
+  });
+  out.push({
+    type: 'submenu',
+    id: 'ade-task-automation',
+    label: 'Run automation',
+    items: [...i.automations],
   });
 
   if (!review) {

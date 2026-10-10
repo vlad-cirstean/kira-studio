@@ -9,6 +9,7 @@ import { useRepoLinksStore } from '../../../repo/state/repoLinks';
 import { useRepos } from '../../../repo/state/reposQueries';
 import { repoTint } from '../../../state/coderepos';
 import AdeTip from '../AdeTip.vue';
+import { useRunAutomation } from '../automation/useRunAutomation';
 import { fixItems } from '../board/fixMenu';
 import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
@@ -25,6 +26,7 @@ const contextMenu = useContextMenuStore();
 const { model } = usePlanModel();
 const repos = useRepos();
 const reviewCode = useReviewCode();
+const automation = useRunAutomation();
 const choice = computed(() => reviewCode.choiceOf(props.row));
 const rowRef = useTemplateRef<HTMLElement>('rowEl');
 const hasChips = computed(() => props.row.chips.merged.length + props.row.chips.deployed.length > 0);
@@ -66,6 +68,9 @@ function onMenu(ev: MouseEvent): void {
             run: () => reviewCode.open(props.row.branch.taskId, id, rowRef.value),
           },
         ]
+      : []),
+    ...(props.row.branch.kind === 'mine' && props.row.branch.name !== ''
+      ? [automation.submenu(props.row.branch.taskId, id)]
       : []),
     ...(!items
       ? []

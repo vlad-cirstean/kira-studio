@@ -6,6 +6,7 @@ import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
+import AdeAutomationsBlock from '../automation/AdeAutomationsBlock.vue';
 import { ARCHIVE_TIP, STATUS_TONE } from '../board/actions';
 import { dayLabel, LATER } from '../board/calendar';
 import { taskFacts, taskPatch } from '../board/panelFacts';
@@ -145,6 +146,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
       <p v-if="ui.actionError[card.task.id]" class="m-0 text-kira-sm text-error" data-testid="ade-panel-action-error">
         {{ ui.actionError[card.task.id] }}
       </p>
+      <AdeAutomationsBlock :task-id="card.task.id" />
       <div
         v-if="card.review"
         class="flex items-center gap-2 rounded-kira px-2.5 py-1.5 text-kira-md"

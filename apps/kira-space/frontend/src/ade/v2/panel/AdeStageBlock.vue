@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
+import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
@@ -191,6 +192,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           data-testid="ade-step-name"
           >{{ sv.step.name }}</span
         >
+        <SmartBadge v-if="sv.step.smartScript" />
         <span v-if="sv.failText" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-blue">{{ sv.failText }}</span>
         <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm text-tone-amber">needs approval</span>
         <AdeTip :text="sv.scope">

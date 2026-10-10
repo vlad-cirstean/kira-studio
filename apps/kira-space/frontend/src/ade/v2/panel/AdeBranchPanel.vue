@@ -4,12 +4,14 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { useClipboard } from '@vueuse/core';
+import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import { control } from '../../../bridge/control';
 import { useRepos } from '../../../repo/state/reposQueries';
 import AdeChip from '../AdeChip.vue';
 import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import AdeTip from '../AdeTip.vue';
+import { useRunAutomation } from '../automation/useRunAutomation';
 import type { Tone } from '../board/actions';
 import { type RebaseAct, rebaseActs } from '../board/rebaseActions';
 import { baseNameOf } from '../board/reviewCode';
@@ -40,6 +42,8 @@ const prs = usePrs();
 const repos = useRepos();
 const retrySetup = useRetrySetup();
 const reviewCode = useReviewCode();
+const automation = useRunAutomation();
+const contextMenu = useContextMenuStore();
 const setupError = ref('');
 const forcePush = ref(false);
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
@@ -96,12 +100,15 @@ const outcomeActs = computed((): RebaseAct[] =>
     mainName: mainName.value,
   }).filter((a) => a.id === 'rebase-retry' || a.id === 'abort-rebase'),
 );
-function run(a: HeaderAction): void {
+function run(a: HeaderAction, ev?: MouseEvent): void {
   const id = branch.value.id;
   if (a.kind === 'rebase') dialogs.act(a.act);
   else if (a.kind === 'remerge') dialogs.merge(id, a.target);
   else if (a.kind === 'start') dialogs.start(id);
-  else if (a.kind === 'review') {
+  else if (a.kind === 'automation') {
+    const r = (ev?.currentTarget as Element | null)?.getBoundingClientRect();
+    if (r) contextMenu.openContextMenuAt(r.left, r.bottom, automation.menuItems(props.card.task.id, id));
+  } else if (a.kind === 'review') {
     setupError.value = '';
     reviewCode.open(props.card.task.id, id, null, { onError: (msg) => (setupError.value = msg) });
   }
@@ -295,7 +302,7 @@ function deployNote(d: Deployment): string {
             :class="actionClass(a)"
             :disabled="a.kind === 'created'"
             :data-testid="`ade-panel-action-${a.kind}`"
-            @click="run(a)"
+            @click="(ev: MouseEvent) => run(a, ev)"
           >
             {{ a.label }}
           </Button>

@@ -2,6 +2,7 @@ import { useClipboard } from '@vueuse/core';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { type MaybeRefOrGetter, toValue } from 'vue';
 import { control } from '../../../bridge/control';
+import { useRunAutomation } from '../automation/useRunAutomation';
 import { changeBaseChoices } from '../board/changeBase';
 import { movePlanArgs } from '../board/dropPlan';
 import { taskPatch } from '../board/panelFacts';
@@ -40,6 +41,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
   const update = useUpdateTask();
   const { copy } = useClipboard();
   const reviewCode = useReviewCode();
+  const automation = useRunAutomation();
   let anchor: HTMLElement | null = null;
 
   function fail(taskId: string, err: unknown): void {
@@ -75,6 +77,8 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
           ui.select(taskId);
           ui.taskTab = 'sessions';
           return;
+        case 'automation':
+          return automation.start(cmd.scriptId, taskId);
         case 'plan': {
           const m = model.value;
           if (m)
@@ -110,6 +114,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
       type: 'item',
       id: e.id,
       label: e.label,
+      icon: e.icon,
       disabled: e.disabled,
       hint: e.hint,
       shortcut: e.shortcut,
@@ -136,6 +141,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
       plan: m.board.plan,
       cal: m.cal,
       archivePending: dialogs.pending.has(`archive:${c.task.id}`),
+      automations: automation.items(),
       choices: reviewChoices(c, m.view.graph),
       baseChoices: changeBaseChoices(c, {
         graph: m.view.graph,

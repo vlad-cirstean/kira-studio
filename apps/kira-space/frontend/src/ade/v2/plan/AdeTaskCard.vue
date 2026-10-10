@@ -12,6 +12,7 @@ import VarText from '@theme/components/VarText.vue';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
+import AdeAutomationChip from '../automation/AdeAutomationChip.vue';
 import type { BranchAction } from '../board/actions';
 import { changeBaseChoices } from '../board/changeBase';
 import { taskReviewTip } from '../board/reviewCode';
@@ -181,6 +182,7 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
             </AdeTip>
           </template>
           <AdeAttention v-if="card.attention" :tip="card.attention" :item="card.attentionItem" />
+          <AdeAutomationChip :task-id="card.task.id" />
           <AdeTip :text="card.meta">
             <span
               class="min-w-0 flex-1 truncate text-kira-sm leading-3.5 text-subtle"
