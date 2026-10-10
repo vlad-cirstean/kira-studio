@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -228,4 +229,42 @@ test('module hosts no setup; hints open Settings > Memory', async ({ relaunch })
   await expect(page.locator('[data-testid="memory-setup-hint-claude"]')).toBeVisible();
   await page.locator('[data-testid="memory-open-settings"]').first().click();
   await expect(page.locator('[data-testid="memory-semantic"]')).toBeVisible();
+});
+
+// Contract memory + restart. Backend halves: memoryflow TestStoreThroughGate (stored, found by
+// search) and journeyflow TestRestartKeepsUserData (same list after a relaunch).
+for (const [scenario, key] of [
+  ['memory', 'MemoryService.Recent#gated'],
+  ['restart', 'MemoryService.Recent#after-restart'],
+] as const) {
+  test(`contract: ${scenario} Recent list shows every stored fact`, async ({ relaunch }) => {
+    const recent = contract<{ id: string; fact: string }[]>(scenario, key);
+    const { window: page } = await relaunch({
+      control: [{ channel: IPC.memoryRecent, response: recent }],
+    });
+    await openMemory(page);
+    await expect(page.locator('[data-testid^="memory-row-"]')).toHaveCount(recent.length);
+    for (const m of recent) {
+      await expect(page.locator(`[data-testid="memory-row-${m.id}"]`)).toContainText(m.fact);
+    }
+  });
+}
+
+test('contract: a search hit lists the fact found by its gate keyword', async ({ relaunch }) => {
+  const hits = contract<{ id: string; fact: string }[]>(
+    'memory',
+    'MemoryService.Search#postgresql',
+  );
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.memoryRecent, response: [] },
+      { channel: IPC.memorySearch, response: hits },
+    ],
+  });
+  await openMemory(page);
+  await page.locator('[data-testid="memory-search"]').fill('postgresql');
+  await expect(page.locator('[data-testid^="memory-row-"]')).toHaveCount(hits.length);
+  await expect(page.locator(`[data-testid="memory-row-${hits[0]?.id}"]`)).toContainText(
+    hits[0]?.fact ?? '',
+  );
 });

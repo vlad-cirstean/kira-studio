@@ -1,0 +1,12 @@
+{
+  "git:app.init#unusable": {
+    "contractVersion": 46,
+    "dateFormat": "relative",
+    "git": {
+      "kind": "unusable",
+      "path": "<work>/not-git",
+      "reason": "could not parse `git --version` output: not-git"
+    },
+    "serverVersion": "<masked>"
+  }
+}

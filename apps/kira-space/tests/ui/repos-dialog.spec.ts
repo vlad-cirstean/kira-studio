@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeFixture, adeV2Control, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -237,4 +238,23 @@ test('Add environment writes nothing until name and command are filled', async (
   const envs = (patches()[0] as { patch: { environments: unknown[] } }).patch.environments;
   expect(envs).toHaveLength(before + 1);
   expect(envs[before]).toEqual({ name: 'qa', deployedShaScript: 'echo abc' });
+});
+
+// Contract repos. Backend half: repoflow TestImportViaFolderPicker. The imported record is what the
+// repo list shows in the nav.
+test('contract: an imported repo record shows as a nav row with its name and colour', async ({
+  relaunch,
+}) => {
+  const rec = contract<{ id: string; name: string; color: string }>(
+    'repos',
+    'CodeWorkspaceService.ImportRepo',
+  );
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      { channel: IPC.codeWorkspaceListRepos, response: [rec] },
+    ],
+  });
+  const row = page.locator(`[data-testid="repo-row"][data-repo-id="${rec.id}"]`);
+  await expect(row).toContainText(rec.name);
 });

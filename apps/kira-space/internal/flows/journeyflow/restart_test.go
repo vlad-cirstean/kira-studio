@@ -162,6 +162,7 @@ func TestRestartKeepsUserData(t *testing.T) {
 	if err != nil || len(recent2) != 2 || !reflect.DeepEqual(recent1, recent2) {
 		t.Fatalf("memories after restart = %d (%v), want %d equal", len(recent2), err, len(recent1))
 	}
+	app.Contract(t, "restart", "MemoryService.Recent#after-restart", recent2, flowharness.Mask("createdAt"))
 	yaml2, err := app.W.AdeTask.WorkflowYaml(ctx, adewire.FileNameArgs{FileName: "flow.yaml"})
 	if err != nil || yaml2.Yaml != yaml.Yaml {
 		t.Fatalf("workflow text changed across restart: %v", err)

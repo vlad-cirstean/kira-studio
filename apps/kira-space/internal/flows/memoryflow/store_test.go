@@ -57,6 +57,7 @@ func TestStoreThroughGate(t *testing.T) {
 	if err != nil || len(recent) != 2 {
 		t.Fatalf("Recent = %d memories, %v, want 2", len(recent), err)
 	}
+	app.Contract(t, "memory", "MemoryService.Recent#gated", recent, flowharness.Mask("createdAt"))
 	for _, m := range recent {
 		if m.Author != memory.AuthorUser || m.Version != 1 || len(m.Keywords) < 3 {
 			t.Fatalf("stored memory = %+v, want a user-authored v1 with the gate's keywords", m)
@@ -66,6 +67,7 @@ func TestStoreThroughGate(t *testing.T) {
 	if err != nil || len(hits) != 1 || hits[0].Fact != "The billing service uses PostgreSQL 16." {
 		t.Fatalf("Search postgresql = %+v, %v, want the billing fact via its gate keyword", hits, err)
 	}
+	app.Contract(t, "memory", "MemoryService.Search#postgresql", hits, flowharness.Mask("createdAt"))
 	hist, err := app.W.Memory.History(ctx, bridge.MemoryIDArgs{ID: hits[0].ID})
 	if err != nil || len(hist.Memories) != 1 || len(hist.Events) != 1 {
 		t.Fatalf("History = %+v, %v, want one version and its store event", hist, err)

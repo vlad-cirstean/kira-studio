@@ -17,6 +17,7 @@ func TestImportViaFolderPicker(t *testing.T) {
 
 	mark := app.Events.Mark()
 	rec := importVia(t, app, r.Dir)
+	app.Contract(t, "repos", "CodeWorkspaceService.ImportRepo", rec, flowharness.Mask("createdAt"))
 	if rec.Root != real(t, r.Dir) || rec.Name != "proj" {
 		t.Fatalf("imported %+v, want root %s name proj", rec, r.Dir)
 	}

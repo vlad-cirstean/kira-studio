@@ -1,5 +1,6 @@
 import { buildPackedChunk } from '@kira/git-core/testing/packedChunk';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { gitStreamRequests, installGitStreamMock } from './support/gitStreamMock';
 import { buildGraphStreamChunk, buildOneCommitChunk } from './support/graphStreamFixture';
 import { IPC } from './support/ipcChannels';
@@ -159,4 +160,24 @@ test('a corrupted graph stream shows the banner and Retry re-sends graph.refresh
   await expect(page.locator('[data-testid="live-announcements"]').first()).not.toHaveText('');
   await page.locator('[data-testid="failure-banner-retry"]').click();
   await expect.poll(() => gitStreamRequests(page)).toContain('graph.refresh');
+});
+
+// Contract git-path. Backend half: appflow TestGitPathSettingEverywhere. An unusable git blocks
+// the graph and the panel names the path from the server's app.init answer.
+test('contract: an unusable git blocks the graph naming the configured path', async ({
+  relaunch,
+}) => {
+  const init = contract<{ git: { kind: string; path: string } }>(
+    'git-path',
+    'git:app.init#unusable',
+  );
+  const { window: page } = await relaunch({ control: CONTROL });
+  await installGitStreamMock(
+    page,
+    REPO.repoId,
+    { ...base, 'app.init': { ...init, contractVersion: 0 } },
+    goodChunks,
+  );
+  await openGraph(page);
+  await expect(page.locator('[data-testid="git-blocked-panel"]')).toContainText(init.git.path);
 });
