@@ -102,9 +102,10 @@ async function openDocker(page: Page): Promise<void> {
   await expect(page.locator('[data-testid="docker-panel"]')).toBeVisible();
 }
 
-async function openContainer(page: Page, name: string): Promise<void> {
+async function openContainer(page: Page, name: string, tab?: string): Promise<void> {
   await page.locator(`[data-testid="docker-row"][data-name="${name}"]`).click();
   await expect(page.locator('[data-testid="docker-container-detail"]')).toBeVisible();
+  if (tab) await page.locator(`[data-testid="docker-tab-${tab}"]`).click();
 }
 
 test('contract: engine disk usage is measured only on demand and persists its last result', async ({
@@ -173,7 +174,7 @@ test('contract: container size is measured on demand and cached for the session'
   };
   const { page, docker } = await setup(relaunch, { ContainerSize: () => size });
   await openDocker(page);
-  await openContainer(page, 'alpha');
+  await openContainer(page, 'alpha', 'stats');
 
   const measure = page.locator('[data-testid="docker-size-measure"]');
   await expect(measure).toBeVisible();
@@ -185,9 +186,9 @@ test('contract: container size is measured on demand and cached for the session'
   expect(docker.calls('ContainerSize')).toHaveLength(1);
   expect(docker.calls('ContainerSize')[0].args).toEqual({ id: 'c-a' });
 
-  await openContainer(page, 'beta');
+  await openContainer(page, 'beta', 'stats');
   await expect(page.locator('[data-testid="docker-size-measure"]')).toBeVisible();
-  await openContainer(page, 'alpha');
+  await openContainer(page, 'alpha', 'stats');
   await expect(page.locator('[data-testid="docker-size-rw"]')).toHaveText('512 KB');
   expect(docker.calls('ContainerSize')).toHaveLength(1);
 
@@ -196,8 +197,24 @@ test('contract: container size is measured on demand and cached for the session'
 
   await page.reload();
   await openDocker(page);
-  await openContainer(page, 'alpha');
+  await openContainer(page, 'alpha', 'stats');
   await expect(page.locator('[data-testid="docker-size-measure"]')).toBeVisible();
+});
+
+test('container size and the stopped notice show in Stats of a stopped container', async ({
+  relaunch,
+}) => {
+  const { page } = await setup(relaunch, {}, [
+    container('c-a', 'alpha'),
+    container('c-s', 'sleepy', { state: 'exited', status: 'Exited (0) 1 hour ago' }),
+  ]);
+  await openDocker(page);
+  await openContainer(page, 'sleepy', 'stats');
+
+  await expect(page.locator('[data-testid="docker-stats-stopped"]')).toBeVisible();
+  await expect(page.locator('[data-testid="docker-size-measure"]')).toBeVisible();
+  await page.locator('[data-testid="docker-tab-overview"]').click();
+  await expect(page.locator('[data-testid="docker-size-measure"]')).toHaveCount(0);
 });
 
 test('contract: left-bar origin icons', async ({ relaunch }) => {

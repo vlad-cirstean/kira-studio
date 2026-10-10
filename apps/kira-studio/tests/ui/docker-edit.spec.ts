@@ -149,31 +149,42 @@ async function openEdit(page: Page): Promise<void> {
 const tid = (page: Page, id: string): Locator => page.locator(`[data-testid="${id}"]`);
 const field = (page: Page, id: string): Locator => tid(page, `docker-edit-field-${id}`);
 
+async function showTab(page: Page, tab: 'inplace' | 'recreate'): Promise<void> {
+  await tid(page, `docker-edit-tab-${tab}`).click();
+  await expect(tid(page, `docker-edit-section-${tab}`)).toBeVisible();
+}
+
 function withoutIdentity(args: unknown): unknown {
   const { id: _id, baseHash: _hash, ...rest } = args as Json;
   return rest;
 }
 
-test('contract: edit tab shows in-place and recreate sections with mode badges', async ({
+test('contract: edit tab splits in-place and recreate into tabs without mode badges', async ({
   relaunch,
 }) => {
   const { page } = await setup(relaunch);
   await openEdit(page);
 
-  for (const [section, mode] of [
-    ['inplace', 'now'],
-    ['recreate', 'recreate'],
-  ] as const) {
-    const badges = tid(page, `docker-edit-section-${section}`).locator(
-      '[data-testid="docker-edit-badge"]',
-    );
-    expect(await badges.count()).toBeGreaterThan(5);
-    for (const b of await badges.all()) await expect(b).toHaveAttribute('data-mode', mode);
-  }
+  await expect(tid(page, 'docker-edit-tab-inplace')).toHaveAttribute('data-state', 'active');
+  await expect(tid(page, 'docker-edit-tab-recreate')).toHaveAttribute('data-state', 'inactive');
+  await expect(tid(page, 'docker-edit-badge')).toHaveCount(0);
   await expect(tid(page, 'docker-edit-name')).toHaveValue('kira-flow-edit');
   await expect(tid(page, 'docker-edit-pending')).toHaveCount(0);
+  await expect(tid(page, 'docker-edit-tab-dirty')).toHaveCount(0);
   await expect(tid(page, 'docker-edit-apply-now')).toBeDisabled();
+
+  await tid(page, 'docker-edit-name').fill('kira-flow-other');
+  await expect(
+    tid(page, 'docker-edit-tab-inplace').locator('[data-testid="docker-edit-tab-dirty"]'),
+  ).toBeVisible();
+  await expect(
+    tid(page, 'docker-edit-tab-recreate').locator('[data-testid="docker-edit-tab-dirty"]'),
+  ).toHaveCount(0);
+
+  await showTab(page, 'recreate');
+  await expect(tid(page, 'docker-edit-badge')).toHaveCount(0);
   await expect(tid(page, 'docker-edit-apply-recreate')).toBeDisabled();
+  await expect(tid(page, 'docker-edit-apply-now')).toHaveCount(0);
 });
 
 test('contract: in-place apply sends the recorded args and keeps recreate edits', async ({
@@ -211,9 +222,11 @@ test('contract: in-place apply sends the recorded args and keeps recreate edits'
   await aliases.blur();
   await tid(page, 'docker-edit-network-select').selectOption('kira-flow-edit2');
   await tid(page, 'docker-edit-network-add').click();
+  await showTab(page, 'recreate');
   await page.locator('[data-testid="docker-edit-env"] [data-testid="docker-edit-row-add"]').click();
   await page.locator('[data-testid="docker-edit-env-key"]').last().fill('B');
   await page.locator('[data-testid="docker-edit-env-value"]').last().fill('2');
+  await showTab(page, 'inplace');
 
   await expect(
     page.locator('[data-testid="docker-edit-pending"][data-mode="now"]'),
@@ -244,10 +257,10 @@ test('clearing a memory limit moves it to recreate', async ({ relaunch }) => {
   await openEdit(page);
 
   await tid(page, 'docker-edit-memory').fill('');
-  await expect(field(page, 'memory').locator('[data-testid="docker-edit-badge"]')).toHaveAttribute(
-    'data-mode',
-    'recreate',
-  );
+  await expect(
+    field(page, 'memory').locator('[data-testid="docker-edit-field-recreate-hint"]'),
+  ).toBeVisible();
+  await expect(tid(page, 'docker-edit-badge')).toHaveCount(0);
   const line = page.locator('[data-testid="docker-edit-pending"][data-mode="recreate"]', {
     hasText: /Memory(?! reservation)/,
   });
@@ -281,6 +294,7 @@ test('contract: recreate confirms losses, then selects the new container', async
   });
   ctx.state = state;
   await openEdit(page);
+  await showTab(page, 'recreate');
 
   await tid(page, 'docker-edit-image').fill(sent.recreate.image);
   await page.locator('[data-testid="docker-edit-env"] [data-testid="docker-edit-row-add"]').click();
@@ -347,12 +361,14 @@ test('contract: failures keep the draft and explain the state', async ({ relaunc
   await expect(tid(page, 'docker-edit-name')).toHaveValue('kira-flow-edit');
   await expect(tid(page, 'docker-edit-pending')).toHaveCount(0);
 
+  await showTab(page, 'recreate');
   await tid(page, 'docker-edit-entrypoint').fill('/nonexistent');
   await tid(page, 'docker-edit-apply-recreate').click();
   await tid(page, 'docker-edit-confirm').click();
   await expect.poll(() => docker.calls('RecreateContainer').length).toBe(1);
   await expect(tid(page, 'docker-edit-error')).toContainText('original container was restored');
   await expect(tid(page, 'docker-detail-id')).toContainText(OLD_ID.slice(0, 12));
+  await showTab(page, 'recreate');
   await expect(tid(page, 'docker-edit-entrypoint')).toHaveValue('/nonexistent');
 });
 
@@ -362,7 +378,8 @@ test('managed container is read-only', async ({ relaunch }) => {
 
   await expect(tid(page, 'docker-edit-managed')).toBeVisible();
   await expect(tid(page, 'docker-edit-name')).toBeDisabled();
-  await expect(tid(page, 'docker-edit-image')).toBeDisabled();
   await expect(tid(page, 'docker-edit-apply-now')).toHaveCount(0);
+  await showTab(page, 'recreate');
+  await expect(tid(page, 'docker-edit-image')).toBeDisabled();
   await expect(tid(page, 'docker-edit-apply-recreate')).toHaveCount(0);
 });

@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { installDockerMocks } from '../../../../packages/docker-ui/src/testing/ui/dockerMock';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
+import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
 const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge';
@@ -87,6 +88,16 @@ const IMAGES = [
     created: 1_700_000_000,
     containers: 2,
     dangling: false,
+    registryUrl: 'https://hub.docker.com/_/alpine',
+  },
+  {
+    id: 'sha256:img2',
+    tags: ['local/app:dev'],
+    size: 1_000_000,
+    created: 1_700_000_000,
+    containers: 0,
+    dangling: false,
+    registryUrl: '',
   },
 ];
 const VOLUMES = [
@@ -132,6 +143,7 @@ function detail(c: ReturnType<typeof container>) {
     labels: {},
     networkAttachments: [],
     raw: '{"Id":"x"}',
+    registryUrl: c.image === 'alpine:3.20' ? 'https://hub.docker.com/_/alpine' : '',
   };
 }
 
@@ -139,7 +151,7 @@ async function setup(
   relaunch: Parameters<Parameters<typeof test>[2]>[0]['relaunch'],
   opts: { status?: unknown; handlers?: Record<string, (args: unknown) => unknown> } = {},
 ) {
-  const { window: page } = await relaunch({ control: [] });
+  const { window: page, control } = await relaunch({ control: [] });
   const state = { status: opts.status ?? OK_STATUS, containers: seedContainers() };
   const docker = await installDockerMocks(page, {
     bridgePkg: BRIDGE_PKG,
@@ -162,7 +174,7 @@ async function setup(
       ...opts.handlers,
     },
   });
-  return { page, docker, state };
+  return { page, docker, state, control };
 }
 
 async function openDocker(page: Page): Promise<void> {
@@ -411,7 +423,7 @@ test('images, volumes and networks list; "used by" selects the container', async
   await openDocker(page);
 
   await page.locator('[data-testid="docker-section-images"]').click();
-  await expect(page.locator('[data-testid="docker-row"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="docker-row"]')).toHaveCount(2);
   await page.locator('[data-testid="docker-section-networks"]').click();
   await expect(page.locator('[data-testid="docker-row"]')).toHaveCount(1);
 
@@ -443,7 +455,9 @@ test('engine overview tabulates containers with humanized stats; section tabs sh
   const { page } = await setup(relaunch);
   await openDocker(page);
 
-  const tabs = page.locator('[data-testid^="docker-section-"][role="tab"]');
+  const tabs = page.locator(
+    '[data-testid="docker-section-containers"], [data-testid="docker-section-images"], [data-testid="docker-section-volumes"], [data-testid="docker-section-networks"]',
+  );
   await expect(tabs).toHaveCount(4);
   const tops = await tabs.evaluateAll((els) =>
     els.map((el) => Math.round(el.getBoundingClientRect().top)),
@@ -480,4 +494,56 @@ test('engine overview tabulates containers with humanized stats; section tabs sh
   await expect(page.locator('[data-testid="docker-detail-name"]')).toHaveText('solo');
   await page.locator('[data-testid="docker-overview-home"]').click();
   await expect(page.locator('[data-testid="docker-engine-overview"]')).toBeVisible();
+});
+
+test('image registry button opens the derived URL; local-only images get none', async ({
+  relaunch,
+}) => {
+  const { page, control } = await setup(relaunch);
+  await openDocker(page);
+  await page.locator('[data-testid="docker-section-images"]').click();
+
+  const alpine = page.locator('[data-testid="docker-row"]', { hasText: 'alpine:3.20' });
+  const local = page.locator('[data-testid="docker-row"]', { hasText: 'local/app:dev' });
+  await expect(local.locator('[data-testid="docker-image-registry"]')).toHaveCount(0);
+  await alpine.hover();
+  await alpine.locator('[data-testid="docker-image-registry"]').click();
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.linkOpenExternal))
+    .toHaveLength(1);
+  expect(control.log().find((e) => e.channel === IPC.linkOpenExternal)?.args).toMatchObject({
+    url: 'https://hub.docker.com/_/alpine',
+  });
+
+  await alpine.click();
+  await expect(page.locator('[data-testid="docker-resource-registry"]')).toBeVisible();
+  await local.click();
+  await expect(page.locator('[data-testid="docker-resource-registry"]')).toHaveCount(0);
+});
+
+test('container detail shows the registry button next to the image', async ({ relaunch }) => {
+  const { page, control } = await setup(relaunch);
+  await openDocker(page);
+  await openContainer(page, 'solo');
+
+  await page.locator('[data-testid="docker-detail-registry"]').click();
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.linkOpenExternal))
+    .toHaveLength(1);
+});
+
+test('start is green, stop is red, and a selected row has no bar', async ({ relaunch }) => {
+  const { page } = await setup(relaunch);
+  await openDocker(page);
+
+  const stopped = page.locator('[data-testid="docker-row"][data-name="old-job"]');
+  const running = page.locator('[data-testid="docker-row"][data-name="solo"]');
+  await stopped.hover();
+  await expect(stopped.locator('[data-testid="docker-row-start"]')).toHaveClass(/text-ok/);
+  await running.hover();
+  await expect(running.locator('[data-testid="docker-row-stop"]')).toHaveClass(/text-error/);
+
+  await running.click();
+  await expect(running).toHaveAttribute('aria-selected', 'true');
+  expect(await running.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
 });
