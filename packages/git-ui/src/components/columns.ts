@@ -64,7 +64,7 @@ function textCell(text: string, className: string): HTMLSpanElement {
 }
 
 /** P11 W13: the subject's own in-place search highlight. `pattern()` is re-read on every render
- *  pass — mirroring `DateFormatterContext`/`LaneColorContext`'s own accessor convention — so
+ *  pass — mirroring `DateFormatterContext`'s own accessor convention — so
  *  `CommitGrid.vue` never rebuilds the column model just to reflect a new query; it only calls
  *  `invalidateAllRows()`/`render()` on `search.searchGeneration`, exactly as it already does for
  *  `graphView.generation`. `undefined` means "no query to highlight" (empty box, refs-only scope,
@@ -76,20 +76,8 @@ export interface MessageSearchContext {
 
 const NO_SEARCH_CONTEXT: MessageSearchContext = { pattern: () => undefined };
 
-/** G21 D4: the message column's own accessor onto the row's lane colour — `columns.ts` itself
- *  has no `LayoutStore` (this module's own doc comment already explains why the graph column's
- *  formatter is supplied by the caller for the same reason); mirrors `MessageSearchContext`'s own
- *  shape exactly, re-read on every render pass rather than captured once. `undefined` for a row
- *  whose layout has not arrived yet (`graphColumn.ts`'s own already-established case) — the badge
- *  then renders with no lane tint, never a guessed colour. */
-export interface LaneColorContext {
-  readonly colorOf: (row: number) => number | undefined;
-}
-
-const NO_LANE_COLOR_CONTEXT: LaneColorContext = { colorOf: () => undefined };
-
 /** G24 D9: the message column's own accessor onto a row's associated PR(s) — a third instance of
- *  `MessageSearchContext`/`LaneColorContext`'s own convention, re-read on every render pass rather
+ *  `MessageSearchContext`'s own convention, re-read on every render pass rather
  *  than captured once, so `CommitGrid.vue` only ever needs to trigger a re-render (the
  *  `pr.generation` watcher) on a new resolution, never rebuild the column model. `prsFor` returns
  *  `undefined` for every "nothing to show" outcome (not-yet-resolved, in-flight, `disabled`,
@@ -102,7 +90,7 @@ export interface PrContext {
 const NO_PR_CONTEXT: PrContext = { prsFor: () => undefined };
 
 /** G26 D-4.10/F12: the message column's own accessor onto a branch's stack decoration — a fourth
- *  instance of `MessageSearchContext`/`LaneColorContext`/`PrContext`'s own convention, re-read on
+ *  instance of `MessageSearchContext`/`PrContext`'s own convention, re-read on
  *  every render pass. `CommitGrid.vue`'s own `stack.generation` watcher (F12's fourth instance)
  *  triggers a re-render on a new `stack.list`, never a column rebuild. `stackInfoFor` returns
  *  `undefined` for every branch that is not a stack member — `refBadges.ts`'s own "render
@@ -175,7 +163,6 @@ export function collapsedMessageText(hiddenCount: number, label: string | undefi
  *  escaping code is introduced and none is needed. */
 function messageFormatter(
   ctx: MessageSearchContext,
-  laneCtx: LaneColorContext,
   prCtx: PrContext = NO_PR_CONTEXT,
   stackCtx: StackContext = NO_STACK_CONTEXT,
   collapsedCtx: CollapsedRowContext = NO_COLLAPSED_ROW_CONTEXT,
@@ -208,11 +195,7 @@ function messageFormatter(
       return cell;
     }
 
-    const badges = buildRefBadges(
-      dataContext.decoration,
-      laneCtx.colorOf(row),
-      stackCtx.stackInfoFor,
-    );
+    const badges = buildRefBadges(dataContext.decoration, stackCtx.stackInfoFor);
     // G24 D9: the PR badge shares the same row-1 strip, placed after the ref badges.
     const prs = prCtx.prsFor(dataContext.sha);
     const prBadge = prs !== undefined ? buildPrBadge(prs) : null;
@@ -321,10 +304,8 @@ export interface BuildColumnsOptions {
  *  this function, called again with the new widths, is the single source of the column model
  *  either way. `graph`'s own `graphFormatter` and geometry are W8's `graphColumn.ts`/`rowSvg.ts`,
  *  built once per grid instance and passed in here rather than built by this stateless module.
- *  `searchCtx` (W13) and
- *  `laneCtx` (G21 D4) are both optional and default to "no highlight"/"no lane colour" so a
- *  caller that only needs the basic shape keeps working unchanged — only `CommitGrid.vue` passes
- *  real ones. `options.compact` (D1) returns only `graph`/`message` — `author`/`date` are omitted
+ *  `searchCtx` (W13) is optional and defaults to "no highlight"; only `CommitGrid.vue` passes
+ *  a real one. `options.compact` (D1) returns only `graph`/`message` — `author`/`date` are omitted
  *  outright, not merely hidden, so there is no resize handle or hit target for a column that is
  *  not rendered. */
 export function buildColumns(
@@ -332,7 +313,6 @@ export function buildColumns(
   dateCtx: DateFormatterContext,
   graphFormatter: Formatter<CommitRecord>,
   searchCtx: MessageSearchContext = NO_SEARCH_CONTEXT,
-  laneCtx: LaneColorContext = NO_LANE_COLOR_CONTEXT,
   prCtx: PrContext = NO_PR_CONTEXT,
   stackCtx: StackContext = NO_STACK_CONTEXT,
   options: BuildColumnsOptions = {},
@@ -372,7 +352,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      formatter: messageFormatter(searchCtx, laneCtx, prCtx, stackCtx, collapsedCtx),
+      formatter: messageFormatter(searchCtx, prCtx, stackCtx, collapsedCtx),
     },
   ];
   if (options.compact) return columns;

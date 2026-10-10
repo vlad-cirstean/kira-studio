@@ -6,7 +6,7 @@
   --kira-graph-t-xs: calc(var(--kira-graph-t-md) - 2px);
   --kira-graph-t-sm: calc(var(--kira-graph-t-md) - 1px);
   --kira-graph-t-lg: calc(var(--kira-graph-t-md) + 1px);
-  --kira-graph-h-xs: calc(var(--kira-graph-t-md) + 5px);
+  --kira-graph-h-xs: calc(var(--kira-graph-t-md) + 6px);
   --kira-graph-row-h-compact: max(var(--kira-row-height), calc(var(--kira-graph-h-xs) + 2px));
   --kira-graph-row-h: calc(var(--kira-graph-row-h-compact) + var(--kira-graph-h-xs));
 }
@@ -19,17 +19,15 @@
   --spacing-graph-row: var(--kira-graph-row-h);
   --spacing-graph-row-compact: var(--kira-graph-row-h-compact);
   --spacing-graph-h-xs: var(--kira-graph-h-xs);
-  /* Lane palette: no app hue ramp has 8 categorical steps. */
-  --color-graph-lane-0: #096db3;
-  --color-graph-lane-1: #c2380a;
-  --color-graph-lane-2: #3196dd;
-  --color-graph-lane-3: #e16d47;
-  --color-graph-lane-4: #7fb2d7;
-  --color-graph-lane-5: #da9f8b;
-  --color-graph-lane-6: #aec5d5;
-  --color-graph-lane-7: #d9beb5;
-  /* PR merged: no app hue. */
-  --color-git-merged: #b180d7;
+  /* Lanes: the connection palette's categorical hues. */
+  --color-graph-lane-0: var(--kira-conn-blue);
+  --color-graph-lane-1: var(--kira-conn-orange);
+  --color-graph-lane-2: var(--kira-conn-green);
+  --color-graph-lane-3: var(--kira-conn-violet);
+  --color-graph-lane-4: var(--kira-conn-teal);
+  --color-graph-lane-5: var(--kira-conn-red);
+  --color-graph-lane-6: var(--kira-conn-amber);
+  --color-graph-lane-7: var(--kira-conn-cyan);
 }
 
 /* SlickGrid builds these nodes and rewrites their inline styles; no template carries utilities.

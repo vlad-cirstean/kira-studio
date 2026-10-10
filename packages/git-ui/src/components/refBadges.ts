@@ -21,13 +21,7 @@
 import type { DecorationRef } from '@kira/git-core';
 import type { PrRecord } from '@kira/git-ipc';
 import { BADGE_ICONS } from '../icons/index.ts';
-import {
-  BADGE_KIND_CLASS,
-  BADGE_STACKED_CLASS,
-  laneBorderClass,
-  prBadgeClass,
-  refBadgeClass,
-} from './badgeClass.ts';
+import { prBadgeClass, type RefBadgeVariant, refBadgeClass } from './badgeClass.ts';
 
 // §6.2: badge text truncates at ~190px (full name in the tooltip); the icon keeps its size.
 const BADGE_LABEL_CLASS = 'max-w-47.5 overflow-hidden text-ellipsis';
@@ -37,13 +31,10 @@ const MAX_VISIBLE_BADGES = 3;
 
 export interface BadgeSpec {
   readonly icon: string;
-  /** Which badge colour group this badge draws from — a border-colour utility class (one of
-   *  `BADGE_KIND_CLASS`), never a colour value read or computed here (B4: colours live only in the
-   *  theme layer). */
-  readonly colorClass: string;
+  /** Studio `Badge` tone for this kind; never a colour value (B4: colours live in the theme layer). */
+  readonly variant: RefBadgeVariant;
   readonly text: string;
   readonly isCurrentBranch: boolean;
-  readonly dashed: boolean;
   /** `docs/plans/P7.md` W14: set only for `branch`/`remoteBranch` — the two kinds
    *  `CommitGrid.vue`'s ref-badge hit-test and `App.vue`'s ref context menu care about. A tag/HEAD
    *  badge has no review action and no rename/delete-from-the-graph menu, so it carries neither
@@ -64,30 +55,27 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
     case 'branch':
       return {
         icon: BADGE_ICONS.localBranch,
-        colorClass: BADGE_KIND_CLASS.local,
+        variant: 'ok',
         text: ref.name,
         isCurrentBranch: ref.isHead,
-        dashed: false,
         refKind: 'branch',
         refName: ref.name,
       };
     case 'remoteBranch':
       return {
         icon: BADGE_ICONS.remoteBranch,
-        colorClass: BADGE_KIND_CLASS.remote,
+        variant: 'info',
         text: ref.name,
         isCurrentBranch: false,
-        dashed: false,
         refKind: 'remoteBranch',
         refName: ref.name,
       };
     case 'tag':
       return {
         icon: BADGE_ICONS.tag,
-        colorClass: BADGE_KIND_CLASS.tag,
+        variant: 'default',
         text: ref.name,
         isCurrentBranch: false,
-        dashed: false,
         refKind: undefined,
         refName: undefined,
       };
@@ -97,10 +85,9 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       // say *which* stash a badge on a non-`stash@{0}` row (P9 W12's own graph walk) belonged to.
       return {
         icon: BADGE_ICONS.stash,
-        colorClass: BADGE_KIND_CLASS.stash,
+        variant: 'default',
         text: `stash@{${ref.index}}`,
         isCurrentBranch: false,
-        dashed: true,
         refKind: 'stash',
         refName: `stash@{${ref.index}}`,
       };
@@ -113,10 +100,9 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       // indistinguishable from an ordinary one — the opposite of what this column is for).
       return {
         icon: BADGE_ICONS.localBranch,
-        colorClass: BADGE_KIND_CLASS.local,
+        variant: 'warn',
         text: 'HEAD',
         isCurrentBranch: true,
-        dashed: false,
         refKind: undefined,
         refName: undefined,
       };
@@ -136,13 +122,9 @@ interface BadgePlan {
   readonly overflow: OverflowSpec | null;
 }
 
-/** G26 D-4.11: a branch badge's own stack decoration — `stacked` recolours the border
- *  (`BADGE_STACKED_CLASS`), `stale` (meaningful only alongside `stacked`) additionally dashes it (a
- *  dashed outline, the existing `dashed` affordance's own visual language, D-4.11's own "reuse,
- *  don't invent" instruction). No new `DecorationRef` kind (`badgeSpecFor`'s exhaustive switch
- *  above is untouched) — this is looked up SEPARATELY, by branch name, from `columns.ts`'s own
- *  `StackContext` (the fourth accessor-context instance, F12), and applied only to `branch`-kind
- *  badges (a stash/tag/remote-branch/HEAD badge is never a stack member). */
+/** G26 D-4.11: a branch badge's own stack decoration — `stacked` uses the `info` tone, `stale`
+ *  (meaningful only alongside `stacked`) the `warn` tone. No new `DecorationRef` kind; looked up
+ *  separately by branch name from `columns.ts`'s `StackContext`, applied only to `branch` badges. */
 export interface StackBadgeInfo {
   readonly stacked: boolean;
   readonly stale: boolean;
@@ -164,32 +146,21 @@ function planBadges(decorations: readonly DecorationRef[]): BadgePlan {
   return { visible, overflow };
 }
 
-/** G21 D4: `laneColor` is the row's own lane colour index (`LayoutStore.colorOf`), threaded in
- *  from `columns.ts`'s `LaneColorContext` — `undefined` for a row whose layout has not arrived
- *  yet (`graphColumn.ts`'s own already-established "no layout, no colour" case). Adds the
- *  lane's border colour after — never instead of — `spec.colorClass`: the badge's shape/icon/label
- *  still carry the *kind* signal, the lane only tints the border, tying the badge back to the
- *  branch it decorates without becoming a second, conflicting source of colour meaning. */
 function buildBadgeElement(
   spec: BadgeSpec,
-  laneColor: number | undefined,
   stackInfoFor?: (branchName: string) => StackBadgeInfo | undefined,
 ): HTMLSpanElement {
   const badge = document.createElement('span');
-  // Border colour order is kind, stacked, lane: `cn` keeps the last, so a lane tint beats the kind
-  // colour exactly as the old specificity did.
-  const classes = [spec.colorClass];
-  if (spec.dashed) classes.push('border-dashed');
+  let variant = spec.variant;
   if (spec.refKind === 'branch' && spec.refName !== undefined) {
     const stackInfo = stackInfoFor?.(spec.refName);
-    if (stackInfo?.stacked) classes.push(BADGE_STACKED_CLASS);
-    if (stackInfo?.stale) classes.push('border-dashed');
+    if (stackInfo?.stacked) variant = stackInfo.stale ? 'warn' : 'info';
   }
-  if (laneColor !== undefined) classes.push(laneBorderClass(laneColor));
+  const classes: string[] = [];
   // G-UX (item 1): a subtle ring (not a border, which would fight the lane-tint border-color
   // above) on the current-branch badge itself.
   if (spec.isCurrentBranch) classes.push('ring-1 ring-focus');
-  badge.className = refBadgeClass(...classes);
+  badge.className = refBadgeClass(variant, ...classes);
   // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
   // CommitGrid.vue mounts over its grid host — a mouse-hover affordance independent of whether the
   // ~190px CSS truncation (`BADGE_LABEL_CLASS`) actually clips this particular badge's text. This file
@@ -236,7 +207,7 @@ function buildBadgeElement(
 
 function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
   const badge = document.createElement('span');
-  badge.className = refBadgeClass(BADGE_KIND_CLASS.overflow);
+  badge.className = refBadgeClass('default');
   badge.setAttribute('data-kira-tip', overflow.title);
   badge.textContent = `+${overflow.count}`;
   return badge;
@@ -245,7 +216,7 @@ function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
 // ---------------------------------------------------------------------------------------
 // G24 D9/D10.8: the per-commit graph indicator — one badge per commit, never one per associated
 // PR. Kept in this file (not a new module) since it is, structurally, a fifth badge kind sharing
-// every one of `buildBadgeElement`'s conventions (`REF_BADGE_CLASS`, an icon, `data-kira-tip`) —
+// every one of `buildBadgeElement`'s conventions (`refBadgeClass`, an icon, `data-kira-tip`) —
 // it just never goes through `badgeSpecFor`/`DecorationRef`, since a PR is not a ref decoration.
 // ---------------------------------------------------------------------------------------
 
@@ -310,13 +281,10 @@ export function buildPrBadge(prs: readonly PrRecord[]): HTMLElement | null {
  * Builds the inline badge strip for one row's decorations, or `null` for a row with none — the
  * caller (`columns.ts`'s `messageFormatter`) skips the wrapper element entirely in that case
  * rather than inserting an empty, non-contributing `<span>` into every one of the tens of
- * thousands of ordinary rows a full history walk can produce. `laneColor` (G21 D4) is this row's
- * own lane colour index, or `undefined` for a row with no layout yet — see `buildBadgeElement`'s
- * own doc comment for what it paints.
+ * thousands of ordinary rows a full history walk can produce.
  */
 export function buildRefBadges(
   decorations: readonly DecorationRef[],
-  laneColor: number | undefined,
   stackInfoFor?: (branchName: string) => StackBadgeInfo | undefined,
 ): HTMLSpanElement | null {
   if (decorations.length === 0) return null;
@@ -326,7 +294,7 @@ export function buildRefBadges(
   container.className = 'flex items-center gap-1 shrink-0';
 
   for (const spec of plan.visible) {
-    container.appendChild(buildBadgeElement(spec, laneColor, stackInfoFor));
+    container.appendChild(buildBadgeElement(spec, stackInfoFor));
   }
   if (plan.overflow !== null) container.appendChild(buildOverflowBadge(plan.overflow));
 

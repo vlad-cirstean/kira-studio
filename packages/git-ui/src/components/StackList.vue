@@ -113,7 +113,7 @@ async function removeFromStack(branch: string): Promise<void> {
           <span class="truncate">{{ row.name }}</span>
           <span
             v-if="row.stale"
-            :class="refBadgeClass('bg-warn text-bg')"
+            :class="refBadgeClass('warn')"
             :data-kira-tip="row.staleText"
           >
             stale

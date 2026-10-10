@@ -361,16 +361,6 @@ function currentColumns(): Column<CommitRecord>[] {
     graphFormatter,
     { pattern: searchPattern },
     {
-      // G21 D4: the row-bold/HEAD-ring and merge-in edge colouring already read this same
-      // LayoutStore for this same row — a row past its own `rowCount` (layout not arrived yet)
-      // gets no lane class, matching `graphColumn.ts`'s own already-established "no layout, no
-      // colour" case, never a guessed one.
-      colorOf: (row) =>
-        props.graphView.layoutCurrent && row < props.graphView.layout.rowCount
-          ? props.graphView.layout.colorOf(row)
-          : undefined,
-    },
-    {
       // G24 D9: `undefined` (not an empty array) is "nothing resolved yet" vs. "resolved, no PR"
       // — `columns.ts`'s own `messageFormatter` already treats both as "render nothing".
       // Badge only the commit a PR's head points at; the detail pane keeps the ancestry answer.
