@@ -3583,10 +3583,14 @@ the grid is a data view, outside P123's four-value chrome scale.
 **Git module follows the app look (P229, P245, P258).** Reference is Kira Studio, never Agents/ADE.
 Graph, detail pane, strip and toolbar sit on `bg-bg`. `GitViewHead` (repo, branch, ahead/behind,
 operation) and the toolbar are `ViewToolbar`s, as are the detail head and review headers. Commit rows
-are one line at one height, `--kira-graph-row-h` = larger of `--kira-row-height` and
-`--kira-graph-h-xs + 2px` (28px in Space). No semibold anywhere (lint). Ref badges are Studio `Badge`
-tones (branch `ok`, remote `info`, tag/stash default, detached `warn`); lanes use the connection
-palette. Empty panels are `Empty`/`EmptyMedia`/`EmptyTitle`; banners `Alert`-style with a 16px icon;
+are one line at `--kira-graph-row-h-compact` = larger of `--kira-row-height` and
+`--kira-graph-h-xs + 2px` (28px in Space). A decorated row (ref or PR badge) adds a badge line above
+the subject: `--kira-graph-row-h` = compact + `--kira-graph-h-xs`; the graph node stays on the
+subject line. Ref badges shrink and ellipsize their label, never clip; the `+N` chip never shrinks.
+The row plan publishes with its layout (`#rebuildLayout`), and `loading` goes idle only after the
+last streamed relayout, so a row never renders laneless. No semibold anywhere (lint, git-ui and
+Space `repo/`). Ref badges are Studio `Badge` tones (branch `ok`, remote `info`, tag/stash default,
+detached `warn`); lanes use the connection palette. Empty panels are `Empty`/`EmptyMedia`/`EmptyTitle`; banners `Alert`-style with a 16px icon;
 list rows `rowVariants` `menu`/`tree` at 22px; section heads `text-kira-sm uppercase`. Dialog bodies
 are `gap-3 p-3` with `Field`/`FieldDescription`/`FieldError`, controls `size="kira-lg"`, warnings
 `Alert variant="warn"`, failures `Alert variant="destructive"`. No raw `<label>` or `outline-focus`
