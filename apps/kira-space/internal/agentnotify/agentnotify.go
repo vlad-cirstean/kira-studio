@@ -250,10 +250,12 @@ func (n *Notifier) HandleRuns(runs []adewire.Run) {
 	}
 }
 
-// HandleScriptRun reacts to a changed script run. Only smart runs notify, from any trigger:
-// failed under Enabled, blocked under OnNeedsInput, done under OnRunEnded, cancelled never.
+// HandleScriptRun reacts to a changed script run. A smart run notifies from any trigger: failed
+// under Enabled, blocked under OnNeedsInput, done under OnRunEnded, cancelled never. A scheduled
+// normal run notifies only when it fails. waiting and skipped runs never notify.
 func (n *Notifier) HandleScriptRun(r scriptruns.Run) {
-	if r.Kind != scriptruns.KindSmart {
+	scheduled := r.Trigger == scriptruns.TriggerScheduled
+	if r.Kind != scriptruns.KindSmart && !scheduled {
 		return
 	}
 	n.mu.Lock()
@@ -273,16 +275,23 @@ func (n *Notifier) HandleScriptRun(r scriptruns.Run) {
 	}
 	p := n.d.Prefs()
 	var verb, detail string
+	title := "Automation "
 	switch runoutcome.Status(r.State) {
 	case runoutcome.StatusFailed:
 		verb = "failed"
+		if scheduled {
+			title = "Recurring script "
+		}
 	case runoutcome.StatusBlocked:
+		if r.Kind != scriptruns.KindSmart {
+			return
+		}
 		if !p.OnNeedsInput {
 			return
 		}
 		verb = "needs you"
 	case runoutcome.StatusDone:
-		if !p.OnRunEnded {
+		if r.Kind != scriptruns.KindSmart || !p.OnRunEnded {
 			return
 		}
 		verb = "done"
@@ -300,7 +309,7 @@ func (n *Notifier) HandleScriptRun(r scriptruns.Run) {
 	}
 	note := Note{
 		ID: string(KindAutomation) + ":" + r.ID, Kind: KindAutomation, TaskID: r.TaskID, ScriptRunID: r.ID,
-		Title: "Automation " + verb + " · " + r.ScriptName, Body: body(p, detail, bodyAutomation),
+		Title: title + verb + " · " + r.ScriptName, Body: body(p, detail, bodyAutomation),
 	}
 	n.mu.Lock()
 	if n.watchedScriptRunLocked(r.ID) || !n.admitLocked(note.ID) {
