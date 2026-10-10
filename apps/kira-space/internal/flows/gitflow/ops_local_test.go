@@ -217,11 +217,6 @@ func TestWorktreeAddRemove(t *testing.T) {
 	if strings.Contains(repo.Git("worktree", "list", "--porcelain"), path) {
 		t.Fatal("git still lists the removed worktree")
 	}
-
-	we := wireErr(t, r.gs, "worktree.prepare", gitrpc.WorktreePrepareParams{RepoID: id, Path: path, ScriptSha256: "x"})
-	if we.Code != "E_READ_ONLY" {
-		t.Fatalf("worktree.prepare code = %q, want E_READ_ONLY", we.Code)
-	}
 }
 
 func TestCherryPickRevertConflict(t *testing.T) {

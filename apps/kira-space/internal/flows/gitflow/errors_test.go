@@ -87,17 +87,3 @@ func TestWorktreeAddBranchCheckedOutElsewhere(t *testing.T) {
 		t.Fatalf("failed add left %s behind: %v", path, err)
 	}
 }
-
-// The native graph surface is read-only for prepare scripts, so a cancel is refused the same way
-// worktree.prepare is; only a socket client (VS Code) can run and cancel one.
-func TestWorktreeCancelPrepare(t *testing.T) {
-	r := newRig(t)
-	repo := r.app.NewRepo("proj")
-	repo.Commit("base", map[string]string{"a.txt": "a\n"})
-	id := r.open(repo.Dir).RepoID
-	for range 2 {
-		if we := wireErr(t, r.gs, "worktree.cancelPrepare", gitrpc.WorktreeCancelPrepareParams{RepoID: id}); we.Code != "E_READ_ONLY" {
-			t.Fatalf("worktree.cancelPrepare = %+v, want E_READ_ONLY", we)
-		}
-	}
-}

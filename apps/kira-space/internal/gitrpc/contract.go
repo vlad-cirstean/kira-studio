@@ -173,7 +173,13 @@ package gitrpc
 // native stream still uses both. git.sock also refuses repoSettings.set with E_READ_ONLY
 // (repository settings are edited in Kira Space only), and app.init's capabilities (composed
 // host-side) gain editRepoSettings. The kiraSpace.log.level repoSettings leaf is removed (it was never read). app.init gains dateFormat (Kira Space's appearance.dateFormat).
-const ContractVersion = 45
+// P243 Part 2: 45 -> 46, breaking. The VS Code extension is gone: worktree.prepare,
+// worktree.cancelPrepare, worktree.openWindow, editor.resolveConflict, the worktree.progress,
+// settings.changed and connection.changed events, and app.init's host, settings and capabilities
+// fields are removed. The extension-injected params (scope and pageSize on graph.loadMore and
+// graph.stream, baseCandidates on review.resolveBase, strategySetting on remote.pullPreflight)
+// are removed; the server reads the stored kiraSpace.* repo settings.
+const ContractVersion = 46
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

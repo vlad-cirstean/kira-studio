@@ -2,8 +2,6 @@ package gitsession
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -17,8 +15,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/loginshell"
-	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
 // ---------------------------------------------------------------------------------------
@@ -394,162 +390,6 @@ func prepareWorktreeRemove(ctx context.Context, e *RepoEntry, _ ConnID, _ string
 		force = true
 	}
 	return prepared{argvList: [][]string{gitops.WorktreeRemoveArgs(op.Path, force)}}, nil
-}
-
-// ---------------------------------------------------------------------------------------
-// worktree.prepare / worktree.cancelPrepare (D9-D14)
-// ---------------------------------------------------------------------------------------
-
-// WorktreePrepareLine mirrors one gitprepare.Line at the wire (D13) — gitprepare itself carries no
-// json tags (D18: it knows nothing about the wire), so this is the one place a Line is dressed for
-// transport.
-type WorktreePrepareLine struct {
-	Stream string `json:"stream"`
-	Text   string `json:"text"`
-}
-
-func wireLines(lines []gitprepare.Line) []WorktreePrepareLine {
-	out := make([]WorktreePrepareLine, len(lines))
-	for i, l := range lines {
-		out[i] = WorktreePrepareLine{Stream: l.Stream, Text: l.Text}
-	}
-	return out
-}
-
-// WorktreeProgress mirrors worktree.progress's own event payload.
-type WorktreeProgress struct {
-	RepoID string                `json:"repoId"`
-	Lines  []WorktreePrepareLine `json:"lines"`
-}
-
-// WorktreePrepareResult mirrors worktree.prepare's own wire result.
-type WorktreePrepareResult struct {
-	OK        bool                  `json:"ok"`
-	Error     *OpError              `json:"error,omitempty"`
-	ExitCode  int                   `json:"exitCode"`
-	TimedOut  bool                  `json:"timedOut"`
-	Cancelled bool                  `json:"cancelled"`
-	Output    []WorktreePrepareLine `json:"output"`
-	Truncated bool                  `json:"truncated"`
-}
-
-// CancelPrepare is worktree.cancelPrepare's own executor (D13) — false, never an error, when
-// nothing is running (a cancel racing a just-finished run is ordinary, not a fault).
-func (e *RepoEntry) CancelPrepare() bool {
-	return e.prepare.tryCancel()
-}
-
-func noSpawnPrepareResult(kind, message string) (WorktreePrepareResult, error) {
-	return WorktreePrepareResult{OK: false, Error: &OpError{Kind: kind, Message: message}, Output: []WorktreePrepareLine{}}, nil
-}
-
-// RunPrepare is worktree.prepare's own executor, in EXACTLY D13's stated order:
-//  1. claim the ≤1 prepare slot (else AlreadyRunning, no spawn).
-//  2. resolve the stored script (empty ⇒ NotConfigured, no spawn).
-//  3. re-hash the CURRENTLY STORED text and compare to params.ScriptSha256 (mismatch ⇒
-//     ScriptChanged, no spawn) — re-checked immediately before the spawn, so the client's user never
-//     runs text they did not see (Kira Space may have changed the script since the dialog showed
-//     it). A staleness guard, not approval: only Kira Space writes the script (P172), and the
-//     human-confirmation dialog lives client-side.
-//  4. verify path is a real worktree of THIS repository (⇒ NotAWorktree, no spawn) — the same
-//     security property D8's notAWorktree blocker states for remove, restated here for prepare.
-//  5. resolve the shell (D9/D16), build the env (D12/F12) from the worktree's own facts, and spawn
-//     OUTSIDE Repo.Read/Repo.Write entirely (F3) — streaming sanitized batches as worktree.progress.
-//  6. release the slot (deferred) and return.
-//
-// deps.Runner defaults to a real gitprepare.OSRunner in production (gitrpc wires it); every
-// gitsession test fakes it, so no test in this package ever spawns a real shell (D18).
-type WorktreePrepareDeps struct {
-	Runner gitprepare.Runner
-	Getenv func(string) string
-}
-
-func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha256 string, deps WorktreePrepareDeps) (WorktreePrepareResult, error) {
-	opCtx, cancel := context.WithCancel(ctx)
-	if !e.prepare.claim("prepare", cancel, true) {
-		cancel()
-		return noSpawnPrepareResult("AlreadyRunning", "A prepare script is already running for this repository.")
-	}
-	defer func() {
-		e.prepare.release()
-		cancel()
-	}()
-	if err := e.errIfTornDown(); err != nil {
-		return WorktreePrepareResult{}, err
-	}
-
-	settings := e.RepoSettings()
-	script := settings.WorktreePrepareScript
-	if script == "" {
-		return noSpawnPrepareResult("NotConfigured", "No prepare script is configured for this repository.")
-	}
-
-	sum := sha256.Sum256([]byte(script))
-	currentSha := hex.EncodeToString(sum[:])
-	if currentSha != scriptSha256 {
-		return noSpawnPrepareResult("ScriptChanged", "The prepare script has changed since it was last shown — review it again before running.")
-	}
-
-	records, err := e.rawWorktreeList(ctx)
-	if err != nil {
-		return WorktreePrepareResult{}, err
-	}
-	target, isWorktree := findWorktree(records, path)
-	if !isWorktree {
-		return noSpawnPrepareResult("NotAWorktree", "This path is not one of this repository's worktrees.")
-	}
-
-	getenv := deps.Getenv
-	if getenv == nil {
-		getenv = os.Getenv
-	}
-	shell, loginShell := loginshell.ResolveShell(getenv, loginshell.IsExecutableFile)
-
-	branch := ""
-	if target.Branch != "" {
-		branch = strings.TrimPrefix(target.Branch, "refs/heads/")
-	}
-	env := gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{
-		WorktreePath: target.Path, WorktreeBranch: branch,
-		RepoRoot: e.Summary.Root, RepoCommonDir: e.Summary.CommonDir,
-	})
-
-	runner := deps.Runner
-	if runner == nil {
-		runner = gitprepare.NewOSRunner()
-	}
-	timeout, timeoutText := ParsePrepareTimeout(settings.WorktreePrepareTimeout)
-
-	onBatch := func(lines []gitprepare.Line) {
-		if conn == nil {
-			return
-		}
-		conn.Emit("worktree.progress", WorktreeProgress{RepoID: e.Summary.RepoID, Lines: wireLines(lines)})
-	}
-
-	res, err := runner.Run(opCtx, gitprepare.Spec{
-		Shell: shell, LoginShell: loginShell, Script: script, Dir: target.Path, Env: env, Timeout: timeout, OnBatch: onBatch,
-	})
-	if err != nil {
-		return WorktreePrepareResult{}, err
-	}
-
-	result := WorktreePrepareResult{
-		OK:       !res.TimedOut && !res.Cancelled && res.ExitCode == 0,
-		ExitCode: res.ExitCode, TimedOut: res.TimedOut, Cancelled: res.Cancelled,
-		Output: wireLines(res.Output), Truncated: res.Truncated,
-	}
-	switch {
-	case res.Cancelled:
-		result.Error = &OpError{Kind: "Cancelled", Message: "the prepare script was cancelled"}
-	case res.TimedOut:
-		o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndTimeout, Timeout: timeoutText})
-		result.Error = &OpError{Kind: "Unknown", Message: "the prepare script " + o.Reason}
-	case res.ExitCode != 0:
-		o := runoutcome.ForProcess(runoutcome.Process{ExitCode: res.ExitCode})
-		result.Error = &OpError{Kind: "Unknown", Message: "the prepare script " + o.Reason}
-	}
-	return result, nil
 }
 
 // ParsePrepareTimeout parses the per-repo worktreePrepareTimeout leaf. A stored value that no longer

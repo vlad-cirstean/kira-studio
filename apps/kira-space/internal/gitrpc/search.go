@@ -56,7 +56,7 @@ func (r *Router) handleSearchRun(ctx context.Context, c *gitsession.Conn, params
 	if status.Kind != "ok" {
 		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
 	}
-	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, nil, "", nil)
+	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, nil)
 	if err != nil {
 		return nil, err
 	}

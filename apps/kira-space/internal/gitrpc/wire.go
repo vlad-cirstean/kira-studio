@@ -118,11 +118,6 @@ type GraphLoadMoreParams struct {
 	RepoID string             `json:"repoId"`
 	Pages  *int               `json:"pages,omitempty"`
 	Range  *CommitRangeParams `json:"range,omitempty"`
-	// Scope/PageSize (D6): optional, injected by the extension from the window's own
-	// kiraSpace.graph.* settings. Absent for every raw socket client (every Go integration
-	// test included) — the server defaults them (walkSpecFrom, graph.go).
-	Scope    string `json:"scope,omitempty"`
-	PageSize *int   `json:"pageSize,omitempty"`
 }
 
 type GraphLoadMoreResult struct {
@@ -146,8 +141,6 @@ type GraphStreamParams struct {
 	RepoID           string             `json:"repoId"`
 	ResumeThroughRow *int               `json:"resumeThroughRow,omitempty"`
 	Range            *CommitRangeParams `json:"range,omitempty"`
-	Scope            string             `json:"scope,omitempty"`
-	PageSize         *int               `json:"pageSize,omitempty"`
 }
 
 // commitsBlob marshals as {"$fb":"gitwire/1","d":{"$blob":true}} — D4's own marker naming where
@@ -372,10 +365,6 @@ type ReviewResolveBaseParams struct {
 	RepoID string  `json:"repoId"`
 	Branch string  `json:"branch"`
 	Base   *string `json:"base,omitempty"`
-	// BaseCandidates (D1): optional, injected by the extension from kiraSpace.review.
-	// baseCandidates. Absent for every raw socket client — the server defaults it
-	// (gitreview.DefaultBaseCandidates).
-	BaseCandidates []string `json:"baseCandidates,omitempty"`
 }
 
 // ---------------------------------------------------------------------------------------
@@ -390,10 +379,6 @@ type ReviewResolveBaseParams struct {
 type RemotePullPreflightParams struct {
 	RepoID string `json:"repoId"`
 	Branch string `json:"branch"`
-	// StrategySetting (D2): optional, injected by the extension from kiraSpace.pull.strategy,
-	// exactly as review.resolveBase injects baseCandidates. Absent (or "auto") for every raw
-	// socket client — gitpreflight.ResolvePullStrategy already treats "" as "auto".
-	StrategySetting string `json:"strategySetting,omitempty"`
 }
 
 // RemotePushPreflightParams is remote.pushPreflight's own request.
@@ -718,8 +703,7 @@ type PrBrowserUrlResult struct {
 // own results are gitsession's/gitpreflight's own wire-shaped types ([]gitsession.WorktreeEntry
 // wrapped in WorktreeListResult, gitpreflight.WorktreeAddPreflight, gitpreflight.
 // WorktreeRemovePreflight) — D5's own precedent applied again: no second, gitrpc-owned copy of a
-// shape those packages already produce JSON-tagged. worktree.prepare's own result is
-// gitsession.WorktreePrepareResult, same precedent. CONTRACT_VERSION moves 27 -> 28 (D16).
+// shape those packages already produce JSON-tagged. CONTRACT_VERSION moved 27 -> 28 (D16).
 // ---------------------------------------------------------------------------------------
 
 // WorktreeListParams is worktree.list's own request.
@@ -746,28 +730,6 @@ type PreflightWorktreeAddParams struct {
 type PreflightWorktreeRemoveParams struct {
 	RepoID string `json:"repoId"`
 	Path   string `json:"path"`
-}
-
-// WorktreePrepareParams is worktree.prepare's own request (D13). The script is written only by Kira
-// Space (P172); the client never supplies it. ScriptSha256 is a staleness guard: the text the
-// client showed its user. The server re-hashes the CURRENTLY STORED text and refuses with
-// ScriptChanged on any mismatch before spawning anything (D11).
-type WorktreePrepareParams struct {
-	RepoID       string `json:"repoId"`
-	Path         string `json:"path"`
-	ScriptSha256 string `json:"scriptSha256"`
-}
-
-// WorktreeCancelPrepareParams is worktree.cancelPrepare's own request.
-type WorktreeCancelPrepareParams struct {
-	RepoID string `json:"repoId"`
-}
-
-// WorktreeCancelPrepareResult mirrors @kira/git-ipc's own worktree.cancelPrepare result —
-// `{cancelled: boolean}`, never an error (D13/RemoteCancelResult's own precedent): a cancel racing
-// a just-finished or never-running prepare is an ordinary outcome, not a fault.
-type WorktreeCancelPrepareResult struct {
-	Cancelled bool `json:"cancelled"`
 }
 
 // StackListParams is stack.list's own request (G26 D3) — the RESULT is

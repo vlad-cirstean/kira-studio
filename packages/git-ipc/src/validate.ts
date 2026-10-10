@@ -173,7 +173,14 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'capabilities.editRepoSettings' flag (Kira Space's native window true, VS Code false). The 'kiraSpace.log.level' leaf is removed
 // from 'RepoSettingsSnapshot'/'RepoSettingsPatch' (it was never read). 'app.init' gains 'dateFormat'
 // (Kira Space's app-wide appearance.dateFormat), which the VS Code graph follows.
-export const CONTRACT_VERSION = 45;
+// P243 Part 2: 45 -> 46, breaking. The VS Code extension is gone, so 'worktree.prepare',
+// 'worktree.cancelPrepare', 'worktree.openWindow', 'editor.resolveConflict', the events
+// 'worktree.progress', 'settings.changed' and 'connection.changed', and 'app.init''s 'host',
+// 'settings' and 'capabilities' fields are removed. The extension-injected params ('scope' and
+// 'pageSize' on 'graph.loadMore'/'graph.stream', 'baseCandidates' on 'review.resolveBase',
+// 'strategySetting' on 'remote.pullPreflight') are removed; the server reads the stored
+// 'kiraSpace.*' repo settings.
+export const CONTRACT_VERSION = 46;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -248,7 +255,6 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'op.run': true,
   'undo.peek': true,
   'undo.run': true,
-  'editor.resolveConflict': true,
   'review.resolveBase': true,
   'review.open': true,
   'review.files': true,
@@ -290,9 +296,6 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'worktree.list': true,
   'preflight.worktreeAdd': true,
   'preflight.worktreeRemove': true,
-  'worktree.prepare': true,
-  'worktree.cancelPrepare': true,
-  'worktree.openWindow': true,
   'stack.list': true,
   'preflight.restack': true,
   'stack.restack': true,
@@ -301,15 +304,12 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
 };
 const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,
-  'settings.changed': true,
-  'connection.changed': true,
   'review.target': true,
   'remote.progress': true,
   'credential.request': true,
   'ui.action': true,
   'repoSettings.changed': true,
   'autoFetch.changed': true,
-  'worktree.progress': true,
   'stack.progress': true,
 };
 const STREAM_KEY_MAP: Record<StreamKey, true> = {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
 // smokeGit runs one git command against dir with a fixed committer identity — reset_test.go's,
@@ -31,13 +30,9 @@ func smokeGit(t *testing.T, dir string, extraEnv []string, args ...string) {
 
 // smokeConnOpts is smokeConn's own optional extras (P107 I2-28). discovery, when non-nil, builds
 // a working Discovery off the registry's own runner — search_test.go's own need (search.run
-// resolves gitPath through Discovery.Status, where reset/preflight/op.run never do). prepareScript,
-// when non-nil, installs a RepoSettingsGet override returning it as WorktreePrepareScript — even ""
-// counts (worktree_test.go's own default-off case still installs the override, unlike
-// reset/search, which never touch RepoSettingsGet at all).
+// resolves gitPath through Discovery.Status, where reset/preflight/op.run never do)..
 type smokeConnOpts struct {
-	discovery     func(runner gitclient.Runner) *gitclient.Discovery
-	prepareScript *string
+	discovery func(runner gitclient.Runner) *gitclient.Discovery
 }
 
 // smokeConn is resetSmokeConn's, searchSmokeConn's and worktreeSmokeConn's own shared shape (P107
@@ -51,14 +46,6 @@ func smokeConn(t *testing.T, connID gitsession.ConnID, dir string, opts smokeCon
 	}
 	runner := gitclient.NewExecRunner()
 	registry := gitsession.NewRegistry(runner)
-	if opts.prepareScript != nil {
-		script := *opts.prepareScript
-		registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
-			s := model.DefaultGitRepoSettings()
-			s.WorktreePrepareScript = script
-			return s, nil
-		}
-	}
 	t.Cleanup(registry.Close)
 
 	deps := Deps{Runner: runner, Registry: registry, ServerVersion: "test"}

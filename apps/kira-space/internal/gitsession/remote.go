@@ -21,7 +21,7 @@ import (
 // same repository, from any connection, is refused rather than queued (upstream's own OQ7 — a
 // push sitting invisibly behind a ninety-second fetch is worse than being told to wait, and it
 // makes "which op does cancel cancel?" ambiguous). The box itself is opSlot (opslot.go) — shared
-// with stack.go's restack slot and worktree.go's prepare slot.
+// with stack.go's restack slot.
 func (e *RepoEntry) CancelRemote() bool {
 	return e.remoteOp.tryCancel()
 }

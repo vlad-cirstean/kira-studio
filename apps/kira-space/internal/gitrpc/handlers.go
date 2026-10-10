@@ -310,12 +310,6 @@ var requestHandlers = map[string]requestHandler{
 	"preflight.worktreeRemove": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handlePreflightWorktreeRemove(ctx, c, params)
 	},
-	"worktree.prepare": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handleWorktreePrepare(ctx, c, params)
-	},
-	"worktree.cancelPrepare": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handleWorktreeCancelPrepare(ctx, c, params)
-	},
 	"stack.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleStackList(ctx, c, params)
 	},

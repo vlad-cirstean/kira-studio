@@ -1,6 +1,7 @@
 package reviewflow_test
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -187,21 +188,29 @@ func TestRangedWalkLeavesTheGraphAlone(t *testing.T) {
 	}
 }
 
-// Guards ranged paging: pageSize is fixed at walk creation and exhaustion shows only after a read hits EOF.
+// Guards ranged paging: the stored page size is fixed at walk creation and exhaustion shows only after a read hits EOF.
 func TestRangedLoadMoreAndStatus(t *testing.T) {
 	app := flowharness.New(t)
 	gs := app.OpenGitStream()
-	repo, base := reviewTopology(app)
+	repo := app.NewRepo("proj")
+	base := repo.Commit("base commit", map[string]string{"base.txt": "base\n"})
+	repo.Git("checkout", "-q", "-b", "topic", base)
+	for i := range 150 {
+		repo.Commit(fmt.Sprintf("topic work %d", i), nil)
+	}
 	id := openRepo(t, gs, repo.Dir)
+	call[gitrpc.RepoSettingsSnapshot](t, gs, "repoSettings.set", gitrpc.RepoSettingsSetParams{
+		RepoID: id, Patch: gitrpc.RepoSettingsPatchWire{GraphPageSize: ptr(100)},
+	})
 	rng := m{"base": base, "branch": "topic"}
 
-	call[gitrpc.GraphLoadMoreResult](t, gs, "graph.loadMore", m{"repoId": id, "range": rng, "pageSize": 1})
-	if st := rangeStatus(t, gs, id, rng); st.Loaded != 1 || st.Exhausted {
-		t.Fatalf("after the first page = %+v, want 1 loaded, not exhausted", st)
+	call[gitrpc.GraphLoadMoreResult](t, gs, "graph.loadMore", m{"repoId": id, "range": rng})
+	if st := rangeStatus(t, gs, id, rng); st.Loaded != 100 || st.Exhausted {
+		t.Fatalf("after the first page = %+v, want 100 loaded, not exhausted", st)
 	}
 	call[gitrpc.GraphLoadMoreResult](t, gs, "graph.loadMore", m{"repoId": id, "range": rng, "pages": 2})
-	if st := rangeStatus(t, gs, id, rng); st.Loaded != 2 || !st.Exhausted {
-		t.Fatalf("after the second call = %+v, want 2 loaded, exhausted", st)
+	if st := rangeStatus(t, gs, id, rng); st.Loaded != 150 || !st.Exhausted {
+		t.Fatalf("after the second call = %+v, want 150 loaded, exhausted", st)
 	}
 	if st := graphStatus(t, gs, id); st.Loaded != 0 || st.Remaining != 0 || st.Exhausted {
 		t.Fatalf("unranged status = %+v, want the empty answer for a connection with no graph walk", st)

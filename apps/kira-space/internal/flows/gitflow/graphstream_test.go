@@ -41,15 +41,17 @@ func TestRangedGraphStreamResumesFromCache(t *testing.T) {
 	id := r.open(repo.Dir).RepoID
 	base := repo.RevList("--max-parents=0", "HEAD")[0]
 	rng := m{"base": base, "branch": "main"}
+	page := 300
+	r.setSettings(id, gitrpc.RepoSettingsPatchWire{GraphPageSize: &page})
 
-	r.gs.Stream("graph.stream", m{"repoId": id, "range": rng, "pageSize": 300}, 10).Drain()
-	call[gitrpc.GraphLoadMoreResult](t, r.gs, "graph.loadMore", m{"repoId": id, "pages": 1, "range": rng, "pageSize": 300})
+	r.gs.Stream("graph.stream", m{"repoId": id, "range": rng}, 10).Drain()
+	call[gitrpc.GraphLoadMoreResult](t, r.gs, "graph.loadMore", m{"repoId": id, "pages": 1, "range": rng})
 	st := call[gitrpc.GraphStatusResult](t, r.gs, "graph.status", m{"repoId": id, "range": rng})
 	if st.Loaded <= 300 {
 		t.Fatalf("ranged loaded = %d after loadMore, want a second page past 300", st.Loaded)
 	}
 
-	metas := chunkMetas(t, r.gs.Stream("graph.stream", m{"repoId": id, "range": rng, "pageSize": 300, "resumeThroughRow": 300}, 10).Drain())
+	metas := chunkMetas(t, r.gs.Stream("graph.stream", m{"repoId": id, "range": rng, "resumeThroughRow": 300}, 10).Drain())
 	if len(metas) == 0 || metas[0].From != 300 {
 		t.Fatalf("resumed ranged chunks = %+v, want the first starting at row 300", metas)
 	}

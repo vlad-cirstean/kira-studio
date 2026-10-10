@@ -55,23 +55,8 @@ describe('ipc codec', () => {
   test('round-trips app.init request/result', async () => {
     const params: ParamsOf<'app.init'> = {};
     const result: ResultOf<'app.init'> = {
-      host: 'harness',
       contractVersion: CONTRACT_VERSION,
-      settings: {
-        'workbench.tree.indent': 8,
-      },
       git: { kind: 'ok', path: '/usr/bin/git', version: '2.43.0' },
-      capabilities: {
-        openInEditor: true,
-        goToFile: true,
-        clipboard: true,
-        resolveConflict: true,
-        openWorktreeWindow: true,
-        runPrepareScript: true,
-        editRepoSettings: true,
-        write: true,
-        openExternal: true,
-      },
     };
     const encodedParams = encode(params);
     const encodedResult = encode(result);

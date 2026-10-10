@@ -7,18 +7,16 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
 // testEntryOpts is newTestEntry's own optional extras (P107 I2-28) — incremental_test.go's,
 // queries_test.go's, stack_test.go's and worktree_test.go's own newXTestEntry each set only the
 // one or two fields their own scenario needs; the zero value is the queries_test.go shape (a
-// plain ExecRunner, no review store, no worktree-prepare script override).
+// plain ExecRunner, no review store).
 type testEntryOpts struct {
 	runner gitclient.Runner // nil means gitclient.NewExecRunner()
 	store  *gitreview.Store // wired as registry.Review when non-nil (incremental_test.go)
 	opLog  *oplog.Log       // wired as registry.OpLog when non-nil (oplog_test.go)
-	script string           // sets RepoSettingsGet's WorktreePrepareScript when non-empty (worktree_test.go)
 }
 
 // newTestEntry is incremental_test.go's, queries_test.go's, stack_test.go's and worktree_test.go's
@@ -36,13 +34,6 @@ func newTestEntry(t *testing.T, connID ConnID, repoDir string, opts testEntryOpt
 		registry.Review = opts.store
 	}
 	registry.OpLog = opts.opLog
-	if opts.script != "" {
-		registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
-			s := model.DefaultGitRepoSettings()
-			s.WorktreePrepareScript = opts.script
-			return s, nil
-		}
-	}
 	t.Cleanup(registry.Close)
 
 	conn := NewConn(connID, "test-client", "test-client-label", nil)

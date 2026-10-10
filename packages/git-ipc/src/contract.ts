@@ -11,12 +11,6 @@
  * not by an import the lint rule would reject anyway.
  */
 
-/** Which shell mounted the UI bundle. `"harness"` is a real value, not a test-only stand-in —
- *  the harness is a first-class Transport consumer (§8.4, C4). `"kira"` (C10) is Kira Space's own
- *  native workspace, mounting these same components read-only over an in-process Wails stream —
- *  see `docs/v1.5/plans/C10-git-graph-native.md`. */
-export type HostKind = 'vscode' | 'harness' | 'kira';
-
 // ---------------------------------------------------------------------------------------
 // Structural copies of core's wire-relevant types — kept honest by wireConformance.test.ts.
 // ---------------------------------------------------------------------------------------
@@ -44,19 +38,6 @@ export type DecorationRef =
   | { readonly kind: 'tag'; readonly name: string }
   | { readonly kind: 'head' }
   | { readonly kind: 'stash'; readonly index: number };
-
-/** The settings schema's keys and value types (D25, W4) — a structural copy of `core`'s
- *  generated `Settings` type, kept in step by wireConformance.test.ts.
- *
- *  G18: the one remaining window/host-scoped key after this phase — `kiraSpace.git.path` and
- *  the six originally-named per-repo keys are gone (`git.path` is server-owned elsewhere now,
- *  D15; the rest moved to `RepoSettingsSnapshot` below). `kiraSpace.pull.strategy` and
- */
-export interface SettingsSnapshot {
-  /** G14 D6: VS Code's own tree indentation, mirrored so the webview's file trees match the
-   *  Explorer. Read from the host, never contributed by this extension. */
-  readonly 'workbench.tree.indent': number;
-}
 
 /** G18 D4: the per-repo display settings, server-stored, edited from the new in-app dialog
  *  (`RepoSettingsDialog.vue`) rather than VS Code's settings.json — every leaf here is genuinely
@@ -610,33 +591,6 @@ export interface WorktreeRemovePreflight {
   readonly verdict: 'clean' | 'dirty' | 'blocked';
 }
 
-/** `worktree.prepare`'s own streamed output line (D12) — already sanitized (invalid UTF-8
- *  replaced, control bytes and ANSI escapes stripped) and already capped server-side; never raw. */
-export interface WorktreePrepareLine {
-  readonly stream: 'stdout' | 'stderr';
-  readonly text: string;
-}
-
-/** `worktree.progress`'s own event payload (D13) — throttled to ~100ms, capped at 8 KiB/64 lines
- *  per batch server-side (D12), the same "coalesce, never withhold past a bound" shape
- *  `remote.progress` already uses. */
-export interface WorktreeProgress {
-  readonly repoId: string;
-  readonly lines: readonly WorktreePrepareLine[];
-}
-
-export interface WorktreePrepareResult {
-  readonly ok: boolean;
-  readonly error: { readonly kind: WorktreePrepareErrorKind; readonly message: string } | undefined;
-  readonly exitCode: number;
-  readonly timedOut: boolean;
-  readonly cancelled: boolean;
-  /** The FINAL, capped/sanitized transcript (D12) — never the live stream `worktree.progress`
-   *  already delivered piecemeal while the script was running. */
-  readonly output: readonly WorktreePrepareLine[];
-  readonly truncated: boolean;
-}
-
 // ---------------------------------------------------------------------------------------
 // G26 — stacked branches: the parent pointer, the restack executor, and stack navigation
 // (D1-D17). No upstream to structurally copy from (SPEC's own row: "not designed at all" before
@@ -1138,21 +1092,6 @@ export type OpErrorKind =
   | 'BranchChanged'
   | 'Unknown';
 
-/** `worktree.prepare`'s own error vocabulary (D13) — deliberately NOT `OpErrorKind`: none of
- *  these four are git failures or shared with any other request, so folding them into the shared
- *  union would spend D16's "exactly one new `OpErrorKind`" budget on kinds that have nothing to
- *  do with git at all. `AlreadyRunning`/`NotConfigured`/`ScriptChanged`/`NotAWorktree` are
- *  synthetic refusals answered BEFORE anything is ever spawned (D13's own documented order);
- *  `Cancelled`/`Unknown` are reused verbatim from the OTHER two states a run can end in (a
- *  cancellation, or a non-zero exit/timeout with no more specific story). */
-export type WorktreePrepareErrorKind =
-  | 'AlreadyRunning'
-  | 'NotConfigured'
-  | 'ScriptChanged'
-  | 'NotAWorktree'
-  | 'Cancelled'
-  | 'Unknown';
-
 export interface UndoSlotSnapshot {
   readonly id: string;
   /** "Deleted branch feature" — §7.12's "labelled with what it will undo". */
@@ -1191,12 +1130,8 @@ export type GitStatus =
     }
   | { readonly kind: 'unusable'; readonly path: string; readonly reason: string };
 
-// P115 H9: `extension.ts`, `proxyHandlers.ts` and `hostHandlers.ts` each declared this exact
-// interface locally (byte-for-byte) — the Go server's real `app.init` result before host/settings/
-// capabilities are composed host-side (S3's own doc comment: neither crosses the Go wire), so a
-// caller reading the raw stream casts to this narrower shape rather than trusting `ResultOf<
-// 'app.init'>`, which describes the *client-visible* shape after that composition. Mirrors
-// internal/gitrpc/wire.go's AppInitResult field for field.
+// The Go server's real `app.init` result — `ResultOf<'app.init'>` is the client-visible shape,
+// which drops `serverVersion`. Mirrors internal/gitrpc/wire.go's AppInitResult field for field.
 export interface ServerAppInitResult {
   readonly contractVersion: number;
   readonly serverVersion: string;
@@ -1536,46 +1471,11 @@ export type Contract = {
     'app.init': {
       params: Record<string, never>;
       result: {
-        host: HostKind;
         contractVersion: number;
-        settings: SettingsSnapshot;
         git: GitStatus;
-        /** Kira Space's app-wide date format; the VS Code host passes the server's value and the
-         *  UI falls back to its own persisted preference when absent. */
+        /** Kira Space's app-wide date format; the UI falls back to its own persisted preference
+         *  when absent. */
         dateFormat?: 'relative' | 'absolute';
-        /** An optional capability the UI feature-detects rather than assumes (§3.3). Nothing in
-         *  P5 or P6 branches on host kind. */
-        capabilities: {
-          readonly openInEditor: boolean;
-          readonly goToFile: boolean;
-          readonly clipboard: boolean;
-          /** §7.11's "Resolve in VS Code". `true` under VS Code, `false` in the harness's
-           *  default posture (D15: reveal the host's own SCM surface, never our own merge UI). */
-          readonly resolveConflict: boolean;
-          /** G25 D6/D14: "Open in New Window" for a worktree — `true` under VS Code
-           *  (`vscode.openFolder`), `false` in the harness (no windowing concept to open a second
-           *  one of). */
-          readonly openWorktreeWindow: boolean;
-          /** G25 D14: gates the prepare script's own "Run" affordance, extension-side, as
-           *  defence in depth — NOT the primary control (D10/D11 are). `true` under VS Code (its
-           *  manifest requires a trusted workspace) and the harness; `false` in Kira Space's
-           *  native window, whose stream refuses `worktree.prepare`. */
-          readonly runPrepareScript: boolean;
-          /** P178: whether this host shows the repository settings dialog. Those settings live in
-           *  Kira Space, so only its native window edits them (`true`); VS Code reads them and
-           *  `git.sock` refuses `repoSettings.set`. */
-          readonly editRepoSettings: boolean;
-          /** C10 §4.2/§4.3: whether this host's transport accepts a write RPC at all. `true` for
-           *  VS Code and the harness (unchanged); `false` for the native `'kira'` host, whose
-           *  transport's Go side refuses every write with `E_READ_ONLY` regardless of this flag —
-           *  this is UI-layer 3 (hide, don't disable), never the boundary itself. */
-          readonly write: boolean;
-          /** P74 §3.3: whether this host can open a URL in the OS/system browser at all — gates
-           *  the PR row's/badge's external-open button, so a future host with no browser renders
-           *  the PR number as plain text rather than a dead control. Not `EditorCapabilities`
-           *  (`DetailActions`'s own `capabilities`) — this is not an editor action. */
-          readonly openExternal: boolean;
-        };
       };
     };
     'repo.list': {
@@ -1596,18 +1496,9 @@ export type Contract = {
       result: { loaded: number; remaining: number; exhausted: boolean };
     };
     'graph.loadMore': {
-      /** `range` present ⇒ pages the review walk instead of the panel's own (P7 W5).
-       *  `scope`/`pageSize` (G3 D6): optional, injected by the extension from the window's own
-       *  `kiraSpace.graph.*` settings — SPEC's "can travel with the request and differ per
-       *  window harmlessly". A raw socket client that omits them gets the server's own defaults
-       *  ("all", 5000). */
-      params: {
-        repoId: string;
-        pages?: number;
-        range?: CommitRange;
-        scope?: 'all' | 'head';
-        pageSize?: number;
-      };
+      /** `range` present ⇒ pages the review walk instead of the panel's own (P7 W5). Scope and
+       *  page size come from the repository's stored `kiraSpace.graph.*` settings. */
+      params: { repoId: string; pages?: number; range?: CommitRange };
       result: { started: boolean };
     };
     'graph.refresh': {
@@ -1633,11 +1524,6 @@ export type Contract = {
         repoId: string;
         branch: string;
         base?: string;
-        /** G6: `kiraSpace.review.baseCandidates`, injected by the extension from the window's
-         *  own coerced settings snapshot — SPEC's "can travel with the request and differ per
-         *  window harmlessly". Absent for a raw socket client, which gets the server's own
-         *  `["main", "master"]` default. */
-        baseCandidates?: readonly string[];
       };
       result: BaseResolution;
     };
@@ -2058,20 +1944,9 @@ export type Contract = {
       params: { repoId: string; id: string };
       result: OpResult;
     };
-    /** §7.11's "Resolve in VS Code": reveal the SCM view and open the first unmerged file in the
-     *  three-way merge editor. Only ever called when `capabilities.resolveConflict` is true. */
-    'editor.resolveConflict': {
-      params: { repoId: string; path: string };
-      result: Record<string, never>;
-    };
     'remote.pullPreflight': {
-      params: {
-        repoId: string;
-        branch: string;
-        /** Optional; absent resolves this repo's stored `kiraSpace.pull.strategy` server-side;
-         *  an unknown value is refused. */
-        strategySetting?: PullStrategy | 'auto';
-      };
+      /** The strategy resolves from this repo's stored `kiraSpace.pull.strategy`. */
+      params: { repoId: string; branch: string };
       result: PullPreflight;
     };
     'remote.pushPreflight': {
@@ -2231,30 +2106,6 @@ export type Contract = {
       params: { repoId: string; path: string };
       result: WorktreeRemovePreflight;
     };
-    /** D13: a long, cancellable, streaming method modelled exactly on `remote.run` —
-     *  the script is written only by Kira Space (P172); the client never supplies it.
-     *  `scriptSha256` is a staleness guard: the text the client showed its user. The server ALWAYS
-     *  re-hashes the currently-stored text and refuses with `ScriptChanged` on any mismatch before
-     *  spawning anything (D11). */
-    'worktree.prepare': {
-      params: { repoId: string; path: string; scriptSha256: string };
-      result: WorktreePrepareResult;
-    };
-    /** No-op if the run already finished or was never running — the same "never an error, a
-     *  cancel racing a just-finished op is ordinary" shape `remote.cancel` already uses. */
-    'worktree.cancelPrepare': {
-      params: { repoId: string };
-      result: { readonly cancelled: boolean };
-    };
-    /** D6: "Open in New Window" — answered ENTIRELY inside the extension via
-     *  `vscode.openFolder(uri, { forceNewWindow })`, never reaching the Go server at all (the same
-     *  "editor.*-shaped" precedent `editor.openDiff`/`editor.openRangeDiff` already set). Gated by
-     *  `capabilities.openWorktreeWindow`. `forceNewWindow` defaults to `true` (same-window
-     *  `openFolder` tears down the extension host mid-request, D6). */
-    'worktree.openWindow': {
-      params: { repoId: string; path: string; forceNewWindow?: boolean };
-      result: Record<string, never>;
-    };
     // ---- G26: stacked branches (D1-D17) -----------------------------------------------------
     /** D3: one `git config --local --null --get-regexp` spawn, always; one `rev-list
      *  --left-right --count` spawn per stacked branch beyond that, bounded by
@@ -2279,8 +2130,8 @@ export type Contract = {
       result: RestackResult;
     };
     /** No-op if the run already finished or was never running — the same "never an error, a
-     *  cancel racing a just-finished op is ordinary" shape `remote.cancel`/`worktree.cancelPrepare`
-     *  already use. No palette command serves this directly (D13): cancel is a button on the
+     *  cancel racing a just-finished op is ordinary" shape `remote.cancel`
+     *  already uses. No palette command serves this directly (D13): cancel is a button on the
      *  surface that started the work. */
     'stack.cancelRestack': {
       params: { repoId: string };
@@ -2303,22 +2154,6 @@ export type Contract = {
   };
   events: {
     'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };
-    'settings.changed': { settings: SettingsSnapshot };
-    /** G-UX (item 13): "app is off" pushed into the webviews themselves, not only the extension's
-     *  own status bar (`ConnectionManager.onStateChange`'s only consumer before this). A narrowed
-     *  shape, not a structural copy of the extension's own richer `ConnectionState` union
-     *  (`connection.ts`) — `denied`/`versionMismatch` there carry fields (`reason`, `expected`/
-     *  `received`/`serverVersion`) meaningful only to the status bar's own tooltip composition;
-     *  `detail`, when present, is that same wording already composed server-side
-     *  (`connection.ts`'s own `toWireConnectionState`), so a webview banner never re-implements it.
-     *  Seeded into `html.ts`'s bootstrap island for a panel opened while already disconnected, and
-     *  pushed live by `extension.ts`'s `ConnectionManager.onStateChange` subscriber otherwise. */
-    'connection.changed': {
-      readonly state: {
-        readonly kind: 'connecting' | 'pairing' | 'connected' | 'denied' | 'versionMismatch';
-        readonly detail?: string;
-      };
-    };
     /** G18 D4/D7: fanned out to every connected client whenever `repoSettings.set` succeeds
      *  anywhere, not only to the connection that made the change. `repoId` names which repo's own
      *  write triggered the emit; a viewer decides for itself whether it is relevant. */
@@ -2330,10 +2165,6 @@ export type Contract = {
     'review.target': { repoId: string; branch: string };
     /** Throttled to 100ms (OQ10) — live progress for whichever `remote.run` is in flight. */
     'remote.progress': RemoteProgress;
-    /** G25 D12/D13: throttled to ~100ms, capped at 8 KiB/64 lines per batch — live output for
-     *  whichever `worktree.prepare` is in flight, the same cadence/shape `remote.progress`
-     *  already uses. */
-    'worktree.progress': WorktreeProgress;
     /** G26 D6 step 4: one event per planned branch (never a stream within one) for whichever
      *  `stack.restack` is in flight. */
     'stack.progress': RestackProgress;
@@ -2378,9 +2209,6 @@ export type Contract = {
         /** Present ⇒ walk `<base>..<branch>` instead of the repo's `graph.scope` rev set,
          *  against this repo's own separate review walk. Chunk shape is byte-for-byte the same. */
         range?: CommitRange;
-        /** G3 D6 — see graph.loadMore's own note; the same optional, extension-injected pair. */
-        scope?: 'all' | 'head';
-        pageSize?: number;
       };
       chunk: {
         readonly repoId: string;

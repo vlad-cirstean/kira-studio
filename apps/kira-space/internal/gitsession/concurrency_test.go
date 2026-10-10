@@ -534,9 +534,9 @@ func TestConcurrent_WalkPairIsolationUnderLoad(t *testing.T) {
 	}
 }
 
-// TestConcurrent_PrepareAndRestackAfterTeardownAreRefused: a slot claimed after teardown's
-// forceCancel is uncancellable, so the claimers re-check tornDown (as RunRemote does).
-func TestConcurrent_PrepareAndRestackAfterTeardownAreRefused(t *testing.T) {
+// TestConcurrent_RestackAfterTeardownIsRefused: a slot claimed after teardown's
+// forceCancel is uncancellable, so the claimer re-checks tornDown (as RunRemote does).
+func TestConcurrent_RestackAfterTeardownIsRefused(t *testing.T) {
 	reg := newTestRegistry()
 	entry, _, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
 	if err != nil {
@@ -544,9 +544,6 @@ func TestConcurrent_PrepareAndRestackAfterTeardownAreRefused(t *testing.T) {
 	}
 	reg.Close()
 
-	if _, err := entry.RunPrepare(context.Background(), nil, "/repo", "", WorktreePrepareDeps{}); !errors.Is(err, ErrRepoTornDown) {
-		t.Fatalf("RunPrepare after teardown = %v, want ErrRepoTornDown", err)
-	}
 	if _, err := entry.RunRestack(context.Background(), nil, "main"); !errors.Is(err, ErrRepoTornDown) {
 		t.Fatalf("RunRestack after teardown = %v, want ErrRepoTornDown", err)
 	}

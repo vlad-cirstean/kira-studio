@@ -1,7 +1,6 @@
 /**
- * C10 §5 (S11) — the native counterpart to `apps/kira-space-vscode/src/proxyHandlers.ts`'s local
- * arm: the handful of methods this host answers itself rather than forwarding over the git
- * stream. `transport.ts` (S12) is the thing that actually decides "local or forward" per request;
+ * C10 §5 (S11) — the handful of methods this host answers itself rather than forwarding over
+ * the git stream. `transport.ts` (S12) is the thing that actually decides "local or forward" per request;
  * this file only supplies the local side, keyed by method name and total over nothing — an absent
  * key here means "forward", which is `transport.ts`'s own correct default (a method a later
  * contract version adds is forwarded, never silently dropped).
@@ -113,12 +112,8 @@ function codeRepoIdFor(gitRepoId: string): string | undefined {
   return useCodeReposStore().records.find((r) => r.repoId === gitRepoId)?.id;
 }
 
-// D11's own shape, ported: the Go server's real app.init result is only these three fields
-// (handlers.go's handleAppInit) — host/settings/capabilities are composed entirely host-side
-// (S3's own doc comment: neither crosses the Go wire). Contract['app.init']['result'] describes
-// the *client-visible* shape after that composition, which is why every caller of this cast (this
-// file, proxyHandlers.ts, extension.ts) uses git-ipc's own ServerAppInitResult (P115 H9) rather
-// than trusting ResultOf<'app.init'> for what the raw stream actually returns.
+// The Go server's real app.init result is only `ServerAppInitResult`'s fields (handlers.go's
+// handleAppInit); the client-visible `Contract['app.init']['result']` drops `serverVersion`.
 
 async function findChangeInDetail(
   remoteRequest: Transport['request'],
@@ -164,16 +159,6 @@ type HostHandler<K extends RequestKey> = (
  *  default for a method this file has simply never heard of, never a silently dropped one. */
 export type HostHandlers = Partial<{ [K in RequestKey]: HostHandler<K> }>;
 
-// 8b (P68 review): named readOnlyRefusal until this rename — a boundary (a3753dd5 deliberately
-// purged "read-only" wording from gitstream.go's own comments) that no longer applies to any of
-// this function's 3 call sites below, each of which refuses for an unrelated reason (no native
-// caller, needs a merge editor, no native meaning).
-function refuseLocally<K extends RequestKey>(method: K, reason: string): HostHandler<K> {
-  return async () => {
-    throw new Error(`hostHandlers: ${method} ${reason}`);
-  };
-}
-
 export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
   return {
     'app.init': async (_params, signal) => {
@@ -183,40 +168,9 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
         signal,
       )) as unknown as ServerAppInitResult;
       return {
-        host: 'kira',
         contractVersion: server.contractVersion,
-        // G14 D6's own VS Code "workbench.tree.indent" mirror has no native equivalent — 8 is
-        // VS Code's own default (the same literal codec.test.ts's own fixture uses), which is all
-        // git-ui's file tree actually needs: a plausible indent, not a live-synced setting.
-        settings: { 'workbench.tree.indent': 8 },
         git: server.git,
-        capabilities: {
-          openInEditor: true,
-          goToFile: true,
-          clipboard: true,
-          // This app has no merge editor — the user's own stated carve-out
-          // (docs/v1.6/plans/P67e-git-relax-read-only.md): conflicts surface through the
-          // conflict banner instead, resolved in the user's own external editor. Layer 2
-          // (editor.resolveConflict throwing, below) covers it regardless.
-          resolveConflict: false,
-          // "Open in New Window" (vscode.openFolder) has no native meaning: there is no second
-          // window to open a worktree into. worktree.openWindow throws below regardless
-          // (layer 2).
-          openWorktreeWindow: false,
-          // Running the worktree prepare script is arbitrary shell execution with no
-          // human-approval gate anywhere in this codebase — a security boundary, not a
-          // file-editing one, so it stays refused even though write is now true.
-          runPrepareScript: false,
-          // Repository settings are edited here, in Kira Space, and nowhere else (P178).
-          editRepoSettings: true,
-          // P67e: the native mount now admits every git operation that writes through git
-          // itself (fetch/pull/push/force-push, merge/rebase as pull strategies, undo, restack,
-          // stash, worktree add/remove) — this is the one flag the UI actually branches on to
-          // show every such write affordance uniformly.
-          write: true,
-          // P74 §3.3: GitHubService.OpenPullRequestURL/BrowserManager.OpenURL always exists.
-          openExternal: true,
-        },
+        dateFormat: server.dateFormat,
       };
     },
 
@@ -473,14 +427,5 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
           return target;
       }
     },
-
-    'editor.resolveConflict': refuseLocally(
-      'editor.resolveConflict',
-      'needs a merge editor this window does not have; resolve the files in your own editor, then Continue',
-    ),
-    'worktree.openWindow': refuseLocally(
-      'worktree.openWindow',
-      'has no native meaning: there is no second window to open a worktree into',
-    ),
   };
 }

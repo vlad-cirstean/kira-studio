@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
@@ -21,27 +23,6 @@ func (s *spyRequest) fn(_ context.Context, method string, _ json.RawMessage) (an
 	return "inner-result", nil
 }
 
-// writeMethods and hostAnsweredMethods are the explicit, commented "must stay refused" lists
-// TestAllowedRequest_WriteMethodsAreRefused/TestAllowedRequest_HostAnsweredMethodsAreRefused
-// exercise below — hoisted to package scope (rather than declared inline in each test) so
-// TestGitrpcDispatch_EveryMethodIsClassified (gitrpc_dispatch_coverage_test.go, C13-11) can check
-// its own derived method set against the exact same two lists, with nothing to fall out of sync.
-//
-// P67e shrank this to the methods that genuinely stay refused (docs/v1.6/plans/
-// P67e-git-relax-read-only.md D1): worktree.prepare/worktree.cancelPrepare (shell execution) are
-// dispatched by Router.ForConn but excluded from allowedMethods on purpose; editor.resolveConflict is refused here too even though Router.ForConn
-// has no case for it at all — this app has no merge editor, the user's own stated carve-out, and
-// pinning the refusal at this layer is defence in depth beside hostHandlers.ts's own throw.
-// worktree.openWindow stays refused only at layer two (gitstream_test.go has never listed it —
-// hostHandlers.ts throws locally and Router.ForConn never sees it either way).
-var writeMethods = []string{
-	"worktree.prepare", "worktree.cancelPrepare", "editor.resolveConflict",
-}
-
-var hostAnsweredMethods = []string{
-	"review.session.save", "review.session.load", "review.open", "editor.openRangeDiff",
-}
-
 func isReadOnlyErr(err error) bool {
 	var e *ipcerr.Error
 	if !errors.As(err, &e) {
@@ -50,145 +31,7 @@ func isReadOnlyErr(err error) bool {
 	return e.Code == "E_READ_ONLY"
 }
 
-// TestAllowedRequest_AllowlistedMethodsReachInnerHandler is one half of the safety-boundary
-// contract: every method the allowlist admits must actually be served, not silently swallowed by
-// the wrapper — a leak in the other direction (allowlisted but never dispatched) would just look
-// like every read is broken, but it is still a correctness bug this test is the one place to catch.
-func TestAllowedRequest_AllowlistedMethodsReachInnerHandler(t *testing.T) {
-	for method := range allowedMethods {
-		t.Run(method, func(t *testing.T) {
-			spy := &spyRequest{}
-			wrapped := allowedRequest(spy.fn)
-
-			result, err := wrapped(context.Background(), method, json.RawMessage(`{}`))
-
-			if err != nil {
-				t.Fatalf("method %q: unexpected error: %v", method, err)
-			}
-			if result != "inner-result" {
-				t.Fatalf("method %q: got result %v, want the inner handler's own result", method, result)
-			}
-			if len(spy.called) != 1 || spy.called[0] != method {
-				t.Fatalf("method %q: inner handler called with %v, want exactly one call with this method", method, spy.called)
-			}
-		})
-	}
-}
-
-// TestAllowedRequest_WriteMethodsAreRefused is the one load-bearing test for what still stays
-// refused after P67e (docs/v1.6/plans/P67e-git-relax-read-only.md D1): every method here needs
-// something this app genuinely does not have (an approval gate for shell execution, or a merge
-// editor) and MUST be refused with E_READ_ONLY, and — the part a weaker test could miss — MUST
-// NEVER reach the inner handler at all. A wrapper that returned E_READ_ONLY on some other code
-// path while still calling next underneath (e.g. to log it, or by accident) would pass a test that
-// only checks the returned error; the spy's own call count is what catches that.
-func TestAllowedRequest_WriteMethodsAreRefused(t *testing.T) {
-	for _, method := range writeMethods {
-		t.Run(method, func(t *testing.T) {
-			spy := &spyRequest{}
-			wrapped := allowedRequest(spy.fn)
-
-			_, err := wrapped(context.Background(), method, json.RawMessage(`{}`))
-
-			if err == nil {
-				t.Fatalf("method %q: got no error, want E_READ_ONLY", method)
-			}
-			if !isReadOnlyErr(err) {
-				t.Fatalf("method %q: got error %v, want an ipcerr.Error with code E_READ_ONLY", method, err)
-			}
-			if len(spy.called) != 0 {
-				t.Fatalf("method %q: inner handler was called (%v) — a write must never reach it", method, spy.called)
-			}
-		})
-	}
-}
-
-// TestAllowedRequest_HostAnsweredMethodsAreRefused covers the methods this stream refuses for a
-// different reason than TestAllowedRequest_WriteMethodsAreRefused's table: the Go router has no
-// case for any of these at all (C11 §3.3) — review.session.save/.load resume the extension's own
-// context.workspaceState and never reach this server even when it exists; review.open and
-// editor.openRangeDiff are answered host-side (§8.2). Refusing them here is defence in depth, not
-// the write boundary itself, but the property under test — never reaching the inner handler — is
-// the same one that matters.
-func TestAllowedRequest_HostAnsweredMethodsAreRefused(t *testing.T) {
-	for _, method := range hostAnsweredMethods {
-		t.Run(method, func(t *testing.T) {
-			spy := &spyRequest{}
-			wrapped := allowedRequest(spy.fn)
-
-			_, err := wrapped(context.Background(), method, json.RawMessage(`{}`))
-
-			if err == nil {
-				t.Fatalf("method %q: got no error, want E_READ_ONLY", method)
-			}
-			if !isReadOnlyErr(err) {
-				t.Fatalf("method %q: got error %v, want an ipcerr.Error with code E_READ_ONLY", method, err)
-			}
-			if len(spy.called) != 0 {
-				t.Fatalf("method %q: inner handler was called (%v) — a host-answered method must never reach it", method, spy.called)
-			}
-		})
-	}
-}
-
-// TestAllowedRequest_UnknownMethodIsRefused pins the allowlist-not-denylist property: a method
-// this file has simply never heard of (e.g. one a future contract version adds) must be refused by
-// default, not admitted because it isn't on any explicit deny list.
-func TestAllowedRequest_UnknownMethodIsRefused(t *testing.T) {
-	spy := &spyRequest{}
-	wrapped := allowedRequest(spy.fn)
-
-	_, err := wrapped(context.Background(), "some.futureMethod", json.RawMessage(`{}`))
-
-	if !isReadOnlyErr(err) {
-		t.Fatalf("got error %v, want an ipcerr.Error with code E_READ_ONLY", err)
-	}
-	if len(spy.called) != 0 {
-		t.Fatalf("inner handler was called (%v) for an unknown method", spy.called)
-	}
-}
-
-// --- allowedStream: the same three properties, over the one streaming method. ---
-
-type spyStream struct {
-	called []string
-}
-
-func (s *spyStream) fn(_ context.Context, method string, _ json.RawMessage, _ func(payload any, blob []byte) error) error {
-	s.called = append(s.called, method)
-	return nil
-}
-
-func TestAllowedStream_GraphStreamReachesInnerHandler(t *testing.T) {
-	spy := &spyStream{}
-	wrapped := allowedStream(spy.fn)
-
-	err := wrapped(context.Background(), "graph.stream", json.RawMessage(`{}`), func(any, []byte) error { return nil })
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(spy.called) != 1 || spy.called[0] != "graph.stream" {
-		t.Fatalf("inner handler called with %v, want exactly one call with graph.stream", spy.called)
-	}
-}
-
-func TestAllowedStream_UnknownStreamMethodIsRefused(t *testing.T) {
-	spy := &spyStream{}
-	wrapped := allowedStream(spy.fn)
-
-	err := wrapped(context.Background(), "review.stream", json.RawMessage(`{}`), func(any, []byte) error { return nil })
-
-	if !isReadOnlyErr(err) {
-		t.Fatalf("got error %v, want an ipcerr.Error with code E_READ_ONLY", err)
-	}
-	if len(spy.called) != 0 {
-		t.Fatalf("inner handler was called (%v) for a non-allowlisted stream method", spy.called)
-	}
-}
-
-// --- guardRepoSettingsSet: the field-level restriction on top of repoSettings.set's own
-// method-level allowlisting (finding C12-1). ---
+// --- guardRepoSettingsSet: the field-level restriction on repoSettings.set (finding C12-1). ---
 
 // TestGuardRepoSettingsSet_AllowedFieldsReachInnerHandler pins the non-regression half: a patch
 // touching only fields that were always meant to work over this stream (graph paging/scope, and —
@@ -215,7 +58,7 @@ func TestGuardRepoSettingsSet_AllowedFieldsReachInnerHandler(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			spy := &spyRequest{}
-			wrapped := guardRepoSettingsSet(allowedRequest(spy.fn))
+			wrapped := guardRepoSettingsSet(spy.fn)
 
 			result, err := wrapped(context.Background(), "repoSettings.set", json.RawMessage(tc.params))
 
@@ -252,7 +95,7 @@ func TestGuardRepoSettingsSet_RestrictedFieldsAreRefused(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			spy := &spyRequest{}
-			wrapped := guardRepoSettingsSet(allowedRequest(spy.fn))
+			wrapped := guardRepoSettingsSet(spy.fn)
 
 			_, err := wrapped(context.Background(), "repoSettings.set", json.RawMessage(tc.params))
 
@@ -266,5 +109,98 @@ func TestGuardRepoSettingsSet_RestrictedFieldsAreRefused(t *testing.T) {
 				t.Fatalf("inner handler was called (%v) — a restricted field must never reach it", spy.called)
 			}
 		})
+	}
+}
+
+// TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField is C13-11's second forcing
+// function: repoSettingsSetTouchesRestrictedField (gitstream.go) hard-codes which
+// RepoSettingsPatchWire leaves are restricted, with nothing checking that list against the type's
+// own actual field set — exactly the gap that let the original C12-1 bug happen (a new patch field
+// silently inheriting "allowed" until someone thought to add it to the restricted list by hand).
+// This sets exactly one field at a time (via reflection over the real struct, not a hand-maintained
+// mirror of its field names) to a real, non-nil value, marshals a genuine RepoSettingsSetParams,
+// and asserts repoSettingsSetTouchesRestrictedField's answer for it against an explicit expected
+// map — so a field added, renamed or removed on RepoSettingsPatchWire with no matching update here
+// (and, in the restricted direction, in repoSettingsSetTouchesRestrictedField itself) fails loudly.
+func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.T) {
+	// EVERY RepoSettingsPatchWire field must have an entry here — true (restricted) or false
+	// (allowed) — checked by PRESENCE (`knownFields[name]`'s second, ok, return), never by the
+	// zero-value default a plain `map[string]bool` would silently give an absent key. That
+	// distinction is the entire point: a `restricted[name]` map with only the 4 restricted names
+	// listed would let a brand-new field pass this test by pure coincidence whenever
+	// repoSettingsSetTouchesRestrictedField ALSO (correctly, by omission) treats it as unrestricted
+	// — both sides silently agreeing is exactly the undetected-gap failure mode C12-1 was, and
+	// exactly what a first draft of this test (using a plain bool map, no `seen`/`ok` check) still
+	// let through uncaught in testing.
+	//
+	// Mirrors gitstream.go's own repoSettingsSetTouchesRestrictedField doc comment: the two `true`
+	// entries are write-only surface a compromised graph mount could otherwise stage (a prepare
+	// script/base path; gitrpc refuses the script on every connection since P172, this guard is
+	// defence in depth). PullStrategy/CheckoutAutoStash flipped to `false` in P67e (docs/v1.6/plans/
+	// P67e-git-relax-read-only.md D4) — they configure operations this stream now admits, not
+	// write-only surface. Every `false` entry is a per-repo graph/UI preference.
+	knownFields := map[string]bool{
+		"WorktreePrepareScript": true,
+		"WorktreeBasePath":      true,
+		"PullStrategy":          false,
+		"CheckoutAutoStash":     false,
+		"GraphPageSize":         false,
+		"GraphScope":            false,
+		"StashShowInGraph":      false,
+		"StashIncludeUntracked": false,
+		"ReviewBaseCandidates":  false,
+		"GithubEnabled":         false,
+	}
+
+	patchType := reflect.TypeOf(gitrpc.RepoSettingsPatchWire{})
+	if patchType.NumField() == 0 {
+		t.Fatal("RepoSettingsPatchWire has zero fields -- reflection is almost certainly looking at the wrong type")
+	}
+
+	seen := map[string]bool{}
+	for i := 0; i < patchType.NumField(); i++ {
+		field := patchType.Field(i)
+		seen[field.Name] = true
+
+		want, ok := knownFields[field.Name]
+		if !ok {
+			t.Errorf(
+				"field %s: no entry in this test's own knownFields map -- classify it explicitly here (true/false) AND, if restricted, add it to repoSettingsSetTouchesRestrictedField itself; do not let it default to \"allowed\"",
+				field.Name,
+			)
+			continue
+		}
+
+		if field.Tag.Get("json") == "" {
+			t.Errorf("field %s: no json tag -- every RepoSettingsPatchWire leaf must round-trip over the wire", field.Name)
+			continue
+		}
+
+		var patch gitrpc.RepoSettingsPatchWire
+		fv := reflect.ValueOf(&patch).Elem().Field(i)
+		if fv.Kind() != reflect.Pointer {
+			t.Errorf("field %s: kind %s, want a pointer -- every RepoSettingsPatchWire leaf is optional", field.Name, fv.Kind())
+			continue
+		}
+		fv.Set(reflect.New(fv.Type().Elem())) // a real, non-nil, zero-valued leaf.
+
+		raw, err := json.Marshal(gitrpc.RepoSettingsSetParams{RepoID: "r1", Patch: patch})
+		if err != nil {
+			t.Fatalf("field %s: marshal: %v", field.Name, err)
+		}
+
+		got := repoSettingsSetTouchesRestrictedField(raw)
+		if got != want {
+			t.Errorf(
+				"field %s: repoSettingsSetTouchesRestrictedField = %v, want %v (per this test's own knownFields classification)",
+				field.Name, got, want,
+			)
+		}
+	}
+
+	for name := range knownFields {
+		if !seen[name] {
+			t.Errorf("field %q in this test's own knownFields map no longer exists on RepoSettingsPatchWire -- update the map", name)
+		}
 	}
 }

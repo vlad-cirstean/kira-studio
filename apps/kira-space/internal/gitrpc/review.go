@@ -43,7 +43,7 @@ func (r *Router) handleReviewResolveBase(ctx context.Context, c *gitsession.Conn
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewResolveBaseParams) (gitreview.BaseResolution, error) {
-			result, err := entry.ResolveReviewBase(ctx, p.Branch, p.Base, p.BaseCandidates)
+			result, err := entry.ResolveReviewBase(ctx, p.Branch, p.Base)
 			if err != nil {
 				return gitreview.BaseResolution{}, mapGitError(err)
 			}

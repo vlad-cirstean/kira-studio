@@ -76,25 +76,25 @@ func TestExcludeStashFor_NilEntry(t *testing.T) {
 // unchanged); showInGraph:false -> ExcludeStash:true (the decidable "off" half, F13).
 func TestWalkSpecFrom_ExcludeStash_TracksTheStoredSetting(t *testing.T) {
 	on := openGraphSpecEntry(t, true)
-	spec, _ := walkSpecFrom(on, "", nil)
+	spec, _ := walkSpecFrom(on)
 	if spec.ExcludeStash {
 		t.Fatalf("ExcludeStash = true with showInGraph:true, want false")
 	}
 
 	off := openGraphSpecEntry(t, false)
-	spec, _ = walkSpecFrom(off, "", nil)
+	spec, _ = walkSpecFrom(off)
 	if !spec.ExcludeStash {
 		t.Fatalf("ExcludeStash = false with showInGraph:false, want true")
 	}
 }
 
 // TestWalkSpecFrom_ExcludeStash_NeverAffectsScope proves the "off" half's own boundary: it changes
-// nothing about scope resolution (D6's own default), only the new field.
+// nothing about scope resolution (the stored default), only the new field.
 func TestWalkSpecFrom_ExcludeStash_NeverAffectsScope(t *testing.T) {
 	off := openGraphSpecEntry(t, false)
-	spec, _ := walkSpecFrom(off, "head", nil)
-	if spec.Scope != "head" {
-		t.Fatalf("Scope = %q, want %q (unaffected by ExcludeStash)", spec.Scope, "head")
+	spec, _ := walkSpecFrom(off)
+	if spec.Scope != "all" {
+		t.Fatalf("Scope = %q, want %q (unaffected by ExcludeStash)", spec.Scope, "all")
 	}
 	if !spec.ExcludeStash {
 		t.Fatal("ExcludeStash = false, want true")

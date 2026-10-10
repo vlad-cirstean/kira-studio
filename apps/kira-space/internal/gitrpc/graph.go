@@ -16,16 +16,11 @@ import (
 // wire chunk carries.
 const ChunkRows = 500
 
-// walkSpecFrom resolves D6's optional scope/pageSize into a porcelain.WalkSpec and a concrete
-// page size. G18 D6 upgrades what "the server's own default" means: entry's own stored
-// kiraSpace.graph.* settings (RepoEntry.RepoSettings, itself falling back to the schema's own
-// "all"/5000 defaults when entry is nil or storage has nothing stored) — reached by every raw
-// socket client that omits scope/pageSize, with zero change to either param's own wire shape.
-func walkSpecFrom(entry *gitsession.RepoEntry, scope string, pageSize *int) (porcelain.WalkSpec, int) {
-	if scope == "" {
-		scope = repoGraphScope(entry)
-	}
-	return porcelain.WalkSpec{Scope: scope, ExcludeStash: excludeStashFor(entry)}, pageSizeFrom(entry, pageSize)
+// walkSpecFrom resolves entry's own stored kiraSpace.graph.* settings (G18 D6;
+// RepoEntry.RepoSettings, itself falling back to the schema's own "all"/5000 defaults when entry
+// is nil or storage has nothing stored) into a porcelain.WalkSpec and a concrete page size.
+func walkSpecFrom(entry *gitsession.RepoEntry) (porcelain.WalkSpec, int) {
+	return porcelain.WalkSpec{Scope: repoGraphScope(entry), ExcludeStash: excludeStashFor(entry)}, pageSizeFrom(entry)
 }
 
 // excludeStashFor is G28 D15's own settings-side wiring for the decidable "off" half of
@@ -39,10 +34,7 @@ func excludeStashFor(entry *gitsession.RepoEntry) bool {
 	return !entry.RepoSettings().StashShowInGraph
 }
 
-func pageSizeFrom(entry *gitsession.RepoEntry, pageSize *int) int {
-	if pageSize != nil && *pageSize > 0 {
-		return *pageSize
-	}
+func pageSizeFrom(entry *gitsession.RepoEntry) int {
 	if entry != nil {
 		if stored := entry.RepoSettings().GraphPageSize; stored > 0 {
 			return stored
@@ -146,7 +138,7 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 	}
 
 	// D10: `range` present -> pages the review walk, never the graph's.
-	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, p.Range, p.Scope, p.PageSize)
+	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, p.Range)
 	if err != nil {
 		return nil, err
 	}
@@ -188,14 +180,14 @@ func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, param
 // resolveWalkRequest is graph.loadMore/graph.stream's shared range-vs-scope resolution: with a
 // `range`, it validates the two ref fields (D8) and peeks the per-repo range-count slot (D9, a
 // non-blocking best-effort optimisation — a miss passes nil and logsession runs its own count);
-// without one, it resolves D6's scope/pageSize as before. entry is looked up once, here, and
+// without one, it resolves the stored scope/pageSize. entry is looked up once, here, and
 // threaded into both branches — the range branch already needed it for the range-count peek; the
 // non-ranged branch now needs it too, for G18 D6's own per-repo scope/pageSize defaults.
-func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParams, scope string, pageSize *int) (porcelain.WalkSpec, int, *int, error) {
+func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParams) (porcelain.WalkSpec, int, *int, error) {
 	entry, _ := c.Entry(gitpath.CleanNFC(repoID)) // G27 D6; nil, ok=false when unheld — c.Walk below rejects that case itself.
 
 	if rng == nil {
-		spec, size := walkSpecFrom(entry, scope, pageSize)
+		spec, size := walkSpecFrom(entry)
 		return spec, size, nil, nil
 	}
 	spec, err := rangedWalkSpecFrom(rng)
@@ -206,7 +198,7 @@ func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParam
 	if entry != nil {
 		precomputedTotal = entry.TakeRangeCount(rng.Base, rng.Branch)
 	}
-	return spec, pageSizeFrom(entry, pageSize), precomputedTotal, nil
+	return spec, pageSizeFrom(entry), precomputedTotal, nil
 }
 
 // handleGraphReportFailure records a client-detected graph failure. The message is composed here,
@@ -256,7 +248,7 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	// spelling while repo.changed events carry the NFC one — a client keying state on repoId used
 	// to see two spellings for one repository.
 
-	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, p.Range, p.Scope, p.PageSize)
+	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, p.Range)
 	if err != nil {
 		return err
 	}

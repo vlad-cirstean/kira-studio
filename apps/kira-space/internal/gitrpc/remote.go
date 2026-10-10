@@ -6,7 +6,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
@@ -36,23 +35,12 @@ func (r *Router) handleRemotePullPreflight(ctx context.Context, c *gitsession.Co
 			if err := validRefArg("branch", p.Branch); err != nil {
 				return "", err
 			}
-			if p.StrategySetting != "" && !model.ValidPullStrategy(p.StrategySetting) {
-				return "", ipcerr.BadRequest("gitrpc: remote.pullPreflight: invalid strategySetting " + p.StrategySetting)
-			}
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p RemotePullPreflightParams) (gitpreflight.PullPreflight, error) {
-			// G18 D6/F14: StrategySetting's own wire shape is unchanged (still optional) — what
-			// upgrades is what "empty" resolves to. A raw socket client omitting it used to fall
-			// straight to gitpreflight.ResolvePullStrategy's own "auto" ladder; it now gets this
-			// repo's own stored kiraSpace.pull.strategy first (itself "auto" until a user changes
-			// it in the dialog), which only changes behaviour for a repo whose setting has
-			// actually been edited.
-			strategySetting := p.StrategySetting
-			if strategySetting == "" {
-				strategySetting = entry.RepoSettings().PullStrategy
-			}
-			result, err := entry.PullPreflight(ctx, p.Branch, strategySetting)
+			// The strategy is this repo's own stored kiraSpace.pull.strategy (G18 D6/F14), "auto"
+			// until a user changes it in the dialog.
+			result, err := entry.PullPreflight(ctx, p.Branch, entry.RepoSettings().PullStrategy)
 			if err != nil {
 				return gitpreflight.PullPreflight{}, mapGitError(err)
 			}
