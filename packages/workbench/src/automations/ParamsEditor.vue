@@ -3,14 +3,14 @@ import type { ScriptKind, ScriptParam, ScriptParamType } from '@shared/domain/sc
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
+import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { useId } from 'vue';
 
 const params = defineModel<ScriptParam[]>({ required: true });
-defineProps<{ kind: ScriptKind }>();
+defineProps<{ kind: ScriptKind; errors?: readonly (readonly string[])[] }>();
 const idBase = useId();
 
 function add(): void {
@@ -117,6 +117,7 @@ function toggleDefault(i: number, option: string, on: boolean): void {
           <CodiconIcon name="trash" :size="12" />
         </Button>
       </div>
+      <FieldError v-for="m in errors?.[i] ?? []" :key="m" :data-testid="`param-error-${i}`">{{ m }}</FieldError>
       <Input
         v-if="p.type === 'text'"
         :model-value="p.default[0] ?? ''"

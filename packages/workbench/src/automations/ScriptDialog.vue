@@ -11,6 +11,7 @@ import type {
 } from '@shared/domain/scripts';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -26,21 +27,23 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { Switch } from '@theme/components/ui/switch';
-import { Textarea } from '@theme/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VarText from '@theme/components/VarText.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import type { TextPart } from '@theme/varText';
 import { queryClient } from '@workbench/state/queryClient';
-import { computed, ref, toRaw, useTemplateRef } from 'vue';
+import { computed, reactive, ref, toRaw, useTemplateRef, watch } from 'vue';
 import type { ScriptsSeam } from './module';
 import ParamsEditor from './ParamsEditor.vue';
+import ScriptBodyField from './ScriptBodyField.vue';
 import ScheduleFields from './schedule/ScheduleFields.vue';
 import { newSchedule } from './schedule/scheduleText';
+import { ALL_SHOWN, type EditorTab, editorErrors, tabErrorCount } from './scriptErrors';
 import McpToolsField from './smart/McpToolsField.vue';
 import SmartBadge from './smart/SmartBadge.vue';
 import SmartSettingsFields from './smart/SmartSettingsFields.vue';
-import { defaultSmart, varsUsed } from './smart/smartSettings';
+import { defaultSmart } from './smart/smartSettings';
 import ToolsField from './smart/ToolsField.vue';
 
 // Adds one script (`script === null`) or edits one. `scripts` is a prop, not
@@ -58,6 +61,8 @@ const props = defineProps<{
   ade?: boolean;
   /** A new script starts recurring (`New recurring script`). */
   schedule?: boolean;
+  /** Tab to open on; defaults to Script. */
+  initialTab?: EditorTab;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -85,15 +90,6 @@ const scheduleOn = computed({
     if (!on) schedule.value = null;
     else schedule.value ??= newSchedule();
   },
-});
-const usedVars = computed(() => (isSmart ? varsUsed(command.value) : []));
-const usesParts = computed<TextPart[]>(() => {
-  const parts: TextPart[] = ['Uses: '];
-  usedVars.value.forEach((v, i) => {
-    if (i > 0) parts.push(', ');
-    parts.push({ name: v, value: v });
-  });
-  return parts;
 });
 const command = ref(props.script?.command ?? '');
 const dirMode = ref<ScriptDirMode>(props.script?.dirMode ?? 'kira');
@@ -124,14 +120,34 @@ const color = ref<PaletteColor>((props.script?.color as PaletteColor | undefined
 const error = ref<string | null>(null);
 const saving = ref(false);
 
-// The dialog's own affordance: the Go check stays the authority on every other rule.
-const canSave = computed(
-  () =>
-    name.value.trim() !== '' &&
-    command.value.trim() !== '' &&
-    (dirMode.value !== 'fixed' || workingDir.value.trim() !== '') &&
-    (schedule.value === null || (schedule.value.cron.trim() !== '' && scheduleOk.value)),
-);
+const TABS: readonly { id: EditorTab; label: string }[] = [
+  { id: 'script', label: 'Script' },
+  { id: 'params', label: 'Parameters' },
+  { id: 'schedule', label: 'Schedule' },
+];
+const tab = ref<EditorTab>(props.initialTab ?? 'script');
+
+// Empty-field errors show once the field was edited; Save stays disabled until none remain.
+const shown = reactive({ name: false, body: false, folder: false });
+watch(name, () => (shown.name = true));
+watch(command, () => (shown.body = true));
+watch(dirMode, () => (shown.folder = true));
+const draft = computed(() => ({
+  kind,
+  name: name.value,
+  body: command.value,
+  dirMode: dirMode.value,
+  workingDir: workingDir.value,
+  maxBudgetUsd: smart.value.maxBudgetUsd,
+  params: params.value,
+  schedule: schedule.value,
+  scheduleOk: scheduleOk.value,
+}));
+const errors = computed(() => editorErrors(draft.value, shown));
+const canSave = computed(() => {
+  const all = editorErrors(draft.value, ALL_SHOWN);
+  return TABS.every((t) => tabErrorCount(all, t.id) === 0);
+});
 
 async function chooseWorkingDir(): Promise<void> {
   error.value = null;
@@ -206,140 +222,157 @@ function onOpenAutoFocus(e: Event): void {
         </DialogClose>
       </DialogHeader>
 
-      <div class="flex flex-col gap-3 overflow-auto p-3">
-        <Field>
-          <FieldLabel for="script-name">Name</FieldLabel>
-          <Input
-            id="script-name"
-            ref="nameEl"
-            v-model="name"
-            placeholder="Build"
-            data-testid="script-dialog-name"
-          />
-        </Field>
-
-        <Field>
-          <FieldLabel for="script-command">{{ isSmart ? 'Prompt' : 'Command' }}</FieldLabel>
-          <Textarea
-            id="script-command"
-            v-model="command"
-            rows="8"
-            spellcheck="false"
-            :placeholder="isSmart ? 'Summarize the open TODOs in this folder' : 'npm run build'"
-            class="field-sizing-fixed min-h-40 resize-y font-data leading-normal"
-            data-testid="script-dialog-command"
-          />
-          <FieldDescription v-if="isSmart" data-testid="script-dialog-uses">
-            <template v-if="usedVars.length > 0"><VarText :parts="usesParts" /></template>
-            <template v-else>Use {name} to insert a parameter. Press Cmd/Ctrl+Enter to save.</template>
-          </FieldDescription>
-          <FieldDescription v-else>
-            Runs in your login shell; lines run in order. Press Cmd/Ctrl+Enter to save.
-          </FieldDescription>
-        </Field>
-
-        <template v-if="isSmart">
-          <SmartSettingsFields v-model="smart" />
-          <ToolsField v-model="smart" />
-          <McpToolsField v-model="smart" />
-        </template>
-        <ParamsEditor v-model="params" :kind="kind" />
-
-        <Field>
-          <FieldLabel>Working directory</FieldLabel>
-          <RadioGroup
-            :model-value="dirMode === 'home' ? '' : dirMode"
-            class="gap-1.5"
-            data-testid="script-dialog-dirmode"
-            @update:model-value="(v) => (dirMode = v === 'fixed' ? 'fixed' : 'kira')"
+      <Tabs v-model="tab" class="flex min-h-0 flex-1 flex-col gap-0">
+        <TabsList class="w-full border-b border-border px-3 pb-1.5" aria-label="Script editor tabs">
+          <TabsTrigger
+            v-for="t in TABS"
+            :key="t.id"
+            :value="t.id"
+            :class="tabChipVariants({ active: tab === t.id })"
+            :data-testid="`script-dialog-tab-${t.id}`"
           >
-            <div class="flex items-center gap-2">
-              <RadioGroupItem id="script-dir-kira" value="kira" data-testid="script-dialog-dir-kira" />
-              <Label for="script-dir-kira">Kira automations folder</Label>
-            </div>
-            <div class="flex items-center gap-2">
-              <RadioGroupItem id="script-dir-fixed" value="fixed" data-testid="script-dialog-dir-fixed" />
-              <Label for="script-dir-fixed">Choose folder…</Label>
-            </div>
-          </RadioGroup>
-          <div v-if="dirMode === 'fixed'" class="flex items-center gap-1.5">
-            <span class="min-w-0 flex-1 truncate font-data" data-testid="script-dialog-workingdir">
-              {{ workingDir || 'No folder chosen' }}
-            </span>
-            <Button variant="dialog" size="kira-lg" data-testid="script-dialog-workingdir-choose" @click="chooseWorkingDir">
-              Choose…
-            </Button>
-          </div>
-          <FieldDescription v-else-if="dirMode === 'home'" data-testid="script-dialog-home-notice">
-            <VarText :parts="homeParts" />
-            <Button
-              variant="dialog"
-              size="kira-lg"
-              class="ml-2"
-              data-testid="script-dialog-use-kira"
-              @click="dirMode = 'kira'"
+            {{ t.label }}
+            <Badge
+              v-if="tabErrorCount(errors, t.id) > 0"
+              variant="err"
+              :data-testid="`script-dialog-tab-${t.id}-errors`"
+              >{{ tabErrorCount(errors, t.id) }}</Badge
             >
-              Use automations folder
-            </Button>
-          </FieldDescription>
-          <FieldDescription v-else data-testid="script-dialog-dir-preview">
-            <VarText :parts="folderParts" />
-          </FieldDescription>
-          <FieldError v-if="blocker" data-testid="script-dialog-dir-blocker">{{ blocker }}</FieldError>
-        </Field>
+          </TabsTrigger>
+        </TabsList>
 
-        <Field v-if="ade" orientation="horizontal">
-          <Switch id="script-use-ade-dir" v-model="useAdeDir" data-testid="script-use-ade-dir" />
-          <Label for="script-use-ade-dir">Run in the task's worktree when started from ADE</Label>
-        </Field>
+        <div class="flex min-h-80 flex-1 flex-col gap-3 overflow-auto p-3">
+          <TabsContent value="script" force-mount class="flex flex-col gap-3 data-[state=inactive]:hidden">
+            <Field>
+              <FieldLabel for="script-name">Name</FieldLabel>
+              <Input
+                id="script-name"
+                ref="nameEl"
+                v-model="name"
+                placeholder="Build"
+                :aria-invalid="!!errors.name"
+                data-testid="script-dialog-name"
+              />
+              <FieldError v-if="errors.name" data-testid="script-dialog-name-error">{{ errors.name }}</FieldError>
+            </Field>
 
-        <Field orientation="horizontal">
-          <Switch id="script-schedule" v-model="scheduleOn" data-testid="script-schedule" />
-          <Label for="script-schedule">Run on a schedule</Label>
-        </Field>
-        <ScheduleFields
-          v-if="schedule"
-          v-model="schedule"
-          @valid="(ok) => (scheduleOk = ok)"
-          :script-id="script?.id ?? null"
-          :kind="kind"
-          :params="params"
-        />
+            <div class="flex items-end gap-3">
+              <Field class="flex-1 min-w-0">
+                <FieldLabel for="script-collection">Collection</FieldLabel>
+                <NativeSelect
+                  id="script-collection"
+                  v-model="collection"
+                  variant="bordered"
+                  size="kira-lg"
+                  data-testid="script-dialog-collection"
+                >
+                  <option value="">No collection</option>
+                  <option v-for="c in scripts.collections()" :key="c.id" :value="c.id">{{ c.name }}</option>
+                </NativeSelect>
+              </Field>
+              <fieldset
+                class="color-picker m-0 flex h-control flex-wrap items-center gap-1 border-0 p-0"
+                aria-label="Colour"
+              >
+                <Tooltip v-for="swatch in colors" :key="swatch">
+                  <TooltipTrigger as-child>
+                    <SwatchRadio
+                      name="script-color"
+                      :value="swatch"
+                      :color="swatch"
+                      :checked="color === swatch"
+                      @change="color = swatch"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>{{ swatch === 'none' ? 'No colour' : swatch }}</TooltipContent>
+                </Tooltip>
+              </fieldset>
+            </div>
 
-        <div class="flex items-end gap-3">
-          <Field class="flex-1 min-w-0">
-            <FieldLabel for="script-collection">Collection</FieldLabel>
-            <NativeSelect
-              id="script-collection"
-              v-model="collection"
-              variant="bordered"
-              size="kira-lg"
-              data-testid="script-dialog-collection"
-            >
-              <option value="">No collection</option>
-              <option v-for="c in scripts.collections()" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </NativeSelect>
-          </Field>
-          <fieldset
-            class="color-picker m-0 flex h-control flex-wrap items-center gap-1 border-0 p-0"
-            aria-label="Colour"
-          >
-            <Tooltip v-for="swatch in colors" :key="swatch">
-              <TooltipTrigger as-child>
-                <SwatchRadio
-                  name="script-color"
-                  :value="swatch"
-                  :color="swatch"
-                  :checked="color === swatch"
-                  @change="color = swatch"
-                />
-              </TooltipTrigger>
-              <TooltipContent>{{ swatch === 'none' ? 'No colour' : swatch }}</TooltipContent>
-            </Tooltip>
-          </fieldset>
+            <ScriptBodyField v-model="command" :kind="kind" :params="params" :ade="!!ade" :error="errors.body" />
+
+            <template v-if="isSmart">
+              <SmartSettingsFields v-model="smart" />
+              <FieldError v-if="errors.budget" data-testid="script-dialog-budget-error">{{ errors.budget }}</FieldError>
+              <ToolsField v-model="smart" />
+              <McpToolsField v-model="smart" />
+            </template>
+
+            <Field>
+              <FieldLabel>Working directory</FieldLabel>
+              <RadioGroup
+                :model-value="dirMode === 'home' ? '' : dirMode"
+                class="gap-1.5"
+                data-testid="script-dialog-dirmode"
+                @update:model-value="(v) => (dirMode = v === 'fixed' ? 'fixed' : 'kira')"
+              >
+                <div class="flex items-center gap-2">
+                  <RadioGroupItem id="script-dir-kira" value="kira" data-testid="script-dialog-dir-kira" />
+                  <Label for="script-dir-kira">Kira automations folder</Label>
+                </div>
+                <div class="flex items-center gap-2">
+                  <RadioGroupItem id="script-dir-fixed" value="fixed" data-testid="script-dialog-dir-fixed" />
+                  <Label for="script-dir-fixed">Choose folder…</Label>
+                </div>
+              </RadioGroup>
+              <div v-if="dirMode === 'fixed'" class="flex items-center gap-1.5">
+                <span class="min-w-0 flex-1 truncate font-data" data-testid="script-dialog-workingdir">
+                  {{ workingDir || 'No folder chosen' }}
+                </span>
+                <Button variant="dialog" size="kira-lg" data-testid="script-dialog-workingdir-choose" @click="chooseWorkingDir">
+                  Choose…
+                </Button>
+              </div>
+              <FieldDescription v-else-if="dirMode === 'home'" data-testid="script-dialog-home-notice">
+                <VarText :parts="homeParts" />
+                <Button
+                  variant="dialog"
+                  size="kira-lg"
+                  class="ml-2"
+                  data-testid="script-dialog-use-kira"
+                  @click="dirMode = 'kira'"
+                >
+                  Use automations folder
+                </Button>
+              </FieldDescription>
+              <FieldDescription v-else data-testid="script-dialog-dir-preview">
+                <VarText :parts="folderParts" />
+              </FieldDescription>
+              <FieldError v-if="blocker" data-testid="script-dialog-dir-blocker">{{ blocker }}</FieldError>
+              <FieldError v-if="errors.folder" data-testid="script-dialog-folder-error">{{ errors.folder }}</FieldError>
+            </Field>
+
+
+            <Field v-if="ade" orientation="horizontal">
+              <Switch id="script-use-ade-dir" v-model="useAdeDir" data-testid="script-use-ade-dir" />
+              <Label for="script-use-ade-dir">Run in the task's worktree when started from ADE</Label>
+            </Field>
+
+          </TabsContent>
+
+          <TabsContent value="params" force-mount class="flex flex-col gap-3 data-[state=inactive]:hidden">
+            <ParamsEditor v-model="params" :kind="kind" :errors="errors.params" />
+          </TabsContent>
+
+          <TabsContent value="schedule" force-mount class="flex flex-col gap-3 data-[state=inactive]:hidden">
+            <Field orientation="horizontal">
+              <Switch id="script-schedule" v-model="scheduleOn" data-testid="script-schedule" />
+              <Label for="script-schedule">Run on a schedule</Label>
+            </Field>
+            <ScheduleFields
+              v-if="schedule"
+              v-model="schedule"
+              @valid="(ok) => (scheduleOk = ok)"
+              :script-id="script?.id ?? null"
+              :kind="kind"
+              :params="params"
+            />
+            <FieldError v-if="errors.cron" data-testid="script-dialog-cron-error">{{ errors.cron }}</FieldError>
+          </TabsContent>
+
+          <FieldError v-if="error" data-testid="script-dialog-error">{{ error }}</FieldError>
         </div>
-        <FieldError v-if="error" data-testid="script-dialog-error">{{ error }}</FieldError>
-      </div>
+      </Tabs>
 
       <DialogFooter class="justify-end">
         <DialogClose as-child>
