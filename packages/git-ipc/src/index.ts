@@ -3,8 +3,6 @@ export {
   MalformedBlobFrameError,
   parseBlobFrameBody,
 } from './blobFrame.ts';
-export type { BufferEncoding, EncodedMessage } from './codec.ts';
-export { decode, dedupeTransferList, encode, VSCODE_WEBVIEW_BUFFER_ENCODING } from './codec.ts';
 export type {
   AutoFetchStatus,
   BaseCandidate,
@@ -110,13 +108,9 @@ export type {
 } from './contract.ts';
 export type {
   MessageChannelLike,
-  RequestHandler,
-  RpcServer,
-  ServerHandlers,
-  StreamHandler,
   WireError,
 } from './rpc.ts';
-export { createRpcClient, createRpcServer, RpcError } from './rpc.ts';
+export { createRpcClient, RpcError } from './rpc.ts';
 export type { StreamChannel, StreamSocketLike } from './streamChannel.ts';
 export { createStreamChannel, StreamFrameDeliveryError } from './streamChannel.ts';
 export type { Transport, TransportErrorCode } from './transport.ts';

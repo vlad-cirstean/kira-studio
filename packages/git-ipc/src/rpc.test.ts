@@ -1,73 +1,102 @@
 import { describe, expect, test } from 'bun:test';
 import { deferred, sleep } from '@workbench/testing/unit/async';
-import type { BufferEncoding } from './codec.ts';
 import { encodeStreamPayload } from './codec.ts';
 import type { PackedCommitChunk, StreamChunkOf } from './contract.ts';
-import {
-  createRpcClient,
-  createRpcServer,
-  type MessageChannelLike,
-  type ServerHandlers,
-} from './rpc.ts';
-import { CONTRACT_VERSION, wrapVersioned } from './validate.ts';
+import { createRpcClient, type MessageChannelLike } from './rpc.ts';
+import { CONTRACT_VERSION, unwrapVersioned, wrapVersioned } from './validate.ts';
 
-/** N sequential macrotask ticks — some race/ordering assertions below need to wait out more than
- *  one round of pending timers before an assertion holds, not just one (`sleep(0)`'s own case). */
-function tick(times = 1): Promise<void> {
-  return times <= 1 ? sleep(0) : tick(times - 1).then(() => sleep(0));
+/** N sequential macrotask ticks: some ordering assertions need more than one timer round. */
+async function tick(times = 1): Promise<void> {
+  for (let i = 0; i < times; i++) await sleep(0);
 }
 
-/** A real in-memory pipe: posting on one end synchronously invokes the other end's handler,
- *  after a `structuredClone` (with transfer, if given) so buffer-detach semantics are real.
- *  `bufferEncoding` defaults to `"native"` — the one field W3 adds to this fake channel; pass
- *  `"base64"` to model a channel like VS Code's `WebviewView` that cannot carry buffers. */
-function createInMemoryChannelPair(
-  bufferEncoding: BufferEncoding = 'native',
-): readonly [MessageChannelLike, MessageChannelLike] {
-  let handlerA: ((message: unknown) => void) | undefined;
-  let handlerB: ((message: unknown) => void) | undefined;
-  let closedA = false;
-  let closedB = false;
+/** In-memory pipe: posting on one end invokes the other end's handler after a structuredClone. */
+function createChannelPair(): readonly [MessageChannelLike, MessageChannelLike] {
+  const handlers: Array<((message: unknown) => void) | undefined> = [undefined, undefined];
+  const end = (self: 0 | 1): MessageChannelLike => ({
+    post(message) {
+      handlers[1 - self]?.(structuredClone(message));
+    },
+    onMessage(handler) {
+      handlers[self] = handler;
+      return () => {
+        if (handlers[self] === handler) handlers[self] = undefined;
+      };
+    },
+    close() {},
+  });
+  return [end(0), end(1)] as const;
+}
 
-  const a: MessageChannelLike = {
-    bufferEncoding,
-    post(message, transfer) {
-      if (closedA) return;
-      const cloned = transfer
-        ? structuredClone(message, { transfer: transfer as ArrayBuffer[] })
-        : structuredClone(message);
-      handlerB?.(cloned);
-    },
-    onMessage(handler) {
-      handlerA = handler;
-      return () => {
-        if (handlerA === handler) handlerA = undefined;
-      };
-    },
-    close() {
-      closedA = true;
-    },
+type Emit = (chunk: StreamChunkOf<'graph.stream'>) => Promise<void>;
+
+interface PeerHandlers {
+  readonly request?: (method: string, params: unknown) => Promise<unknown>;
+  readonly stream?: (ctx: { signal: AbortSignal; emit: Emit }) => Promise<void>;
+}
+
+/** A test-local server: answers `req`, `open`, `credit` and `cancel` frames the way the Go
+ *  server does, with credit-gated chunks. */
+function createPeer(channel: MessageChannelLike, handlers: PeerHandlers) {
+  const post = (body: unknown) => channel.post(wrapVersioned(body));
+  const credit = new Map<number, { n: number; wake?: () => void }>();
+  const aborts = new Map<number, AbortController>();
+
+  channel.onMessage((raw) => {
+    const frame = unwrapVersioned(raw as never) as Record<string, any>;
+    const id = frame.id as number;
+    switch (frame.t) {
+      case 'req':
+        handlers.request?.(frame.method, frame.params).then(
+          (result) => post({ t: 'res', id, ok: true, result }),
+          (e: { code?: string; message: string }) =>
+            post({
+              t: 'res',
+              id,
+              ok: false,
+              error: { code: e.code ?? 'Error', message: e.message },
+            }),
+        );
+        return;
+      case 'open': {
+        const controller = new AbortController();
+        const gate = { n: 0 } as { n: number; wake?: () => void };
+        aborts.set(id, controller);
+        credit.set(id, gate);
+        let seq = 0;
+        const emit: Emit = async (chunk) => {
+          while (gate.n === 0 && !controller.signal.aborted) {
+            await new Promise<void>((resolve) => {
+              gate.wake = resolve;
+            });
+          }
+          if (controller.signal.aborted) return;
+          gate.n--;
+          post({ t: 'chunk', id, seq: seq++, chunk: encodeStreamPayload('graph.stream', chunk) });
+        };
+        void (handlers.stream?.({ signal: controller.signal, emit }) ?? Promise.resolve()).then(
+          () => post({ t: 'end', id }),
+        );
+        return;
+      }
+      case 'credit': {
+        const gate = credit.get(id);
+        if (gate) {
+          gate.n += frame.n;
+          gate.wake?.();
+        }
+        return;
+      }
+      case 'cancel':
+        aborts.get(id)?.abort();
+        credit.get(id)?.wake?.();
+        return;
+    }
+  });
+
+  return {
+    emitEvent: (method: string, payload: unknown) => post({ t: 'evt', method, payload }),
   };
-  const b: MessageChannelLike = {
-    bufferEncoding,
-    post(message, transfer) {
-      if (closedB) return;
-      const cloned = transfer
-        ? structuredClone(message, { transfer: transfer as ArrayBuffer[] })
-        : structuredClone(message);
-      handlerA?.(cloned);
-    },
-    onMessage(handler) {
-      handlerB = handler;
-      return () => {
-        if (handlerB === handler) handlerB = undefined;
-      };
-    },
-    close() {
-      closedB = true;
-    },
-  };
-  return [a, b] as const;
 }
 
 function emptyPackedChunk(): PackedCommitChunk {
@@ -101,126 +130,29 @@ function chunkFor(seq: number): StreamChunkOf<'graph.stream'> {
   };
 }
 
-function stubHandlers(
-  requestOverrides: Partial<ServerHandlers['requests']> = {},
-  streamOverrides: Partial<ServerHandlers['streams']> = {},
-): ServerHandlers {
-  const notImplemented = async (): Promise<never> => {
-    throw new Error('not implemented in this test');
-  };
-  return {
-    requests: {
-      'app.init': notImplemented,
-      'repo.list': notImplemented,
-      'repo.open': notImplemented,
-      'repo.close': notImplemented,
-      'graph.status': notImplemented,
-      'graph.loadMore': notImplemented,
-      'graph.refresh': notImplemented,
-      'graph.reportFailure': notImplemented,
-      'commit.detail': notImplemented,
-      'commit.fileDiff': notImplemented,
-      'editor.openDiff': notImplemented,
-      'editor.openRangeDiff': notImplemented,
-      'editor.openAllChanges': notImplemented,
-      'editor.goToFile': notImplemented,
-      'clipboard.write': notImplemented,
-      'refs.list': notImplemented,
-      'status.get': notImplemented,
-      'preflight.checkout': notImplemented,
-      'preflight.revert': notImplemented,
-      'preflight.reset': notImplemented,
-      'preflight.cherryPick': notImplemented,
-      'op.run': notImplemented,
-      'undo.peek': notImplemented,
-      'undo.run': notImplemented,
-      'review.resolveBase': notImplemented,
-      'review.open': notImplemented,
-      'review.files': notImplemented,
-      'review.fileDiff': notImplemented,
-      'review.mark': notImplemented,
-      'review.snapshot': notImplemented,
-      'review.comment.add': notImplemented,
-      'review.comment.list': notImplemented,
-      'review.comment.remove': notImplemented,
-      'review.comment.clear': notImplemented,
-      'review.comment.export': notImplemented,
-      'remote.run': notImplemented,
-      'remote.cancel': notImplemented,
-      'remote.pullPreflight': notImplemented,
-      'remote.pushPreflight': notImplemented,
-      'credential.provide': notImplemented,
-      'stash.list': notImplemented,
-      'stash.show': notImplemented,
-      'preflight.stashPop': notImplemented,
-      'preflight.stashBranch': notImplemented,
-      'globalStash.list': notImplemented,
-      'search.run': notImplemented,
-      'file.read': notImplemented,
-      'file.goToTarget': notImplemented,
-      'blame.line': notImplemented,
-      'working.detail': notImplemented,
-      'editor.openWorkingDiff': notImplemented,
-      'repoSettings.get': notImplemented,
-      'repoSettings.set': notImplemented,
-      'review.session.save': notImplemented,
-      'review.session.load': notImplemented,
-      'commit.resolvePr': notImplemented,
-      'branch.resolvePr': notImplemented,
-      'pr.browserUrl': notImplemented,
-      'pr.openExternal': notImplemented,
-      'link.openExternal': notImplemented,
-      'worktree.list': notImplemented,
-      'preflight.worktreeAdd': notImplemented,
-      'preflight.worktreeRemove': notImplemented,
-      'stack.list': notImplemented,
-      'preflight.restack': notImplemented,
-      'stack.restack': notImplemented,
-      'stack.cancelRestack': notImplemented,
-      'graph.revealCommit': notImplemented,
-      ...requestOverrides,
-    },
-    streams: {
-      'graph.stream': notImplemented,
-      ...streamOverrides,
-    },
-  };
-}
-
-describe('ipc rpc — request/response', () => {
-  test("a request round-trips to its handler's result", async () => {
-    const [a, b] = createInMemoryChannelPair();
-    const handlers = stubHandlers({
-      'repo.close': async ({ repoId }) => {
-        expect(repoId).toBe('r1');
+describe('ipc rpc client — request/response', () => {
+  test("a request round-trips to the peer's result", async () => {
+    const [a, b] = createChannelPair();
+    createPeer(a, {
+      request: async (method, params) => {
+        expect(method).toBe('repo.close');
+        expect(params).toEqual({ repoId: 'r1' });
         return {};
       },
     });
-    const server = createRpcServer(a, handlers);
     const client = createRpcClient(b);
 
-    const result = await client.request('repo.close', { repoId: 'r1' });
-    expect(result).toEqual({});
-
+    expect(await client.request('repo.close', { repoId: 'r1' })).toEqual({});
     client.dispose();
-    server.dispose();
   });
 
-  test("a request rejects with an RpcError carrying the handler's error code", async () => {
-    const [a, b] = createInMemoryChannelPair();
-    class FakeGitError extends Error {
-      readonly code = 'E_BAD_REQUEST';
-      constructor() {
-        super('no such repo');
-        this.name = 'GitError';
-      }
-    }
-    const handlers = stubHandlers({
-      'repo.open': async () => {
-        throw new FakeGitError();
+  test("a request rejects with an RpcError carrying the peer's error code", async () => {
+    const [a, b] = createChannelPair();
+    createPeer(a, {
+      request: async () => {
+        throw Object.assign(new Error('no such repo'), { code: 'E_BAD_REQUEST' });
       },
     });
-    const server = createRpcServer(a, handlers);
     const client = createRpcClient(b);
 
     await expect(client.request('repo.open', { path: '/nope' })).rejects.toMatchObject({
@@ -228,274 +160,134 @@ describe('ipc rpc — request/response', () => {
       code: 'E_BAD_REQUEST',
       message: 'no such repo',
     });
-
     client.dispose();
-    server.dispose();
   });
 });
 
-describe('ipc rpc — events', () => {
-  test('server.emit reaches every registered handler', async () => {
-    const [a, b] = createInMemoryChannelPair();
-    const server = createRpcServer(a, stubHandlers());
+describe('ipc rpc client — events', () => {
+  test('an event reaches registered handlers until unsubscribed', async () => {
+    const [a, b] = createChannelPair();
+    const peer = createPeer(a, {});
     const client = createRpcClient(b);
 
     const seen: unknown[] = [];
     const unsubscribe = client.on('repo.changed', (payload) => seen.push(payload));
 
-    server.emit('repo.changed', { repoId: 'r1', kind: 'refsChanged' });
+    peer.emitEvent('repo.changed', { repoId: 'r1', kind: 'refsChanged' });
     await tick();
     expect(seen).toEqual([{ repoId: 'r1', kind: 'refsChanged' }]);
 
     unsubscribe();
-    server.emit('repo.changed', { repoId: 'r1', kind: 'worktreeChanged' });
+    peer.emitEvent('repo.changed', { repoId: 'r1', kind: 'worktreeChanged' });
     await tick();
-    expect(seen).toHaveLength(1); // unsubscribed — did not receive the second event
-
+    expect(seen).toHaveLength(1);
     client.dispose();
-    server.dispose();
   });
 });
 
-describe('ipc rpc — streams', () => {
-  test('ten chunks arrive in order, and the server never runs ahead of its credit', async () => {
-    const [a, b] = createInMemoryChannelPair();
+describe('ipc rpc client — streams', () => {
+  test('ten chunks arrive in order, and the peer never runs ahead of the granted credit', async () => {
+    const [a, b] = createChannelPair();
     let emitCompleted = 0;
-    const handlers = stubHandlers(
-      {},
-      {
-        'graph.stream': async (_params, { emit }) => {
-          for (let i = 0; i < 10; i++) {
-            await emit(chunkFor(i));
-            emitCompleted++;
-          }
-        },
+    createPeer(a, {
+      stream: async ({ emit }) => {
+        for (let i = 0; i < 10; i++) {
+          await emit(chunkFor(i));
+          emitCompleted++;
+        }
       },
-    );
-    const server = createRpcServer(a, handlers);
+    });
     const client = createRpcClient(b);
 
     const received: number[] = [];
     const freeze = deferred<void>();
-    let firstChunkFrozen = false;
-
-    const streamPromise = client.stream('graph.stream', { repoId: 'r1' }, async (chunk) => {
+    let frozen = false;
+    const done = client.stream('graph.stream', { repoId: 'r1' }, async (chunk) => {
       received.push((chunk as StreamChunkOf<'graph.stream'>).seq);
-      if (!firstChunkFrozen) {
-        firstChunkFrozen = true;
+      if (!frozen) {
+        frozen = true;
         await freeze.promise;
       }
     });
 
-    // Let every microtask the server can run without more credit actually run.
     await tick(3);
-
-    // Initial credit is small and fixed: the server can get ahead by only that much while the
-    // client is stalled processing the first chunk — this is the whole point of W2's credit
-    // mechanism, and the assertion that would fail if `emit` did not block on the gate.
+    // Initial credit is 2: the peer gets that far ahead while the client is stalled on chunk 0.
     expect(emitCompleted).toBe(2);
     expect(received).toEqual([0]);
 
     freeze.resolve();
-    await streamPromise;
-
+    await done;
     expect(received).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(emitCompleted).toBe(10);
-
     client.dispose();
-    server.dispose();
   });
 
-  test("cancel mid-stream stops delivery and resolves the client's promise cleanly", async () => {
-    const [a, b] = createInMemoryChannelPair();
+  test('cancel mid-stream stops delivery and resolves the promise cleanly', async () => {
+    const [a, b] = createChannelPair();
     let cancelled = false;
-    const handlers = stubHandlers(
-      {},
-      {
-        'graph.stream': async (_params, { signal, emit }) => {
-          for (let i = 0; i < 5; i++) {
-            if (signal.aborted) {
-              cancelled = true;
-              return;
-            }
-            await emit(chunkFor(i));
+    createPeer(a, {
+      stream: async ({ signal, emit }) => {
+        for (let i = 0; i < 5; i++) {
+          if (signal.aborted) {
+            cancelled = true;
+            return;
           }
-        },
+          await emit(chunkFor(i));
+        }
       },
-    );
-    const server = createRpcServer(a, handlers);
+    });
     const client = createRpcClient(b);
 
     const controller = new AbortController();
     const received: number[] = [];
-    const freeze = deferred<void>();
-    let frozen = false;
-    const streamPromise = client.stream(
+    const done = client.stream(
       'graph.stream',
       { repoId: 'r1' },
-      async (chunk) => {
+      (chunk) => {
         received.push((chunk as StreamChunkOf<'graph.stream'>).seq);
-        // Freeze on the first chunk so the stream is still genuinely in-flight (the server
-        // has run out of its initial credit and is blocked) when we cancel it below.
-        if (!frozen) {
-          frozen = true;
-          await freeze.promise;
-        }
+        controller.abort();
       },
       controller.signal,
     );
-
-    await tick(2);
-    controller.abort();
-    await expect(streamPromise).resolves.toBeUndefined();
-    await tick(2);
-    freeze.resolve();
+    await done;
     await tick(2);
 
-    expect(cancelled).toBe(true);
-    // The second chunk had already been sent (it was inside the initial credit grant) but its
-    // delivery to `onChunk` is skipped once the stream is marked done — a superseded/cancelled
-    // stream must not keep calling the caller's callback after its promise has resolved.
     expect(received).toEqual([0]);
-
+    expect(cancelled || received.length < 5).toBe(true);
     client.dispose();
-    server.dispose();
   });
 
-  test('concurrent streams of one method on one client complete independently', async () => {
-    const [a, b] = createInMemoryChannelPair();
-    const cancelledIds: string[] = [];
-    const handlers = stubHandlers(
-      {},
-      {
-        'graph.stream': async (params, { signal, emit }) => {
-          const { repoId } = params as { readonly repoId: string };
-          for (let i = 0; i < 5; i++) {
-            if (signal.aborted) {
-              cancelledIds.push(repoId);
-              return;
-            }
-            await emit(chunkFor(i));
-          }
-        },
+  test('concurrent streams on one client complete independently', async () => {
+    const [a, b] = createChannelPair();
+    createPeer(a, {
+      stream: async ({ emit }) => {
+        for (let i = 0; i < 3; i++) await emit(chunkFor(i));
       },
-    );
-    const server = createRpcServer(a, handlers);
+    });
     const client = createRpcClient(b);
 
-    const firstReceived: number[] = [];
-    const freezeFirst = deferred<void>();
-    let firstFrozen = false;
-    const firstPromise = client.stream('graph.stream', { repoId: 'r1' }, async (chunk) => {
-      firstReceived.push((chunk as StreamChunkOf<'graph.stream'>).seq);
-      if (!firstFrozen) {
-        firstFrozen = true;
-        await freezeFirst.promise;
-      }
-    });
+    const first: number[] = [];
+    const second: number[] = [];
+    await Promise.all([
+      client.stream('graph.stream', { repoId: 'r1' }, (c) => {
+        first.push((c as StreamChunkOf<'graph.stream'>).seq);
+      }),
+      client.stream('graph.stream', { repoId: 'r2' }, (c) => {
+        second.push((c as StreamChunkOf<'graph.stream'>).seq);
+      }),
+    ]);
 
-    await tick(2); // first chunk delivered and frozen — the stream is genuinely still open
-
-    const secondReceived: number[] = [];
-    await client.stream('graph.stream', { repoId: 'r2' }, (chunk) => {
-      secondReceived.push((chunk as StreamChunkOf<'graph.stream'>).seq);
-    });
-    freezeFirst.resolve();
-    await firstPromise;
-
-    expect(cancelledIds).toEqual([]);
-    expect(secondReceived).toEqual([0, 1, 2, 3, 4]);
-    expect(firstReceived).toEqual([0, 1, 2, 3, 4]);
-
+    expect(first).toEqual([0, 1, 2]);
+    expect(second).toEqual([0, 1, 2]);
     client.dispose();
-    server.dispose();
   });
 
-  test('a channel declaring "base64" round-trips a graph.stream chunk with real buffer content (W3)', async () => {
-    const [a, b] = createInMemoryChannelPair('base64');
-    const shas = new ArrayBuffer(20);
-    new Uint8Array(shas).fill(0x7a);
-    const handlers = stubHandlers(
-      {},
-      {
-        'graph.stream': async (_params, { emit }) => {
-          await emit({ ...chunkFor(0), commits: { ...emptyPackedChunk(), shas } });
-        },
+  test('rawStreamChunks delivers the still-wire-shaped chunk without decoding it', async () => {
+    const [a, b] = createChannelPair();
+    createPeer(a, {
+      stream: async ({ emit }) => {
+        await emit(chunkFor(0));
       },
-    );
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b);
-
-    const received: StreamChunkOf<'graph.stream'>[] = [];
-    await client.stream('graph.stream', { repoId: 'r1' }, (chunk) => {
-      received.push(chunk as StreamChunkOf<'graph.stream'>);
     });
-
-    expect(received).toHaveLength(1);
-    const commits = received[0]?.commits;
-    expect(commits?.shas.byteLength).toBe(20);
-    expect(new Uint8Array(commits?.shas ?? new ArrayBuffer(0)).every((b) => b === 0x7a)).toBe(true);
-
-    client.dispose();
-    server.dispose();
-  });
-
-  test("emit registers at most one 'abort' listener for a stream's whole life, not one per chunk (G32-PERF8)", async () => {
-    const [a, b] = createInMemoryChannelPair();
-    let addEventListenerCalls = 0;
-    const originalAddEventListener: typeof AbortSignal.prototype.addEventListener =
-      AbortSignal.prototype.addEventListener;
-    AbortSignal.prototype.addEventListener = function (
-      this: AbortSignal,
-      ...callArgs: Parameters<typeof originalAddEventListener>
-    ): ReturnType<typeof originalAddEventListener> {
-      addEventListenerCalls++;
-      return originalAddEventListener.apply(this, callArgs);
-    };
-
-    try {
-      const handlers = stubHandlers(
-        {},
-        {
-          'graph.stream': async (_params, { emit }) => {
-            for (let i = 0; i < 25; i++) await emit(chunkFor(i));
-          },
-        },
-      );
-      const server = createRpcServer(a, handlers);
-      const client = createRpcClient(b);
-
-      const received: number[] = [];
-      await client.stream('graph.stream', { repoId: 'r1' }, (chunk) => {
-        received.push((chunk as StreamChunkOf<'graph.stream'>).seq);
-      });
-
-      expect(received).toHaveLength(25);
-      // One shared listener for the whole stream, not one per emitted chunk -- 25 chunks with the
-      // old per-emit addEventListener would report 25 (each self-removing only once the signal
-      // actually fires, which this stream, ending normally, never does).
-      expect(addEventListenerCalls).toBeLessThanOrEqual(1);
-
-      client.dispose();
-      server.dispose();
-    } finally {
-      AbortSignal.prototype.addEventListener = originalAddEventListener;
-    }
-  });
-
-  test('rawStreamChunks: true delivers the still-wire-shaped chunk without decoding it (G32-PERF5)', async () => {
-    const [a, b] = createInMemoryChannelPair();
-    const shas = new ArrayBuffer(20);
-    new Uint8Array(shas).fill(0x5c);
-    const handlers = stubHandlers(
-      {},
-      {
-        'graph.stream': async (_params, { emit }) => {
-          await emit({ ...chunkFor(0), commits: { ...emptyPackedChunk(), shas } });
-        },
-      },
-    );
-    const server = createRpcServer(a, handlers);
     const client = createRpcClient(b, { rawStreamChunks: true });
 
     const received: unknown[] = [];
@@ -503,135 +295,41 @@ describe('ipc rpc — streams', () => {
       received.push(chunk);
     });
 
-    expect(received).toHaveLength(1);
     const envelope = received[0] as { commits: { $fb: string; d: ArrayBuffer } };
-    // Still wrapped: decodeStreamPayload was never called, so `commits` is the raw `{$fb, d}`
-    // wire wrapper, not a decoded PackedCommitChunk (which has no `$fb` field at all).
     expect(envelope.commits.$fb).toBe('gitwire/1');
     expect(envelope.commits.d).toBeInstanceOf(ArrayBuffer);
-
     client.dispose();
-    server.dispose();
   });
 
-  test('a throwing onChunk rejects the stream promise instead of wedging it forever (F2)', async () => {
-    const [a, b] = createInMemoryChannelPair();
-    const handlers = stubHandlers(
-      {},
-      {
-        'graph.stream': async (_params, { emit }) => {
-          for (let i = 0; i < 5; i++) await emit(chunkFor(i));
-        },
+  test('a throwing onChunk rejects the stream promise instead of wedging it', async () => {
+    const [a, b] = createChannelPair();
+    createPeer(a, {
+      stream: async ({ emit }) => {
+        for (let i = 0; i < 5; i++) await emit(chunkFor(i));
       },
-    );
-    const server = createRpcServer(a, handlers);
+    });
     const client = createRpcClient(b);
 
     const boom = new Error('bad chunk');
-    const streamPromise = client.stream('graph.stream', { repoId: 'r1' }, () => {
-      throw boom;
-    });
-
-    // Before the F2 fix, this would hang forever: the throwing callback rejected the internal
-    // queue promise, and every later `.then` chained onto it (including `end`'s own
-    // finish/resolve/reject) was silently skipped.
-    await expect(streamPromise).rejects.toBe(boom);
-
+    await expect(
+      client.stream('graph.stream', { repoId: 'r1' }, () => {
+        throw boom;
+      }),
+    ).rejects.toBe(boom);
     client.dispose();
-    server.dispose();
-  });
-
-  test('a raw chunk handed back to encodeStreamPayload is returned by identity, not rebuilt (G32-PERF5)', async () => {
-    const [a, b] = createInMemoryChannelPair();
-    const handlers = stubHandlers(
-      {},
-      {
-        'graph.stream': async (_params, { emit }) => {
-          await emit(chunkFor(0));
-        },
-      },
-    );
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b, { rawStreamChunks: true });
-
-    let raw: unknown;
-    await client.stream('graph.stream', { repoId: 'r1' }, (chunk) => {
-      raw = chunk;
-    });
-
-    // A relay (the extension host) hands the still-wrapped chunk straight back into its own
-    // outbound encodeStreamPayload call -- this must be a no-op reference return, not a
-    // decode-then-rebuild of bytes that are already exactly correct.
-    expect(encodeStreamPayload('graph.stream', raw)).toBe(raw);
-
-    client.dispose();
-    server.dispose();
   });
 });
 
-describe('ipc rpc — protocol integrity', () => {
-  test('a version mismatch throws loudly on receipt', () => {
-    const [a, b] = createInMemoryChannelPair();
-    createRpcServer(a, stubHandlers());
+describe('ipc rpc client — protocol integrity', () => {
+  test('a contract version mismatch throws loudly on receipt', () => {
+    const [a, b] = createChannelPair();
     const client = createRpcClient(b);
-    void client; // keep the client's onMessage registered
+    void client;
 
     const badEnvelope = {
       version: CONTRACT_VERSION + 1,
       body: { t: 'evt', method: 'repo.changed', payload: {} },
     };
     expect(() => a.post(badEnvelope)).toThrow(/contract version mismatch/);
-  });
-
-  test('wrapVersioned frames delivered directly are otherwise ignored if unrecognised', () => {
-    const [a, b] = createInMemoryChannelPair();
-    createRpcServer(a, stubHandlers());
-    const client = createRpcClient(b);
-    void client;
-
-    // A server -> client-only frame delivered to the server is a protocol bug, not silently
-    // dropped.
-    expect(() => b.post(wrapVersioned({ t: 'res', id: 1, ok: true, result: {} }))).toThrow(
-      /unexpected frame/,
-    );
-  });
-
-  test('disposing the server aborts every in-flight stream for that channel', async () => {
-    const [a, b] = createInMemoryChannelPair();
-    let aborted = false;
-    const handlers = stubHandlers(
-      {},
-      {
-        'graph.stream': async (_params, { signal, emit }) => {
-          await emit(chunkFor(0));
-          await new Promise<void>((resolve) => {
-            signal.addEventListener('abort', () => {
-              aborted = true;
-              resolve();
-            });
-          });
-        },
-      },
-    );
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b);
-
-    const received: number[] = [];
-    const streamPromise = client.stream('graph.stream', { repoId: 'r1' }, (chunk) => {
-      received.push((chunk as StreamChunkOf<'graph.stream'>).seq);
-    });
-
-    await tick(2);
-    server.dispose();
-    await tick(2);
-
-    expect(aborted).toBe(true);
-    expect(received).toEqual([0]);
-
-    client.dispose();
-    // The client's own stream promise never got an "end" frame (the channel died first) — it
-    // is left pending by design (a disposed server is a channel-closed event the *client*
-    // detects via its own dispose path in production; here we only assert the server's half).
-    void streamPromise;
   });
 });

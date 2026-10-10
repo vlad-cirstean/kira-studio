@@ -141,8 +141,6 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
   };
 
   return {
-    bufferEncoding: 'native',
-
     post(message): void {
       const frame = JSON.stringify(message);
       if (phase === 'open') socket.send(frame);

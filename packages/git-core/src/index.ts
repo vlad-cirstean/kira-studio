@@ -117,27 +117,6 @@ export type {
 } from './model/status.ts';
 export { dirtyPathsFrom, summarizeStatus } from './model/status.ts';
 export { isAnnotated, tagTargetCommit } from './model/tag.ts';
-export type { Browser } from './ports/browser.ts';
-export type { Clipboard } from './ports/clipboard.ts';
-export type { Disposable } from './ports/disposable.ts';
-export type {
-  DocumentRef,
-  EditorCapabilities,
-  EditorIntegration,
-  VirtualDocumentSource,
-} from './ports/editorIntegration.ts';
-export type { FileWatchEvent, FileWatcher, FileWatchOptions } from './ports/fileWatcher.ts';
-export type { Logger, LogLevel } from './ports/logger.ts';
-export type {
-  ProcessExit,
-  ProcessRunner,
-  SpawnedProcess,
-  SpawnRequest,
-} from './ports/processRunner.ts';
-export type { Storage, StorageScope } from './ports/storage.ts';
-export type { Theme, ThemeKind } from './ports/theme.ts';
-export type { OpenFolderOptions, Windows } from './ports/windows.ts';
-export type { RepoCandidate, WorkspaceRoots } from './ports/workspaceRoots.ts';
 export { classifyReset } from './preflight/reset.ts';
 export { classifyTagCreate, validateRefName } from './preflight/tag.ts';
 export type {
@@ -173,7 +152,6 @@ export { compileQuery, escapeRegExp, MIN_SHA_PREFIX } from './search/query.ts';
 export type {
   CoerceProblem,
   CoerceResult,
-  HostKind,
   SettingDef,
   SettingKey,
   Settings,

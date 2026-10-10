@@ -9,12 +9,6 @@ describe('defaultSettings', () => {
       expect(settings[key]).toEqual(SETTINGS[key].default);
     }
   });
-
-  // G14 D6/D11: the fallback for a host that reports nothing — 8, VS Code's own default for
-  // workbench.tree.indent.
-  test('carries workbench.tree.indent at its host-matching default of 8', () => {
-    expect(defaultSettings()['workbench.tree.indent']).toBe(8);
-  });
 });
 
 describe('coerceSettings', () => {
@@ -104,9 +98,9 @@ describe('coerceSettings', () => {
   test('an unknown key falls back to defaults for everything and is reported, without touching known keys', () => {
     const result = coerceSettings({
       'kiraSpace.nonsense': true,
-      'workbench.tree.indent': 12,
+      'kiraSpace.graph.pageSize': 200,
     });
-    expect(result.settings).toEqual({ ...defaultSettings(), 'workbench.tree.indent': 12 });
+    expect(result.settings).toEqual({ ...defaultSettings(), 'kiraSpace.graph.pageSize': 200 });
     expect(result.problems).toEqual([{ key: 'kiraSpace.nonsense', reason: 'unknown key' }]);
   });
 
@@ -115,7 +109,6 @@ describe('coerceSettings', () => {
       coerceSettings({
         'kiraSpace.git.path': 42,
         'kiraSpace.graph.pageSize': null,
-        'workbench.tree.indent': {},
       }),
     ).not.toThrow();
   });
