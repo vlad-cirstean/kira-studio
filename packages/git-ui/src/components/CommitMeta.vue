@@ -310,7 +310,7 @@ const prIcon = computed(() => {
     v-if="detail"
     :class="
       expanded
-        ? 'flex flex-col flex-initial min-h-[min(220px,60%)] max-h-7/10 overflow-auto'
+        ? 'flex flex-col flex-initial min-h-[min(220px,60%)] max-h-7/10'
         : 'flex flex-col flex-none max-h-1/5 overflow-hidden'
     "
     data-testid="commit-meta"
@@ -324,32 +324,11 @@ const prIcon = computed(() => {
         </TooltipTrigger>
         <TooltipContent>{{ detail.subject }}</TooltipContent>
       </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Badge
-            as="button"
-            type="button"
-            class="cursor-pointer"
-            aria-label="Copy full SHA"
-            data-testid="commit-meta-sha"
-            @click="copySha"
-          >
-            {{ shortSha }}
-          </Badge>
-        </TooltipTrigger>
-        <TooltipContent>Copy full SHA</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <span class="shrink-0 text-kira-sm text-subtle">{{ formatRelativeDate(detail.committer.timestamp) }}</span>
-        </TooltipTrigger>
-        <TooltipContent>{{ formatAbsoluteDate(detail.committer.timestamp) }}</TooltipContent>
-      </Tooltip>
       <Tooltip v-if="prIcon">
         <TooltipTrigger as-child>
           <Button
             variant="link"
-            :class="cn('h-auto p-0 border-0 leading-none', PR_ICON_CLASS[prIcon!.state])"
+            :class="cn('h-auto p-0 border-0 leading-none ml-auto', PR_ICON_CLASS[prIcon!.state])"
             :aria-label="`Open pull request #${prIcon!.number} on GitHub`"
             data-testid="commit-meta-pr-icon"
             @click="openPullRequest(prIcon!.number)"
@@ -361,31 +340,15 @@ const prIcon = computed(() => {
           `#${prIcon!.number} ${prIcon!.title} — ${prIcon!.stateLabel}`
         }}</TooltipContent>
       </Tooltip>
-      <TooltipIconButton
-        class="ml-auto"
-        icon="diff-multiple"
-        label="Open all changes"
-        data-testid="open-all-changes-button"
-        @click="openAllChanges"
-      />
     </ViewToolbar>
 
-    <div class="flex flex-col gap-1 px-3 py-2">
+    <div :class="['flex min-h-0 flex-col gap-1 overflow-auto px-3', expanded ? 'py-2' : '']">
     <p data-testid="meta-body"
       v-if="bodyParagraphs.length > 0"
       ref="bodyEl"
       v-show="expanded"
-      class="mt-1 whitespace-normal"
+      class="mt-1 whitespace-normal break-words"
     ></p>
-
-    <Button data-testid="meta-body-toggle"
-      variant="link"
-      size="kira"
-      class="mt-0.5 h-auto p-0 justify-start text-muted-foreground hover:text-fg"
-      @click="expanded = !expanded"
-    >
-      {{ expanded ? 'Show less' : 'Show more' }}
-    </Button>
 
     <div v-if="expanded" class="flex flex-col gap-1 mt-1">
       <p data-testid="meta-identity" class="text-graph-sm text-muted-foreground">
@@ -446,6 +409,46 @@ const prIcon = computed(() => {
         </template>
       </dl>
     </div>
+    </div>
+
+    <div class="flex shrink-0 items-center gap-2 px-3 py-2">
+      <Button data-testid="meta-body-toggle"
+        variant="link"
+        size="kira"
+        class="h-auto p-0 justify-start text-muted-foreground hover:text-fg"
+        @click="expanded = !expanded"
+      >
+        {{ expanded ? 'Show less' : 'Show more' }}
+      </Button>
+      <div class="ml-auto flex items-center gap-2">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Badge
+              as="button"
+              type="button"
+              class="cursor-pointer"
+              aria-label="Copy full SHA"
+              data-testid="commit-meta-sha"
+              @click="copySha"
+            >
+              {{ shortSha }}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>Copy full SHA</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="shrink-0 text-kira-sm text-subtle">{{ formatRelativeDate(detail.committer.timestamp) }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ formatAbsoluteDate(detail.committer.timestamp) }}</TooltipContent>
+        </Tooltip>
+        <TooltipIconButton
+          icon="diff-multiple"
+          label="Open all changes"
+          data-testid="open-all-changes-button"
+          @click="openAllChanges"
+        />
+      </div>
     </div>
   </div>
 </template>
