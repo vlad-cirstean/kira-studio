@@ -33,9 +33,9 @@ const DOT: Record<typeof connection.value, string> = {
 <template>
   <div class="flex h-full flex-col pt-[env(safe-area-inset-top)]" data-testid="app-shell">
     <header class="flex items-center gap-2 border-b border-border bg-chrome px-3 py-2">
-      <h1 class="m-0 flex-1 text-kira-lg font-semibold">Agents</h1>
-      <Button variant="ghost" size="icon" aria-label="Refresh" data-testid="refresh" @click="refresh">
-        <CodiconIcon name="refresh" :size="14" />
+      <h1 class="m-0 flex-1 text-kira-lg font-medium">Agents</h1>
+      <Button variant="ghost" size="kira-icon" class="size-11" aria-label="Refresh" data-testid="refresh" @click="refresh">
+        <CodiconIcon name="refresh" :size="13" />
       </Button>
       <span
         class="size-2 rounded-full"

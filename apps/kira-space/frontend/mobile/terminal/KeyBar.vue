@@ -23,7 +23,7 @@ const KEYS = [
 
 <template>
   <div class="flex gap-1 overflow-x-auto px-2 py-1 [scrollbar-width:none]" data-testid="term-keybar">
-    <Button
+    <Button size="kira"
       variant="dialog"
       class="h-11 shrink-0 px-3"
       :class="ctrl ? 'bg-primary text-primary-foreground' : ''"
@@ -33,7 +33,7 @@ const KEYS = [
     >
       Ctrl
     </Button>
-    <Button
+    <Button size="kira"
       v-for="key in KEYS"
       :key="key.id"
       variant="dialog"
@@ -42,7 +42,7 @@ const KEYS = [
       :data-testid="`term-key-${key.id}`"
       @click="emit('key', key.seq())"
     >
-      <CodiconIcon v-if="key.icon" :name="key.icon" :size="14" />
+      <CodiconIcon v-if="key.icon" :name="key.icon" :size="13" />
       <template v-else>{{ key.label }}</template>
     </Button>
   </div>

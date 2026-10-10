@@ -82,7 +82,7 @@ useSortableReorder(
         @update:model-value="(v) => (text = String(v))"
         data-testid="backlog-add"
       />
-      <Button
+      <Button size="kira"
         type="submit"
         variant="dialog-primary"
         class="h-11 px-4"

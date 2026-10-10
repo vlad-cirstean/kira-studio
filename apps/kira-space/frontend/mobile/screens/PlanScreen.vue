@@ -24,7 +24,7 @@ const open = ref<string | null>(null);
     </Empty>
     <template v-else-if="model">
       <div v-for="group in model.plan" :key="group.key" data-testid="plan-group">
-        <h2 class="m-0 border-b border-border bg-chrome px-3 py-1.5 text-kira-sm font-semibold uppercase tracking-wide text-subtle">
+        <h2 class="m-0 border-b border-border bg-chrome px-3 py-1.5 text-kira-sm font-medium uppercase tracking-wide text-subtle">
           {{ group.label }}
         </h2>
         <ul class="m-0 flex list-none flex-col p-0">

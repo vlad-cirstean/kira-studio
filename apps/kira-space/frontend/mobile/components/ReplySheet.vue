@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -48,24 +49,26 @@ async function send(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && emit('close')">
-    <DialogContent :show-close-button="false" data-testid="reply-sheet">
+    <DialogContent size="sm" data-testid="reply-sheet">
       <DialogHeader>
         <DialogTitle>Reply to the agent</DialogTitle>
         <DialogDescription>{{ context }}</DialogDescription>
       </DialogHeader>
-      <Textarea
-        :model-value="message"
-        rows="4"
-        class="text-base"
-        data-testid="reply-input"
-        @update:model-value="(v) => (message = String(v))"
-      />
-      <Alert v-if="error" variant="destructive" data-testid="reply-error">
-        <AlertDescription>{{ error }}</AlertDescription>
-      </Alert>
+      <DialogBody>
+        <Textarea
+          :model-value="message"
+          rows="4"
+          class="text-base"
+          data-testid="reply-input"
+          @update:model-value="(v) => (message = String(v))"
+        />
+        <Alert v-if="error" variant="destructive" data-testid="reply-error">
+          <AlertDescription>{{ error }}</AlertDescription>
+        </Alert>
+      </DialogBody>
       <DialogFooter>
-        <Button variant="dialog" class="h-11 flex-1" data-testid="reply-cancel" @click="emit('close')">Cancel</Button>
-        <Button
+        <Button size="kira" variant="dialog" class="h-11 flex-1" data-testid="reply-cancel" @click="emit('close')">Cancel</Button>
+        <Button size="kira"
           variant="dialog-primary"
           class="h-11 flex-1"
           :disabled="!message.trim() || writes.sendReply.isPending.value"

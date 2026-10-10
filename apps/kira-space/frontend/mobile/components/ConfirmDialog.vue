@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -25,19 +26,21 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>();
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && emit('cancel')">
-    <DialogContent :show-close-button="false" data-testid="confirm-dialog">
+    <DialogContent size="sm" data-testid="confirm-dialog">
       <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
         <DialogDescription>{{ text }}</DialogDescription>
       </DialogHeader>
-      <Alert v-if="error" variant="destructive" data-testid="confirm-error">
-        <AlertDescription>{{ error }}</AlertDescription>
-      </Alert>
+      <DialogBody v-if="error">
+        <Alert variant="destructive" data-testid="confirm-error">
+          <AlertDescription>{{ error }}</AlertDescription>
+        </Alert>
+      </DialogBody>
       <DialogFooter>
-        <Button variant="dialog" class="h-11 flex-1" data-testid="confirm-cancel" @click="emit('cancel')">
+        <Button size="kira" variant="dialog" class="h-11 flex-1" data-testid="confirm-cancel" @click="emit('cancel')">
           Cancel
         </Button>
-        <Button
+        <Button size="kira"
           variant="dialog-primary"
           class="h-11 flex-1"
           :disabled="busy"

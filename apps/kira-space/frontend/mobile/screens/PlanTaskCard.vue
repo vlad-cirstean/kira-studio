@@ -40,7 +40,7 @@ const stopFirst = computed(() => props.card.moves.live);
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <span class="rounded-kira-sm px-2 py-0.5 font-bold" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{ card.status }}</span>
+          <span class="rounded-kira-sm px-2 py-0.5" :class="TONE_TAG_CLASS[tone]" data-testid="plan-status">{{ card.status }}</span>
           <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-stage">{{ card.progress.label }}</span>
           <Badge v-for="repo in card.repos" :key="repo" variant="chip" class="bg-field text-muted-foreground">{{ repo }}</Badge>
         </span>
@@ -61,7 +61,7 @@ const stopFirst = computed(() => props.card.moves.live);
     <ol v-if="open" class="m-0 flex list-none flex-col gap-2 px-3 pb-3 pl-8" data-testid="plan-stages">
       <li v-if="!card.blocks.length" class="text-kira-sm text-subtle">No workflow.</li>
       <li v-for="block in card.blocks" :key="block.stage.id" class="flex flex-col gap-0.5" :data-state="block.state">
-        <span class="flex items-center gap-2 text-kira-md" :class="block.state === 'now' ? 'font-semibold text-fg' : 'text-muted-foreground'">
+        <span class="flex items-center gap-2 text-kira-md" :class="block.state === 'now' ? 'font-medium text-fg' : 'text-muted-foreground'">
           <span aria-hidden="true">{{ block.state === 'done' ? '✓' : block.state === 'now' ? '▸' : '○' }}</span>
           {{ block.stage.name }}
           <span v-if="block.count" class="text-kira-sm text-subtle">{{ block.count }}</span>
@@ -78,7 +78,7 @@ const stopFirst = computed(() => props.card.moves.live);
     </ol>
 
     <div v-if="open && canMove" class="flex flex-wrap gap-2 px-3 pb-3 pl-8" data-testid="plan-actions">
-      <Button
+      <Button size="kira"
         variant="dialog"
         class="h-11 px-4"
         :disabled="stopFirst || !card.moves.prev"
@@ -87,7 +87,7 @@ const stopFirst = computed(() => props.card.moves.live);
       >
         Back
       </Button>
-      <Button
+      <Button size="kira"
         variant="dialog"
         class="h-11 px-4"
         :disabled="stopFirst || !card.moves.next"
@@ -96,7 +96,7 @@ const stopFirst = computed(() => props.card.moves.live);
       >
         Next
       </Button>
-      <Button
+      <Button size="kira"
         v-if="actions.startKind.value"
         variant="dialog-primary"
         class="h-11 px-4"

@@ -17,7 +17,7 @@ const TABS = [
       v-for="tab in TABS"
       :key="tab.id"
       :to="tab.to"
-      class="flex min-h-12 flex-1 items-center justify-center gap-1.5 text-kira-md text-muted-foreground no-underline aria-[current=page]:font-semibold aria-[current=page]:text-fg"
+      class="flex min-h-12 flex-1 items-center justify-center gap-1.5 text-kira-md text-muted-foreground no-underline aria-[current=page]:font-medium aria-[current=page]:text-fg"
       :data-testid="`tab-${tab.id}`"
     >
       {{ tab.label }}

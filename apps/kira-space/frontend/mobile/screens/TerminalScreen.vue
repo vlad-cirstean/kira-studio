@@ -133,16 +133,16 @@ function leave(): void {
     data-testid="terminal-screen"
   >
     <header class="flex items-center gap-2 border-b border-border bg-chrome px-2 py-1">
-      <Button variant="ghost" size="icon" aria-label="Back" data-testid="term-back" @click="leave">
+      <Button variant="ghost" size="kira-icon" class="size-11" aria-label="Back" data-testid="term-back" @click="leave">
         <CodiconIcon name="chevron-left" :size="16" />
       </Button>
-      <h1 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-semibold">Terminal</h1>
+      <h1 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium">Terminal</h1>
       <span class="text-kira-sm text-muted-foreground" role="status" data-testid="term-status">
         {{ STATUS_LABEL[remote.status.value] }}
       </span>
-      <Button variant="ghost" size="icon" aria-label="Smaller text" data-testid="term-font-down" :disabled="fontSize <= FONT_MIN" @click="step(-1)">A-</Button>
-      <Button variant="ghost" size="icon" aria-label="Larger text" data-testid="term-font-up" :disabled="fontSize >= FONT_MAX" @click="step(1)">A+</Button>
-      <Button variant="dialog" class="h-9 px-3" data-testid="term-release" @click="leave">Release</Button>
+      <Button variant="ghost" size="kira-icon" class="size-11" aria-label="Smaller text" data-testid="term-font-down" :disabled="fontSize <= FONT_MIN" @click="step(-1)">A-</Button>
+      <Button variant="ghost" size="kira-icon" class="size-11" aria-label="Larger text" data-testid="term-font-up" :disabled="fontSize >= FONT_MAX" @click="step(1)">A+</Button>
+      <Button size="kira" variant="dialog" class="h-9 px-3" data-testid="term-release" @click="leave">Release</Button>
     </header>
 
     <PermissionHint v-if="!permissions.agentInput" what="Controlling terminals is off for this phone." />
@@ -168,7 +168,7 @@ function leave(): void {
           data-testid="term-compose"
           @update:model-value="(v) => (compose = String(v))"
         />
-        <Button type="submit" variant="dialog-primary" class="h-11 px-4" :disabled="!compose" data-testid="term-compose-send">Send</Button>
+        <Button size="kira" type="submit" variant="dialog-primary" class="h-11 px-4" :disabled="!compose" data-testid="term-compose-send">Send</Button>
       </form>
     </template>
   </section>

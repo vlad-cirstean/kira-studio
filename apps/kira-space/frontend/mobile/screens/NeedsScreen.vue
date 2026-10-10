@@ -80,7 +80,7 @@ async function confirmTakeOver(): Promise<void> {
           >
             <span class="flex items-center gap-2">
               <span
-                class="rounded-kira-sm px-2 py-0.5 text-kira-sm font-bold"
+                class="rounded-kira-sm px-2 py-0.5 text-kira-sm"
                 :class="TONE_TAG_CLASS[item.tone]"
                 >{{ item.kind }}</span
               >
@@ -97,7 +97,7 @@ async function confirmTakeOver(): Promise<void> {
             <span v-if="item.detail" class="text-kira-sm text-muted-foreground">{{ item.detail }}</span>
             <span v-if="item.scope" class="text-kira-sm text-subtle">{{ item.scope }}</span>
             <span v-if="canReply && item.sessionId" class="flex gap-2 pt-1">
-              <Button
+              <Button size="kira"
                 v-if="item.kind === 'question'"
                 variant="dialog-primary"
                 class="h-11 px-4"
@@ -114,7 +114,7 @@ async function confirmTakeOver(): Promise<void> {
               >
                 Terminal
               </RouterLink>
-              <Button
+              <Button size="kira"
                 v-else-if="item.kind === 'stuck run'"
                 variant="dialog"
                 class="h-11 px-4"
