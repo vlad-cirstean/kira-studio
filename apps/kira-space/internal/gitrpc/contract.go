@@ -115,20 +115,11 @@ package gitrpc
 // G-UX D13 (item 13): 32 -> 33, one new event, connection.changed -- extension<->webview only,
 // the Go server neither emits nor parses it, the same reason this constant moves for every
 // ui.action-only addition since G10 D9. No new request, no new capability, no SQL migration.
-// P5 (2026-09-11): 33 -> 34, for one new Go-served request, blame.line -- the status-bar blame
-// widget's own one-line-at-a-time query (internal/gitclient/porcelain's new BlameLineArgs/
-// ParseBlameLine, RepoEntry.BlameLine). No webview caller exists yet, only the extension's own
-// host-side status bar; packages/git-ipc's proxyHandlers.ts still gained a plain forward entry
-// since ServerHandlers['requests'] is total over RequestKey. No new event, no new capability, no
-// new UiActionKind member, no SQL migration.
-// P7 item 2 (2026-09-12): 34 -> 35, for one new Go-served request, working.detail -- the
-// uncommitted-changes strip's click-through file list (internal/gitclient/porcelain's new
-// WorkingNumstatArgs/WorkingNameStatusArgs, RepoEntry.WorkingDetail, composed the same way
-// CommitDetail composes commit.detail's own). A real webview caller exists this time (the new
-// WorkingDetailPane), so this is a plain forward in proxyHandlers.ts too, no different in kind
-// from blame.line's own bump. No new event, no new capability, no new UiActionKind member, no SQL
-// migration. editor.openWorkingDiff (the same item's diff-open action) is extension-only, answered
-// entirely inside the extension exactly like editor.openRangeDiff -- it needs no bump of its own.
+// P5 (2026-09-11): 33 -> 34, one new Go-served request, blame.line (RepoEntry.BlameLine). No new
+// event, no new capability, no new UiActionKind member, no SQL migration.
+// P7 item 2 (2026-09-12): 34 -> 35, one new Go-served request, working.detail
+// (RepoEntry.WorkingDetail), the uncommitted-changes strip's click-through file list. No new event,
+// no new capability, no new UiActionKind member, no SQL migration.
 // P74 §3.3 (2026-09-15): 35 -> 36, for one new Go-served request, pr.browserUrl (composes a PR's
 // github.com URL server-side; params: repoId/number, result: {url: string|null}) and one new
 // extension-answered request, pr.openExternal (params: repoId/number, result: {}), which requests
