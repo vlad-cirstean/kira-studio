@@ -819,7 +819,7 @@ come after 0027; `0024_p85_custom_scripts.sql`
 created `custom_scripts`; `0025_p97_drop_repo_map.sql`; `0026_p100_drop_git_tables.sql`;
 `0027_p108part11_op_log_path.sql` added `op_log.path TEXT`, the console path an op actually ran
 against, F5). Kira Space's own `kira.db` runs its own sequence
-(`apps/kira-space/internal/storage/migrations/`, high-water **0031**; `0031_p243_drop_git_clients.sql` drops `git_clients`, the paired-editor trust store (P243 Part 2); `0030_p242_recurring_scripts.sql` is Studio's 0037; `0029_p242_scripts_in_ade.sql` is Studio's 0036; `0028` is Part 2's smart-script columns; `0027_p241_rebase.sql` is P241's rebase columns (ADE, Storage); `0026_p242_automations.sql` is Studio's 0034 plus `ade_runs.outcome_json`; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033; `0021_p212_mobile_devices.sql`, `0022_p212_mobile_permissions.sql`, `0024_p222_code_repo_color.sql`, `0025_p223_mobile_lan.sql`): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
+(`apps/kira-space/internal/storage/migrations/`, high-water **0032**; `0032_p259_repo_hidden.sql` adds `code_repos.hidden` and `ade_folders.hidden` (P259); `0031_p243_drop_git_clients.sql` drops `git_clients`, the paired-editor trust store (P243 Part 2); `0030_p242_recurring_scripts.sql` is Studio's 0037; `0029_p242_scripts_in_ade.sql` is Studio's 0036; `0028` is Part 2's smart-script columns; `0027_p241_rebase.sql` is P241's rebase columns (ADE, Storage); `0026_p242_automations.sql` is Studio's 0034 plus `ade_runs.outcome_json`; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033; `0021_p212_mobile_devices.sql`, `0022_p212_mobile_permissions.sql`, `0024_p222_code_repo_color.sql`, `0025_p223_mobile_lan.sql`): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
 window mode, the ADE tables (see ADE, Storage) and `0020_p204_custom_scripts.sql` (scripts).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -4173,8 +4173,18 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
   window sees every change. All repository configuration lives in one Git-module dialog,
   `repo/ReposDialog.vue` (P205): Repositories tab (import, list, per-repo form: nickname, prepare
   script and timeout, integration branches, environments, `worktreeBasePath` via `UpdateRepo`,
-  remove) and Scan folders tab (add, watch, remove). Opened from the Git panel header, `GitStart.vue`,
+  remove) and Scan folders tab (add, watch, hide all, remove). Opened from the Git panel header, `GitStart.vue`,
   a repo-row "Configure repository…" item and the Agents empty state. Agents has no Repos tab.
+  Hiding (P259): `code_repos.hidden` decides visibility for one-by-one and folder imports alike;
+  `ade_folders.hidden` is the folder "hide all" (bulk-writes its repos, later discoveries import
+  hidden, a single repo can be shown inside a hidden folder). Hidden only filters the Git panel Repos
+  list (`repo/state/repoVisibility.ts`); ADE, agent `task_info`, mobile and open workspaces ignore it,
+  and the dialog lists every repo. Header eye toggle "Show hidden" is session-only; hiding from the
+  panel closes that repo's workspace in this window. Re-importing a hidden repo unhides it
+  (`ExistingRecord`, no `E_ALREADY_IMPORTED`). `RepoHeads` runs for listed repos only. Bound:
+  `CodeWorkspaceService.SetRepoHidden`, `AdeTaskService.SetFolderHidden`. "Remove repository…" lives in
+  the dialog's repo head (`ViewToolbar`), always behind `confirmRemoveCodeRepo`, which names the scan
+  folder that would re-import it.
 - Session tabs (P193) are named `<stage> · <step> · <repo>` (headless) or `<stage> · <repo|spec>` (TUI),
   from the session's own `stageId`; review keeps `Review agent`. `AdeSessionId.vue` shows the full
   Claude session id with a copy button (VueUse `useClipboard`).
