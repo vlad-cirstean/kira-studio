@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { queryClient } from '@workbench/state/queryClient';
-import type { FolderArgs, PathArgs, UpdateRepoArgs } from '../../ade/v2/wire';
+import type { FolderArgs, FolderHiddenArgs, PathArgs, UpdateRepoArgs } from '../../ade/v2/wire';
 import { control } from '../../bridge/control';
 
 export const reposKey = ['adetask', 'repos'] as const;
@@ -31,6 +31,13 @@ export function useAddFolder() {
 export function useSetFolderWatch() {
   return useMutation({
     mutationFn: (args: FolderArgs) => control.adeTaskSetFolderWatch(args),
+    onSettled: invalidateRepos,
+  });
+}
+
+export function useSetFolderHidden() {
+  return useMutation({
+    mutationFn: (args: FolderHiddenArgs) => control.adeTaskSetFolderHidden(args),
     onSettled: invalidateRepos,
   });
 }

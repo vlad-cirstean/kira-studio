@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -15,20 +16,26 @@ import {
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { colorMarkClass } from '@theme/connColor';
-import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import RepoConfigForm from './RepoConfigForm.vue';
 import { useReposDialogStore } from './state/reposDialog';
-import { useAddFolder, useRemoveFolder, useRepos, useSetFolderWatch } from './state/reposQueries';
+import {
+  useAddFolder,
+  useRemoveFolder,
+  useRepos,
+  useSetFolderHidden,
+  useSetFolderWatch,
+} from './state/reposQueries';
 
 const dialog = useReposDialogStore();
 const codeRepos = useCodeReposStore();
-const confirmDialogStore = useConfirmDialogStore();
 const repos = useRepos();
 const addFolder = useAddFolder();
 const watchFolder = useSetFolderWatch();
+const hideFolder = useSetFolderHidden();
 const removeFolder = useRemoveFolder();
 
 const folders = computed(() => repos.data.value?.folders ?? []);
@@ -76,13 +83,24 @@ const onWatch = (path: string, watch: boolean) =>
 const onRemoveFolder = (path: string) =>
   run(async () => void (await removeFolder.mutateAsync({ path })));
 
+const onHideFolder = (path: string, hidden: boolean) =>
+  run(async () => void (await hideFolder.mutateAsync({ path, hidden })));
+
+const onHideRepo = (id: string, hidden: boolean) => run(() => codeRepos.setCodeRepoHidden(id, hidden));
+
 const onRemoveRepo = (id: string, name: string) =>
-  run(async () => {
-    const ok = await confirmDialogStore.confirmDialog(`Remove repository "${name}" from Kira Space? Files on disk stay.`, {
-      confirmLabel: 'Remove',
-    });
-    if (ok) await codeRepos.removeCodeRepo(id);
-  });
+  run(async () => void (await codeRepos.confirmRemoveCodeRepo(id, name)));
+
+/** Parent directory of the checkout with its trailing separator, the dim half of the head's path. */
+function parentDir(root: string): string {
+  const trimmed = root.replace(/[\\/]+$/, '');
+  const i = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  return i >= 0 ? trimmed.slice(0, i + 1) : '';
+}
+
+function baseName(path: string): string {
+  return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path;
+}
 </script>
 
 <template>
@@ -115,15 +133,20 @@ const onRemoveRepo = (id: string, name: string) =>
               type="button"
               role="option"
               class="relative flex h-5.5 shrink-0 cursor-pointer items-center gap-1.5 rounded-kira-sm border-none px-1.5 text-left text-kira-md"
-              :class="showRepos && selected?.id === r.id ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground hover:bg-hover'"
+              :class="[
+                showRepos && selected?.id === r.id ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground hover:bg-hover',
+                { 'opacity-60': r.hidden },
+              ]"
               :aria-selected="showRepos && selected?.id === r.id"
               :title="r.root"
               data-testid="repos-dialog-repo"
               :data-repo-id="r.id"
+              :data-hidden="r.hidden"
               @click="pickRepo(r.id)"
             >
               <span :class="colorMarkClass('rail', r.color)" data-testid="repos-dialog-repo-rail" aria-hidden="true" />
               <span class="min-w-0 flex-1 truncate">{{ nickOf(r.id) || r.name }}</span>
+              <CodiconIcon v-if="r.hidden" name="eye-closed" :size="13" class="shrink-0" data-testid="repos-dialog-repo-hidden-mark" />
             </button>
           </div>
           <div class="flex flex-col gap-px border-t border-border px-1 py-1.5">
@@ -145,18 +168,51 @@ const onRemoveRepo = (id: string, name: string) =>
           </Button>
         </nav>
 
-        <section class="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-          <Alert v-if="error" variant="destructive" class="w-auto" data-testid="repos-dialog-error">
+        <section class="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          <Alert v-if="error" variant="destructive" class="m-3 w-auto" data-testid="repos-dialog-error">
             <AlertDescription>{{ error }}</AlertDescription>
           </Alert>
           <template v-if="showRepos">
             <template v-if="selected">
-              <h2 class="m-0 truncate text-kira-lg font-semibold" data-testid="repos-dialog-selected">{{ selected.name }}</h2>
-              <RepoConfigForm v-if="selectedConfig" :key="selectedConfig.codeRepoId" :repo="selectedConfig" />
+              <ViewToolbar border="none" data-testid="repos-dialog-repo-head" :data-repo-id="selected.id">
+                <span :class="colorMarkClass('dot', selected.color)" />
+                <span class="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+                  <CodiconIcon name="repo" :size="13" />
+                </span>
+                <span class="min-w-0 truncate text-kira-md text-fg" :title="selected.root" data-testid="repos-dialog-selected"
+                  ><span v-if="parentDir(selected.root)" class="text-subtle">{{ parentDir(selected.root) }}</span
+                  >{{ selected.name }}</span
+                >
+                <Badge
+                  v-if="selectedConfig"
+                  class="shrink-0"
+                  :title="selectedConfig.source === 'added' ? undefined : selectedConfig.source"
+                  data-testid="repos-dialog-repo-source"
+                  >{{ selectedConfig.source === 'added' ? 'Added' : baseName(selectedConfig.source) }}</Badge
+                >
+                <Badge v-if="selected.hidden" variant="warn" class="shrink-0" data-testid="repos-dialog-repo-hidden-badge">Hidden</Badge>
+                <div class="ml-auto flex shrink-0 items-center gap-1">
+                  <TooltipIconButton
+                    :icon="selected.hidden ? 'eye' : 'eye-closed'"
+                    :label="selected.hidden ? 'Show in Git panel' : 'Hide from Git panel'"
+                    :aria-pressed="selected.hidden"
+                    data-testid="repos-dialog-repo-hide"
+                    @click="onHideRepo(selected.id, !selected.hidden)"
+                  />
+                  <TooltipIconButton
+                    icon="trash"
+                    label="Remove repository…"
+                    data-testid="repos-dialog-repo-remove"
+                    @click="onRemoveRepo(selected.id, selected.name)"
+                  />
+                </div>
+              </ViewToolbar>
+              <div :class="colorMarkClass('band', selected.color)" />
+              <RepoConfigForm v-if="selectedConfig" :key="selectedConfig.codeRepoId" class="m-3" :repo="selectedConfig" />
             </template>
-            <p v-else class="m-0 text-muted-foreground">Import a repository to configure it.</p>
+            <p v-else class="m-3 text-muted-foreground">Import a repository to configure it.</p>
           </template>
-          <div v-else class="flex flex-col gap-2" data-testid="repos-dialog-folders">
+          <div v-else class="flex flex-col gap-2 p-3" data-testid="repos-dialog-folders">
             <div class="flex items-center gap-2">
               <p class="m-0 flex-1 text-muted-foreground">Every git repository inside a scan folder is imported.</p>
               <Button
@@ -179,7 +235,9 @@ const onRemoveRepo = (id: string, name: string) =>
               :data-path="f.path"
             >
               <span class="min-w-0 flex-1 truncate font-data" :title="f.path">{{ f.path }}</span>
-              <span class="shrink-0 text-kira-sm text-muted-foreground">{{ f.repoCount }} repos</span>
+              <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-folder-count">{{
+                f.hiddenCount > 0 ? `${f.repoCount} repos · ${f.hiddenCount} hidden` : `${f.repoCount} repos`
+              }}</span>
               <div class="flex shrink-0 items-center gap-1.5" title="Import new repositories that appear in this folder">
                 <Switch
                   :id="`repos-dialog-watch-${i}`"
@@ -189,6 +247,13 @@ const onRemoveRepo = (id: string, name: string) =>
                 />
                 <Label :for="`repos-dialog-watch-${i}`" class="text-kira-sm text-muted-foreground">watch</Label>
               </div>
+              <TooltipIconButton
+                :icon="f.hidden ? 'eye' : 'eye-closed'"
+                :label="f.hidden ? 'Show all' : 'Hide all'"
+                :aria-pressed="f.hidden"
+                data-testid="repos-dialog-folder-hide"
+                @click="onHideFolder(f.path, !f.hidden)"
+              />
               <TooltipIconButton
                 icon="close"
                 label="Remove folder"
@@ -201,16 +266,7 @@ const onRemoveRepo = (id: string, name: string) =>
       </div>
 
       <DialogFooter>
-        <Button
-          v-if="showRepos && selected"
-          variant="dialog-danger"
-          size="kira-lg"
-          data-testid="repos-dialog-repo-remove"
-          @click="onRemoveRepo(selected.id, selected.name)"
-        >
-          Remove repository
-        </Button>
-        <p v-else-if="!showRepos && note" class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{ note }}</p>
+        <p v-if="!showRepos && note" class="m-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-note">{{ note }}</p>
         <DialogClose as-child>
           <Button variant="dialog" size="kira-lg" class="ml-auto" data-testid="repos-dialog-footer-close">Close</Button>
         </DialogClose>
