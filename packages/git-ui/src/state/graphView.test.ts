@@ -16,7 +16,8 @@ import { TransportError } from '@kira/git-ipc';
 import { sleep } from '@workbench/testing/unit/async';
 import { watch } from 'vue';
 import { BridgeClient } from '../bridge/client.ts';
-import type { LayoutClient } from '../graph/layoutClient.ts';
+import { type LayoutClient, LayoutClientStaleError } from '../graph/layoutClient.ts';
+import { GraphOrderState } from './graphOrder.ts';
 import { GraphViewState } from './graphView.ts';
 
 const REPO_A = '/repos/a';
@@ -315,6 +316,62 @@ describe('GraphViewState — restart from row 0', () => {
     await sleep();
     expect(overruns).toEqual([]);
     expect(graphView.plan.value.length).toBe(3);
+
+    transport.streamOpens[0]?.end();
+    await open;
+    graphView.dispose();
+  });
+});
+
+describe('GraphViewState — plan and layout publish together', () => {
+  test('overlapping relayouts: plan never moves before its layout lands, the stale one publishes nothing', async () => {
+    const pending: Array<{
+      to: number;
+      resolve: (chunk: LayoutChunk) => void;
+      reject: (error: Error) => void;
+    }> = [];
+    const client: LayoutClient = {
+      submit: (input) =>
+        new Promise<LayoutChunk>((resolve, reject) => {
+          pending.push({ to: input.to, resolve, reject });
+        }),
+      // The real client rejects every in-flight submit as stale on reset.
+      reset: () => {
+        for (const request of pending.splice(0)) request.reject(new LayoutClientStaleError(0));
+      },
+      dispose: () => {},
+    };
+    const transport = new RaceTransport();
+    const graphView = new GraphViewState(
+      new BridgeClient(transport),
+      client,
+      new GraphOrderState(),
+    );
+    const sha = (n: number) => n.toString(16).padStart(2, '0').repeat(20);
+    const open = graphView.openStream(REPO_A);
+    await sleep();
+    transport.streamOpens[0]?.push({
+      ...chunkFor(REPO_A, sha(1)),
+      to: 5,
+      commits: buildPackedChunk(
+        Array.from({ length: 5 }, (_, i) => ({ sha: sha(1 + i), subject: `c${i}` })),
+      ),
+    });
+    await sleep();
+    expect(pending).toHaveLength(1);
+    expect(graphView.plan.value.length).toBe(0);
+    expect(graphView.layoutCurrent).toBe(true);
+
+    const second = graphView.rebuildOrder(); // stales the first submit
+    await sleep();
+    expect(pending).toHaveLength(1);
+    expect(graphView.plan.value.length).toBe(0);
+    expect(graphView.layoutCurrent).toBe(true);
+
+    pending[0]?.resolve(fakeLayoutChunk(0, 5));
+    await second;
+    expect(graphView.plan.value.length).toBe(5);
+    expect(graphView.layoutCurrent).toBe(true);
 
     transport.streamOpens[0]?.end();
     await open;

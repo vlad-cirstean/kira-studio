@@ -69,7 +69,7 @@ export class GraphViewState {
   readonly layout: LayoutStore;
   /** The plan `layout` was built for. Display rows move between plans in grouped mode, so a
    *  mismatch means every lane read from `layout` belongs to a different commit. */
-  #layoutPlan: RowPlan | undefined;
+  #layoutPlan: RowPlan;
   readonly loadedRows: ShallowRef<number>;
   readonly remaining: ShallowRef<number>;
   readonly exhausted: ShallowRef<boolean>;
@@ -133,6 +133,7 @@ export class GraphViewState {
     this.#bridge = bridge;
     this.#layoutClient = layoutClient;
     this.#order = order;
+    this.#layoutPlan = this.plan.value;
     this.#packed = new PackedStreamState();
     this.store = this.#packed.store;
     this.loadedRows = this.#packed.loadedRows;
@@ -478,19 +479,21 @@ export class GraphViewState {
     this.#autoRefreshPending = false;
   }
 
-  /** False in grouped mode while `plan` is ahead of `layout` (one worker round trip after each
-   *  rebuild): `graphColumn.ts` draws no lanes then rather than the previous layout's. Identity
-   *  mode never moves rows, so its older layout stays valid for the rows it covers. */
+  /** False in grouped mode when `plan` and `layout` differ (a collapse reset, never a rebuild:
+   *  rebuilds publish both together): `graphColumn.ts` draws no lanes then rather than the other
+   *  plan's. Identity mode never moves rows, so its older layout stays valid for the rows it
+   *  covers. */
   get layoutCurrent(): boolean {
     return this.#order === undefined || this.#layoutPlan === this.plan.value;
   }
 
   #resetLayout(): void {
-    this.#layoutPlan = undefined;
     this.layout.clear();
     this.#layoutClient.reset();
     this.laneCount.value = 0;
-    this.plan.value = identityRowPlan(0);
+    const empty = identityRowPlan(0);
+    this.#layoutPlan = empty;
+    this.plan.value = empty;
   }
 
   /**
@@ -510,7 +513,6 @@ export class GraphViewState {
   async #rebuildLayout(): Promise<void> {
     this.#order?.rebuild(this.store, this.generation.value);
     const plan = this.#order?.plan.value ?? identityRowPlan(this.store.rowCount);
-    this.plan.value = plan;
     const input = projectLayoutInput(plan, this.store.layoutInput(0, this.store.rowCount));
 
     // W15's `layoutSubmitMs` — the worker round trip for the *first* relayout only, so a
@@ -542,7 +544,10 @@ export class GraphViewState {
     // passes through 0 the way it would if `clear()` ran on its own, earlier.
     this.layout.clear();
     this.layout.append(layoutChunk);
+    // Plan and layout publish together: a row never renders against a plan whose lanes are not
+    // yet in `layout` (it drew an empty graph column for the whole stream otherwise).
     this.#layoutPlan = plan;
+    this.plan.value = plan;
     this.laneCount.value = this.layout.laneCount;
   }
 
