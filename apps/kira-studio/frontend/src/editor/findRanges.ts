@@ -1,5 +1,5 @@
+import type { RangeHighlight } from '@workbench/editor/ranges';
 import { REGEX_SCAN_TEXT_CAP } from '../views/shared/page/scan';
-import type { RangeHighlight } from './ranges';
 import { compileSearchPattern, type SearchPatternOptions } from './searchPattern';
 
 // P16 D11: the find bar's own "find" — not @codemirror/search (that package is not a dependency,

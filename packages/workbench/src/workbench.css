@@ -25,5 +25,6 @@
  * files, only takes effect through a file that itself imports the Tailwind root -- exactly what
  * this file's own history above already explains. */
 @import "@theme/base.css";
+@import "./editor/edDecorations.css";
 @source "./";
 @source "../../docker-ui/src";

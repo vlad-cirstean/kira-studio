@@ -5,7 +5,7 @@
 // keystroke stale. parseColorizedLine's own HTML-shape parsing is exercised alongside it since both
 // live in editor/paintSpans.ts and both are pure, DOM-free functions.
 import { describe, expect, test } from 'bun:test';
-import { mergeHighlightRanges, parseColorizedLine } from '../../frontend/src/editor/paintSpans';
+import { mergeHighlightRanges, parseColorizedLine } from '@workbench/editor/paintSpans';
 
 describe('mergeHighlightRanges', () => {
   test('a highlight fully inside one base run splits it into three, middle carrying both classes', () => {

@@ -11,10 +11,10 @@ import {
   type TransformName,
 } from '@kira/api-core';
 import type { ApiVariable } from '@shared/domain/variables';
+import { type Completion, templateToken } from '@workbench/editor/fieldCompletion';
+import type { RangeHighlight } from '@workbench/editor/ranges';
 import type { EditorCompletionSource } from '../../editor/completion';
 import { type ConsoleHoverInfo, formatHoverValue } from '../../editor/hoverInfo';
-import type { RangeHighlight } from '../../editor/ranges';
-import { type Completion, templateToken } from '../../theme/completion';
 import { mergeVariableRows } from './variables';
 
 // P15b D4: the Api side supplies the data, in one module, from the call already being made — F5's

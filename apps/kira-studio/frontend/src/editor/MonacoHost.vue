@@ -11,6 +11,8 @@ import {
   type MonacoModule,
   overflowWidgetsContainer,
 } from '@workbench/editor/monaco';
+import { monacoLanguageIdFor } from '@workbench/editor/monacoLanguages';
+import type { RangeHighlight } from '@workbench/editor/ranges';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import type { SqlDialect } from '../views/shared/sqlIdent';
@@ -22,8 +24,6 @@ import {
   escapeMarkdownSyntaxTokens,
   fenceMarkdownValue,
 } from './hoverInfo';
-import { monacoLanguageIdFor } from './monacoLanguages';
-import type { RangeHighlight } from './ranges';
 
 // `import('monaco-editor').X` inline type references, not a static `import type {...}` — this
 // ambient module's own established style for its types.
@@ -741,7 +741,7 @@ watch(
    needs (no template to put a class on for Monaco's own child DOM). P110 I2-18: the
    `.monaco-host--single-line.monaco-host-pending` compound moved to a ternary on the `<pre>` in the
    template; `.kira-ed-var*` moved to the shared apps/kira-studio/frontend/src/editor/
-   edDecorations.css (M8), imported once from main.ts -- AutocompleteField.vue's overlay painted a
+   edDecorations.css (M8), imported once from workbench.css -- AutocompleteField.vue's overlay painted a
    byte-identical copy of the same three rules. */
 .monaco-host--single-line,
 .monaco-host--single-line :deep(.monaco-editor) {

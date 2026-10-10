@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import type { RangeHighlight } from '@workbench/editor/ranges';
 import { computed, ref } from 'vue';
 import {
   type VariableSupport,
@@ -21,7 +22,6 @@ import {
 } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import type { RangeHighlight } from '../../editor/ranges';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { INLINE_CHARS } from '../../workers/parse/client';
 import { useParseWorker } from '../../workers/parse/useParseWorker';

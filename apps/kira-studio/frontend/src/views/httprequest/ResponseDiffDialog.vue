@@ -8,11 +8,11 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { KIRA_EDITOR_THEME, loadMonaco } from '@workbench/editor/monaco';
+import { monacoLanguageIdFor } from '@workbench/editor/monacoLanguages';
 import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import { control } from '../../bridge/control';
-import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 
 // P8 D12: two entries, three levels of difference, one dialog. `ids` are the two selections from
 // the History list's own checkboxes — this dialog itself decides which is A (older) and which is

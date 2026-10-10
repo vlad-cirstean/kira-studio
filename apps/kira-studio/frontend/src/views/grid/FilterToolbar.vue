@@ -4,11 +4,11 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
 import type { DataTabRecord } from '../../state/tabDomain';
-import AutocompleteField from '../shared/AutocompleteField.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import { identNeedsQuoting, quoteIdent, sqlDialectFor } from '../shared/sqlIdent';
 import {

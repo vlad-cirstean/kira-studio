@@ -2,7 +2,7 @@
 // AutocompleteField.vue — completion.ts is app-side (theme/), so this lives here rather
 // than in packages/api-core/test.
 import { describe, expect, test } from 'bun:test';
-import { templateToken, wholeFieldToken } from '../../frontend/src/theme/completion';
+import { templateToken, wholeFieldToken } from '@workbench/editor/fieldCompletion';
 
 describe('wholeFieldToken (item 7 — F1: Content-T must not become Content-Content-Type)', () => {
   test('a hyphenated header name is one token, trimmed', () => {

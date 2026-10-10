@@ -14,7 +14,7 @@ export function explicitContentType(headers: readonly HttpHeaderState[]): string
   return value;
 }
 
-/** Structurally identical to `theme/completion.ts`'s own `Completion` (label, optional
+/** Structurally identical to `editor/fieldCompletion.ts`'s own `Completion` (label, optional
  *  insert/detail/icon/caretOffsetFromEnd) — declared independently rather than imported, since
  *  `packages/api-core` is app-free, DOM-free logic (P12 D16(e)) and may not import anything under
  *  `apps/**`. TypeScript's structural typing makes `WELL_KNOWN_REQUEST_HEADERS` directly usable
@@ -39,7 +39,7 @@ function header(label: string, detail: string): HeaderCompletion {
  *  `detail` is the one-word category the completion popup right-aligns (the old hand-rolled
  *  autocomplete field's own `sugg-detail`). Canonical Train-Case spelling for `label` — matches
  *  what the header would render as on the wire, and `rankCandidates` already case-folds
- *  (completion.ts:36-38), so typing `content-t` still matches `Content-Type`. */
+ *  (fieldCompletion.ts), so typing `content-t` still matches `Content-Type`. */
 export const WELL_KNOWN_REQUEST_HEADERS: readonly HeaderCompletion[] = [
   // content
   header('Content-Type', 'content'),

@@ -32,7 +32,10 @@ import { colorMarkClass } from '@theme/connColor';
 import { methodTextClass } from '@theme/methodColor';
 import RunState from '@theme/RunState.vue';
 import { refDebounced } from '@vueuse/core';
+import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import { templateToken } from '@workbench/editor/fieldCompletion';
+import type { RangeHighlight } from '@workbench/editor/ranges';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
@@ -47,11 +50,8 @@ import { mergeVariableRows } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
-import type { RangeHighlight } from '../../editor/ranges';
 import { useSettingsStore } from '../../state/settings';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import { templateToken } from '../../theme/completion';
-import AutocompleteField from '../shared/AutocompleteField.vue';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,

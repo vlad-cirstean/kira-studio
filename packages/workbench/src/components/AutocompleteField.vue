@@ -8,11 +8,10 @@ import { loadMonaco, type MonacoModule } from '@workbench/editor/monaco';
 import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
 import { AutocompleteRoot, ComboboxAnchor, ComboboxContent, ComboboxItem, ComboboxPortal, ComboboxViewport } from 'reka-ui';
 import { computed, type HTMLAttributes, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
-import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
-import { overlayOffsetAtPoint, paintOverlayHtml } from '../../editor/paintSpans';
-import type { RangeHighlight } from '../../editor/ranges';
-import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../../theme/completion';
-import type { SqlDialect } from './sqlIdent';
+import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../editor/fieldCompletion';
+import { monacoLanguageIdFor } from '../editor/monacoLanguages';
+import { overlayOffsetAtPoint, paintOverlayHtml } from '../editor/paintSpans';
+import type { RangeHighlight } from '../editor/ranges';
 
 // Mirrors TextField.vue's own inheritAttrs:false — data-testid and friends belong on the real
 // <input>, not on the wrapping <span class="p-input">.
@@ -80,14 +79,11 @@ const props = withDefaults(
      *  which only works on a real `<input>`/`<textarea>`/`[contenteditable]` element, not a wrapper
      *  div around one. */
     language?: EditorLanguageId;
-    /** Monaco's built-in `sql` Monarch has no per-dialect keyword set (MonacoHost.vue's own
-     *  `sqlDialect` prop carries the identical limitation). Kept for call-site compatibility. */
-    sqlDialect?: SqlDialect;
     /** Painted onto the overlay verbatim — a field with no *grammar* (no `language`) still gets the
      *  read-only overlay when it has *ranges* to paint (the URL and header/param value fields'
      *  `{{variable}}` colouring). */
     rangeHighlights?: (doc: string) => readonly RangeHighlight[];
-    /** Overrides the default word-run tokenizer (`completion.ts`'s own `tokenAt`) —
+    /** Overrides the default word-run tokenizer (`fieldCompletion.ts`'s own `tokenAt`) —
      *  `wholeFieldToken` for a field holding exactly one identifier (a header name), `templateToken`
      *  for `{{variable}}` completion. A `null` result clears the current word and closes the popup,
      *  so a variable field only suggests while the caret is actually inside `{{…}}`. */

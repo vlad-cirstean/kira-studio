@@ -8,11 +8,11 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
 import { useEventListener } from '@vueuse/core';
+import AutocompleteField from '@workbench/components/AutocompleteField.vue';
+import type { Completion } from '@workbench/editor/fieldCompletion';
+import { templateToken, wholeFieldToken } from '@workbench/editor/fieldCompletion';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../../api/state/variableCompletion';
-import type { Completion } from '../../../theme/completion';
-import { templateToken, wholeFieldToken } from '../../../theme/completion';
-import AutocompleteField from '../AutocompleteField.vue';
 
 // P3 D15/C6: the one row table behind Params, Headers, urlencoded (C7) and form-data (C8) —
 // RequestHeadersTable.vue and QueryParamsTable.vue were the same file twice minus a checkbox

@@ -7,12 +7,12 @@ import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import AutocompleteField from '@workbench/components/AutocompleteField.vue';
+import { templateToken } from '@workbench/editor/fieldCompletion';
 import { formatBytes } from '@workbench/util/format';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import { templateToken } from '../../theme/completion';
-import AutocompleteField from '../shared/AutocompleteField.vue';
 import FieldRowsTable from '../shared/fields/FieldRowsTable.vue';
 import { chooseBodyFile } from './files';
 
