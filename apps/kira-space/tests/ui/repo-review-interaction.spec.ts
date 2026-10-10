@@ -173,6 +173,6 @@ test('contract: stored review comments come back in the Review pane', async ({ r
   );
   const page = await openReviewListing(relaunch, { results: { 'review.comment.list': list } });
   const host = page.locator('[data-testid="repo-review-host"]');
-  await host.getByRole('button', { name: `Comments (${list.comments.length})` }).click();
+  await host.locator('[data-testid="review-pane-comments"]').click();
   await expect(host.getByText(list.comments[0].body)).toBeVisible();
 });

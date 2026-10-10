@@ -31,7 +31,7 @@ test('a query on Branches badges Stashes and survives the tab switch', async ({ 
   await page.locator('input[aria-label="Filter branches"]').fill('auth');
 
   const stashesTab = page.getByRole('button', { name: /^Stashes/ });
-  await expect(stashesTab).toHaveAttribute('aria-label', 'Stashes (1)');
+  await expect(stashesTab.locator('[data-testid="picker-tab-badge"]')).toHaveText('1');
 
   await stashesTab.click();
   await expect(page.locator('input[aria-label="Filter stashes"]')).toHaveValue('auth');

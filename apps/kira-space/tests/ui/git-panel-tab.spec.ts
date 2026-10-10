@@ -32,25 +32,25 @@ const modeTab = (page: Page, mode: 'git' | 'automations') =>
 
 test('opening a repo from the Repos list leaves the Repos tab selected', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: CONTROL });
-  await expect(panelTab(page, 'repos')).toHaveAttribute('data-state', 'on');
+  await expect(panelTab(page, 'repos')).toHaveAttribute('aria-pressed', 'true');
   await page.locator(`[data-testid="repo-row"][data-repo-id="${REPO.id}"]`).click();
   await expect(page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]')).toHaveCount(
     1,
   );
-  await expect(panelTab(page, 'repos')).toHaveAttribute('data-state', 'on');
-  await expect(panelTab(page, 'files')).toHaveAttribute('data-state', 'off');
+  await expect(panelTab(page, 'repos')).toHaveAttribute('aria-pressed', 'true');
+  await expect(panelTab(page, 'files')).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('the picked tab survives leaving the Git module and coming back', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: CONTROL });
   await page.locator(`[data-testid="repo-row"][data-repo-id="${REPO.id}"]`).click();
   await panelTab(page, 'review').click();
-  await expect(panelTab(page, 'review')).toHaveAttribute('data-state', 'on');
+  await expect(panelTab(page, 'review')).toHaveAttribute('aria-pressed', 'true');
 
   await modeTab(page, 'automations').click();
   await expect(panelTab(page, 'review')).toHaveCount(0);
   await modeTab(page, 'git').click();
-  await expect(panelTab(page, 'review')).toHaveAttribute('data-state', 'on');
+  await expect(panelTab(page, 'review')).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('the picked tab survives a reload with a restored repo workspace', async ({ relaunch }) => {
@@ -74,10 +74,10 @@ test('the picked tab survives a reload with a restored repo workspace', async ({
       },
     ],
   });
-  await expect(panelTab(page, 'repos')).toHaveAttribute('data-state', 'on');
+  await expect(panelTab(page, 'repos')).toHaveAttribute('aria-pressed', 'true');
   await panelTab(page, 'review').click();
-  await expect(panelTab(page, 'review')).toHaveAttribute('data-state', 'on');
+  await expect(panelTab(page, 'review')).toHaveAttribute('aria-pressed', 'true');
 
   await page.reload();
-  await expect(panelTab(page, 'review')).toHaveAttribute('data-state', 'on');
+  await expect(panelTab(page, 'review')).toHaveAttribute('aria-pressed', 'true');
 });

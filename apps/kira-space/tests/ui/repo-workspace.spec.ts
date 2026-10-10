@@ -350,7 +350,7 @@ test('a repo workspace: the panel has three top-level tabs (Repos/Files/Review),
   );
   await expect(topTabs).toHaveCount(3);
   const labels = await topTabs.allTextContents();
-  expect(labels).toEqual(['Repos', 'Files', 'Review']);
+  expect(labels.map((l) => l.trim())).toEqual(['Repos', 'Files', 'Review']);
 
   // Files tab: its own inner strip is Files/Search only — Review is no longer one of its values.
   await page.locator('[data-testid="git-panel-tab-files"]').click();
@@ -359,7 +359,7 @@ test('a repo workspace: the panel has three top-level tabs (Repos/Files/Review),
     '[data-testid="repo-view-files"], [data-testid="repo-view-search"]',
   );
   await expect(innerStrip).toHaveCount(2);
-  expect(await innerStrip.allTextContents()).toEqual(['Files', 'Search']);
+  expect((await innerStrip.allTextContents()).map((l) => l.trim())).toEqual(['Files', 'Search']);
 
   // Review shows the real ReviewView.vue bundle, not an empty container.
   await page.locator('[data-testid="git-panel-tab-review"]').click();
