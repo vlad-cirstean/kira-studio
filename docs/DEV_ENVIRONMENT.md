@@ -161,14 +161,14 @@ running it here. **As of v1.9 P100, the whole module lives under `apps/kira-spac
 historical prose.
 
 - **`go test ./apps/kira-space/internal/git...` needs a real `git` on `PATH` and nothing else** —
-  no Docker, no container, no display, no VS Code. Each test builds its own repository under
+  no Docker, no container, no display. Each test builds its own repository under
   `t.TempDir()`, and cases that need `git` self-skip without it. The app's own floor is **git
   2.38** (`merge-tree --write-tree`), so an older `git` skips more than it runs rather than failing
   informatively.
-- **`KIRA_SPACE_HOME` scopes the socket, not just the database.** The listener is
-  `${KIRA_SPACE_HOME}/git.sock` with its flock beside it, so two `KIRA_SPACE_HOME`s are two fully
-  independent backends and a test never contends with a `bun run dev:space` session's socket.
-  Anything needing a server builds one over its own temp `KIRA_SPACE_HOME` — never the fixed path.
+- **`KIRA_SPACE_HOME` scopes the instance lock, not just the database.** The single-instance flock
+  is `${KIRA_SPACE_HOME}/app.lock`, so two `KIRA_SPACE_HOME`s are two fully independent backends
+  and a test never contends with a `bun run dev:space` session. Anything needing a server builds
+  one over its own temp `KIRA_SPACE_HOME` — never the fixed path.
   Never `KIRA_HOME` (Kira Studio's own env var) — the two apps' homes are fully separate as of
   P100, so setting the wrong one silently talks to the wrong app's storage, or none at all.
 - **A test binary panics if it resolves an app home with `KIRA_HOME`/`KIRA_SPACE_HOME` unset** (`kirapaths.Home`, non-`production` builds). A package whose tests reach one calls `testx.RunWithTempHomes` from `TestMain`.
@@ -177,7 +177,7 @@ historical prose.
   port (9246, beside Kira Studio's 9245) so both can run at once without colliding.
 - **The perf probes are opt-in and assert nothing.**
   `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-space/internal/flows/gitflow/ -v`
-  prints one `key=value` line per probe. The `gitsock` copy goes in P243 Part 2. No threshold assertion, deliberately: this container's
+  prints one `key=value` line per probe. No threshold assertion, deliberately: this container's
   numbers and a real Mac's aren't comparable, so a hard bound would be flaky in exactly the way
   it's meant to guard against. Record numbers in the commit message and, when they
   answer a stated budget, in `docs/PERF.md`.
@@ -206,10 +206,6 @@ historical prose.
 - **The FSEvents watcher is `darwin && cgo`** (`apps/kira-space/internal/gitclient/watcher_fsevents_darwin.go`), so
   a Linux run exercises the `fsnotify` companion instead. Both satisfy the same seam and both are
   covered by `watcher_test.go`; only the darwin backend's own behaviour needs real hardware.
-- **The extension's own suites need neither VS Code nor `xvfb`.** `bun run test:webview` builds the
-  extension bundle and drives the real emitted webview documents in headless Chromium (a layout
-  project asserting rendered box heights, and an interaction project); `bun run test:unit` covers
-  the extension's and `packages/git-*`'s in-source specs alongside everything else.
 - **The scoped Go race run** for a git-chapter phase is the git packages in play plus
   `internal` itself for the layering test, not the whole tree — `docs/v1.3/SPEC.md`'s own "Full
   verification scope" note fixes the list and the reason. The unscoped tree stays worth running

@@ -1598,8 +1598,8 @@ program.
 Upstream's ≤300 ms first-paint budget was measured over in-process `postMessage`. v1.3 replaced
 that with a Unix socket plus FlatBuffers framing, so `docs/v1.3/SPEC.md` carried a standing note
 asking for re-measurement, not re-derivation. G3 built the probe (`TestGraphStreamPerf`) and G8
-extended it to nine (`TestG8PerfBaseline`), both in `internal/gitsock/` (`apps/kira-studio/` at the
-time; moved to `apps/kira-space/` at v1.9 P100, same relative path). Both are
+extended it to nine (`TestG8PerfBaseline`), both in `internal/gitsock/` at the time (the
+suites now live in `apps/kira-space/internal/flows/gitflow/`, P243; `gitsock` is gone). Both are
 **opt-in** — `KIRA_GIT_PERF=1`, skipped in `-short`, skipped without `git` on `PATH` — and **assert
 nothing**: each prints one `key=value` line. That's a decision, not an omission: a hard threshold
 in a suite that also runs on real macOS hardware would be flaky in exactly the way
@@ -1642,7 +1642,7 @@ replaced and is worth investigating before merge." None of G34's four commits
 review flagged the gap. This entry supplies the measurement the exit criterion asked for, run now
 rather than at the time.
 
-**Method.** `bun run build:vscode` (`scripts/build-vscode.ts`, the same Vite production build G34's
+**Method.** `bun run build:vscode` (removed in P243 Part 2; `scripts/build-vscode.ts`, the same Vite production build G34's
 own exit criterion #4 already exercises) at the commit immediately before G34's first code change
 (`521fcba`, a docs-only plan commit — its parent has no G34 code at all) versus at G34's last commit
 (`bf0a1d8`). Nothing between `bf0a1d8` and the measurement date touches a `.vue` `<style>` block or
@@ -1830,7 +1830,7 @@ multiplier.
 | `internal/gitsession` | 17.4s | 6.5s (`-race`) | `t.Parallel()` on everything except `concurrency_test.go` (ordering/timing-sensitive by its own header) — no `t.Setenv` blocker existed here |
 | `gitclient/porcelain`, `gitpreflight`, `gitops`, `gitsearch` | each &lt;1s | unchanged, `-race`-clean | `t.Parallel()` added for correctness headroom; none was ever on the critical path so wall clock doesn't move |
 
-**A real, load-bearing prerequisite, found empirically, not in the original plan**: `gitsock` fully
+**A real, load-bearing prerequisite, found empirically, not in the original plan**: `gitsock` (since removed) fully
 parallel hangs — not just slow, a genuine 10-minute timeout with goroutines stuck mid-read — under
 this container's stock `fs.inotify.max_user_instances` (128). Each open repo holds one fsnotify
 watcher, one inotify instance apiece; a 100-plus-test parallel run exhausts the ceiling faster than

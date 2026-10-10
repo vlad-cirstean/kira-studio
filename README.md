@@ -9,7 +9,7 @@ Wails (Go) and Vue 3, and you switch between its **Studio** (database), **Api**,
 
 This repository also contains a sibling app, **Kira Space** — a native git client and code
 workspace with coding agents (ADE), a memory store, a terminal and a phone view on your home
-network, plus a VS Code extension over the same backend. This README covers Kira Studio; see
+network. This README covers Kira Studio; see
 [`apps/kira-space/README.md`](apps/kira-space/README.md) for Kira Space.
 
 ## Status
@@ -196,7 +196,6 @@ package under `apps/kira-studio/internal/adapters/`, not changing the UI.
 ```
 apps/kira-studio      this app: Go backend (internal/), Vue frontend (frontend/src), tests
 apps/kira-space       Kira Space, the git client and code workspace
-apps/kira-space-vscode  Kira Space's VS Code extension
 internal              Go shared by both apps
 packages/             TypeScript/Vue shared by both apps (workbench shell, theme, wire protocol, Api logic, git UI)
 docs                  architecture, packaging, performance and the per-chapter records

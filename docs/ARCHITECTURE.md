@@ -43,7 +43,7 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod's remaining TypeScript-side job is connection-dialog input — the engine wire protocol it used to guard (`src/engine/{control,rpc,data,stdio-main}.ts`) went with `src/engine/`'s deletion (P58f). Rows read back out of SQLite are validated in Go (`apps/kira-studio/internal/storage/model/`) |
 | Lint + format | Biome (TS/Vue, incl. its `performance` rule group as of P94 pass 1 and `complexity/noExcessiveCognitiveComplexity` at `maxAllowedComplexity: 30` as of P94 pass 3), `golangci-lint` (Go — `bodyclose`, `copyloopvar`, `gocognit`, `gocritic`'s performance tag, `gocyclo`, `govet`, `ineffassign`, `makezero`, `prealloc`, `unconvert`, `unused`; `gocognit`/`gocyclo` at `min-complexity: 30` as of P94 pass 2), `knip` (TS/Vue dead files/dependencies/duplicate exports, plus unused exports/types/binaries as of P94 pass 3) | Biome for TS/Vue formatting stays the single tool there, no ESLint/Prettier; `bun run lint` also runs `scripts/check-tokens.sh`, `scripts/check-theme-classes.sh` and `scripts/check-class-conflicts.ts` (the theme/Tailwind guards above); `golangci-lint`/`knip` are pre-push-hook/CI-only (`.githooks/pre-push`, `docs/DEV_ENVIRONMENT.md`), not per-commit |
 | Storage | SQLite at `~/.kira-studio/kira.db`, accessed **from Go** | `database/sql` + `modernc.org/sqlite` (pure-Go, no cgo — the same driver the sqlite adapter package already used for browsing external files, now also backing the app's own database); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
-| Packaging | `wails3 task darwin:package:dmg` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`), both the `.app` and the `.dmg` around it; ships as a styled disk image with an `/Applications` shortcut (P10), no *silent* auto-update (P119 adds a user-initiated one, `scripts/install.sh`), no notarization; no `runtime/` tree to vendor or sign any more (P58f). **As of P100, this DMG carries no `.vsix` at all** — the packaged VS Code extension (`@vscode/vsce`, G10) and its "Install VS Code Integration" button (`internal/gitvsix`) both moved to Kira Space's own DMG, since the extension is Kira Space's frontend now, not a companion to this app |
+| Packaging | `wails3 task darwin:package:dmg` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`), both the `.app` and the `.dmg` around it; ships as a styled disk image with an `/Applications` shortcut (P10), no *silent* auto-update (P119 adds a user-initiated one, `scripts/install.sh`), no notarization; no `runtime/` tree to vendor or sign any more (P58f). **No DMG carries a `.vsix`** (Kira Space's VS Code extension was removed in P243 Part 2) |
 | DB tests | Testcontainers, driven from Go (`testcontainers-go`) | Real-container adapter coverage is Go (`apps/kira-studio/internal/adapters/testsupport/`, `bun run test:go`), not Bun — `packages/db-fixtures/` no longer holds per-engine specs (P58f D1); it survives as the shared fixture corpus (`fixtures/*.sql`, `support/*.ts`) that Go's `testsupport` package and `apps/kira-studio/tests/e2e-real/` both seed from, Bun driving only that `e2e-real` seeding; real containers, real data; Colima |
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
@@ -521,8 +521,7 @@ connection-flow change out of scope for this pass.
 
 `~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`), `logs/`, and the DB MCP server's own
 token `mcp-db-token.json` (one per `KIRA_HOME`, no slug) — each covered in its own paragraph below.
-**As of P100, this directory holds no git state at all**: `review.db`, `git.sock`/`git.sock.lock`
-moved to Kira Space's own `~/.kira-space/` under `KIRA_SPACE_HOME` (see the Git module section
+**As of P100, this directory holds no git state at all**: `review.db` moved to Kira Space's own `~/.kira-space/` under `KIRA_SPACE_HOME` (see the Git module section
 below).
 
 Credentials in the `connections` table's `password` column are **encrypted at rest** (P25), now from
@@ -808,7 +807,7 @@ come after 0027; `0024_p85_custom_scripts.sql`
 created `custom_scripts`; `0025_p97_drop_repo_map.sql`; `0026_p100_drop_git_tables.sql`;
 `0027_p108part11_op_log_path.sql` added `op_log.path TEXT`, the console path an op actually ran
 against, F5). Kira Space's own `kira.db` runs its own sequence
-(`apps/kira-space/internal/storage/migrations/`, high-water **0030**; `0030_p242_recurring_scripts.sql` is Studio's 0037; `0029_p242_scripts_in_ade.sql` is Studio's 0036; `0028` is Part 2's smart-script columns; `0026_p242_automations.sql` is Studio's 0034 plus `ade_runs.outcome_json`; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033; `0021_p212_mobile_devices.sql`, `0022_p212_mobile_permissions.sql`, `0024_p222_code_repo_color.sql`, `0025_p223_mobile_lan.sql`): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
+(`apps/kira-space/internal/storage/migrations/`, high-water **0031**; `0031_p243_drop_git_clients.sql` drops `git_clients`, the paired-editor trust store (P243 Part 2); `0030_p242_recurring_scripts.sql` is Studio's 0037; `0029_p242_scripts_in_ade.sql` is Studio's 0036; `0028` is Part 2's smart-script columns; `0026_p242_automations.sql` is Studio's 0034 plus `ade_runs.outcome_json`; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033; `0021_p212_mobile_devices.sql`, `0022_p212_mobile_permissions.sql`, `0024_p222_code_repo_color.sql`, `0025_p223_mobile_lan.sql`): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
 window mode, the ADE tables (see ADE, Storage) and `0020_p204_custom_scripts.sql` (scripts).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -1001,8 +1000,7 @@ before the split.** The git module's incremental-review state lives in its own f
 is nothing like the rest of the app's data: bulk blob content, and TTL purges that want to reclaim
 space aggressively without holding a lock on the main database while they do it. Construction is
 free — the file is neither created nor opened until the first request that actually needs one, so
-an instance that never serves a review request (including a second instance that lost the
-`git.sock.lock` flock) never creates the file and never starts its reaper. Four tables:
+an instance that never serves a review request never creates the file and never starts its reaper. Four tables:
 `review_session`, one per `(repo_id, branch)` with `last_used_at` indexed because that is the
 reaper's entire query; `review_file`, one per reviewed path, carrying the reviewed-at sha, git's
 own blob oid, a `content_kind` of `text`/`binary`/`tooLarge`/`absent`, the *uncompressed* length,
@@ -1435,7 +1433,7 @@ own prop shape, not either app's own tab-record type.
 
 **The Operations panel is a shared component now, not a Kira-Studio-only one (P132 Part 1 §2).** `packages/workbench/src/components/OpLogPanel.vue` (generic over `R extends OpLogRecord`) and `packages/workbench/src/state/createOpLogStore.ts`'s `createOpLogStore<R>({ control, searchText? })` are the panel shell and Pinia store factory; `packages/shared/domain/ops.ts`'s `opLogRecordSchema`/`OpLogRecord` (id, startedAt, durationMs, kind as a plain `z.string()`, status, command, error) is the base contract a consumer's own record extends — Kira Studio's `OpRecord` (`opLogRecordSchema.extend({ connectionId, tabId, kind: opKindSchema, rows, commandTruncated, path })`) is the first of two consumers (Kira Space's `SpaceOpRecord` is the second, P132 Part 2, below). `apps/kira-studio/frontend/src/workbench/panels/OperationsPanel.vue` wraps `OpLogPanel` with its own `columns` array and `#cell`/`#detail` slots (connection chip, tab, rows, the `MonacoHost` command detail) and a `menuFor` prop building its five-item context menu (`opLogMenuItems` supplies the generic copy-command/copy-error/cancel three, in a fixed order so a consumer can destructure them) around Studio-only actions (reveal tab, re-run). `toggleOperationsPanel`/`setOperationsHeight` moved from Kira Studio's own `state/layout.ts` into the shared `createLayoutStore.ts` core (both apps use them). No Kira-Studio import (`MonacoHost`, a connections store, `kira-studio`) reaches the shared package — verified, not assumed (P132 Part 1 §7's own closing-audit grep).
 
-**Kira Space mounts the same dock over an in-memory op log (P132 Part 2).** `WorkbenchShell.vue` (shared) always mounts `#dock`; `hasDock` is gone, `opsVisible`/`opsHeight` are required props, status bar always `mt-1`. Space's dock shows in `ade` full layout too, gated only by `panel.operations.visible`. Go side: `apps/kira-space/internal/oplog` is a 500-record ring, process-global, lost on quit, app-local (Studio's op log is SQLite-backed and shares nothing). Producer is `gitsession`: `RunOp`, `UndoRun` (takes `connLabel`), `RunRemote` with a non-nil conn and `RunRestack` start an op; four write-spawn sites record argv through `noteWrite` (`runWriteArgvList`, `runRemoteSpawn`, pull integrate, `runRestackSpawn`). Auto-fetch ticks (nil conn), `RunPrepare` and every read are not logged; an auto-fetch stop and a failed graph load are recorded once each (P173, `Log.Record`). Command comes from argv only, so the askpass token in env is never recorded. Cancel registers for fetch, pull's fetch stage and restack (`CancelRemote`/`CancelRestack`); push family is never cancellable. Each op unregisters its cancel before releasing its `opSlot`, and `Log.Cancel` calls the func under the log lock, so a late cancel never hits the next op. `Registry.OpLog` is set in `wireGit` before `gitSock.Start()`: a paired VS Code client can write before the emitter exists. `OpsService` (`Recent`, `Cancel`) plus `kira:op:update` broadcast to every window; `Clear` is per window, renderer-only. `source` is `Conn.ClientLabel`: `"Kira Space"` (native conn, renamed from `"This window"`, which was false in other windows), `"Kira Space ade"`, or a VS Code client label. `ChannelOpUpdate`/`ChannelToggleOperationsPanel` live in `internal/appevent`; `onToggleOperationsPanel` lives in `createCoreControl`. Cmd+J reaches the renderer only through the Go menu item (`Toggle Operations Panel`), never a keydown.
+**Kira Space mounts the same dock over an in-memory op log (P132 Part 2).** `WorkbenchShell.vue` (shared) always mounts `#dock`; `hasDock` is gone, `opsVisible`/`opsHeight` are required props, status bar always `mt-1`. Space's dock shows in `ade` full layout too, gated only by `panel.operations.visible`. Go side: `apps/kira-space/internal/oplog` is a 500-record ring, process-global, lost on quit, app-local (Studio's op log is SQLite-backed and shares nothing). Producer is `gitsession`: `RunOp`, `UndoRun` (takes `connLabel`), `RunRemote` with a non-nil conn and `RunRestack` start an op; four write-spawn sites record argv through `noteWrite` (`runWriteArgvList`, `runRemoteSpawn`, pull integrate, `runRestackSpawn`). Auto-fetch ticks (nil conn), every read is not logged; an auto-fetch stop and a failed graph load are recorded once each (P173, `Log.Record`). Command comes from argv only, so the askpass token in env is never recorded. Cancel registers for fetch, pull's fetch stage and restack (`CancelRemote`/`CancelRestack`); push family is never cancellable. Each op unregisters its cancel before releasing its `opSlot`, and `Log.Cancel` calls the func under the log lock, so a late cancel never hits the next op. `Registry.OpLog` is set in `wireGit`. `OpsService` (`Recent`, `Cancel`) plus `kira:op:update` broadcast to every window; `Clear` is per window, renderer-only. `source` is `Conn.ClientLabel`: `"Kira Space"` (native conn, renamed from `"This window"`, which was false in other windows), `"Kira Space ade"`, or a VS Code client label. `ChannelOpUpdate`/`ChannelToggleOperationsPanel` live in `internal/appevent`; `onToggleOperationsPanel` lives in `createCoreControl`. Cmd+J reaches the renderer only through the Go menu item (`Toggle Operations Panel`), never a keydown.
 
 **C5 widened this from "per mode" to "per workspace"** (see "Native code workspace (C5)" in the Git
 module section) — `packages/shared/domain/tabs.ts`'s `TabScope = AppMode | 'repo'` is each
@@ -2286,10 +2284,8 @@ should be re-evaluated.
 
 Two processes for the Studio and Api modules: the **webview** running the Vue renderer, and the
 **Go shell** owning the window, all app state, and now every database driver too. **As of P100,
-this is the whole of Kira Studio's own process model** — the git module (and its own third process,
-a separately-installed VS Code extension host reached over a Unix socket) moved out entirely into
-Kira Space, a separate app with its own identical two-process shape plus that same third one (see
-Git module, above).
+this is the whole of Kira Studio's own process model** — the git module moved out entirely into
+Kira Space, a separate app with the identical two-process shape (see Git module, above).
 
 ```
 ┌──────────────────────┐
@@ -2327,8 +2323,7 @@ and no per-connection Go process exists either — the adapter host multiplexes 
 connection through its own registry and cache regardless of how many are open at once.
 
 **Keep-awake is a short-lived child process the Go shell can spawn**, beside
-`internal/startupfail`'s `osascript`/`pbcopy` (`internal/gitvsix`'s `code` spawn moved to Kira
-Space with the rest of the git module, v1.9 P100 — this binary no longer has it, P87). `internal/
+`internal/startupfail`'s `osascript`/`pbcopy` (`gitvsix`'s `code` spawn went with the git module, P100, and is gone entirely as of P243 Part 2). `internal/
 keepawake` (repo-root as of v1.9 P116, shared by both apps rather than Kira Studio-only) composes
 independent, level-shaped reasons onto one `Controller`, a set of held reasons rather than a
 refcount (a refcount double-acquires the moment either source re-asserts a level it already holds).
@@ -2557,13 +2552,9 @@ listener moved to a shared package that Kira Space, not Kira Studio, now wires (
 keep-awake and Claude Code hook monitoring paragraphs above)); one the Docker module's
 (`DockerService`, P200, see "Docker module").
 `UpdateService` (P66) rounds it out. **One used to be the git module's — `GitClientsService`, gone
-as of P100.** It
-was the *Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and
-the only bound service the headless git module had, since everything else it did crossed its own
-socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
-along with the rest of the module (see Git module, above) — Kira Studio's `Bound()` binds no
+as of P100** (it moved to Kira Space and was deleted there in P243 Part 2 with the *Connected editors* pane) — Kira Studio's `Bound()` binds no
 git-related service of any kind any more, confirmed by the grep above and the phase-closing audit's
-own service-list check, below. Kira Space's own `Bound()` binds a separate **20**
+own service-list check, below. Kira Space's own `Bound()` binds a separate **22**
 (`grep -o 'NewService(w\.' apps/kira-space/internal/appwire/appwire.go | wc -l`; this count already included P116/P119's
 own additions — `KeepAwakeService`, `WindowsService`, `UpdateService` — before P128 touched it, and
 P129 Part 1's own ADE service (now `AdeTaskService`) since; P201 added `MemoryService`, P204
@@ -2763,13 +2754,12 @@ release-page behavior with this dialog, the deliberate behavior change P119's ow
 **Kira Space, not Kira Studio, from here to the end of this section.** Through v1.3-v1.9 P99, git
 was the third top-level module of Kira Studio itself, beside `studio` and `api` — the paragraphs
 below describe exactly how that worked, and every technical claim in them (the transport, the
-session model, the Go packages, the extension, the native mount, code review, inline blame) is
+session model, the Go packages, the native mount, code review, inline blame) is
 still true today. **P100 changed only *which app* it runs in and *what sits beside it*:** the whole
-module — every `internal/git*` Go package (plus `internal/ghclient`/`internal/codeworkspace`), the
-VS Code extension, and `packages/git-ui`/`packages/git-core`/`packages/git-ipc`/`packages/kira-ui`'s
+module — every `internal/git*` Go package (plus `internal/ghclient`/`internal/codeworkspace`), and `packages/git-ui`/`packages/git-core`/`packages/git-ipc`/`packages/kira-ui`'s
 consumers — moved out of `apps/kira-studio` into `apps/kira-space`, a **separate, standalone macOS
 app** with its own binary, its own `~/.kira-space/` home (`KIRA_SPACE_HOME`), its own `kira.db` and
-`review.db`, and its own `git.sock`. Kira Space has **no `studio`/`api` sibling modules of Kira
+and `review.db`. Kira Space has **no `studio`/`api` sibling modules of Kira
 Studio's own kind** — every "beside `studio` and `api`"/"peer `AppMode`"/"title bar reads
 `Studio | Api | Git`" claim below describes Kira Studio's history through P99, not Kira Space's
 present structure. From P100 through P127, Kira Space's own window had no title-bar mode switcher
@@ -2789,8 +2779,7 @@ from any path always shows it; the boot-time fall-forward onto the first restore
 (`main.ts`) does not, so a relaunch into a persisted `automations`/`ade` mode stays there even with
 repositories open behind it.** Every "Kira Studio" below that means *this app, the one whose window
 hosts the git UI* now means Kira Space; every "Kira Studio" that means *the DB/API client, a
-different app entirely* (the Settings dialog's *Connected editors* pane and *Git* section, the
-trust authority, the pairing approval prompt) also now means Kira Space, for the same reason — Kira
+different app entirely* (the Settings dialog's *Git* section) also now means Kira Space, for the same reason — Kira
 Studio itself holds none of this any more, confirmed by the phase-closing audit's own grep, below.
 **P116 gave
 Kira Space the rest of Kira Studio's own generic window chrome**: a native menu (Settings…, View ›
@@ -2802,22 +2791,10 @@ AppMetricsItem}.vue`), not a Space-only reimplementation. P119 added a fourth: K
 same status-bar update item and in-app update dialog Kira Studio does, over its own `UpdateService`
 sharing the same repo-root `internal/appupdate`. Space's own Window menu now matches Kira
 Studio's own long-standing scheme exactly: Close Tab claims ⌘W, Close Window moved to ⇧⌘W — the one
-user-visible behavior change this phase made (Space's ⌘W used to close the window). The primary
-frontend is still a separately-installed VS Code extension (`apps/kira-space-vscode`, renamed from
-`apps/kira-studio-vscode` at P100 Part 3) connecting as an external client, dialing the same Unix
-socket the native window's own in-process stream also reaches (see "Git graph in the native
-workspace (C10)" below).
-
-**Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
-the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
-transport seam instead of a UI one: `rpcstream`'s `Conn{Send([]byte) error; Receive() ([]byte,
-error)}` is the whole of what the protocol needs from a channel, so the same `Handlers` serve a
-Unix socket today and would serve an in-process Wails stream unchanged. An embedded git UI is out
-of scope and stays additive rather than a rework — the same "additive, not a rework" shape the
-`-tags server` build tag already gives the `studio` data plane. `-tags server` itself is a Wails v3
-platform facility (`pkg/application`), not per-app source (`docs/DEV_ENVIRONMENT.md`'s own "zero
-source changes" note) — Kira Space gets the identical `go build -tags server` substitute for free,
-verified booting the same way Kira Studio's own does (P100 Part 2's own verification).
+user-visible behavior change this phase made (Space's ⌘W used to close the window). The git UI is `packages/git-ui`, mounted by Kira Space's own window (see "Git graph in the native
+workspace (C10)" below). `-tags server` is a Wails v3 platform facility (`pkg/application`), not
+per-app source (`docs/DEV_ENVIRONMENT.md`'s "zero source changes" note); Kira Space gets the identical
+`go build -tags server` substitute (P100 Part 2's verification).
 
 **P67b (historical, while this ran inside Kira Studio): `git` is a peer `AppMode`, not a per-repo
 title-bar tab.** Before P67b, opening a repository added one extra tab to the title bar per open
@@ -2846,66 +2823,39 @@ module system.
 
 ### Transport
 
-**One Unix domain socket at `${KIRA_SPACE_HOME}/git.sock`** (default `~/.kira-space/git.sock`, its
-own separate home directory and env var as of P100 — never `KIRA_HOME`/`~/.kira-studio`, which is
-Kira Studio's own, unrelated home), mode 0600, inside the 0700 directory `config.EnsureLayout`
-already owns. There is **no discovery or announce mechanism**: the extension dials the fixed path,
-and a connection failure means Kira Space isn't running — that is the entire signal, with nothing
-further to distinguish. This app is macOS-only, so a Unix socket is unconditionally viable with no
-cross-platform fallback.
+**One in-process Wails stream per window, no socket.** `apps/kira-space/internal/bridge/gitstream.go`'s
+`ServeGitStream` serves `gitrpc.Router` over `rpcstream` (the same pattern `ServeEngineStream` uses
+for the `studio` data plane). `rpcstream`'s `Conn{Send([]byte) error; Receive() ([]byte, error)}` is
+the whole of what the protocol needs from a channel. No handshake, no pairing, no trust store: the
+peer is this process's own webview. Through P243 Part 2 a Unix socket (`git.sock`) served a
+separately-installed VS Code extension; both are gone, and `removeLegacyGitSocket` in `main.go`
+deletes the `git.sock`/`git.sock.lock` an older build left in `KIRA_SPACE_HOME`.
 
-**Stale-socket recovery is an `flock`, not a liveness probe.** At startup the app takes an
-exclusive lock on `${KIRA_SPACE_HOME}/git.sock.lock`. Lock acquired: any `git.sock` still on disk is a
-crash leftover — unlink it and listen. Lock already held: another instance is serving, and this one
-does not listen. Either way the app still boots; `internal/appwire/wire.go` logs the listener's error and never
-`Fatal`s on it. A `SIGKILL`ed instance's flock is released by the kernel, so the next launch
-recovers with no stale-pid file and no manual cleanup, and a leaked askpass directory needs no
-startup sweep, since it is inert.
+**An `flock` on `${KIRA_SPACE_HOME}/app.lock` is the single-instance guard.**
+`config.AcquireLock` takes it before `storage.Open`. Not acquired means another instance owns the
+home: the process logs and exits 0. A `SIGKILL`ed instance's lock is released by the kernel, so no
+stale-pid file or manual cleanup exists.
 
-**Pairing is the auth model, and there is no pre-shared token file.** A client's `hello` carries
-its identity and, if it has one, an opaque token; the server answers `ready`, `versionMismatch`,
-`tokenRejected`, or `pairingRequired`. An unrecognised or invalid token raises an approval prompt
-**in Kira Space's own window** — Kira Space is the trust authority, not the requesting editor —
-one prompt on screen at a time with concurrent requests queued and counted, a 120 s window per
-request measured from enqueue (a request arriving before any window exists is *held*, not
-auto-denied), and a 60 s cooldown after an explicit denial so a reconnecting extension cannot
-re-prompt in a loop. Before the handshake the server reads the peer's uid and pid from the kernel
-(`SO_PEERCRED` on Linux, `LOCAL_PEERCRED`/`LOCAL_PEERPID` on macOS) and closes a different uid or a
-failed lookup with no frame. The prompt shows the kernel-reported executable and pid; the label is
-client-reported and marked so. One Approve admits exactly one connection (P172): same-client
-requests queued behind it are aborted with no token and redial, then reuse the token the approved
-window stored in the shared `context.secrets`, or get their own prompt. The macOS credential path
-compiles but has not run on macOS. The approved token is 32 `crypto/rand` bytes; **only `sha256(salt‖token)` is
-stored**, compared with `subtle.ConstantTimeCompare`. The plaintext is never stored and never
-recoverable — not an omission, a consequence: verifying a presented token is the only thing this
-app ever needs to do with one, so a reversible form would mean strictly more exposure for no
-capability. The extension keeps its own copy in VS Code's `context.secrets`. Revoking from the
-*Connected editors* pane sets `revoked_at` and closes every live connection holding that id; the
-extension receives `tokenRejected`, clears its stored token, and re-dials with none, producing a
-fresh prompt. A row is never deleted — a re-pair clears `revoked_at` on the same row, so a fresh
-human approval always re-admits.
+**Version compatibility is one number.** `gitrpc.ContractVersion` and
+`packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are equal (**46** today, asserted equal by
+tests on both sides). `app.init` returns `{contractVersion, serverVersion, git, dateFormat}`;
+`dateFormat` is Space's app-wide `appearance.dateFormat`. Both sides ship in one binary, so a mismatch
+is a build bug, not a runtime state. 46 removed the extension-only surface: `worktree.prepare`,
+`worktree.cancelPrepare`, `worktree.openWindow`, `editor.resolveConflict`, the `worktree.progress`,
+`settings.changed` and `connection.changed` events, `app.init`'s `host`, `settings` and
+`capabilities`, and the params the extension injected (`scope`, `pageSize`, `baseCandidates`,
+`strategySetting`). The server reads the stored `kiraSpace.*` repo settings instead. 45 was P178's;
+44 was P173's `StatusSummary.autoFetch`, `autoFetch.changed` event and `graph.reportFailure`; 43 was
+P172's refusal of prepare-script writes from `repoSettings.set` and removal of
+`settings.setGitPath`.
 
-**Version compatibility is hard lockstep, negotiated in that same handshake.**
-`gitrpc.ContractVersion` and `packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are one number
-(**45** today, since P178 stopped sending `credential.request` to socket clients, refused `credential.provide` and `repoSettings.set` on `git.sock`, added `capabilities.editRepoSettings` and `app.init.dateFormat`, and dropped the `kiraSpace.log.level` leaf; 44 was P173's `StatusSummary.autoFetch`, the `autoFetch.changed` event and `graph.reportFailure`; 43 was P172's refusal of prepare-script writes from `repoSettings.set` and removal of `settings.setGitPath`), asserted equal by tests
-on both sides, and it is the *sole* compatibility authority — not the
-app version, not a side file. A mismatch is a blocking panel in the extension naming both versions,
-never a degraded mode: the app's own P119 update never touches the separately-installed extension,
-so "run an older method set" has no honest meaning here.
+**Frame cap is 32 MiB.** `bridge.maxGitStreamFrameBytes` caps one frame; 8 MiB failed the graph and
+commit detail on large repositories. A session's `sendCh` holds up to 16 frames, so the worst case is
+512 MiB, reached only by 16 concurrent near-cap requests. Wails admits one oversize frame into an
+empty per-window queue under its 256 MiB global budget; the JS side joins the frame once, decodes,
+parses and structured-clones it to the webview, about 4-5x frame size, transient.
 
-**Frame cap is 32 MiB, and an unauthenticated peer gets 64 KiB (P173).** `gitsock.maxFrameBytes`,
-`bridge.maxGitStreamFrameBytes` and `socketChannel.ts`'s `MAX_FRAME_BYTES` are one number; 8 MiB failed
-the graph and commit detail on large repositories. `conn` carries a per-connection atomic read limit
-that starts at `handshakeMaxFrameBytes` (64 KiB, the hello is a label and an id) and rises to the full
-cap only after `runHandshake` succeeds, so a connection that never pairs can allocate 64 KiB, not 32
-MiB. Accepted memory costs, with no byte budget (a budget is new infrastructure for a trusted peer):
-Go allocates the declared size once per inbound frame and holds two copies of an outgoing body
-transiently (64 MiB for one max frame); a session's `sendCh` holds up to 16 frames, so the worst case
-is 512 MiB, reached only by a paired client issuing 16 concurrent near-cap requests; Wails admits one
-oversize frame into an empty per-window queue under its 256 MiB global budget; the JS side joins the
-frame once, decodes, parses and structured-clones it to the webview, about 4-5x frame size, transient.
-
-**Two frame shapes over that one socket — the same split the `studio` data plane already uses, not
+**Two frame shapes over that stream — the same split the `studio` data plane already uses, not
 a second design.** Control frames (the whole `rpcstream` envelope, every request, and every small
 response) stay **JSON text**. Bulk payloads are **FlatBuffers**:
 `packages/git-ipc/schema/gitwire.fbs`, generated through the same pinned, digest-verified `flatc`
@@ -2937,23 +2887,21 @@ meant "app-agnostic too," not just "agnostic across `studio`/`api`/`git` within 
 
 ### Session model
 
-A real, load-bearing requirement rather than a hypothetical: **several VS Code windows connect to
-one backend at once**, pointed at the same repository or at different ones. The structure follows
-one rule — *a fact about the repository is shared; a fact about one viewer's session is private* —
-the one genuine structural departure from a single-session design that conflates the two.
+**Several windows can hold one repository at once**: native Kira Space windows, plus ADE's board
+connection, each with its own `gitsession.Conn`. The structure follows one rule — *a fact about the
+repository is shared; a fact about one viewer's session is private* — the one genuine structural
+departure from a single-session design that conflates the two.
 
 ```
-GitServer (internal/gitsock)
-├─ listener (accept loop over the Unix socket) + flock + pairing broker + trust store
-├─ Registry (internal/gitsession): map[RepoID]*RepoEntry — mutex + refcount
-│    RepoEntry — SHARED by every connection open on that repository
-│      reader/writer gate · git driver · cat-file --batch session · repo watcher
-│      detail / diff / refs / stack caches · live HEAD · undo slot · active remote op (<=1)
-│      subscribers: map[ConnID]chan Event
-└─ Conn (internal/gitsession): one per accepted socket
-     client identity · its own ctx · its own rpcstream session and Handlers
-     walks: map[RepoID]*Walk — PRIVATE per (connection, repository)
-       log session, commit store, dictionary marks, paging state, the active review walk
+Registry (internal/gitsession): map[RepoID]*RepoEntry — mutex + refcount
+  RepoEntry — SHARED by every connection open on that repository
+    reader/writer gate · git driver · cat-file --batch session · repo watcher
+    detail / diff / refs / stack caches · live HEAD · undo slot · active remote op (<=1)
+    subscribers: map[ConnID]chan Event
+Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connection
+  client identity · its own ctx · its own rpcstream session and Handlers
+  walks: map[RepoID]*Walk — PRIVATE per (connection, repository)
+    log session, commit store, dictionary marks, paging state, the active review walk
 ```
 
 - **`RepoID` is the absolute git dir**, NFC-normalized (below), so two clients that reached the
@@ -2991,35 +2939,29 @@ GitServer (internal/gitsock)
 - **The undo slot is one per repository**, not per connection, and names the originating client in
   its own label, so a second window reads "Undo reset of `main` (window: repo-review)" rather than
   an anonymous or misattributed action.
-- **Credential prompts for a socket client's op and for ADE open in Kira Space, as pairing prompts
-  do (P178).** Config and Space-held prompts live in Space; the extension keeps only VS Code-owned
-  UI. A VS Code window never shows a credential prompt: `git.sock` sends it no `credential.request`
-  and refuses its `credential.provide` with `E_READ_ONLY`. A relay (`internal/gitcred.Relay`)
+- **Credential prompts open in Kira Space's own window (P178).** A relay (`internal/gitcred.Relay`)
   holds each prompt, labelled `<source> · <repo folder>`, and pushes the full pending list on
   `kira:git:credential`. The `gitCredential` Pinia store queues them behind the native stream's
   own prompts in the one dialog. When the relay withdraws a prompt (answered elsewhere, op
   cancelled, 120 s timeout), the next snapshot closes the stale dialog. With no Space window open,
   an arriving prompt opens one as a Dock click would (U1); otherwise it focuses the first window.
-  ADE's board connection uses the same relay; the `kira:adetask:credential` channel is gone.
-  `internal/gitaskpass` still brokers the prompt over its own private socket behind a
-  `GIT_ASKPASS` shim, relaying to whichever `gitsession.Conn` owns the op — routed to the relay for
-  socket and ADE connections, to the native stream's own dialog for the native window's op (P67e). `internal/gitaskpass` brokers the first over its own private socket behind a
-  `GIT_ASKPASS` shim, relaying to whichever `gitsession.Conn` owns the op — an external, paired VS
-  Code extension window for its own op, or (as of P67e) Kira Space's own native window for the
-  native stream's own op, since that stream now has real writes to prompt for. If that connection
-  dies mid-prompt the broker fails the credential request non-zero rather than hanging, and the
+  ADE's board connection uses the same relay.
+  `internal/gitaskpass` brokers the prompt over its own private socket behind a `GIT_ASKPASS` shim,
+  relaying to whichever `gitsession.Conn` owns the op — routed to the relay for ADE connections, to
+  the native stream's own dialog for the native window's op (P67e). If that connection dies
+  mid-prompt the broker fails the credential request non-zero rather than hanging, and the
   120-second wait (`gitaskpass.DefaultTimeout`) is bounded regardless — a git process blocked
   forever on a prompt nobody will answer is the failure this design exists to make impossible.
-  **The native window's own answer path** (`apps/kira-space/frontend/src/state/gitCredential.ts` +
-  `apps/kira-space/frontend/src/workbench/GitCredentialDialog.vue`) is a FIFO queue feeding one always-mounted dialog, the same
-  precedent `GitPairingDialog.vue` sets — a prompt started in one repo tab must stay answerable
-  after switching away, and one repository's own remote-op slot means at most one prompt per
-  workspace, but two open workspaces can each prompt at once. No client-side timeout: the broker's
-  own 120-second bound already covers it, and answering a request the broker has already given up
-  on is a documented no-op. Nothing on this path is ever logged, persisted, or stored anywhere
-  beyond the one in-flight prompt — the typed secret lives only in the dialog's own field, cleared
-  on submit, cancel, Escape or the frame's own close, and the prompt text gets the same treatment
-  (it can itself contain a username the user just typed).
+  **The native window's answer path** (`apps/kira-space/frontend/src/state/gitCredential.ts` +
+  `apps/kira-space/frontend/src/workbench/GitCredentialDialog.vue`) is a FIFO queue feeding one
+  always-mounted dialog — a prompt started in one repo tab must stay answerable after switching
+  away, and one repository's own remote-op slot means at most one prompt per workspace, but two
+  open workspaces can each prompt at once. No client-side timeout: the broker's own 120-second
+  bound already covers it, and answering a request the broker has already given up on is a
+  documented no-op. Nothing on this path is ever logged, persisted, or stored anywhere beyond the
+  one in-flight prompt — the typed secret lives only in the dialog's own field, cleared on submit,
+  cancel, Escape or the frame's own close, and the prompt text gets the same treatment (it can
+  itself contain a username the user just typed).
 
 **Settings ownership follows the same shared/private line, and it is a correctness question rather
 than a preference.** `protectedBranches`, `fetch.autoInterval` and `git.path` are **server-owned**
@@ -3027,9 +2969,7 @@ than a preference.** `protectedBranches`, `fetch.autoInterval` and `git.path` ar
 Space's own Settings dialog (*Git* section), read fresh on every push pre-flight and every
 auto-fetch tick, never cached. Every per-viewer display setting (graph page size and scope, stash
 visibility, and similar) is **per repository**, stored server-side in `git_repo_settings` (Storage,
-above) and edited from a dialog opened in the graph view itself. Neither category lives in VS
-Code's own configuration any more: the extension's manifest contributes **no configuration
-properties at all**.
+above) and edited from a dialog opened in the graph view itself.
 
 ### Go packages
 
@@ -3055,25 +2995,23 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (**57 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**45**, P178), and the wire types |
-| `gitsock` | The Unix listener, length-prefixed framing, the handshake, the trust store and stale-socket recovery |
+| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**46**, P243 Part 2), and the wire types |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
-| `gitprepare` | The worktree prepare script's execution seam — the one shell exception, below |
-| `gitvsix` | Locating the `.vsix` bundled inside a packaged `Kira Space.app` and installing it via `code --install-extension`, or revealing it in Finder when `code` isn't on `PATH` |
+| `gitprepare` | The worktree prepare script's execution seam, called by ADE only — the one shell exception, below |
 | `ghclient` | `gh` CLI discovery and spawn discipline mirroring `gitclient`'s own `Locator`/probe/TTL-cache shape, a `GhStatus` classification, and PR lookup through `gh api` |
 | `startupfail` (repo-root, shared — not a git package, see above) | Native, pre-window failure alerts for every boot step (below) |
 | `rpcstream` (repo-root, shared) | The correlated-RPC-with-credits protocol (above) — module-agnostic by design, hoisted out of `apps/kira-studio/internal/bridge` at P100 so both apps import it |
-| `apps/kira-space/internal/bridge/gitclients.go` | `GitClientsService`, the bound Wails service behind the *Connected editors* pane |
+| `config` (`AcquireLock`) | The `app.lock` single-instance flock (Transport, above) |
 
 **One deliberate exception to argv-only spawning, and exactly one.** Every other spawn in this
 codebase hands a fixed argv straight to `os/exec` with no shell involved. `gitprepare` runs the
 user's own worktree prepare script *through* a shell, and its safety argument rests on a single
 property rather than on sanitisation: **no app-supplied value is ever interpolated into the command
 string.** The command string *is* the user's own typed command, written only by Kira Space
-in-process (ADE repo settings); `repoSettings.set` refuses it on every gitrpc connection (P172), so a
-socket client cannot choose or change what runs. `worktree.prepare`'s sha256 is a staleness guard
-against a script edited after the client showed it, not approval. App data — the worktree path, its branch, the repository root — reaches the script only as
+in-process (ADE repo settings); `repoSettings.set` refuses it on every gitrpc connection (P172), so no
+renderer can choose or change what runs. ADE runs the prepare script; the Git window never does
+(P202). App data — the worktree path, its branch, the repository root — reaches the script only as
 environment variable *values*, so even a maximally adversarial branch name can at worst be a
 word-splittable value, never re-parsed as a command. The package imports nothing beyond the
 standard library and knows nothing about repositories, sessions or approval; `gitsession` owns
@@ -3106,21 +3044,20 @@ laptop sleep. `Unknown` stops because silent endless retry would hide a real pro
 and emits `autoFetch.changed`; retries are never logged. `StatusSummary.autoFetch` carries the state
 for cold start and reconnect, the event carries the change. A successful explicit fetch or pull with a
 conn re-arms; a settings interval change does not, since the stop is about the remote. The toolbar
-shows an `Auto-fetch stopped` marker (`autofetch-stopped`) in both hosts, even with write controls
+shows an `Auto-fetch stopped` marker (`autofetch-stopped`) even with write controls
 hidden; clicking runs Fetch when Fetch is enabled.
 
 **Failures are visible in an inline banner, not a toast (P173).** `FailureBanner.vue` (shadcn
 `Alert`, `role="region"` so the live region stays the one announcer) mounts under `ConnectionBanner` in
-`App.vue` for failed ops, async errors and graph-stream failures. A toast would need a toast host in
-both apps, would cover grid rows, and would vanish before it is read; the banner stays until dismissed
+`App.vue` for failed ops, async errors and graph-stream failures. A toast would need a toast host,
+would cover grid rows, and would vanish before it is read; the banner stays until dismissed
 or superseded and carries a retry hint per error kind (`failureNotice.ts`). Graph failures add Retry
-(`graph.refresh`); Kira Space adds "Show in Operations", the VS Code webview a text pointer since it
-has no dock. A corrupted graph stream is also reported with `graph.reportFailure`, so Go records it in
+(`graph.refresh`) and "Show in Operations". A corrupted graph stream is also reported with `graph.reportFailure`, so Go records it in
 the op log; `{reason: 'corrupted'}` is the only reason and Go composes the message. The op log
 records user-initiated git writes, plus auto-fetch stops and graph-load failures. Failures before an
-op starts, and anything while the transport is down, are banner-only. The webview bundle imports its
-own Tailwind root first: CSS layers order by first appearance, and git-ui's `kv:` root declares
-`utilities` without `base`, so any later import put preflight above every unprefixed utility.
+op starts, and anything while the transport is down, are banner-only. A host's bundle must
+import its own Tailwind root first: CSS layers order by first appearance, and git-ui's `kv:` root
+declares `utilities` without `base`, so any later import puts preflight above every unprefixed utility.
 
 **Search reconciles Go's RE2 against JavaScript's `RegExp` explicitly rather than approximating
 it**, because the server-side tail scan and the client-side scan of already-loaded rows must agree
@@ -3185,7 +3122,7 @@ site in `main.go` — `config.EnsureLayout`, `logging.Init`, `storage.Open` (inc
 run against a `schema_version` newer than the binary knows), `repos.New`, the settings read, and
 window list/create — used to reach only a log file, with no window ever created and nothing shown:
 the app simply failed to launch, silently. `internal/startupfail` renders each as a native OS alert
-through an **argv-only `osascript` spawn**, the same discipline `gitvsix` uses for `code`. Wails'
+through an **argv-only `osascript` spawn**, like every other spawn in this module. Wails'
 own dialog API is structurally unusable at these sites (it dispatches through `globalApplication`
 and `a.impl`, assigned inside `New()` and `Run()` respectively, so both are nil dereferences at
 boot). A cgo `NSAlert` shim was declined for a measured reason rather than a stylistic one: a
@@ -3196,37 +3133,20 @@ not a nicety. `internal/gitreview`'s own equivalent refusal is deliberately *not
 fires mid-session inside an already-open window, as an RPC-level error — a different
 surface with a working answer already.
 
-### The extension and its packages
+### Frontend packages
 
-`apps/kira-space-vscode` (`apps/kira-studio-vscode` through P100 Part 3's rename) is the whole
-frontend. It contributes a **Git Graph** webview in the panel and a **Kira Space** webview in the
-activity bar (renamed from "Kira Version" at P100 Part 3, alongside the rest of the
-`kiraVersion.*` → `kiraSpace.*` sweep, below), **47 commands** (every mutating operation
-has one — the command-palette audit establishing this happens once, and each later phase
-registers its own; P100 Part 3's own re-count against the real manifest corrected an earlier
-estimate of 46/62 found stale at two different points in this repo's history — the real,
-JSON-parsed number is 47), SCM-title / editor-title / editor-context / comment-thread menus,
-keybindings and colors, and — as above — **no configuration properties**. It reaches Go through
-`packages/git-ipc`'s `socketChannel.ts`: `net.connect` plus length-prefixed framing behind the same
-`MessageChannelLike` seam a `webview.postMessage` channel satisfies, which is why swapping the
-transport was a channel change rather than a rewrite. A handful of host-capability calls — dialogs,
-clipboard, "open externally", editor integration, workspace roots, storage, logger, theme, windows
-— are answered **locally** by the extension's own ports rather than round-tripped to Go. The
-criterion (P178): config and Space-held prompts live in Space; the extension keeps VS Code-owned UI.
-The manifest sets `capabilities.untrustedWorkspaces.supported: false`, so the extension runs only in
-a trusted workspace and the prepare-script capability is always `true` from VS Code; Space runs only
-the script it stores. The extension logs through a `LogOutputChannel` (VS Code owns the level).
-Repository settings are edited in Kira Space only: `git.sock` refuses `repoSettings.set` with
-`E_READ_ONLY`, `app.init` reports `capabilities.editRepoSettings` (Space native `true`, VS Code
-`false`), and the settings dialog is hidden under VS Code. The per-repo `kiraSpace.log.level` leaf
-is gone (it was never read). The VS Code graph follows Space's app-wide `appearance.dateFormat`,
-carried in `app.init.dateFormat` and read at each `app.init`.
+The git UI is `packages/git-ui`, mounted by Kira Space's `RepoGraphView.vue`. It reaches Go through
+`packages/git-ipc`'s `streamChannel.ts`, a Wails stream behind the `MessageChannelLike` seam.
+Kira Space's own `repo/git/hostHandlers.ts` answers the few host calls (dialogs, clipboard, open
+externally, reveal in graph) locally. Repository settings are edited in Kira Space; the settings
+dialog is always shown. `app.init.dateFormat` carries Space's app-wide `appearance.dateFormat`,
+read at each `app.init`.
 
 | Package | Holds |
 |---|---|
-| `packages/git-ipc` | The shared vocabulary: `contract.ts`, `rpc.ts`, `transport.ts`, `codec.ts`, `validate.ts` (`CONTRACT_VERSION`), `socketChannel.ts`, `schema/gitwire.fbs` with its generated code, and `graphChunkCodec.ts` |
-| `packages/git-core` | Client-side domain logic: the commit store, the lane-layout graph worker, the client half of search, the wire model types, the settings schema, and the port interfaces the extension implements |
-| `packages/git-ui` | The webview UI itself — the graph panel, the review panel, the dialogs, the file tree — Vue, mounted by the extension in both webview roots |
+| `packages/git-ipc` | The shared vocabulary: `contract.ts`, `rpc.ts` (client only), `transport.ts`, `codec.ts`, `validate.ts` (`CONTRACT_VERSION`), `streamChannel.ts`, `blobFrame.ts`, `schema/gitwire.fbs` with its generated code, and `graphChunkCodec.ts` |
+| `packages/git-core` | Client-side domain logic: the commit store, the lane-layout graph worker, the client half of search, the wire model types and the settings schema |
+| `packages/git-ui` | The UI itself — the graph panel, the review panel, the dialogs, the file tree — Vue, mounted by Kira Space |
 | `packages/kira-ui` | `KuiColumnResizeHandle` (Kira Studio's `StreamView.vue`, the git graph's own `App.vue`/`CommitGrid.vue`) plus `floatingPosition.ts`'s Floating-UI positioning primitives (`packages/workbench`'s own wrapper) — down from a full host-agnostic component set (P131 Part 3): every other `Kui*` component moved its last consumer (git-ui's review view) onto shadcn-vue and was deleted, along with the helpers (`cn.ts`, `contextMenuModel.ts`, `modalFocus.ts`, `rowVariants.ts`, `tooltip.ts`, its own `theme/tailwind-theme.css`) that served only them |
 
 **Branches, tags, stashes, worktrees and stacks fold into one tabbed picker (P77).**
@@ -3257,25 +3177,9 @@ this app's tokens, until P67c themed Monaco's menu/suggest/list widgets from the
 `e7e2c546`), and any bespoke click-point popup are each their own path. A module is not clear
 because one of its mechanisms is.
 
-**A webview panel can instantiate correctly and still be invisible, which is why the guard asserts
-pixels.** A shipped build once rendered the graph with a correct `aria-rowcount` while the panel
-was collapsed to roughly 75 px, because nothing in the emitted document or the bundled CSS ever
-gave `html`/`body`/`#app` a height, so the components' own `height: 100%` resolved to `auto`
-against an ancestor chain with none. `apps/kira-space-vscode/tests/layout/` asserts **real
-rendered box height** via `getBoundingClientRect()` against the real emitted document and the real
-built bundle. DOM shape is exactly the kind of proxy that passes while the thing it stands for is
-broken — this tier exists because that happened.
-
-**The extension ships in Kira Space's own DMG, not through a marketplace.** `bun run
-package:vscode` produces `kira-space.vsix` (renamed from `kira-version.vsix` at P100 Part 3); the
-packaging task copies it to `Contents/Resources/kira-space.vsix` before the ad-hoc signature is
-applied, so the signature covers it; and the *Connected editors* pane's *Install VS Code
-Integration* button shells out to `code --install-extension <path>` — argv-only, matching every
-other spawn in this module — with a reveal-in-Finder fallback when the `code` CLI isn't on `PATH`.
-The filename carries no version: the version lives inside the manifest, where `code` reads it.
-**Kira Studio's own DMG carries no `.vsix` at all as of P100** — `apps/kira-studio/build/darwin/
-Taskfile.yml`'s copy-and-fail-loudly block, and `build:vsix`'s own dependency edge into it, were
-both removed at P100 Part 3, since the extension it used to bundle is Kira Space's now.
+**No `.vsix` is built or bundled.** P243 Part 2 removed the VS Code extension, `build:vscode`,
+`package:vscode` and the *Connected editors* pane. A user who installed it runs
+`code --uninstall-extension vladcirstean.kira-space-vscode`.
 
 ### The native code workspace (C5-C7, P67c)
 
@@ -3407,7 +3311,7 @@ placed it in; a repository is an instance inside the Git module, not a sibling o
   missing means deleted). Mounted with `mod.editor.createDiffEditor`, `readOnly`/`domReadOnly`
   (blocking the keyboard and paste, same as the file viewer) plus **`renderMarginRevertIcon: false`
   and `renderGutterMenu: false`** — not cosmetic: both surface revert/apply affordances that would
-  otherwise let a user trigger a write from a widget built for the extension's own read-write use,
+  otherwise let a user trigger a write from a widget built for a read-write use,
   the second enforcement layer beyond `readOnly` itself. `hideUnchangedRegions.enabled` and
   `renderSideBySide` are both on; `diffAlgorithm` is left at its pinned default (never
   `'advanced-wasm'`/`'advanced-external'`, which resolve an external computer this bundle doesn't
@@ -3522,26 +3426,15 @@ placed it in; a repository is an instance inside the Git module, not a sibling o
 workspace (C5-C7, above), which the same phase moved out of Kira Studio in full.
 
 The pinned first tab of every repo workspace (`views/repo/RepoGraphView.vue`, reserved empty by C5)
-mounts `packages/git-ui`'s own graph — the identical Vue components the VS Code extension runs,
-`mount()` called unchanged — directly into the native window. No reimplementation, and no fork of
-`git-ui`: every edit that phase made to the package is additive (three read-only menu builders
-beside the five existing ones, a `write` capability threaded through the same handful of components
-that already thread `openWorktreeWindow`/`runPrepareScript`), so the VS Code extension's own
-behaviour (`capabilities.write: true`) is unchanged.
+mounts `packages/git-ui`'s own graph, `mount()` called directly in the native window. No
+reimplementation and no fork of `git-ui`.
 
-**A second, in-process Wails stream, not the socket.** `apps/kira-space/internal/bridge/gitstream.go`'s
-`ServeGitStream` mirrors `ServeEngineStream` over the identical `gitrpc.Router` `internal/gitsock`
-already serves — one handler table, two transports, exactly the precedent `internal/gitsock` and
-`internal/bridge` already were named as peers of (`apps/kira-space/internal/layering_test.go`'s own comment). No
-handshake, no pairing token, no `git_clients` row: the peer is this process's own webview, not an
-external client the trust store exists to gate, and a pairing prompt for "should this window ever
-talk to me" has no question behind it when the asker is Kira Space's own renderer. Reusing
-`git.sock` itself was rejected outright — `gitsock.Server.Start`'s own flock means a *second*
-window would get no listener at all, the opposite of what an in-process, per-process stream needs.
-On the TypeScript side, `packages/git-ipc/src/streamChannel.ts` is `socketChannel.ts`'s sibling: the
-same blob-frame body shape (`blobFrame.ts`, shared by both), but no length prefix, no `recvBuffer`,
-no drain loop — a Wails stream is message-framed already, so the machinery that exists solely to
-turn a byte stream back into frames is simply absent.
+**An in-process Wails stream.** `apps/kira-space/internal/bridge/gitstream.go`'s `ServeGitStream`
+mirrors `ServeEngineStream` over `gitrpc.Router` (`apps/kira-space/internal/layering_test.go`'s own
+comment names `internal/bridge` and the router as peers). No handshake and no pairing token: the peer
+is this process's own webview. On the TypeScript side, `packages/git-ipc/src/streamChannel.ts` is a
+Wails-stream channel with the blob-frame body shape (`blobFrame.ts`) and no length prefix, no
+`recvBuffer`, no drain loop — a Wails stream is message-framed already.
 
 **A tab switch fully unmounts and remounts the graph; continuity comes from persisted view state,
 not a live KeepAlive.** P72 originally wrapped the pre-P100 host's tab view in a `KeepAlive` with an
@@ -3567,37 +3460,17 @@ branch. A burst of individually-resolving PR branches now coalesces into one anc
 tick (`scheduleAncestryRebuild`'s `nextTick` drain) rather than one rebuild per branch. This is
 user-visible — which commits show a PR icon — not an internal tidy-up.
 
-**The write boundary is still three layers, and only one of them is load-bearing — P67e widened
-what layer one admits, not the shape of the boundary itself.** `allowedMethods` in `gitstream.go`
-(`readOnlyMethods` before P67e) is a default-deny **allowlist**, not a denylist: a method the
-allowlist has not named is refused with `E_READ_ONLY` before the shared router handler is ever
-called, so a future contract addition is refused by construction rather than admitted by omission.
-Of the 58 methods `internal/gitrpc`'s `Router.ForConn` dispatches (57 requests plus the one
-`graph.stream` stream method), the allowlist now admits 56 (55 requests plus `graph.stream`) —
-every operation that writes through git itself (`op.run`'s kinds, the five `remote.run` kinds,
-every `preflight.*`/`remote.*Preflight`, `undo.run`, `stack.restack`/`cancelRestack`,
-`credential.provide`) alongside every pre-existing read and the nine `review.*` methods (below).
-Exactly two stay refused: `worktree.prepare`/`worktree.cancelPrepare` (shell execution — a
-security boundary, not a file-editing one). The Router also refuses the prepare-script leaf of
-`repoSettings.set` on every connection (P172); `guardRepoSettingsSet` keeps that, plus
-`worktreeBasePath`, as defence in depth. `settings.setGitPath` no longer exists. `gitstream_test.go` pins both directions (every allowlisted method reaches the handler;
-every refused method **never reaches the handler**, asserted with a spy — one table for a genuine
-refusal, a separate one for a method Go has no handler for at all). Layer two is a handful of
-explicit throwing entries in `repo/git/hostHandlers.ts` (`editor.resolveConflict`,
-`worktree.openWindow`) for methods layer one also refuses or never reaches Go
-under VS Code either — `editor.resolveConflict` because this app has no merge editor (the user's
-own stated carve-out: conflicts surface through the conflict banner, resolved in the user's own
-external editor, then Continue/Skip/Abort), `worktree.openWindow` because `vscode.openFolder` has no
-native meaning. Layer three is `capabilities.*` — `write: true` now shows every write affordance
-`git-ui`'s toolbar/dialogs/row menus gate on that one flag, while `resolveConflict`/
-`runPrepareScript`/`openWorktreeWindow` stay `false`, each naming a real layer-one or layer-two
-refusal — a convenience and an honesty measure, never the boundary itself; layer one holds
-regardless of what any Vue component believes. The property this three-layer shape now guarantees,
-in both directions: **every `capabilities.*` flag that is `false` corresponds to something layer one
-or layer two refuses, and every method layer one admits has a reachable UI affordance**.
+**The write boundary is `guardRepoSettingsSet` and the contract itself.** There is no method
+allowlist (P243 Part 2 removed it with the extension, whose capability flags it mirrored): every
+`gitrpc` method is served, and a method the contract does not name does not exist. The one
+field-level restriction is `guardRepoSettingsSet` in `gitstream.go`: `repoSettings.set` is refused
+with `E_READ_ONLY` when its patch touches the prepare script or `worktreeBasePath`, which only Kira
+Space writes in-process (ADE repo config). The Router also refuses the prepare-script leaf on every
+connection (P172). Shell execution has no gitrpc method at all since 46 removed `worktree.prepare`.
+`gitstream_test.go` pins the guard with a spy handler. `review.*` is served like every other method.
 
 **`repo.open` itself must never transitively arm a write, either — traced once, C13 round 2's own
-finding.** `repo.open` sits on the allowlist as a pure identify-and-subscribe read, but
+finding.** `repo.open` is a pure identify-and-subscribe read, but
 `gitsession.Conn.Open` → `Registry.Acquire`/`RepoEntry.EnsureAutoFetch` (`autofetch.go`) arms a
 background timer that eventually runs a real `git fetch --prune` whenever a user has set
 `git.fetchAutoIntervalMinutes` above its default of 0 — opt-in, credential-free and silent, but a
@@ -3609,13 +3482,10 @@ routes its own `Open` through `Registry.AcquireQuiet` (never arms a *brand-new* 
 construction) and skips `EnsureAutoFetch` on the already-existing-entry path too — so the native
 mount's own `repo.open` can never be what arms one, in either direction. This is scoped to *this*
 Conn only: `RepoEntry` (and its timer) is shared per-repository across every connection regardless,
-so an ordinary, already-paired VS Code extension window opening the identical repository still arms
-it exactly as before — a real write that surface has always been allowed to make, unaffected by any
-of this. `gitsession/conn_test.go`'s `TestConn_DisableAutoFetch_OptsThisConnOutOfArming` pins both
+so another Conn on the same repository that does not opt out can still arm it. `gitsession/conn_test.go`'s `TestConn_DisableAutoFetch_OptsThisConnOutOfArming` pins both
 directions (this Conn never arms it; an ordinary Conn reusing the same, still-unarmed entry still
 does). **P67e kept this opt-out even though the native mount is no longer read-only** — the reason
-was never "this surface can't write", it is that every fetch this phase's own allowlist widening
-admits is one the user pressed a button for, and a periodic background `git fetch --prune` the user
+was never "this surface can't write", it is that every fetch the native mount runs is one the user pressed a button for, and a periodic background `git fetch --prune` the user
 never asked for is a different thing entirely. One deleted line (`DisableAutoFetch()`'s own call)
 whenever someone actually wants automatic background fetching for the native mount too.
 
@@ -3658,7 +3528,7 @@ workbench colour id), additive and with zero changes to `git-ui`'s own token lay
 **Two-host shadcn plumbing (P131 Part 1).** `git-ui`'s dialogs (`components/dialogs/*.vue`) moved
 off `@kira/kira-ui`'s `Kui*` components onto shadcn-vue (`Dialog`, `Button`, `Input`, `Textarea`,
 `Checkbox`, `RadioGroup`, `NativeSelect`, `Label`), which read the unprefixed `--kira-*`/shadcn
-token vocabulary, never `kv:`. Reaching both hosts needed a split, not a third root:
+token vocabulary, never `kv:`. Reaching both vocabularies needed a split, not a third root:
 `packages/theme/src/base.css` (Kira Studio/Space's own unprefixed root) is now a thin
 `@import "./tailwind-core.css"; @theme { ... Kira-app-only tokens ... }` shell over
 `packages/theme/src/tailwind-core.css`, the host-neutral half (Tailwind's own entry, every
@@ -3666,21 +3536,7 @@ token vocabulary, never `kv:`. Reaching both hosts needed a split, not a third r
 CSS-output-identical for both apps via an isolated `git worktree` structural diff (sorted,
 at-rule-context-prefixed rule lists via `postcss`, ignoring only in-layer rule order). Kira Space's
 own `styles.css` already scans `git-ui`'s sources for its unprefixed root (`apps/kira-space/frontend/
-src/styles.css`'s `@source`), so a migrated dialog's shadcn utilities compile there for free. The
-VS Code webview had no unprefixed root at all until this phase: `apps/kira-space-vscode/src/webview/
-tailwind.css` is its own `@import "tailwindcss" source(none); @import "@theme/tailwind-core.css"
-theme(inline); ...` root (`theme(inline)` so every mapped utility re-resolves its `--kira-*` fresh
-per element, off whatever that element inherits — needed because the light theme kinds only
-override a handful of `--kv-*` sources on `body.vscode-light`, never at `:root`), and
-`apps/kira-space-vscode/src/webview/kira-bridge.css` bridges every `--kira-*` a shadcn primitive
-reads onto this host's own already-bridged `--kv-*` vocabulary (the reverse of
-`vscode-bridge.css`, declared on `:root, body` for the identical inheritance reason as
-`tailwind.css`'s own `theme(inline)`), so a migrated dialog's shadcn controls now pick up the
-user's real VS Code theme instead of a fixed dark palette. Live-verified (a standalone,
-non-committed Vite/Vue harness mounting the real dialog components): `--kira-fg-muted` (a real
-shadcn-facing token) resolves to `--kv-description-fg`'s dark literal (`#9d9d9d`) under
-`body.vscode-dark` and its light literal (`#606060`) under `body.vscode-light`, confirming the
-bridge chain resolves per-theme, not just per-host. Two lint guards keep the two vocabularies from
+src/styles.css`'s `@source`), so a migrated dialog's shadcn utilities compile there for free. Two lint guards keep the two vocabularies from
 crossing: `check-class-conflicts.ts` fails any `@theme/components/**`-imported tag inside
 `packages/git-ui/src/**/*.vue` that also carries a `kv:` token, and `check-theme-classes.sh`'s
 `check_alias`/`check_focus_width`/`check_font_scale` each gained a second, `kv:`-excluding pass over
@@ -3700,9 +3556,7 @@ sit on `--kira-bg` like every other module (`vscode-bridge.css` maps `panel.back
 `editorGroupHeader.tabsBackground` to it; selected rows keep `--kira-fg`). Commit row height follows
 Appearance density: `vscode-bridge.css` sets the `--vscode-kiraSpace-rowHeight` hook from
 `--kira-row-height`, and `density.css` makes `--kv-row-height-compact` the larger of the hook and
-`--kv-h-xs + 2px` (28/22px in Space; unset in VS Code, so rows stay font-derived). The webview's
-`kira-bridge.css` maps `--kira-row-height` to `--kv-h-sm` so unprefixed `h-row`/`min-h-row` markup
-works there too. Markup rewritten in P229 uses unprefixed app utilities (`ViewToolbar` recipe,
+`--kv-h-xs + 2px` (28/22px in Space). Markup rewritten in P229 uses unprefixed app utilities (`ViewToolbar` recipe,
 `Alert` banners, `Empty` panels, dialog header/body/footer recipe, `rowVariants` `menu`/`tree`
 layouts, 13px `CodiconIcon`). Data surfaces (grid cells, detail meta, `FileTree` and review rows)
 keep `kv:text-*` so Settings > Git graph font size still reaches them. Ref badges are a 1px
@@ -3761,11 +3615,10 @@ lanes. Edges carry no kind.
 **As of P100, this section describes Kira Space, not Kira Studio** — same move as C10, above.
 
 C10's native graph left the review sidebar out — `review.open` had no native surface and
-`review.*` was absent from `gitstream.go`'s allowlist by design. C11 builds both, porting
+`review.*` was not served to the native stream by design. C11 builds both, porting
 `git-ui`'s existing `components/review/*`/`state/review*.ts` unchanged (the SPEC requirement) and
 adding the one surface with no portable half: comment threads and review-marking gutter icons over
-Monaco, which have no VS Code equivalent to reuse (that host paints them with its own Comments API
-and native diff editor, neither of which exists here).
+Monaco.
 
 **Where the panel lives: a third left-panel segment, not a tab.** `GitPanel.vue`'s top-level
 Repos/Files/Review switch (a `ui/toggle-group` `ToggleGroup`/`ToggleGroupItem` — the `SegmentedControl`
@@ -3774,9 +3627,7 @@ carries its own nested Files/Search switch (C7), the same control one level down
 — a `repo-review` tab kind mirroring `repo-graph` — was rejected because the review workflow is
 *pick a file → read its diff → mark it → pick the next*: splitting the file list into one tab and
 the diff into another costs two tab switches per file and hides the diff being reviewed. The
-extension's own package.json already drew this line the same way (the graph in a `panel` container,
-the review view in an `activitybar` one) — the graph is content, the review view is a navigator
-driving diffs in the editor, and `ReviewView.vue` is built for sidebar width with no viewState it
+graph is content, the review view is a navigator driving diffs in the editor, and `ReviewView.vue` is built for sidebar width with no viewState it
 needs to persist per-mount (it takes `NullViewStateStore`), corroborating the call. `GitPanel.vue`
 is one persistent component instance across every repo workspace — Kira Space's own
 `WorkbenchShell.vue` mounts it directly (`<GitPanel />`), with no per-mode dynamic dispatch to carry
@@ -3790,7 +3641,7 @@ The chosen Repos/Files/Review tab persists in `localStorage` (`kira.git.panelTab
 windows, last write wins) and defaults to Repos. Opening a repo never switches it. The panel shows
 Repos, without writing it, while no repo workspace is active.
 
-**`review.*` is allowlisted because its writes never touch the repository.** Traced through the
+**`review.*` writes never touch the repository.** Traced through the
 real handler chain (`internal/gitrpc/handlers.go` → `internal/gitsession/{comments,incremental}.go`
 → `internal/gitreview`), every one of the nine methods (`review.resolveBase`, `review.files`,
 `review.fileDiff`, `review.mark`, `review.comment.add/list/remove/clear/export`) is a thin decode-
@@ -3803,18 +3654,11 @@ anywhere in the path. This is the same shape as `repoSettings.set`'s own pre-exi
 name that says "write" whose writes land in Kira's own storage, never the user's repository.
 
 **"Open in graph" from a review row is a real host-answered request, not a webview escape hatch
-(P75).** It used to be a `command:` URI — a VS Code webview mechanism with no handler in Kira
-Space's Wails webview at all. It is now `graph.revealCommit` (`{repoId, sha} -> {revealed}`),
-answered locally by both hosts (`repo/git/hostHandlers.ts` here, `proxyHandlers.ts`'s
-`revealCommitInGraph` in the extension) and never reaching the Go server — the same class as
-`review.open`, so it needs no `gitstream.go` allowlist entry. The status-bar blame item's click
+(P75).** It is `graph.revealCommit` (`{repoId, sha} -> {revealed}`), answered locally by
+`repo/git/hostHandlers.ts` and never reaching the Go server — the same class as `review.open`. The status-bar blame item's click
 (below) reuses this exact request rather than adding a second one.
-`review.session.save`/`.load` are a separate case — not a Go method at all (`handlers.go` has no
-case for either; they resume the extension's own `context.workspaceState`, replaced here by
-`repo/git/reviewSession.ts`'s use of the pinned graph tab's own state, below) — so they stay
-refused by the allowlist as defence in depth, and `gitstream_test.go`'s own table split reflects
-the two different reasons: `TestAllowedRequest_WriteMethodsAreRefused` for a genuine write,
-`TestAllowedRequest_HostAnsweredMethodsAreRefused` for a method Go simply has no handler for.
+`review.session.save`/`.load` are not Go methods at all: the review session resumes through
+`repo/git/reviewSession.ts`'s use of the pinned graph tab's own state, below.
 
 **Anchoring needs no client-side line mapping.** A review diff's right-hand document is always
 `<branchTip>:<path>`, and `LineRange`/`ReviewComment.range` are already defined in exactly those
@@ -3849,8 +3693,7 @@ workspace. Three more P75 facts, each read off source:
 - **A fully-reviewed file's whole-line tint is skipped**: `paint()` guards on
   `coverage({start: 1, end: lineCount}, reviewedRanges) === 'full'`, reusing the helper the per-hunk
   branch beside it already calls. Per-hunk glyphs and the partial-review overview ruler are
-  unchanged. Both hosts share the guard (`reviewDecorations.ts` here, `reviewMarking.ts` in the
-  extension).
+  unchanged. `reviewDecorations.ts` holds the guard.
 - **The file tree's mark-reviewed control is a real `<input type="checkbox">`** with a genuine
   `indeterminate` state for a partial review (its own codicon-dash glyph via the shared checkbox
   theming, not a third colour on a two-state control), placed at the row's leading edge so the
@@ -3880,20 +3723,18 @@ built: a user writes plain-text comments on lines, they render as gutter icons a
 **As of P100, this section describes Kira Space, not Kira Studio** — same move as C10/C11, above.
 
 **Reuses v1.4 P5's backend outright — no Go change, no contract bump for this phase.** `blame.line`
-(one line per `git blame` spawn, working tree only, no `atSha`) already answers the extension's
-status-bar widget; `views/repo/blameAnnotation.ts` calls the identical method over the identical
-wire. P62 itself bumped neither `ContractVersion` nor `gitstream.go`'s allowlist — the only Go
+(one line per `git blame` spawn, working tree only, no `atSha`) already answers the status-bar widget; `views/repo/blameAnnotation.ts` calls the identical method over the identical
+wire. P62 itself bumped neither `ContractVersion` nor the method set — the only Go
 touched by this phase at all is `internal/storage/{model,repos}/settings.go`, for the unrelated
 reason below. (Both moved later, for unrelated reasons: `ContractVersion` was 39 as of this chapter
-— 40 as of P100, **41 as of P111** — and the allowlist gained `pr.browserUrl`, P74 §3.3; see
+— 40 as of P100, **41 as of P111** — and `pr.browserUrl` was added, P74 §3.3; see
 Transport, above.)
 
 **Where it surfaces — the status bar shipped too, just not the way this paragraph used to expect.**
 The annotation renders as injected text at the end of the cursor's line in
 `views/repo/RepoFileView.vue` — the one native surface whose displayed bytes and `blame.line`'s
 answer are the same document by construction (the diff tabs compare historical revisions
-`blame.line` structurally can't answer for). The status bar was the extension's own surface for
-this, and `apps/kira-space/frontend/src/workbench/StatusBar.vue` (wrapping the shared
+`blame.line` structurally can't answer for). `apps/kira-space/frontend/src/workbench/StatusBar.vue` (wrapping the shared
 `packages/workbench/src/components/StatusBar.vue`) carries no caret readout (P164 removed the
 unwired "no selection" item). P62 declined the status bar for blame; P76 shipped it anyway as a
 left-side item. Whole-file gutter blame (a GitLens-style column beside every
@@ -3910,12 +3751,12 @@ rendering, driven by the controller. P79 batch E added a cap to the per-mount ca
 (`gitsession.Conn.Entry`'s own `alreadyHeld` check) — the controller ensures this itself with a
 memoised `repo.open`, the same idempotent-per-`(connection, repoId)` call the pinned graph tab's own
 mount already relies on, so a file tab opened before the graph ever mounts still works. The request
-itself follows the extension's own shape: cursor-line trigger, 150 ms debounce, dedupe on the line,
+itself follows the pre-P100 shape: cursor-line trigger, 150 ms debounce, dedupe on the line,
 a per-mount cache (sound here in a way a server-side cache isn't — the model is immutable for the
 life of the mount), and `repo.changed` invalidation. There is no dirty-buffer state to track (P5's
 `'dirty'` display state): this view is `readOnly`/`domReadOnly` and nothing in this app ever writes
 the model, so the buffer is always the saved file. Failure is always silence — an untracked path, a
-line past EOF, an aborted request all render nothing, matching the extension's own posture that
+line past EOF, an aborted request all render nothing, matching the posture that
 this is, from the reader's vantage, an ordinary file.
 
 **Two surfaces, one setting.** `RepoFileView.vue` creates the controller whenever `blameable`,
@@ -4337,7 +4178,7 @@ replies and full terminal attach for Claude Code sessions.
 - Plaintext: anyone on the same LAN can read the board, backlog and terminal output, and can copy a
   phone's cookie and act as it. Mitigations: trusted network only, device tokens expire after 30 days
   (re-pair), revoke, warning always visible in the pane and one line on the phone's pair screen.
-- Pairing: generic `internal/pairing.Broker[M]` (extracted from gitsock; 120 s timeout, 60 s cooldown
+- Pairing: generic `internal/pairing.Broker[M]` (120 s timeout, 60 s cooldown
   on deny keyed by remote IP, queue 8). `POST /api/pair` long-polls; phone shows a 4-digit code, the
   desktop dialog (`MobilePairingDialog`, shared `PairingRequestDialog`) shows it with IP and label.
   Approval mints a `tokenauth` token; the row (`mobile_devices`, migration 0021) is written before
@@ -4634,9 +4475,8 @@ stop being stripped as a real comment (`16ea4f89`).
 
 ### The approval flow
 
-`internal/dbmcp/approval.go`'s `ApprovalBroker`, modeled on `internal/gitsock`'s own FIFO broker
-(`Broker`, `pairing.go`) — `ApprovalTimeout`/`maxPendingApprovals` reuse that broker's own bounds
-(`pairingTimeout`, its own queue cap): a client disconnect stops the wait via `ctx`, with no
+`internal/dbmcp/approval.go`'s `ApprovalBroker`, modeled on `internal/pairing.Broker`'s FIFO
+queue — `ApprovalTimeout`/`maxPendingApprovals` reuse that broker's own bounds: a client disconnect stops the wait via `ctx`, with no
 external expiry ticker. The UI is `workbench/DbMcpApprovalDialog.vue`, an always-mounted modal at
 `App.vue`'s root beside Studio's other always-mounted dialogs (`ConnectionDialog`,
 `DataGripImportDialog`, `ApiDialogs`, `ConfirmDialog`, …) — the shared
@@ -4751,8 +4591,8 @@ batch F closed the one PR icon that was missing the gate). `link.openExternal` i
 server-side from data the app controls, while a commit-body URL **is** the untrusted content,
 already visible to the renderer as linkified text — so the only check left is the URL's own shape.
 `LinkService.OpenExternal` refuses anything that is not a well-formed `http`/`https` URL with a
-non-empty host, before `Browser.OpenURL` ever sees it, and VS Code's `proxyHandlers.ts` does the
-equivalent shape validation it previously lacked (`prUrl.ts`). The host check for a PR URL is
+non-empty host, before `Browser.OpenURL` ever sees it, and the git-ui host handlers do the
+equivalent shape validation. The host check for a PR URL is
 `gitsession.IsGitHubHost` — `github.com` plus any host `gh`'s own `Discovery` has authenticated
 against — shared by the composer and the validator, not two hand-rolled allowlists (P79 batch B; the
 previous hardcoded literal broke GitHub Enterprise Server entirely, since the validator's allowlist
@@ -4820,8 +4660,7 @@ alongside these.** Space's suites are `unit/`, `ui/`, `mobile/`, `e2e-real/`, `v
 plus the Go flow tier. `apps/kira-space/tests/unit/` and `apps/kira-space/tests/ui/` (`bun run
 test:ui:space`) mirror Kira Studio's own `tests/unit/`/`tests/ui/` shape, running against Kira
 Space's own built bundle; `apps/kira-space/internal/` has its own Go suite too, covered by the same
-`bun run test:go` (it runs both apps' packages together — see below). `apps/kira-space-vscode/tests/` (renamed from `apps/kira-studio-vscode/tests/` at P100 Part 3) is
-the git module's own frontend tier, unchanged in shape by the move — full detail below. Kira Space has no `ipc/`
+`bun run test:go` (it runs both apps' packages together — see below). Kira Space has no `ipc/`
 tier: no database adapters to split against. It has two real-backend tiers instead (P231).
 
 **Studio flow tier (P232).** `apps/kira-studio/internal/appwire` is the composition root; `internal/flowharness`
@@ -4834,10 +4673,10 @@ Terminal keystrokes: `createTerminalsStore` (shared by both apps and the Docker 
 concurrent bound calls reach the backend in any order.
 
 **Flow tier (Go).** `apps/kira-space/internal/appwire` is the composition root: `Build(Options)`
-wires repos, git, gitsock, terminal, ADE, memory, mobile and the bound services; `main.go` supplies
+wires repos, git, terminal, ADE, memory, mobile and the bound services; `main.go` supplies
 native pieces (dialogs, browser, keep-awake, locator, window hooks), tests supply fakes.
 `internal/flowharness` boots `appwire.Build` in-process on a temp home. Real: SQLite, git (fixed
-dates, `git fast-import` history), the git stream, gitsock, PTY, watchers, mobile HTTP. Faked: the
+dates, `git fast-import` history), the git stream, PTY, watchers, mobile HTTP. Faked: the
 `claude` and `gh` CLIs (`internal/flowtest/fakeagent`, scenario JSON), dialogs, browser, keep-awake, LAN
 detection, window manager. `appwire.Options` exposes the test seams `GhLocator`, `TrackerGrace` and
 `MobilePoll` (`flowharness.WithoutGh`, `WithTrackerGrace`, `WithMobilePoll`). The fake `claude` prints
@@ -5045,19 +4884,9 @@ animations before capture; a small test-only stylesheet (`tests/visual/support/p
 loaded via `stylePath`, `ui`'s own specs unaffected) collapses `--kira-font-ui`/`--kira-font-data`
 to their trailing generic keyword, removing a multi-hop fontconfig fallback's own run-to-run
 ambiguity on the CI image. `docs/v1.4/plans/P6-visual-regression.md` is the full design record,
-including what's deliberately out of scope (the extension's webview tier, `apps/kira-space-vscode/
-tests/` as of P100's rename — no CI job runs it at all today, and its VS-Code-theme-following
-palette is a different baselining problem than this app's single hard-coded dark theme). Kira Space has
-its own `apps/kira-space/tests/visual/` (`bun run test:visual:space`): `settings` (5 panes: Advanced,
-Appearance, Connected editors, Git, Memory) and `git-module` (3: graph, graph detail, stash dialog; P229).
-
-**`apps/kira-space-vscode/tests/`** (`bun run test:webview`) is the git module's own frontend tier
-— Playwright against the extension's real emitted webview documents and its real built bundle, in
-two projects, with no VS Code, no backend and no container. `layout` asserts **rendered box
-heights** rather than DOM shape, for a specific reason recorded in the Git module section above: a
-build once shipped a graph panel with a correct `aria-rowcount` while the panel was visually
-collapsed to roughly 75 px, and every existing check passed. `interaction` covers the graph
-columns, the file tree, the review panel and the shared Floating-UI geometry.
+including what's deliberately out of scope (the removed extension's webview tier). Kira Space has
+its own `apps/kira-space/tests/visual/` (`bun run test:visual:space`): `settings` (4 panes: Advanced,
+Appearance, Git, Memory) and `git-module` (3: graph, graph detail, stash dialog; P229).
 
 **The git module's Go coverage needs no container, and one part of it is opt-in.** Every
 `internal/git*` package (`apps/kira-space/internal/git*` as of P100) builds real repositories under
@@ -5068,7 +4897,7 @@ recorded real `git` output, the same pattern `internal/postman`'s round-trip tes
 porcelain parser is exactly the "several interacting rules" case this repo's own testing bar exists
 for. `gitsearch` is guarded by `packages/git-core/testdata/searchConformance.json`, read by both
 its Go suite and the TypeScript twin's. And the transport's perf probes (`TestGraphStreamPerf`,
-`TestG8PerfBaseline`, in `internal/gitsock/`) run only behind `KIRA_GIT_PERF=1` and **assert
+`TestG8PerfBaseline`, in `internal/flows/gitflow/`) run only behind `KIRA_GIT_PERF=1` and **assert
 nothing** — they print one `key=value` line each. That is deliberate: a hard threshold in a suite
 that also runs on real macOS hardware would be flaky in exactly the way "re-measurement, not
 re-derivation" warns against. Their numbers are in `docs/PERF.md` §2.13.
@@ -5086,8 +4915,7 @@ was ported from — drift in either fails on the same bytes. `internal/mask/pari
 `tests/perf/`): `ui`, `ui-timing`, `ipc-frontend`, `e2e-real`, `visual` and `perf`,
 every one but `ui-timing` `fullyParallel`. Kira Space has its own
 `apps/kira-space/playwright.config.ts` (`ui`, `mobile-ios`, `mobile-android`, `e2e-real` with
-`workers: 2`, `visual`) and the extension has its own
-`apps/kira-space-vscode/playwright.config.ts` (`webview-layout`, `webview-interaction`). `ui` being fully parallel is a real change from the old `e2e` project's
+`workers: 2`, `visual`). `ui` being fully parallel is a real change from the old `e2e` project's
 `workers: 1`, and it is earned rather than inherited: that serialisation existed because concurrent
 Electron apps contend over wall-clock/RSS budgets and Docker containers, and this tier has neither —
 the same reasoning that already made `ipc-frontend` (and `visual`, which carries no timing
@@ -5135,9 +4963,6 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   to the phone's size on attach and back to the window's on return; no Claude account in the sandbox
   (see the P147 item), so only the Go and e2e sides are checked. Delete once checked with an
   authenticated `claude` and a real phone.
-- **P178 behaviours are unverified in a real VS Code host and on macOS.** Restricted Mode (`untrustedWorkspaces.supported: false`), the Space window opening or focusing over VS Code on a relay prompt (macOS activation), and `LogOutputChannel` level handling ran only in the harness and Kira Space UI tier. Delete once checked on a Mac with a real VS Code window (P180).
-- **P173 failure banner and auto-fetch marker are unobserved in a real VS Code host.** Verified only in the interaction harness (Chromium, fake host) and Kira Space's WebKit UI tier; a real 32 MiB result through Wails is also unexercised. Delete once checked in a real VS Code window against a running Kira Space.
-- **A paired git socket token is a bearer secret, not bound to the peer (P172).** Any same-user process holding the token connects. Pairing shows the kernel-reported process, but reconnects do not re-check it. Options: pin the pairing-time executable or code signature, or accept the same-user threat model. Open user decision; delete when resolved.
 - **Console reads on PostgreSQL and MySQL/MariaDB drain past the cap (P174).** At the cap `rows.Close()` discards the remaining rows off the wire: memory is bounded, server and network time are not. The Stop button ends a long drain. Delete once a driver offers a cheap server-side stop that keeps later statements in the batch intact.
 - **Some Redis console commands are read whole before the cap (P174).** `SUNION`, `SINTER`, `SDIFF`, `EVAL`/`FCALL`, module commands and `GET` of a huge string have no bounded form; go-redis reads the reply whole, then the page is capped. Delete once those commands get bounded rewrites or a streaming reader.
 - **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
@@ -5309,18 +5134,9 @@ repo-wide).
   posture C5's project tree already takes for its own listing.
 - **C7's search cannot match a pattern spanning multiple lines.** The scanner hands the matcher one
   line at a time (`^`/`$` anchor per line, D5); a `--multiline`-equivalent search is out of scope.
-- **The native graph and the VS Code extension hold independent `gitsession.Conn`s over the same
-  repository** (C10 §8). Correct by design — each connection's own hold/refcount is exactly what
-  lets `repo.close` release only that connection's share (`internal/gitrpc/handlers.go`) — but it
-  means a repository can be open twice in one process, each with its own watcher subscription.
-  Harmless (each connection's own hold is independently refcounted and released) and bounded, but
-  real.
-
 - **Native `review.session.save`/`.load` (`repo/git/reviewSession.ts`, backed by the pinned
-  repo-graph tab's own persisted state) has no expiry**, unlike the VS Code extension's own
-  `ReviewSessionStore`, which discards a saved session past `REVIEW_SESSION_TTL_MS` (14 days,
-  `proxyHandlers.ts`, matching `gitreview`'s own `IdleTTL` reaper window). A native resume point can
-  be arbitrarily old and still gets silently reapplied on the next cold mount — no parity fix
+  repo-graph tab's own persisted state) has no expiry**, unlike `gitreview`'s own `IdleTTL` reaper window. A native resume point can
+  be arbitrarily old and still gets silently reapplied on the next cold mount — no fix
   attempted here, since the pinned tab's state is small (a branch/mode pointer, not the review data
   itself) and already goes away when the tab or workspace closes.
 - **No standalone merge or rebase operation exists anywhere in this stack** (P67e §7). `op.run`'s
@@ -5342,7 +5158,7 @@ Performance:
   `review.comment.list` re-anchoring passes** (a server-side cost) — C13-12 fixed the diff-reload
   fan-out (C14-2 fixed a regression in that same split) but not the comment-reload fan-out.
 
-- **`.github/workflows/pr.yml` has no `build:vscode`, `test:webview` or `test:ui:space` step.**
+- **`.github/workflows/pr.yml` has no `test:ui:space` step.**
   `typecheck`/`lint` cover Kira Space (whole-repo scripts), `build:space` and the Space `gitclient`
   tests run. `verify:packaging` in `pr.yml` finds no packaged bundle, so its artifact checks skip;
   `release.yml` runs them. Closing this needs its own follow-up. This session cannot push a
@@ -5367,7 +5183,7 @@ Performance:
 - **Re-importing a changed document never retracts facts (P211).** New facts add or update; facts the edit removed stay as current memories. Delete if memories gain a delete or retract path.
 - **Semantic memory search is unverified on a Mac (P210).** Loading the bundled dylib from `Contents/Frameworks`, int8 kernels on arm64 and the worker footprint were checked on Linux only (95 MB loaded, 137 MB peak). Delete once checked on a Mac.
 - **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
-- **The Space Git window refuses `worktree.prepare` by design (P202).** Prepare-script progress shows in ADE paths and the VS Code extension host, not in the Space Git window's own worktree dialog or toolbar. The git-ui toolbar strip is not screenshot-verified (no fake-host scenario drives `worktree.prepare`). Delete when the user lifts the boundary.
+- **`release.yml` still stamps the removed extension manifest until `docs/pending-changes/.github__workflows__release.yml.patch` is applied (P243 Part 2).** The release workflow fails until then. `docs/pending-changes/.github__workflows__pr.yml.patch` renames two step names that still say `gitsock`. Delete once both are applied.
 - **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
 - **The agent MCP tools (`task_info`, `declare_repos`, `request_branch`, `branch_status`) are untested against a real board and real `claude` (P199).** Covered by the `claudeheadless` go-sdk client test and `agenttools_test.go` only. Delete once one live run calls them.
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.

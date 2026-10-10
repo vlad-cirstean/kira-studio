@@ -52,8 +52,7 @@ Expected artifacts (nothing lands in `dist/` or `out/` any more):
   from. Still produced, and still what you run locally; it is no longer what ships.
 - `apps/kira-studio/bin/Kira Studio` — the bare Go binary the bundle is assembled around.
 
-**As of v1.9 P100, this app's own artifacts carry no `.vsix` at all.** The packaged VS Code
-extension (G10 D7) moved to Kira Space's own bundle in full — see "Kira Space packaging" below.
+**No app artifact carries a `.vsix`.** The VS Code extension was removed in P243 Part 2.
 
 No `.zip` is produced anywhere any more — the release workflow uploads the `.dmg` (§7).
 
@@ -75,9 +74,6 @@ apps/kira-studio/bin/Kira Studio.app/
 There is no `runtime/` subtree any more (P58f M10) — the compiled Go binary is the whole app.
 `create:app:bundle` used to assert `runtime/{node,engine}` existed and copy that tree in before
 signing; both the guard and the copy step are gone, since there is nothing left to vendor.
-
-**As of P100, installing the extension is Kira Space's own concern — see "Kira Space packaging"
-below.** This app has no *Connected editors* pane, no `internal/gitvsix`, and nothing to install.
 
 **Dev loop:** `bun run dev:studio` (`cd apps/kira-studio && wails3 task dev`) launches a real native window
 with hot reload — the Wails task's own dev-mode config drives the frontend build with a blocking
@@ -256,9 +252,7 @@ human to launch the packaged app and use it.
     volume icon. — **partial**: mount, contents, both icons and `Signature=adhoc` on the image were
     verified from the shell; the drag-onto-Applications gesture and how the window *looks* when
     Finder opens it — background, icon placement — still want a human's eyes.
-12. **Moved to Kira Space as of P100** — the *Connected editors* pane, `internal/gitvsix`'s Install
-    VS Code Integration button, and `kira-*.vsix` bundling all now belong to Kira Space's own
-    checklist. See "Kira Space packaging" below.
+12. **Removed in P243 Part 2** — the extension install button and `.vsix` bundling no longer exist.
 
 **P119's curl installer and in-app update, items 13-20 — none of these can run in this Linux
 sandbox.** They need a published release with both DMGs, which only the first real run of the
@@ -299,13 +293,11 @@ frameworks. On Linux that leaves two doors, and neither was opened here:
   macOS.
 
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
-"skipped A1/A3/A5/A6/N2" note and one "skipped A4/N3" note and passes on the static checks alone,
-and even with a bundle it would skip A1/A3/A5/A6/N2 for want of `codesign`/`PlistBuddy`. **A green
-`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S9/S10/S11/S12), not that
-any bundle is correct.** S9 (G10 — the extension manifest's `version` matches `build/config.yml`'s
-`info.version`) is a pure string comparison over two committed files, so it runs — and means
-something — even without a bundle; A6 (the bundled `.vsix` exists, is non-empty and `PK`-prefixed)
-needs the real `.app` and so shares A1/A3/A5/N2's fate here.
+"skipped A1/A3/A5/N2" note and one "skipped A4/N3" note and passes on the static checks alone,
+and even with a bundle it would skip A1/A3/A5/N2 for want of `codesign`/`PlistBuddy`. **A green
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S10/S11/S12), not that
+any bundle is correct.** The static checks run over committed files, so they mean something even without a bundle. A1/A3/A5/N2
+need the real `.app`.
 
 What *is* fully verifiable off macOS: everything that feeds the bundle rather than being the bundle —
 the renderer build, typecheck, lint, the Go unit tests, and the static half of `verify:packaging`.
@@ -517,25 +509,9 @@ apps/kira-space && wails3 task darwin:package:dmg`, then `sh scripts/sign-bundle
 "Kira Space"`) is the entry point — `sign-bundle.sh` takes the app dir and app name as `$1`/`$2` as
 of P100 Part 2, so this one script signs both apps' bundles rather than a near-identical copy per
 app. Expected artifacts: `apps/kira-space/bin/Kira Space.dmg`/`.app`/`Kira Space` (the DMG, the
-bundle, and the bare binary), plus `apps/kira-space/bin/kira-space.vsix` — the one artifact with no
-Kira Studio equivalent. **As of P119, `Kira Space.dmg` ships as `kira-space-macos-arm64.dmg` on the
+bundle, and the bare binary). **As of P119, `Kira Space.dmg` ships as `kira-space-macos-arm64.dmg` on the
 same draft release as Kira Studio's own disk image** — one `release.yml` job, one tag, one release
 (§7) — rather than a separate release or a separate `release-space` job.
-
-**The `.vsix` chain — this is where G10's whole packaged-extension story now lives.**
-`scripts/build-vscode.ts` builds the extension's two outputs (the webview UI, from
-`packages/git-ui/vite.config.ts`, and `dist/extension.cjs`, CommonJS per G10 D6) with `Bun.build`;
-`scripts/package-vscode.ts` (`bun run package:vscode`) calls it, then shells `@vscode/vsce package
---no-dependencies` (mandatory — vsce's own dependency-resolution shells `npm list`, which cannot
-read this workspace's `workspace:*` protocol) to produce `apps/kira-space/bin/kira-space.vsix`, a
-fixed filename with no version baked in (the version lives in the manifest, where `code` reads it).
-`apps/kira-space/build/Taskfile.yml`'s `build:vsix` task wires this into `darwin:package`/
-`darwin:package:universal` (retargeted here from Kira Studio by P100 Part 3); `create:app:bundle`
-copies the built `.vsix` into `Contents/Resources/kira-space.vsix` **before** `codesign:adhoc` runs,
-so the ad-hoc signature covers it too, and fails loudly if the file is missing rather than
-packaging a broken bundle silently. `darwin:run`'s `.dev.app` gets the same conditional copy Kira
-Studio's own dev-app task used to, so **Install VS Code Integration** is exercisable from a dev
-build without cutting a real `.dmg`.
 
 **ONNX Runtime (P210).** `darwin:package` and `darwin:package:universal` depend on `fetch:onnxruntime`
 (`scripts/fetch-onnxruntime.sh osx-arm64`: MIT release tgz, SHA-256 pinned, extracted to the gitignored
@@ -547,21 +523,6 @@ x86_64 macOS build); the universal bundle's x86_64 slice reports embeddings unav
 needs signing. Mac verification is a human item (see `docs/ARCHITECTURE.md` Known open items):
 `Contents/Frameworks/libonnxruntime.1.29.1.dylib` present, `codesign --verify --deep --strict` passes,
 worker footprint in Activity Monitor at most 150 MB.
-
-**Installing the extension (G10) — Settings → *Connected editors* → Install VS Code Integration**
-(`apps/kira-space/internal/gitvsix`, retargeted from Kira Studio by P100 Part 3): locates the
-bundled `.vsix` next to the running executable, probes for a `code` CLI (`PATH`, then
-`/usr/local/bin`, then `/opt/homebrew/bin`, then the VS Code `.app` bundle's own `bin/code`, then
-`~/Applications/...`), and either runs `code --install-extension <path> --force` or reveals the
-file in Finder as a fallback.
-
-**Human checklist item, carried over from Kira Studio's own §4 item 12, not yet run against this
-app:** with `code` on `PATH`, click **Install VS Code Integration**, expect `installed` and VS
-Code's own "Completed installing extension" under **Kira Space**, publisher `vladcirstean`. Rename
-`/usr/local/bin/code` aside and relaunch: the button reads **Reveal Extension in Finder**, clicking
-it opens Finder with `kira-space.vsix` selected. Restore. With the extension installed from the
-`.vsix` (not `--extensionDevelopmentPath`), open a git repository and confirm the Git Graph panel
-renders.
 
 **Not yet run in this environment** for the same reason as Kira Studio's own §3/§4: this sandbox is
 Linux, with no macOS, no `codesign`, and no `code` CLI to probe for. What §5's off-macOS limits say

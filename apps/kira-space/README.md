@@ -5,13 +5,12 @@
 A native macOS git client and code workspace: a commit graph, branch review and remote operations
 over a VS Code-adjacent workspace (file tree, Monaco viewer, diffs, search), with coding agents, a
 memory store, a terminal and a phone view on your home network — built on Wails (Go)
-and Vue 3. Its modules are Git, Agents, Terminal and Memory. The same backend also serves the **Kira Space VS Code extension**
-(`apps/kira-space-vscode`), which brings the same graph and review sidebar into an editor window.
+and Vue 3. Its modules are Git, Agents, Terminal and Memory.
 
 ## Status
 
 - **Beta, split out of Kira Studio as its own app at v1.9 P100.** The git backend, the native code
-  workspace and the VS Code extension all shipped as part of Kira Studio through v1.3-v1.8; P100
+  workspace all shipped as part of Kira Studio through v1.3-v1.8; P100
   moved them here, unchanged in behavior, into a standalone app with no database or API tooling of
   its own. See the root [`README.md`](../../README.md) for that sibling app and
   [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md)'s Git module section for the fuller history.
@@ -30,7 +29,7 @@ and Vue 3. Its modules are Git, Agents, Terminal and Memory. The same backend al
 - **Diff tabs** — worktree-vs-HEAD diffs in Monaco's own diff editor.
 - **Search** — in-file via Monaco's own find widget; repository-wide in Go, with streamed results
   and no `ripgrep` subprocess.
-- **Git graph, natively** — the same `packages/git-ui` graph the VS Code extension uses, mounted
+- **Git graph, natively** — the `packages/git-ui` graph, mounted
   as each workspace's pinned first tab, with the code-review layer (inline AI-review gutter icons,
   PR-review threads) alongside it.
 - **Inline git blame** — a per-line annotation over the file viewer, toggled by an Appearance
@@ -55,19 +54,12 @@ and Vue 3. Its modules are Git, Agents, Terminal and Memory. The same backend al
 ## Git features
 
 The git backend runs inside this app — spawn discipline, porcelain parsing, the paged log walk,
-pre-flight hazard analysis, every write — and serves two frontends over it: this window's own
-native workspace (a pinned native graph tab and a native code-review layer, both described under
-Code workspace above), and the
-**Kira Space** VS Code extension, which dials the same backend over a Unix socket at
-`~/.kira-space/git.sock`. The `.vsix` ships inside
-this app's own DMG rather than through the Marketplace, and installs from a *Connected editors*
-pane in Settings.
+pre-flight hazard analysis, every write — and serves this window's own native workspace (a pinned
+native graph tab and a native code-review layer, both described under Code workspace above).
 
-The capabilities below are all backend capabilities, reachable from both frontends, except where
-noted: the native surface performs fetch/pull/push/force-push, undo, restack, stash and worktree
-operations, with a native credential prompt for HTTPS remotes, but conflict resolution, a worktree
-prepare script's shell execution, opening a worktree window, and setting the global git path stay
-extension-only for now.
+The native surface performs fetch/pull/push/force-push, undo, restack, stash and worktree
+operations, with a native credential prompt for HTTPS remotes. Conflicts are resolved in your own
+external editor, then Continue, Skip or Abort.
 
 - **Commit graph** — a virtualized, lane-drawn log over the whole ref set, paged and streamed from
   the backend as binary FlatBuffers chunks; per-lane ref badges, a checked-out-HEAD indicator, and
@@ -85,16 +77,15 @@ extension-only for now.
   crosses as data, so the editor never re-derives it. A single-slot **undo** covers the last
   undoable operation per repository, labelled with the window that ran it.
 - **Remote operations** — fetch, push, force-with-lease, a decomposed pull with a strategy picker,
-  background auto-fetch, and real cancellation. A credential prompt is relayed into the VS Code
-  window that owns the operation, through an askpass broker that fails rather than hangs.
+  background auto-fetch, and real cancellation. A credential prompt opens in this app's
+  window, through an askpass broker that fails rather than hangs.
 - **Stash** — the full stack (push/apply/pop/drop/branch-from-stash) with `merge-tree`-based pop
   prediction, plus branch-scoped extras: auto-stash on checkout tagged with the branch it came
   from, cross-branch apply, and a reusable global stash kept under this app's own `refs/kira/*`
   namespace, which never appears in your graph.
 - **Branch review** — a base resolver and a ranged walk, with **incremental review state**: what
   you last reviewed is kept per file as a compressed content snapshot, not just a commit sha, so a
-  rebase, squash or amend still diffs correctly. Range-level marking happens in VS Code's own diff
-  editor. The file tree's mark-reviewed control is a real checkbox: a partially-reviewed file shows
+  rebase, squash or amend still diffs correctly. The file tree's mark-reviewed control is a real checkbox: a partially-reviewed file shows
   an indeterminate state, and a fully-reviewed file's row tint clears. A flat list of file/line
   **AI review comments** exports as plain text to paste into a chat — deliberately a copy-paste
   workflow, not a live integration.
@@ -121,19 +112,10 @@ extension-only for now.
   browser — never an embedded webview and never a real `<a href>`. **GitHub Enterprise hosts work**
   too: the host check accepts `github.com` plus any host the `gh` CLI has itself authenticated
   against, rather than a hardcoded literal.
-- **Several editors at once** — multiple VS Code windows connect to one backend, on the same
-  repository or different ones. Repository-level state (the reader/writer gate, the file watcher,
-  the caches, the undo slot) is shared; each connection's own paging and walk state is private. A
-  new editor asks for approval **in Kira Space's window**, its token is stored only as a salted
-  hash, and revoking it drops every live connection holding it.
-
 Two limits worth knowing up front:
 
 - **Git 2.38 or newer is required** — `git merge-tree --write-tree`, which conflict prediction
-  needs. Below that the extension shows a blocked state rather than degrading silently.
-- **Kira Space and the extension are hard-locked to the same contract version.** A mismatch is a
-  blocking panel naming both versions, not a reduced feature set — the app's own update never
-  touches the separately-installed extension, so "run an older method set" has no honest meaning.
+  needs. Below that the Git module shows a blocked state rather than degrading silently.
 
 ## Requirements
 
@@ -142,8 +124,7 @@ Two limits worth knowing up front:
   that.
 - Optional: an authenticated `claude` CLI for Agents
   and Memory.
-- Optional: [VS Code](https://code.visualstudio.com) 1.134+, to install the bundled **Kira Space**
-  extension into as a second frontend, and the [GitHub CLI](https://cli.github.com) (`gh`), already
+- Optional: the [GitHub CLI](https://cli.github.com) (`gh`), already
   logged in, for PR links — without it the PR indicator simply stays blank and nothing else
   changes.
 - The rest of the toolchain (Go, Bun, the Wails v3 CLI, Xcode command-line tools) is the same as
@@ -173,8 +154,7 @@ bun run package:space
 ```
 
 The built, signed (ad-hoc) app lands at `apps/kira-space/bin/Kira Space.app`, and the disk image
-that ships it at `apps/kira-space/bin/Kira Space.dmg`. `apps/kira-space/bin/kira-space.vsix` is the
-packaged VS Code extension, copied into the bundle before signing.
+that ships it at `apps/kira-space/bin/Kira Space.dmg`.
 
 Since a locally built image is unsigned (ad-hoc) and never passed through the installer, its first
 launch needs a Gatekeeper workaround: right-click → Open, or:
@@ -184,7 +164,7 @@ xattr -dr com.apple.quarantine "apps/kira-space/bin/Kira Space.app"
 ```
 
 See [`docs/PACKAGING.md`](../../docs/PACKAGING.md)'s "Kira Space packaging" section for the bundle
-layout, the `.vsix` chain, and the verification checklist.
+layout and the verification checklist.
 
 ## Development
 
@@ -204,10 +184,7 @@ The scripts specific to this app:
 | `bun run typecheck:space-web` | `apps/kira-space/frontend/src`, including `.vue` files (`vue-tsc`) |
 | `bun run typecheck:space-tests` | `apps/kira-space/tests/` tiers and `playwright.config.ts` (`tsgo`) |
 | `bun run typecheck:space-unit` | `apps/kira-space/tests/unit` (`tsgo`) |
-| `bun run typecheck:git` | `packages/git-ipc`, `packages/git-core` and `apps/kira-space-vscode` (`tsgo`), plus `packages/git-ui` and `packages/kira-ui` (`vue-tsc`) |
-| `bun run build:vscode` | Builds the VS Code extension's bundle (`scripts/build-vscode.ts`) |
-| `bun run package:vscode` | Packages it into `apps/kira-space/bin/kira-space.vsix` (`scripts/package-vscode.ts`) — `bun run package:space` runs this before bundling it into the app |
-| `bun run test:webview` | Builds the extension bundle, then runs Playwright against its own webviews (layout + interaction, see Tests below) |
+| `bun run typecheck:git` | `packages/git-ipc`, `packages/git-core` (`tsgo`), plus `packages/git-ui` and `packages/kira-ui` (`vue-tsc`) |
 | `bun run test:ui:space` | Builds, then runs Playwright (WebKit) against this app's own built bundle |
 | `bun run test:ui:space-mobile` | Builds the phone bundle, then runs its Playwright tests on iOS (WebKit) and Android (Chromium) profiles |
 | `bun run test:e2e-real:space` | Playwright against a real `-tags server` build of this app |
@@ -218,28 +195,22 @@ The scripts specific to this app:
 `bun run test:unit`, `bun run test:go` and `bun run typecheck` (unscoped) already cover this app —
 they run every project/package in the workspace, git included.
 
-**App data:** this app keeps `kira.db`, `logs/`, `review.db`, and its own `git.sock`/
-`git.sock.lock`, all under `~/.kira-space/`. The `KIRA_SPACE_HOME` environment variable relocates
+**App data:** this app keeps `kira.db`, `logs/`, and `review.db`, all under `~/.kira-space/`. The `KIRA_SPACE_HOME` environment variable relocates
 that whole directory, the same way `KIRA_HOME` does for Kira Studio's own home — the two are
-independent, so running both apps at once (or two test instances) never contends over one socket
+independent, so running both apps at once (or two test instances) never contends over one lock
 or one database. Memories live apart, in `~/.kira-memory/` (`KIRA_MEMORY_HOME`): `memory.db` and the
 downloaded `models/`.
 
 ## Tests
 
 TypeScript suites under `apps/kira-space/tests/` (`unit/`, `ui/`, `mobile/`, `e2e-real/`, `visual/`,
-and an opt-in `perf/`), a suite under `apps/kira-space-vscode/tests/` for the git webviews, and the Go
+and an opt-in `perf/`), and the Go
 suite under `apps/kira-space/`, including the flow tier (`test:flows:space`).
 `packages/db-fixtures/` is not exercised here — that's Kira Studio's own DB fixture corpus.
 
 - **`bun run test:unit`** — plain TypeScript modules exercised with fakes rather than a real
   window process (this app's tests run alongside Kira Studio's own in one invocation).
 - **`bun run test:ui:space`** — Playwright against this app's own built bundle, real WebKit.
-- **`bun run test:webview`** — Playwright against the extension's own built webview documents
-  (`apps/kira-space-vscode/tests/`), in two projects. `layout` asserts **real rendered box
-  heights** against the real emitted document and the real bundle, not DOM shape. `interaction`
-  covers the graph columns, the file tree, the review panel, the branch/tag/stash/worktree/stack
-  picker and the shared floating-UI geometry. No backend, no container, no VS Code.
 - **`bun run test:go`** — the Go test suite, shared with Kira Studio's own (`go test ./...` from
   the repo root covers both apps, since they're one Go module). The git packages need no container
   at all — they build real repositories under `t.TempDir()` against the `git` on `PATH`, and skip
@@ -253,19 +224,18 @@ handles windowing, IPC and the whole git backend — no sidecar, no second runti
 frontend runs in the OS's own WebView (WKWebView on macOS).
 
 ```
-apps/kira-space/internal        the Go app: git backend (gitclient, gitops, gitstore, gitrpc, gitsock, gitsession, ...), the native code workspace (codeworkspace), agents (ade), the phone server (mobileweb), wiring (appwire), flow tests (flowharness), the IPC bridge
+apps/kira-space/internal        the Go app: git backend (gitclient, gitops, gitstore, gitrpc, gitsession, ...), the native code workspace (codeworkspace), agents (ade), the phone server (mobileweb), wiring (appwire), flow tests (flowharness), the IPC bridge
 apps/kira-space/frontend/src    the Vue 3 app (bindings + the built bundle live alongside it, both gitignored)
 apps/kira-space/tests/unit      unit suite — no external resource
 apps/kira-space/tests/ui        Playwright against the built bundle, WebKit
 apps/kira-space/tests/mobile    Playwright for the phone bundle
 apps/kira-space/tests/e2e-real  Playwright against a real server build
 apps/kira-space/tests/visual    pixel-diff baselines
-apps/kira-space-vscode          the Kira Space VS Code extension — the git module's second frontend
 internal             repo-root Go shared by both apps: `shell`, `appevent`, `rpcstream`, `ipcerr`, `startupfail`, `appstorage`, `memory`, `agenthooks`, and more
 packages/workbench   the shared workbench shell (TitleBar/StatusBar/MainView/TabStrip), Pinia store factories, the Monaco editor bootstrap, both apps' test harnesses
-packages/git-ipc     the git contract, RPC/codec/validation, the socket channel, the FlatBuffers schema
-packages/git-core    client-side git logic: commit store, lane layout, the client half of search, ports
-packages/git-ui      the git graph/review UI, hosted by the extension and by this app's own native Git module
+packages/git-ipc     the git contract, RPC/codec/validation, the stream channel, the FlatBuffers schema
+packages/git-core    client-side git logic: commit store, lane layout, the client half of search, settings schema
+packages/git-ui      the git graph/review UI, hosted by this app's native Git module
 packages/kira-ui     KuiColumnResizeHandle plus a Floating-UI positioning primitive workbench wraps
 packages/theme       shared design tokens/CSS both apps' frontends import, plus the shadcn-vue `components/ui/*` sets
 ```
@@ -276,9 +246,12 @@ that created this app.
 
 ## Not shipped
 
-Everything the root [`README.md`](../../README.md)'s own "Not shipped" section lists, plus: the
-extension is **not published to the VS Code Marketplace or OpenVSX**; it ships in this app's DMG
-and installs from the *Connected editors* pane.
+Everything the root [`README.md`](../../README.md)'s own "Not shipped" section lists.
+
+## Upgrading
+
+The VS Code extension (`vladcirstean.kira-space-vscode`) was removed in v2.2. If you installed it, run
+`code --uninstall-extension vladcirstean.kira-space-vscode`.
 
 ## License
 
