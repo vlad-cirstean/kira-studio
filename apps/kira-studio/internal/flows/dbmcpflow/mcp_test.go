@@ -172,6 +172,9 @@ func TestDbMcpApprovalFlow(t *testing.T) {
 
 	denied := call()
 	req := f.pending(t)
+	// Contract dbmcp: tests/ui/dbmcp-approval.spec.ts renders this request in the approval dialog.
+	f.app.Contract(t, "dbmcp", "DbMcpService.PendingApprovals", bridge.DbMcpApprovalSnapshot{Pending: &req}, flowharness.Mask("expiresAtMs"))
+	f.app.Contract(t, "dbmcp", "args:DbMcpService.ApproveQuery", bridge.DbMcpApprovalArgs{RequestID: req.RequestID})
 	if req.Statement != write || req.ConnectionID != f.connID || req.Class == "" {
 		t.Fatalf("pending approval = %+v, want the write statement on the connection", req)
 	}

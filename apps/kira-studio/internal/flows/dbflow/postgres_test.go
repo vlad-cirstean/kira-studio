@@ -63,3 +63,28 @@ func TestPostgresJourney(t *testing.T) {
 	j := &journey{t: t, app: app, input: in, table: "users", readSQL: "select id, name, email from users order by id", rows: 3, bad: &bad}
 	j.run()
 }
+
+// Contract paste-credentials: tests/ui/connection-paste-credentials.spec.ts "Update credentials with a
+// password only reconnects a live connection" answers its connect calls with these states.
+func TestPostgresUpdateCredentials(t *testing.T) {
+	flowharness.Complete(t)
+	in := startPostgres(t)
+	app := flowharness.New(t)
+	stale := in
+	stale.Password = ptr("stale-password")
+	conn := createConn(t, app, stale)
+	st, err := app.W.Connections.Connect(bridge.ConnectionsIDArgs{ID: conn.ID})
+	if err == nil && st.Status != "error" {
+		t.Fatalf("connect with a stale password = %+v, want an error", st)
+	}
+
+	if _, err := app.W.Connections.Update(bridge.ConnectionsUpdateArgs{ID: conn.ID, Input: in}); err != nil {
+		t.Fatal(err)
+	}
+	fixed := connect(t, app, conn.ID)
+	if fixed.Status != "connected" {
+		t.Fatalf("connect after Update = %+v, want connected", fixed)
+	}
+	app.Contract(t, "paste-credentials", "ConnectionsService.Connect#connected", fixed,
+		flowharness.Mask("since", "serverVersion"), flowharness.Omit("caps"))
+}

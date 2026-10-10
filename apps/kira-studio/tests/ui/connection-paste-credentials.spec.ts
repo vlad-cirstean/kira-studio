@@ -1,7 +1,12 @@
 import type { Page } from '@playwright/test';
-import type { ConnectionKind, ConnectionSummary } from '@shared/domain/connection';
+import {
+  type ConnectionKind,
+  type ConnectionSummary,
+  connectionStateSchema,
+} from '@shared/domain/connection';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { connectionRow } from './support/tree';
 
@@ -251,12 +256,12 @@ test('Update credentials writes only user and password; a username change leaves
 test('Update credentials with a password only reconnects a live connection', async ({
   relaunch,
 }) => {
+  // Backend half: dbflow TestPostgresUpdateCredentials (complete suite).
   const state = {
+    ...contract('paste-credentials', 'ConnectionsService.Connect#connected', {
+      schema: connectionStateSchema.omit({ caps: true }),
+    }),
     connectionId: PG.id,
-    status: 'connected',
-    serverVersion: '16.0',
-    error: null,
-    since: 1735689600000,
     caps: null,
   };
   const { window: page, control } = await relaunch({

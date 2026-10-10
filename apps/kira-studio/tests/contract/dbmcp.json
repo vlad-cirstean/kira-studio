@@ -1,0 +1,19 @@
+{
+  "DbMcpService.PendingApprovals": {
+    "pending": {
+      "class": "write",
+      "connectionId": "<id:1>",
+      "connectionName": "notes db",
+      "expiresAtMs": 0,
+      "kind": "sqlite",
+      "plan": null,
+      "reason": "permission",
+      "requestId": "<id:2>",
+      "statement": "insert into notes (body) values ('three')"
+    },
+    "queued": 0
+  },
+  "args:DbMcpService.ApproveQuery": {
+    "requestId": "<id:2>"
+  }
+}
