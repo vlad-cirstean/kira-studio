@@ -767,7 +767,7 @@ onUnmounted(() => {
         <span class="text-kira-sm text-muted-foreground" data-testid="stream-status">{{ statusLine }}</span>
         <Tooltip v-if="isReadOnlyBatch">
           <TooltipTrigger as-child>
-            <InputGroup variant="kira" class="flex w-24 shrink-0" :aria-invalid="!visibilityValid">
+            <InputGroup variant="kira" class="flex w-24 shrink-0 font-data" :aria-invalid="!visibilityValid">
               <span class="shrink-0 text-kira-sm text-muted-foreground">hide</span>
               <InputGroupInput
                 :model-value="visibilityText"
@@ -903,7 +903,7 @@ onUnmounted(() => {
           />
         </div>
         <div class="w-40 shrink-0">
-          <InputGroup variant="kira" class="flex w-full">
+          <InputGroup variant="kira" class="flex w-full font-data">
             <span
               class="shrink-0 text-kira-sm"
               :class="tab.state.offsetFilter ? 'text-state-on' : 'text-muted-foreground'"

@@ -6,11 +6,12 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@theme/components/ui/input-group'
-import { onMounted, useTemplateRef } from 'vue'
+import { useTemplateRef } from 'vue'
 
 // P262 §2.5: the one search/filter text box. Attrs (data-testid, @keydown, @keydown.enter, ...) land
 // on the <input>. Esc clears a non-empty value and stops there; an empty field lets Esc bubble so
-// the surrounding surface (dialog, popover, find bar) still closes.
+// the surrounding surface (dialog, popover, find bar) still closes. Callers focus via the exposed
+// focus() (biome noAutofocus forbids the attribute).
 defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(defineProps<{
@@ -18,12 +19,10 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   ariaLabel?: string
   size?: 'kira' | 'kira-lg'
-  autofocus?: boolean
 }>(), {
   placeholder: 'Search',
   ariaLabel: undefined,
   size: 'kira',
-  autofocus: false,
 })
 
 const emit = defineEmits<(e: 'update:modelValue', value: string) => void>()
@@ -44,10 +43,6 @@ function clear(): void {
   emit('update:modelValue', '')
   focus()
 }
-
-onMounted(() => {
-  if (props.autofocus) focus()
-})
 
 defineExpose({ focus })
 </script>

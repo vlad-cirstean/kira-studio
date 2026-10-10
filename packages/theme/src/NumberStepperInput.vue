@@ -37,7 +37,7 @@ function stepBy(dir: 1 | -1): void {
 
 <template>
   <div ref="containerRef" class="contents">
-    <InputGroup :class="cn('h-control-lg w-full rounded-kira-sm border-border-strong bg-field', props.groupClass)">
+    <InputGroup variant="default" :class="cn('h-control-lg w-full rounded-kira-sm border-border-strong bg-field', props.groupClass)">
       <InputGroupInput
         type="number"
         :model-value="props.modelValue"

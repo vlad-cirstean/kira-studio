@@ -239,7 +239,7 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
     <PopoverAnchor as-child>
       <div ref="rootEl" class="relative flex-1 min-w-0">
         <div class="flex items-center gap-1">
-          <InputGroup variant="kira" class="flex-1 min-w-0" data-testid="search-input">
+          <InputGroup variant="kira" class="flex-1 min-w-0 font-data" data-testid="search-input">
             <InputGroupAddon>
               <CodiconIcon name="search" :size="13" />
             </InputGroupAddon>

@@ -61,7 +61,7 @@ function onUpdate(v: unknown): void {
             >
               <slot name="item" :item="item" :active="item.value === modelValue">
                 <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" />
-                {{ item.label }}
+                <span>{{ item.label }}</span>
                 <span v-if="item.count !== undefined" class="text-kira-sm text-muted-foreground">{{ item.count }}</span>
               </slot>
             </ToggleGroupItem>
@@ -78,7 +78,7 @@ function onUpdate(v: unknown): void {
       >
         <slot name="item" :item="item" :active="item.value === modelValue">
           <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" />
-          {{ item.label }}
+          <span>{{ item.label }}</span>
           <span v-if="item.count !== undefined" class="text-kira-sm text-muted-foreground">{{ item.count }}</span>
         </slot>
       </ToggleGroupItem>
