@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -179,6 +180,28 @@ func runGh(scen Scenario, dir string, args []string) int {
 func runClaude(scen Scenario, dir string, args []string) int {
 	cwd, _ := os.Getwd()
 	repo := filepath.Base(filepath.Dir(cwd))
+	action := pickAction(scen, dir, repo, cwd, args)
+	headless := slices.Contains(args, "-p") || slices.Contains(args, "--print")
+	if headless {
+		if code, done := startHeadless(scen, dir, action.stem, args); done {
+			return code
+		}
+	} else {
+		recordTUIInput(action.stem)
+	}
+	if code, done := runSideEffects(action.Action, dir, cwd, args); done {
+		return code
+	}
+	return finishAction(action.Action, args, headless)
+}
+
+type pickedAction struct {
+	Action
+	stem string
+}
+
+// pickAction selects this call's scripted action and records the call's args, cwd, env and MCP configs.
+func pickAction(scen Scenario, dir, repo, cwd string, args []string) pickedAction {
 	actions := scen.Claude[repo]
 	if len(actions) == 0 {
 		actions = scen.Claude["*"]
@@ -197,35 +220,24 @@ func runClaude(scen Scenario, dir string, args []string) int {
 			_ = os.WriteFile(fmt.Sprintf("%s.mcp%d", stem, i), raw, 0o644)
 		}
 	}
+	return pickedAction{Action: action, stem: stem}
+}
 
-	headless := false
-	for _, a := range args {
-		if a == "-p" || a == "--print" {
-			headless = true
-		}
-	}
-	if headless {
-		if code, done := startHeadless(scen, dir, stem, args); done {
-			return code
-		}
-	} else {
-		recordTUIInput(stem)
-	}
-
+// runSideEffects plays the action's shell, MCP calls, emit and wait; done reports an early exit code.
+func runSideEffects(action Action, dir, cwd string, args []string) (code int, done bool) {
 	if action.Sh != "" {
 		cmd := exec.Command("sh", "-c", action.Sh)
 		cmd.Dir = cwd
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Fprintf(os.Stderr, "sh: %v\n%s", err, out)
-			return 4
+			return 4, true
 		}
 	}
-	cfg := argAfter(args, "--mcp-config")
 	for _, c := range action.MCP {
 		res, err := callTool(argsAfter(args, "--mcp-config"), c.Server, c.Tool, c.Args)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "mcp:", err)
-			return 3
+			return 3, true
 		}
 		recordMCPResult(dir, c.Tool, res)
 	}
@@ -233,7 +245,7 @@ func runClaude(scen Scenario, dir string, args []string) int {
 		raw, err := os.ReadFile(action.Emit)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "fakeagent:", err)
-			return 3
+			return 3, true
 		}
 		_, _ = os.Stdout.Write(raw)
 	}
@@ -246,9 +258,14 @@ func runClaude(scen Scenario, dir string, args []string) int {
 		}
 	}
 	if action.Exit != nil {
-		return *action.Exit
+		return *action.Exit, true
 	}
+	return 0, false
+}
 
+// finishAction ends the run per the action's name, calling finish_step where the name asks for it.
+func finishAction(action Action, args []string, headless bool) int {
+	cfg := argAfter(args, "--mcp-config")
 	finish := func(status string) int {
 		if _, err := callTool([]string{cfg}, claudeheadless.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
 			fmt.Fprintln(os.Stderr, "finish_step:", err)

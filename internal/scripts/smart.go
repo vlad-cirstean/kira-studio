@@ -153,51 +153,60 @@ func validParamShape(p Param) (Param, error) {
 	p.Default = nonNil(p.Default)
 	switch p.Type {
 	case ParamText:
-		if len(p.Options) > 0 {
-			return p, invalid("scripts: param %s: a text param has no options", p.Name)
-		}
-		if len(p.Default) > 1 {
-			return p, invalid("scripts: param %s: a text param has one default", p.Name)
-		}
-		if len(p.Default) == 1 {
-			if p.Secret {
-				return p, invalid("scripts: secret param %s cannot have a default", p.Name)
-			}
-			if err := checkText(p.Default[0]); err != nil {
-				return p, invalid("scripts: param %s: default %v", p.Name, err)
-			}
-		}
+		return p, validTextParam(p)
 	case ParamSelect, ParamMultiselect:
-		if p.Secret {
-			return p, invalid("scripts: param %s: only a text param can be secret", p.Name)
-		}
-		if len(p.Options) == 0 || len(p.Options) > MaxOptions {
-			return p, invalid("scripts: param %s: give 1 to %d options", p.Name, MaxOptions)
-		}
-		seen := map[string]bool{}
-		for i, o := range p.Options {
-			o = strings.TrimSpace(o)
-			p.Options[i] = o
-			switch {
-			case o == "" || utf8.RuneCountInString(o) > MaxOptionRunes || strings.ContainsAny(o, "\r\n"):
-				return p, invalid("scripts: param %s: an option must be 1 to %d characters on one line", p.Name, MaxOptionRunes)
-			case seen[o]:
-				return p, invalid("scripts: param %s: option %q is listed twice", p.Name, o)
-			}
-			seen[o] = true
-		}
-		if p.Type == ParamSelect && len(p.Default) > 1 {
-			return p, invalid("scripts: param %s: a select param has one default", p.Name)
-		}
-		for _, d := range p.Default {
-			if !containsStr(p.Options, d) {
-				return p, invalid("scripts: param %s: default %q is not an option", p.Name, d)
-			}
-		}
-	default:
-		return p, invalid("scripts: param %s: type must be text, select or multiselect", p.Name)
+		return p, validChoiceParam(p)
 	}
-	return p, nil
+	return p, invalid("scripts: param %s: type must be text, select or multiselect", p.Name)
+}
+
+func validTextParam(p Param) error {
+	if len(p.Options) > 0 {
+		return invalid("scripts: param %s: a text param has no options", p.Name)
+	}
+	if len(p.Default) > 1 {
+		return invalid("scripts: param %s: a text param has one default", p.Name)
+	}
+	if len(p.Default) == 1 {
+		if p.Secret {
+			return invalid("scripts: secret param %s cannot have a default", p.Name)
+		}
+		if err := checkText(p.Default[0]); err != nil {
+			return invalid("scripts: param %s: default %v", p.Name, err)
+		}
+	}
+	return nil
+}
+
+// validChoiceParam checks a select or multiselect param; it trims p.Options in place.
+func validChoiceParam(p Param) error {
+	if p.Secret {
+		return invalid("scripts: param %s: only a text param can be secret", p.Name)
+	}
+	if len(p.Options) == 0 || len(p.Options) > MaxOptions {
+		return invalid("scripts: param %s: give 1 to %d options", p.Name, MaxOptions)
+	}
+	seen := map[string]bool{}
+	for i, o := range p.Options {
+		o = strings.TrimSpace(o)
+		p.Options[i] = o
+		switch {
+		case o == "" || utf8.RuneCountInString(o) > MaxOptionRunes || strings.ContainsAny(o, "\r\n"):
+			return invalid("scripts: param %s: an option must be 1 to %d characters on one line", p.Name, MaxOptionRunes)
+		case seen[o]:
+			return invalid("scripts: param %s: option %q is listed twice", p.Name, o)
+		}
+		seen[o] = true
+	}
+	if p.Type == ParamSelect && len(p.Default) > 1 {
+		return invalid("scripts: param %s: a select param has one default", p.Name)
+	}
+	for _, d := range p.Default {
+		if !containsStr(p.Options, d) {
+			return invalid("scripts: param %s: default %q is not an option", p.Name, d)
+		}
+	}
+	return nil
 }
 
 func nonNil(s []string) []string {
@@ -432,29 +441,9 @@ func ParamValues(params []Param, given map[string][]string) (vals []ParamValue, 
 		}
 	}
 	for _, p := range params {
-		vs := given[p.Name]
-		if p.Type == ParamText {
-			if len(vs) > 1 {
-				return nil, nil, fmt.Errorf("%s takes one value", p.Name)
-			}
-			if len(vs) == 1 && vs[0] == "" {
-				vs = nil
-			}
-		}
-		if len(vs) == 0 {
-			vs = p.Default
-		}
-		if p.Type == ParamSelect && len(vs) > 1 {
-			return nil, nil, fmt.Errorf("%s takes one value", p.Name)
-		}
-		for _, v := range vs {
-			if p.Type == ParamText {
-				if err := checkText(v); err != nil {
-					return nil, nil, fmt.Errorf("%s %v", p.Name, err)
-				}
-			} else if !containsStr(p.Options, v) {
-				return nil, nil, fmt.Errorf("value %q is not an option of %s", v, p.Name)
-			}
+		vs, err := resolveParam(p, given[p.Name])
+		if err != nil {
+			return nil, nil, err
 		}
 		if len(vs) == 0 && p.Required {
 			missing = append(missing, p.Name)
@@ -462,6 +451,34 @@ func ParamValues(params []Param, given map[string][]string) (vals []ParamValue, 
 		vals = append(vals, ParamValue{Name: p.Name, Secret: p.Secret, Rendered: strings.Join(vs, ", "), Env: strings.Join(vs, "\n")})
 	}
 	return vals, missing, nil
+}
+
+// resolveParam applies the default to blank input and validates the values against the param.
+func resolveParam(p Param, vs []string) ([]string, error) {
+	if p.Type == ParamText {
+		if len(vs) > 1 {
+			return nil, fmt.Errorf("%s takes one value", p.Name)
+		}
+		if len(vs) == 1 && vs[0] == "" {
+			vs = nil
+		}
+	}
+	if len(vs) == 0 {
+		vs = p.Default
+	}
+	if p.Type == ParamSelect && len(vs) > 1 {
+		return nil, fmt.Errorf("%s takes one value", p.Name)
+	}
+	for _, v := range vs {
+		if p.Type == ParamText {
+			if err := checkText(v); err != nil {
+				return nil, fmt.Errorf("%s %v", p.Name, err)
+			}
+		} else if !containsStr(p.Options, v) {
+			return nil, fmt.Errorf("value %q is not an option of %s", v, p.Name)
+		}
+	}
+	return vs, nil
 }
 
 // ToolArgs returns the --tools list (the ticked built-ins) and the exact --allowedTools list: the
