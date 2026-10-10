@@ -1,0 +1,29 @@
+{
+  "AdeTaskService.Run#no-claude": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "no report: claude exited with status 127",
+    "outcome": {
+      "exitCode": 0,
+      "lastError": "<masked>",
+      "reason": "no report: claude exited with status 127",
+      "reported": false,
+      "result": "failed",
+      "route": "stop",
+      "source": "exit",
+      "status": "failed"
+    },
+    "purpose": "",
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "failed",
+    "stepId": "one",
+    "summary": "",
+    "taskId": "<id:3>"
+  }
+}

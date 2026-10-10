@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeBoard, adeFixture, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -305,6 +306,31 @@ test('Details lists every environment of the repo, not deployed where the branch
   await expect(rows).toHaveCount(3);
   await expect(rows.first()).toContainText('not deployed');
   await expect(page.locator('[data-testid="ade-branch-deploy"][data-env="prod"]')).toBeVisible();
+});
+
+test('contract: a deployed environment and one whose script failed show as the backend reports them', async ({
+  relaunch,
+}) => {
+  const facts = contract<{ env: string; status: string; error: string }[]>(
+    'repo-env',
+    'AdeTaskService.Branch#deployments',
+  );
+  const board = adeFixture<BoardFx>('board');
+  const target = board.branches.find((b) => b.id === 'b_bill');
+  if (target)
+    target.deployments = facts.map((d) => ({
+      ...d,
+      deployedSha: d.status === 'deployed' ? 'abc1234' : '',
+    }));
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+  ]);
+  await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_bill"]').first().click();
+  const row = (env: string) => page.locator(`[data-testid="ade-branch-deploy"][data-env="${env}"]`);
+  const ok = facts.find((d) => d.status === 'deployed');
+  const broken = facts.find((d) => d.error);
+  await expect(row(ok?.env ?? '')).toContainText('runs abc1234, contains this branch');
+  await expect(row(broken?.env ?? '')).toContainText(broken?.error ?? '');
 });
 
 // ---- worktree setup

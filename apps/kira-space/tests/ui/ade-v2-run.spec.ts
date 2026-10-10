@@ -327,6 +327,21 @@ test("contract: a fix round counts against its result's loop budget", async ({ r
   ).toHaveCount(1);
 });
 
+test('contract: a run without claude on PATH shows its reason', async ({ relaunch }) => {
+  const failed = contract<ContractRun>('ade-run-errors', 'AdeTaskService.Run#no-claude');
+  const { window: page } = await openPlan(
+    relaunch,
+    boardWith((b) => placeRun(b, 'impl', failed)),
+  );
+  await open(page, 'T_push');
+  const line = stage(page, 'impl')
+    .locator(`${t('ade-run-line')}[data-branch-id="b_push"]`)
+    .filter({ has: page.locator(t('ade-run-retry')) });
+  await expect(line.locator(t('ade-run-status'))).toHaveText('failed');
+  await expect(line.locator(t('ade-run-note'))).toHaveText(failed.outcome.reason as string);
+  await expect(line.locator(t('ade-run-retry'))).toBeVisible();
+});
+
 test('contract: a spent loop shows the result and that the stage stopped', async ({ relaunch }) => {
   const spent = contract<ContractRun>('ade-branching', 'AdeTaskService.Run#review-spent');
   const { window: page } = await openPlan(

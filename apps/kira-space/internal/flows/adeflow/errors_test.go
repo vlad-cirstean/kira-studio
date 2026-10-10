@@ -21,6 +21,7 @@ func TestRunWithoutClaudeOnPath(t *testing.T) {
 	var run adewire.Run
 	if err == nil {
 		run = waitRun(t, app, task.ID, "one", "failed")
+		app.Contract(t, "ade-run-errors", "AdeTaskService.Run#no-claude", run, runMask, flowharness.Mask("lastError"))
 	}
 	text := ""
 	if err != nil {

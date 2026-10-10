@@ -218,7 +218,14 @@ test('picking a swatch sends SetRepoColor and the nav dot follows', async ({ rel
   ).toHaveClass(/bg-conn-red/);
 });
 
-test('Add environment writes nothing until name and command are filled', async ({ relaunch }) => {
+test('contract: Add environment writes nothing until name and command are filled', async ({
+  relaunch,
+}) => {
+  const sent = contract<{
+    patch: { environments: { name: string; deployedShaScript: string }[] };
+  }>('repo-env', 'args:AdeTaskService.UpdateRepo');
+  const env = sent.patch.environments[0];
+  if (!env) throw new Error('repo-env has no environment');
   const { window: page, control } = await openDialog(relaunch);
   const patches = () => calls(control, IPC.adeTaskUpdateRepo).map((e) => e.args);
   const before = await page.locator(t('repo-env')).count();
@@ -228,16 +235,16 @@ test('Add environment writes nothing until name and command are filled', async (
   const row = page.locator(t('repo-env')).last();
   await expect(row.locator(t('repo-env-name'))).toBeFocused();
 
-  await row.locator(t('repo-env-name')).fill('qa');
+  await row.locator(t('repo-env-name')).fill(env.name);
   await row.locator(t('repo-env-name')).blur();
   expect(patches()).toHaveLength(0);
 
-  await row.locator(t('repo-env-script')).fill('echo abc');
+  await row.locator(t('repo-env-script')).fill(env.deployedShaScript);
   await row.locator(t('repo-env-script')).blur();
   await expect.poll(patches).toHaveLength(1);
   const envs = (patches()[0] as { patch: { environments: unknown[] } }).patch.environments;
   expect(envs).toHaveLength(before + 1);
-  expect(envs[before]).toEqual({ name: 'qa', deployedShaScript: 'echo abc' });
+  expect(envs[before]).toEqual(env);
 });
 
 // Contract repos. Backend half: repoflow TestImportViaFolderPicker. The imported record is what the
