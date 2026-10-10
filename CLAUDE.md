@@ -243,7 +243,8 @@ duplicated here; this file only points at them.
   functional coverage (load/write/delete/filter/DDL, per adapter) rather than building a parallel
   mechanism — it's designed for that (P25's own `Scenario`/`Requires` seam, populated by P26).
 - **Real `claude` tests are opt-in and cost tokens.** After changing Claude integration code, run the
-  matching row of `docs/DEV_ENVIRONMENT.md` "Real `claude` tests (P237)". Never wire them into hooks or CI.
+  matching row of `docs/DEV_ENVIRONMENT.md` "Real `claude` tests" (`bun run test:claude*`). They live in
+  nested Go modules under `apps/*/tests/claude/`. Never wire them into hooks or CI.
 - **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)** —
   `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, with a `!` or `BREAKING CHANGE:` footer
   for breaking changes.
