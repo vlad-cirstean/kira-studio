@@ -935,6 +935,10 @@ onMounted(() => {
     rowTopOffsetRenderType: 'transform', // matches how --kira-graph-row-h drives row positioning
   });
   grid = instance;
+  // The vertical scrollbar appearing (history streaming past the viewport height) shrinks the
+  // viewport's content box with no host resize; observing it catches that regardless of whether
+  // the row-count change lands before or after the rAF a `loadedRows` watcher scheduled.
+  useResizeObserver(instance.getViewportNode(), scheduleResize);
 
   // W14/V2: SlickGrid's own internal structural elements — `_focusSink`/`_focusSink2` (two
   // invisible divs it binds its own keyboard handling to) and, less obviously, six `.slick-pane`,

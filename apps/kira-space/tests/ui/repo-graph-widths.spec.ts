@@ -44,7 +44,15 @@ const handleCenter = async (page: Page, name: string): Promise<number> => {
   return box.x + box.width / 2;
 };
 
+// The grid re-lays out on an rAF after a viewport resize or a scrollbar change, and the handles
+// follow in a Vue flush after that, so cells and handles agree only once that settles; poll for it.
 async function expectLayoutConsistent(page: Page): Promise<void> {
+  await expect(async () => {
+    await assertLayoutConsistent(page);
+  }).toPass();
+}
+
+async function assertLayoutConsistent(page: Page): Promise<void> {
   const [graph, message, author, date] = await cells(page);
   expect(graph.left + graph.width).toBeCloseTo(message.left, 0);
   expect(message.left + message.width).toBeCloseTo(author.left, 0);
@@ -72,16 +80,21 @@ async function drag(page: Page, name: string, dx: number): Promise<void> {
   await page.mouse.down();
   await page.mouse.move(x + dx, y, { steps: 6 });
   await page.mouse.up();
-  expect(Math.abs((await handleCenter(page, name)) - (x + dx))).toBeLessThan(3);
+  await expect
+    .poll(async () => Math.abs((await handleCenter(page, name)) - (x + dx)))
+    .toBeLessThan(3);
 }
 
 test('saved column widths are restored and every handle sits on its cell boundary', async ({
   relaunch,
 }) => {
   const page = await boot(relaunch);
-  const [, , author, date] = await cells(page);
-  expect(Math.round(author.width)).toBe(SAVED.author);
-  expect(Math.round(date.width)).toBe(SAVED.date);
+  await expect
+    .poll(async () => {
+      const [, , author, date] = await cells(page);
+      return [Math.round(author.width), Math.round(date.width)];
+    })
+    .toEqual([SAVED.author, SAVED.date]);
   await expectLayoutConsistent(page);
 });
 
@@ -89,21 +102,22 @@ test('dragging the author, date and graph handles moves that boundary with the p
   relaunch,
 }) => {
   const page = await boot(relaunch);
+  await expectLayoutConsistent(page);
 
   const before = await cells(page);
   await drag(page, 'Resize author column', -40);
+  await expectLayoutConsistent(page);
   const afterAuthor = await cells(page);
   expect(Math.round(afterAuthor[2].width - before[2].width)).toBe(40);
   expect(Math.round(afterAuthor[3].width)).toBe(Math.round(before[3].width));
-  await expectLayoutConsistent(page);
 
   await drag(page, 'Resize date column', -30);
+  await expectLayoutConsistent(page);
   const afterDate = await cells(page);
   expect(Math.round(afterDate[3].width - afterAuthor[3].width)).toBe(30);
-  await expectLayoutConsistent(page);
 
   await drag(page, 'Resize graph column', 25);
+  await expectLayoutConsistent(page);
   const afterGraph = await cells(page);
   expect(Math.round(afterGraph[0].width - afterDate[0].width)).toBe(25);
-  await expectLayoutConsistent(page);
 });
