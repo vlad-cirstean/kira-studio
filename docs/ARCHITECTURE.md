@@ -1241,8 +1241,7 @@ Previous, a filter/sort/projection change, Refresh, or the Count button. No back
 prefetch of the next page and no automatic count-on-open exist; both existed at one point and were
 removed by user request as unwanted background work rather than kept as an opt-out setting.
 
-**Observability.** The status bar shows cache size; the settings dialog shows hit rate and a
-*Clear caches* action.
+**Observability.** The settings Cache pane shows usage, hit rate and a *Clear caches* action.
 
 **A fourth, renderer-side tier, deliberately unbudgeted (P5).** The three tiers above are all
 Go-side and byte-budgeted (L2's own `> budget/2` refusal rule). The renderer keeps its own copy —
@@ -1254,7 +1253,7 @@ byte budget of any kind**, a deliberate consequence of an earlier decision (`doc
 §2.2's lever L-B: evicting a cold tab's page was declined twice, on the stated trade of RAM for the
 ≤ 50 ms cached-tab-switch interaction budget) — not an oversight P5 left unfixed. Ten tabs of large
 pages is real, uncapped renderer memory; `docs/v1.1/plans/P5-ram-usage.md` §8 OQ-2 hands the actual
-follow-up (surfacing this figure next to the status bar's own cache size, not eviction) to P7.
+follow-up (surfacing this figure next to the Cache pane's own usage, not eviction) to P7.
 
 **Renderer server-state cache (TanStack Query, P99/P112).** Above the three Go tiers, the renderer
 caches bridge-fetched server state in one `QueryClient` per window
@@ -2688,7 +2687,7 @@ array views, landing at +0.01–1.7% over raw buffer bytes with no transient hea
 
 **Update check and in-app install (P66, P119), shared by both apps.** The status bar's right-hand
 group can show one more item, `[data-testid="update-available"]`, first in that group so the
-existing readouts (`app-metrics`, `cache-size`) keep their positions. Clicking the
+existing readout (`app-metrics`) keeps its position. Clicking the
 item, or a new version becoming available while the app is open, opens a modal dialog
 (`UpdateDialog.vue`) with an **Update** button — P119 replaced Kira Studio's own click-opens-the-
 release-page behavior with this dialog, the deliberate behavior change P119's own plan names.

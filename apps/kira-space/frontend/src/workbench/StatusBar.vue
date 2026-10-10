@@ -65,6 +65,8 @@ function onRevealBlameCommit(): void {
         </TooltipTrigger>
         <TooltipContent>{{ blameTooltip }}</TooltipContent>
       </Tooltip>
+      <!-- P239: Claude Code usage limits, ADE module only. -->
+      <ClaudeUsageItem v-if="modeStore.active === 'ade' && settingsStore.claudeCode.usageEnabled" />
     </template>
     <template #right>
       <RunsStatusItem />
@@ -74,8 +76,6 @@ function onRevealBlameCommit(): void {
         :current-version="appUpdateStore.currentVersion"
         @open="appUpdateStore.openUpdateDialog()"
       />
-      <!-- P239: Claude Code usage limits, ADE module only. -->
-      <ClaudeUsageItem v-if="modeStore.active === 'ade' && settingsStore.claudeCode.usageEnabled" />
       <AppMetricsItem :sample="appMetricsStore.sample" />
     </template>
     <!-- P110 I2-19 (§3.5.3): `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s

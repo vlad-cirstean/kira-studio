@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Shared bar chrome for both apps. Per-app content comes through the two slots: Kira Space's
-// blame item on the left, update/app-metrics (and Kira Studio's cache-size) items on the right.
+// blame item on the left, update/app-metrics items on the right.
 </script>
 
 <template>

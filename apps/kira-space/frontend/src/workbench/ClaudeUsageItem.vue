@@ -74,7 +74,7 @@ const detail = computed(() => {
         :class="tone"
         data-testid="claude-usage-status"
       >
-        <CodiconIcon name="pulse" :size="13" />
+        <CodiconIcon name="dashboard" :size="13" />
         <span class="font-data" data-testid="claude-usage-text">{{ text }}</span>
       </span>
     </TooltipTrigger>
