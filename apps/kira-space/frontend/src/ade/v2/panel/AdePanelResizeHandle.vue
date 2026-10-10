@@ -81,10 +81,13 @@ function onKeydown(e: KeyboardEvent): void {
     :aria-valuemin="min"
     :aria-valuemax="max"
     tabindex="0"
-    class="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center border-l border-border bg-chrome"
+    class="w-1 shrink-0 cursor-col-resize outline-none"
+    :class="
+      isDragging
+        ? 'bg-focus'
+        : 'bg-transparent shadow-[inset_calc(var(--kira-border-width)*-1)_0_0_0_var(--kira-border)] hover:bg-focus hover:shadow-none focus-visible:bg-focus focus-visible:shadow-none'
+    "
     data-testid="ade-panel-resize-handle"
     @keydown="onKeydown"
-  >
-    <span class="h-7 w-0.5 rounded-kira-xs bg-border-strong" />
-  </div>
+  />
 </template>

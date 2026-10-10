@@ -229,11 +229,11 @@ function deployNote(d: Deployment): string {
         </AdeTip>
         <AdeTip v-if="branch.origin === 'agent'" text="Added or named by the agent">
           <span class="mt-px inline-flex shrink-0 text-subtle" data-testid="ade-panel-agent">
-            <CodiconIcon name="sparkle" :size="14" />
+            <CodiconIcon name="sparkle" :size="13" />
           </span>
         </AdeTip>
         <h3
-          class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-semibold leading-4.5"
+          class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-medium leading-4.5"
           data-testid="ade-panel-title"
         >
           {{ row.draft ? `new branch (${row.repo})` : branch.name }}
@@ -245,10 +245,10 @@ function deployNote(d: Deployment): string {
         {{ ui.actionError[card.task.id] }}
       </p>
       <div v-if="canForcePush || setupFailed || actions.length" class="flex flex-wrap gap-1.5 pt-1">
-        <Button
+        <Button variant="dialog"
           v-if="setupFailed"
           size="kira-lg"
-          class="font-semibold"
+          
           :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-panel-retry-setup"
           @click="onRetrySetup"
@@ -256,9 +256,9 @@ function deployNote(d: Deployment): string {
           Retry setup
         </Button>
         <AdeTip v-if="canForcePush" text="git push --force-with-lease">
-          <Button
+          <Button variant="dialog"
             size="kira-lg"
-            class="font-semibold"
+            
             :class="TONE_SOLID_CLASS.amber"
             data-testid="ade-panel-force-push"
             @click="forcePush = true"
@@ -269,9 +269,9 @@ function deployNote(d: Deployment): string {
         <template v-for="a in actions" :key="(a.kind === 'rebase' ? a.act.id : a.kind) + a.label">
           <AdeTip v-if="a.kind === 'review'" :parts="reviewChoice?.tip ?? []">
             <TooltipDisabledTrigger :disabled="reviewOff">
-              <Button
+              <Button variant="dialog"
                 size="kira-lg"
-                class="font-semibold"
+                
                 :class="actionClass(a)"
                 :disabled="reviewOff"
                 :data-testid="`ade-panel-action-${a.kind}`"
@@ -283,9 +283,9 @@ function deployNote(d: Deployment): string {
           </AdeTip>
           <AdeTip v-else-if="a.kind === 'rebase'" :parts="a.act.tip">
             <TooltipDisabledTrigger :disabled="a.act.disabled">
-              <Button
+              <Button variant="dialog"
                 size="kira-lg"
-                class="font-semibold"
+                
                 :class="actionClass(a)"
                 :disabled="a.act.disabled"
                 :data-testid="`ade-panel-action-${a.act.id}`"
@@ -295,10 +295,10 @@ function deployNote(d: Deployment): string {
               </Button>
             </TooltipDisabledTrigger>
           </AdeTip>
-          <Button
+          <Button variant="dialog"
             v-else
             size="kira-lg"
-            class="font-semibold"
+            
             :class="actionClass(a)"
             :disabled="a.kind === 'created'"
             :data-testid="`ade-panel-action-${a.kind}`"
@@ -374,10 +374,10 @@ function deployNote(d: Deployment): string {
           <AdeChip :label="i.status" :tone="INTO_TONE[i.status]" wide />
           <span class="font-data text-kira-md">{{ i.target }}</span>
           <span class="min-w-0 flex-1 truncate text-kira-sm text-muted-foreground">{{ intoNote(i) }}</span>
-          <Button
+          <Button variant="dialog"
             v-if="canMerge && i.status !== 'merged'"
             size="kira"
-            class="shrink-0 font-semibold"
+            class="shrink-0 "
             :class="ACTION_CLASS[i.status === 'stale' ? 'amber' : 'claude']"
             :disabled="dialogs.pending.has(`merge:${branch.id}:${i.target}`)"
             data-testid="ade-branch-merge"

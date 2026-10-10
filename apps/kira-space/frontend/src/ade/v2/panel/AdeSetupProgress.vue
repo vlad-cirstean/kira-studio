@@ -37,10 +37,10 @@ async function onRetry(): Promise<void> {
   <div v-if="status" class="flex flex-col gap-1" data-testid="ade-setup-progress" :data-branch-id="branch.id">
     <ScriptProgress v-bind="status">
       <template #actions>
-        <Button
+        <Button variant="dialog"
           v-if="status.state === 'failed'"
-          size="xs"
-          class="shrink-0 rounded-kira-xs px-2 font-semibold"
+          size="kira"
+          class="shrink-0 rounded-kira-xs px-2 "
           :class="TONE_SOLID_CLASS.amber"
           :disabled="retry.isPending.value"
           data-testid="ade-setup-retry"

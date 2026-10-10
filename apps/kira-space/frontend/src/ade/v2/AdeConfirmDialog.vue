@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -48,16 +49,16 @@ async function onYes(): Promise<void> {
 
 <template>
   <Dialog :open="open" @update:open="(v) => !v && emit('close')">
-    <DialogContent :show-close-button="false" data-testid="ade-confirm-dialog" class="w-110">
-      <DialogHeader>
+    <DialogContent size="sm" data-testid="ade-confirm-dialog">
+      <DialogHeader closable>
         <DialogTitle class="break-all">{{ title }}</DialogTitle>
       </DialogHeader>
-      <div class="flex flex-col gap-2 px-3 py-2 text-kira-md">
-        <p v-if="text">{{ text }}</p>
+      <DialogBody>
+        <p v-if="text" class="m-0">{{ text }}</p>
         <Alert v-if="error" variant="destructive" data-testid="ade-confirm-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
-      </div>
+      </DialogBody>
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="ade-confirm-no" @click="emit('close')">
           {{ noLabel }}

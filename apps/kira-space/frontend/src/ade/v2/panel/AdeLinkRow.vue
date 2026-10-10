@@ -2,6 +2,7 @@
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { useClipboard } from '@vueuse/core';
 import { ref } from 'vue';
 import { control } from '../../../bridge/control';
@@ -69,7 +70,7 @@ function openLink(e: MouseEvent): void {
         />
       </template>
       <template v-else>
-        <label :for="id" class="sr-only">{{ label }} link</label>
+        <Label :for="id" class="sr-only">{{ label }} link</Label>
         <Input
           :id="id"
           v-model="draft"

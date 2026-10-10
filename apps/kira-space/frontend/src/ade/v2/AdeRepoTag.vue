@@ -11,7 +11,7 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
 
 <template>
   <span
-    class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-semibold"
+    class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-medium"
     :class="tint.class"
     :style="tint.style"
     data-testid="ade-repo-tag"

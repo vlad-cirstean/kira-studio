@@ -150,9 +150,9 @@ async function copy(): Promise<void> {
     <p v-if="copyError" class="m-0 text-kira-sm text-error">{{ copyError }}</p>
     <div v-if="acts?.length" class="flex flex-wrap gap-1.5">
       <AdeTip v-for="a in acts" :key="a.id" :parts="a.tip">
-        <Button
+        <Button variant="dialog"
           size="kira"
-          class="font-semibold"
+          
           :class="ACTION_CLASS[a.kind === 'abortRebase' ? 'red' : 'amber']"
           :disabled="a.disabled"
           :data-testid="`ade-outcome-act-${a.id}`"

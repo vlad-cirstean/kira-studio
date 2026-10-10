@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { computed, ref, watch } from 'vue';
 
 // Estimate row. Unset: number plus an hours/days toggle, written on `change`. Set: extend-only
@@ -63,7 +64,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
   <div class="flex flex-col gap-0.5">
     <div v-if="locked" class="flex h-7 items-center gap-1.5">
       <span class="text-kira-md text-fg" data-testid="ade-estimate-total">{{ est }}</span>
-      <label for="ade-estimate-extend" class="sr-only">Extend estimate</label>
+      <Label for="ade-estimate-extend" class="sr-only">Extend estimate</Label>
       <Input
         id="ade-estimate-extend"
         v-model="extendBy"
@@ -87,7 +88,7 @@ const hint = computed(() => (props.days > 1 ? `spans ${props.days} days` : ''));
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>
     <div v-else class="flex h-7 items-center gap-1.5">
-      <label for="ade-est-num" class="sr-only">Estimate</label>
+      <Label for="ade-est-num" class="sr-only">Estimate</Label>
       <Input
         id="ade-est-num"
         v-model="num"

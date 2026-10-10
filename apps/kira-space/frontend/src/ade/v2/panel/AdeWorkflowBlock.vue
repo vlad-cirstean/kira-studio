@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
@@ -42,7 +43,7 @@ function edit(): void {
   <div class="flex flex-col gap-1.5" data-testid="ade-workflow-block">
     <div class="flex items-center gap-2">
       <span class="text-kira-sm text-muted-foreground">Workflow</span>
-      <label for="ade-workflow-select" class="sr-only">Workflow</label>
+      <Label for="ade-workflow-select" class="sr-only">Workflow</Label>
       <NativeSelect
         id="ade-workflow-select"
         variant="bordered"
@@ -67,7 +68,7 @@ function edit(): void {
       </Tooltip>
       <Button
         variant="link"
-        size="xs"
+        size="kira"
         class="px-2 text-info"
         data-testid="ade-edit-workflows"
         @click="edit"

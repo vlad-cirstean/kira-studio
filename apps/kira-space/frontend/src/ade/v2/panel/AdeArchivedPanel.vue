@@ -26,7 +26,7 @@ const repos = computed(() => props.entry.codeRepoIds.map(repoLabel).join(' · ')
         <AdeChip label="archived" tone="grey" />
         <AdeTip :text="entry.title">
           <h3
-            class="m-0 line-clamp-2 min-w-0 flex-1 break-words text-kira-lg font-bold leading-4.5"
+            class="m-0 line-clamp-2 min-w-0 flex-1 break-words text-kira-lg font-medium leading-4.5"
             data-testid="ade-panel-title"
           >
             {{ entry.title }}

@@ -53,7 +53,7 @@ async function move(stageId: string): Promise<void> {
       />
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button variant="dialog" size="xs" :disabled="live" data-testid="ade-stage-pick">
+          <Button variant="dialog" size="kira" :disabled="live" data-testid="ade-stage-pick">
             {{ options[at]?.name }}
             <CodiconIcon name="chevron-down" :size="12" />
           </Button>

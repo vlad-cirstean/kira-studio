@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Badge } from '@theme/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
 import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
@@ -17,7 +18,6 @@ import AdeRunDialog from '../run/AdeRunDialog.vue';
 import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
-import { TONE_TAG_CLASS } from '../tones';
 import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
 import AdeCaptureBox from './AdeCaptureBox.vue';
 
@@ -76,8 +76,8 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
 </script>
 
 <template>
-  <Tabs :model-value="ui.view" class="flex min-h-0 flex-1 flex-col gap-0.5" data-testid="ade-shell" @update:model-value="onView">
-    <nav class="flex h-tabbar shrink-0 items-center gap-2 rounded-kira border border-border bg-bg px-1.5">
+  <Tabs :model-value="ui.view" class="flex min-h-0 flex-1 flex-col gap-0" data-testid="ade-shell" @update:model-value="onView">
+    <nav class="flex h-tabbar shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1">
       <TabsList>
         <TabsTrigger
           value="backlog"
@@ -85,12 +85,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           data-testid="ade-tab-backlog"
         >
           Backlog
-          <span
-            class="rounded-kira-pill px-1.5 text-kira-sm font-semibold"
-            :class="TONE_TAG_CLASS.grey"
-            data-testid="ade-backlog-count"
-            >{{ count }}</span
-          >
+          <span class="text-kira-sm tabular-nums text-muted-foreground" data-testid="ade-backlog-count">{{ count }}</span>
         </TabsTrigger>
         <TabsTrigger
           value="needs"
@@ -98,13 +93,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
           data-testid="ade-tab-needs"
         >
           Needs you
-          <span
-            v-if="needsCount > 0"
-            class="rounded-kira-pill px-1.5 text-kira-sm font-semibold"
-            :class="TONE_TAG_CLASS.amber"
-            data-testid="ade-needs-count"
-            >{{ needsCount }}</span
-          >
+          <Badge v-if="needsCount > 0" variant="count" data-testid="ade-needs-count">{{ needsCount }}</Badge>
         </TabsTrigger>
         <TabsTrigger
           value="plan"
@@ -115,7 +104,7 @@ useEventListener(planRef, 'keydown', (e: KeyboardEvent) => {
         </TabsTrigger>
       </TabsList>
       <span class="flex-1" />
-      <div class="flex items-center gap-2">
+      <div class="mx-2 flex items-center gap-2">
         <AdeCaptureBox />
         <AdeAddPopover />
       </div>

@@ -154,8 +154,8 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
     <div class="flex min-h-6 items-center gap-2" data-testid="ade-stage-block-head" @contextmenu="onMenu">
       <AdeChip :label="stateLabel(block.state)" :tone="STATE_TONE[block.state]" class="min-w-10 text-center" />
       <slot name="action" />
-      <span class="text-kira-lg font-bold" data-testid="ade-stage-block-name">{{ block.stage.name }}</span>
-      <span class="font-data text-kira-md font-bold text-tone-amber" data-testid="ade-stage-block-count">{{ block.count }}</span>
+      <span class="text-kira-lg font-medium" data-testid="ade-stage-block-name">{{ block.stage.name }}</span>
+      <span class="font-data text-kira-md font-medium text-tone-amber" data-testid="ade-stage-block-count">{{ block.count }}</span>
       <span class="min-w-0 truncate text-kira-sm text-subtle" data-testid="ade-stage-block-mode">{{ block.mode }}</span>
     </div>
 
@@ -175,10 +175,10 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         <span class="shrink-0 whitespace-nowrap text-kira-sm" :class="statusClass(sv.step.state)" data-testid="ade-step-status">{{
           sv.statusText
         }}</span>
-        <Button
+        <Button variant="dialog"
           v-if="sv.step.approval"
           size="kira"
-          class="shrink-0 font-semibold"
+          class="shrink-0 "
           :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-step-approve"
           @click="onApprove(sv.step.id)"
@@ -187,7 +187,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         </Button>
         <span class="shrink-0 text-kira-sm text-subtle">{{ sv.step.n }}.</span>
         <span
-          class="min-w-0 flex-1 truncate text-kira-md font-semibold"
+          class="min-w-0 flex-1 truncate text-kira-md font-medium"
           :class="sv.step.state === 'done' ? 'text-subtle' : 'text-fg'"
           data-testid="ade-step-name"
           >{{ sv.step.name }}</span
@@ -222,10 +222,10 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           >
             {{ block.stage.kind === 'script' ? (openLog === rl.run.runId ? 'Hide output' : 'Output') : openLog === rl.run.runId ? 'Hide log' : 'Log' }}
           </Button>
-          <Button
+          <Button variant="dialog"
             v-if="canTakeOver(rl.run)"
             size="kira"
-            class="shrink-0 font-semibold"
+            class="shrink-0 "
             :class="ACTION_CLASS.claude"
             :disabled="takeOver.pending.has(rl.run.sessionId)"
             data-testid="ade-run-takeover"
@@ -233,10 +233,10 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           >
             Take over
           </Button>
-          <Button
+          <Button variant="dialog"
             v-if="rl.canRetry"
             size="kira"
-            class="shrink-0 font-semibold"
+            class="shrink-0 "
             :class="TONE_SOLID_CLASS.red"
             data-testid="ade-run-retry"
             @click="onRetry(rl.run.runId)"
@@ -276,11 +276,11 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
       :data-branch-id="row.id"
       @click="ui.selectBranch(card.task.id, row.id)"
     >
-      <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-semibold" :class="TONE_TAG_CLASS[row.branch.mergedIntoMain ? 'purple' : 'grey']">{{
+      <span class="shrink-0 rounded-kira-sm px-1.5 py-px text-kira-sm font-medium" :class="TONE_TAG_CLASS[row.branch.mergedIntoMain ? 'purple' : 'grey']">{{
         row.branch.mergedIntoMain ? 'main ✓' : 'main —'
       }}</span>
       <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
-        <span class="shrink-0 text-kira-sm font-semibold" :class="chipClass(c.tone)">{{ c.label }}</span>
+        <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{ c.label }}</span>
       </AdeTip>
       <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
       <span class="min-w-0 truncate font-data text-kira-md">{{ row.name }}</span>

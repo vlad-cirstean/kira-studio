@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import { computed, ref, watch } from 'vue';
@@ -120,12 +121,12 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
     data-testid="ade-task-tab"
   >
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
-      <label for="ade-task-name" class="text-kira-sm text-muted-foreground">Name</label>
+      <Label for="ade-task-name" class="font-normal text-kira-sm text-muted-foreground">Name</Label>
       <Input
         id="ade-task-name"
         v-model="name"
         :placeholder="card.defaultTitle"
-        size="kira-lg" class="font-semibold"
+        size="kira-lg" class="font-medium"
         data-testid="ade-task-name"
         @blur="commitName"
         @keydown.enter="commitName"
@@ -168,7 +169,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
             data-testid="ade-task-parked"
             @update:model-value="(v: boolean) => write({ kind: v ? 'parked' : 'task' })"
           />
-          <label for="ade-task-parked" class="text-kira-md">Not merging</label>
+          <Label for="ade-task-parked" class="font-normal text-kira-md">Not merging</Label>
           <span class="text-kira-sm text-subtle">stays on the plan, never merged</span>
         </div>
       </template>
@@ -182,12 +183,12 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
         <span class="text-kira-sm text-muted-foreground">Branches</span>
         <span class="flex-1" />
         <template v-if="!review">
-          <label for="ade-add-repo" class="sr-only">Add a repo to this task</label>
+          <Label for="ade-add-repo" class="sr-only">Add a repo to this task</Label>
           <NativeSelect
             id="ade-add-repo"
             :model-value="addRepoValue"
             variant="default"
-            class="max-w-50 border border-dashed border-border-strong"
+            class="max-w-50"
             title="Add a new branch in this repo (created when work starts)"
             data-testid="ade-add-repo"
             @update:model-value="onAddRepo"
@@ -207,7 +208,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
           + Add branch
         </Button>
       </div>
-      <Button
+      <Button size="kira"
         v-for="row in card.rows"
         :key="row.id"
         variant="ghost"
@@ -218,13 +219,13 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
       >
         <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
         <span
-          class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-semibold"
+          class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-medium"
           :class="tintOf(row.branch.codeRepoId).class"
           :style="tintOf(row.branch.codeRepoId).style"
           >{{ row.repo }}</span
         >
         <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
-          <span class="shrink-0 text-kira-sm font-semibold" :class="chipClass(c.tone)">{{ c.label }}</span>
+          <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{ c.label }}</span>
         </AdeTip>
         <span
           class="min-w-0 flex-1 truncate font-data text-kira-md"

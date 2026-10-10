@@ -27,7 +27,7 @@ const dot = computed(() => (big.value ? 'size-2.5' : 'size-2'));
     <span
       v-else-if="kind === 'waiting'"
       :class="badge"
-      class="flex items-center justify-center rounded-full border-2 border-tone-blue-solid text-kira-sm font-bold leading-none text-tone-blue"
+      class="flex items-center justify-center rounded-full border-2 border-tone-blue-solid text-kira-sm font-medium leading-none text-tone-blue"
       >z</span
     >
     <span v-else-if="kind === 'idle'" :class="dot" class="m-0.5 inline-block rounded-full border-2 border-subtle" />

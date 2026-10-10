@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { useTimeoutFn } from '@vueuse/core';
 import { ref } from 'vue';
 import { useAddBacklogItem } from '../queries';
@@ -32,7 +33,7 @@ async function onEnter(): Promise<void> {
 
 <template>
   <div class="flex items-center gap-2">
-    <label for="ade-capture" class="sr-only">Add to backlog</label>
+    <Label for="ade-capture" class="sr-only">Add to backlog</Label>
     <Input
       id="ade-capture"
       v-model="text"
