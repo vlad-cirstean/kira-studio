@@ -286,6 +286,7 @@ stays only for rows, chips and tab chips that render through a cva (`rowVariants
 | Read-only key/value | `grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1`, keys `text-muted-foreground` |
 | Labels | `FieldLabel` (or `Label` inside a `Field`); raw `<label>` retired |
 | Input / NativeSelect / InputGroup / Textarea | default size `kira-lg` (26px) for Input and NativeSelect; `size="kira"` (22px) in toolbars, filter/search bars, table cells, inline rename; InputGroup default `kira-lg`, `kira` in toolbars; Textarea `px-2 py-1.5 min-h-16`; all `rounded-kira-sm bg-field border-border-strong`; data values `font-data` on the control is the only allowed class besides width/flex/resize/min-h |
+| Search / filter text box | `SearchField` (theme): `InputGroup` (`kira` 22px toolbars, filters, trees, popovers; `kira-lg` in dialog forms), 13px `search` icon at start, ghost icon clear button (12px) when non-empty, Esc clears a non-empty value (stops propagation) and bubbles when empty, `autofocus` prop, exposed `focus()`, attrs (testid, `@keydown`) on the `<input>`. Why: 33 files hand-roll icon + `InputGroupInput` + clear with different sizes, clear buttons and Esc handling. Match-count/option toggles (`SearchBox`, `ResponseFindBar`) stay beside it in their own row, never inside the field. `CommandInput` (cmdk list filter) is exempt |
 | Placeholder, disabled, invalid | theme bases unchanged |
 
 ### 2.6 Bars, sections, rows, menus, empty states
@@ -325,6 +326,7 @@ stream's findings file, fixed in close-out).
 | `.../input-group/index.ts` | add `kira-lg` variant (`kira` with `h-control-lg`); default variant → `kira-lg` |
 | `.../field/FieldGroup.vue` | `gap-3` |
 | `packages/theme/src/components/SecondaryTabs.vue` (new) | props `modelValue: string`, `items: readonly { value: string; label: string; icon?: string; count?: number \| string; disabled?: boolean; testid?: string; tooltip?: string }[]`, `variant?: 'tabs' \| 'segmented'` (default tabs), `size?: 'kira' \| 'kira-lg'` (default kira), `ariaLabel?: string`; emits `update:modelValue` (non-empty only); slot `item` (`{ item, active }`) for custom content; root `data-slot="secondary-tabs"`; `$attrs` to root (testid). Built on `ToggleGroup`/`ToggleGroupItem` |
+| `packages/theme/src/components/SearchField.vue` (new) | per §2.5 row; props `modelValue`, `placeholder` (default `Search`), `ariaLabel`, `size` (`kira` default), `autofocus`; emits `update:modelValue`; exposes `focus()` |
 | `packages/theme/src/components/SectionHeading.vue` (new) | props `label: string`; default slot trailing |
 | `packages/workbench/src/components/ConfirmDialog.vue`, `UpdateDialog.vue`, `SettingsShell.vue`, `prompt/TextPromptDialog.vue`, `apps/kira-studio/frontend/src/workbench/SettingsDialog.vue`, `apps/kira-space/frontend/src/workbench/SettingsDialog.vue` | reference migrations to §2.2/§2.3 (SettingsShell `size="xl" fixed-height`, nav per §2.3, width/height props removed from both SettingsDialog callers) |
 | `packages/workbench/src/components/PanelHeader.vue`, `ViewToolbar.vue` | frozen (no change expected); foundation-owned so neither stream edits them |
@@ -363,6 +365,7 @@ Guards (`check-ui-primitives.sh`, GNU grep `-P` like `check-theme-classes.sh`; s
 - U14 `EmptyMedia variant="icon"`; `<Alert` with `bg-transparent`.
 - U15 `PopoverContent` class width outside {`w-56`, `w-80`, `w-96`, `w-120`, `w-auto`}.
 - U16 `<DialogClose` wrapping a `size="icon-sm"` Button (header close is `closable`).
+- U17 an `<Input|InputGroupInput|input` with a `placeholder` containing Search/Filter/Find, or an `InputGroupAddon` holding `CodiconIcon name="search"`, outside `SearchField.vue`.
 
 Allowlist format, one per line: `path` (whole file exempt while unmigrated) or
 `permanent U<n> path # reason` (a real requirement, e.g. a raw `<input>` grid cell editor). A
@@ -406,6 +409,12 @@ spec, PNG or allowlist is shared; Studio never renders git-ui or Space code; the
 surface rendering A's code (Settings > Memory) has its PNG and spec in A. Any needed change in
 the other stream's or foundation's files goes to the stream findings file and is fixed in
 close-out.
+
+#### Search sites (U17, migrate to `SearchField` inside the named chunk; no chunk grew past 25 files)
+
+Stream A: A1 `S/project/ConnectionDialog.vue`, `S/project/FiltersDialog.vue`; A2 `S/api/CollectionsPanel.vue`, `S/api/DynamicValuesDialog.vue`, `S/api/EnvironmentsView.vue`, `S/api/VariableSetView.vue`, `S/api/VariablesOverviewPanel.vue`, `S/workbench/panels/ProjectPanel.vue`; A3 `S/views/grpcrequest/{CallHistoryList,GrpcRequestView,SchemaBrowser}.vue`, `S/views/httprequest/{CookiesPane,HttpRequestView,ResponseHistoryList,ResponsePane}.vue`; A4 `S/views/browse/BrowseView.vue`, `S/views/definition/DefinitionView.vue`; A5 `S/views/shared/ResponseFindBar.vue`, `S/views/shared/page/SearchToolbar.vue`, `S/views/stream/StreamSearchToolbar.vue`; A6 `p/workbench/src/components/OpLogPanel.vue`; A7 `p/docker-ui/src/components/{DockerPanel,LogsView}.vue`; A8 `p/workbench/src/automations/AutomationsPanel.vue`; A9 `p/workbench/src/memory/MemoryPanel.vue`.
+
+Stream B: B2 `p/git-ui/src/components/{BranchPicker,FileTree}.vue`, `p/git-ui/src/components/review/{BaseSelector,ReviewView}.vue`; B3 `p/git-ui/src/components/SearchBox.vue`; B4 `K/repo/GitPanel.vue`, `K/repo/RepoSearchView.vue`; B5 `K/ade/v2/AdeAddPopover.vue`. Foundation owns no search site.
 
 Spec rules: testids never change (exception: none planned); a spec changes only for a
 documented §2 effect (`data-state` `active`/`inactive` → `on`/`off` in `docker-edit.spec.ts:169-170`; a height or
