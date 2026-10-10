@@ -7,7 +7,7 @@ import { useAdeBoardUiStore } from './adeBoardUi';
 export const useAdeWorkflowsUiStore = defineStore('adeWorkflowsUi', () => {
   /** Selected file name (`null` = first listed). */
   const workflowFile = ref<string | null>(null);
-  const workflowMode = ref<'form' | 'yaml'>('form');
+  const workflowMode = ref<'graph' | 'yaml'>('graph');
   /** The open editor holds edits that are not saved. */
   const dirty = ref(false);
 

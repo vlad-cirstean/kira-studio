@@ -24,3 +24,11 @@ export function smartBodyParts(
   if (at < body.length) parts.push(body.slice(at));
   return parts;
 }
+
+/** A prompt as chips for its built-in variables; any other braces stay text. */
+export function promptParts(
+  text: string,
+  known: Readonly<Record<string, string>> = {},
+): TextPart[] {
+  return smartBodyParts(text, {}, known);
+}

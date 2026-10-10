@@ -2,27 +2,33 @@
 import { Button } from '@theme/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { useClipboard } from '@vueuse/core';
+import { defineAsyncComponent } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { useWorkflowYaml } from '../queries';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { WorkflowEntry } from '../wire';
-import AdeWorkflowForm from './AdeWorkflowForm.vue';
 import AdeWorkflowYaml from './AdeWorkflowYaml.vue';
 
-// One workflow: mode toggle, file path, Copy YAML, then the Form or YAML pane.
+// One workflow: mode toggle, file path, Copy YAML, then the Graph or YAML pane. The graph editor (Vue Flow)
+// loads on first use so the board bundle does not carry it.
+const AdeWorkflowGraph = defineAsyncComponent(() => import('./AdeWorkflowGraph.vue'));
 const props = defineProps<{ entry: WorkflowEntry }>();
 const wfUi = useAdeWorkflowsUiStore();
 const yaml = useWorkflowYaml(() => props.entry.fileName);
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
 
 async function setMode(v: unknown): Promise<void> {
-  if ((v !== 'form' && v !== 'yaml') || v === wfUi.workflowMode) return;
+  if ((v !== 'graph' && v !== 'yaml') || v === wfUi.workflowMode) return;
   if (await wfUi.leave()) wfUi.workflowMode = v;
 }
 </script>
 
 <template>
-  <div class="flex max-w-4xl flex-col gap-3" data-testid="ade-wf-editor">
+  <div
+    class="flex flex-col gap-3"
+    :class="wfUi.workflowMode === 'yaml' ? 'max-w-4xl' : 'h-full min-h-0'"
+    data-testid="ade-wf-editor"
+  >
     <div class="flex flex-wrap items-center gap-2.5">
       <ToggleGroup
         type="single"
@@ -33,7 +39,7 @@ async function setMode(v: unknown): Promise<void> {
         data-testid="ade-wf-mode"
         @update:model-value="setMode"
       >
-        <ToggleGroupItem value="form" data-testid="ade-wf-mode-form">Form</ToggleGroupItem>
+        <ToggleGroupItem value="graph" data-testid="ade-wf-mode-graph">Graph</ToggleGroupItem>
         <ToggleGroupItem value="yaml" data-testid="ade-wf-mode-yaml">YAML</ToggleGroupItem>
       </ToggleGroup>
       <AdeTip :text="entry.path">
@@ -52,6 +58,6 @@ async function setMode(v: unknown): Promise<void> {
       </Button>
     </div>
     <AdeWorkflowYaml v-if="wfUi.workflowMode === 'yaml'" :entry="entry" />
-    <AdeWorkflowForm v-else :entry="entry" />
+    <AdeWorkflowGraph v-else :entry="entry" />
   </div>
 </template>

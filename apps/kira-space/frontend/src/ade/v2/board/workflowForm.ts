@@ -22,17 +22,6 @@ function nextId(prefix: 'stage' | 'step', taken: readonly string[]): string {
   return id;
 }
 
-/** A copy of `list` with the item at `index` swapped one place `up` or down; unchanged at the ends. */
-export function moved<T>(list: readonly T[], index: number, dir: 'up' | 'down'): T[] {
-  const to = dir === 'up' ? index - 1 : index + 1;
-  const out = [...list];
-  if (to < 0 || to >= out.length) return out;
-  const a = out[index] as T;
-  out[index] = out[to] as T;
-  out[to] = a;
-  return out;
-}
-
 export function newStep(steps: readonly PipelineStep[]): PipelineStep {
   const id = nextId(
     'step',
@@ -93,25 +82,6 @@ export function newStage(stages: readonly Stage[]): Stage {
 
 export function runnableCount(stages: readonly Stage[]): number {
   return stages.filter((s) => !s.skip).length;
-}
-
-/** Steps a `back:` can point at from position `index`: the earlier ones. */
-export function backOptions(
-  steps: readonly PipelineStep[],
-  index: number,
-): { value: OnFailure; label: string }[] {
-  return steps
-    .slice(0, index)
-    .map((s) => ({ value: `back:${s.id}` as const, label: `↩ send back to ${s.name}` }));
-}
-
-/** Resets a `back:` that no longer points at an earlier step (after a move or removal) to `stop`. */
-export function withValidBacks(steps: readonly PipelineStep[]): PipelineStep[] {
-  return steps.map((s, i) => {
-    if (!s.onFailure.startsWith('back:')) return s;
-    const target = s.onFailure.slice(5);
-    return steps.slice(0, i).some((e) => e.id === target) ? s : { ...s, onFailure: 'stop' };
-  });
 }
 
 export function parseTools(text: string): string[] {

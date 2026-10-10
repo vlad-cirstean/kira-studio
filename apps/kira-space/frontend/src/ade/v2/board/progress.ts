@@ -208,7 +208,7 @@ export function walkPath(
   while (i < ids.length) {
     path.push(i);
     const step = steps[i];
-    if (!step || step.state !== 'done') break;
+    if (step?.state !== 'done') break;
     const next = forwardTarget(ids, i, step.runs);
     for (let j = i + 1; j < next && j < ids.length; j++) skipped[j] = true;
     i = next;

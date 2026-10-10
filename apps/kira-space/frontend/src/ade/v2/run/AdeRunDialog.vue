@@ -10,7 +10,7 @@ import { computed, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../../state/customScripts';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import { smartBodyParts } from '../automation/smartStepBody';
-import { branchSlug, defaultRunMessage, FINISH_STEP_SUFFIX } from '../board/runMessage';
+import { branchSlug, defaultRunMessage, finishStepSuffix } from '../board/runMessage';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useSpaceTools, useStartRun } from '../queries';
@@ -46,6 +46,8 @@ const smartBody = computed(() => {
   if (!step || !c || !script) return null;
   return smartBodyParts(script.command, step.params, { task: c.title, jira: c.task.jira?.key ?? '' });
 });
+// The finish instruction the first step ends with, as its results declare it.
+const suffix = computed(() => finishStepSuffix(stage.value?.steps[0]?.results ?? []));
 const spaceTools = useSpaceTools(() => card.value?.task.workflowId ?? '');
 const pending = computed(() => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? []);
 // With the Kira Space tools on the agent names its branches (request_branch), so no name is asked.
@@ -155,7 +157,7 @@ async function send(): Promise<void> {
             <VarText :parts="smartBody" />
           </div>
           <p v-else class="m-0 text-error" data-testid="ade-run-smart-missing">This smart script was not found.</p>
-          <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">{{ FINISH_STEP_SUFFIX }}</p>
+          <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">{{ suffix }}</p>
         </div>
         <div v-else class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
@@ -182,7 +184,7 @@ async function send(): Promise<void> {
               class="m-0 border-t border-border px-3 py-2 text-kira-sm text-subtle"
               data-testid="ade-run-suffix"
             >
-              {{ FINISH_STEP_SUFFIX }}
+              {{ suffix }}
             </p>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import type { TextPart } from '@theme/varText';
+
 /** Ends every agent step prompt, added by the app and not editable (SPEC2 section 5.1.2); mirrors
  *  Go `claudeheadless.FinishStepSuffix`. */
 export const FINISH_STEP_SUFFIX =
@@ -8,20 +10,41 @@ export const FINISH_RESULTS_INTRO =
 export const FINISH_RESULTS_TAIL =
   '. Add a one-line summary; for a not-ok status give the reason. If you need a decision from me, use status "needs_input" with your question.';
 
+function isImplicit(results: readonly { id: string; ok: boolean; description: string }[]): boolean {
+  return (
+    results.length === 0 ||
+    (results.length === 2 &&
+      results[0]?.id === 'done' &&
+      !!results[0].ok &&
+      !results[0].description &&
+      results[1]?.id === 'failed' &&
+      !results[1].ok &&
+      !results[1].description)
+  );
+}
+
+/** `finishStepSuffix` as parts: each result id is a chip. Joined, the parts read as that text. */
+export function finishStepParts(
+  results: readonly { id: string; ok: boolean; description: string }[],
+): TextPart[] {
+  if (isImplicit(results)) return [FINISH_STEP_SUFFIX];
+  const parts: TextPart[] = [FINISH_RESULTS_INTRO];
+  results.forEach((r, i) => {
+    parts.push({ name: 'result', value: r.id });
+    parts.push(
+      `${r.ok ? ' (ok' : ' (not ok'}${r.description ? `: ${r.description}` : ''})${i < results.length - 1 ? ', ' : ''}`,
+    );
+  });
+  parts.push(FINISH_RESULTS_TAIL);
+  return parts;
+}
+
 /** The finish instruction for a step's results; mirrors Go `claudeheadless.FinishStepSuffixFor`. The
  *  implicit pair gives `FINISH_STEP_SUFFIX`. */
 export function finishStepSuffix(
   results: readonly { id: string; ok: boolean; description: string }[],
 ): string {
-  const implicit =
-    results.length === 2 &&
-    results[0]?.id === 'done' &&
-    results[0].ok &&
-    !results[0].description &&
-    results[1]?.id === 'failed' &&
-    !results[1].ok &&
-    !results[1].description;
-  if (results.length === 0 || implicit) return FINISH_STEP_SUFFIX;
+  if (isImplicit(results)) return FINISH_STEP_SUFFIX;
   const parts = results.map(
     (r) => `${r.id} (${r.ok ? 'ok' : 'not ok'}${r.description ? `: ${r.description}` : ''})`,
   );

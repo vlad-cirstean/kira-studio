@@ -64,7 +64,7 @@ async function createNew(): Promise<void> {
   try {
     const entry = await newWf.mutateAsync({ name: 'New workflow' });
     wfUi.workflowFile = entry.fileName;
-    wfUi.workflowMode = 'form';
+    wfUi.workflowMode = 'graph';
   } catch (err) {
     listError.value = err instanceof Error ? err.message : String(err);
   }
