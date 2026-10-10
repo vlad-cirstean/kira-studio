@@ -63,6 +63,8 @@ type CustomScript struct {
 	// UseAdeDir runs the script in the task's branch worktree when started from ADE. Only Kira
 	// Space shows it.
 	UseAdeDir bool `json:"useAdeDir"`
+	// Schedule is nil for a script that is not recurring.
+	Schedule *Schedule `json:"schedule"`
 }
 
 // Collection mirrors packages/shared/domain/scripts.ts's scriptCollectionSchema: one
@@ -98,6 +100,8 @@ type CustomScriptFields struct {
 	Smart *Smart `json:"smart"`
 	// UseAdeDir: see CustomScript.
 	UseAdeDir bool `json:"useAdeDir"`
+	// Schedule: see CustomScript.
+	Schedule *Schedule `json:"schedule"`
 }
 
 // Validate is the complete rule set: the Go check is the authority, the mirrored zod schema is
@@ -140,6 +144,11 @@ func (f *CustomScriptFields) Validate() error {
 		return err
 	}
 	f.Params = params
+	if f.Schedule != nil {
+		if err := validSchedule(f.Schedule, f.Kind, f.Command, f.Params); err != nil {
+			return err
+		}
+	}
 	if f.DirMode == "" {
 		f.DirMode = DirModeKira
 	}

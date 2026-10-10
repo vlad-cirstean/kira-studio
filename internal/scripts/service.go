@@ -10,6 +10,8 @@ type Service struct {
 	Emit func(snapshot Snapshot)
 	// Home is the app data folder; removing a script deletes its automations folder under it.
 	Home string
+	// OnChange runs after every mutation's broadcast (the scheduler reloads).
+	OnChange func()
 }
 
 func fail(err error) error {
@@ -41,6 +43,9 @@ func (s *Service) broadcast() {
 		return
 	}
 	s.Emit(snap)
+	if s.OnChange != nil {
+		s.OnChange()
+	}
 }
 
 type CreateArgs struct {

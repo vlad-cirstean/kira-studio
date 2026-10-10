@@ -13,6 +13,8 @@ const (
 	StatusFailed    Status = "failed"
 	StatusBlocked   Status = "blocked"
 	StatusCancelled Status = "cancelled"
+	// StatusSkipped is a scheduled run that never started.
+	StatusSkipped Status = "skipped"
 )
 
 type Source string
@@ -26,6 +28,8 @@ const (
 	SourceRestart Source = "restart"
 	SourceVerify  Source = "verify"
 	SourceBudget  Source = "budget"
+	// SourceSchedule is a scheduled run skipped by the scheduler itself.
+	SourceSchedule Source = "schedule"
 )
 
 const lastErrorCap = 1024
@@ -42,6 +46,11 @@ type Outcome struct {
 	CostUSD *float64 `json:"costUsd,omitempty"`
 	// PermissionDenials names the tools Claude was denied during the run.
 	PermissionDenials []string `json:"permissionDenials,omitempty"`
+}
+
+// Skipped is the outcome of a scheduled run that did not start; src is SourceSchedule or SourceUser.
+func Skipped(reason string, src Source) Outcome {
+	return Outcome{Status: StatusSkipped, Source: src, Reason: reason}
 }
 
 // Ended reports whether the outcome is set.

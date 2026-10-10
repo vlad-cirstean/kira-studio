@@ -54,6 +54,7 @@ var names = []sqlitex.MigrationSource{
 	{Version: 34, Name: "p242_automations", File: "0034_p242_automations.sql"},
 	{Version: 35, Name: "p242_smart_scripts", File: "0035_p242_smart_scripts.sql"},
 	{Version: 36, Name: "p242_scripts_in_ade", File: "0036_p242_scripts_in_ade.sql"},
+	{Version: 37, Name: "p242_recurring_scripts", File: "0037_p242_recurring_scripts.sql"},
 }
 
 // All returns every migration in ascending version order.

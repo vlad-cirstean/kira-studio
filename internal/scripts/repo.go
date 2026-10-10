@@ -15,7 +15,7 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-const selectColumns = `id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json, use_ade_dir`
+const selectColumns = `id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json, use_ade_dir, schedule_json`
 
 // Repo reads and writes the `custom_scripts` table, List ordered deterministically.
 type Repo struct {
@@ -25,10 +25,10 @@ type Repo struct {
 func scanRow(row rowScanner) (CustomScript, error) {
 	var s CustomScript
 	var collectionID sql.NullString
-	var paramsJSON, smartJSON string
+	var paramsJSON, smartJSON, scheduleJSON string
 	if err := row.Scan(
 		&s.ID, &s.Name, &s.Command, &s.WorkingDir, &s.DirMode, &s.Color, &collectionID, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt,
-		&s.Kind, &paramsJSON, &smartJSON, &s.UseAdeDir,
+		&s.Kind, &paramsJSON, &smartJSON, &s.UseAdeDir, &scheduleJSON,
 	); err != nil {
 		return CustomScript{}, err
 	}
@@ -42,26 +42,43 @@ func scanRow(row rowScanner) (CustomScript, error) {
 			return CustomScript{}, fmt.Errorf("scripts: decode smart settings of %s: %w", s.ID, err)
 		}
 	}
+	if scheduleJSON != "" {
+		s.Schedule = &Schedule{}
+		if err := json.Unmarshal([]byte(scheduleJSON), s.Schedule); err != nil {
+			return CustomScript{}, fmt.Errorf("scripts: decode schedule of %s: %w", s.ID, err)
+		}
+	}
 	if collectionID.Valid {
 		s.CollectionID = &collectionID.String
 	}
 	return s, nil
 }
 
-// encodeExtras is the params_json and smart_json column values of validated fields.
-func encodeExtras(f CustomScriptFields) (params, smart string, err error) {
+// extras are the JSON column values of validated fields.
+type extras struct{ params, smart, schedule string }
+
+// encodeExtras encodes the params, smart and schedule columns; nil values encode as "".
+func encodeExtras(f CustomScriptFields) (extras, error) {
 	pb, err := json.Marshal(f.Params)
 	if err != nil {
-		return "", "", fmt.Errorf("scripts: encode params: %w", err)
+		return extras{}, fmt.Errorf("scripts: encode params: %w", err)
 	}
-	if f.Smart == nil {
-		return string(pb), "", nil
+	out := extras{params: string(pb)}
+	if f.Smart != nil {
+		sb, err := json.Marshal(f.Smart)
+		if err != nil {
+			return extras{}, fmt.Errorf("scripts: encode smart settings: %w", err)
+		}
+		out.smart = string(sb)
 	}
-	sb, err := json.Marshal(f.Smart)
-	if err != nil {
-		return "", "", fmt.Errorf("scripts: encode smart settings: %w", err)
+	if f.Schedule != nil {
+		sb, err := json.Marshal(f.Schedule)
+		if err != nil {
+			return extras{}, fmt.Errorf("scripts: encode schedule: %w", err)
+		}
+		out.schedule = string(sb)
 	}
-	return string(pb), string(sb), nil
+	return out, nil
 }
 
 // List orders by sort_order, name for a stable, deterministic tiebreak.
@@ -105,7 +122,7 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 	if err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: next sort order: %w", err)
 	}
-	paramsJSON, smartJSON, err := encodeExtras(fields)
+	ex, err := encodeExtras(fields)
 	if err != nil {
 		return CustomScript{}, err
 	}
@@ -125,12 +142,13 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 		Params:       fields.Params,
 		Smart:        fields.Smart,
 		UseAdeDir:    fields.UseAdeDir,
+		Schedule:     fields.Schedule,
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO custom_scripts (id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json, use_ade_dir)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO custom_scripts (id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json, use_ade_dir, schedule_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Name, rec.Command, rec.WorkingDir, rec.DirMode, rec.Color, rec.CollectionID, rec.SortOrder, rec.CreatedAt, rec.UpdatedAt,
-		rec.Kind, paramsJSON, smartJSON, rec.UseAdeDir,
+		rec.Kind, ex.params, ex.smart, rec.UseAdeDir, ex.schedule,
 	); err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: insert: %w", err)
 	}
@@ -156,16 +174,16 @@ func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error
 			return CustomScript{}, errHomeRetired
 		}
 	}
-	paramsJSON, smartJSON, err := encodeExtras(fields)
+	ex, err := encodeExtras(fields)
 	if err != nil {
 		return CustomScript{}, err
 	}
 	now := kiratime.NowISO()
 	res, err := r.DB.Exec(
 		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, dir_mode = ?, color = ?, collection_id = ?, updated_at = ?,
-		 kind = ?, params_json = ?, smart_json = ?, use_ade_dir = ? WHERE id = ?`,
+		 kind = ?, params_json = ?, smart_json = ?, use_ade_dir = ?, schedule_json = ? WHERE id = ?`,
 		fields.Name, fields.Command, fields.WorkingDir, fields.DirMode, fields.Color, fields.CollectionID, now,
-		fields.Kind, paramsJSON, smartJSON, fields.UseAdeDir, id,
+		fields.Kind, ex.params, ex.smart, fields.UseAdeDir, ex.schedule, id,
 	)
 	if err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: update %s: %w", id, err)
