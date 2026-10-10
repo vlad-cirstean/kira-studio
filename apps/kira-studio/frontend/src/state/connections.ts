@@ -139,6 +139,41 @@ export const useConnectionsStore = defineStore('connections', () => {
     }
   }
 
+  // Writes only username and password; every other field stays as stored. An omitted password is
+  // `null` (kept), a supplied one replaces. Go reconnects a live connection when the username
+  // changes; a password-only change needs the reconnect here, same as setConnectionReadOnly.
+  async function updateConnectionCredentials(
+    id: string,
+    credentials: { username?: string; password?: string },
+  ): Promise<void> {
+    const existing = connectionRecord(id);
+    if (!existing) return;
+    const {
+      id: _id,
+      sortOrder: _sortOrder,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      ...fields
+    } = existing;
+    const updated = await control.connectionsUpdate(id, {
+      ...fields,
+      username: credentials.username ?? fields.username,
+      password: credentials.password ?? null,
+    });
+    const idx = state.records.findIndex((r) => r.id === id);
+    if (idx >= 0) state.records[idx] = updated;
+    const usernameChanged =
+      credentials.username !== undefined && credentials.username !== existing.username;
+    if (
+      credentials.password !== undefined &&
+      !usernameChanged &&
+      state.states[id]?.status === 'connected'
+    ) {
+      await disconnectConnection(id);
+      await connectConnection(id);
+    }
+  }
+
   // M1 §6.2: the Database MCP section's own allow-list checkbox, setConnectionColor's own shape —
   // no reconnect needed, unlike setConnectionReadOnly: this gates whether the DB MCP server exposes
   // the connection to an AI client, never what the live adapter connection itself does.
@@ -157,6 +192,7 @@ export const useConnectionsStore = defineStore('connections', () => {
     disconnectConnection,
     setConnectionColor,
     setConnectionReadOnly,
+    updateConnectionCredentials,
     setConnectionMcpEnabled,
   };
 });

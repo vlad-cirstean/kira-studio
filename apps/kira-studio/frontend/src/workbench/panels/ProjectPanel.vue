@@ -4,9 +4,11 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, useTemplateRef } from 'vue';
+import CredentialsUpdateDialog from '../../project/CredentialsUpdateDialog.vue';
 import FiltersDialog from '../../project/FiltersDialog.vue';
 import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
+import { useCredentialsDialogStore } from '../../project/state/credentialsDialog';
 import { useTreeStore } from '../../project/state/tree';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useSchemaDialogStore } from '../../state/schemas';
@@ -14,6 +16,7 @@ import { useSchemaDialogStore } from '../../state/schemas';
 const connectionsStore = useConnectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
 const schemaDialogStore = useSchemaDialogStore();
+const credentialsDialogStore = useCredentialsDialogStore();
 const treeStore = useTreeStore();
 
 const empty = computed(() => connectionsStore.records.length === 0);
@@ -81,5 +84,6 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
     </div>
   </div>
   <FiltersDialog />
+  <CredentialsUpdateDialog v-if="credentialsDialogStore.open" />
   <SchemaDialog v-if="schemaDialogStore.open" />
 </template>

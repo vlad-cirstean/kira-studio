@@ -1,4 +1,5 @@
-import { CONNECTION_COLOR_CHOICES } from '@shared/domain/connection';
+import type { ConnectionSummary } from '@shared/domain/connection';
+import { AWS_STYLE_KINDS, CONNECTION_COLOR_CHOICES, FILE_KINDS } from '@shared/domain/connection';
 import { formatConnectionUri } from '@shared/domain/uri';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -13,6 +14,7 @@ import { dataQueryCommands } from '../state/viewCommands';
 import { nodeIcon } from '../theme/icons';
 import { copyNameItems, countItem, definitionItem, openItems, refreshItem } from './menuItems';
 import { revealConnectionSecret } from './state/connectionReveal';
+import { useCredentialsDialogStore } from './state/credentialsDialog';
 import {
   groupParentPath,
   rowKey,
@@ -92,6 +94,17 @@ function consoleMenuItem(row: TreeRowVm): MenuItem[] {
   ];
 }
 
+// Network kinds in fields mode only: URI mode keeps its URI encrypted, file and AWS kinds have no
+// username/password pair to paste.
+function canUpdateCredentials(record: ConnectionSummary | undefined): boolean {
+  return (
+    record !== undefined &&
+    record.mode === 'fields' &&
+    !FILE_KINDS.has(record.kind) &&
+    !AWS_STYLE_KINDS.has(record.kind)
+  );
+}
+
 function connectionMenu(row: TreeRowVm): MenuItem[] {
   const status = useConnectionsStore().states[row.connectionId]?.status ?? 'disconnected';
   const record = useConnectionsStore().connectionRecord(row.connectionId);
@@ -128,6 +141,17 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       shortcut: 'tree.rename',
       run: () => useConnectionDialogStore().openEditDialog(row.connectionId),
     },
+    ...(canUpdateCredentials(record)
+      ? [
+          {
+            type: 'item' as const,
+            id: 'update-credentials',
+            label: 'Update credentials…',
+            icon: 'key',
+            run: () => useCredentialsDialogStore().openFor(row.connectionId),
+          },
+        ]
+      : []),
     {
       type: 'item',
       id: 'duplicate',
