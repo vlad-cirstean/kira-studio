@@ -262,6 +262,11 @@ above allows two worktrees off `dcdbe9233`.
 7. `docs: P250 iter2 result` - `plans/P250-iter2-result.md` (items, fixture keys, run counts, the
    `ui-timing` quiet rerun outcome). SPEC status is the orchestrator's.
 
+Pre-existing biome warnings at base, fixed in commits 3 and 4 (files they touch anyway): unused
+`preview` in both `tests/ui/automations-editor.spec.ts` (line 75: assert the run dialog value from it
+or drop it); `noTemplateCurlyInString` in `apps/kira-studio/tests/unit/autocomplete-tokenizers.spec.ts:116`
+(commit 3; rename the describe title).
+
 Each fixture is written with `KIRA_CONTRACT=write`, read by hand (no secrets, machine paths or run
 ids), committed with its test.
 
