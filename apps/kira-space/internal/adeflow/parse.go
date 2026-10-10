@@ -10,23 +10,27 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"go.yaml.in/yaml/v3"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 )
 
+const maxSmartScriptName = 200
+
 const syntaxMessage = "unexpected content here (check the indentation)"
 
 var (
-	idPattern       = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
-	toolPattern     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*(\(.+\))?$`)
-	mcpToolPattern  = regexp.MustCompile(`^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$`)
-	yamlErrLine     = regexp.MustCompile(`line (\d+)`)
-	maxStepTimeout  = 24 * time.Hour
-	taskStatuses    = []string{"To do", "In progress", "In review", "Done"}
-	stageKindAlias  = map[string]string{"user": "user", "manual": "user", "agent": "agent", "automated": "agent", "script": "script"}
-	onFailureSimple = map[string]bool{"stop": true, "retry 1": true, "retry 2": true}
+	idPattern        = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+	paramNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
+	toolPattern      = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*(\(.+\))?$`)
+	mcpToolPattern   = regexp.MustCompile(`^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$`)
+	yamlErrLine      = regexp.MustCompile(`line (\d+)`)
+	maxStepTimeout   = 24 * time.Hour
+	taskStatuses     = []string{"To do", "In progress", "In review", "Done"}
+	stageKindAlias   = map[string]string{"user": "user", "manual": "user", "agent": "agent", "automated": "agent", "script": "script"}
+	onFailureSimple  = map[string]bool{"stop": true, "retry 1": true, "retry 2": true}
 )
 
 // Parse decodes and validates one workflow file. src is the whole file; the file stem is checked
@@ -266,11 +270,11 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 	earlier := make(map[string]bool)
 	for i, stepNode := range list.Content {
 		sp := fmt.Sprintf("%sstep %d: ", prefix[:len(prefix)-2]+", ", i+1)
-		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "timeout", "prompt", "allowed_tools")
+		sm := v.fields(stepNode, sp, "id", "name", "runs_on", "before", "on_failure", "timeout", "prompt", "allowed_tools", "smart_script", "params")
 		if v.err != nil {
 			return out
 		}
-		step := adewire.PipelineStep{AllowedTools: make([]string, 0)}
+		step := adewire.PipelineStep{AllowedTools: make([]string, 0), Params: map[string][]string{}}
 		step.ID = v.str(sm, sp, "id", true)
 		if v.err == nil && !idPattern.MatchString(step.ID) {
 			v.fail(sm["id"], sp, "id must be lowercase letters, digits, - or _")
@@ -289,8 +293,7 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		}
 		step.OnFailure = v.onFailure(sm, sp, earlier)
 		step.Timeout = v.timeout(sm, sp)
-		step.Prompt = v.str(sm, sp, "prompt", true)
-		step.AllowedTools = v.allowedTools(sm, sp)
+		v.stepBody(sm, sp, &step)
 		if v.err != nil {
 			return out
 		}
@@ -298,6 +301,80 @@ func (v *validator) steps(m map[string]*yaml.Node, prefix string) []adewire.Pipe
 		out = append(out, step)
 	}
 	return out
+}
+
+// stepBody reads what a step runs: a prompt with its allowed tools, or a smart script with its params.
+func (v *validator) stepBody(sm map[string]*yaml.Node, sp string, step *adewire.PipelineStep) {
+	if _, smart := sm["smart_script"]; !smart {
+		if n, has := sm["params"]; has {
+			v.fail(n, sp, "params is only allowed with smart_script")
+			return
+		}
+		step.Prompt = v.str(sm, sp, "prompt", true)
+		step.AllowedTools = v.allowedTools(sm, sp)
+		return
+	}
+	for _, key := range []string{"prompt", "allowed_tools"} {
+		if n, has := sm[key]; has {
+			v.fail(n, sp, "%s is not allowed with smart_script", key)
+			return
+		}
+	}
+	step.SmartScript = v.str(sm, sp, "smart_script", true)
+	if v.err == nil && utf8.RuneCountInString(step.SmartScript) > maxSmartScriptName {
+		v.fail(sm["smart_script"], sp, "smart_script must be at most %d characters", maxSmartScriptName)
+	}
+	step.Params = v.stepParams(sm, sp)
+}
+
+// stepParams reads params: a mapping from a param name to one text value or a list of them.
+func (v *validator) stepParams(sm map[string]*yaml.Node, sp string) map[string][]string {
+	out := map[string][]string{}
+	n, has := sm["params"]
+	if !has {
+		return out
+	}
+	if n.Kind != yaml.MappingNode {
+		v.fail(n, sp, "params must be a mapping of names to values")
+		return out
+	}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		k, val := n.Content[i], n.Content[i+1]
+		if k.Kind != yaml.ScalarNode || !paramNamePattern.MatchString(k.Value) {
+			v.fail(k, sp, "param name %q must be lowercase letters, digits or _, starting with a letter", k.Value)
+			return out
+		}
+		if _, dup := out[k.Value]; dup {
+			v.fail(k, sp, "duplicate param %q", k.Value)
+			return out
+		}
+		vals, ok := scalarValues(val)
+		if !ok {
+			v.fail(val, sp, "param %q must be text or a list of text", k.Value)
+			return out
+		}
+		out[k.Value] = vals
+	}
+	return out
+}
+
+// scalarValues is a scalar as one value, or a sequence of scalars; ok is false for anything else.
+func scalarValues(n *yaml.Node) ([]string, bool) {
+	isText := func(c *yaml.Node) bool { return c.Kind == yaml.ScalarNode && c.Tag != "!!null" }
+	switch {
+	case isText(n):
+		return []string{n.Value}, true
+	case n.Kind == yaml.SequenceNode:
+		out := make([]string, 0, len(n.Content))
+		for _, c := range n.Content {
+			if !isText(c) {
+				return nil, false
+			}
+			out = append(out, c.Value)
+		}
+		return out, true
+	}
+	return nil, false
 }
 
 // runsOn: once | each repo | only <repo> (syntax only; repos are checked at run time).

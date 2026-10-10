@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -281,7 +283,7 @@ const (
 var (
 	topOrder   = []string{"id", "name", "kira_space_mcp", "stages"}
 	stageOrder = []string{"id", "name", "kind", "status", "skip", "session", "prompt", "steps", "command", "runs_on", "on_failure", "timeout"}
-	stepOrder  = []string{"id", "name", "runs_on", "before", "on_failure", "timeout", "prompt", "allowed_tools"}
+	stepOrder  = []string{"id", "name", "runs_on", "before", "on_failure", "timeout", "smart_script", "params", "prompt", "allowed_tools"}
 )
 
 func find(m *yaml.Node, key string) (int, *yaml.Node) {
@@ -504,8 +506,73 @@ func applyStep(m *yaml.Node, s adewire.PipelineStep) {
 	setScalar(m, "before", kText, defaultStr(s.Before, "auto"), s.Before != "" && s.Before != "auto", stepOrder)
 	setScalar(m, "on_failure", kText, defaultStr(s.OnFailure, "stop"), s.OnFailure != "" && s.OnFailure != "stop", stepOrder)
 	setScalar(m, "timeout", kText, s.Timeout, true, stepOrder)
-	setScalar(m, "prompt", kBlock, s.Prompt, true, stepOrder)
-	setList(m, "allowed_tools", s.AllowedTools, stepOrder)
+	if s.SmartScript == "" {
+		dropKeys(m, "smart_script", "params")
+		setScalar(m, "prompt", kBlock, s.Prompt, true, stepOrder)
+		setList(m, "allowed_tools", s.AllowedTools, stepOrder)
+		return
+	}
+	dropKeys(m, "prompt", "allowed_tools")
+	setScalar(m, "smart_script", kText, s.SmartScript, true, stepOrder)
+	setParams(m, s.Params)
+}
+
+// dropKeys removes keys a step of this shape does not allow.
+func dropKeys(m *yaml.Node, keys ...string) {
+	for _, k := range keys {
+		if i, _ := find(m, k); i >= 0 {
+			m.Content = append(m.Content[:i], m.Content[i+2:]...)
+		}
+	}
+}
+
+// setParams writes a smart step's params: a scalar for one value, a list for more. Existing keys keep
+// their place; new ones are added in name order. No params removes the key.
+func setParams(m *yaml.Node, params map[string][]string) {
+	if len(params) == 0 {
+		dropKeys(m, "params")
+		return
+	}
+	_, old := find(m, "params")
+	if old == nil || old.Kind != yaml.MappingNode {
+		old = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	}
+	for i := 0; i+1 < len(old.Content); {
+		if _, keep := params[old.Content[i].Value]; keep {
+			i += 2
+			continue
+		}
+		old.Content = append(old.Content[:i], old.Content[i+2:]...)
+	}
+	names := make([]string, 0, len(params))
+	for name := range params {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		vals := params[name]
+		if _, cur := find(old, name); cur != nil && sameParam(cur, vals) {
+			continue
+		}
+		var v *yaml.Node
+		if len(vals) == 1 {
+			v = &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: vals[0]}
+		} else {
+			v = scalarList(vals)
+		}
+		if i, _ := find(old, name); i >= 0 {
+			old.Content[i+1] = v
+			continue
+		}
+		old.Content = append(old.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name}, v)
+	}
+	put(m, "params", old, stepOrder)
+}
+
+// sameParam reports whether a node already holds vals.
+func sameParam(n *yaml.Node, vals []string) bool {
+	got, ok := scalarValues(n)
+	return ok && slices.Equal(got, vals)
 }
 
 func defaultStr(v, def string) string {

@@ -34,6 +34,10 @@ func step(id, extra string) string {
 	return "      - id: " + id + "\n        name: S\n        runs_on: each repo\n        timeout: 1h\n        prompt: go\n" + extra
 }
 
+func smartStep(id, extra string) string {
+	return "      - id: " + id + "\n        name: S\n        runs_on: each repo\n        timeout: 1h\n        smart_script: Summarize\n" + extra
+}
+
 func TestParse_rules(t *testing.T) {
 	cases := []struct {
 		name string
@@ -75,6 +79,13 @@ func TestParse_rules(t *testing.T) {
 		{"allowed tools ok", head + agent + step("s", "        allowed_tools:\n          - Bash(git *)\n          - Read\n          - mcp__srv__tool\n"), 0, ""},
 		{"allowed tools dup", head + agent + step("s", "        allowed_tools:\n          - Read\n          - Read\n"), 0, "listed twice"},
 		{"allowed tools bad", head + agent + step("s", "        allowed_tools:\n          - \"bad tool\"\n"), 0, "not a tool pattern"},
+		{"smart step", head + agent + smartStep("s", "        params:\n          lang: go\n          dirs: [a, b]\n"), 0, ""},
+		{"smart step no params", head + agent + smartStep("s", ""), 0, ""},
+		{"smart prompt refused", head + agent + smartStep("s", "        prompt: go\n"), 0, "prompt is not allowed with smart_script"},
+		{"smart tools refused", head + agent + smartStep("s", "        allowed_tools: [Read]\n"), 0, "allowed_tools is not allowed with smart_script"},
+		{"params alone", head + agent + step("s", "        params:\n          a: b\n"), 0, "params is only allowed with smart_script"},
+		{"smart param name", head + agent + smartStep("s", "        params:\n          Bad-Name: x\n"), 0, "param name"},
+		{"smart param nested", head + agent + smartStep("s", "        params:\n          a:\n            b: c\n"), 0, "must be text or a list of text"},
 		{"script ok", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: make\n", 0, ""},
 		{"script back", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: make\n    on_failure: back:x\n", 0, "back: is only allowed on an agent step"},
 		{"script needs command", head + "  - id: r\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n", 0, "command is required"},

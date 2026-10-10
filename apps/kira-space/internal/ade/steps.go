@@ -18,6 +18,9 @@ import (
 type stepDef struct {
 	ID, Name, RunsOn, Before, OnFailure, Timeout, Prompt string
 	AllowedTools                                         []string
+	// SmartScript names the smart script that replaces Prompt; Params are its values.
+	SmartScript string
+	Params      map[string][]string
 }
 
 // stageSteps lists a stage's steps; a user stage has none.
@@ -37,7 +40,8 @@ func stageSteps(st adewire.Stage) []stepDef {
 		out := make([]stepDef, len(st.Steps))
 		for i, s := range st.Steps {
 			out[i] = stepDef{ID: s.ID, Name: s.Name, RunsOn: s.RunsOn, Before: s.Before, OnFailure: s.OnFailure,
-				Timeout: s.Timeout, Prompt: s.Prompt, AllowedTools: s.AllowedTools}
+				Timeout: s.Timeout, Prompt: s.Prompt, AllowedTools: s.AllowedTools,
+				SmartScript: s.SmartScript, Params: s.Params}
 		}
 		return out
 	}

@@ -97,10 +97,6 @@ func (b *TaskBoard) Context(taskID, branchID string) (scriptruns.ADEContext, err
 
 // branchContext adds a chosen branch's variables, worktree and setup state to c.
 func (b *TaskBoard) branchContext(tc *taskCtx, sb model.AdeTaskBranch, c *scriptruns.ADEContext) error {
-	base := sb.Base
-	if base == "" {
-		base = b.mainShortName(b.ctx, sb.CodeRepoID)
-	}
 	path, err := b.worktreeOf(b.ctx, sb)
 	if err != nil {
 		return err
@@ -116,7 +112,9 @@ func (b *TaskBoard) branchContext(tc *taskCtx, sb model.AdeTaskBranch, c *script
 		path, c.Pending = b.freePath(rec.Name, sb.Name), true
 	}
 	c.Worktree = path
-	c.Vars["repo"], c.Vars["branch"], c.Vars["base"], c.Vars["worktree"] = tc.nick[sb.CodeRepoID], sb.Name, base, path
+	for name, v := range b.adeVars(tc, sb, path) {
+		c.Vars[name] = v
+	}
 	setups, err := b.deps.Tasks.SetupByBranch()
 	if err != nil {
 		return err
@@ -128,6 +126,18 @@ func (b *TaskBoard) branchContext(tc *taskCtx, sb model.AdeTaskBranch, c *script
 		}
 	}
 	return nil
+}
+
+// adeVars are the built-in variables of a run on sb: the base is the branch's own, else the repo's main branch.
+func (b *TaskBoard) adeVars(tc *taskCtx, sb model.AdeTaskBranch, path string) map[string]string {
+	base := sb.Base
+	if base == "" {
+		base = b.mainShortName(b.ctx, sb.CodeRepoID)
+	}
+	return map[string]string{
+		"task": taskTitle(tc.task, tc.branches), "jira": tc.task.JiraKey, "repo": tc.nick[sb.CodeRepoID],
+		"branch": sb.Name, "base": base, "worktree": path,
+	}
 }
 
 // busyLocked says why a smart run cannot take the branch now; the task mutex is held.

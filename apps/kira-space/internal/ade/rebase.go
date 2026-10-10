@@ -522,7 +522,7 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 	go func() {
 		defer b.wg.Done()
 		defer endRun()
-		b.superviseAgent(runCtx, updated, b.rebaseDef(), sessionID, "", root.Worktree, prompt, b.rebaseTimeout())
+		b.superviseAgent(runCtx, updated, agentLaunch{def: b.rebaseDef(), sessionID: sessionID, path: root.Worktree, prompt: prompt, timeout: b.rebaseTimeout()})
 	}()
 	return updated, nil
 }

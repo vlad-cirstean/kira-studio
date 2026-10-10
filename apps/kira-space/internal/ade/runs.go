@@ -475,14 +475,25 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	patch := model.AdeRunPatch{State: &running, StartedAt: &now, Note: &note, Launch: &model.AdeRunLaunch{}}
 	vars := b.runVarsFor(tc, sb, path)
 
+	var smart *smartStep
+	runPath := path
+	if tc.stage.Kind == "agent" && def.SmartScript != "" {
+		if smart, err = b.planSmartStep(tc, sb, path, def); err != nil {
+			return run, err
+		}
+		runPath = smart.dir
+	}
 	var sessionID, prompt string
 	if tc.stage.Kind == "agent" {
 		sessionID = b.newID()
 		patch.SessionID = &sessionID
 		claudeID := cmpNonEmpty(spec.ResumeID, b.newID())
-		if spec.ResumeID != "" {
+		switch {
+		case spec.ResumeID != "":
 			prompt = composeResumePrompt(spec.Prompt)
-		} else {
+		case smart != nil:
+			prompt = smart.prompt
+		default:
 			prompt = composePrompt(promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
 				Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID), Extra: spec.Extra,
@@ -491,7 +502,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 			ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID, StageID: tc.stage.ID,
-			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, ClaudeSessionID: claudeID, Cwd: path,
+			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, ClaudeSessionID: claudeID, Cwd: runPath,
 			State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 		}); err != nil {
 			return run, err
@@ -505,13 +516,16 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	b.emitRuns(updated)
 
 	timeout := parseStepTimeout(def.Timeout)
+	if smart != nil {
+		timeout = smart.timeout
+	}
 	runCtx, endRun := b.beginLive(b.live, run.ID)
 	started = true
 	if tc.stage.Kind == "agent" {
 		go func() {
 			defer b.wg.Done()
 			defer endRun()
-			b.superviseAgent(runCtx, updated, def, sessionID, spec.ResumeID, path, prompt, timeout)
+			b.superviseAgent(runCtx, updated, agentLaunch{def: def, sessionID: sessionID, resume: spec.ResumeID, path: runPath, prompt: prompt, timeout: timeout, smart: smart})
 		}()
 	} else {
 		go func() {
@@ -576,15 +590,24 @@ func allowedTools(step []string, space bool) []string {
 	return out
 }
 
-func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def stepDef, sessionID, resume, path, prompt string, timeout time.Duration) {
+// agentLaunch is what superviseAgent runs: a prompt, or a smart script's step (smart != nil).
+type agentLaunch struct {
+	def               stepDef
+	sessionID, resume string
+	path, prompt      string
+	timeout           time.Duration
+	smart             *smartStep
+}
+
+func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agentLaunch) {
+	def, sessionID := l.def, l.sessionID
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	rebase := run.Purpose == model.AdeRunPurposeRebase
 	space := false
 	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil && !rebase {
 		space = b.spaceEnabled(task)
 	}
-	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space})
-	if err != nil {
+	fail := func(err error) {
 		sink.add(logStderr, "could not start: "+err.Error())
 		sink.flush()
 		end := fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndStartErr, Err: err}))
@@ -593,23 +616,39 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 			return
 		}
 		b.completeRun(run, sessionID, end)
+	}
+	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space})
+	if err != nil {
+		fail(err)
 		return
 	}
-	bin := b.deps.ClaudeBin
-	if bin == "" {
-		bin = "claude"
+	spec := claudeheadless.Spec{
+		ClaudeBin: cmpNonEmpty(b.deps.ClaudeBin, "claude"), Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
+		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space),
+		Timeout: l.timeout,
 	}
-	vars := gitprepare.Vars{WorktreePath: path}
-	env := gitprepare.BuildEnv(os.Environ(), vars)
+	spec.Env = gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: l.path})
 	if rebase {
-		env = append(env, "GIT_EDITOR=true")
+		spec.Env = append(spec.Env, "GIT_EDITOR=true")
 	}
-	exit, runErr := claudeheadless.Run(ctx, claudeheadless.Spec{
-		ClaudeBin: bin, Dir: path, Prompt: prompt, SessionID: b.sessionClaudeID(sessionID), Resume: resume, MCPConfigPath: cfg,
-		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools, space), Timeout: timeout, Env: env,
-	}, claudeheadless.Handler{
+	if l.smart != nil {
+		spec = l.smart.spec(spec, space)
+		if names := l.smart.mcpNames(); len(names) > 0 {
+			path, relUser, err := claudeheadless.WriteUserConfig(os.Getenv, b.deps.AgentDir, run.ID, names)
+			if err != nil {
+				release()
+				fail(err)
+				return
+			}
+			defer relUser()
+			spec.MCPConfigPaths = []string{path}
+		}
+	}
+	var res *claudeheadless.Result
+	exit, runErr := claudeheadless.Run(ctx, spec, claudeheadless.Handler{
 		OnLine:       func(l claudeheadless.Line) { sink.add(l.Stream, l.Text) },
 		OnRateLimits: b.deps.OnRateLimits,
+		OnResult:     func(r claudeheadless.Result) { res = &r },
 	})
 	sink.flush()
 	release()
@@ -638,6 +677,10 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 			report = &f
 		}
 		b.completeRebase(run, sessionID, report, end)
+		return
+	}
+	if l.smart != nil {
+		b.completeRun(run, sessionID, b.smartOutcome(run.ID, exit, runErr, res, l.smart, sink.lastStderr()))
 		return
 	}
 	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def.Timeout, sink.lastStderr()))

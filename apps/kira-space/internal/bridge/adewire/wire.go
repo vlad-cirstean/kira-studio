@@ -96,6 +96,9 @@ type PipelineStep struct {
 	Timeout      string    `json:"timeout"`
 	Prompt       string    `json:"prompt"`
 	AllowedTools []string  `json:"allowedTools"`
+	// SmartScript runs the named smart script instead of Prompt; Params are its values per param name.
+	SmartScript string              `json:"smartScript"`
+	Params      map[string][]string `json:"params"`
 }
 
 type Stage struct {

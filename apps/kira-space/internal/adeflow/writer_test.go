@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -114,7 +115,7 @@ func TestSave_edits(t *testing.T) {
 		wf.Stages[2].Steps = append(append([]adewire.PipelineStep(nil), steps[:2]...), steps[3:]...)
 		wf.Stages[2].Steps = append(wf.Stages[2].Steps, adewire.PipelineStep{
 			ID: "lint", Name: "Lint", RunsOn: "once", Before: "auto", OnFailure: "stop", Timeout: "10m",
-			Prompt: "Run lint.\nFix it.", AllowedTools: []string{"Bash(git *)"},
+			Prompt: "Run lint.\nFix it.", AllowedTools: []string{"Bash(git *)"}, Params: map[string][]string{},
 		})
 		out := saveOK(t, r, "standard.yaml", wf)
 		if strings.Index(out, "id: review") > strings.Index(out, "id: spec") {
@@ -145,6 +146,35 @@ func TestSave_edits(t *testing.T) {
 		seg, _, _ = strings.Cut(seg, "- id:")
 		if !strings.Contains(seg, "session: true") || strings.Contains(seg, "prompt:") {
 			t.Fatalf("spec stage:\n%s", seg)
+		}
+	})
+
+	t.Run("smart step keeps key order and params shape", func(t *testing.T) {
+		wf := load(t, r, "standard.yaml")
+		impl := slices.IndexFunc(wf.Stages, func(s adewire.Stage) bool { return s.ID == "impl" })
+		wf.Stages[impl].Steps = append([]adewire.PipelineStep(nil), wf.Stages[impl].Steps...)
+		wf.Stages[impl].Steps[0] = adewire.PipelineStep{
+			ID: wf.Stages[impl].Steps[0].ID, Name: "Smart", RunsOn: "once", Before: "auto", OnFailure: "stop", Timeout: "10m", AllowedTools: []string{}, SmartScript: "Summarize",
+			Params: map[string][]string{"lang": {"go"}, "dirs": {"a", "b"}},
+		}
+		out := saveOK(t, r, "standard.yaml", wf)
+		_, seg, _ := strings.Cut(out, "name: Smart")
+		seg, _, _ = strings.Cut(seg, "- id:")
+		order := []string{"runs_on:", "timeout:", "smart_script: Summarize", "params:", "dirs:", "lang: go"}
+		at := 0
+		for _, k := range order {
+			i := strings.Index(seg[at:], k)
+			if i < 0 {
+				t.Fatalf("%q missing or out of order:\n%s", k, seg)
+			}
+			at += i
+		}
+		if strings.Contains(seg, "prompt:") || strings.Contains(seg, "allowed_tools:") {
+			t.Fatalf("prompt keys left on a smart step:\n%s", seg)
+		}
+		back := load(t, r, "standard.yaml")
+		if got := back.Stages[impl].Steps[0]; got.SmartScript != "Summarize" || !reflect.DeepEqual(got.Params, wf.Stages[impl].Steps[0].Params) {
+			t.Fatalf("round trip: %+v", got)
 		}
 	})
 
