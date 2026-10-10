@@ -371,8 +371,9 @@ test('contract: an unsaved script asks to save before it lists tasks', async ({ 
   });
   await openPanel(page);
   await page.locator('[data-testid="automations-add"]').click();
-  await page.locator('[data-testid="menu-item-new-recurring"]').hover();
-  await page.locator('[data-testid="menu-item-new-recurring-script"]').click();
+  await page.locator('[data-testid="menu-item-new-script"]').click();
+  await dialog(page).locator('[data-testid="script-dialog-tab-schedule"]').click();
+  await dialog(page).locator('[data-testid="script-schedule"]').click();
   await dialog(page).locator('[data-testid="schedule-where-task"]').click();
   await expect(dialog(page).locator('[data-testid="schedule-task-save"]')).toBeVisible();
   expect(
