@@ -743,14 +743,14 @@ check_toggle_radius
 # alternative. Data-view sites keep their own sizes via the exemptions inside check_font_scale.
 check_font_scale
 
-# P245: git-ui is on the app's one Tailwind root and token layer. The
+# P245: git-ui and the theme package are on the app's one Tailwind root and token layer. The
 # `kv:` prefix, `--kv-*` tokens and the VS Code token layer (`--vscode-*`) are gone for good.
 check_no_kv_layer() {
   if [ -n "$TC_COLLECT" ]; then
     return 0
   fi
   hits=$(grep -rnP --include='*.vue' --include='*.ts' --include='*.css' \
-    -- '(?<![\w-])kv:[a-z\[!-]|--kv-|--vscode-' "$GIT_UI_SRC" 2>/dev/null || true)
+    -- '(?<![\w-])kv:[a-z\[!-]|--kv-|--vscode-' "$GIT_UI_SRC" "$THEME_SRC" 2>/dev/null || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: kv:/--kv-/--vscode- layer is retired (P245) -- use app utilities and --kira-* tokens:" >&2
     echo "$hits" >&2

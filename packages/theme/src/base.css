@@ -1,11 +1,6 @@
 @import "tailwindcss";
 @import "@vscode/codicons/dist/codicon.css";
 @import "@theme/tokens.css";
-/* C10 §7: bridges --kira-* onto packages/git-ui's own --vscode-* vocabulary — this is what makes
-   the mounted graph (C10) render Kira's own theme instead of falling back to VS Code Dark
-   literals. P131 Part 3 §6.5: the sibling bridge file that used to sit beside it (kira-ui's own
-   token bridge) is gone — kira-ui's own Kui* components (its only consumer) are gone too. */
-@import "@theme/vscode-bridge.css";
 @import "@theme/primitives.css";
 @import "@theme/review-decorations.css";
 @import "@theme/blame-annotation.css";

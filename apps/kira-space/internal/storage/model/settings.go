@@ -50,7 +50,7 @@ type GitSettings struct {
 	GitPath string `json:"gitPath"`
 	// GraphFontSize is P92 item 9's git-graph font size, in whole pixels; 0 means "follow
 	// appearance.fontSize" — see settingsDomain.ts's own doc comment for the propagation path
-	// (--kira-graph-font-size -> --vscode-font-size, git-ui's only consumer of that token).
+	// (--kira-graph-font-size, read by git-ui's theme/git.css).
 	GraphFontSize int `json:"graphFontSize"`
 }
 

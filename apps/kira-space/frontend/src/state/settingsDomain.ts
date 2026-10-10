@@ -39,7 +39,7 @@ const gitSettingsSchema = /*#__PURE__*/ z.object({
   // discover" (PATH lookup) — gitclient.Discovery's own existing contract.
   gitPath: z.string().default(''),
   // P92 item 9: 0 = follow appearance.fontSize. Reaches every embedded git-ui surface (graph,
-  // diff, review) through --vscode-font-size, which nothing else in this app consumes.
+  // diff, review) through --kira-graph-font-size (git-ui's theme/git.css graph scale).
   graphFontSize: z.number().int().min(0).max(FONT_SIZE_RANGE.max).default(0),
 });
 

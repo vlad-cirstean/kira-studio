@@ -3,8 +3,7 @@
 
    No `@import "tailwindcss"`, no --kira-* token definitions and no host rule (html/body/#app,
    scrollbars, dark-mode variant) live here -- each host's own root supplies those, since a token
-   value and a dark-mode selector are host-specific (the webview bridges --kira-* from --kv-*;
-   Studio/Space define them directly in tokens.css) while everything below is not. */
+   value and a dark-mode selector are host-specific (Studio/Space define them directly in tokens.css) while everything below is not. */
 @import "@theme/shadcn-bridge.css";
 
 /* P100 Part 2 (P103's byte-identical tier, folded in): a shadcn primitive under
