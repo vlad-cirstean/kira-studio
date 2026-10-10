@@ -13,6 +13,7 @@
     "@kira/api-core": "workspace:*",
     "@kira/docker-ui": "workspace:*",
     "@kira/kira-ui": "workspace:*",
+    "shell-quote": "1.10.0",
     "vue": "3.5.42",
     "zod": "4.6.5"
   }
