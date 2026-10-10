@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/netip"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -24,7 +25,39 @@ const (
 
 	labelComposeProject = "com.docker.compose.project"
 	labelComposeService = "com.docker.compose.service"
+
+	labelDevcontainer    = "devcontainer.local_folder"
+	labelTestcontainers  = "org.testcontainers"
+	labelTestcontSession = "org.testcontainers.sessionId"
+	labelKindCluster     = "io.x-k8s.kind.cluster"
+	labelPodName         = "io.kubernetes.pod.name"
+	labelPodNamespace    = "io.kubernetes.pod.namespace"
+	labelSwarmService    = "com.docker.swarm.service.name"
+
+	buildxPrefix = "buildx_buildkit_"
 )
+
+// originOf infers what created a container from its labels and name; first match wins. "" when
+// nothing is recognised.
+func originOf(labels map[string]string, name string) (origin, originName string) {
+	switch {
+	case labels[labelDevcontainer] != "":
+		return "devcontainer", path.Base(strings.ReplaceAll(labels[labelDevcontainer], "\\", "/"))
+	case labels[labelTestcontainers] == "true":
+		return "testcontainers", labels[labelTestcontSession]
+	case labels[labelKindCluster] != "":
+		return "kind", labels[labelKindCluster]
+	case labels[labelPodName] != "":
+		return "kubernetes", labels[labelPodNamespace] + "/" + labels[labelPodName]
+	case labels[labelSwarmService] != "":
+		return "swarm", labels[labelSwarmService]
+	case strings.HasPrefix(name, buildxPrefix):
+		return "buildx", strings.TrimPrefix(name, buildxPrefix)
+	case labels[labelComposeProject] != "":
+		return "compose", labels[labelComposeProject]
+	}
+	return "", ""
+}
 
 // Port is one published or exposed container port.
 type Port struct {
@@ -46,6 +79,8 @@ type Container struct {
 	Ports          []Port   `json:"ports"`
 	ComposeProject string   `json:"composeProject"`
 	ComposeService string   `json:"composeService"`
+	Origin         string   `json:"origin"`
+	OriginName     string   `json:"originName"`
 	Networks       []string `json:"networks"`
 }
 
@@ -157,6 +192,7 @@ func containerFromSummary(s container.Summary) Container {
 		ComposeProject: s.Labels[labelComposeProject], ComposeService: s.Labels[labelComposeService],
 		Networks: []string{},
 	}
+	c.Origin, c.OriginName = originOf(s.Labels, c.Name)
 	for _, p := range s.Ports {
 		c.Ports = append(c.Ports, Port{IP: addrString(p.IP), PrivatePort: int(p.PrivatePort), PublicPort: int(p.PublicPort), Type: p.Type})
 	}
@@ -372,6 +408,7 @@ func detailFromInspect(r container.InspectResponse, raw []byte) ContainerDetail 
 		cfg := r.Config
 		c.Image = cfg.Image
 		c.ComposeProject, c.ComposeService = cfg.Labels[labelComposeProject], cfg.Labels[labelComposeService]
+		c.Origin, c.OriginName = originOf(cfg.Labels, c.Name)
 		d.Command, d.Entrypoint, d.Env = nonNil(cfg.Cmd), nonNil(cfg.Entrypoint), nonNil(cfg.Env)
 		d.WorkingDir, d.User, d.TTY = cfg.WorkingDir, cfg.User, cfg.Tty
 		if cfg.Labels != nil {

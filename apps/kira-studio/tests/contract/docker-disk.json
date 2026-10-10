@@ -5,6 +5,64 @@
     "sizeRw": 0,
     "takenAt": "<time>"
   },
+  "DockerService.Containers#origins": [
+    {
+      "composeProject": "",
+      "composeService": "",
+      "name": "buildx_buildkit_kfrun",
+      "origin": "buildx",
+      "originName": "kfrun"
+    },
+    {
+      "composeProject": "shop",
+      "composeService": "web",
+      "name": "kira-flow-compose",
+      "origin": "compose",
+      "originName": "shop"
+    },
+    {
+      "composeProject": "kira_devcontainer",
+      "composeService": "app",
+      "name": "kira-flow-devc",
+      "origin": "devcontainer",
+      "originName": "kira"
+    },
+    {
+      "composeProject": "",
+      "composeService": "",
+      "name": "kira-flow-k8s",
+      "origin": "kubernetes",
+      "originName": "prod/api-1"
+    },
+    {
+      "composeProject": "",
+      "composeService": "",
+      "name": "kira-flow-kind",
+      "origin": "kind",
+      "originName": "dev"
+    },
+    {
+      "composeProject": "",
+      "composeService": "",
+      "name": "kira-flow-plain",
+      "origin": "",
+      "originName": ""
+    },
+    {
+      "composeProject": "",
+      "composeService": "",
+      "name": "kira-flow-swarm",
+      "origin": "swarm",
+      "originName": "stack_web"
+    },
+    {
+      "composeProject": "",
+      "composeService": "",
+      "name": "kira-flow-tc",
+      "origin": "testcontainers",
+      "originName": "sess1"
+    }
+  ],
   "DockerService.DiskUsage": {
     "buildCache": {
       "active": 0,
