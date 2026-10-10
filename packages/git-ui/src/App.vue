@@ -1797,7 +1797,7 @@ onBeforeUnmount(() => {
               @update:value="setDetailWidth"
               @change="setDetailWidth"
             />
-            <Empty v-if="!hasSelection" class="p-6"><EmptyDescription>Select a commit to see its details.</EmptyDescription></Empty>
+            <Empty v-if="!hasSelection" class="h-full p-6"><EmptyDescription>Select a commit to see its details.</EmptyDescription></Empty>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"
@@ -1831,7 +1831,7 @@ onBeforeUnmount(() => {
             data-testid="detail-region"
             aria-label="Commit detail"
           >
-            <Empty v-if="!hasSelection" class="p-6"><EmptyDescription>Select a commit to see its details.</EmptyDescription></Empty>
+            <Empty v-if="!hasSelection" class="h-full p-6"><EmptyDescription>Select a commit to see its details.</EmptyDescription></Empty>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"

@@ -133,7 +133,7 @@ const tooltipText = computed(() => {
   <button
     v-if="visible"
     type="button"
-    class="shrink-0 flex items-center w-full h-graph-row-compact border-0 border-b border-border bg-bg text-inherit text-left cursor-pointer hover:bg-hover focus-visible:outline-1 focus-visible:outline-focus focus-visible:-outline-offset-1"
+    class="shrink-0 flex items-center w-full h-graph-row-compact border-0 border-b border-border bg-bg text-inherit text-left cursor-pointer hover:bg-hover focus-visible:focus-ring"
     data-testid="uncommitted-strip"
     @click="emit('select')"
   >

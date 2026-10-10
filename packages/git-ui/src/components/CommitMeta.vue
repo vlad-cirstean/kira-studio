@@ -328,7 +328,7 @@ const prIcon = computed(() => {
       />
     </div>
 
-    <p class="flex items-center gap-0.5 text-muted-foreground text-graph-sm">
+    <p class="flex items-center gap-1 text-muted-foreground text-graph-sm">
       <Tooltip>
         <TooltipTrigger as-child>
           <span>{{ formatRelativeDate(detail.committer.timestamp) }}</span>

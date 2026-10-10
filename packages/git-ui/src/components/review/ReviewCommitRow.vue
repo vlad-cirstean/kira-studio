@@ -16,9 +16,9 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import { TransportError } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { useEventListener } from '@vueuse/core';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, ref, useTemplateRef } from 'vue';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
@@ -196,7 +196,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 <template>
   <div
     v-if="commit"
-    class="flex flex-col border-b border-border cursor-pointer group focus-visible:outline-1 focus-visible:outline-focus focus-visible:-outline-offset-2"
+    class="flex flex-col border-b border-border cursor-pointer group focus-visible:focus-ring"
     role="treeitem"
     :aria-expanded="expanded"
     :tabindex="focused ? 0 : -1"
@@ -216,10 +216,13 @@ function onOpenFile(index: number, pinned: boolean): void {
       ref="headerEl"
       class="kv-review-row-header flex items-center gap-1 py-1 px-2 min-h-row min-w-0 font-ui group-hover:bg-hover"
     >
-      <CodiconIcon
-        :name="expanded ? 'chevron-down' : 'chevron-right'"
-        :size="13"
-        class="size-3.5 shrink-0 text-center text-muted-foreground"
+      <TreeTwisty
+        :expanded="expanded"
+        :has-children="true"
+        @toggle="
+          emit('focus-row');
+          emit('toggle');
+        "
       />
       <!-- G14 D8 row 1: two lines — subject on its own, full-width line; author/date/sha, muted,
            below it. GitLens's own commit-node anatomy. -->

@@ -29,6 +29,7 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, nextTick, ref, useId, watch } from 'vue';
 import { ACTION_ICONS, codiconName } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
@@ -262,7 +263,7 @@ function rowClass(row: FileTreeRow, index: number): string {
     'kv-file-tree-row',
     rowVariants({ layout: 'tree', selected }),
     index === focusedRow.value
-      ? 'group-focus-within:outline group-focus-within:outline-1 group-focus-within:outline-focus group-focus-within:-outline-offset-1'
+      ? 'group-focus-within:focus-ring'
       : '',
   );
 }
@@ -596,13 +597,18 @@ const parentSelectId = useId();
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
                rows' checkbox column aligned underneath it. -->
           <span v-if="reviewStates" class="w-3.5 shrink-0" aria-hidden="true"></span>
-          <CodiconIcon
-            :name="row.expanded ? 'chevron-down' : 'chevron-right'"
-            :size="13"
-            class="size-3.5 shrink-0 text-center text-muted-foreground"
+          <TreeTwisty
+            :expanded="row.expanded"
+            :has-children="true"
+            @toggle="toggleDir(row.node.path)"
           />
-          <span class="font-ui font-semibold truncate">{{ row.node.name }}</span>
-          <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
+          <CodiconIcon
+            :name="row.expanded ? 'folder-opened' : 'folder'"
+            :size="16"
+            class="shrink-0 text-muted-foreground"
+          />
+          <span class="font-ui truncate">{{ row.node.name }}</span>
+          <span class="ml-auto text-subtle font-ui text-graph-sm flex gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
             <span class="text-ok" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
@@ -663,7 +669,7 @@ const parentSelectId = useId();
               >
             </span>
             <span
-              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0 saturate-160 contrast-115"
+              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -704,13 +710,18 @@ const parentSelectId = useId();
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
                rows' checkbox column aligned underneath it. -->
           <span v-if="reviewStates" class="w-3.5 shrink-0" aria-hidden="true"></span>
-          <CodiconIcon
-            :name="row.expanded ? 'chevron-down' : 'chevron-right'"
-            :size="13"
-            class="size-3.5 shrink-0 text-center text-muted-foreground"
+          <TreeTwisty
+            :expanded="row.expanded"
+            :has-children="true"
+            @toggle="toggleDir(row.node.path)"
           />
-          <span class="font-ui font-semibold truncate">{{ row.node.name }}</span>
-          <span class="ml-auto text-muted-foreground font-ui text-graph-sm flex gap-1">
+          <CodiconIcon
+            :name="row.expanded ? 'folder-opened' : 'folder'"
+            :size="16"
+            class="shrink-0 text-muted-foreground"
+          />
+          <span class="font-ui truncate">{{ row.node.name }}</span>
+          <span class="ml-auto text-subtle font-ui text-graph-sm flex gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
             <span class="text-ok" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
@@ -774,7 +785,7 @@ const parentSelectId = useId();
               >
             </span>
             <span
-              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0 saturate-160 contrast-115"
+              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm font-semibold leading-none shrink-0"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
