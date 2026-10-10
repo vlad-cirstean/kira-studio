@@ -1,8 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
-import { useDocumentVisibility } from '@vueuse/core';
-import { computed, onScopeDispose, type Ref, reactive, ref, watch } from 'vue';
+import { useDocumentVisibility, useLocalStorage } from '@vueuse/core';
+import {
+  computed,
+  type MaybeRefOrGetter,
+  onScopeDispose,
+  type Ref,
+  reactive,
+  ref,
+  toValue,
+  watch,
+} from 'vue';
 import { useDocker } from './context';
-import type { DockerStatus, InspectKind, ResourceKind } from './wire';
+import type { DockerDiskUsage, DockerStatus, InspectKind, ResourceKind } from './wire';
 
 const STATUS_KEY = ['docker', 'status'] as const;
 const UNAVAILABLE_POLL_MS = 5000;
@@ -102,6 +111,52 @@ export function useInspect(kind: Ref<InspectKind>, id: Ref<string>) {
     queryFn: () => control.inspect(kind.value, id.value),
     enabled: computed(() => ready.value && id.value !== ''),
   });
+}
+
+const storedDisk = useLocalStorage<Record<string, DockerDiskUsage>>('kira.docker.diskUsage', {});
+
+/**
+ * Engine-wide disk usage, measured only on `refresh()`. Keys sit outside the `['docker']` prefix so
+ * no refresh, container action or live-sync invalidation ever triggers a df walk. The last result
+ * per engine persists in localStorage with its own timestamp.
+ */
+export function useEngineDiskUsage() {
+  const { control } = useDocker();
+  const { scope } = useScope();
+  const query = useQuery({
+    queryKey: computed(() => ['docker-disk', scope.value, 'engine'] as const),
+    queryFn: () => control.diskUsage(),
+    enabled: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+    initialData: () => storedDisk.value[scope.value],
+    initialDataUpdatedAt: () => {
+      const at = Date.parse(storedDisk.value[scope.value]?.takenAt ?? '');
+      return Number.isNaN(at) ? 0 : at;
+    },
+  });
+  watch(query.data, (d) => {
+    if (d && storedDisk.value[scope.value]?.takenAt !== d.takenAt) {
+      storedDisk.value = { ...storedDisk.value, [scope.value]: d };
+    }
+  });
+  return { query, refresh: () => query.refetch() };
+}
+
+/** One container's size, measured only on `refresh()` and kept for the session, never persisted. */
+export function useContainerSize(id: MaybeRefOrGetter<string>) {
+  const { control } = useDocker();
+  const { scope } = useScope();
+  const query = useQuery({
+    queryKey: computed(() => ['docker-disk', scope.value, 'container', toValue(id)] as const),
+    queryFn: () => control.containerSize(toValue(id)),
+    enabled: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+  });
+  return { query, refresh: () => query.refetch() };
 }
 
 export type ContainerAction = 'start' | 'stop' | 'restart';

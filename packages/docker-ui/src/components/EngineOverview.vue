@@ -12,6 +12,7 @@ import type { DockerStatsSample } from '../wire';
 import ContainerTable from './ContainerTable.vue';
 import DetailSection from './DetailSection.vue';
 import EndpointChip from './EndpointChip.vue';
+import EngineDiskSection from './EngineDiskSection.vue';
 import StatsSparkline from './StatsSparkline.vue';
 import UsageBar from './UsageBar.vue';
 
@@ -192,6 +193,8 @@ function refresh(): Promise<void> {
           </DetailSection>
         </div>
       </div>
+
+      <EngineDiskSection />
 
       <DetailSection title="Containers" flush class="shrink-0">
         <ContainerTable />

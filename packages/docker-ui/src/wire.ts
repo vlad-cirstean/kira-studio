@@ -73,6 +73,16 @@ export type ContainerState =
   | 'exited'
   | 'dead';
 
+export type ContainerOrigin =
+  | ''
+  | 'compose'
+  | 'devcontainer'
+  | 'testcontainers'
+  | 'kind'
+  | 'kubernetes'
+  | 'swarm'
+  | 'buildx';
+
 export interface DockerContainer {
   id: string;
   name: string;
@@ -84,7 +94,41 @@ export interface DockerContainer {
   ports: DockerPort[];
   composeProject: string;
   composeService: string;
+  origin: ContainerOrigin;
+  originName: string;
   networks: string[];
+}
+
+export interface DockerDiskCategory {
+  count: number;
+  active: number;
+  size: number;
+  reclaimable: number;
+}
+
+/** `size` is -1 when the engine did not compute it. */
+export interface DockerVolumeDisk {
+  name: string;
+  size: number;
+  refCount: number;
+}
+
+export interface DockerDiskUsage {
+  takenAt: string;
+  durationMs: number;
+  total: number;
+  images: DockerDiskCategory;
+  containers: DockerDiskCategory;
+  volumes: DockerDiskCategory;
+  buildCache: DockerDiskCategory;
+  volumeSizes: DockerVolumeDisk[];
+}
+
+export interface DockerContainerSize {
+  sizeRw: number;
+  sizeRootFs: number;
+  takenAt: string;
+  durationMs: number;
 }
 
 export interface DockerImage {
