@@ -1,9 +1,20 @@
-import type { Branch, OnFailure, RunState, RunsOn, Stage, Task, Workflow } from '../wire';
+import type {
+  Branch,
+  OnFailure,
+  RunState,
+  RunsOn,
+  Stage,
+  StepResult,
+  Task,
+  Workflow,
+} from '../wire';
+import { implicitResults } from './stepResults';
 
 // Pure port of mockup v2 `renderVals()` step aggregation (1423-1466), `phasePills` (1672-1702) and
 // `branchProg` (1768-1787). Runs are the backend's: a stuck run arrives as `state: 'stuck'`.
 
-export type StepState = 'pending' | 'running' | 'stuck' | 'failed' | 'done';
+/** `skipped`: a route went past the step, so it never runs. */
+export type StepState = 'pending' | 'running' | 'stuck' | 'failed' | 'done' | 'skipped';
 
 export interface StepRun {
   branchId: string;
@@ -12,6 +23,12 @@ export interface StepRun {
   note: string;
   /** The stored outcome's reason, '' while none. */
   reason: string;
+  /** The step result the agent reported, '' while none. */
+  result: string;
+  /** Whether that result was ok; null while none. */
+  ok: boolean | null;
+  /** Where the result sent the step: next, end, stop, a step id, `back:<id>` or `retry`; '' while none. */
+  route: string;
   runId: string;
   sessionId: string;
   finishedAt: number | null;
@@ -25,6 +42,8 @@ export interface StepProgress {
   runsOn: RunsOn;
   before: 'auto' | 'approval';
   onFailure: OnFailure | '';
+  /** The step's results with their routes. */
+  results: StepResult[];
   /** Name of the smart script the step runs, else ''. */
   smartScript: string;
   state: StepState;
@@ -107,6 +126,7 @@ interface StepDef {
   runsOn: RunsOn;
   before: 'auto' | 'approval';
   onFailure: OnFailure | '';
+  results: StepResult[];
   smartScript: string;
 }
 
@@ -120,6 +140,7 @@ function stepDefs(stage: Stage): StepDef[] {
         runsOn: stage.runsOn || 'once',
         before: 'auto',
         onFailure: stage.onFailure || 'stop',
+        results: implicitResults(stage.id, stage.onFailure || 'stop'),
         smartScript: '',
       },
     ];
@@ -130,6 +151,7 @@ function stepDefs(stage: Stage): StepDef[] {
     runsOn: s.runsOn,
     before: s.before,
     onFailure: s.onFailure,
+    results: s.results?.length ? s.results : implicitResults(s.id, s.onFailure || 'stop'),
     smartScript: s.smartScript,
   }));
 }
@@ -148,16 +170,56 @@ function latestRun(task: Task, stageId: string, stepId: string, branchId: string
     loops: best.loops,
     note: best.note,
     reason: best.outcome?.reason ?? '',
+    result: best.outcome?.result ?? '',
+    ok: best.outcome?.result ? best.outcome.status !== 'failed' : null,
+    route: best.outcome?.route ?? '',
     runId: best.id,
     sessionId: best.sessionId,
     finishedAt: best.finishedAt,
   };
 }
 
+/** Index of the step after `i` for a done step: the earliest forward route among its runs. Mirrors Go
+ *  `forwardTarget`; a run without a stored route counts as `next`. */
+function forwardTarget(ids: readonly string[], i: number, runs: readonly StepRun[]): number {
+  let next = ids.length;
+  for (const r of runs) {
+    let to = i + 1;
+    if (r.route === 'end') to = ids.length;
+    else if (r.route && r.route !== 'next') {
+      const j = ids.indexOf(r.route);
+      if (j > i) to = j;
+    }
+    next = Math.min(next, to);
+  }
+  return Math.max(next, i + 1);
+}
+
+/** The route path of a stage: from the first step, a done step moves to its forward target and the
+ *  first step not done ends the path. `skipped` marks the steps the route went past. Mirrors Go
+ *  `walkPath`. */
+export function walkPath(
+  ids: readonly string[],
+  steps: readonly { state: StepState; runs: readonly StepRun[] }[],
+): { path: number[]; skipped: boolean[] } {
+  const path: number[] = [];
+  const skipped = ids.map(() => false);
+  let i = 0;
+  while (i < ids.length) {
+    path.push(i);
+    const step = steps[i];
+    if (!step || step.state !== 'done') break;
+    const next = forwardTarget(ids, i, step.runs);
+    for (let j = i + 1; j < next && j < ids.length; j++) skipped[j] = true;
+    i = next;
+  }
+  return { path, skipped };
+}
+
 /** Steps of the task's current stage with per-branch runs, step state and approval flag. */
 export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
-  let prevDone = true;
-  return stepDefs(stage).map((def, idx) => {
+  const defs = stepDefs(stage);
+  const built = defs.map((def, idx) => {
     const runs = stepTargets(i, def.runsOn).map(
       (branchId): StepRun =>
         latestRun(i.task, stage.id, def.id, branchId) ?? {
@@ -166,16 +228,27 @@ export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
           loops: 0,
           note: '',
           reason: '',
+          result: '',
+          ok: null,
+          route: '',
           runId: '',
           sessionId: '',
           finishedAt: null,
         },
     );
     const state = aggregate(runs.map((r) => r.state));
-    const approval = state === 'pending' && def.before === 'approval' && idx > 0 && prevDone;
-    prevDone = state === 'done';
     const frac = runs.length ? runs.reduce((acc, r) => acc + runFraction(r), 0) / runs.length : 0;
-    return { ...def, n: idx + 1, state, runs, approval, frac };
+    return { ...def, n: idx + 1, state, runs, approval: false, frac };
+  });
+  const { path, skipped } = walkPath(
+    defs.map((d) => d.id),
+    built,
+  );
+  const end = path[path.length - 1] ?? -1;
+  return built.map((s, idx) => {
+    if (skipped[idx]) return { ...s, state: 'skipped', frac: 1 };
+    const approval = s.state === 'pending' && s.before === 'approval' && idx > 0 && idx === end;
+    return { ...s, approval };
   });
 }
 
@@ -207,7 +280,7 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
   const idx = finished ? stages.length : found;
   const steps = !finished && stage ? buildSteps(i, stage) : [];
   const bad = steps.some((s) => s.state === 'stuck' || s.state === 'failed');
-  const doneSteps = steps.filter((s) => s.state === 'done').length;
+  const doneSteps = steps.filter((s) => s.state === 'done' || s.state === 'skipped').length;
   const frac = steps.length ? steps.reduce((acc, s) => acc + s.frac, 0) / steps.length : 0;
   const segments = stages.map((s, k): StageSegment => {
     let state: StageSegment['state'] = 'todo';
@@ -267,6 +340,7 @@ export function branchProgress(p: TaskProgress, branchId: string): BranchProgres
   if (!stage || stage.kind === 'user') return null;
   const own: { step: StepProgress; run: StepRun }[] = [];
   for (const step of p.steps) {
+    if (step.state === 'skipped') continue;
     const run = step.runs.find((r) => r.branchId === branchId);
     if (run) own.push({ step, run });
   }
@@ -283,7 +357,10 @@ export function branchProgress(p: TaskProgress, branchId: string): BranchProgres
     label = `${stage.name} ✓`;
     tone = 'green';
   } else if (pos.run.state === 'back') {
-    label = `${pos.step.name} ↩ sent back`;
+    label =
+      pos.run.route === 'retry'
+        ? `${pos.step.name} · ${pos.run.note}`
+        : `${pos.step.name} ↩ sent back`;
   } else {
     const suffix = { stuck: ' · stuck', failed: ' · failed', pending: ' · waiting' } as Record<
       string,

@@ -152,7 +152,9 @@ function agentStageAction(p: TaskProgress): TaskAction | null {
       tone: 'claude',
     };
   }
-  return p.steps.length && p.steps.every((s) => s.state === 'done') ? doneAction(p) : null;
+  return p.steps.length && p.steps.every((s) => s.state === 'done' || s.state === 'skipped')
+    ? doneAction(p)
+    : null;
 }
 
 function stageAction(i: TaskCellInput): TaskAction | null {

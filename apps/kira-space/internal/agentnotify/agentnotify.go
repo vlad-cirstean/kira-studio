@@ -229,6 +229,9 @@ func (n *Notifier) HandleRuns(runs []adewire.Run) {
 			detail = r.Note
 		}
 		title := "ADE run " + r.State
+		if res := stepResult(r); res != "" {
+			title = "ADE " + res
+		}
 		if r.Purpose == "rebase" {
 			title = "Rebase " + rebaseVerdict(r)
 			if r.Outcome != nil && r.Outcome.Reason != "" {
@@ -341,6 +344,17 @@ func rebaseVerdict(r adewire.Run) string {
 		return "stopped"
 	}
 	return "needs you"
+}
+
+// stepResult is the step result an agent reported, "" for the implicit done and failed.
+func stepResult(r adewire.Run) string {
+	if r.Outcome == nil || r.Purpose == "rebase" {
+		return ""
+	}
+	if id := r.Outcome.Result; id != "done" && id != "failed" {
+		return id
+	}
+	return ""
 }
 
 func runEnded(s adewire.RunState) bool {

@@ -3,6 +3,7 @@ import {
   branchProgress,
   buildTaskProgress,
   type ProgressInput,
+  walkPath,
 } from '../../frontend/src/ade/v2/board/progress';
 import { deriveStatus } from '../../frontend/src/ade/v2/board/status';
 import { implicitResults } from '../../frontend/src/ade/v2/board/stepResults';
@@ -286,5 +287,31 @@ describe('derived status', () => {
   test('review and parked tasks ignore the workflow', () => {
     expect(status([], { kind: 'review' })).toBe('In review');
     expect(status([run('code', 'b_api', { state: 'failed' })], { kind: 'parked' })).toBe('To do');
+  });
+});
+
+describe('walkPath (mirrors Go walkPath)', () => {
+  const run = (route: string) => ({ route }) as never;
+  const done = (route: string) => ({ state: 'done' as const, runs: [run(route)] });
+  const pending = { state: 'pending' as const, runs: [] };
+
+  test('a forward route skips the steps between', () => {
+    expect(walkPath(['a', 'b', 'c'], [done('c'), pending, pending])).toEqual({
+      path: [0, 2],
+      skipped: [false, true, false],
+    });
+  });
+  test('end completes the stage and skips the rest', () => {
+    expect(walkPath(['a', 'b'], [done('end'), pending])).toEqual({
+      path: [0],
+      skipped: [false, true],
+    });
+  });
+  test('the earliest forward target across branches wins', () => {
+    const two = { state: 'done' as const, runs: [run('c'), run('next')] };
+    expect(walkPath(['a', 'b', 'c'], [two, pending, pending]).path).toEqual([0, 1]);
+  });
+  test('a run without a stored route counts as next', () => {
+    expect(walkPath(['a', 'b'], [done(''), pending]).path).toEqual([0, 1]);
   });
 });

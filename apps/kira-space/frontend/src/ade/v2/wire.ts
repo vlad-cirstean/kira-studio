@@ -262,7 +262,12 @@ interface RebaseFacts {
   branches: BranchShas[];
   pushed: boolean | null;
 }
-type AdeRunOutcome = RunOutcome & { report?: AgentReport; rebase?: RebaseFacts };
+/** `route`: where the result sent the step (`next`, `end`, `stop`, a step id, `back:<id>`, `retry`). */
+type AdeRunOutcome = RunOutcome & {
+  report?: AgentReport;
+  rebase?: RebaseFacts;
+  route?: string;
+};
 export interface Task {
   id: string;
   kind: 'task' | 'review' | 'parked';

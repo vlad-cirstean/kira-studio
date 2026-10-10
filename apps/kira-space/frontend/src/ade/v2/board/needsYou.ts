@@ -119,6 +119,13 @@ interface Ctx {
   sessionsById: ReadonlyMap<string, Session>;
 }
 
+/** `Step "x" failed`, or `ended <result>` when the step declared its own result. */
+function failedWhat(name: string, result: string): string {
+  return result && result !== 'failed' && result !== 'done'
+    ? `Step "${name}" ended ${result}`
+    : `Step "${name}" failed`;
+}
+
 function stepItems(c: Ctx): NeedsItem[] {
   const out: NeedsItem[] = [];
   for (const task of c.i.board.tasks) {
@@ -148,7 +155,7 @@ function stepItems(c: Ctx): NeedsItem[] {
           item('failed', {
             ...base,
             id: `failed:${task.id}:${step.id}`,
-            what: `Step "${step.name}" failed`,
+            what: failedWhat(step.name, failed.find((x) => x.result)?.result ?? ''),
             runIds: failed.flatMap((x) => (x.runId ? [x.runId] : [])),
             detail: failed.find((x) => x.note)?.note ?? '',
             ageMs: c.age(Math.max(0, ...failed.map((x) => x.finishedAt ?? 0))),

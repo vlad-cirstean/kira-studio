@@ -7,6 +7,7 @@ import {
   type StepRun,
   type StepState,
 } from './progress';
+import { defaultRoute } from './stepResults';
 
 // Task panel Workflow block (SPEC2 section 7, mockup `phaseBlocks`): one block per stage, steps with
 // their per-repo run lines. Pure, so the card model carries it ready to render.
@@ -30,7 +31,7 @@ interface StepView {
   /** Agent: the `runsOn` text; script: the command. */
   scope: string;
   gated: boolean;
-  failText: string;
+  routeText: string;
   runs: RunLine[];
 }
 
@@ -60,6 +61,7 @@ const STEP_TONE: Record<StepState, Tone> = {
   stuck: 'red',
   failed: 'red',
   pending: 'grey',
+  skipped: 'grey',
 };
 
 function stepStatusText(s: StepProgress): string {
@@ -68,13 +70,25 @@ function stepStatusText(s: StepProgress): string {
   return s.state;
 }
 
-function failText(s: StepProgress, stage: Stage): string {
-  const f = s.onFailure;
-  if (f.startsWith('back:')) {
-    const id = f.slice(5);
-    return `↩ on failure: back to ${stage.steps.find((x) => x.id === id)?.name ?? id}`;
+/** The step's non-default routes, `changes ↩ Implement (max 3)`, `trivial → end`; '' when it has none. */
+function routeText(s: StepProgress, stage: Stage): string {
+  const nameOf = (id: string): string => stage.steps.find((x) => x.id === id)?.name ?? id;
+  const parts: string[] = [];
+  for (const r of s.results) {
+    if (r.next === defaultRoute(r.ok)) continue;
+    if (r.next === 'end') parts.push(`${r.id} → end`);
+    else if (r.next === 'stop') parts.push(`${r.id} → stop`);
+    else if (r.max > 0 && r.next === s.id) parts.push(`${r.id} ↻ retry (max ${r.max})`);
+    else if (r.max > 0) parts.push(`${r.id} ↩ ${nameOf(r.next)} (max ${r.max})`);
+    else parts.push(`${r.id} → ${nameOf(r.next)}`);
   }
-  return f && f !== 'stop' ? `on failure: ${f}` : '';
+  return parts.join(' · ');
+}
+
+function runStatus(r: StepRun): string {
+  if (r.state === 'done') return r.ok === false ? 'failed, continued' : 'done';
+  if (r.state === 'back') return r.route === 'retry' ? 'retry' : 'sent back';
+  return r.state;
 }
 
 function runLine(r: StepRun): RunLine {
@@ -84,7 +98,7 @@ function runLine(r: StepRun): RunLine {
     run: r,
     glyph: g.glyph,
     tone: g.tone,
-    status: r.state === 'done' ? 'done' : r.state === 'back' ? 'sent back' : r.state,
+    status: runStatus(r),
     note: r.reason || r.note || (r.loops ? `fix round ${r.loops} of 3` : ''),
     hasLog: started,
     canRetry: started && (r.state === 'failed' || r.state === 'stuck'),
@@ -130,13 +144,13 @@ export function buildStageBlocks(
           tone: STEP_TONE[s.state],
           scope: script ? stage.command : s.runsOn,
           gated: s.before === 'approval',
-          failText: failText(s, stage),
+          routeText: routeText(s, stage),
           runs: showRuns(s, script) ? s.runs.map(runLine) : [],
         }),
       ),
       count:
         stage.kind === 'agent'
-          ? `${steps.filter((s) => s.state === 'done').length}/${steps.length}`
+          ? `${steps.filter((s) => s.state === 'done' || s.state === 'skipped').length}/${steps.length}`
           : '',
       mode: modeText(stage),
       release: stage.id === 'release' && k <= idx,

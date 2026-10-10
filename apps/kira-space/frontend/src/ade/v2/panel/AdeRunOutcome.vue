@@ -56,6 +56,29 @@ const STATE_TONE: Record<string, Tone> = {
 const STATE_LABEL: Record<string, string> = { stuck: 'needs you', back: 'sent back' };
 const state = computed(() => STATE_LABEL[props.run.state] ?? props.run.state);
 
+// A step's own result, shown next to the state; the implicit done and failed say nothing more.
+const result = computed(() => {
+  const id = outcome.value?.result ?? '';
+  return id && id !== 'done' && id !== 'failed' ? id : '';
+});
+const resultTone = computed<Tone>(() => (outcome.value?.status === 'done' ? 'green' : 'red'));
+const route = computed(() => {
+  const r = outcome.value?.route ?? '';
+  switch (r) {
+    case '':
+    case 'next':
+      return '';
+    case 'end':
+      return '→ end of stage';
+    case 'stop':
+      return 'stopped';
+    case 'retry':
+      return `↻ ${props.run.note}`;
+    default:
+      return r.startsWith('back:') ? `↩ ${props.run.note}` : `→ ${r}`;
+  }
+});
+
 const short = (sha: string): string => sha.slice(0, 7);
 
 function text(): string {
@@ -94,6 +117,8 @@ async function copy(): Promise<void> {
     <div class="flex items-center gap-2">
       <span class="text-kira-sm text-muted-foreground">{{ title }}</span>
       <AdeChip :label="state" :tone="STATE_TONE[run.state] ?? 'grey'" />
+      <span v-if="result" data-testid="ade-outcome-result"><AdeChip :label="result" :tone="resultTone" /></span>
+      <span v-if="route" class="text-kira-sm text-muted-foreground" data-testid="ade-outcome-route">{{ route }}</span>
       <AdeChip
         v-if="rebase"
         :label="rebase.verified ? 'verified' : 'not verified'"
