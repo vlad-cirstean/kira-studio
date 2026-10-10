@@ -5,6 +5,8 @@ import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -30,6 +32,7 @@ import { useFileTreeStore } from './state/fileTree';
 import { useRepoHeadsStore } from './state/repoHeads';
 import { useRepoLinksStore } from './state/repoLinks';
 import { useReposDialogStore } from './state/reposDialog';
+import { useRepoVisibilityStore } from './state/repoVisibility';
 import { useRepoPanelTabStore, useRepoSearchStore } from './state/search';
 import { useWorktreesStore, worktreeLabel } from './state/worktrees';
 
@@ -42,6 +45,7 @@ const repoHeadsStore = useRepoHeadsStore();
 const worktreesStore = useWorktreesStore();
 const fileTreeStore = useFileTreeStore();
 const repoLinksStore = useRepoLinksStore();
+const visibility = useRepoVisibilityStore();
 const repoPanelTabStore = useRepoPanelTabStore();
 const repoSearchStore = useRepoSearchStore();
 const terminalsStore = useTerminalsStore();
@@ -101,7 +105,7 @@ function worktreeRecordId(path: string): string {
 // anchor's twisty (`worktreeEntries` below). §4.4: reads this panel's own PanelShell search box
 // (`local.repoSearch`), not the Studio tree's own `treeState.search`.
 const filteredRepos = computed<RepoSummary[]>(() => {
-  const topLevel = codeReposStore.records.filter((r) => !repoLinksStore.worktreeParentId(r.id));
+  const topLevel = visibility.listed;
   const query = local.repoSearch.trim().toLowerCase();
   if (!query) return topLevel;
   return topLevel.filter((r) => r.name.toLowerCase().includes(query));
@@ -117,8 +121,19 @@ async function onRenameRepo(id: string, currentName: string): Promise<void> {
   await codeReposStore.renameCodeRepo(id, name.trim());
 }
 
-async function onRemoveRepo(id: string): Promise<void> {
-  await codeReposStore.removeCodeRepo(id);
+async function onRemoveRepo(id: string, name: string): Promise<void> {
+  await codeReposStore.confirmRemoveCodeRepo(id, name);
+}
+
+// Same calls as the row's Close; collapse first so the lease release is synchronous.
+function closeRepo(id: string): void {
+  worktreesStore.collapseRepoWorktrees(id);
+  workspaceStore.closeRepoWorkspace(id);
+}
+
+async function onHideRepo(id: string): Promise<void> {
+  await codeReposStore.setCodeRepoHidden(id, true);
+  closeRepo(id);
 }
 
 // P107 I2-20: the Rename…/Close/Remove triple onRepoContextMenu and onWorktreeContextMenu below
@@ -195,17 +210,29 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
         run: () => codeReposStore.setCodeRepoColor(repo.id, color),
       })),
     },
+    repo.hidden
+      ? {
+          type: 'item' as const,
+          id: 'show',
+          label: 'Show',
+          icon: 'eye',
+          run: () => codeReposStore.setCodeRepoHidden(repo.id, false),
+        }
+      : {
+          type: 'item' as const,
+          id: 'hide',
+          label: 'Hide',
+          icon: 'eye-closed',
+          run: () => onHideRepo(repo.id),
+        },
     { type: 'separator' as const },
     ...recordMenuItems(repo, {
       rename: () => onRenameRepo(repo.id, repo.name),
       // P82 §8.3: collapse first, so the lease release is synchronous with the close instead of a
       // watch flush later — the same reason quickOpen.ts:178 exposes dropQuickOpen alongside its
       // own watch. The §6.6 watch would collapse it anyway.
-      close: () => {
-        worktreesStore.collapseRepoWorktrees(repo.id);
-        workspaceStore.closeRepoWorkspace(repo.id);
-      },
-      remove: () => onRemoveRepo(repo.id),
+      close: () => closeRepo(repo.id),
+      remove: () => onRemoveRepo(repo.id, repo.name),
     }),
   ];
   contextMenuStore.openContextMenu(e, items);
@@ -249,13 +276,10 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
     items.push(
       ...recordMenuItems(record, {
         rename: () => onRenameRepo(record.id, record.name),
-        close: () => {
-          worktreesStore.collapseRepoWorktrees(record.id);
-          workspaceStore.closeRepoWorkspace(record.id);
-        },
+        close: () => closeRepo(record.id),
         // Removes the code_repos record, never the worktree on disk — the nested row survives it,
         // since it comes from `git worktree list`, not from codeReposState.
-        remove: () => onRemoveRepo(record.id),
+        remove: () => onRemoveRepo(record.id, record.name),
       }),
     );
   }
@@ -312,6 +336,8 @@ const panelSearch = computed<string>({
   },
 });
 const panelEmpty = computed(() => codeReposStore.records.length === 0);
+// Every top-level repo hidden and Show hidden off: the list is empty by choice, not for lack of imports.
+const allHidden = computed(() => visibility.listed.length === 0 && visibility.hasHidden);
 const panelSearchable = computed(() => tab.value !== 'review');
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
 const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
@@ -367,6 +393,15 @@ onUnmounted(() => {
         @click="toggleSearch"
       />
       <TooltipIconButton
+        v-if="tab === 'repos' && (visibility.hasHidden || visibility.showHidden)"
+        :icon="visibility.showHidden ? 'eye' : 'eye-closed'"
+        :label="visibility.showHidden ? 'Hide hidden repositories' : 'Show hidden repositories'"
+        :aria-pressed="visibility.showHidden"
+        :data-active="visibility.showHidden"
+        data-testid="repos-show-hidden"
+        @click="visibility.showHidden = !visibility.showHidden"
+      />
+      <TooltipIconButton
         v-if="tab === 'repos'"
         icon="repo"
         label="Manage repositories…"
@@ -405,11 +440,24 @@ onUnmounted(() => {
       <div class="min-h-0 flex-1">
         <div class="h-full flex flex-col min-h-0">
         <section v-if="tab === 'repos'" class="flex-1 min-h-0 overflow-y-auto" data-testid="repo-section">
-          <div class="flex flex-col" role="listbox" aria-label="Repositories">
+          <Empty v-if="allHidden" class="p-6" data-testid="repos-all-hidden">
+            <EmptyHeader>
+              <EmptyMedia><CodiconIcon name="eye-closed" :size="24" /></EmptyMedia>
+              <EmptyTitle>All repositories are hidden</EmptyTitle>
+              <EmptyDescription>They stay imported and usable.</EmptyDescription>
+            </EmptyHeader>
+            <Button variant="dialog" size="kira-lg" data-testid="repos-show-hidden-empty" @click="visibility.showHidden = true">
+              Show hidden
+            </Button>
+          </Empty>
+          <div v-else class="flex flex-col" role="listbox" aria-label="Repositories">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <div
                 class="relative h-row flex items-center gap-1 px-1.5 cursor-default select-none"
-                :class="[isActive(repo.id) ? 'bg-select' : 'hover:bg-hover', { active: isActive(repo.id) }]"
+                :class="[
+                  isActive(repo.id) ? 'bg-select' : 'hover:bg-hover',
+                  { active: isActive(repo.id), 'text-muted-foreground': repo.hidden },
+                ]"
                 data-testid="repo-row"
                 :data-repo-id="repo.id"
                 role="option"
@@ -446,6 +494,17 @@ onUnmounted(() => {
                      size/colour
                      pair as `.worktree-badge` below, so a collapsed row's branch and its expanded
                      children's read as the same class of information. -->
+                <Tooltip v-if="repo.hidden">
+                  <TooltipTrigger as-child>
+                    <CodiconIcon
+                      name="eye-closed"
+                      :size="13"
+                      class="shrink-0 text-subtle"
+                      data-testid="repo-hidden-mark"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>Hidden</TooltipContent>
+                </Tooltip>
                 <Tooltip v-if="repoHeadsStore.repoHeadLabel(repo.id)">
                   <TooltipTrigger as-child>
                     <span class="repo-head flex-none min-w-0 max-w-5/12 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-subtle">

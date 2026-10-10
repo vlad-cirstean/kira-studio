@@ -2,10 +2,13 @@ import type { PaletteColor } from '@shared/domain/color';
 import { canonicalPath } from '@shared/domain/path';
 import type { RepoSummary } from '@shared/domain/repo';
 import { connColorVar } from '@theme/connColor';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import { queryClient } from '@workbench/state/queryClient';
 import { moveId } from '@workbench/util/useSortableReorder';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
+import { reposKey } from '../repo/state/reposQueries';
 import { useWorkspaceStore } from './workspace';
 
 /** Tint for a repo chip: set `style` and `class` together. `'none'` falls back to neutral chrome. */
@@ -41,6 +44,7 @@ export const useCodeReposStore = defineStore('coderepos', () => {
   // instance before this setup body runs, so this nested call correctly resolves to it without
   // needing its own explicit instance (state/pinia.ts's own header comment).
   const workspaceStore = useWorkspaceStore();
+  const confirmDialogStore = useConfirmDialogStore();
 
   function codeRepoRecord(id: string | null | undefined): RepoSummary | undefined {
     if (!id) return undefined;
@@ -105,6 +109,40 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     const repo = await control.codeWorkspaceSetRepoColor(id, color);
     const idx = state.records.findIndex((r) => r.id === id);
     if (idx >= 0) state.records[idx] = repo;
+  }
+
+  async function setCodeRepoHidden(id: string, hidden: boolean): Promise<void> {
+    upsertRecord(await control.codeWorkspaceSetRepoHidden(id, hidden));
+  }
+
+  /** Scan folder that imported the repo, undefined for a one-by-one import or an unreadable config. */
+  async function importFolderOf(id: string): Promise<string | undefined> {
+    try {
+      const { repos } = await queryClient.fetchQuery({
+        queryKey: reposKey,
+        queryFn: () => control.adeTaskRepos(),
+        staleTime: Number.POSITIVE_INFINITY,
+      });
+      const source = repos.find((r) => r.codeRepoId === id)?.source;
+      return source && source !== 'added' ? source : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Confirms, then removes. A folder-sourced repo comes back on the folder's next rescan, so the
+   *  message points at Hide. Resolves true when removed. */
+  async function confirmRemoveCodeRepo(id: string, name: string): Promise<boolean> {
+    const folder = await importFolderOf(id);
+    const rescan = folder
+      ? ` A rescan of ${folder} imports it again; hide it to keep it out of the list.`
+      : '';
+    const ok = await confirmDialogStore.confirmDialog(
+      `Remove repository "${name}" from Kira Space? Files on disk stay.${rescan}`,
+      { danger: true, confirmLabel: 'Remove' },
+    );
+    if (ok) await removeCodeRepo(id);
+    return ok;
   }
 
   /** Optimistic: the new order shows at once in ade's tab strip and the Git panel (both read
@@ -176,12 +214,14 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     codeRepoRecord,
     colorOf,
     setCodeRepoColor,
+    setCodeRepoHidden,
     hydrateCodeRepos,
     initCodeRepos,
     importRepoViaDialog,
     renameCodeRepo,
     reorderCodeRepos,
     removeCodeRepo,
+    confirmRemoveCodeRepo,
     codeRepoRecordForPath,
     openRepoAtPath,
   };

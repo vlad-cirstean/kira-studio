@@ -5,10 +5,12 @@ import { control } from '../../bridge/control';
 import { useCodeReposStore } from '../../state/coderepos';
 import { useWorkspaceStore } from '../../state/workspace';
 import { gitTransportFor, onTransportEvicted, RELEASE_RETRY_MS } from '../git/transport';
+import { useRepoVisibilityStore } from './repoVisibility';
 
 export const useRepoHeadsStore = defineStore('repoHeads', () => {
   const codeReposStore = useCodeReposStore();
   const workspaceStore = useWorkspaceStore();
+  const visibility = useRepoVisibilityStore();
 
   // P83 plan §12.3: every repo row's checked-out branch, session-scoped and module-level — same
   // shape as worktrees.ts's byRepo/search.ts's repoSearchView. `null` means "known, and there is
@@ -36,13 +38,15 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
 
   let warned = false;
 
-  /** One batched `RepoHeads` call — every row when `ids` is omitted (mount, a records change), one
-   *  row for a `refsChanged` event (§12.3 trigger 3, a one-row `RepoHeads` call over the same
-   *  batched method). No coalescing: each trigger fires at most once per its own event, nothing
-   *  bursts this. */
+  /** One batched `RepoHeads` call — every listed row when `ids` is omitted (mount, a records
+   *  change; hidden repos stay out so they cost no git spawn), one row for a `refsChanged` event
+   *  (§12.3 trigger 3, a one-row `RepoHeads` call over the same batched method). No coalescing:
+   *  each trigger fires at most once per its own event, nothing bursts this. */
   async function refreshRepoHeads(ids?: string[]): Promise<void> {
+    const target = ids ?? visibility.listedIds;
+    if (target.length === 0) return;
     try {
-      const rows = await control.codeWorkspaceRepoHeads(ids);
+      const rows = await control.codeWorkspaceRepoHeads(target);
       for (const row of rows) byRepoId.set(row.id, row.head);
     } catch (err) {
       // Fired without awaiting from watchers and events; keep the labels already shown.
@@ -54,8 +58,8 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
   // §12.3 trigger 2: an import, a remove, or a P82 worktree switch changes the row set — a new row
   // must not render headless, and a removed one must not linger in the map.
   watch(
-    () => codeReposStore.records,
-    (records) => {
+    () => [codeReposStore.records, visibility.showHidden] as const,
+    ([records]) => {
       const live = new Set(records.map((r) => r.id));
       for (const id of [...byRepoId.keys()]) if (!live.has(id)) byRepoId.delete(id);
       void refreshRepoHeads();
