@@ -199,3 +199,38 @@ test('contract: container size is measured on demand and cached for the session'
   await openContainer(page, 'alpha');
   await expect(page.locator('[data-testid="docker-size-measure"]')).toBeVisible();
 });
+
+test('contract: left-bar origin icons', async ({ relaunch }) => {
+  const rows = contract<
+    Array<{
+      name: string;
+      origin: string;
+      originName: string;
+      composeProject: string;
+      composeService: string;
+    }>
+  >('docker-disk', 'DockerService.Containers#origins');
+  const containers = rows.map((r, i) => container(`c-${i}`, r.name, r));
+  const { page } = await setup(relaunch, {}, containers);
+  await openDocker(page);
+
+  const groups = page.locator('[data-testid="docker-group"]');
+  await expect(groups).toHaveCount(2);
+  for (const g of await groups.all()) {
+    await expect(g.locator('[data-testid="docker-group-icon"][data-origin="compose"]')).toHaveCount(
+      1,
+    );
+  }
+
+  for (const r of rows) {
+    const icon = page.locator(
+      `[data-testid="docker-row"][data-name="${r.name}"] [data-testid="docker-origin-icon"]`,
+    );
+    if (r.origin === '' || (r.origin === 'compose' && r.composeProject !== '')) {
+      await expect(icon).toHaveCount(0);
+    } else {
+      await expect(icon).toHaveAttribute('data-origin', r.origin);
+    }
+  }
+  expect(rows.some((r) => r.origin === 'devcontainer' && r.composeProject !== '')).toBe(true);
+});

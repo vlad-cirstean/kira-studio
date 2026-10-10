@@ -10,6 +10,7 @@ import { useContainerAction, useContainers } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { DockerContainer } from '../wire';
 import ListState from './ListState.vue';
+import OriginIcon from './OriginIcon.vue';
 import VirtualList from './VirtualList.vue';
 
 const GROUP_ROW_HEIGHT = 28;
@@ -142,6 +143,7 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         :data-project="row.name"
       >
         <TreeTwisty :expanded="isOpen(row.name)" :has-children="true" @toggle="ui.toggleGroup(row.name)" />
+        <OriginIcon origin="compose" data-testid="docker-group-icon" />
         <button
           type="button"
           class="min-w-0 flex-1 cursor-default overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-semibold text-inherit"
@@ -174,11 +176,18 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         @contextmenu.prevent="onContextMenu($event, row.container)"
       >
         <span class="row-span-1 size-1.5 rounded-full" :class="stateDotClass(row.container.state)" data-testid="docker-state-dot" />
-        <span
-          class="truncate"
-          :class="row.container.state === 'running' ? '' : 'text-muted-foreground'"
-          data-testid="docker-row-name"
-        >{{ row.container.name }}</span>
+        <span class="flex min-w-0 items-center gap-1.5">
+          <span
+            class="truncate"
+            :class="row.container.state === 'running' ? '' : 'text-muted-foreground'"
+            data-testid="docker-row-name"
+          >{{ row.container.name }}</span>
+          <OriginIcon
+            v-if="row.container.origin !== '' && !(row.container.origin === 'compose' && row.grouped)"
+            :origin="row.container.origin"
+            :name="row.container.originName"
+          />
+        </span>
         <span v-if="row.container.state !== 'running'" class="text-right text-kira-sm text-muted-foreground" data-testid="docker-row-state">{{ row.container.state }}</span>
         <span v-else />
         <span class="row-span-2 flex items-center justify-end">

@@ -53,6 +53,8 @@ function container(id: string, name: string, state: string, extra: Record<string
     ports: [],
     composeProject: '',
     composeService: '',
+    origin: '',
+    originName: '',
     networks: ['bridge'],
     ...extra,
   };
@@ -60,8 +62,18 @@ function container(id: string, name: string, state: string, extra: Record<string
 
 function seedContainers() {
   return [
-    container('c-web', 'shop-web-1', 'running', { composeProject: 'shop', composeService: 'web' }),
-    container('c-db', 'shop-db-1', 'running', { composeProject: 'shop', composeService: 'db' }),
+    container('c-web', 'shop-web-1', 'running', {
+      composeProject: 'shop',
+      composeService: 'web',
+      origin: 'compose',
+      originName: 'shop',
+    }),
+    container('c-db', 'shop-db-1', 'running', {
+      composeProject: 'shop',
+      composeService: 'db',
+      origin: 'compose',
+      originName: 'shop',
+    }),
     container('c-solo', 'solo', 'running'),
     container('c-old', 'old-job', 'exited'),
   ];
