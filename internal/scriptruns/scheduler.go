@@ -18,12 +18,16 @@ type Clock interface {
 
 type realClock struct{}
 
-func (realClock) Now() time.Time                         { return time.Now() }
+// Now drops the monotonic reading: it stops during system sleep on some platforms, wall time does not.
+func (realClock) Now() time.Time                         { return time.Now().Round(0) }
 func (realClock) After(d time.Duration) <-chan time.Time { return time.After(d) }
 
 const (
 	// defaultLate is how late a timer may fire before its fire is treated as missed (sleep, clock jump).
 	defaultLate = 60 * time.Second
+	// maxWait caps one timer. Runtime timers can stall during system sleep, so the loop re-reads
+	// wall-clock time at least this often instead of trusting one long timer.
+	maxWait = 30 * time.Second
 )
 
 type entry struct {
@@ -111,7 +115,7 @@ func (s *Scheduler) loop() {
 		var timer <-chan time.Time
 		earliest, ok := s.earliest()
 		if ok {
-			timer = clk.After(max(earliest.Sub(clk.Now()), 0))
+			timer = clk.After(min(max(earliest.Sub(clk.Now()), 0), maxWait))
 			// The clock may have moved between the two reads above.
 			if !clk.Now().Before(earliest) {
 				s.tick(clk.Now())

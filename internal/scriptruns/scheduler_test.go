@@ -246,3 +246,79 @@ func TestSchedulerCloseWhilePending(t *testing.T) {
 		t.Fatal("Close blocked with a timer pending")
 	}
 }
+
+// stallClock models a runtime timer that does not advance during system sleep: wall time jumps with
+// set, but a timer only fires when the test releases it.
+type stallClock struct {
+	mu      sync.Mutex
+	now     time.Time
+	waits   []time.Duration
+	pending []chan time.Time
+}
+
+func (c *stallClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *stallClock) After(d time.Duration) <-chan time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ch := make(chan time.Time, 1)
+	c.waits = append(c.waits, d)
+	c.pending = append(c.pending, ch)
+	return ch
+}
+
+func (c *stallClock) armed() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.waits)
+}
+
+func (c *stallClock) wake(now time.Time) {
+	c.mu.Lock()
+	c.now = now
+	pending := c.pending
+	c.pending = nil
+	c.mu.Unlock()
+	for _, ch := range pending {
+		ch <- now
+	}
+}
+
+func (c *stallClock) waitArmed(t *testing.T, n int) {
+	t.Helper()
+	for i := 0; i < 500 && c.armed() < n; i++ {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if c.armed() < n {
+		t.Fatalf("timers armed = %d, want %d", c.armed(), n)
+	}
+}
+
+func TestSchedulerSurvivesStalledTimer(t *testing.T) {
+	clock := &stallClock{now: time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)}
+	st, rec := &store{}, &recorder{}
+	st.set(sched("a", "0 * * * *", true))
+	s := &Scheduler{Clock: clock, fire: rec.fire, list: st.get, retire: func(string, string) {}}
+	s.Start()
+	defer s.Close()
+
+	clock.waitArmed(t, 1)
+	if clock.waits[0] > maxWait {
+		t.Fatalf("first wait = %v, want <= %v", clock.waits[0], maxWait)
+	}
+	// Asleep 08:10 to 09:50: the 09:00 fire is far too late and is skipped.
+	clock.wake(time.Date(2026, 6, 1, 9, 50, 0, 0, time.UTC))
+	clock.waitArmed(t, 2)
+	if got := rec.snapshot(); len(got) != 0 {
+		t.Fatalf("a missed fire ran: %v", got)
+	}
+	// The 10:00 fire falls while awake and must run on time.
+	clock.wake(time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
+	if got := rec.waitFor(t, 1); got[0] != "a@10:00" {
+		t.Fatalf("fires = %v, want a@10:00", got)
+	}
+}
