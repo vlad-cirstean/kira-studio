@@ -56,7 +56,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
       </DropdownMenu>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-      <Label class="font-normal" :for="n('kind')">Type</Label>
+      <Label :for="n('kind')">Type</Label>
       <NativeSelect
         :id="n('kind')"
         variant="bordered"
@@ -69,7 +69,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         <option value="agent">agent (background)</option>
         <option value="script">script</option>
       </NativeSelect>
-      <Label class="font-normal" :for="n('status')">Task status</Label>
+      <Label :for="n('status')">Task status</Label>
       <NativeSelect
         :id="n('status')"
         variant="bordered"
@@ -91,7 +91,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
           data-testid="ade-wf-stage-session"
           @update:model-value="(v: boolean) => patch({ session: v, prompt: v ? stage.prompt : '' })"
         />
-        <Label class="font-normal" :for="n('session')">Opens an interactive Claude Code session</Label>
+        <Label :for="n('session')">Opens an interactive Claude Code session</Label>
       </div>
       <template v-if="stage.session">
         <Label :for="n('prompt')" class="sr-only">Session prompt</Label>
@@ -107,7 +107,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
     </template>
 
     <div v-else-if="stage.kind === 'script'" class="flex flex-col gap-1.5">
-      <Label :for="n('command')" class="font-normal text-kira-sm text-muted-foreground"
+      <Label :for="n('command')" class="text-kira-sm text-muted-foreground"
         >Command
         <span class="text-subtle"
           >(runs in each branch's worktree; non-zero exit = failed; {task} {jira} {repo} {branch} {worktree} are
@@ -123,7 +123,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         @update:model-value="(v: string | number) => patch({ command: String(v) })"
       />
       <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-        <Label class="font-normal" :for="n('scope')">Runs on</Label>
+        <Label :for="n('scope')">Runs on</Label>
         <NativeSelect
           :id="n('scope')"
           variant="bordered"
@@ -133,7 +133,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         >
           <option v-for="s in scopes" :key="s" :value="s">{{ s }}</option>
         </NativeSelect>
-        <Label class="font-normal" :for="n('fail')">On failure</Label>
+        <Label :for="n('fail')">On failure</Label>
         <NativeSelect
           :id="n('fail')"
           variant="bordered"
@@ -143,7 +143,7 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
         >
           <option v-for="o in FAILURE_OPTIONS" :key="o" :value="o">{{ o }}</option>
         </NativeSelect>
-        <Label class="font-normal" :for="n('timeout')">Timeout</Label>
+        <Label :for="n('timeout')">Timeout</Label>
         <Input
           :id="n('timeout')"
           :model-value="stage.timeout"

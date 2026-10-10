@@ -128,7 +128,7 @@ async function refresh(): Promise<void> {
         class="flex h-control shrink-0 cursor-default items-center gap-1.5 border-b border-border px-1.5 text-kira-sm text-muted-foreground"
       >
         <Checkbox id="docker-show-stopped" v-model="ui.showStopped" data-testid="docker-show-stopped" />
-        <Label for="docker-show-stopped" class="cursor-default font-normal">Show stopped</Label>
+        <Label for="docker-show-stopped" class="cursor-default">Show stopped</Label>
         <span class="ml-auto" data-testid="docker-summary">{{ running }} running<template v-if="stopped"> · {{ stopped }} stopped</template></span>
       </div>
       <ContainerList v-if="ui.section === 'containers'" />

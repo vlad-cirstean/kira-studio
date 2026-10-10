@@ -18,7 +18,7 @@ function onDate(e: Event): void {
     data-testid="ade-history-bar"
   >
     <span class="font-medium">History</span>
-    <Label for="ade-go-to-date" class="font-normal text-muted-foreground">Go to</Label>
+    <Label for="ade-go-to-date" class="text-muted-foreground">Go to</Label>
     <Input
       id="ade-go-to-date"
       type="date"

@@ -90,7 +90,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
       </Button>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-kira-sm text-muted-foreground">
-      <Label class="font-normal" :for="id('scope')">Runs on</Label>
+      <Label :for="id('scope')">Runs on</Label>
       <NativeSelect
         :id="id('scope')"
         variant="bordered"
@@ -100,7 +100,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
       >
         <option v-for="s in scopes" :key="s" :value="s">{{ s }}</option>
       </NativeSelect>
-      <Label class="font-normal" :for="id('gate')">Before it</Label>
+      <Label :for="id('gate')">Before it</Label>
       <NativeSelect
         :id="id('gate')"
         variant="bordered"
@@ -111,7 +111,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         <option value="auto">start automatically</option>
         <option value="approval">wait for my approval</option>
       </NativeSelect>
-      <Label class="font-normal" :for="id('timeout')">Timeout</Label>
+      <Label :for="id('timeout')">Timeout</Label>
       <Input
         :id="id('timeout')"
         :model-value="step.timeout"
@@ -128,7 +128,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
       @update:model-value="setMode"
     />
     <div v-if="smart" class="flex flex-col gap-2" data-testid="ade-wf-step-smart">
-      <Label :for="id('script')" class="font-normal text-kira-sm text-muted-foreground">Smart script</Label>
+      <Label :for="id('script')" class="text-kira-sm text-muted-foreground">Smart script</Label>
       <NativeSelect
         :id="id('script')"
         variant="bordered"
@@ -158,7 +158,7 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
     </div>
     <template v-else>
       <div class="flex flex-col gap-1">
-        <Label :for="id('tools')" class="font-normal text-kira-sm text-muted-foreground"
+        <Label :for="id('tools')" class="text-kira-sm text-muted-foreground"
           >Allowed tools <span class="text-subtle">Passed as --allowedTools; deny rules still win.</span></Label
         >
         <Input

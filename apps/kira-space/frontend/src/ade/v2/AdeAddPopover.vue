@@ -141,9 +141,9 @@ async function pick(b: CandidateBranch): Promise<void> {
         <SecondaryTabs v-model="tab" :items="tabItems" size="kira-lg" class="w-full" />
       </div>
       <div v-if="tab === 'new'" class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 p-3 text-kira-md">
-        <Label for="ade-nw-title" class="font-normal text-muted-foreground">Title</Label>
+        <Label for="ade-nw-title" class="text-muted-foreground">Title</Label>
         <Input id="ade-nw-title" v-model="title" placeholder="What needs doing" data-testid="ade-nw-title" />
-        <Label for="ade-nw-jira" class="font-normal text-muted-foreground">Jira</Label>
+        <Label for="ade-nw-jira" class="text-muted-foreground">Jira</Label>
         <Input
           id="ade-nw-jira"
           v-model="jira"
@@ -177,7 +177,7 @@ async function pick(b: CandidateBranch): Promise<void> {
             />
           </div>
         </template>
-        <Label for="ade-nw-notes" class="font-normal self-start pt-1.5 text-muted-foreground">Notes</Label>
+        <Label for="ade-nw-notes" class="self-start pt-1.5 text-muted-foreground">Notes</Label>
         <Textarea
           id="ade-nw-notes"
           v-model="notes"

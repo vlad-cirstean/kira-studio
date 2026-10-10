@@ -20,7 +20,7 @@ function onDate(e: Event): void {
       <Button variant="dialog" size="kira" class="border-dashed" data-testid="ade-more-week" @click="emit('moreWeek')">
         + week
       </Button>
-      <Label for="ade-add-day" class="font-normal text-kira-sm text-muted-foreground">or date</Label>
+      <Label for="ade-add-day" class="text-kira-sm text-muted-foreground">or date</Label>
       <Input
         id="ade-add-day"
         type="date"

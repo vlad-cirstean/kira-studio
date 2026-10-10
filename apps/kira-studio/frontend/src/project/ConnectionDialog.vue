@@ -24,6 +24,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -638,7 +639,7 @@ const preconnectText = computed({
   <Dialog v-if="draft" :open="true" @update:open="(v) => !v && connectionDialogStore.closeDialog()">
     <DialogContent size="xl" fixed-height data-testid="connection-dialog">
       <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
-      <DialogHeader v-if="step === 'engine'" icon="database" closable close-testid="connection-dialog-close">
+      <DialogHeader v-if="step === 'engine'" icon="database" close-testid="connection-dialog-close">
         <DialogTitle>{{ isEdit ? 'Change engine' : 'New connection' }}</DialogTitle>
         <span class="min-w-0 grow" />
         <Button v-if="isEdit" variant="toolbar" size="kira" @click="step = 'details'">
@@ -648,7 +649,7 @@ const preconnectText = computed({
       </DialogHeader>
       <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
            is identity here, not a control (changed via "Change engine" back to step 1). -->
-      <DialogHeader v-else closable close-testid="connection-dialog-close">
+      <DialogHeader v-else close-testid="connection-dialog-close">
         <span class="flex shrink-0" :class="KIND_ACCENT_CLASS[draft.kind]">
           <EngineIcon :kind="draft.kind" :size="13" />
         </span>
@@ -723,12 +724,12 @@ const preconnectText = computed({
 
           <TabsContent value="General" class="flex flex-col gap-3 p-3">
           <div class="flex gap-2 items-start">
-            <div class="flex flex-col gap-1 flex-2 text-kira-md">
-              <Label class="leading-none text-muted-foreground">Name</Label>
+            <Field class="flex-2">
+              <FieldLabel>Name</FieldLabel>
               <Input v-model="draft.name" class="font-ui" data-testid="connection-name" />
-            </div>
-            <div class="flex flex-col gap-1 flex-none text-kira-md">
-              <Label class="leading-none text-muted-foreground">Color</Label>
+            </Field>
+            <Field class="flex-none">
+              <FieldLabel>Color</FieldLabel>
               <fieldset
                 class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
                 aria-label="Connection color"
@@ -746,7 +747,7 @@ const preconnectText = computed({
                   <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
                 </Tooltip>
               </fieldset>
-            </div>
+            </Field>
           </div>
           <span v-if="fieldErrors.name" class="text-error text-kira-sm leading-normal">{{ fieldErrors.name }}</span>
 
@@ -755,8 +756,8 @@ const preconnectText = computed({
           </p>
 
           <div class="flex items-end gap-2">
-          <div class="flex flex-col gap-1 flex-1 text-kira-md">
-            <Label class="leading-none text-muted-foreground">Mode</Label>
+          <Field class="flex-1">
+            <FieldLabel>Mode</FieldLabel>
             <SecondaryTabs
               variant="segmented"
               size="kira-lg"
@@ -764,7 +765,7 @@ const preconnectText = computed({
               :items="MODE_ITEMS"
               @update:model-value="(v) => setMode(v as 'fields' | 'uri')"
             />
-          </div>
+          </Field>
           <Popover v-if="draft.mode === 'fields' && !isFileStyle" v-model:open="pasteOpen">
             <PopoverTrigger as-child>
               <Button variant="dialog" size="kira-lg" data-testid="connection-paste-credentials">
@@ -784,8 +785,8 @@ const preconnectText = computed({
           </div>
 
           <template v-if="draft.mode === 'fields' && isFileStyle">
-            <div class="flex flex-col gap-1 flex-1 text-kira-md">
-              <Label class="leading-none text-muted-foreground">Database file</Label>
+            <Field class="flex-1">
+              <FieldLabel>Database file</FieldLabel>
               <div class="flex items-center gap-1">
                 <div class="flex-1 min-w-0">
                   <Input
@@ -799,72 +800,72 @@ const preconnectText = computed({
                   Browse…
                 </Button>
               </div>
-            </div>
+            </Field>
             <span v-if="fieldErrors.database" class="text-error text-kira-sm leading-normal">{{ fieldErrors.database }}</span>
           </template>
           <template v-else-if="draft.mode === 'fields'">
             <div v-if="!isAwsStyle" class="flex gap-2 items-start">
-              <div class="flex flex-col gap-1 flex-1 text-kira-md">
-                <Label class="leading-none text-muted-foreground">Host</Label>
+              <Field class="flex-1">
+                <FieldLabel>Host</FieldLabel>
                 <Input
                   :model-value="draft.host ?? ''"
                   class="font-data"
                   data-testid="connection-host"
                   @update:model-value="draft.host = String($event)"
                 />
-              </div>
-              <div class="flex flex-col gap-1 flex-none basis-24 text-kira-md">
-                <Label class="leading-none text-muted-foreground">Port</Label>
+              </Field>
+              <Field class="flex-none basis-24">
+                <FieldLabel>Port</FieldLabel>
                 <NumberStepperInput
                   :model-value="draft.port != null ? String(draft.port) : ''"
                   data-testid="connection-port"
                   @update:model-value="(v: string | number) => setPort(String(v))"
                 />
-              </div>
+              </Field>
             </div>
             <span v-if="fieldErrors.host" class="text-error text-kira-sm leading-normal">{{ fieldErrors.host }}</span>
             <div v-if="isAwsStyle" class="flex gap-2 items-start">
-              <div class="flex flex-col gap-1 flex-1 text-kira-md">
-                <Label class="leading-none text-muted-foreground">Region</Label>
+              <Field class="flex-1">
+                <FieldLabel>Region</FieldLabel>
                 <Input
                   :model-value="draft.database ?? ''"
                   class="font-data"
                   data-testid="connection-database"
                   @update:model-value="draft.database = String($event)"
                 />
-              </div>
-              <div class="flex flex-col gap-1 flex-1 text-kira-md">
-                <Label class="leading-none text-muted-foreground">AWS profile (optional)</Label>
+              </Field>
+              <Field class="flex-1">
+                <FieldLabel>AWS profile (optional)</FieldLabel>
                 <Input
                   :model-value="draft.username ?? ''"
                   class="font-data"
                   data-testid="connection-username"
                   @update:model-value="draft.username = String($event)"
                 />
-              </div>
+              </Field>
             </div>
             <template v-else>
-              <div class="flex flex-col gap-1 flex-1 text-kira-md">
-                <Label class="leading-none text-muted-foreground">Database</Label>
+              <Field class="flex-1">
+                <FieldLabel>Database</FieldLabel>
                 <Input
                   :model-value="draft.database ?? ''"
                   class="font-data"
                   data-testid="connection-database"
                   @update:model-value="draft.database = String($event)"
                 />
-              </div>
+              </Field>
               <div class="flex gap-2 items-start">
-                <div class="flex flex-col gap-1 flex-1 text-kira-md">
-                  <Label class="leading-none text-muted-foreground">User</Label>
+                <Field class="flex-1">
+                  <FieldLabel>User</FieldLabel>
                   <Input
                     :model-value="draft.username ?? ''"
                     class="font-data"
                     data-testid="connection-username"
                     @update:model-value="draft.username = String($event)"
                   />
-                </div>
-                <div class="flex flex-col gap-1 flex-1 text-kira-md">
-                  <Label class="leading-none text-muted-foreground">Password</Label>
+                </Field>
+                <Field class="flex-1">
+                  <FieldLabel>Password</FieldLabel>
                   <div class="flex items-center gap-1">
                     <div class="flex-1 min-w-0">
                       <Input
@@ -882,13 +883,13 @@ const preconnectText = computed({
                       @click="onEyeClick"
                     />
                   </div>
-                </div>
+                </Field>
               </div>
             </template>
           </template>
           <template v-else>
-            <div class="flex flex-col gap-1 flex-1 text-kira-md">
-              <Label class="leading-none text-muted-foreground">Connection URI</Label>
+            <Field class="flex-1">
+              <FieldLabel>Connection URI</FieldLabel>
               <div class="flex items-center gap-1">
                 <div class="flex-1 min-w-0">
                   <Input
@@ -906,7 +907,7 @@ const preconnectText = computed({
                   @click="onEyeClick"
                 />
               </div>
-            </div>
+            </Field>
             <p class="font-data uri-note text-muted-foreground text-kira-sm">{{ uriNote }}</p>
           </template>
           </TabsContent>
@@ -943,8 +944,8 @@ const preconnectText = computed({
             </span>
           </Label>
 
-          <div class="flex flex-col gap-1 flex-1 text-kira-md">
-            <Label class="leading-none text-muted-foreground">Throttle commands <span class="text-subtle">— per second</span></Label>
+          <Field class="flex-1">
+            <FieldLabel>Throttle commands <span class="text-subtle">— per second</span></FieldLabel>
             <div class="w-24">
               <NumberStepperInput
                 :min="0"
@@ -963,12 +964,12 @@ const preconnectText = computed({
               0 disables the limit. Reads served from cache are never throttled, and connecting is
               never throttled. Applies immediately to a connected connection.
             </span>
-          </div>
+          </Field>
           </TabsContent>
 
           <TabsContent value="Pre-connect" class="flex flex-col gap-3 p-3">
-          <div class="flex flex-col gap-1 flex-1 text-kira-md">
-            <Label class="leading-none text-muted-foreground">Pre-connect command <span class="text-subtle">— optional</span></Label>
+          <Field class="flex-1">
+            <FieldLabel>Pre-connect command <span class="text-subtle">— optional</span></FieldLabel>
             <Textarea
               v-model="preconnectText"
               class="font-data"
@@ -984,7 +985,7 @@ const preconnectText = computed({
               This command runs on your machine with your permissions every time this connection
               connects.
             </span>
-          </div>
+          </Field>
           <span v-if="fieldErrors.preconnect" class="text-error text-kira-sm leading-normal">{{ fieldErrors.preconnect }}</span>
 
           <Label v-if="preconnectText" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
@@ -1023,12 +1024,9 @@ const preconnectText = computed({
             </span>
           </Label>
 
-          <div class="flex flex-col gap-1 flex-1 text-kira-md">
-            <Label
-              class="leading-none text-muted-foreground"
-              >Description
-              <span class="text-subtle">— what this database is for, read verbatim by an AI client</span></Label
-            >
+          <Field class="flex-1">
+            <FieldLabel>Description
+              <span class="text-subtle">— what this database is for, read verbatim by an AI client</span></FieldLabel>
             <Textarea
               v-model="draft.mcpDescription"
               class="font-data"
@@ -1039,7 +1037,7 @@ const preconnectText = computed({
               @keydown="wrapSelectionOnType"
             />
             <span v-if="fieldErrors.mcpDescription" class="text-error text-kira-sm leading-normal">{{ fieldErrors.mcpDescription }}</span>
-          </div>
+          </Field>
 
           <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
@@ -1057,8 +1055,8 @@ const preconnectText = computed({
             </span>
           </Label>
 
-          <div class="flex flex-col gap-1 flex-1 text-kira-md">
-            <Label class="leading-none text-muted-foreground">Read <span class="text-subtle">— SELECT and its engine equivalents</span></Label>
+          <Field class="flex-1">
+            <FieldLabel>Read <span class="text-subtle">— SELECT and its engine equivalents</span></FieldLabel>
             <SecondaryTabs
               variant="segmented"
               size="kira-lg"
@@ -1067,9 +1065,9 @@ const preconnectText = computed({
               data-testid="connection-mcp-read"
               @update:model-value="(v) => draft && (draft.mcpReadMode = v as McpPermissionMode)"
             />
-          </div>
-          <div class="flex flex-col gap-1 flex-1 text-kira-md">
-            <Label class="leading-none text-muted-foreground">Write <span class="text-subtle">— INSERT/UPDATE/DELETE and equivalents</span></Label>
+          </Field>
+          <Field class="flex-1">
+            <FieldLabel>Write <span class="text-subtle">— INSERT/UPDATE/DELETE and equivalents</span></FieldLabel>
             <SecondaryTabs
               variant="segmented"
               size="kira-lg"
@@ -1078,9 +1076,9 @@ const preconnectText = computed({
               data-testid="connection-mcp-write"
               @update:model-value="(v) => draft && (draft.mcpWriteMode = v as McpPermissionMode)"
             />
-          </div>
-          <div class="flex flex-col gap-1 flex-1 text-kira-md">
-            <Label class="leading-none text-muted-foreground">DDL <span class="text-subtle">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
+          </Field>
+          <Field class="flex-1">
+            <FieldLabel>DDL <span class="text-subtle">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></FieldLabel>
             <SecondaryTabs
               variant="segmented"
               size="kira-lg"
@@ -1089,7 +1087,7 @@ const preconnectText = computed({
               data-testid="connection-mcp-ddl"
               @update:model-value="(v) => draft && (draft.mcpDdlMode = v as McpPermissionMode)"
             />
-          </div>
+          </Field>
           <p class="text-subtle text-kira-sm leading-normal w-full">
             A statement this app cannot classify is treated as whichever of the three is strictest.
             These govern the MCP server only — the Read-only flag on the Advanced tab is what

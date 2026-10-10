@@ -121,7 +121,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
     data-testid="ade-task-tab"
   >
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
-      <Label for="ade-task-name" class="font-normal text-kira-sm text-muted-foreground">Name</Label>
+      <Label for="ade-task-name" class="text-kira-sm text-muted-foreground">Name</Label>
       <Input
         id="ade-task-name"
         v-model="name"
@@ -169,7 +169,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
             data-testid="ade-task-parked"
             @update:model-value="(v: boolean) => write({ kind: v ? 'parked' : 'task' })"
           />
-          <Label for="ade-task-parked" class="font-normal text-kira-md">Not merging</Label>
+          <Label for="ade-task-parked" class="text-kira-md">Not merging</Label>
           <span class="text-kira-sm text-subtle">stays on the plan, never merged</span>
         </div>
       </template>

@@ -235,7 +235,7 @@ onBeforeUnmount(() => {
   <div v-if="draft.draft" ref="root" class="flex h-full min-h-0 flex-col gap-3" data-testid="ade-wf-form">
     <AdeWorkflowSaveBar :dirty="draft.dirty" :saving="save.isPending.value" @save="saveNow" @discard="discard" />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Label for="ade-wf-form-name" class="font-normal text-kira-sm text-muted-foreground">Name</Label>
+      <Label for="ade-wf-form-name" class="text-kira-sm text-muted-foreground">Name</Label>
       <Input
         id="ade-wf-form-name"
         :model-value="draft.draft.name"
@@ -251,7 +251,7 @@ onBeforeUnmount(() => {
           data-testid="ade-wf-form-space"
           @update:model-value="(v: boolean) => draft.patchWorkflow({ kiraSpaceMcp: v })"
         />
-        <Label class="font-normal" for="ade-wf-form-space" title="Agent steps can declare repos on the task and request branches and worktrees through Kira Space.">Kira Space tools for agents</Label>
+        <Label for="ade-wf-form-space" title="Agent steps can declare repos on the task and request branches and worktrees through Kira Space.">Kira Space tools for agents</Label>
       </div>
     </div>
     <div class="flex items-center gap-2" data-testid="ade-wf-strip-row">

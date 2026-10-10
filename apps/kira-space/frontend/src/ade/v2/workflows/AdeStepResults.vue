@@ -38,7 +38,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           data-testid="ade-wf-result-id"
           @update:model-value="(v: string | number) => draft.changeResult(stageId, step.id, r.id, { id: String(v) })"
         />
-        <Label :for="id('ok', r.id)" class="font-normal text-kira-sm text-muted-foreground">ok</Label>
+        <Label :for="id('ok', r.id)" class="text-kira-sm text-muted-foreground">ok</Label>
         <Switch
           :id="id('ok', r.id)"
           :model-value="r.ok"
@@ -65,7 +65,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
         @update:model-value="(v: string | number) => draft.changeResult(stageId, step.id, r.id, { description: String(v) })"
       />
       <div class="flex flex-wrap items-center gap-2 text-kira-sm text-muted-foreground">
-        <Label class="font-normal" :for="id('route', r.id)">Goes to</Label>
+        <Label :for="id('route', r.id)">Goes to</Label>
         <NativeSelect
           :id="id('route', r.id)"
           variant="bordered"
@@ -79,7 +79,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           <option v-if="!r.ok" value="stop">stop</option>
         </NativeSelect>
         <template v-if="r.max > 0">
-          <Label class="font-normal" :for="id('max', r.id)">at most</Label>
+          <Label :for="id('max', r.id)">at most</Label>
           <Input
             :id="id('max', r.id)"
             type="number"

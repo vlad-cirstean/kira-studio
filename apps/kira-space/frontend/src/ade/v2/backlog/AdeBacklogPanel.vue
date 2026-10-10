@@ -92,7 +92,7 @@ function saveNotes(_id: string, value: string): void {
       </div>
     </header>
     <div class="grid shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-3 text-kira-md">
-      <Label for="ade-backlog-title-input" class="font-normal text-kira-sm text-muted-foreground">Title</Label>
+      <Label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">Title</Label>
       <Input
         id="ade-backlog-title-input"
         v-model="title"
