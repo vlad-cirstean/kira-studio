@@ -192,6 +192,9 @@
     return socket;
   };
   g.__kiraStreamSeen = seen;
+  g.__kiraPushFrame = (base64) => {
+    socket.dispatchEvent(new MessageEvent('message', { data: fromBase64(base64).buffer }));
+  };
   g.__kiraReleaseCancelled = () => {
     held.splice(0).forEach((reply) => {
       reply();

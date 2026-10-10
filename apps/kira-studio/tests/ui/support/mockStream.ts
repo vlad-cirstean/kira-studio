@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
-import { DATA_OP } from '@shared/protocol/data-ops';
+import { DATA_OP, PORT_EVENT } from '@shared/protocol/data-ops';
 import {
   createDocumentPageBuilder,
   createKeyValuePageBuilder,
@@ -24,6 +24,30 @@ export interface SeenPortRequest {
  *  until the renderer sends `opsCancel`, so a spec proves the view recovered because of the
  *  cancel, not because a canned reply timed out. */
 export type StudioPortSnapshot = PortSnapshot & { untilCancel?: true };
+
+/** Pushes one engine `cache:stats` event to the open stream, as the engine does on a change. */
+export async function pushCacheStats(
+  page: Page,
+  stats: {
+    l2Bytes: number;
+    l2BudgetBytes: number;
+    l2Entries: number;
+    l2Hits: number;
+    l2Misses: number;
+    l3Entries: number;
+  },
+): Promise<void> {
+  const { bytes } = encodeFrame({
+    kind: 'evt',
+    topic: PORT_EVENT.cacheStats,
+    payload: { type: 'cacheStats', ...stats },
+  });
+  const base64 = toBase64(bytes);
+  await page.evaluate(
+    (b) => (globalThis as unknown as { __kiraPushFrame(b: string): void }).__kiraPushFrame(b),
+    base64,
+  );
+}
 
 export interface MockStreamHandle {
   /** Every `PortRequest` the UI actually issued, in order — ported from
