@@ -145,7 +145,7 @@ func main() {
 	}
 	attachDialogs(app, windowToActOn)
 
-	appshell.RegisterGitStream(app, wired.GitRouter())
+	appshell.RegisterGitStream(app, wired.GitRouter(), wired.CredentialRelay)
 
 	winDeps := shell.WindowOpenerDeps{
 		App:        app,

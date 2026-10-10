@@ -122,26 +122,14 @@ func TestCredentialPrompt(t *testing.T) {
 
 	run := func(secret string) gitsession.RemoteOpResult {
 		done := make(chan gitsession.RemoteOpResult, 1)
-		before := len(r.gs.Events("credential.request"))
 		go func() {
 			var res gitsession.RemoteOpResult
 			_ = r.gs.Request("remote.run", gitrpc.RemoteRunParams{RepoID: id, RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"}}, &res)
 			done <- res
 		}()
-		testx.WaitUntil(t, wait, func() bool { return len(r.gs.Events("credential.request")) > before })
-		ev := r.gs.Events("credential.request")[before]
-		var req struct {
-			RequestID string `json:"requestId"`
-			RepoID    string `json:"repoId"`
-			Prompt    string `json:"prompt"`
-			Masked    bool   `json:"masked"`
-		}
-		ev.Decode(t, &req)
-		if !req.Masked || !strings.Contains(req.Prompt, "Password") || req.RepoID != id {
-			t.Fatalf("credential.request = %+v, want a masked password prompt for %s", req, id)
-		}
-		if err := r.gs.Request("credential.provide", gitrpc.CredentialProvideParams{RequestID: req.RequestID, Secret: &secret}, nil); err != nil {
-			t.Fatalf("credential.provide: %v", err)
+		req := answer(t, r.app, secret)
+		if !req.Masked || !strings.Contains(req.Prompt, "Password") || req.RepoLabel != "x" {
+			t.Fatalf("credential prompt = %+v, want a masked password prompt for repo x", req)
 		}
 		select {
 		case res := <-done:

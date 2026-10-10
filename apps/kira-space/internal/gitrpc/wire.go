@@ -408,14 +408,6 @@ type RemoteCancelResult struct {
 	Cancelled bool `json:"cancelled"`
 }
 
-// CredentialProvideParams is credential.provide's own request (D2/D4) — Secret is nil for a
-// dismissal, never omitted (the `null`-vs-absent discipline G4 D5 set for this chapter: "dismissed"
-// is a value the wire carries, not an absence the server has to infer).
-type CredentialProvideParams struct {
-	RequestID string  `json:"requestId"`
-	Secret    *string `json:"secret"`
-}
-
 // ---------------------------------------------------------------------------------------
 // G11 — incremental review: review.files/review.fileDiff/review.mark (D1, D13). Results are
 // gitsession's own wire-shaped types (RangeFilesResult, ReviewFileDiffResult, ReviewFileStatus) —

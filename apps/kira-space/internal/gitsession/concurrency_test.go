@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
@@ -358,112 +357,6 @@ func TestConcurrent_RemoteOpSlotAdmitsExactlyOne(t *testing.T) {
 		t.Fatalf("winners among %d simultaneous claims after release = %d, want exactly 1", n, got)
 	}
 	slot.release()
-}
-
-// TestConcurrent_CredentialWaiterFourExits is a pin against D3's `closed` flag: AskCredential's own
-// four exits (answered, dismissed, ctx cancellation, Conn.Close) raced against each other on one
-// connection must each resolve independently, every one but the answer reporting ("", false), and
-// leave the waiter map empty.
-func TestConcurrent_CredentialWaiterFourExits(t *testing.T) {
-	var idsMu sync.Mutex
-	ids := map[string]string{} // label (carried in RepoID) -> minted requestId
-
-	c := NewConn("c1", "client-1", "label-1", func(method string, payload any) {
-		if method != "credential.request" {
-			return
-		}
-		p, ok := payload.(credentialRequestPayload)
-		if !ok {
-			return
-		}
-		idsMu.Lock()
-		ids[p.RepoID] = p.RequestID
-		idsMu.Unlock()
-	})
-
-	type outcome struct {
-		secret string
-		ok     bool
-	}
-	var resMu sync.Mutex
-	results := map[string]outcome{}
-	record := func(label, secret string, ok bool) {
-		resMu.Lock()
-		results[label] = outcome{secret, ok}
-		resMu.Unlock()
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(4)
-	go func() {
-		defer wg.Done()
-		secret, ok := c.AskCredential(context.Background(), gitaskpass.Request{RepoID: "answered"})
-		record("answered", secret, ok)
-	}()
-	go func() {
-		defer wg.Done()
-		secret, ok := c.AskCredential(context.Background(), gitaskpass.Request{RepoID: "dismissed"})
-		record("dismissed", secret, ok)
-	}()
-	go func() {
-		defer wg.Done()
-		ctx, cancel := context.WithCancel(context.Background())
-		go func() { time.Sleep(5 * time.Millisecond); cancel() }()
-		secret, ok := c.AskCredential(ctx, gitaskpass.Request{RepoID: "cancelled"})
-		record("cancelled", secret, ok)
-	}()
-	go func() {
-		defer wg.Done()
-		secret, ok := c.AskCredential(context.Background(), gitaskpass.Request{RepoID: "closed"})
-		record("closed", secret, ok)
-	}()
-
-	deadline := time.After(2 * time.Second)
-	for {
-		idsMu.Lock()
-		n := len(ids)
-		idsMu.Unlock()
-		if n == 4 {
-			break
-		}
-		select {
-		case <-deadline:
-			t.Fatal("not all four credential.request events were emitted in time")
-		case <-time.After(2 * time.Millisecond):
-		}
-	}
-
-	idsMu.Lock()
-	answeredID, dismissedID := ids["answered"], ids["dismissed"]
-	idsMu.Unlock()
-
-	const secret = "s3cr3t"
-	if !c.ProvideCredential(answeredID, sPtr(secret)) {
-		t.Fatal("ProvideCredential(answered) reported false")
-	}
-	if !c.ProvideCredential(dismissedID, nil) {
-		t.Fatal("ProvideCredential(dismissed) reported false")
-	}
-	// "cancelled" resolves on its own via ctx; "closed" resolves via Close below.
-	c.Close()
-	wg.Wait()
-
-	if got := results["answered"]; got.secret != secret || !got.ok {
-		t.Fatalf("answered result = %+v, want {%q true}", got, secret)
-	}
-	for _, label := range []string{"dismissed", "cancelled", "closed"} {
-		got := results[label]
-		if got.secret != "" || got.ok {
-			t.Fatalf("%s result = %+v, want {\"\" false}", label, got)
-		}
-	}
-
-	c.credMu.Lock()
-	remaining := len(c.creds)
-	c.credMu.Unlock()
-	if remaining != 0 {
-		t.Fatalf("creds map has %d entries after all four resolved, want 0", remaining)
-	}
 }
 
 // TestConcurrent_WalkPairIsolationUnderLoad is G6 D3's own pin under real concurrency, which its

@@ -23,8 +23,7 @@ func validPullStrategy(s string) bool {
 // remote.pullPreflight/remote.pushPreflight are reads and stay on the request ctx. remote.run
 // detaches (D19/G5 D8, applied again): a write already in flight must never be killed by a client
 // disconnect or a `cancel` frame — remote.cancel (below) is the one deliberate, in-band way to end
-// a killable phase early. remote.cancel and credential.provide are both fast, synchronous state
-// mutations and need no detaching of their own.
+// a killable phase early. remote.cancel is a fast, synchronous state mutation and needs no detaching of its own.
 
 func (r *Router) handleRemotePullPreflight(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	return handleRepoCall(ctx, c, "remote.pullPreflight", params,
@@ -120,23 +119,6 @@ func (r *Router) handleRemoteCancel(ctx context.Context, c *gitsession.Conn, par
 		},
 		func(_ context.Context, entry *gitsession.RepoEntry, _ RemoteCancelParams) (RemoteCancelResult, error) {
 			return RemoteCancelResult{Cancelled: entry.CancelRemote()}, nil
-		},
-	)
-}
-
-// handleCredentialProvide is D4's own three-liner: decode, resolve the waiter on THIS connection
-// only (Conn.ProvideCredential is already scoped that way — a foreign or stale id simply finds
-// nothing), answer {} either way. Never logs, never echoes the secret back, never returns it in an
-// error message (D9). Uses handleCall, not handleRepoCall — credential.provide has no repo to
-// resolve (P107 I2-13).
-func (r *Router) handleCredentialProvide(_ context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	return handleCall("credential.provide", params,
-		func(p CredentialProvideParams) error {
-			return requireNonEmpty("credential.provide", "requestId", p.RequestID)
-		},
-		func(p CredentialProvideParams) (struct{}, error) {
-			c.ProvideCredential(p.RequestID, p.Secret)
-			return struct{}{}, nil
 		},
 	)
 }

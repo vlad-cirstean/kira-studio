@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
@@ -511,7 +512,15 @@ func TestDisconnectDuringCredentialPromptFreesTheSlot(t *testing.T) {
 	openOn(t, b, local.Dir)
 
 	r.gs.Fire("remote.run", gitrpc.RemoteRunParams{RepoID: id, RemoteOpParams: fetchOp})
-	testx.WaitUntil(t, wait, func() bool { return len(r.gs.Events("credential.request")) > 0 })
+	var first string
+	testx.WaitUntil(t, wait, func() bool {
+		p := r.app.W.GitCredential.Pending()
+		if len(p) == 0 {
+			return false
+		}
+		first = p[0].RequestID
+		return true
+	})
 	go r.gs.Close()
 
 	// B retries until A's disconnect frees the slot; its attempt then raises its own prompt.
@@ -527,14 +536,19 @@ func TestDisconnectDuringCredentialPromptFreesTheSlot(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()
-	testx.WaitUntil(t, wait, func() bool { return len(b.Events("credential.request")) > 0 })
-	var req struct {
-		RequestID string `json:"requestId"`
-	}
-	b.Events("credential.request")[0].Decode(t, &req)
+	var second string
+	testx.WaitUntil(t, wait, func() bool {
+		for _, p := range r.app.W.GitCredential.Pending() {
+			if p.RequestID != first {
+				second = p.RequestID
+				return true
+			}
+		}
+		return false
+	})
 	wrong := "wrong"
-	if err := b.Request("credential.provide", gitrpc.CredentialProvideParams{RequestID: req.RequestID, Secret: &wrong}, nil); err != nil {
-		t.Fatalf("credential.provide: %v", err)
+	if ok, err := r.app.W.GitCredential.Provide(bridge.GitCredentialProvideArgs{RequestID: second, Secret: &wrong}); err != nil || !ok {
+		t.Fatalf("Provide = %v, %v", ok, err)
 	}
 	select {
 	case got := <-res:

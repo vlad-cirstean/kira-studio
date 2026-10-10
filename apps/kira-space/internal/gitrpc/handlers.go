@@ -252,9 +252,6 @@ var requestHandlers = map[string]requestHandler{
 	"remote.cancel": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleRemoteCancel(ctx, c, params)
 	},
-	"credential.provide": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handleCredentialProvide(ctx, c, params)
-	},
 	"review.files": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewFiles(ctx, c, params)
 	},

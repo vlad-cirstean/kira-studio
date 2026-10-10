@@ -180,8 +180,12 @@ type GitStream struct {
 	notify  chan struct{}
 }
 
-// OpenGitStream starts ServeGitStream on the app's router, exactly as appshell registers it.
-func (a *App) OpenGitStream() *GitStream {
+// OpenGitStream starts ServeGitStream on the app's router, exactly as appshell registers it, with
+// no window behind the connection.
+func (a *App) OpenGitStream() *GitStream { return a.OpenGitStreamFor("") }
+
+// OpenGitStreamFor is OpenGitStream for a connection opened by window windowKey.
+func (a *App) OpenGitStreamFor(windowKey string) *GitStream {
 	a.t.Helper()
 	s := &GitStream{
 		t:       a.t,
@@ -194,7 +198,7 @@ func (a *App) OpenGitStream() *GitStream {
 	s.wg.Add(2)
 	go func() {
 		defer s.wg.Done()
-		bridge.ServeGitStream(a.W.GitRouter(), server)
+		bridge.ServeGitStream(a.W.GitRouter(), server, windowKey, a.W.CredentialRelay)
 		server.closeOut()
 	}()
 	go func() {

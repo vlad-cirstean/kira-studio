@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -68,14 +69,22 @@ func guardRepoSettingsSet(next requestFn) requestFn {
 	}
 }
 
+// CredentialAsker is the relay a stream's credential prompts go to (gitcred.Relay).
+type CredentialAsker interface {
+	AskFrom(ctx context.Context, origin, source string, req gitaskpass.Request) (string, bool)
+}
+
 // ServeGitStream runs for the life of one renderer connection, mirroring ServeEngineStream
 // (stream.go). There is no handshake: the peer is this process's own
 // webview, not an external client the trust store exists to gate (docs/v1.5/plans/
 // C10-git-graph-native.md §3.2). gconn still does its real job — per-connection repo holds, so
 // repo.close only ever releases this connection's own hold (gitrpc/handlers.go), and Emit for
-// repo.changed and, since P67e, credential.request.
-func ServeGitStream(router *gitrpc.Router, conn StreamSession) {
+// repo.changed. Its credential prompts go to the relay, tagged with windowKey (P246).
+func ServeGitStream(router *gitrpc.Router, conn StreamSession, windowKey string, relay CredentialAsker) {
 	gconn := gitsession.NewConn(newStreamConnID(), nativeClientID, nativeLabel, nil)
+	gconn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
+		return relay.AskFrom(ctx, windowKey, nativeLabel, req)
+	})
 	// P67e/D5: still opted out, but no longer because writes were refused here — a periodic
 	// background `git fetch --prune` is a network write the user never pressed a button for, and
 	// every fetch this phase admits is one they did (P67e's own plan doc §9 OQ-2, docs/v1.6/plans/).

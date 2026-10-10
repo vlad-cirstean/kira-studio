@@ -2,8 +2,6 @@ package gitsession
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"sync"
 
@@ -92,12 +90,7 @@ type Conn struct {
 	// reaching into rpcstream, which this package must stay under (SPEC §7's layering
 	// rule).
 	done chan struct{}
-	// credMu/creds are G7 D4/D21's credential relay: one waiter per in-flight credential.request,
-	// keyed by its own server-minted requestId. "" is never a valid answer (an empty passphrase is
-	// meaningless to git), so a closed/abandoned channel and an explicit dismissal collapse to the
-	// same "not answered" outcome the caller sees.
-	credMu    sync.Mutex
-	creds     map[string]chan string
+	// routeCred answers every credential prompt this connection raises (RouteCredentials).
 	routeCred func(ctx context.Context, req gitaskpass.Request) (string, bool)
 	closeOnce sync.Once
 }
@@ -107,7 +100,7 @@ func NewConn(id ConnID, clientID, clientLabel string, emit func(method string, p
 	return &Conn{
 		ID: id, ClientID: clientID, ClientLabel: clientLabel, emitFn: emit,
 		held: make(map[string]*hold), walks: make(map[string]*walkPair),
-		done: make(chan struct{}), creds: make(map[string]chan string),
+		done: make(chan struct{}),
 	}
 }
 
@@ -142,96 +135,30 @@ func (c *Conn) Done() <-chan struct{} { return c.done }
 // starts each request-handling goroutine) is what makes this safe with no lock of its own.
 func (c *Conn) DisableAutoFetch() { c.noAutoFetch = true }
 
-// RouteCredentials sends every credential prompt this connection raises to fn instead of emitting
-// credential.request on it (P178: a socket client never sees one). Call it once, before this Conn
-// serves — the same happens-before rule as DisableAutoFetch. fn gets a ctx that also ends when
-// this connection closes.
+// RouteCredentials sets where every credential prompt this connection raises goes. Call it once,
+// before this Conn serves — the same happens-before rule as DisableAutoFetch. fn gets a ctx that
+// also ends when this connection closes.
 func (c *Conn) RouteCredentials(fn func(ctx context.Context, req gitaskpass.Request) (string, bool)) {
 	c.routeCred = fn
 }
 
-// credentialRequestPayload mirrors @kira/git-ipc's own 'credential.request' event payload field
-// for field (G7 D2).
-type credentialRequestPayload struct {
-	RequestID string `json:"requestId"`
-	RepoID    string `json:"repoId"`
-	Prompt    string `json:"prompt"`
-	Masked    bool   `json:"masked"`
-}
-
-func newCredentialRequestID() string {
-	buf := make([]byte, 16)
-	_, _ = rand.Read(buf) // crypto/rand.Read never errors on a Reader that never fails to fill.
-	return hex.EncodeToString(buf)
-}
-
-// AskCredential is this connection's own gitaskpass.Prompter implementation (G7 D4/D21): mints an
-// unguessable request id, registers a waiter, emits credential.request, then selects on the
-// answer, ctx (the op's own cancellation) and c.done (this connection dying mid-prompt) — D4's
-// table's three bounds that live on this side; the broker's own timer is the fourth, layered on
-// top of ctx by the broker itself. Every exit path deletes this waiter's own map entry.
+// AskCredential is this connection's own gitaskpass.Prompter implementation: it hands the prompt to
+// the routed relay and ends the wait when ctx (the op's own cancellation) or this connection ends.
+// A connection with no route answers nothing.
 func (c *Conn) AskCredential(ctx context.Context, req gitaskpass.Request) (string, bool) {
-	if c.routeCred != nil {
-		routed, cancel := context.WithCancel(ctx)
-		defer cancel()
-		go func() {
-			select {
-			case <-c.done:
-				cancel()
-			case <-routed.Done():
-			}
-		}()
-		return c.routeCred(routed, req)
+	if c.routeCred == nil {
+		return "", false
 	}
-	id := newCredentialRequestID()
-	ch := make(chan string, 1)
-	c.credMu.Lock()
-	c.creds[id] = ch
-	c.credMu.Unlock()
-	defer func() {
-		c.credMu.Lock()
-		delete(c.creds, id)
-		c.credMu.Unlock()
-	}()
-
-	c.Emit("credential.request", credentialRequestPayload{
-		RequestID: id, RepoID: req.RepoID, Prompt: req.Prompt, Masked: req.Masked,
-	})
-
-	select {
-	case secret, ok := <-ch:
-		if !ok || secret == "" {
-			return "", false
+	routed, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		select {
+		case <-c.done:
+			cancel()
+		case <-routed.Done():
 		}
-		return secret, true
-	case <-ctx.Done():
-		return "", false
-	case <-c.done:
-		return "", false
-	}
-}
-
-// ProvideCredential resolves requestID's waiter on THIS connection with secret (nil for a
-// dismissal, closing the waiter's channel instead of sending). Anti-abuse (D4): the map entry is
-// deleted under the lock before the channel is touched, so answering twice — or another connection
-// presenting the same id — finds nothing; both report false, never an error (a retry after a
-// dropped response is legitimate).
-func (c *Conn) ProvideCredential(requestID string, secret *string) bool {
-	c.credMu.Lock()
-	ch, ok := c.creds[requestID]
-	if ok {
-		delete(c.creds, requestID)
-	}
-	c.credMu.Unlock()
-	if !ok {
-		return false
-	}
-	if secret == nil {
-		close(ch)
-	} else {
-		ch <- *secret
-	}
-	return true
+	}()
+	return c.routeCred(routed, req)
 }
 
 // Open acquires path's repository and subscribes this connection to it — idempotent per (Conn,

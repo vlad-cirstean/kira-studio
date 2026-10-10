@@ -179,7 +179,9 @@ package gitrpc
 // fields are removed. The extension-injected params (scope and pageSize on graph.loadMore and
 // graph.stream, baseCandidates on review.resolveBase, strategySetting on remote.pullPreflight)
 // are removed; the server reads the stored kiraSpace.* repo settings.
-const ContractVersion = 46
+// P246: 46 -> 47, breaking. credential.request and credential.provide are removed: a native stream
+// connection's credential prompts go to the app's credential relay, tagged with its window.
+const ContractVersion = 47
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.
