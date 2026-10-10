@@ -227,13 +227,18 @@ func TestAutomationRun(t *testing.T) {
 			t.Fatalf("dir = %+v, want the api worktree", pv.Dir)
 		}
 
+		// Contract ade-automation: tests/ui/ade-v2-automations.spec.ts "contract: ..." reads these.
+		f.app.Contract(t, "ade-automation", "CustomScriptsService.Create", rec)
+		f.app.Contract(t, "ade-automation", "ScriptRunsService.Preview", pv, flowharness.Mask("hash"))
 		started := f.start(t, args)
 		run := f.run(t, started.RunID, "running")
+		f.app.Contract(t, "ade-automation", "ScriptRunsService.Get#running", run, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "sessionId", "costUsd"))
 		if run.Trigger != scriptruns.TriggerADE || run.TaskID != f.task || run.BranchID != f.apiBr.ID || run.BranchLabel == "" || run.Cwd != f.apiBr.Worktree {
 			t.Fatalf("run = %+v", run)
 		}
 		release(t, f.gateOne)
-		f.run(t, started.RunID, "done")
+		finished := f.run(t, started.RunID, "done")
+		f.app.Contract(t, "ade-automation", "ScriptRunsService.Get#done", finished, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "sessionId", "costUsd"))
 
 		off := f.script(t, scripts.CustomScriptFields{Name: "elsewhere", Kind: scripts.KindSmart, Command: "Look at {branch}"})
 		pv = f.preview(t, scriptruns.RunArgs{ScriptID: off.ID, TaskID: f.task, BranchID: f.apiBr.ID})
@@ -292,6 +297,7 @@ func TestAutomationRun(t *testing.T) {
 		if !ok || held.State != "pending" || held.Note != "waiting for automation audit" {
 			t.Fatalf("step run while a script works = %+v, want pending behind the automation", held)
 		}
+		f.app.Contract(t, "ade-automation", "AdeTaskService.Run#waiting", held, flowharness.Mask("createdAt", "startedAt", "finishedAt", "sessionId"))
 
 		release(t, f.gateOne)
 		f.run(t, started.RunID, "done")

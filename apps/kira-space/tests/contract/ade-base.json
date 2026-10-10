@@ -1,0 +1,283 @@
+{
+  "AdeTaskService.Branch#on-develop": {
+    "addedAt": 0,
+    "ahead": 0,
+    "base": "develop",
+    "baseBranchId": "",
+    "baseMissing": false,
+    "baseOwner": "",
+    "basePendingFrom": "",
+    "behind": 0,
+    "codeRepoId": "<id:1>",
+    "commitCount": 1,
+    "commits": [],
+    "conflictCheck": "done",
+    "conflictCheckReason": "",
+    "conflictsIfRebased": [],
+    "deployments": [],
+    "dirty": [],
+    "files": [],
+    "id": "<id:2>",
+    "integration": [],
+    "kind": "mine",
+    "lastCommitAt": 0,
+    "mergedAt": null,
+    "mergedIntoMain": false,
+    "name": "feat/api-dev",
+    "origin": "",
+    "owner": "",
+    "rebaseInProgress": false,
+    "setup": {
+      "exitCode": 0,
+      "finishedAt": 0,
+      "note": "",
+      "startedAt": 0,
+      "state": "ready"
+    },
+    "taskId": "<id:3>",
+    "tip": "<masked>",
+    "upstream": "refs/remotes/origin/develop",
+    "upstreamAhead": 0,
+    "upstreamBehind": 0,
+    "worktree": "<home>/wt/api/api-dev"
+  },
+  "AdeTaskService.Branch#rebase-conflict": {
+    "addedAt": 0,
+    "ahead": 2,
+    "base": "main",
+    "baseBranchId": "",
+    "baseMissing": false,
+    "baseOwner": "",
+    "basePendingFrom": "",
+    "behind": 2,
+    "codeRepoId": "<id:4>",
+    "commitCount": 2,
+    "commits": [
+      {
+        "message": "add clash.txt",
+        "sha": "<masked>"
+      },
+      {
+        "message": "work a",
+        "sha": "<masked>"
+      }
+    ],
+    "conflictCheck": "done",
+    "conflictCheckReason": "",
+    "conflictsIfRebased": [
+      "clash.txt"
+    ],
+    "deployments": [],
+    "dirty": [
+      {
+        "code": "M",
+        "path": "clash.txt"
+      }
+    ],
+    "files": [
+      {
+        "added": 1,
+        "binary": false,
+        "deleted": 0,
+        "path": "a.txt"
+      },
+      {
+        "added": 1,
+        "binary": false,
+        "deleted": 0,
+        "path": "clash.txt"
+      }
+    ],
+    "id": "<id:1>",
+    "integration": [],
+    "kind": "mine",
+    "lastCommitAt": 0,
+    "mergedAt": null,
+    "mergedIntoMain": false,
+    "name": "feat/a",
+    "origin": "",
+    "owner": "",
+    "rebaseInProgress": true,
+    "setup": {
+      "exitCode": 0,
+      "finishedAt": 0,
+      "note": "",
+      "startedAt": 0,
+      "state": "ready"
+    },
+    "taskId": "<id:3>",
+    "tip": "<masked>",
+    "upstream": "refs/remotes/origin/feat/a",
+    "upstreamAhead": 0,
+    "upstreamBehind": 0,
+    "worktree": "<home>/wt/api/a"
+  },
+  "AdeTaskService.RepoBranches": {
+    "branches": [
+      {
+        "branchId": "",
+        "draft": false,
+        "excluded": "",
+        "local": false,
+        "name": "develop",
+        "remote": true,
+        "taskId": "",
+        "taskTitle": ""
+      }
+    ],
+    "mainName": "main",
+    "previous": ""
+  },
+  "AdeTaskService.Run#rebase-aborted": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "clash.txt conflicts",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "clash.txt conflicts",
+      "rebase": {
+        "aborted": true,
+        "branches": [
+          {
+            "after": "<masked>",
+            "before": "<masked>",
+            "branchId": "<id:1>",
+            "name": "feat/a",
+            "onBase": false
+          }
+        ],
+        "conflictedFiles": [],
+        "inProgress": false,
+        "ontoRef": "main",
+        "ontoTip": "<masked>",
+        "pushed": null,
+        "verified": false
+      },
+      "report": {
+        "conflictedFiles": [
+          "clash.txt"
+        ],
+        "lastGitError": "CONFLICT (add/add)",
+        "tried": "plain rebase"
+      },
+      "reported": true,
+      "result": "failed",
+      "source": "agent",
+      "status": "failed",
+      "summary": "conflict"
+    },
+    "purpose": "rebase",
+    "sessionId": "<masked>",
+    "stageId": "",
+    "startedAt": 0,
+    "state": "failed",
+    "stepId": "rebase",
+    "summary": "conflict",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#rebase-conflict": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "clash.txt conflicts",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "clash.txt conflicts",
+      "rebase": {
+        "aborted": false,
+        "branches": [
+          {
+            "after": "<masked>",
+            "before": "<masked>",
+            "branchId": "<id:1>",
+            "name": "feat/a",
+            "onBase": false
+          }
+        ],
+        "conflictedFiles": [
+          "clash.txt"
+        ],
+        "inProgress": true,
+        "ontoRef": "main",
+        "ontoTip": "<masked>",
+        "pushed": null,
+        "verified": false
+      },
+      "report": {
+        "conflictedFiles": [
+          "clash.txt"
+        ],
+        "lastGitError": "CONFLICT (add/add)",
+        "tried": "plain rebase"
+      },
+      "reported": true,
+      "result": "failed",
+      "source": "agent",
+      "status": "failed",
+      "summary": "conflict"
+    },
+    "purpose": "rebase",
+    "sessionId": "<masked>",
+    "stageId": "",
+    "startedAt": 0,
+    "state": "failed",
+    "stepId": "rebase",
+    "summary": "conflict",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#rebase-done": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "rebase": {
+        "aborted": false,
+        "branches": [
+          {
+            "after": "<masked>",
+            "before": "<masked>",
+            "branchId": "<id:1>",
+            "name": "feat/a",
+            "onBase": true
+          }
+        ],
+        "conflictedFiles": [],
+        "inProgress": false,
+        "ontoRef": "main",
+        "ontoTip": "<masked>",
+        "pushed": null,
+        "verified": true
+      },
+      "reported": true,
+      "result": "done",
+      "source": "agent",
+      "status": "done",
+      "summary": "rebased"
+    },
+    "purpose": "rebase",
+    "sessionId": "<masked>",
+    "stageId": "",
+    "startedAt": 0,
+    "state": "done",
+    "stepId": "rebase",
+    "summary": "rebased",
+    "taskId": "<id:3>"
+  },
+  "args:AdeTaskService.CreateTask.bases#develop": {
+    "branchId": "",
+    "ref": "develop"
+  }
+}

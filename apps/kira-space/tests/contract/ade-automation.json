@@ -1,0 +1,268 @@
+{
+  "AdeTaskService.Run#waiting": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": null,
+    "finishedAt": null,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "waiting for automation audit",
+    "outcome": null,
+    "purpose": "",
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": null,
+    "state": "pending",
+    "stepId": "two",
+    "summary": "",
+    "taskId": "<id:3>"
+  },
+  "CustomScriptsService.Create": {
+    "collectionId": null,
+    "color": "blue",
+    "command": "Audit {branch} on {base} in {worktree} for {task}",
+    "createdAt": "<time>",
+    "dirMode": "kira",
+    "id": "<id:1>",
+    "kind": "smart",
+    "name": "audit",
+    "params": [],
+    "schedule": null,
+    "smart": {
+      "bashPatterns": [],
+      "maxBudgetUsd": 1,
+      "mcp": [],
+      "model": "sonnet",
+      "timeout": "15m",
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
+    },
+    "sortOrder": 0,
+    "updatedAt": "<time>",
+    "useAdeDir": true,
+    "workingDir": ""
+  },
+  "ScriptRunsService.Get#done": {
+    "branchId": "<id:2>",
+    "branchLabel": "api · feat/api-login",
+    "color": "blue",
+    "command": "",
+    "createdAt": 0,
+    "cwd": "<home>/wt/api/api-login",
+    "finishedAt": 0,
+    "id": "<id:4>",
+    "kind": "smart",
+    "model": "sonnet",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": true,
+      "source": "agent",
+      "status": "done",
+      "summary": "summary-done"
+    },
+    "params": [],
+    "prompt": "Audit feat/api-login on main in <home>/wt/api/api-login for Fix login\n\nKira Space tools are available: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, but change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "scriptId": "<id:1>",
+    "scriptName": "audit",
+    "sessionId": "<masked>",
+    "startedAt": 0,
+    "state": "done",
+    "taskId": "<id:3>",
+    "taskTitle": "Fix login",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "mcp__kira-ade__finish_step",
+        "mcp__kira-ade__run_outcome",
+        "mcp__kira-ade__task_info",
+        "mcp__kira-ade__declare_repos",
+        "mcp__kira-ade__request_branch",
+        "mcp__kira-ade__branch_status"
+      ],
+      "mcpServers": [],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
+    },
+    "trigger": "ade"
+  },
+  "ScriptRunsService.Get#running": {
+    "branchId": "<id:2>",
+    "branchLabel": "api · feat/api-login",
+    "color": "blue",
+    "command": "",
+    "createdAt": 0,
+    "cwd": "<home>/wt/api/api-login",
+    "finishedAt": null,
+    "id": "<id:4>",
+    "kind": "smart",
+    "model": "sonnet",
+    "outcome": null,
+    "params": [],
+    "prompt": "Audit feat/api-login on main in <home>/wt/api/api-login for Fix login\n\nKira Space tools are available: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, but change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "scriptId": "<id:1>",
+    "scriptName": "audit",
+    "sessionId": "<masked>",
+    "startedAt": 0,
+    "state": "running",
+    "taskId": "<id:3>",
+    "taskTitle": "Fix login",
+    "terminalId": "",
+    "tools": {
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "mcp__kira-ade__finish_step",
+        "mcp__kira-ade__run_outcome",
+        "mcp__kira-ade__task_info",
+        "mcp__kira-ade__declare_repos",
+        "mcp__kira-ade__request_branch",
+        "mcp__kira-ade__branch_status"
+      ],
+      "mcpServers": [],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ]
+    },
+    "trigger": "ade"
+  },
+  "ScriptRunsService.Preview": {
+    "ade": {
+      "branchId": "<id:2>",
+      "branchLabel": "api · feat/api-login",
+      "taskId": "<id:3>",
+      "taskTitle": "Fix login"
+    },
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "mcp__kira-ade__finish_step",
+      "mcp__kira-ade__run_outcome",
+      "mcp__kira-ade__task_info",
+      "mcp__kira-ade__declare_repos",
+      "mcp__kira-ade__request_branch",
+      "mcp__kira-ade__branch_status"
+    ],
+    "blocker": "",
+    "body": "Audit {branch} on {base} in {worktree} for {task}",
+    "command": "",
+    "dir": {
+      "base": "",
+      "blocker": "",
+      "branch": "api · feat/api-login",
+      "mode": "worktree",
+      "path": "<home>/wt/api/api-login",
+      "pending": false
+    },
+    "env": [
+      {
+        "fromVar": "task",
+        "name": "KIRA_TASK",
+        "secret": false,
+        "value": "Fix login"
+      },
+      {
+        "fromVar": "jira",
+        "name": "KIRA_JIRA",
+        "secret": false,
+        "value": ""
+      },
+      {
+        "fromVar": "repo",
+        "name": "KIRA_REPO",
+        "secret": false,
+        "value": "api"
+      },
+      {
+        "fromVar": "branch",
+        "name": "KIRA_BRANCH",
+        "secret": false,
+        "value": "feat/api-login"
+      },
+      {
+        "fromVar": "base",
+        "name": "KIRA_BASE",
+        "secret": false,
+        "value": "main"
+      },
+      {
+        "fromVar": "worktree",
+        "name": "KIRA_WORKTREE",
+        "secret": false,
+        "value": "<home>/wt/api/api-login"
+      }
+    ],
+    "hash": "<masked>",
+    "kind": "smart",
+    "maxBudgetUsd": 1,
+    "mcpServers": [],
+    "missing": [],
+    "model": "sonnet",
+    "needs": {
+      "branches": [],
+      "tasks": []
+    },
+    "prompt": [
+      {
+        "text": "Audit ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "feat/api-login",
+        "var": "branch"
+      },
+      {
+        "text": " on ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "main",
+        "var": "base"
+      },
+      {
+        "text": " in ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "<home>/wt/api/api-login",
+        "var": "worktree"
+      },
+      {
+        "text": " for ",
+        "value": "",
+        "var": ""
+      },
+      {
+        "text": "",
+        "value": "Fix login",
+        "var": "task"
+      }
+    ],
+    "suffix": "Kira Space tools are available: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, but change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.\n\nWhen you are finished, call the finish_step tool with status \"done\" and a one-line summary. If you could not finish, call it with status \"failed\" and give the reason. If you need a decision, call it with status \"needs_input\" and your question.",
+    "timeout": "15m",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob"
+    ]
+  }
+}

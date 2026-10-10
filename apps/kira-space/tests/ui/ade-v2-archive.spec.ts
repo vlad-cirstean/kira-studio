@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { emitAgentEvent, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 
 // Archiving a task: straight when nothing is at risk, else the Claude dialog; archived sessions.
@@ -95,3 +96,38 @@ test('a history row opens the archived panel with its sessions', async ({ relaun
   await expect(page.locator(t('ade-session-takeover'))).toHaveCount(0);
   await expect(page.locator(t('ade-stopped-takeover'))).toHaveCount(0);
 });
+
+// Contract ade-task. Backend half: adeflow TestArchiveRisk. The task and branch ids are the
+// fixture's; the worktree path, counts and dirty files are the backend's.
+for (const [key, atRisk] of [
+  ['clean', false],
+  ['at-risk', true],
+] as const) {
+  test(`contract: archive with ${key} worktree`, async ({ relaunch }) => {
+    const backend = contract<{ branches: Record<string, unknown>[] }>(
+      'ade-task',
+      `AdeTaskService.ArchiveRisk#${key}`,
+    );
+    const sentArgs = contract<Record<string, unknown>>(
+      'ade-task',
+      'args:AdeTaskService.ArchiveTask',
+    );
+    const { window: page, control } = await openPlan(relaunch, [
+      {
+        channel: IPC.adeTaskArchiveRisk,
+        response: risk(backend.branches.map((b) => branchRisk(b))),
+      },
+    ]);
+    await openArchive(page);
+    if (atRisk) {
+      await expect(page.locator(t('ade-dialog-title'))).toHaveText('Archive: work would be lost');
+      await expect(page.locator(t('ade-dialog-risk'))).toContainText(
+        '1 uncommitted, 1 unmerged commit',
+      );
+      await page.locator(t('ade-dialog-delete')).click();
+    }
+    await expect.poll(() => calls(control, IPC.adeTaskArchiveTask)).toHaveLength(1);
+    const sent = calls(control, IPC.adeTaskArchiveTask)[0]?.args as Record<string, unknown>;
+    expect(Object.keys(sent).sort()).toEqual(Object.keys(sentArgs).sort());
+  });
+}

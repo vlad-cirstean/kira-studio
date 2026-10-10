@@ -127,6 +127,13 @@ func TestCollectionsMoveAndDelete(t *testing.T) {
 	}
 	keep := mk("keep", &col.ID)
 	mk("drop", &col.ID)
+	// Contract commands: tests/ui/automations-scripts.spec.ts "contract: a collection with its scripts
+	// shows after boot" reads the same fixture.
+	grouped, err := svc.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, "commands", "CustomScriptsService.List#grouped", grouped)
 
 	if err := svc.Move(bridge.CustomScriptsMoveArgs{ID: keep.ID, CollectionID: nil}); err != nil {
 		t.Fatal(err)

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeBoard, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -204,3 +205,45 @@ test('the earlier entry points still open their branch', async ({ relaunch }) =>
   await expect.poll(() => calls(control)).toHaveLength(3);
   expect(calls(control)[2]?.args).toEqual({ branchId: 'b_auth' });
 });
+
+// Contract ade-review-open. Backend half: adeflow TestReviewOpenFacts. The fixture branch b_deps
+// takes the backend's ahead, dirty and base facts; its identity stays the fixture's.
+for (const phase of ['uncommitted', 'committed'] as const) {
+  test(`contract: Review code with ${phase} changes`, async ({ relaunch }) => {
+    const facts = contract<{
+      name: string;
+      ahead: number;
+      base: string;
+      dirty: unknown[];
+      commitCount: number;
+      files: unknown[];
+    }>('ade-review-open', `AdeTaskService.Branch#${phase}`);
+    const { window: page, control } = await openPlan(relaunch, [
+      OPEN,
+      {
+        channel: IPC.adeTaskBoard,
+        response: adeBoard((b) => {
+          for (const r of b.tasks.find((x) => x.id === 'T_deps')?.runs ?? []) r.state = 'done';
+          const br = b.branches.find((x) => x.id === 'b_deps');
+          if (!br) throw new Error('fixture branch missing');
+          const { name, ahead, base, dirty, commitCount, files } = facts;
+          Object.assign(br, { name, ahead, base, dirty, commitCount, files });
+        }),
+      },
+    ]);
+    const btn = page.locator(`${card('T_deps')} ${t('ade-card-review')}`);
+    await btn.locator('xpath=..').hover();
+    const tooltip = page.locator(tip);
+    await expect(tooltip.locator('[data-var="base"]')).toHaveText(facts.base);
+    if (phase === 'uncommitted') {
+      await expect(btn).toBeDisabled();
+      await expect(tooltip).toContainText('Only uncommitted changes on');
+    } else {
+      await expect(btn).toBeEnabled();
+      await expect(tooltip.locator('[data-var="branch"]')).toHaveText(facts.name);
+      await btn.click();
+      await expect.poll(() => calls(control)).toHaveLength(1);
+      expect(calls(control)[0]?.args).toEqual({ branchId: 'b_deps' });
+    }
+  });
+}

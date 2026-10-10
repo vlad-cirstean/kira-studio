@@ -45,6 +45,9 @@ func (f *baseFx) task(t *testing.T, title string, base adewire.BaseChoice) (adew
 	args := adewire.CreateTaskArgs{Title: title, CodeRepoIDs: []string{f.repoID}, WorkflowID: "flow"}
 	if base != (adewire.BaseChoice{}) {
 		args.Bases = map[string]adewire.BaseChoice{f.repoID: base}
+		if base.Ref == "develop" {
+			f.app.Contract(t, "ade-base", "args:AdeTaskService.CreateTask.bases#develop", base)
+		}
 	}
 	task, err := f.app.W.AdeTask.CreateTask(ctx, args)
 	if err != nil {
@@ -83,6 +86,10 @@ func TestTaskBase(t *testing.T) {
 		if got.MainName != "main" || !picks["develop"].Remote || picks["develop"].Local {
 			t.Fatalf("picker = %+v, want main and remote-only develop", got)
 		}
+		// Contract ade-base: tests/ui/ade-v2-base-rebase.spec.ts "contract: ..." reads these.
+		shown := got
+		shown.Branches = []adewire.BasePick{picks["develop"]}
+		f.app.Contract(t, "ade-base", "AdeTaskService.RepoBranches", shown)
 		if p, ok := picks[br.Name]; ok && p.Excluded == "" {
 			t.Fatalf("picker offers %+v for task %s: a branch cannot be its own base", p, task.ID)
 		}
@@ -104,6 +111,7 @@ func TestTaskBase(t *testing.T) {
 		if br.Base != "develop" || br.Ahead != 0 || br.Behind != 0 {
 			t.Fatalf("board branch base=%q ahead=%d behind=%d, want develop 0 0", br.Base, br.Ahead, br.Behind)
 		}
+		f.app.Contract(t, "ade-base", "AdeTaskService.Branch#on-develop", br, flowharness.Mask("startedAt", "finishedAt", "tip", "createdAt", "addedAt", "lastCommitAt"))
 	})
 
 	t.Run("the remote wins over a stale local twin", func(t *testing.T) {

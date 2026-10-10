@@ -1,0 +1,106 @@
+{
+  "AdeTaskService.Branch#committed": {
+    "addedAt": 0,
+    "ahead": 1,
+    "base": "main",
+    "baseBranchId": "",
+    "baseMissing": false,
+    "baseOwner": "",
+    "basePendingFrom": "",
+    "behind": 0,
+    "codeRepoId": "<id:1>",
+    "commitCount": 1,
+    "commits": [
+      {
+        "message": "add wip",
+        "sha": "<masked>"
+      }
+    ],
+    "conflictCheck": "done",
+    "conflictCheckReason": "",
+    "conflictsIfRebased": [],
+    "deployments": [],
+    "dirty": [],
+    "files": [
+      {
+        "added": 1,
+        "binary": false,
+        "deleted": 0,
+        "path": "wip.txt"
+      }
+    ],
+    "id": "<id:2>",
+    "integration": [],
+    "kind": "mine",
+    "lastCommitAt": 0,
+    "mergedAt": null,
+    "mergedIntoMain": false,
+    "name": "feat/api-open",
+    "origin": "",
+    "owner": "",
+    "rebaseInProgress": false,
+    "setup": {
+      "exitCode": 0,
+      "finishedAt": 0,
+      "note": "",
+      "startedAt": 0,
+      "state": "ready"
+    },
+    "taskId": "<id:3>",
+    "tip": "<masked>",
+    "upstream": "refs/remotes/origin/main",
+    "upstreamAhead": 1,
+    "upstreamBehind": 0,
+    "worktree": "<home>/wt/api/api-open"
+  },
+  "AdeTaskService.Branch#uncommitted": {
+    "addedAt": 0,
+    "ahead": 0,
+    "base": "main",
+    "baseBranchId": "",
+    "baseMissing": false,
+    "baseOwner": "",
+    "basePendingFrom": "",
+    "behind": 0,
+    "codeRepoId": "<id:1>",
+    "commitCount": 0,
+    "commits": [],
+    "conflictCheck": "done",
+    "conflictCheckReason": "",
+    "conflictsIfRebased": [],
+    "deployments": [],
+    "dirty": [
+      {
+        "code": "??",
+        "path": "wip.txt"
+      }
+    ],
+    "files": [],
+    "id": "<id:2>",
+    "integration": [],
+    "kind": "mine",
+    "lastCommitAt": 0,
+    "mergedAt": null,
+    "mergedIntoMain": false,
+    "name": "feat/api-open",
+    "origin": "",
+    "owner": "",
+    "rebaseInProgress": false,
+    "setup": {
+      "exitCode": 0,
+      "finishedAt": 0,
+      "note": "",
+      "startedAt": 0,
+      "state": "ready"
+    },
+    "taskId": "<id:3>",
+    "tip": "<masked>",
+    "upstream": "refs/remotes/origin/main",
+    "upstreamAhead": 0,
+    "upstreamBehind": 0,
+    "worktree": "<home>/wt/api/api-open"
+  },
+  "args:AdeTaskService.OpenReviewWindow": {
+    "branchId": "<id:2>"
+  }
+}

@@ -1,5 +1,8 @@
 import type { Page } from '@playwright/test';
+import { scriptRunSchema } from '@shared/domain/scriptRuns';
+import { customScriptSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -407,3 +410,49 @@ test('a normal script with params starts through a launch token', async ({ relau
     .poll(() => control.log().find((e) => e.channel === IPC.terminalOpen)?.args)
     .toMatchObject({ scriptId: 'plain-1', scriptLaunchToken: 'tok-1', launchKind: 'script' });
 });
+
+// Contract smart. Backend half: termflow TestSmartScriptSpace stores the same
+// fixture against the fake claude.
+for (const outcome of [{ key: 'done', label: 'Succeeded', summary: 'summary-done' }] as const) {
+  test(`contract: a smart script run ends ${outcome.label} with the agent summary`, async ({
+    relaunch,
+  }) => {
+    const suffix = outcome.key === 'done' ? '' : '#failed';
+    const script = contract('smart', `CustomScriptsService.Create${suffix}`, {
+      schema: customScriptSchema,
+    });
+    const finished = contract('smart', `ScriptRunsService.Get#${outcome.key}`, {
+      schema: scriptRunSchema,
+    });
+    const preview = contract<{ dir: unknown }>('smart', 'ScriptRunsService.Preview');
+    const { window: page, control } = await relaunch({
+      control: [
+        { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
+        { channel: IPC.scriptRunsPreview, response: preview },
+        { channel: IPC.scriptRunsStart, response: { runId: finished.id, terminal: null } },
+        { channel: IPC.scriptRunsReadLog, response: { chunks: [], truncated: false } },
+        { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
+      ],
+    });
+    await openPanel(page);
+    await page.locator(`[data-testid="script-${script.id}"]`).click();
+    await expect(page.locator('[data-testid="run-start"]')).toBeEnabled();
+    await page.locator('[data-testid="run-start"]').click();
+    await expect
+      .poll(() => control.log().find((e) => e.channel === IPC.scriptRunsStart)?.args)
+      .toMatchObject({ scriptId: script.id });
+
+    const times = { createdAt: 1_000, startedAt: 1_000 };
+    await emitWailsEvent(page, IPC.scriptRunsChanged, {
+      ...finished,
+      ...times,
+      state: 'running',
+      outcome: null,
+      finishedAt: null,
+    });
+    await emitWailsEvent(page, IPC.scriptRunsChanged, { ...finished, ...times, finishedAt: 4_000 });
+    const view = page.locator('[data-testid="script-run-view"]');
+    await expect(view.locator('[data-testid="run-status"]')).toHaveText(outcome.label);
+    await expect(view.locator('[data-testid="run-outcome-summary"]')).toHaveText(outcome.summary);
+  });
+}

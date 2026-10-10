@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 )
 
 // The Review code controls read ahead and dirty from the board and preview the base the window
@@ -29,6 +30,8 @@ func TestReviewOpenFacts(t *testing.T) {
 	if got.Ahead != 0 || len(got.Dirty) != 1 {
 		t.Fatalf("uncommitted only: ahead %d, dirty %d, want 0 and 1", got.Ahead, len(got.Dirty))
 	}
+	// Contract ade-review-open: tests/ui/ade-v2-review-open.spec.ts "contract: ..." reads these.
+	app.Contract(t, "ade-review-open", "AdeTaskService.Branch#uncommitted", got, flowharness.Mask("startedAt", "finishedAt", "tip", "createdAt", "addedAt", "lastCommitAt", "sha"))
 
 	gitOut(t, br.Worktree, "add", "-A")
 	gitOut(t, br.Worktree, "commit", "-q", "-m", "add wip")
@@ -36,7 +39,9 @@ func TestReviewOpenFacts(t *testing.T) {
 	if got.Ahead != 1 || len(got.Dirty) != 0 {
 		t.Fatalf("committed: ahead %d, dirty %d, want 1 and 0", got.Ahead, len(got.Dirty))
 	}
+	app.Contract(t, "ade-review-open", "AdeTaskService.Branch#committed", got, flowharness.Mask("startedAt", "finishedAt", "tip", "createdAt", "addedAt", "lastCommitAt", "sha"))
 
+	app.Contract(t, "ade-review-open", "args:AdeTaskService.OpenReviewWindow", adewire.BranchArgs{BranchID: br.ID})
 	if _, err := app.W.AdeTask.OpenReviewWindow(ctx, adewire.BranchArgs{BranchID: br.ID}); err != nil {
 		t.Fatal(err)
 	}

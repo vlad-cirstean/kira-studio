@@ -49,6 +49,10 @@ func TestSmartScriptSpace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Contract smart: tests/ui/automations-smart.spec.ts "contract: a smart script ..." reads the same fixture.
+	app.Contract(t, "smart", "CustomScriptsService.Create", rec)
+	app.Contract(t, "smart", "ScriptRunsService.Preview", pv, flowharness.Mask("hash"))
+	app.Contract(t, "smart", "args:ScriptRunsService.Start", scriptruns.StartArgs{RunArgs: args, Hash: pv.Hash}, flowharness.Mask("hash"))
 	if got := strings.Join(pv.Allowed, " "); strings.Contains(got, "mcp__kira-space") || !strings.Contains(got, "mcp__fake__echo") {
 		t.Fatalf("allowed = %q, want the fake tool and no Space tools without a task", got)
 	}
@@ -61,6 +65,7 @@ func TestSmartScriptSpace(t *testing.T) {
 		run, _ = app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: started.RunID})
 		return run.State == "done"
 	})
+	app.Contract(t, "smart", "ScriptRunsService.Get#done", run, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "costUsd"))
 	if o := run.Outcome; o == nil || !o.Reported || o.Source != "agent" {
 		t.Fatalf("outcome = %+v", o)
 	}
@@ -71,6 +76,7 @@ func TestSmartScriptSpace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Contract(t, "smart", "ScriptRunsService.ReadLog", page)
 	if raw, _ := json.Marshal(page); len(page.Chunks) == 0 {
 		t.Fatalf("ReadLog empty: %s", raw)
 	}

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { type AdeBoardFx, adeBoard, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 
 // Task base branch, Change base and the headless rebase: one rule behind every control, the base
@@ -379,4 +380,79 @@ test('a failed step that reported detail shows it in its stage block', async ({ 
   const out = page.locator(t('ade-run-outcome'));
   await expect(out.locator(t('ade-outcome-reason'))).toHaveText('release script exited 1');
   await expect(out.locator(t('ade-outcome-git-error'))).toHaveText('push rejected');
+});
+
+// Contract ade-base. Backend half: adeflow TestTaskBase and TestRebaseRun. Fixture ids replace the
+// backend's; every other field is the backend's.
+test('contract: a remote-only develop is offered as a base and sent with CreateTask', async ({
+  relaunch,
+}) => {
+  const picker = contract<{ branches: { name: string }[] }>(
+    'ade-base',
+    'AdeTaskService.RepoBranches',
+  );
+  const choice = contract<{ ref: string; branchId: string }>(
+    'ade-base',
+    'args:AdeTaskService.CreateTask.bases#develop',
+  );
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskRepoBranches, response: picker },
+  ]);
+  await page.locator(t('ade-add')).click();
+  await page.locator(t('ade-nw-title')).fill('Export CSV');
+  await page.locator(t('ade-nw-repo'), { hasText: 'api' }).click();
+  await page
+    .locator(`${t('ade-nw-base')}[data-repo-id="repo-api"]`)
+    .locator(t('ade-base-picker'))
+    .click();
+  await page.locator(t(`ade-base-option-${picker.branches[0]?.name}`)).click();
+  await page.locator(t('ade-nw-add')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskCreateTask)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskCreateTask)[0]?.args).toMatchObject({
+    bases: { 'repo-api': choice },
+  });
+});
+
+test('contract: a conflicting rebase is reported, left in progress, and Abort rebase asks first', async ({
+  relaunch,
+}) => {
+  const conflict = contract<{
+    outcome: { reason: string; rebase: { conflictedFiles: string[]; branches: object[] } };
+  }>('ade-base', 'AdeTaskService.Run#rebase-conflict');
+  const stuck = contract<{ rebaseInProgress: boolean }>(
+    'ade-base',
+    'AdeTaskService.Branch#rebase-conflict',
+  );
+  const run = rebaseRun('r_rb1', 'b_auth', 'T_auth', {
+    ...conflict,
+    id: 'r_rb1',
+    taskId: 'T_auth',
+    branchId: 'b_auth',
+    startedAt: 1790060000000,
+    finishedAt: 1790060100000,
+    outcome: {
+      ...conflict.outcome,
+      rebase: {
+        ...conflict.outcome.rebase,
+        branches: conflict.outcome.rebase.branches.map((b) => ({ ...b, branchId: 'b_auth' })),
+      },
+    },
+  });
+  const { window: page, control } = await open(relaunch, (b) => {
+    Object.assign(branch(b, 'b_auth'), {
+      base: 'develop',
+      basePendingFrom: 'main',
+      rebaseInProgress: stuck.rebaseInProgress,
+    });
+    b.tasks.find((x) => x.id === 'T_auth')?.runs.push(run);
+  });
+  await page.locator(row('b_auth')).click();
+  const out = page.locator(t('ade-run-outcome'));
+  await expect(out.locator(t('ade-outcome-reason'))).toHaveText(conflict.outcome.reason);
+  for (const file of conflict.outcome.rebase.conflictedFiles) {
+    await expect(out.locator(t('ade-outcome-files'))).toContainText(file);
+  }
+  await page.locator(t('ade-panel-action-abort-rebase')).click();
+  await page.getByRole('button', { name: 'Abort rebase' }).click();
+  await expect.poll(() => calls(control, IPC.adeTaskAbortRebase)).toHaveLength(1);
 });

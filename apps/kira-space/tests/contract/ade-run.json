@@ -1,0 +1,61 @@
+{
+  "AdeTaskService.Run#one-done": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": true,
+      "result": "done",
+      "route": "next",
+      "source": "agent",
+      "status": "done",
+      "summary": "summary-done"
+    },
+    "purpose": "",
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "done",
+    "stepId": "one",
+    "summary": "summary-done",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#two-done": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:4>",
+    "loops": 0,
+    "note": "",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": true,
+      "result": "done",
+      "route": "next",
+      "source": "agent",
+      "status": "done",
+      "summary": "summary-done"
+    },
+    "purpose": "",
+    "sessionId": "<masked>",
+    "stageId": "build",
+    "startedAt": 0,
+    "state": "done",
+    "stepId": "two",
+    "summary": "summary-done",
+    "taskId": "<id:3>"
+  },
+  "args:AdeTaskService.Approve": {
+    "stageId": "build",
+    "stepId": "two",
+    "taskId": "<id:3>"
+  }
+}

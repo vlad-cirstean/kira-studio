@@ -118,6 +118,12 @@ func TestRefreshDefaultSettings(t *testing.T) {
 		}
 	}
 
+	// Contract ade-board: tests/ui/ade-v2-plan.spec.ts "contract: Refresh all ..." reads these.
+	before := board(t, app)
+	for _, name := range []string{"tracked", "noremote"} {
+		st, _ := repoState(before, recs[name])
+		app.Contract(t, "ade-board", "AdeTaskService.Board#repo-"+name+"-before", st)
+	}
 	res, err := app.W.AdeTask.Refresh(ctx, adewire.RefreshArgs{})
 	if err != nil {
 		t.Fatal(err)
@@ -125,6 +131,11 @@ func TestRefreshDefaultSettings(t *testing.T) {
 	rows := map[string]adewire.RepoRefresh{}
 	for _, r := range res.Repos {
 		rows[r.CodeRepoID] = r
+	}
+	for _, name := range []string{"tracked", "noremote"} {
+		app.Contract(t, "ade-board", "AdeTaskService.Refresh#"+name, rows[recs[name]])
+		st, _ := repoState(board(t, app), recs[name])
+		app.Contract(t, "ade-board", "AdeTaskService.Board#repo-"+name+"-after", st, flowharness.Mask("lastFetchAt"))
 	}
 	if len(rows) != 4 {
 		t.Fatalf("refresh-all answered %d repos, want 4", len(rows))

@@ -62,6 +62,8 @@ func TestRunLifecycle(t *testing.T) {
 		if one.Summary != "summary-done" {
 			t.Fatalf("run = %+v, want the finish_step summary", one)
 		}
+		// Contract ade-run: tests/ui/ade-v2-run.spec.ts "contract: ..." reads these.
+		app.Contract(t, "ade-run", "AdeTaskService.Run#one-done", one, flowharness.Mask("startedAt", "finishedAt", "sessionId", "createdAt"))
 		if _, queued := latestRun(t, app, f.taskID, "two"); queued {
 			t.Fatal("approval step started without Approve")
 		}
@@ -104,10 +106,11 @@ func TestRunLifecycle(t *testing.T) {
 		if err := app.W.AdeTask.Approve(ctx, step("one")); err == nil {
 			t.Fatal("Approve accepted for a step that is not waiting")
 		}
+		app.Contract(t, "ade-run", "args:AdeTaskService.Approve", step("two"))
 		if err := app.W.AdeTask.Approve(ctx, step("two")); err != nil {
 			t.Fatal(err)
 		}
-		waitRun(t, app, f.taskID, "two", "done")
+		app.Contract(t, "ade-run", "AdeTaskService.Run#two-done", waitRun(t, app, f.taskID, "two", "done"), flowharness.Mask("startedAt", "finishedAt", "sessionId", "createdAt"))
 
 		task, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
 		if err != nil || task.StageID != "review" {

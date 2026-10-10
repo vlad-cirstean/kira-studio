@@ -1,5 +1,8 @@
 import type { Page } from '@playwright/test';
+import { scriptRunSchema } from '@shared/domain/scriptRuns';
+import { customScriptSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import { emitPrompts, routed } from './support/prompts';
@@ -334,4 +337,111 @@ test('the editor targets an ADE task through the task picker', async ({ relaunch
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.customScriptsUpdate)?.args)
     .toMatchObject({ id: SCRIPT.id, fields: { schedule: { taskId: 'task-1' } } });
+});
+
+// Contract schedule-confirm and schedule-now. Backend half: termflow TestScheduleConfirm and
+// TestRunScheduleNow (fake clock) store the same fixtures.
+const CONTRACT_TIMES = { createdAt: 2_000, startedAt: 2_000 };
+
+test('contract: a waiting run asks, Run starts it headless and it ends Succeeded', async ({
+  relaunch,
+}) => {
+  const script = contract('schedule-confirm', 'CustomScriptsService.Create', {
+    schema: customScriptSchema,
+  });
+  const preview = contract<{ command: string; dir: { path: string } }>(
+    'schedule-confirm',
+    'ScriptRunsService.SchedulePreview',
+  );
+  const waiting = contract('schedule-confirm', 'ScriptRunsService.Get#waiting', {
+    schema: scriptRunSchema,
+  });
+  const done = contract('schedule-confirm', 'ScriptRunsService.Get#done', {
+    schema: scriptRunSchema,
+  });
+  const accept = contract<{ runId: string }>(
+    'schedule-confirm',
+    'args:ScriptRunsService.ConfirmAccept',
+  );
+  const log = contract<{ chunks: { text: string }[] }>(
+    'schedule-confirm',
+    'ScriptRunsService.ReadLog',
+  );
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
+      { channel: IPC.scriptRunsResolveDir, response: preview.dir },
+      { channel: IPC.scriptRunsNextFires, response: FIRES },
+      { channel: IPC.scriptRunsMainWindow, response: 'main' },
+      { channel: IPC.scriptRunsSchedulePreview, response: preview },
+      {
+        channel: IPC.scriptRunsConfirmAccept,
+        response: contract('schedule-confirm', 'ScriptRunsService.ConfirmAccept'),
+      },
+      { channel: IPC.scriptRunsReadLog, response: log },
+    ],
+  });
+  await openPanel(page);
+  await emitWailsEvent(page, IPC.scriptRunsChanged, {
+    ...waiting,
+    ...CONTRACT_TIMES,
+    startedAt: null,
+  });
+  const popup = page.locator('[data-testid="schedule-confirm"]');
+  await expect(popup).toContainText(`Run ${script.name}?`);
+  await expect(popup.locator('[data-testid="run-command"]')).toContainText(preview.command);
+  await popup.locator('[data-testid="schedule-confirm-run"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.scriptRunsConfirmAccept)?.args)
+    .toMatchObject({ runId: accept.runId });
+
+  await emitWailsEvent(page, IPC.scriptRunsChanged, {
+    ...done,
+    ...CONTRACT_TIMES,
+    finishedAt: 3_000,
+  });
+  await expect(
+    page.locator('[data-testid="run-row"][data-state="done"] [data-testid="run-status"]'),
+  ).toHaveText('Succeeded');
+  await page.locator('[data-testid="run-row"][data-state="done"] button').first().click();
+  await expect(
+    page.locator('[data-testid="script-run-view"] [data-testid="run-log"]'),
+  ).toContainText(log.chunks[0].text);
+});
+
+test('contract: Run now starts the schedule run at once', async ({ relaunch }) => {
+  const script = contract('schedule-now', 'CustomScriptsService.Create', {
+    schema: customScriptSchema,
+  });
+  const preview = contract<{ dir: { path: string } }>(
+    'schedule-now',
+    'ScriptRunsService.SchedulePreview',
+  );
+  const sent = contract<{ scriptId: string }>(
+    'schedule-now',
+    'args:ScriptRunsService.RunScheduleNow',
+  );
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
+      { channel: IPC.scriptRunsResolveDir, response: preview.dir },
+      { channel: IPC.scriptRunsNextFires, response: FIRES },
+      { channel: IPC.scriptRunsMainWindow, response: 'main' },
+      { channel: IPC.scriptRunsSchedulePreview, response: preview },
+      {
+        channel: IPC.scriptRunsRunScheduleNow,
+        response: contract('schedule-now', 'ScriptRunsService.RunScheduleNow'),
+      },
+    ],
+  });
+  await openPanel(page);
+  await page.locator(`[data-testid="script-${script.id}"]`).click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-run-now"]').click();
+  const popup = page.locator('[data-testid="schedule-confirm"]');
+  await expect(popup.locator('[data-testid="schedule-confirm-due"]')).toHaveText('Now');
+  await popup.locator('[data-testid="schedule-confirm-run"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.scriptRunsRunScheduleNow)?.args)
+    .toMatchObject({ scriptId: sent.scriptId });
+  await expect(popup).toHaveCount(0);
 });

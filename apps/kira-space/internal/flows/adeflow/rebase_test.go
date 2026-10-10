@@ -57,6 +57,9 @@ func (f *rbFx) agent(sh string, finish map[string]any) {
 	claude(f.app, map[string][]fakeagent.Action{"*": {a}})
 }
 
+// rebaseMask hides what changes per run: times, the agent session and commit shas.
+var rebaseMask = flowharness.Mask("startedAt", "finishedAt", "sessionId", "before", "after", "ontoTip", "exitCode", "tip", "createdAt", "sha", "addedAt", "lastCommitAt")
+
 const rebaseSh = "git fetch -q origin && git rebase -q origin/main"
 
 func done() map[string]any { return map[string]any{"status": "done", "summary": "rebased"} }
@@ -105,6 +108,7 @@ func TestRebaseRun(t *testing.T) {
 		if run.State != "done" || run.Purpose != "rebase" || run.Outcome == nil || run.Outcome.Rebase == nil {
 			t.Fatalf("run = %+v, want done rebase with facts", run)
 		}
+		f.app.Contract(t, "ade-base", "AdeTaskService.Run#rebase-done", run, rebaseMask)
 		facts := run.Outcome.Rebase
 		after := gitOut(t, br.Worktree, "rev-parse", "HEAD")
 		if !facts.Verified || len(facts.Branches) != 1 || facts.Branches[0].Before != before || facts.Branches[0].After != after || !facts.Branches[0].OnBase {
@@ -145,6 +149,8 @@ func TestRebaseRun(t *testing.T) {
 		if cur := f.branch(t, task.ID); !cur.RebaseInProgress || cur.Worktree != br.Worktree {
 			t.Fatalf("board branch = worktree %q rebaseInProgress %v, want %q and true", cur.Worktree, cur.RebaseInProgress, br.Worktree)
 		}
+		f.app.Contract(t, "ade-base", "AdeTaskService.Run#rebase-conflict", run, rebaseMask)
+		f.app.Contract(t, "ade-base", "AdeTaskService.Branch#rebase-conflict", f.branch(t, task.ID), rebaseMask)
 		if err := f.app.W.AdeTask.AbortRebase(ctx, adewire.BranchArgs{BranchID: br.ID}); err != nil {
 			t.Fatalf("AbortRebase: %v", err)
 		}
@@ -152,6 +158,7 @@ func TestRebaseRun(t *testing.T) {
 		if run.Outcome.Rebase == nil || !run.Outcome.Rebase.Aborted || run.Outcome.Rebase.InProgress {
 			t.Fatalf("after abort facts = %+v, want aborted and not in progress", run.Outcome.Rebase)
 		}
+		f.app.Contract(t, "ade-base", "AdeTaskService.Run#rebase-aborted", run, rebaseMask)
 		if err := f.app.W.AdeTask.AbortRebase(ctx, adewire.BranchArgs{BranchID: br.ID}); err == nil {
 			t.Fatal("second AbortRebase succeeded with nothing in progress")
 		}

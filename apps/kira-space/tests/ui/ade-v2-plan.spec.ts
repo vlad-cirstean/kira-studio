@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { adeFixture, bandOf, openPlan } from './support/adeV2';
+import { adeFixture, bandOf, FIXED_NOW, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 
 // The ade v2 Plan on the committed board fixture, anchored to Tue 2026-09-22.
@@ -232,4 +233,56 @@ test('a repo chip reports what the last fetch changed', async ({ relaunch }) => 
       '[data-testid="ade-repo-chip"][data-repo-id="repo-web-app"] [data-testid="ade-repo-note"]',
     ),
   ).toContainText('3 refs changed · 1 merged into develop');
+});
+
+// Contract ade-board. Backend half: adeflow TestRefreshDefaultSettings (one repo with a remote that
+// another clone pushed to, one without). Fixture repos repo-api and repo-mobile take the two states.
+function boardWithStates(phase: 'before' | 'after'): BoardFx {
+  const board = adeFixture<BoardFx>('board');
+  const state = (name: string, id: string) => ({
+    ...contract<Record<string, unknown>>('ade-board', `AdeTaskService.Board#repo-${name}-${phase}`),
+    codeRepoId: id,
+    ...(phase === 'after' && name === 'tracked' ? { lastFetchAt: FIXED_NOW - 30_000 } : {}),
+  });
+  board.repos = board.repos.map((r) =>
+    r.codeRepoId === 'repo-api'
+      ? (state('tracked', 'repo-api') as typeof r)
+      : r.codeRepoId === 'repo-mobile'
+        ? (state('noremote', 'repo-mobile') as typeof r)
+        : r,
+  );
+  return board;
+}
+
+const repoNote = (page: Page, id: string) =>
+  page.locator(`[data-testid="ade-repo-chip"][data-repo-id="${id}"] [data-testid="ade-repo-note"]`);
+
+test('contract: before a refresh the repo with a remote was never fetched, the other has none', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: boardWithStates('before') },
+  ]);
+  await expect(repoNote(page, 'repo-api')).toHaveText('never fetched');
+  await expect(repoNote(page, 'repo-mobile')).toHaveText('no remote');
+});
+
+test('contract: Refresh all fetches a repo with a remote and rescans one without', async ({
+  relaunch,
+}) => {
+  const refresh = (name: string, id: string) => ({
+    ...contract<Record<string, unknown>>('ade-board', `AdeTaskService.Refresh#${name}`),
+    codeRepoId: id,
+  });
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: boardWithStates('after') },
+    {
+      channel: IPC.adeTaskRefresh,
+      response: { repos: [refresh('tracked', 'repo-api'), refresh('noremote', 'repo-mobile')] },
+    },
+  ]);
+  await page.locator('[data-testid="ade-refresh-all"]').click();
+  await expect(repoNote(page, 'repo-api')).toContainText('1 ref');
+  await expect(repoNote(page, 'repo-mobile')).toHaveText('no remote · no changes');
+  await expect(page.locator('[data-testid="ade-repo-note"].text-tone-red')).toHaveCount(0);
 });

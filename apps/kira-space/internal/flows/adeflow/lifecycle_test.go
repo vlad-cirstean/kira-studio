@@ -26,19 +26,23 @@ func doneFixture(t *testing.T, branch string) (*runFixture, adewire.Branch) {
 func TestArchiveRisk(t *testing.T) {
 	f, br := doneFixture(t, "feat/api-risk")
 	app := f.app
-	if risk, err := app.W.AdeTask.ArchiveRisk(ctx, adewire.TaskArgs{TaskID: f.taskID}); err != nil || len(risk.Branches) != 1 ||
-		risk.Branches[0].Unmerged != 0 || len(risk.Branches[0].Dirty) != 0 {
+	risk, err := app.W.AdeTask.ArchiveRisk(ctx, adewire.TaskArgs{TaskID: f.taskID})
+	if err != nil || len(risk.Branches) != 1 || risk.Branches[0].Unmerged != 0 || len(risk.Branches[0].Dirty) != 0 {
 		t.Fatalf("clean worktree risk = %+v, %v, want nothing at risk", risk, err)
 	}
+	// Contract ade-task: tests/ui/ade-v2-archive.spec.ts "contract: ..." reads these.
+	app.Contract(t, "ade-task", "AdeTaskService.ArchiveRisk#clean", risk)
 
 	commitIn(t, br.Worktree, "unpushed.txt")
 	if err := os.WriteFile(filepath.Join(br.Worktree, "wip.txt"), []byte("wip\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	risk, err := app.W.AdeTask.ArchiveRisk(ctx, adewire.TaskArgs{TaskID: f.taskID})
+	risk, err = app.W.AdeTask.ArchiveRisk(ctx, adewire.TaskArgs{TaskID: f.taskID})
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Contract(t, "ade-task", "AdeTaskService.ArchiveRisk#at-risk", risk)
+	app.Contract(t, "ade-task", "args:AdeTaskService.ArchiveTask", adewire.TaskArgs{TaskID: f.taskID})
 	got := risk.Branches[0]
 	if got.BranchID != br.ID || got.Worktree != br.Worktree || got.Unmerged != 1 || len(got.Dirty) != 1 || got.Dirty[0].Path != "wip.txt" {
 		t.Fatalf("risk = %+v, want 1 unmerged commit and dirty wip.txt in %s", got, br.Worktree)

@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
+import { scriptsSnapshotSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -153,4 +155,23 @@ test('Choose folder… switches the script to a fixed folder', async ({ relaunch
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.customScriptsCreate)?.args)
     .toMatchObject({ fields: { dirMode: 'fixed', workingDir: '/tmp/picked' } });
+});
+
+// Contract commands. Backend half: termflow TestCollectionsMoveAndDelete.
+test('contract: a collection with its scripts shows after boot', async ({ relaunch }) => {
+  const library = contract('commands', 'CustomScriptsService.List#grouped', {
+    schema: scriptsSnapshotSchema,
+  });
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.windowsEnsure, response: { mode: 'automations' } },
+      { channel: IPC.customScriptsList, response: library },
+    ],
+  });
+  const group = page.locator('[data-testid="script-group"][data-name="Build"]');
+  await expect(group).toBeVisible();
+  await expect(group).toContainText(String(library.scripts.length));
+  for (const script of library.scripts) {
+    await expect(page.locator(`[data-testid="script-${script.id}"]`)).toBeVisible();
+  }
 });

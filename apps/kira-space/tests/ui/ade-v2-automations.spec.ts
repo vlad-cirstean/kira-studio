@@ -1,6 +1,9 @@
 import type { Page } from '@playwright/test';
+import { scriptRunSchema } from '@shared/domain/scriptRuns';
+import { customScriptSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
 import { adeBoard, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -362,4 +365,108 @@ test('the script editor shows the worktree Switch in Space', async ({ relaunch }
   await page.locator(t('automations-add')).click();
   await page.locator(t('menu-item-new-script')).click();
   await expect(page.locator(t('script-use-ade-dir'))).toBeVisible();
+});
+
+// Contract ade-automation. Backend half: adeflow TestAutomationRun ("variables, tools and folder",
+// "gate both ways"). The task and branch ids are the fixture board's; every other field is the
+// backend's.
+const ALERTS = { taskId: 'T_alerts', taskTitle: 'Usage alerts by email', branchId: 'd_alerts_api' };
+
+function contractRun(key: string, extra: Record<string, unknown> = {}) {
+  const script = contract('ade-automation', 'CustomScriptsService.Create', {
+    schema: customScriptSchema,
+  });
+  return {
+    script,
+    run: {
+      ...contract('ade-automation', `ScriptRunsService.${key}`, { schema: scriptRunSchema }),
+      ...ALERTS,
+      createdAt: 1_000,
+      startedAt: 1_000,
+      ...extra,
+    },
+  };
+}
+
+test('contract: a smart script runs in the task worktree, Running chip then Succeeded', async ({
+  relaunch,
+}) => {
+  const { script, run: running } = contractRun('Get#running');
+  const { run: done } = contractRun('Get#done', { finishedAt: 4_000 });
+  const { window: page } = await openPlan(
+    relaunch,
+    withBase(
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
+      { channel: IPC.scriptRunsList, response: [running] },
+    ),
+  );
+  const chip = page.locator(`${card('T_alerts')} ${t('ade-automation-chip')}`);
+  await expect(chip).toHaveAttribute('data-state', 'running');
+  await expect(chip).toContainText(script.name);
+  await chip.click();
+  await expect(page.locator(t('script-run-header')).locator(t('run-status'))).toHaveText('Running');
+
+  await emitWailsEvent(page, IPC.scriptRunsChanged, done);
+  await expect(page.locator(t('script-run-header')).locator(t('run-status'))).toHaveText(
+    'Succeeded',
+  );
+});
+
+test('contract: the run dialog shows the backend preview for the task branch', async ({
+  relaunch,
+}) => {
+  const { script } = contractRun('Get#running');
+  const pv = contract<{
+    prompt: { var: string; value: string }[];
+    dir: { branch: string };
+    ade: Record<string, string>;
+  }>('ade-automation', 'ScriptRunsService.Preview');
+  const branch = pv.prompt.find((p) => p.var === 'branch')?.value ?? '';
+  const { window: page } = await openPlan(
+    relaunch,
+    withBase(
+      { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
+      { channel: IPC.scriptRunsPreview, response: { ...pv, ade: { ...pv.ade, ...ALERTS } } },
+    ),
+  );
+  await rightClick(page, 'T_alerts');
+  await page.locator(t('menu-item-ade-task-automation')).click();
+  await page.locator(t(`menu-item-ade-automation-${script.id}`)).click();
+  const dialog = page.locator(t('run-dialog'));
+  await expect(
+    dialog.locator('[data-testid="run-prompt-text"] [data-testid="var-chip"][data-var="branch"]'),
+  ).toContainText(branch);
+  await expect(
+    dialog.locator('[data-testid="run-folder"] [data-testid="var-chip"][data-var="branch"]'),
+  ).toContainText(pv.dir.branch);
+  await expect(dialog.locator(t('run-start'))).toBeEnabled();
+});
+
+test('contract: a step run waits behind a running automation', async ({ relaunch }) => {
+  const waiting = contract<Record<string, unknown>>('ade-automation', 'AdeTaskService.Run#waiting');
+  const { window: page } = await openPlan(relaunch, [
+    {
+      channel: IPC.adeTaskBoard,
+      response: adeBoard((b) => {
+        const bill = b.tasks.find((x) => x.id === 'T_bill');
+        if (!bill) throw new Error('fixture task missing');
+        bill.runs = bill.runs.map((r) =>
+          r.id === 'r_T_bill_impl_b_meter'
+            ? {
+                ...waiting,
+                id: r.id,
+                taskId: r.taskId,
+                stageId: r.stageId,
+                stepId: r.stepId,
+                branchId: r.branchId,
+              }
+            : r,
+        );
+      }),
+    },
+  ]);
+  await page
+    .locator('[data-testid="ade-card"][data-task-id="T_bill"] [data-testid="ade-card-head"]')
+    .click();
+  await expect(page.locator(t('ade-panel'))).toContainText(String(waiting.note));
 });

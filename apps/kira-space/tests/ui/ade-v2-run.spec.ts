@@ -8,6 +8,7 @@ import {
   emitRuns,
   openPlan,
 } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -318,4 +319,43 @@ test('a script run offers Output, and the Release block lists the branches', asy
   await open(page, 'T_cart');
   await expect(stage(page, 'release').locator(t('ade-run-log-toggle'))).toHaveText('Output');
   await expect(stage(page, 'release').locator(t('ade-release-row'))).toHaveCount(1);
+});
+
+// Contract ade-run. Backend half: adeflow TestRunLifecycle ("approval, logs and stage done"). Fixture
+// ids replace the backend's; every other field is the backend's.
+test('contract: a finished step run shows done', async ({ relaunch }) => {
+  const one = contract<Record<string, unknown>>('ade-run', 'AdeTaskService.Run#one-done');
+  const { window: page } = await openPlan(relaunch);
+  await open(page, 'T_bill');
+  const line = stage(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
+  await expect(line.locator(t('ade-run-status'))).toHaveText('running');
+  await emitRuns(page, [
+    {
+      ...one,
+      id: 'r_T_bill_impl_b_bill',
+      taskId: 'T_bill',
+      stageId: 'impl',
+      stepId: 'impl',
+      branchId: 'b_bill',
+      startedAt: 1_790_035_200_000,
+      finishedAt: 1_790_035_300_000,
+    },
+  ]);
+  await expect(line.locator(t('ade-run-glyph'))).toHaveText('✓');
+  await expect(line.locator(t('ade-run-status'))).toHaveText(String(one.state));
+});
+
+test('contract: Approve sends the arguments the backend takes', async ({ relaunch }) => {
+  const approve = contract<Record<string, unknown>>('ade-run', 'args:AdeTaskService.Approve');
+  const { window: page, control } = await openPlan(
+    relaunch,
+    boardWith((b) => {
+      const hooks = b.tasks.find((x) => x.id === 'T_hooks');
+      if (hooks) hooks.runs = hooks.runs.filter((r) => r.stepId !== 'pr');
+    }),
+  );
+  await page.locator(cellAction('T_hooks', 'approve')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskApprove)).toHaveLength(1);
+  const sent = calls(control, IPC.adeTaskApprove)[0]?.args as Record<string, unknown>;
+  expect(Object.keys(sent).sort()).toEqual(Object.keys(approve).sort());
 });

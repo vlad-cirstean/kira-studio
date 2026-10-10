@@ -12,6 +12,8 @@
       "!test-results",
       "!playwright-report",
       "!node_modules",
+      "!apps/kira-studio/tests/contract",
+      "!apps/kira-space/tests/contract",
       "!docs/design",
       "!docs/v2.0/design",
       "!.claude",
