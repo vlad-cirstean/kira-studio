@@ -3913,6 +3913,9 @@ and `docs/v2.0/plans/`.
   `normalizeOrder` keeps the start first and forward routes pointing later). A result dot dragged to a step,
   or the route select in the inspector, sets `next`. Stages reorder by dragging the stage strip. The editor
   mode is `graph | yaml`; the graph editor loads asynchronously so the board bundle stays free of Vue Flow.
+  Layout is locked (P255): top to bottom only, every node `256x104`, stages stacked on one spine column,
+  `results:` branches fan to the side, loops run dashed in a left gutter of the stage and enter the target
+  from above, native vertical scroll, no zoom or pan (viewport shrinks only to fit width).
 - Edits save explicitly (P196): Save and Discard in the graph and YAML editors, Cmd/Ctrl+S, no autosave;
   leaving with unsaved edits (list switch, import/new, mode toggle, shell tab change) asks through
   `ConfirmDialog`. Validation stays debounced.
