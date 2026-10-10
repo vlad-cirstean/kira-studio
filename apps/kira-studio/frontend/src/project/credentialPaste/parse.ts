@@ -20,7 +20,7 @@ export interface PasteCandidate {
 }
 
 /** Never carries a pasted value: recognised-but-unusable labels only. */
-export interface PasteNote {
+interface PasteNote {
   label: string;
   reason: string;
 }

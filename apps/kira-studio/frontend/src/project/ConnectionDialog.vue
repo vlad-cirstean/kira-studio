@@ -26,6 +26,7 @@ import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
 import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
@@ -46,6 +47,8 @@ import {
 } from '../state/maskRules';
 import { schemaDialectFor } from '../state/schemas';
 import EngineIcon from '../theme/EngineIcon.vue';
+import CredentialPastePanel from './credentialPaste/CredentialPastePanel.vue';
+import type { PasteField } from './credentialPaste/parse';
 import { revealConnectionSecret } from './state/connectionReveal';
 
 const confirmDialogStore = useConfirmDialogStore();
@@ -361,6 +364,37 @@ function onEyeClick(): void {
 function onPasswordInput(value: string): void {
   if (draft.value) draft.value.password = value;
   revealed.value = true;
+}
+
+// Paste credentials: parsed in the panel, applied into the draft only on its Apply.
+const pasteOpen = ref(false);
+const pasteAllowed = computed<readonly PasteField[]>(() => {
+  const kind = draft.value?.kind;
+  if (kind && AWS_STYLE_KINDS.has(kind)) return ['region', 'profile'];
+  if (kind === 'mongodb') return ['host', 'port', 'database', 'username', 'password', 'authSource'];
+  return ['host', 'port', 'database', 'username', 'password'];
+});
+
+function onPasteApply(values: Partial<Record<PasteField, string>>): void {
+  const d = draft.value;
+  pasteOpen.value = false;
+  if (!d) return;
+  const aws = AWS_STYLE_KINDS.has(d.kind);
+  const database = aws ? values.region : values.database;
+  const username = aws ? values.profile : values.username;
+  if (values.host !== undefined) d.host = values.host;
+  if (values.port !== undefined) d.port = Number(values.port);
+  if (database !== undefined) d.database = database;
+  if (username !== undefined) d.username = username;
+  if (values.password !== undefined) onPasswordInput(values.password);
+  if (values.authSource !== undefined) d.options = { ...d.options, authSource: values.authSource };
+  const touched = new Set<string>();
+  if (values.host !== undefined) touched.add('host');
+  if (values.port !== undefined) touched.add('port');
+  if (database !== undefined) touched.add('database');
+  fieldErrors.value = Object.fromEntries(
+    Object.entries(fieldErrors.value).filter(([key]) => !touched.has(key)),
+  );
 }
 
 // P28 §4.2: with the fields split across tabs, a field error is no longer always on screen — a
@@ -746,6 +780,7 @@ const preconnectText = computed({
             {{ minVersionNote }}
           </p>
 
+          <div class="flex items-end gap-2">
           <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Mode</Label>
             <ToggleGroup
@@ -762,6 +797,23 @@ const preconnectText = computed({
                 Connection URI
               </ToggleGroupItem>
             </ToggleGroup>
+          </div>
+          <Popover v-if="draft.mode === 'fields' && !isFileStyle" v-model:open="pasteOpen">
+            <PopoverTrigger as-child>
+              <Button variant="dialog" size="kira-lg" data-testid="connection-paste-credentials">
+                <CodiconIcon name="clippy" :size="13" />
+                Paste credentials…
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" class="w-96" data-testid="connection-paste-popover">
+              <CredentialPastePanel
+                :kind="draft.kind"
+                :allowed="pasteAllowed"
+                @apply="onPasteApply"
+                @cancel="pasteOpen = false"
+              />
+            </PopoverContent>
+          </Popover>
           </div>
 
           <template v-if="draft.mode === 'fields' && isFileStyle">
