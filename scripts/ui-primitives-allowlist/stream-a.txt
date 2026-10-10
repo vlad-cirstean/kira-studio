@@ -11,12 +11,6 @@ apps/kira-studio/frontend/src/api/VariableHistoryMenu.vue
 apps/kira-studio/frontend/src/api/VariableRow.vue
 apps/kira-studio/frontend/src/api/VariableSetView.vue
 apps/kira-studio/frontend/src/api/VariablesOverviewPanel.vue
-apps/kira-studio/frontend/src/project/ConnectionDialog.vue
-apps/kira-studio/frontend/src/project/CredentialsUpdateDialog.vue
-apps/kira-studio/frontend/src/project/DataGripImportDialog.vue
-apps/kira-studio/frontend/src/project/FiltersDialog.vue
-apps/kira-studio/frontend/src/project/SchemaDialog.vue
-apps/kira-studio/frontend/src/project/credentialPaste/CredentialPastePanel.vue
 apps/kira-studio/frontend/src/views/browse/BrowseView.vue
 apps/kira-studio/frontend/src/views/console/ConsoleView.vue
 apps/kira-studio/frontend/src/views/console/ExplainResultView.vue
@@ -34,7 +28,6 @@ apps/kira-studio/frontend/src/views/grpcrequest/SchemaBrowser.vue
 apps/kira-studio/frontend/src/views/httprequest/HttpRequestView.vue
 apps/kira-studio/frontend/src/views/httprequest/RequestBodyPane.vue
 apps/kira-studio/frontend/src/views/httprequest/RequestSettingsPane.vue
-apps/kira-studio/frontend/src/views/httprequest/ResponseDiffDialog.vue
 apps/kira-studio/frontend/src/views/httprequest/ResponseHistoryList.vue
 apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue
 apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue
@@ -45,9 +38,6 @@ apps/kira-studio/frontend/src/views/shared/page/PagerControls.vue
 apps/kira-studio/frontend/src/views/stream/StreamComposeMessage.vue
 apps/kira-studio/frontend/src/views/stream/StreamSearchToolbar.vue
 apps/kira-studio/frontend/src/views/stream/StreamView.vue
-apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue
-apps/kira-studio/frontend/src/workbench/GenerateDataDialog.vue
-apps/kira-studio/frontend/src/workbench/UploadObjectDialog.vue
 apps/kira-studio/frontend/src/workbench/panels/ProjectPanel.vue
 apps/kira-studio/frontend/src/workbench/panels/StudioStart.vue
 apps/kira-studio/frontend/src/workbench/settings/AdvancedPane.vue
@@ -107,8 +97,6 @@ apps/kira-studio/frontend/src/views/shared/ResponseFindBar.vue
 apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue
 apps/kira-studio/frontend/src/api/CollectionRow.vue
 apps/kira-studio/frontend/src/api/CollectionsTree.vue
-apps/kira-studio/frontend/src/project/ProjectTree.vue
-apps/kira-studio/frontend/src/project/TreeRow.vue
 packages/docker-ui/src/components/ImageList.vue
 packages/docker-ui/src/components/NetworkList.vue
 packages/docker-ui/src/components/VirtualList.vue

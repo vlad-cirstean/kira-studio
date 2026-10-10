@@ -389,7 +389,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   // and explain why (§8.12).
   await page.fill('[data-testid="connection-uri"]', 'postgres://u:p@a.example,b.example/db');
   await page.click('[data-testid="mode-fields"]');
-  await expect(page.locator('[data-testid="mode-uri"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-testid="mode-uri"]')).toHaveAttribute('data-state', 'on');
   await expect(page.locator('[data-testid="connection-host"]')).toHaveCount(0);
   await expect(page.locator('.uri-note')).toContainText('cannot be represented as fields');
 
@@ -428,12 +428,12 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   // no reveal call. Flipping to fields has no URI to convert until it is shown.
   await uriConnRow.click({ button: 'right' });
   await page.click('[data-testid="menu-item-edit"]');
-  await expect(page.locator('[data-testid="mode-uri"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-testid="mode-uri"]')).toHaveAttribute('data-state', 'on');
   await expect(uriField).toHaveValue('');
   await expect(uriField).toHaveAttribute('type', 'password');
   await expect(uriField).toHaveAttribute('placeholder', 'Unchanged — click the eye to reveal');
   await page.click('[data-testid="mode-fields"]');
-  await expect(page.locator('[data-testid="mode-uri"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-testid="mode-uri"]')).toHaveAttribute('data-state', 'on');
   await expect(page.locator('.uri-note')).toContainText('Show the URI first');
   expect(revealCalls()).toHaveLength(0);
 

@@ -47,24 +47,41 @@ function onUpdate(v: unknown): void {
     :aria-label="ariaLabel"
     @update:model-value="onUpdate"
   >
-    <Tooltip v-for="item in items" :key="item.value" :disabled="!item.tooltip">
-      <TooltipTrigger as-child>
-        <ToggleGroupItem
-          :value="item.value"
-          :disabled="item.disabled"
-          :data-testid="item.testid"
-          :class="cn(variant === 'tabs' && 'text-muted-foreground data-[state=on]:text-fg')"
-        >
-          <slot name="item" :item="item" :active="item.value === modelValue">
-            <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" />
-            {{ item.label }}
-            <span v-if="item.count !== undefined" class="text-kira-sm text-muted-foreground">{{ item.count }}</span>
-          </slot>
-        </ToggleGroupItem>
-      </TooltipTrigger>
-      <TooltipContent v-if="item.tooltip">
-        {{ item.tooltip }}
-      </TooltipContent>
-    </Tooltip>
+    <template v-for="item in items" :key="item.value">
+      <!-- A tooltip trigger stamps its own data-state on the element it wraps, which would hide
+           the toggle's on/off state: wrap in a span only when the item has a tooltip. -->
+      <Tooltip v-if="item.tooltip">
+        <TooltipTrigger as-child>
+          <span class="inline-flex">
+            <ToggleGroupItem
+              :value="item.value"
+              :disabled="item.disabled"
+              :data-testid="item.testid"
+              :class="cn(variant === 'tabs' && 'text-muted-foreground data-[state=on]:text-fg')"
+            >
+              <slot name="item" :item="item" :active="item.value === modelValue">
+                <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" />
+                {{ item.label }}
+                <span v-if="item.count !== undefined" class="text-kira-sm text-muted-foreground">{{ item.count }}</span>
+              </slot>
+            </ToggleGroupItem>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{{ item.tooltip }}</TooltipContent>
+      </Tooltip>
+      <ToggleGroupItem
+        v-else
+        :value="item.value"
+        :disabled="item.disabled"
+        :data-testid="item.testid"
+        :class="cn(variant === 'tabs' && 'text-muted-foreground data-[state=on]:text-fg')"
+      >
+        <slot name="item" :item="item" :active="item.value === modelValue">
+          <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" />
+          {{ item.label }}
+          <span v-if="item.count !== undefined" class="text-kira-sm text-muted-foreground">{{ item.count }}</span>
+        </slot>
+      </ToggleGroupItem>
+    </template>
   </ToggleGroup>
 </template>

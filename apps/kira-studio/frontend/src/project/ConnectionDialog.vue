@@ -16,24 +16,25 @@ import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
-import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
-import { Tabs, TabsContent, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
+import { Tabs, TabsContent } from '@theme/components/ui/tabs';
 import { Textarea } from '@theme/components/ui/textarea';
-import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
@@ -107,13 +108,19 @@ const connectionColors = PALETTE_COLOR_CHOICES;
 // data-testid (connection-mcp-<class>) prefix.
 function mcpModeOptions(
   cls: 'read' | 'write' | 'ddl',
-): readonly { value: McpPermissionMode; label: string; testid: string }[] {
+): readonly { value: McpPermissionMode; label: string; testid: string; disabled: boolean }[] {
+  const disabled = !draft.value?.mcpEnabled;
   return [
-    { value: 'deny', label: 'Deny', testid: `connection-mcp-${cls}-deny` },
-    { value: 'allow', label: 'Allow', testid: `connection-mcp-${cls}-allow` },
-    { value: 'prompt', label: 'Ask me', testid: `connection-mcp-${cls}-prompt` },
+    { value: 'deny', label: 'Deny', testid: `connection-mcp-${cls}-deny`, disabled },
+    { value: 'allow', label: 'Allow', testid: `connection-mcp-${cls}-allow`, disabled },
+    { value: 'prompt', label: 'Ask me', testid: `connection-mcp-${cls}-prompt`, disabled },
   ];
 }
+
+const MODE_ITEMS = [
+  { value: 'fields', label: 'Fields', testid: 'mode-fields' },
+  { value: 'uri', label: 'Connection URI', testid: 'mode-uri' },
+] as const;
 
 const draft = computed(() => connectionDialogStore.draft);
 const isEdit = computed(() => connectionDialogStore.mode === 'edit');
@@ -146,12 +153,12 @@ watch(step, (s) => {
   if (s === 'details') activeTab.value = 'General';
 });
 
-const DETAIL_TABS: readonly { value: DetailTab; testid: string }[] = [
-  { value: 'General', testid: 'connection-tab-general' },
-  { value: 'Advanced', testid: 'connection-tab-advanced' },
-  { value: 'Pre-connect', testid: 'connection-tab-preconnect' },
-  { value: 'MCP', testid: 'connection-tab-mcp' },
-  { value: 'Privacy', testid: 'connection-tab-privacy' },
+const DETAIL_TABS: readonly { value: DetailTab; label: string; testid: string }[] = [
+  { value: 'General', label: 'General', testid: 'connection-tab-general' },
+  { value: 'Advanced', label: 'Advanced', testid: 'connection-tab-advanced' },
+  { value: 'Pre-connect', label: 'Pre-connect', testid: 'connection-tab-preconnect' },
+  { value: 'MCP', label: 'MCP', testid: 'connection-tab-mcp' },
+  { value: 'Privacy', label: 'Privacy', testid: 'connection-tab-privacy' },
 ];
 
 const showPassword = ref(false);
@@ -629,81 +636,50 @@ const preconnectText = computed({
 
 <template>
   <Dialog v-if="draft" :open="true" @update:open="(v) => !v && connectionDialogStore.closeDialog()">
-    <!-- h-138 (was h-136): P123 moved every label/description here onto text-kira-md, which grew
-         the MCP tab -- this dialog's tallest -- past the old fixed height by ~6px
-         (connection-dialog-tabs.spec.ts's own "box never moves" test caught it). -->
-    <DialogContent
-      :show-close-button="false"
-      data-testid="connection-dialog"
-      class="flex flex-col p-0 gap-0 w-155 h-138"
-    >
+    <DialogContent size="xl" fixed-height data-testid="connection-dialog">
       <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
-      <DialogHeader v-if="step === 'engine'">
-        <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
+      <DialogHeader v-if="step === 'engine'" icon="database" closable close-testid="connection-dialog-close">
         <DialogTitle>{{ isEdit ? 'Change engine' : 'New connection' }}</DialogTitle>
-        <span class="flex min-w-0 ml-auto" />
+        <span class="min-w-0 grow" />
         <Button v-if="isEdit" variant="toolbar" size="kira" @click="step = 'details'">
           <CodiconIcon name="chevron-left" :size="13" />
           Back
         </Button>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Close"
-            data-testid="connection-dialog-close"
-            @click="connectionDialogStore.closeDialog"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
       <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
            is identity here, not a control (changed via "Change engine" back to step 1). -->
-      <DialogHeader v-else>
+      <DialogHeader v-else closable close-testid="connection-dialog-close">
         <span class="flex shrink-0" :class="KIND_ACCENT_CLASS[draft.kind]">
           <EngineIcon :kind="draft.kind" :size="13" />
         </span>
         <DialogTitle>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</DialogTitle>
+        <span class="min-w-0 grow" />
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira" class="ml-auto" @click="step = 'engine'">
+            <Button variant="toolbar" size="kira" @click="step = 'engine'">
               <CodiconIcon name="chevron-left" :size="13" />
               Change engine
             </Button>
           </TooltipTrigger>
           <TooltipContent>Pick a different engine</TooltipContent>
         </Tooltip>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Close"
-            data-testid="connection-dialog-close"
-            @click="connectionDialogStore.closeDialog"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="flex-1 min-h-0 overflow-auto" data-testid="connection-dialog-body">
+      <DialogBody flush data-testid="connection-dialog-body">
     <template v-if="step === 'engine'">
       <div class="flex flex-col gap-3 p-3 min-h-0 flex-1">
-        <InputGroup variant="kira" class="flex h-control-lg font-ui">
-          <CodiconIcon name="search" :size="13" class="shrink-0 text-muted-foreground" />
-          <InputGroupInput
-            v-model="engineSearch"
-            placeholder="Search engines"
-            class="h-full p-0 font-ui"
-            data-testid="connection-engine-search"
-          />
-        </InputGroup>
+        <SearchField
+          v-model="engineSearch"
+          size="kira-lg"
+          placeholder="Search engines"
+          class="font-ui"
+          data-testid="connection-engine-search"
+        />
 
         <fieldset class="grid grid-cols-3 gap-1.5 content-start m-0 border-0 p-0" aria-label="Connection kind" data-testid="connection-kind">
           <Tooltip v-for="kind in filteredKinds" :key="kind">
             <TooltipTrigger as-child>
-              <label
+              <div
                 class="relative flex flex-col items-start gap-1 py-3 px-2 border rounded-kira bg-bg cursor-pointer text-left text-inherit not-data-[off]:hover:bg-hover not-data-[off]:hover:border-border-strong focus-within:border-focus data-[off]:opacity-40 data-[off]:cursor-default"
                 :class="draft.kind === kind ? 'border-focus' : 'border-border'"
                 :data-off="SUPPORTED_KINDS.has(kind) ? undefined : ''"
@@ -715,6 +691,7 @@ const preconnectText = computed({
                   :value="kind"
                   :checked="draft.kind === kind"
                   :disabled="!SUPPORTED_KINDS.has(kind)"
+                  :aria-label="KIND_LABEL[kind]"
                   :data-testid="`connection-kind-${kind}`"
                   @click="pickKind(kind)"
                   @change="pickKind(kind)"
@@ -726,7 +703,7 @@ const preconnectText = computed({
                   <EngineIcon :kind="kind" :size="22" />
                 </span>
                 <span class="text-kira-md text-fg">{{ KIND_LABEL[kind] }}</span>
-              </label>
+              </div>
             </TooltipTrigger>
             <TooltipContent>{{ KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported') }}</TooltipContent>
           </Tooltip>
@@ -734,24 +711,21 @@ const preconnectText = computed({
       </div>
     </template>
     <template v-else>
-      <Tabs :model-value="activeTab" class="flex flex-col gap-2 p-3" @update:model-value="(v) => (activeTab = v as DetailTab)">
-          <TabsList class="w-full border-b border-border pb-1.5" aria-label="Connection detail tabs">
-            <TabsTrigger
-              v-for="t in DETAIL_TABS"
-              :key="t.value"
-              :value="t.value"
-              :class="tabChipVariants({ active: activeTab === t.value })"
-              :data-testid="t.testid"
-            >
-              {{ t.value }}
-            </TabsTrigger>
-          </TabsList>
+      <Tabs :model-value="activeTab" class="flex flex-col" @update:model-value="(v) => (activeTab = v as DetailTab)">
+          <ViewToolbar class="px-3">
+            <SecondaryTabs
+              :model-value="activeTab"
+              :items="DETAIL_TABS"
+              aria-label="Connection detail tabs"
+              @update:model-value="(v) => (activeTab = v as DetailTab)"
+            />
+          </ViewToolbar>
 
-          <TabsContent value="General" class="flex flex-col gap-2">
+          <TabsContent value="General" class="flex flex-col gap-3 p-3">
           <div class="flex gap-2 items-start">
             <div class="flex flex-col gap-1 flex-2 text-kira-md">
               <Label class="leading-none text-muted-foreground">Name</Label>
-              <Input v-model="draft.name" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-ui" data-testid="connection-name" />
+              <Input v-model="draft.name" class="font-ui" data-testid="connection-name" />
             </div>
             <div class="flex flex-col gap-1 flex-none text-kira-md">
               <Label class="leading-none text-muted-foreground">Color</Label>
@@ -783,20 +757,13 @@ const preconnectText = computed({
           <div class="flex items-end gap-2">
           <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Mode</Label>
-            <ToggleGroup
-              type="single"
-              variant="outline"
+            <SecondaryTabs
+              variant="segmented"
               size="kira-lg"
               :model-value="draft.mode"
-              @update:model-value="(v) => v && setMode(v as 'fields' | 'uri')"
-            >
-              <ToggleGroupItem value="fields" data-testid="mode-fields" :class="{ active: draft.mode === 'fields' }">
-                Fields
-              </ToggleGroupItem>
-              <ToggleGroupItem value="uri" data-testid="mode-uri" :class="{ active: draft.mode === 'uri' }">
-                Connection URI
-              </ToggleGroupItem>
-            </ToggleGroup>
+              :items="MODE_ITEMS"
+              @update:model-value="(v) => setMode(v as 'fields' | 'uri')"
+            />
           </div>
           <Popover v-if="draft.mode === 'fields' && !isFileStyle" v-model:open="pasteOpen">
             <PopoverTrigger as-child>
@@ -823,7 +790,7 @@ const preconnectText = computed({
                 <div class="flex-1 min-w-0">
                   <Input
                     :model-value="draft.database ?? ''"
-                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                    class="font-data"
                     data-testid="connection-database"
                     @update:model-value="draft.database = String($event)"
                   />
@@ -841,7 +808,7 @@ const preconnectText = computed({
                 <Label class="leading-none text-muted-foreground">Host</Label>
                 <Input
                   :model-value="draft.host ?? ''"
-                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                  class="font-data"
                   data-testid="connection-host"
                   @update:model-value="draft.host = String($event)"
                 />
@@ -861,7 +828,7 @@ const preconnectText = computed({
                 <Label class="leading-none text-muted-foreground">Region</Label>
                 <Input
                   :model-value="draft.database ?? ''"
-                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                  class="font-data"
                   data-testid="connection-database"
                   @update:model-value="draft.database = String($event)"
                 />
@@ -870,7 +837,7 @@ const preconnectText = computed({
                 <Label class="leading-none text-muted-foreground">AWS profile (optional)</Label>
                 <Input
                   :model-value="draft.username ?? ''"
-                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                  class="font-data"
                   data-testid="connection-username"
                   @update:model-value="draft.username = String($event)"
                 />
@@ -881,7 +848,7 @@ const preconnectText = computed({
                 <Label class="leading-none text-muted-foreground">Database</Label>
                 <Input
                   :model-value="draft.database ?? ''"
-                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                  class="font-data"
                   data-testid="connection-database"
                   @update:model-value="draft.database = String($event)"
                 />
@@ -891,7 +858,7 @@ const preconnectText = computed({
                   <Label class="leading-none text-muted-foreground">User</Label>
                   <Input
                     :model-value="draft.username ?? ''"
-                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                    class="font-data"
                     data-testid="connection-username"
                     @update:model-value="draft.username = String($event)"
                   />
@@ -903,7 +870,7 @@ const preconnectText = computed({
                       <Input
                         :model-value="draft.password ?? ''"
                         :type="showPassword ? 'text' : 'password'"
-                        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                        class="font-data"
                         :placeholder="revealed ? undefined : 'Unchanged — click the eye to reveal'"
                         data-testid="connection-password"
                         @update:model-value="(v) => onPasswordInput(String(v))"
@@ -927,7 +894,7 @@ const preconnectText = computed({
                   <Input
                     :model-value="draft.uri ?? ''"
                     :type="showPassword ? 'text' : 'password'"
-                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+                    class="font-data"
                     :placeholder="revealed ? undefined : 'Unchanged — click the eye to reveal'"
                     data-testid="connection-uri"
                     @update:model-value="(v) => setUri(String(v))"
@@ -944,7 +911,7 @@ const preconnectText = computed({
           </template>
           </TabsContent>
 
-          <TabsContent value="Advanced" class="flex flex-col gap-2">
+          <TabsContent value="Advanced" class="flex flex-col gap-3 p-3">
           <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
               :model-value="draft.readOnly"
@@ -952,7 +919,7 @@ const preconnectText = computed({
               data-testid="connection-readonly"
               @update:model-value="(v) => { if (draft) draft.readOnly = v === true; }"
             >
-              <CodiconIcon name="check" :size="10" />
+              <CodiconIcon name="check" :size="12" />
             </Checkbox>
             <span>Read-only</span>
             <span class="text-subtle text-kira-sm leading-normal w-full">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
@@ -965,7 +932,7 @@ const preconnectText = computed({
               data-testid="connection-auto-explain"
               @update:model-value="(v) => { if (draft) draft.autoExplain = v === true; }"
             >
-              <CodiconIcon name="check" :size="10" />
+              <CodiconIcon name="check" :size="12" />
             </Checkbox>
             <span>Auto-explain SELECT queries</span>
             <span class="text-subtle text-kira-sm leading-normal w-full">
@@ -999,7 +966,7 @@ const preconnectText = computed({
           </div>
           </TabsContent>
 
-          <TabsContent value="Pre-connect" class="flex flex-col gap-2">
+          <TabsContent value="Pre-connect" class="flex flex-col gap-3 p-3">
           <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Pre-connect command <span class="text-subtle">— optional</span></Label>
             <Textarea
@@ -1027,7 +994,7 @@ const preconnectText = computed({
               data-testid="connection-preconnect-sidecar"
               @update:model-value="(v) => { if (draft) draft.preconnectSidecar = v === true; }"
             >
-              <CodiconIcon name="check" :size="10" />
+              <CodiconIcon name="check" :size="12" />
             </Checkbox>
             <span>Keep it running, disconnect if it dies</span>
             <span class="text-subtle text-kira-sm leading-normal w-full">
@@ -1039,7 +1006,7 @@ const preconnectText = computed({
           </Label>
           </TabsContent>
 
-          <TabsContent value="MCP" class="flex flex-col gap-2">
+          <TabsContent value="MCP" class="flex flex-col gap-3 p-3">
           <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
               :model-value="draft.mcpEnabled"
@@ -1047,7 +1014,7 @@ const preconnectText = computed({
               data-testid="connection-mcp-enabled"
               @update:model-value="(v) => { if (draft) draft.mcpEnabled = v === true; }"
             >
-              <CodiconIcon name="check" :size="10" />
+              <CodiconIcon name="check" :size="12" />
             </Checkbox>
             <span>Expose to the database MCP server</span>
             <span class="text-subtle text-kira-sm leading-normal w-full">
@@ -1082,7 +1049,7 @@ const preconnectText = computed({
               data-testid="connection-mcp-auto-explain"
               @update:model-value="(v) => { if (draft) draft.mcpAutoExplain = v === true; }"
             >
-              <CodiconIcon name="check" :size="10" />
+              <CodiconIcon name="check" :size="12" />
             </Checkbox>
             <span>Plan queries before running them</span>
             <span v-if="!mcpExplainSupported" class="text-subtle text-kira-sm leading-normal w-full">
@@ -1092,63 +1059,36 @@ const preconnectText = computed({
 
           <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Read <span class="text-subtle">— SELECT and its engine equivalents</span></Label>
-            <ToggleGroup
-              type="single"
+            <SecondaryTabs
+              variant="segmented"
               size="kira-lg"
               :model-value="draft.mcpReadMode"
-              :disabled="!draft.mcpEnabled"
+              :items="mcpModeOptions('read')"
               data-testid="connection-mcp-read"
-              @update:model-value="(v) => v && draft && (draft.mcpReadMode = v as McpPermissionMode)"
-            >
-              <ToggleGroupItem
-                v-for="opt in mcpModeOptions('read')"
-                :key="opt.value"
-                :value="opt.value"
-                :data-testid="opt.testid"
-              >
-                {{ opt.label }}
-              </ToggleGroupItem>
-            </ToggleGroup>
+              @update:model-value="(v) => draft && (draft.mcpReadMode = v as McpPermissionMode)"
+            />
           </div>
           <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Write <span class="text-subtle">— INSERT/UPDATE/DELETE and equivalents</span></Label>
-            <ToggleGroup
-              type="single"
+            <SecondaryTabs
+              variant="segmented"
               size="kira-lg"
               :model-value="draft.mcpWriteMode"
-              :disabled="!draft.mcpEnabled"
+              :items="mcpModeOptions('write')"
               data-testid="connection-mcp-write"
-              @update:model-value="(v) => v && draft && (draft.mcpWriteMode = v as McpPermissionMode)"
-            >
-              <ToggleGroupItem
-                v-for="opt in mcpModeOptions('write')"
-                :key="opt.value"
-                :value="opt.value"
-                :data-testid="opt.testid"
-              >
-                {{ opt.label }}
-              </ToggleGroupItem>
-            </ToggleGroup>
+              @update:model-value="(v) => draft && (draft.mcpWriteMode = v as McpPermissionMode)"
+            />
           </div>
           <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">DDL <span class="text-subtle">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
-            <ToggleGroup
-              type="single"
+            <SecondaryTabs
+              variant="segmented"
               size="kira-lg"
               :model-value="draft.mcpDdlMode"
-              :disabled="!draft.mcpEnabled"
+              :items="mcpModeOptions('ddl')"
               data-testid="connection-mcp-ddl"
-              @update:model-value="(v) => v && draft && (draft.mcpDdlMode = v as McpPermissionMode)"
-            >
-              <ToggleGroupItem
-                v-for="opt in mcpModeOptions('ddl')"
-                :key="opt.value"
-                :value="opt.value"
-                :data-testid="opt.testid"
-              >
-                {{ opt.label }}
-              </ToggleGroupItem>
-            </ToggleGroup>
+              @update:model-value="(v) => draft && (draft.mcpDdlMode = v as McpPermissionMode)"
+            />
           </div>
           <p class="text-subtle text-kira-sm leading-normal w-full">
             A statement this app cannot classify is treated as whichever of the three is strictest.
@@ -1157,7 +1097,7 @@ const preconnectText = computed({
           </p>
           </TabsContent>
 
-          <TabsContent value="Privacy" class="flex flex-col gap-2">
+          <TabsContent value="Privacy" class="flex flex-col gap-3 p-3">
           <p class="text-subtle text-kira-sm leading-normal w-full">
             Rules redact values for this connection's MCP clients and for the data viewer's
             masking preview. They never change stored data.
@@ -1192,7 +1132,7 @@ const preconnectText = computed({
                     data-testid="mask-rule-keep-hint"
                     @update:model-value="onToggleMaskRuleFlag(rule.id, 'keepHint')"
                   >
-                    <CodiconIcon name="check" :size="10" />
+                    <CodiconIcon name="check" :size="12" />
                   </Checkbox>
                   <span>{{ KEEP_HINT_LABEL[rule.kind] }}</span>
                 </Label>
@@ -1204,7 +1144,7 @@ const preconnectText = computed({
                     data-testid="mask-rule-correlate"
                     @update:model-value="onToggleMaskRuleFlag(rule.id, 'correlate')"
                   >
-                    <CodiconIcon name="check" :size="10" />
+                    <CodiconIcon name="check" :size="12" />
                   </Checkbox>
                   <span>Correlate</span>
                 </Label>
@@ -1221,8 +1161,8 @@ const preconnectText = computed({
             <p v-else class="text-subtle text-kira-sm leading-normal w-full">No masking rules yet on this connection.</p>
 
             <div class="flex gap-2 items-center">
-              <Input v-model="newMaskTable" placeholder="*" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="mask-rule-add-table" />
-              <Input v-model="newMaskColumn" placeholder="column" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="mask-rule-add-column" />
+              <Input v-model="newMaskTable" placeholder="*" class="font-data" data-testid="mask-rule-add-table" />
+              <Input v-model="newMaskColumn" placeholder="column" class="font-data" data-testid="mask-rule-add-column" />
               <NativeSelect v-model="newMaskKind" variant="bordered" data-testid="mask-rule-add-kind">
                 <option value="name">Name</option>
                 <option value="email">Email</option>
@@ -1256,6 +1196,7 @@ const preconnectText = computed({
           </template>
           </TabsContent>
 
+          <div class="flex flex-col gap-3 px-3 pb-3 empty:hidden">
           <span
             v-if="connectionDialogStore.error"
             class="text-error text-kira-sm leading-normal"
@@ -1298,21 +1239,20 @@ const preconnectText = computed({
               </AlertDescription>
             </Alert>
           </template>
+          </div>
       </Tabs>
     </template>
-      </div>
+      </DialogBody>
 
       <DialogFooter v-if="step === 'engine'">
-        <span class="flex items-center gap-1 ml-auto">
-          <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</Button>
-          <Button variant="dialog-primary" size="kira-lg" @click="continueToDetails">
-            Continue
-            <CodiconIcon name="chevron-right" :size="13" />
-          </Button>
-        </span>
+        <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</Button>
+        <Button variant="dialog-primary" size="kira-lg" @click="continueToDetails">
+          Continue
+          <CodiconIcon name="chevron-right" :size="13" />
+        </Button>
       </DialogFooter>
       <DialogFooter v-else>
-        <div class="flex items-center gap-1.5 min-w-0">
+        <template #start>
           <Button variant="dialog" size="kira-lg" data-testid="connection-test" @click="onTest">
             <CodiconIcon name="plug" :size="13" />
             Test connection
@@ -1335,19 +1275,17 @@ const preconnectText = computed({
             </TooltipTrigger>
             <TooltipContent v-if="testState.status === 'error'">{{ testState.message ?? '' }}</TooltipContent>
           </Tooltip>
-        </div>
-        <div class="flex items-center gap-1 ml-auto">
-          <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</Button>
-          <Button
-            variant="dialog-primary"
-            size="kira-lg"
-            data-testid="connection-save"
-            :disabled="!isValid || saving"
-            @click="onSave"
-          >
-            Save
-          </Button>
-        </div>
+        </template>
+        <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="connection-save"
+          :disabled="!isValid || saving"
+          @click="onSave"
+        >
+          Save
+        </Button>
       </DialogFooter>
     </DialogContent>
     <!-- P110 I2-18: the `.kind` hover/selected/focus-within/off compound rules (previously kept as

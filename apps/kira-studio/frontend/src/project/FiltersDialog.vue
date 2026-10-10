@@ -2,11 +2,11 @@
 import type { NodeKind } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SearchField from '@theme/components/SearchField.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { Input } from '@theme/components/ui/input';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
@@ -177,32 +177,14 @@ const connectionName = computed(
 
 <template>
   <Dialog v-if="filtersDialogStore.open" :open="true" @update:open="(v) => !v && filtersDialogStore.closeFiltersDialog()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="filters-dialog"
-      class="flex flex-col p-0 gap-0 w-140 max-h-4/5"
-    >
-      <DialogHeader>
-        <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="filter" :size="13" /></span>
+    <DialogContent size="lg" data-testid="filters-dialog">
+      <DialogHeader icon="filter" closable close-testid="filters-dialog-close">
         <DialogTitle
           >Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
         >
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="filters-dialog-close"
-            @click="filtersDialogStore.closeFiltersDialog"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="overflow-auto">
-    <div class="flex flex-col gap-2 p-3">
+      <DialogBody>
       <span class="help text-kira-sm leading-normal text-subtle">
         Ticked types and objects are shown; unticking one hides it and everything under it.
         Nothing you have not unticked is ever hidden — an object created later shows up too.
@@ -210,10 +192,10 @@ const connectionName = computed(
 
       <section class="flex flex-col gap-1">
         <div class="flex items-center justify-between">
-          <span class="font-semibold text-kira-lg text-fg">Object types</span>
+          <span class="font-medium text-kira-lg text-fg">Object types</span>
           <span class="flex gap-1">
-            <Button variant="link" size="xs" class="h-auto p-0" @click="allKinds">All</Button>
-            <Button variant="link" size="xs" class="h-auto p-0" @click="noneKinds">None</Button>
+            <Button variant="link" size="kira" class="h-auto p-0" @click="allKinds">All</Button>
+            <Button variant="link" size="kira" class="h-auto p-0" @click="noneKinds">None</Button>
           </span>
         </div>
         <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-kind-list">
@@ -229,7 +211,7 @@ const connectionName = computed(
               class="size-3.5"
               @update:model-value="onToggleKind(row.kind)"
             >
-              <CodiconIcon name="check" :size="10" />
+              <CodiconIcon name="check" :size="12" />
             </Checkbox>
             <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md">{{ row.label }}</span>
             <span class="text-kira-sm text-subtle">{{ row.count }}</span>
@@ -240,20 +222,18 @@ const connectionName = computed(
 
       <section class="flex flex-col gap-1">
         <div class="flex items-center justify-between">
-          <span class="font-semibold text-kira-lg text-fg">Objects</span>
+          <span class="font-medium text-kira-lg text-fg">Objects</span>
           <span class="flex gap-1">
-            <Button variant="link" size="xs" class="h-auto p-0" @click="allObjects">All</Button>
-            <Button variant="link" size="xs" class="h-auto p-0" @click="noneObjects">None</Button>
+            <Button variant="link" size="kira" class="h-auto p-0" @click="allObjects">All</Button>
+            <Button variant="link" size="kira" class="h-auto p-0" @click="noneObjects">None</Button>
           </span>
         </div>
-        <div class="w-full">
-          <Input
-            v-model="nameFilter"
-            class="name-filter h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
-            placeholder="Filter objects by name"
-            data-testid="filter-name-input"
-          />
-        </div>
+        <SearchField
+          v-model="nameFilter"
+          size="kira-lg"
+          placeholder="Filter objects by name"
+          data-testid="filter-name-input"
+        />
         <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-object-list">
           <div
             v-for="row in objects.rows"
@@ -284,7 +264,7 @@ const connectionName = computed(
                     @update:model-value="onToggleNode(row)"
                   >
                     <template #default="{ state }">
-                      <CodiconIcon :name="state === 'indeterminate' ? 'dash' : 'check'" :size="10" />
+                      <CodiconIcon :name="state === 'indeterminate' ? 'dash' : 'check'" :size="12" />
                     </template>
                   </Checkbox>
                   <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md">{{ row.name }}</span>
@@ -313,25 +293,24 @@ const connectionName = computed(
       <span class="help cached-note text-kira-sm leading-normal text-subtle self-start">
         Only cached nodes are listed here — expand more of the tree to include them.
       </span>
-    </div>
-      </div>
 
       <Alert v-if="loadError || saveError" variant="destructive" class="self-stretch" data-testid="filters-error">
         <AlertDescription>{{ loadError ?? saveError }}</AlertDescription>
       </Alert>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="help text-kira-sm leading-normal text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
-        <span class="flex items-center gap-1 ml-auto">
-          <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
-          <Button
-            variant="dialog-primary"
-            size="kira-lg"
-            data-testid="filters-save"
-            :disabled="loading || !!loadError || saving"
-            @click="onSave"
-          >Save filters</Button>
-        </span>
+        <template #start>
+          <span class="help text-kira-sm leading-normal text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+        </template>
+        <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="filters-save"
+          :disabled="loading || !!loadError || saving"
+          @click="onSave"
+        >Save filters</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

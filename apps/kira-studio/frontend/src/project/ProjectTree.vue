@@ -3,11 +3,11 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
+import { nextTick, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
-import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
 import { emptyBackgroundMenu, menuForRow } from './menus';
@@ -17,7 +17,6 @@ import TreeRow from './TreeRow.vue';
 const contextMenuStore = useContextMenuStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
-const settingsStore = useSettingsStore();
 const treeStore = useTreeStore();
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
@@ -42,7 +41,7 @@ function isKeyBrowserRow(row: TreeRowVm): boolean {
   return connectionsStore.states[row.connectionId]?.caps?.keyBrowser === true;
 }
 
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 
 // P104 §3.4: TreeHost's own recipe (virtualization + pinned ancestor band + reveal-scroll),
 // inlined via the shared useTreeVirtualRows composable rather than kept as a wrapper component.

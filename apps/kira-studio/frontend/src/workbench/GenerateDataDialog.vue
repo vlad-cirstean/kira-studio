@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -209,34 +209,17 @@ function onSequenceStartChange(index: number, start: number): void {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onClose()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="generate-data-dialog"
-      class="flex flex-col p-0 gap-0 w-170 max-h-[82vh]"
-    >
-      <DialogHeader>
+    <DialogContent size="xl" data-testid="generate-data-dialog">
+      <DialogHeader closable close-testid="generate-data-close">
         <DialogTitle>Generate data</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="generate-data-close"
-            @click="onClose"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="overflow-auto">
-    <div class="flex flex-col gap-2 py-2 px-3">
+      <DialogBody>
       <div class="flex items-center gap-1.5">
         <Label class="p-0 text-muted-foreground">Rows</Label>
         <NumberStepperInput
           :model-value="String(rowCount)"
-          group-class="h-control"
+          group-class="h-control-lg"
           data-testid="generate-data-row-count"
           :disabled="running"
           @update:model-value="(v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
@@ -244,7 +227,7 @@ function onSequenceStartChange(index: number, start: number): void {
         <Label class="p-0 text-muted-foreground">Seed</Label>
         <NumberStepperInput
           :model-value="String(seed)"
-          group-class="h-control"
+          group-class="h-control-lg"
           data-testid="generate-data-seed"
           :disabled="running"
           @update:model-value="(v: string | number) => (seed = Math.trunc(Number(v)) || 0)"
@@ -290,7 +273,7 @@ function onSequenceStartChange(index: number, start: number): void {
           <Input
             v-if="plan.recipe.kind === 'constant'"
             :model-value="plan.recipe.value"
-            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
+            class="w-full font-data"
             :data-testid="`generate-data-constant-${plan.column.name}`"
             :disabled="running"
             @update:model-value="(v) => onConstantChange(index, String(v))"
@@ -298,7 +281,7 @@ function onSequenceStartChange(index: number, start: number): void {
           <NumberStepperInput
             v-else-if="plan.recipe.kind === 'sequence'"
             :model-value="String(plan.recipe.start)"
-            group-class="h-control"
+            group-class="h-control-lg"
             :data-testid="`generate-data-sequence-start-${plan.column.name}`"
             :disabled="running"
             @update:model-value="(v: string | number) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
@@ -308,20 +291,20 @@ function onSequenceStartChange(index: number, start: number): void {
       </div>
 
       <Alert v-if="noColumnsLoaded" variant="warn" data-testid="generate-data-no-columns">
-        <CodiconIcon name="warning" :size="14" class="text-warn-text" />
+        <CodiconIcon name="warning" :size="13" class="text-warn-text" />
         <AlertDescription>
           No column information available yet. Close this dialog, let the page load, then try again.
         </AlertDescription>
       </Alert>
       <Alert v-else-if="allColumnsSkipped" variant="warn" data-testid="generate-data-no-columns">
-        <CodiconIcon name="warning" :size="14" class="text-warn-text" />
+        <CodiconIcon name="warning" :size="13" class="text-warn-text" />
         <AlertDescription>
           Every column is set to Skip — pick a recipe for at least one column to generate rows.
         </AlertDescription>
       </Alert>
 
       <Alert v-if="warnings.length" variant="warn" data-testid="generate-data-warnings">
-        <CodiconIcon name="warning" :size="14" class="text-warn-text" />
+        <CodiconIcon name="warning" :size="13" class="text-warn-text" />
         <AlertDescription>
           <ul class="m-0 pl-2">
             <li v-for="w in warnings" :key="w">{{ w }}</li>
@@ -333,7 +316,7 @@ function onSequenceStartChange(index: number, start: number): void {
         <Button
           type="button"
           variant="link"
-          size="xs"
+          size="kira"
           class="h-auto p-0 disabled:text-muted-foreground"
           data-testid="generate-data-preview-toggle"
           :disabled="noUsableColumns"
@@ -357,45 +340,42 @@ function onSequenceStartChange(index: number, start: number): void {
       </div>
 
       <Alert v-if="runError" variant="destructive" data-testid="generate-data-error">
-        <CodiconIcon name="warning" :size="14" />
+        <CodiconIcon name="warning" :size="13" />
         <AlertDescription>{{ runError }}</AlertDescription>
       </Alert>
-    </div>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="flex items-center gap-1 ml-auto">
-          <!-- P104 §3: RunState inlined -- status is always 'running' here (elapsedMs is always
-               null, so the label is always the em dash RunState's own computed would give it). -->
-          <Tooltip v-if="running">
-            <TooltipTrigger as-child>
-              <span class="inline-flex items-center gap-1 font-data text-kira-sm text-info">
-                <span class="min-w-[7ch] text-right">—</span>
-                <span
-                  class="h-3 w-3 shrink-0 rounded-full border-2 border-t-primary border-r-transparent border-b-primary border-l-primary animate-spin"
-                />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{{ `${committedRows} / ${rowCount} rows committed` }}</TooltipContent>
-          </Tooltip>
-          <Button v-if="running" variant="dialog" size="kira-lg" data-testid="generate-data-stop" @click="onStop">
-            Stop
+        <!-- P104 §3: RunState inlined -- status is always 'running' here (elapsedMs is always
+             null, so the label is always the em dash RunState's own computed would give it). -->
+        <Tooltip v-if="running">
+          <TooltipTrigger as-child>
+            <span class="inline-flex items-center gap-1 font-data text-kira-sm text-info">
+              <span class="min-w-[7ch] text-right">—</span>
+              <span
+                class="h-3 w-3 shrink-0 rounded-full border-2 border-t-primary border-r-transparent border-b-primary border-l-primary animate-spin"
+              />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{{ `${committedRows} / ${rowCount} rows committed` }}</TooltipContent>
+        </Tooltip>
+        <Button v-if="running" variant="dialog" size="kira-lg" data-testid="generate-data-stop" @click="onStop">
+          Stop
+        </Button>
+        <template v-else>
+          <Button variant="dialog" size="kira-lg" data-testid="generate-data-cancel" @click="onClose">
+            Cancel
           </Button>
-          <template v-else>
-            <Button variant="dialog" size="kira-lg" data-testid="generate-data-cancel" @click="onClose">
-              Cancel
-            </Button>
-            <Button
-              variant="dialog-primary"
-              size="kira-lg"
-              data-testid="generate-data-submit"
-              :disabled="rowCount < 1 || noUsableColumns"
-              @click="onGenerate"
-            >
-              Generate
-            </Button>
-          </template>
-        </span>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="generate-data-submit"
+            :disabled="rowCount < 1 || noUsableColumns"
+            @click="onGenerate"
+          >
+            Generate
+          </Button>
+        </template>
       </DialogFooter>
     </DialogContent>
   </Dialog>

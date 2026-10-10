@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
@@ -116,30 +115,14 @@ async function onSave(): Promise<void> {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && schemaDialogStore.closeSchemaDialog()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="schema-dialog"
-      class="flex flex-col p-0 gap-0 w-180 max-h-4/5"
-    >
-      <DialogHeader>
+    <DialogContent size="xl" data-testid="schema-dialog">
+      <DialogHeader closable close-testid="schema-dialog-close">
         <DialogTitle
           >Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
         >
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="schema-dialog-close"
-            @click="schemaDialogStore.closeSchemaDialog"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-    <div class="flex flex-col gap-2 p-3 h-[60vh]">
+      <DialogBody class="h-[60vh] flex-none">
       <span class="help text-subtle text-kira-sm leading-normal">
         Table and column completion for this connection normally fills in on its own from the
         connection's own cached schema metadata — no setup needed. Paste a schema here only to
@@ -171,19 +154,19 @@ async function onSave(): Promise<void> {
           </span>
         </AlertDescription>
       </Alert>
-    </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span v-if="saveError" class="text-kira-sm leading-normal text-error" data-testid="schema-save-error">{{
-          saveError
-        }}</span>
-        <span v-else class="help text-subtle text-kira-sm leading-normal">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
-        <span class="flex items-center gap-1 ml-auto">
-          <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>
-          <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">
-            Save schema
-          </Button>
-        </span>
+        <template #start>
+          <span v-if="saveError" class="text-kira-sm leading-normal text-error" data-testid="schema-save-error">{{
+            saveError
+          }}</span>
+          <span v-else class="help text-subtle text-kira-sm leading-normal">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+        </template>
+        <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>
+        <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">
+          Save schema
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useMutation } from '@tanstack/vue-query';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import CredentialPastePanel from './credentialPaste/CredentialPastePanel.vue';
@@ -38,24 +38,26 @@ function onOpenChange(open: boolean): void {
 
 <template>
   <Dialog :open="true" @update:open="onOpenChange">
-    <DialogContent :show-close-button="false" data-testid="credentials-update-dialog" class="flex flex-col gap-2 w-120">
-      <DialogHeader>
+    <DialogContent size="md" data-testid="credentials-update-dialog">
+      <DialogHeader closable>
         <DialogTitle>Update credentials — {{ record?.name }}</DialogTitle>
       </DialogHeader>
-      <CredentialPastePanel
-        v-if="record"
-        :kind="record.kind"
-        :allowed="ALLOWED"
-        retain
-        @apply="(values) => update.mutate(values)"
-        @cancel="dialogStore.close()"
-      />
-      <p v-if="live" class="m-0 text-kira-sm text-muted-foreground" data-testid="credentials-update-live-note">
-        Reconnects the live connection.
-      </p>
-      <Alert v-if="update.error.value" variant="destructive" data-testid="credentials-update-error">
-        <AlertDescription>{{ update.error.value.message }}</AlertDescription>
-      </Alert>
+      <DialogBody>
+        <CredentialPastePanel
+          v-if="record"
+          :kind="record.kind"
+          :allowed="ALLOWED"
+          retain
+          @apply="(values) => update.mutate(values)"
+          @cancel="dialogStore.close()"
+        />
+        <p v-if="live" class="m-0 text-kira-sm text-muted-foreground" data-testid="credentials-update-live-note">
+          Reconnects the live connection.
+        </p>
+        <Alert v-if="update.error.value" variant="destructive" data-testid="credentials-update-error">
+          <AlertDescription>{{ update.error.value.message }}</AlertDescription>
+        </Alert>
+      </DialogBody>
     </DialogContent>
   </Dialog>
 </template>

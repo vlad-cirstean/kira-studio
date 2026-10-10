@@ -111,7 +111,7 @@ function onCancel(): void {
       <Textarea
         ref="input"
         v-model="text"
-        :class="['font-data h-24 resize-none', showText ? '' : '[-webkit-text-security:disc]']"
+        :class="['font-data min-h-24 max-h-24 resize-none', showText ? '' : '[-webkit-text-security:disc]']"
         placeholder="user: …  password: …&#10;PGPASSWORD=…&#10;mysql -u … -p…"
         autocomplete="off"
         autocapitalize="off"

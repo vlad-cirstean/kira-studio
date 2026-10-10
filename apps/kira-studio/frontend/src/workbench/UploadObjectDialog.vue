@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { contentTypeForFilename } from '@shared/domain/object-store';
 import { decodePath } from '@shared/domain/tree';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Field } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { formatBytes } from '@workbench/util/format';
@@ -99,28 +99,12 @@ watch(
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onClose()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="upload-dialog"
-      class="flex flex-col p-0 gap-0 w-120 max-h-4/5"
-    >
-      <DialogHeader>
+    <DialogContent size="md" data-testid="upload-dialog">
+      <DialogHeader closable close-testid="upload-close">
         <DialogTitle>Upload file</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="upload-close"
-            @click="onClose"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="flex flex-col gap-1.5 px-3 py-2 overflow-auto">
+      <DialogBody>
         <Button variant="dialog" size="kira-lg" class="self-start" data-testid="upload-choose-file" @click="chooseFile">
           Choose file…
         </Button>
@@ -129,31 +113,33 @@ watch(
         </div>
 
         <template v-if="chosenFile">
-          <Label class="text-muted-foreground p-0">Key</Label>
-          <Input v-model="key" class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="upload-key" />
+          <Field>
+            <Label class="text-muted-foreground p-0">Key</Label>
+            <Input v-model="key" class="font-data" data-testid="upload-key" />
+          </Field>
 
-          <Label class="text-muted-foreground p-0">Content type</Label>
-          <Input v-model="contentType" class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="upload-content-type" />
+          <Field>
+            <Label class="text-muted-foreground p-0">Content type</Label>
+            <Input v-model="contentType" class="font-data" data-testid="upload-content-type" />
+          </Field>
         </template>
 
         <Alert v-if="error" variant="destructive" data-testid="upload-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="flex items-center gap-1 ml-auto">
-          <Button variant="dialog" size="kira-lg" data-testid="upload-cancel" @click="onClose">Cancel</Button>
-          <Button
-            variant="dialog-primary"
-            size="kira-lg"
-            data-testid="upload-submit"
-            :disabled="!chosenFile || !key.trim() || saving"
-            @click="onUpload"
-          >
-            Upload
-          </Button>
-        </span>
+        <Button variant="dialog" size="kira-lg" data-testid="upload-cancel" @click="onClose">Cancel</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="upload-submit"
+          :disabled="!chosenFile || !key.trim() || saving"
+          @click="onUpload"
+        >
+          Upload
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

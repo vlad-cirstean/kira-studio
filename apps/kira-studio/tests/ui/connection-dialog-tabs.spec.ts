@@ -40,21 +40,21 @@ test('all four tabs switch, and General is where a freshly-opened details step l
   const preconnectTab = page.locator('[data-testid="connection-tab-preconnect"]');
   const mcpTab = page.locator('[data-testid="connection-tab-mcp"]');
 
-  await expect(generalTab).toHaveClass(/is-active/);
+  await expect(generalTab).toHaveAttribute('data-state', 'on');
   await expect(page.locator('[data-testid="connection-name"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-readonly"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="connection-preconnect"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toHaveCount(0);
 
   await advancedTab.click();
-  await expect(advancedTab).toHaveClass(/is-active/);
-  await expect(generalTab).not.toHaveClass(/is-active/);
+  await expect(advancedTab).toHaveAttribute('data-state', 'on');
+  await expect(generalTab).toHaveAttribute('data-state', 'off');
   await expect(page.locator('[data-testid="connection-readonly"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-name"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toHaveCount(0);
 
   await preconnectTab.click();
-  await expect(preconnectTab).toHaveClass(/is-active/);
+  await expect(preconnectTab).toHaveAttribute('data-state', 'on');
   await expect(page.locator('[data-testid="connection-preconnect"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-readonly"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toHaveCount(0);
@@ -62,7 +62,7 @@ test('all four tabs switch, and General is where a freshly-opened details step l
   // M2 §7.2: the fourth tab — expose checkbox, description, and one SegmentedControl per
   // permission class, each disabled while mcpEnabled is false.
   await mcpTab.click();
-  await expect(mcpTab).toHaveClass(/is-active/);
+  await expect(mcpTab).toHaveAttribute('data-state', 'on');
   await expect(page.locator('[data-testid="connection-preconnect"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-mcp-description"]')).toBeVisible();
@@ -84,7 +84,7 @@ test('all four tabs switch, and General is where a freshly-opened details step l
   await expect(page.locator('[data-testid="connection-mcp-ddl-deny"]')).toBeEnabled();
 
   await generalTab.click();
-  await expect(generalTab).toHaveClass(/is-active/);
+  await expect(generalTab).toHaveAttribute('data-state', 'on');
   await expect(page.locator('[data-testid="connection-name"]')).toBeVisible();
 
   // Reopening a fresh details step (Cancel, then reopen) lands back on General, not wherever the
@@ -92,7 +92,10 @@ test('all four tabs switch, and General is where a freshly-opened details step l
   await preconnectTab.click();
   await page.click('[data-testid="connection-cancel"]');
   await openNewPostgresDialog(page);
-  await expect(page.locator('[data-testid="connection-tab-general"]')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="connection-tab-general"]')).toHaveAttribute(
+    'data-state',
+    'on',
+  );
 });
 
 test('the pre-connect textarea round-trips a multi-line value, and a valid throttle reaches connectionsCreate', async ({
@@ -231,7 +234,10 @@ test('a save that fails validation on a Pre-connect-tab field switches to that t
   await saveButton.evaluate((el) => el.removeAttribute('disabled'));
   await saveButton.click();
 
-  await expect(page.locator('[data-testid="connection-tab-preconnect"]')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="connection-tab-preconnect"]')).toHaveAttribute(
+    'data-state',
+    'on',
+  );
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
 });
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
@@ -26,12 +27,8 @@ const props = withDefaults(
   { sticky: false },
 );
 
-// P110 I2-14: selected beats hover pre-phase on specificity (equal-specificity scoped rules,
-// `.selected` after `:hover` in source order) -- this ternary reproduces that exactly: a selected
-// row never falls through to the hover/sticky branches at all.
-const stateClass = computed(() =>
-  props.selected ? 'bg-select' : props.sticky ? 'bg-bg hover:bg-hover' : 'hover:bg-hover',
-);
+// A pinned band row needs an opaque background; selected still wins (rowVariants selected).
+const stickyClass = computed(() => (props.sticky && !props.selected ? 'bg-bg' : undefined));
 const emit = defineEmits<{
   select: [row: TreeRowVm];
   toggle: [row: TreeRowVm];
@@ -124,13 +121,9 @@ function onKeydown(e: KeyboardEvent): void {
 <template>
   <div
     :class="
-      cn(
-        'relative flex items-center gap-1 pr-2 h-row text-kira-md whitespace-nowrap select-none cursor-default',
-        stateClass,
-        props.class,
-      )
+      cn(rowVariants({ layout: 'tree', selected }), 'h-row', stickyClass, props.class)
     "
-    :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+    :style="rowIndent(row.depth)"
     :data-testid="sticky ? 'tree-sticky-row' : 'tree-row'"
     :data-path="row.path"
     :data-kind="row.kind"

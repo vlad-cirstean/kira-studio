@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { RoutedPrompt } from '@shared/domain/prompts';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { usePendingDecision } from '@workbench/util/usePendingDecision';
 import { computed } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
@@ -67,7 +66,7 @@ async function onApprove(requestId: string): Promise<void> {
 // P110 B39: `.detail`'s own class string, used 5 times in the template below (the plan's own 4+
 // threshold for de-duplication) -- a `const` here rather than a local child component, since every
 // site is a plain `<p>` with no props or behaviour of its own.
-const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
+const DETAIL_CLASS = 'm-0 text-subtle';
 </script>
 
 <template>
@@ -77,43 +76,28 @@ const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
     :open="true"
     @update:open="(v) => !v && onDeny(dbMcpStore.approval.pending!.requestId)"
   >
-    <DialogContent
-      :show-close-button="false"
-      data-testid="db-mcp-approval-dialog"
-      class="flex flex-col p-0 gap-0 w-130 max-h-4/5"
-    >
-      <DialogHeader>
+    <DialogContent size="lg" data-testid="db-mcp-approval-dialog">
+      <DialogHeader closable>
         <DialogTitle>{{ dialogTitle }}</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            @click="onDeny(dbMcpStore.approval.pending!.requestId)"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="overflow-auto">
-        <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="whitespace-pre-wrap mb-1 pt-2 px-3">
+      <DialogBody>
+        <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="m-0 whitespace-pre-wrap">
           {{ heavyLede }}
         </p>
-        <p v-else class="whitespace-pre-wrap mb-1 pt-2 px-3">
+        <p v-else class="m-0 whitespace-pre-wrap">
           <strong>{{ dbMcpStore.approval.pending.connectionName }}</strong>
           ({{ dbMcpStore.approval.pending.kind }}) wants to run {{ classWord }} through the database
           MCP server.
         </p>
         <pre
-          class="font-data max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm mx-3 mb-1 py-1 px-1.5 bg-field border border-border"
+          class="font-data max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm m-0 py-1 px-1.5 bg-field border border-border"
           data-testid="db-mcp-approval-statement"
         >{{
           dbMcpStore.approval.pending.statement
         }}</pre>
 
-        <div v-if="dbMcpStore.approval.pending.plan" class="mb-1" data-testid="db-mcp-approval-plan">
+        <div v-if="dbMcpStore.approval.pending.plan" class="flex flex-col gap-1" data-testid="db-mcp-approval-plan">
           <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-plan-rows">
             <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
               Estimated {{ dbMcpStore.approval.pending.plan.estimatedRowsRead.toLocaleString() }} rows
@@ -124,7 +108,7 @@ const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
           <p
             v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
             :key="i"
-            :class="[DETAIL_CLASS, 'pt-0']"
+            :class="DETAIL_CLASS"
             data-testid="db-mcp-approval-plan-issue"
           >
             <strong>{{ issue.severity }}</strong> {{ issue.message }}
@@ -138,28 +122,26 @@ const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
         <p v-if="more > 0" :class="DETAIL_CLASS" data-testid="db-mcp-approval-queue-count">
           {{ more }} more waiting
         </p>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
-        <span class="flex items-center gap-1 ml-auto">
-          <Button
-            ref="denyButton"
-            variant="dialog"
-            size="kira-lg"
-            data-testid="db-mcp-approval-deny"
-            @click="onDeny(dbMcpStore.approval.pending!.requestId)"
-          >
-            Deny
-          </Button>
-          <Button
-            variant="dialog-primary"
-            size="kira-lg"
-            data-testid="db-mcp-approval-approve"
-            @click="onApprove(dbMcpStore.approval.pending!.requestId)"
-          >
-            Approve
-          </Button>
-        </span>
+        <Button
+          ref="denyButton"
+          variant="dialog"
+          size="kira-lg"
+          data-testid="db-mcp-approval-deny"
+          @click="onDeny(dbMcpStore.approval.pending!.requestId)"
+        >
+          Deny
+        </Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="db-mcp-approval-approve"
+          @click="onApprove(dbMcpStore.approval.pending!.requestId)"
+        >
+          Approve
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
