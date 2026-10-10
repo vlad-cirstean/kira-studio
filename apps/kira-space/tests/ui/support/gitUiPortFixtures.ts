@@ -248,7 +248,7 @@ export async function openCommitDetail(relaunch: Relaunch): Promise<Page> {
   const row = page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]');
   await expect(row).toBeVisible();
   await row.click();
-  await expect(page.locator('.kv-meta-subject')).toBeVisible();
+  await expect(page.locator('[data-testid="meta-subject"]')).toBeVisible();
   return page;
 }
 
@@ -333,7 +333,7 @@ export async function openBranchPicker(relaunch: Relaunch): Promise<Page> {
     results: PICKER_RESULTS,
   });
   await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')).toBeVisible();
-  await page.locator('.kv-branch-trigger').click();
+  await page.locator('[data-testid="branch-trigger"]').click();
   await expect(page.getByRole('dialog')).toBeVisible();
   return page;
 }

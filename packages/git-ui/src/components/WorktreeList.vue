@@ -122,14 +122,14 @@ async function confirmRemove(): Promise<void> {
         Create Worktree…
       </Button>
     </RefSectionHeader>
-    <div
+    <div data-testid="branch-row"
       v-for="entry in section.visible"
       :key="entry.path"
-      class="kv-branch-row flex items-center gap-0.5 px-1"
+      class="flex items-center gap-0.5 px-1"
       :data-row-id="`worktree:${entry.path}`"
       :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
     >
-      <div class="kv-branch-row-main flex items-center gap-0.5 flex-1 min-w-0 text-left">
+      <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
         <span v-if="entry.isCurrent" class="text-kira-sm text-subtle" data-kira-tip="This window">●</span>
         <span v-if="entry.isMain" class="text-kira-sm text-subtle" data-kira-tip="Main worktree">M</span>
         <span v-if="entry.locked" class="text-kira-sm text-subtle" :data-kira-tip="entry.locked.reason">

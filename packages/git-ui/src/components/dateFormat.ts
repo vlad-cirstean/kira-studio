@@ -11,7 +11,7 @@ import { formatAbsoluteDate, formatRelativeDate } from '@kira/git-core';
 export { formatAbsoluteDate, formatRelativeDate };
 
 /** G21 D6b: a representative widest sample `formatAbsoluteDate` can produce — the format's own
- *  shape ("YYYY-MM-DD HH:MM") never varies in length, and `.kv-cell-date`'s own
+ *  shape ("YYYY-MM-DD HH:MM") never varies in length, and `.kira-cell-date`'s own
  *  `font-variant-numeric: tabular-nums` makes which digits appear irrelevant to the rendered
  *  width, so any one concrete timestamp is as "widest" as any other. `Date.UTC` rather than a
  *  hand-computed epoch, so the sample string is legible directly from this file. */
@@ -21,7 +21,7 @@ let measureCanvas: HTMLCanvasElement | OffscreenCanvas | undefined;
 
 /**
  * The pixel width of the widest string `formatAbsoluteDate` can produce, rendered in `font` (a
- * CSS font shorthand — `CommitGrid.vue` reads this from a live `.kv-cell-date` probe's own
+ * CSS font shorthand — `CommitGrid.vue` reads this from a live `.kira-cell-date` probe's own
  * computed style). Item 6's second gap (F6): a hard-coded pixel width is only correct at one
  * font size, and G14 already made the type scale follow the host's own settings, so this measures
  * rather than assumes.

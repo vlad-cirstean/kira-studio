@@ -108,7 +108,7 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 </script>
 
 <template>
-  <section class="kv-branch-section" aria-label="Stashes">
+  <section data-testid="branch-section" aria-label="Stashes">
     <RefSectionHeader label="Stashes" />
     <StashRows
       :section="section"

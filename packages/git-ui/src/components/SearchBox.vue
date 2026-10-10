@@ -86,7 +86,7 @@ const emit = defineEmits<{
 const rootEl = ref<HTMLElement | null>(null);
 const searchInputEl = useTemplateRef<{ $el: HTMLElement }>('searchInputEl');
 
-const ERROR_ID = 'kv-search-error';
+const ERROR_ID = 'git-search-error';
 
 /** The inline `n of N` indicator mirrors exactly what `Enter`/`Shift+Enter` step through —
  *  commit matches (judgment call 6) — so it is hidden entirely in `Refs` scope, where there is

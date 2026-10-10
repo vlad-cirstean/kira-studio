@@ -8,7 +8,7 @@
  * scroll-row value saved across sessions) — inserting a row upstream of real data would mean
  * converting every one of those to an explicit grid-row<->store-row mapping, its own project. This
  * sits entirely outside SlickGrid's coordinate space instead: a `flex-shrink: 0` sibling mounted
- * above `<CommitGrid>` in `App.vue`'s own flex-column `.kv-graph-region`, so none of those ~25
+ * above `<CommitGrid>` in `App.vue`'s own flex-column `graph-region`, so none of those ~25
  * row-index assumptions are touched.
  *
  * Data: `OpsState.statusSummary` — already reactive, already refreshed on every `repo.changed`

@@ -31,58 +31,58 @@
    height/left/right, so position must come from here. `outline: 0` and `border: 0` stay raw: the
    utilities lean on `--tw-*` @property rules. */
 @layer components {
-  .kv-commit-grid .slick-pane {
+  .kira-commit-grid .slick-pane {
     @apply absolute overflow-hidden w-full;
     outline: 0;
   }
 
-  .kv-commit-grid .slick-viewport,
-  .kv-commit-grid .grid-canvas {
+  .kira-commit-grid .slick-viewport,
+  .kira-commit-grid .grid-canvas {
     @apply relative bg-bg;
     outline: 0;
   }
 
   /* SlickGrid rewrites inline `overflow-x: auto` on every resizeCanvas. Columns always fit
      (columnFit.ts); important hidden stops a sideways wheel scrolling the graph off screen. */
-  .kv-commit-grid .slick-viewport {
+  .kira-commit-grid .slick-viewport {
     @apply w-full overflow-x-hidden!;
   }
 
   /* One stacking context and paint boundary for all rows: no per-row compositing layer. */
-  .kv-commit-grid .grid-canvas {
+  .kira-commit-grid .grid-canvas {
     contain: layout paint;
   }
 
   /* Opaque, not transparent: a repainted row erases the band it owns. */
-  .kv-commit-grid .slick-row.ui-widget-content {
+  .kira-commit-grid .slick-row.ui-widget-content {
     @apply absolute w-full bg-bg cursor-pointer;
     border: 0;
   }
 
-  .kv-commit-grid .slick-row:hover {
+  .kira-commit-grid .slick-row:hover {
     @apply bg-hover;
   }
 
-  .kv-commit-grid .slick-row.kv-row-selected {
+  .kira-commit-grid .slick-row.kira-row-selected {
     @apply bg-select text-fg;
   }
 
-  .kv-commit-grid .slick-row:focus-visible {
+  .kira-commit-grid .slick-row:focus-visible {
     @apply focus-ring;
   }
 
   /* Placeholder row: the muted tone is the "not a real commit" cue. */
-  .kv-commit-grid .slick-row.kv-row-collapsed {
+  .kira-commit-grid .slick-row.kira-row-collapsed {
     @apply text-muted-foreground;
   }
 
-  .kv-commit-grid .slick-cell {
+  .kira-commit-grid .slick-cell {
     @apply absolute flex items-center overflow-hidden py-0 px-2;
     border: none;
   }
 
   /* Row overdraw (0.5px past the band, no seam at fractional DPR) draws outside the cell. */
-  .kv-commit-grid .kv-cell-graph {
+  .kira-commit-grid .kira-cell-graph {
     @apply p-0 overflow-visible;
   }
 }

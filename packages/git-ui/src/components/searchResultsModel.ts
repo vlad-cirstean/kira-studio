@@ -20,11 +20,11 @@ export type SearchOption =
   | { readonly kind: 'commit'; readonly id: string; readonly hit: CommitHit };
 
 function refOptionId(ref: RefRow): string {
-  return `kv-search-option-ref-${ref.refname}`;
+  return `git-search-option-ref-${ref.refname}`;
 }
 
 function commitOptionId(hit: CommitHit): string {
-  return `kv-search-option-commit-${hit.sha}`;
+  return `git-search-option-commit-${hit.sha}`;
 }
 
 interface SearchResultsSection {

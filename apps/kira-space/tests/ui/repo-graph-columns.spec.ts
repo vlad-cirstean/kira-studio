@@ -62,17 +62,17 @@ test('the grid has the four columns and no SHA cell, and the date column fits it
   await expect(headers).toHaveCount(4);
   const ids = await headers.evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-id')));
   expect(new Set(ids)).toEqual(new Set(['graph', 'message', 'author', 'date']));
-  await expect(page.locator('.kv-cell-sha')).toHaveCount(0);
-  await expect(row(page, 0).locator('.kv-cell-message')).toContainText(
+  await expect(page.locator('.kira-cell-sha')).toHaveCount(0);
+  await expect(row(page, 0).locator('.kira-cell-message')).toContainText(
     'Add the graph column fixture',
   );
 
   const { cellWidth, widest } = await row(page, 0)
-    .locator('.kv-cell-date')
+    .locator('.kira-cell-date')
     .first()
     .evaluate((span) => {
       const cell = span.closest('.slick-cell');
-      if (!cell) throw new Error('.kv-cell-date has no ancestor .slick-cell');
+      if (!cell) throw new Error('.kira-cell-date has no ancestor .slick-cell');
       const style = getComputedStyle(span);
       const ctx = document.createElement('canvas').getContext('2d');
       if (!ctx) throw new Error('2d canvas context unavailable');
@@ -99,8 +99,8 @@ test('a decorated row is taller, and each row graph node sits on its own subject
       const rowEl = document.querySelector(
         `[data-testid="commit-grid"] .slick-row[data-row="${index}"]`,
       );
-      const circle = rowEl?.querySelector('.kv-graph-svg circle');
-      const subject = rowEl?.querySelector('.kv-message-subject');
+      const circle = rowEl?.querySelector('[data-testid="graph-svg"] circle');
+      const subject = rowEl?.querySelector('[data-testid="message-subject"]');
       if (!rowEl || !circle || !subject) throw new Error(`row ${index}: missing element`);
       const rowTop = rowEl.getBoundingClientRect().top;
       const box = subject.getBoundingClientRect();
@@ -126,7 +126,7 @@ test('Git graph font size scales grid text and decorated row height', async ({ r
   await expect(row(page, 1)).toBeVisible();
 
   const fontSize = await row(page, 0)
-    .locator('.kv-cell-message')
+    .locator('.kira-cell-message')
     .evaluate((el) => getComputedStyle(el).fontSize);
   expect(fontSize).toBe('20px');
   // compact = max(row-height 28, h-xs 25 + 2), decorated = compact + h-xs (13px default gives 45).
@@ -138,13 +138,13 @@ test('a tag badge is a translucent tint with a coloured border and a matching ic
   relaunch,
 }) => {
   const page = await bootGrid(relaunch, TAGGED);
-  const badge = row(page, 1).locator('.kv-badge-tag').first();
+  const badge = row(page, 1).locator('[data-testid="badge-tag"]').first();
   await expect(badge).toBeVisible();
 
   const style = await badge.evaluate((el) => {
     const css = getComputedStyle(el);
-    const icon = el.querySelector('.kv-badge-icon');
-    if (!icon) throw new Error('.kv-badge-tag has no .kv-badge-icon');
+    const icon = el.querySelector('[data-testid="badge-icon"]');
+    if (!icon) throw new Error('[data-testid="badge-tag"] has no [data-testid="badge-icon"]');
     return {
       bg: css.backgroundColor,
       border: css.borderColor,
@@ -172,8 +172,8 @@ test('every cell shows a pointer cursor, and clicking the date cell leaves its t
 }) => {
   const page = await bootGrid(relaunch, ONE);
   await expect(row(page, 0)).toHaveCSS('cursor', 'pointer');
-  await expect(row(page, 0).locator('.kv-cell-message').first()).toHaveCSS('cursor', 'pointer');
-  const date = row(page, 0).locator('.kv-cell-date').first();
+  await expect(row(page, 0).locator('.kira-cell-message').first()).toHaveCSS('cursor', 'pointer');
+  const date = row(page, 0).locator('.kira-cell-date').first();
   await expect(date).toHaveCSS('cursor', 'pointer');
   const before = await date.textContent();
 
@@ -181,7 +181,7 @@ test('every cell shows a pointer cursor, and clicking the date cell leaves its t
   await expect(detail(page)).toBeVisible();
   await row(page, 0).click();
   await expect(detail(page)).toHaveCount(0);
-  await expect(row(page, 0).locator('.kv-cell-date').first()).toHaveText(before ?? '');
+  await expect(row(page, 0).locator('.kira-cell-date').first()).toHaveText(before ?? '');
 });
 
 test('with the detail pane open the grid keeps graph and message, and the message takes the rest', async ({
@@ -202,11 +202,11 @@ test('with the detail pane open the grid keeps graph and message, and the messag
         .querySelector(`[data-testid="commit-grid"] .slick-row[data-row="0"] ${sel}`)
         ?.closest('.slick-cell')
         ?.getBoundingClientRect().width ?? 0;
-    const hostEl = document.querySelector('[data-testid="commit-grid"] .kv-grid-host');
+    const hostEl = document.querySelector('[data-testid="commit-grid"] [data-testid="grid-host"]');
     return {
       host: hostEl?.clientWidth ?? 0,
-      graph: width('.kv-cell-graph'),
-      message: width('.kv-cell-message'),
+      graph: width('.kira-cell-graph'),
+      message: width('.kira-cell-message'),
     };
   });
   expect(host - graph - message).toBeLessThanOrEqual(4);

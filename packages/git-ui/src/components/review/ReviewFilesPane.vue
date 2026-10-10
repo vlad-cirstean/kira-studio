@@ -179,9 +179,9 @@ function onToggleReviewed(path: string): void {
         Nothing changed since your last review.
       </p>
 
-      <FileTree
+      <FileTree data-testid="review-files-tree"
         v-else
-        class="kv-review-files-tree flex-auto min-h-0 border-b border-border"
+        class="flex-auto min-h-0 border-b border-border"
         :files="files"
         :selected-file="selectedIndex"
         :list-mode="listMode"

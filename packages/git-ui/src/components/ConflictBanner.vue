@@ -33,7 +33,7 @@ const props = defineProps<{
 const inProgress = computed(() => props.ops.statusSummary.value?.inProgress ?? null);
 const busyAction = ref<'continue' | 'skip' | 'abort' | undefined>(undefined);
 
-const CONTINUE_REASON_ID = 'kv-conflict-continue-reason';
+const CONTINUE_REASON_ID = 'git-conflict-continue-reason';
 
 async function onContinue(): Promise<void> {
   if (busyAction.value) return;

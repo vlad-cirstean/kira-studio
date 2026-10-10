@@ -14,19 +14,15 @@ import {
 test('five tabs show badges that match the seeded counts', async ({ relaunch }) => {
   const page = await openBranchPicker(relaunch);
   // Branches, Tags, Stashes, Worktrees, Stacks.
-  await expect(page.locator('.kv-branch-tabs [data-testid="picker-tab-badge"]')).toHaveText([
-    '2',
-    '1',
-    '1',
-    '1',
-    '1',
-  ]);
+  await expect(
+    page.locator('[data-testid="branch-tabs"] [data-testid="picker-tab-badge"]'),
+  ).toHaveText(['2', '1', '1', '1', '1']);
 });
 
 test('Stashes swaps the body and relabels the filter', async ({ relaunch }) => {
   const page = await openBranchPicker(relaunch);
   await page.getByRole('button', { name: /^Stashes/ }).click();
-  await expect(page.locator('.kv-branch-section[aria-label="Stashes"]')).toBeVisible();
+  await expect(page.locator('[data-testid="branch-section"][aria-label="Stashes"]')).toBeVisible();
   await expect(page.locator('input[aria-label="Filter stashes"]')).toBeVisible();
 });
 
@@ -40,7 +36,9 @@ test('a query on Branches badges Stashes and survives the tab switch', async ({ 
   await stashesTab.click();
   await expect(page.locator('input[aria-label="Filter stashes"]')).toHaveValue('auth');
   await expect(
-    page.locator('.kv-branch-section[aria-label="Stashes"] .kv-stash-message'),
+    page.locator(
+      '[data-testid="branch-section"][aria-label="Stashes"] [data-testid="stash-message"]',
+    ),
   ).toHaveText('auth work');
 });
 
@@ -71,9 +69,11 @@ test('contract: the Stashes tab lists the entry an auto-stash leaves', async ({ 
     results: { ...PICKER_RESULTS, 'stash.list': list },
   });
   await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')).toBeVisible();
-  await page.locator('.kv-branch-trigger').click();
+  await page.locator('[data-testid="branch-trigger"]').click();
   await page.getByRole('button', { name: /^Stashes/ }).click();
   await expect(
-    page.locator('.kv-branch-section[aria-label="Stashes"] .kv-stash-message'),
+    page.locator(
+      '[data-testid="branch-section"][aria-label="Stashes"] [data-testid="stash-message"]',
+    ),
   ).toHaveText(entry.message.replace(/^On [^:]+: /, ''));
 });

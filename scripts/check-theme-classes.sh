@@ -750,9 +750,9 @@ check_no_kv_layer() {
     return 0
   fi
   hits=$(grep -rnP --include='*.vue' --include='*.ts' --include='*.css' \
-    -- '(?<![\w-])kv:[a-z\[!-]|--kv-|--vscode-' "$GIT_UI_SRC" "$THEME_SRC" 2>/dev/null || true)
+    -- '(?<![\w-])kv:[a-z\[!-]|--kv-|--vscode-|(?<![\w-])kv-[a-z]' "$GIT_UI_SRC" "$THEME_SRC" 2>/dev/null || true)
   if [ -n "$hits" ]; then
-    echo "check-theme-classes: kv:/--kv-/--vscode- layer is retired (P245) -- use app utilities and --kira-* tokens:" >&2
+    echo "check-theme-classes: kv:/--kv-/kv-*/--vscode- layer is retired (P245, P258) -- use app utilities, --kira-* tokens, data-testid for test hooks and kira-* for grid runtime classes:" >&2
     echo "$hits" >&2
     STATUS=1
   fi
@@ -773,6 +773,21 @@ check_git_ui_primitives() {
   fi
 }
 check_git_ui_primitives
+
+# P258: git-ui follows Studio's weight scale (400/500), never semibold/bold, and has no
+# `text-graph-lg` heading size.
+check_git_ui_type_scale() {
+  if [ -n "$TC_COLLECT" ]; then
+    return 0
+  fi
+  hits=$(grep -rnP --include='*.vue' --include='*.ts' -- 'font-semibold|font-bold|text-graph-lg' "$GIT_UI_SRC" 2>/dev/null || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: git-ui must not use font-semibold/font-bold/text-graph-lg (P258):" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+check_git_ui_type_scale
 
 if [ -s "$GREP_ERRORS" ]; then
   echo "check-theme-classes: grep failed, results are unreliable:" >&2

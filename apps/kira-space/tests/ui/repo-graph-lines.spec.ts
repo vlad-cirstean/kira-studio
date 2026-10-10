@@ -86,7 +86,7 @@ const MOCK_RESULTS = {
   'graph.status': { loaded: ROWS, remaining: 0, exhausted: true },
 };
 
-const svgs = (p: Page) => p.locator('[data-testid="commit-grid"] svg.kv-graph-svg');
+const svgs = (p: Page) => p.locator('[data-testid="commit-grid"] svg[data-testid="graph-svg"]');
 
 async function graphWidth(p: Page): Promise<number> {
   return svgs(p)
@@ -108,7 +108,7 @@ async function laneLineCoverage(p: Page): Promise<number> {
   return p.evaluate(
     async ({ b64, x }) => {
       const stroke = getComputedStyle(
-        document.querySelector('svg.kv-graph-svg path.kv-lane-0')!,
+        document.querySelector('svg[data-testid="graph-svg"] path.stroke-graph-lane-0')!,
       ).stroke;
       const probe = document.createElement('canvas').getContext('2d')!;
       probe.fillStyle = stroke;

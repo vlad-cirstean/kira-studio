@@ -353,7 +353,7 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
  *  `slice.laneCount` — a narrowed column must clip its lanes, not overflow into the message
  *  column) and `rowHeight` (the grid's row height, so lanes and rows cannot drift). Lane x-coordinates
  *  (`laneX`, `planEdgePaths`/`planNode`) are unchanged — only the box around the drawing is the
- *  column's; the `clip-path` utility on `kv-graph-svg` is what actually
+ *  column's; the `clip-path` utility on `graph-svg` is what actually
  *  cuts a lane at the column's right edge, since `overflow: hidden` cannot do it (one non-visible
  *  axis forces the other to `auto`) while still letting `GEOMETRY.overdraw`'s vertical bleed
  *  through — see that rule's own comment.
@@ -365,7 +365,8 @@ export function buildRowSvg(
   width: number,
 ): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('class', 'kv-graph-svg block overflow-visible [clip-path:inset(-2px_0)]');
+  svg.setAttribute('data-testid', 'graph-svg');
+  svg.setAttribute('class', 'block overflow-visible [clip-path:inset(-2px_0)]');
   svg.setAttribute('width', String(width));
   svg.setAttribute('height', String(rowHeight));
   svg.setAttribute('viewBox', `0 0 ${width} ${rowHeight}`);

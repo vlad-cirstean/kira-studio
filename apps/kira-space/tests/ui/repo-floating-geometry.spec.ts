@@ -7,7 +7,7 @@ import { openReviewListing, SHA_A } from './support/gitUiPortFixtures';
 async function expandedRow(relaunch: Parameters<typeof openReviewListing>[0]) {
   const page = await openReviewListing(relaunch);
   const row = page.locator(`[data-testid="review-row-${SHA_A}"]`);
-  await row.locator('.kv-review-row-header').click();
+  await row.locator('[data-testid="review-row-header"]').click();
   await expect(row).toHaveAttribute('aria-expanded', 'true');
   return page;
 }
@@ -47,7 +47,7 @@ test('a tooltip flips above a trigger with no room below', async ({ relaunch }) 
 
 test('a dropdown menu flips above the click point with no room below', async ({ relaunch }) => {
   const page = await expandedRow(relaunch);
-  const fileRow = page.locator('[data-testid="file-tree"] .kv-file-tree-row', {
+  const fileRow = page.locator('[data-testid="file-tree"] [data-testid="file-tree-row"]', {
     hasText: 'example.ts',
   });
   await expect(fileRow).toBeVisible();

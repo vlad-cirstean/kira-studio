@@ -1122,7 +1122,7 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
 
   function messageCell(page: import('@playwright/test').Page, row: number) {
     return page
-      .locator(`[data-testid="commit-grid"] .slick-row[data-row="${row}"] .kv-cell-message`)
+      .locator(`[data-testid="commit-grid"] .slick-row[data-row="${row}"] .kira-cell-message`)
       .first();
   }
 
@@ -1220,7 +1220,7 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
     const targetRow = page.locator('[data-testid="commit-grid"] .slick-row[data-row="5"]');
     await expect(targetRow).toContainText('feature-newer F2');
     await expect(targetRow).toBeVisible();
-    await expect(targetRow).toHaveClass(/kv-row-selected/);
+    await expect(targetRow).toHaveClass(/kira-row-selected/);
   });
 });
 

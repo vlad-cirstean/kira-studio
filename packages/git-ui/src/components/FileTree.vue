@@ -11,7 +11,7 @@
  * byte-identity guarantee the graph panel's tree needed while it still embedded a diff — is gone.
  * Items 9/10/12/13 already changed the graph tree's icons, status glyph, and click/double-click
  * behaviour; there is no byte-identity guarantee left to protect, so the review anatomy (the row
- * geometry `ReviewView.vue` used to restyle from outside under `.kv-skin-kira`, and the
+ * geometry `ReviewView.vue` used to restyle from outside under `skin-kira`, and the
  * dimmed-directory-suffix/context-menu-copy behaviour) is now this component's *only* appearance,
  * everywhere it mounts — `DetailPane.vue`, `StashDetailPane.vue`, `ReviewFilesPane.vue`,
  * `ReviewCommitRow.vue` alike.
@@ -244,22 +244,20 @@ function rowKey(row: FileTreeRow): string {
 }
 
 /** P110 A15, retokened onto git-ui's own `rowVariants` (P131 Part 2 §4.2). `rowVariants({
- *  selected })` renders byte-identically to the file's own retired `.kv-row-selected`/hover
+ *  selected })` renders byte-identically to the file's own retired `.kira-row-selected`/hover
  *  rules — no separate selected class needed. `cn()` cancels the variant's own horizontal
- *  padding with this row's real 2px/8px padding (`.kv-file-tree-row`'s own padding shorthand
+ *  padding with this row's real 2px/8px padding (`file-tree-row`'s own padding shorthand
  *  always fully overrode it, unlayered). The focus ring is `group-focus-within` (the container
  *  below carries `group`) applied only to the one row `index === focusedRow` names —
- *  reproducing the old `.kv-file-tree-rows:focus-within .kv-file-tree-row.kv-row-focused`
+ *  reproducing the old `file-tree-rows:focus-within file-tree-row.kira-row-focused`
  *  compound selector.
  *
- *  P110 A-fix: `.kv-file-tree-row` itself is kept, as a bare literal (no CSS of its own —
- *  tailwind-merge passes an unrecognized class straight through) — several Playwright specs
+ *  `data-testid="file-tree-row"` marks each row — several Playwright specs
  *  outside this package's own tests (file-tree-open/review-interaction/floating-geometry)
- *  select rows by this class name; dropping it broke them. */
+ *  select rows by it. */
 function rowClass(row: FileTreeRow, index: number): string {
   const selected = row.kind === 'file' && row.node.fileIndex === props.selectedFile;
   return cn(
-    'kv-file-tree-row',
     rowVariants({ layout: 'tree', selected }),
     index === focusedRow.value
       ? 'group-focus-within:focus-ring'
@@ -412,7 +410,7 @@ function statusClass(change: FileChange): string {
 /** G19 D14: the row's primary leading glyph, replacing the status letter in that role; the letter
  *  itself is kept, demoted to a small secondary chip (SPEC's own wording: kept, not removed).
  *  G-UX D3 (item 3): a real per-language seti-ui icon now, not one shared codicon glyph, rendered
- *  as a CSS mask (`.kv-file-tree-icon`'s own `mask-image`) so `background-color` still drives the
+ *  as a CSS mask (`file-tree-icon`'s own `mask-image`) so `background-color` still drives the
  *  glyph's colour exactly as the codicon it replaces did — see `setiFileIcon.ts`'s own doc
  *  comment for why a mask rather than inline SVG/`v-html`. */
 function fileIconStyle(path: string): Record<string, string> {
@@ -580,6 +578,7 @@ const parentSelectId = useId();
         v-for="(row, index) in capped.visible"
         :id="rowId(index)"
         :key="rowKey(row)"
+        data-testid="file-tree-row"
         :class="rowClass(row, index)"
         role="treeitem"
         :aria-level="row.depth + 1"
@@ -632,7 +631,7 @@ const parentSelectId = useId();
           </Checkbox>
           <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
             <span
-              class="kv-file-tree-icon size-3.25 mask-contain mask-no-repeat mask-center"
+              class="size-3.25 mask-contain mask-no-repeat mask-center"
               :style="fileIconStyle(row.node.path)"
             ></span>
           </span>
@@ -647,8 +646,8 @@ const parentSelectId = useId();
           <!-- P105: the flat-mode-only directory hint never applies in tree mode (a real
                directory row already carries this path via its own ancestor rows). -->
           <span class="ml-auto flex items-center gap-1 shrink-0">
-            <span
-              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
+            <span data-testid="file-tree-status"
+              class="min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -675,6 +674,7 @@ const parentSelectId = useId();
         v-for="(row, index) in capped.visible"
         :id="rowId(index)"
         :key="rowKey(row)"
+        data-testid="file-tree-row"
         :class="rowClass(row, index)"
         role="option"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
@@ -725,7 +725,7 @@ const parentSelectId = useId();
           </Checkbox>
           <span class="size-4 shrink-0 flex items-center justify-center" aria-hidden="true">
             <span
-              class="kv-file-tree-icon size-3.25 mask-contain mask-no-repeat mask-center"
+              class="size-3.25 mask-contain mask-no-repeat mask-center"
               :style="fileIconStyle(row.node.path)"
             ></span>
           </span>
@@ -743,8 +743,8 @@ const parentSelectId = useId();
             >{{ dirOf(row.node.path) }}</span
           >
           <span class="ml-auto flex items-center gap-1 shrink-0">
-            <span
-              class="kv-file-tree-status min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
+            <span data-testid="file-tree-status"
+              class="min-w-[1ch] font-data text-graph-sm leading-none shrink-0"
               :class="statusClass(row.node.change)"
               :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span

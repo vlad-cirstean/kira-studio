@@ -118,7 +118,7 @@ async function openRepo(p: Page, errors: string[]): Promise<void> {
   p.on('pageerror', (err) => errors.push(err.message));
   await installGitStreamMock(p, REPO.repoId, MOCK_RESULTS, undefined, OPENS);
   await p.locator(`[data-testid="repo-row"][data-repo-id="${REPO.id}"]`).click();
-  await expect(p.locator(`${GRID} svg.kv-graph-svg`).first()).toBeVisible();
+  await expect(p.locator(`${GRID} svg[data-testid="graph-svg"]`).first()).toBeVisible();
 }
 
 /** Scrolls inside the page (no actionability waits: SlickGrid recycles row nodes under a scroll),
@@ -137,7 +137,10 @@ async function scrollToRow(p: Page, row: number, loadedRows: number): Promise<vo
           target.scrollIntoView({ block: 'center' });
           await frame();
           await frame();
-          if (vp.querySelector(`.slick-row[data-row="${args.row}"] svg.kv-graph-svg > *`)) return;
+          if (
+            vp.querySelector(`.slick-row[data-row="${args.row}"] svg[data-testid="graph-svg"] > *`)
+          )
+            return;
           continue;
         }
         const mid = rows.length ? rows[Math.floor(rows.length / 2)]! : 0;
@@ -160,7 +163,7 @@ async function visibleReports(p: Page): Promise<RowReport[]> {
       for (const el of document.querySelectorAll(`${gridSel} .slick-row[data-row]`)) {
         const rect = el.getBoundingClientRect();
         if (rect.bottom <= vp.top || rect.top >= vp.bottom) continue;
-        const svg = el.querySelector('svg.kv-graph-svg');
+        const svg = el.querySelector('svg[data-testid="graph-svg"]');
         if (!svg) continue;
         const width = svg.getBoundingClientRect().width;
         const height = svg.getBoundingClientRect().height;
@@ -228,7 +231,7 @@ async function loadMore(p: Page): Promise<void> {
   await button.click();
   await expect(button).toHaveCount(0);
   await scrollToRow(p, PAGING_ROWS - 1, PAGING_ROWS);
-  await expect(rowAt(p, PAGING_ROWS - 1).locator('.kv-cell-message')).toHaveText(
+  await expect(rowAt(p, PAGING_ROWS - 1).locator('.kira-cell-message')).toHaveText(
     `commit ${PAGING_ROWS - 1}`,
   );
 }
@@ -243,7 +246,7 @@ test('outer-lane commits keep their node across scroll, click and Load more', as
   await scrollToRow(win, PAGE_SIZE - 1, PAGE_SIZE);
   expect(await clippedNodes(win)).toEqual([]);
   await rowAt(win, PAGE_SIZE - 5)
-    .locator('.kv-cell-message')
+    .locator('.kira-cell-message')
     .click();
   expect(await clippedNodes(win)).toEqual([]);
 
@@ -307,7 +310,7 @@ async function overflow(p: Page): Promise<string[]> {
         out.push(`scrollWidth ${vp.scrollWidth} > clientWidth ${vp.clientWidth}`);
       }
       if (vp.scrollLeft !== 0) out.push(`scrollLeft ${vp.scrollLeft}`);
-      const cell = vp.querySelector('.slick-row .kv-cell-graph, .slick-row .l0');
+      const cell = vp.querySelector('.slick-row .kira-cell-graph, .slick-row .l0');
       if (cell) {
         const x = Math.round(cell.getBoundingClientRect().left - vp.getBoundingClientRect().left);
         if (x < 0) out.push(`graph cell at x ${x}`);
@@ -345,7 +348,7 @@ test('columns resized wide never push the graph out of view', async ({ relaunch 
   expect(await clippedNodes(win)).toEqual([]);
 
   await scrollToRow(win, 3, PAGE_SIZE);
-  await rowAt(win, 3).locator('.kv-cell-message').click();
+  await rowAt(win, 3).locator('.kira-cell-message').click();
   await win.keyboard.press('Escape');
   expect(await overflow(win)).toEqual([]);
 

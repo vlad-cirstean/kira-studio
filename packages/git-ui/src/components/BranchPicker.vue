@@ -240,18 +240,18 @@ function onFilterKeydown(event: KeyboardEvent): void {
 
 /** §7.3: `ArrowDown`/`ArrowUp` step through the active tab's rows (`ArrowUp` from the first row
  *  returns to the filter); `Home`/`End` jump to the ends; `Enter` runs the focused row's own main
- *  action where it has one (`.kv-branch-row-main` is a `<button>` for branch/tag/stash rows and a
+ *  action where it has one (`branch-row-main` is a `<button>` for branch/tag/stash rows and a
  *  plain, unclickable `<div>` for worktree/stack rows — one selector does both without a per-kind
  *  branch). `Tab` is left alone: it already reaches the row's own trailing buttons.
  *
- *  P110 A18: `.kv-branch-row`/`.kv-branch-row-main` carry no CSS any more (every row's own styling
+ *  P110 A18: `branch-row`/`branch-row-main` carry no CSS any more (every row's own styling
  *  moved to utilities, here and in TagList/StashRows/WorktreeList/StackList) — both class
  *  names stay as bare query-selector hooks for `closest()`/`querySelector()` below, the same
- *  "functional, not stylistic" reason `.kv-branch-rename-input` (line ~636) stays a literal class
+ *  "functional, not stylistic" reason `branch-rename-input` (line ~636) stays a literal class
  *  for its own `querySelector(...).focus()` call. */
 const rowsScrollEl = ref<HTMLElement | null>(null);
 function onRowsKeydown(event: KeyboardEvent): void {
-  const rowEl = (event.target as HTMLElement).closest<HTMLElement>('.kv-branch-row[data-row-id]');
+  const rowEl = (event.target as HTMLElement).closest<HTMLElement>('[data-testid="branch-row"][data-row-id]');
   if (rowEl === null) return;
   const items = toMenuItems(model.value.rowIds);
   const currentId = rowEl.dataset.rowId;
@@ -285,7 +285,7 @@ function onRowsKeydown(event: KeyboardEvent): void {
       // Only the row itself: Enter on an inner button (actions, PR badge, main) activates natively.
       if (event.target !== rowEl) return;
       event.preventDefault();
-      rowEl.querySelector<HTMLElement>('.kv-branch-row-main')?.click();
+      rowEl.querySelector<HTMLElement>('[data-testid="branch-row-main"]')?.click();
       return;
     default:
       return;
@@ -459,7 +459,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
     // P105 §8: not the panel's own open-auto-focus moment (the panel is already open, mid-row-
     // menu-selection here) — focused explicitly once the rename input renders.
     void nextTick(() => {
-      panelEl.value?.querySelector<HTMLInputElement>('.kv-branch-rename-input')?.focus();
+      panelEl.value?.querySelector<HTMLInputElement>('[data-testid="branch-rename-input"]')?.focus();
     });
     return;
   }
@@ -584,7 +584,7 @@ watch(visibleBranchNames, (names) => {
         <Tooltip>
           <TooltipTrigger as-child>
             <PopoverTrigger as-child>
-              <Button ref="triggerEl" variant="toolbar" size="kira" class="kv-branch-trigger max-w-50">
+              <Button data-testid="branch-trigger" ref="triggerEl" variant="toolbar" size="kira" class="max-w-50">
                 <CodiconIcon name="git-branch" :size="13" />
                 <span class="truncate">{{ triggerLabel }}</span>
                 <CodiconIcon :name="codiconName(STATE_ICONS.chevronDown)" :size="13" />
@@ -606,11 +606,11 @@ watch(visibleBranchNames, (names) => {
           ref="panelEl"
           class="flex flex-col min-h-0 max-h-[min(520px,var(--reka-popover-content-available-height))]"
         >
-          <ToggleGroup
+          <ToggleGroup data-testid="branch-tabs"
             type="single"
             variant="outline"
             size="kira"
-            class="kv-branch-tabs mx-1 mt-1"
+            class="mx-1 mt-1"
             aria-label="Picker section"
             :model-value="activeTab"
             @update:model-value="(v) => v && (activeTab = v as PickerTab)"
@@ -658,18 +658,18 @@ watch(visibleBranchNames, (names) => {
             <template v-if="activeTab === 'branches'">
         <section aria-label="Branches">
           <RefSectionHeader label="Branches" />
-          <div
+          <div data-testid="branch-row"
             v-for="row in model.branchesLocal.visible"
             :key="row.refname"
-            class="kv-branch-row flex items-center gap-0.5 px-1"
+            class="flex items-center gap-0.5 px-1"
             :data-row-id="`branch:${row.refname}`"
             :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
           >
             <template v-if="renaming?.name === row.shortName">
-              <Input
+              <Input data-testid="branch-rename-input"
                 v-model="renaming.value"
                 size="kira"
-                class="kv-branch-rename-input flex-1"
+                class="flex-1"
                 aria-label="Rename branch"
                 @keydown.enter="submitRename"
                 @keydown.escape="renaming = undefined"
@@ -677,9 +677,9 @@ watch(visibleBranchNames, (names) => {
               <TooltipIconButton icon="check" label="Rename branch" @click="submitRename" />
             </template>
             <template v-else>
-              <button
+              <button data-testid="branch-row-main"
                 type="button"
-                :class="cn(rowVariants(), 'kv-branch-row-main flex-1 min-w-0 text-left')"
+                :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
                 @click="checkoutBranch(row)"
               >
                 <span
@@ -717,16 +717,16 @@ watch(visibleBranchNames, (names) => {
 
         <section aria-label="Remote branches">
           <RefSectionHeader label="Remote branches" />
-          <div
+          <div data-testid="branch-row"
             v-for="row in model.branchesRemote.visible"
             :key="row.refname"
-            class="kv-branch-row flex items-center gap-0.5 px-1"
+            class="flex items-center gap-0.5 px-1"
             :data-row-id="`remote:${row.refname}`"
             :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
           >
-            <button
+            <button data-testid="branch-row-main"
               type="button"
-              :class="cn(rowVariants(), 'kv-branch-row-main flex-1 min-w-0 text-left')"
+              :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
               @click="checkoutRemote(row)"
             >
               <CodiconIcon name="cloud" :size="13" />

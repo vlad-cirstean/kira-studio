@@ -16,7 +16,7 @@ export interface MenuItem {
    *  unchanged. */
   readonly icon?: string;
   /** Renders the item in the danger (destructive) visual treatment — matching the toolbar's own
-   *  existing `.kv-push-menu-item` danger-colour precedent. Optional, defaults to `false`. */
+   *  existing `push-menu-item` danger-colour precedent. Optional, defaults to `false`. */
   readonly danger?: boolean;
   /** G34 D8: a secondary line under the label — muted, one type step down. `PullStrategyPicker`'s
    *  own "Merge — from pull.rebase in your repository config" is the only producer today; it is a

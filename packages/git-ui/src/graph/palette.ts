@@ -5,16 +5,16 @@
  */
 import { DEFAULT_PALETTE_SIZE } from '@kira/git-core';
 
-// Every entry is a full literal: Tailwind emits only scanned strings. `kv-lane-N` is a DOM marker.
+// Every entry is a full literal: Tailwind emits only scanned strings.
 const LANE_CLASS = [
-  'kv-lane-0 stroke-graph-lane-0 fill-graph-lane-0',
-  'kv-lane-1 stroke-graph-lane-1 fill-graph-lane-1',
-  'kv-lane-2 stroke-graph-lane-2 fill-graph-lane-2',
-  'kv-lane-3 stroke-graph-lane-3 fill-graph-lane-3',
-  'kv-lane-4 stroke-graph-lane-4 fill-graph-lane-4',
-  'kv-lane-5 stroke-graph-lane-5 fill-graph-lane-5',
-  'kv-lane-6 stroke-graph-lane-6 fill-graph-lane-6',
-  'kv-lane-7 stroke-graph-lane-7 fill-graph-lane-7',
+  'stroke-graph-lane-0 fill-graph-lane-0',
+  'stroke-graph-lane-1 fill-graph-lane-1',
+  'stroke-graph-lane-2 fill-graph-lane-2',
+  'stroke-graph-lane-3 fill-graph-lane-3',
+  'stroke-graph-lane-4 fill-graph-lane-4',
+  'stroke-graph-lane-5 fill-graph-lane-5',
+  'stroke-graph-lane-6 fill-graph-lane-6',
+  'stroke-graph-lane-7 fill-graph-lane-7',
 ] as const;
 
 /** Wraps modulo the palette size: a colour index past the palette reuses an earlier lane. */

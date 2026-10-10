@@ -35,15 +35,14 @@ function isStashDecoration(ref: DecorationRef): boolean {
   return ref.kind === 'stash';
 }
 
-// `kv-cell-date` stays as a marker (tests and the width probe read it); `kv-cell-author` has no reader.
+// `kira-cell-date` stays as a runtime class: tests and the width probe read it.
 const CELL_TEXT_CLASS = 'overflow-hidden text-ellipsis whitespace-nowrap';
 const CELL_AUTHOR_CLASS = `text-muted-foreground ${CELL_TEXT_CLASS}`;
-const CELL_DATE_CLASS = `kv-cell-date tabular-nums text-muted-foreground ${CELL_TEXT_CLASS}`;
+const CELL_DATE_CLASS = `kira-cell-date tabular-nums text-muted-foreground ${CELL_TEXT_CLASS}`;
 // One flex row: badge strip (capped at half the cell), then the subject.
-const CELL_MESSAGE_CLASS = 'kv-cell-message flex items-center gap-1 min-w-0 overflow-hidden';
+const CELL_MESSAGE_CLASS = 'kira-cell-message flex items-center gap-1 min-w-0 overflow-hidden';
 const CELL_MESSAGE_COLLAPSED_CLASS = CELL_MESSAGE_CLASS;
-const SUBJECT_CLASS =
-  'kv-message-subject min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap';
+const SUBJECT_CLASS = 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap';
 const SUBJECT_STASH_CLASS = `${SUBJECT_CLASS} italic`;
 const BADGES_ROW_CLASS = 'flex items-center gap-1 shrink min-w-0 max-w-1/2 overflow-hidden';
 const SUBJECT_COLLAPSED_CLASS = `${SUBJECT_CLASS} italic text-muted-foreground`;
@@ -167,7 +166,7 @@ function messageFormatter(
       // pair — a placeholder row only ever means "collapsed" (expanding it replaces the row
       // outright, §4.2), so there is no expanded state for this glyph to reflect.
       const chevron = document.createElement('span');
-      chevron.className = 'codicon codicon-chevron-right kv-collapsed-chevron shrink-0';
+      chevron.className = 'codicon codicon-chevron-right shrink-0';
       chevron.setAttribute('aria-hidden', 'true');
       cell.appendChild(chevron);
       const text = document.createElement('span');
@@ -193,6 +192,7 @@ function messageFormatter(
     }
 
     const subject = document.createElement('span');
+    subject.dataset.testid = 'message-subject';
     subject.className = dataContext.decoration.some(isStashDecoration)
       ? SUBJECT_STASH_CLASS
       : SUBJECT_CLASS;
@@ -320,7 +320,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      cssClass: 'kv-cell-graph',
+      cssClass: 'kira-cell-graph',
       formatter: graphFormatter,
     },
     {
@@ -388,16 +388,16 @@ function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata 
   const entry = ctx.plan().entryAt(displayRow);
   if (entry.kind === 'collapsed') {
     // P93 §4.2: "the compact height... A placeholder never carries badges" — nor is it ever
-    // `kv-row-selected`/`-stash`: `entry.storeRow` is only the placeholder's first
+    // `kira-row-selected`/`-stash`: `entry.storeRow` is only the placeholder's first
     // contracted row (a shape `getItem` needs, §4.2's own note), not a fact about the placeholder
     // itself, so `store.decorationAt`/`isSelected` are never consulted for it.
-    return { cssClasses: 'kv-row-collapsed' };
+    return { cssClasses: 'kira-row-collapsed' };
   }
   const row = entry.storeRow;
   const classes: string[] = [];
-  if (ctx.isSelected(row)) classes.push('kv-row-selected');
+  if (ctx.isSelected(row)) classes.push('kira-row-selected');
   const decoration = ctx.store.decorationAt(row);
-  if (decoration.some(isStashDecoration)) classes.push('kv-row-stash');
+  if (decoration.some(isStashDecoration)) classes.push('kira-row-stash');
   return classes.length > 0 ? { cssClasses: classes.join(' ') } : null;
 }
 

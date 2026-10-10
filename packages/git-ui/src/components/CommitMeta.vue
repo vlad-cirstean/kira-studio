@@ -158,7 +158,7 @@ const PR_STATE_LABEL: Readonly<Record<string, string>> = {
 
 // P110 A14 (§1.3): a lookup map, not string interpolation, so every text-badge-pr-* class
 // Tailwind must scan appears as a complete literal below. Replaces the old dynamic
-// `kv-meta-pr-icon--${state}` class, whose own colour rule lived in this file's deleted <style>.
+// `meta-pr-icon--${state}` class, whose own colour rule lived in this file's deleted <style>.
 // Inline link: no button chrome, ambient colour, graph font.
 const LINK_BUTTON_CLASS =
   'h-auto p-0 border-0 font-normal text-inherit text-graph-sm';
@@ -310,8 +310,8 @@ const prIcon = computed(() => {
     v-if="detail"
     :class="
       expanded
-        ? 'kv-detail-pane-meta flex flex-col flex-initial min-h-[min(220px,60%)] max-h-7/10 overflow-auto'
-        : 'kv-detail-pane-meta flex flex-col flex-none max-h-1/5 overflow-hidden'
+        ? 'flex flex-col flex-initial min-h-[min(220px,60%)] max-h-7/10 overflow-auto'
+        : 'flex flex-col flex-none max-h-1/5 overflow-hidden'
     "
     data-testid="commit-meta"
   >
@@ -320,7 +320,7 @@ const prIcon = computed(() => {
     <ViewToolbar data-testid="detail-head">
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="kv-meta-subject min-w-0 truncate text-kira-md text-fg">{{ detail.subject }}</span>
+          <span data-testid="meta-subject" class="min-w-0 truncate text-kira-md text-fg">{{ detail.subject }}</span>
         </TooltipTrigger>
         <TooltipContent>{{ detail.subject }}</TooltipContent>
       </Tooltip>
@@ -371,33 +371,33 @@ const prIcon = computed(() => {
     </ViewToolbar>
 
     <div class="flex flex-col gap-1 px-3 py-2">
-    <p
+    <p data-testid="meta-body"
       v-if="bodyParagraphs.length > 0"
       ref="bodyEl"
       v-show="expanded"
-      class="kv-meta-body mt-1 whitespace-normal"
+      class="mt-1 whitespace-normal"
     ></p>
 
-    <Button
+    <Button data-testid="meta-body-toggle"
       variant="link"
       size="kira"
-      class="kv-meta-body-toggle mt-0.5 h-auto p-0 justify-start text-muted-foreground hover:text-fg"
+      class="mt-0.5 h-auto p-0 justify-start text-muted-foreground hover:text-fg"
       @click="expanded = !expanded"
     >
       {{ expanded ? 'Show less' : 'Show more' }}
     </Button>
 
-    <div v-if="expanded" class="kv-meta-expanded flex flex-col gap-1 mt-1">
-      <p class="kv-meta-identity text-graph-sm text-muted-foreground">
+    <div v-if="expanded" class="flex flex-col gap-1 mt-1">
+      <p data-testid="meta-identity" class="text-graph-sm text-muted-foreground">
         {{ detail.author.name }} &lt;{{ detail.author.email }}&gt;
       </p>
-      <p v-if="committerDiffersFromAuthor" class="kv-meta-identity text-graph-sm text-muted-foreground">
+      <p data-testid="meta-identity" v-if="committerDiffersFromAuthor" class="text-graph-sm text-muted-foreground">
         {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
         <span class="text-graph-sm">committer</span>
       </p>
-      <dl
+      <dl data-testid="meta-trailers"
         v-if="trailerRows.length > 0"
-        class="kv-meta-trailers grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
+        class="grid grid-cols-[max-content_1fr] gap-y-0.5 gap-x-2 text-graph-sm"
       >
         <template v-for="(row, index) in trailerRows" :key="index">
           <dt class="text-muted-foreground">{{ row.token }}</dt>
@@ -413,7 +413,7 @@ const prIcon = computed(() => {
       >
         <template v-if="detail.decoration.length > 0">
           <dt class="text-muted-foreground">Refs</dt>
-          <dd ref="decorationEl" class="kv-meta-refs flex flex-wrap gap-0.5"></dd>
+          <dd data-testid="meta-refs" ref="decorationEl" class="flex flex-wrap gap-0.5"></dd>
         </template>
         <template v-if="signatureText">
           <dt class="text-muted-foreground">Signature</dt>

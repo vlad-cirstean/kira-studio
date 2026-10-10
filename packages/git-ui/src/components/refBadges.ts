@@ -161,6 +161,7 @@ function buildBadgeElement(
   // above) on the current-branch badge itself.
   if (spec.isCurrentBranch) classes.push('ring-1 ring-focus');
   badge.className = refBadgeClass(variant, ...classes);
+  if (spec.icon === BADGE_ICONS.tag) badge.dataset.testid = 'badge-tag';
   // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
   // CommitGrid.vue mounts over its grid host — a mouse-hover affordance independent of whether the
   // ~190px CSS truncation (`BADGE_LABEL_CLASS`) actually clips this particular badge's text. This file
@@ -178,7 +179,8 @@ function buildBadgeElement(
   }
 
   const icon = document.createElement('span');
-  icon.className = `codicon ${spec.icon} kv-badge-icon`;
+  icon.className = `codicon ${spec.icon}`;
+  icon.dataset.testid = 'badge-icon';
   // Decorative: the visible label text (or, for the overflow badge, its title) already carries
   // the information — see this file's module doc on "no colour/glyph-only meaning" (§7.9/W14).
   icon.setAttribute('aria-hidden', 'true');
@@ -196,7 +198,7 @@ function buildBadgeElement(
     // "reliably reach the accessibility tree as a second, non-text signal" reasoning the dot it
     // replaces already established (§6.1/§7's own "no colour/shape-only meaning" still applies).
     const check = document.createElement('span');
-    check.className = 'codicon codicon-check kv-badge-current-glyph text-focus';
+    check.className = 'codicon codicon-check text-focus';
     check.setAttribute('role', 'img');
     check.setAttribute('aria-label', 'current branch');
     badge.appendChild(check);
@@ -262,6 +264,7 @@ export function buildPrBadge(prs: readonly PrRecord[]): HTMLElement | null {
 
   const badge = document.createElement('button');
   badge.className = prBadgeClass(best.state);
+  badge.dataset.testid = 'badge-pr';
   badge.type = 'button';
   // Not a Tab stop inside the roving-tabindex grid; Enter on it would toggle the detail pane.
   badge.tabIndex = -1;

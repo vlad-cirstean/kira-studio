@@ -264,7 +264,7 @@ let pendingFocusRow: number | null = null;
 // leaves open.
 //
 // G21 D5: this used to also track which of a row's *two* focusable elements — the row div or its
-// `kv-cell-sha` copy button (P5 W10) — the user was actually on, since a background render (the
+// `kira-cell-sha` copy button (P5 W10) — the user was actually on, since a background render (the
 // layout worker's still-arriving chunks) could recreate the row's DOM node out from under
 // whichever one currently held focus. The sha column and its button are gone; a row's own div is
 // its only focusable element now, so that second piece of state goes with it.
@@ -801,7 +801,7 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
     }
     // The graph column carries no information the row's own aria-label does not (§7.9) — lane
     // colour is decorative, and HEAD/stash/branch-vs-tag are all named in the label already.
-    rowNode.querySelector('.kv-cell-graph')?.setAttribute('aria-hidden', 'true');
+    rowNode.querySelector('.kira-cell-graph')?.setAttribute('aria-hidden', 'true');
 
     // Either this row was just explicitly selected (`pendingFocusRow` — always the row div itself,
     // matching "selection scrolls it into view first, focuses second") or it is the row the user
@@ -994,7 +994,7 @@ onMounted(() => {
     // widen or narrow the absolute date format's own rendered width — re-measure so the date
     // column's minimum drag width stays honest, even though nothing here forces the column's
     // *current* width to follow (a user-narrowed relative-format column stays exactly as narrow
-    // as they left it; `.kv-cell-date`'s own ellipsis is the safety net for that case).
+    // as they left it; `.kira-cell-date`'s own ellipsis is the safety net for that case).
     remeasureDateWidth();
     if (!grid) return;
     grid.setOptions({ rowHeight: rowHeightPx(tokenReader) });
@@ -1278,25 +1278,25 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 
 <template>
   <div
-    class="kv-commit-grid relative h-full w-full min-h-graph-row-compact overflow-hidden text-graph-md text-fg font-ui"
+    class="kira-commit-grid relative h-full w-full min-h-graph-row-compact overflow-hidden text-graph-md text-fg font-ui"
     data-testid="commit-grid"
   >
     <!-- SlickGrid's own `init()` (`Utils.emptyElement(this._container)`) wipes out whatever was
          inside its container the moment it constructs — including these resize handles, if they
          were this element's own children. `host` is SlickGrid's *exclusive* DOM: the handles are
-         its siblings, absolutely positioned over it via `.kv-commit-grid`'s own `position:
+         its siblings, absolutely positioned over it via `.kira-commit-grid`'s own `position:
          relative` above, not descendants a `new SlickGrid(host.value, ...)` call would delete. -->
-    <div ref="host" class="kv-grid-host h-full w-full"></div>
+    <div data-testid="grid-host" ref="host" class="h-full w-full"></div>
     <!-- P131 Part 2 §5.1: ref and PR badges (refBadges.ts) write `data-kira-tip` on plain DOM they
          build outside Vue -- this one hoisted trigger, a sibling of `host` (never inside it:
          SlickGrid's own `init()` empties `host`), covers every badge in every cell. -->
     <AttributeTooltip :container="host" />
-    <!-- G21 D6b: an off-screen probe carrying .kv-cell-date's own font-affecting rules, purely so
+    <!-- G21 D6b: an off-screen probe carrying .kira-cell-date's own font-affecting rules, purely so
          `remeasureDateWidth` has a real element to read a computed `font` shorthand from — never
          shown, never a fifth grid column. -->
     <span
       ref="dateWidthProbe"
-      class="kv-cell-date tabular-nums absolute invisible pointer-events-none whitespace-nowrap"
+      class="kira-cell-date tabular-nums absolute invisible pointer-events-none whitespace-nowrap"
       aria-hidden="true"
     ></span>
     <KuiColumnResizeHandle

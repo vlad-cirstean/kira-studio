@@ -214,7 +214,7 @@ test('git module: graph with the detail pane (P229)', async ({ relaunch }) => {
   await win.locator('[data-testid="commit-grid"] .slick-row[data-row="1"]').click();
   await expect(win.locator('[data-testid="detail-region"]')).toBeVisible();
   await expect(
-    win.locator('[data-testid="detail-region"] .kv-file-tree-row').first(),
+    win.locator('[data-testid="detail-region"] [data-testid="file-tree-row"]').first(),
   ).toBeVisible();
   await expect(win.locator('[data-testid="repo-graph-host"]')).toHaveScreenshot(
     'git-graph-detail.png',
@@ -239,7 +239,7 @@ test('git module: repository settings dialog (P256)', async ({ relaunch }) => {
 
 test('git module: branch picker (P256)', async ({ relaunch }) => {
   const win = await openGraph(relaunch);
-  await win.locator('.kv-branch-trigger').click();
+  await win.locator('[data-testid="branch-trigger"]').click();
   const picker = win.getByRole('dialog');
   await expect(picker).toBeVisible();
   await expect(picker).toHaveScreenshot('git-branch-picker.png');

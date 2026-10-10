@@ -70,7 +70,7 @@ const REFS_LIST = {
 };
 
 function message(p: Page, row: number) {
-  return p.locator(`[data-testid="commit-grid"] .slick-row[data-row="${row}"] .kv-cell-message`);
+  return p.locator(`[data-testid="commit-grid"] .slick-row[data-row="${row}"] .kira-cell-message`);
 }
 
 test('a re-walk from row 0 with a shorter first page keeps the graph rendering, and a click still selects', async ({
@@ -134,7 +134,7 @@ test('a re-walk from row 0 with a shorter first page keeps the graph rendering, 
     .click();
   await expect(message(win, 0)).toHaveText('new 0');
 
-  const rendered = win.locator('[data-testid="commit-grid"] .slick-row .kv-cell-message');
+  const rendered = win.locator('[data-testid="commit-grid"] .slick-row .kira-cell-message');
   const texts = await rendered.allTextContents();
   expect(texts.length).toBeGreaterThan(0);
   expect(texts.every((text) => text.trim() !== '')).toBe(true);

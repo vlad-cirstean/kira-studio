@@ -31,10 +31,10 @@ test('clicking a file inside an expanded commit does not collapse the row', asyn
 }) => {
   const page = await openReviewListing(relaunch);
   const row = reviewRow(page);
-  await row.locator('.kv-review-row-header').click();
+  await row.locator('[data-testid="review-row-header"]').click();
   await expect(row).toHaveAttribute('aria-expanded', 'true');
 
-  await row.locator('.kv-file-tree-row', { hasText: 'example.ts' }).click();
+  await row.locator('[data-testid="file-tree-row"]', { hasText: 'example.ts' }).click();
 
   await expect(row).toHaveAttribute('aria-expanded', 'true');
   await expect(row.locator('[data-testid="file-tree"]')).toBeVisible();
@@ -65,11 +65,13 @@ test('Open in graph activates the graph tab on that commit', async ({ relaunch }
 
 test('the Files pane reviewed control is a checkbox with three states', async ({ relaunch }) => {
   const page = await openReviewListing(relaunch);
-  await page.locator('.kv-review-toolbar [aria-label^="Files"]').click();
+  await page.locator('[data-testid="review-toolbar"] [aria-label^="Files"]').click();
 
   const box = (path: string) =>
     page
-      .locator('.kv-review-files-tree .kv-file-tree-row', { hasText: base(path) })
+      .locator('[data-testid="review-files-tree"] [data-testid="file-tree-row"]', {
+        hasText: base(path),
+      })
       .locator('[role="checkbox"]');
   await expect(box(REVIEW_FILE_NONE)).toHaveAttribute('aria-checked', 'false');
   await expect(box(REVIEW_FILE_PARTIAL)).toHaveAttribute('aria-checked', 'mixed');
@@ -78,9 +80,11 @@ test('the Files pane reviewed control is a checkbox with three states', async ({
 
 test('Space on the focused reviewed checkbox marks the file', async ({ relaunch }) => {
   const page = await openReviewListing(relaunch);
-  await page.locator('.kv-review-toolbar [aria-label^="Files"]').click();
+  await page.locator('[data-testid="review-toolbar"] [aria-label^="Files"]').click();
   const box = page
-    .locator('.kv-review-files-tree .kv-file-tree-row', { hasText: base(REVIEW_FILE_NONE) })
+    .locator('[data-testid="review-files-tree"] [data-testid="file-tree-row"]', {
+      hasText: base(REVIEW_FILE_NONE),
+    })
     .locator('[role="checkbox"]');
   await box.focus();
   await page.keyboard.press('Space');
@@ -105,7 +109,7 @@ test('600 commits mount 500 rows; Show more reveals the rest', async ({ relaunch
   const rows = page.locator('[data-testid^="review-row-"]');
   await expect(rows).toHaveCount(500);
 
-  const showMore = page.locator('.kv-review-load-more-button');
+  const showMore = page.locator('[data-testid="review-load-more-button"]');
   await expect(showMore).toHaveText(/Show 100 more/);
   await showMore.click();
   await expect(rows).toHaveCount(total);
@@ -121,7 +125,7 @@ test('Review branch changes from the picker opens the Review tab on that branch'
     results: { ...PICKER_RESULTS, ...REVIEW_RESULTS, 'refs.list': PICKER_RESULTS['refs.list'] },
   });
   await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')).toBeVisible();
-  await page.locator('.kv-branch-trigger').click();
+  await page.locator('[data-testid="branch-trigger"]').click();
   await page
     .locator('[data-row-id="branch:refs/heads/feature-auth"]')
     .getByRole('button', { name: 'More actions' })

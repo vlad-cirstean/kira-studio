@@ -24,10 +24,12 @@ async function bootBranchOrder(relaunch: Relaunch): Promise<Page> {
 }
 
 const messageCell = (p: Page, row: number) =>
-  p.locator(`${grid} .slick-row[data-row="${row}"] .kv-cell-message`).first();
+  p.locator(`${grid} .slick-row[data-row="${row}"] .kira-cell-message`).first();
 
 const dashedPaths = (p: Page, row: number) =>
-  p.locator(`${grid} .slick-row[data-row="${row}"] .kv-graph-svg path[stroke-dasharray]`);
+  p.locator(
+    `${grid} .slick-row[data-row="${row}"] [data-testid="graph-svg"] path[stroke-dasharray]`,
+  );
 
 test('each feature branch draws one dashed fork stub on its oldest row', async ({ relaunch }) => {
   const page = await bootBranchOrder(relaunch);

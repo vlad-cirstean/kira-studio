@@ -89,16 +89,16 @@ async function onRefMenuSelect(id: string): Promise<void> {
 <template>
   <section aria-label="Tags">
     <RefSectionHeader label="Tags" />
-    <div
+    <div data-testid="branch-row"
       v-for="row in section.visible"
       :key="row.refname"
-      class="kv-branch-row flex items-center gap-0.5 px-1"
+      class="flex items-center gap-0.5 px-1"
       :data-row-id="`tag:${row.refname}`"
       :tabindex="focusedRowId === `tag:${row.refname}` ? 0 : -1"
     >
-      <button
+      <button data-testid="branch-row-main"
         type="button"
-        :class="cn(rowVariants(), 'kv-branch-row-main flex-1 min-w-0 text-left')"
+        :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
         @click="checkout(row)"
       >
         <span

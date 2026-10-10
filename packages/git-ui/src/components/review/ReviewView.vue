@@ -646,7 +646,7 @@ watch(shas, (list) => {
 });
 
 function rowElId(sha: string): string {
-  return `kv-review-row-${sha}`;
+  return `git-review-row-${sha}`;
 }
 
 function focusRow(index: number): void {
@@ -756,7 +756,7 @@ watch(
 <template>
   <div
     ref="rootEl"
-    class="kv-review-view flex flex-col h-full w-full relative bg-bg text-fg font-ui text-graph-md overflow-hidden"
+    class="flex flex-col h-full w-full relative bg-bg text-fg font-ui text-graph-md overflow-hidden"
     :data-connection-state="connectionState"
   >
     <!-- P131 Part 3 §5.1: MountRoot.vue's own TooltipProvider (Part 2 §3.5) already wraps this
@@ -892,9 +892,9 @@ watch(
       <!-- G12 D13/D14: one panel-level toolbar, holding the Commits/Files pane toggle, the
            filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
            expanded row plus a third, separately-stateful copy in the Files pane. -->
-      <div
+      <div data-testid="review-toolbar"
         v-if="review.phase.value === 'listing'"
-        class="kv-review-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border"
+        class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border"
       >
         <ToggleGroup
           type="single"
@@ -1044,10 +1044,10 @@ watch(
                so only one affordance shows at a time: reveal the local buffer first, only then ask
                the server for more. -->
           <div v-if="shas.length > renderCap" class="flex justify-center py-1 px-1.5 shrink-0">
-            <!-- `kv-review-load-more-button` carries no styling of its own (verified: no rule ever
+            <!-- `review-load-more-button` carries no styling of its own (verified: no rule ever
                  existed for it) — kept as a plain test-selector hook,
                  `review-commit-list-cap.spec.ts`'s own precedent. -->
-            <Button variant="toolbar" size="kira" class="kv-review-load-more-button" @click="revealMore">
+            <Button data-testid="review-load-more-button" variant="toolbar" size="kira" @click="revealMore">
               {{ revealMoreLabel() }}
             </Button>
           </div>
@@ -1060,10 +1060,10 @@ watch(
             v-else-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
             class="flex justify-center py-1 px-1.5 shrink-0"
           >
-            <Button
+            <Button data-testid="review-load-more-button"
               variant="toolbar"
               size="kira"
-              class="kv-review-load-more-button"
+             
               :disabled="review.isLoadingMore.value"
               @click="handleLoadMore"
             >

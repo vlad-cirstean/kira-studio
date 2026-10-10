@@ -159,7 +159,7 @@ test('contract: the branch picker marks a branch behind its upstream', async ({ 
     results: { 'refs.list': refs },
   });
   await expect(row(page, 0)).toBeVisible();
-  await page.locator('.kv-branch-trigger').click();
-  const branchRow = page.locator('.kv-branch-row-main', { hasText: 'main' }).first();
+  await page.locator('[data-testid="branch-trigger"]').click();
+  const branchRow = page.locator('[data-testid="branch-row-main"]', { hasText: 'main' }).first();
   await expect(branchRow).toContainText(`\u2193${main.track.behind}`);
 });

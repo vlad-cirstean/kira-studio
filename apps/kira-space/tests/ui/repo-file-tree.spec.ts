@@ -11,7 +11,7 @@ const diffTabs = (p: Page) =>
 
 async function fileTreeRows(relaunch: Parameters<typeof openCommitDetail>[0]) {
   const page = await openCommitDetail(relaunch);
-  const rows = page.locator('[data-testid="file-tree"] .kv-file-tree-row');
+  const rows = page.locator('[data-testid="file-tree"] [data-testid="file-tree-row"]');
   const fileRow = rows.filter({ hasText: 'example.ts' });
   await expect(fileRow).toBeVisible();
   return { page, rows, fileRow };
@@ -40,8 +40,8 @@ test('the status letter is smaller than its row', async ({ relaunch }) => {
   const { fileRow } = await fileTreeRows(relaunch);
 
   const { status, row } = await fileRow.evaluate((el) => {
-    const letter = el.querySelector('.kv-file-tree-status');
-    if (!letter) throw new Error('.kv-file-tree-status not found');
+    const letter = el.querySelector('[data-testid="file-tree-status"]');
+    if (!letter) throw new Error('[data-testid="file-tree-status"] not found');
     return {
       status: Number.parseFloat(getComputedStyle(letter).fontSize),
       row: Number.parseFloat(getComputedStyle(el).fontSize),

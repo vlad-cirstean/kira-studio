@@ -88,18 +88,18 @@ function onMenuSelect(id: string): void {
 </script>
 
 <template>
-  <div
+  <div data-testid="branch-row"
     v-for="entry in section.visible"
     :key="entry.sha"
-    class="kv-branch-row flex items-center gap-0.5 px-1"
+    class="flex items-center gap-0.5 px-1"
     :class="{ 'bg-hover': stash.selectedSha.value === entry.sha }"
     :data-kira-tip="rowModel(entry).rowTooltip"
     :data-row-id="rowModel(entry).id"
     :tabindex="focusedRowId === rowModel(entry).id ? 0 : -1"
   >
-    <button
+    <button data-testid="branch-row-main"
       type="button"
-      :class="cn(rowVariants(), 'kv-branch-row-main flex-1 min-w-0 text-left')"
+      :class="cn(rowVariants(), 'flex-1 min-w-0 text-left')"
       @click="select(entry)"
     >
       <CodiconIcon name="archive" :size="13" />
@@ -113,7 +113,7 @@ function onMenuSelect(id: string): void {
       <Badge v-if="rowModel(entry).auto" data-kira-tip="Created automatically by an auto-stashed checkout"
         >auto</Badge
       >
-      <span class="kv-stash-message flex-1 min-w-0 truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
+      <span data-testid="stash-message" class="flex-1 min-w-0 truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
       <span v-if="entry.includedUntracked" class="font-data text-kira-sm text-subtle" data-kira-tip="Includes untracked files">-u</span>
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
       <span class="text-kira-sm text-muted-foreground whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>

@@ -44,7 +44,7 @@ const emit = defineEmits<{
 
 const isEmpty = computed(() => props.model.sections.length === 0);
 
-/** P110 A17: `.kv-search-option`'s own gap/px are already exactly `rowVariants()`'s own
+/** P110 A17: `search-option`'s own gap/px are already exactly `rowVariants()`'s own
  *  `gap-1`/`px-1.5` (P110 I2-29: the default spacing scale directly).
  *  Only the vertical padding and the "active" (keyboard-highlighted, not a real `:hover`)
  *  background need adding —

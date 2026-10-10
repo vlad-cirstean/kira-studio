@@ -65,7 +65,7 @@ const dateText = computed(() =>
  *  Code's own bubble-phase link interceptor needed to see), but the guard stays — it is still
  *  correct for keeping either action's click from also toggling the row. */
 function onRowClick(event: MouseEvent): void {
-  if ((event.target as Element | null)?.closest('.kv-review-row-actions')) return;
+  if ((event.target as Element | null)?.closest('[data-testid="review-row-actions"]')) return;
   emit('focus-row');
   emit('toggle');
 }
@@ -136,7 +136,7 @@ function onMenuSelect(id: string): void {
 // default (parent 0) is exactly what an unexpanded row would have shown anyway.
 async function openAllChanges(): Promise<void> {
   // G-UX D5: stopPropagation() here is now redundant with (and removed in favour of) onRowClick's
-  // own .kv-review-row-actions guard above -- one rule for the whole action cluster.
+  // own review-row-actions guard above -- one rule for the whole action cluster.
   await openAllChangesAnnounced(props.actions, {
     sha: props.sha,
     parentIndex: props.expansion?.detail.parentIndex.value,
@@ -205,16 +205,16 @@ function onOpenFile(index: number, pinned: boolean): void {
     @contextmenu="onContextMenu"
   >
     <!-- G19 D10: the click-to-toggle listener moved here, off the whole row (F10's root cause —
-         a click on any file row inside .kv-review-row-body used to bubble straight up and
+         a click on any file row inside review-row-body used to bubble straight up and
          collapse the very commit it was clicked inside, since nothing along the way ever called
          stopPropagation()). Only the header itself toggles the row now. -->
     <!-- W17: hover tint scoped to the header, not the whole row — the expanded body's own
          diff-deleted-fg text drops below 4.5:1 contrast in the dark theme against the hover tint
          (axe caught it); the header's own background (`bg-bg`, unhovered) is what the body
          already sits on, and that combination passes. -->
-    <div
+    <div data-testid="review-row-header"
       ref="headerEl"
-      class="kv-review-row-header flex items-center gap-1 py-1 px-2 min-h-row min-w-0 font-ui group-hover:bg-hover"
+      class="flex items-center gap-1 py-1 px-2 min-h-row min-w-0 font-ui group-hover:bg-hover"
     >
       <TreeTwisty
         :expanded="expanded"
@@ -241,12 +241,11 @@ function onOpenFile(index: number, pinned: boolean): void {
       </span>
       <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within
            (below) and always present for the roving-tabindex-focused row. GitLens's own
-           row-action pattern. `kv-review-row-actions` is kept as a literal class — `onRowClick`'s
-           own `.closest('.kv-review-row-actions')` guard below reads it as a script hook, not
-           styling. -->
-      <span
+           row-action pattern. `data-testid="review-row-actions"` is also a script hook — `onRowClick`'s
+           own `.closest('[data-testid="review-row-actions"]')` guard below reads it. -->
+      <span data-testid="review-row-actions"
         :class="[
-          'kv-review-row-actions flex items-center gap-0.5 shrink-0',
+          'flex items-center gap-0.5 shrink-0',
           focused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
         ]"
       >
@@ -257,7 +256,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         />
         <!-- P75 §2.3: a real button now — no more command: anchor a bubble-phase
              link interceptor needed to observe directly, since the reveal is a bridge request.
-             onRowClick's own .kv-review-row-actions guard above still keeps this click from also
+             onRowClick's own review-row-actions guard above still keeps this click from also
              toggling the row. -->
         <TooltipIconButton
           icon="git-commit"

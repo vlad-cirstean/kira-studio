@@ -1655,7 +1655,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="rootEl"
-    class="kv-app flex flex-col h-full w-full bg-bg text-fg overflow-hidden text-graph-md font-ui"
+    class="flex flex-col h-full w-full bg-bg text-fg overflow-hidden text-graph-md font-ui"
     :data-connection-state="connectionState"
   >
     <!-- Unconditional, present from first paint regardless of which of the four content states

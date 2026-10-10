@@ -100,15 +100,15 @@ async function removeFromStack(branch: string): Promise<void> {
         </Button>
       </div>
 
-      <div
+      <div data-testid="branch-row"
         v-for="row in rowsFor(group.branches)"
         :key="row.name"
-        class="kv-branch-row flex items-center gap-0.5 px-1"
+        class="flex items-center gap-0.5 px-1"
         :style="{ paddingLeft: `${4 + row.depth * 8}px` }"
         :data-row-id="`stack:${row.name}`"
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
-        <div class="kv-branch-row-main flex items-center gap-0.5 flex-1 min-w-0 text-left">
+        <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
           <span v-if="row.isHead" class="text-kira-sm text-subtle" data-kira-tip="Current branch">●</span>
           <span class="truncate">{{ row.name }}</span>
           <span
@@ -150,14 +150,14 @@ async function removeFromStack(branch: string): Promise<void> {
       <div class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider">
         <span class="flex-1 min-w-0 truncate">Needs attention</span>
       </div>
-      <div
+      <div data-testid="branch-row"
         v-for="row in orphanRows()"
         :key="row.name"
-        class="kv-branch-row flex items-center gap-0.5 px-1"
+        class="flex items-center gap-0.5 px-1"
         :data-row-id="`orphan:${row.name}`"
         :tabindex="focusedRowId === `orphan:${row.name}` ? 0 : -1"
       >
-        <div class="kv-branch-row-main flex items-center gap-0.5 flex-1 min-w-0 text-left">
+        <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
           <span class="truncate">{{ row.name }}</span>
           <span class="truncate text-kira-sm text-error">{{ row.orphanReason }}</span>
         </div>

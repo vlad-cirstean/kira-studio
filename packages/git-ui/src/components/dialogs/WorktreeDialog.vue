@@ -231,10 +231,10 @@ function onClose(): void {
               type="text"
               size="kira-lg"
               class="w-full"
-              list="kv-worktree-branches"
+              list=""
               placeholder="branch name"
             />
-            <datalist id="kv-worktree-branches">
+            <datalist id="">
               <option v-for="row in refs.branches.value" :key="row.refname" :value="row.shortName" />
             </datalist>
           </Field>
