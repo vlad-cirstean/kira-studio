@@ -169,8 +169,11 @@ export const IPC = {
   keepAwakeSetManual: 'kira:keepAwake:setManual',
 
   // P200: the Docker module's bound surface; pushes (changed/stats/logs/exec) are events, no entry.
+  dockerContainerEditSpec: 'kira:docker:containerEditSpec',
+  dockerContainerSize: 'kira:docker:containerSize',
   dockerContainers: 'kira:docker:containers',
   dockerContexts: 'kira:docker:contexts',
+  dockerDiskUsage: 'kira:docker:diskUsage',
   dockerExecClose: 'kira:docker:execClose',
   dockerExecOpen: 'kira:docker:execOpen',
   dockerExecResize: 'kira:docker:execResize',
@@ -181,6 +184,7 @@ export const IPC = {
   dockerLogsClose: 'kira:docker:logsClose',
   dockerLogsOpen: 'kira:docker:logsOpen',
   dockerNetworks: 'kira:docker:networks',
+  dockerRecreateContainer: 'kira:docker:recreateContainer',
   dockerRestart: 'kira:docker:restart',
   dockerStart: 'kira:docker:start',
   dockerStatsSubscribe: 'kira:docker:statsSubscribe',
@@ -188,6 +192,7 @@ export const IPC = {
   dockerStatus: 'kira:docker:status',
   dockerStop: 'kira:docker:stop',
   dockerUnwatch: 'kira:docker:unwatch',
+  dockerUpdateContainer: 'kira:docker:updateContainer',
   dockerUseContext: 'kira:docker:useContext',
   dockerVolumes: 'kira:docker:volumes',
   dockerWatch: 'kira:docker:watch',
