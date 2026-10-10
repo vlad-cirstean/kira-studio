@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { installDockerMocks } from '../../../../packages/docker-ui/src/testing/ui/dockerMock';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -170,12 +171,15 @@ async function setup(
         const c = state.containers.find((x) => x.id === (a as { id: string }).id);
         if (c) c.state = 'exited';
       },
-      ExecOpen: () => ({ shell: 'sh' }),
+      ExecOpen: () => contract('docker-exec', 'DockerService.ExecOpen'),
       ...opts.handlers,
     },
   });
   return { page, docker, state, control };
 }
+
+const execOpenArgs = () =>
+  contract<Record<string, unknown>>('docker-exec', 'args:DockerService.ExecOpen');
 
 async function openDocker(page: Page): Promise<void> {
   await modeTab(page, 'docker').click();
@@ -328,7 +332,7 @@ test('logs: stream args, appended lines, filter, stderr styling, timestamps reop
   expect(docker.calls('LogsClose').length).toBeGreaterThan(0);
 });
 
-test('terminal: exec opens for the container, input is written, closing the chip closes it', async ({
+test('contract: terminal: exec opens for the container, input is written, closing the chip closes it', async ({
   relaunch,
 }) => {
   const { page, docker } = await setup(relaunch);
@@ -337,7 +341,9 @@ test('terminal: exec opens for the container, input is written, closing the chip
 
   await page.locator('[data-testid="docker-exec-new"]').click();
   await expect.poll(() => docker.calls('ExecOpen').length).toBe(1);
-  expect(docker.calls('ExecOpen')[0].args).toMatchObject({ containerId: 'c-solo' });
+  const sent = docker.calls('ExecOpen')[0].args as Record<string, unknown>;
+  expect(sent).toMatchObject({ containerId: 'c-solo' });
+  expect(Object.keys(sent).sort()).toEqual(Object.keys(execOpenArgs()).sort());
   await expect(page.locator('.xterm-rows')).toBeVisible();
 
   await page.locator('.xterm-helper-textarea').focus();
@@ -348,7 +354,7 @@ test('terminal: exec opens for the container, input is written, closing the chip
   await expect.poll(() => docker.calls('ExecClose').length).toBe(1);
 });
 
-test('terminal: no session opens until New session is clicked; sessions survive tab switches', async ({
+test('contract: terminal: no session opens until New session is clicked; sessions survive tab switches', async ({
   relaunch,
 }) => {
   const { page, docker } = await setup(relaunch);
@@ -366,6 +372,9 @@ test('terminal: no session opens until New session is clicked; sessions survive 
   await page.locator('[data-testid="docker-exec-new"]').focus();
   await page.keyboard.press('Enter');
   await expect.poll(() => docker.calls('ExecOpen').length).toBe(1);
+  expect(Object.keys(docker.calls('ExecOpen')[0].args as object).sort()).toEqual(
+    Object.keys(execOpenArgs()).sort(),
+  );
   await expect(page.locator('[data-testid="docker-exec-chip"]')).toHaveCount(1);
   await expect(page.locator('.xterm-rows')).toBeVisible();
 

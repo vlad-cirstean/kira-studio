@@ -141,9 +141,13 @@ func TestExecSession(t *testing.T) {
 	id := sleeper(d, "exec", nil)
 
 	mark := app.Events.Mark()
-	if _, err := svc.ExecOpen(docker.ExecOpenArgs{WindowKey: "w1", TerminalID: "x1", ContainerID: id, Cols: 80, Rows: 24}); err != nil {
+	open := docker.ExecOpenArgs{WindowKey: "w1", TerminalID: "x1", ContainerID: id, Cols: 80, Rows: 24}
+	opened, err := svc.ExecOpen(open)
+	if err != nil {
 		t.Fatal(err)
 	}
+	app.Contract(t, "docker-exec", "args:DockerService.ExecOpen", open, flowharness.Mask("containerId"))
+	app.Contract(t, "docker-exec", "DockerService.ExecOpen", opened)
 	write(t, app, "x1", "echo $((6*7))\n")
 	answer := regexp.MustCompile(`(?m)^42\r?$`)
 	testx.WaitUntil(t, wait, func() bool {
