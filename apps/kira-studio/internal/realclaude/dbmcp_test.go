@@ -91,7 +91,7 @@ func TestDbMcpThroughClaude(t *testing.T) {
 func TestDbMcpInstallRegisters(t *testing.T) {
 	app := newRealApp(t)
 	_, url, helper := enableDbMcp(t, app)
-	res := mcpinstall.New(mcpinstall.Deps{}).Install(ctx, dbServer, url, helper)
+	res := mcpinstall.New(mcpinstall.Deps{LookPath: func(string) (string, error) { return app.Claude, nil }}).Install(ctx, dbServer, url, helper)
 	if res.Outcome != mcpinstall.OutcomeInstalled {
 		t.Fatalf("Install = %+v, want installed", res)
 	}
