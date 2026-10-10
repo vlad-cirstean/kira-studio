@@ -163,7 +163,7 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
               </span>
             </AdeTip>
             <span
-              class="max-w-37.5 shrink-0 truncate rounded-kira-sm px-1.5 py-px text-kira-sm font-bold"
+              class="max-w-37.5 shrink-0 truncate rounded-kira-sm px-1.5 py-px text-kira-sm"
               :class="labelClass"
               data-testid="ade-stage-label"
               >{{ p.label }}</span
@@ -244,10 +244,10 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
           </TooltipIconButton>
         </div>
         <AdeTip :text="card.title">
-          <Button
+          <Button size="kira"
             type="button"
             variant="link"
-            class="line-clamp-2 block h-auto justify-start whitespace-normal break-words rounded-none border-0 p-0 text-left text-kira-lg font-bold leading-4"
+            class="line-clamp-2 block h-auto justify-start whitespace-normal break-words rounded-none border-0 p-0 text-left text-kira-lg leading-4"
             :class="card.parked ? 'text-muted-foreground' : 'text-fg'"
             :aria-label="`Open ${card.title}`"
             data-testid="ade-card-title"

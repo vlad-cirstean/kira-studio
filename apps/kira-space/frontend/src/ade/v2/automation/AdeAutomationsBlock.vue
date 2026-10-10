@@ -24,7 +24,7 @@ function toggle(id: string): void {
 
 <template>
   <section v-if="rows.length > 0" class="flex max-h-48 flex-col gap-1 overflow-y-auto" data-testid="ade-automations">
-    <h4 class="m-0 text-kira-sm font-semibold uppercase tracking-wider text-muted-foreground">Automations</h4>
+    <h4 class="m-0 text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">Automations</h4>
     <div v-for="run in rows" :key="run.id" class="flex flex-col" data-testid="ade-automation-row" :data-state="run.state">
       <div class="flex items-center gap-1.5">
         <button

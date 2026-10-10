@@ -60,7 +60,7 @@ function open(): void {
       v-if="!archived"
       size="kira-lg"
       :variant="opens ? 'dialog' : undefined"
-      class="w-23 shrink-0 font-semibold"
+      class="w-23 shrink-0 "
       :class="opens ? undefined : ACTION_CLASS.claude"
       :disabled="takeOver.pending.has(view.session.id)"
       data-testid="ade-all-action"

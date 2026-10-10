@@ -142,7 +142,7 @@ const rowBgClass = computed(() => {
       />
     </span>
     <span
-      class="shrink-0 rounded-kira-xs px-1 py-px text-kira-sm font-semibold"
+      class="shrink-0 rounded-kira-xs px-1 py-px text-kira-sm font-medium"
       :class="repoTintOf.class"
       :style="repoTintOf.style"
       data-testid="ade-branch-repo"
@@ -150,7 +150,7 @@ const rowBgClass = computed(() => {
     >
     <AdeTip v-if="row.base" :parts="row.base.tip">
       <span
-        class="max-w-27.5 shrink-0 truncate rounded-kira-xs px-1 py-px font-data text-kira-sm font-semibold"
+        class="max-w-27.5 shrink-0 truncate rounded-kira-xs px-1 py-px font-data text-kira-sm font-medium"
         :class="[
           row.base.tone === 'blue' ? TONE_TAG_CLASS.blue : 'bg-field text-fg',
           row.base.pending ? 'border border-dashed border-tone-amber-solid' : '',
@@ -163,7 +163,7 @@ const rowBgClass = computed(() => {
     <AdeAttention v-if="row.attention" :tip="row.attention" :item="row.attentionItem" />
     <AdeTip v-if="row.isReview" text="Someone else's branch: read-only here">
       <span
-        class="inline-flex h-5 shrink-0 items-center gap-1 rounded-kira-pill px-2 text-kira-sm font-semibold"
+        class="inline-flex h-5 shrink-0 items-center gap-1 rounded-kira-pill px-2 text-kira-sm font-medium"
         :class="TONE_TAG_CLASS.blue"
         data-testid="ade-owner-pill"
         >{{ row.branch.owner }}</span
@@ -177,7 +177,7 @@ const rowBgClass = computed(() => {
     <div class="flex h-full min-w-0 flex-1 flex-col justify-center text-left">
       <AdeTip :text="row.name">
         <span
-          class="truncate font-data text-kira-md font-semibold leading-4"
+          class="truncate font-data text-kira-md font-medium leading-4"
           :class="row.isReview ? 'text-tone-blue' : row.draft ? 'italic text-muted-foreground' : 'text-fg'"
           data-testid="ade-branch-name"
           >{{ row.name }}</span
@@ -194,7 +194,7 @@ const rowBgClass = computed(() => {
                 :class="segClass(seg)"
               />
             </span>
-            <span class="text-kira-sm font-semibold" :class="progClass">{{ row.prog.label }}</span>
+            <span class="text-kira-sm font-medium" :class="progClass">{{ row.prog.label }}</span>
           </span>
         </AdeTip>
         <span

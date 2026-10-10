@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 
 // The Later band's row: `+ week` grows the horizon, `or date` appends one future day.
 defineProps<{ minDate: string }>();
@@ -19,13 +20,13 @@ function onDate(e: Event): void {
       <Button variant="dialog" size="kira" class="border-dashed" data-testid="ade-more-week" @click="emit('moreWeek')">
         + week
       </Button>
-      <label for="ade-add-day" class="text-kira-sm text-muted-foreground">or date</label>
+      <Label for="ade-add-day" class="font-normal text-kira-sm text-muted-foreground">or date</Label>
       <Input
         id="ade-add-day"
         type="date"
         size="kira"
         :min="minDate"
-        class="w-36 border-dashed scheme-dark"
+        class="w-36 scheme-dark"
         data-testid="ade-add-day"
         @input="onDate"
       />

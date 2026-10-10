@@ -37,15 +37,15 @@ const ROW_BG_CLASS: Record<Tone, string> = {
       :class="ROW_BG_CLASS[item.tone]"
     >
       <span
-        class="w-23 shrink-0 whitespace-nowrap rounded-kira-sm px-2 py-0.5 text-center text-kira-sm font-bold"
+        class="w-23 shrink-0 whitespace-nowrap rounded-kira-sm px-2 py-0.5 text-center text-kira-sm"
         :class="TONE_TAG_CLASS[item.tone]"
         data-testid="ade-needs-kind"
         >{{ item.kind }}</span
       >
       <span class="w-15 shrink-0 text-kira-md text-muted-foreground" data-testid="ade-needs-age">{{ shortAge(item.ageMs) }}</span>
-      <Button
+      <Button variant="dialog"
         size="kira-lg"
-        class="w-23 shrink-0 font-semibold"
+        class="w-23 shrink-0 "
         :class="buttonClass"
         :disabled="busy"
         data-testid="ade-needs-action"

@@ -45,7 +45,7 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
     <AdeTip text="Show or hide this repo">
       <Toggle
         size="kira"
-        class="shrink-0 px-1.5 font-semibold"
+        class="shrink-0 px-1.5 font-medium"
         :class="tint.class"
         :style="tint.style"
         :model-value="shown"

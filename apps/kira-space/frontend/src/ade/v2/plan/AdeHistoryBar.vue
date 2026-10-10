@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 
 // Sticky bar while scrolled into the open history region.
 const emit = defineEmits<{ goToDate: [iso: string]; hide: []; current: [] }>();
@@ -16,8 +17,8 @@ function onDate(e: Event): void {
     class="flex items-center gap-2 border-b border-border bg-elevated px-3 py-1.5 text-kira-md"
     data-testid="ade-history-bar"
   >
-    <span class="font-semibold">History</span>
-    <label for="ade-go-to-date" class="text-muted-foreground">Go to</label>
+    <span class="font-medium">History</span>
+    <Label for="ade-go-to-date" class="font-normal text-muted-foreground">Go to</Label>
     <Input
       id="ade-go-to-date"
       type="date"

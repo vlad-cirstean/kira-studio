@@ -281,7 +281,7 @@ function onForcePush(row: BranchRowModel): void {
     <Alert v-if="boardQuery.isError.value" variant="destructive" class="m-3 w-auto" data-testid="ade-board-error">
       <AlertTitle>Couldn't load the board</AlertTitle>
       <AlertDescription>{{ (boardQuery.error.value as Error | null)?.message }}</AlertDescription>
-      <Button variant="dialog" size="sm" class="mt-2" @click="() => boardQuery.refetch()">Retry</Button>
+      <Button variant="dialog" size="kira" class="mt-2" @click="() => boardQuery.refetch()">Retry</Button>
     </Alert>
     <p v-else-if="!model" class="p-4 text-muted-foreground" data-testid="ade-plan-loading">Loading…</p>
     <template v-else>
@@ -300,7 +300,7 @@ function onForcePush(row: BranchRowModel): void {
       <Alert v-if="setPlan.isError.value" variant="destructive" class="mb-2" data-testid="ade-plan-error">
         <AlertDescription class="flex items-center gap-2">
           <span class="flex-1">{{ (setPlan.error.value as Error | null)?.message }}</span>
-          <Button variant="link" size="sm" @click="setPlan.reset()">Dismiss</Button>
+          <Button variant="link" size="kira" @click="setPlan.reset()">Dismiss</Button>
         </AlertDescription>
       </Alert>
       <div v-if="!ui.showHistory" class="mb-2.5 ml-15">
@@ -312,7 +312,7 @@ function onForcePush(row: BranchRowModel): void {
           @click="openHistory"
         >
           <span>↑</span>
-          <span class="font-semibold text-fg">{{ model.view.historyButtonLabel }}</span>
+          <span class="font-medium text-fg">{{ model.view.historyButtonLabel }}</span>
         </Button>
       </div>
       <template v-for="band in model.view.bands" :key="band.key">
@@ -339,7 +339,7 @@ function onForcePush(row: BranchRowModel): void {
         <Button
           variant="dialog"
           size="kira-lg"
-          class="w-full border-dashed bg-transparent font-semibold"
+          class="w-full border-dashed bg-transparent "
           data-testid="ade-load-all"
           @click="ui.showAllItems = true"
         >

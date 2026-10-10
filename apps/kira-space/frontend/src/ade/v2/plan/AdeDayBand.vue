@@ -111,7 +111,7 @@ const solidBorder = computed(
       />
       <div
         class="whitespace-nowrap"
-        :class="[empty ? 'text-kira-sm font-medium' : 'text-kira-md font-semibold', band.dayOff ? 'line-through' : '', labelClass]"
+        :class="[empty ? 'text-kira-sm font-medium' : 'text-kira-md font-medium', band.dayOff ? 'line-through' : '', labelClass]"
         data-testid="ade-band-label"
       >
         {{ band.label }}
@@ -127,7 +127,7 @@ const solidBorder = computed(
       ref="dropEl"
       data-testid="ade-band-drop"
     >
-      <Button
+      <Button size="kira"
         v-for="h in history"
         :key="h.key"
         variant="ghost"
@@ -136,19 +136,19 @@ const solidBorder = computed(
         data-testid="ade-history-row"
         @click="ui.select(h.key)"
       >
-        <span class="font-bold text-tone-purple">✓</span>
+        <span class="font-medium text-tone-purple">✓</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-tone-purple">{{ h.how }}</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{ h.repos }}</span>
-        <span class="min-w-0 truncate font-semibold text-fg">{{ h.title }}</span>
+        <span class="min-w-0 truncate font-medium text-fg">{{ h.title }}</span>
       </Button>
       <div
         v-if="overdue"
         class="flex items-center gap-2 pl-54.5 text-kira-sm text-tone-amber"
       >
         <span>{{ overdueNote }}</span>
-        <Button
+        <Button variant="dialog"
           size="kira"
-          class="font-semibold"
+          
           :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-band-rollover"
           @click="emit('rollover')"
@@ -161,7 +161,7 @@ const solidBorder = computed(
         <Button
           variant="dialog"
           size="kira"
-          class="max-w-90 truncate border-tone-red-solid bg-transparent font-semibold text-tone-red"
+          class="max-w-90 truncate border-tone-red-solid bg-transparent text-tone-red"
           data-testid="ade-band-overflow-move"
           @click="emit('overflowMove')"
         >
@@ -175,7 +175,7 @@ const solidBorder = computed(
         @select="emit('select', card.task.id)"
         @force-push="(row) => emit('forcePush', row)"
       />
-      <Button
+      <Button size="kira"
         v-for="s in spans"
         :key="s.taskId"
         variant="ghost"
@@ -191,7 +191,7 @@ const solidBorder = computed(
           :class="s.merges ? 'text-tone-amber' : 'text-subtle'"
           >{{ s.note }}</span
         >
-        <span class="min-w-0 truncate font-semibold text-fg">{{ s.title }}</span>
+        <span class="min-w-0 truncate font-medium text-fg">{{ s.title }}</span>
       </Button>
     </div>
   </div>

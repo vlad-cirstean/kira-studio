@@ -50,7 +50,7 @@ const TESTID: Record<BranchAction['kind'], string> = {
   >
     <AdeTip :text="tag.tip" :parts="tag.tipParts">
       <span
-        class="box-border max-w-30 shrink truncate rounded-kira-sm px-1.5 py-0.5 text-kira-sm font-semibold"
+        class="box-border max-w-30 shrink truncate rounded-kira-sm px-1.5 py-0.5 text-kira-sm font-medium"
         :class="TONE_TAG_CLASS[tag.tone]"
         data-testid="ade-tag"
         >{{ label }}</span
@@ -58,9 +58,9 @@ const TESTID: Record<BranchAction['kind'], string> = {
     </AdeTip>
     <AdeTip v-for="a in actions" :key="a.act?.id ?? a.kind" :text="a.tip" :parts="a.tipParts">
       <TooltipDisabledTrigger :disabled="a.disabled === true">
-        <Button
+        <Button variant="dialog"
           size="kira-lg"
-          class="shrink-0 font-semibold"
+          class="shrink-0 "
           :class="ACTION_BTN_CLASS[a.kind]"
           :disabled="a.disabled"
           :data-testid="TESTID[a.kind]"

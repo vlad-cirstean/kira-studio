@@ -86,7 +86,7 @@ const summary = computed(() => {
     <section v-for="g in groups" :key="g.taskId" class="flex flex-col gap-0.5" data-testid="ade-all-group">
       <div class="mb-1 flex items-center gap-2 border-b border-border px-3 pb-1.5">
         <span class="size-2.5 shrink-0 rounded-kira-xs" :style="{ background: g.color }" />
-        <h3 class="m-0 truncate text-kira-lg font-semibold">{{ g.title }}</h3>
+        <h3 class="m-0 truncate text-kira-lg font-medium">{{ g.title }}</h3>
       </div>
       <AdeAllSessionRow v-for="r in g.rows" :key="r.session.id" :view="r" :archived="g.archived" />
     </section>

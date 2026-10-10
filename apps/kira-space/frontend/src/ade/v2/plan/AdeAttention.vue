@@ -17,7 +17,7 @@ function onClick(): void {
 
 <template>
   <AdeTip :text="tip">
-    <Button
+    <Button size="kira"
       type="button"
       variant="ghost"
       aria-label="Needs you"
