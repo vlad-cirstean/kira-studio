@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { computed } from 'vue';
+import { useDocker } from '../context';
 import { formatCreated, formatSize, shortId, stateDotClass } from '../lib/format';
 import { useContainers, useImages, useInspect, useNetworks, useVolumes } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
@@ -14,6 +16,7 @@ const props = defineProps<{ kind: InspectKind; id: string }>();
 const ICONS: Record<InspectKind, string> = { image: 'package', volume: 'database', network: 'globe' };
 
 const ui = useDockerUiStore();
+const docker = useDocker();
 const images = useImages();
 const volumes = useVolumes();
 const networks = useNetworks();
@@ -32,6 +35,12 @@ const title = computed(() => {
   if (props.kind === 'volume') return props.id;
   return network.value?.name ?? shortId(props.id);
 });
+
+const registryUrl = computed(() => (props.kind === 'image' ? (image.value?.registryUrl ?? '') : ''));
+
+function openRegistry(): void {
+  void docker.openExternal(registryUrl.value).catch(() => undefined);
+}
 
 const facts = computed<Array<[string, string]>>(() => {
   if (props.kind === 'image' && image.value) {
@@ -85,6 +94,13 @@ const usedByRows = computed(() =>
     <div class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
       <CodiconIcon :name="ICONS[kind]" :size="15" class="text-muted-foreground" />
       <span class="min-w-0 truncate text-kira-lg font-semibold" data-testid="docker-resource-title">{{ title }}</span>
+      <TooltipIconButton
+        v-if="registryUrl"
+        icon="link-external"
+        label="Open in registry"
+        data-testid="docker-resource-registry"
+        @click="openRegistry"
+      />
       <Badge>{{ kind }}</Badge>
     </div>
     <div class="@container p-3">

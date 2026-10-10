@@ -6,7 +6,8 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { copyText } from '@workbench/util/clipboard';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useDocker } from '../context';
 import { formatPercent, formatSize, publishedPorts, shortId, stateDotClass } from '../lib/format';
 import { useContainerAction, useContainerDetail } from '../queries';
 import { useDockerEditStore } from '../state/dockerEdit';
@@ -23,6 +24,8 @@ import UsageBar from './UsageBar.vue';
 const props = defineProps<{ containerId: string }>();
 
 const ui = useDockerUiStore();
+const docker = useDocker();
+const linkError = ref<string | null>(null);
 const stats = useDockerStatsStore();
 const edits = useDockerEditStore();
 const id = computed(() => props.containerId);
@@ -30,6 +33,7 @@ const detail = useContainerDetail(id);
 const actions = useContainerAction();
 
 const c = computed(() => detail.data.value?.container);
+const registryUrl = computed(() => detail.data.value?.registryUrl ?? '');
 const running = computed(() => c.value?.state === 'running');
 const live = computed(() => (running.value ? stats.latest.get(props.containerId) : undefined));
 const recreating = computed(() => edits.applying[props.containerId] === 'recreate');
@@ -64,6 +68,13 @@ watch([running, c], () => {
     ui.detailTab = 'overview';
   }
 });
+
+function openRegistry(url: string): void {
+  linkError.value = null;
+  docker.openExternal(url).catch((e: unknown) => {
+    linkError.value = e instanceof Error ? e.message : String(e);
+  });
+}
 
 function act(action: 'start' | 'stop' | 'restart'): void {
   void actions.run(props.containerId, action).catch(() => undefined);
@@ -107,6 +118,13 @@ function act(action: 'start' | 'stop' | 'restart'): void {
         </div>
         <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-kira-sm text-muted-foreground">
           <span class="min-w-0 truncate" data-testid="docker-detail-image">{{ c.image }}</span>
+          <TooltipIconButton
+            v-if="registryUrl"
+            icon="link-external"
+            label="Open in registry"
+            data-testid="docker-detail-registry"
+            @click="openRegistry(registryUrl)"
+          />
           <span class="inline-flex items-center gap-0.5 font-data" data-testid="docker-detail-id">
             {{ shortId(c.id) }}
             <TooltipIconButton icon="copy" label="Copy ID" @click="copyText(c.id)" />
@@ -125,8 +143,8 @@ function act(action: 'start' | 'stop' | 'restart'): void {
           </span>
         </div>
       </div>
-      <p v-if="actions.error.value" class="shrink-0 border-b border-border px-3 py-1 text-error" data-testid="docker-action-error">
-        {{ (actions.error.value as Error).message }}
+      <p v-if="actions.error.value || linkError" class="shrink-0 border-b border-border px-3 py-1 text-error" data-testid="docker-action-error">
+        {{ actions.error.value ? (actions.error.value as Error).message : linkError }}
       </p>
       <div class="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-1.5 py-1" role="tablist">
         <button
