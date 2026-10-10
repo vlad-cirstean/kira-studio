@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import '@vue-flow/core/dist/style.css';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { Switch } from '@theme/components/ui/switch';
 import { type Connection, type Edge, type Node, useVueFlow, VueFlow } from '@vue-flow/core';
-import { onKeyStroke, useResizeObserver } from '@vueuse/core';
+import { onKeyStroke, useElementSize } from '@vueuse/core';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
-import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useRepos } from '../../../repo/state/reposQueries';
 import AdeChip from '../AdeChip.vue';
@@ -35,14 +34,15 @@ import AdeWorkflowSaveBar from './AdeWorkflowSaveBar.vue';
 import { useSaveShortcut } from './useSaveShortcut';
 
 // Graph mode: edits a local draft of the last valid workflow as a canvas of stages and steps, one
-// connector per step result; Save writes it whole, Discard drops the edits. Layout is automatic.
+// connector per step result; Save writes it whole, Discard drops the edits. Layout is automatic and
+// locked: top to bottom, one node size, native vertical scroll, no zoom or pan.
 const props = defineProps<{ entry: WorkflowEntry }>();
 const wfUi = useAdeWorkflowsUiStore();
 const draft = useAdeWorkflowDraftStore();
 const repos = useRepos();
 const save = useSaveWorkflow();
 const confirm = useConfirmDialogStore();
-const { fitView, zoomIn, zoomOut, onNodesInitialized } = useVueFlow();
+const { setViewport } = useVueFlow();
 
 draft.open(props.entry.workflow);
 watch(
@@ -78,7 +78,9 @@ const discard = (): void => draft.discard(props.entry.workflow);
 const KIND_TONE: Record<StageKind, Tone> = { user: 'blue', agent: 'amber', script: 'green' };
 const strip = computed(() => [...(draft.draft?.stages ?? [])]);
 
-const layout = computed(() => (draft.draft ? layoutWorkflow(draft.draft) : { nodes: [], edges: [] }));
+const layout = computed(() =>
+  draft.draft ? layoutWorkflow(draft.draft) : { nodes: [], edges: [], width: 0, height: 0 },
+);
 const edgeSel = ref('');
 
 function nodeData(n: GraphNode, wf: Workflow): StepNodeData | StageNodeData | { w: number; h: number } {
@@ -100,6 +102,7 @@ function nodeData(n: GraphNode, wf: Workflow): StepNodeData | StageNodeData | { 
     stage,
     index: wf.stages.indexOf(stage),
     selected: sel?.kind === 'stage' && sel.stageId === stage.id,
+    spineX: n.spineX,
   };
 }
 
@@ -124,6 +127,10 @@ const flowEdges = computed<Edge[]>(() =>
       max: e.max,
       results: e.results,
       selected: e.id === edgeSel.value,
+      spine: e.spine ?? false,
+      points: e.points,
+      lane: e.lane,
+      laneX: e.laneX,
       stage,
     };
     return {
@@ -132,7 +139,7 @@ const flowEdges = computed<Edge[]>(() =>
       source: e.source,
       target: e.target,
       sourceHandle: stage ? 'out' : e.sourceHandle,
-      targetHandle: 'in',
+      targetHandle: e.loop ? 'loop-in' : 'in',
       selectable: false,
       data,
     };
@@ -172,12 +179,19 @@ function onPaneClick(): void {
 }
 
 const root = useTemplateRef<HTMLElement>('root');
-const canvas = useTemplateRef<HTMLElement>('canvas');
+const scroller = useTemplateRef<HTMLElement>('scroller');
 useSaveShortcut(root, () => void saveNow());
 
-const fit = (): void => void fitView({ padding: 0.12, maxZoom: 1 });
-onNodesInitialized(() => nextTick(fit));
-useResizeObserver(canvas, () => fit());
+const PAD = 24;
+const { width: paneW } = useElementSize(scroller);
+const zoom = computed(() => (paneW.value > 0 ? Math.min(1, paneW.value / (layout.value.width + PAD * 2)) : 1));
+const viewport = computed(() => ({
+  x: Math.max(0, (paneW.value - layout.value.width * zoom.value) / 2),
+  y: PAD * zoom.value,
+  zoom: zoom.value,
+}));
+const contentH = computed(() => (layout.value.height + PAD * 2) * zoom.value);
+watch(viewport, (v) => void setViewport(v), { immediate: true });
 
 const IN_FIELD = 'input, textarea, select, [contenteditable]';
 onKeyStroke(
@@ -270,7 +284,8 @@ onBeforeUnmount(() => {
     </div>
     <ResizablePanelGroup direction="horizontal" class="min-h-96 flex-1 rounded-kira border border-border bg-bg">
       <ResizablePanel :default-size="66" :min-size="35" class="relative">
-        <div ref="canvas" class="absolute inset-0" data-testid="ade-wf-graph">
+        <div ref="scroller" class="absolute inset-0 overflow-y-auto overflow-x-hidden" data-testid="ade-wf-graph">
+          <div class="relative min-h-full w-full" :style="{ height: `${contentH}px` }">
           <svg class="absolute size-0" aria-hidden="true">
             <defs>
               <marker
@@ -298,8 +313,17 @@ onBeforeUnmount(() => {
             :edges="flowEdges"
             :nodes-draggable="false"
             :delete-key-code="null"
-            :min-zoom="0.2"
-            :max-zoom="1.5"
+            :min-zoom="0.1"
+            :max-zoom="1"
+            :default-viewport="viewport"
+            :zoom-on-scroll="false"
+            :zoom-on-pinch="false"
+            :zoom-on-double-click="false"
+            :pan-on-drag="false"
+            :pan-on-scroll="false"
+            :prevent-scrolling="false"
+            :auto-pan-on-connect="false"
+            :auto-pan-on-node-drag="false"
             :is-valid-connection="validConnection"
             @connect="onConnect"
             @node-click="onNodeClick"
@@ -312,10 +336,6 @@ onBeforeUnmount(() => {
             <template #node-end="p"><AdeEndNode :data="p.data" /></template>
             <template #edge-result="p"><AdeResultEdge v-bind="p" /></template>
           </VueFlow>
-          <div class="absolute right-2 top-2 flex gap-1" data-testid="ade-wf-graph-tools">
-            <TooltipIconButton icon="zoom-in" label="Zoom in" data-testid="ade-wf-zoom-in" @click="zoomIn()" />
-            <TooltipIconButton icon="zoom-out" label="Zoom out" data-testid="ade-wf-zoom-out" @click="zoomOut()" />
-            <TooltipIconButton icon="screen-full" label="Fit view" data-testid="ade-wf-fit" @click="fit()" />
           </div>
         </div>
       </ResizablePanel>

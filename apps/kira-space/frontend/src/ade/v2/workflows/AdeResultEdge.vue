@@ -1,34 +1,82 @@
 <script setup lang="ts">
-import { EdgeLabelRenderer, type EdgeProps, getBezierPath } from '@vue-flow/core';
+import { EdgeLabelRenderer, type EdgeProps } from '@vue-flow/core';
 import { computed } from 'vue';
-import type { EdgeData } from '../board/workflowGraph';
+import { type EdgeData, NODE_H, type Point, RANK_SEP } from '../board/workflowGraph';
 
 // A route between steps, grouped by target: toned by the results on it (all ok green, all not ok red,
-// mixed neutral). A loop edge leaves to the right and comes back up, dashed, with its budget.
+// mixed neutral). Forward edges run orthogonal, jogging in the gap between ranks. A loop edge runs in
+// the left gutter of its stage and enters the target from above, dashed, with its budget.
 const props = defineProps<EdgeProps<EdgeData>>();
 const d = computed(() => props.data as EdgeData);
 const TONE_STROKE = { ok: 'stroke-tone-green-solid', fail: 'stroke-tone-red-solid', neutral: 'stroke-muted-foreground' };
 const TONE_MARKER = { ok: 'ade-arrow-ok', fail: 'ade-arrow-fail', neutral: 'ade-arrow-neutral' };
-const BOW = 210;
+const RADIUS = 10;
+const DROP = 16;
+const LOOP_DROP = 44;
+const LOOP_RISE = 18;
+const HALF_GAP = RANK_SEP / 2;
+
+/** Polyline through the corners, each corner rounded to at most `RADIUS`. */
+function rounded(pts: Point[]): string {
+  const p = pts.filter((q, i) => i === 0 || q.x !== (pts[i - 1] as Point).x || q.y !== (pts[i - 1] as Point).y);
+  let out = `M ${(p[0] as Point).x} ${(p[0] as Point).y}`;
+  for (let i = 1; i < p.length - 1; i += 1) {
+    const a = p[i - 1] as Point;
+    const b = p[i] as Point;
+    const c = p[i + 1] as Point;
+    const r = Math.min(RADIUS, Math.hypot(b.x - a.x, b.y - a.y) / 2, Math.hypot(c.x - b.x, c.y - b.y) / 2);
+    const u = (from: Point, to: Point): Point => {
+      const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+      return { x: (to.x - from.x) / len, y: (to.y - from.y) / len };
+    };
+    const ab = u(a, b);
+    const bc = u(b, c);
+    out += ` L ${b.x - ab.x * r} ${b.y - ab.y * r} Q ${b.x} ${b.y} ${b.x + bc.x * r} ${b.y + bc.y * r}`;
+  }
+  const last = p[p.length - 1] as Point;
+  return `${out} L ${last.x} ${last.y}`;
+}
 
 const geometry = computed(() => {
   const { sourceX: sx, sourceY: sy, targetX: tx, targetY: ty } = props;
-  if (!d.value.loop) {
-    const [path, x, y] = getBezierPath(props);
-    return { path, x, y };
+  if (d.value.loop && d.value.laneX !== undefined) {
+    const lx = d.value.laneX;
+    const jog = sy + LOOP_DROP + Math.min(d.value.lane ?? 0, 3) * 4;
+    const above = ty - LOOP_RISE;
+    const pts = [
+      { x: sx, y: sy },
+      { x: sx, y: jog },
+      { x: lx, y: jog },
+      { x: lx, y: above },
+      { x: tx, y: above },
+      { x: tx, y: ty },
+    ];
+    return { path: rounded(pts), x: lx + 6, y: jog, anchor: 'left' };
   }
-  const bx = Math.max(sx, tx) + BOW;
-  return {
-    path: `M ${sx} ${sy} C ${bx} ${sy + 40}, ${bx} ${ty - 40}, ${tx} ${ty}`,
-    x: (sx + 3 * bx + 3 * bx + tx) / 8,
-    y: (sy + 3 * (sy + 40) + 3 * (ty - 40) + ty) / 8,
-  };
+  const via = d.value.points ?? [];
+  const pts: Point[] = [{ x: sx, y: sy }];
+  let jog = sy + HALF_GAP;
+  let x = sx;
+  for (const v of via) {
+    pts.push({ x, y: jog }, { x: v.x, y: jog });
+    x = v.x;
+    jog = v.y + NODE_H / 2 + HALF_GAP;
+  }
+  pts.push({ x, y: ty - HALF_GAP }, { x: tx, y: ty - HALF_GAP }, { x: tx, y: ty });
+  return { path: rounded(pts), x: sx, y: sy + DROP, anchor: 'centre' };
 });
-const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ` ↩ max ${d.value.max}` : ''}`);
+const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ` ↩ ≤${d.value.max}` : ''}`);
 </script>
 
 <template>
-  <g data-testid="ade-wf-edge" :data-tone="d.tone" :data-loop="d.loop" :data-selected="d.selected" :data-results="d.results.join(',')">
+  <g
+    data-testid="ade-wf-edge"
+    :data-tone="d.tone"
+    :data-loop="d.loop"
+    :data-spine="d.spine"
+    :data-selected="d.selected"
+    :data-results="d.results.join(',')"
+  >
     <path
       :d="geometry.path"
       class="fill-none"
@@ -39,8 +87,10 @@ const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ` �
   </g>
   <EdgeLabelRenderer v-if="!d.stage">
     <span
-      class="nodrag nopan pointer-events-auto absolute rounded-kira-sm border border-border bg-bg px-1 text-kira-sm text-muted-foreground"
-      :style="{ transform: `translate(-50%, -50%) translate(${geometry.x}px, ${geometry.y}px)` }"
+      class="nodrag nopan pointer-events-auto absolute whitespace-nowrap rounded-kira-sm border border-border bg-bg px-1 text-kira-sm text-muted-foreground"
+      :style="{
+        transform: `${geometry.anchor === 'left' ? 'translate(0, -50%)' : 'translate(-50%, -50%)'} translate(${geometry.x}px, ${geometry.y}px)`,
+      }"
       data-testid="ade-wf-edge-label"
     >
       {{ label }}
