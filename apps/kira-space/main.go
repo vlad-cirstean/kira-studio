@@ -16,7 +16,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -206,20 +205,14 @@ func main() {
 // main.go carries the same bound, for the same reason (G29 D7).
 var platformErrorOnce sync.Once
 
-// acquireSingleInstance is F7's app-wide single-instance guard, called before storage.Open — a
-// second launch pointed at the same KIRA_SPACE_HOME (open -n, the binary run directly, or a dev
-// build) would otherwise open the same kira.db, restore the same window rows, and
-// last-writer-wins on every table the first instance also owns, while its own gitsock silently
-// never listens (server.go:99-101). A distinct lock file from git.sock.lock (gitsock.Server
-// acquires that one itself, inside wireGit): flock is scoped to the open file description, not
-// the process, so reusing the same path here would make wireGit's own acquireLock see this same
-// process as "another instance" a few lines later. Not acquired here means a real other instance
-// owns this home — exit quietly (D5's own posture for gitsock's identical case: this is a
-// supported state, not a failure), never show a window over a database another process already
-// owns. Fatals through reporter on a real error; exits the process directly (never returns) when
-// another instance already holds the lock.
+// acquireSingleInstance is the app-wide single-instance guard, called before storage.Open: a second
+// launch on the same KIRA_SPACE_HOME (open -n, the binary run directly, or a dev build) would open
+// the same kira.db and restore the same window rows, last-writer-wins on every table the first
+// instance owns. Not acquired means a real other instance owns this home: exit quietly (a supported
+// state, not a failure) rather than show a window over a database another process owns. Fatals
+// through reporter on a real error; exits the process directly when another instance holds the lock.
 func acquireSingleInstance(reporter *startupfail.Reporter) *os.File {
-	instanceLock, acquired, err := gitsock.AcquireLock(filepath.Join(config.KiraSpaceHome(), "app.lock"))
+	instanceLock, acquired, err := config.AcquireLock(filepath.Join(config.KiraSpaceHome(), "app.lock"))
 	if err != nil {
 		reporter.Fatal(startupfail.StepInstanceLock, err)
 	}

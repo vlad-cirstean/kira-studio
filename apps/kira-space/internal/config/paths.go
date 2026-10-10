@@ -3,9 +3,7 @@
 // The path logic itself (P100 Part 1) is repo-root internal/kirapaths, shared with
 // apps/kira-studio — this file is a thin wrapper supplying Kira Space's own env var
 // (KIRA_SPACE_HOME), directory name (.kira-space) and database file name (kira.db). Kira Space
-// never shares a home, a database or a socket with Kira Studio — two processes pointed at the
-// same home would silently make the loser not listen (gitsock.Server's exclusive flock on
-// git.sock.lock).
+// never shares a home or a database with Kira Studio.
 package config
 
 import "github.com/kirathecat/kira-studio/internal/kirapaths"
