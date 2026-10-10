@@ -188,3 +188,11 @@ func (b *BoundService) ExecResize(args ExecResizeArgs) error {
 }
 
 func (b *BoundService) ExecClose(args ExecCloseArgs) error { return b.m.execClose(args.TerminalID) }
+
+// DiskUsage measures the engine's storage (/system/df). Slow on large hosts; the UI calls it on demand only.
+func (b *BoundService) DiskUsage() (DiskUsage, error) { return b.m.diskUsage() }
+
+// ContainerSize measures one container's writable layer and total size on demand.
+func (b *BoundService) ContainerSize(args IDArgs) (ContainerSize, error) {
+	return b.m.containerSize(args.ID)
+}

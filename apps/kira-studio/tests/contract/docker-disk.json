@@ -1,0 +1,44 @@
+{
+  "DockerService.ContainerSize": {
+    "durationMs": 0,
+    "sizeRootFs": 0,
+    "sizeRw": 0,
+    "takenAt": "<time>"
+  },
+  "DockerService.DiskUsage": {
+    "buildCache": {
+      "active": 0,
+      "count": 0,
+      "reclaimable": 0,
+      "size": 0
+    },
+    "containers": {
+      "active": 0,
+      "count": 0,
+      "reclaimable": 0,
+      "size": 0
+    },
+    "durationMs": 0,
+    "images": {
+      "active": 0,
+      "count": 0,
+      "reclaimable": 0,
+      "size": 0
+    },
+    "takenAt": "<time>",
+    "total": 0,
+    "volumeSizes": [
+      {
+        "name": "kira-flow-disk",
+        "refCount": 0,
+        "size": 0
+      }
+    ],
+    "volumes": {
+      "active": 0,
+      "count": 0,
+      "reclaimable": 0,
+      "size": 0
+    }
+  }
+}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/moby/moby/client"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -73,6 +74,8 @@ type Manager struct {
 	stats  *statsHub
 	logs   *logRegistry
 	execs  *execRegistry
+
+	flight singleflight.Group
 }
 
 // NewManager builds a Manager reading the real process environment.

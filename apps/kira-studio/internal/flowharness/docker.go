@@ -150,22 +150,29 @@ func (d *Docker) Run(name string, cmd []string, labels map[string]string) string
 // RunWith is Run with a caller-built container config and host config.
 func (d *Docker) RunWith(name string, cfg container.Config, host *container.HostConfig, labels map[string]string) string {
 	d.t.Helper()
+	return d.RunNamed(d.Prefix()+name, cfg, host, labels)
+}
+
+// Prefix is the run-scoped name prefix RunWith, Volume and Network put before a name.
+func (d *Docker) Prefix() string { return fmt.Sprintf("kira-flow-%s-", runID) }
+
+// RunNamed is RunWith with the exact container name, for names a feature infers meaning from.
+func (d *Docker) RunNamed(fullName string, cfg container.Config, host *container.HostConfig, labels map[string]string) string {
+	d.t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cfg.Image = Image
 	cfg.Labels = labelled(labels)
-	created, err := d.Cli.ContainerCreate(ctx, client.ContainerCreateOptions{
-		Name: fmt.Sprintf("kira-flow-%s-%s", runID, name), Config: &cfg, HostConfig: host,
-	})
+	created, err := d.Cli.ContainerCreate(ctx, client.ContainerCreateOptions{Name: fullName, Config: &cfg, HostConfig: host})
 	if err != nil {
-		d.t.Fatalf("docker: create %s: %v", name, err)
+		d.t.Fatalf("docker: create %s: %v", fullName, err)
 	}
 	id := created.ID
 	d.t.Cleanup(func() {
 		_, _ = d.Cli.ContainerRemove(context.Background(), id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 	})
 	if _, err := d.Cli.ContainerStart(ctx, id, client.ContainerStartOptions{}); err != nil {
-		d.t.Fatalf("docker: start %s: %v", name, err)
+		d.t.Fatalf("docker: start %s: %v", fullName, err)
 	}
 	return id
 }
