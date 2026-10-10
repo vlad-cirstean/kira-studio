@@ -3896,7 +3896,22 @@ and `docs/v2.0/plans/`.
   The writer keeps key order and comments. Aliases `manual`/`automated` map to `user`/`agent`.
   Step `allowed_tools` feeds the headless `--allowedTools` list.
 - Sample workflows (`docs/v2.0/design/ade-v2/workflows/`) import and validate in the app.
-- Edits save explicitly (P196): Save and Discard in the form and YAML editors, Cmd/Ctrl+S, no autosave;
+- Step results (P247): an agent step may declare `results:` (1 to 12): `id`, `ok` (required), `description`
+  (one line, at most 200), `next` (`next|end|stop|<step id>`, default `next` for ok and `stop` for not ok),
+  `max` (1..10, loop edges only, default 3). `needs_input` is reserved; `results` and `on_failure` on one
+  step is a parse error; at least one result must route forward. The parser always materializes
+  `PipelineStep.Results`; `OnFailure` is set only when the results equal a legacy form. The writer writes
+  `on_failure` when they do (old files save byte-identical) and `results` otherwise. `adewire/results.go`
+  holds `ImplicitResults` and `LegacyOnFailure`.
+- Graph editor (P247, `ade/v2/workflows/`): the Workflows page edits a draft (`state/adeWorkflowDraft.ts`)
+  as a Vue Flow canvas (`@vue-flow/core`, MIT) with `@dagrejs/dagre` auto-layout on every edit; no stored
+  positions, nodes not draggable. `board/workflowGraph.ts` is the pure model (edges grouped by target,
+  green for all ok, red for all not ok, neutral for mixed; loop edges dashed with `max`; `setRoute` turns an
+  edge into a loop when the target already leads to the source, else moves the target after it;
+  `normalizeOrder` keeps the start first and forward routes pointing later). A result dot dragged to a step,
+  or the route select in the inspector, sets `next`. Stages reorder by dragging the stage strip. The editor
+  mode is `graph | yaml`; the graph editor loads asynchronously so the board bundle stays free of Vue Flow.
+- Edits save explicitly (P196): Save and Discard in the graph and YAML editors, Cmd/Ctrl+S, no autosave;
   leaving with unsaved edits (list switch, import/new, mode toggle, shell tab change) asks through
   `ConfirmDialog`. Validation stays debounced.
 - Task snapshot (P196, `ade/taskwf.go`): a task follows the live file until its first run, session
@@ -3922,12 +3937,21 @@ and `docs/v2.0/plans/`.
 - `finish_step` MCP server (`internal/claudeheadless`): one loopback listener, bearer token per run
   (`tokenauth`), config `<home>/ade/runs/<runId>.mcp.json` mode `0600` deleted at process exit, token
   never on argv, last call wins and applies at exit. `suffix.go` holds the text appended to the message.
+  A grant with declared results (P247) gets its own per-run `mcp.Server` whose `status` enum is the
+  result ids plus `needs_input` (schema inferred from `finishArgs`, enum set, passed as `Tool.InputSchema`);
+  implicit grants keep the shared servers and `done|failed|needs_input`. `FinishStepSuffixFor(results)`
+  names the ids; the TS mirror is `finishStepSuffix`.
   A run that ends without it fails with `ended without finish_step`; timeout is `failed`; script
   stages fail by exit code.
-- Step machine (`steps.go`, `runs.go`): a step starts `auto` or waits for `approval`; `on_failure` is
-  `stop`, `retry 1|2` or `back:<step>`. Send-back queues a fix run of the target step with
-  `claude -p --resume <session id>` (same Claude session), `loops` is the round epoch, 3 rounds then
-  the run fails. The fix run's resume spec sits on its run row until launch, so a run held behind a setup resumes the same Claude session after restart. A `once` step runs in the first mine branch's worktree (D12). No concurrency cap (D8).
+- Step machine (`steps.go`, `route.go`, `runs.go`, P247): a step starts `auto` or waits for `approval`.
+  Every step has results; `on_failure` (`stop`, `retry 1|2`, `back:<step>`) is the legacy form of the
+  implicit pair `done` (ok, next) and `failed` (not ok, that rule). `decideRoute` maps the reported result
+  to a route: `next`, a later step (steps between are skipped, a view only), `end`, `stop`, or a loop to
+  the step itself or an earlier one. A forward or `end` route marks the run `done` (a not-ok result keeps
+  outcome status `failed`), `stop` or a spent loop marks it `failed`, a loop marks it `back`. Loop counts
+  are cumulative per task, stage, step, branch and result (`max` 1..10, default 3). A self loop starts a
+  fresh attempt; an earlier-step loop queues a fix run of the target with `claude -p --resume <session id>`
+  (same Claude session), `loops` is the round epoch. The fix run's resume spec sits on its run row until launch, so a run held behind a setup resumes the same Claude session after restart. No report (crash, timeout) takes the step's `failed` result, else stops. `walkPath` follows the routes; `nextAction` and `chainRerun` use that path. The run outcome stores `result` and `route`. A `once` step runs in the first mine branch's worktree (D12). No concurrency cap (D8).
 - Restart recovery (`recover.go`, D7): `Recover()` runs before `Start()`; running runs become `stuck`
   with note `interrupted by restart`, running setups fail, task sessions stop, stale `*.mcp.json` files
   are removed. Pending runs keep their launch spec and launch when their gate opens. Nothing auto-resumes.
