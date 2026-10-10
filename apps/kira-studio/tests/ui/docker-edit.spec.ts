@@ -78,13 +78,14 @@ function detail(c: Json): Json {
   };
 }
 
-const specFixture = (): Json => ({
-  ...contract<Json>('docker-edit', 'DockerService.ContainerEditSpec'),
+const specFixture = (tag = ''): Json => ({
+  ...contract<Json>('docker-edit', `DockerService.ContainerEditSpec${tag}`),
   id: OLD_ID,
   baseHash: 'hash-1',
 });
 
 interface Setup {
+  name?: string;
   spec?: Json;
   handlers?: Record<string, (args: unknown) => unknown>;
 }
@@ -96,7 +97,7 @@ async function setup(
   const { window: page } = await relaunch({ control: [] });
   const state = {
     spec: opts.spec ?? specFixture(),
-    containers: [row(OLD_ID, 'kira-flow-edit')] as Json[],
+    containers: [row(OLD_ID, opts.name ?? 'kira-flow-edit')] as Json[],
   };
   const docker = await installDockerMocks(page, {
     bridgePkg: BRIDGE_PKG,
@@ -138,10 +139,10 @@ async function setup(
   return { page, docker, state };
 }
 
-async function openEdit(page: Page): Promise<void> {
+async function openEdit(page: Page, name = 'kira-flow-edit'): Promise<void> {
   await modeTab(page, 'docker').click();
   await expect(page.locator('[data-testid="docker-panel"]')).toBeVisible();
-  await page.locator('[data-testid="docker-row"][data-name="kira-flow-edit"]').click();
+  await page.locator(`[data-testid="docker-row"][data-name="${name}"]`).click();
   await page.locator('[data-testid="docker-tab-edit"]').click();
   await expect(page.locator('[data-testid="docker-edit-inplace"]')).toBeVisible();
 }
@@ -340,11 +341,13 @@ test('contract: failures keep the draft and explain the state', async ({ relaunc
     'docker-edit',
     'DockerService.RecreateContainer#rollback',
   );
+  const stale = contract<{ code: string; message: string }>(
+    'docker-edit',
+    'DockerService.UpdateContainer#stale',
+  );
   const { page, docker } = await setup(relaunch, {
     handlers: {
-      UpdateContainer: () => ({
-        error: { code: 'E_CONFLICT', message: 'container changed since the editor loaded; reload' },
-      }),
+      UpdateContainer: () => ({ error: { code: stale.code, message: stale.message } }),
       RecreateContainer: () => ({
         error: { code: rollback.code, message: 'start: no such file', details: rollback.details },
       }),
@@ -372,9 +375,11 @@ test('contract: failures keep the draft and explain the state', async ({ relaunc
   await expect(tid(page, 'docker-edit-entrypoint')).toHaveValue('/nonexistent');
 });
 
-test('managed container is read-only', async ({ relaunch }) => {
-  const { page } = await setup(relaunch, { spec: { ...specFixture(), managed: 'kubernetes' } });
-  await openEdit(page);
+test('contract: a managed container is read-only', async ({ relaunch }) => {
+  const spec = specFixture('#managed');
+  expect(spec.managed).toBe('kubernetes');
+  const { page } = await setup(relaunch, { spec, name: 'kira-flow-managed' });
+  await openEdit(page, 'kira-flow-managed');
 
   await expect(tid(page, 'docker-edit-managed')).toBeVisible();
   await expect(tid(page, 'docker-edit-name')).toBeDisabled();
@@ -382,4 +387,64 @@ test('managed container is read-only', async ({ relaunch }) => {
   await showTab(page, 'recreate');
   await expect(tid(page, 'docker-edit-image')).toBeDisabled();
   await expect(tid(page, 'docker-edit-apply-recreate')).toHaveCount(0);
+});
+
+test('contract: a stopped container applies in place and recreate keeps it stopped', async ({
+  relaunch,
+}) => {
+  const spec = specFixture('#stopped');
+  expect(spec.state).toBe('exited');
+  const sent = contract<Json>('docker-edit', 'args:DockerService.UpdateContainer#stopped');
+  const result = contract<Json>('docker-edit', 'DockerService.UpdateContainer#stopped');
+  const calls: unknown[] = [];
+  const ctx: { state?: { spec: Json } } = {};
+  const { page, docker, state } = await setup(relaunch, {
+    spec,
+    handlers: {
+      UpdateContainer: (a) => {
+        calls.push(a);
+        if (ctx.state)
+          ctx.state.spec = { ...ctx.state.spec, baseHash: 'hash-2', inPlace: (a as Json).spec };
+        return result;
+      },
+    },
+  });
+  ctx.state = state;
+  state.containers = [row(OLD_ID, 'kira-flow-edit', { state: 'exited', status: 'Exited (0)' })];
+  await openEdit(page);
+
+  await tid(page, 'docker-edit-memory').fill(String(sent.spec.resources.memory / 1024 ** 2));
+  await tid(page, 'docker-edit-swap').fill(String(sent.spec.resources.memorySwap / 1024 ** 2));
+  await tid(page, 'docker-edit-restart').selectOption(sent.spec.restart.name);
+  await tid(page, 'docker-edit-apply-now').click();
+  await expect.poll(() => docker.calls('UpdateContainer').length).toBe(1);
+  expect(withoutIdentity(calls[0])).toEqual(withoutIdentity(sent));
+  await expect(page.locator('[data-testid="docker-edit-pending"]')).toHaveCount(0);
+
+  await showTab(page, 'recreate');
+  await page.locator('[data-testid="docker-edit-env"] [data-testid="docker-edit-row-add"]').click();
+  await page.locator('[data-testid="docker-edit-env-key"]').last().fill('B');
+  await page.locator('[data-testid="docker-edit-env-value"]').last().fill('2');
+  await tid(page, 'docker-edit-apply-recreate').click();
+  await expect(tid(page, 'docker-edit-kept')).toContainText('The new container stays stopped.');
+  await tid(page, 'docker-edit-cancel').click();
+  expect(docker.calls('RecreateContainer')).toHaveLength(0);
+});
+
+test('contract: an auto-remove container is never recreated', async ({ relaunch }) => {
+  const spec = specFixture('#auto-remove');
+  expect(spec.autoRemove).toBe(true);
+  const refusal = contract<{ code: string }>(
+    'docker-edit',
+    'DockerService.RecreateContainer#auto-remove',
+  );
+  expect(refusal.code).toBe('E_INVALID');
+  const { page, docker } = await setup(relaunch, { spec, name: 'kira-flow-auto' });
+  await openEdit(page, 'kira-flow-auto');
+
+  await expect(tid(page, 'docker-edit-autoremove')).toBeVisible();
+  await showTab(page, 'recreate');
+  await tid(page, 'docker-edit-image').fill('alpine:3.21');
+  await expect(tid(page, 'docker-edit-apply-recreate')).toBeDisabled();
+  expect(docker.calls('RecreateContainer')).toHaveLength(0);
 });

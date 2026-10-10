@@ -95,11 +95,238 @@
     },
     "state": "running"
   },
+  "DockerService.ContainerEditSpec#auto-remove": {
+    "anonymousVolumes": [],
+    "autoRemove": true,
+    "baseHash": "<masked>",
+    "dependents": [],
+    "id": "<masked>",
+    "inPlace": {
+      "name": "kira-flow-auto",
+      "networks": [
+        {
+          "aliases": [],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "bridge"
+        }
+      ],
+      "resources": {
+        "blkioWeight": 0,
+        "cpuPeriod": 0,
+        "cpuQuota": 0,
+        "cpuShares": 0,
+        "cpusetCpus": "",
+        "cpusetMems": "",
+        "memory": 0,
+        "memoryReservation": 0,
+        "memorySwap": 0,
+        "nanoCpus": 0,
+        "pidsLimit": 0
+      },
+      "restart": {
+        "maxRetries": 0,
+        "name": "no"
+      }
+    },
+    "managed": "",
+    "networkMode": "bridge",
+    "origin": "",
+    "originName": "",
+    "preserved": [
+      "workdir /"
+    ],
+    "recreate": {
+      "capAdd": [],
+      "capDrop": [],
+      "cmd": [
+        "sleep",
+        "300"
+      ],
+      "entrypoint": [],
+      "env": [
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "hostname": "",
+      "image": "mirror.gcr.io/library/alpine:3.20",
+      "labels": {
+        "kira.flowtest": "run"
+      },
+      "mounts": [],
+      "ports": [],
+      "user": ""
+    },
+    "state": "running"
+  },
+  "DockerService.ContainerEditSpec#managed": {
+    "anonymousVolumes": [],
+    "autoRemove": false,
+    "baseHash": "<masked>",
+    "dependents": [],
+    "id": "<masked>",
+    "inPlace": {
+      "name": "kira-flow-managed",
+      "networks": [
+        {
+          "aliases": [],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "bridge"
+        }
+      ],
+      "resources": {
+        "blkioWeight": 0,
+        "cpuPeriod": 0,
+        "cpuQuota": 0,
+        "cpuShares": 0,
+        "cpusetCpus": "",
+        "cpusetMems": "",
+        "memory": 0,
+        "memoryReservation": 0,
+        "memorySwap": 0,
+        "nanoCpus": 0,
+        "pidsLimit": 0
+      },
+      "restart": {
+        "maxRetries": 0,
+        "name": "no"
+      }
+    },
+    "managed": "kubernetes",
+    "networkMode": "bridge",
+    "origin": "kubernetes",
+    "originName": "/p",
+    "preserved": [
+      "workdir /"
+    ],
+    "recreate": {
+      "capAdd": [],
+      "capDrop": [],
+      "cmd": [
+        "sleep",
+        "300"
+      ],
+      "entrypoint": [],
+      "env": [
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "hostname": "",
+      "image": "mirror.gcr.io/library/alpine:3.20",
+      "labels": {
+        "io.kubernetes.pod.name": "p",
+        "kira.flowtest": "run"
+      },
+      "mounts": [],
+      "ports": [],
+      "user": ""
+    },
+    "state": "running"
+  },
+  "DockerService.ContainerEditSpec#stopped": {
+    "anonymousVolumes": [
+      {
+        "destination": "/anon",
+        "name": "anon-volume"
+      }
+    ],
+    "autoRemove": false,
+    "baseHash": "<masked>",
+    "dependents": [],
+    "id": "<masked>",
+    "inPlace": {
+      "name": "kira-flow-edit",
+      "networks": [
+        {
+          "aliases": [],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "bridge"
+        },
+        {
+          "aliases": [
+            "svc"
+          ],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "kira-flow-edit"
+        }
+      ],
+      "resources": {
+        "blkioWeight": 0,
+        "cpuPeriod": 0,
+        "cpuQuota": 0,
+        "cpuShares": 0,
+        "cpusetCpus": "",
+        "cpusetMems": "",
+        "memory": 67108864,
+        "memoryReservation": 0,
+        "memorySwap": 134217728,
+        "nanoCpus": 0,
+        "pidsLimit": 0
+      },
+      "restart": {
+        "maxRetries": 3,
+        "name": "on-failure"
+      }
+    },
+    "managed": "",
+    "networkMode": "bridge",
+    "origin": "",
+    "originName": "",
+    "preserved": [
+      "workdir /"
+    ],
+    "recreate": {
+      "capAdd": [
+        "CAP_NET_ADMIN"
+      ],
+      "capDrop": [],
+      "cmd": [
+        "sh",
+        "-c",
+        "echo hello > /data/hello; echo ready; exec sleep 300"
+      ],
+      "entrypoint": [],
+      "env": [
+        "A=1",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "hostname": "edit-host",
+      "image": "mirror.gcr.io/library/alpine:3.20",
+      "labels": {
+        "edit": "1",
+        "kira.flowtest": "run"
+      },
+      "mounts": [
+        {
+          "key": "mount:0",
+          "readOnly": false,
+          "source": "kira-flow-edit",
+          "target": "/data",
+          "type": "volume"
+        }
+      ],
+      "ports": [
+        {
+          "containerPort": 8080,
+          "hostIp": "",
+          "hostPort": "",
+          "proto": "tcp"
+        }
+      ],
+      "user": ""
+    },
+    "state": "exited"
+  },
   "DockerService.RecreateContainer": {
     "id": "<masked>",
     "name": "kira-flow-edit",
     "oldId": "<masked>",
     "warnings": []
+  },
+  "DockerService.RecreateContainer#auto-remove": {
+    "code": "E_INVALID",
+    "message": "<masked>"
   },
   "DockerService.RecreateContainer#rollback": {
     "code": "E_RECREATE_FAILED",
@@ -116,6 +343,17 @@
       "restart",
       "network:kira-flow-edit",
       "network:kira-flow-edit2"
+    ],
+    "warnings": []
+  },
+  "DockerService.UpdateContainer#stale": {
+    "code": "E_CONFLICT",
+    "message": "container changed since the editor loaded; reload"
+  },
+  "DockerService.UpdateContainer#stopped": {
+    "applied": [
+      "resources",
+      "restart"
     ],
     "warnings": []
   },
@@ -245,6 +483,46 @@
       "restart": {
         "maxRetries": 0,
         "name": "unless-stopped"
+      }
+    }
+  },
+  "args:DockerService.UpdateContainer#stopped": {
+    "baseHash": "<masked>",
+    "id": "<masked>",
+    "spec": {
+      "name": "kira-flow-edit",
+      "networks": [
+        {
+          "aliases": [],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "bridge"
+        },
+        {
+          "aliases": [
+            "svc"
+          ],
+          "ipv4": "",
+          "ipv6": "",
+          "name": "kira-flow-edit"
+        }
+      ],
+      "resources": {
+        "blkioWeight": 0,
+        "cpuPeriod": 0,
+        "cpuQuota": 0,
+        "cpuShares": 0,
+        "cpusetCpus": "",
+        "cpusetMems": "",
+        "memory": 83886080,
+        "memoryReservation": 0,
+        "memorySwap": 167772160,
+        "nanoCpus": 0,
+        "pidsLimit": 0
+      },
+      "restart": {
+        "maxRetries": 0,
+        "name": "always"
       }
     }
   }

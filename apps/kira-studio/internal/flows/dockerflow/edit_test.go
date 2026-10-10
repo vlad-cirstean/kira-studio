@@ -246,9 +246,11 @@ func TestUpdateContainerRejects(t *testing.T) {
 		return ipcCode(t, err)
 	}
 
-	if ie := try(func(*docker.InPlaceSpec) {}, strings.Repeat("0", 64)); ie.Code != "E_CONFLICT" {
-		t.Fatalf("stale hash code = %s, want E_CONFLICT", ie.Code)
+	stale := try(func(*docker.InPlaceSpec) {}, strings.Repeat("0", 64))
+	if stale.Code != "E_CONFLICT" {
+		t.Fatalf("stale hash code = %s, want E_CONFLICT", stale.Code)
 	}
+	app.Contract(t, "docker-edit", "DockerService.UpdateContainer#stale", stale, editOpts(d, box)...)
 	ie := try(func(in *docker.InPlaceSpec) { in.Resources.Memory = 0 }, spec.BaseHash)
 	if ie.Code != "E_INVALID" || !strings.Contains(string(ie.Details), "resources.memory") {
 		t.Fatalf("clear memory = %s %s, want E_INVALID on resources.memory", ie.Code, ie.Details)
@@ -266,6 +268,7 @@ func TestUpdateContainerRejects(t *testing.T) {
 	if err != nil || mspec.Managed != "kubernetes" {
 		t.Fatalf("managed spec = %q, err %v, want kubernetes", mspec.Managed, err)
 	}
+	app.Contract(t, "docker-edit", "DockerService.ContainerEditSpec#managed", mspec, editOpts(d, box)...)
 	_, err = svc.UpdateContainer(docker.UpdateArgs{ID: managed, BaseHash: mspec.BaseHash, Spec: mspec.InPlace})
 	if ie := ipcCode(t, err); ie.Code != "E_INVALID" {
 		t.Fatalf("managed code = %s, want E_INVALID", ie.Code)
@@ -303,6 +306,10 @@ func TestUpdateStoppedContainer(t *testing.T) {
 	if !slices.Equal(got.Applied, []string{"resources", "restart"}) {
 		t.Fatalf("applied = %v, want resources, restart", got.Applied)
 	}
+	args := docker.UpdateArgs{ID: box.id, BaseHash: spec.BaseHash, Spec: want}
+	app.Contract(t, "docker-edit", "DockerService.ContainerEditSpec#stopped", spec, editOpts(d, box)...)
+	app.Contract(t, "docker-edit", "args:DockerService.UpdateContainer#stopped", args, editOpts(d, box)...)
+	app.Contract(t, "docker-edit", "DockerService.UpdateContainer#stopped", got, editOpts(d, box, flowharness.Mask("warnings"))...)
 	in, err := d.Cli.ContainerInspect(context.Background(), box.id, client.ContainerInspectOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -485,9 +492,13 @@ func TestRecreateRefusals(t *testing.T) {
 		t.Fatalf("auto spec autoRemove=%v err=%v, want true", aspec.AutoRemove, err)
 	}
 	_, err = svc.RecreateContainer(docker.RecreateArgs{ID: auto, BaseHash: aspec.BaseHash, InPlace: aspec.InPlace, Recreate: aspec.Recreate})
-	if ie := ipcCode(t, err); ie.Code != "E_INVALID" {
+	ie := ipcCode(t, err)
+	if ie.Code != "E_INVALID" {
 		t.Fatalf("auto-remove code = %s, want E_INVALID", ie.Code)
 	}
+	autoBox := editBox{}
+	app.Contract(t, "docker-edit", "DockerService.ContainerEditSpec#auto-remove", aspec, editOpts(d, autoBox)...)
+	app.Contract(t, "docker-edit", "DockerService.RecreateContainer#auto-remove", ie, editOpts(d, autoBox, flowharness.Mask("message"))...)
 
 	box := newEditBox(t, d, true)
 	spec, err := svc.ContainerEditSpec(docker.IDArgs{ID: box.id})
