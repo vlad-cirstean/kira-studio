@@ -22,7 +22,8 @@ import { useScriptRuns } from './runs/runsQueries';
 import ScriptDialog from './ScriptDialog.vue';
 import { useScheduleConfirmStore } from './schedule/confirmDialog';
 import ScriptScheduleLine from './schedule/ScriptScheduleLine.vue';
-import { toggleSchedule, useRemoveScript } from './scriptActions';
+import { useRemoveScript } from './scriptActions';
+import type { EditorTab } from './scriptErrors';
 import SmartBadge from './smart/SmartBadge.vue';
 
 const contextMenuStore = useContextMenuStore();
@@ -41,7 +42,7 @@ const editor = ref<{
   script: CustomScript | null;
   kind: ScriptKind;
   collectionId: string | null;
-  schedule?: boolean;
+  initialTab?: EditorTab;
 } | null>(null);
 
 const search = ref('');
@@ -185,32 +186,6 @@ function newScriptItems(collectionId: string | null): MenuItem[] {
         editor.value = { script: null, kind: 'smart', collectionId };
       },
     },
-    {
-      type: 'submenu',
-      id: 'new-recurring',
-      label: 'New recurring script',
-      icon: 'watch',
-      items: [
-        {
-          type: 'item',
-          id: 'new-recurring-script',
-          label: 'Script',
-          icon: 'add',
-          run: () => {
-            editor.value = { script: null, kind: 'script', collectionId, schedule: true };
-          },
-        },
-        {
-          type: 'item',
-          id: 'new-recurring-smart-script',
-          label: 'Smart script',
-          icon: 'sparkle',
-          run: () => {
-            editor.value = { script: null, kind: 'smart', collectionId, schedule: true };
-          },
-        },
-      ],
-    },
   ];
 }
 
@@ -270,10 +245,12 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
           },
           {
             type: 'item',
-            id: 'toggle-schedule',
-            label: script.schedule.enabled ? 'Turn schedule off' : 'Turn schedule on',
+            id: 'edit-schedule',
+            label: 'Edit schedule…',
             icon: 'watch',
-            run: () => guarded(() => toggleSchedule(scripts, script)),
+            run: () => {
+              editor.value = { script, kind: script.kind, collectionId: null, initialTab: 'schedule' };
+            },
           },
         ] satisfies MenuItem[])
       : []),
@@ -515,7 +492,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
         :choose-folder="ctx.chooseFolder"
         :resolve-dir="ctx.runs.resolveDir"
         :ade="ctx.ade"
-        :schedule="editor.schedule"
+        :initial-tab="editor.initialTab"
         @close="editor = null"
       />
     </div>

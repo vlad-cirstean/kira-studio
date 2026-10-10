@@ -1,4 +1,4 @@
-import { type CustomScript, customScriptFieldsSchema } from '@shared/domain/scripts';
+import type { CustomScript } from '@shared/domain/scripts';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { ScriptsSeam } from './module';
 
@@ -19,14 +19,4 @@ export function useRemoveScript(): (
     await scripts.remove(script.id);
     return true;
   };
-}
-
-/** Flips a recurring script's `enabled`; a script that is not recurring is left alone. */
-export async function toggleSchedule(scripts: ScriptsSeam, script: CustomScript): Promise<void> {
-  if (!script.schedule) return;
-  const fields = customScriptFieldsSchema.parse(script);
-  await scripts.update(script.id, {
-    ...fields,
-    schedule: { ...script.schedule, enabled: !script.schedule.enabled },
-  });
 }

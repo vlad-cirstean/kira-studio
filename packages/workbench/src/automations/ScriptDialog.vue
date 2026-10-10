@@ -59,8 +59,6 @@ const props = defineProps<{
   resolveDir: (scriptId: string) => Promise<ScriptDir>;
   /** Kira Space: offers the task-worktree switch. */
   ade?: boolean;
-  /** A new script starts recurring (`New recurring script`). */
-  schedule?: boolean;
   /** Tab to open on; defaults to Script. */
   initialTab?: EditorTab;
 }>();
@@ -81,7 +79,7 @@ const smart = ref<SmartSettings>(
 );
 // null: not recurring. Turning the switch off keeps the edits until Save.
 const schedule = ref<ScriptSchedule | null>(
-  structuredClone(toRaw(props.script?.schedule ?? (props.schedule ? newSchedule() : null))),
+  structuredClone(toRaw(props.script?.schedule ?? null)),
 );
 const scheduleOk = ref(true);
 const scheduleOn = computed({
