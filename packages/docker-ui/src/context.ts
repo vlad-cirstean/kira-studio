@@ -11,10 +11,13 @@ export interface DockerContext {
   execHostDeps: TerminalHostDeps;
   /** execId -> containerId, filled before an exec view mounts so `terminalOpen` can resolve it. */
   execContainers: Map<string, string>;
+  /** Opens an http(s) URL in the OS browser. */
+  openExternal(url: string): Promise<void>;
 }
 
 interface DockerContextOptions {
   appearance(): { fontFamily: string; fontSize: number };
+  openExternal(url: string): Promise<void>;
 }
 
 const dockerKey: InjectionKey<DockerContext> = Symbol('docker');
@@ -41,7 +44,7 @@ export function createDockerContext(
     openTerminalSession: execStore.openTerminalSession,
     resizeTerminal: execStore.resizeTerminal,
   };
-  return { control, execStore, execHostDeps, execContainers };
+  return { control, execStore, execHostDeps, execContainers, openExternal: options.openExternal };
 }
 
 export function provideDocker(ctx: DockerContext): void {

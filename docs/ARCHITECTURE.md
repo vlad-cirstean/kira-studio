@@ -2566,7 +2566,7 @@ menu and `startupfail`. Production and both `flowharness` packages call the same
 (`grep -n "^func Build\|^type Options\|func (w \*Wired) Bound\|BindShell\|StartMobile" apps/kira-{studio,space}/internal/appwire/appwire.go`)
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options from `appwire.Build`; `Wired.Bound()` registers **29** bound services under
+options from `appwire.Build`; `Wired.Bound()` registers **30** bound services under
 `apps/kira-studio/internal/bridge/`
 (`grep -o 'NewService(w\.' apps/kira-studio/internal/appwire/appwire.go | wc -l`), grouped by module: six shell/app-wide
 (`AppService`, `SettingsService`, `LayoutService`, `TabsService`, `WindowsService` — P8: a page's

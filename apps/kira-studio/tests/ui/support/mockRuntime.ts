@@ -189,6 +189,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   scriptRunsMcpServers: 'ScriptRunsService.McpServers',
   scriptRunsMcpTools: 'ScriptRunsService.McpTools',
 
+  linkOpenExternal: 'LinkService.OpenExternal',
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
 
@@ -290,6 +291,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // miss. connectionId is echoed as '' here since the frontend only reads `.ddl` off this call.
   [IPC.schemaGet]: JSON.stringify({ connectionId: '', ddl: '', updatedAt: '' }),
   [IPC.windowsSetMode]: 'null',
+  [IPC.linkOpenExternal]: 'null',
   // P246: the prompt router's calls; a spec drives the list through IPC.promptsChanged pushes.
   [IPC.promptsList]: '[]',
   [IPC.promptsClaim]: 'null',

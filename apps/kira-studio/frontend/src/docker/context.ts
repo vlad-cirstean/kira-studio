@@ -1,4 +1,5 @@
 import * as DockerService from '@bindings/dockerservice.js';
+import * as LinkService from '@bindings/linkservice.js';
 import { createDockerContext, type DockerBindings, type DockerContext } from '@kira/docker-ui';
 import { useSettingsStore } from '../state/settings';
 
@@ -8,6 +9,7 @@ let ctx: DockerContext | null = null;
 export function studioDocker(): DockerContext {
   ctx ??= createDockerContext(DockerService as unknown as DockerBindings, {
     appearance: () => useSettingsStore().appearance,
+    openExternal: (url) => LinkService.OpenExternal({ url }),
   });
   return ctx;
 }

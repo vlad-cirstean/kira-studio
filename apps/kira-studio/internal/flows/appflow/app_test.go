@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -118,5 +119,25 @@ func TestDataGripScan(t *testing.T) {
 	list, err := app.W.Connections.List()
 	if err != nil || len(list) != len(uuids) {
 		t.Fatalf("Import created %d connections (%v), want %d; report %+v", len(list), err, len(uuids), report)
+	}
+}
+
+func TestOpenExternal(t *testing.T) {
+	app := flowharness.New(t)
+	open := func(url string) error { return app.W.Link.OpenExternal(bridge.LinkOpenExternalArgs{URL: url}) }
+
+	for _, ok := range []string{"https://hub.docker.com/_/alpine", "http://localhost:3000/"} {
+		if err := open(ok); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, bad := range []string{"javascript:alert(1)", "file:///etc/passwd", "ftp://example.com/x", "https://", "example.com", ""} {
+		if err := open(bad); err == nil {
+			t.Errorf("OpenExternal(%q) succeeded", bad)
+		}
+	}
+	want := []string{"https://hub.docker.com/_/alpine", "http://localhost:3000/"}
+	if got := app.Browser.Opened(); !slices.Equal(got, want) {
+		t.Fatalf("browser opened %v, want only %v", got, want)
 	}
 }

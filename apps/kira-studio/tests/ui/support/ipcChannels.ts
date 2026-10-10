@@ -192,6 +192,8 @@ export const IPC = {
   dockerVolumes: 'kira:docker:volumes',
   dockerWatch: 'kira:docker:watch',
 
+  linkOpenExternal: 'kira:link:openExternal',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',

@@ -10,6 +10,26 @@ import (
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 )
 
+// Browser records OpenURL calls.
+type Browser struct {
+	mu   sync.Mutex
+	urls []string
+}
+
+func (b *Browser) OpenURL(url string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.urls = append(b.urls, url)
+	return nil
+}
+
+// Opened returns a copy of the recorded URLs.
+func (b *Browser) Opened() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]string(nil), b.urls...)
+}
+
 // Dialogs answers the native pickers from queues; an empty queue answers like a cancel ("").
 type Dialogs struct {
 	mu      sync.Mutex

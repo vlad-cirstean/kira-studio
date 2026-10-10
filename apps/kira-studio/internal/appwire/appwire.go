@@ -1,4 +1,4 @@
-// Package appwire is Kira Studio's composition root: it builds the 29 bound services, the adapter
+// Package appwire is Kira Studio's composition root: it builds the 30 bound services, the adapter
 // router, the embedded modules and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It
 // sits above internal/bridge in the layering, like internal/appshell.
@@ -43,8 +43,10 @@ type Options struct {
 	Dialogs         bridge.Dialogs
 	KeepAwakeDriver keepawake.Driver
 	McpInstaller    bridge.McpInstaller
-	AppName         string
-	Version         string
+	// Browser opens external URLs (a deferred Wails opener in production).
+	Browser bridge.Browser
+	AppName string
+	Version string
 	// SmartTimeout replaces every smart script's own timeout (a flow-test seam); production leaves it zero.
 	SmartTimeout time.Duration
 	// ScheduleTimeout replaces every headless scheduled run's own timeout and Clock drives the
@@ -94,6 +96,7 @@ type Wired struct {
 	CustomScripts   *bridge.CustomScriptsService
 	ScriptRuns      *bridge.ScriptRunsService
 	Docker          *bridge.DockerService
+	Link            *bridge.LinkService
 	Update          *bridge.UpdateService
 	Lifecycle       *bridge.LifecycleService
 	PromptsSvc      *bridge.PromptsService
@@ -202,6 +205,7 @@ func Build(opts Options) (*Wired, error) {
 		CustomScripts:   &bridge.CustomScriptsService{Deps: deps, Changed: embedded.sched.Reload},
 		ScriptRuns:      embedded.scriptRuns,
 		Docker:          embedded.dockerSvc,
+		Link:            &bridge.LinkService{Browser: opts.Browser},
 		Update: &bridge.UpdateService{
 			Checker: updateChecker, Installer: updateInstaller, Quit: lifecycle.quitter.RequestQuit,
 		},
@@ -222,7 +226,7 @@ func (w *Wired) reopenWindow() {
 	}
 }
 
-// Bound returns the 29 bound services in registration order.
+// Bound returns the 30 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.App), application.NewService(w.Settings), application.NewService(w.Layout),
@@ -233,7 +237,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.Collections), application.NewService(w.Variables),
 		application.NewService(w.ResponseHistory), application.NewService(w.GrpcHistory),
 		application.NewService(w.DataGrip), application.NewService(w.DbMcp), application.NewService(w.KeepAwake),
-		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker),
+		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker), application.NewService(w.Link),
 		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc),
 	}
 }
