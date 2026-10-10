@@ -155,7 +155,7 @@ const tooltipText = computed(() => {
           :class="laneClassName"
           :stroke-width="GEOMETRY.strokeWidth"
           :stroke-dasharray="dashArray"
-          class="fill-none"
+          style="fill: none"
         />
       </svg>
     </div>

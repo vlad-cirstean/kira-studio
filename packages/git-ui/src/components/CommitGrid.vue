@@ -678,16 +678,21 @@ function raiseLaneFloor(): void {
   if (graphWidth() !== before) rebuildColumns();
 }
 
-/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
- *  heights; `raiseLaneFloor` widens the graph column when the new lanes need it.
- *
- *  `invalidateRowHeights()` rebuilds SlickGrid's row-position index (heights vary with badges);
- *  it does not redraw rows, so the rendered ones are rebuilt too. `_range` is unused — kept for
- *  the callback signature. */
-function handleChunkLayout(_range: LayoutRange): void {
+/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5); `raiseLaneFloor`
+ *  widens the graph column when the new lanes need it. Layout never changes row heights, so the
+ *  row-position index stays; only rendered rows inside `range` are rebuilt. */
+function handleChunkLayout(range: LayoutRange): void {
   if (!grid) return;
   raiseLaneFloor();
-  grid.invalidateAllRows();
+  const { top, bottom } = grid.getRenderedRange();
+  const stale: number[] = [];
+  for (let displayRow = top; displayRow <= bottom && displayRow < plan().length; displayRow++) {
+    const entry = plan().entryAt(displayRow);
+    if (entry.kind === 'collapsed' || (entry.storeRow >= range.from && entry.storeRow < range.to)) {
+      stale.push(displayRow);
+    }
+  }
+  if (stale.length > 0) grid.invalidateRows(stale);
   grid.render();
   if (!layoutCompleteMarked) {
     layoutCompleteMarked = true;
