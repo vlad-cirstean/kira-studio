@@ -1,3 +1,5 @@
+import { useLocalStorage } from '@vueuse/core';
+import { windowKey } from '@workbench/util/window';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -44,7 +46,7 @@ export function repoIdOfTab(tab: { workspaceId: string | null }): string | null 
 export const NO_REPOSITORY_MESSAGE = 'This tab has no repository.';
 
 // The active workspace, the Git panel's repo switcher (`openRepos`), and which repo was last
-// active (`lastRepoKey`, session-only) — Kira Studio's own useWorkspaceStore (state/workspace.ts).
+// active (`lastRepoKey`, persisted per window so a relaunch reopens on it) — Kira Studio's own useWorkspaceStore (state/workspace.ts).
 // P128 §2.6: this app now has its own mode dimension too (state/mode.ts), but `state.active` stays
 // git-only — a module key (`terminal`/`ade`) never reaches it, `repoIdOfWorkspace`, `GitPanel`, or
 // `lastRepoKey`. `visibleWorkspace()` below is the one function that reads across both stores.
@@ -52,12 +54,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const state = reactive({
     active: GENERAL_WORKSPACE as WorkspaceKey,
     openRepos: [] as string[], // code_repos.id, in switcher order
-    lastRepoKey: null as WorkspaceKey | null,
   });
+  const lastRepoKey = useLocalStorage<WorkspaceKey | null>(
+    `kira.space.lastRepo.${windowKey}`,
+    null,
+  );
 
   function activateWorkspace(key: WorkspaceKey): void {
     state.active = key;
-    if (key !== GENERAL_WORKSPACE) state.lastRepoKey = key;
+    if (key !== GENERAL_WORKSPACE) lastRepoKey.value = key;
   }
 
   // Opens repoId's own workspace — adds it to the switcher (a no-op if already open), ensures its
@@ -107,12 +112,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     disposeGitTransport(repoId);
     useFileTreeStore().dropRepoTree(repoId);
     useRepoSearchStore().dropRepoSearch(repoId);
-    if (state.lastRepoKey === repoId) state.lastRepoKey = null;
+    if (lastRepoKey.value === repoId) lastRepoKey.value = null;
     if (state.active === repoId) activateWorkspace(GENERAL_WORKSPACE);
   }
 
   return {
     ...toRefs(state),
+    lastRepoKey,
     activateWorkspace,
     openRepoWorkspace,
     openReviewWorkspace,

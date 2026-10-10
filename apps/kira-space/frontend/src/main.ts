@@ -133,18 +133,20 @@ async function mountShell(): Promise<void> {
   // restored repo right here, after hydrateTabs, since hydrateTabs itself never calls back into it
   // (avoiding a third link in that module pair's existing two-way call graph).
   if (!reviewTarget) for (const repoId of workspaceStore.openRepos) ensureWorkspaceShell(repoId);
-  // No persisted "last active repo" survives a restart in this app (unlike the per-window mode
-  // hydrated above) — falling forward onto the first restored repo, when there is one, means a
-  // relaunch with open repositories lands on one of their own tabs rather than the empty GitStart
-  // screen every time. `activateWorkspace` never forces the mode back to `git` (its own doc
-  // comment, state/workspace.ts), so this still honours whatever mode `windowsEnsure` restored
-  // above — a relaunch into `terminal`/`ade` stays there even with repositories open behind it.
+  // Falls forward onto the last active repo (persisted per window), else the first restored one,
+  // so a relaunch with open repositories skips the empty GitStart screen. `activateWorkspace`
+  // never forces the mode back to `git`, so the mode `windowsEnsure` restored stays.
   if (
     !reviewTarget &&
     workspaceStore.active === GENERAL_WORKSPACE &&
     workspaceStore.openRepos.length > 0
   ) {
-    workspaceStore.activateWorkspace(workspaceStore.openRepos[0] as string);
+    const last = workspaceStore.lastRepoKey;
+    workspaceStore.activateWorkspace(
+      last !== null && workspaceStore.openRepos.includes(last)
+        ? last
+        : (workspaceStore.openRepos[0] as string),
+    );
   }
 
   const app = createApp(App);
