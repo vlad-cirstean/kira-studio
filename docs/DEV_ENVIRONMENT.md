@@ -406,6 +406,9 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
   stale keys by hand. Inspect the diff for secrets and machine paths.
 - Run one UI half: `npx playwright test --config=apps/<app>/playwright.config.ts --project=ui <spec> -g "contract:"`.
 - Biome ignores the directories; never hand-format them.
+- Phone specs set `server.state.replies.{me,pair,expired,backlog,backlogItem}` from a contract. Studio
+  specs push an engine `cache:stats` event with `pushCacheStats` (`tests/ui/support/mockStream.ts`).
+- A `bun run ... &` job dies with its tool call; start long suites with `setsid nohup`.
 - Complete-gated flow tests that write contracts need `KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`.
 
 ## Kira Space flow suites (P231)

@@ -4819,7 +4819,9 @@ the flow test; a hand edit of the JSON fails both halves. Keys: `Service.Method[
 `args:Service.Method`, `git:<rpc method>[#variant]`, `event:<channel>`. Volatile values: auto
 placeholders (`<home>`, `<tmp>`, `<work>`, `<bin>`, UUIDs as `<id:n>`, RFC3339 as `<time>`) plus
 `flowharness.Mask`/`Omit`/`Replace` options. `KIRA_CONTRACT=write` rewrites the files (merge; delete
-stale keys by hand). `e2e-real` keeps only what cannot split: Studio Docker, MariaDB, SQLite
+stale keys by hand). P250 filled the v2.2 gaps the same way: 37 Space and 20 Studio scenario files,
+phone keys `http:<METHOD> <path>[#variant]` (mock server `replies` override), and `args:` keys whose
+UI half compares key sets when the UI mints its own ids. `e2e-real` keeps only what cannot split: Studio Docker, MariaDB, SQLite
 wiring, Postgres connection tests, multi-window routing, terminal keystroke order; Space boot,
 multi-window routing, terminal keystroke order. The graph chunk golden
 (`gitflow.TestFixtures_CaptureGraphChunkFrame`) compares by default and writes under
