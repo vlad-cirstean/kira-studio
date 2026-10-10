@@ -2,10 +2,11 @@
 import { computed } from 'vue';
 import { formatPercent, formatSize } from '../lib/format';
 import { useDockerStatsStore } from '../state/dockerStats';
+import ContainerSizeSection from './ContainerSizeSection.vue';
 import DetailSection from './DetailSection.vue';
 import StatsSparkline from './StatsSparkline.vue';
 
-const props = defineProps<{ containerId: string }>();
+const props = defineProps<{ containerId: string; running: boolean }>();
 
 const stats = useDockerStatsStore();
 const latest = computed(() => stats.latest.get(props.containerId));
@@ -16,9 +17,11 @@ const mem = computed(() => history.value.map((s) => s.memUsage));
 
 <template>
   <div class="h-full overflow-auto p-3" data-testid="docker-stats">
-    <p v-if="!latest" class="text-muted-foreground" data-testid="docker-stats-waiting">Waiting for stats…</p>
-    <div v-else class="@container">
-      <div class="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
+    <div class="@container flex flex-col gap-3">
+      <ContainerSizeSection :id="containerId" />
+      <p v-if="!running" class="text-muted-foreground" data-testid="docker-stats-stopped">Live stats need a running container.</p>
+      <p v-else-if="!latest" class="text-muted-foreground" data-testid="docker-stats-waiting">Waiting for stats…</p>
+      <div v-else class="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
         <DetailSection title="CPU">
           <div class="mb-2 flex items-baseline justify-between">
             <span class="text-kira-xl font-semibold" data-testid="docker-stats-cpu">{{ formatPercent(latest.cpuPercent) }}</span>

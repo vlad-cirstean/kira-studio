@@ -3,7 +3,6 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { copyText } from '@workbench/util/clipboard';
 import { reactive } from 'vue';
 import type { DockerContainerDetail } from '../wire';
-import ContainerSizeSection from './ContainerSizeSection.vue';
 import DetailSection from './DetailSection.vue';
 
 const props = defineProps<{ detail: DockerContainerDetail }>();
@@ -51,8 +50,6 @@ const rows = (): Array<[string, string]> => [
         </DetailSection>
 
         <div class="flex min-w-0 flex-col gap-3">
-          <ContainerSizeSection :id="detail.container.id" />
-
           <DetailSection v-if="detail.container.ports.length" title="Ports">
             <div v-for="p in detail.container.ports" :key="`${p.ip}:${p.publicPort}:${p.privatePort}/${p.type}`" class="font-data" data-testid="docker-overview-port">
               {{ p.publicPort ? `${p.ip || '0.0.0.0'}:${p.publicPort} -> ` : '' }}{{ p.privatePort }}/{{ p.type }}

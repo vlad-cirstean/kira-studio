@@ -43,7 +43,7 @@ const TABS: ReadonlyArray<{ id: DockerDetailTab; label: string; icon: string; ne
   { id: 'overview', label: 'Overview', icon: 'info', needsRunning: false },
   { id: 'logs', label: 'Logs', icon: 'output', needsRunning: false },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', needsRunning: true },
-  { id: 'stats', label: 'Stats', icon: 'graph', needsRunning: true },
+  { id: 'stats', label: 'Stats', icon: 'graph', needsRunning: false },
   { id: 'inspect', label: 'Inspect', icon: 'json', needsRunning: false },
   { id: 'edit', label: 'Edit', icon: 'edit', needsRunning: false },
 ];
@@ -62,9 +62,9 @@ const stateVariant = computed(() => {
   }
 });
 
-// A stopped container cannot serve its own Terminal/Stats tabs: fall back to Overview.
+// A stopped container cannot serve its Terminal tab: fall back to Overview.
 watch([running, c], () => {
-  if (c.value && !running.value && (ui.detailTab === 'terminal' || ui.detailTab === 'stats')) {
+  if (c.value && !running.value && ui.detailTab === 'terminal') {
     ui.detailTab = 'overview';
   }
 });
@@ -167,7 +167,7 @@ function act(action: 'start' | 'stop' | 'restart'): void {
         <ContainerOverview v-if="ui.detailTab === 'overview'" :detail="detail.data.value" />
         <LogsView v-else-if="ui.detailTab === 'logs'" :container-id="containerId" />
         <ExecView v-else-if="ui.detailTab === 'terminal' && running" :container-id="containerId" />
-        <StatsView v-else-if="ui.detailTab === 'stats' && running" :container-id="containerId" />
+        <StatsView v-else-if="ui.detailTab === 'stats'" :container-id="containerId" :running="running" />
         <InspectView v-else-if="ui.detailTab === 'inspect'" :raw="detail.data.value.raw" />
         <ContainerEditView v-else-if="ui.detailTab === 'edit'" :container-id="containerId" />
       </div>
