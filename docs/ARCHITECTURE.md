@@ -707,7 +707,8 @@ op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
                                                        -- op actually ran against, NULL for every
                                                        -- non-console-execute op kind and for every
                                                        -- pre-existing row
-custom_scripts(id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at)
+custom_scripts(id, name, command, working_dir, dir_mode, kind, params_json, smart_json, use_ade_dir, schedule_json,
+               color, collection_id, sort_order, created_at, updated_at)
                                                        -- P85, migration 0024; scripts, one row
                                                        -- per script, user-curated (no cap).
                                                        -- dir_mode (P242, Studio 0034 / Space 0026):
@@ -715,17 +716,28 @@ custom_scripts(id, name, command, working_dir, dir_mode, color, collection_id, s
                                                        -- = working_dir, 'home' = legacy $HOME (rows
                                                        -- that predate the choice; never offered anew).
                                                        -- collection_id (P219, Studio 0033 / Space
-                                                       -- 0023; replaced 0031's free-text collection):
+                                                       -- 0023; replaced 0031's free-text collection)
+                                                       -- kind 'script'|'smart' (P242 Part 2, Studio
+                                                       -- 0035 / Space 0028), use_ade_dir (Part 3,
+                                                       -- 0036 / 0029), schedule_json (Part 4, 0037 /
+                                                       -- 0030; '' = not recurring):
                                                        -- NULL = ungrouped, FK to
                                                        -- custom_script_collections ON DELETE CASCADE
 script_runs(id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command,
-            outcome_json, created_at, started_at, finished_at)
-                                                       -- P242 (Studio 0034 / Space 0026); one row per
+            outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json,
+            tools_json, task_id, task_title, branch_id, branch_label)
+                                                       -- P242 (Studio 0034 / Space 0026, extended by
+                                                       -- 0035-0037 / 0028-0030); one row per
                                                        -- Automations run, newest 500 kept (finished
-                                                       -- rows only are purged). state running|done|
-                                                       -- failed|cancelled|blocked; outcome_json is a
-                                                       -- runoutcome.Outcome. trigger_kind terminal now;
-                                                       -- manual|ade|scheduled reserved.
+                                                       -- rows only are purged). state waiting|running|
+                                                       -- done|failed|cancelled|blocked|skipped;
+                                                       -- outcome_json is a runoutcome.Outcome.
+                                                       -- trigger_kind terminal|manual|ade|scheduled.
+                                                       -- model..tools_json describe a smart run (a
+                                                       -- secret param is stored masked); task_*,
+                                                       -- branch_* name the ADE context (Space only).
+script_run_logs(run_id, seq, stream, text)              -- P242 Part 2; smart-run log lines, stream
+                                                       -- stdout|stderr|event
 custom_script_collections(id, name, sort_order, created_at, updated_at)
                                                        -- P219; one row per script collection, name
                                                        -- trimmed, 64 runes max, order is sort_order,
@@ -801,13 +813,13 @@ sequence (`apps/kira-space/internal/storage/migrations/`) — see the Git module
 `mcp_auto_explain` (auto-force-EXPLAIN on `run_query`); `0023` created `connection_mask_rules` and
 added `connections.mask_correlation_key`. Prior high-water mark: migration **0019** as of P67d
 (`0019_p67d_repo_map_access.sql`) — `code_repos.mcp_enabled` on top of C5's `code_repos` plus
-`tabs.workspace_id` (above). Current high-water mark is **0037** (`0037_p242_recurring_scripts.sql`: `custom_scripts.schedule`; `0036_p242_scripts_in_ade.sql`: `custom_scripts.use_ade_dir`, `script_runs.task_id/task_title/branch_id/branch_label`; `0035` is Part 2's smart-script columns; `0034_p242_automations.sql`: `windows.mode`/`tabs.workspace_id` `terminal` becomes `automations`, `custom_scripts.dir_mode`, `script_runs`; `0033_p219_quick_command_collections.sql`; `0028_p120_drop_git_settings.sql`, `0029_p127_drop_agent_hooks_settings.sql`,
+`tabs.workspace_id` (above). Current high-water mark is **0037** (`0037_p242_recurring_scripts.sql`: `custom_scripts.schedule_json`, `script_runs` rebuilt with `waiting`/`skipped` states; `0036_p242_scripts_in_ade.sql`: `custom_scripts.use_ade_dir`, `script_runs.task_id/task_title/branch_id/branch_label`; `0035` is Part 2's smart-script columns; `0034_p242_automations.sql`: `windows.mode`/`tabs.workspace_id` `terminal` becomes `automations`, `custom_scripts.dir_mode`, `script_runs`; `0033_p219_quick_command_collections.sql`; `0028_p120_drop_git_settings.sql`, `0029_p127_drop_agent_hooks_settings.sql`,
 `0030_p168_fk_indexes.sql`, `0031_p187_custom_script_collection.sql`, `0032_p188_drop_claude_code_settings.sql`
 come after 0027; `0024_p85_custom_scripts.sql`
 created `custom_scripts`; `0025_p97_drop_repo_map.sql`; `0026_p100_drop_git_tables.sql`;
 `0027_p108part11_op_log_path.sql` added `op_log.path TEXT`, the console path an op actually ran
 against, F5). Kira Space's own `kira.db` runs its own sequence
-(`apps/kira-space/internal/storage/migrations/`, high-water **0031**; `0031_p243_drop_git_clients.sql` drops `git_clients`, the paired-editor trust store (P243 Part 2); `0030_p242_recurring_scripts.sql` is Studio's 0037; `0029_p242_scripts_in_ade.sql` is Studio's 0036; `0028` is Part 2's smart-script columns; `0026_p242_automations.sql` is Studio's 0034 plus `ade_runs.outcome_json`; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033; `0021_p212_mobile_devices.sql`, `0022_p212_mobile_permissions.sql`, `0024_p222_code_repo_color.sql`, `0025_p223_mobile_lan.sql`): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
+(`apps/kira-space/internal/storage/migrations/`, high-water **0031**; `0031_p243_drop_git_clients.sql` drops `git_clients`, the paired-editor trust store (P243 Part 2); `0030_p242_recurring_scripts.sql` is Studio's 0037; `0029_p242_scripts_in_ade.sql` is Studio's 0036; `0028` is Part 2's smart-script columns; `0027_p241_rebase.sql` is P241's rebase columns (ADE, Storage); `0026_p242_automations.sql` is Studio's 0034 plus `ade_runs.outcome_json`; `0023_p219_quick_command_collections.sql` carries the same SQL as Studio's 0033; `0021_p212_mobile_devices.sql`, `0022_p212_mobile_permissions.sql`, `0024_p222_code_repo_color.sql`, `0025_p223_mobile_lan.sql`): `0001_init.sql`, `0002_p100_tabs_layout.sql`, then
 window mode, the ADE tables (see ADE, Storage) and `0020_p204_custom_scripts.sql` (scripts).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -1402,7 +1414,7 @@ body, shared with repo terminals below) are the same six files in both apps, imp
 
 **Run outcome and script runs (P242).** `internal/runoutcome` is the one run-result type both stores share: `Outcome{status done|failed|blocked|cancelled, reason, source agent|exit|timeout|start|user|restart, reported, exitCode, lastError, summary}`. `ForProcess` is the only wording table (script exit N: "exited with status N"; a signal: "ended by a signal"; agent without `finish_step`: "no report: Claude ended without calling finish_step"; timeout, start error, user stop "stopped by you", window close, app quit and restart-interruption texts naming the app), so ADE step runs (`ade_runs.outcome_json`, Space only) and Automations runs say the same thing. `internal/scriptruns` owns `script_runs` and the `kira:scriptRuns:changed` push (the whole changed run). It is the `terminal.ScriptLauncher`: `Begin` records a `running` run when a script terminal opens (a blocked folder records a `failed` run with source `start` and refuses the open), `Exited` finishes it from the session's exit code and the registry's close cause (`CauseUser` from `Terminal.Close` or `ScriptRuns.Stop`, `CauseWindow`, `CauseQuit`), and `Recover` runs at boot and fails every run a dead process left `running` ("interrupted: Kira Studio closed while it ran"). Bound methods: `ScriptRuns.List`, `Get`, `Stop`, `ResolveDir` (a folder preview; an empty script id answers the app home as `base`), then the smart and schedule methods below. Frontend: `automations/runs/` holds `runsQueries.ts` (TanStack Query keyed `['scriptRuns', 'list']`, patched in place by the push channel, no polling), `RunStatusBadge`, `RunElapsed`, `RunOutcomeBlock` (reason, exit code, last error, "Copy for agent", "Run again"), `RunsSection` (All|Running|Failed, Stop) and `RunsStatusItem` (status-bar "N running", every mode). A script tab shows a status strip and, once ended, the result block in place of the plain exit footer; its tab badge comes from the terminal session. Memory runs stay out of the Automations list.
 **Smart scripts (P242 Part 2).** A script of kind `smart` (`custom_scripts.kind`, `params_json`, `smart_json`; Studio 0035, Space 0028) runs as headless Claude instead of a shell command: `claude -p` through `internal/claudeheadless` (moved here from Space's `adeagent`), the same launch, stream-json parser and `finish_step` loopback server the ADE run engine uses. Defaults: `sonnet`, 1 USD (`--max-budget-usd`), 15 min; bounds in `internal/scripts/smart.go` (20 params, 20000-char prompt, budget 0.05-25 USD, timeout 1 min-2 h). The run is `Isolated`: `--setting-sources ''` loads no Claude settings file, `--strict-mcp-config` allows only the report server plus the MCP servers the script ticked, and `--permission-prompts none` denies instead of asking. `--tools` and `--allowedTools` come from the script's tool allowlist (built-ins `Read`, `Grep`, `Glob`, `Edit`, `Write`, `NotebookEdit`, `Bash`; default the first three). The final report must go through `finish_step`; a run without it fails with the shared "no report" text. Params are `text`, `select` or `multiselect` (a `text` param may be `secret`); names are lowercase and reserve the ADE built-ins `task`, `jira`, `repo`, `branch`, `base`, `worktree`. A `{name}` in the prompt is substituted before launch. A secret value reaches the run through env only: it is never in the prompt, the stored `script_runs.prompt` or `params_json` (stored as the mask), and a smart script whose prompt names a secret param is refused. `script_runs` gains `model`, `session_id`, `prompt`, `params_json`, `tools_json`; `script_run_logs` holds the run log (`stdout|stderr|event`, read by `ScriptRuns.ReadLog`). Bound methods: `Preview` (the full launch preview and what still needs picking), `Start`, `ReadLog`, `McpServers` and `McpTools` (the user's configured MCP servers and their tools, for the allowlist picker). Frontend: `automations/smart/` (`SmartBadge`, `SmartSettingsFields`, `ToolsField`, `McpToolsField`), `ParamsEditor.vue`, and `automations/run/` (`RunScriptDialog` with `ParamsForm` and `RunPreview`, mounted once by `RunScriptDialogHost`); the run tab is `runs/ScriptRunView.vue` with `RunLog`.
-**Recurring scripts (P242 Part 4).** A recurring script is a script with a `schedule` (`{cron, timezone, enabled, confirm, timeoutSec, taskId, branchId}`; Studio 0037, Space 0030; `schedule` is nullable JSON on the script row). Cron is 5 fields, no `@` tags, IANA zone, parsed by `adhocore/gronx` v1.20.4 (`internal/scriptruns/scheduler.go`). One loop per app sleeps on the injected clock to the next fire across all enabled schedules; a fire later than 60 s (app closed, sleep) is dropped silently, never replayed. Any trigger (cron, Run now, manual) that finds the script's previous run `running` or `waiting` records a `skipped` run with the reason. A `confirm` script records a `waiting` run and raises a popup; the run starts only on `ConfirmAccept`, `ConfirmDecline` ends it `cancelled`, and a waiting run never expires. A script with a secret param always confirms (secrets are never stored). Normal scripts run headless (`terminal` session without a tab, output to the run log) with `timeoutSec`; smart scripts run as before. A Space ADE-bound run holds the board claim and fails with the task reason when the task is missing or archived. New states `waiting` and `skipped`, new outcome source `schedule`. Bound methods: `ScriptRuns.NextFires`, `SchedulePreview`, `RunScheduleNow`, `ConfirmAccept`, `ConfirmDecline`. The confirm popup (`automations/schedule/ScheduleConfirmHost`) is prompt kind `schedule`, routed by the central prompt router (see Prompt routing, P246). Space posts a notification for a failed scheduled run.
+**Recurring scripts (P242 Part 4).** A recurring script is a script with a `schedule` (`{cron, timezone, enabled, confirm, timeoutSec, taskId, branchId}`; Studio 0037, Space 0030; `schedule_json` on the script row, empty when not recurring). Cron is 5 fields, no `@` tags, IANA zone, parsed by `adhocore/gronx` v1.20.4 (`internal/scriptruns/scheduler.go`). One loop per app sleeps on the injected clock to the next fire across all enabled schedules; a fire later than 60 s (app closed, sleep) is dropped silently, never replayed. Any trigger (cron, Run now, manual) that finds the script's previous run `running` or `waiting` records a `skipped` run with the reason. A `confirm` script records a `waiting` run and raises a popup; the run starts only on `ConfirmAccept`, `ConfirmDecline` ends it `cancelled`, and a waiting run never expires. A script with a secret param always confirms (secrets are never stored). Normal scripts run headless (`terminal` session without a tab, output to the run log) with `timeoutSec`; smart scripts run as before. A Space ADE-bound run holds the board claim and fails with the task reason when the task is missing or archived. New states `waiting` and `skipped`, new outcome source `schedule`. Bound methods: `ScriptRuns.NextFires`, `SchedulePreview`, `RunScheduleNow`, `ConfirmAccept`, `ConfirmDecline`. The confirm popup (`automations/schedule/ScheduleConfirmHost`) is prompt kind `schedule`, routed by the central prompt router (see Prompt routing, P246). Space posts a notification for a failed scheduled run.
 **Scripts in ADE (P242 Part 3, Space only).** `scriptruns.ADE` is the seam to the task board; `ade.TaskBoard` (`ade/automation.go`) implements it, Studio leaves it nil and refuses a `taskId` ("tasks exist only in Kira Space"). `RunArgs{taskId, branchId}` add the built-ins `task`, `jira`, `repo`, `branch`, `base`, `worktree`. `Preview.needs` lists the tasks and branches still to pick (a draft branch is disabled with "not created yet"); one enabled branch is picked on its own. A script with `use_ade_dir` runs in the branch worktree (`Dir.mode` `worktree`, `pending` while Start creates it). `ClaimWorktree` creates a missing worktree and holds a claim keyed by branch id under the board's `runMu`; the claim blocks both ways. A step run launching on a claimed branch is held with note "waiting for automation <name>" and starts when the claim is released (and after a restart). A rebase refuses with "automation X is running in <branch>", `StartBranch` is refused, and a script start is refused while a step run or rebase works on the branch. `claudeheadless` grants smart runs with a task the Space tools and `run_outcome` kind `automation`. A workflow step may name `smart_script` plus `params` instead of a prompt (`planSmartStep`, `smartOutcome`, supervised by `superviseAgent`). `agentnotify.HandleScriptRun` posts for smart runs only (failed under Enabled, blocked under OnNeedsInput, done under OnRunEnded, cancelled never); a click emits `kira:agent:reveal-script-run`. Frontend: `ade/v2/automation/` (task menu submenu, branch row and header entries, `AdeAutomationChip`, `AdeAutomationsBlock`), a step-card Prompt|Smart script toggle, and the shared `RunScriptDialog` with `AdeContextFields`. After a smart start from ADE the person stays on the board; the chip opens the run tab.
 
 **Panel resize (P185).** reka-ui 2.10.5 `SplitterResizeHandle` ends a drag only on a `window` `mouseup`
@@ -4614,7 +4626,7 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 |---|---|
 | `contextIsolation` / `sandbox` / `nodeIntegration: false` | **No subject, strictly better.** There is no Node in the webview to isolate it from, and no `contextBridge`/`window.kira` surface at all — the renderer reaches Go only through generated bindings and the `engine` stream. |
 | DevTools in a packaged build | **Ports, by a different mechanism.** It is a Go build tag rather than a runtime option: `-tags production`, already set by `apps/kira-studio/build/darwin/Taskfile.yml`. |
-| Every Chromium permission except the clipboard | **Set, but inert on macOS.** `WebviewWindowOptions.Permissions` exists and is populated (microphone/camera/geolocation/notifications denied, `PermissionClipboardRead` allowed), but Wails v3.0.0-beta.16 implements `resolvePermission` only for Linux and Windows — there are zero darwin references. The option is kept because it is genuinely correct on Linux, where `wails3 task dev` runs; on macOS the real clipboard answer is WebKit's own user-gesture heuristics. |
+| Every Chromium permission except the clipboard | **Set; on macOS and Linux only camera and microphone are enforced.** `WebviewWindowOptions.Permissions` exists and is populated (microphone/camera/geolocation/notifications denied, `PermissionClipboardRead` allowed). Wails v3.0.0-beta.28's `permissions_darwin.go` consults it for `getUserMedia` only (`resolveMediaCapturePermission`: a denied microphone or camera is refused instead of prompting); geolocation, notifications and clipboard are not consulted there (beta.16 had no darwin code at all; `permissions_linux.go` likewise covers media capture only). On macOS the real clipboard answer is WebKit's own user-gesture heuristics. |
 | `window.open` deny | **Partial.** `MacWebviewPreferences.JavaScriptCanOpenWindowsAutomatically` is false, which denies JS-initiated windows; there is no per-request handler (no `WKUIDelegate createWebViewWithConfiguration:`). Still zero `window.open`, zero `target="_blank"` and zero `<a href>` in `apps/kira-studio/frontend/src`/`packages/shared`, and file pickers remain native dialogs via `FilesService`, not popups. |
 | Navigation lock to the base URL | **No analogue — a real loss, already known.** There is no navigation-policy delegate on darwin at all (`webview_window_darwin.m` has no `decidePolicy`). This is weaker than the Electron `will-frame-navigate` guard plus fuses it replaces, and is recorded as a loss rather than mitigated. |
 | `webviewTag: false` | **No subject.** |
@@ -4653,8 +4665,8 @@ previous hardcoded literal broke GitHub Enterprise Server entirely, since the va
 was not really an allowlist for a GHES host).
 
 **Whether the `WKWebView` itself is configurable beyond this table — checked, and closed, at P22
-(D5).** `MacWebviewPreferences` (`webview_window_options.go:762-786`) is Wails v3.0.0-beta.16's
-entire macOS webview surface — ten fields, byte-identical to beta.15 — and none is a compositing or
+(D5).** `MacWebviewPreferences` (`webview_window_options.go:773-796`) is Wails v3.0.0-beta.28's
+entire macOS webview surface — ten fields, unchanged since beta.15 — and none is a compositing or
 tiling knob; the `WKWebViewConfiguration` is built and `autorelease`d inside one cgo block
 (`webview_window_darwin.go:138-195`) with no hook of any kind between "config allocated" and
 "webview created" (the whole options file has exactly one func-typed field, `KeyBindings`).
@@ -4778,6 +4790,14 @@ Docker module against a real engine), `termflow` (terminals, scripts, runs). Sha
 `KIRA_FLOW_COMPLETE`). `bun run test:flows:studio` is the general suite;
 `test:flows:studio:complete` sets `KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`.
 
+**Real `claude` tier (P237, P249).** `apps/kira-space/tests/claude/` and `apps/kira-studio/tests/claude/` are
+nested Go modules (own `go.mod`, `replace` to the repo module), so `go test ./...`, `lint:go`, CI and hooks never
+see them. They boot the real `appwire.Build` with the real `claude` CLI (haiku, a temp `HOME`, a 0.05 USD cap per
+run) and assert what fakes cannot: hook injection and payload contract, that the user's Claude settings stay
+untouched, ADE headless runs, step results, TUI stage sessions and rebase runs, smart scripts, the memory gate and
+import, the Database MCP install. Opt-in and token-costing: `bun run test:claude`, `test:claude:space`,
+`test:claude:studio`; the per-area command rows are in `docs/DEV_ENVIRONMENT.md`, "Real `claude` tests".
+
 **Isolation from the dev server.** The container-backed and UI suites run against their own
 `KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real
 `~/.kira-studio` or a database a running `bun run dev:studio` session is connected to. Running the tests
@@ -4894,8 +4914,8 @@ were deleted outright with no analogue: no `webPreferences`, fuse or Chromium-pe
 concept is left to assert, and no `process.uptime()` equivalent — cold start is now a manual procedure
 (`docs/PERF.md` §3).
 
-**`tests/ui/`** (`bun run test:ui:studio`) is its replacement for everything that ported: **349**
-tests across **58** spec files, split across the `ui` and `ui-timing` projects (P234 recount,
+**`tests/ui/`** (`bun run test:ui:studio`) is its replacement for everything that ported: **402**
+tests across **64** spec files, split across the `ui` and `ui-timing` projects (P251 recount,
 `npx playwright test --list --project=ui --project=ui-timing` from `apps/kira-studio` — v1.4 P6's
 own recount is now historical; `docs/PERF.md` §5 records that earlier tier's own measured
 wall-clock cost, 5m4s) driving the **real built `apps/kira-studio/
@@ -4915,8 +4935,8 @@ P13), Explain/auto-explain and the DDL-driven SQL language service (`console-exp
 (`fake-data.spec.ts`, P15), credential reveal (`credential-reveal.spec.ts`, P14), row coloring
 (`row-coloring.spec.ts`, P9), and settings apply-on-save (`settings-apply-on-save.spec.ts`, P17).
 
-**`tests/e2e-real/`** is the full-stack *wiring* tier, and it is deliberately small — five specs
-(sqlite, postgres, mariadb, multiwindow, `api-boot-real.spec.ts`), seven tests (P234 recount,
+**`tests/e2e-real/`** is the full-stack *wiring* tier, and it is deliberately small — seven specs
+(sqlite, postgres, mariadb, docker, terminal, multiwindow, prompts-two-windows), nine tests (recount,
 `npx playwright test --list --project=e2e-real`). `multiwindow-real.spec.ts` is the only
 full-stack proof of P8's `tabs.window_key` isolation ("two windows, one backend: each keeps only
 its own tabs"), referenced by name in the multi-window subsection below. It builds the Go shell
@@ -5029,12 +5049,12 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   by the trusted-network gate, the warning and expiry; not removable without TLS, which the user
   declined. Delete only if TLS is adopted.
 - **Claude Code redraw after a phone resize or reclaim is unobserved (P212 Part 2).** The PTY resizes
-  to the phone's size on attach and back to the window's on return; no Claude account in the sandbox
-  (see the P147 item), so only the Go and e2e sides are checked. Delete once checked with an
-  authenticated `claude` and a real phone.
+  to the phone's size on attach and back to the window's on return; the real `claude` suite does not attach a phone,
+  so only the Go and e2e sides are checked. Delete once checked with an authenticated `claude` and a
+  real phone.
 - **Console reads on PostgreSQL and MySQL/MariaDB drain past the cap (P174).** At the cap `rows.Close()` discards the remaining rows off the wire: memory is bounded, server and network time are not. The Stop button ends a long drain. Delete once a driver offers a cheap server-side stop that keeps later statements in the batch intact.
 - **Some Redis console commands are read whole before the cap (P174).** `SUNION`, `SINTER`, `SDIFF`, `EVAL`/`FCALL`, module commands and `GET` of a huge string have no bounded form; go-redis reads the reply whole, then the page is capped. Delete once those commands get bounded rewrites or a streaming reader.
-- **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
+- **Parts of an interactive `claude` turn are unobserved (P147, P149, P150).** The real suite (`bun run test:claude:space`) launches the TUI, sees hooks including `Stop`, and drives `Send` into a session. Never seen against a real `claude`: the folder-trust prompt (the suite pre-trusts the folder), `claude --resume` of a stopped session, the initial ` -- ` message, send-then-archive completing after the turn, and for the P150 review agent `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint. Delete once checked on an authenticated desktop build.
 - **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
 - **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
@@ -5082,16 +5102,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   further prompt. Closing this needs the pending archive itself surviving a reload (a persisted
   Go-side flag on the task), a later phase's call.
 
-- **`internal/ipcfixture`'s golden fixtures (P25's complete real-container suite) are stale**,
-  discovered running `go test ./...` with Docker available (v1.7 M3). `testdata/*.fixture.json`
-  were last regenerated at `6a7b8118`, a v1.6-era commit — before Redis's `keyTypes` capability
-  (`2e856b7d`) and before v1.7's `mcp_read_mode`/`mcp_write_mode`/`mcp_ddl_mode` columns (M1/M2)
-  existed. `TestFixture_ClickHouse`/`Kafka`/`MariaDB`/`MySQL`/`Redis`/`SQS` all diff against the
-  committed JSON: a new `caps.keyTypes` field, and every fixture connection row logs "unrecognised
-  MCP {read,write,DDL} mode ... mode=\"\"" since the stored rows predate those columns and read back
-  empty. This suite is explicitly on-demand/CI-only (`CLAUDE.md`'s real-container two-suite rule),
-  so it doesn't gate a phase's own fast checks. Closing it needs running the suite's own
-  regeneration path (extend, per `CLAUDE.md`'s own P25/P26 guidance) against a current schema.
+- **`internal/ipcfixture`'s fixture connection rows carry no MCP mode columns** (v1.7 M3). The committed `testdata/*.fixture.json` hold no `mcp_read_mode`/`mcp_write_mode`/`mcp_ddl_mode`, so each fixture connection logs "coercing connection row: unrecognised MCP ... mode". The `keyTypes` gap this item once named is fixed. Not rerun here for lack of Docker: whether the on-demand suite still diffs against the committed JSON is unconfirmed. Closing it needs the suite's own regeneration path (`KIRA_IPC_FIXTURES=write`) against the current schema.
 
 - **`maskedColumnRenamedOrHidden`'s outer-statement scan can't see into a pre-existing view
   definition** (M7 round 2, finding #1). A view that itself renames a masked column
@@ -5245,11 +5256,11 @@ Performance:
 - **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
 - **`release.yml` still stamps the removed extension manifest until `docs/pending-changes/.github__workflows__release.yml.patch` is applied (P243 Part 2).** The release workflow fails until then. `docs/pending-changes/.github__workflows__pr.yml.patch` renames two step names that still say `gitsock`. Delete once both are applied.
 - **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
-- **The agent MCP tools (`task_info`, `declare_repos`, `request_branch`, `branch_status`) are untested against a real board and real `claude` (P199).** Covered by the `claudeheadless` go-sdk client test and `agenttools_test.go` only. Delete once one live run calls them.
+- **`declare_repos`, `request_branch` and `branch_status` are untested against a real board and real `claude` (P199).** Covered by the `claudeheadless` go-sdk client test and `agenttools_test.go` only; `task_info` runs in the real `TestSmartScriptRun`. Delete once one live run calls them.
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
 - **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
-- **Visual baselines are unchecked on the CI `ui` job image (P227, P229).** P227 re-recorded the 13 Studio and the Space Settings baselines in the dev container, P229 added 3 git-module ones; both suites pass there. If the CI job disagrees, regenerate there and check each diff is the expected change only.
+- **Visual baselines are unchecked on the CI `ui` job image (P227, P229, P242, P245, P247).** All were recorded in the dev container: 13 Studio (P227, P242), 4 Space Settings, 3 git-module (P229, P245) and 1 ADE workflow graph (P247); the suites pass there. If the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
-- **Load-sensitive UI specs (P230, P231).** The `repo-graph-paging` drag step fails about 1 run in 80 at 8 workers; the `ade-v2-panel` handle-drag width fails under load. Both pass alone. Delete once deflaked.
+- **Load-sensitive specs and tests (P230, P231, P236, P243, P247, P251).** Under a loaded machine (load above 20 on 4 CPUs) these fail and pass alone: UI `repo-graph-paging` drag (about 1 run in 80 at 8 workers), `ade-v2-panel` handle-drag width, `repo-review-interaction` 600-commit case, `sql-schema` D3, `tooltips` a11y, `http-timeline` failed-send; Go `adeflow` `TestRebaseRun` (rebase `NoOp:true`, root cause not found) and `TestScheduleADE`. Run suites one at a time; rerun the one test alone before calling it broken. Delete once deflaked.
