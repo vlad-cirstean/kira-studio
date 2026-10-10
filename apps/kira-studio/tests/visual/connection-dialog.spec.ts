@@ -20,6 +20,9 @@ test('connection dialog at rest, General tab (P6)', async ({ relaunch }) => {
   await page.fill('[data-testid="connection-database"]', 'testdb');
   await page.fill('[data-testid="connection-username"]', 'testuser');
 
-  await expect(page.locator('[data-testid="connection-tab-general"]')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="connection-tab-general"]')).toHaveAttribute(
+    'data-state',
+    'on',
+  );
   await expect(page).toHaveScreenshot('connection-dialog.png');
 });

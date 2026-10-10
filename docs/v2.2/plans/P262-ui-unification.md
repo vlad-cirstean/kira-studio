@@ -871,3 +871,13 @@ Verify: `typecheck`, `lint`, `test:unit` (1793), `test:visual:studio` (13) and
 Deviations: `rowVariants` `menu` layout carries git-ui's base classes inline (no shared cva base)
 so `nav`/`tree` avoid `text-fg` conflicts; `nav` selected-false adds `bg-transparent` (the old
 inline string had it). No pixel moved.
+
+## Stream A result
+
+A1..A10 done. Commits: 58733cacd (A1), 3f2fbbdc1 (A2+A3), b7507d30a (A4), f261c4b23 (A5), 23f954328 (A6), b2a23f2d9 (A7), 819553e9c (A8), dd4593688 (A9), 586fcb8f5 (fixes), plus visual/docs commit.
+
+`stream-a.txt` holds 2 permanent lines: CommandPalette U3, LogsView U11.
+
+Verify: `check-ui-primitives.sh`, lint, typecheck green. `test:ui:studio` 427 passed. Space A specs (automations-*, memory-*, settings-memory) 56 passed. Visual re-recorded after viewing: Studio workbench-shell, script-dialog, connection-dialog, data-grid, console, http-request-view, schema-dialog, settings-api, settings-appearance; Space settings-appearance. `settings-memory-visual-linux.png` unchanged.
+
+Deviations in `P262-stream-a-findings.md`.
