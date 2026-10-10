@@ -7,7 +7,6 @@ import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
 import ClaudeCodePane from './settings/ClaudeCodePane.vue';
-import ConnectedEditorsPane from './settings/ConnectedEditorsPane.vue';
 import GitPane from './settings/GitPane.vue';
 import MemoryPane from './settings/MemoryPane.vue';
 import MobileAccessPane from './settings/MobileAccessPane.vue';
@@ -67,13 +66,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <GitPane
         :active="s.activeSection === 'Git'"
-        :draft="s.draft"
-        :is-at-default="s.isAtDefault"
-        :reset-leaf="s.resetLeaf"
-        :register-field-error="s.registerFieldError"
-      />
-      <ConnectedEditorsPane
-        :active="s.activeSection === 'Connected editors'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"

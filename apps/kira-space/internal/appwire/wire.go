@@ -22,7 +22,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -72,7 +71,6 @@ type gitWired struct {
 	registry      *gitsession.Registry
 	askpassBroker *gitaskpass.Broker
 	router        *gitrpc.Router
-	sock          *gitsock.Server
 	opLog         *oplog.Log
 }
 
@@ -268,9 +266,8 @@ func shutdownTracker(tracker *ade.Tracker, hooks *agenthooks.Manager) {
 	}
 }
 
-// wireGit builds the git runner, discovery (over locator), session registry, router and the
-// pairing socket, and starts the socket.
-func wireGit(repositories *repos.Repos, credentials *gitcred.Relay, locator gitclient.Locator, ghLocator ghclient.Locator) gitWired {
+// wireGit builds the git runner, discovery (over locator), session registry and router.
+func wireGit(repositories *repos.Repos, locator gitclient.Locator, ghLocator ghclient.Locator) gitWired {
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(locator, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
@@ -278,7 +275,6 @@ func wireGit(repositories *repos.Repos, credentials *gitcred.Relay, locator gitc
 		gitRegistry.Gh = ghclient.NewClient(
 			ghclient.NewDiscovery(ghLocator, ghclient.NewExecRunner(), ghclient.NewRealClock()), ghclient.NewExecRunner())
 	}
-	// Set before gitSock.Start: a paired VS Code client can run a write the moment the socket is up.
 	opLog := oplog.New()
 	gitRegistry.OpLog = opLog
 	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int, gitPath string) {
@@ -310,22 +306,9 @@ func wireGit(repositories *repos.Repos, credentials *gitcred.Relay, locator gitc
 			return s.Appearance.DateFormat
 		},
 	})
-	gitSock := gitsock.New(gitsock.Deps{
-		SocketPath:    filepath.Join(config.KiraSpaceHome(), "git.sock"),
-		LockPath:      filepath.Join(config.KiraSpaceHome(), "git.sock.lock"),
-		Clients:       repositories.GitClients,
-		Registry:      gitRegistry,
-		Credentials:   credentials,
-		Router:        gitRouter,
-		ServerVersion: buildinfo.Version,
-		Now:           time.Now,
-	})
-	if err := gitSock.Start(); err != nil {
-		slog.Warn("git socket listener", "scope", "startup", "err", err)
-	}
 	return gitWired{
 		runner: gitRunner, discovery: gitDiscovery, registry: gitRegistry,
-		askpassBroker: askpassBroker, router: gitRouter, sock: gitSock, opLog: opLog,
+		askpassBroker: askpassBroker, router: gitRouter, opLog: opLog,
 	}
 }
 

@@ -5,12 +5,11 @@ import { defaultSettings, type Settings, type SettingsPatch } from './settingsDo
 // P100 Part 2: Kira Studio's own state/settings.ts, ported. Settings itself stays this app's own
 // three-section schema (./settingsDomain, P103 Part 4 §7.3) — every section still round-trips
 // through this store even though SettingsDialog.vue here (a small rewrite, not a port) surfaces
-// only Appearance/Git/Connected editors/Advanced's own gitLogLevel leaf; the sections list below
+// only Appearance/Git/Advanced's own gitLogLevel leaf; the sections list below
 // is this app's own dialog surface, not the full Settings shape.
 export const sections = [
   'Appearance',
   'Git',
-  'Connected editors',
   'Mobile access',
   'Claude Code',
   'Memory',

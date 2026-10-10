@@ -1,5 +1,5 @@
 // Package flowharness boots Kira Space's real composition root (internal/appwire) over a temporary
-// home for flow tests at the IPC boundary. Real: git, SQLite, the git stream, gitsock, PTYs, file
+// home for flow tests at the IPC boundary. Real: git, SQLite, the git stream, PTYs, file
 // watchers, the phone HTTP server, the hooks and askpass sockets. Faked, each an OS or third-party
 // seam with no git in it: the claude and gh CLIs, native dialogs, the browser, the power assertion,
 // LAN detection and the window manager. Settings stay at their defaults; a test changes one only
@@ -88,7 +88,7 @@ func (noGhLocator) Locate() (string, []string, bool) { return "", []string{"gh (
 type App struct {
 	t *testing.T
 	// Root is the short temp root (not t.TempDir: macOS paths there exceed the 104-byte unix socket
-	// limit for git.sock, the hooks and askpass sockets). Home is the isolated HOME, Work the
+	// limit for the hooks and askpass sockets). Home is the isolated HOME, Work the
 	// directory test repositories are built in, BinDir the PATH-first fake tool directory, FakeDir
 	// where the fake agent records its calls.
 	Root, Home, SpaceHome, MemoryHome, Work, BinDir, FakeDir string

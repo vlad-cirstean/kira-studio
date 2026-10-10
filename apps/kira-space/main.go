@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -37,7 +38,7 @@ var assets embed.FS
 var mobileAssets embed.FS
 
 // Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout -> logging.Init/Sweep ->
-// storage.Open (migrates) -> repos.New -> appwire.Build (git socket, terminal registry, ADE tracker
+// storage.Open (migrates) -> repos.New -> appwire.Build (terminal registry, ADE tracker
 // with the Claude Code hooks, task board, keep-awake, the 20 bound services) -> application.New
 // (the bound services plus the git stream registration) -> the menu -> the startup window list,
 // opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP: not this app's module.
@@ -73,6 +74,7 @@ func main() {
 
 	instanceLock := acquireSingleInstance(reporter)
 	_ = instanceLock // kept open for the process's lifetime (AcquireLock's own doc); closing it releases the lock.
+	removeLegacyGitSocket()
 
 	db, err := storage.Open()
 	if err != nil {
@@ -221,6 +223,16 @@ func acquireSingleInstance(reporter *startupfail.Reporter) *os.File {
 		os.Exit(0)
 	}
 	return instanceLock
+}
+
+// removeLegacyGitSocket deletes the git.sock and git.sock.lock a pre-P243 build left in the home.
+// Safe after acquireSingleInstance: the instance lock means no other Space owns this home.
+func removeLegacyGitSocket() {
+	for _, name := range []string{"git.sock", "git.sock.lock"} {
+		if err := os.Remove(filepath.Join(config.KiraSpaceHome(), name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			slog.Warn("remove legacy git socket", "scope", "startup", "file", name, "err", err)
+		}
+	}
 }
 
 // purgeReviewWindows drops review windows a previous run left behind: they are never restored.

@@ -35,13 +35,10 @@ export const CHANNEL = {
   // P11 D8: a server-streaming call's coalesced message batches, delivered via EmitTo (one window
   // only) — the one genuinely new push channel this phase adds.
   grpcCall: 'kira:grpc:call',
-  // G1 §3.6/D19: the pairing prompt's live queue snapshot and the Connected editors pane's list.
-  gitPairing: 'kira:git:pairing',
-  gitClientsChanged: 'kira:git:clients',
-  // P178: every pending credential prompt raised by a socket client or the ADE board.
+  // P178: every pending credential prompt raised by the git stream or the ADE board.
   gitCredential: 'kira:git:credential',
   // P212: the phone pairing prompt's queue snapshot, the paired phones list and the server state
-  // (Emit to every window; gitPairing's own shape).
+  // (Emit to every window).
   mobilePairing: 'kira:mobile:pairing',
   mobileDevices: 'kira:mobile:devices',
   mobileStatus: 'kira:mobile:status',
@@ -52,7 +49,7 @@ export const CHANNEL = {
   // C7 D7: a repository-wide search's coalesced file groups, delivered via EmitTo (one window
   // only) — grpcCall's own shape, restated for a payload that shares no field with it.
   codeSearch: 'kira:code:search',
-  // M2 §7.1: the prompt-mode approval queue's live snapshot — gitPairing's own shape.
+  // M2 §7.1: the prompt-mode approval queue's live snapshot.
   dbMcpApproval: 'kira:dbmcp:approval',
   // P83 §3.2: one terminal's coalesced output and its exit, delivered via EmitTo (one window
   // only) — codeSearch's own shape, restated for a byte payload.

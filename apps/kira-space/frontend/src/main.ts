@@ -16,7 +16,6 @@ import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCodeReposStore } from './state/coderepos';
 import { useCustomScriptsStore } from './state/customScripts';
-import { useGitClientsStore } from './state/gitClients';
 import { useGitCredentialStore } from './state/gitCredential';
 import { useKeepAwakeStore } from './state/keepAwake';
 import { useLayoutStore } from './state/layout';
@@ -58,7 +57,6 @@ async function mountShell(): Promise<void> {
   const settingsStore = useSettingsStore(pinia);
   const codeReposStore = useCodeReposStore(pinia);
   const customScriptsStore = useCustomScriptsStore(pinia);
-  const gitClientsStore = useGitClientsStore(pinia);
   const gitCredentialStore = useGitCredentialStore(pinia);
   const mobileAccessStore = useMobileAccessStore(pinia);
   const mobileTerminalsStore = useMobileTerminalsStore(pinia);
@@ -96,11 +94,10 @@ async function mountShell(): Promise<void> {
   // stuck/erroring OS power-assertion call must never block this app's own boot the way it's
   // allowed to gate Kira Studio's (that app's own main.ts keeps it in the critical group).
 
-  // F2: gitClients (Connected editors/pairing) and terminals (new-terminal defaults) are not on
+  // F2: git credential prompts, terminals (new-terminal defaults) and the rest are not on
   // the critical path to a rendered shell — Promise.allSettled so one of these hitting a DB error
   // never takes down the whole window the way it did bundled into the Promise.all above.
   const optional = await Promise.allSettled([
-    gitClientsStore.hydrateGitClients(),
     gitCredentialStore.hydrateRelayPrompts(),
     mobileAccessStore.hydrateMobileAccess(),
     mobileTerminalsStore.hydrateMobileTerminals(),

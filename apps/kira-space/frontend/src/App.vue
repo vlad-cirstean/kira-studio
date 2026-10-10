@@ -17,7 +17,6 @@ import { useLayoutStore } from './state/layout';
 import { useSettingsStore } from './state/settings';
 import { createAutomationsModule } from './workbench/automationsModule';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
-import GitPairingDialog from './workbench/GitPairingDialog.vue';
 import { createWorkbenchHost, useTabsStore } from './workbench/host';
 import MobilePairingDialog from './workbench/MobilePairingDialog.vue';
 import { createMemoryModule } from './workbench/memoryModule';
@@ -34,8 +33,7 @@ provide(memoryModuleKey, createMemoryModule());
 
 // P100 Part 2: Kira Studio's own App.vue, trimmed to this app's own always-mounted root dialogs —
 // ConfirmDialog (G1 D17's own precedent) and, moved here wholesale from Studio,
-// GitPairingDialog/GitCredentialDialog (a pairing/credential prompt must be able to appear with
-// nothing else open).
+// GitCredentialDialog (a credential prompt must be able to appear with nothing else open).
 //
 // P116 G1-G4 (P132 Part 2 adds Toggle Operations Panel): this app's own Go menu
 // (internal/appshell/menu.go) emits six of Kira Studio's own dozen menu-bar CHANNEL commands
@@ -76,7 +74,6 @@ onUnmounted(() => {
       <TitleBar />
       <WorkbenchShell />
     </div>
-    <GitPairingDialog />
     <MobilePairingDialog />
     <GitCredentialDialog />
     <ConfirmDialog />

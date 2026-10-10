@@ -12,15 +12,6 @@ import (
 // call site in this package has to change.
 const ChannelCodeSearch = appevent.ChannelCodeSearch
 
-// ChannelGitPairing and ChannelGitClientsChanged are G1's own two push channels — the pairing
-// prompt's live queue snapshot, and the Connected editors pane's list. AttachGitClientsPush
-// (gitclients.go) subscribes gitsock's Broker.Subscribe/OnClientsChanged and pushes through these;
-// main.go calls it once at startup.
-const (
-	ChannelGitPairing        = "kira:git:pairing"
-	ChannelGitClientsChanged = "kira:git:clients"
-)
-
 // ChannelMobilePairing, ChannelMobileDevices and ChannelMobileStatus are P212's three desktop-only
 // channels: the phone pairing prompt's queue snapshot, the paired phones list and the server state.
 // None is on the mobileweb event allowlist.
@@ -39,7 +30,7 @@ const (
 const ChannelCustomScriptsChanged = "kira:customScripts:changed"
 
 // ChannelGitCredential is P178's credential relay snapshot (every pending prompt a socket client
-// or the ADE board raised), broadcast to every window — ChannelGitPairing's own shape.
+// or the ADE board raised), broadcast to every window.
 const ChannelGitCredential = "kira:git:credential"
 
 // ChannelSettingsChanged/ChannelLayoutChanged are SettingsService.Set/LayoutService.Set's own

@@ -4,7 +4,6 @@ import * as ClaudeUsageService from '@bindings/claudeusageservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as FilesService from '@bindings/filesservice.js';
-import * as GitClientsService from '@bindings/gitclientsservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
 import * as GitHubService from '@bindings/githubservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
@@ -22,14 +21,7 @@ import * as WindowsService from '@bindings/windowsservice.js';
 import type { HeadState } from '@kira/git-ipc';
 import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
 import type { PaletteColor } from '@shared/domain/color';
-import type {
-  GitClient,
-  GitCredentialPrompt,
-  GitPairingActionResult,
-  GitPairingSnapshot,
-  GitVsixInstallResult,
-  GitVsixStatus,
-} from '@shared/domain/git';
+import type { GitCredentialPrompt } from '@shared/domain/git';
 import type { Layout } from '@shared/domain/layout';
 import type {
   MobileDevice,
@@ -174,32 +166,12 @@ const spaceControl = {
   githubOpenPullRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHubService.OpenPullRequestURL({ url })),
 
-  gitClientsList: (): Promise<GitClient[]> =>
-    unwrap(GitClientsService.List()).then((r) => trust<GitClient[]>(r ?? [])),
-  gitClientsRevoke: (id: string): Promise<void> => unwrap(GitClientsService.Revoke({ id })),
-  onGitClientsChanged: (cb: (clients: GitClient[]) => void): (() => void) =>
-    on(CHANNEL.gitClientsChanged, cb),
-  gitPairingPending: (): Promise<GitPairingSnapshot> =>
-    unwrap(GitClientsService.PendingPairing()).then((r) => trust<GitPairingSnapshot>(r)),
-  gitPairingApprove: (id: string): Promise<GitPairingActionResult> =>
-    unwrap(GitClientsService.Approve({ id })).then((r) => trust<GitPairingActionResult>(r)),
-  gitPairingDeny: (id: string): Promise<GitPairingActionResult> =>
-    unwrap(GitClientsService.Deny({ id })).then((r) => trust<GitPairingActionResult>(r)),
-  onGitPairingChanged: (cb: (snap: GitPairingSnapshot) => void): (() => void) =>
-    on(CHANNEL.gitPairing, cb),
   gitCredentialPending: (): Promise<GitCredentialPrompt[]> =>
     unwrap(GitCredentialService.Pending()).then((r) => trust<GitCredentialPrompt[]>(r ?? [])),
   gitCredentialProvide: (requestId: string, secret: string | null): Promise<boolean> =>
     unwrap(GitCredentialService.Provide({ requestId, secret })),
   onGitCredentialChanged: (cb: (prompts: GitCredentialPrompt[]) => void): (() => void) =>
     on(CHANNEL.gitCredential, cb),
-  gitVsixStatus: (): Promise<GitVsixStatus> =>
-    unwrap(GitClientsService.VsixStatus()).then((r) => trust<GitVsixStatus>(r)),
-  gitVsixInstall: (): Promise<GitVsixInstallResult> =>
-    unwrap(GitClientsService.InstallVsCodeIntegration()).then((r) =>
-      trust<GitVsixInstallResult>(r),
-    ),
-
   // P212: the Mobile access pane and the phone pairing prompt.
   mobileStatus: (): Promise<MobileStatus> =>
     unwrap(MobileAccessService.Status()).then((r) => trust<MobileStatus>(r)),

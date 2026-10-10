@@ -26,8 +26,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitvsix"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
@@ -114,7 +112,6 @@ type Wired struct {
 	Metrics       *metrics.Ticker
 	UpdateInstall *appupdate.Installer
 
-	GitClients     *bridge.GitClientsService
 	GitCredential  *bridge.GitCredentialService
 	GitHub         *bridge.GitHubService
 	Link           *bridge.LinkService
@@ -143,20 +140,19 @@ type Wired struct {
 
 	detachMetrics   func()
 	detachOpLog     func()
-	detachGitPush   func()
 	detachGitCred   func()
 	detachMobile    func()
 	beforeFlushOnce func()
 	teardownOnce    func()
 }
 
-// Build wires every service. The git socket is already listening on return.
+// Build wires every service.
 func Build(opts Options) *Wired {
 	repositories := opts.Repos
 	w := &Wired{Repos: repositories}
 
 	credentialRelay := gitcred.New()
-	git := wireGit(repositories, credentialRelay, opts.Locator, opts.GhLocator)
+	git := wireGit(repositories, opts.Locator, opts.GhLocator)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
@@ -176,10 +172,6 @@ func Build(opts Options) *Wired {
 		Deps: deps, Discovery: git.discovery, Runner: git.runner, Registry: codeworkspace.NewRegistry(),
 		OnReposChanged: func() { bridge.AdeTaskReposChanged(events) },
 	}
-	w.GitClients = &bridge.GitClientsService{
-		Deps: deps, Sock: git.sock, Broker: git.sock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{}),
-	}
-	w.detachGitPush = bridge.AttachGitClientsPush(w.GitClients)
 	w.GitCredential = &bridge.GitCredentialService{Deps: deps, Relay: credentialRelay}
 	w.detachGitCred = bridge.AttachGitCredentialPush(w.GitCredential)
 	w.GitHub = &bridge.GitHubService{Deps: deps, Browser: opts.Browser}
@@ -336,7 +328,7 @@ func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 // Bound returns the 22 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
-		application.NewService(w.GitClients), application.NewService(w.GitCredential),
+		application.NewService(w.GitCredential),
 		application.NewService(w.CodeWorkspace), application.NewService(w.GitHub), application.NewService(w.Link),
 		application.NewService(w.Files), application.NewService(w.Settings), application.NewService(w.Layout),
 		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Terminal),
@@ -349,9 +341,6 @@ func (w *Wired) Bound() []application.Service {
 
 // GitRouter is the router the git stream serves.
 func (w *Wired) GitRouter() *gitrpc.Router { return w.Git.router }
-
-// GitSock is the VS Code pairing socket server.
-func (w *Wired) GitSock() *gitsock.Server { return w.Git.sock }
 
 // BeforeFlush stops the metrics ticker and detaches window listeners; idempotent.
 func (w *Wired) BeforeFlush() { w.beforeFlushOnce() }
@@ -376,17 +365,11 @@ func (w *Wired) teardown(db io.Closer) {
 	w.runs.Close()
 	shutdownTracker(w.Tracker, w.AgentHooks)
 	w.AdeBoard.Close()
-	w.detachGitPush()
 	w.detachGitCred()
-	// Before gitSock/DB close: ends open streams and aborts parked pairing requests.
+	// Before DB close: ends open streams and aborts parked pairing requests.
 	bridge.StopMobile(w.Mobile)
 	w.detachMobile()
-	if err := w.Git.sock.Close(); err != nil {
-		slog.Warn("close git socket", "scope", "shutdown", "err", err)
-	}
-	// F6: gitSock.Close() only reaches the registry's Close itself when this instance actually won
-	// the listen — a second instance's entries, watchers, auto-fetch timers and review.db stayed
-	// open until process exit. Registry.Close is idempotent, so calling it again is always safe.
+	// Ends entries, watchers, auto-fetch timers and review.db.
 	w.Git.registry.Close()
 	if w.Git.askpassBroker != nil {
 		if err := w.Git.askpassBroker.Close(); err != nil {

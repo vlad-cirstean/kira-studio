@@ -5,13 +5,12 @@ import type { ControlSnapshot } from './types';
 
 /**
  * The `Promise.all` `apps/kira-space/frontend/src/main.ts`'s `bootstrap()` fires before `mount()`
- * — `layoutGetAll`/`settingsGetAll`/`codeWorkspaceListRepos`/`gitClientsList`/`tabsList` —
- * answered with an empty, healthy app: defaults, no repositories imported, no editors paired, no
- * tabs. This is what every `tests/ui/` spec's `relaunch()` starts from — Kira Studio's own
+ * — `layoutGetAll`/`settingsGetAll`/`codeWorkspaceListRepos`/`tabsList` —
+ * answered with an empty, healthy app: defaults, no repositories imported, no tabs. This is what every `tests/ui/` spec's `relaunch()` starts from — Kira Studio's own
  * EMPTY_BOOT_SNAPSHOTS, trimmed to this app's own bootstrap() (no connections/masked
  * columns/ops — none of that exists here).
  *
- * `gitPairingPending`/`gitCredentialPending`/`gitVsixStatus`/`terminalDefaultCwd`/`windowsEnsure` are deliberately
+ * `gitCredentialPending`/`terminalDefaultCwd`/`windowsEnsure` are deliberately
  * absent — every one of them already has a `WILDCARD_DEFAULTS` entry in mockRuntime.ts (nothing
  * here ever needs to override them per-spec the way `tabsList` regularly does), the same "boot
  * call with no committed fixture will ever snapshot it" reasoning as Kira Studio's own array.
@@ -22,7 +21,6 @@ export const EMPTY_BOOT_SNAPSHOTS: readonly ControlSnapshot[] = [
   { channel: IPC.layoutGetAll, response: defaultLayout },
   { channel: IPC.settingsGetAll, response: defaultSettings },
   { channel: IPC.codeWorkspaceListRepos, response: [] },
-  { channel: IPC.gitClientsList, response: [] },
   { channel: IPC.tabsList, response: [] },
   { channel: IPC.customScriptsList, response: { collections: [], scripts: [] } },
   { channel: IPC.scriptRunsList, response: [] },

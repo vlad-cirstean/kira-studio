@@ -19,8 +19,8 @@ func TestHarnessBootsWithDefaultSettings(t *testing.T) {
 	app := flowharness.New(t)
 	t.Logf("harness boot: %s", time.Since(start))
 
-	if got := len(app.W.Bound()); got != 23 {
-		t.Fatalf("bound services = %d, want 23", got)
+	if got := len(app.W.Bound()); got != 22 {
+		t.Fatalf("bound services = %d, want 22", got)
 	}
 	settings, err := app.W.Settings.GetAll()
 	if err != nil {
@@ -55,12 +55,5 @@ func TestHarnessBootsWithDefaultSettings(t *testing.T) {
 	}
 
 	gs.Close()
-	sock := filepath.Join(app.SpaceHome, "git.sock")
-	if _, err := os.Stat(sock); err != nil {
-		t.Fatalf("git.sock missing while running: %v", err)
-	}
 	app.W.Teardown()
-	if _, err := os.Stat(sock); !os.IsNotExist(err) {
-		t.Fatalf("git.sock after teardown: %v, want removed", err)
-	}
 }

@@ -12,7 +12,7 @@ import (
 // Repos is every storage repo this app needs, constructed once at startup — Kira Studio's own
 // Repos aggregate carries eighteen repos across connections/queries/collections/history/git;
 // Kira Space's own trimmed copy (P100 Part 1) carried only the five this app's own services
-// (GitClientsService, CodeWorkspaceService, GithubService, this app's own window shell, and
+// (CodeWorkspaceService, GithubService, this app's own window shell, and
 // SettingsService reads for advanced.gitLogLevel/git.*) actually touched. Layout and Tabs are
 // P100 Part 2's own addition, once the frontend gave both a real consumer
 // (migrations/0002_p100_tabs_layout.sql). AdeSessions is P129 Part 1's own addition — ade.Tracker's
@@ -21,7 +21,6 @@ import (
 type Repos struct {
 	Settings        *SettingsRepo
 	Windows         *WindowsRepo
-	GitClients      *GitClientsRepo
 	MobileDevices   *MobileDevicesRepo
 	MobileNetwork   *MobileTrustedNetworkRepo
 	GitRepoSettings *GitRepoSettingsRepo
@@ -62,7 +61,6 @@ func New(db *sql.DB) (*Repos, error) {
 	return &Repos{
 		Settings:        &SettingsRepo{DB: db, selectAll: settingsSelectAll},
 		Windows:         &WindowsRepo{DB: db},
-		GitClients:      &GitClientsRepo{DB: db},
 		MobileDevices:   &MobileDevicesRepo{DB: db},
 		MobileNetwork:   &MobileTrustedNetworkRepo{DB: db},
 		GitRepoSettings: &GitRepoSettingsRepo{DB: db},

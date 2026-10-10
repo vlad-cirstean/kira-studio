@@ -76,13 +76,6 @@ export const IPC = {
   updateInstall: 'kira:update:install',
   updateCancelInstall: 'kira:update:cancelInstall',
 
-  gitClientsList: 'kira:git:clients:list',
-  gitClientsRevoke: 'kira:git:clients:revoke',
-  gitClientsChanged: 'kira:git:clients',
-  gitPairingPending: 'kira:git:pairing:pending',
-  gitPairingApprove: 'kira:git:pairing:approve',
-  gitPairingDeny: 'kira:git:pairing:deny',
-  gitPairing: 'kira:git:pairing',
   mobileStatusGet: 'kira:mobile:status:get',
   mobileSetEnabled: 'kira:mobile:setEnabled',
   mobileSetPort: 'kira:mobile:setPort',
@@ -106,8 +99,6 @@ export const IPC = {
   gitCredentialPending: 'kira:git:credential:pending',
   gitCredentialProvide: 'kira:git:credential:provide',
   gitCredential: 'kira:git:credential',
-  gitVsixStatus: 'kira:git:vsix:status',
-  gitVsixInstall: 'kira:git:vsix:install',
 
   tabsList: 'kira:tabs:list',
   tabsSave: 'kira:tabs:save',
@@ -149,7 +140,7 @@ export const IPC = {
   claudeUsageGet: 'kira:claudeusage:get',
   claudeUsage: 'kira:claude:usage',
   // P145: the ade v2 board surface. `adeTaskBoard` names the bound call; its push counterpart is
-  // `adeTaskBoardChanged` (the same call/push split as `gitClientsList`/`gitClientsChanged`).
+  // `adeTaskBoardChanged`.
   adeTaskBoard: 'kira:adetask:board:call',
   adeTaskPrs: 'kira:adetask:prs',
   adeTaskRefresh: 'kira:adetask:refresh',
