@@ -1,6 +1,4 @@
-//go:build realclaude
-
-package realclaude
+package claude
 
 import (
 	"bufio"
@@ -70,7 +68,7 @@ func preflight(t *testing.T, a *realApp, parentSession string) {
 	preflightOnce.Do(func() {
 		out, errOut, err := a.run(t, t.TempDir(), "-p", "Reply: ok", "--model", "haiku", "--max-budget-usd", "0.02", "--output-format", "json")
 		if err != nil {
-			preflightSkip = fmt.Sprintf("claude -p does not run under a temp HOME (see docs/DEV_ENVIRONMENT.md \"Real `claude` tests (P237)\"): %v\n%s", err, tail(errOut+out, 600))
+			preflightSkip = fmt.Sprintf("claude -p does not run under a temp HOME (see docs/DEV_ENVIRONMENT.md \"Real `claude` tests\"): %v\n%s", err, tail(errOut+out, 600))
 			return
 		}
 		var res struct {

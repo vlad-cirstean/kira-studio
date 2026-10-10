@@ -1,24 +1,20 @@
-//go:build realclaude
-
-package importer
+package claude
 
 import (
 	"context"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/importer"
 )
 
-// Real Claude Code CLI, opt-in:
-//
-//	KIRA_REAL_CLAUDE=1 go test -tags realclaude ./internal/memory/importer/ -run Smoke -v
-//
 // The finalize agent's MCP server is this test binary re-executed as `memory-mcp` (see TestMain).
-func TestSmokeImport(t *testing.T) {
-	if os.Getenv("KIRA_REAL_CLAUDE") != "1" {
-		t.Skip("real claude tests: set KIRA_REAL_CLAUDE=1 (spends real tokens)")
+func TestMemoryImport(t *testing.T) {
+	if _, err := exec.LookPath("claude"); err != nil {
+		t.Skip("real claude tests: no claude on PATH")
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -28,11 +24,11 @@ func TestSmokeImport(t *testing.T) {
 	defer ms.Close()
 	svc := memory.NewService(ms, memory.NewCLIRunner(), memory.ServiceOptions{})
 	defer svc.Close()
-	agent := ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home(),
+	agent := importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home(),
 		Env: map[string]string{"KIRA_TEST_MEMORY_MCP": "1"}}
 	// A small budget forces billing.md's second section into its own chunk, so "It restarts..."
 	// reaches step 1 without the service name.
-	e, err := Open(ms, Options{Agent: agent, Budget: Budget{Target: 150, Max: 250, MinFill: 40, MinTail: 1, Context: 60}})
+	e, err := importer.Open(ms, importer.Options{Agent: agent, Budget: importer.Budget{Target: 150, Max: 250, MinFill: 40, MinTail: 1, Context: 60}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +39,7 @@ func TestSmokeImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitFor := func(want string) JobDetail {
+	waitFor := func(want string) importer.JobDetail {
 		t.Helper()
 		deadline := time.Now().Add(20 * time.Minute)
 		for time.Now().Before(deadline) {
@@ -54,25 +50,25 @@ func TestSmokeImport(t *testing.T) {
 			if d.Job.State == want {
 				return d
 			}
-			if d.Job.State == JobFailed || d.Job.State == JobPaused {
+			if d.Job.State == importer.JobFailed || d.Job.State == importer.JobPaused {
 				t.Fatalf("job %s: %s", d.Job.State, d.Job.Reason)
 			}
 			time.Sleep(500 * time.Millisecond)
 		}
 		t.Fatalf("job never reached %s", want)
-		return JobDetail{}
+		return importer.JobDetail{}
 	}
-	d := waitFor(JobAwaiting)
+	d := waitFor(importer.JobAwaiting)
 	t.Logf("estimate: %+v", d.Job.Estimate)
 	if err := e.Start(job.ID); err != nil {
 		t.Fatal(err)
 	}
-	d = waitFor(JobDone)
+	d = waitFor(importer.JobDone)
 	t.Logf("done in %s: calls=%d cost=$%.3f totals=%+v", time.Since(begin).Round(time.Second), d.Job.Calls, d.Job.CostUSD, d.Job.Totals)
 	for _, f := range d.Files {
 		t.Logf("file %s: %s chunks=%d facts=%d added=%d updated=%d noop=%d cost=$%.3f unresolved=%+v dropped=%+v reason=%q",
 			f.RelPath, f.State, f.ChunkCount, f.FactCount, f.Added, f.Updated, f.Noop, f.CostUSD, f.Unresolved, f.Dropped, f.Reason)
-		if f.State != FileDone {
+		if f.State != importer.FileDone {
 			t.Errorf("%s is %s", f.RelPath, f.State)
 		}
 	}

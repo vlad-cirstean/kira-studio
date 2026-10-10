@@ -1,6 +1,4 @@
-//go:build realclaude
-
-package realclaude
+package claude
 
 import (
 	"crypto/sha256"
