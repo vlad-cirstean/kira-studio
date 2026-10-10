@@ -3,12 +3,17 @@
 // this one provider.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
 import { automationsModuleKey } from '@workbench/automations/module';
+import ScheduleConfirmPrompt from '@workbench/automations/schedule/ScheduleConfirmPrompt.vue';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
+import PromptHost from '@workbench/prompts/PromptHost.vue';
+import { promptsControlKey } from '@workbench/prompts/promptsQueries';
+import UpdatePrompt from '@workbench/prompts/UpdatePrompt.vue';
 import { runCommand } from '@workbench/shortcuts/commands';
-import { onMounted, onUnmounted, provide } from 'vue';
+import { appUpdateStoreKey } from '@workbench/state/createAppUpdateStore';
+import { markRaw, onMounted, onUnmounted, provide } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
 import { useCollectionsStore } from './api/state/collections';
 import { openApiRequestTab } from './api/tabs';
@@ -40,8 +45,16 @@ provide(workbenchHostKey, createWorkbenchHost());
 // P128 §2.4: the automations module's own context, for AutomationsPanel.vue/AutomationsStart.vue/
 // AutomationsNewTab.vue/TerminalTabView.vue (all shared with Kira Space) to inject.
 provide(automationsModuleKey, createAutomationsModule());
+provide(promptsControlKey, control);
 
 const appUpdateStore = useAppUpdateStore();
+provide(appUpdateStoreKey, appUpdateStore);
+// P246: one dialog per routed popup kind; PromptHost shows the one the router targeted here.
+const promptKinds = {
+  schedule: markRaw(ScheduleConfirmPrompt),
+  dbmcp: markRaw(DbMcpApprovalDialog),
+  update: markRaw(UpdatePrompt),
+};
 const paletteStore = usePaletteStore();
 const modeStore = useModeStore();
 const datagripImportStore = useDatagripImportStore();
@@ -112,7 +125,7 @@ onUnmounted(() => {
     <ApiDialogs />
     <UploadObjectDialog v-if="objectStoreStore.open" />
     <GenerateDataDialog v-if="fakeDataStore.open" />
-    <DbMcpApprovalDialog />
+    <PromptHost :kinds="promptKinds" />
     <ConfirmDialog />
     <UpdateDialog v-if="appUpdateStore.dialogOpen" :store="appUpdateStore" />
     <ContextMenu />

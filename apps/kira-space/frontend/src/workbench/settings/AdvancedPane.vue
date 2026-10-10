@@ -4,7 +4,9 @@ import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import LogLevelField from '@workbench/settings/fields/LogLevelField.vue';
+import NotifyPromptsField from '@workbench/settings/fields/NotifyPromptsField.vue';
 import { computed, useId } from 'vue';
+import { control } from '../../bridge/control';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -53,5 +55,11 @@ function setSources(ignore: boolean): void {
       />
       <FieldDescription>Runs claude -p with --setting-sources user. Off: repo .claude settings also load; their deny rules still apply.</FieldDescription>
     </Field>
+    <NotifyPromptsField
+      :advanced="draft.advanced"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+      :send-test="control.promptsSendTest"
+    />
   </div>
 </template>

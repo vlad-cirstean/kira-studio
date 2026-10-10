@@ -3,12 +3,17 @@
 // this one provider.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
 import { automationsModuleKey } from '@workbench/automations/module';
+import ScheduleConfirmPrompt from '@workbench/automations/schedule/ScheduleConfirmPrompt.vue';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
 import { memoryModuleKey } from '@workbench/memory/module';
-import { onMounted, onUnmounted, provide } from 'vue';
+import PromptHost from '@workbench/prompts/PromptHost.vue';
+import { promptsControlKey } from '@workbench/prompts/promptsQueries';
+import UpdatePrompt from '@workbench/prompts/UpdatePrompt.vue';
+import { appUpdateStoreKey } from '@workbench/state/createAppUpdateStore';
+import { markRaw, onMounted, onUnmounted, provide } from 'vue';
 import AdeReviewWindow from './ade/v2/review/AdeReviewWindow.vue';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { control } from './bridge/control';
@@ -30,6 +35,7 @@ provide(workbenchHostKey, createWorkbenchHost());
 // AutomationsNewTab.vue/TerminalTabView.vue (all shared with Kira Studio) to inject.
 provide(automationsModuleKey, createAutomationsModule());
 provide(memoryModuleKey, createMemoryModule());
+provide(promptsControlKey, control);
 
 // P100 Part 2: Kira Studio's own App.vue, trimmed to this app's own always-mounted root dialogs —
 // ConfirmDialog (G1 D17's own precedent) and, moved here wholesale from Studio,
@@ -44,6 +50,14 @@ const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
 const tabsStore = useTabsStore();
 const appUpdateStore = useAppUpdateStore();
+provide(appUpdateStoreKey, appUpdateStore);
+// P246: one dialog per routed popup kind; PromptHost shows the one the router targeted here.
+const promptKinds = {
+  schedule: markRaw(ScheduleConfirmPrompt),
+  'git-credential': markRaw(GitCredentialDialog),
+  'mobile-pairing': markRaw(MobilePairingDialog),
+  update: markRaw(UpdatePrompt),
+};
 const reviewWindow = useAdeReviewWindowStore();
 
 let unsubscribe: Array<() => void> = [];
@@ -74,8 +88,7 @@ onUnmounted(() => {
       <TitleBar />
       <WorkbenchShell />
     </div>
-    <MobilePairingDialog />
-    <GitCredentialDialog />
+    <PromptHost :kinds="promptKinds" />
     <ConfirmDialog />
     <UpdateDialog v-if="appUpdateStore.dialogOpen" :store="appUpdateStore" />
     <ContextMenu />

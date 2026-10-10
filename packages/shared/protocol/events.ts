@@ -61,6 +61,10 @@ export const CHANNEL = {
   scriptRunsChanged: 'kira:scriptRuns:changed',
   // P242: log lines a smart run just stored, {runId, chunks} (Emit, app-wide).
   scriptRunLog: 'kira:scriptRunLog:appended',
+  // P246: the routed popup list changed (Emit, app-wide) — carries every open prompt with its target.
+  promptsChanged: 'kira:prompts:changed',
+  // P246: a notification click asks one window to show a prompt (EmitTo), {id}.
+  promptsReveal: 'kira:prompts:reveal',
   // P108 Part 12 F18: one connection's mask-rule set changed (Upsert/Remove/RegenerateKey) —
   // schemaChanged's own per-connection shape (Emit, not EmitTo), so a second window's Privacy tab,
   // grid header menu and grid preview all stay in sync rather than reading a stale rule list.

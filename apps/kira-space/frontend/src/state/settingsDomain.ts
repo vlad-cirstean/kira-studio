@@ -50,6 +50,8 @@ const gitSettingsSchema = /*#__PURE__*/ z.object({
 // reads the leaf's type through the shared `LogLevel` above instead.
 const advancedSettingsSchema = /*#__PURE__*/ z.object({
   gitLogLevel: logLevelSchema.default('info'),
+  // P246: system notification when a popup waits in a window that is not in front.
+  notifyPrompts: z.boolean().default(true),
 });
 
 // P120: inlineBlame/dateFormat are this app's own — the only app with a git module to show either
@@ -151,7 +153,7 @@ const mobileSettingsSchema = /*#__PURE__*/ z.object({
 // with no `advanced`/`git`/`ade`/`claudeCode` keys, and that row must still parse on next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appSpaceAppearanceSettingsSchema,
-  advanced: advancedSettingsSchema.default({ gitLogLevel: 'info' }),
+  advanced: advancedSettingsSchema.default({ gitLogLevel: 'info', notifyPrompts: true }),
   git: gitSettingsSchema.default({
     protectedBranches: ['main', 'master', 'release/*'],
     fetchAutoIntervalMinutes: 0,
@@ -208,6 +210,7 @@ export const defaultSettings: Settings = {
   },
   advanced: {
     gitLogLevel: 'info',
+    notifyPrompts: true,
   },
   git: {
     protectedBranches: ['main', 'master', 'release/*'],

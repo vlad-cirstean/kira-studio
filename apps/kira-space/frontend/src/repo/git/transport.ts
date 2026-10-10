@@ -39,14 +39,8 @@ import { createRpcClient, createStreamChannel } from '@kira/git-ipc';
 // biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
 // @ts-ignore
 import { Stream } from '/wails/runtime.js';
-import { useGitCredentialStore } from '../../state/gitCredential';
-import { pinia } from '../../state/pinia';
 import { forgetRepoOpen } from '../../state/repoOpenHold';
 import { clearPendingTargets, createHostHandlers, gitRepoIdFor } from './hostHandlers';
-
-// Reached via state/workspace.ts's static import (main.ts imports it at module scope), before
-// app.use(pinia) runs — needs the explicit instance (state/pinia.ts's own header comment).
-const gitCredentialStore = useGitCredentialStore(pinia);
 
 /** The two `EventKey`s this host answers itself rather than forwarding to `remote.on` — never
  *  emitted by Go (§8.1). */
@@ -158,25 +152,6 @@ function createNativeGitTransport(codeRepoId: string): Transport {
     remoteRequest: remote.request,
     codeRepoId,
     emitLocal: local.emit,
-  });
-
-  // P67e D9: on the SHARED client, not a per-mount lease — this prompt belongs to the repo
-  // workspace as a whole (a pull started in the Git module must stay answerable after switching
-  // tabs), not to whichever mount happened to trigger the remote op. remote.dispose() below
-  // (disposeGitTransport) releases this subscription along with everything else on the client.
-  remote.on('credential.request', (req) => {
-    gitCredentialStore.enqueueCredentialRequest({
-      codeRepoId,
-      prompt: req.prompt,
-      masked: req.masked,
-      answer: (secret: string | null) => {
-        void remote
-          .request('credential.provide', { requestId: req.requestId, secret })
-          .catch(() => {
-            /* the broker's own 120s bound already ended the wait — nothing to log or recover. */
-          });
-      },
-    });
   });
 
   const transport: Transport = {
@@ -353,7 +328,6 @@ export function onTransportEvicted(codeRepoId: string, fn: () => void): () => vo
 /** Everything tied to one shared client's life, whether it ended on purpose or not. */
 function evictSharedClient(codeRepoId: string, shared: SharedClient): void {
   sharedClientsByCodeRepoId.delete(codeRepoId);
-  gitCredentialStore.dropCredentialRequests(codeRepoId);
   // blameAnnotation.ts's `repoOpenMemo` records a `repo.open` hold scoped to this shared
   // client's own Conn — a reopened workspace gets a new Conn, so the memo must not outlive this
   // one (Group 3, P69 review).

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RoutedPrompt } from '@shared/domain/prompts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -6,12 +7,13 @@ import { usePendingDecision } from '@workbench/util/usePendingDecision';
 import { computed } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
 
+// P246: mounted by PromptHost for the routed `dbmcp` entry whose ref is the pending request.
+const props = defineProps<{ entry: RoutedPrompt; more: number }>();
 const dbMcpStore = useDbMcpStore();
 
-// M2 §5.4/§7.4: a separate, always-mounted dialog at App.vue's root, gating run_query in
-// prompt mode. An AI client is blocked while the human decides on the one pending approval the
+// M2 §5.4/§7.4: a dialog gating run_query in prompt mode. An AI client is blocked while the human decides on the one pending approval the
 // FIFO queue presents at a time, with a timeout — a dock or a notification queue would let more
-// than one sit unresolved. Renders nothing while dbMcpStore.approval.pending is null.
+// than one sit unresolved. Renders nothing unless the pending request is this entry's.
 //
 // P108 Part 12 F2 fixed this to key on requestId, not a `pending !== null` boolean — a queue
 // advance (A approved/denied while B is already queued) swaps pending from A straight to B with no
@@ -70,7 +72,7 @@ const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
 
 <template>
   <Dialog
-    v-if="dbMcpStore.approval.pending"
+    v-if="dbMcpStore.approval.pending?.requestId === props.entry.ref"
     :key="dbMcpStore.approval.pending.requestId"
     :open="true"
     @update:open="(v) => !v && onDeny(dbMcpStore.approval.pending!.requestId)"
@@ -133,8 +135,8 @@ const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
         </div>
 
         <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">Expires in {{ remainingSeconds }}s</p>
-        <p v-if="dbMcpStore.approval.queued > 1" :class="DETAIL_CLASS" data-testid="db-mcp-approval-queue-count">
-          1 of {{ dbMcpStore.approval.queued }} waiting
+        <p v-if="more > 0" :class="DETAIL_CLASS" data-testid="db-mcp-approval-queue-count">
+          {{ more }} more waiting
         </p>
       </div>
 

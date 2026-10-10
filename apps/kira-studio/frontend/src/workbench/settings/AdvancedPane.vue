@@ -4,7 +4,9 @@ import { Field, FieldDescription, FieldError } from '@theme/components/ui/field'
 import { Label } from '@theme/components/ui/label';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import LogLevelField from '@workbench/settings/fields/LogLevelField.vue';
+import NotifyPromptsField from '@workbench/settings/fields/NotifyPromptsField.vue';
 import { computed, useId } from 'vue';
+import { control } from '../../bridge/control';
 import {
   EXPENSIVE_QUERY_ROWS_RANGE,
   OP_LOG_RETENTION_DAYS_RANGE,
@@ -122,5 +124,11 @@ const expensiveQueryRowsId = useId();
     >
       <FieldDescription>Verbosity of Kira Studio's own diagnostic log.</FieldDescription>
     </LogLevelField>
+    <NotifyPromptsField
+      :advanced="draft.advanced"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+      :send-test="control.promptsSendTest"
+    />
   </div>
 </template>

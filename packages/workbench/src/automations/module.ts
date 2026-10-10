@@ -67,8 +67,6 @@ export interface ScriptRunsSeam {
     secrets: Record<string, string[]>,
   ): Promise<ScriptRunStarted>;
   confirmDecline(runId: string): Promise<void>;
-  /** Window key the confirm popup shows in; '' when none. */
-  mainWindow(): Promise<string>;
   /** Servers of the user's Claude config. */
   mcpServers(): Promise<ScriptMcpServer[]>;
   mcpTools(server: string): Promise<ScriptMcpTool[]>;

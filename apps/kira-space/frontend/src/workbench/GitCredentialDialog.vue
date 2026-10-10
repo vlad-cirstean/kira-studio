@@ -1,62 +1,42 @@
 <script setup lang="ts">
+import type { RoutedPrompt } from '@shared/domain/prompts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
-import { nextTick, ref, watch } from 'vue';
-import { useCodeReposStore } from '../state/coderepos';
-import { type PendingCredential, useGitCredentialStore } from '../state/gitCredential';
+import { computed, nextTick, onMounted, ref } from 'vue';
+import { useGitCredentialStore } from '../state/gitCredential';
 
-const gitCredentialStore = useGitCredentialStore();
-
-const codeReposStore = useCodeReposStore();
-
-// P67e (docs/v1.6/plans/P67e-git-relax-read-only.md D10) — the native counterpart to git's own
-// askpass prompt (fetch/pull/push against an HTTPS remote with no credential helper configured).
-// A separate, always-mounted dialog at App.vue's root, the same precedent GitPairingDialog.vue
-// sets: a pull started in the Git module must stay answerable after switching to Studio, so this
-// mounts once and self-gates on gitCredentialStore.active rather than living inside whichever
-// repo tab happened to trigger the remote op. Renders nothing while active is null.
-//
-// The typed value never outlives this dialog: it lives only in `value` below, cleared in the same
-// statement that settles (submit, cancel, Escape or the frame's own close), and is never logged,
-// persisted, or read by anything other than answerCredential's own synchronous call.
+// P67e D10 / P246: git's own askpass prompt, mounted by PromptHost for the routed
+// `git-credential` entry whose ref is a relay request id. Escape and the frame's close hide it in this
+// window (the op keeps waiting); Cancel answers null (the op fails). The typed value lives only in `value`, cleared
+// in the same statement that answers, and is never logged or persisted.
+const props = defineProps<{ entry: RoutedPrompt; more: number }>();
+const emit = defineEmits<{ hide: [] }>();
+const store = useGitCredentialStore();
+const prompt = computed(() => store.prompts.find((p) => p.requestId === props.entry.ref) ?? null);
 
 const value = ref('');
 const inputField = ref<InstanceType<typeof Input> | null>(null);
-// What the user is looking at. A pre-flush watch updates it only after a close event's duplicate
-// handler calls ran, so both settle the same prompt and the second one is ignored.
-const shown = ref<PendingCredential | null>(null);
 
-watch(
-  () => gitCredentialStore.active,
-  (active) => {
-    shown.value = active;
-    value.value = '';
-    if (active) {
-      // Input.vue's own root IS the <input> element, unlike TextField's wrapping <span> --
-      // $el already is the real input, no querySelector needed.
-      void nextTick(() => (inputField.value?.$el as HTMLInputElement | undefined)?.focus());
-    }
-  },
-  { immediate: true },
-);
+// Input.vue's own root IS the <input> element, so $el already is the real input.
+onMounted(() => void nextTick(() => (inputField.value?.$el as HTMLInputElement | undefined)?.focus()));
 
 function onSubmit(): void {
-  if (!shown.value) return;
+  if (!prompt.value) return;
   const secret = value.value;
   value.value = '';
-  gitCredentialStore.answerCredential(shown.value, secret);
+  void store.answer(prompt.value.requestId, secret);
 }
 
 function onCancel(): void {
   value.value = '';
-  if (shown.value) gitCredentialStore.answerCredential(shown.value, null);
+  if (prompt.value) void store.answer(prompt.value.requestId, null);
 }
 </script>
 
 <template>
-  <Dialog v-if="gitCredentialStore.active" :open="true" @update:open="(v) => !v && onCancel()">
+  <Dialog v-if="prompt" :open="true" @update:open="(v) => !v && emit('hide')">
     <DialogContent
       :show-close-button="false"
       data-testid="git-credential-dialog"
@@ -79,19 +59,16 @@ function onCancel(): void {
 
       <div class="flex flex-col gap-1 px-3 py-2 overflow-auto">
         <p class="m-0 text-subtle" data-testid="git-credential-repo">
-          {{
-            gitCredentialStore.active.label ??
-            codeReposStore.codeRepoRecord(gitCredentialStore.active.codeRepoId)?.name
-          }}
+          {{ prompt.source }} · {{ prompt.repoLabel }}
         </p>
         <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
         <p class="font-data whitespace-pre-wrap mb-0.5" data-testid="git-credential-prompt">
-          {{ gitCredentialStore.active.prompt }}
+          {{ prompt.prompt }}
         </p>
         <Input
           ref="inputField"
           v-model="value"
-          :type="gitCredentialStore.active.masked ? 'password' : 'text'"
+          :type="prompt.masked ? 'password' : 'text'"
           class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
           data-testid="git-credential-input"
           @keydown.enter="onSubmit"
@@ -99,6 +76,9 @@ function onCancel(): void {
       </div>
 
       <DialogFooter>
+        <span v-if="more > 0" class="mr-auto text-kira-sm text-muted-foreground" data-testid="git-credential-more">
+          {{ more }} more waiting
+        </span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="git-credential-cancel" @click="onCancel">
             Cancel

@@ -74,6 +74,8 @@ const advancedSettingsSchema = /*#__PURE__*/ z.object({
   // pre-existing default. logLevelSchema is the shared enum (P103 Part 4 §7.1/§7.3, P120) — Kira
   // Space validates the same leaf against it under its own settings key.
   logLevel: logLevelSchema.default('info'),
+  // P246: system notification when a popup waits in a window that is not in front.
+  notifyPrompts: z.boolean().default(true),
 });
 
 // P90 §2.1: the seven request-settings leaves that used to be internal/httpclient package
@@ -136,6 +138,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     opLogRetentionDays: 30,
     expensiveQueryRows: 100_000,
     logLevel: 'info',
+    notifyPrompts: true,
   }),
   api: apiSettingsSchema.default({
     httpVersion: '2',
@@ -178,6 +181,7 @@ export const defaultSettings: Settings = {
     opLogRetentionDays: 30,
     expensiveQueryRows: 100_000,
     logLevel: 'info',
+    notifyPrompts: true,
   },
   api: {
     httpVersion: '2',

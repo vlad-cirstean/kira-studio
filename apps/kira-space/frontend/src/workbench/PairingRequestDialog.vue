@@ -4,17 +4,17 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { usePendingDecision } from '@workbench/util/usePendingDecision';
 
-// Shared shell for an always-mounted pairing prompt: a request must be able to appear with
-// nothing else open. Renders nothing while `requestId` is absent. The countdown keys on the
+// Shared shell for a pairing prompt PromptHost mounts. Renders nothing while `requestId` is absent;
+// Escape and the frame's close hide it (`hide`), only Deny denies. The countdown keys on the
 // request id (usePendingDecision), so the queue advancing A to B re-arms Deny focus and the timer.
 const props = defineProps<{
   title: string;
   requestId?: string;
   expiresAtMs?: number;
-  queued: number;
+  more: number;
   testidPrefix: string;
 }>();
-const emit = defineEmits<{ deny: []; approve: [] }>();
+const emit = defineEmits<{ deny: []; approve: []; hide: [] }>();
 
 const { remainingSeconds } = usePendingDecision({
   pendingId: () => props.requestId,
@@ -23,7 +23,7 @@ const { remainingSeconds } = usePendingDecision({
 </script>
 
 <template>
-  <Dialog v-if="requestId" :open="true" @update:open="(v) => !v && emit('deny')">
+  <Dialog v-if="requestId" :open="true" @update:open="(v) => !v && emit('hide')">
     <DialogContent
       :show-close-button="false"
       :data-testid="`${testidPrefix}-dialog`"
@@ -43,8 +43,8 @@ const { remainingSeconds } = usePendingDecision({
         <p class="m-0 text-subtle px-3 pb-2" :data-testid="`${testidPrefix}-expires`">
           Expires in {{ remainingSeconds }}s
         </p>
-        <p v-if="queued > 1" class="m-0 text-subtle px-3 pb-2" :data-testid="`${testidPrefix}-queue-count`">
-          1 of {{ queued }} waiting
+        <p v-if="more > 0" class="m-0 text-subtle px-3 pb-2" :data-testid="`${testidPrefix}-queue-count`">
+          {{ more }} more waiting
         </p>
       </div>
 

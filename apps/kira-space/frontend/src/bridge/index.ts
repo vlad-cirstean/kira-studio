@@ -12,6 +12,7 @@ import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
 import * as MobileAccessService from '@bindings/mobileaccessservice.js';
 import * as OpsService from '@bindings/opsservice.js';
+import * as PromptsService from '@bindings/promptsservice.js';
 import * as ScriptRunsService from '@bindings/scriptrunsservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
@@ -152,7 +153,6 @@ const spaceControl = {
     ),
   scriptRunsConfirmDecline: (runId: string): Promise<void> =>
     unwrap(ScriptRunsService.ConfirmDecline({ id: runId })),
-  scriptRunsMainWindow: (): Promise<string> => unwrap(ScriptRunsService.MainWindow()),
   scriptRunsMcpServers: (): Promise<ScriptMcpServer[]> =>
     unwrap(ScriptRunsService.McpServers()).then((r) => trust<ScriptMcpServer[]>(r ?? [])),
   scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>
@@ -471,6 +471,7 @@ export const control = {
     windows: WindowsService,
     keepAwake: KeepAwakeService,
     update: UpdateService,
+    prompts: PromptsService,
   }),
   ...memoryControl,
   ...spaceControl,

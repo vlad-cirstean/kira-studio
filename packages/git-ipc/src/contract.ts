@@ -1948,18 +1948,6 @@ export type Contract = {
        *  fault. */
       result: { readonly cancelled: boolean };
     };
-    /** G7 D2/D4: answers exactly one `credential.request` by id. Only Kira Space's own window
-     *  sends it. `secret` is `null` for a dismissal, never
-     *  omitted — a value the wire carries, not an absence the server has to infer (the same
-     *  discipline G4 D5 set for this chapter). Answering twice, or presenting an id this connection
-     *  never received, is a no-op, never an error (D4's own anti-abuse rules). */
-    'credential.provide': {
-      params: {
-        readonly requestId: string;
-        readonly secret: string | null;
-      };
-      result: Record<string, never>;
-    };
     // ---- P11: search -----------------------------------------------------------------------
     /** §7.8's git-backed half. One request, one cancellable read — no cancel key, no second walk
      *  session (`docs/plans/P11.md`'s hard parts 3 and 6, and D51's contrast). Superseded by the
@@ -2135,21 +2123,6 @@ export type Contract = {
     /** G26 D6 step 4: one event per planned branch (never a stream within one) for whichever
      *  `stack.restack` is in flight. */
     'stack.progress': RestackProgress;
-    /** G7 D2/D4: one prompt from git's own askpass protocol, sent to the connection that owns the
-     *  in-flight remote op. Only the native stream receives it (`internal/bridge/gitstream.go`; its
-     *  window answers in `state/gitCredential.ts` + `workbench/GitCredentialDialog.vue`). A socket
-     *  client never sees one: its prompts open in Kira Space (P178). `requestId` is a server-minted,
-     *  unguessable id, answered exactly once with `credential.provide`. Nothing here is ever logged
-     *  or stored on either side — `prompt` can itself contain a username the user just typed
-     *  (probe P1's second prompt). */
-    'credential.request': {
-      readonly requestId: string;
-      readonly repoId: string;
-      /** git's own text, verbatim: "Password for 'https://alice@github.com': ". */
-      readonly prompt: string;
-      /** `false` only for git's own "Username for …" shape; everything unrecognised is masked. */
-      readonly masked: boolean;
-    };
     /** G10: host -> whichever webview the action targets — the graph panel for every mutating op
      *  (the review sidebar renders no operation UI), and, since G11 D17, the review sidebar for
      *  'toggleFileReviewed'. One palette command's action, routed to the affordance the toolbar or

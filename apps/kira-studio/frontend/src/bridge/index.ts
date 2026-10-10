@@ -11,6 +11,7 @@ import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as MaskRulesService from '@bindings/maskrulesservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
+import * as PromptsService from '@bindings/promptsservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
 import * as SchemaService from '@bindings/schemaservice.js';
 import * as ScriptRunsService from '@bindings/scriptrunsservice.js';
@@ -435,7 +436,6 @@ const studioControl = {
     ),
   scriptRunsConfirmDecline: (runId: string): Promise<void> =>
     unwrap(ScriptRunsService.ConfirmDecline({ id: runId })),
-  scriptRunsMainWindow: (): Promise<string> => unwrap(ScriptRunsService.MainWindow()),
   scriptRunsMcpServers: (): Promise<ScriptMcpServer[]> =>
     unwrap(ScriptRunsService.McpServers()).then((r) => trust<ScriptMcpServer[]>(r ?? [])),
   scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>
@@ -460,6 +460,7 @@ export const control = {
     windows: WindowsService,
     keepAwake: KeepAwakeService,
     update: UpdateService,
+    prompts: PromptsService,
   }),
   ...apiControl,
   ...studioControl,

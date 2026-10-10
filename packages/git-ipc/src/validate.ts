@@ -180,7 +180,9 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'pageSize' on 'graph.loadMore'/'graph.stream', 'baseCandidates' on 'review.resolveBase',
 // 'strategySetting' on 'remote.pullPreflight') are removed; the server reads the stored
 // 'kiraSpace.*' repo settings.
-export const CONTRACT_VERSION = 46;
+// P246: 46 -> 47, breaking. 'credential.request' and 'credential.provide' are removed: native git
+// stream credential prompts go through Kira Space's prompt router and credential relay instead.
+export const CONTRACT_VERSION = 47;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -270,7 +272,6 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'remote.pushPreflight': true,
   'remote.run': true,
   'remote.cancel': true,
-  'credential.provide': true,
   'stash.list': true,
   'stash.show': true,
   'preflight.stashPop': true,
@@ -306,7 +307,6 @@ const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,
   'review.target': true,
   'remote.progress': true,
-  'credential.request': true,
   'ui.action': true,
   'repoSettings.changed': true,
   'autoFetch.changed': true,

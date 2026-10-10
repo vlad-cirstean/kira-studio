@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { useLocalStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
-import { computed, ref, watch } from 'vue';
+import { computed, type InjectionKey, ref, watch } from 'vue';
 import type { AppUpdateStatus } from '../bridge/createCoreControl';
 import { queryClient } from './queryClient';
 
@@ -13,6 +13,9 @@ export interface AppUpdateControl {
   updateStatus(): Promise<AppUpdateStatus>;
   updateInstall(): Promise<void>;
   updateCancelInstall(): Promise<void>;
+  /** P246: asks the prompt router to show the update popup in one window. */
+  promptsRaiseUpdate(ref: string): Promise<void>;
+  promptsDismiss(id: string): Promise<void>;
 }
 
 // appMetrics.ts's own shape, pull instead of push: Go decides cadence (an hourly poll here is a
@@ -58,13 +61,14 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
     );
     const installing = computed(() => installMutation.isPending.value);
 
-    // Net: the dialog auto-opens once per new version, across all windows; **Later** silences that
-    // version until a newer one appears. Skipped while installing — the dialog stays open through
-    // its own installing state even if another window's poll lands in between.
+    // Net: the router shows the update popup once per new version, in one window; **Later**
+    // silences that version until a newer one appears. Skipped while installing — the dialog stays
+    // open through its own installing state even if another window's poll lands in between.
+    // `dialogOpen` is only the status-bar item's own local open.
     watch([available, latestVersion, dismissedVersion], ([isAvailable, latest, dismissed]) => {
       if (installing.value) return;
       if (isAvailable && latest !== dismissed) {
-        dialogOpen.value = true;
+        void control.promptsRaiseUpdate(latest).catch(() => undefined);
       } else if (dismissed === latest) {
         dialogOpen.value = false;
       }
@@ -83,6 +87,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
       if (installing.value) return;
       dismissedVersion.value = latestVersion.value;
       dialogOpen.value = false;
+      void control.promptsDismiss(`update:${latestVersion.value}`).catch(() => undefined);
     }
 
     async function install(): Promise<void> {
@@ -124,3 +129,6 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
 }
 
 export type AppUpdateStore = ReturnType<ReturnType<typeof createAppUpdateStore>>;
+
+/** App.vue provides its update store here for the routed update popup (prompts/UpdatePrompt.vue). */
+export const appUpdateStoreKey: InjectionKey<AppUpdateStore> = Symbol('appUpdateStore');

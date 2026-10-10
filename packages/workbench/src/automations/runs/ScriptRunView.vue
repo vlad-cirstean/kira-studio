@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { useMutation } from '@tanstack/vue-query';
 import { Button } from '@theme/components/ui/button';
+import { useClaimPrompt } from '@workbench/prompts/promptsQueries';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, onMounted, ref } from 'vue';
 import { useAutomationsModule } from '../module';
 import { useRerun } from '../runScript';
-import { useScheduleConfirmStore } from '../schedule/confirmDialog';
 import SmartBadge from '../smart/SmartBadge.vue';
 import RunElapsed from './RunElapsed.vue';
 import RunLog from './RunLog.vue';
@@ -27,7 +27,7 @@ const error = ref<string | null>(null);
 const { markSeen } = useSeenRuns();
 onMounted(() => markSeen(props.tab.state.runId));
 
-const confirmStore = useScheduleConfirmStore();
+const claim = useClaimPrompt();
 const isSmart = computed(() => run.value?.kind === 'smart');
 const live = computed(() => run.value?.state === 'running' || run.value?.state === 'waiting');
 const ended = computed(() => run.value !== null && !live.value);
@@ -79,7 +79,7 @@ async function rerun(): Promise<void> {
           size="kira-lg"
           class="ml-auto"
           data-testid="run-review"
-          @click="confirmStore.openRun(run)"
+          @click="claim.mutate(`schedule:${run.id}`)"
         >
           Review and run
         </Button>

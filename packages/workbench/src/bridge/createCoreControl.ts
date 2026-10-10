@@ -1,4 +1,5 @@
 import type { LayoutPatch } from '@shared/domain/layout';
+import type { RoutedPrompt } from '@shared/domain/prompts';
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
 import { on, trust, unwrap, windowKey } from './rpc';
@@ -90,6 +91,13 @@ export interface CoreBindings {
     Status(): Promise<unknown>;
     InstallUpdate(): Promise<void>;
     CancelInstall(): Promise<void>;
+  };
+  prompts: {
+    List(): Promise<unknown>;
+    Claim(a: { id: string; windowKey: string }): Promise<void>;
+    Raise(a: { kind: string; ref: string }): Promise<void>;
+    Dismiss(a: { id: string }): Promise<void>;
+    SendTest(): Promise<void>;
   };
 }
 
@@ -191,6 +199,15 @@ export interface CoreControl<S, L, T, P, M> {
   updateStatus: () => Promise<AppUpdateStatus>;
   updateInstall: () => Promise<void>;
   updateCancelInstall: () => Promise<void>;
+
+  // P246: the prompt router's calls and pushes — see prompts/PromptHost.vue.
+  promptsList: () => Promise<RoutedPrompt[]>;
+  promptsClaim: (id: string) => Promise<void>;
+  promptsRaiseUpdate: (ref: string) => Promise<void>;
+  promptsDismiss: (id: string) => Promise<void>;
+  promptsSendTest: () => Promise<void>;
+  onPromptsChanged: (cb: (prompts: RoutedPrompt[]) => void) => () => void;
+  onPromptsReveal: (cb: (event: { id: string }) => void) => () => void;
 }
 
 export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S, L, T, P, M> {
@@ -285,5 +302,17 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
       unwrap(b.update.Status()).then((r) => trust<AppUpdateStatus>(r)),
     updateInstall: (): Promise<void> => unwrap(b.update.InstallUpdate()),
     updateCancelInstall: (): Promise<void> => unwrap(b.update.CancelInstall()),
+
+    promptsList: (): Promise<RoutedPrompt[]> =>
+      unwrap(b.prompts.List()).then((r) => trust<RoutedPrompt[]>(r ?? [])),
+    promptsClaim: (id: string): Promise<void> => unwrap(b.prompts.Claim({ id, windowKey })),
+    promptsRaiseUpdate: (ref: string): Promise<void> =>
+      unwrap(b.prompts.Raise({ kind: 'update', ref })),
+    promptsDismiss: (id: string): Promise<void> => unwrap(b.prompts.Dismiss({ id })),
+    promptsSendTest: (): Promise<void> => unwrap(b.prompts.SendTest()),
+    onPromptsChanged: (cb: (prompts: RoutedPrompt[]) => void): (() => void) =>
+      on(CHANNEL.promptsChanged, (p) => cb(trust<RoutedPrompt[]>(p ?? []))),
+    onPromptsReveal: (cb: (event: { id: string }) => void): (() => void) =>
+      on(CHANNEL.promptsReveal, (e) => cb(trust<{ id: string }>(e))),
   };
 }
