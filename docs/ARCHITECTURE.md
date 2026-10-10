@@ -2850,7 +2850,7 @@ home: the process logs and exits 0. A `SIGKILL`ed instance's lock is released by
 stale-pid file or manual cleanup exists.
 
 **Version compatibility is one number.** `gitrpc.ContractVersion` and
-`packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are equal (**47** today, asserted equal by
+`packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are equal (**48** today, asserted equal by
 tests on both sides). `app.init` returns `{contractVersion, serverVersion, git, dateFormat}`;
 `dateFormat` is Space's app-wide `appearance.dateFormat`. Both sides ship in one binary, so a mismatch
 is a build bug, not a runtime state. 47 (P246) dropped `credential.request` and `credential.provide` from the stream (credentials go through the relay snapshot and `GitCredentialService.Provide`). 46 removed the extension-only surface: `worktree.prepare`,
@@ -3008,7 +3008,7 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**47**, P246), and the wire types |
+| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**48**, P257), and the wire types |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
 | `gitprepare` | The worktree prepare script's execution seam, called by ADE only — the one shell exception, below |
