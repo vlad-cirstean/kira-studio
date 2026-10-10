@@ -66,6 +66,8 @@ func TestPhoneWrites(t *testing.T) {
 	if first.Status != http.StatusOK {
 		t.Fatalf("backlog add = %d %s", first.Status, first.Body)
 	}
+	app.Contract(t, "mobile-board", "args:POST /api/ade/backlog/items", map[string]string{"text": "first"})
+	app.Contract(t, "mobile-board", "http:POST /api/ade/backlog/items", first.raw(t), flowharness.Mask("addedAt"))
 	replay := p.send(http.MethodPost, "/api/ade/backlog/items", map[string]string{"text": "first"}, key)
 	if replay.Status != http.StatusOK || replay.Header.Get("Idempotent-Replay") != "true" || !bytes.Equal(replay.Body, first.Body) {
 		t.Fatalf("replay = %d %q (replay header %q), want the first response again", replay.Status, replay.Body, replay.Header.Get("Idempotent-Replay"))

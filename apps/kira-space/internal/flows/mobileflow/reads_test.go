@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 )
 
 func normalize(t *testing.T, v any) any {
@@ -104,6 +105,7 @@ func TestPhoneReadsRealAde(t *testing.T) {
 	check("/api/ade/board", board)
 	backlog, _ := app.W.AdeTask.Backlog(ctx)
 	check("/api/ade/backlog", backlog)
+	app.Contract(t, "mobile-board", "http:GET /api/ade/backlog", p.get("/api/ade/backlog").raw(t), flowharness.Mask("addedAt"))
 	workflows, _ := app.W.AdeTask.Workflows(ctx)
 	check("/api/ade/workflows", workflows)
 	sessions, _ := app.W.AdeTask.Sessions(ctx)

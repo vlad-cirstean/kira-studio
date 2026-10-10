@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures';
 import { adeFixture, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -8,14 +9,15 @@ import { emitWailsEvent } from './support/mockRuntime';
 
 const t = (id: string) => `[data-testid="${id}"]`;
 
+const [backendHold] = contract<Record<string, unknown>[]>(
+  'mobile-terminal',
+  'event:kira:mobile:terminals#held',
+);
 const hold = {
+  ...backendHold,
   terminalId: 'term-tk01',
   sessionId: 'tk01',
-  deviceId: 'dev-1',
-  label: 'Pixel 7',
-  connected: true,
   since: 1_790_070_000_000,
-  returnsAt: 0,
 };
 
 const control = [
@@ -46,7 +48,7 @@ test('a phone-started launch opens its terminal here, then answers the server', 
     .toEqual({ terminalId: 'term-tk01', error: '' });
 });
 
-test('a hold shows the overlay and the strip badge; Reconnect reclaims the terminal', async ({
+test('contract: a hold shows the overlay and the strip badge; Reconnect reclaims the terminal', async ({
   relaunch,
 }) => {
   const { window: page, control: log } = await openPlan(relaunch, control);
@@ -55,7 +57,9 @@ test('a hold shows the overlay and the strip badge; Reconnect reclaims the termi
   await expect(page.locator(t('ade-tui-phone-overlay'))).toHaveCount(0);
 
   await emitWailsEvent(page, IPC.mobileTerminals, [hold]);
-  await expect(page.locator(t('ade-tui-phone-overlay'))).toContainText('Controlled from Pixel 7');
+  await expect(page.locator(t('ade-tui-phone-overlay'))).toContainText(
+    "Controlled from Ana's phone",
+  );
   await expect(page.locator(t('ade-session-phone'))).toBeVisible();
 
   await emitWailsEvent(page, IPC.mobileTerminals, [

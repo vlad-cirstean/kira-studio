@@ -1,0 +1,14 @@
+{
+  "event:kira:mobile:terminals#held": [
+    {
+      "connected": true,
+      "deviceId": "<id:1>",
+      "label": "Ana's phone",
+      "returnsAt": 0,
+      "sessionId": "<id:2>",
+      "since": 0,
+      "terminalId": "<id:3>"
+    }
+  ],
+  "event:kira:mobile:terminals#released": []
+}

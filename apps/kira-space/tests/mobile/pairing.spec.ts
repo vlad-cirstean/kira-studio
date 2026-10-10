@@ -1,3 +1,4 @@
+import { contract } from '../ui/support/contract';
 import { expect, test } from './fixtures';
 
 // Pairing from a fresh phone: request, the match code, and the four ways it can end.
@@ -28,7 +29,13 @@ test('requesting access shows a 4-digit code and the same code is sent to the co
   expect(sent).toEqual({ label: 'Vlad iPhone', code });
 });
 
-test('approval lands on the app and shows the three tabs', async ({ page, app, server }) => {
+test('contract: approval lands on the app and shows the three tabs', async ({
+  page,
+  app,
+  server,
+}) => {
+  server.state.replies.pair = contract('mobile-pairing', 'http:POST /api/pair#approved');
+  server.state.replies.me = contract('mobile-pairing', 'http:GET /api/me#paired');
   await app();
   await page.locator(t('pair-request')).click();
   await expect(page.locator(t('pair-waiting'))).toBeVisible();
@@ -69,11 +76,12 @@ test('a revoked device returns to the pairing screen', async ({ page, app, serve
   await expect(page.locator(t('pair-notice'))).toContainText('removed in Kira Space');
 });
 
-test('an expired device returns to the pairing screen with a notice', async ({
+test('contract: an expired device returns to the pairing screen with a notice', async ({
   page,
   app,
   server,
 }) => {
+  server.state.replies.expired = contract('mobile-pairing', 'http:GET /api/me#expired');
   server.state.auth = 'ok';
   await app();
   await expect(page.locator(t('app-shell'))).toBeVisible();

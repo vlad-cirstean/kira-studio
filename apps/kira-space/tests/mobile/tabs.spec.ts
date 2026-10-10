@@ -1,11 +1,14 @@
+import { contract } from '../ui/support/contract';
 import { expect, test } from './fixtures';
 
 // The three read-only tabs against the committed ADE fixtures.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 
-test.beforeEach(async ({ app, server }) => {
+test.beforeEach(async ({ app, server }, info) => {
   server.state.auth = 'ok';
+  if (info.title.startsWith('contract:'))
+    server.state.replies.backlog = contract('mobile-board', 'http:GET /api/ade/backlog');
   await app();
 });
 
@@ -30,6 +33,13 @@ test('Backlog lists items in priority order and expands notes', async ({ page })
   await expect(items.first()).toContainText('PAY-140');
   await items.first().locator('button').click();
   await expect(page.locator(t('backlog-notes'))).toHaveText('No notes.');
+});
+
+test('contract: Backlog lists what the backend returns', async ({ page }) => {
+  await page.locator(t('tab-backlog')).click();
+  const items = page.locator(t('backlog-item'));
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Write the docs');
 });
 
 test('Plan groups tasks by day and expands a task into its stages', async ({ page }) => {

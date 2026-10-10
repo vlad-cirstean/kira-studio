@@ -1,0 +1,31 @@
+{
+  "event:kira:mobile:pairing#request": {
+    "pending": {
+      "clientId": "127.0.0.1",
+      "code": "4821",
+      "expiresAtMs": 0,
+      "label": "Ana's phone",
+      "remoteIp": "127.0.0.1",
+      "requestId": "<id:1>",
+      "userAgent": "Go-http-client/1.1"
+    },
+    "queued": 1
+  },
+  "http:GET /api/me#expired": {
+    "code": "E_EXPIRED",
+    "message": "device access expired"
+  },
+  "http:GET /api/me#paired": {
+    "agentInputGlobal": false,
+    "deviceId": "<id:2>",
+    "label": "Ana's phone",
+    "permissions": {
+      "agentInput": false,
+      "write": true
+    }
+  },
+  "http:POST /api/pair#approved": {
+    "deviceId": "<id:2>",
+    "label": "Ana's phone"
+  }
+}

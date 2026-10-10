@@ -98,6 +98,13 @@ func (r reply) json(t *testing.T, out any) {
 	}
 }
 
+func (r reply) raw(t *testing.T) any {
+	t.Helper()
+	var v any
+	r.json(t, &v)
+	return v
+}
+
 func (r reply) code(t *testing.T) string {
 	t.Helper()
 	var e struct {

@@ -1,3 +1,4 @@
+import { contract } from '../ui/support/contract';
 import { expect, test } from './fixtures';
 
 // The phone's write paths against the scripted backend: what each tap sends, and how the app
@@ -15,14 +16,19 @@ test.describe('with write access', () => {
     await app();
   });
 
-  test('adding a backlog item sends it once with an idempotency key', async ({ page, server }) => {
+  test('contract: adding a backlog item sends it once with an idempotency key', async ({
+    page,
+    server,
+  }) => {
+    const args = contract<{ text: string }>('mobile-board', 'args:POST /api/ade/backlog/items');
+    server.state.replies.backlogItem = contract('mobile-board', 'http:POST /api/ade/backlog/items');
     await page.locator(t('tab-backlog')).click();
-    await page.locator(t('backlog-add')).fill('Write the release notes');
+    await page.locator(t('backlog-add')).fill(args.text);
     await page.locator(t('backlog-add-submit')).click();
     await expect(page.locator(t('backlog-add'))).toHaveValue('');
     const sent = posts(server, '/api/ade/backlog/items') as { body: string; key: string }[];
     expect(sent).toHaveLength(1);
-    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({ text: 'Write the release notes' });
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual(args);
     expect(sent[0]?.key).toMatch(/^[0-9a-f-]{36}$/);
   });
 

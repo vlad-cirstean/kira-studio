@@ -1,0 +1,25 @@
+{
+  "args:POST /api/ade/backlog/items": {
+    "text": "first"
+  },
+  "http:GET /api/ade/backlog": {
+    "items": [
+      {
+        "addedAt": 0,
+        "githubUrl": "",
+        "id": "<id:1>",
+        "jira": null,
+        "notes": "",
+        "text": "Write the docs"
+      }
+    ]
+  },
+  "http:POST /api/ade/backlog/items": {
+    "addedAt": 0,
+    "githubUrl": "",
+    "id": "<id:1>",
+    "jira": null,
+    "notes": "",
+    "text": "first"
+  }
+}

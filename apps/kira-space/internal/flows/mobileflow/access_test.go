@@ -169,11 +169,12 @@ func TestPhonePairing(t *testing.T) {
 	if pending.Code != "4821" || pending.RemoteIP != "127.0.0.1" || pending.ClientID == "" {
 		t.Fatalf("prompt = %+v", pending)
 	}
-	app.Events.WaitAfter(t, mark, bridge.ChannelMobilePairing, func(e flowharness.Event) bool {
+	ev := app.Events.WaitAfter(t, mark, bridge.ChannelMobilePairing, func(e flowharness.Event) bool {
 		var snap bridge.MobilePairingSnapshot
 		e.Decode(t, &snap)
 		return snap.Pending != nil && snap.Pending.RequestID == pending.RequestID
 	}, waitFor)
+	app.Contract(t, "mobile-pairing", "event:"+ev.Channel+"#request", ev.Data, flowharness.Mask("expiresAtMs"))
 	if res, err := app.W.Mobile.Approve(bridge.MobileIDArgs{ID: pending.RequestID}); err != nil || res.Result != "resolved" {
 		t.Fatalf("Approve = %+v, %v", res, err)
 	}
@@ -184,6 +185,7 @@ func TestPhonePairing(t *testing.T) {
 	if out.err != nil || out.reply.Status != http.StatusOK {
 		t.Fatalf("approved pairing = %+v", out)
 	}
+	app.Contract(t, "mobile-pairing", "http:POST /api/pair#approved", out.reply.raw(t))
 	var paired struct{ DeviceID, Label string }
 	out.reply.json(t, &struct {
 		DeviceID *string `json:"deviceId"`
@@ -205,6 +207,7 @@ func TestPhonePairing(t *testing.T) {
 		t.Fatalf("paired GET /api/me = %d %s", r.Status, r.Body)
 	}
 	r.json(t, &me)
+	app.Contract(t, "mobile-pairing", "http:GET /api/me#paired", r.raw(t))
 	if me.DeviceID != paired.DeviceID || me.Permissions.AgentInput || me.AgentInputGlobal {
 		t.Fatalf("me = %+v, want agent input off", me)
 	}
@@ -246,4 +249,22 @@ func TestPhonePairing(t *testing.T) {
 	if len(devices) != 1 || devices[0].RevokedAt == nil {
 		t.Fatalf("Devices after Revoke = %+v, want the row marked revoked", devices)
 	}
+}
+
+func TestPhoneExpiredDevice(t *testing.T) {
+	app := flowharness.New(t)
+	st := serve(t, app)
+	a := newPhone(t, st.AppURL)
+	a.pair(app, "Ana's phone")
+	if r := a.get("/api/me"); r.Status != http.StatusOK {
+		t.Fatalf("paired GET /api/me = %d", r.Status)
+	}
+	if _, err := app.DB().Exec(`UPDATE mobile_devices SET expires_at = ?`, time.Now().Add(-time.Hour).UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
+	r := a.get("/api/me")
+	if r.Status != http.StatusUnauthorized || r.code(t) != "E_EXPIRED" {
+		t.Fatalf("expired GET /api/me = %d %s", r.Status, r.Body)
+	}
+	app.Contract(t, "mobile-pairing", "http:GET /api/me#expired", r.raw(t))
 }

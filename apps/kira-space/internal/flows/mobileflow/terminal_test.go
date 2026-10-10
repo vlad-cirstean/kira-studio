@@ -106,11 +106,12 @@ func TestPhoneTerminalAttach(t *testing.T) {
 		holds[0].DeviceID != deviceID || !holds[0].Connected || holds[0].Label != "Ana's phone" {
 		t.Fatalf("TerminalHolds = %+v, want the phone's hold on the session", holds)
 	}
-	app.Events.WaitAfter(t, mark, bridge.ChannelMobileTerminals, func(e flowharness.Event) bool {
+	held := app.Events.WaitAfter(t, mark, bridge.ChannelMobileTerminals, func(e flowharness.Event) bool {
 		var got []mobileterm.Hold
 		e.Decode(t, &got)
 		return len(got) == 1
 	}, waitFor)
+	app.Contract(t, "mobile-terminal", "event:"+held.Channel+"#held", held.Data, flowharness.Mask("since", "returnsAt"))
 
 	// Typed bytes reach the agent's terminal.
 	if err := term.ws.Write(ctx, websocket.MessageBinary, []byte("typed on the phone\n")); err != nil {
@@ -137,11 +138,12 @@ func TestPhoneTerminalAttach(t *testing.T) {
 	if holds := app.W.Mobile.TerminalHolds(); len(holds) != 0 {
 		t.Fatalf("holds after reclaim = %+v", holds)
 	}
-	app.Events.WaitAfter(t, mark, bridge.ChannelMobileTerminals, func(e flowharness.Event) bool {
+	released := app.Events.WaitAfter(t, mark, bridge.ChannelMobileTerminals, func(e flowharness.Event) bool {
 		var got []mobileterm.Hold
 		e.Decode(t, &got)
 		return len(got) == 0
 	}, waitFor)
+	app.Contract(t, "mobile-terminal", "event:"+released.Channel+"#released", released.Data)
 
 	// Turning agent input off ends a fresh attach.
 	again := p.attach(t, launch.SessionID)

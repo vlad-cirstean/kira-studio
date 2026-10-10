@@ -35,6 +35,14 @@ interface State {
   failNext: Map<string, { status: number; code: string; message: string }>;
   /** What `/api/agent/sessions` lists: the live Claude Code tabs. */
   agentSessions: { terminalId: string; cwd: string }[];
+  /** Backend-shaped bodies a spec reads from a contract fixture; unset keeps the canned answer. */
+  replies: {
+    me?: unknown;
+    pair?: unknown;
+    expired?: unknown;
+    backlog?: unknown;
+    backlogItem?: unknown;
+  };
   pairWaiters: ServerResponse[];
   streams: Set<ServerResponse>;
 }
@@ -111,6 +119,7 @@ export async function startMobileServer(): Promise<MobileServer> {
     requests: [],
     failNext: new Map(),
     agentSessions: [],
+    replies: {},
     pairWaiters: [],
     streams: new Set(),
   });
@@ -123,7 +132,6 @@ export async function startMobileServer(): Promise<MobileServer> {
     '/api/ade/prs': fixture('prs'),
     '/api/ade/sessions': fixture('sessions'),
     '/api/ade/workflows': fixture('workflows'),
-    '/api/ade/backlog': fixture('backlog'),
     '/api/ade/repos': { repos },
     '/api/ade/log': fixture('log-page'),
   };
@@ -131,7 +139,7 @@ export async function startMobileServer(): Promise<MobileServer> {
   const unauthorized = (res: ServerResponse): void => {
     const failure = {
       revoked: { code: 'E_REVOKED', message: 'device revoked' },
-      expired: { code: 'E_EXPIRED', message: 'device access expired' },
+      expired: state.replies.expired ?? { code: 'E_EXPIRED', message: 'device access expired' },
     }[state.auth as 'revoked' | 'expired'] ?? { code: 'E_UNAUTHORIZED', message: 'not paired' };
     json(res, 401, failure);
   };
@@ -159,12 +167,16 @@ export async function startMobileServer(): Promise<MobileServer> {
       return;
     }
     if (path === '/api/me') {
-      json(res, 200, {
-        deviceId: 'dev-1',
-        label: 'Test phone',
-        permissions: state.permissions,
-        agentInputGlobal: state.agentInputGlobal,
-      });
+      json(
+        res,
+        200,
+        state.replies.me ?? {
+          deviceId: 'dev-1',
+          label: 'Test phone',
+          permissions: state.permissions,
+          agentInputGlobal: state.agentInputGlobal,
+        },
+      );
     } else if (path === '/api/events') {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -180,10 +192,18 @@ export async function startMobileServer(): Promise<MobileServer> {
         state.failNext.delete(path);
         json(res, fail.status, { code: fail.code, message: fail.message });
       } else {
-        json(res, 200, writeReply(path, body));
+        json(
+          res,
+          200,
+          path === '/api/ade/backlog/items' && state.replies.backlogItem
+            ? state.replies.backlogItem
+            : writeReply(path, body),
+        );
       }
     } else if (path === '/api/agent/sessions' && method === 'GET') {
       json(res, 200, { sessions: state.agentSessions });
+    } else if (path === '/api/ade/backlog' && method === 'GET') {
+      json(res, 200, state.replies.backlog ?? fixture('backlog'));
     } else if (path in reads && method === 'GET') {
       json(res, 200, reads[path]);
     } else {
@@ -214,7 +234,7 @@ export async function startMobileServer(): Promise<MobileServer> {
       for (const res of state.pairWaiters) {
         if (outcome === 'approve') {
           state.auth = 'ok';
-          json(res, 200, { deviceId: 'dev-1', label: 'Test phone' });
+          json(res, 200, state.replies.pair ?? { deviceId: 'dev-1', label: 'Test phone' });
         } else {
           json(res, 403, {
             code: 'E_PAIRING_DENIED',

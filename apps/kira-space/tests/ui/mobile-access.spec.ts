@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import { emitPrompts, routed } from './support/prompts';
@@ -260,17 +261,13 @@ test('a pushed device list replaces the rendered one', async ({ relaunch }) => {
   await expect(window.locator('[data-testid="mobile-device-row-dev-1"]')).toBeVisible();
 });
 
-const request = {
-  requestId: 'req-1',
-  clientId: 'c1',
-  label: 'Pixel 7',
-  code: '4821',
-  remoteIp: '192.168.1.40',
-  userAgent: 'Mozilla/5.0',
-  expiresAtMs: Date.now() + 120_000,
-};
+const { pending: request } = contract<{ pending: Record<string, unknown> & { requestId: string } }>(
+  'mobile-pairing',
+  'event:kira:mobile:pairing#request',
+);
+request.expiresAtMs = Date.now() + 120_000;
 
-test('the pairing prompt shows the code and origin; approve and deny call the bound methods', async ({
+test('contract: the pairing prompt shows the code and origin; approve and deny call the bound methods', async ({
   relaunch,
 }) => {
   const { window, control } = await relaunch({
@@ -283,17 +280,15 @@ test('the pairing prompt shows the code and origin; approve and deny call the bo
   await expect(dialog).toHaveCount(0);
 
   await emitWailsEvent(window, IPC.mobilePairing, { pending: request, queued: 1 });
-  await emitPrompts(window, [routed('mobile-pairing', 'req-1')]);
+  await emitPrompts(window, [routed('mobile-pairing', request.requestId)]);
   await expect(dialog).toBeVisible();
   await expect(window.locator('[data-testid="mobile-pairing-code"]')).toHaveText('4821');
-  await expect(window.locator('[data-testid="mobile-pairing-origin"]')).toContainText(
-    '192.168.1.40',
-  );
+  await expect(window.locator('[data-testid="mobile-pairing-origin"]')).toContainText('127.0.0.1');
 
   await window.locator('[data-testid="mobile-pairing-approve"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.mobilePairingApprove)?.args)
-    .toEqual({ id: 'req-1' });
+    .toEqual({ id: request.requestId });
 
   await emitWailsEvent(window, IPC.mobilePairing, {
     pending: { ...request, requestId: 'req-2' },
