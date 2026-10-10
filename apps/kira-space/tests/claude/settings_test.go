@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -108,6 +110,29 @@ func TestRealClaudeSettingsUntouched(t *testing.T) {
 		_ = f.W.Terminal.Close(terminal.CloseArgs{TerminalID: launch.TerminalID})
 		time.Sleep(time.Second)
 		check(t, "ade tui stage")
+	})
+
+	t.Run("smart script run", func(t *testing.T) {
+		if run := smartRun(t, f.realApp, "Reply with the word ok.", []string{"Read"}); run.State != "done" {
+			t.Fatalf("run = %s, want done", run.State)
+		}
+		check(t, "smart script run")
+	})
+
+	t.Run("ade smart step", func(t *testing.T) {
+		if _, err := f.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
+			Name: "settings-lint", Kind: scripts.KindSmart, Color: "blue", UseAdeDir: true,
+			Command: "Call finish_step with status done and summary ok.",
+			Smart:   &scripts.Smart{Model: "haiku", MaxBudgetUSD: 0.05, Timeout: "3m", Tools: []string{"Read"}},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		f.saveWorkflow(t, "smartflow", "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n"+
+			"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 2m\n        smart_script: settings-lint\n")
+		if r := f.startRun(t, f.createTask(t, "smartflow"), "feat/settings-smart"); r.State != "done" {
+			t.Fatalf("smart step run = %s, want done", r.State)
+		}
+		check(t, "ade smart step")
 	})
 
 	f.Restart()
