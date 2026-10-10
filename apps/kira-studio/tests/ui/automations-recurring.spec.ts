@@ -347,7 +347,7 @@ test('contract: a waiting run asks, Run starts it headless and it ends Succeeded
       { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
       { channel: IPC.scriptRunsResolveDir, response: preview.dir },
       { channel: IPC.scriptRunsNextFires, response: FIRES },
-      { channel: IPC.scriptRunsMainWindow, response: 'main' },
+      { channel: IPC.promptsMainWindow, response: 'main' },
       { channel: IPC.scriptRunsSchedulePreview, response: preview },
       {
         channel: IPC.scriptRunsConfirmAccept,
@@ -362,6 +362,7 @@ test('contract: a waiting run asks, Run starts it headless and it ends Succeeded
     ...CONTRACT_TIMES,
     startedAt: null,
   });
+  await emitPrompts(page, [routed('schedule', waiting.id)]);
   const popup = page.locator('[data-testid="schedule-confirm"]');
   await expect(popup).toContainText(`Run ${script.name}?`);
   await expect(popup.locator('[data-testid="run-command"]')).toContainText(preview.command);
@@ -401,7 +402,7 @@ test('contract: Run now starts the schedule run at once', async ({ relaunch }) =
       { channel: IPC.customScriptsList, response: { collections: [], scripts: [script] } },
       { channel: IPC.scriptRunsResolveDir, response: preview.dir },
       { channel: IPC.scriptRunsNextFires, response: FIRES },
-      { channel: IPC.scriptRunsMainWindow, response: 'main' },
+      { channel: IPC.promptsMainWindow, response: 'main' },
       { channel: IPC.scriptRunsSchedulePreview, response: preview },
       {
         channel: IPC.scriptRunsRunScheduleNow,
