@@ -20,6 +20,8 @@ type launch struct {
 	env      []string
 	params   []RunParam
 	created  time.Time
+	trigger  Trigger
+	ade      *RunADE
 }
 
 func (s *Service) startTerminal(p *planned) (Started, error) {
@@ -47,6 +49,7 @@ func (s *Service) startTerminal(p *planned) (Started, error) {
 	}
 	s.launches[token] = launch{
 		scriptID: p.script.ID, dir: p.dir, command: p.script.Command, env: p.envList, params: p.params, created: now,
+		trigger: runTrigger(p), ade: p.preview.ADE,
 	}
 	return Started{Terminal: &TerminalStart{Token: token, Cwd: p.dir.Path}}, nil
 }
@@ -61,4 +64,12 @@ func (s *Service) takeLaunch(token, scriptID string) (launch, bool) {
 		return launch{}, false
 	}
 	return l, true
+}
+
+// runTrigger is ade for a run started for a task, else manual.
+func runTrigger(p *planned) Trigger {
+	if p.preview.ADE != nil {
+		return TriggerADE
+	}
+	return TriggerManual
 }

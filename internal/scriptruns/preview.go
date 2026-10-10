@@ -1,6 +1,7 @@
 package scriptruns
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -23,6 +24,9 @@ type RunArgs struct {
 	Params   map[string][]string `json:"params"`
 	// Prompt is a one-off prompt body for this run, never saved; nil uses the saved body.
 	Prompt *string `json:"prompt"`
+	// TaskID and BranchID run the script for an ADE task and branch (Kira Space); "" for none.
+	TaskID   string `json:"taskId"`
+	BranchID string `json:"branchId"`
 }
 
 // EnvVar is one variable the run gets. A secret's Value is empty here. FromVar names the param the
@@ -57,6 +61,9 @@ type Preview struct {
 	Allowed      []string `json:"allowedTools"`
 	MCP          []string `json:"mcpServers"`
 	Hash         string   `json:"hash"`
+	// Needs lists what to pick before the run can resolve; ADE is the task and branch it resolved, nil without a task.
+	Needs Needs   `json:"needs"`
+	ADE   *RunADE `json:"ade"`
 }
 
 // StartArgs is RunArgs plus the hash of the preview the user confirmed.
@@ -87,6 +94,8 @@ type planned struct {
 	smart   scripts.Smart
 	mcp     []string
 	preview Preview
+	// release drops the board's worktree claim a smart run holds; nil when none.
+	release func()
 }
 
 func (s *Service) getenv(k string) string {
@@ -97,7 +106,9 @@ func (s *Service) getenv(k string) string {
 }
 
 // plan resolves a run the one way Preview shows it and Start executes it.
-func (s *Service) plan(args RunArgs) (*planned, error) {
+//
+// claimed says the caller already holds the worktree claim, so the busy check skips it.
+func (s *Service) plan(args RunArgs, claimed bool) (*planned, error) {
 	rec, err := s.Scripts.Get(args.ScriptID)
 	if err != nil {
 		return nil, ipcerr.InternalErr(err)
@@ -110,7 +121,10 @@ func (s *Service) plan(args RunArgs) (*planned, error) {
 		return nil, ipcerr.New("E_INVALID", err.Error())
 	}
 	p := &planned{script: *rec, dir: scripts.ResolveDir(*rec, s.Home)}
-	pv := Preview{Kind: rec.Kind, Missing: nonNilStrings(missing), Dir: p.dir, Env: []EnvVar{}, MCP: []string{}, Tools: []string{}, Allowed: []string{}, Prompt: []scripts.Part{}}
+	pv := Preview{
+		Kind: rec.Kind, Missing: nonNilStrings(missing), Dir: p.dir, Env: []EnvVar{}, MCP: []string{}, Tools: []string{},
+		Allowed: []string{}, Prompt: []scripts.Part{}, Needs: Needs{Tasks: []TaskChoice{}, Branches: []BranchChoice{}},
+	}
 	pv.Blocker = p.dir.Blocker
 	rendered := map[string]string{}
 	for _, v := range vals {
@@ -126,6 +140,9 @@ func (s *Service) plan(args RunArgs) (*planned, error) {
 	}
 	if rec.Kind != scripts.KindSmart {
 		pv.Command = rec.Command
+		if err := s.planADE(args, p, &pv, rec.Command, rendered, claimed); err != nil {
+			return nil, err
+		}
 		p.preview = finishPreview(pv, p)
 		return p, nil
 	}
@@ -140,11 +157,19 @@ func (s *Service) plan(args RunArgs) (*planned, error) {
 			pv.Blocker = blocker
 		}
 	}
+	if err := s.planADE(args, p, &pv, body, rendered, claimed); err != nil {
+		return nil, err
+	}
 	pv.Prompt = scripts.Compose(body, rendered)
 	pv.Suffix = claudeheadless.ScriptReportSuffix
+	extra := []string{claudeheadless.FinishStepTool}
+	if args.TaskID != "" {
+		pv.Suffix = claudeheadless.SpaceSuffix + "\n\n" + pv.Suffix
+		extra = append(append(extra, claudeheadless.RunOutcomeTool), claudeheadless.SpaceToolNames...)
+	}
 	p.sent = scripts.PlainText(pv.Prompt) + "\n\n" + pv.Suffix
 	pv.Model, pv.MaxBudgetUSD, pv.Timeout = smart.Model, smart.MaxBudgetUSD, smart.Timeout
-	pv.Tools, pv.Allowed = scripts.ToolArgs(smart, []string{claudeheadless.FinishStepTool})
+	pv.Tools, pv.Allowed = scripts.ToolArgs(smart, extra)
 	for _, c := range smart.MCP {
 		pv.MCP = append(pv.MCP, c.Server)
 	}
@@ -234,19 +259,23 @@ func hashOf(pv Preview, p *planned) string {
 	for _, e := range pv.Env {
 		fixed = append(fixed, envKV{e.Name, e.Value})
 	}
+	adeKey := ""
+	if pv.ADE != nil {
+		adeKey = pv.ADE.TaskID + "/" + pv.ADE.BranchID
+	}
 	b, _ := json.Marshal(struct {
-		Kind, Cwd, Sent, Model, Timeout, Command string
-		Budget                                   float64
-		Tools, Allowed, MCP                      []string
-		Env                                      []envKV
-	}{pv.Kind, pv.Dir.Path, p.sent, pv.Model, pv.Timeout, pv.Command, pv.MaxBudgetUSD, pv.Tools, pv.Allowed, pv.MCP, fixed})
+		Kind, Cwd, Mode, Ade, Sent, Model, Timeout, Command string
+		Budget                                              float64
+		Tools, Allowed, MCP                                 []string
+		Env                                                 []envKV
+	}{pv.Kind, pv.Dir.Path, pv.Dir.Mode, adeKey, p.sent, pv.Model, pv.Timeout, pv.Command, pv.MaxBudgetUSD, pv.Tools, pv.Allowed, pv.MCP, fixed})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
 
 // Preview resolves a run without starting anything.
 func (s *Service) Preview(args RunArgs) (Preview, error) {
-	p, err := s.plan(args)
+	p, err := s.plan(args, false)
 	if err != nil {
 		return Preview{}, err
 	}
@@ -255,11 +284,46 @@ func (s *Service) Preview(args RunArgs) (Preview, error) {
 
 // Start runs what Preview showed. A script that changed since the preview is refused.
 func (s *Service) Start(args StartArgs) (Started, error) {
-	p, err := s.plan(args.RunArgs)
+	p, err := s.plan(args.RunArgs, false)
 	if err != nil {
 		return Started{}, err
 	}
-	if p.preview.Hash != args.Hash {
+	if p.dir.Mode == scripts.DirModeWorktree && p.preview.Blocker == "" && len(p.preview.Missing) == 0 &&
+		(p.script.Kind == scripts.KindSmart || p.dir.Pending) {
+		if p, err = s.claimWorktree(args.RunArgs, p); err != nil {
+			return Started{}, err
+		}
+	}
+	started, err := s.startPlanned(p, args.Hash)
+	if err != nil && p.release != nil {
+		p.release()
+	}
+	return started, err
+}
+
+// claimWorktree creates the branch's missing worktree and, for a smart run, keeps the board's claim
+// on it. A normal script only needs the worktree to exist, so its claim is dropped at once. The run
+// is planned again against the created worktree.
+func (s *Service) claimWorktree(args RunArgs, p *planned) (*planned, error) {
+	release, err := s.ADE.ClaimWorktree(context.Background(), args.BranchID, p.script.Name)
+	if err != nil {
+		return nil, ipcerr.New("E_INVALID", err.Error())
+	}
+	if p.script.Kind != scripts.KindSmart {
+		release()
+		return s.plan(args, false)
+	}
+	np, err := s.plan(args, true)
+	if err != nil {
+		release()
+		return nil, err
+	}
+	np.release = release
+	return np, nil
+}
+
+func (s *Service) startPlanned(p *planned, hash string) (Started, error) {
+	if p.preview.Hash != hash {
 		return Started{}, ipcerr.New("E_CONFLICT", "the script changed since the preview: check it again")
 	}
 	if p.preview.Blocker != "" {

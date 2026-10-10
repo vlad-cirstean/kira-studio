@@ -21,6 +21,8 @@ type Service struct {
 	Runs     *Repo
 	Scripts  *scripts.Repo
 	Registry *terminal.Registry
+	// ADE is Kira Space's task board; nil in Studio.
+	ADE ADE
 	// Home is the app data folder; App is "Studio" or "Space", for reasons that name the app.
 	Home string
 	App  string
@@ -73,18 +75,22 @@ func (s *Service) Begin(scriptID, terminalID, token string) (terminal.ScriptLaun
 	dir, command, trigger := scripts.ResolveDir(*rec, s.Home), rec.Command, TriggerTerminal
 	var env []string
 	var params []RunParam
+	var ade *RunADE
 	if token != "" {
 		l, ok := s.takeLaunch(token, scriptID)
 		if !ok {
 			return terminal.ScriptLaunch{}, ipcerr.New("E_INVALID", "this run expired: start it again")
 		}
-		dir, command, env, params, trigger = l.dir, l.command, l.env, l.params, TriggerManual
+		dir, command, env, params, trigger, ade = l.dir, l.command, l.env, l.params, l.trigger, l.ade
 	}
 	now := s.now()
 	run := Run{
 		ID: uuid.NewString(), ScriptID: rec.ID, ScriptName: rec.Name, Color: rec.Color, Kind: KindScript,
 		Trigger: trigger, State: StateRunning, TerminalID: terminalID, Cwd: dir.Path, Command: command,
 		CreatedAt: now, StartedAt: &now, Params: params,
+	}
+	if ade != nil {
+		run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel = ade.TaskID, ade.TaskTitle, ade.BranchID, ade.BranchLabel
 	}
 	if err := scripts.PrepareDir(dir); err != nil {
 		o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndStartErr, Err: err})

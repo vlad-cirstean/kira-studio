@@ -47,10 +47,11 @@ func (r *smartRun) endedBy() int {
 // mcpServer returns the loopback report server, started on first use.
 func (s *Service) mcpServer() *claudeheadless.Server {
 	if s.server == nil {
-		s.server = claudeheadless.NewServer(claudeheadless.Options{
-			Dir:      filepath.Join(s.Home, "automations-mcp"),
-			OnFinish: s.recordFinish,
-		})
+		opts := claudeheadless.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish}
+		if s.ADE != nil {
+			opts.Space, opts.Outcomes = s.ADE.Tools()
+		}
+		s.server = claudeheadless.NewServer(opts)
 	}
 	return s.server
 }
@@ -106,9 +107,12 @@ func (s *Service) startSmart(p *planned) (Started, error) {
 	pv := p.preview
 	run := Run{
 		ID: runID, ScriptID: p.script.ID, ScriptName: p.script.Name, Color: p.script.Color, Kind: KindSmart,
-		Trigger: TriggerManual, State: StateRunning, Cwd: p.dir.Path, CreatedAt: now, StartedAt: &now,
+		Trigger: runTrigger(p), State: StateRunning, Cwd: p.dir.Path, CreatedAt: now, StartedAt: &now,
 		Model: pv.Model, SessionID: sessionID, Prompt: p.sent, Params: p.params,
 		Tools: RunTools{Tools: pv.Tools, AllowedTools: pv.Allowed, McpServers: pv.MCP},
+	}
+	if a := pv.ADE; a != nil {
+		run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel = a.TaskID, a.TaskTitle, a.BranchID, a.BranchLabel
 	}
 	if err := scripts.PrepareDir(p.dir); err != nil {
 		abandon()
@@ -120,7 +124,7 @@ func (s *Service) startSmart(p *planned) (Started, error) {
 	s.mu.Lock()
 	srv := s.mcpServer()
 	s.mu.Unlock()
-	cfg, releaseGrant, err := srv.Register(claudeheadless.Grant{RunID: runID})
+	cfg, releaseGrant, err := srv.Register(claudeheadless.Grant{RunID: runID, TaskID: run.TaskID, Space: run.TaskID != ""})
 	if err != nil {
 		abandon()
 		return Started{}, ipcerr.InternalErr(err)
@@ -174,6 +178,9 @@ func (s *Service) startSmart(p *planned) (Started, error) {
 		})
 		cancel()
 		done, ferr := s.Runs.FinishByRun(runID, out, s.now())
+		if p.release != nil {
+			p.release()
+		}
 		s.mu.Lock()
 		delete(s.smart, runID)
 		delete(s.finishes, runID)
