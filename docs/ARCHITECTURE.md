@@ -3555,8 +3555,9 @@ tests and click delegation, not styled. A codicon span sized by a utility needs 
 `packages/theme/src`. Monaco's own `--vscode-*` stay scoped to its editor nodes.
 
 **Two font-size settings.** Chrome (dialogs, toolbar, review chrome) reads `text-kira-*`, so it tracks
-Appearance font size. Data surfaces (grid cells, detail meta, file tree, review and search rows,
-picker lists) read `text-graph-*`, which follow `git.graphFontSize` (`--kira-graph-font-size`, set
+Appearance font size. Picker popovers (branch, base, search results) are chrome too: row and secondary
+text read `text-kira-*` (P256). Data surfaces (grid cells, detail meta, file tree, review rows)
+read `text-graph-*`, which follow `git.graphFontSize` (`--kira-graph-font-size`, set
 by `applyAppearance` only when above 0) and fall back to Appearance font size. A deliberate split:
 the grid is a data view, outside P123's four-value chrome scale.
 
@@ -3565,6 +3566,10 @@ the grid is a data view, outside P123's four-value chrome scale.
 density: `--kira-graph-row-h-compact` is the larger of `--kira-row-height` and
 `--kira-graph-h-xs + 2px` (28/22px in Space). Banners are `Alert`, empty panels `Empty`, inline
 links `Button variant="link"`, list rows `rowVariants` `menu`/`tree`, icons 13px `CodiconIcon`.
+Dialog bodies are `gap-3 p-3` with `Field`/`FieldLabel`/`FieldDescription`/`FieldError`, sections
+`FieldSet` + `FieldLegend`, warnings `Alert variant="warn"`, failures `Alert variant="destructive"`.
+No raw `<label>` or `outline-focus` (lint). `FileTree` folder rows use `TreeTwisty` plus a
+`folder`/`folder-opened` icon, normal weight; chips are `Badge`.
 Ref badges are a 1px lane/kind border plus a 15% tint of the same colour, `text-graph-sm` label.
 `FileTree` indents `8px + depth * 14px`, the app tree's formula. Visual baselines:
 `apps/kira-space/tests/visual/git-module.spec.ts`.
