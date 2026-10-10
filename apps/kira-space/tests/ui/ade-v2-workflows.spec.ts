@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { adeFixture, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -164,6 +165,30 @@ test('the route select sets where a result goes and saves it in results', async 
     next: 'plan',
     max: 3,
   });
+});
+
+test('contract: a result built in the editor saves as the backend takes it', async ({
+  relaunch,
+}) => {
+  const sent = contract<{
+    workflow: { stages: { steps: { id: string; results: Record<string, unknown>[] }[] }[] };
+  }>('ade-workflow-results', 'args:AdeTaskService.SaveWorkflow');
+  const want = sent.workflow.stages[0]?.steps
+    .find((x) => x.id === 'review')
+    ?.results.find((r) => r.id === 'changes');
+  expect(want).toMatchObject({ next: 'impl', max: 2 });
+  const { window: page, control } = await openWorkflows(relaunch);
+  await node(page, 'tests').click();
+  await page.locator(t('ade-wf-add-result')).click();
+  const row = page.locator(t('ade-wf-result')).nth(2);
+  await row.locator(t('ade-wf-result-id')).fill(String(want?.id));
+  await row.locator(t('ade-wf-result-description')).fill(String(want?.description));
+  if (want?.ok === false) await row.locator(t('ade-wf-result-ok')).click();
+  await row.locator(t('ade-wf-result-route')).selectOption(String(want?.next));
+  await row.locator(t('ade-wf-result-max')).fill(String(want?.max));
+  const out = await saved(page, control, 1);
+  const tests = out.workflow.stages[1]?.steps.find((x) => x.id === 'tests');
+  expect(tests?.results.find((r) => r.id === 'changes')).toEqual(want);
 });
 
 test('dragging a result dot to another step sets its route', async ({ relaunch }) => {
