@@ -3555,19 +3555,19 @@ utilities and `--kira-*` tokens, compiled by Kira Space's root (`apps/kira-space
 styles.css` `@source`s `packages/git-ui/src`). The only git CSS is `packages/git-ui/src/theme/
 git.css`, imported by that file (not by `main.ts`: `@theme` needs the host root):
 
-- the graph scale, `--kira-graph-t-*` (`xs/sm/md/lg` = graph font size -2/-1/0/+1px),
-  `--kira-graph-h-xs`, `--kira-graph-row-h-compact` and `--kira-graph-row-h`, exposed as
-  `text-graph-*`, `h-graph-row`, `h-graph-row-compact`, `h-graph-h-xs` utilities (registered in
+- the graph scale, `--kira-graph-t-*` (`xs/sm/md` = graph font size -2/-1/0px),
+  `--kira-graph-h-xs` and `--kira-graph-row-h`, exposed as
+  `text-graph-*`, `h-graph-row-compact`, `h-graph-h-xs` utilities (registered in
   `packages/theme/src/lib/utils.ts` so `cn` merges them);
-- the lane palette `graph-lane-0..7` and `git-merged` (no app hue exists for either);
-- the SlickGrid structural rules (`.kv-commit-grid .slick-*`, in `@layer components`): SlickGrid builds
+- the lane palette `graph-lane-0..7`, aliases of the connection palette `--kira-conn-*`;
+- the SlickGrid structural rules (`.kira-commit-grid .slick-*`, in `@layer components`): SlickGrid builds
   those nodes itself, so no template carries utilities.
 
 Every other git colour is an app utility: status `ok`/`warn`/`error`, remote and stash origin
 `info`, stash and draft `muted-foreground`, rows `bg-hover`/`bg-select`, borders `border-border`.
 `TokenReader` measures the graph tokens for SlickGrid's `rowHeight` and `rowSvg.ts` geometry.
-`.kv-*` class names that remain (`.kv-cell-message`, `.kv-badge-pr`, `.kv-lane-N` ...) are DOM hooks for
-tests and click delegation, not styled. A codicon span sized by a utility needs the `!` suffix
+No `kv-` marker layer (lint bans it). Test hooks are `data-testid`; the grid's runtime
+classes are `kira-*` (`kira-cell-message`, `kira-row-selected` ...). A codicon span sized by a utility needs the `!` suffix
 (`text-graph-xs!`): codicon.css's unlayered `font` shorthand beats layered utilities.
 
 `check-theme-classes.sh` fails any `kv:`, `--kv-` or `--vscode-` under `packages/git-ui/src` and
@@ -3580,18 +3580,18 @@ read `text-graph-*`, which follow `git.graphFontSize` (`--kira-graph-font-size`,
 by `applyAppearance` only when above 0) and fall back to Appearance font size. A deliberate split:
 the grid is a data view, outside P123's four-value chrome scale.
 
-**Git module follows the app look (P229, P245).** The graph, detail pane, strip and toolbar sit on
-`bg-bg` like every other module; the toolbar is `ViewToolbar`. Commit row height follows Appearance
-density: `--kira-graph-row-h-compact` is the larger of `--kira-row-height` and
-`--kira-graph-h-xs + 2px` (28/22px in Space). Banners are `Alert`, empty panels `Empty`, inline
-links `Button variant="link"`, list rows `rowVariants` `menu`/`tree`, icons 13px `CodiconIcon`.
-Dialog bodies are `gap-3 p-3` with `Field`/`FieldLabel`/`FieldDescription`/`FieldError`, sections
-`FieldSet` + `FieldLegend`, warnings `Alert variant="warn"`, failures `Alert variant="destructive"`.
-No raw `<label>` or `outline-focus` (lint). `FileTree` folder rows use `TreeTwisty` plus a
-`folder`/`folder-opened` icon, normal weight; chips are `Badge`.
-Ref badges are a 1px lane/kind border plus a 15% tint of the same colour, `text-graph-sm` label.
-`FileTree` indents `8px + depth * 14px`, the app tree's formula. Visual baselines:
-`apps/kira-space/tests/visual/git-module.spec.ts`.
+**Git module follows the app look (P229, P245, P258).** Reference is Kira Studio, never Agents/ADE.
+Graph, detail pane, strip and toolbar sit on `bg-bg`. `GitViewHead` (repo, branch, ahead/behind,
+operation) and the toolbar are `ViewToolbar`s, as are the detail head and review headers. Commit rows
+are one line at one height, `--kira-graph-row-h` = larger of `--kira-row-height` and
+`--kira-graph-h-xs + 2px` (28px in Space). No semibold anywhere (lint). Ref badges are Studio `Badge`
+tones (branch `ok`, remote `info`, tag/stash default, detached `warn`); lanes use the connection
+palette. Empty panels are `Empty`/`EmptyMedia`/`EmptyTitle`; banners `Alert`-style with a 16px icon;
+list rows `rowVariants` `menu`/`tree` at 22px; section heads `text-kira-sm uppercase`. Dialog bodies
+are `gap-3 p-3` with `Field`/`FieldDescription`/`FieldError`, controls `size="kira-lg"`, warnings
+`Alert variant="warn"`, failures `Alert variant="destructive"`. No raw `<label>` or `outline-focus`
+(lint). `FileTree` indents `8px + depth * 14px` with `TreeTwisty` and a 13px folder icon. Visual
+baselines: `apps/kira-space/tests/visual/git-module.spec.ts`.
 
 **Checkboxes (P67c), retired (P131 Part 2).** The 14 raw `<input type="checkbox">` elements across
 9 dialogs (RepoSettingsDialog, StashDialog, TagDialog, BranchDialog, RevertDialog, WorktreeDialog,
