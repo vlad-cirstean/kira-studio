@@ -881,3 +881,12 @@ A1..A10 done. Commits: 58733cacd (A1), 3f2fbbdc1 (A2+A3), b7507d30a (A4), f261c4
 Verify: `check-ui-primitives.sh`, lint, typecheck green. `test:ui:studio` 427 passed. Space A specs (automations-*, memory-*, settings-memory) 56 passed. Visual re-recorded after viewing: Studio workbench-shell, script-dialog, connection-dialog, data-grid, console, http-request-view, schema-dialog, settings-api, settings-appearance; Space settings-appearance. `settings-memory-visual-linux.png` unchanged.
 
 Deviations in `P262-stream-a-findings.md`.
+
+## Stream B result
+
+Branch `p262-b`, B1-B9 one commit each (2ccebe1ea, 18c14b721, 0e0d0ffe2, 09fd588c3, dcf9be8d2, 995af0541, 7d20a8408, d9081cb94, e2a8b66dc); B10 sweep needed no change (side-panel files pass U18-U21).
+
+- `stream-b.txt` holds only `permanent` lines (AdeBacklogRow, mobile Backlog/Terminal screens U9; git-ui SearchBox U17).
+- Lint, typecheck, `test:unit` (1793) green. Space `ui` minus A-owned specs: 401 tests, 395 pass first run; 6 failures were spec selectors tied to old markup, fixed in specs. Mobile: 53 pass.
+- Visual: 6 baselines re-recorded (workflow-graph, workflow-graph-branches, git-branch-picker, git-graph-detail, git-repos-dialog, settings-appearance); diffs are weight, tab, search, dialog and tree-row changes from section 2.
+- Deviations and foundation bugs: `P262-stream-b-findings.md`.
