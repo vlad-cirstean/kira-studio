@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
@@ -246,6 +247,25 @@ func (r *AdeRepoConfigRepo) SetFolderHidden(path string, hidden bool) (bool, err
 		return false, fmt.Errorf("repos: commit set ade folder hidden: %w", err)
 	}
 	return true, nil
+}
+
+// ApplyFolderHidden writes the folder's stored hidden flag onto the given repos in one statement. It
+// never writes ade_folders, so a flag changed since the caller read it is not overwritten.
+func (r *AdeRepoConfigRepo) ApplyFolderHidden(path string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, path)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	q := `UPDATE code_repos SET hidden = COALESCE((SELECT hidden FROM ade_folders WHERE path = ?), hidden)
+		WHERE id IN (?` + strings.Repeat(",?", len(ids)-1) + `)`
+	if _, err := r.DB.Exec(q, args...); err != nil {
+		return fmt.Errorf("repos: apply ade folder hidden: %w", err)
+	}
+	return nil
 }
 
 // FolderHidden reports a folder's hidden flag; false for an unknown folder.
