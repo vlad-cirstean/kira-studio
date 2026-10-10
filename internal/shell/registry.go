@@ -11,6 +11,7 @@ type windowEntry struct {
 	win       *application.WebviewWindow
 	detach    func()
 	ephemeral bool
+	order     int
 }
 
 // WindowRegistry tracks every currently open window by its key (P8 C2). Window creation runs on
@@ -20,6 +21,8 @@ type windowEntry struct {
 type WindowRegistry struct {
 	mu      sync.Mutex
 	entries map[string]windowEntry
+	// OnChange runs outside the lock after every Add, AddEphemeral and removal.
+	OnChange func()
 }
 
 func NewWindowRegistry() *WindowRegistry {
@@ -29,11 +32,19 @@ func NewWindowRegistry() *WindowRegistry {
 // Add registers a newly opened window under key, replacing whatever was registered there before.
 // A reopened window reusing its old key is exactly what used to detach window 1's listeners the
 // moment window 2 was created (F4) — now each key gets its own slot, so one key's Add can never
-// clobber another key's entry.
-func (r *WindowRegistry) Add(key string, win *application.WebviewWindow, detach func()) {
+// clobber another key's entry. order is the window's stored order; the lowest one is the main
+// window (MainKey).
+func (r *WindowRegistry) Add(key string, order int, win *application.WebviewWindow, detach func()) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.entries[key] = windowEntry{win: win, detach: detach}
+	r.entries[key] = windowEntry{win: win, detach: detach, order: order}
+	r.mu.Unlock()
+	r.changed()
+}
+
+func (r *WindowRegistry) changed() {
+	if r.OnChange != nil {
+		r.OnChange()
+	}
 }
 
 // AddEphemeral registers a window that is never restored on relaunch (P150 review windows): it
@@ -41,8 +52,9 @@ func (r *WindowRegistry) Add(key string, win *application.WebviewWindow, detach 
 // is never the one that hides instead of closing.
 func (r *WindowRegistry) AddEphemeral(key string, win *application.WebviewWindow, detach func()) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.entries[key] = windowEntry{win: win, detach: detach, ephemeral: true}
+	r.mu.Unlock()
+	r.changed()
 }
 
 // Close asks key's window to close through its normal WindowClosing hooks. false for an unknown key.
@@ -137,7 +149,7 @@ func (r *WindowRegistry) Focus(key string) bool {
 	r.mu.Lock()
 	e, ok := r.entries[key]
 	r.mu.Unlock()
-	if !ok {
+	if !ok || e.win == nil {
 		return false
 	}
 	e.win.Show()
@@ -158,18 +170,37 @@ func (r *WindowRegistry) Any() application.Window {
 	return nil
 }
 
-// AnyRealKey returns the smallest key of a non-ephemeral window, deterministic so repeated calls
-// pick the same window. false when none is open.
-func (r *WindowRegistry) AnyRealKey() (string, bool) {
+// MainKey returns the key of the main window: the non-ephemeral window with the lowest stored
+// order, smallest key as tiebreak. false when none is open.
+func (r *WindowRegistry) MainKey() (string, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	best, found := "", false
+	best, bestOrder, found := "", 0, false
 	for k, e := range r.entries {
-		if !e.ephemeral && (!found || k < best) {
-			best, found = k, true
+		if e.ephemeral {
+			continue
+		}
+		if !found || e.order < bestOrder || (e.order == bestOrder && k < best) {
+			best, bestOrder, found = k, e.order, true
 		}
 	}
 	return best, found
+}
+
+// Has reports whether key is registered, ephemeral or not.
+func (r *WindowRegistry) Has(key string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, ok := r.entries[key]
+	return ok
+}
+
+// Focused reports whether key's window has focus. false for an unknown key or a nil window.
+func (r *WindowRegistry) Focused(key string) bool {
+	r.mu.Lock()
+	e, ok := r.entries[key]
+	r.mu.Unlock()
+	return ok && e.win != nil && e.win.IsFocused()
 }
 
 // Keys returns every currently registered window's key — Quitter's LiveWindowKeys seam (P8 C8):
@@ -205,6 +236,7 @@ func (r *WindowRegistry) removeAndCount(key string) (wasEphemeral bool, remainin
 	r.mu.Unlock()
 	if ok {
 		e.detach()
+		r.changed()
 	}
 	return e.ephemeral, remaining, ok
 }

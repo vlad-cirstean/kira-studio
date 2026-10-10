@@ -87,7 +87,7 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 	if ephemeral {
 		d.Windows.AddEphemeral(rec.Key, win, detach)
 	} else {
-		d.Windows.Add(rec.Key, win, detach)
+		d.Windows.Add(rec.Key, rec.Order, win, detach)
 	}
 	// Real-interaction fix (item 8): isLastWindow reads the registry fresh at the moment this
 	// window's own close-flush wait completes (closeflush.go's own doc comment) — this window is

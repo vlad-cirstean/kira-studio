@@ -24,7 +24,7 @@ func TestCloseDecision(t *testing.T) {
 
 func TestRegistryEphemeralNeverCounts(t *testing.T) {
 	r := NewWindowRegistry()
-	r.Add("main", nil, func() {})
+	r.Add("main", 0, nil, func() {})
 	r.AddEphemeral("rv", nil, func() {})
 	if got := r.OthersReal("main"); got != 0 {
 		t.Fatalf("OthersReal(main) = %d, want 0 (the review window does not count)", got)

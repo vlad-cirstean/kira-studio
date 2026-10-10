@@ -96,7 +96,7 @@ func newFixture(t *testing.T) *fixture {
 	if _, err := app.W.AdeTask.StageDone(ctx, adewire.TaskArgs{TaskID: f.task.ID}); err != nil {
 		t.Fatal(err)
 	}
-	app.W.Windows.Add(desktopWindow, nil, func() {})
+	app.W.Windows.Add(desktopWindow, 0, nil, func() {})
 	return f
 }
 

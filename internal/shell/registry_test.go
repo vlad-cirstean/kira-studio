@@ -26,12 +26,12 @@ func TestWindowRegistry_Count(t *testing.T) {
 		t.Fatalf("Count() on an empty registry = %d, want 0", got)
 	}
 
-	r.Add("main", nil, func() {})
+	r.Add("main", 0, nil, func() {})
 	if got := r.Count(); got != 1 {
 		t.Fatalf("Count() after adding one window = %d, want 1 (the case AttachCloseFlush's isLastWindow must see as true)", got)
 	}
 
-	r.Add("second", nil, func() {})
+	r.Add("second", 1, nil, func() {})
 	if got := r.Count(); got != 2 {
 		t.Fatalf("Count() after adding a second window = %d, want 2 (isLastWindow must see this as false for either key)", got)
 	}
@@ -60,12 +60,29 @@ func TestWindowRegistry_Count(t *testing.T) {
 // own doc comment names this exact case) must not change Count() at all.
 func TestWindowRegistry_Count_UnaffectedByRemovingAnUnknownKey(t *testing.T) {
 	r := shell.NewWindowRegistry()
-	r.Add("main", nil, func() {})
+	r.Add("main", 0, nil, func() {})
 
 	if remaining := r.RemoveAndCount("never-added"); remaining != 1 {
 		t.Fatalf("RemoveAndCount of an unknown key = %d, want 1 (unchanged)", remaining)
 	}
 	if got := r.Count(); got != 1 {
 		t.Fatalf("Count() after removing an unknown key = %d, want 1 (unchanged)", got)
+	}
+}
+
+func TestWindowRegistry_MainKey(t *testing.T) {
+	r := shell.NewWindowRegistry()
+	if _, ok := r.MainKey(); ok {
+		t.Fatal("MainKey on an empty registry reported a window")
+	}
+	r.AddEphemeral("a-review", nil, func() {})
+	r.Add("z", 0, nil, func() {})
+	r.Add("a", 1, nil, func() {})
+	if k, _ := r.MainKey(); k != "z" {
+		t.Fatalf("MainKey = %q, want the lowest order z, not the smallest key", k)
+	}
+	r.Add("b", 0, nil, func() {})
+	if k, _ := r.MainKey(); k != "b" {
+		t.Fatalf("MainKey = %q, want b (order tie, smaller key)", k)
 	}
 }

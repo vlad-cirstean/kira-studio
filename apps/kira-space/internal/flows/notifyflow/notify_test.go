@@ -358,7 +358,7 @@ func TestAutomationQuietCases(t *testing.T) {
 	})
 	t.Run("focused run", func(t *testing.T) {
 		app, sink := newApp(t)
-		app.W.Windows.Add(window, nil, func() {})
+		app.W.Windows.Add(window, 0, nil, func() {})
 		gate := filepath.Join(app.Root, "gate")
 		claude(app, map[string][]fakeagent.Action{"*": {{Name: "done", WaitFile: gate}}})
 		id := smartRun(t, app)
@@ -387,7 +387,7 @@ func waitScriptState(t *testing.T, app *flowharness.App, id, state string) {
 
 func TestClickRevealsScriptRun(t *testing.T) {
 	app, sink := newApp(t)
-	app.W.Windows.Add(window, nil, func() {})
+	app.W.Windows.Add(window, 0, nil, func() {})
 	claude(app, map[string][]fakeagent.Action{"*": {{Name: "failed"}}})
 	id := smartRun(t, app)
 	testx.WaitUntil(t, waitFor, func() bool { return len(sink.all()) > 0 })

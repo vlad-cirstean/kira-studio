@@ -424,7 +424,7 @@ func (w *Wired) revealNote(n agentnotify.Note) {
 			return
 		}
 	}
-	if key, ok := w.Windows.AnyRealKey(); ok {
+	if key, ok := w.Windows.MainKey(); ok {
 		focus(key)
 		if n.ScriptRunID != "" {
 			w.Emitter.EmitTo(key, bridge.ChannelAgentRevealScriptRun, map[string]string{"runId": n.ScriptRunID, "label": n.Title})

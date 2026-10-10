@@ -101,7 +101,7 @@ func addWindows(t *testing.T, app *flowharness.App, keys ...string) map[string]i
 	t.Helper()
 	detached := map[string]int{}
 	for _, key := range keys {
-		app.W.Windows.Add(key, nil, func() { detached[key]++ })
+		app.W.Windows.Add(key, 0, nil, func() { detached[key]++ })
 	}
 	return detached
 }

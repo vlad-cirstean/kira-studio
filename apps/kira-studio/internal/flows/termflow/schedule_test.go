@@ -254,7 +254,7 @@ func TestScheduleOverlap(t *testing.T) {
 func TestScheduleConfirm(t *testing.T) {
 	const window = "w-main"
 	app, clock := clockApp(t)
-	app.W.Windows.Add(window, nil, func() {})
+	app.W.Windows.Add(window, 0, nil, func() {})
 	if key, err := app.W.ScriptRuns.MainWindow(); err != nil || key != window {
 		t.Fatalf("MainWindow = %q, %v", key, err)
 	}

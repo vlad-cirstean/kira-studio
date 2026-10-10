@@ -155,7 +155,7 @@ func Build(opts Options) (*Wired, error) {
 	lifecycle := wireLifecycle(embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
 		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
 	embedded.runs.MainWindow = func() string {
-		key, _ := lifecycle.windows.AnyRealKey()
+		key, _ := lifecycle.windows.MainKey()
 		return key
 	}
 	embedded.sched.Start()

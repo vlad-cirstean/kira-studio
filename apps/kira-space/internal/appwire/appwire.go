@@ -247,7 +247,7 @@ func Build(opts Options) *Wired {
 		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage, opts.RebaseTimeout, runs)
 	runs.ADE = w.AdeBoard
 	runs.MainWindow = func() string {
-		key, _ := w.Windows.AnyRealKey()
+		key, _ := w.Windows.MainKey()
 		return key
 	}
 	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
@@ -274,7 +274,7 @@ func Build(opts Options) *Wired {
 	w.AdeTask.FocusWindow = w.Windows.Focus
 	w.CloseFlush = shell.NewCloseFlushCoordinator(events)
 
-	mobileLaunches := &bridge.MobileLaunches{Emit: emitter, Window: w.Windows.AnyRealKey}
+	mobileLaunches := &bridge.MobileLaunches{Emit: emitter, Window: w.Windows.MainKey}
 	w.Mobile = bridge.NewMobileAccessService(&bridge.MobileAccessService{
 		Deps: deps, Reader: w.AdeTask, Hub: mobileHub, Broker: mobileweb.NewBroker(time.Now), Assets: opts.MobileAssets,
 		AgentSessions: func() any { return w.Terminal.AgentSessions() },
