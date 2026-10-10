@@ -125,14 +125,14 @@ const listEl = useTemplateRef<HTMLElement>('list');
               class="relative flex flex-col gap-0.5 pt-0.5 px-2 pb-1 hover:bg-hover"
             >
               <div class="flex items-center gap-1">
-                <button
-                  type="button"
-                  class="font-data text-muted-foreground text-graph-sm bg-transparent border-0 p-0 cursor-pointer after:absolute after:inset-0"
+                <Button
+                  variant="link"
+                  class="h-auto p-0 border-0 font-data font-normal text-muted-foreground text-graph-sm after:absolute after:inset-0"
                   :aria-label="`Open ${group.path} ${lineLabel(c.range)}`"
                   @click="emit('select-comment', group.path)"
                 >
                   {{ lineLabel(c.range) }}
-                </button>
+                </Button>
                 <span
                   v-if="anchorTitle(c)"
                   class="codicon codicon-warning text-warn"

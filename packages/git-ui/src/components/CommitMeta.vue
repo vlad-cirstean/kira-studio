@@ -162,7 +162,7 @@ const PR_STATE_LABEL: Readonly<Record<string, string>> = {
 // `kv-meta-pr-icon--${state}` class, whose own colour rule lived in this file's deleted <style>.
 // Inline link: no button chrome, ambient colour, graph font.
 const LINK_BUTTON_CLASS =
-  'h-auto p-0 border-0 font-normal text-inherit text-graph-md';
+  'h-auto p-0 border-0 font-normal text-inherit text-graph-sm';
 
 const PR_ICON_CLASS: Readonly<Record<string, string>> = {
   open: 'text-ok',
