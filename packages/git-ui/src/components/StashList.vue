@@ -21,10 +21,10 @@
  * stack entry, never on a global bucket one).
  */
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import type { PickerList } from './pickerModel.ts';
-import RefSectionHeader from './RefSectionHeader.vue';
 import { buildStashMenu } from './rowMenuModel.ts';
 import StashRows, { type StashRowModel } from './StashRows.vue';
 import { isAutoStash, originLabel, stashLabel } from './stashListModel.ts';
@@ -109,7 +109,7 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 
 <template>
   <section data-testid="branch-section" aria-label="Stashes">
-    <RefSectionHeader label="Stashes" />
+    <SectionHeading label="Stashes" />
     <StashRows
       :section="section"
       :stash="stash"

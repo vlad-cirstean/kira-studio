@@ -16,13 +16,13 @@
  */
 import type { StackBranch } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import { prBadgeClass, refBadgeClass } from './badgeClass.ts';
 import type { PickerList, PickerStackGroup } from './pickerModel.ts';
-import RefSectionHeader from './RefSectionHeader.vue';
 import ShowMoreButton from './ShowMoreButton.vue';
 import { buildOrphanRows, buildStackRows, prBadgeLabel, type StackRow } from './stackListModel.ts';
 
@@ -84,7 +84,7 @@ async function removeFromStack(branch: string): Promise<void> {
 
 <template>
   <section aria-label="Stacks">
-    <RefSectionHeader label="Stacks" />
+    <SectionHeading label="Stacks" />
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="mb-1">
       <div class="min-h-control-sm flex items-center gap-1 px-1.5 text-kira-sm text-subtle uppercase tracking-wider">

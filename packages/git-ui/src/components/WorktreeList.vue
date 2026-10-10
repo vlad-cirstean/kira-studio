@@ -18,6 +18,7 @@
  */
 import type { WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -33,7 +34,6 @@ import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
 import { type PickerList, worktreeLabel } from './pickerModel.ts';
-import RefSectionHeader from './RefSectionHeader.vue';
 import ShowMoreButton from './ShowMoreButton.vue';
 
 const props = defineProps<{
@@ -117,11 +117,11 @@ async function confirmRemove(): Promise<void> {
 
 <template>
   <section aria-label="Worktrees">
-    <RefSectionHeader label="Worktrees">
+    <SectionHeading label="Worktrees">
       <Button variant="toolbar" size="kira" class="ml-auto" @click="emit('create-worktree')">
         Create Worktree…
       </Button>
-    </RefSectionHeader>
+    </SectionHeading>
     <div data-testid="branch-row"
       v-for="entry in section.visible"
       :key="entry.path"

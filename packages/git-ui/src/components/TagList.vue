@@ -8,11 +8,11 @@
  * this file's own template, not that one's.
  */
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
+import { rowVariants } from '@theme/components/rowVariants';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
-import { rowVariants } from '../lib/rowVariants.ts';
 import type { OpsState } from '../state/ops.ts';
-import RefSectionHeader from './RefSectionHeader.vue';
 import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
 import type { RefListSection } from './refListModel.ts';
@@ -88,7 +88,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
 
 <template>
   <section aria-label="Tags">
-    <RefSectionHeader label="Tags" />
+    <SectionHeading label="Tags" />
     <div data-testid="branch-row"
       v-for="row in section.visible"
       :key="row.refname"

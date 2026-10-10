@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Badge } from '@theme/components/ui/badge';
-import { cn } from '@theme/lib/utils';
 /**
  * I2-21: `StashList.vue`'s and `GlobalStashList.vue`'s own row list, selection and row-menu
  * open/select were byte-identical apart from each row's own label fields (badge/origin/message,
@@ -12,9 +10,11 @@ import { cn } from '@theme/lib/utils';
  * (Pop/Drop/`stashSaveGlobal` exist only on a real stack entry), so a selected id is bubbled up
  * via `menuSelect` for the caller's own `switch`.
  */
+import { rowVariants } from '@theme/components/rowVariants';
+import { Badge } from '@theme/components/ui/badge';
+import { cn } from '@theme/lib/utils';
 import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
-import { rowVariants } from '../lib/rowVariants.ts';
 import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';

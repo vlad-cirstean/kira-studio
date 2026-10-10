@@ -15,11 +15,11 @@
  * file's own doc comment.
  */
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import type { PickerList } from './pickerModel.ts';
-import RefSectionHeader from './RefSectionHeader.vue';
 import { buildGlobalStashMenu } from './rowMenuModel.ts';
 import StashRows, { type StashRowModel } from './StashRows.vue';
 import { globalRowModel } from './stashListModel.ts';
@@ -88,9 +88,9 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 
 <template>
   <section aria-label="Global stash">
-    <RefSectionHeader label="Global stash">
+    <SectionHeading label="Global stash">
       <TooltipIconButton icon="add" label="Save to global stash…" @click="emit('saveGlobalStash')" />
-    </RefSectionHeader>
+    </SectionHeading>
     <StashRows
       :section="section"
       :stash="stash"

@@ -18,11 +18,11 @@
  * classes, `w-105`/`max-h-90`/`overflow-y-auto`/`py-0.5`, moved onto `PopoverContent` there too),
  * rendering only the inner listbox content.
  */
+import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
-import { rowVariants } from '../lib/rowVariants.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
 import type { SearchOption, SearchResultsModel } from './searchResultsModel.ts';
@@ -52,7 +52,7 @@ const isEmpty = computed(() => props.model.sections.length === 0);
  *  same property; §1.3). */
 function optionClass(option: SearchOption): string {
   return cn(
-    rowVariants({ layout: 'tree' }),
+    rowVariants({ layout: 'tree', data: true }),
     'pl-2',
     option.id === props.highlightedId ? 'bg-hover' : '',
   );

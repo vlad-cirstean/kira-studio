@@ -2,7 +2,7 @@
 /**
  * `docs/plans/P11.md` W11/W12: §6.2's search box. One text input, three toggle buttons
  * (case-sensitive / whole-word / regex) as `aria-pressed` icon buttons with
- * icon-button styling, a Commits/Refs/Both scope `<select>` living *inside* the box (OQ6: §6.2
+ * icon-button styling, a Commits/Refs/Both scope select living *inside* the box (OQ6: §6.2
  * gave the toolbar one slot and §6.3's 600px breakpoint had no room for a second control — G-UX
  * D9/item 9 later moved this whole component out of the toolbar into its own row below it, but
  * the box's own internal anatomy is unchanged), the inline `n of N` match count, an inline regex
@@ -295,7 +295,7 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
     <PopoverContent
       align="start"
       :side-offset="2"
-      class="p-0 gap-0 w-105"
+      class="p-0 gap-0 w-120"
       @open-auto-focus.prevent
       @close-auto-focus.prevent
       @escape-key-down="(e) => e.preventDefault()"
