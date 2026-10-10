@@ -4,6 +4,8 @@ Ask (user): dialogs all look different (alignment, spacing, buttons, inputs). Ta
 bar seems unified; secondary tabs are all over the place. Go over all UI, use the same elements
 everywhere, align sizes, proportions, spacing. Decide the unified design first, then apply it in
 chunks on 2 streams. Every look decision below is final (user: decide, no sign-off list).
+Amendment (user, after foundation): left panels have different functionality, but much of the
+visuals can be unified (§1.6, §2.7, §3.1).
 
 Base: `v2.0` at `f046f9a12`. Extends the Studio design language P258 measured
 (`plans/P258-git-ui-studio-language.md` §3) and the token layer in `packages/theme/src/tokens.css`
@@ -13,9 +15,12 @@ Steps, strictly in order:
 
 1. **Foundation** (one sequential Sonnet implementer, `v2.0` checkout): shared primitives, base
    class changes, lint guard with per-stream allowlists, reference migrations, baselines (§3).
-2. **Stream A** and **Stream B** (two Sonnet implementers, two worktrees off the foundation tip,
+   Landed (see "Foundation result").
+2. **Foundation addendum: side panels** (one sequential Sonnet implementer, `v2.0` checkout, after
+   step 1, before any worktree exists): row/bar primitives, guards U18-U21, allowlists (§3.1).
+3. **Stream A** and **Stream B** (two Sonnet implementers, two worktrees off the addendum tip,
    concurrent): per-site migration, chunk after chunk (§4).
-3. **Close-out** (one sequential Sonnet implementer after both land): remove legacy paths,
+4. **Close-out** (one sequential Sonnet implementer after both land): remove legacy paths,
    empty allowlists, docs, result (§5.4).
 
 Method: CodeGraph (`codegraph_explore` on the dialog, tabs, toggle, button, input/field, toolbar,
@@ -160,6 +165,68 @@ Divergence summary: 15 dialog widths, 14 body wrappers, 4 footer alignments, 4 c
 mechanisms, 5 secondary-tab looks with 2 heights, 3 input heights × 2 radii × 2 fills, 32 button
 combos, 18 popover strings, 9 icon sizes, 2 bold weights where the system has none.
 
+### 1.6 Left and side panels: 6 module panels, 45 files
+
+Method: `codegraph_explore` on `WorkbenchShell`, `PanelHeader`, `usePanelHeaderSearch`, both apps'
+`MODES`, `rowVariants`, `TreeTwisty`, the ADE side panes; then a class-level grep of the files below.
+Paths use the §4.2 prefixes. Mobile has none (bottom `TabBar`, full-width screens); `kira-ui` has
+none (`KuiColumnResizeHandle` is a grid column handle, P263).
+
+- **Module left panels** (`ModeDef.panel`, mounted in `WorkbenchShell` `#panel`), 6 files: Studio
+  `S/workbench/panels/ProjectPanel.vue` (Connections), `S/api/CollectionsPanel.vue`,
+  `p/docker-ui/src/components/DockerPanel.vue` (Studio wrapper `S/docker/DockerPanel.vue` has no
+  markup); shared `p/workbench/src/automations/AutomationsPanel.vue` (both apps),
+  `p/workbench/src/memory/MemoryPanel.vue` (Space); Space `K/repo/GitPanel.vue`. ADE is
+  `layout: 'full'`, no left panel.
+- **Panel bodies**, 20 files: Studio trees `S/project/{ProjectTree,TreeRow}.vue`,
+  `S/api/{CollectionsTree,CollectionRow}.vue`; Docker lists
+  `p/docker-ui/src/components/{ContainerList,ImageList,VolumeList,NetworkList,VirtualList,ListState}.vue`;
+  Space repo `K/repo/{RepoFileTree,RepoTreeRow,RepoSearchView,RepoSearchRow,RepoReviewView}.vue`;
+  git review sidebar `p/git-ui/src/components/review/{ReviewView,ReviewCommitRow,ReviewFilesPane,ReviewCommentsPane}.vue`,
+  `p/git-ui/src/components/FileTree.vue`.
+- **Other side panes**, 15 files: ADE review window `K/ade/v2/review/{AdeReviewWindow,AdeReviewFiles,AdeReviewAgentPanel}.vue`;
+  Plan detail pane `K/ade/v2/panel/{AdePanel,AdePanelFrame,AdePanelResizeHandle,AdeTaskPanel,AdeBranchPanel,AdeArchivedPanel}.vue`;
+  backlog aside `K/ade/v2/backlog/{AdeBacklogPage,AdeBacklogPanel,AdeBacklogRow}.vue`; stopped
+  sessions `K/ade/v2/sessions/{AdeStoppedList,AdeStoppedRow}.vue`; in-dialog nav `K/repo/ReposDialog.vue`.
+- **Shared chrome**, 4 files: `p/workbench/src/components/{WorkbenchShell,PanelHeader,TreeTwisty,SettingsShell}.vue`.
+
+Total 45 (A 15, B 26, foundation 4). Divergence, counted across them:
+
+- **Header: 0 of 6 module panels use `PanelHeader`.** 5 hand-roll its exact string (Project,
+  Collections, Docker, Automations, Memory); `GitPanel` puts a tab row in a title-less `h-bar`.
+  Toggled search button: `:data-active` (Project) vs `bg-field text-fg` class (Collections).
+- **Sub-bars below the header: 3 wrappers.** Search row `shrink-0 border-b border-border px-1.5 py-1`
+  ×5 (Project, Docker, Automations, Git, Memory), bare `InputGroup` (Collections), `py-1 px-2`
+  toolbar (`RepoSearchView.vue:104`); section-tab row `px-1.5 py-1` (Docker) vs `h-row` (Git files);
+  filter row `h-control` (Docker "Show stopped").
+- **Rows: 6 height mechanisms.** `h-row` 8, `min-h-row` 1 (git `rowVariants` tree), `h-5.5` 2
+  (`ReposDialog`), `min-h-9` 1 (`AdeBacklogRow`), padded `py-1`/`py-1.5` rows (Automations,
+  Memory, `AdeStoppedRow`), fixed JS heights (`VirtualList` 28, `ContainerList` 28/44, ignoring density). The density
+  formula `rowDensity === 'compact' ? 22 : 28` is copied in 4 side-panel trees.
+- **Row state: 3 recipes.** `bg-select` selected + `hover:bg-hover` (trees, Docker, git), `bg-hover`
+  as selected (`MemoryPanel.vue:109`), `border-l-3` amber bar + `bg-select` (`AdeBacklogRow.vue:55`);
+  `opacity-70` for historical memories; text-fg vs muted for open/closed repos. Focus: outline
+  (Docker), `group-focus-within:focus-ring` (git `FileTree`), none (Automations, Memory).
+- **Indent: 2 schemes.** `8 + depth × 14` px ×5 (`TreeRow`, `CollectionRow`, `RepoTreeRow`,
+  `FileTree` ×2); hand `pl-5`/`pl-6` ×9 (Automations group children, Git worktrees). Flat rows
+  `px-1.5` (6px), so depth-0 tree text sits 2px right of flat-list and header text.
+- **Section headings: 3 hand-rolled** (`CollectionsPanel` Button `h-control ... uppercase`,
+  `ReviewView` `pt-1 pb-0.5 ... uppercase` ×2). Automations collection groups are `font-semibold`
+  rows.
+- **Counts: 3 looks.** `text-kira-sm text-muted-foreground` (Docker section counts, Automations
+  groups), `Badge` pills (Memory), `font-semibold` tone numbers (`AdeBacklogPanel`).
+- **Empty: 3 mechanisms.** `Empty` with padding overrides (`p-4`, `p-6`; Collections, Git, Memory,
+  Docker `variant="icon"`), hand-rolled `.side-empty` div (Project, Automations, Git), `Alert`
+  faking an empty state (Automations, Git).
+- **Containers: framed 3, unframed 1.** Framed pane on chrome `rounded-kira border border-border bg-bg`
+  with `gap-0.5`: shell panel, `AdePanel`, backlog aside; `AdeReviewWindow` sections sit flat with
+  `border-l` handles. In-dialog navs: `SettingsShell` `w-44`, `ReposDialog` `w-52`.
+- **Resize: 2 handles, 3 bound sets.** Shell `ResizableHandle` 2px transparent, hover/drag
+  `bg-focus`, 180-480px default 260; `AdePanelResizeHandle` 6px `bg-chrome border-l` with a grip,
+  review left 220-560 default 320, review right 280-720, `AdePanel` 340 to row minus plan.
+- **Scroll: native only** (`overflow-y-auto` or a virtualizer scroller); 0 `ScrollArea`.
+- **Icons** in these files: 13 ×41, 12 ×9, 16 ×4, 24 ×6, 14 ×1.
+
 ## 2. Decisions (final)
 
 ### 2.1 Scale (existing tokens; nothing new)
@@ -294,7 +361,7 @@ stays only for rows, chips and tab chips that render through a cva (`rowVariants
 | Element | Spec |
 |---|---|
 | View/pane toolbar | `ViewToolbar` (`h-bar gap-1.5 px-2 border-b`); the 8 hand-rolled bars migrate |
-| Panel title bar | `PanelHeader` (unchanged; the one semibold); the 6 hand-rolled copies migrate (`GitPanel` gains the label-style header only where it shows a title; its tab row is a `ViewToolbar`) |
+| Panel title bar | `PanelHeader` (unchanged; the one semibold); the 6 hand-rolled copies migrate (`GitPanel`: §2.7, its tabs in the `#start` slot) |
 | Section heading in a panel, picker or list | new `SectionHeading` (theme) = `RefSectionHeader`'s string `flex items-center justify-between h-control-sm px-1.5 text-kira-sm text-subtle uppercase tracking-wider`, default slot for a trailing action; `RefSectionHeader` deleted. Settings/forms use `FieldLegend` |
 | View/detail title | `text-kira-lg font-medium text-fg truncate` in a `ViewToolbar` or head block |
 | List/tree row | `h-row gap-1 px-1.5 text-kira-md`, hover `bg-hover`, selected `bg-select`, secondary text `ml-auto text-kira-sm text-muted-foreground` |
@@ -307,6 +374,57 @@ stays only for rows, chips and tab chips that render through a cva (`rowVariants
 | Alerts | `Alert destructive` operation failures, `warn` blockers/data loss, `note` informational banners; explanatory text in forms is `FieldDescription` |
 | Badges | `Badge` variants unchanged; no ad-hoc pill spans (`AdeShell` count, `TONE_TAG_CLASS` pills keep their tone classes but `rounded-kira-sm px-1 h-control-sm text-kira-sm`, weight 400) |
 | Mobile (`apps/kira-space/frontend/mobile`) | same primitives, structure, typography and weights; touch heights `h-11` kept for buttons, inputs and tab bar (platform minimum) |
+
+### 2.7 Left and side panels
+
+Functionality stays per panel; the frame, bars, rows and states below are one look. Primitives
+marked (new) land in the addendum (§3.1).
+
+```vue
+<div ref="rootEl" class="flex h-full min-h-0 flex-col">          <!-- panel root -->
+  <PanelHeader>Connections                                       <!-- or #start for tabs (Git) -->
+    <template #actions><TooltipIconButton icon="search" :pressed="showSearch" …/> …</template>
+  </PanelHeader>
+  <PanelBar v-if="showSearch"><SearchField v-model="search" data-testid="tree-search" /></PanelBar>
+  <div class="min-h-0 flex-1 overflow-y-auto">                    <!-- or a virtualizer scroller -->
+    <SectionHeading label="Containers" collapsible :expanded @toggle />
+    <div :class="rowVariants({ layout: 'tree', selected })" :style="rowIndent(depth)">
+      <TreeTwisty …/> <CodiconIcon :size="13" …/> <span class="min-w-0 truncate">name</span>
+      <span class="ml-auto …">meta / hover actions</span>
+    </div>
+  </div>
+  <Empty v-if="empty" class="h-full">…</Empty>
+</div>
+```
+
+| Element | Spec | Why |
+|---|---|---|
+| Container | Beside a main area: framed pane `flex min-h-0 flex-col overflow-hidden rounded-kira border border-border bg-bg` on `bg-chrome`, panes `gap-0.5`, outer `px-1.5 pb-0.5` (the `WorkbenchShell` geometry). `AdeReviewWindow` adopts it; shell, `AdePanel`, backlog aside already match. In a dialog: nav column `w-44 shrink-0 border-r border-border px-1 py-1.5 flex flex-col gap-px` (SettingsShell); `ReposDialog` `w-52` → `w-44` | 3 of 4 panes already framed; SettingsShell nav already landed at `w-44` |
+| Panel root | `flex h-full min-h-0 flex-col`; header, bars `shrink-0`; one body `min-h-0 flex-1` | the 6 module panels' own root, minus drift |
+| Header | `PanelHeader` on every module left panel, title = the panel's noun (Connections, Collections, Automations, Docker, Memory); `GitPanel` has no title: its view tabs go in the new `#start` slot (normal case, not uppercase). Detail side panes keep §2.2's head block | 5 hand-rolled copies of the exact `PanelHeader` string |
+| Header actions | `TooltipIconButton` (toolbar `kira-icon`, 13) in `#actions`, order: search toggle (when the panel has one), create, other actions, refresh last; a toggled button passes `pressed` (new prop: `aria-pressed` + `bg-field text-fg`) | search first matches all 4 panels that have one; one toggled-state mechanism instead of 2 |
+| Sub-bars | new `PanelBar` (workbench): `flex shrink-0 flex-col gap-1 border-b border-border px-1.5 py-1`, default slot. One per concern under the header, in order: search (`SearchField` `kira`), view tabs (`SecondaryTabs`, counts via `item.count`), filter row (`flex items-center gap-1.5`, a horizontal `Field` with Checkbox + `FieldLabel`, summary `ml-auto text-kira-sm text-muted-foreground`) | the search row string already ×5; replaces 3 wrappers and 2 tab-row paddings |
+| Search | toggled from the header with type-to-search (`usePanelHeaderSearch`, testid `tree-search`) on every tree/list panel; `MemoryPanel` keeps it always visible (search is its main function), `RepoSearchView` keeps its own query toolbar but as a `PanelBar` | same behaviour already in 4 panels; only the chrome unifies |
+| Section heading | `SectionHeading` (`h-control-sm px-1.5 text-kira-sm text-subtle uppercase tracking-wider`); new props `collapsible`, `expanded`, `count` and emit `toggle`: collapsible renders a full-width button with a 12px chevron before the label, `count` renders trailing `text-kira-sm tabular-nums` | the §2.6 heading, so panels and pickers read alike; replaces 3 hand-rolled headings |
+| Row | theme `rowVariants` (new, moved up from git-ui) `layout: 'tree'`: `relative flex items-center gap-1 min-h-row pr-1.5 text-kira-md whitespace-nowrap select-none cursor-default outline-none focus-visible:focus-ring`; height `h-row` (28px comfortable, 22px compact) through the virtualizer or `min-h-row` | 8 of the single-line rows already `h-row`; follows Appearance density |
+| Two-line row | `layout: 'double'`: same, `items-start py-1`, second line `text-kira-sm text-muted-foreground truncate`; virtualized height `useRowHeight().double` = single + 16 (44 / 38px) | Docker containers, Automations scripts and Memory facts need a second line; 44px is Docker's height today |
+| Indent | `rowIndent(depth)` = `paddingLeft` `6 + depth × 14` px; a tree row always renders the `TreeTwisty` slot (invisible on leaves), a flat list row none; children of a twisty row (Git worktrees, Automations group scripts) are `depth + 1` | depth 0 lines up with `PanelHeader`/`SectionHeading` `px-1.5`; one scheme instead of 2 |
+| Chevron | `TreeTwisty` (unchanged: `size-3.5` slot, 13px chevron, `text-muted-foreground`) on every expandable row; never a hand-rolled chevron | already shared by 5 consumers |
+| Icon | 13px glyph in a `size-4 flex items-center justify-center shrink-0` box, `text-muted-foreground` (status/kind colour where the icon carries meaning); 12px only in 18px chips; rail `colorMarkClass('rail', …)` first child where a colour exists (P16) | §2.1 icon rule; `TreeRow`'s box |
+| Label / meta | label `min-w-0 truncate`; meta (counts, sizes, branch, ports) `ml-auto shrink-0 text-kira-sm text-muted-foreground tabular-nums` | §2.6 row rule |
+| Hover / selected / muted | hover `bg-hover`; selected (the item the main area shows) `bg-select text-fg`, from `selected: true`; `muted: true` → `text-muted-foreground` for closed/stopped/historical items (no `opacity-*`); `danger`, `disabled` as git-ui's variants; no `border-l` bars | 16 `bg-select` sites already; P260 dropped the blue selected bar |
+| Data font | `data: true` → `text-graph-md` for git rows (Settings > Git graph font reaches them, P229) | keeps P229's rule, now a variant |
+| Counts | a count of rows inside a group/section/tab is plain meta (`text-kira-sm text-muted-foreground tabular-nums`); `Badge variant="count"` only for an attention count (needs you, unread); `Badge` tones stay for row status (Memory author/historical) | plain counts are the majority; pills on every row read as noise |
+| Inline actions | row `group/row`; trailing `ml-auto flex items-center gap-0.5`; `TooltipIconButton` actions `invisible group-hover/row:visible group-focus-within/row:visible` (always visible on the selected row); meta in the same slot `group-hover/row:hidden` | Docker `ContainerList` already swaps meta for actions; `invisible` keeps row width stable |
+| Empty | `Empty class="h-full"` per §2.6 (`EmptyMedia` default, 24px icon, `EmptyTitle`, `EmptyDescription`, optional action `dialog kira-lg` in `EmptyContent`); in-list empty/loading/error line `px-1.5 py-1 text-kira-sm text-subtle` (error `text-error`); no `.side-empty`, no padding override, no `Alert`-as-empty | the §2.6 rule; replaces 3 mechanisms |
+| Scroll | native `overflow-y-auto` on the one body element, or the virtualizer's scroller; no `ScrollArea` | `@tanstack/vue-virtual` and the sticky band need a native scroll element; 0 uses today |
+| Row height source | `useRowHeight()` (new, workbench) reads `--kira-row-height` via VueUse `useCssVar` (set by `createSettingsStore`) → `{ single, double }`; every side-panel virtualizer uses it, never the density formula or a fixed 28 | 4 copies of the formula plus Docker's fixed 28/44 that ignores density |
+| Resize handle | shell `ResizableHandle` look everywhere: 2px (`w-0.5`), transparent, `bg-focus` on hover/drag, hit area 4px fine / 8px coarse. `AdePanelResizeHandle` keeps its pointer/px/persist mechanics but renders that look (no grip, no `border-l`, no `bg-chrome`) | one divider look; swapping its mechanics to reka would change width persistence (§5.1) |
+| Width bounds | left list panes 180-480px, default 260 (shell, `defaultLayout`); `AdeReviewWindow` left 220-560/320 → 180-480/260. Right detail panes keep content-driven bounds (`AdePanel` 340 to row minus plan; review agent 280-720) | lists share one range; detail panes size to their content |
+| Detail side panes | `AdePanelFrame`, `AdeBacklogPanel`, `AdeReviewAgentPanel` follow §2.2's side-panel row (`PanelHeader` or head block `flex flex-col gap-1.5 border-b border-border px-3 py-2`, `SecondaryTabs` in a `px-3` row, content `p-3 gap-3`), title `text-kira-lg font-medium` (no `font-bold`), lists inside them use the rows above | §2.2 already decided it; this names the files |
+
+Not in scope here (P263): tables/grids, menus, tooltips, scrollbar styling, badge/pill colours,
+focus-ring and disabled tokens.
 
 ## 3. Foundation (step 1, sequential, lands before streams)
 
@@ -379,9 +497,55 @@ Foundation commits (Conventional Commits, each hook-green): (1) dialog parts + D
 `bun run test:ui:studio`, `bun run test:ui:space`, `bun run test:visual:studio`,
 `bun run test:visual:space` (update, inspect each diff is a §2 base change, re-run clean).
 
-## 4. Streams (step 2)
+### 3.1 Foundation addendum: side panels (step 2, sequential, before the streams branch)
 
-Two named streams, worktrees off the **foundation tip** (same base commit for both):
+One Sonnet implementer on `v2.0` (main checkout), after "Foundation result", before §4.4 creates
+any worktree. Small: primitives, one reference migration, guards; no stream-owned file is edited.
+Owner of every file below for the rest of the phase, same rule as §3 (streams never edit them;
+findings go to the stream findings file).
+
+| File | Change |
+|---|---|
+| `packages/theme/src/components/rowVariants.ts` (new) | `rowVariants` cva per §2.7: layouts `menu` (git-ui's string unchanged), `tree`, `double`, `nav` (`h-control-lg px-2 rounded-kira-sm text-kira-md`, selected `bg-select text-fg`, else `text-muted-foreground hover:bg-hover`: SettingsShell's current string, byte-equal), variants `selected`, `muted`, `disabled`, `danger`, `data`; `rowIndent(depth: number)` returning `{ paddingLeft: '<6 + depth × 14>px' }`; exported `RowVariants` type |
+| `packages/workbench/src/util/rowHeight.ts` (new) | `useRowHeight()`: `useCssVar('--kira-row-height', document.documentElement, { observe: true })` parsed to px → computed `{ single, double: single + 16 }`; falls back to 28 when unset (tests) |
+| `packages/workbench/src/components/PanelBar.vue` (new) | `<script setup lang="ts">`, props `class?`; root `data-slot="panel-bar"`, classes per §2.7, default slot |
+| `packages/workbench/src/components/PanelHeader.vue` | `#start` slot before the title (`flex items-center gap-1 normal-case tracking-normal`); title span rendered only when the default slot has content; existing output byte-equal when `#start` is unused |
+| `packages/theme/src/components/SectionHeading.vue` | props `collapsible?`, `expanded?`, `count?: number \| string`; emit `toggle`; collapsible root is a `button type="button"` (`w-full cursor-default`, `aria-expanded`), chevron `CodiconIcon` 12 (`chevron-down`/`chevron-right`); static output byte-equal |
+| `packages/theme/src/components/TooltipIconButton.vue` | prop `pressed?: boolean` → `aria-pressed` and `bg-field text-fg` |
+| `packages/workbench/src/components/SettingsShell.vue` | reference migration: nav items `rowVariants({ layout: 'nav', selected })`; no pixel change |
+| `packages/workbench/src/components/TreeTwisty.vue`, `WorkbenchShell.vue` | frozen (no change expected); move to foundation ownership (`TreeTwisty` leaves A6) |
+| `scripts/ui-primitives-side-panels.txt` (new) | the 45 §1.6 paths, one per line (foundation-owned; close-out folds it into the script) |
+| `scripts/check-ui-primitives.sh` | guard kind `s` (`.vue` + `.ts`, only paths in the side-panel list); guards U18-U21 below |
+| `scripts/ui-primitives-allowlist/stream-a.txt`, `stream-b.txt` | add every side-panel file that newly fails at addendum tip, by §4.1 ownership; foundation-owned ones must pass |
+| `docs/ARCHITECTURE.md` "UI architecture" | one sentence: side panels use `PanelHeader`, `PanelBar`, `SectionHeading`, `rowVariants`/`rowIndent`, `useRowHeight` |
+
+Guards (kind `s`, side-panel files only, so P263's grids and lists stay untouched):
+
+- U18 hand-rolled row state: `(?<![\w-])(?:hover:)?bg-(?:select|hover)(?![\w-])` (use
+  `rowVariants`).
+- U19 hand-rolled indent or row height: `depth\s*\*\s*\d+`, `rowDensity\s*===`,
+  `(?:ROW_HEIGHT|rowHeight)\s*[:=]\s*\d+`, `(?<![\w-])(?:h-5\.5|min-h-9)(?![\w-])` (use `rowIndent`,
+  `useRowHeight`, `rowVariants`).
+- U20 hand-rolled panel chrome: `side-empty`; `<Empty\b` with a `p-`/`px-`/`py-` class; the search
+  row string `shrink-0 border-b border-border px-1.5 py-1` (use `Empty class="h-full"`, `PanelBar`).
+- U21 hand-rolled heading: `(?<![\w-])uppercase(?![\w-])` outside `PanelHeader.vue` (built-in
+  exempt; use `PanelHeader`/`SectionHeading`).
+
+No unit tests: `rowVariants`, `PanelBar`, `useRowHeight`, the new props are thin (CLAUDE.md test
+bar). Coverage: `settings-*` UI specs and the Settings visual baselines through the SettingsShell
+migration; streams exercise the rest per chunk.
+
+Commits (each hook-green): (1) `rowVariants` + `rowIndent` + `useRowHeight` + `PanelBar`;
+(2) `PanelHeader` `#start`, `SectionHeading` collapsible/count, `TooltipIconButton` `pressed`,
+SettingsShell nav migration; (3) side-panel list + guards U18-U21 + allowlists + ARCHITECTURE
+sentence; (4) plan "Addendum result" section (what landed, allowlist counts, deviations).
+Verify: `bun run typecheck`, `bun run lint`, `bun run test:unit`, both apps' `settings-*` UI specs
+(§4.3 per-chunk command), `bun run test:visual:studio` and `test:visual:space` clean without update (the addendum moves no pixel;
+a moved PNG is a bug to fix here, not to re-record).
+
+## 4. Streams (step 3)
+
+Two named streams, worktrees off the **addendum tip** (§3.1; same base commit for both):
 `/home/user/kira-p262-a` on branch `p262-a`, `/home/user/kira-p262-b` on branch `p262-b`.
 One Sonnet implementer per stream, chunk after chunk in the order below, one commit per chunk
 (more if a chunk splits into logical groups), each hook-green. Each chunk also removes its files
@@ -389,16 +553,16 @@ from the stream's allowlist (or turns a line into `permanent ...` with a reason)
 
 Per site the implementer applies §2 exactly: dialog parts and size from the §2.2 table, tabs from
 the §2.3 classification, buttons §2.4, fields/inputs §2.5, bars/sections/rows/menus/empty §2.6,
-typography/icons §2.1. Files in a chunk whose only hits are already compliant need no edit.
+typography/icons §2.1, side panels §2.7 (every file in `scripts/ui-primitives-side-panels.txt`). Files in a chunk whose only hits are already compliant need no edit.
 Discovery inside a file (what a component renders, its callers) uses `codegraph_explore` first.
 
 ### 4.1 Ownership (zero overlap)
 
 | Stream | Owns | Files to touch | Dialog sites | Tab sites | Form-control tags |
 |---|---|---|---|---|---|
-| Foundation (done before) | §3 table | 18 source + guard files | 3 + prompt | 1 (settings nav) | 1 |
-| A: Kira Studio + Docker + shared workbench modules | `apps/kira-studio/frontend/src/**`, `packages/docker-ui/src/**`, `packages/workbench/src/**` (minus foundation files), `apps/kira-studio/tests/**` (ui, visual specs and PNGs), Space specs `apps/kira-space/tests/ui/{automations-*,memory-*,settings-memory}.spec.ts`, Space PNG `apps/kira-space/tests/visual/settings.spec.ts-snapshots/settings-memory-visual-linux.png`, `scripts/ui-primitives-allowlist/stream-a.txt`, `docs/v2.2/plans/P262-stream-a-findings.md` | 163 | 20 | 30 | 149 |
-| B: Kira Space + mobile + git module | `apps/kira-space/frontend/src/**` and `apps/kira-space/frontend/mobile/**` (minus foundation files), `packages/git-ui/src/**`, `apps/kira-space/tests/**` except the A-owned files above, `scripts/ui-primitives-allowlist/stream-b.txt`, `docs/v2.2/plans/P262-stream-b-findings.md` | 144 | 23 | 18 | 88 |
+| Foundation (done before) | §3 and §3.1 tables | 18 source + guard files; addendum 14 | 3 + prompt | 1 (settings nav) | 1 |
+| A: Kira Studio + Docker + shared workbench modules | `apps/kira-studio/frontend/src/**`, `packages/docker-ui/src/**`, `packages/workbench/src/**` (minus foundation files), `apps/kira-studio/tests/**` (ui, visual specs and PNGs), Space specs `apps/kira-space/tests/ui/{automations-*,memory-*,settings-memory}.spec.ts`, Space PNG `apps/kira-space/tests/visual/settings.spec.ts-snapshots/settings-memory-visual-linux.png`, `scripts/ui-primitives-allowlist/stream-a.txt`, `docs/v2.2/plans/P262-stream-a-findings.md` | 164 | 20 | 30 | 149 |
+| B: Kira Space + mobile + git module | `apps/kira-space/frontend/src/**` and `apps/kira-space/frontend/mobile/**` (minus foundation files), `packages/git-ui/src/**`, `apps/kira-space/tests/**` except the A-owned files above, `scripts/ui-primitives-allowlist/stream-b.txt`, `docs/v2.2/plans/P262-stream-b-findings.md` | 153 | 23 | 18 | 88 |
 
 Weighted by element hits A 1258, B 990; B carries most weight fixes (ADE 79 of 116
 semibold/bold), so the effort is even. `packages/theme/**`, `scripts/check-ui-primitives.sh`,
@@ -416,6 +580,33 @@ Stream A: A1 `S/project/ConnectionDialog.vue`, `S/project/FiltersDialog.vue`; A2
 
 Stream B: B2 `p/git-ui/src/components/{BranchPicker,FileTree}.vue`, `p/git-ui/src/components/review/{BaseSelector,ReviewView}.vue`; B3 `p/git-ui/src/components/SearchBox.vue`; B4 `K/repo/GitPanel.vue`, `K/repo/RepoSearchView.vue`; B5 `K/ade/v2/AdeAddPopover.vue`. Foundation owns no search site.
 
+#### Side-panel sites (§2.7, U18-U21; migrate inside the named chunk; no chunk past 25 files)
+
+Stream A (15): A1 `S/project/{ProjectTree,TreeRow}.vue`; A2 `S/workbench/panels/ProjectPanel.vue`,
+`S/api/{CollectionsPanel,CollectionsTree,CollectionRow}.vue` (`CollectionsTree` added to A2); A7
+`p/docker-ui/src/components/{DockerPanel,ContainerList,ImageList,VolumeList,NetworkList,ListState}.vue`;
+A8 `p/workbench/src/automations/AutomationsPanel.vue`; A9 `p/workbench/src/memory/MemoryPanel.vue`;
+A10 `p/docker-ui/src/components/VirtualList.vue` (new chunk, A7 is full). Plus `S/docker/DockerPanel.vue`
+(no markup, no edit).
+
+Stream B (26): B2 `p/git-ui/src/components/review/{ReviewView,ReviewCommitRow,ReviewFilesPane,ReviewCommentsPane}.vue`,
+`p/git-ui/src/components/FileTree.vue` (`ReviewCommitRow` added to B2); B3 switches the last git-ui
+`rowVariants` callers to the theme one and deletes `p/git-ui/src/lib/rowVariants.ts` (added to B3;
+B2's callers switch first); B4 `K/repo/{GitPanel,RepoFileTree,RepoTreeRow,RepoSearchView,RepoSearchRow,RepoReviewView,ReposDialog}.vue`
+(`RepoFileTree`, `RepoTreeRow`, `RepoSearchRow` added to B4); B6
+`K/ade/v2/panel/{AdePanel,AdePanelFrame,AdePanelResizeHandle,AdeTaskPanel,AdeBranchPanel,AdeArchivedPanel}.vue`
+(`AdePanel`, `AdePanelResizeHandle` added to B6); B8
+`K/ade/v2/review/{AdeReviewWindow,AdeReviewFiles,AdeReviewAgentPanel}.vue`,
+`K/ade/v2/backlog/{AdeBacklogPage,AdeBacklogPanel,AdeBacklogRow}.vue`,
+`K/ade/v2/sessions/{AdeStoppedList,AdeStoppedRow}.vue` (`AdeReviewWindow`, `AdeStoppedList` added to B8).
+
+Foundation (4): `p/workbench/src/components/{WorkbenchShell,PanelHeader,TreeTwisty,SettingsShell}.vue`
+(`TreeTwisty` leaves A6).
+
+A side-panel file that the addendum finds failing but is not named above is a plan gap: the
+addendum implementer appends it to the owning stream's chunk with the nearest directory (A10/B10
+when none fits) in this section, in the same commit as the allowlist.
+
 Spec rules: testids never change (exception: none planned); a spec changes only for a
 documented §2 effect (`data-state` `active`/`inactive` → `on`/`off` in `docker-edit.spec.ts:169-170`; a height or
 position assertion). Baselines: a stream re-records only its own PNGs, after its last chunk.
@@ -428,17 +619,17 @@ Paths: `S/` = `apps/kira-studio/frontend/src/`, `K/` = `apps/kira-space/frontend
 uppercase, h-bar, alerts, badges).
 
 Stream A order: A1 Studio dialogs, A2 API module, A3 HTTP/gRPC views, A4 data views, A5 shared
-views, A6 settings + workbench chrome, A7 Docker, A8 Automations, A9 Memory. Stream B order:
+views, A6 settings + workbench chrome, A7 Docker, A8 Automations, A9 Memory, A10 side-panel sweep. Stream B order:
 B1 git dialogs, B2-B3 git module, B4 Space repo/workbench/settings, B5 ADE dialogs + workflows,
-B6 ADE panel/shell, B7 ADE plan/needs, B8 ADE rest, B9 mobile.
+B6 ADE panel/shell, B7 ADE plan/needs, B8 ADE rest, B9 mobile, B10 side-panel sweep.
 
 Stream A chunks:
 
-#### A1 (13 files, 219 element hits)
+#### A1 (13 files, 219 element hits + side panels)
 `S/project/ConnectionDialog.vue`, `S/project/CredentialsUpdateDialog.vue`, `S/project/DataGripImportDialog.vue`, `S/project/ErrorPopover.vue`, `S/project/FiltersDialog.vue`, `S/project/ProjectTree.vue`, `S/project/SchemaDialog.vue`, `S/project/TreeRow.vue`, `S/project/credentialPaste/CredentialPastePanel.vue`, `S/views/httprequest/ResponseDiffDialog.vue`, `S/workbench/DbMcpApprovalDialog.vue`, `S/workbench/GenerateDataDialog.vue`, `S/workbench/UploadObjectDialog.vue`
 
-#### A2 (20 files, 145 element hits)
-`S/api/ApiStart.vue`, `S/api/BulkVariablesEditor.vue`, `S/api/CollectionRow.vue`, `S/api/CollectionsPanel.vue`, `S/api/CopyAsCurlDialog.vue`, `S/api/DynamicValuesDialog.vue`, `S/api/EditRawRequestDialog.vue`, `S/api/EnvironmentSelect.vue`, `S/api/EnvironmentsView.vue`, `S/api/ImportCurlDialog.vue`, `S/api/ImportReportStrip.vue`, `S/api/MethodSelect.vue`, `S/api/SaveRequestDialog.vue`, `S/api/VariableHistoryMenu.vue`, `S/api/VariableRow.vue`, `S/api/VariableSetView.vue`, `S/api/VariablesOverviewPanel.vue`, `S/editor/MonacoHost.vue`, `S/workbench/panels/ProjectPanel.vue`, `S/workbench/panels/StudioStart.vue`
+#### A2 (21 files, 145 element hits + side panels)
+`S/api/ApiStart.vue`, `S/api/BulkVariablesEditor.vue`, `S/api/CollectionRow.vue`, `S/api/CollectionsPanel.vue`, `S/api/CollectionsTree.vue`, `S/api/CopyAsCurlDialog.vue`, `S/api/DynamicValuesDialog.vue`, `S/api/EditRawRequestDialog.vue`, `S/api/EnvironmentSelect.vue`, `S/api/EnvironmentsView.vue`, `S/api/ImportCurlDialog.vue`, `S/api/ImportReportStrip.vue`, `S/api/MethodSelect.vue`, `S/api/SaveRequestDialog.vue`, `S/api/VariableHistoryMenu.vue`, `S/api/VariableRow.vue`, `S/api/VariableSetView.vue`, `S/api/VariablesOverviewPanel.vue`, `S/editor/MonacoHost.vue`, `S/workbench/panels/ProjectPanel.vue`, `S/workbench/panels/StudioStart.vue`
 
 #### A3 (14 files, 161 element hits)
 `S/views/grpcrequest/CallHistoryList.vue`, `S/views/grpcrequest/GrpcRequestView.vue`, `S/views/grpcrequest/ResponsePane.vue`, `S/views/grpcrequest/SchemaBrowser.vue`, `S/views/httprequest/BinaryBodyPicker.vue`, `S/views/httprequest/CookiesPane.vue`, `S/views/httprequest/FormDataTable.vue`, `S/views/httprequest/HttpRequestView.vue`, `S/views/httprequest/RawExchangePane.vue`, `S/views/httprequest/RequestBodyPane.vue`, `S/views/httprequest/RequestSettingsPane.vue`, `S/views/httprequest/ResponseHistoryList.vue`, `S/views/httprequest/ResponsePane.vue`, `S/views/httprequest/TimelinePane.vue`
@@ -449,17 +640,23 @@ Stream A chunks:
 #### A5 (16 files, 118 element hits)
 `S/views/shared/DateTimePicker.vue`, `S/views/shared/EditBufferActions.vue`, `S/views/shared/FilterHistoryMenu.vue`, `S/views/shared/ResponseFindBar.vue`, `S/views/shared/SavedListMenu.vue`, `S/views/shared/celleditor/CellEditorView.vue`, `S/views/shared/celleditor/TimestampPane.vue`, `S/views/shared/document/DocumentRow.vue`, `S/views/shared/document/DocumentTree.vue`, `S/views/shared/fields/FieldRowsTable.vue`, `S/views/shared/keyvalue/KeyValuePane.vue`, `S/views/shared/page/PagerControls.vue`, `S/views/shared/page/SearchToolbar.vue`, `S/views/stream/StreamComposeMessage.vue`, `S/views/stream/StreamSearchToolbar.vue`, `S/views/stream/StreamView.vue`
 
-#### A6 (25 files, 128 element hits)
-`S/workbench/settings/AdvancedPane.vue`, `S/workbench/settings/ApiPane.vue`, `S/workbench/settings/AppearancePane.vue`, `S/workbench/settings/CachePane.vue`, `S/workbench/settings/DataPane.vue`, `S/workbench/settings/DatabaseMcpPane.vue`, `p/workbench/src/components/AutocompleteField.vue`, `p/workbench/src/components/BootFailure.vue`, `p/workbench/src/components/ContextMenu.vue`, `p/workbench/src/components/InlineRenameInput.vue`, `p/workbench/src/components/ModeSwitcher.vue`, `p/workbench/src/components/OpLogPanel.vue`, `p/workbench/src/components/TabStrip.vue`, `p/workbench/src/components/TabStripNewButton.vue`, `p/workbench/src/components/TitleBar.vue`, `p/workbench/src/components/TitleBarWindowActions.vue`, `p/workbench/src/components/TreeTwisty.vue`, `p/workbench/src/components/UpdateAvailableItem.vue`, `p/workbench/src/memory/settings/ClaudeCodeMcpSection.vue`, `p/workbench/src/memory/settings/SemanticModelSection.vue`, `p/workbench/src/settings/fields/FontSizeField.vue`, `p/workbench/src/settings/fields/LogLevelField.vue`, `p/workbench/src/settings/fields/NotifyPromptsField.vue`, `p/workbench/src/settings/fields/RowDensityField.vue`, `p/workbench/src/settings/fields/WordWrapField.vue`
+#### A6 (24 files, 128 element hits; `TreeTwisty` moved to foundation)
+`S/workbench/settings/AdvancedPane.vue`, `S/workbench/settings/ApiPane.vue`, `S/workbench/settings/AppearancePane.vue`, `S/workbench/settings/CachePane.vue`, `S/workbench/settings/DataPane.vue`, `S/workbench/settings/DatabaseMcpPane.vue`, `p/workbench/src/components/AutocompleteField.vue`, `p/workbench/src/components/BootFailure.vue`, `p/workbench/src/components/ContextMenu.vue`, `p/workbench/src/components/InlineRenameInput.vue`, `p/workbench/src/components/ModeSwitcher.vue`, `p/workbench/src/components/OpLogPanel.vue`, `p/workbench/src/components/TabStrip.vue`, `p/workbench/src/components/TabStripNewButton.vue`, `p/workbench/src/components/TitleBar.vue`, `p/workbench/src/components/TitleBarWindowActions.vue`, `p/workbench/src/components/UpdateAvailableItem.vue`, `p/workbench/src/memory/settings/ClaudeCodeMcpSection.vue`, `p/workbench/src/memory/settings/SemanticModelSection.vue`, `p/workbench/src/settings/fields/FontSizeField.vue`, `p/workbench/src/settings/fields/LogLevelField.vue`, `p/workbench/src/settings/fields/NotifyPromptsField.vue`, `p/workbench/src/settings/fields/RowDensityField.vue`, `p/workbench/src/settings/fields/WordWrapField.vue`
 
-#### A7 (25 files, 129 element hits)
+#### A7 (25 files, 129 element hits + side panels)
 `p/docker-ui/src/components/ContainerDetail.vue`, `p/docker-ui/src/components/ContainerEditView.vue`, `p/docker-ui/src/components/ContainerList.vue`, `p/docker-ui/src/components/ContainerSizeSection.vue`, `p/docker-ui/src/components/ContainerTable.vue`, `p/docker-ui/src/components/DetailSection.vue`, `p/docker-ui/src/components/DockerPanel.vue`, `p/docker-ui/src/components/EditInPlaceSection.vue`, `p/docker-ui/src/components/EditPendingSummary.vue`, `p/docker-ui/src/components/EditRecreateSection.vue`, `p/docker-ui/src/components/EditRows.vue`, `p/docker-ui/src/components/EditSize.vue`, `p/docker-ui/src/components/EndpointChip.vue`, `p/docker-ui/src/components/EngineDiskSection.vue`, `p/docker-ui/src/components/EngineOverview.vue`, `p/docker-ui/src/components/ExecView.vue`, `p/docker-ui/src/components/ImageList.vue`, `p/docker-ui/src/components/ListState.vue`, `p/docker-ui/src/components/LogsView.vue`, `p/docker-ui/src/components/NetworkList.vue`, `p/docker-ui/src/components/RecreateConfirmDialog.vue`, `p/docker-ui/src/components/ResourceDetail.vue`, `p/docker-ui/src/components/StatsView.vue`, `p/docker-ui/src/components/UnavailableState.vue`, `p/docker-ui/src/components/VolumeList.vue`
 
-#### A8 (19 files, 171 element hits)
+#### A8 (19 files, 171 element hits + side panel)
 `p/workbench/src/automations/AutomationsPanel.vue`, `p/workbench/src/automations/AutomationsStart.vue`, `p/workbench/src/automations/ParamsEditor.vue`, `p/workbench/src/automations/ScriptBodyField.vue`, `p/workbench/src/automations/ScriptDialog.vue`, `p/workbench/src/automations/run/AdeContextFields.vue`, `p/workbench/src/automations/run/ParamsForm.vue`, `p/workbench/src/automations/run/RunScriptDialog.vue`, `p/workbench/src/automations/runs/RunOutcomeBlock.vue`, `p/workbench/src/automations/runs/RunStatusBadge.vue`, `p/workbench/src/automations/runs/RunsSection.vue`, `p/workbench/src/automations/runs/RunsStatusItem.vue`, `p/workbench/src/automations/runs/ScriptRunView.vue`, `p/workbench/src/automations/schedule/ScheduleConfirmDialog.vue`, `p/workbench/src/automations/schedule/ScheduleFields.vue`, `p/workbench/src/automations/smart/McpServerTools.vue`, `p/workbench/src/automations/smart/McpToolsField.vue`, `p/workbench/src/automations/smart/SmartSettingsFields.vue`, `p/workbench/src/automations/smart/ToolsField.vue`
 
-#### A9 (10 files, 67 element hits)
+#### A9 (10 files, 67 element hits + side panel)
 `p/workbench/src/memory/AddMemoryDialog.vue`, `p/workbench/src/memory/MemoryPanel.vue`, `p/workbench/src/memory/MemorySetupHint.vue`, `p/workbench/src/memory/MemoryStart.vue`, `p/workbench/src/memory/import/ImportConfirmDialog.vue`, `p/workbench/src/memory/import/ImportFileRow.vue`, `p/workbench/src/memory/import/ImportJobDetail.vue`, `p/workbench/src/memory/import/ImportMenu.vue`, `p/workbench/src/memory/import/ImportStatus.vue`, `p/workbench/src/memory/import/ImportView.vue`
+
+#### A10 (1 file + sweep, side panels)
+`p/docker-ui/src/components/VirtualList.vue` (`useRowHeight`, no fixed 28). Then a sweep, no new
+files: screenshot the Studio panels (Connections, Collections, Automations, Docker) side by side in
+both densities and fix any §2.7 drift in A's side-panel files (one commit). Stream A's side-panel
+files then pass U18-U21 with no allowlist line.
 
 
 Stream B chunks:
@@ -467,29 +664,34 @@ Stream B chunks:
 #### B1 (17 files, 304 element hits)
 `p/git-ui/src/components/PullStrategyPicker.vue`, `p/git-ui/src/components/WorktreeList.vue`, `p/git-ui/src/components/dialogs/BranchDialog.vue`, `p/git-ui/src/components/dialogs/CheckoutDialog.vue`, `p/git-ui/src/components/dialogs/CherryPickDialog.vue`, `p/git-ui/src/components/dialogs/ForcePushDialog.vue`, `p/git-ui/src/components/dialogs/PostCheckoutPullDialog.vue`, `p/git-ui/src/components/dialogs/PreflightPrediction.vue`, `p/git-ui/src/components/dialogs/PullDialog.vue`, `p/git-ui/src/components/dialogs/RenameRefDialog.vue`, `p/git-ui/src/components/dialogs/RepoSettingsDialog.vue`, `p/git-ui/src/components/dialogs/ResetDialog.vue`, `p/git-ui/src/components/dialogs/RevertDialog.vue`, `p/git-ui/src/components/dialogs/StackDialog.vue`, `p/git-ui/src/components/dialogs/StashDialog.vue`, `p/git-ui/src/components/dialogs/TagDialog.vue`, `p/git-ui/src/components/dialogs/WorktreeDialog.vue`
 
-#### B2 (16 files, 83 element hits)
-`p/git-ui/src/App.vue`, `p/git-ui/src/components/AppToolbar.vue`, `p/git-ui/src/components/BranchPicker.vue`, `p/git-ui/src/components/CommitGrid.vue`, `p/git-ui/src/components/CommitMeta.vue`, `p/git-ui/src/components/ConflictBanner.vue`, `p/git-ui/src/components/DetailPane.vue`, `p/git-ui/src/components/EmptyRepositoryPanel.vue`, `p/git-ui/src/components/FailureBanner.vue`, `p/git-ui/src/components/FileTree.vue`, `p/git-ui/src/components/GitBlockedPanel.vue`, `p/git-ui/src/components/GitViewHead.vue`, `p/git-ui/src/components/review/BaseSelector.vue`, `p/git-ui/src/components/review/ReviewCommentsPane.vue`, `p/git-ui/src/components/review/ReviewFilesPane.vue`, `p/git-ui/src/components/review/ReviewView.vue`
+#### B2 (17 files, 83 element hits + side panels)
+`p/git-ui/src/App.vue`, `p/git-ui/src/components/AppToolbar.vue`, `p/git-ui/src/components/BranchPicker.vue`, `p/git-ui/src/components/CommitGrid.vue`, `p/git-ui/src/components/CommitMeta.vue`, `p/git-ui/src/components/ConflictBanner.vue`, `p/git-ui/src/components/DetailPane.vue`, `p/git-ui/src/components/EmptyRepositoryPanel.vue`, `p/git-ui/src/components/FailureBanner.vue`, `p/git-ui/src/components/FileTree.vue`, `p/git-ui/src/components/GitBlockedPanel.vue`, `p/git-ui/src/components/GitViewHead.vue`, `p/git-ui/src/components/review/BaseSelector.vue`, `p/git-ui/src/components/review/ReviewCommentsPane.vue`, `p/git-ui/src/components/review/ReviewCommitRow.vue`, `p/git-ui/src/components/review/ReviewFilesPane.vue`, `p/git-ui/src/components/review/ReviewView.vue`
 
-#### B3 (14 files, 33 element hits)
-`p/git-ui/src/components/LoadMoreButton.vue`, `p/git-ui/src/components/NoRepositoryPanel.vue`, `p/git-ui/src/components/RefSectionHeader.vue`, `p/git-ui/src/components/RefreshButton.vue`, `p/git-ui/src/components/RowContextMenu.vue`, `p/git-ui/src/components/SearchBox.vue`, `p/git-ui/src/components/SearchResults.vue`, `p/git-ui/src/components/ShowMoreButton.vue`, `p/git-ui/src/components/StackList.vue`, `p/git-ui/src/components/StashDetailPane.vue`, `p/git-ui/src/components/StashRows.vue`, `p/git-ui/src/components/TagList.vue`, `p/git-ui/src/components/UncommittedChangesStrip.vue`, `p/git-ui/src/components/UndoButton.vue`
+#### B3 (15 files, 33 element hits + `rowVariants` move)
+`p/git-ui/src/components/LoadMoreButton.vue`, `p/git-ui/src/components/NoRepositoryPanel.vue`, `p/git-ui/src/components/RefSectionHeader.vue`, `p/git-ui/src/components/RefreshButton.vue`, `p/git-ui/src/components/RowContextMenu.vue`, `p/git-ui/src/components/SearchBox.vue`, `p/git-ui/src/components/SearchResults.vue`, `p/git-ui/src/components/ShowMoreButton.vue`, `p/git-ui/src/components/StackList.vue`, `p/git-ui/src/components/StashDetailPane.vue`, `p/git-ui/src/components/StashRows.vue`, `p/git-ui/src/components/TagList.vue`, `p/git-ui/src/components/UncommittedChangesStrip.vue`, `p/git-ui/src/components/UndoButton.vue`, `p/git-ui/src/lib/rowVariants.ts` (deleted once no caller imports it)
 
-#### B4 (21 files, 160 element hits)
-`K/repo/GitPanel.vue`, `K/repo/GitStart.vue`, `K/repo/RepoConfigForm.vue`, `K/repo/RepoEnvRow.vue`, `K/repo/RepoReviewView.vue`, `K/repo/RepoSearchView.vue`, `K/repo/ReposDialog.vue`, `K/views/repo/RepoDiffView.vue`, `K/views/repo/RepoFileView.vue`, `K/views/repo/RepoGraphView.vue`, `K/views/repo/RepoMultiDiffView.vue`, `K/views/repo/ReviewThread.vue`, `K/workbench/GitCredentialDialog.vue`, `K/workbench/PairingRequestDialog.vue`, `K/workbench/StatusBar.vue`, `K/workbench/settings/AdvancedPane.vue`, `K/workbench/settings/AppearancePane.vue`, `K/workbench/settings/ClaudeCodePane.vue`, `K/workbench/settings/DateFormatField.vue`, `K/workbench/settings/GitPane.vue`, `K/workbench/settings/MobileAccessPane.vue`
+#### B4 (24 files, 160 element hits + side panels)
+`K/repo/GitPanel.vue`, `K/repo/GitStart.vue`, `K/repo/RepoConfigForm.vue`, `K/repo/RepoEnvRow.vue`, `K/repo/RepoFileTree.vue`, `K/repo/RepoReviewView.vue`, `K/repo/RepoSearchRow.vue`, `K/repo/RepoSearchView.vue`, `K/repo/RepoTreeRow.vue`, `K/repo/ReposDialog.vue`, `K/views/repo/RepoDiffView.vue`, `K/views/repo/RepoFileView.vue`, `K/views/repo/RepoGraphView.vue`, `K/views/repo/RepoMultiDiffView.vue`, `K/views/repo/ReviewThread.vue`, `K/workbench/GitCredentialDialog.vue`, `K/workbench/PairingRequestDialog.vue`, `K/workbench/StatusBar.vue`, `K/workbench/settings/AdvancedPane.vue`, `K/workbench/settings/AppearancePane.vue`, `K/workbench/settings/ClaudeCodePane.vue`, `K/workbench/settings/DateFormatField.vue`, `K/workbench/settings/GitPane.vue`, `K/workbench/settings/MobileAccessPane.vue`
 
 #### B5 (21 files, 158 element hits)
 `K/ade/AdeView.vue`, `K/ade/v2/AdeActivityIcon.vue`, `K/ade/v2/AdeAddPopover.vue`, `K/ade/v2/AdeBasePicker.vue`, `K/ade/v2/AdeCandidateRow.vue`, `K/ade/v2/AdeChip.vue`, `K/ade/v2/AdeConfirmDialog.vue`, `K/ade/v2/AdeRepoTag.vue`, `K/ade/v2/dialog/AdeClaudeDialog.vue`, `K/ade/v2/run/AdeRunDialog.vue`, `K/ade/v2/run/AdeTaskActionButton.vue`, `K/ade/v2/workflows/AdeStageGroupNode.vue`, `K/ade/v2/workflows/AdeStageInspector.vue`, `K/ade/v2/workflows/AdeStepInspector.vue`, `K/ade/v2/workflows/AdeStepNode.vue`, `K/ade/v2/workflows/AdeStepResults.vue`, `K/ade/v2/workflows/AdeWorkflowEditor.vue`, `K/ade/v2/workflows/AdeWorkflowGraph.vue`, `K/ade/v2/workflows/AdeWorkflowSaveBar.vue`, `K/ade/v2/workflows/AdeWorkflowYaml.vue`, `K/ade/v2/workflows/AdeWorkflowsPage.vue`
 
-#### B6 (16 files, 91 element hits)
-`K/ade/v2/automation/AdeAutomationChip.vue`, `K/ade/v2/automation/AdeAutomationsBlock.vue`, `K/ade/v2/panel/AdeArchivedPanel.vue`, `K/ade/v2/panel/AdeBranchPanel.vue`, `K/ade/v2/panel/AdeEstimateField.vue`, `K/ade/v2/panel/AdeLinkRow.vue`, `K/ade/v2/panel/AdePanelFrame.vue`, `K/ade/v2/panel/AdeRunOutcome.vue`, `K/ade/v2/panel/AdeSetupProgress.vue`, `K/ade/v2/panel/AdeStageBlock.vue`, `K/ade/v2/panel/AdeStageMover.vue`, `K/ade/v2/panel/AdeTaskPanel.vue`, `K/ade/v2/panel/AdeTaskTab.vue`, `K/ade/v2/panel/AdeWorkflowBlock.vue`, `K/ade/v2/shell/AdeCaptureBox.vue`, `K/ade/v2/shell/AdeShell.vue`
+#### B6 (18 files, 91 element hits + side panels)
+`K/ade/v2/automation/AdeAutomationChip.vue`, `K/ade/v2/automation/AdeAutomationsBlock.vue`, `K/ade/v2/panel/AdeArchivedPanel.vue`, `K/ade/v2/panel/AdeBranchPanel.vue`, `K/ade/v2/panel/AdeEstimateField.vue`, `K/ade/v2/panel/AdeLinkRow.vue`, `K/ade/v2/panel/AdePanel.vue`, `K/ade/v2/panel/AdePanelFrame.vue`, `K/ade/v2/panel/AdePanelResizeHandle.vue`, `K/ade/v2/panel/AdeRunOutcome.vue`, `K/ade/v2/panel/AdeSetupProgress.vue`, `K/ade/v2/panel/AdeStageBlock.vue`, `K/ade/v2/panel/AdeStageMover.vue`, `K/ade/v2/panel/AdeTaskPanel.vue`, `K/ade/v2/panel/AdeTaskTab.vue`, `K/ade/v2/panel/AdeWorkflowBlock.vue`, `K/ade/v2/shell/AdeCaptureBox.vue`, `K/ade/v2/shell/AdeShell.vue`
 
 #### B7 (14 files, 54 element hits)
 `K/ade/v2/needs/AdeAllSessionRow.vue`, `K/ade/v2/needs/AdeAllSessions.vue`, `K/ade/v2/needs/AdeNeedsPage.vue`, `K/ade/v2/needs/AdeNeedsRow.vue`, `K/ade/v2/plan/AdeActionCell.vue`, `K/ade/v2/plan/AdeAttention.vue`, `K/ade/v2/plan/AdeBranchRow.vue`, `K/ade/v2/plan/AdeDayBand.vue`, `K/ade/v2/plan/AdeDayControls.vue`, `K/ade/v2/plan/AdeHistoryBar.vue`, `K/ade/v2/plan/AdePlanHeader.vue`, `K/ade/v2/plan/AdePlanView.vue`, `K/ade/v2/plan/AdeRepoChip.vue`, `K/ade/v2/plan/AdeTaskCard.vue`
 
-#### B8 (13 files, 45 element hits)
-`K/ade/v2/backlog/AdeBacklogPage.vue`, `K/ade/v2/backlog/AdeBacklogPanel.vue`, `K/ade/v2/backlog/AdeBacklogRow.vue`, `K/ade/v2/notes/AdeNotesEditor.vue`, `K/ade/v2/review/AdeReviewAgentPanel.vue`, `K/ade/v2/review/AdeReviewCompose.vue`, `K/ade/v2/review/AdeReviewFiles.vue`, `K/ade/v2/review/AdeReviewHeader.vue`, `K/ade/v2/review/AdeReviewSync.vue`, `K/ade/v2/sessions/AdeHeadlessPane.vue`, `K/ade/v2/sessions/AdeSessionStrip.vue`, `K/ade/v2/sessions/AdeStoppedRow.vue`, `K/ade/v2/sessions/AdeTuiPane.vue`
+#### B8 (15 files, 45 element hits + side panels)
+`K/ade/v2/backlog/AdeBacklogPage.vue`, `K/ade/v2/backlog/AdeBacklogPanel.vue`, `K/ade/v2/backlog/AdeBacklogRow.vue`, `K/ade/v2/notes/AdeNotesEditor.vue`, `K/ade/v2/review/AdeReviewAgentPanel.vue`, `K/ade/v2/review/AdeReviewCompose.vue`, `K/ade/v2/review/AdeReviewFiles.vue`, `K/ade/v2/review/AdeReviewHeader.vue`, `K/ade/v2/review/AdeReviewSync.vue`, `K/ade/v2/review/AdeReviewWindow.vue`, `K/ade/v2/sessions/AdeHeadlessPane.vue`, `K/ade/v2/sessions/AdeSessionStrip.vue`, `K/ade/v2/sessions/AdeStoppedList.vue`, `K/ade/v2/sessions/AdeStoppedRow.vue`, `K/ade/v2/sessions/AdeTuiPane.vue`
 
 #### B9 (12 files, 62 element hits)
 `M/AppShell.vue`, `M/TabBar.vue`, `M/components/ConfirmDialog.vue`, `M/components/PermissionHint.vue`, `M/components/ReplySheet.vue`, `M/screens/BacklogScreen.vue`, `M/screens/NeedsScreen.vue`, `M/screens/PairScreen.vue`, `M/screens/PlanScreen.vue`, `M/screens/PlanTaskCard.vue`, `M/screens/TerminalScreen.vue`, `M/terminal/KeyBar.vue`
+
+#### B10 (sweep, side panels, no new files)
+Screenshot the Space side panels (Git repos/files/review, Automations, Memory, ADE review window,
+Plan detail pane, backlog aside) side by side in both densities and fix any §2.7 drift in B's
+side-panel files (one commit). Stream B's side-panel files then pass U18-U21 with no allowlist line.
 
 
 ### 4.3 Verification per stream
@@ -514,7 +716,7 @@ on Linux, so real use is lower), Wails bindings and `frontend/dist`. Never symli
 
 1. Before creating worktrees: `git worktree list`; `/home/user/kira-v22-base` (`v2.2-fixes`, 116 MB)
    is not P262's; leave it unless the user removes it. `df -h /home/user`.
-2. Create A: `git worktree add -b p262-a /home/user/kira-p262-a <foundation-tip>`, then in it
+2. Create A: `git worktree add -b p262-a /home/user/kira-p262-a <addendum-tip>`, then in it
    `sh scripts/prepare-worktree.sh` (runs `scripts/setup.sh`: bun install, go mod download,
    bindings, dist) and `sh scripts/codegraph-setup.sh`. Check `df`; continue only with ≥1.5 GB free.
 3. Create B the same way at `/home/user/kira-p262-b`.
@@ -533,7 +735,10 @@ No functional change: no store, query, IPC, bridge or Go edit. Event wiring stay
 uses `DialogClose`, the same `update:open(false)` Esc already sends). Testids, accessible names
 and labels stay; Go untouched (no Go test asserts a frontend label or testid moved by this plan).
 The two accepted a11y-semantics shifts: `ContainerEditView`/`ContainerDetail` tab triggers become
-ToggleGroup items (`data-state` `on`/`off`, radio roles).
+ToggleGroup items (`data-state` `on`/`off`, radio roles). Accepted side-panel shifts (§2.7): the
+`AdeReviewWindow` left pane's bounds/default (220-560/320 → 180-480/260; a stored width is clamped,
+never reset), Docker rows following Appearance density (compact 22/38 instead of fixed 28/44), and
+collapsible section headings becoming buttons with `aria-expanded`.
 
 ### 5.2 Risks
 
@@ -550,21 +755,30 @@ ToggleGroup items (`data-state` `on`/`off`, radio roles).
 - A6 edits shared workbench chrome (`TabStrip`, `ModeSwitcher`, `OpLogPanel`, `TitleBar*`) that Space
   also renders. §2 needs no visual change there; if one moves a Space PNG, A records it in its
   findings file and close-out re-records it (B never re-records for A's change).
+- Side panels (§2.7): tree indent 8 → 6px at depth 0 and the new paddings move every side-panel
+  PNG in both apps; each stream re-records its own at stream end, after A10/B10. A6's shared
+  chrome no longer includes `TreeTwisty` (frozen in foundation), so no side-panel primitive
+  changes under a running stream.
 - Rebase conflicts: none expected (zero overlap); a real conflict means the ownership table was
   wrong — stop and fix ownership, never merge PNGs (re-record after rebase).
 
 ### 5.3 Out of scope
 
-Colour palette, tokens and Appearance settings; the git graph canvas, SlickGrid, Monaco,
+P263's families (tables/grids and lists outside side panels, badges/pills, checkbox/switch/radio,
+tooltips, toasts, loading states, alerts and validation, menus, scrollbars and split handles,
+cards, kbd hints, colour/status tokens, focus/disabled states); colour palette, tokens and
+Appearance settings; the git graph canvas, SlickGrid, Monaco,
 terminal and xterm internals; workflow-graph node rendering (`AdeStepNode`, `AdeStageGroupNode`
 content, P255 sizing); CommandDialog; data-view font exemptions (`text-graph-*`, P123 anchors);
 new features, copy rewrites beyond dismiss-button wording; Go.
 
-### 5.4 Close-out (step 3, sequential, after both streams land)
+### 5.4 Close-out (step 4, sequential, after both streams land)
 
 On the landed `v2.0`: fix every item in both findings files; `DialogContent` `size` required
 (legacy path deleted), `DialogHeader` `closable` default true; `Input` `default` size deleted;
 move `permanent` allowlist lines into `check-ui-primitives.sh` as named exemptions with reasons;
+fold `scripts/ui-primitives-side-panels.txt` into the script as a `SIDE_PANELS` list and delete the
+file;
 delete `scripts/ui-primitives-allowlist/`; delete findings files once fixed; `docs/ARCHITECTURE.md`
 UI paragraph final; SPEC P262 result section and row Done; full `typecheck`, `lint`, `test:unit`,
 `test:ui:studio`, `test:ui:space`, `test:ui:space-mobile`, `test:visual:studio`,
@@ -574,11 +788,12 @@ UI paragraph final; SPEC P262 result section and row Done; full `typecheck`, `li
 
 1. Foundation commits on `v2.0` (main checkout), hook-green, verified (§3). Plain push in the
    background (`git push origin v2.0`); no PR.
-2. Worktrees A and B off that tip (§4.4); streams run concurrently.
-3. Each stream done (§4.3) → in its worktree `git rebase v2.0` (B after A lands, or either order),
+2. Addendum commits on `v2.0` (§3.1), hook-green, verified, "Addendum result" written; push.
+3. Worktrees A and B off the addendum tip (§4.4); streams run concurrently.
+4. Each stream done (§4.3) → in its worktree `git rebase v2.0` (B after A lands, or either order),
    re-run lint/typecheck and its own visual check, then in the main checkout
    `git merge --ff-only p262-a` (then `p262-b` after its rebase). Plain background push after each.
-4. Close-out (§5.4) on `v2.0`, push, remove worktrees (§4.4 step 5).
+5. Close-out (§5.4) on `v2.0`, push, remove worktrees (§4.4 step 5).
 
 ## 6. Verification checklist (orchestrator greps, after close-out)
 
@@ -599,6 +814,11 @@ Scope `D="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-s
 - `grep -rn 'variant="icon"' --include=*.vue $D | grep EmptyMedia` → 0.
 - Real usage of the new primitives: `grep -rl "<SecondaryTabs" $D | wc -l` ≥ 35 files,
   `grep -rl '<DialogBody' $D | wc -l` ≥ 40, `grep -rl '<SectionHeading' $D | wc -l` ≥ 6.
+- Side panels: `grep -rln 'rowVariants(' $D | wc -l` ≥ 20, `grep -rl '<PanelBar' $D | wc -l` ≥ 6,
+  `grep -rl '<PanelHeader' $D | wc -l` ≥ 12 (6 module panels + the 6 earlier users),
+  `grep -rl 'useRowHeight' $D | wc -l` ≥ 5; `packages/git-ui/src/lib/rowVariants.ts` gone;
+  `grep -rn "rowDensity === 'compact'" $D` only in the P263 grid files (none in the side-panel list);
+  `grep -rn 'side-empty' $D` → 0.
 - `git diff --stat <foundation-base>..HEAD -- '*.go'` → empty.
 - `docker-edit.spec.ts` asserts `on`/`off`; every `visual` project green on both apps.
 
