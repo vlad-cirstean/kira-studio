@@ -4529,6 +4529,13 @@ replies and full terminal attach for Claude Code sessions.
   detached, not deleted. No image pull. Swarm and Kubernetes containers are read-only. `mapErr` maps
   engine conflict to `E_CONFLICT`, permission denied to `E_INVALID`.
   lucide `Boxes`: no allowed library ships a Compose mark.
+- P260 polish. Edit view: two shadcn `Tabs` (In place, Recreate), neutral dirty dot, no per-field mode badge;
+  an In place field whose mode resolves to recreate shows a plain hint. `Image.registryUrl` and
+  `ContainerDetail.registryUrl` are computed in Go (`registry.go`) from tags and RepoDigests; empty means no
+  button. Known limit: with the containerd image store, local-only images also carry a digest, so an
+  unqualified local name (`myapp:dev`) gets a Docker Hub link that may 404. The button opens through
+  `LinkService.OpenExternal` (Studio binds it again, 30 services); docker-ui takes `openExternal` in its
+  context options. Container size lives in the Stats tab, which also opens for stopped containers.
 
 ## Database MCP server (v1.7)
 
