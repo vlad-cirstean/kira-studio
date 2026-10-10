@@ -1,0 +1,32 @@
+{
+  "git:status.get#cherry-pick": {
+    "autoFetch": null,
+    "counts": {
+      "staged": 0,
+      "unmerged": 1,
+      "unstaged": 0,
+      "untracked": 0
+    },
+    "dirtyPaths": [
+      "c.txt"
+    ],
+    "dirtyTruncated": false,
+    "head": {
+      "kind": "branch",
+      "name": "main"
+    },
+    "inProgress": {
+      "canAbort": true,
+      "canContinue": true,
+      "canSkip": true,
+      "conflictedPaths": [
+        "c.txt"
+      ],
+      "isSequence": false,
+      "kind": "cherryPick",
+      "otherSha": "<masked>",
+      "unmergedCount": 1
+    },
+    "isClean": false
+  }
+}

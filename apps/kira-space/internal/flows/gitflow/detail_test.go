@@ -114,9 +114,12 @@ func TestCommitDetailAndDiff(t *testing.T) {
 			if detail.Subject == "" || detail.SHA != tc.sha {
 				t.Fatalf("detail header = %+v", detail)
 			}
-			// Contract git-commit-detail: tests/ui/repo-commit-detail.spec.ts reads the rename and merge.
-			if tc.name == "rename" {
-				r.app.Contract(t, "git-commit-detail", "git:commit.detail#"+tc.name, detail, flowharness.Mask("sha", "parents", "timestamp"))
+			// Contract git-commit-detail: tests/ui/repo-commit-detail.spec.ts reads the rename, binary-mode and merge.
+			switch tc.name {
+			case "rename":
+				r.app.Contract(t, "git-commit-detail", "git:commit.detail#rename", detail, flowharness.Mask("sha", "parents", "timestamp"))
+			case "binary mode NFD":
+				r.app.Contract(t, "git-commit-detail", "git:commit.detail#binary-mode", detail, flowharness.Mask("sha", "parents", "timestamp"))
 			}
 		})
 	}

@@ -242,6 +242,12 @@ func TestCherryPickRevertConflict(t *testing.T) {
 	if res.OK || res.InProgress == nil || res.InProgress.Kind != gitpreflight.InProgressCherryPick {
 		t.Fatalf("conflicting pick = %+v, want a cherry-pick in progress", res)
 	}
+	st := r.status(id)
+	if st.InProgress == nil || st.InProgress.Kind != gitpreflight.InProgressCherryPick {
+		t.Fatalf("status.get = %+v, want a cherry-pick in progress", st.InProgress)
+	}
+	// Contract git-view-head: tests/ui/repo-commit-meta.spec.ts shows the operation in the view head.
+	r.app.Contract(t, "git-view-head", "git:status.get#cherry-pick", st, flowharness.Mask("otherSha"))
 	r.mustOp(id, gitsession.OpRequest{Kind: "opAbort"})
 	if got := repo.Git("rev-parse", "HEAD"); got != onMain {
 		t.Fatalf("HEAD after abort = %s, want %s", got, onMain)

@@ -11,6 +11,7 @@ interface DetailFile {
   path: string;
   kind: string;
   originalPath?: string;
+  similarity?: number;
 }
 interface Detail {
   files: DetailFile[];
@@ -40,6 +41,27 @@ test('contract: a rename commit lists the new path with its old path in the tip'
   const tree = page.locator('[data-testid="file-tree"]');
   await expect(tree).toContainText(renamed.path.split('/').pop() ?? renamed.path);
   await expect(tree.locator(`[data-kira-tip*="${renamed.originalPath}"]`).first()).toBeVisible();
+  await expect(
+    tree.locator(`[data-kira-tip*="${renamed.similarity}% similar"]`).first(),
+  ).toBeVisible();
+});
+
+test('contract: a binary and a mode-only change list by name-status with no line counts', async ({
+  relaunch,
+}) => {
+  const detail = contract<Detail>('git-commit-detail', 'git:commit.detail#binary-mode');
+  const letters: Record<string, string> = { added: 'A', modified: 'M', deleted: 'D' };
+  expect(detail.files.length).toBeGreaterThanOrEqual(3);
+  const page = await openDetail(relaunch, detail, [SHA_B]);
+  const tree = page.locator('[data-testid="file-tree"]');
+  for (const f of detail.files) {
+    const row = tree.locator('[data-testid="file-tree-row"]', {
+      hasText: f.path.split('/').pop() ?? f.path,
+    });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('[data-testid="file-tree-status"]')).toHaveText(letters[f.kind]);
+    expect(await row.innerText()).not.toMatch(/[+\u2212-]\d+/);
+  }
 });
 
 for (const parent of [0, 1] as const) {

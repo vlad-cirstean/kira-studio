@@ -1,4 +1,41 @@
 {
+  "git:commit.detail#binary-mode": {
+    "author": {
+      "email": "author@example.com",
+      "name": "Test Author",
+      "timestamp": 0
+    },
+    "body": "",
+    "committer": {
+      "email": "author@example.com",
+      "name": "Test Author",
+      "timestamp": 0
+    },
+    "decoration": [],
+    "files": [
+      {
+        "kind": "added",
+        "path": "bin.dat"
+      },
+      {
+        "kind": "modified",
+        "path": "café.txt"
+      },
+      {
+        "kind": "modified",
+        "path": "run.sh"
+      }
+    ],
+    "parentIndex": 0,
+    "parents": [],
+    "sha": "<masked>",
+    "signature": {
+      "signer": "",
+      "status": "N"
+    },
+    "subject": "binary and mode",
+    "trailers": []
+  },
   "git:commit.detail#merge-parent-0": {
     "author": {
       "email": "author@example.com",

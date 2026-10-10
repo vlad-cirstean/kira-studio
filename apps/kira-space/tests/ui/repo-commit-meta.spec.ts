@@ -1,5 +1,12 @@
 import { expect, test } from './fixtures';
-import { openCommitDetail } from './support/gitUiPortFixtures';
+import { contract } from './support/contract';
+import {
+  openCommitDetail,
+  openPortGraph,
+  rootRow,
+  SHA_A,
+  singleRowChunks,
+} from './support/gitUiPortFixtures';
 
 // The commit detail pane's collapsed and expanded states inside Space, over real rendered
 // geometry. Ported from the VS Code webview suite.
@@ -83,4 +90,32 @@ test('the view head and the detail head are Studio 34px toolbars', async ({ rela
   for (const head of [viewHead, detailHead]) {
     expect(await head.evaluate((el) => el.getBoundingClientRect().height)).toBe(34);
   }
+});
+
+// Contracts git-remote (refs.list#behind) and git-view-head (status.get#cherry-pick). Backend
+// halves: gitflow TestRemoteFetchPullPush and TestCherryPickRevertConflict.
+test('contract: the view head shows the branch, its behind count and the operation in progress', async ({
+  relaunch,
+}) => {
+  const refs = contract<{
+    branches: { shortName: string; isHead: boolean; track?: { ahead: number; behind: number } }[];
+  }>('git-remote', 'git:refs.list#behind');
+  const head = refs.branches.find((b) => b.isHead);
+  if (!head?.track) throw new Error('contract lost the head branch tracking');
+  const status = contract<{ inProgress: { kind: string } }>(
+    'git-view-head',
+    'git:status.get#cherry-pick',
+  );
+  expect(status.inProgress.kind).toBe('cherryPick');
+  const page = await openPortGraph(relaunch, {
+    chunks: singleRowChunks([rootRow(SHA_A, 'Add the graph column fixture')]),
+    results: { 'refs.list': refs, 'status.get': status },
+  });
+  await expect(page.locator('[data-testid="git-view-head-branch"]')).toHaveText(head.shortName);
+  await expect(page.locator('[data-testid="git-view-head-sync"]')).toContainText(
+    `\u2193${head.track.behind}`,
+  );
+  await expect(page.locator('[data-testid="git-view-head-operation"]')).toContainText(
+    'Cherry-picking',
+  );
 });
