@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { dialogBodyClass, dialogFooterClass, dialogHeaderClass } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener } from '@vueuse/core';
@@ -50,13 +51,16 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
       role="dialog"
       aria-modal="true"
       :aria-labelledby="titleId"
-      class="w-72 flex flex-col gap-1.5 p-2 bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden"
+      class="w-100 max-w-[90vw] flex flex-col overflow-hidden rounded-kira-pill bg-elevated text-fg text-kira-md ring-1 ring-fg/10"
     >
-      <div :id="titleId" class="text-kira-md text-muted-foreground">{{ title }}</div>
+      <div :class="dialogHeaderClass">
+        <div :id="titleId" class="text-kira-lg">{{ title }}</div>
+      </div>
+      <div :class="dialogBodyClass">
       <Input
         ref="inputRef"
         :model-value="modelValue"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2"
+        size="kira-lg"
         :aria-labelledby="titleId"
         data-testid="text-prompt-input"
         @update:model-value="emit('update:modelValue', String($event))"
@@ -64,7 +68,8 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
         @keydown.enter="(e: KeyboardEvent) => !e.isComposing && emit('submit')"
         @keydown.escape="(e: KeyboardEvent) => !e.isComposing && emit('cancel')"
       />
-      <div class="flex justify-end gap-1.5">
+      </div>
+      <div :class="dialogFooterClass">
         <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="emit('cancel')"
           >Cancel</Button
         >

@@ -36,8 +36,6 @@ async function save(patch: SettingsPatch): Promise<void> {
   <SettingsShell
     :sections="sections"
     :initial-section="settingsStore.settingsSection ?? undefined"
-    :width="780"
-    :height="560"
     :defaults="{
       appearance: defaultSettings.appearance,
       data: defaultSettings.data,
@@ -101,25 +99,23 @@ async function save(patch: SettingsPatch): Promise<void> {
     </template>
 
     <template #footer="f">
-      <span class="flex-1 min-w-0 flex items-center">
+      <span class="mr-auto min-w-0 flex items-center">
         <FieldError v-if="f.saveError" data-testid="settings-save-error">{{ f.saveError }}</FieldError>
         <FieldDescription v-else data-testid="settings-footer-status"
           >Stored in <span class="font-data">~/.kira-studio/kira.sqlite</span><template v-if="f.isDirty">
           · Unsaved changes</template></FieldDescription
         >
       </span>
-      <span class="flex items-center gap-1">
-        <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">Cancel</Button>
-        <Button
-          variant="dialog-primary"
-          size="kira-lg"
-          data-testid="settings-save"
-          :disabled="!f.isValid"
-          @click="f.onSave"
-        >
-          Save
-        </Button>
-      </span>
+      <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">Cancel</Button>
+      <Button
+        variant="dialog-primary"
+        size="kira-lg"
+        data-testid="settings-save"
+        :disabled="!f.isValid"
+        @click="f.onSave"
+      >
+        Save
+      </Button>
     </template>
   </SettingsShell>
 </template>

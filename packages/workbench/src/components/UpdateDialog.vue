@@ -2,6 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -40,39 +41,38 @@ function onEscapeOrOutside(e: Event): void {
 <template>
   <Dialog :open="true" @update:open="onOpenChange">
     <DialogContent
-      :show-close-button="false"
+      size="sm"
       data-testid="update-dialog"
-      class="w-100"
       @escape-key-down="onEscapeOrOutside"
       @pointer-down-outside="onEscapeOrOutside"
     >
-      <DialogHeader>
+      <DialogHeader :closable="state !== 'installing'">
         <DialogTitle>{{ store.appName }} update</DialogTitle>
       </DialogHeader>
 
-      <template v-if="state === 'installing'">
-        <p class="m-0">
-          Downloading and verifying {{ store.appName }} {{ store.latestVersion }}…
-          {{ store.appName }} quits once the new version is ready.
-        </p>
-      </template>
-      <template v-else>
-        <p class="m-0" data-testid="update-dialog-versions">
-          {{ store.appName }} {{ store.latestVersion }} is available. You have
-          {{ store.currentVersion }}.
-        </p>
-        <p class="m-0 text-subtle">
-          Updating quits {{ store.appName }}, installs the new version into /Applications, then
-          reopens it. If it doesn't reopen within a few minutes, see {{ store.installLogPath }}.
-        </p>
-        <p v-if="state === 'error'" class="m-0 text-error" data-testid="update-dialog-error">
-          {{ store.installError }} Details: {{ store.installLogPath }}.
-        </p>
-      </template>
+      <DialogBody>
+        <template v-if="state === 'installing'">
+          <p class="m-0">
+            Downloading and verifying {{ store.appName }} {{ store.latestVersion }}…
+            {{ store.appName }} quits once the new version is ready.
+          </p>
+        </template>
+        <template v-else>
+          <p class="m-0" data-testid="update-dialog-versions">
+            {{ store.appName }} {{ store.latestVersion }} is available. You have
+            {{ store.currentVersion }}.
+          </p>
+          <p class="m-0 text-subtle">
+            Updating quits {{ store.appName }}, installs the new version into /Applications, then
+            reopens it. If it doesn't reopen within a few minutes, see {{ store.installLogPath }}.
+          </p>
+          <p v-if="state === 'error'" class="m-0 text-error" data-testid="update-dialog-error">
+            {{ store.installError }} Details: {{ store.installLogPath }}.
+          </p>
+        </template>
+      </DialogBody>
 
-      <DialogFooter
-        class="items-stretch gap-2 border-t bg-field/50 -mx-4 -mb-4 rounded-b-kira-pill p-4 flex-col-reverse sm:flex-row sm:justify-end"
-      >
+      <DialogFooter>
         <template v-if="state === 'installing'">
           <Button
             variant="dialog"

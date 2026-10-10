@@ -37,8 +37,6 @@ async function save(patch: SettingsPatch): Promise<void> {
   <SettingsShell
     :sections="sections"
     :initial-section="settingsStore.settingsSection ?? undefined"
-    :width="680"
-    :height="520"
     :defaults="{
       appearance: defaultSettings.appearance,
       advanced: defaultSettings.advanced,
@@ -102,7 +100,7 @@ async function save(patch: SettingsPatch): Promise<void> {
     </template>
 
     <template #footer="f">
-      <span class="flex-1 min-w-0">
+      <span class="mr-auto min-w-0">
         <!-- P110 B12/B36: no `flex` here (unlike Kira Studio's own copy) -- its children are
              plain inline spans today, so kept as spans with .field-error's/.helper-text's own
              utility-class equivalent, not FieldError/FieldDescription (a <div>/<p>), which would
@@ -114,18 +112,16 @@ async function save(patch: SettingsPatch): Promise<void> {
           f.isDirty ? 'Unsaved changes' : ''
         }}</span>
       </span>
-      <span class="flex items-center gap-1">
-        <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">Cancel</Button>
-        <Button
-          variant="dialog-primary"
-          size="kira-lg"
-          :disabled="!f.isValid"
-          data-testid="settings-save"
-          @click="f.onSave"
-        >
-          Save
-        </Button>
-      </span>
+      <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">Cancel</Button>
+      <Button
+        variant="dialog-primary"
+        size="kira-lg"
+        :disabled="!f.isValid"
+        data-testid="settings-save"
+        @click="f.onSave"
+      >
+        Save
+      </Button>
     </template>
   </SettingsShell>
 </template>

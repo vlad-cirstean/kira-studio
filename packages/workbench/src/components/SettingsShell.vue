@@ -1,9 +1,7 @@
 <script setup lang="ts" generic="T extends Record<string, Record<string, unknown>>">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -69,8 +67,6 @@ type SectionPatch = { [K in keyof T]?: Partial<T[K]> };
 const props = defineProps<{
   sections: readonly string[];
   initialSection?: string;
-  width?: number;
-  height?: number;
   defaults: T;
   current: T;
   save: (patch: SectionPatch) => Promise<void>;
@@ -185,41 +181,18 @@ async function onSave(): Promise<void> {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onDismiss()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="settings-dialog"
-      class="flex flex-col p-0 gap-0"
-      :class="height === undefined && 'max-h-[80vh]'"
-      :style="{
-        width: `${width ?? 640}px`,
-        height: height !== undefined ? `${height}px` : undefined,
-      }"
-    >
-      <DialogHeader>
-        <span class="flex items-center justify-center shrink-0 size-4 text-muted-foreground">
-          <CodiconIcon name="gear" :size="13" />
-        </span>
+    <DialogContent size="xl" fixed-height data-testid="settings-dialog">
+      <DialogHeader icon="gear" closable close-testid="settings-dialog-close">
         <DialogTitle>Settings</DialogTitle>
-        <DialogClose as-child>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto"
-            aria-label="Close"
-            data-testid="settings-dialog-close"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </DialogClose>
       </DialogHeader>
 
-      <div class="flex-1 min-h-0 flex">
+      <DialogBody flush class="flex-row">
         <nav class="w-44 shrink-0 flex flex-col gap-px border-r border-border py-1.5 px-1">
           <button
             v-for="section in sections"
             :key="section"
             type="button"
-            class="text-left rounded-kira-sm border-none cursor-pointer h-5.5 px-1.5 text-kira-md"
+            class="text-left rounded-kira-sm border-none cursor-pointer h-control-lg px-2 text-kira-md"
             :class="activeSection === section ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground hover:bg-hover'"
             :aria-current="activeSection === section ? 'page' : undefined"
             :data-testid="`settings-section-${section}`"
@@ -229,7 +202,7 @@ async function onSave(): Promise<void> {
           </button>
         </nav>
 
-        <section class="flex-1 overflow-auto flex flex-col p-3 gap-2">
+        <section class="flex-1 overflow-auto flex flex-col p-3 gap-3">
           <slot
             name="pane"
             :active-section="activeSection"
@@ -239,7 +212,7 @@ async function onSave(): Promise<void> {
             :register-field-error="registerFieldError"
           />
         </section>
-      </div>
+      </DialogBody>
 
       <UiDialogFooter>
         <slot

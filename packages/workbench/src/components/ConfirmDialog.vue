@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -31,24 +30,18 @@ function onConfirm(): void {
        Losing the closing fade (v-if unmounts immediately, no exit transition) is the accepted
        trade-off for correct stacking when nested under another open dialog. -->
   <Dialog v-if="confirmDialogStore.open" :open="true" @update:open="(v) => !v && onCancel()">
-    <DialogContent
-      :show-close-button="false"
-      data-testid="confirm-dialog"
-      class="w-100"
-    >
-      <DialogHeader>
+    <DialogContent size="sm" data-testid="confirm-dialog">
+      <DialogHeader closable close-testid="confirm-dialog-close">
         <DialogTitle>Confirm</DialogTitle>
       </DialogHeader>
 
-      <p class="m-0 whitespace-pre-wrap" data-testid="confirm-dialog-message">
-        {{ confirmDialogStore.message }}
-      </p>
+      <DialogBody>
+        <p class="m-0 whitespace-pre-wrap" data-testid="confirm-dialog-message">
+          {{ confirmDialogStore.message }}
+        </p>
+      </DialogBody>
 
-      <!-- P110 I2-21: DialogFooter's own base changed (§3.10, M9) -- this explicit class restates
-           the old merged default so this dialog's look stays put. -->
-      <DialogFooter
-        class="items-stretch gap-2 border-t bg-field/50 -mx-4 -mb-4 rounded-b-kira-pill p-4 flex-col-reverse sm:flex-row sm:justify-end"
-      >
+      <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="confirm-dialog-cancel" @click="onCancel">
           Cancel
         </Button>
@@ -61,18 +54,6 @@ function onConfirm(): void {
           {{ confirmDialogStore.confirmLabel || (confirmDialogStore.danger ? 'Delete' : 'Continue') }}
         </Button>
       </DialogFooter>
-
-      <DialogClose as-child>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          class="absolute top-2 right-2"
-          aria-label="Close"
-          data-testid="confirm-dialog-close"
-        >
-          <CodiconIcon name="close" :size="13" />
-        </Button>
-      </DialogClose>
     </DialogContent>
   </Dialog>
 </template>
