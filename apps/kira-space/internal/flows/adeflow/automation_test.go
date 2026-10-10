@@ -74,6 +74,19 @@ func newAutoFixture(t *testing.T, extraStep string, draft bool, opts ...flowharn
 		t.Fatalf("StartRun: %v", err)
 	}
 	waitRun(t, app, f.task, "one", "done")
+	// waitRun sees one branch's run; the other branch must be done too, or it still counts as busy.
+	testx.WaitUntil(t, waitFor, func() bool {
+		n := 0
+		for _, r := range taskOf(t, board(t, app), f.task).Runs {
+			if r.StepID == "one" {
+				if r.State != "done" {
+					return false
+				}
+				n++
+			}
+		}
+		return n == 2
+	})
 	if draft {
 		// A draft branch makes step one pending on it again, so only the pickers test adds one.
 		if _, err := app.W.AdeTask.AddTaskRepo(ctx, adewire.AddTaskRepoArgs{TaskID: f.task, CodeRepoID: f.docs}); err != nil {
