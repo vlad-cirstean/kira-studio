@@ -19,6 +19,8 @@ const (
 	DirModeKira  = "kira"
 	DirModeFixed = "fixed"
 	DirModeHome  = "home"
+	// DirModeWorktree is a Dir.Mode only (a run from an ADE task); a script never stores it.
+	DirModeWorktree = "worktree"
 )
 
 // MaxCollectionRunes caps a script collection name.
@@ -58,6 +60,9 @@ type CustomScript struct {
 	Params []Param `json:"params"`
 	// Smart is nil for a normal script.
 	Smart *Smart `json:"smart"`
+	// UseAdeDir runs the script in the task's branch worktree when started from ADE. Only Kira
+	// Space shows it.
+	UseAdeDir bool `json:"useAdeDir"`
 }
 
 // Collection mirrors packages/shared/domain/scripts.ts's scriptCollectionSchema: one
@@ -91,6 +96,8 @@ type CustomScriptFields struct {
 	Params []Param `json:"params"`
 	// Smart is required for a smart script (missing fields take the defaults) and nil otherwise.
 	Smart *Smart `json:"smart"`
+	// UseAdeDir: see CustomScript.
+	UseAdeDir bool `json:"useAdeDir"`
 }
 
 // Validate is the complete rule set: the Go check is the authority, the mirrored zod schema is

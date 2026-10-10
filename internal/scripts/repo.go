@@ -15,7 +15,7 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-const selectColumns = `id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json`
+const selectColumns = `id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json, use_ade_dir`
 
 // Repo reads and writes the `custom_scripts` table, List ordered deterministically.
 type Repo struct {
@@ -28,7 +28,7 @@ func scanRow(row rowScanner) (CustomScript, error) {
 	var paramsJSON, smartJSON string
 	if err := row.Scan(
 		&s.ID, &s.Name, &s.Command, &s.WorkingDir, &s.DirMode, &s.Color, &collectionID, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt,
-		&s.Kind, &paramsJSON, &smartJSON,
+		&s.Kind, &paramsJSON, &smartJSON, &s.UseAdeDir,
 	); err != nil {
 		return CustomScript{}, err
 	}
@@ -124,6 +124,7 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 		Kind:         fields.Kind,
 		Params:       fields.Params,
 		Smart:        fields.Smart,
+		UseAdeDir:    fields.UseAdeDir,
 	}
 	if _, err := r.DB.Exec(
 		`INSERT INTO custom_scripts (id, name, command, working_dir, dir_mode, color, collection_id, sort_order, created_at, updated_at, kind, params_json, smart_json)
@@ -162,9 +163,9 @@ func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error
 	now := kiratime.NowISO()
 	res, err := r.DB.Exec(
 		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, dir_mode = ?, color = ?, collection_id = ?, updated_at = ?,
-		 kind = ?, params_json = ?, smart_json = ? WHERE id = ?`,
+		 kind = ?, params_json = ?, smart_json = ?, use_ade_dir = ? WHERE id = ?`,
 		fields.Name, fields.Command, fields.WorkingDir, fields.DirMode, fields.Color, fields.CollectionID, now,
-		fields.Kind, paramsJSON, smartJSON, id,
+		fields.Kind, paramsJSON, smartJSON, fields.UseAdeDir, id,
 	)
 	if err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: update %s: %w", id, err)

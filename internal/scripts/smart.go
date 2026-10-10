@@ -351,6 +351,9 @@ func validMCP(choices []MCPChoice) ([]MCPChoice, error) {
 	return out, nil
 }
 
+// BuiltinEnv is the environment variable a built-in variable reaches a run through.
+func BuiltinEnv(name string) string { return "KIRA_" + strings.ToUpper(name) }
+
 // VarsUsed returns the built-in variable and param names that text uses in {...}, in first-seen order.
 func VarsUsed(text string, params []Param) []string {
 	known := map[string]bool{}

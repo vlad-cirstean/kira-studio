@@ -148,10 +148,13 @@ func (s *Service) Exited(terminalID string, code int, cause terminal.CloseCause)
 	s.finish(run, err)
 }
 
-// List returns the newest runs first.
-func (s *Service) List(limit int) ([]Run, error) {
+// List returns the newest runs first; a task id narrows it to that task's runs.
+func (s *Service) List(limit int, taskID string) ([]Run, error) {
 	if limit <= 0 || limit > keepFinished {
 		limit = keepFinished
+	}
+	if taskID != "" {
+		return s.Runs.ListByTask(taskID, limit)
 	}
 	return s.Runs.List(limit)
 }

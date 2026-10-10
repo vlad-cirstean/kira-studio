@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const columns = `id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command, outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json, tools_json`
+const columns = `id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command, outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json, tools_json, task_id, task_title, branch_id, branch_label`
 
 // keepFinished is how many finished runs are retained.
 const keepFinished = 500
@@ -26,7 +26,8 @@ func scan(row rowScanner) (Run, error) {
 	var started, finished sql.NullInt64
 	if err := row.Scan(&r.ID, &r.ScriptID, &r.ScriptName, &r.Color, &r.Kind, &r.Trigger, &r.State, &r.TerminalID,
 		&r.Cwd, &r.Command, &outcome, &r.CreatedAt, &started, &finished,
-		&r.Model, &r.SessionID, &r.Prompt, &paramsJSON, &toolsJSON); err != nil {
+		&r.Model, &r.SessionID, &r.Prompt, &paramsJSON, &toolsJSON,
+		&r.TaskID, &r.TaskTitle, &r.BranchID, &r.BranchLabel); err != nil {
 		return Run{}, err
 	}
 	r.Params = []RunParam{}
@@ -78,10 +79,11 @@ func (r *Repo) Insert(run Run) error {
 	if err != nil {
 		return fmt.Errorf("scriptruns: encode tools: %w", err)
 	}
-	if _, err := r.DB.Exec(`INSERT INTO script_runs (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	if _, err := r.DB.Exec(`INSERT INTO script_runs (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		run.ID, run.ScriptID, run.ScriptName, run.Color, run.Kind, run.Trigger, run.State, run.TerminalID,
 		run.Cwd, run.Command, outcome, run.CreatedAt, run.StartedAt, run.FinishedAt,
-		run.Model, run.SessionID, run.Prompt, string(params), string(tools)); err != nil {
+		run.Model, run.SessionID, run.Prompt, string(params), string(tools),
+		run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel); err != nil {
 		return fmt.Errorf("scriptruns: insert %s: %w", run.ID, err)
 	}
 	return nil
@@ -99,6 +101,15 @@ func (r *Repo) Get(id string) (Run, error) {
 // List returns the newest runs first.
 func (r *Repo) List(limit int) ([]Run, error) {
 	rows, err := r.DB.Query(`SELECT `+columns+` FROM script_runs ORDER BY created_at DESC, id DESC LIMIT ?`, limit)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (Run, bool, error) {
+		run, err := scan(rows)
+		return run, true, err
+	})
+}
+
+// ListByTask returns the newest runs started for a task first.
+func (r *Repo) ListByTask(taskID string, limit int) ([]Run, error) {
+	rows, err := r.DB.Query(`SELECT `+columns+` FROM script_runs WHERE task_id = ? ORDER BY created_at DESC, id DESC LIMIT ?`, taskID, limit)
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (Run, bool, error) {
 		run, err := scan(rows)
 		return run, true, err

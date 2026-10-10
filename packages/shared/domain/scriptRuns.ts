@@ -45,6 +45,11 @@ export const scriptRunSchema = /*#__PURE__*/ z.object({
   prompt: z.string(),
   params: z.array(scriptRunParamSchema),
   tools: scriptRunToolsSchema,
+  // Set when started for an ADE task (Kira Space).
+  taskId: z.string(),
+  taskTitle: z.string(),
+  branchId: z.string(),
+  branchLabel: z.string(),
 });
 export type ScriptRun = z.infer<typeof scriptRunSchema>;
 
@@ -84,6 +89,30 @@ export const scriptRunPartSchema = /*#__PURE__*/ z.object({
 });
 export type ScriptRunPart = z.infer<typeof scriptRunPartSchema>;
 
+// Mirrors scriptruns.TaskChoice / BranchChoice: what the run dialog asks the user to pick.
+export const scriptRunTaskChoiceSchema = /*#__PURE__*/ z.object({
+  id: z.string(),
+  title: z.string(),
+});
+export type ScriptRunTaskChoice = z.infer<typeof scriptRunTaskChoiceSchema>;
+
+export const scriptRunBranchChoiceSchema = /*#__PURE__*/ z.object({
+  id: z.string(),
+  label: z.string(),
+  disabled: z.boolean(),
+  why: z.string(),
+});
+export type ScriptRunBranchChoice = z.infer<typeof scriptRunBranchChoiceSchema>;
+
+// Mirrors scriptruns.RunADE: the task and branch a run resolved.
+export const scriptRunAdeSchema = /*#__PURE__*/ z.object({
+  taskId: z.string(),
+  taskTitle: z.string(),
+  branchId: z.string(),
+  branchLabel: z.string(),
+});
+export type ScriptRunAde = z.infer<typeof scriptRunAdeSchema>;
+
 export const scriptRunPreviewSchema = /*#__PURE__*/ z.object({
   kind: z.enum(['script', 'smart']),
   missing: z.array(z.string()),
@@ -101,6 +130,11 @@ export const scriptRunPreviewSchema = /*#__PURE__*/ z.object({
   allowedTools: z.array(z.string()),
   mcpServers: z.array(z.string()),
   hash: z.string(),
+  needs: z.object({
+    tasks: z.array(scriptRunTaskChoiceSchema),
+    branches: z.array(scriptRunBranchChoiceSchema),
+  }),
+  ade: scriptRunAdeSchema.nullable(),
 });
 export type ScriptRunPreview = z.infer<typeof scriptRunPreviewSchema>;
 
@@ -109,6 +143,9 @@ export interface ScriptRunArgs {
   scriptId: string;
   params: Record<string, string[]>;
   prompt: string | null;
+  // Kira Space: the ADE task and branch to run for; '' when none is chosen.
+  taskId: string;
+  branchId: string;
 }
 
 export const scriptRunStartedSchema = /*#__PURE__*/ z.object({

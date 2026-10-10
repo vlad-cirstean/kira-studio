@@ -43,6 +43,8 @@ const args = computed<ScriptRunArgs>(() => ({
   scriptId: props.scriptId,
   params: values.value,
   prompt: oneOff.value,
+  taskId: '',
+  branchId: '',
 }));
 const debounced = refDebounced(args, 250);
 

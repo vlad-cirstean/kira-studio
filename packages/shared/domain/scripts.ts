@@ -78,6 +78,8 @@ export const customScriptFieldsSchema = /*#__PURE__*/ z.object({
   color: paletteColorSchema,
   // null = ungrouped; the panel groups rows under their collection.
   collectionId: z.string().nullable(),
+  // Kira Space: run in the ADE task's worktree when started from ADE. Studio stores it, never shows it.
+  useAdeDir: z.boolean(),
 });
 export type CustomScriptFields = z.infer<typeof customScriptFieldsSchema>;
 
@@ -111,9 +113,12 @@ export type ScriptsSnapshot = z.infer<typeof scriptsSnapshotSchema>;
 // scriptDirSchema mirrors scripts.Dir — where a saved script runs, and why it cannot.
 export const scriptDirSchema = /*#__PURE__*/ z.object({
   path: z.string(),
-  mode: scriptDirModeSchema,
+  mode: /*#__PURE__*/ z.enum(['kira', 'fixed', 'home', 'worktree']),
   base: z.string(),
   blocker: z.string(),
+  // 'repo · branch' of a worktree folder; pending = the worktree is created on Run.
+  branch: z.string(),
+  pending: z.boolean(),
 });
 export type ScriptDir = z.infer<typeof scriptDirSchema>;
 

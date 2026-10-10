@@ -78,6 +78,7 @@ const usesParts = computed<TextPart[]>(() => {
 const command = ref(props.script?.command ?? '');
 const dirMode = ref<ScriptDirMode>(props.script?.dirMode ?? 'kira');
 const workingDir = ref(props.script?.workingDir ?? '');
+const useAdeDir = ref(props.script?.useAdeDir ?? true);
 const dir = useQuery(
   {
     queryKey: ['scriptRuns', 'dir', props.script?.id ?? ''],
@@ -137,6 +138,7 @@ async function save(): Promise<void> {
     workingDir: dirMode.value === 'fixed' ? workingDir.value.trim() : '',
     color: color.value,
     collectionId: collection.value === '' ? null : collection.value,
+    useAdeDir: useAdeDir.value,
   };
   try {
     if (props.script) await props.scripts.update(props.script.id, fields);

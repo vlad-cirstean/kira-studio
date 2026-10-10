@@ -14,6 +14,8 @@ type Bound struct{ Svc *Service }
 
 type ListArgs struct {
 	Limit int `json:"limit"`
+	// TaskID, when set, lists only the runs started for that ADE task.
+	TaskID string `json:"taskId"`
 }
 
 type IDArgs struct {
@@ -21,7 +23,7 @@ type IDArgs struct {
 }
 
 func (b *Bound) List(args ListArgs) ([]Run, error) {
-	return ipcerr.InternalResult(b.Svc.List(args.Limit))
+	return ipcerr.InternalResult(b.Svc.List(args.Limit, args.TaskID))
 }
 
 func (b *Bound) Get(args IDArgs) (Run, error) {

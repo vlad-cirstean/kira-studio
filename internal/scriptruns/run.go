@@ -58,4 +58,9 @@ type Run struct {
 	Prompt    string     `json:"prompt"`
 	Params    []RunParam `json:"params"`
 	Tools     RunTools   `json:"tools"`
+	// Set when the run was started for an ADE task (Kira Space); empty otherwise.
+	TaskID      string `json:"taskId"`
+	TaskTitle   string `json:"taskTitle"`
+	BranchID    string `json:"branchId"`
+	BranchLabel string `json:"branchLabel"`
 }

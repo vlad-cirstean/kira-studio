@@ -6,7 +6,7 @@ import { computed } from 'vue';
 
 const props = defineProps<{ preview: ScriptRunPreview }>();
 
-const MODE_LABEL = { kira: 'Kira automations folder', fixed: 'Chosen folder', home: 'Home folder' } as const;
+const MODE_LABEL = { kira: 'Kira automations folder', fixed: 'Chosen folder', home: 'Home folder', worktree: 'Worktree' } as const;
 const folderParts = computed<TextPart[]>(() => [
   `${MODE_LABEL[props.preview.dir.mode]}: `,
   { name: 'folder', value: props.preview.dir.path },

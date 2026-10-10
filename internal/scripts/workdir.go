@@ -16,6 +16,9 @@ type Dir struct {
 	// Base is the app home for DirModeKira and $HOME for DirModeHome; "" for DirModeFixed.
 	Base    string `json:"base"`
 	Blocker string `json:"blocker"`
+	// Branch labels a DirModeWorktree folder as "repo · branch"; Pending says the worktree is created on Run.
+	Branch  string `json:"branch"`
+	Pending bool   `json:"pending"`
 }
 
 // ResolveDir reports where s runs, without creating anything. appHome is the app's data folder.
