@@ -43,8 +43,13 @@ function createPeer(channel: MessageChannelLike, handlers: PeerHandlers) {
   const aborts = new Map<number, AbortController>();
 
   channel.onMessage((raw) => {
-    const frame = unwrapVersioned(raw as never) as Record<string, any>;
-    const id = frame.id as number;
+    const frame = unwrapVersioned(raw as never) as Record<string, unknown> & {
+      id: number;
+      n: number;
+      method: string;
+      params: unknown;
+    };
+    const id = frame.id;
     switch (frame.t) {
       case 'req':
         handlers.request?.(frame.method, frame.params).then(
