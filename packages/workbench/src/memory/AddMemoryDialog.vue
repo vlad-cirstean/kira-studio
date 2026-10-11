@@ -2,6 +2,7 @@
 import type { MemoryClarification, MemoryStoreResult } from '@shared/domain/memory';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -93,7 +94,8 @@ function select(id: string): void {
 
         <template v-if="stored && result">
           <ul class="m-0 flex list-none flex-col gap-1 p-0" data-testid="add-memory-outcomes">
-            <li v-for="(o, i) in result.outcomes" :key="i" class="flex flex-col gap-0.5 rounded-kira-sm border border-border p-1.5">
+            <li v-for="(o, i) in result.outcomes" :key="i">
+              <Card class="gap-0.5">
               <span class="text-kira-sm text-muted-foreground" :data-testid="`add-memory-outcome-${i}`">{{ actionLabel(o) }}</span>
               <button
                 v-if="o.action !== 'failed'"
@@ -102,6 +104,7 @@ function select(id: string): void {
                 @click="select(o.id)"
               >{{ o.fact }}</button>
               <span v-else class="text-kira-md">{{ o.fact }}</span>
+              </Card>
             </li>
           </ul>
         </template>
@@ -119,17 +122,18 @@ function select(id: string): void {
             />
             <span class="self-end text-kira-sm text-muted-foreground" data-testid="add-memory-count">{{ text.length }} / {{ MAX_TEXT }}</span>
             <template v-if="challenged">
-              <div
+              <Alert
                 v-for="c in result?.challenges.filter((x) => x.index === 0)"
                 :key="c.index"
-                class="flex flex-col gap-1 rounded-kira-sm bg-warn/10 p-1.5"
+                variant="warn"
+                :icon="null"
                 data-testid="add-memory-challenge"
               >
                 <div v-for="(question, q) in c.questions" :key="q" class="flex flex-col gap-0.5">
                   <Label :for="`memory-answer-${q}`">{{ question }}</Label>
                   <Textarea :id="`memory-answer-${q}`" v-model="answers[answerKey(c.index, q)]" :disabled="busy" placeholder="Your answer" data-testid="add-memory-answer" />
                 </div>
-              </div>
+              </Alert>
             </template>
           </div>
           <p v-if="busy" class="m-0 text-kira-sm text-muted-foreground" data-testid="add-memory-busy">Checking with Claude…</p>

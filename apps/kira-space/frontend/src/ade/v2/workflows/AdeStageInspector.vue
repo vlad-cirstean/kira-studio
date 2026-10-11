@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +11,6 @@ import {
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { Switch } from '@theme/components/ui/switch';
 import { Textarea } from '@theme/components/ui/textarea';
 import { FAILURE_OPTIONS, STATUS_OPTIONS, withKind } from '../board/workflowForm';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
@@ -84,12 +84,12 @@ const n = (k: string): string => `ade-wf-stage-${k}-${props.stage.id}`;
 
     <template v-if="stage.kind === 'user'">
       <div class="flex items-center gap-2.5 text-kira-md">
-        <Switch
+        <Checkbox
           :id="n('session')"
           :model-value="stage.session"
           :class="stage.session && 'data-[state=checked]:border-claude data-[state=checked]:bg-claude'"
           data-testid="ade-wf-stage-session"
-          @update:model-value="(v: boolean) => patch({ session: v, prompt: v ? stage.prompt : '' })"
+          @update:model-value="(v) => patch({ session: v === true, prompt: v === true ? stage.prompt : '' })"
         />
         <Label :for="n('session')">Opens an interactive Claude Code session</Label>
       </div>

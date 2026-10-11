@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { cn } from '@theme/lib/utils';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
@@ -15,6 +18,14 @@ const wfUi = useAdeWorkflowsUiStore();
 const workflows = useWorkflows();
 const importWf = useImportWorkflow();
 const newWf = useNewWorkflow();
+
+function rowClass(selected: boolean): string {
+  return cn(
+    rowVariants({ layout: 'double', selected }),
+    'box-border w-full cursor-pointer flex-col items-stretch gap-0.5 whitespace-normal rounded-kira border-0 border-l-3 border-solid px-2.5 py-2 text-left',
+    selected ? 'border-l-tone-amber-solid' : 'border-l-transparent',
+  );
+}
 
 const entries = computed(() => workflows.data.value?.workflows ?? []);
 const dir = computed(() => workflows.data.value?.dir ?? '');
@@ -118,7 +129,7 @@ async function createNew(): Promise<void> {
           </Button>
         </div>
       </div>
-      <p v-if="listError" class="m-0 px-1 pb-1 text-kira-sm text-error" data-testid="ade-wf-error">{{ listError }}</p>
+      <FieldError v-if="listError" class="px-1 pb-1" data-testid="ade-wf-error">{{ listError }}</FieldError>
       <p
         v-if="workflows.isSuccess.value && entries.length === 0"
         class="m-0 px-1 py-2 text-kira-sm text-subtle"
@@ -126,12 +137,11 @@ async function createNew(): Promise<void> {
       >
         No workflows yet. Workflows are YAML files in {{ dir }}.
       </p>
-      <Button size="kira"
+      <button
         v-for="e in entries"
         :key="e.fileName"
-        variant="ghost"
-        class="box-border h-auto w-full flex-col items-stretch justify-start gap-0.5 whitespace-normal rounded-kira border-l-3 px-2.5 py-2 text-left text-fg"
-        :class="current?.fileName === e.fileName ? 'bg-select border-l-tone-amber-solid' : 'border-l-transparent'"
+        type="button"
+        :class="rowClass(current?.fileName === e.fileName)"
         data-testid="ade-wf-row"
         :data-file="e.fileName"
         @click="pick(e.fileName)"
@@ -146,7 +156,7 @@ async function createNew(): Promise<void> {
         </span>
         <span class="max-w-full truncate text-kira-sm text-muted-foreground" data-testid="ade-wf-row-stages">{{ stages(e) }}</span>
         <span class="text-kira-sm text-subtle" data-testid="ade-wf-row-used">used by {{ e.usedBy }}</span>
-      </Button>
+      </button>
       <div class="px-1 pt-3 text-kira-sm leading-normal text-subtle">
         A workflow is the list of stages a task goes through. User stages are yours (optionally with an
         interactive Claude Code session). Agent stages run AI steps in the background with

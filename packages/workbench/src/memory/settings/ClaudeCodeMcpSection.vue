@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { FieldDescription, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { useClipboard } from '@vueuse/core';
 import { computed } from 'vue';
@@ -38,11 +39,11 @@ const message = computed(() => {
     <Alert v-if="status.isError.value" variant="error">
       <AlertDescription>{{ status.error.value?.message }}</AlertDescription>
     </Alert>
-    <p
+    <Card
       v-else-if="command"
-      class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-sm leading-normal"
+      class="font-data whitespace-pre-wrap break-all select-all text-kira-sm leading-normal"
       data-testid="memory-mcp-command"
-    >{{ command }}</p>
+    >{{ command }}</Card>
     <p v-if="command" class="m-0 text-kira-sm text-muted-foreground">
       The server runs this app's executable with <code class="font-data">memory-mcp</code>. Install again if the app moves.
     </p>

@@ -3,7 +3,9 @@ import type { ImportAction } from '@shared/domain/memoryImport';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { Progress } from '@theme/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { storeToRefs } from 'pinia';
 import { computed, useTemplateRef } from 'vue';
@@ -56,7 +58,12 @@ async function discard(): Promise<void> {
   <div v-if="job" class="flex h-full min-h-0 flex-col" data-testid="import-job" :data-state="job.state">
     <div class="flex shrink-0 flex-col gap-1.5 border-b border-border p-3">
       <div class="flex items-center gap-1.5">
-        <span class="min-w-0 flex-1 truncate text-kira-md font-medium" :title="job.roots.join(', ')">{{ jobTitle(job) }}</span>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="min-w-0 flex-1 truncate text-kira-md font-medium">{{ jobTitle(job) }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ job.roots.join(', ') }}</TooltipContent>
+        </Tooltip>
         <span class="text-kira-sm uppercase tracking-wider text-muted-foreground" data-testid="import-job-state">{{ job.state }}</span>
         <Button v-if="job.state === 'awaiting'" variant="toolbar" size="kira" data-testid="import-start" @click="run('start')">Start</Button>
         <Button v-if="job.state === 'running'" variant="toolbar" size="kira" data-testid="import-pause" @click="run('pause')">Pause</Button>
@@ -112,14 +119,14 @@ async function discard(): Promise<void> {
     <div v-if="selectedFile" class="flex max-h-1/3 shrink-0 flex-col gap-1 overflow-y-auto border-t border-border p-3 text-kira-md" data-testid="import-file-detail">
       <span class="font-medium">{{ selectedFile.title || selectedFile.relPath }}</span>
       <p v-if="selectedFile.reason" class="m-0 text-muted-foreground" data-testid="import-file-reason">{{ selectedFile.reason }}</p>
-      <div v-for="(u, i) in selectedFile.unresolved" :key="`u${i}`" class="flex flex-col rounded-kira-sm bg-warn/10 p-1.5">
+      <Alert v-for="(u, i) in selectedFile.unresolved" :key="`u${i}`" variant="warn" :icon="null">
         <span>{{ u.fact }}</span>
         <span v-for="q in u.questions" :key="q" class="text-kira-sm text-muted-foreground">{{ q }}</span>
-      </div>
-      <div v-for="(d, i) in selectedFile.dropped" :key="`d${i}`" class="flex flex-col rounded-kira-sm border border-border p-1.5">
+      </Alert>
+      <Card v-for="(d, i) in selectedFile.dropped" :key="`d${i}`" class="gap-0">
         <span>{{ d.fact }}</span>
         <span class="text-kira-sm text-muted-foreground">Dropped: {{ d.why }}</span>
-      </div>
+      </Card>
     </div>
   </div>
 </template>

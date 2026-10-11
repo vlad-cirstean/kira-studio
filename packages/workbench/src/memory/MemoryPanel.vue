@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { cn } from '@theme/lib/utils';
@@ -77,12 +78,13 @@ const historyToggleId = useId();
       <ImportStatus />
     </PanelBar>
     <div class="min-h-0 flex-1 overflow-y-auto" data-testid="memory-results">
-      <Alert v-if="search.isError.value" variant="error" class="m-1.5 w-auto" data-testid="memory-error">
+      <Alert v-if="search.isError.value" variant="error" strip data-testid="memory-error">
         <AlertDescription>{{ search.error.value?.message }}</AlertDescription>
       </Alert>
       <Empty v-else-if="search.isPending.value" class="h-full">
         <EmptyHeader>
-          <EmptyDescription>Loading…</EmptyDescription>
+          <EmptyMedia><Spinner :size="24" /></EmptyMedia>
+          <EmptyTitle>Loading memories…</EmptyTitle>
         </EmptyHeader>
       </Empty>
       <Empty v-else-if="(search.data.value ?? []).length === 0" class="h-full" data-testid="memory-empty">

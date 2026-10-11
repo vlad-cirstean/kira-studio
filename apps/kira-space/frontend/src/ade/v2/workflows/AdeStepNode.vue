@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatusDot from '@theme/components/StatusDot.vue';
 import VarText from '@theme/components/VarText.vue';
 import { Handle, Position } from '@vue-flow/core';
 import { computed } from 'vue';
@@ -31,7 +32,7 @@ const tip = (r: StepNodeData['step']['results'][number]): string =>
     <Handle id="in" type="target" :position="Position.Top" class="!size-2.5 !border-0 !bg-muted-foreground" />
     <Handle id="loop-in" type="target" :position="Position.Top" class="!size-2 !border-0 !bg-muted-foreground !left-5" />
     <div class="flex items-center gap-1.5 px-2.5 pt-2">
-      <span v-if="data.start" class="text-tone-green" title="Start" data-testid="ade-wf-node-start">▶</span>
+      <AdeTip v-if="data.start" text="Start"><span class="text-tone-green" data-testid="ade-wf-node-start">▶</span></AdeTip>
       <span class="min-w-0 flex-1 truncate text-kira-md font-medium" data-testid="ade-wf-node-name">{{ step.name }}</span>
       <span v-if="step.before === 'approval'" class="shrink-0 text-warn-text" data-testid="ade-wf-node-gate">approval</span>
       <span v-if="step.smartScript" class="shrink-0 text-info">smart</span>
@@ -48,7 +49,7 @@ const tip = (r: StepNodeData['step']['results'][number]): string =>
           :data-result="r.id"
           :data-ok="r.ok"
         >
-          <span class="size-1.5 shrink-0 rounded-full" :class="r.ok ? 'bg-tone-green-solid' : 'bg-tone-red-solid'" />
+          <StatusDot :color="r.ok ? 'var(--color-tone-green-solid)' : 'var(--color-tone-red-solid)'" />
           <span v-if="labelled" class="truncate">{{ r.id }}</span>
           <Handle
             :id="resultHandleId(r.id)"

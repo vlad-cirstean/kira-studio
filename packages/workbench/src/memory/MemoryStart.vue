@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
+import { Card } from '@theme/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
@@ -30,7 +31,7 @@ function when(iso: string): string {
 <template>
   <ImportView v-if="imports.view === 'imports'" />
   <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
-    <Alert v-if="history.isError.value" variant="error" class="m-3 w-auto">
+    <Alert v-if="history.isError.value" variant="error" strip>
       <AlertDescription>{{ history.error.value?.message }}</AlertDescription>
     </Alert>
     <Empty v-else-if="!selectedId" class="h-full" data-testid="memory-detail-empty">
@@ -56,10 +57,10 @@ function when(iso: string): string {
       </div>
       <div v-if="trail.length > 1" class="flex flex-col gap-1.5" data-testid="memory-trail">
         <span class="text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">Versions</span>
-        <div
+        <Card
           v-for="version in trail"
           :key="version.id"
-          class="flex flex-col gap-0.5 rounded-kira-sm border border-border p-1.5"
+          class="gap-0.5"
           :class="{ 'opacity-70': version.historical }"
           :data-testid="`memory-version-${version.version}`"
         >
@@ -72,7 +73,7 @@ function when(iso: string): string {
             {{ event.action === 'noop' ? 'Reconfirmed' : event.action === 'add' ? 'Added' : 'Updated' }}
             by {{ event.author }} via {{ event.source }}<template v-if="event.source === 'import'"> ({{ event.sourceLabel ?? event.sourceRef }})</template><template v-if="event.rationale"> — {{ event.rationale }}</template>
           </span>
-        </div>
+        </Card>
       </div>
     </div>
   </div>

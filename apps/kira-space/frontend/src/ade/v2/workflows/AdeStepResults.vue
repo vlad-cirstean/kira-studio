@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { Switch } from '@theme/components/ui/switch';
 import { MAX_LOOP_MAX } from '../board/stepResults';
 import { useAdeWorkflowDraftStore } from '../state/adeWorkflowDraft';
 import type { PipelineStep } from '../wire';
@@ -21,10 +22,10 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
     <div class="text-kira-sm text-muted-foreground">
       Results: the agent picks one when the step ends; each one sets where the stage goes next.
     </div>
-    <div
+    <Card
       v-for="r in step.results"
       :key="r.id"
-      class="flex flex-col gap-1 rounded-kira-sm border border-border p-2"
+      class="gap-1"
       data-testid="ade-wf-result"
       :data-result="r.id"
     >
@@ -39,11 +40,11 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           @update:model-value="(v: string | number) => draft.changeResult(stageId, step.id, r.id, { id: String(v) })"
         />
         <Label :for="id('ok', r.id)" class="text-kira-sm text-muted-foreground">ok</Label>
-        <Switch
+        <Checkbox
           :id="id('ok', r.id)"
           :model-value="r.ok"
           data-testid="ade-wf-result-ok"
-          @update:model-value="(v: boolean) => draft.changeResult(stageId, step.id, r.id, { ok: v })"
+          @update:model-value="(v) => draft.changeResult(stageId, step.id, r.id, { ok: v === true })"
         />
         <TooltipIconButton
           icon="close"
@@ -94,7 +95,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           <span>times</span>
         </template>
       </div>
-    </div>
+    </Card>
     <Button
       variant="dialog"
       size="kira-lg"

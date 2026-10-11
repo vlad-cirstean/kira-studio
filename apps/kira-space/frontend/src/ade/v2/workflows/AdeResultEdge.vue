@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Badge } from '@theme/components/ui/badge';
 import { EdgeLabelRenderer, type EdgeProps } from '@vue-flow/core';
 import { computed } from 'vue';
 import { type EdgeData, NODE_H, type Point, RANK_SEP } from '../board/workflowGraph';
@@ -16,8 +17,8 @@ const LOOP_DROP = 44;
 const LOOP_RISE = 18;
 const HALF_GAP = RANK_SEP / 2;
 
-/** Polyline through the corners, each corner rounded to at most `RADIUS`. */
-function rounded(pts: Point[]): string {
+/** Polyline through the corners, each corner smoothed to at most `RADIUS`. */
+function smoothCorners(pts: Point[]): string {
   const p = pts.filter((q, i) => i === 0 || q.x !== (pts[i - 1] as Point).x || q.y !== (pts[i - 1] as Point).y);
   let out = `M ${(p[0] as Point).x} ${(p[0] as Point).y}`;
   for (let i = 1; i < p.length - 1; i += 1) {
@@ -51,7 +52,7 @@ const geometry = computed(() => {
       { x: tx, y: above },
       { x: tx, y: ty },
     ];
-    return { path: rounded(pts), x: lx + 6, y: jog, anchor: 'left' };
+    return { path: smoothCorners(pts), x: lx + 6, y: jog, anchor: 'left' };
   }
   const via = d.value.points ?? [];
   const pts: Point[] = [{ x: sx, y: sy }];
@@ -63,7 +64,7 @@ const geometry = computed(() => {
     jog = v.y + NODE_H / 2 + HALF_GAP;
   }
   pts.push({ x, y: ty - HALF_GAP }, { x: tx, y: ty - HALF_GAP }, { x: tx, y: ty });
-  return { path: rounded(pts), x: sx, y: sy + DROP, anchor: 'centre' };
+  return { path: smoothCorners(pts), x: sx, y: sy + DROP, anchor: 'centre' };
 });
 const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ` ↩ ≤${d.value.max}` : ''}`);
 </script>
@@ -86,14 +87,15 @@ const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ` �
     <path :d="geometry.path" class="fill-none stroke-transparent stroke-[16px]" />
   </g>
   <EdgeLabelRenderer v-if="!d.stage">
-    <span
-      class="nodrag nopan pointer-events-auto absolute whitespace-nowrap rounded-kira-sm border border-border bg-bg px-1 text-kira-sm text-muted-foreground"
+    <Badge
+      variant="chip"
+      class="nodrag nopan pointer-events-auto absolute border border-border bg-bg text-muted-foreground"
       :style="{
         transform: `${geometry.anchor === 'left' ? 'translate(0, -50%)' : 'translate(-50%, -50%)'} translate(${geometry.x}px, ${geometry.y}px)`,
       }"
       data-testid="ade-wf-edge-label"
     >
       {{ label }}
-    </span>
+    </Badge>
   </EdgeLabelRenderer>
 </template>

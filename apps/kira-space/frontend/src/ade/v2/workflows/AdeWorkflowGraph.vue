@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import { Switch } from '@theme/components/ui/switch';
 import { type Connection, type Edge, type Node, useVueFlow, VueFlow } from '@vue-flow/core';
 import { onKeyStroke, useElementSize } from '@vueuse/core';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -12,6 +13,7 @@ import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useRepos } from '../../../repo/state/reposQueries';
 import AdeChip from '../AdeChip.vue';
+import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import {
   type EdgeData,
@@ -245,13 +247,15 @@ onBeforeUnmount(() => {
         @update:model-value="(v: string | number) => draft.patchWorkflow({ name: String(v) })"
       />
       <div class="flex items-center gap-2 text-kira-md">
-        <Switch
+        <Checkbox
           id="ade-wf-form-space"
           :model-value="draft.draft.kiraSpaceMcp"
           data-testid="ade-wf-form-space"
-          @update:model-value="(v: boolean) => draft.patchWorkflow({ kiraSpaceMcp: v })"
+          @update:model-value="(v) => draft.patchWorkflow({ kiraSpaceMcp: v === true })"
         />
-        <Label for="ade-wf-form-space" title="Agent steps can declare repos on the task and request branches and worktrees through Kira Space.">Kira Space tools for agents</Label>
+        <AdeTip text="Agent steps can declare repos on the task and request branches and worktrees through Kira Space.">
+          <Label for="ade-wf-form-space">Kira Space tools for agents</Label>
+        </AdeTip>
       </div>
     </div>
     <div class="flex items-center gap-2" data-testid="ade-wf-strip-row">
@@ -263,13 +267,15 @@ onBeforeUnmount(() => {
         data-testid="ade-wf-strip"
         @update="onStripUpdate"
       >
-        <button
+        <Button
           v-for="(s, i) in strip"
           :key="s.id"
           type="button"
-          class="flex cursor-grab items-center gap-1.5 rounded-kira border bg-elevated px-2 py-1 text-kira-sm"
+          variant="dialog"
+          size="kira"
+          class="cursor-grab gap-1.5 px-2 text-kira-sm"
           :class="[
-            draft.selection?.stageId === s.id ? 'border-info' : 'border-border',
+            draft.selection?.stageId === s.id ? 'border-info' : '',
             s.skip ? 'opacity-60' : '',
           ]"
           data-testid="ade-wf-strip-chip"
@@ -280,7 +286,7 @@ onBeforeUnmount(() => {
           <span class="font-medium">{{ i + 1 }}.</span>
           <span :class="s.skip ? 'line-through' : ''">{{ s.name }}</span>
           <AdeChip :label="s.kind" :tone="KIND_TONE[s.kind]" />
-        </button>
+        </Button>
       </VueDraggable>
       <Button
         variant="dialog"
@@ -368,7 +374,7 @@ onBeforeUnmount(() => {
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>
-    <p v-if="draft.error" class="m-0 text-kira-sm text-error" data-testid="ade-wf-save-error">
+    <FieldError v-if="draft.error" data-testid="ade-wf-save-error">
       {{ draft.error }}
       <template v-if="draft.conflict">
         <Button variant="link" size="kira" class="px-1 text-kira-sm text-info" data-testid="ade-wf-reload" @click="discard">
@@ -388,7 +394,7 @@ onBeforeUnmount(() => {
       >
         Switch to YAML
       </Button>
-    </p>
+    </FieldError>
   </div>
   <p v-else class="m-0 text-kira-md text-muted-foreground" data-testid="ade-wf-no-valid">
     This file has no valid version yet.

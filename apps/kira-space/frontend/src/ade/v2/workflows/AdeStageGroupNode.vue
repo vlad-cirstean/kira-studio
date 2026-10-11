@@ -40,7 +40,7 @@ const detail = computed(() => {
       class="!size-2 !border-0 !bg-muted-foreground"
       :style="handleStyle"
     />
-    <div class="flex items-center gap-1.5 px-3" :class="agent ? 'h-9' : 'pt-2'">
+    <div class="flex items-center gap-1.5 px-3" :class="agent ? 'h-row' : 'pt-2'">
       <span class="font-medium">{{ data.index + 1 }}.</span>
       <span class="min-w-0 flex-1 truncate font-medium" :class="stage.skip ? 'line-through' : ''">{{ stage.name }}</span>
       <AdeChip :label="stage.kind" :tone="KIND_TONE[stage.kind]" />

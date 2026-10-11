@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
@@ -148,13 +149,9 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         :params="script.params"
         @update:model-value="(v) => patch({ params: v })"
       />
-      <div
-        v-if="script"
-        class="rounded-kira-sm border border-border p-2 font-data text-kira-sm whitespace-pre-wrap"
-        data-testid="ade-wf-step-body"
-      >
+      <Card v-if="script" class="font-data text-kira-sm whitespace-pre-wrap" data-testid="ade-wf-step-body">
         <VarText :parts="bodyParts" />
-      </div>
+      </Card>
     </div>
     <template v-else>
       <div class="flex flex-col gap-1">
@@ -180,18 +177,14 @@ const isStart = computed(() => props.steps[0]?.id === props.step.id);
         data-testid="ade-wf-step-prompt"
         @update:model-value="(v: string | number) => patch({ prompt: String(v) })"
       />
-      <div
-        v-if="step.prompt"
-        class="rounded-kira-sm border border-border p-2 text-kira-sm text-muted-foreground"
-        data-testid="ade-wf-step-preview"
-      >
+      <Card v-if="step.prompt" class="text-kira-sm text-muted-foreground" data-testid="ade-wf-step-preview">
         <VarText :parts="preview" />
-      </div>
+      </Card>
     </template>
     <AdeStepResults :stage-id="stageId" :step="step" :steps="steps" />
-    <div class="rounded-kira-sm border border-border p-2 text-kira-sm text-subtle" data-testid="ade-wf-finish-note">
+    <Card class="text-kira-sm text-subtle" data-testid="ade-wf-finish-note">
       <span class="text-info">+ finish_step instruction</span> is added to this prompt automatically:
       <span class="block pt-1"><VarText :parts="finish" /></span>
-    </div>
+    </Card>
   </div>
 </template>
