@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { ReviewSelection } from '../../ade/v2/state/adeReviewWindow';
 
 type CodeEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
@@ -30,7 +31,7 @@ export function attachAskReviewAgent(
   });
   const action = editor.addAction({
     id: 'ade.askReviewAgent',
-    label: 'Ask review agent',
+    label: t('space.repo.view.askReviewAgent.label'),
     contextMenuGroupId: 'navigation',
     contextMenuOrder: 0,
     run: () => {

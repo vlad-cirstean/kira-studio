@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { ModeRegistry } from '@workbench/modes';
 import { defineAsyncComponent } from 'vue';
 import AdeView from '../ade/AdeView.vue';
@@ -17,7 +18,9 @@ export const MODE_ORDER: SpaceMode[] = ['git', 'ade', 'automations', 'memory'];
 // branches on `layout` instead (`workbench/WorkbenchShell.vue`'s own `isFull` computed).
 export const MODES: ModeRegistry<SpaceMode> = {
   git: {
-    label: 'Git',
+    get label() {
+      return t('common.module.git.label');
+    },
     icon: 'source-control',
     panel: GitPanel,
     start: GitStart,
@@ -25,11 +28,20 @@ export const MODES: ModeRegistry<SpaceMode> = {
   },
   // P129 Part 3 §0.12/§2.1: the module's own real surface — a full-area view, no left panel, no
   // tab strip, no tabs of its own (P128's own placeholder deleted in this commit).
-  ade: { label: 'Agents', icon: 'robot', layout: 'full', view: AdeView },
+  ade: {
+    get label() {
+      return t('mobile.shell.heading.title');
+    },
+    icon: 'robot',
+    layout: 'full',
+    view: AdeView,
+  },
   // P128 §2.4/§2.7: a peer module, lazy the same reason Kira Studio's own copy is — nothing in a
   // git-only session should pay for the terminal panel's own launch chunk.
   automations: {
-    label: 'Automations',
+    get label() {
+      return t('common.module.automations.label');
+    },
     icon: 'run-all',
     panel: defineAsyncComponent(() => import('@workbench/automations/AutomationsPanel.vue')),
     start: defineAsyncComponent(() => import('@workbench/automations/AutomationsStart.vue')),
@@ -37,7 +49,9 @@ export const MODES: ModeRegistry<SpaceMode> = {
   },
   // P201 Part 2: a panel module that opens no tabs; the detail view is its main area.
   memory: {
-    label: 'Memory',
+    get label() {
+      return t('common.module.memory.label');
+    },
     icon: 'lightbulb',
     panel: defineAsyncComponent(() => import('@workbench/memory/MemoryPanel.vue')),
     start: defineAsyncComponent(() => import('@workbench/memory/MemoryStart.vue')),

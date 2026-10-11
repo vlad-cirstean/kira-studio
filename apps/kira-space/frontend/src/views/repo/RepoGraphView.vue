@@ -22,7 +22,7 @@ import { useCodeReposStore } from '../../state/coderepos';
 import { useLayoutStore } from '../../state/layout';
 import { useSettingsStore } from '../../state/settings';
 import type { RepoGraphTabRecord } from '../../state/tabDomain';
-import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
+import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 
 const props = defineProps<{ tab: RepoGraphTabRecord }>();
 
@@ -36,7 +36,7 @@ async function mountGraph(): Promise<void> {
   const repoHead = repoHeadOf(useCodeReposStore().codeRepoRecord(repoIdOfTab(props.tab)));
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
-    errorMessage.value = NO_REPOSITORY_MESSAGE;
+    errorMessage.value = noRepositoryMessage();
     return;
   }
   if (!container.value) return; // unmounted (tab closed/switched away) before this ran.

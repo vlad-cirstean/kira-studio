@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import type { OpLogColumn } from '@workbench/components/opLog';
+import { computed } from 'vue';
 import { useOpsStore } from '../state/ops';
 import type { SpaceOpRecord } from '../state/opsDomain';
 
@@ -9,15 +11,15 @@ import type { SpaceOpRecord } from '../state/opsDomain';
 // come from the panel's default menu; only the repo and source cells are this app's own.
 const opsStore = useOpsStore();
 
-const columns: OpLogColumn[] = [
-  { id: 'time', label: 'Time', width: '90px' },
-  { id: 'repo', label: 'Repository', width: '140px' },
-  { id: 'source', label: 'Source', width: '120px' },
-  { id: 'kind', label: 'Kind', width: '120px' },
-  { id: 'status', label: 'Status', width: '90px' },
-  { id: 'duration', label: 'Duration', width: '70px' },
-  { id: 'command', label: 'Command', width: '1fr' },
-];
+const columns = computed<OpLogColumn[]>(() => [
+  { id: 'time', label: t('common.field.time.label'), width: '90px' },
+  { id: 'repo', label: t('space.repo.config.repository.label'), width: '140px' },
+  { id: 'source', label: t('common.field.source.label'), width: '120px' },
+  { id: 'kind', label: t('common.field.kind.label'), width: '120px' },
+  { id: 'status', label: t('common.field.status.label'), width: '90px' },
+  { id: 'duration', label: t('common.field.duration.label'), width: '70px' },
+  { id: 'command', label: t('common.field.command.label'), width: '1fr' },
+]);
 
 function canCancel(record: SpaceOpRecord): boolean {
   return record.cancellable;
@@ -31,7 +33,7 @@ function canCancel(record: SpaceOpRecord): boolean {
     :records="opsStore.visibleOps"
     :running-count="opsStore.runningCount"
     :columns="columns"
-    clear-hint="Clears this window's list only — the log resets when Kira Space quits"
+    :clear-hint="t('space.workbench.operations.clearHint.hint')"
     :can-cancel="canCancel"
     @clear="opsStore.clearOps"
     @cancel="(record) => opsStore.cancelOp(record.id)"

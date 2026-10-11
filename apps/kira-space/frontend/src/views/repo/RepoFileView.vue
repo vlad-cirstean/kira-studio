@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -13,7 +14,7 @@ import { useSettingsStore } from '../../state/settings';
 // separate stand-in file view ever ships in between).
 import type { RepoFileTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
-import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
+import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 import { registerEditor, unmountEditor } from './editors';
 import { loadFileContent } from './fileContent';
 import { monacoLanguageFor } from './language';
@@ -69,10 +70,10 @@ const isMarkdown = computed(() => monacoLanguageFor(props.tab.path) === 'markdow
 const view = ref<'source' | 'reading'>(props.tab.state.markdownReading ? 'reading' : 'source');
 const fileText = ref('');
 const renderedHtml = ref<string | null>(null);
-const VIEW_OPTIONS = [
-  { value: 'source' as const, label: 'Source', testid: 'repo-file-view-source' },
-  { value: 'reading' as const, label: 'Reading', testid: 'repo-file-view-reading' },
-];
+const viewOptions = computed(() => [
+  { value: 'source' as const, label: t('common.field.source.label'), testid: 'repo-file-view-source' },
+  { value: 'reading' as const, label: t('space.repo.view.reading.label'), testid: 'repo-file-view-reading' },
+]);
 
 // D11: rendered lazily on first switch to Reading, then cached — a markdown file opened and never
 // toggled never pays `markdown-it`'s import cost, and a plain read-only view is re-rendered at most
@@ -135,7 +136,7 @@ async function mount(): Promise<void> {
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
     state.value = 'error';
-    errorMessage.value = NO_REPOSITORY_MESSAGE;
+    errorMessage.value = noRepositoryMessage();
     return;
   }
 
@@ -275,7 +276,7 @@ onUnmounted(() => {
       <ViewToolbar border="none">
         <SecondaryTabs
           :model-value="view"
-          :items="VIEW_OPTIONS"
+          :items="viewOptions"
           data-testid="repo-file-view-toggle"
           @update:model-value="(v) => onViewChange(v as 'source' | 'reading')"
         />
@@ -299,19 +300,19 @@ onUnmounted(() => {
   </template>
   <Empty v-else-if="state === 'binary'" class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file is binary and can't be previewed.</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.binaryPreview.empty') }}</EmptyTitle>
     </Empty>
   <Empty v-else-if="state === 'tooLarge'" class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file is too large to preview (over 8 MB).</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.tooLargePreview.empty') }}</EmptyTitle>
     </Empty>
   <Empty v-else-if="state === 'missing'" class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file no longer exists.</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.missing.empty') }}</EmptyTitle>
     </Empty>
   <Empty v-else class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ errorMessage || 'Could not open this file.' }}</EmptyTitle>
+      <EmptyTitle>{{ errorMessage || t('space.repo.view.openFileFailed.error') }}</EmptyTitle>
     </Empty>
 </template>
 

@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
 // P92 item 5/§7.3: one commit's whole changed-file set, one tab — VS Code's own multi-file diff
@@ -23,7 +24,7 @@ import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive
 // actually reads — `expanded`, and each section's own copied-out state/error strings — need to be
 // reactive.
 import type { RepoMultiDiffTabRecord } from '../../state/tabDomain';
-import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
+import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 import { useDiffEditor } from './useDiffEditor';
 
 const props = defineProps<{ tab: RepoMultiDiffTabRecord }>();
@@ -124,7 +125,7 @@ onUnmounted(() => {
   <div v-if="!repoId" class="h-full overflow-y-auto flex flex-col">
     <Empty class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ NO_REPOSITORY_MESSAGE }}</EmptyTitle>
+      <EmptyTitle>{{ noRepositoryMessage() }}</EmptyTitle>
     </Empty>
   </div>
   <div v-else class="h-full overflow-y-auto flex flex-col" data-testid="repo-multi-diff-view">
@@ -132,7 +133,7 @@ onUnmounted(() => {
       <ViewToolbar border="none">
         <TooltipIconButton
           :icon="section.expanded ? 'chevron-down' : 'chevron-right'"
-          :label="section.expanded ? 'Collapse' : 'Expand'"
+          :label="section.expanded ? t('common.action.collapse.label') : t('common.action.expand.label')"
           data-testid="repo-multi-diff-toggle"
           @click="toggle(section)"
         />
@@ -156,7 +157,7 @@ onUnmounted(() => {
           @click="goToFile(section.path)"
         >
           <CodiconIcon name="go-to-file" :size="13" />
-          Go to file
+          {{ t('space.repo.view.goToFile.label') }}
         </Button>
       </ViewToolbar>
       <template v-if="section.expanded">
@@ -168,25 +169,25 @@ onUnmounted(() => {
         />
         <Empty v-else-if="sectionState[section.path] === 'binary'" class="p-4">
       <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file is binary and can't be compared.</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.binaryCompare.empty') }}</EmptyTitle>
     </Empty>
         <Empty v-else-if="sectionState[section.path] === 'tooLarge'" class="p-4">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file is too large to compare (over 8 MB).</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.tooLargeCompare.empty') }}</EmptyTitle>
     </Empty>
         <Empty v-else-if="sectionState[section.path] === 'bothMissing'" class="p-4">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file no longer exists.</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.missing.empty') }}</EmptyTitle>
     </Empty>
         <Empty v-else class="p-4">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ sectionError[section.path] || 'Could not open this diff.' }}</EmptyTitle>
+      <EmptyTitle>{{ sectionError[section.path] || t('space.repo.view.openDiffFailed.error') }}</EmptyTitle>
     </Empty>
       </template>
     </div>
     <Empty v-if="sections.length === 0" class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="git-compare" :size="24" /></EmptyMedia>
-      <EmptyTitle>No changed files.</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.noChanges.empty') }}</EmptyTitle>
     </Empty>
   </div>
 </template>

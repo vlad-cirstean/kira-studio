@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
 import { useId } from 'vue';
 import type { Settings } from '../../state/settingsDomain';
 
@@ -32,10 +33,10 @@ const fieldId = useId();
 <template>
   <Field>
     <div class="flex items-center justify-between gap-1">
-      <Label :for="fieldId">Commit date</Label>
+      <Label :for="fieldId">{{ t('space.workbench.appearance.commitDate.label') }}</Label>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         data-testid="settings-reset-appearance-dateFormat"
         :disabled-trigger="isAtDefault('appearance', 'dateFormat')"
         :disabled="isAtDefault('appearance', 'dateFormat')"
@@ -50,9 +51,9 @@ const fieldId = useId();
       :model-value="appearance.dateFormat"
       @update:model-value="onDateFormatChange"
     >
-      <option value="relative">Relative (3 days ago)</option>
-      <option value="absolute">Absolute (2024-12-30 22:48)</option>
+      <option value="relative">{{ t('space.workbench.appearance.commitDate.relative.option') }}</option>
+      <option value="absolute">{{ t('space.workbench.appearance.commitDate.absolute.option') }}</option>
     </NativeSelect>
-    <FieldDescription>The git graph's own commit timestamps.</FieldDescription>
+    <FieldDescription>{{ t('space.workbench.appearance.commitDate.description') }}</FieldDescription>
   </Field>
 </template>

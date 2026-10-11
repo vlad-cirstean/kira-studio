@@ -5,6 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
+import { CatalogText, t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { useIntervalFn, useNow } from '@vueuse/core';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
@@ -48,9 +49,9 @@ watch(
 
 const portError = computed(() => {
   const port = parseIntField(portDraft.value);
-  if (!Number.isInteger(port)) return 'Enter a whole number.';
+  if (!Number.isInteger(port)) return t('space.workbench.mobileAccess.port.integer.error');
   if (port < MOBILE_PORT_RANGE.min || port > MOBILE_PORT_RANGE.max) {
-    return `Ports run from ${MOBILE_PORT_RANGE.min} to ${MOBILE_PORT_RANGE.max}.`;
+    return t('space.workbench.mobileAccess.port.range.error', { min: MOBILE_PORT_RANGE.min, max: MOBILE_PORT_RANGE.max });
   }
   return null;
 });
@@ -87,18 +88,50 @@ const canTrust = computed(() => {
 async function onTrust(): Promise<void> {
   const now = current.value;
   if (!now) return;
-  const ok = await confirmDialogStore.confirm({ message: `Trust ${now.subnet} (router ${now.routerMac})? The phone talks to Kira Space over plain HTTP: anyone on this network can read what it shows. Turn this on only on a network you control, such as your home Wi-Fi.`, confirmLabel: 'Trust', tone: 'danger' });
+  const ok = await confirmDialogStore.confirm({
+    title: t('space.workbench.mobileAccess.trustConfirm.title'),
+    message: t('space.workbench.mobileAccess.trustConfirm.body', { subnet: now.subnet, mac: now.routerMac }),
+    confirmLabel: t('space.workbench.mobileAccess.network.trustVerb.label'),
+    tone: 'danger',
+  });
   if (ok) await runTrust();
 }
 
 async function onForget(): Promise<void> {
-  const ok = await confirmDialogStore.confirm({ message: 'Forget the trusted network? The phone server stops until you trust a network again.', confirmLabel: 'Forget', tone: 'danger' });
+  const ok = await confirmDialogStore.confirm({
+    title: t('space.workbench.mobileAccess.forgetConfirm.title'),
+    message: t('space.workbench.mobileAccess.forgetConfirm.body'),
+    confirmLabel: t('space.workbench.mobileAccess.network.forget.label'),
+    tone: 'danger',
+  });
   if (ok) await runForget();
 }
 
 async function onRevoke(id: string, label: string): Promise<void> {
-  const ok = await confirmDialogStore.confirm({ message: `Revoke access for "${label || id}"? It will need to be re-approved.`, confirmLabel: 'Revoke', tone: 'danger' });
+  const ok = await confirmDialogStore.confirm({
+    title: t('space.workbench.mobileAccess.revokeConfirm.title'),
+    message: t('space.workbench.mobileAccess.revokeConfirm.body', { name: label || id }),
+    confirmLabel: t('space.workbench.mobileAccess.devices.revoke.label'),
+    tone: 'danger',
+  });
   if (ok) await store.revoke(id);
+}
+
+const trustedText = computed(() => {
+  const net = trusted.value;
+  if (!net) return '';
+  const at = store.status.trustedAt;
+  const params = { subnet: net.subnet, router: net.routerIp, mac: net.routerMac, interface: net.interface };
+  return at
+    ? t('space.workbench.mobileAccess.network.trustedAt.status', { ...params, date: formatDateTime(at) })
+    : t('space.workbench.mobileAccess.network.trusted.status', params);
+});
+
+function lastSeenText(device: { lastSeenAt: number; lastIp?: string }): string {
+  const when = formatRelative(device.lastSeenAt);
+  return device.lastIp
+    ? t('space.workbench.mobileAccess.devices.lastSeenFrom.status', { when, address: device.lastIp })
+    : t('space.workbench.mobileAccess.devices.lastSeen.status', { when });
 }
 
 const activeDevices = computed(() =>
@@ -110,7 +143,7 @@ const activeDevices = computed(() =>
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="switchId">View Agents from a phone on my trusted network</Label>
+        <Label :for="switchId">{{ t('space.workbench.mobileAccess.enabled.label') }}</Label>
       </div>
       <Switch
         :id="switchId"
@@ -120,9 +153,7 @@ const activeDevices = computed(() =>
         @update:model-value="(v) => onToggle(v === true)"
       />
       <FieldDescription>
-        A phone on your trusted home network pairs once, then sees the board, backlog and plan. Each
-        phone can also change the backlog and move or start tasks, and reply to agents. The server
-        runs only while this computer is on that network.
+        {{ t('space.workbench.mobileAccess.enabled.description') }}
       </FieldDescription>
       <FieldError v-if="store.status.error" data-testid="mobile-access-error">
         {{ store.status.error }}
@@ -130,30 +161,29 @@ const activeDevices = computed(() =>
     </Field>
 
     <Alert variant="warn" data-testid="mobile-access-plaintext-warning">
-      The phone talks to Kira Space over plain HTTP. Anyone on the same network can read the board,
-      backlog and terminal output it shows, and can copy the phone's access and act as that phone
-      until it expires or you revoke it. Turn this on only on a network you control, such as your
-      home Wi-Fi.
+      {{ t('space.workbench.mobileAccess.plaintext.body') }}
     </Alert>
 
     <section class="flex flex-col gap-1" data-testid="mobile-access-network">
-      <h3 class="m-0 text-kira-md font-medium">Trusted network</h3>
+      <h3 class="m-0 text-kira-md font-medium">{{ t('space.workbench.mobileAccess.network.title') }}</h3>
       <p v-if="trusted" class="m-0 text-kira-sm" data-testid="mobile-access-trusted">
-        {{ trusted.subnet }}, router {{ trusted.routerIp }} ({{ trusted.routerMac }}), trusted on
-        {{ trusted.interface }}
-        <template v-if="store.status.trustedAt">
-          on {{ formatDateTime(store.status.trustedAt) }}
-        </template>
+        {{ trustedText }}
       </p>
       <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-trusted">
-        No trusted network.
+        {{ t('space.workbench.mobileAccess.network.none.empty') }}
       </p>
       <p v-if="current" class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-current">
-        This computer: {{ current.address }} on {{ current.subnet }}, router {{ current.routerIp }}
-        ({{ current.routerMac }})
+        {{
+          t('space.workbench.mobileAccess.network.current.status', {
+            address: current.address,
+            subnet: current.subnet,
+            router: current.routerIp,
+            mac: current.routerMac,
+          })
+        }}
       </p>
       <p v-else class="m-0 text-subtle text-kira-sm" data-testid="mobile-access-current">
-        This computer is not on a private local network.
+        {{ t('space.workbench.mobileAccess.network.offNetwork.empty') }}
       </p>
       <div class="flex gap-2">
         <Button
@@ -163,7 +193,7 @@ const activeDevices = computed(() =>
           data-testid="mobile-access-trust"
           @click="onTrust"
         >
-          Trust this network
+          {{ t('space.workbench.mobileAccess.network.trust.label') }}
         </Button>
         <Button
           v-if="trusted"
@@ -172,7 +202,7 @@ const activeDevices = computed(() =>
           data-testid="mobile-access-forget"
           @click="onForget"
         >
-          Forget
+          {{ t('space.workbench.mobileAccess.network.forget.label') }}
         </Button>
       </div>
       <p
@@ -185,7 +215,7 @@ const activeDevices = computed(() =>
     </section>
 
     <section v-if="store.status.running" class="flex flex-col gap-1" data-testid="mobile-access-step-app">
-      <h3 class="m-0 text-kira-md font-medium">Open the app</h3>
+      <h3 class="m-0 text-kira-md font-medium">{{ t('space.workbench.mobileAccess.openApp.title') }}</h3>
       <figure class="m-0 flex flex-col gap-0.5">
         <MobileQr :url="store.status.appUrl" />
         <figcaption class="font-data text-kira-sm break-all select-all">{{ store.status.appUrl }}</figcaption>
@@ -194,7 +224,7 @@ const activeDevices = computed(() =>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="agentInputId">Let phones reply to agents and control their terminals</Label>
+        <Label :for="agentInputId">{{ t('space.workbench.mobileAccess.agentInput.label') }}</Label>
       </div>
       <Switch
         :id="agentInputId"
@@ -204,14 +234,12 @@ const activeDevices = computed(() =>
         @update:model-value="(v) => onToggleAgentInput(v === true)"
       />
       <FieldDescription>
-        Anyone holding a phone with this on can type into Claude Code and run commands as you. Each
-        phone also needs its own Agent input switch below. Turning this off ends every phone
-        terminal now.
+        {{ t('space.workbench.mobileAccess.agentInput.description') }}
       </FieldDescription>
     </Field>
 
     <Field>
-      <Label :for="portId">Port</Label>
+      <Label :for="portId">{{ t('space.workbench.mobileAccess.port.label') }}</Label>
       <NumberStepperInput
         :id="portId"
         :min="MOBILE_PORT_RANGE.min"
@@ -229,14 +257,14 @@ const activeDevices = computed(() =>
         data-testid="mobile-access-apply-port"
         @click="onApplyPort"
       >
-        Apply port
+        {{ t('space.workbench.mobileAccess.port.apply.label') }}
       </Button>
     </Field>
 
     <section class="flex flex-col gap-1">
-      <h3 class="m-0 text-kira-md font-medium">Paired phones</h3>
+      <h3 class="m-0 text-kira-md font-medium">{{ t('space.workbench.mobileAccess.devices.title') }}</h3>
       <p v-if="activeDevices.length === 0" class="text-subtle text-kira-sm" data-testid="mobile-devices-empty">
-        No phones are paired.
+        {{ t('space.workbench.mobileAccess.devices.none.empty') }}
       </p>
       <ul v-else class="m-0 flex list-none flex-col gap-1 p-0">
         <li
@@ -248,25 +276,27 @@ const activeDevices = computed(() =>
           <span class="flex min-w-0 flex-col">
             <span class="truncate">{{ device.label || device.id }}</span>
             <span class="text-subtle text-kira-sm leading-normal">
-              Last seen {{ formatRelative(device.lastSeenAt) }}<template v-if="device.lastIp"> from {{ device.lastIp }}</template>
+              {{ lastSeenText(device) }}
             </span>
             <span
               class="text-subtle text-kira-sm leading-normal"
               :data-testid="`mobile-device-expires-${device.id}`"
             >
-              Access expires <RelativeTime :at="device.expiresAt" />
+              <CatalogText k="space.workbench.mobileAccess.devices.expires.status">
+                <template #when><RelativeTime :at="device.expiresAt" /></template>
+              </CatalogText>
             </span>
             <span
               v-if="phones.countFor(device.id) > 0"
               class="text-kira-sm leading-normal"
               :data-testid="`mobile-device-terminals-${device.id}`"
             >
-              Controlling {{ phones.countFor(device.id) }} terminal{{ phones.countFor(device.id) === 1 ? '' : 's' }}
+              {{ t('space.workbench.mobileAccess.devices.terminals.status', { count: phones.countFor(device.id) }) }}
             </span>
           </span>
           <span class="flex shrink-0 items-center gap-2">
             <Label class="flex items-center gap-1 text-kira-sm">
-              Changes
+              {{ t('space.ade.branchPanel.changes.label') }}
               <Switch
                 :model-value="device.canWrite"
                 :data-testid="`mobile-device-write-${device.id}`"
@@ -276,7 +306,7 @@ const activeDevices = computed(() =>
               />
             </Label>
             <Label class="flex items-center gap-1 text-kira-sm">
-              Agent input
+              {{ t('space.workbench.mobileAccess.devices.agentInput.label') }}
               <Switch
                 :model-value="device.canAgentInput"
                 :disabled="!store.status.agentInput"
@@ -286,7 +316,7 @@ const activeDevices = computed(() =>
             </Label>
             <TooltipIconButton
               icon="trash"
-              label="Revoke"
+              :label="t('space.workbench.mobileAccess.devices.revoke.label')"
               variant="danger"
               :data-testid="`mobile-device-revoke-${device.id}`"
               @click="onRevoke(device.id, device.label)"

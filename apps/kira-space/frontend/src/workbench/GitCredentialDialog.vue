@@ -3,6 +3,7 @@ import type { RoutedPrompt } from '@shared/domain/prompts';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import { t } from '@theme/i18n';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { type ComponentPublicInstance, computed, ref, useTemplateRef } from 'vue';
 import { useGitCredentialStore } from '../state/gitCredential';
@@ -38,12 +39,12 @@ function onCancel(): void {
   <Dialog v-if="prompt" :open="true" @update:open="(v) => !v && emit('hide')">
     <DialogContent size="sm" data-testid="git-credential-dialog">
       <DialogHeader close-testid="git-credential-dialog-close">
-        <DialogTitle>Git credentials</DialogTitle>
+        <DialogTitle>{{ t('space.workbench.gitCredential.dialog.title') }}</DialogTitle>
       </DialogHeader>
 
       <DialogBody>
         <p class="m-0 text-subtle" data-testid="git-credential-repo">
-          {{ prompt.source }} · {{ prompt.repoLabel }}
+          {{ t('space.common.dotPair.label', { first: prompt.source, second: prompt.repoLabel }) }}
         </p>
         <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
         <p class="m-0 font-data whitespace-pre-wrap" data-testid="git-credential-prompt">
@@ -62,11 +63,11 @@ function onCancel(): void {
       <DialogFooter>
         <template v-if="more > 0" #start>
           <span class="text-kira-sm text-muted-foreground" data-testid="git-credential-more">
-            {{ more }} more waiting
+            {{ t('space.workbench.queue.more.status', { count: more }) }}
           </span>
         </template>
         <Button variant="dialog" size="kira-lg" data-testid="git-credential-cancel" @click="onCancel">
-          Cancel
+          {{ t('common.action.cancel.label') }}
         </Button>
         <Button
           variant="dialog-primary"
@@ -74,7 +75,7 @@ function onCancel(): void {
           data-testid="git-credential-submit"
           @click="onSubmit"
         >
-          Continue
+          {{ t('space.workbench.gitCredential.continue.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

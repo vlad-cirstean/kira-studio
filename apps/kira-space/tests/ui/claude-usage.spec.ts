@@ -59,11 +59,11 @@ test('shows both windows, and the tooltip lists the reset times and the source',
   relaunch,
 }) => {
   const { window: page } = await openPlan(relaunch, usageControl(snapshot(23.4, 41.2)));
-  await expect(text(page)).toHaveText('5h 23% · wk 41%');
+  await expect(text(page)).toHaveText('Session 23% · Weekly 41%');
   await expect(item(page)).toHaveClass(/text-fg/);
   await item(page).hover();
   const tip = page.locator('[data-testid="claude-usage-tooltip"]');
-  await expect(tip).toContainText('5-hour: 23% used');
+  await expect(tip).toContainText('Five-hour: 23% used');
   await expect(tip).toContainText('in 2h 0m');
   await expect(tip).toContainText('Weekly: 41% used');
   await expect(tip).toContainText('From a Claude Code session, 5m ago');
@@ -72,7 +72,9 @@ test('shows both windows, and the tooltip lists the reset times and the source',
 test('contract: a session snapshot shows both windows and its source', async ({ relaunch }) => {
   const snap = fromContract('ClaudeUsageService.Get#session');
   const { window: page } = await openPlan(relaunch, usageControl(snap));
-  await expect(text(page)).toHaveText(`5h ${pct(snap.fiveHour)}% · wk ${pct(snap.sevenDay)}%`);
+  await expect(text(page)).toHaveText(
+    `Session ${pct(snap.fiveHour)}% · Weekly ${pct(snap.sevenDay)}%`,
+  );
   await item(page).hover();
   await expect(page.locator('[data-testid="claude-usage-tooltip"]')).toContainText(
     'From a Claude Code session',
@@ -82,7 +84,9 @@ test('contract: a session snapshot shows both windows and its source', async ({ 
 test('contract: a run snapshot names the run source', async ({ relaunch }) => {
   const snap = fromContract('ClaudeUsageService.Get#run');
   const { window: page } = await openPlan(relaunch, usageControl(snap));
-  await expect(text(page)).toHaveText(`5h ${pct(snap.fiveHour)}% · wk ${pct(snap.sevenDay)}%`);
+  await expect(text(page)).toHaveText(
+    `Session ${pct(snap.fiveHour)}% · Weekly ${pct(snap.sevenDay)}%`,
+  );
   await item(page).hover();
   await expect(page.locator('[data-testid="claude-usage-tooltip"]')).toContainText(
     'From a background ADE run',
@@ -93,7 +97,7 @@ test('contract: one window only shows only that window', async ({ relaunch }) =>
   const snap = fromContract('ClaudeUsageService.Get#expired');
   expect(snap.sevenDay).toBeNull();
   const { window: page } = await openPlan(relaunch, usageControl(snap));
-  await expect(text(page)).toHaveText(`5h ${pct(snap.fiveHour)}%`);
+  await expect(text(page)).toHaveText(`Session ${pct(snap.fiveHour)}%`);
 });
 
 test('the usage item sits in the left group with the dashboard icon', async ({ relaunch }) => {
@@ -110,7 +114,7 @@ test('warns at 80 percent and errors at 95 percent', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, usageControl(snapshot(85, 10)));
   await expect(item(page)).toHaveClass(/text-warn-text/);
   await emitWailsEvent(page, IPC.claudeUsage, snapshot(85, 97));
-  await expect(text(page)).toHaveText('5h 85% · wk 97%');
+  await expect(text(page)).toHaveText('Session 85% · Weekly 97%');
   await expect(item(page)).toHaveClass(/text-error/);
 });
 
@@ -142,9 +146,9 @@ test('shows unavailable when the read fails', async ({ relaunch }) => {
 
 test('a pushed snapshot replaces the shown values', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, usageControl(snapshot(10, 20)));
-  await expect(text(page)).toHaveText('5h 10% · wk 20%');
+  await expect(text(page)).toHaveText('Session 10% · Weekly 20%');
   await emitWailsEvent(page, IPC.claudeUsage, snapshot(30, 40));
-  await expect(text(page)).toHaveText('5h 30% · wk 40%');
+  await expect(text(page)).toHaveText('Session 30% · Weekly 40%');
 });
 
 test('hidden while the setting is off', async ({ relaunch }) => {

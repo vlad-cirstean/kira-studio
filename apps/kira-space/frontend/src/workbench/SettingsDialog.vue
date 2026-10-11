@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
 import { sections, useSettingsStore } from '../state/settings';
@@ -104,10 +105,10 @@ async function save(patch: SettingsPatch): Promise<void> {
       <div class="mr-auto min-w-0">
         <FieldError v-if="f.saveError" data-testid="settings-save-error">{{ f.saveError }}</FieldError>
         <span v-else class="text-subtle text-kira-sm leading-normal" data-testid="settings-footer-status">{{
-          f.isDirty ? 'Unsaved changes' : ''
+          f.isDirty ? t('common.state.unsavedChanges.status') : ''
         }}</span>
       </div>
-      <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">Cancel</Button>
+      <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">{{ t('common.action.cancel.label') }}</Button>
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -115,7 +116,7 @@ async function save(patch: SettingsPatch): Promise<void> {
         data-testid="settings-save"
         @click="f.onSave"
       >
-        Save
+        {{ t('common.action.save.label') }}
       </Button>
     </template>
   </SettingsShell>

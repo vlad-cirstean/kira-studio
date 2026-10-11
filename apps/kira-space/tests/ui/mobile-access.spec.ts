@@ -86,7 +86,7 @@ test('enabled without a trusted network says why and shows no QR', async ({ rela
     'Trust this network',
   );
   await expect(window.locator('[data-testid="mobile-access-trusted"]')).toHaveText(
-    'No trusted network.',
+    'No trusted network',
   );
   await expect(window.locator('[data-testid="mobile-access-step-app"]')).toHaveCount(0);
 });
@@ -142,7 +142,7 @@ test('forgetting the network confirms first, then calls ForgetNetwork', async ({
     .poll(() => control.log().some((e) => e.channel === IPC.mobileForgetNetwork))
     .toBe(true);
   await expect(window.locator('[data-testid="mobile-access-trusted"]')).toHaveText(
-    'No trusted network.',
+    'No trusted network',
   );
 });
 

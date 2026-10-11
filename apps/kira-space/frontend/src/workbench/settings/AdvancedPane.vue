@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
+import { t } from '@theme/i18n';
 import LogLevelField from '@workbench/settings/fields/LogLevelField.vue';
 import NotifyPromptsField from '@workbench/settings/fields/NotifyPromptsField.vue';
 import { computed, useId } from 'vue';
@@ -28,19 +29,19 @@ function setSources(ignore: boolean): void {
     <LogLevelField
       :advanced="draft.advanced"
       leaf="gitLogLevel"
-      label="Git log level"
+      :label="t('space.workbench.advanced.gitLogLevel.label')"
       select-test-id="settings-git-log-level"
       :is-at-default="isAtDefault"
       :reset-leaf="resetLeaf"
     >
-      <FieldDescription>Kira-version's own diagnostic log verbosity.</FieldDescription>
+      <FieldDescription>{{ t('space.workbench.advanced.gitLogLevel.description') }}</FieldDescription>
     </LogLevelField>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="switchId">Background agents ignore repo settings</Label>
+        <Label :for="switchId">{{ t('space.workbench.advanced.ignoreRepoSettings.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-ade-headlessSettingSources"
           :disabled-trigger="isAtDefault('ade', 'headlessSettingSources')"
           :disabled="isAtDefault('ade', 'headlessSettingSources')"
@@ -53,7 +54,7 @@ function setSources(ignore: boolean): void {
         data-testid="settings-ade-headless-sources"
         @update:model-value="(v) => setSources(v === true)"
       />
-      <FieldDescription>Runs claude -p with --setting-sources user. Off: repo .claude settings also load; their deny rules still apply.</FieldDescription>
+      <FieldDescription>{{ t('space.workbench.advanced.ignoreRepoSettings.description') }}</FieldDescription>
     </Field>
     <NotifyPromptsField
       :advanced="draft.advanced"

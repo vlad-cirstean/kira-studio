@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { useIntervalFn, useNow } from '@vueuse/core';
 import { formatDateTime, formatDuration, formatRelative } from '@workbench/behaviour/format';
 import { TIMING } from '@workbench/behaviour/timing';
@@ -20,15 +21,17 @@ const windows = computed(() => {
   const d = data.value;
   if (d?.state !== 'ok') return [];
   return [
-    { label: '5h', long: '5-hour', window: d.fiveHour },
-    { label: 'wk', long: 'Weekly', window: d.sevenDay },
+    { label: t('space.workbench.claudeUsage.session.label'), long: t('space.workbench.claudeUsage.fiveHourLong.label'), window: d.fiveHour },
+    { label: t('space.workbench.claudeUsage.weeklyLong.label'), long: t('space.workbench.claudeUsage.weeklyLong.label'), window: d.sevenDay },
   ].filter((w): w is { label: string; long: string; window: ClaudeUsageWindow } => w.window !== null);
 });
 
 const text = computed(() => {
-  if (isError.value && windows.value.length === 0) return 'Usage unavailable';
-  if (windows.value.length === 0) return 'Usage: –';
-  return windows.value.map((w) => `${w.label} ${Math.round(w.window.usedPercent)}%`).join(' · ');
+  if (isError.value && windows.value.length === 0) return t('space.workbench.claudeUsage.unavailable.status');
+  if (windows.value.length === 0) return t('space.workbench.claudeUsage.unknown.status');
+  return windows.value
+    .map((w) => t('space.workbench.claudeUsage.item.label', { label: w.label, percent: Math.round(w.window.usedPercent) }))
+    .join(' · ');
 });
 
 const tone = computed(() => {
@@ -42,19 +45,19 @@ const lines = computed(() =>
   windows.value.map((w) => {
     const when = formatDateTime(w.window.resetsAt);
     const left = formatDuration(Math.max(0, Math.round((w.window.resetsAt - now.value.getTime()) / 60_000)) * 60_000);
-    return `${w.long}: ${Math.round(w.window.usedPercent)}% used · resets ${when} (in ${left})`;
+    return t('space.workbench.claudeUsage.line.status', { window: w.long, percent: Math.round(w.window.usedPercent), when, left });
   }),
 );
 
 const sourceLine = computed(() => {
   const d = data.value;
   if (d?.state !== 'ok') return '';
-  const from = d.source === 'run' ? 'a background ADE run' : 'a Claude Code session';
-  return `From ${from}, ${formatRelative(d.updatedAt, now.value.getTime())}`;
+  const when = formatRelative(d.updatedAt, now.value.getTime());
+  return t(d.source === 'run' ? 'space.workbench.claudeUsage.sourceRun.status' : 'space.workbench.claudeUsage.sourceSession.status', { when });
 });
 
 const detail = computed(() => {
-  if (isError.value && windows.value.length === 0) return 'Could not read the usage limits';
+  if (isError.value && windows.value.length === 0) return t('space.workbench.claudeUsage.readFailed.error');
   return data.value?.state === 'ok' ? '' : (data.value?.detail ?? '');
 });
 </script>

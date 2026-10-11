@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { useLocalStorage } from '@vueuse/core';
 import { windowKey } from '@workbench/util/window';
 import { defineStore } from 'pinia';
@@ -41,9 +42,9 @@ export function repoIdOfTab(tab: { workspaceId: string | null }): string | null 
   return tab.workspaceId ? repoIdOfWorkspace(tab.workspaceId as WorkspaceKey) : null;
 }
 
-/** The message every repo view's own "no repository" error/empty state showed, hand-copied ×4
+/** The message every repo view's own "no repository" error/empty state shows, hand-copied ×4
  *  (P115 H9) — moved beside `repoIdOfTab` since it always accompanies a null result from it. */
-export const NO_REPOSITORY_MESSAGE = 'This tab has no repository.';
+export const noRepositoryMessage = (): string => t('space.repo.view.noRepoTab.error');
 
 // The active workspace, the Git panel's repo switcher (`openRepos`), and which repo was last
 // active (`lastRepoKey`, persisted per window so a relaunch reopens on it) — Kira Studio's own useWorkspaceStore (state/workspace.ts).

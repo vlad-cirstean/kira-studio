@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RoutedPrompt } from '@shared/domain/prompts';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useMobileAccessStore } from '../state/mobileAccess';
 import PairingRequestDialog from './PairingRequestDialog.vue';
@@ -25,7 +26,7 @@ async function onApprove(): Promise<void> {
 
 <template>
   <PairingRequestDialog
-    title="Phone wants to view Agents"
+    :title="t('space.workbench.mobilePairing.dialog.title')"
     :request-id="current?.requestId"
     :expires-at-ms="current?.expiresAtMs"
     :more="more"
@@ -36,17 +37,16 @@ async function onApprove(): Promise<void> {
   >
     <template v-if="current">
       <p class="m-0 whitespace-pre-wrap">
-        A phone on your network wants read-only access to the agents board. Approve only if the
-        code below matches the one on the phone.
+        {{ t('space.workbench.mobilePairing.intro.body') }}
       </p>
       <p class="m-0 font-data text-kira-xl tracking-widest" data-testid="mobile-pairing-code">
         {{ current.code }}
       </p>
       <p class="m-0 text-subtle break-all" data-testid="mobile-pairing-label">
-        Says it is: {{ current.label || 'unnamed phone' }}
+        {{ t('space.workbench.mobilePairing.says.label', { name: current.label || t('space.workbench.mobilePairing.unnamed.label') }) }}
       </p>
       <p class="m-0 text-subtle break-all" data-testid="mobile-pairing-origin">
-        From {{ current.remoteIp }}
+        {{ t('space.workbench.mobilePairing.from.label', { address: current.remoteIp }) }}
         <span v-if="current.userAgent">({{ current.userAgent }})</span>
       </p>
     </template>

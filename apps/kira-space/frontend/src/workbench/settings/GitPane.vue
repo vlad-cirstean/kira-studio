@@ -4,6 +4,7 @@ import { Field, FieldDescription, FieldError } from '@theme/components/ui/field'
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { computed, ref, useId, watch } from 'vue';
 import {
@@ -50,9 +51,12 @@ function resetProtectedBranches(): void {
 
 const fetchAutoIntervalError = computed<string | null>(() => {
   const v = props.draft.git.fetchAutoIntervalMinutes;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isFinite(v)) return t('space.workbench.gitSettings.enterNumber.error');
   if (v < FETCH_AUTO_INTERVAL_MINUTES_RANGE.min || v > FETCH_AUTO_INTERVAL_MINUTES_RANGE.max) {
-    return `${FETCH_AUTO_INTERVAL_MINUTES_RANGE.min}–${FETCH_AUTO_INTERVAL_MINUTES_RANGE.max} minutes`;
+    return t('space.workbench.gitSettings.fetchRange.error', {
+      min: FETCH_AUTO_INTERVAL_MINUTES_RANGE.min,
+      max: FETCH_AUTO_INTERVAL_MINUTES_RANGE.max,
+    });
   }
   return null;
 });
@@ -63,10 +67,10 @@ props.registerFieldError('git.fetchAutoIntervalMinutes', fetchAutoIntervalError)
 // itself accepts the full 0..max range (a stored out-of-range value must still hydrate).
 const graphFontSizeError = computed<string | null>(() => {
   const v = props.draft.git.graphFontSize;
-  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (!Number.isFinite(v)) return t('space.workbench.gitSettings.enterNumber.error');
   if (v === 0) return null;
   if (v < FONT_SIZE_RANGE.min || v > FONT_SIZE_RANGE.max) {
-    return `0, or ${FONT_SIZE_RANGE.min}–${FONT_SIZE_RANGE.max} px`;
+    return t('space.workbench.gitSettings.graphFont.range.error', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max });
   }
   return null;
 });
@@ -82,17 +86,16 @@ const graphFontSizeId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <h3 class="text-kira-lg">Git remote operations</h3>
+    <h3 class="text-kira-lg">{{ t('space.workbench.gitSettings.remote.title') }}</h3>
     <p class="text-subtle text-kira-sm">
-      Server-owned: applies to every connected editor immediately, since two windows
-      disagreeing about either is a safety issue, not a preference.
+      {{ t('space.workbench.gitSettings.remote.description') }}
     </p>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="protectedBranchesId">Protected branch patterns (one per line)</Label>
+        <Label :for="protectedBranchesId">{{ t('space.workbench.gitSettings.protected.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-git-protectedBranches"
           :disabled-trigger="isAtDefault('git', 'protectedBranches')"
           :disabled="isAtDefault('git', 'protectedBranches')"
@@ -104,20 +107,17 @@ const graphFontSizeId = useId();
         v-model="protectedBranchesText"
         class="font-data"
         rows="4"
-        placeholder="main"
+        :placeholder="t('space.workbench.gitSettings.protected.example')"
         data-testid="settings-git-protected-branches"
       />
-      <FieldDescription
-        >Force-pushing or deleting a matching remote branch requires typing its name to
-        confirm. "*" matches any characters except "/". Ordinary pushes are never gated.</FieldDescription
-      >
+      <FieldDescription>{{ t('space.workbench.gitSettings.protected.description') }}</FieldDescription>
     </Field>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="fetchAutoIntervalMinutesId">Auto-fetch interval (minutes)</Label>
+        <Label :for="fetchAutoIntervalMinutesId">{{ t('space.workbench.gitSettings.fetchInterval.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-git-fetchAutoIntervalMinutes"
           :disabled-trigger="isAtDefault('git', 'fetchAutoIntervalMinutes')"
           :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
@@ -139,18 +139,14 @@ const graphFontSizeId = useId();
       >
         {{ fetchAutoIntervalError }}
       </FieldError>
-      <FieldDescription v-else
-        >0 disables background fetching. Never prompts for a credential — it stops after a
-        credential or remote error until the next explicit fetch; network errors retry with
-        backoff.</FieldDescription
-      >
+      <FieldDescription v-else>{{ t('space.workbench.gitSettings.fetchInterval.description') }}</FieldDescription>
     </Field>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="gitPathId">Git executable path</Label>
+        <Label :for="gitPathId">{{ t('space.workbench.gitSettings.gitPath.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-git-gitPath"
           :disabled-trigger="isAtDefault('git', 'gitPath')"
           :disabled="isAtDefault('git', 'gitPath')"
@@ -164,18 +160,15 @@ const graphFontSizeId = useId();
         data-testid="settings-git-path"
         v-model="draft.git.gitPath"
       />
-      <FieldDescription
-        >Empty uses the host's own discovery (PATH). A remote op reads this fresh every
-        time, never cached, so a change here takes effect on the next one.</FieldDescription
-      >
+      <FieldDescription>{{ t('space.workbench.gitSettings.gitPath.description') }}</FieldDescription>
     </Field>
-    <h3 class="text-kira-lg">Graph</h3>
+    <h3 class="text-kira-lg">{{ t('space.ade.workflows.editor.graph.label') }}</h3>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="graphFontSizeId">Font size</Label>
+        <Label :for="graphFontSizeId">{{ t('space.workbench.gitSettings.graphFont.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-git-graphFontSize"
           :disabled-trigger="isAtDefault('git', 'graphFontSize')"
           :disabled="isAtDefault('git', 'graphFontSize')"
@@ -194,7 +187,7 @@ const graphFontSizeId = useId();
       <FieldError v-if="graphFontSizeError" data-testid="settings-git-graphFontSize-error">
         {{ graphFontSizeError }}
       </FieldError>
-      <FieldDescription v-else>0 = match the app font size.</FieldDescription>
+      <FieldDescription v-else>{{ t('space.workbench.gitSettings.graphFont.description') }}</FieldDescription>
     </Field>
   </div>
 </template>

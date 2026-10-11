@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 // P94 pass 3 §4.3: RepoFileView.vue's mount() read its file two different ways (worktree vs a
 // revision-pinned tab) with near-duplicate try/catch/error-message plumbing around each — lifted
@@ -33,7 +34,7 @@ export async function loadFileContent(
   }
 
   const gitRepoId = gitRepoIdFor(repoId);
-  if (!gitRepoId) return { kind: 'error', message: 'This repository is not open.' };
+  if (!gitRepoId) return { kind: 'error', message: t('space.repo.view.repoNotOpen.error') };
   const transport = gitTransportFor(repoId);
   try {
     const result = await transport.request('file.read', { repoId: gitRepoId, rev, path });

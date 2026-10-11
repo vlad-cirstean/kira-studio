@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 /**
  * P62 §4 / P76 §4 — the repo file viewer's own git-blame annotation: injected text at the end of
  * the cursor's line, `<author>, <age> · <subject>`. The request lifecycle (debounce, cache,
@@ -24,11 +25,13 @@ export interface BlameAnnotationHandle {
 type LineState = Extract<BlameLineState, { kind: 'uncommitted' | 'resolved' }>;
 
 function annotationText(state: LineState): string {
-  return state.kind === 'uncommitted' ? 'Uncommitted' : blameLineText(state);
+  return state.kind === 'uncommitted'
+    ? t('space.ade.changes.uncommitted.label')
+    : blameLineText(state);
 }
 
 function hoverMessage(state: LineState): { value: string }[] {
-  if (state.kind === 'uncommitted') return [{ value: 'Not committed yet' }];
+  if (state.kind === 'uncommitted') return [{ value: t('space.repo.blame.uncommitted.tooltip') }];
   return blameLineTooltip(state).map((value) => ({ value }));
 }
 
@@ -77,7 +80,7 @@ export function attachBlameAnnotation(
   // the injected text (§4.5's full reasoning).
   const revealAction = editor.addAction({
     id: 'kira.blame.revealCommit',
-    label: 'Open Blame Commit in Graph',
+    label: t('space.repo.blame.openInGraph.label'),
     contextMenuGroupId: 'kiraBlame',
     run: () => {
       const state = controller.state.value;

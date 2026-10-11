@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { t } from '@theme/i18n';
 import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 
 // Shared shell for a pairing prompt PromptHost mounts. Renders nothing while `requestId` is absent;
@@ -31,10 +32,10 @@ const { remainingSeconds } = usePendingDecision({
       <DialogBody>
         <slot />
         <p class="m-0 text-subtle" :data-testid="`${testidPrefix}-expires`">
-          Expires in {{ remainingSeconds }}s
+          {{ t('space.workbench.pairing.expires.status', { seconds: remainingSeconds }) }}
         </p>
         <p v-if="more > 0" class="m-0 text-subtle" :data-testid="`${testidPrefix}-queue-count`">
-          {{ more }} more waiting
+          {{ t('space.workbench.queue.more.status', { count: more }) }}
         </p>
       </DialogBody>
 
@@ -46,7 +47,7 @@ const { remainingSeconds } = usePendingDecision({
           :data-testid="`${testidPrefix}-deny`"
           @click="emit('deny')"
         >
-          Deny
+          {{ t('common.action.deny.label') }}
         </Button>
         <Button
           variant="dialog-primary"
@@ -54,7 +55,7 @@ const { remainingSeconds } = usePendingDecision({
           :data-testid="`${testidPrefix}-approve`"
           @click="emit('approve')"
         >
-          Approve
+          {{ t('common.action.approve.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

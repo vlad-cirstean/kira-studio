@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { onMounted, onUnmounted, ref } from 'vue';
@@ -22,7 +23,7 @@ import { gitTransportFor } from '../../repo/git/transport';
 // single-active-view scoped: repoId resolution, the view.find/repo.goToFileFromDiff command
 // registrations, and review-decorations wiring.
 import type { RepoDiffTabRecord } from '../../state/tabDomain';
-import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
+import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 import { attachAskReviewAgent } from './askReviewAgent';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
@@ -50,7 +51,7 @@ async function mount(): Promise<void> {
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
     state.value = 'error';
-    errorMessage.value = NO_REPOSITORY_MESSAGE;
+    errorMessage.value = noRepositoryMessage();
     return;
   }
 
@@ -130,7 +131,7 @@ onUnmounted(() => {
     <ViewToolbar v-if="state === 'found'">
       <Button variant="toolbar" size="kira" data-testid="repo-diff-go-to-file" @click="onGoToFile">
         <CodiconIcon name="go-to-file" :size="13" />
-        Go to file
+        {{ t('space.repo.view.goToFile.label') }}
       </Button>
     </ViewToolbar>
     <div
@@ -141,19 +142,19 @@ onUnmounted(() => {
     />
     <Empty v-else-if="state === 'binary'" class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file is binary and can't be compared.</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.binaryCompare.empty') }}</EmptyTitle>
     </Empty>
     <Empty v-else-if="state === 'tooLarge'" class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file is too large to compare (over 8 MB).</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.tooLargeCompare.empty') }}</EmptyTitle>
     </Empty>
     <Empty v-else-if="state === 'bothMissing'" class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>This file no longer exists.</EmptyTitle>
+      <EmptyTitle>{{ t('space.repo.view.missing.empty') }}</EmptyTitle>
     </Empty>
     <Empty v-else class="flex-1 min-h-0">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-      <EmptyTitle>{{ errorMessage || 'Could not open this diff.' }}</EmptyTitle>
+      <EmptyTitle>{{ errorMessage || t('space.repo.view.openDiffFailed.error') }}</EmptyTitle>
     </Empty>
   </div>
 </template>

@@ -4,7 +4,8 @@ import { Button } from '@theme/components/ui/button';
 import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
-import { useId } from 'vue';
+import { t } from '@theme/i18n';
+import { computed, useId } from 'vue';
 import { control } from '../../bridge/control';
 import type { Settings } from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
@@ -20,13 +21,13 @@ type NotifyLeaf = Exclude<
 >;
 
 // P238: master first; the rest are disabled while it is off.
-const notifyLeaves: { leaf: NotifyLeaf; testid: string; label: string }[] = [
-  { leaf: 'notifyEnabled', testid: 'settings-claude-code-notify', label: 'Notify me when a Claude Code session needs me' },
-  { leaf: 'notifyOnFinished', testid: 'settings-claude-code-notify-finished', label: 'When a session finishes' },
-  { leaf: 'notifyOnNeedsInput', testid: 'settings-claude-code-notify-needs-input', label: 'When a session needs input' },
-  { leaf: 'notifyOnRunEnded', testid: 'settings-claude-code-notify-run-ended', label: 'When a background ADE run ends' },
-  { leaf: 'notifyIncludeMessage', testid: 'settings-claude-code-notify-include-message', label: 'Show the start of the reply in the notification' },
-];
+const notifyLeaves = computed<{ leaf: NotifyLeaf; testid: string; label: string }[]>(() => [
+  { leaf: 'notifyEnabled', testid: 'settings-claude-code-notify', label: t('space.workbench.claudeCode.notify.label') },
+  { leaf: 'notifyOnFinished', testid: 'settings-claude-code-notify-finished', label: t('space.workbench.claudeCode.notifyFinished.label') },
+  { leaf: 'notifyOnNeedsInput', testid: 'settings-claude-code-notify-needs-input', label: t('space.workbench.claudeCode.notifyNeedsInput.label') },
+  { leaf: 'notifyOnRunEnded', testid: 'settings-claude-code-notify-run-ended', label: t('space.workbench.claudeCode.notifyRunEnded.label') },
+  { leaf: 'notifyIncludeMessage', testid: 'settings-claude-code-notify-include-message', label: t('space.workbench.claudeCode.notifyIncludeMessage.label') },
+]);
 
 function setNotify(leaf: NotifyLeaf, on: boolean): void {
   props.draft.claudeCode[leaf] = on;
@@ -51,10 +52,10 @@ function setKeepAwake(on: boolean): void {
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="switchId">Keep this Mac awake while a Claude Code session is running</Label>
+        <Label :for="switchId">{{ t('space.workbench.claudeCode.keepAwake.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-claudeCode-keepAwakeWithAgents"
           :disabled-trigger="isAtDefault('claudeCode', 'keepAwakeWithAgents')"
           :disabled="isAtDefault('claudeCode', 'keepAwakeWithAgents')"
@@ -68,9 +69,7 @@ function setKeepAwake(on: boolean): void {
         @update:model-value="(v) => setKeepAwake(v === true)"
       />
       <FieldDescription>
-        Prevents idle sleep, and system sleep on AC power, while a Claude Code terminal tab or a
-        background agent is running. Independent of the title bar's own keep-awake button: either
-        one is enough to keep the machine awake.
+        {{ t('space.workbench.claudeCode.keepAwake.description') }}
       </FieldDescription>
     </Field>
 
@@ -79,7 +78,7 @@ function setKeepAwake(on: boolean): void {
         <Label :for="`${switchId}-${n.leaf}`" :class="n.leaf === 'notifyEnabled' ? '' : 'pl-4'">{{ n.label }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           :data-testid="`settings-reset-claudeCode-${n.leaf}`"
           :disabled-trigger="isAtDefault('claudeCode', n.leaf)"
           :disabled="isAtDefault('claudeCode', n.leaf)"
@@ -94,9 +93,7 @@ function setKeepAwake(on: boolean): void {
         @update:model-value="(v) => setNotify(n.leaf, v === true)"
       />
       <FieldDescription v-if="n.leaf === 'notifyEnabled'">
-        Posts to the system notification centre; clicking one opens that session. On macOS the
-        first one asks for permission. Reply text only goes to the local notification centre,
-        never off this Mac. Nothing shows while you are looking at that session.
+        {{ t('space.workbench.claudeCode.notify.description') }}
       </FieldDescription>
     </Field>
     <Field>
@@ -108,16 +105,16 @@ function setKeepAwake(on: boolean): void {
         data-testid="settings-claude-code-notify-test"
         @click="sendTest"
       >
-        Send test notification
+        {{ t('space.workbench.claudeCode.sendTest.label') }}
       </Button>
     </Field>
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="`${switchId}-usage`">Show Claude Code usage limits in the ADE status bar</Label>
+        <Label :for="`${switchId}-usage`">{{ t('space.workbench.claudeCode.usage.label') }}</Label>
         <TooltipIconButton
           icon="discard"
-          label="Reset to default"
+          :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-claudeCode-usageEnabled"
           :disabled-trigger="isAtDefault('claudeCode', 'usageEnabled')"
           :disabled="isAtDefault('claudeCode', 'usageEnabled')"
@@ -131,10 +128,7 @@ function setKeepAwake(on: boolean): void {
         @update:model-value="(v) => setUsage(v === true)"
       />
       <FieldDescription>
-        Shows the 5-hour and weekly limits that Claude Code sessions started from Kira Space
-        report. Claude Code hands the numbers to a status-line hook on this Mac; nothing is
-        sent anywhere and no login or token is read. Applies to sessions started after you
-        change it. Pro and Max plans only.
+        {{ t('space.workbench.claudeCode.usage.description') }}
       </FieldDescription>
     </Field>
   </div>

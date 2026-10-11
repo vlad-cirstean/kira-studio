@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
+import { t } from '@theme/i18n';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
@@ -27,7 +28,7 @@ const inlineBlameId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <FieldLegend class="pt-0">Typography</FieldLegend>
+    <FieldLegend class="pt-0">{{ t('space.workbench.appearance.typography.label') }}</FieldLegend>
     <FontSizeField
       :appearance="draft.appearance"
       :is-at-default="isAtDefault"
@@ -36,11 +37,11 @@ const inlineBlameId = useId();
     />
 
     <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>Applies to the file tree and every list.</FieldDescription>
+      <FieldDescription>{{ t('space.workbench.appearance.rowDensity.description') }}</FieldDescription>
     </RowDensityField>
 
     <WordWrapField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>Long lines wrap instead of scrolling, in the file viewer.</FieldDescription>
+      <FieldDescription>{{ t('space.workbench.appearance.wordWrap.description') }}</FieldDescription>
     </WordWrapField>
 
     <FieldGroup>
@@ -52,16 +53,13 @@ const inlineBlameId = useId();
           @update:model-value="(v) => onInlineBlameChange(v === true)"
         />
         <FieldContent>
-          <Label :for="inlineBlameId">Inline blame</Label>
-          <FieldDescription
-            >Show who last changed the current line, at the end of that line, in the
-            repository file viewer.</FieldDescription
-          >
+          <Label :for="inlineBlameId">{{ t('space.workbench.appearance.inlineBlame.label') }}</Label>
+          <FieldDescription>{{ t('space.workbench.appearance.inlineBlame.description') }}</FieldDescription>
         </FieldContent>
       </Field>
       <TooltipIconButton
         icon="discard"
-        label="Reset to default"
+        :label="t('common.action.resetToDefault.label')"
         class="ml-auto"
         data-testid="settings-reset-appearance-inlineBlame"
         :disabled-trigger="isAtDefault('appearance', 'inlineBlame')"

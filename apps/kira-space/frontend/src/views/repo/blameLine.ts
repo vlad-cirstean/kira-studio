@@ -8,6 +8,7 @@
  */
 import { formatAbsoluteDate, formatRelativeDate } from '@kira/git-core';
 import type { EventPayload, ResultOf, Transport } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { useDebounceFn } from '@vueuse/core';
 import { type ShallowRef, shallowRef } from 'vue';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
@@ -85,15 +86,20 @@ function toState(line: number, result: BlameResult | null): BlameLineState {
 export function blameLineText(state: Extract<BlameLineState, { kind: 'resolved' }>): string {
   const subject = clampSubject(state.summary);
   const age = formatRelativeDate(state.authorTimeSeconds);
-  return subject.length > 0 ? `${state.author}, ${age} · ${subject}` : `${state.author}, ${age}`;
+  return subject.length > 0
+    ? t('space.repo.blame.line.label', { author: state.author, when: age, subject })
+    : t('space.repo.blame.authorWhen.label', { author: state.author, when: age });
 }
 
 /** Two lines: the clamped subject, then `<author>, <absolute date>`. */
 export function blameLineTooltip(state: Extract<BlameLineState, { kind: 'resolved' }>): string[] {
   const subject = clampSubject(state.summary);
   return [
-    subject.length > 0 ? subject : '(no commit message)',
-    `${state.author}, ${formatAbsoluteDate(state.authorTimeSeconds)}`,
+    subject.length > 0 ? subject : t('space.repo.blame.noMessage.label'),
+    t('space.repo.blame.authorWhen.label', {
+      author: state.author,
+      when: formatAbsoluteDate(state.authorTimeSeconds),
+    }),
   ];
 }
 

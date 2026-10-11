@@ -6579,6 +6579,23 @@
       "title": "Kira Space"
     },
     "repo": {
+      "blame": {
+        "authorWhen": {
+          "label": "{author}, {when}"
+        },
+        "line": {
+          "label": "{author}, {when} · {subject}"
+        },
+        "noMessage": {
+          "label": "(No commit message)"
+        },
+        "openInGraph": {
+          "label": "Open blame commit in graph"
+        },
+        "uncommitted": {
+          "tooltip": "Not committed yet"
+        }
+      },
       "config": {
         "basePath": {
           "choose": {
@@ -6774,6 +6791,26 @@
           "error": "This panel has no repository."
         }
       },
+      "reviewEditor": {
+        "addComment": {
+          "label": "Add review comment",
+          "tooltip": "Add a review comment"
+        },
+        "loadError": {
+          "error": "Couldn’t load review data for this file."
+        },
+        "markReviewed": {
+          "label": "Mark selection reviewed",
+          "tooltip": "Mark reviewed"
+        },
+        "markUnreviewed": {
+          "label": "Mark selection unreviewed",
+          "tooltip": "Mark unreviewed"
+        },
+        "noBase": {
+          "error": "No base branch configured for this repository."
+        }
+      },
       "search": {
         "results": {
           "aria": "Search results"
@@ -6795,7 +6832,323 @@
         "files": {
           "aria": "Repository files"
         }
+      },
+      "view": {
+        "anchorRemoved": {
+          "status": "Lines no longer exist on {branch}, shown as of {sha}"
+        },
+        "anchorStale": {
+          "status": "Lines as of {sha}, {branch}’s history was rewritten since"
+        },
+        "askReviewAgent": {
+          "label": "Ask review agent"
+        },
+        "binaryCompare": {
+          "empty": "This file is binary and can’t be compared"
+        },
+        "binaryPreview": {
+          "empty": "This file is binary and can’t be previewed"
+        },
+        "comment": {
+          "label": "Comment",
+          "placeholder": "Leave a review comment"
+        },
+        "goToFile": {
+          "label": "Go to file"
+        },
+        "missing": {
+          "empty": "This file no longer exists"
+        },
+        "noChanges": {
+          "empty": "No changed files"
+        },
+        "noRepoTab": {
+          "error": "This tab has no repository."
+        },
+        "openDiffFailed": {
+          "error": "Couldn’t open this diff."
+        },
+        "openFileFailed": {
+          "error": "Couldn’t open this file."
+        },
+        "reading": {
+          "label": "Reading"
+        },
+        "repoNotOpen": {
+          "error": "This repository is not open."
+        },
+        "tooLargeCompare": {
+          "empty": "This file is too large to compare (over 8 megabytes)"
+        },
+        "tooLargePreview": {
+          "empty": "This file is too large to preview (over 8 megabytes)"
+        }
       }
+    },
+    "workbench": {
+      "advanced": {
+        "gitLogLevel": {
+          "description": "Kira Space’s own diagnostic log verbosity.",
+          "label": "Git log level"
+        },
+        "ignoreRepoSettings": {
+          "description": "Runs claude -p with --setting-sources user. When off, the repository’s Claude settings also load, and their deny rules still apply.",
+          "label": "Background agents ignore repository settings"
+        }
+      },
+      "appearance": {
+        "commitDate": {
+          "absolute": {
+            "option": "Absolute (2024-12-30 22:48)"
+          },
+          "description": "The Git graph’s commit timestamps.",
+          "label": "Commit date",
+          "relative": {
+            "option": "Relative (3 days ago)"
+          }
+        },
+        "inlineBlame": {
+          "description": "Shows who last changed the current line, at the end of that line, in the repository file viewer.",
+          "label": "Inline blame"
+        },
+        "rowDensity": {
+          "description": "Applies to the file tree and every list."
+        },
+        "typography": {
+          "label": "Typography"
+        },
+        "wordWrap": {
+          "description": "Long lines wrap instead of scrolling, in the file viewer."
+        }
+      },
+      "claudeCode": {
+        "keepAwake": {
+          "description": "Prevents idle sleep, and system sleep on mains power, while a Claude Code terminal tab or a background agent is running. Independent of the title bar’s own keep-awake button. Either one is enough to keep the machine awake.",
+          "label": "Keep this Mac awake while a Claude Code session is running"
+        },
+        "notify": {
+          "description": "Posts to the system notification centre, and clicking one opens that session. On macOS the first one asks for permission. Reply text only goes to the local notification centre, never off this Mac. Nothing shows while you are looking at that session.",
+          "label": "Notify me when a Claude Code session needs me"
+        },
+        "notifyFinished": {
+          "label": "When a session finishes"
+        },
+        "notifyIncludeMessage": {
+          "label": "Show the start of the reply in the notification"
+        },
+        "notifyNeedsInput": {
+          "label": "When a session needs input"
+        },
+        "notifyRunEnded": {
+          "label": "When a background ADE run ends"
+        },
+        "sendTest": {
+          "label": "Send test notification"
+        },
+        "usage": {
+          "description": "Shows the 5-hour and weekly limits that Claude Code sessions started from Kira Space report. Claude Code hands the numbers to a status-line hook on this Mac. Nothing is sent anywhere, and no login or token is read. Applies to sessions started after you change it. Available on Claude subscription plans only.",
+          "label": "Show Claude Code usage limits in the ADE status bar"
+        }
+      },
+      "claudeUsage": {
+        "fiveHourLong": {
+          "label": "Five-hour"
+        },
+        "item": {
+          "label": "{label} {percent}%"
+        },
+        "line": {
+          "status": "{window}: {percent}% used · resets {when} (in {left})"
+        },
+        "readFailed": {
+          "error": "Couldn’t read the usage limits."
+        },
+        "session": {
+          "label": "Session"
+        },
+        "sourceRun": {
+          "status": "From a background ADE run, {when}"
+        },
+        "sourceSession": {
+          "status": "From a Claude Code session, {when}"
+        },
+        "unavailable": {
+          "status": "Usage unavailable"
+        },
+        "unknown": {
+          "status": "Usage: –"
+        },
+        "weeklyLong": {
+          "label": "Weekly"
+        }
+      },
+      "gitCredential": {
+        "continue": {
+          "label": "Continue"
+        },
+        "dialog": {
+          "title": "Git credentials"
+        }
+      },
+      "gitSettings": {
+        "enterNumber": {
+          "error": "Enter a number."
+        },
+        "fetchInterval": {
+          "description": "Zero disables background fetching. It never prompts for a credential. After a credential or remote error it stops until the next explicit fetch, and network errors retry with backoff.",
+          "label": "Auto-fetch interval (minutes)"
+        },
+        "fetchRange": {
+          "error": "Enter {min}–{max} minutes."
+        },
+        "gitPath": {
+          "description": "Empty uses the host’s own discovery. A remote operation reads this fresh every time, never cached, so a change here takes effect on the next one.",
+          "label": "Git executable path"
+        },
+        "graphFont": {
+          "description": "Zero matches the app font size.",
+          "label": "Font size",
+          "range": {
+            "error": "Enter 0, or a size from {min} to {max} px."
+          }
+        },
+        "protected": {
+          "description": "Force-pushing or deleting a matching remote branch requires typing its name to confirm. “*” matches any characters except “/”. Ordinary pushes are never gated.",
+          "example": "release/*",
+          "label": "Protected branch patterns (one per line)"
+        },
+        "remote": {
+          "description": "Server-owned. These apply to every connected editor immediately, since two windows disagreeing about either is a safety issue, not a preference.",
+          "title": "Git remote operations"
+        }
+      },
+      "mobileAccess": {
+        "agentInput": {
+          "description": "Anyone holding a phone with this on can type into Claude Code and run commands as you. Each phone also needs agent input turned on in its own row below. Turning this off ends every phone terminal now.",
+          "label": "Let phones reply to agents and control their terminals"
+        },
+        "devices": {
+          "agentInput": {
+            "label": "Agent input"
+          },
+          "expires": {
+            "status": "Access expires {when}"
+          },
+          "lastSeen": {
+            "status": "Last seen {when}"
+          },
+          "lastSeenFrom": {
+            "status": "Last seen {when} from {address}"
+          },
+          "none": {
+            "empty": "No phones are paired"
+          },
+          "revoke": {
+            "label": "Revoke"
+          },
+          "terminals": {
+            "status": "Controlling {count} terminal | Controlling {count} terminals"
+          },
+          "title": "Paired phones"
+        },
+        "enabled": {
+          "description": "A phone on your trusted home network pairs once, then sees the board, backlog and plan. Each phone can also change the backlog and move or start tasks, and reply to agents. The server runs only while this computer is on that network.",
+          "label": "View the agents board from a phone on my trusted network"
+        },
+        "forgetConfirm": {
+          "body": "The phone server stops until you trust a network again.",
+          "title": "Forget trusted network?"
+        },
+        "network": {
+          "current": {
+            "status": "This computer: {address} on {subnet}, router {router} ({mac})"
+          },
+          "forget": {
+            "label": "Forget"
+          },
+          "none": {
+            "empty": "No trusted network"
+          },
+          "offNetwork": {
+            "empty": "This computer is not on a private local network"
+          },
+          "title": "Trusted network",
+          "trust": {
+            "label": "Trust this network"
+          },
+          "trusted": {
+            "status": "{subnet}, router {router} ({mac}), trusted on {interface}"
+          },
+          "trustedAt": {
+            "status": "{subnet}, router {router} ({mac}), trusted on {interface} on {date}"
+          },
+          "trustVerb": {
+            "label": "Trust"
+          }
+        },
+        "openApp": {
+          "title": "Open the app"
+        },
+        "plaintext": {
+          "body": "The phone talks to Kira Space over plain HTTP. Anyone on the same network can read the board, backlog and terminal output it shows, and can copy the phone’s access and act as that phone until it expires or you revoke it. Turn this on only on a network you control, such as your home Wi-Fi."
+        },
+        "port": {
+          "apply": {
+            "label": "Apply port"
+          },
+          "integer": {
+            "error": "Enter a whole number."
+          },
+          "label": "Port",
+          "range": {
+            "error": "Ports run from {min} to {max}."
+          }
+        },
+        "qr": {
+          "aria": "QR code for {url}"
+        },
+        "revokeConfirm": {
+          "body": "“{name}” needs to be approved again before it can connect.",
+          "title": "Revoke access?"
+        },
+        "trustConfirm": {
+          "body": "The phone talks to Kira Space over plain HTTP, so anyone on {subnet} (router {mac}) can read what it shows. Turn this on only on a network you control, such as your home Wi-Fi.",
+          "title": "Trust network?"
+        }
+      },
+      "mobilePairing": {
+        "dialog": {
+          "title": "Phone wants to view the agents board"
+        },
+        "from": {
+          "label": "From {address}"
+        },
+        "intro": {
+          "body": "A phone on your network wants read-only access to the agents board. Approve only if the code below matches the one on the phone."
+        },
+        "says": {
+          "label": "Says it is: {name}"
+        },
+        "unnamed": {
+          "label": "Unnamed phone"
+        }
+      },
+      "operations": {
+        "clearHint": {
+          "hint": "Clears this window’s list only. The log resets when Kira Space quits."
+        }
+      },
+      "pairing": {
+        "expires": {
+          "status": "Expires in {seconds}s"
+        }
+      },
+      "queue": {
+        "more": {
+          "status": "{count} more waiting"
+        }
+      },
+      "settings": {}
     }
   },
   "studio": {

@@ -11,6 +11,7 @@
 // still owns; registering either once per expanded multi-diff section would mean the last section
 // mounted wins, silently shadowing the others'.
 import type { DiffSide } from '@shared/domain/repo';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, ref, shallowRef } from 'vue';
 import { control } from '../../bridge/control';
@@ -73,7 +74,7 @@ async function loadDiffSides(
 
   const gitRepoId = gitRepoIdFor(repoId);
   if (!gitRepoId || right === null) {
-    return { error: 'This repository is not open.' };
+    return { error: t('space.repo.view.repoNotOpen.error') };
   }
   // 7d (P68 review): this lease is only ever used for the two requests below, so it is released
   // as soon as they settle rather than left to leak for the rest of the mount.

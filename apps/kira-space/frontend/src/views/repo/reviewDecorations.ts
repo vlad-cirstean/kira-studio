@@ -31,7 +31,7 @@ import type {
   Transport,
 } from '@kira/git-ipc';
 import { buttonVariants } from '@theme/components/ui/button';
-import { i18n } from '@theme/i18n';
+import { i18n, t } from '@theme/i18n';
 import { type App, createApp, nextTick } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
@@ -220,7 +220,7 @@ export function attachReviewDecorations(
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = buttonVariants({ variant: 'dialog-danger', size: 'kira' });
-      retry.textContent = 'Retry';
+      retry.textContent = t('common.action.retry.label');
       retry.addEventListener('click', () => void load());
       domNode.append(retry);
     }
@@ -230,11 +230,11 @@ export function attachReviewDecorations(
   }
 
   function showLoadError(): void {
-    showBannerZone("Couldn't load review data for this file.", true);
+    showBannerZone(t('space.repo.reviewEditor.loadError.error'), true);
   }
 
   function showNoBaseConfigured(): void {
-    showBannerZone('No base branch configured for this repository.', false);
+    showBannerZone(t('space.repo.reviewEditor.noBase.error'), false);
   }
 
   function paintAddGlyph(): void {
@@ -248,7 +248,7 @@ export function attachReviewDecorations(
         options: {
           glyphMarginClassName: 'codicon codicon-add kira-review-glyph kira-review-glyph-add',
           glyphMargin: { position: mod.editor.GlyphMarginLane.Left },
-          glyphMarginHoverMessage: { value: 'Add a review comment' },
+          glyphMarginHoverMessage: { value: t('space.repo.reviewEditor.addComment.tooltip') },
         },
       },
     ]);
@@ -295,7 +295,11 @@ export function attachReviewDecorations(
               ? 'codicon codicon-pass-filled kira-review-glyph kira-review-glyph-reviewed'
               : 'codicon codicon-circle-large-outline kira-review-glyph kira-review-glyph-actionable',
             glyphMargin: { position: mod.editor.GlyphMarginLane.Right },
-            glyphMarginHoverMessage: { value: reviewed ? 'Mark unreviewed' : 'Mark reviewed' },
+            glyphMarginHoverMessage: {
+              value: reviewed
+                ? t('space.repo.reviewEditor.markUnreviewed.tooltip')
+                : t('space.repo.reviewEditor.markReviewed.tooltip'),
+            },
           },
         });
       }
@@ -580,7 +584,7 @@ export function attachReviewDecorations(
   // OQ3's "keep both".
   const addCommentAction = modifiedEditor.addAction({
     id: 'kira.review.addComment',
-    label: 'Add Review Comment',
+    label: t('space.repo.reviewEditor.addComment.label'),
     contextMenuGroupId: 'kiraReview',
     run: () => {
       const line =
@@ -591,13 +595,13 @@ export function attachReviewDecorations(
   });
   const markReviewedAction = modifiedEditor.addAction({
     id: 'kira.review.markReviewed',
-    label: 'Mark Selection Reviewed',
+    label: t('space.repo.reviewEditor.markReviewed.label'),
     contextMenuGroupId: 'kiraReview',
     run: () => void mark(currentSelectionRange(), true),
   });
   const markUnreviewedAction = modifiedEditor.addAction({
     id: 'kira.review.markUnreviewed',
-    label: 'Mark Selection Unreviewed',
+    label: t('space.repo.reviewEditor.markUnreviewed.label'),
     contextMenuGroupId: 'kiraReview',
     run: () => void mark(currentSelectionRange(), false),
   });

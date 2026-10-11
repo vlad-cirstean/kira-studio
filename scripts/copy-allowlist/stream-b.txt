@@ -1,24 +1,2 @@
 # Stream B (Kira Space, mobile, memory). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
 permanent U64 apps/kira-space/frontend/src/ade/v2/AdeActivityIcon.vue # `z` is the waiting-on-monitor glyph, not text
-apps/kira-space/frontend/src/views/repo/RepoDiffView.vue
-apps/kira-space/frontend/src/views/repo/RepoFileView.vue
-apps/kira-space/frontend/src/views/repo/RepoMultiDiffView.vue
-apps/kira-space/frontend/src/views/repo/ReviewThread.vue
-apps/kira-space/frontend/src/views/repo/askReviewAgent.ts
-apps/kira-space/frontend/src/views/repo/blameAnnotation.ts
-apps/kira-space/frontend/src/views/repo/fileContent.ts
-apps/kira-space/frontend/src/views/repo/reviewDecorations.ts
-apps/kira-space/frontend/src/workbench/GitCredentialDialog.vue
-apps/kira-space/frontend/src/workbench/MobilePairingDialog.vue
-apps/kira-space/frontend/src/workbench/OperationsPanel.vue
-apps/kira-space/frontend/src/workbench/PairingRequestDialog.vue
-apps/kira-space/frontend/src/workbench/SettingsDialog.vue
-apps/kira-space/frontend/src/workbench/TitleBar.vue
-apps/kira-space/frontend/src/workbench/modes.ts
-apps/kira-space/frontend/src/workbench/settings/AdvancedPane.vue
-apps/kira-space/frontend/src/workbench/settings/AppearancePane.vue
-apps/kira-space/frontend/src/workbench/settings/ClaudeCodePane.vue
-apps/kira-space/frontend/src/workbench/settings/DateFormatField.vue
-apps/kira-space/frontend/src/workbench/settings/GitPane.vue
-apps/kira-space/frontend/src/workbench/settings/MobileAccessPane.vue
-apps/kira-space/frontend/src/workbench/settings/MobileQr.vue

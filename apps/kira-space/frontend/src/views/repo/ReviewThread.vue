@@ -11,6 +11,7 @@ import type { ReviewComment } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, ref, useTemplateRef } from 'vue';
 
@@ -38,9 +39,9 @@ const anchorLabel = computed<string | undefined>(() => {
   const sha8 = comment.anchorSha.slice(0, 8);
   switch (comment.anchor) {
     case 'removed':
-      return `lines no longer exist on ${props.branch} — shown as of ${sha8}`;
+      return t('space.repo.view.anchorRemoved.status', { branch: props.branch, sha: sha8 });
     case 'stale':
-      return `lines as of ${sha8} — ${props.branch}'s history was rewritten since`;
+      return t('space.repo.view.anchorStale.status', { branch: props.branch, sha: sha8 });
     case 'exact':
     case 'projected':
       return undefined;
@@ -68,11 +69,11 @@ function submit(): void {
       <div class="flex justify-end gap-1.5">
         <Button variant="toolbar" size="kira" @click="emit('close')">
           <CodiconIcon name="close" :size="13" />
-          Close
+          {{ t('common.action.close.label') }}
         </Button>
         <Button variant="danger" size="kira" @click="emit('delete')">
           <CodiconIcon name="trash" :size="13" />
-          Delete
+          {{ t('common.action.delete.label') }}
         </Button>
       </div>
     </template>
@@ -81,15 +82,15 @@ function submit(): void {
         ref="input"
         v-model="draft"
         class="resize-y"
-        placeholder="Leave a review comment…"
+        :placeholder="t('space.repo.view.comment.placeholder')"
         rows="3"
         data-testid="review-thread-input"
       />
       <div class="flex justify-end gap-1.5">
-        <Button variant="toolbar" size="kira" @click="emit('cancel')">Cancel</Button>
+        <Button variant="toolbar" size="kira" @click="emit('cancel')">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="toolbar-primary" size="kira" @click="submit">
           <CodiconIcon name="comment" :size="13" />
-          Comment
+          {{ t('space.repo.view.comment.label') }}
         </Button>
       </div>
     </template>
