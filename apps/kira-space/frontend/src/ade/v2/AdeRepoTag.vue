@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Badge } from '@theme/components/ui/badge';
 import { computed } from 'vue';
 import { useRepoLinksStore } from '../../repo/state/repoLinks';
 import { repoTint } from '../../state/coderepos';
@@ -10,11 +11,5 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
 </script>
 
 <template>
-  <span
-    class="shrink-0 rounded-kira-xs px-1.25 py-px text-kira-sm font-medium"
-    :class="tint.class"
-    :style="tint.style"
-    data-testid="ade-repo-tag"
-    >{{ label }}</span
-  >
+  <Badge variant="chip" :class="tint.class" :style="tint.style" data-testid="ade-repo-tag">{{ label }}</Badge>
 </template>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -150,14 +152,10 @@ async function send(): Promise<void> {
             <SmartBadge />
             <span>{{ smartStep.smartScript }}</span>
           </div>
-          <div
-            v-if="smartBody"
-            class="whitespace-pre-wrap rounded-kira border border-border bg-field px-3 py-2 font-data text-kira-sm"
-            data-testid="ade-run-smart-body"
-          >
+          <Card v-if="smartBody" class="whitespace-pre-wrap font-data text-kira-sm" data-testid="ade-run-smart-body">
             <VarText :parts="smartBody" />
-          </div>
-          <p v-else class="m-0 text-error" data-testid="ade-run-smart-missing">This smart script was not found.</p>
+          </Card>
+          <FieldError v-else data-testid="ade-run-smart-missing">This smart script was not found.</FieldError>
           <p class="m-0 text-kira-sm text-subtle" data-testid="ade-run-suffix">{{ suffix }}</p>
         </div>
         <div v-else class="flex flex-col gap-1">

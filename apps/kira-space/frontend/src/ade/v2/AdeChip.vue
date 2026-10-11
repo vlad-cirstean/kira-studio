@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Badge } from '@theme/components/ui/badge';
 import type { Tone } from './board/actions';
 import { TONE_TAG_CLASS } from './tones';
 
@@ -7,10 +8,5 @@ defineProps<{ label: string; tone: Tone; wide?: boolean }>();
 </script>
 
 <template>
-  <span
-    class="box-border shrink-0 whitespace-nowrap rounded-kira-sm px-1.5 py-px text-kira-sm font-medium"
-    :class="[TONE_TAG_CLASS[tone], wide ? 'min-w-21 text-center' : '']"
-    data-testid="ade-chip"
-    >{{ label }}</span
-  >
+  <Badge variant="chip" :class="[TONE_TAG_CLASS[tone], wide ? 'min-w-21 justify-center' : '']" data-testid="ade-chip">{{ label }}</Badge>
 </template>

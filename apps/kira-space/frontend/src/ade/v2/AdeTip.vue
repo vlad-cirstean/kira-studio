@@ -11,7 +11,7 @@ defineProps<{ text?: string; parts?: readonly TextPart[] }>();
     <TooltipTrigger as-child>
       <slot />
     </TooltipTrigger>
-    <TooltipContent class="whitespace-pre-line break-words"
+    <TooltipContent
       ><VarText v-if="parts?.length" :parts="parts" /><template v-else>{{ text }}</template></TooltipContent
     >
   </Tooltip>

@@ -116,7 +116,7 @@ function commit(): void {
     <Input
       :id="`ade-backlog-${item.id}`"
       v-model="draft"
-      class="min-w-0 flex-1 border-transparent bg-transparent px-2 focus-visible:border-focus dark:bg-transparent"
+      class="min-w-0 flex-1 border-transparent bg-transparent px-2 dark:bg-transparent"
       data-testid="ade-backlog-text"
       @blur="commit"
       @keydown.enter="commit"

@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
@@ -215,7 +216,7 @@ async function pick(b: CandidateBranch): Promise<void> {
           <div v-if="shown.length === 0" class="p-2.5 text-kira-md text-muted-foreground">No branches</div>
         </div>
       </div>
-      <p v-if="error" class="px-3 pb-2 text-kira-sm text-error" data-testid="ade-add-error">{{ error }}</p>
+      <FieldError v-if="error" class="px-3 pb-2" data-testid="ade-add-error">{{ error }}</FieldError>
     </PopoverContent>
   </Popover>
 </template>

@@ -2,10 +2,11 @@
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { FieldLabel } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import { Switch } from '@theme/components/ui/switch';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
@@ -179,7 +180,7 @@ async function discard(): Promise<void> {
           <AlertDescription>{{ b.text }}</AlertDescription>
         </Alert>
         <Label v-if="view.canAutostash" for="ade-dialog-autostash" class="text-kira-sm">
-          <Switch id="ade-dialog-autostash" v-model="dialogs.autostash" data-testid="ade-dialog-autostash" />
+          <Checkbox id="ade-dialog-autostash" v-model="dialogs.autostash" data-testid="ade-dialog-autostash" />
           <span>Autostash: stash the uncommitted changes, rebase, then restore them</span>
         </Label>
         <p v-if="view.noOp" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-dialog-noop">
@@ -206,7 +207,7 @@ async function discard(): Promise<void> {
         </div>
 
         <Label v-if="view.canPush" for="ade-dialog-push" class="text-kira-sm">
-          <Switch id="ade-dialog-push" v-model="dialogs.push" data-testid="ade-dialog-push" />
+          <Checkbox id="ade-dialog-push" v-model="dialogs.push" data-testid="ade-dialog-push" />
           <span>
             <span data-testid="ade-dialog-push-label">{{ view.pushLabel }}</span>
             <span v-if="!dialogs.push" class="text-subtle"> (off: stays local, push it yourself later)</span>
@@ -234,11 +235,11 @@ async function discard(): Promise<void> {
             data-testid="ade-dialog-message"
             @update:model-value="(v) => (dialogs.msg = String(v))"
           />
-          <pre
+          <Card
             v-if="view.suffix"
-            class="m-0 whitespace-pre-wrap rounded-kira border border-border bg-bg px-2 py-1.5 font-data text-kira-sm text-muted-foreground"
+            class="whitespace-pre-wrap font-data text-kira-sm text-muted-foreground"
             data-testid="ade-dialog-suffix"
-            >{{ view.suffix }}</pre
+            >{{ view.suffix }}</Card
           >
         </div>
 

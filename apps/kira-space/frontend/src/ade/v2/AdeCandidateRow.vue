@@ -18,7 +18,7 @@ const repoLabel = computed(() => repoText(repoLinks.repoColorOf(props.branch.cod
 <template>
   <Button size="kira"
     variant="ghost"
-    class="box-border h-9 w-full justify-start gap-2 px-2 text-left text-fg"
+    class="box-border h-row w-full justify-start gap-2 px-2 text-left text-fg"
     data-testid="ade-candidate"
     @click="emit('pick')"
   >

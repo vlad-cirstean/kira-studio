@@ -232,7 +232,7 @@ function keepFocus(e: MouseEvent): void {
     </div>
     <EditorContent
       :editor="editor"
-      class="min-h-25 flex-1 overflow-auto text-kira-md leading-normal text-fg"
+      class="min-h-25 flex-1 overflow-auto text-kira-md leading-normal text-fg focus-within:focus-ring"
       data-testid="ade-notes-editor"
     />
   </div>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Badge } from '@theme/components/ui/badge';
+import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -141,16 +143,12 @@ const rowBgClass = computed(() => {
         :class="elbowClass"
       />
     </span>
-    <span
-      class="shrink-0 rounded-kira-xs px-1 py-px text-kira-sm font-medium"
-      :class="repoTintOf.class"
-      :style="repoTintOf.style"
-      data-testid="ade-branch-repo"
-      >{{ row.repo }}</span
-    >
+    <Badge variant="chip" :class="repoTintOf.class" :style="repoTintOf.style" data-testid="ade-branch-repo">{{ row.repo }}</Badge>
     <AdeTip v-if="row.base" :parts="row.base.tip">
-      <span
-        class="max-w-27.5 shrink-0 truncate rounded-kira-xs px-1 py-px font-data text-kira-sm font-medium"
+      <Badge
+        variant="chip"
+        data
+        class="max-w-27.5 truncate"
         :class="[
           row.base.tone === 'blue' ? TONE_TAG_CLASS.blue : 'bg-field text-fg',
           row.base.pending ? 'border border-dashed border-tone-amber-solid' : '',
@@ -158,16 +156,11 @@ const rowBgClass = computed(() => {
         data-testid="ade-base-marker"
         :data-pending="row.base.pending || undefined"
         ><VarText :parts="row.base.label"
-      /></span>
+      /></Badge>
     </AdeTip>
     <AdeAttention v-if="row.attention" :tip="row.attention" :item="row.attentionItem" />
     <AdeTip v-if="row.isReview" text="Someone else's branch: read-only here">
-      <span
-        class="inline-flex h-5 shrink-0 items-center gap-1 rounded-kira-pill px-2 text-kira-sm font-medium"
-        :class="TONE_TAG_CLASS.blue"
-        data-testid="ade-owner-pill"
-        >{{ row.branch.owner }}</span
-      >
+      <Badge variant="chip" :class="TONE_TAG_CLASS.blue" data-testid="ade-owner-pill">{{ row.branch.owner }}</Badge>
     </AdeTip>
     <AdeTip v-if="row.branch.origin === 'agent'" text="Added or named by the agent">
       <span class="inline-flex shrink-0 text-subtle" data-testid="ade-branch-agent">
@@ -235,7 +228,7 @@ const rowBgClass = computed(() => {
       @click.stop="reviewCode.open(row.branch.taskId, row.id, rowRef)"
     >
       <VarText :parts="choice.tip" />
-      <span class="text-muted-foreground"> ({{ formatShortcut('ade.reviewCode') }})</span>
+      <Kbd>{{ formatShortcut('ade.reviewCode') }}</Kbd>
     </TooltipIconButton>
   </div>
 </template>

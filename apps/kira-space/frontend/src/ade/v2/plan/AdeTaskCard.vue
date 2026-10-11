@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
+import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { computed } from 'vue';
@@ -240,7 +241,7 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
             @click.stop="(ev: MouseEvent) => reviewCode.openTask(card, ev.currentTarget as HTMLElement)"
           >
             <VarText :parts="reviewTip" />
-            <span class="text-muted-foreground"> ({{ formatShortcut('ade.reviewCode') }})</span>
+            <Kbd>{{ formatShortcut('ade.reviewCode') }}</Kbd>
           </TooltipIconButton>
         </div>
         <AdeTip :text="card.title">

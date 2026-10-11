@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import AdeTip from './AdeTip.vue';
 import { ACTIVITY_LABEL, type ActivityKind } from './activity';
 
 // Activity glyph of a session: `!` needs input, a green dot working, `z` waiting on a monitor, an
@@ -12,7 +13,8 @@ const dot = computed(() => (big.value ? 'size-2.5' : 'size-2'));
 </script>
 
 <template>
-  <span :data-activity="kind" :title="ACTIVITY_LABEL[kind]" class="inline-flex shrink-0 items-center justify-center">
+  <AdeTip :text="ACTIVITY_LABEL[kind]">
+  <span :data-activity="kind" class="inline-flex shrink-0 items-center justify-center">
     <span
       v-if="kind === 'input'"
       :class="badge"
@@ -33,4 +35,5 @@ const dot = computed(() => (big.value ? 'size-2.5' : 'size-2'));
     <span v-else-if="kind === 'idle'" :class="dot" class="m-0.5 inline-block rounded-full border-2 border-subtle" />
     <span v-else class="m-0.75 inline-block size-1.5 rounded-kira-xs bg-disabled" />
   </span>
+  </AdeTip>
 </template>

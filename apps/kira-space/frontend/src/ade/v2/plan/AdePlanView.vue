@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import Spinner from '@theme/components/Spinner.vue';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { useElementSize, useScroll } from '@vueuse/core';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, ref } from 'vue';
@@ -278,12 +280,19 @@ function onForcePush(row: BranchRowModel): void {
 
 <template>
   <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg" data-testid="ade-plan">
-    <Alert v-if="boardQuery.isError.value" variant="error" class="m-3 w-auto" data-testid="ade-board-error">
+    <Alert v-if="boardQuery.isError.value" variant="error" strip data-testid="ade-board-error">
       <AlertTitle>Couldn't load the board</AlertTitle>
       <AlertDescription>{{ (boardQuery.error.value as Error | null)?.message }}</AlertDescription>
-      <Button variant="dialog" size="kira" class="mt-2" @click="() => boardQuery.refetch()">Retry</Button>
+      <AlertAction>
+        <Button variant="dialog" size="kira" @click="() => boardQuery.refetch()">Retry</Button>
+      </AlertAction>
     </Alert>
-    <p v-else-if="!model" class="p-4 text-muted-foreground" data-testid="ade-plan-loading">Loading…</p>
+    <Empty v-else-if="!model" class="h-full" data-testid="ade-plan-loading">
+      <EmptyHeader>
+        <EmptyMedia><Spinner :size="24" /></EmptyMedia>
+        <EmptyTitle>Loading board…</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
     <template v-else>
       <div ref="headerEl" class="sticky top-0 z-10 bg-bg">
         <AdePlanHeader
@@ -297,12 +306,14 @@ function onForcePush(row: BranchRowModel): void {
         <AdeHistoryBar v-if="inHistory" @go-to-date="onGoToDate" @hide="hideHistory" @current="scrollToDay(0)" />
       </div>
       <div class="px-4 pb-4 pt-3">
-      <Alert v-if="setPlan.isError.value" variant="error" class="mb-2" data-testid="ade-plan-error">
-        <AlertDescription class="flex items-center gap-2">
-          <span class="flex-1">{{ (setPlan.error.value as Error | null)?.message }}</span>
-          <Button variant="link" size="kira" @click="setPlan.reset()">Dismiss</Button>
-        </AlertDescription>
-      </Alert>
+      <div v-if="setPlan.isError.value" class="mb-2">
+        <Alert variant="error" data-testid="ade-plan-error">
+          <AlertDescription>{{ (setPlan.error.value as Error | null)?.message }}</AlertDescription>
+          <AlertAction>
+            <Button variant="link" size="kira" @click="setPlan.reset()">Dismiss</Button>
+          </AlertAction>
+        </Alert>
+      </div>
       <div v-if="!ui.showHistory" class="mb-2.5 ml-15">
         <Button
           variant="dialog"

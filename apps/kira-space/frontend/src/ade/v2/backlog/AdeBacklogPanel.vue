@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { useTimeAgo } from '@vueuse/core';
@@ -123,7 +124,7 @@ function saveNotes(_id: string, value: string): void {
         @save="links.saveGithub"
         @clear="links.clearGithub"
       />
-      <span v-if="error" class="col-span-2 text-kira-sm text-error" data-testid="ade-backlog-error">{{ error }}</span>
+      <FieldError v-if="error" class="col-span-2" data-testid="ade-backlog-error">{{ error }}</FieldError>
     </div>
     <div class="flex min-h-0 flex-1 flex-col px-3 pb-3">
       <AdeNotesEditor :notes="item.notes" :item-id="item.id" @save="saveNotes" />

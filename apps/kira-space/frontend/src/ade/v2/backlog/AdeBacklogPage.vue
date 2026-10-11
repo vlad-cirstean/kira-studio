@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -93,7 +94,7 @@ function onEdit(id: string, value: string): void {
         data-testid="ade-backlog-add"
         @keydown.enter="capture"
       />
-      <span v-if="error" class="text-kira-sm text-error" data-testid="ade-backlog-page-error">{{ error }}</span>
+      <FieldError v-if="error" data-testid="ade-backlog-page-error">{{ error }}</FieldError>
       </div>
       <div class="flex min-h-0 flex-1 flex-col overflow-auto">
       <AdeBacklogRow

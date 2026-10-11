@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Toggle } from '@theme/components/ui/toggle';
 import { useTimeAgo } from '@vueuse/core';
@@ -36,8 +37,9 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
 </script>
 
 <template>
-  <span
-    class="inline-flex h-control-lg max-w-80 items-center gap-1.5 rounded-kira-sm border border-border-strong pl-0.5 pr-0.5"
+  <Badge
+    variant="chip"
+    class="h-control-lg max-w-80 gap-1.5 border border-border-strong px-0.5"
     :class="shown ? 'bg-elevated' : 'bg-transparent opacity-50'"
     data-testid="ade-repo-chip"
     :data-repo-id="codeRepoId"
@@ -73,5 +75,5 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
         <CodiconIcon name="refresh" :size="12" />
       </Button>
     </AdeTip>
-  </span>
+  </Badge>
 </template>
