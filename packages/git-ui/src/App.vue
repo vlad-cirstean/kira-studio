@@ -26,6 +26,7 @@ import { ResizeHandle } from '@theme/components/ui/resizable';
 import { onClickOutside, useEventListener, useResizeObserver } from '@vueuse/core';
 import { useLiveRegion } from '@workbench/behaviour/liveRegion';
 import { compareNatural } from '@workbench/behaviour/match';
+import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
@@ -1532,6 +1533,18 @@ function onSearchShortcut(event: KeyboardEvent): boolean {
   return true;
 }
 
+const contextMenuStore = useContextMenuStore();
+// Menu closes on Escape before the bubble listener runs; capture records it was open.
+let escapeClosedMenu = false;
+useEventListener(
+  document,
+  'keydown',
+  (event: KeyboardEvent) => {
+    escapeClosedMenu = event.key === 'Escape' && contextMenuStore.open;
+  },
+  { capture: true },
+);
+
 function onDocumentKeydown(event: KeyboardEvent): void {
   // P108 F12: Kira Space mounts several git-ui apps into one document — one per graph tab
   // (`KeepAlive`d while hidden) plus the review sidebar (`v-show`). Every instance's own
@@ -1543,7 +1556,7 @@ function onDocumentKeydown(event: KeyboardEvent): void {
   const insideThisRoot = !!rootEl.value && target instanceof Node && rootEl.value.contains(target);
   if (!insideThisRoot && !graphVisible.value) return;
   if (onSearchShortcut(event)) return;
-  if (event.key === 'Escape' && detailOpen.value) closeDetail();
+  if (event.key === 'Escape' && detailOpen.value && !escapeClosedMenu) closeDetail();
 }
 
 // The overlay drawer's own "dismissible... on a click outside" (§6.3) — only acted on while the
