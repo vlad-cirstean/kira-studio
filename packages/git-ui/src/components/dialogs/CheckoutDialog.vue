@@ -37,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { CatalogText, t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -83,50 +84,51 @@ function stashAndCarry(): void {
       size="md"
     >
       <DialogHeader>
-        <DialogTitle>Can't check out {{ preflight?.target.name }}</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.checkout.title', { name: preflight?.target.name ?? '' }) }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <template v-if="headline?.kind === 'inProgressOperation'">
-          <DialogDescription>An operation is already in progress. Resolve or abort it first.</DialogDescription>
+          <DialogDescription>{{ t('git.common.operationInProgress.body') }}</DialogDescription>
         </template>
 
         <template v-else-if="headline?.kind === 'worktreeConflict'">
           <DialogDescription>
-            <code class="font-data">{{ headline.branch }}</code> is already checked out in another worktree
-            (<code class="font-data">{{ headline.worktreePath }}</code>). Git will not check out the same branch in two
-            places at once.
+            <CatalogText k="git.dialog.checkout.worktreeConflict.body">
+              <template #branch><code class="font-data">{{ headline.branch }}</code></template>
+              <template #path><code class="font-data">{{ headline.worktreePath }}</code></template>
+            </CatalogText>
           </DialogDescription>
         </template>
 
         <template v-else-if="headline?.kind === 'blockedByUntracked'">
-          <DialogDescription>These untracked files would be overwritten by the checkout:</DialogDescription>
+          <DialogDescription>{{ t('git.dialog.checkout.untracked.body') }}</DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="path in headline.paths" :key="path"><code class="font-data">{{ path }}</code></li>
           </ul>
-          <p>Move or remove them yourself, then try again — there is no safe way to discard them here.</p>
+          <p>{{ t('git.dialog.checkout.untracked.hint') }}</p>
         </template>
 
         <template v-else-if="trackedBlocker">
-          <DialogDescription>These local changes would be overwritten by the checkout:</DialogDescription>
+          <DialogDescription>{{ t('git.dialog.checkout.localChanges.body') }}</DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="path in trackedBlocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
           </ul>
           <Alert v-if="canDiscard" variant="warn">
             <AlertDescription>
-              Discard permanently deletes these changes — this cannot be undone.
-              <template v-if="canStashAndCarry">Stashing them instead keeps them, safely.</template>
+              {{ t('git.dialog.checkout.discard.hint') }}
+              <template v-if="canStashAndCarry">{{ t('git.dialog.checkout.stashInstead.hint') }}</template>
             </AlertDescription>
           </Alert>
         </template>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button v-if="canStashAndCarry" variant="dialog-primary" size="kira-lg" @click="stashAndCarry">
-          Stash changes and check out
+          {{ t('git.dialog.checkout.stashAndCheckOut.confirm') }}
         </Button>
         <Button v-if="canDiscard" variant="dialog-danger" size="kira-lg" @click="discard">
-          Discard changes and check out
+          {{ t('git.dialog.checkout.discardAndCheckOut.confirm') }}
         </Button>
       </DialogFooter>
     </DialogContent>

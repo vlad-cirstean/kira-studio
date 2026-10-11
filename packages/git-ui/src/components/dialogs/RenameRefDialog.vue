@@ -24,6 +24,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -69,22 +70,26 @@ async function submit(): Promise<void> {
       size="md"
     >
       <DialogHeader>
-        <DialogTitle>Rename branch</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.rename.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
-        <FieldDescription>Renaming <code class="font-data">{{ currentName }}</code></FieldDescription>
+        <FieldDescription>
+          <CatalogText k="git.dialog.rename.description">
+            <template #name><code class="font-data">{{ currentName }}</code></template>
+          </CatalogText>
+        </FieldDescription>
 
         <Field>
-          <FieldLabel :for="nameId">New name</FieldLabel>
+          <FieldLabel :for="nameId">{{ t('git.dialog.rename.name.label') }}</FieldLabel>
           <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
           <FieldError v-if="nameError">{{ nameError }}</FieldError>
         </Field>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
-          Rename branch
+          {{ t('common.action.rename.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

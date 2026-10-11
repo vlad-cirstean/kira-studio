@@ -34,6 +34,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -97,26 +98,29 @@ function confirmPlain(): void {
       destructive
     >
       <DialogHeader>
-        <DialogTitle>Force push {{ pending.branch }} to {{ pending.remote }}?</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.forcePushConfirm.title', { branch: pending.branch, remote: pending.remote }) }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
-          This will overwrite <code class="font-data">{{ pending.remote }}/{{ resolvedBranch }}</code>, currently at
-          <code class="font-data">{{ shortSha(pending.preflight.remoteTip) }}</code>.
+          <CatalogText k="git.dialog.forcePushConfirm.body">
+            <template #ref><code class="font-data">{{ pending.remote }}/{{ resolvedBranch }}</code></template>
+            <template #sha><code class="font-data">{{ shortSha(pending.preflight.remoteTip) }}</code></template>
+          </CatalogText>
           <template v-if="pending.preflight.behind > 0">
-            It is {{ pending.preflight.behind }} commit{{ pending.preflight.behind === 1 ? '' : 's' }}
-            ahead of what you last saw.
+            {{ t('git.dialog.forcePushConfirm.ahead.hint', { count: pending.preflight.behind }) }}
           </template>
         </DialogDescription>
 
         <Alert v-if="protectedBy" variant="warn">
           <AlertDescription>
-            <code class="font-data">{{ resolvedBranch }}</code> matches your protected pattern
-            <code class="font-data">{{ protectedBy }}</code>. Type the branch name to confirm.
+            <CatalogText k="git.dialog.forcePushConfirm.protected.hint">
+              <template #branch><code class="font-data">{{ resolvedBranch }}</code></template>
+              <template #pattern><code class="font-data">{{ protectedBy }}</code></template>
+            </CatalogText>
           </AlertDescription>
         </Alert>
         <Field v-if="protectedBy">
-          <FieldLabel :for="branchNameId">Branch name</FieldLabel>
+          <FieldLabel :for="branchNameId">{{ t('git.common.branchName.label') }}</FieldLabel>
           <Input
             :id="branchNameId"
             v-model="typedBranch"
@@ -129,20 +133,20 @@ function confirmPlain(): void {
         </Field>
 
         <details class="pt-2 border-t border-border text-kira-md">
-          <summary class="cursor-pointer text-muted-foreground">Use plain <code class="font-data">--force</code> instead</summary>
+          <summary class="cursor-pointer text-muted-foreground"><CatalogText k="git.dialog.forcePushConfirm.plain.label">
+              <template #flag><code class="font-data">--force</code></template>
+            </CatalogText></summary>
           <div class="mt-3">
             <Alert variant="warn">
               <AlertDescription>
-                This skips the lease check entirely — it will overwrite the remote branch even if someone
-                else has pushed to it since the lease's own tip was read, with no protection against
-                discarding their work.
+                {{ t('git.dialog.forcePushConfirm.plain.hint') }}
               </AlertDescription>
             </Alert>
           </div>
           <Field orientation="horizontal" class="mt-3">
             <Checkbox :id="plainAckId" v-model="understandPlain" data-testid="force-push-plain-ack" />
             <FieldLabel :for="plainAckId">
-              I understand — overwrite the remote branch without checking for other pushes
+              {{ t('git.dialog.forcePushConfirm.plainAck.label') }}
             </FieldLabel>
           </Field>
           <div class="mt-3 flex justify-end">
@@ -153,14 +157,14 @@ function confirmPlain(): void {
               data-testid="force-push-confirm-plain"
               @click="confirmPlain"
             >
-              Force push (plain --force)
+              {{ t('git.dialog.forcePushConfirm.plainConfirm.confirm') }}
             </Button>
           </div>
         </details>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"
@@ -168,7 +172,7 @@ function confirmPlain(): void {
           data-testid="force-push-confirm-lease"
           @click="confirmLease"
         >
-          Force push (with lease)
+          {{ t('git.dialog.forcePushConfirm.confirm') }}
         </Button>
       </DialogFooter>
     </DialogContent>

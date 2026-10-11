@@ -589,7 +589,7 @@ watch(visibleBranchNames, (names) => {
             <InlineEditInput
               v-if="renaming === row.shortName"
               data-testid="branch-rename-input"
-              :aria-label="t('git.picker.rename.aria')"
+              :aria-label="t('git.dialog.rename.title')"
               :name="row.shortName"
               @commit="(to) => submitRename(row.shortName, to)"
               @cancel="renaming = undefined"

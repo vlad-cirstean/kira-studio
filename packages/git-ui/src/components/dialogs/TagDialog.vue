@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CatalogText, t } from '@theme/i18n';
 /**
  * `docs/plans/P6.md` W15: "create tag here" (W14's row menu). Unlike `CheckoutDialog.vue`/
  * `RevertDialog.vue`, this one is not driven by an `OpsState` pending-ref (P6 has no
@@ -84,13 +85,17 @@ async function submit(): Promise<void> {
       size="md"
     >
       <DialogHeader>
-        <DialogTitle>Create tag</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.tag.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
-        <FieldDescription>Tagging <code class="font-data">{{ target.slice(0, 7) }}</code></FieldDescription>
+        <FieldDescription>
+          <CatalogText k="git.dialog.tag.target.description">
+            <template #sha><code class="font-data">{{ target.slice(0, 7) }}</code></template>
+          </CatalogText>
+        </FieldDescription>
 
         <Field>
-          <FieldLabel :for="nameId">Name</FieldLabel>
+          <FieldLabel :for="nameId">{{ t('common.field.name.label') }}</FieldLabel>
           <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
           <FieldError v-if="state.nameError">{{ state.nameError }}</FieldError>
         </Field>
@@ -98,36 +103,35 @@ async function submit(): Promise<void> {
         <template v-if="state.verdict === 'blockedByExisting'">
           <Alert variant="warn">
             <AlertDescription>
-              A tag named "{{ name }}" already exists{{ state.existingIsAnnotated ? ' (annotated)' : '' }}.
+              {{ t(state.existingIsAnnotated ? 'git.dialog.tag.existsAnnotated.hint' : 'git.dialog.tag.exists.hint', { name }) }}
             </AlertDescription>
           </Alert>
           <Field orientation="horizontal">
             <Checkbox :id="forceId" v-model="force" />
-            <FieldLabel :for="forceId">Replace it</FieldLabel>
+            <FieldLabel :for="forceId">{{ t('git.dialog.tag.replace.label') }}</FieldLabel>
           </Field>
         </template>
 
         <Alert v-if="state.verdict === 'movesWithForce' && state.requiresAnnotationToPreserve" variant="warn">
           <AlertDescription>
-            The existing tag is annotated — moving it without a message here would silently downgrade
-            it to lightweight. Supply a message below to keep it annotated.
+            {{ t('git.dialog.tag.downgrade.hint') }}
           </AlertDescription>
         </Alert>
 
         <Field orientation="horizontal">
           <Checkbox :id="annotatedId" v-model="annotated" />
-          <FieldLabel :for="annotatedId">Annotated</FieldLabel>
+          <FieldLabel :for="annotatedId">{{ t('git.tag.annotated.status') }}</FieldLabel>
         </Field>
         <Field v-if="annotated">
-          <FieldLabel :for="messageId">Message</FieldLabel>
+          <FieldLabel :for="messageId">{{ t('git.dialog.tag.message.label') }}</FieldLabel>
           <Textarea :id="messageId" v-model="message" rows="3" class="w-full" />
         </Field>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
-          Create tag
+          {{ t('common.action.create.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

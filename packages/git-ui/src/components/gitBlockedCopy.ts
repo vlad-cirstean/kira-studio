@@ -12,6 +12,7 @@
  * one place that can actually answer it.
  */
 import type { GitStatus } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 
 export type Platform = 'mac' | 'windows' | 'linux' | 'unknown';
 
@@ -22,15 +23,17 @@ export function detectPlatform(userAgent: string): Platform {
   return 'unknown';
 }
 
-const UPGRADE_COMMANDS: Record<Platform, string> = {
-  mac: 'brew upgrade git',
-  windows: 'winget upgrade --id Git.Git',
-  linux: "sudo apt install --only-upgrade git  (or your distribution's equivalent)",
-  unknown: "your package manager's git upgrade command",
-};
-
 function upgradeCommandFor(platform: Platform): string {
-  return UPGRADE_COMMANDS[platform];
+  switch (platform) {
+    case 'mac':
+      return 'brew upgrade git';
+    case 'windows':
+      return 'winget upgrade --id Git.Git';
+    case 'linux':
+      return t('git.blocked.upgradeLinux.example');
+    case 'unknown':
+      return t('git.blocked.upgradeUnknown.example');
+  }
 }
 
 export type BlockedGitStatus = Exclude<GitStatus, { readonly kind: 'ok' }>;
@@ -40,27 +43,30 @@ export interface GitBlockedCopy {
   readonly detail: string;
 }
 
-const GIT_PATH_HINT = 'Settings → Git → Git executable path';
-
 export function gitBlockedCopy(status: BlockedGitStatus, platform: Platform): GitBlockedCopy {
   switch (status.kind) {
     case 'notFound':
       return {
-        title: 'Git was not found',
+        title: t('git.blocked.notFound.title'),
         detail:
           status.probed.length > 0
-            ? `Looked for git at: ${status.probed.join(', ')}. Install git, or set ${GIT_PATH_HINT} to point at it.`
-            : `Install git, or set ${GIT_PATH_HINT} to point at it.`,
+            ? t('git.blocked.notFound.body', { paths: status.probed.join(', ') })
+            : t('git.blocked.notFoundNoPaths.body'),
       };
     case 'tooOld':
       return {
-        title: 'Git is too old',
-        detail: `Found ${status.detected} at ${status.path}; Kira Space needs at least ${status.required}. Run "${upgradeCommandFor(platform)}", or set ${GIT_PATH_HINT} to a newer git.`,
+        title: t('git.blocked.tooOld.title'),
+        detail: t('git.blocked.tooOld.body', {
+          detected: status.detected,
+          path: status.path,
+          required: status.required,
+          command: upgradeCommandFor(platform),
+        }),
       };
     case 'unusable':
       return {
-        title: 'Git is not usable',
-        detail: `${status.path}: ${status.reason}`,
+        title: t('git.blocked.unusable.title'),
+        detail: t('git.blocked.unusable.error', { path: status.path, reason: status.reason }),
       };
   }
 }

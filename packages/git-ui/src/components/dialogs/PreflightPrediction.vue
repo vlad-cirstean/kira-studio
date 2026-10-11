@@ -11,6 +11,7 @@
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldDescription, FieldLabel } from '@theme/components/ui/field';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, useId } from 'vue';
 
 const props = defineProps<{
@@ -31,12 +32,12 @@ const noCommitModel = computed({
 
 <template>
   <div v-if="prediction.kind === 'clean'" class="text-ok">
-    No conflicts predicted.
+    {{ t('git.dialog.preflight.clean.status') }}
   </div>
   <div v-else-if="prediction.kind === 'conflicts'" class="flex flex-col gap-3">
     <Alert variant="warn">
       <AlertDescription>
-        <p>This will likely conflict in:</p>
+        <p>{{ t('git.dialog.preflight.conflicts.body') }}</p>
         <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
           <li v-for="path in prediction.paths" :key="path"><code class="font-data">{{ path }}</code></li>
         </ul>
@@ -45,11 +46,13 @@ const noCommitModel = computed({
     <Field orientation="horizontal">
       <Checkbox :id="noCommitId" v-model="noCommitModel" />
       <FieldLabel :for="noCommitId">
-        <span>Stop before committing (<code class="font-data">--no-commit</code>), so I can resolve first</span>
+        <CatalogText k="git.dialog.preflight.noCommit.label">
+          <template #flag><code class="font-data">--no-commit</code></template>
+        </CatalogText>
       </FieldLabel>
     </Field>
   </div>
   <FieldDescription v-else-if="prediction.kind === 'unknown'">
-    Couldn't predict the outcome: {{ prediction.reason }}
+    {{ t('git.dialog.preflight.unknown.error', { reason: prediction.reason }) }}
   </FieldDescription>
 </template>

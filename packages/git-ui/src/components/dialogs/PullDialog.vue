@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { CatalogText, t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -46,27 +47,25 @@ function stashAndCarry(): void {
       size="md"
     >
       <DialogHeader>
-        <DialogTitle>Can't pull — local changes in the way</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.pull.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
-          Pulling with <code class="font-data">{{ pending.strategy }}</code> would rewrite history here, and your
-          working tree has uncommitted changes that would be overwritten.
+          <CatalogText k="git.dialog.pull.body">
+            <template #strategy><code class="font-data">{{ pending.strategy }}</code></template>
+          </CatalogText>
         </DialogDescription>
         <Alert variant="warn">
           <AlertDescription>
-            Stashing them first keeps them safe: your changes are pushed to a stash, the pull runs,
-            then — if it can be applied back with no conflict — they are popped back automatically. A
-            predicted conflict leaves them stashed instead of forcing a bad pop; nothing is ever
-            discarded.
+            {{ t('git.dialog.pull.stash.hint') }}
           </AlertDescription>
         </Alert>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" data-testid="pull-stash-and-carry" @click="stashAndCarry">
-          Stash changes and pull
+          {{ t('git.dialog.pull.stashAndPull.confirm') }}
         </Button>
       </DialogFooter>
     </DialogContent>

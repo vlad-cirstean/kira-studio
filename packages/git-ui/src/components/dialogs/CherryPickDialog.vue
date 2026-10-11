@@ -22,6 +22,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import PreflightPrediction from './PreflightPrediction.vue';
@@ -90,44 +91,44 @@ function confirm(): void {
       destructive
     >
       <DialogHeader>
-        <DialogTitle>Cherry-pick</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.cherryPick.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
-          Applies this commit's changes here as a new commit — the original stays where it is.
+          {{ t('git.dialog.cherryPick.description') }}
         </DialogDescription>
 
         <Alert v-if="preflight?.detachedHead" variant="warn">
           <AlertDescription>
-            HEAD is detached: the new commit will not belong to any branch until you create one.
+            {{ t('git.dialog.cherryPick.detachedHead.hint') }}
           </AlertDescription>
         </Alert>
 
         <Alert v-if="preflight?.alreadyApplied" variant="warn">
           <AlertDescription>
-            This change already appears in this branch's history; the pick will probably be empty.
+            {{ t('git.dialog.cherryPick.alreadyApplied.hint') }}
           </AlertDescription>
         </Alert>
 
         <template v-if="hasBlocker">
           <Alert v-for="(blocker, i) in blockers" :key="i" variant="warn"><AlertDescription>
             <template v-if="blocker.kind === 'inProgressOperation'">
-              <p>An operation is already in progress. Resolve or abort it first.</p>
+              <p>{{ t('git.common.operationInProgress.body') }}</p>
             </template>
             <template v-else-if="blocker.kind === 'stagedChanges'">
-              <p>Staged changes would be overwritten by this pick — commit or unstage them first:</p>
+              <p>{{ t('git.dialog.cherryPick.stagedChanges.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
             </template>
             <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
-              <p>These local changes would be overwritten by this pick:</p>
+              <p>{{ t('git.dialog.cherryPick.localChanges.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
             </template>
             <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
-              <p>These untracked files would be overwritten by this pick:</p>
+              <p>{{ t('git.dialog.cherryPick.untracked.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
@@ -136,10 +137,7 @@ function confirm(): void {
         </template>
 
         <template v-if="!hasBlocker && needsMainline">
-          <p>
-            This picks a merge commit — pick which parent's history to treat as the "mainline"
-            (probe 8: git cannot guess this for you):
-          </p>
+          <p>{{ t('git.dialog.cherryPick.mainline.body') }}</p>
           <RadioGroup v-model="selectedMainline">
             <Field
               v-for="entry in preflight?.mainlineRequired"
@@ -149,8 +147,11 @@ function confirm(): void {
             >
               <RadioGroupItem :id="`${mainlineId}-${entry.parentNumber}`" :value="entry.parentNumber" />
               <FieldLabel :for="`${mainlineId}-${entry.parentNumber}`">
-                <span>Parent {{ entry.parentNumber }} — <code class="font-data">{{ entry.sha.slice(0, 7) }}</code>
-                {{ entry.subject }}</span>
+                <span>
+                  <CatalogText k="git.common.mergeParent.option" :params="{ number: entry.parentNumber, subject: entry.subject }">
+                    <template #sha><code class="font-data">{{ entry.sha.slice(0, 7) }}</code></template>
+                  </CatalogText>
+                </span>
               </FieldLabel>
             </Field>
           </RadioGroup>
@@ -166,7 +167,7 @@ function confirm(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"
@@ -174,7 +175,7 @@ function confirm(): void {
           data-testid="cherry-pick-confirm"
           @click="confirm"
         >
-          Cherry-pick
+          {{ t('git.dialog.cherryPick.confirm') }}
         </Button>
       </DialogFooter>
     </DialogContent>

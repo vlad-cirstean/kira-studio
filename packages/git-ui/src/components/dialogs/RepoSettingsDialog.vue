@@ -45,6 +45,7 @@ import {
 } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
+import { type MessageKey, t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, reactive, ref, useId, watch } from 'vue';
@@ -57,7 +58,7 @@ const props = defineProps<{
 
 const emit = defineEmits<(e: 'close') => void>();
 
-type SelectOption = { readonly value: string; readonly label: string };
+type SelectOption = { readonly value: string; readonly label: MessageKey };
 
 /** `RepoSettingsSnapshot`'s own leaves are `readonly` (a wire type is never a mutation target) —
  *  this dialog's draft needs a genuinely mutable copy of the same shape for `v-model` to write
@@ -97,15 +98,15 @@ const baseCandidatesText = computed({
 });
 
 const graphScopeOptions: readonly SelectOption[] = [
-  { value: 'all', label: 'All refs' },
-  { value: 'head', label: "Current HEAD's ancestry only" },
+  { value: 'all', label: 'git.dialog.repoSettings.scopeAll.option' },
+  { value: 'head', label: 'git.dialog.repoSettings.scopeHead.option' },
 ];
 
 const pullStrategyOptions: readonly SelectOption[] = [
-  { value: 'auto', label: 'Auto (follow git configuration)' },
-  { value: 'ff-only', label: 'Fast-forward only' },
-  { value: 'merge', label: 'Merge' },
-  { value: 'rebase', label: 'Rebase' },
+  { value: 'auto', label: 'git.pullStrategy.auto.option' },
+  { value: 'ff-only', label: 'git.pullStrategy.ffOnly.option' },
+  { value: 'merge', label: 'git.pullStrategy.merge.option' },
+  { value: 'rebase', label: 'git.pullStrategy.rebase.option' },
 ];
 
 function onGraphScopeChange(value: string): void {
@@ -197,13 +198,13 @@ async function save(): Promise<void> {
       size="md"
     >
       <DialogHeader>
-        <DialogTitle>Repository settings</DialogTitle>
+        <DialogTitle>{{ t('git.toolbar.repoSettings.tooltip') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <FieldSet>
-          <FieldLegend>Graph</FieldLegend>
+          <FieldLegend>{{ t('git.dialog.repoSettings.graph.label') }}</FieldLegend>
           <Field>
-            <FieldLabel :for="pageSizeId">Load more page size</FieldLabel>
+            <FieldLabel :for="pageSizeId">{{ t('git.dialog.repoSettings.pageSize.label') }}</FieldLabel>
             <NumberStepperInput
               :id="pageSizeId"
               :model-value="pageSizeText"
@@ -214,12 +215,11 @@ async function save(): Promise<void> {
               @update:model-value="onPageSizeChange"
             />
             <FieldError v-if="!pageSizeValid">
-              Enter a whole number from {{ SETTINGS['kiraSpace.graph.pageSize'].minimum }} to
-              {{ SETTINGS['kiraSpace.graph.pageSize'].maximum }}.
+              {{ t('git.dialog.repoSettings.pageSize.error', { min: SETTINGS['kiraSpace.graph.pageSize'].minimum, max: SETTINGS['kiraSpace.graph.pageSize'].maximum }) }}
             </FieldError>
           </Field>
           <Field>
-            <FieldLabel :for="graphScopeId">Scope</FieldLabel>
+            <FieldLabel :for="graphScopeId">{{ t('git.dialog.repoSettings.scope.label') }}</FieldLabel>
             <NativeSelect
               :id="graphScopeId"
               :model-value="draft['kiraSpace.graph.scope']"
@@ -229,63 +229,61 @@ async function save(): Promise<void> {
               @update:model-value="(v) => onGraphScopeChange(v as string)"
             >
               <option v-for="opt in graphScopeOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
+                {{ t(opt.label) }}
               </option>
             </NativeSelect>
           </Field>
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend>Checkout</FieldLegend>
+          <FieldLegend>{{ t('git.dialog.repoSettings.checkout.label') }}</FieldLegend>
           <Field orientation="horizontal">
             <Checkbox :id="autoStashId" v-model="draft['kiraSpace.checkout.autoStash']" />
             <FieldLabel :for="autoStashId">
-              Automatically stash local changes that block a branch switch
+              {{ t('git.dialog.repoSettings.autoStash.label') }}
             </FieldLabel>
           </Field>
           <FieldDescription>
-            The stash is tagged with the branch you switched FROM and is never popped back
-            automatically — bring it back deliberately from the stash list, even onto a different
-            branch. Off restores the old dialog (discard / stash and carry / cancel).
+            {{ t('git.dialog.repoSettings.autoStash.hint') }}
           </FieldDescription>
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend>Stash</FieldLegend>
+          <FieldLegend>{{ t('git.toolbar.stash.label') }}</FieldLegend>
           <Field orientation="horizontal">
             <Checkbox :id="showInGraphId" v-model="draft['kiraSpace.stash.showInGraph']" />
-            <FieldLabel :for="showInGraphId">Show stash entries as nodes in the commit graph</FieldLabel>
+            <FieldLabel :for="showInGraphId">{{ t('git.dialog.repoSettings.showInGraph.label') }}</FieldLabel>
           </Field>
           <Field orientation="horizontal">
             <Checkbox :id="includeUntrackedId" v-model="draft['kiraSpace.stash.includeUntracked']" />
             <FieldLabel :for="includeUntrackedId">
-              "Include untracked files" starts checked in the Stash dialog
+              {{ t('git.dialog.repoSettings.includeUntracked.label') }}
             </FieldLabel>
           </Field>
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend>Branch review</FieldLegend>
+          <FieldLegend>{{ t('git.dialog.repoSettings.review.label') }}</FieldLegend>
           <Field>
             <FieldLabel :for="baseCandidatesId">
-              Candidate base branches (one per line, tried in order)
+              {{ t('git.dialog.repoSettings.baseCandidates.label') }}
             </FieldLabel>
             <Textarea :id="baseCandidatesId" v-model="baseCandidatesText" rows="3" class="w-full" />
           </Field>
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend>GitHub</FieldLegend>
+          <FieldLegend>{{ t('common.product.github.label') }}</FieldLegend>
           <Field orientation="horizontal">
             <Checkbox :id="githubId" v-model="draft['kiraSpace.github.enabled']" />
-            <FieldLabel :for="githubId">Show pull request status for this repository</FieldLabel>
+            <FieldLabel :for="githubId">{{ t('git.dialog.repoSettings.githubEnabled.label') }}</FieldLabel>
           </Field>
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend>Pull</FieldLegend>
+          <FieldLegend>{{ t('git.toolbar.pull.label') }}</FieldLegend>
           <Field>
-            <FieldLabel :for="pullStrategyId">Strategy</FieldLabel>
+            <FieldLabel :for="pullStrategyId">{{ t('git.dialog.repoSettings.strategy.label') }}</FieldLabel>
             <NativeSelect
               :id="pullStrategyId"
               :model-value="draft['kiraSpace.pull.strategy']"
@@ -295,21 +293,21 @@ async function save(): Promise<void> {
               @update:model-value="(v) => onPullStrategyChange(v as string)"
             >
               <option v-for="opt in pullStrategyOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
+                {{ t(opt.label) }}
               </option>
             </NativeSelect>
           </Field>
         </FieldSet>
 
         <Alert v-if="saveError" variant="error">
-          <AlertDescription>Couldn't save settings — {{ saveError }}</AlertDescription>
+          <AlertDescription>{{ t('git.dialog.repoSettings.saveError.error', { error: saveError }) }}</AlertDescription>
         </Alert>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="close">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" @click="close">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!pageSizeValid" @click="save">
-          Save
+          {{ t('common.action.save.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

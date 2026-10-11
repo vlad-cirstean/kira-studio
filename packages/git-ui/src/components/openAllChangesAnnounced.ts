@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import type { DetailActions } from '../state/detailActions.ts';
 
@@ -14,12 +15,15 @@ export async function openAllChangesAnnounced(
     const { opened, failed, mode } = await actions.openAllChanges(target);
     actions.announce(
       failed === 0
-        ? mode === 'multiDiff'
-          ? `Opened all ${opened} changed files`
-          : `Opened ${opened} files`
-        : `Opened ${opened} of ${opened + failed} files — ${failed} couldn't be opened`,
+        ? t(
+            mode === 'multiDiff' ? 'git.detail.openAll.announce' : 'git.detail.openFiles.announce',
+            {
+              count: opened,
+            },
+          )
+        : t('git.detail.openPartial.announce', { opened, total: opened + failed, failed }),
     );
   } catch (err) {
-    actions.announce(`Couldn't open the changes — ${errorText(err)}`);
+    actions.announce(t('git.detail.openAll.error', { error: errorText(err) }));
   }
 }

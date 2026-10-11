@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { CatalogText, t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -41,22 +42,23 @@ function pullNow(): void {
       size="md"
     >
       <DialogHeader>
-        <DialogTitle>Pull the latest changes?</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.postCheckoutPullConfirm.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
-          <strong>{{ pending.branch }}</strong> is {{ pending.behind }}
-          {{ pending.behind === 1 ? 'commit' : 'commits' }} behind
-          <code class="font-data">{{ pending.upstreamShortName }}</code> — pull now?
+          <CatalogText k="git.dialog.postCheckoutPullConfirm.body" :params="{ count: pending.behind }">
+            <template #branch><strong>{{ pending.branch }}</strong></template>
+            <template #upstream><code class="font-data">{{ pending.upstreamShortName }}</code></template>
+          </CatalogText>
         </DialogDescription>
       </DialogBody>
 
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="post-checkout-pull-not-now" @click="notNow">
-          Not now
+          {{ t('git.dialog.postCheckoutPullConfirm.notNow.label') }}
         </Button>
         <Button variant="dialog-primary" size="kira-lg" data-testid="post-checkout-pull-now" @click="pullNow">
-          Pull now
+          {{ t('git.dialog.postCheckoutPullConfirm.confirm') }}
         </Button>
       </DialogFooter>
     </DialogContent>

@@ -28,6 +28,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -108,17 +109,17 @@ function blockerText(pf: RestackPreflight): string {
   if (!b) return '';
   switch (b.kind) {
     case 'inProgressOperation':
-      return 'Another operation is already in progress.';
+      return t('git.dialog.stack.blocker.inProgress.error');
     case 'notStacked':
-      return `${b.branch} is not part of a stack.`;
+      return t('git.dialog.stack.blocker.notStacked.error', { branch: b.branch });
     case 'cycle':
-      return `This stack has a cycle: ${b.branches.join(' → ')}.`;
+      return t('git.dialog.stack.blocker.cycle.error', { branches: b.branches.join(' → ') });
     case 'parentMissing':
-      return `${b.branch}'s recorded parent "${b.parent}" no longer exists.`;
+      return t('git.dialog.stack.blocker.parentMissing.error', { branch: b.branch, parent: b.parent });
     case 'checkedOutElsewhere':
-      return `${b.branch} is checked out at ${b.worktreePath}.`;
+      return t('git.dialog.stack.blocker.checkedOut.error', { branch: b.branch, path: b.worktreePath });
     case 'dirtyWorktree':
-      return 'Commit, stash, or discard your changes before restacking.';
+      return t('git.dialog.stack.blocker.dirty.error');
   }
 }
 
@@ -150,15 +151,15 @@ function closeDialog(): void {
         <DialogTitle>
           {{
             target?.mode === 'setParent'
-              ? `Set ${target.branch}'s stack parent`
-              : `Restack ${target?.branch ?? ''}`
+              ? t('git.dialog.stack.setParent.title', { branch: target.branch })
+              : t('git.dialog.stack.restack.title', { branch: target?.branch ?? '' })
           }}
         </DialogTitle>
       </DialogHeader>
       <DialogBody>
         <template v-if="target?.mode === 'setParent'">
           <Field>
-            <FieldLabel :for="parentId">Parent branch</FieldLabel>
+            <FieldLabel :for="parentId">{{ t('git.dialog.stack.parent.label') }}</FieldLabel>
             <NativeSelect
               :id="parentId"
               v-model="selectedParent"
@@ -166,7 +167,7 @@ function closeDialog(): void {
               size="kira-lg"
               class="w-full"
             >
-              <option value="">None (remove from stack)</option>
+              <option value="">{{ t('git.dialog.stack.noParent.option') }}</option>
               <option v-for="name in parentCandidates" :key="name" :value="name">{{ name }}</option>
             </NativeSelect>
           </Field>
@@ -176,28 +177,38 @@ function closeDialog(): void {
           <Alert v-if="preflight.verdict === 'blocked'" variant="warn">
             <AlertDescription>{{ blockerText(preflight) }}</AlertDescription>
           </Alert>
-          <p v-else-if="preflight.verdict === 'noop'">This stack is already up to date.</p>
+          <p v-else-if="preflight.verdict === 'noop'">{{ t('git.dialog.stack.upToDate.hint') }}</p>
           <template v-else>
-            <p>The following branches will be restacked onto <code class="font-data">{{ preflight.base }}</code>:</p>
+            <p>
+              <CatalogText k="git.dialog.stack.plan.body">
+                <template #base><code class="font-data">{{ preflight.base }}</code></template>
+              </CatalogText>
+            </p>
             <ul class="max-h-50 overflow-y-auto p-1 bg-bg border border-border text-kira-md">
               <li v-for="entry in preflight.plan" :key="entry.branch">
-                <code class="font-data">{{ entry.branch }}</code> onto <code class="font-data">{{ entry.parent }}</code>
-                ({{ entry.commits }} commit{{ entry.commits === 1 ? '' : 's' }},
-                {{ entry.reason === 'stale' ? 'stale' : 'ancestor restacked' }},
-                base: {{ entry.baseSource }})
+                <CatalogText
+                  k="git.dialog.stack.planEntry.label"
+                  :params="{
+                    count: entry.commits,
+                    reason: entry.reason === 'stale' ? t('git.stack.stale.status') : t('git.dialog.stack.reasonAncestor.status'),
+                    source: entry.baseSource,
+                  }"
+                >
+                  <template #branch><code class="font-data">{{ entry.branch }}</code></template>
+                  <template #parent><code class="font-data">{{ entry.parent }}</code></template>
+                </CatalogText>
               </li>
             </ul>
             <p v-if="preflight.needsForcePush.length > 0" class="text-muted-foreground">
-              These branches will need a force-push afterwards:
-              {{ preflight.needsForcePush.join(', ') }}.
+              {{ t('git.dialog.stack.forcePush.hint', { branches: preflight.needsForcePush.join(', ') }) }}
             </p>
           </template>
 
           <template v-if="stack.restacking.value">
-            <p>Restacking…</p>
+            <p>{{ t('git.toolbar.restacking.loading') }}</p>
             <ul class="max-h-50 overflow-y-auto p-1 bg-bg border border-border text-kira-md">
               <li v-for="(p, i) in stack.progress.value" :key="i">
-                {{ p.branch }} ({{ p.index }}/{{ p.total }})
+                {{ t('git.dialog.stack.progress.status', { branch: p.branch, index: p.index, total: p.total }) }}
               </li>
             </ul>
           </template>
@@ -206,22 +217,22 @@ function closeDialog(): void {
 
       <DialogFooter>
         <template v-if="target?.mode === 'setParent'">
-          <Button variant="dialog" size="kira-lg" @click="closeDialog">Cancel</Button>
-          <Button variant="dialog-primary" size="kira-lg" @click="submitSetParent">Save</Button>
+          <Button variant="dialog" size="kira-lg" @click="closeDialog">{{ t('common.action.cancel.label') }}</Button>
+          <Button variant="dialog-primary" size="kira-lg" @click="submitSetParent">{{ t('common.action.save.label') }}</Button>
         </template>
         <template v-else-if="target?.mode === 'restack'">
           <template v-if="stack.restacking.value">
-            <Button variant="dialog" size="kira-lg" @click="cancelRestack">Cancel restack</Button>
+            <Button variant="dialog" size="kira-lg" @click="cancelRestack">{{ t('git.dialog.stack.cancelRestack.label') }}</Button>
           </template>
           <template v-else>
-            <Button variant="dialog" size="kira-lg" @click="closeDialog">Close</Button>
+            <Button variant="dialog" size="kira-lg" @click="closeDialog">{{ t('common.action.close.label') }}</Button>
             <Button
               variant="dialog-primary"
               size="kira-lg"
               :disabled="!preflight || preflight.verdict === 'blocked' || preflight.verdict === 'noop'"
               @click="submitRestack"
             >
-              Restack
+              {{ t('git.common.restack.label') }}
             </Button>
           </template>
         </template>

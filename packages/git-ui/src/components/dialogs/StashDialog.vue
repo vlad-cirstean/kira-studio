@@ -44,6 +44,7 @@ import {
 } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import { stashLabel } from '../stashListModel.ts';
@@ -255,6 +256,14 @@ function cancelPop(): void {
   props.ops.resolveStashPopDialog(false);
 }
 
+const popConfirmLabel = computed(() => {
+  const forced = pending.value?.preflight.verdict === 'blocked';
+  if (pending.value?.verb === 'pop') {
+    return t(forced ? 'git.dialog.stash.popAnyway.confirm' : 'git.dialog.stash.popConfirm.confirm');
+  }
+  return t(forced ? 'git.dialog.stash.applyAnyway.confirm' : 'common.action.apply.label');
+});
+
 function confirmPop(): void {
   props.ops.resolveStashPopDialog(true);
 }
@@ -264,14 +273,23 @@ function confirmPop(): void {
 // ---------------------------------------------------------------------------------------
 
 const title = computed(() => {
-  if (mode.value === 'create') return 'Stash changes';
-  if (mode.value === 'branch') return 'Create branch from stash';
-  if (mode.value === 'save') return 'Save to global stash';
+  if (mode.value === 'create') return t('git.toolbar.stash.tooltip');
+  if (mode.value === 'branch') return t('git.dialog.stash.branch.title');
+  if (mode.value === 'save') return t('git.dialog.stash.save.title');
   if (mode.value === 'popConfirm' && pending.value) {
-    return `${pending.value.verb === 'pop' ? 'Pop' : 'Apply'} stash@{${pending.value.preflight.stashIndex}}`;
+    return t(
+      pending.value.verb === 'pop' ? 'git.dialog.stash.popConfirm.title' : 'git.dialog.stash.applyConfirm.title',
+      { stash: stashRef(pending.value.preflight.stashIndex) },
+    );
   }
   return '';
 });
+
+// A template literal would put two closing braces back to back, which the Vue parser reads as a
+// mustache delimiter in templates; building it here keeps the template clean.
+function stashRef(index: number | string): string {
+  return 'stash@{' + index + '}';
+}
 
 function onClose(): void {
   if (mode.value === 'create') cancelCreate();
@@ -293,107 +311,104 @@ function onClose(): void {
       <DialogBody>
         <template v-if="mode === 'create'">
           <Field>
-            <FieldLabel :for="messageId">Message (optional)</FieldLabel>
+            <FieldLabel :for="messageId">{{ t('git.dialog.stash.message.label') }}</FieldLabel>
             <Input
               :id="messageId"
               v-model="message"
               type="text"
               size="kira-lg"
               class="w-full"
-              placeholder="git's own WIP message"
+              :placeholder="t('git.dialog.stash.message.placeholder')"
             />
           </Field>
           <Field orientation="horizontal">
             <Checkbox :id="untrackedId" v-model="includeUntracked" />
             <FieldLabel :for="untrackedId">
-              <span>Include untracked files (<code class="font-data">-u</code>)</span>
+              <CatalogText k="git.dialog.stash.untracked.label">
+                <template #flag><code class="font-data">-u</code></template>
+              </CatalogText>
             </FieldLabel>
           </Field>
           <Field orientation="horizontal">
             <Checkbox :id="keepIndexId" v-model="keepIndex" />
             <FieldLabel :for="keepIndexId">
-              <span>Keep staged changes staged (<code class="font-data">--keep-index</code>)</span>
+              <CatalogText k="git.dialog.stash.keepIndex.label">
+                <template #flag><code class="font-data">--keep-index</code></template>
+              </CatalogText>
             </FieldLabel>
           </Field>
           <FieldDescription v-if="pathspec.length > 0">
-            Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
-            stashed, not the whole working tree.
+            {{ t('git.dialog.stash.pathspec.hint', { count: pathspec.length }) }}
           </FieldDescription>
         </template>
 
         <template v-else-if="mode === 'branch'">
           <FieldDescription>
-            From <code class="font-data">{{
-              // A template literal here would put two closing braces back to back, which this Vue
-              // parser reads as the mustache's own closing delimiter mid-expression.
-              // biome-ignore lint/style/useTemplate: see above
-              'stash@{' + (branchTarget?.index ?? '') + '}'
-            }}</code>:
-            {{ branchTarget?.message }}
+            <CatalogText k="git.dialog.stash.from.label" :params="{ message: branchTarget?.message ?? '' }">
+              <template #stash><code class="font-data">{{ stashRef(branchTarget?.index ?? '') }}</code></template>
+            </CatalogText>
           </FieldDescription>
           <Field>
-            <FieldLabel :for="branchNameId">Branch name</FieldLabel>
+            <FieldLabel :for="branchNameId">{{ t('git.common.branchName.label') }}</FieldLabel>
             <Input :id="branchNameId" v-model="branchName" type="text" size="kira-lg" class="w-full" />
             <FieldError v-if="branchNameLocalError">{{ branchNameLocalError }}</FieldError>
             <FieldError v-else-if="branchPreflight?.name.error">{{ branchPreflight.name.error }}</FieldError>
           </Field>
           <Alert v-if="branchPreflight?.verdict === 'blocked'" variant="warn">
             <AlertDescription>
-              The branch will be created, but switching to it will not be clean — your working tree
-              has changes that would be overwritten. You will stay on your current branch until you
-              resolve that yourself.
+              {{ t('git.dialog.stash.blocked.hint') }}
             </AlertDescription>
           </Alert>
         </template>
 
         <template v-else-if="mode === 'save'">
           <Field>
-            <FieldLabel :for="saveLabelId">Label</FieldLabel>
+            <FieldLabel :for="saveLabelId">{{ t('git.dialog.stash.saveLabel.label') }}</FieldLabel>
             <Input :id="saveLabelId" v-model="saveLabel" type="text" size="kira-lg" class="w-full" />
           </Field>
           <FieldSet>
-            <FieldLegend>Source</FieldLegend>
+            <FieldLegend>{{ t('common.field.source.label') }}</FieldLegend>
             <RadioGroup v-model="saveSource">
               <Field orientation="horizontal">
                 <RadioGroupItem :id="`${saveSourceId}-workingTree`" value="workingTree" />
-                <FieldLabel :for="`${saveSourceId}-workingTree`">This working tree</FieldLabel>
+                <FieldLabel :for="`${saveSourceId}-workingTree`">{{ t('git.dialog.stash.workingTree.label') }}</FieldLabel>
               </Field>
               <Alert v-if="saveSource === 'workingTree' && saveHasUntracked" variant="warn">
                 <AlertDescription>
-                  Untracked files will not be included — <code class="font-data">git stash create</code> cannot save them.
-                  Promote an existing stash entry that already includes them instead if you need to keep
-                  those too.
+                  <CatalogText k="git.dialog.stash.untrackedLimit.hint">
+                    <template #command><code class="font-data">git stash create</code></template>
+                  </CatalogText>
                 </AlertDescription>
               </Alert>
               <Field v-if="saveSourceEntry" orientation="horizontal">
                 <RadioGroupItem :id="`${saveSourceId}-entry`" value="entry" />
                 <FieldLabel :for="`${saveSourceId}-entry`">
-                  This stash entry: {{ stashLabel(saveSourceEntry) }}
+                  {{ t('git.dialog.stash.entry.label', { label: stashLabel(saveSourceEntry) }) }}
                 </FieldLabel>
               </Field>
             </RadioGroup>
           </FieldSet>
-          <FieldDescription>The source is copied — it is never removed or dropped.</FieldDescription>
+          <FieldDescription>{{ t('git.dialog.stash.copied.hint') }}</FieldDescription>
         </template>
 
         <template v-else-if="mode === 'popConfirm' && pending">
           <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
             <Alert v-if="blocker.kind === 'untrackedCollision'" variant="warn"><AlertDescription>
-              <p>These untracked files already exist in your working tree and would be overwritten:</p>
+              <p>{{ t('git.dialog.stash.untrackedCollision.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
-              <p>Remedy: move or remove them yourself, or discard them and try again.</p>
+              <p>{{ t('git.dialog.stash.untrackedCollision.hint') }}</p>
             </AlertDescription></Alert>
             <Alert v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'" variant="warn"><AlertDescription>
-              <p>Your uncommitted changes to these files would be overwritten:</p>
+              <p>{{ t('git.dialog.stash.localChanges.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in blocker.paths" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
-              <p>Remedy: commit or discard those changes first.</p>
+              <p>{{ t('git.dialog.stash.localChanges.hint') }}</p>
             </AlertDescription></Alert>
             <Alert v-else variant="warn">
-              <AlertDescription>An operation is already in progress — finish or abort it first.</AlertDescription>
+              <AlertDescription>{{ t('git.common.operationInProgress.body') }}</AlertDescription>
             </Alert>
           </template>
 
@@ -402,24 +417,19 @@ function onClose(): void {
               v-if="pending.preflight.prediction.kind === 'clean'"
               class="text-ok"
             >
-              No conflicts predicted.
+              {{ t('git.dialog.preflight.clean.status') }}
             </div>
             <Alert v-else-if="pending.preflight.prediction.kind === 'conflicts'" variant="warn"><AlertDescription>
-              <p>This will likely conflict in:</p>
+              <p>{{ t('git.dialog.preflight.conflicts.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in pending.preflight.prediction.paths" :key="path">
                   <code class="font-data">{{ path }}</code>
                 </li>
               </ul>
-              <p>
-                Your stash stays in the list either way{{
-                  pending.verb === 'pop' ? ' if this conflicts' : ''
-                }}
-                — nothing is lost.
-              </p>
+              <p>{{ t(pending.verb === 'pop' ? 'git.dialog.stash.keptPop.hint' : 'git.dialog.stash.keptApply.hint') }}</p>
             </AlertDescription></Alert>
             <FieldDescription v-else>
-              Couldn't predict the outcome: {{ pending.preflight.prediction.reason }}
+              {{ t('git.dialog.preflight.unknown.error', { reason: pending.preflight.prediction.reason }) }}
             </FieldDescription>
           </template>
         </template>
@@ -427,33 +437,30 @@ function onClose(): void {
 
       <DialogFooter>
         <template v-if="mode === 'create'">
-          <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
-          <Button variant="dialog-primary" size="kira-lg" @click="submitCreate">Stash</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelCreate">{{ t('common.action.cancel.label') }}</Button>
+          <Button variant="dialog-primary" size="kira-lg" @click="submitCreate">{{ t('git.toolbar.stash.label') }}</Button>
         </template>
         <template v-else-if="mode === 'branch'">
-          <Button variant="dialog" size="kira-lg" @click="cancelBranch">Cancel</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelBranch">{{ t('common.action.cancel.label') }}</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
             :disabled="!canSubmitBranch"
             @click="submitBranch"
           >
-            Create branch
+            {{ t('common.action.create.label') }}
           </Button>
         </template>
         <template v-else-if="mode === 'save'">
-          <Button variant="dialog" size="kira-lg" @click="cancelSave">Cancel</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelSave">{{ t('common.action.cancel.label') }}</Button>
           <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitSave" @click="submitSave">
-            Save
+            {{ t('common.action.save.label') }}
           </Button>
         </template>
         <template v-else-if="mode === 'popConfirm' && pending">
-          <Button variant="dialog" size="kira-lg" @click="cancelPop">Cancel</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelPop">{{ t('common.action.cancel.label') }}</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="confirmPop">
-            {{ pending.preflight.verdict === 'blocked' ? 'Force ' : '' }}{{
-              pending.verb === 'pop' ? 'Pop' : 'Apply'
-            }}
-            anyway
+            {{ popConfirmLabel }}
           </Button>
         </template>
       </DialogFooter>

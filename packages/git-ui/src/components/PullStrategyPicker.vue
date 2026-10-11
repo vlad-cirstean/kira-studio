@@ -27,7 +27,7 @@ import { computed, ref, watch } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { OpsState } from '../state/ops.ts';
 import MenuSections from './MenuSections.vue';
-import { describePullStrategySource, PULL_STRATEGY_LABELS } from './pullStrategyModel.ts';
+import { describePullStrategySource, pullStrategyLabel } from './pullStrategyModel.ts';
 
 const props = defineProps<{
   ops: OpsState;
@@ -45,7 +45,7 @@ const mainTitle = computed(() => {
   const last = lastRun.value;
   return last
     ? t('git.toolbar.pullLast.tooltip', {
-        strategy: PULL_STRATEGY_LABELS[last.strategy],
+        strategy: pullStrategyLabel(last.strategy),
         source: describePullStrategySource(last.source),
       })
     : t('git.toolbar.pull.hint');
@@ -70,14 +70,14 @@ const menuSections = computed<MenuSection[]>(() => [
           ? t('git.toolbar.pullResolving.loading')
           : preview.value
             ? t('git.toolbar.pullPreview.status', {
-                strategy: PULL_STRATEGY_LABELS[preview.value.strategy],
+                strategy: pullStrategyLabel(preview.value.strategy),
                 source: describePullStrategySource(preview.value.source),
               })
             : undefined,
       },
       ...STRATEGIES.map((strategy) => ({
         id: `pull-strategy-${strategy}`,
-        label: PULL_STRATEGY_LABELS[strategy],
+        label: pullStrategyLabel(strategy),
         disabled: false,
         disabledReason: undefined,
       })),

@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import { CatalogText, t } from '@theme/i18n';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
@@ -85,15 +86,15 @@ function blockerText(preflight: WorktreeRemovePreflight): string {
   if (!b) return '';
   switch (b.kind) {
     case 'notAWorktree':
-      return `${b.path} is not one of this repository's worktrees.`;
+      return t('git.worktree.blocker.notAWorktree.error', { path: b.path });
     case 'mainWorktree':
-      return 'The main worktree cannot be removed.';
+      return t('git.worktree.blocker.main.error');
     case 'currentWorktree':
-      return 'This worktree is currently open here and cannot remove itself.';
+      return t('git.worktree.blocker.current.error');
     case 'openInAnotherWindow':
-      return 'This worktree is open in another window — close it there first.';
+      return t('git.worktree.blocker.openElsewhere.error');
     case 'locked':
-      return `This worktree is locked (${b.reason}) — unlock it first.`;
+      return t('git.worktree.blocker.locked.error', { reason: b.reason });
   }
 }
 
@@ -117,10 +118,10 @@ async function confirmRemove(): Promise<void> {
 </script>
 
 <template>
-  <section aria-label="Worktrees">
-    <SectionHeading label="Worktrees">
+  <section :aria-label="t('common.module.worktrees.label')">
+    <SectionHeading :label="t('common.module.worktrees.label')">
       <Button variant="toolbar" size="kira" class="ml-auto" @click="emit('create-worktree')">
-        Create Worktree…
+        {{ t('git.worktree.create.label') }}
       </Button>
     </SectionHeading>
     <div data-testid="branch-row"
@@ -131,12 +132,12 @@ async function confirmRemove(): Promise<void> {
       :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
     >
       <div data-testid="branch-row-main" class="flex items-center gap-0.5 flex-1 min-w-0 text-left">
-        <span v-if="entry.isCurrent" class="text-kira-sm text-subtle" data-kira-tip="This window">●</span>
-        <span v-if="entry.isMain" class="text-kira-sm text-subtle" data-kira-tip="Main worktree">M</span>
+        <span v-if="entry.isCurrent" class="text-kira-sm text-subtle" :data-kira-tip="t('git.worktree.current.tooltip')">●</span>
+        <span v-if="entry.isMain" class="text-kira-sm text-subtle" :data-kira-tip="t('git.worktree.main.tooltip')">{{ t('git.worktree.mainBadge.label') }}</span>
         <span v-if="entry.locked" class="text-kira-sm text-subtle" :data-kira-tip="entry.locked.reason">
           <CodiconIcon name="lock" :size="13" />
         </span>
-        <span v-if="entry.openElsewhere" class="text-kira-sm text-subtle" data-kira-tip="Open in another window">
+        <span v-if="entry.openElsewhere" class="text-kira-sm text-subtle" :data-kira-tip="t('git.worktree.openElsewhere.tooltip')">
           <CodiconIcon name="window" :size="13" />
         </span>
         <span class="truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>
@@ -145,18 +146,18 @@ async function confirmRemove(): Promise<void> {
       <TooltipIconButton
         v-if="!entry.isCurrent"
         icon="arrow-swap"
-        label="Switch to this worktree"
+        :label="t('git.worktree.switch.tooltip')"
         @click="switchTo(entry)"
       />
       <TooltipIconButton
         v-if="!entry.isMain && !entry.isCurrent"
         icon="trash"
-        label="Remove worktree"
+        :label="t('git.worktree.remove.tooltip')"
         @click="requestRemove(entry)"
       />
     </div>
     <ShowMoreButton :step="REF_LIST_SECTION_CAP" :hidden-count="section.hiddenCount" @click="showMore" />
-    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">No worktrees</div>
+    <div v-if="section.visible.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ t('git.worktree.list.empty') }}</div>
 
     <!-- P131 Part 2 §5: opens inside BranchPicker's own modal Popover panel (§5.2) -- reka's
          modal content there prevents the panel dismissing under this nested Dialog. -->
@@ -166,7 +167,7 @@ async function confirmRemove(): Promise<void> {
         size="md"
       >
         <DialogHeader>
-          <DialogTitle>{{ pendingRemove ? `Remove ${pendingRemove.entry.path}` : '' }}</DialogTitle>
+          <DialogTitle>{{ pendingRemove ? t('git.worktree.removeConfirm.title', { path: pendingRemove.entry.path }) : '' }}</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
@@ -174,14 +175,15 @@ async function confirmRemove(): Promise<void> {
           </template>
           <template v-else-if="pendingRemove?.preflight.verdict === 'dirty'">
             <p>
-              This worktree has uncommitted changes that will be permanently lost. Type
-              <code class="font-data">{{ pendingRemove.preflight.confirmToken }}</code> to confirm.
+              <CatalogText k="git.worktree.removeConfirm.body">
+                <template #token><code class="font-data">{{ pendingRemove.preflight.confirmToken }}</code></template>
+              </CatalogText>
             </p>
-            <Input v-model="typedToken" size="kira-lg" class="w-full" aria-label="Confirmation token" />
+            <Input v-model="typedToken" size="kira-lg" class="w-full" :aria-label="t('git.common.confirmToken.aria')" />
           </template>
         </DialogBody>
         <DialogFooter>
-          <Button variant="dialog" size="kira-lg" @click="cancelRemove">Cancel</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelRemove">{{ t('common.action.cancel.label') }}</Button>
           <Button
             v-if="pendingRemove?.preflight.verdict === 'dirty'"
             variant="dialog-primary"
@@ -189,7 +191,7 @@ async function confirmRemove(): Promise<void> {
             :disabled="!canConfirmRemove"
             @click="confirmRemove"
           >
-            Remove anyway
+            {{ t('common.action.remove.label') }}
           </Button>
         </DialogFooter>
       </DialogContent>

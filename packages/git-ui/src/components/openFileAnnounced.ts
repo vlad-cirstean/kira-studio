@@ -1,4 +1,5 @@
 import { TransportError } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import type { DetailActions } from '../state/detailActions.ts';
 
@@ -11,6 +12,6 @@ export function openFileAnnounced(
 ): void {
   open().catch((err: unknown) => {
     if (err instanceof TransportError && err.code === 'transport-closed') return;
-    actions.announce(`Couldn't open ${path} — ${errorText(err)}`);
+    actions.announce(t('git.fileTree.openError.error', { path, error: errorText(err) }));
   });
 }

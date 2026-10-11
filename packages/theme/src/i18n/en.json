@@ -744,6 +744,29 @@
         "title": "Couldn’t scroll to the selected commit"
       }
     },
+    "blocked": {
+      "notFound": {
+        "body": "Looked for Git at {paths}. Install Git, or set the Git executable path in the app settings to point at it.",
+        "title": "Git was not found"
+      },
+      "notFoundNoPaths": {
+        "body": "Install Git, or set the Git executable path in the app settings to point at it."
+      },
+      "tooOld": {
+        "body": "Found {detected} at {path}. Kira Space needs at least {required}. Run “{command}”, or set the Git executable path in the app settings to a newer Git.",
+        "title": "Git is too old"
+      },
+      "unusable": {
+        "error": "{path} can’t be used: {reason}",
+        "title": "Git is not usable"
+      },
+      "upgradeLinux": {
+        "example": "sudo apt install --only-upgrade git (or your distribution’s equivalent)"
+      },
+      "upgradeUnknown": {
+        "example": "your package manager’s Git upgrade command"
+      }
+    },
     "commit": {
       "committer": {
         "label": "Committer"
@@ -768,6 +791,12 @@
       "abort": {
         "label": "Abort"
       },
+      "branchName": {
+        "label": "Branch name"
+      },
+      "confirmToken": {
+        "aria": "Confirmation token"
+      },
       "continue": {
         "label": "Continue"
       },
@@ -781,8 +810,14 @@
         "body": "“{name}” is not fully merged.",
         "confirm": "Force delete"
       },
+      "mergeParent": {
+        "option": "Parent {number}: {sha} {subject}"
+      },
       "moreActions": {
         "tooltip": "More actions"
+      },
+      "operationInProgress": {
+        "body": "An operation is already in progress. Resolve or abort it first."
       },
       "refs": {
         "label": "Refs"
@@ -835,11 +870,465 @@
       "noSelection": {
         "emptyHint": "Select a commit to see its details."
       },
+      "openAll": {
+        "announce": "Opened all {count} changed file | Opened all {count} changed files",
+        "error": "Couldn’t open the changes: {error}"
+      },
+      "openFiles": {
+        "announce": "Opened {count} file | Opened {count} files"
+      },
+      "openPartial": {
+        "announce": "Opened {opened} of {total} files; {failed} couldn’t be opened"
+      },
       "region": {
         "aria": "Commit detail"
       },
       "resizeHandle": {
         "label": "Resize detail pane"
+      },
+      "working": {
+        "error": "Couldn’t load uncommitted changes: {error}",
+        "title": "Uncommitted changes"
+      }
+    },
+    "dialog": {
+      "branch": {
+        "checkout": {
+          "label": "Check out the new branch"
+        },
+        "startPoint": {
+          "description": "Starting from {sha}."
+        },
+        "title": "Create branch"
+      },
+      "checkout": {
+        "discard": {
+          "hint": "Discard permanently deletes these changes. This can’t be undone."
+        },
+        "discardAndCheckOut": {
+          "confirm": "Discard changes and check out"
+        },
+        "localChanges": {
+          "body": "These local changes would be overwritten by the checkout."
+        },
+        "stashAndCheckOut": {
+          "confirm": "Stash changes and check out"
+        },
+        "stashInstead": {
+          "hint": "Stashing them instead keeps them safe."
+        },
+        "title": "Can’t check out {name}",
+        "untracked": {
+          "body": "These untracked files would be overwritten by the checkout.",
+          "hint": "Move or remove them yourself, then retry. There is no safe way to discard them here."
+        },
+        "worktreeConflict": {
+          "body": "{branch} is already checked out in another worktree ({path}). Git won’t check out the same branch in two places at once."
+        }
+      },
+      "cherryPick": {
+        "alreadyApplied": {
+          "hint": "This change already appears in this branch’s history. The cherry-pick will probably be empty."
+        },
+        "confirm": "Cherry-pick",
+        "description": "Applies this commit’s changes here as a new commit. The original stays where it is.",
+        "detachedHead": {
+          "hint": "HEAD is detached. The new commit won’t belong to any branch until you create one."
+        },
+        "localChanges": {
+          "body": "These local changes would be overwritten by this cherry-pick."
+        },
+        "mainline": {
+          "body": "This picks a merge commit. Choose which parent’s history to treat as the mainline. Git can’t guess it."
+        },
+        "stagedChanges": {
+          "body": "Staged changes would be overwritten by this cherry-pick. Commit or unstage them first."
+        },
+        "title": "Cherry-pick commit",
+        "untracked": {
+          "body": "These untracked files would be overwritten by this cherry-pick."
+        }
+      },
+      "forcePushConfirm": {
+        "ahead": {
+          "hint": "It is {count} commit ahead of what you last saw. | It is {count} commits ahead of what you last saw."
+        },
+        "body": "This will overwrite {ref}, currently at {sha}.",
+        "confirm": "Force push with lease",
+        "plain": {
+          "hint": "This skips the lease check entirely. It overwrites the remote branch even if someone else pushed since the lease tip was read, with no protection against discarding their work.",
+          "label": "Use plain {flag} instead"
+        },
+        "plainAck": {
+          "label": "I understand and want to overwrite the remote branch without checking for other pushes"
+        },
+        "plainConfirm": {
+          "confirm": "Force push without lease"
+        },
+        "protected": {
+          "hint": "{branch} matches your protected pattern {pattern}. Type the branch name to confirm."
+        },
+        "title": "Force push {branch} to {remote}?"
+      },
+      "postCheckoutPullConfirm": {
+        "body": "{branch} is {count} commit behind {upstream}. | {branch} is {count} commits behind {upstream}.",
+        "confirm": "Pull now",
+        "notNow": {
+          "label": "Not now"
+        },
+        "title": "Pull the latest changes?"
+      },
+      "preflight": {
+        "clean": {
+          "status": "No conflicts predicted"
+        },
+        "conflicts": {
+          "body": "This will likely conflict in these files."
+        },
+        "noCommit": {
+          "label": "Stop before committing ({flag}) so you can resolve first"
+        },
+        "unknown": {
+          "error": "Couldn’t predict the outcome: {reason}"
+        }
+      },
+      "pull": {
+        "body": "Pulling with {strategy} would rewrite history here, and your working tree has uncommitted changes that would be overwritten.",
+        "stash": {
+          "hint": "Stashing them first keeps them safe. Your changes are stashed, the pull runs, then they are popped back automatically if they apply without a conflict. A predicted conflict leaves them stashed. Nothing is ever discarded."
+        },
+        "stashAndPull": {
+          "confirm": "Stash changes and pull"
+        },
+        "title": "Can’t pull with local changes"
+      },
+      "rename": {
+        "description": "Renaming {name}.",
+        "name": {
+          "label": "New name"
+        },
+        "title": "Rename branch"
+      },
+      "repoSettings": {
+        "autoStash": {
+          "hint": "The stash is tagged with the branch you switched from and is never popped back automatically. Bring it back deliberately from the stash list, even onto a different branch. Turning this off restores the old dialog, which offers discard, stash and carry, or cancel.",
+          "label": "Automatically stash local changes that block a branch switch"
+        },
+        "baseCandidates": {
+          "label": "Candidate base branches (one per line, tried in order)"
+        },
+        "checkout": {
+          "label": "Switching branches"
+        },
+        "githubEnabled": {
+          "label": "Show pull request status for this repository"
+        },
+        "graph": {
+          "label": "Graph"
+        },
+        "includeUntracked": {
+          "label": "Check the untracked files option by default in the stash dialog"
+        },
+        "pageSize": {
+          "error": "Enter a whole number from {min} to {max}.",
+          "label": "Load more page size"
+        },
+        "review": {
+          "label": "Branch review"
+        },
+        "saveError": {
+          "error": "Couldn’t save settings: {error}"
+        },
+        "scope": {
+          "label": "Scope"
+        },
+        "scopeAll": {
+          "option": "All refs"
+        },
+        "scopeHead": {
+          "option": "Ancestors of the checked-out commit only"
+        },
+        "showInGraph": {
+          "label": "Show stash entries as nodes in the commit graph"
+        },
+        "strategy": {
+          "label": "Strategy"
+        }
+      },
+      "reset": {
+        "alreadyHere": {
+          "body": "HEAD is already here. This resets your working state only."
+        },
+        "branch": {},
+        "discard": {
+          "body": "This will permanently discard these uncommitted changes."
+        },
+        "discardAndReset": {
+          "confirm": "Reset and discard changes"
+        },
+        "diverged": {
+          "body": "This moves to a different line of history. Commits that leave: {leaving}. Commits that arrive: {gaining}."
+        },
+        "hard": {
+          "description": "Branch pointer, index and working tree reset. Commits left behind remain in the reflog for about 90 days.",
+          "hint": "Uncommitted changes are destroyed and are not recoverable.",
+          "label": "Hard"
+        },
+        "head": {},
+        "leaving": {
+          "body": "{count} commit will leave {ref}. | {count} commits will leave {ref}."
+        },
+        "mixed": {
+          "description": "Branch pointer moves, index reset. Changes appear unstaged. Working tree files untouched. Nothing is lost.",
+          "label": "Mixed"
+        },
+        "mode": {
+          "label": "Mode"
+        },
+        "more": {
+          "status": "And more…"
+        },
+        "noBranch": {
+          "hint": "You aren’t on a branch. HEAD moves and no branch changes."
+        },
+        "soft": {
+          "description": "Branch pointer moves. Index and working tree untouched; the difference appears as staged changes. Nothing is lost.",
+          "label": "Soft"
+        },
+        "stashAndReset": {
+          "confirm": "Stash and reset"
+        },
+        "stashFirst": {
+          "label": "Stash these changes first instead of discarding them"
+        },
+        "title": "Move {ref} to {sha}",
+        "token": {
+          "label": "Type {token} to confirm"
+        },
+        "untracked": {
+          "hint": "Untracked and ignored files aren’t affected."
+        }
+      },
+      "revert": {
+        "confirm": "Revert",
+        "description": "Reverting applies the inverse of this commit as a new commit. The original stays in history, so this is safe on branches you’ve already pushed.",
+        "detachedHead": {
+          "hint": "HEAD is detached. The revert commit won’t belong to any branch until you create one."
+        },
+        "mainline": {
+          "body": "This reverts a merge commit. Choose which parent’s history to treat as the mainline. Git can’t guess it."
+        },
+        "multiple": {
+          "description": "Reverting applies the inverse of each selected commit as new commits. The originals stay in history, so this is safe on branches you’ve already pushed.",
+          "hint": "This prediction covers only the first of {count} selected commits. The rest may conflict differently."
+        },
+        "title": "Revert {count} commit | Revert {count} commits"
+      },
+      "stack": {
+        "blocker": {
+          "checkedOut": {
+            "error": "{branch} is checked out at {path}."
+          },
+          "cycle": {
+            "error": "This stack has a cycle: {branches}."
+          },
+          "dirty": {
+            "error": "Commit, stash or discard your changes before restacking."
+          },
+          "inProgress": {
+            "error": "Another operation is already in progress."
+          },
+          "notStacked": {
+            "error": "{branch} is not part of a stack."
+          },
+          "parentMissing": {
+            "error": "The recorded parent {parent} of {branch} no longer exists."
+          }
+        },
+        "cancelRestack": {
+          "label": "Cancel restack"
+        },
+        "forcePush": {
+          "hint": "These branches will need a force push afterwards: {branches}."
+        },
+        "noParent": {
+          "option": "None (remove from stack)"
+        },
+        "parent": {
+          "label": "Parent branch"
+        },
+        "plan": {
+          "body": "These branches will be restacked onto {base}."
+        },
+        "planEntry": {
+          "label": "{branch} onto {parent} ({count} commit, {reason}, base: {source}) | {branch} onto {parent} ({count} commits, {reason}, base: {source})"
+        },
+        "progress": {
+          "status": "{branch} ({index}/{total})"
+        },
+        "reasonAncestor": {
+          "status": "Ancestor restacked"
+        },
+        "restack": {
+          "title": "Restack {branch}"
+        },
+        "setParent": {
+          "title": "Set stack parent of {branch}"
+        },
+        "upToDate": {
+          "hint": "This stack is already up to date."
+        }
+      },
+      "stash": {
+        "applyAnyway": {
+          "confirm": "Apply anyway"
+        },
+        "applyConfirm": {
+          "title": "Apply {stash}?"
+        },
+        "blocked": {
+          "hint": "The branch will be created, but switching to it isn’t clean. Your working tree has changes that would be overwritten. You stay on your current branch until you resolve that yourself."
+        },
+        "branch": {
+          "title": "Create branch from stash"
+        },
+        "copied": {
+          "hint": "The source is copied. It is never removed or dropped."
+        },
+        "entry": {
+          "label": "This stash entry: {label}"
+        },
+        "from": {
+          "label": "From {stash}: {message}"
+        },
+        "keepIndex": {
+          "label": "Keep staged changes staged ({flag})"
+        },
+        "keptApply": {
+          "hint": "Your stash stays in the list either way. Nothing is lost."
+        },
+        "keptPop": {
+          "hint": "Your stash stays in the list if this conflicts. Nothing is lost."
+        },
+        "localChanges": {
+          "body": "Your uncommitted changes to these files would be overwritten.",
+          "hint": "Commit or discard those changes first."
+        },
+        "message": {
+          "label": "Message (optional)",
+          "placeholder": "Git’s default message"
+        },
+        "pathspec": {
+          "hint": "Only {count} selected file will be stashed, not the whole working tree. | Only {count} selected files will be stashed, not the whole working tree."
+        },
+        "popAnyway": {
+          "confirm": "Pop anyway"
+        },
+        "popConfirm": {
+          "confirm": "Pop",
+          "title": "Pop {stash}?"
+        },
+        "save": {
+          "title": "Save global stash entry"
+        },
+        "saveLabel": {
+          "label": "Label"
+        },
+        "untracked": {
+          "label": "Include untracked files ({flag})"
+        },
+        "untrackedCollision": {
+          "body": "These untracked files already exist in your working tree and would be overwritten.",
+          "hint": "Move or remove them yourself, or discard them and retry."
+        },
+        "untrackedLimit": {
+          "hint": "Untracked files won’t be included. {command} can’t save them. Promote an existing stash entry that already includes them if you need to keep those too."
+        },
+        "workingTree": {
+          "label": "This working tree"
+        }
+      },
+      "tag": {
+        "downgrade": {
+          "hint": "The existing tag is annotated. Moving it without a message here would silently downgrade it to lightweight. Supply a message below to keep it annotated."
+        },
+        "exists": {
+          "hint": "A tag named “{name}” already exists."
+        },
+        "existsAnnotated": {
+          "hint": "An annotated tag named “{name}” already exists."
+        },
+        "message": {
+          "label": "Message"
+        },
+        "replace": {
+          "label": "Replace the existing tag"
+        },
+        "target": {
+          "description": "Tagging {sha}."
+        },
+        "title": "Create tag"
+      },
+      "worktree": {
+        "blocker": {
+          "branchExists": {
+            "error": "A branch named {branch} already exists."
+          },
+          "checkedOut": {
+            "error": "{branch} is already checked out at {path}."
+          },
+          "invalidPath": {
+            "error": "The path is invalid."
+          },
+          "pathExists": {
+            "error": "{path} already exists."
+          },
+          "unknownStartPoint": {
+            "error": "{startPoint} does not resolve to a commit."
+          }
+        },
+        "commitish": {
+          "label": "Commit-ish",
+          "placeholder": "Branch, tag or SHA"
+        },
+        "detach": {
+          "option": "Detached (no branch)"
+        },
+        "detachedHead": {
+          "hint": "The new worktree will start detached."
+        },
+        "detachHere": {
+          "label": "Create it detached at that branch’s commit"
+        },
+        "existingBranch": {
+          "option": "An existing branch",
+          "placeholder": "Name of an existing branch"
+        },
+        "newBranch": {
+          "example": "feature/x",
+          "label": "New branch name",
+          "option": "A new branch"
+        },
+        "note": {
+          "insideRepo": {
+            "hint": "This path is inside the current repository."
+          },
+          "parentMissing": {
+            "hint": "The parent folder will be created."
+          }
+        },
+        "path": {
+          "example": "../my-repo-feature-x",
+          "label": "Path"
+        },
+        "startFrom": {
+          "label": "Start from"
+        },
+        "startPoint": {
+          "example": "main",
+          "label": "Start point"
+        },
+        "title": "Create worktree"
       }
     },
     "emptyRepository": {
@@ -1014,9 +1503,6 @@
         "empty": "No remote branches",
         "label": "Remote branches"
       },
-      "rename": {
-        "aria": "Rename branch"
-      },
       "sections": {
         "aria": "Picker section"
       },
@@ -1045,6 +1531,40 @@
       },
       "summary": {
         "tooltip": "#{number} {title} — {state}"
+      }
+    },
+    "pullStrategy": {
+      "auto": {
+        "option": "Auto (follow Git configuration)"
+      },
+      "branchConfig": {
+        "status": "This branch’s rebase config"
+      },
+      "default": {
+        "status": "Kira Space default"
+      },
+      "explicit": {
+        "status": "Chosen for this pull"
+      },
+      "ffOnly": {
+        "option": "Fast-forward only"
+      },
+      "merge": {
+        "option": "Merge"
+      },
+      "pullConfig": {
+        "status": "Your {rebase} or {ff} config"
+      },
+      "rebase": {
+        "option": "Rebase"
+      },
+      "setting": {
+        "status": "Your {setting} setting"
+      }
+    },
+    "refBadge": {
+      "prMore": {
+        "tooltip": "{title} — {state} (and {count} more)"
       }
     },
     "review": {
@@ -1238,7 +1758,7 @@
         "aria": "Pull strategy options"
       },
       "pullPreview": {
-        "status": "{strategy} from {source}"
+        "status": "{strategy} ({source})"
       },
       "pullResolving": {
         "loading": "Resolving…"
@@ -1276,6 +1796,53 @@
     "undo": {
       "copyRecovery": {
         "tooltip": "Copy recovery SHA {sha}"
+      }
+    },
+    "worktree": {
+      "blocker": {
+        "current": {
+          "error": "This worktree is open here and can’t remove itself."
+        },
+        "locked": {
+          "error": "This worktree is locked ({reason}). Unlock it first."
+        },
+        "main": {
+          "error": "The main worktree can’t be removed."
+        },
+        "notAWorktree": {
+          "error": "{path} is not one of this repository’s worktrees."
+        },
+        "openElsewhere": {
+          "error": "This worktree is open in another window. Close it there first."
+        }
+      },
+      "create": {
+        "label": "New worktree…"
+      },
+      "current": {
+        "tooltip": "This window"
+      },
+      "list": {
+        "empty": "No worktrees yet"
+      },
+      "main": {
+        "tooltip": "Main worktree"
+      },
+      "mainBadge": {
+        "label": "M"
+      },
+      "openElsewhere": {
+        "tooltip": "Open in another window"
+      },
+      "remove": {
+        "tooltip": "Remove worktree"
+      },
+      "removeConfirm": {
+        "body": "This worktree has uncommitted changes that will be permanently lost. Type {token} to confirm.",
+        "title": "Remove {path}?"
+      },
+      "switch": {
+        "tooltip": "Switch to this worktree"
       }
     }
   },

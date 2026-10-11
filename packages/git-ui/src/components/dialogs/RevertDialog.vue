@@ -22,6 +22,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import PreflightPrediction from './PreflightPrediction.vue';
@@ -53,6 +54,7 @@ watch(selectedMainline, (mainline) => {
 const needsMainline = computed(() => (preflight.value?.mainlineRequired.length ?? 0) > 0);
 const canConfirm = computed(() => !needsMainline.value || selectedMainline.value !== undefined);
 const isMultiSha = computed(() => (preflight.value?.shas.length ?? 0) > 1);
+const commitCount = computed(() => Math.max(preflight.value?.shas.length ?? 1, 1));
 
 function cancel(): void {
   props.ops.resolveRevertDialog(null);
@@ -71,26 +73,21 @@ function confirm(): void {
       destructive
     >
       <DialogHeader>
-        <DialogTitle>Revert</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.revert.title', { count: commitCount }) }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <DialogDescription>
-          Reverting applies the inverse of {{ isMultiSha ? 'each selected commit' : 'this commit' }}
-          as a new commit — the original stays in history, so this is safe on branches you've already
-          pushed.
+          {{ t(isMultiSha ? 'git.dialog.revert.multiple.description' : 'git.dialog.revert.description') }}
         </DialogDescription>
 
         <Alert v-if="preflight?.detachedHead" variant="warn">
           <AlertDescription>
-            HEAD is detached: the revert commit will not belong to any branch until you create one.
+            {{ t('git.dialog.revert.detachedHead.hint') }}
           </AlertDescription>
         </Alert>
 
         <template v-if="needsMainline">
-          <p>
-            This reverts a merge commit — pick which parent's history to treat as the "mainline"
-            (§7.10: git cannot guess this for you):
-          </p>
+          <p>{{ t('git.dialog.revert.mainline.body') }}</p>
           <RadioGroup v-model="selectedMainline">
             <Card
               v-for="entry in preflight?.mainlineRequired"
@@ -108,8 +105,11 @@ function confirm(): void {
                   :value="parent.parentNumber"
                 />
                 <FieldLabel :for="`${mainlineId}-${entry.sha}-${parent.parentNumber}`">
-                  <span>Parent {{ parent.parentNumber }} — <code class="font-data">{{ parent.sha.slice(0, 7) }}</code>
-                  {{ parent.subject }}</span>
+                  <span>
+                    <CatalogText k="git.common.mergeParent.option" :params="{ number: parent.parentNumber, subject: parent.subject }">
+                      <template #sha><code class="font-data">{{ parent.sha.slice(0, 7) }}</code></template>
+                    </CatalogText>
+                  </span>
                 </FieldLabel>
               </Field>
             </Card>
@@ -125,17 +125,16 @@ function confirm(): void {
 
           <Alert v-if="isMultiSha" variant="warn">
             <AlertDescription>
-              This prediction covers only the first of the {{ preflight?.shas.length }} selected
-              commits — the rest may conflict differently.
+              {{ t('git.dialog.revert.multiple.hint', { count: commitCount }) }}
             </AlertDescription>
           </Alert>
         </template>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canConfirm" @click="confirm">
-          Revert
+          {{ t('git.dialog.revert.confirm') }}
         </Button>
       </DialogFooter>
     </DialogContent>

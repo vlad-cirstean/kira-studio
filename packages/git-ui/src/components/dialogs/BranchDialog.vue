@@ -24,6 +24,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -75,27 +76,31 @@ async function submit(): Promise<void> {
       size="md"
     >
       <DialogHeader>
-        <DialogTitle>Create branch</DialogTitle>
+        <DialogTitle>{{ t('git.dialog.branch.title') }}</DialogTitle>
       </DialogHeader>
       <DialogBody>
-        <FieldDescription>Starting from <code class="font-data">{{ startPoint.slice(0, 7) }}</code></FieldDescription>
+        <FieldDescription>
+          <CatalogText k="git.dialog.branch.startPoint.description">
+            <template #sha><code class="font-data">{{ startPoint.slice(0, 7) }}</code></template>
+          </CatalogText>
+        </FieldDescription>
 
         <Field>
-          <FieldLabel :for="nameId">Name</FieldLabel>
+          <FieldLabel :for="nameId">{{ t('common.field.name.label') }}</FieldLabel>
           <Input :id="nameId" v-model="name" type="text" size="kira-lg" class="w-full" />
           <FieldError v-if="nameError">{{ nameError }}</FieldError>
         </Field>
 
         <Field orientation="horizontal">
           <Checkbox :id="checkoutId" v-model="checkout" />
-          <FieldLabel :for="checkoutId">Switch to it</FieldLabel>
+          <FieldLabel :for="checkoutId">{{ t('git.dialog.branch.checkout.label') }}</FieldLabel>
         </Field>
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
-          Create branch
+          {{ t('common.action.create.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

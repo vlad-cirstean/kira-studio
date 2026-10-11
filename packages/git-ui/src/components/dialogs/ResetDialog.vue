@@ -31,6 +31,7 @@ import {
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
+import { CatalogText, t } from '@theme/i18n';
 import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -62,6 +63,8 @@ function selectMode(next: ResetMode): void {
   props.ops.previewResetMode(next);
 }
 
+/** `HEAD` is a Git ref name, not prose. */
+const refName = computed(() => preflight.value?.branch ?? 'HEAD');
 const shortTarget = computed(() => preflight.value?.target.slice(0, 7) ?? '');
 const destroys = computed(() => preflight.value?.destroys ?? []);
 const requiresToken = computed(() => preflight.value?.requiresTypedConfirmation ?? false);
@@ -94,49 +97,46 @@ function confirm(): void {
     >
       <DialogHeader>
         <DialogTitle>
-          <template v-if="preflight?.branch">Move <code class="font-data">{{ preflight.branch }}</code> to</template>
-          <template v-else>Move HEAD to</template>
-          <code class="font-data">{{ shortTarget }}</code>
-          <template v-if="preflight?.targetSubject">— {{ preflight.targetSubject }}</template>
+          <CatalogText k="git.dialog.reset.title">
+            <template #ref><code class="font-data">{{ refName }}</code></template>
+            <template #sha><code class="font-data">{{ shortTarget }}</code></template>
+          </CatalogText>
+          <span v-if="preflight?.targetSubject" class="ml-1 font-normal text-muted-foreground">{{ preflight.targetSubject }}</span>
         </DialogTitle>
       </DialogHeader>
       <DialogBody>
         <FieldDescription v-if="preflight && !preflight.branch">
-          You are not on a branch, so no branch is changed — this moves HEAD only.
+          {{ t('git.dialog.reset.noBranch.hint') }}
         </FieldDescription>
 
         <DialogDescription v-if="preflight?.leaving === 0 && preflight.gaining === 0">
-          HEAD is already here — this resets your working state only.
+          {{ t('git.dialog.reset.alreadyHere.body') }}
         </DialogDescription>
         <template v-else-if="preflight?.gaining === 0">
           <DialogDescription>
-            {{ preflight.leaving }} commit{{ preflight.leaving === 1 ? '' : 's' }} will leave
-            <template v-if="preflight.branch"><code class="font-data">{{ preflight.branch }}</code></template>
-            <template v-else>HEAD</template>:
+            <CatalogText k="git.dialog.reset.leaving.body" :params="{ count: preflight.leaving }">
+              <template #ref><code class="font-data">{{ refName }}</code></template>
+            </CatalogText>
           </DialogDescription>
           <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
             <li v-for="c in preflight.leavingCommits" :key="c.sha">
               <code class="font-data">{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
             </li>
           </ul>
-          <p v-if="preflight.leavingTruncated" class="text-muted-foreground italic">and more…</p>
+          <p v-if="preflight.leavingTruncated" class="text-muted-foreground italic">{{ t('git.dialog.reset.more.status') }}</p>
         </template>
         <DialogDescription v-else-if="preflight">
-          This moves to a different line of history: {{ preflight.leaving }} commit{{
-            preflight.leaving === 1 ? '' : 's'
-          }}
-          leave, {{ preflight.gaining }} arrive.
+          {{ t('git.dialog.reset.diverged.body', { leaving: preflight.leaving, gaining: preflight.gaining }) }}
         </DialogDescription>
 
         <FieldSet>
-          <FieldLegend>Mode</FieldLegend>
+          <FieldLegend>{{ t('git.dialog.reset.mode.label') }}</FieldLegend>
           <RadioGroup :model-value="mode" @update:model-value="(v) => selectMode(v as ResetMode)">
             <Field orientation="horizontal" class="items-start py-1">
               <RadioGroupItem :id="`${modeId}-soft`" value="soft" class="mt-0.5" />
               <FieldLabel :for="`${modeId}-soft`">
                 <span>
-                  <strong>Soft</strong> — Branch pointer moves. Index and working tree untouched; the
-                  difference appears as staged changes. Nothing is lost.
+                  <strong>{{ t('git.dialog.reset.soft.label') }}</strong> {{ t('git.dialog.reset.soft.description') }}
                 </span>
               </FieldLabel>
             </Field>
@@ -144,8 +144,7 @@ function confirm(): void {
               <RadioGroupItem :id="`${modeId}-mixed`" value="mixed" class="mt-0.5" />
               <FieldLabel :for="`${modeId}-mixed`">
                 <span>
-                  <strong>Mixed</strong> — Branch pointer moves, index reset. Changes appear unstaged.
-                  Working tree files untouched. Nothing is lost.
+                  <strong>{{ t('git.dialog.reset.mixed.label') }}</strong> {{ t('git.dialog.reset.mixed.description') }}
                 </span>
               </FieldLabel>
             </Field>
@@ -153,9 +152,8 @@ function confirm(): void {
               <RadioGroupItem :id="`${modeId}-hard`" value="hard" class="mt-0.5" />
               <FieldLabel :for="`${modeId}-hard`">
                 <span>
-                  <strong>Hard</strong> — Branch pointer, index, <strong>and working tree</strong> reset.
-                  <strong>Uncommitted changes are destroyed and are not recoverable.</strong> Commits left
-                  behind remain in the reflog for about 90 days.
+                  <strong>{{ t('git.dialog.reset.hard.label') }}</strong> {{ t('git.dialog.reset.hard.description') }}
+                  <strong>{{ t('git.dialog.reset.hard.hint') }}</strong>
                 </span>
               </FieldLabel>
             </Field>
@@ -165,24 +163,26 @@ function confirm(): void {
         <template v-if="mode === 'hard' && destroys.length > 0">
           <Alert variant="warn">
             <AlertDescription>
-              <p>This will permanently discard these uncommitted changes:</p>
+              <p>{{ t('git.dialog.reset.discard.body') }}</p>
               <ul class="max-h-40 overflow-y-auto pl-3 font-data text-kira-md">
                 <li v-for="path in destroys" :key="path"><code class="font-data">{{ path }}</code></li>
               </ul>
             </AlertDescription>
           </Alert>
           <FieldDescription class="italic">
-            Untracked and ignored files are <strong>not</strong> affected.
+            {{ t('git.dialog.reset.untracked.hint') }}
           </FieldDescription>
 
           <Field v-if="canStashFirst" orientation="horizontal">
             <Checkbox :id="stashFirstId" v-model="stashFirst" />
-            <FieldLabel :for="stashFirstId">Stash these changes first instead of discarding them</FieldLabel>
+            <FieldLabel :for="stashFirstId">{{ t('git.dialog.reset.stashFirst.label') }}</FieldLabel>
           </Field>
 
           <Field v-if="!stashFirst">
             <FieldLabel :for="tokenId">
-              <span>Type <code class="font-data">{{ shortTarget }}</code> to confirm</span>
+              <CatalogText k="git.dialog.reset.token.label">
+                <template #token><code class="font-data">{{ shortTarget }}</code></template>
+              </CatalogText>
             </FieldLabel>
             <Input
               :id="tokenId"
@@ -197,7 +197,7 @@ function confirm(): void {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">Cancel</Button>
+        <Button variant="dialog" size="kira-lg" data-dialog-dismiss @click="cancel">{{ t('common.action.cancel.label') }}</Button>
         <Button
           v-if="isHardDestructive && canStashFirst"
           variant="dialog-primary"
@@ -206,7 +206,7 @@ function confirm(): void {
           data-testid="reset-confirm"
           @click="confirm"
         >
-          {{ stashFirst ? 'Stash and reset' : 'Reset (discard changes)' }}
+          {{ stashFirst ? t('git.dialog.reset.stashAndReset.confirm') : t('git.dialog.reset.discardAndReset.confirm') }}
         </Button>
         <Button
           v-else
@@ -216,7 +216,7 @@ function confirm(): void {
           data-testid="reset-confirm"
           @click="confirm"
         >
-          Reset
+          {{ t('common.action.reset.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

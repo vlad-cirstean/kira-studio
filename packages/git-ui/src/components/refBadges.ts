@@ -20,10 +20,14 @@
  */
 import type { DecorationRef } from '@kira/git-core';
 import type { PrRecord } from '@kira/git-ipc';
+import { t } from '@theme/i18n';
 import { BADGE_ICONS } from '../icons/index.ts';
 import { prBadgeClass, type RefBadgeVariant, refBadgeClass } from './badgeClass.ts';
+import { prStateLabel } from './prStateLabel.ts';
 
 // §6.2: badge text truncates at ~190px (full name in the tooltip); the icon keeps its size.
+/** A Git ref name, not prose. */
+const HEAD_REF_NAME = 'HEAD';
 const BADGE_LABEL_CLASS = 'min-w-0 max-w-47.5 truncate';
 
 /** §6.2: "a row with more than three badges collapses the overflow into a +N badge". */
@@ -101,7 +105,7 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       return {
         icon: BADGE_ICONS.localBranch,
         variant: 'warn',
-        text: 'HEAD',
+        text: HEAD_REF_NAME,
         isCurrentBranch: true,
         refKind: undefined,
         refName: undefined,
@@ -201,7 +205,7 @@ function buildBadgeElement(
     const check = document.createElement('span');
     check.className = 'codicon codicon-check shrink-0 text-focus';
     check.setAttribute('role', 'img');
-    check.setAttribute('aria-label', 'current branch');
+    check.setAttribute('aria-label', t('git.common.currentBranch.tooltip'));
     badge.appendChild(check);
   }
 
@@ -228,13 +232,6 @@ const PR_STATE_PRECEDENCE: Readonly<Record<PrRecord['state'], number>> = {
   draft: 1,
   merged: 2,
   closed: 3,
-};
-
-const PR_STATE_LABEL: Readonly<Record<PrRecord['state'], string>> = {
-  open: 'Open',
-  draft: 'Draft',
-  merged: 'Merged',
-  closed: 'Closed',
 };
 
 /** D9's own precedence rule: `open > draft > merged > closed`, ties broken by most recently
@@ -270,8 +267,13 @@ export function buildPrBadge(prs: readonly PrRecord[]): HTMLElement | null {
   // Not a Tab stop inside the roving-tabindex grid; Enter on it would toggle the detail pane.
   badge.tabIndex = -1;
   badge.dataset.prNumber = String(best.number);
-  const extra = prs.length > 1 ? ` (+${prs.length - 1} more)` : '';
-  badge.setAttribute('data-kira-tip', `${best.title} — ${PR_STATE_LABEL[best.state]}${extra}`);
+  const state = prStateLabel(best.state);
+  badge.setAttribute(
+    'data-kira-tip',
+    prs.length > 1
+      ? t('git.refBadge.prMore.tooltip', { title: best.title, state, count: prs.length - 1 })
+      : t('git.picker.prTitle.tooltip', { title: best.title, state }),
+  );
 
   const label = document.createElement('span');
   label.className = BADGE_LABEL_CLASS;
