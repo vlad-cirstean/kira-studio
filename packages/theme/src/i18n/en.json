@@ -9665,7 +9665,7 @@
           "status": "{total} total"
         },
         "totalApprox": {
-          "status": "About {total} total"
+          "status": "~{total} total"
         }
       },
       "tooLarge": {
