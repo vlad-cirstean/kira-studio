@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useTimeAgo } from '@vueuse/core';
 import { computed } from 'vue';
 import { formatSize } from '../lib/format';
@@ -22,11 +24,12 @@ const ago = useTimeAgo(takenAt);
   <DetailSection title="Size">
     <template #actions>
       <span class="ml-auto flex items-center gap-1 normal-case tracking-normal">
-        <span
-          v-if="size"
-          :title="new Date(size.takenAt).toLocaleString()"
-          data-testid="docker-size-taken"
-        >{{ ago }}</span>
+        <Tooltip v-if="size">
+          <TooltipTrigger as-child>
+            <span data-testid="docker-size-taken">{{ ago }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ new Date(size.takenAt).toLocaleString() }}</TooltipContent>
+        </Tooltip>
         <TooltipIconButton
           icon="refresh"
           label="Measure size"
@@ -37,10 +40,10 @@ const ago = useTimeAgo(takenAt);
       </span>
     </template>
 
-    <p v-if="query.error.value" class="mb-2 text-error" data-testid="docker-size-error">{{ query.error.value.message }}</p>
+    <FieldError v-if="query.error.value" class="mb-2" data-testid="docker-size-error">{{ query.error.value.message }}</FieldError>
 
     <div v-if="measuring && !size" class="flex items-center gap-2 text-muted-foreground">
-      <CodiconIcon name="loading" :size="12" class="codicon-modifier-spin" />Measuring…
+      <Spinner label="" />Measuring…
     </div>
     <div v-else-if="!size" class="flex flex-wrap items-center gap-3 text-muted-foreground">
       <span>Not measured. Measuring walks the container's filesystem and can take a while.</span>

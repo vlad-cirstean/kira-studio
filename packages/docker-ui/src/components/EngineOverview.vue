@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
 import { formatPercent, formatSize } from '../lib/format';
 import { useContainerAction, useContainers, useDockerStatus, useImages, useNetworks, useVolumes } from '../queries';
@@ -166,7 +168,7 @@ function refresh(): Promise<void> {
               <span class="text-muted-foreground">of {{ engine.cpus * 100 }}%</span>
             </div>
             <div class="mt-2"><UsageBar :percent="cpuPercentOfCapacity" /></div>
-            <div class="mt-2"><StatsSparkline :values="cpuSeries" :max="cpuCapacity" height-class="h-8" /></div>
+            <div class="mt-2"><StatsSparkline :values="cpuSeries" :max="cpuCapacity" height-class="h-[2rem]" /></div>
           </DetailSection>
           <DetailSection title="Memory">
             <div class="flex items-baseline gap-1.5">
@@ -174,14 +176,14 @@ function refresh(): Promise<void> {
               <span class="text-muted-foreground">of {{ formatSize(engine.memTotal) }}</span>
             </div>
             <div class="mt-2"><UsageBar :percent="memPercentOfTotal" /></div>
-            <div class="mt-2"><StatsSparkline :values="memSeries" :max="engine.memTotal" height-class="h-8" /></div>
+            <div class="mt-2"><StatsSparkline :values="memSeries" :max="engine.memTotal" height-class="h-[2rem]" /></div>
           </DetailSection>
           <DetailSection title="Resources" flush>
             <button
               v-for="l in links"
               :key="l.section"
               type="button"
-              class="flex h-control-lg w-full cursor-default items-center gap-2 px-3 text-left hover:bg-hover"
+              :class="cn(rowVariants({ layout: 'menu' }), 'h-control-lg w-full cursor-default gap-2 rounded-none px-3 text-left')"
               :data-testid="`docker-overview-link-${l.section}`"
               @click="openSection(l.section)"
             >

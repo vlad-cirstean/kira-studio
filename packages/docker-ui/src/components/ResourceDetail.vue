@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
+import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
+import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
 import { useDocker } from '../context';
-import { formatCreated, formatSize, shortId, stateDotClass } from '../lib/format';
+import { formatCreated, formatSize, shortId, stateDotTone } from '../lib/format';
 import { useContainers, useImages, useInspect, useNetworks, useVolumes } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { InspectKind } from '../wire';
@@ -119,11 +122,11 @@ const usedByRows = computed(() =>
             v-for="row in usedByRows"
             :key="row.id"
             type="button"
-            class="flex h-control-lg w-full cursor-default items-center gap-2 px-3 text-left hover:bg-hover"
+            :class="cn(rowVariants({ layout: 'menu' }), 'h-control-lg w-full cursor-default gap-2 rounded-none px-3 text-left')"
             data-testid="docker-used-by"
             @click="ui.select({ kind: 'container', id: row.id })"
           >
-            <span class="size-1.5 rounded-full" :class="row.state ? stateDotClass(row.state) : 'bg-subtle'" />
+            <StatusDot :tone="row.state ? stateDotTone(row.state) : 'muted'" />
             {{ row.name }}
           </button>
         </DetailSection>

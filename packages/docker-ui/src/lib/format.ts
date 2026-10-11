@@ -30,12 +30,12 @@ export function isActiveState(state: ContainerState): boolean {
   return state === 'running' || state === 'paused' || state === 'restarting';
 }
 
-/** Tailwind background for a container state's status dot. */
-export function stateDotClass(state: ContainerState): string {
-  if (state === 'running') return 'bg-ok';
-  if (state === 'paused' || state === 'restarting') return 'bg-warn';
-  if (state === 'dead') return 'bg-error';
-  return 'bg-subtle';
+/** `StatusDot` tone for a container state. */
+export function stateDotTone(state: ContainerState): 'ok' | 'warn' | 'error' | 'muted' {
+  if (state === 'running') return 'ok';
+  if (state === 'paused' || state === 'restarting') return 'warn';
+  if (state === 'dead') return 'error';
+  return 'muted';
 }
 
 /** Tailwind background for a usage bar: calm until it nears the limit. */

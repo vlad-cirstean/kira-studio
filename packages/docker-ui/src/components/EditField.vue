@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import StatusDot from '@theme/components/StatusDot.vue';
+import { FieldError } from '@theme/components/ui/field';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, inject } from 'vue';
 import type { EditMode } from '../lib/editDiff';
 import { inPlaceSectionKey } from '../lib/editSection';
@@ -25,10 +28,15 @@ const needsRecreate = computed(() => inPlaceTab === true && props.mode === 'recr
   >
     <div class="flex items-center gap-2">
       <span class="text-muted-foreground">{{ label }}</span>
-      <span v-if="changed" class="size-1.5 rounded-full bg-muted-foreground" title="Changed" />
+      <Tooltip v-if="changed">
+        <TooltipTrigger as-child>
+          <StatusDot tone="muted" label="Changed" />
+        </TooltipTrigger>
+        <TooltipContent>Changed</TooltipContent>
+      </Tooltip>
     </div>
     <slot />
-    <p v-if="error" class="text-error" data-testid="docker-edit-field-error">{{ error }}</p>
+    <FieldError v-if="error" data-testid="docker-edit-field-error">{{ error }}</FieldError>
     <p v-else-if="needsRecreate" class="text-muted-foreground" data-testid="docker-edit-field-recreate-hint">This change needs a recreate.</p>
     <p v-else-if="hint" class="text-muted-foreground">{{ hint }}</p>
   </fieldset>

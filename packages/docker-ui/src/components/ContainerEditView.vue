@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import Spinner from '@theme/components/Spinner.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Skeleton } from '@theme/components/ui/skeleton';
 import { Tabs, TabsContent } from '@theme/components/ui/tabs';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
@@ -146,8 +148,8 @@ const originNotice = computed(() => {
 <template>
   <div class="@container h-full overflow-auto p-3" data-testid="docker-edit">
     <div v-if="!draft || !base" class="flex flex-col gap-2" aria-busy="true">
-      <div class="h-6 w-1/3 animate-pulse rounded-kira-sm bg-field" />
-      <div class="h-4 w-2/3 animate-pulse rounded-kira-sm bg-field" />
+      <Skeleton class="h-control-lg w-1/3" />
+      <Skeleton class="h-4 w-2/3" />
     </div>
     <div v-else class="flex flex-col gap-3">
       <Alert v-if="base.managed" variant="warn" data-testid="docker-edit-managed">
@@ -156,17 +158,21 @@ const originNotice = computed(() => {
         </AlertDescription>
       </Alert>
       <Alert v-if="originNotice" variant="info" data-testid="docker-edit-origin">
-        <AlertDescription class="flex items-center gap-2">
-          <OriginIcon :origin="base.origin" :name="base.originName" />{{ originNotice }}
+        <AlertDescription>
+          <div class="flex items-center gap-2">
+            <OriginIcon :origin="base.origin" :name="base.originName" />{{ originNotice }}
+          </div>
         </AlertDescription>
       </Alert>
       <Alert v-if="base.autoRemove" variant="info" data-testid="docker-edit-autoremove">
         <AlertDescription>Auto-remove container: it cannot be recreated, and its restart policy cannot change.</AlertDescription>
       </Alert>
       <Alert v-if="draft.stale" variant="warn" data-testid="docker-edit-stale">
-        <AlertDescription class="flex items-center gap-2">
-          The container changed since the editor loaded.
-          <Button size="kira" variant="toolbar" data-testid="docker-edit-reload" @click="reload">Reload</Button>
+        <AlertDescription>
+          <div class="flex items-center gap-2">
+            The container changed since the editor loaded.
+            <Button size="kira" variant="toolbar" data-testid="docker-edit-reload" @click="reload">Reload</Button>
+          </div>
         </AlertDescription>
       </Alert>
       <Alert v-if="failure" variant="error" data-testid="docker-edit-error">
@@ -194,9 +200,9 @@ const originNotice = computed(() => {
         >
           <template #item="{ item }">
             {{ item.label }}
-            <span
+            <StatusDot
               v-if="item.value === 'inPlace' ? inPlaceCount : recreateCount"
-              class="size-1.5 rounded-full bg-muted-foreground"
+              tone="muted"
               data-testid="docker-edit-tab-dirty"
             />
           </template>
@@ -207,7 +213,7 @@ const originNotice = computed(() => {
           <div class="flex items-center justify-end gap-1">
             <TooltipIconButton icon="discard" label="Reset" :disabled="!inPlaceCount" data-testid="docker-edit-reset-inplace" @click="store.reset(containerId, 'inPlace')" />
             <Button v-if="!readOnly" size="kira" variant="toolbar" :disabled="!canApplyNow" data-testid="docker-edit-apply-now" @click="applyNow">
-              <CodiconIcon v-if="applying === 'inPlace'" name="loading" :size="12" class="codicon-modifier-spin" />Apply
+              <Spinner v-if="applying === 'inPlace'" label="" />Apply
             </Button>
           </div>
         </TabsContent>
@@ -217,7 +223,7 @@ const originNotice = computed(() => {
           <div class="flex items-center justify-end gap-1">
             <TooltipIconButton icon="discard" label="Reset" :disabled="!recreateCount" data-testid="docker-edit-reset-recreate" @click="store.reset(containerId, 'recreate')" />
             <Button v-if="!readOnly" size="kira" variant="toolbar" :disabled="!canRecreate" data-testid="docker-edit-apply-recreate" @click="confirming = true">
-              <CodiconIcon v-if="applying === 'recreate'" name="loading" :size="12" class="codicon-modifier-spin" />Recreate…
+              <Spinner v-if="applying === 'recreate'" label="" />Recreate…
             </Button>
           </div>
         </TabsContent>

@@ -3,6 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, provide, ref } from 'vue';
 import { resourceMode, toNumber } from '../lib/editDiff';
 import { inPlaceSectionKey } from '../lib/editSection';
@@ -175,7 +176,12 @@ const netChanged = (name: string): boolean => {
             data-testid="docker-edit-network-aliases"
             @change="setAliases(n.name, ($event.target as HTMLInputElement).value)"
           />
-          <span v-if="n.ipv4 || n.ipv6" class="shrink-0 font-data text-muted-foreground" title="Static address, kept as is">{{ n.ipv4 || n.ipv6 }}</span>
+          <Tooltip v-if="n.ipv4 || n.ipv6">
+            <TooltipTrigger as-child>
+              <span class="shrink-0 font-data text-muted-foreground">{{ n.ipv4 || n.ipv6 }}</span>
+            </TooltipTrigger>
+            <TooltipContent>Static address, kept as is</TooltipContent>
+          </Tooltip>
           <TooltipIconButton icon="trash" label="Detach" :disabled="disabled || networkLocked" data-testid="docker-edit-network-remove" @click="removeNetwork(n.name)" />
         </div>
         <div class="flex items-center gap-2">

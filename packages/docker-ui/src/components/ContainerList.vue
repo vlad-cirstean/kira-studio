@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import Spinner from '@theme/components/Spinner.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
@@ -8,7 +9,7 @@ import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu
 import { copyText } from '@workbench/util/clipboard';
 import { useRowHeight } from '@workbench/util/rowHeight';
 import { computed } from 'vue';
-import { isActiveState, publishedPorts, stateDotClass } from '../lib/format';
+import { isActiveState, publishedPorts, stateDotTone } from '../lib/format';
 import { useContainerAction, useContainers } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { DockerContainer } from '../wire';
@@ -180,7 +181,7 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         @keydown.enter="ui.select({ kind: 'container', id: row.container.id })"
         @contextmenu.prevent="onContextMenu($event, row.container)"
       >
-        <span class="row-span-1 size-1.5 rounded-full" :class="stateDotClass(row.container.state)" data-testid="docker-state-dot" />
+        <StatusDot :tone="stateDotTone(row.container.state)" data-testid="docker-state-dot" />
         <span class="flex min-w-0 items-center gap-1.5">
           <span
             class="truncate"
@@ -196,7 +197,7 @@ function onContextMenu(e: MouseEvent, c: DockerContainer): void {
         <span v-if="row.container.state !== 'running'" class="text-right text-kira-sm text-muted-foreground" data-testid="docker-row-state">{{ row.container.state }}</span>
         <span v-else />
         <span class="row-span-2 flex items-center justify-end">
-          <CodiconIcon v-if="actions.isBusy(row.container.id)" name="loading" :size="12" class="codicon-modifier-spin" />
+          <Spinner v-if="actions.isBusy(row.container.id)" label="" />
           <span v-else class="hidden group-hover/row:flex group-focus-within/row:flex">
             <TooltipIconButton
               v-if="row.container.state !== 'running'"

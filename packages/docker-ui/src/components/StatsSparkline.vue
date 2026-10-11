@@ -3,7 +3,7 @@ import { computed } from 'vue';
 
 const props = withDefaults(
   defineProps<{ values: readonly number[]; max?: number; width?: number; height?: number; heightClass?: string }>(),
-  { max: 0, width: 240, height: 48, heightClass: 'h-12' },
+  { max: 0, width: 240, height: 48, heightClass: 'h-[3rem]' },
 );
 
 const coords = computed(() => {

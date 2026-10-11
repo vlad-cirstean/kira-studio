@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { computed } from 'vue';
@@ -50,7 +51,7 @@ const copy = computed(() => COPY[props.status.reason ?? 'error']);
       <p v-if="status.message" class="max-w-md text-kira-sm text-muted-foreground">{{ status.message }}</p>
       <div class="flex items-center gap-2">
         <Button size="kira" variant="toolbar" :disabled="retrying" data-testid="docker-retry" @click="retry">
-          <CodiconIcon :name="retrying ? 'loading' : 'refresh'" :size="12" :class="retrying ? 'codicon-modifier-spin' : ''" />Retry
+          <Spinner v-if="retrying" label="" /><CodiconIcon v-else name="refresh" :size="12" />Retry
         </Button>
         <EndpointChip />
       </div>

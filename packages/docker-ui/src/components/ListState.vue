@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { Skeleton } from '@theme/components/ui/skeleton';
 
 defineProps<{
   loading: boolean;
@@ -18,7 +19,7 @@ const LOADING_OPACITY = ['opacity-86', 'opacity-72', 'opacity-58', 'opacity-44',
 
 <template>
   <div v-if="loading" class="flex flex-col gap-1.5 p-2" data-testid="docker-list-loading" aria-busy="true">
-    <div v-for="n in 5" :key="n" class="h-7 animate-pulse rounded-kira-sm bg-field" :class="LOADING_OPACITY[n - 1]" />
+    <Skeleton v-for="n in 5" :key="n" class="h-row" :class="LOADING_OPACITY[n - 1]" />
   </div>
   <Empty v-else-if="error" class="h-full" data-testid="docker-list-error">
     <EmptyHeader>

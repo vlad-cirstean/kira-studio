@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/components/ui/table';
+import { cn } from '@theme/lib/utils';
 import { computed } from 'vue';
-import { formatPercent, formatSize, publishedPorts, stateDotClass } from '../lib/format';
+import { formatPercent, formatSize, publishedPorts, stateDotTone } from '../lib/format';
 import { useContainerAction, useContainers } from '../queries';
 import { useDockerStatsStore } from '../state/dockerStats';
 import { useDockerUiStore } from '../state/dockerUi';
@@ -46,10 +49,7 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
     @retry="containers.refetch()"
   />
   <div v-else class="@container" role="listbox" data-testid="docker-table">
-    <div
-      class="grid items-center gap-x-3 border-b border-border px-3 py-1 text-kira-sm uppercase tracking-wider text-muted-foreground"
-      :class="COLUMNS"
-    >
+    <div :class="cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-x-3 px-3', COLUMNS)">
       <span />
       <span>Name</span>
       <span class="hidden @4xl:block">Image</span>
@@ -61,8 +61,7 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
     <div
       v-for="c in rows"
       :key="c.id"
-      class="group/row grid cursor-default select-none items-center gap-x-3 border-b border-border/60 px-3 py-1.5 outline-none last:border-b-0 hover:bg-hover focus-visible:outline focus-visible:-outline-offset-1 focus-visible:outline-focus"
-      :class="COLUMNS"
+:class="cn(tableRowClass, 'group/row grid h-auto min-h-row cursor-default select-none items-center gap-x-3 px-3 py-1 last:border-b-0', COLUMNS)"
       data-testid="docker-table-row"
       :data-name="c.name"
       :data-state="c.state"
@@ -73,7 +72,7 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
       @keydown.enter="open(c)"
       @dblclick="open(c, 'logs')"
     >
-      <span class="size-1.5 rounded-full" :class="stateDotClass(c.state)" />
+      <StatusDot :tone="stateDotTone(c.state)" />
       <span class="flex min-w-0 flex-col">
         <span class="flex min-w-0 items-baseline gap-1.5">
           <span class="truncate" :class="c.state === 'running' ? 'font-medium' : 'text-muted-foreground'">{{ c.name }}</span>
@@ -98,7 +97,7 @@ function open(c: DockerContainer, tab: 'overview' | 'logs' | 'terminal' = 'overv
         <span class="text-right text-muted-foreground">{{ c.state === 'running' ? '…' : '-' }}</span>
       </template>
       <span class="flex items-center justify-end">
-        <CodiconIcon v-if="actions.isBusy(c.id)" name="loading" :size="12" class="codicon-modifier-spin" />
+        <Spinner v-if="actions.isBusy(c.id)" label="" />
         <span v-else class="invisible flex group-hover/row:visible group-focus-within/row:visible">
           <TooltipIconButton icon="output" label="Logs" @click.stop="open(c, 'logs')" />
           <TooltipIconButton v-if="c.state === 'running'" icon="debug-stop" label="Stop" class="text-error hover:text-error" data-testid="docker-table-stop" @click.stop="act(c, 'stop')" />

@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { Switch } from '@theme/components/ui/switch';
 import { Textarea } from '@theme/components/ui/textarea';
 import { computed } from 'vue';
 import { deepEqual, toNumber } from '../lib/editDiff';
@@ -131,7 +131,7 @@ function addMount(): void {
           </NativeSelect>
           <Input class="min-w-0 flex-1" placeholder="volume name or host path" :list="item.type === 'volume' ? 'docker-edit-volumes' : undefined" v-model="item.source" :disabled="disabled" data-testid="docker-edit-mount-source" />
           <Input class="min-w-0 flex-1" placeholder="/path/in/container" v-model="item.target" :disabled="disabled" data-testid="docker-edit-mount-target" />
-          <span class="flex shrink-0 items-center gap-1 text-muted-foreground"><Switch v-model="item.readOnly" :disabled="disabled" data-testid="docker-edit-mount-ro" aria-label="Read-only" />ro</span>
+          <span class="flex shrink-0 items-center gap-1 text-muted-foreground"><Checkbox v-model="item.readOnly" :disabled="disabled" data-testid="docker-edit-mount-ro" aria-label="Read-only" />ro</span>
         </template>
       </EditRows>
     </EditField>

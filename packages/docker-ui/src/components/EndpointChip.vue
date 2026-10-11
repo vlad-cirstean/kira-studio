@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
+import { Button } from '@theme/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,23 +41,23 @@ async function onSelect(value: unknown): Promise<void> {
 <template>
   <DropdownMenu :modal="false">
     <DropdownMenuTrigger as-child>
-      <button
-        type="button"
-        class="flex min-w-0 items-center gap-1 rounded-kira-sm px-1 h-control-sm normal-case tracking-normal text-kira-sm text-fg hover:bg-hover"
+      <Button
+        variant="toolbar"
+        size="kira"
+        class="h-control-sm min-w-0 gap-1 px-1 normal-case tracking-normal text-kira-sm font-normal text-fg"
         data-testid="docker-endpoint-chip"
         :aria-label="`Docker endpoint ${endpoint?.context ?? ''}`"
       >
-        <span
-          class="size-1.5 shrink-0 rounded-full"
-          :class="ok ? 'bg-ok' : 'bg-error'"
+        <StatusDot
+          :tone="ok ? 'ok' : 'error'"
           data-testid="docker-status-dot"
           :data-state="ok ? 'ok' : 'unavailable'"
         />
         <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ endpoint?.context ?? 'docker' }}</span>
         <CodiconIcon name="chevron-down" :size="12" />
-      </button>
+      </Button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" class="w-56" data-testid="docker-context-menu">
+    <DropdownMenuContent align="start" data-testid="docker-context-menu">
       <DropdownMenuRadioGroup :model-value="selected" @update:model-value="onSelect">
         <DropdownMenuRadioItem :value="AUTOMATIC" class="h-auto min-h-control py-1" data-testid="docker-context-automatic">
           <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Automatic</span>

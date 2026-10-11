@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import Spinner from '@theme/components/Spinner.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { FieldError } from '@theme/components/ui/field';
+import { Skeleton } from '@theme/components/ui/skeleton';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
-import { formatPercent, formatSize, publishedPorts, shortId, stateDotClass } from '../lib/format';
+import { formatPercent, formatSize, publishedPorts, shortId, stateDotTone } from '../lib/format';
 import { useContainerAction, useContainerDetail } from '../queries';
 import { useDockerEditStore } from '../state/dockerEdit';
 import { useDockerStatsStore } from '../state/dockerStats';
@@ -95,7 +99,7 @@ function act(action: 'start' | 'stop' | 'restart'): void {
 <template>
   <div class="flex h-full flex-col" data-testid="docker-container-detail">
     <div v-if="recreating" class="flex items-center gap-2 p-4 text-muted-foreground" data-testid="docker-detail-recreating">
-      <CodiconIcon name="loading" :size="13" class="codicon-modifier-spin" />Recreating…
+      <Spinner label="" />Recreating…
     </div>
     <Empty v-else-if="detail.isError.value" class="h-full" data-testid="docker-detail-error">
       <EmptyHeader>
@@ -106,13 +110,13 @@ function act(action: 'start' | 'stop' | 'restart'): void {
       <Button size="kira" variant="toolbar" @click="ui.select(null)">Back to overview</Button>
     </Empty>
     <div v-else-if="!detail.data.value" class="flex flex-col gap-2 p-3" aria-busy="true">
-      <div class="h-6 w-1/3 animate-pulse rounded-kira-sm bg-field" />
-      <div class="h-4 w-2/3 animate-pulse rounded-kira-sm bg-field" />
+      <Skeleton class="h-control-lg w-1/3" />
+      <Skeleton class="h-4 w-2/3" />
     </div>
     <template v-else-if="c">
       <div class="flex shrink-0 flex-col gap-1 border-b border-border px-3 py-2">
         <div class="flex min-w-0 items-center gap-2">
-          <span class="size-2 shrink-0 rounded-full" :class="stateDotClass(c.state)" />
+          <StatusDot :tone="stateDotTone(c.state)" />
           <span class="min-w-0 truncate text-kira-lg font-medium" data-testid="docker-detail-name">{{ c.name }}</span>
           <Badge :variant="stateVariant" data-testid="docker-detail-state">{{ c.state }}</Badge>
           <span class="ml-auto flex shrink-0 items-center gap-1">
@@ -154,9 +158,9 @@ function act(action: 'start' | 'stop' | 'restart'): void {
           </span>
         </div>
       </div>
-      <p v-if="actions.error.value || linkError" class="shrink-0 border-b border-border px-3 py-1 text-error" data-testid="docker-action-error">
+      <FieldError v-if="actions.error.value || linkError" class="shrink-0 border-b border-border px-3 py-1" data-testid="docker-action-error">
         {{ actions.error.value ? (actions.error.value as Error).message : linkError }}
-      </p>
+      </FieldError>
       <ViewToolbar class="overflow-x-auto">
         <SecondaryTabs
           :model-value="ui.detailTab"

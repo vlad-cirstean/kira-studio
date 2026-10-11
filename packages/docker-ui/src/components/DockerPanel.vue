@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -139,7 +140,8 @@ async function refresh(): Promise<void> {
     <Empty v-else class="h-full" data-testid="docker-panel-unavailable">
       <EmptyHeader>
         <EmptyMedia>
-          <CodiconIcon :name="status.data.value ? 'debug-disconnect' : 'loading'" :size="24" :class="status.data.value ? 'text-error' : 'codicon-modifier-spin'" />
+          <CodiconIcon v-if="status.data.value" name="debug-disconnect" :size="24" class="text-error" />
+          <Spinner v-else :size="24" label="" />
         </EmptyMedia>
         <EmptyTitle>{{ status.data.value ? 'Docker unavailable' : 'Connecting…' }}</EmptyTitle>
         <EmptyDescription v-if="status.data.value">Details are in the main pane.</EmptyDescription>

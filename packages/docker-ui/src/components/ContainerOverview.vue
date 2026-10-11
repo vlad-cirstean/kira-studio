@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { cn } from '@theme/lib/utils';
 import { copyText } from '@workbench/util/clipboard';
 import { reactive } from 'vue';
 import type { DockerContainerDetail } from '../wire';
@@ -81,7 +83,7 @@ const rows = (): Array<[string, string]> => [
           <div
             v-for="(entry, i) in detail.env"
             :key="i"
-            class="group/env -mx-1 flex items-center gap-1 rounded-kira-sm px-1 font-data hover:bg-hover"
+            :class="cn(rowVariants({ layout: 'tree' }), 'group/env -mx-1 rounded-kira-sm pl-1 font-data')"
             data-testid="docker-env-row"
           >
             <span class="shrink-0 text-muted-foreground">{{ splitEnv(entry).key }}=</span>

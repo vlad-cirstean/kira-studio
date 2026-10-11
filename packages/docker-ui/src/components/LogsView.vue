@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SearchField from '@theme/components/SearchField.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Toggle } from '@theme/components/ui/toggle';
 import { useDebounceFn } from '@vueuse/core';
@@ -170,7 +171,7 @@ function clear(): void {
             <template v-for="(seg, i) in parseAnsi(l.text)" :key="i">
               <span :style="{ color: seg.color, background: seg.background }" :class="[seg.bold ? 'font-bold' : '', seg.faint ? 'opacity-70' : '']">
                 <template v-for="(part, j) in splitMatches(seg.text, needle)" :key="j">
-                  <mark v-if="part.match" class="bg-warn/40 text-inherit">{{ part.text }}</mark>
+                  <mark v-if="part.match" class="bg-search-match text-inherit">{{ part.text }}</mark>
                   <template v-else>{{ part.text }}</template>
                 </template>
               </span>
@@ -191,7 +192,7 @@ function clear(): void {
               <template v-for="(seg, i) in parseAnsi(visible[vi.index]!.text)" :key="i">
                 <span :style="{ color: seg.color, background: seg.background }" :class="[seg.bold ? 'font-bold' : '', seg.faint ? 'opacity-70' : '']">
                   <template v-for="(part, j) in splitMatches(seg.text, needle)" :key="j">
-                    <mark v-if="part.match" class="bg-warn/40 text-inherit">{{ part.text }}</mark>
+                    <mark v-if="part.match" class="bg-search-match text-inherit">{{ part.text }}</mark>
                     <template v-else>{{ part.text }}</template>
                   </template>
                 </span>
@@ -218,13 +219,19 @@ function clear(): void {
         Jump to latest
       </Button>
     </div>
-    <div
-      v-if="failure || ended"
-      class="shrink-0 border-t border-border bg-chrome px-2 py-0.5 text-kira-sm"
-      :class="failure || streamError ? 'text-error' : 'text-muted-foreground'"
+    <FieldError
+      v-if="failure || (ended && streamError)"
+      class="shrink-0 border-t border-border bg-chrome px-2 py-0.5"
       data-testid="docker-logs-ended"
     >
-      {{ failure || streamError || 'Container stopped' }}
+      {{ failure || streamError }}
+    </FieldError>
+    <div
+      v-else-if="ended"
+      class="shrink-0 border-t border-border bg-chrome px-2 py-0.5 text-kira-sm text-muted-foreground"
+      data-testid="docker-logs-ended"
+    >
+      Container stopped
     </div>
   </div>
 </template>

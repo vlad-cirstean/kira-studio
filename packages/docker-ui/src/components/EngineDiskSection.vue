@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useTimeAgo } from '@vueuse/core';
 import { computed } from 'vue';
 import { formatSize } from '../lib/format';
@@ -37,11 +39,12 @@ const sizeText = (n: number): string => (n < 0 ? '-' : formatSize(n));
   <DetailSection title="Disk" class="shrink-0">
     <template #actions>
       <span class="ml-auto flex items-center gap-1 normal-case tracking-normal">
-        <span
-          v-if="usage"
-          :title="new Date(usage.takenAt).toLocaleString()"
-          data-testid="docker-disk-taken"
-        >{{ ago }}</span>
+        <Tooltip v-if="usage">
+          <TooltipTrigger as-child>
+            <span data-testid="docker-disk-taken">{{ ago }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ new Date(usage.takenAt).toLocaleString() }}</TooltipContent>
+        </Tooltip>
         <TooltipIconButton
           icon="refresh"
           label="Measure disk usage"
@@ -52,10 +55,10 @@ const sizeText = (n: number): string => (n < 0 ? '-' : formatSize(n));
       </span>
     </template>
 
-    <p v-if="query.error.value" class="mb-2 text-error" data-testid="docker-disk-error">{{ query.error.value.message }}</p>
+    <FieldError v-if="query.error.value" class="mb-2" data-testid="docker-disk-error">{{ query.error.value.message }}</FieldError>
 
     <div v-if="measuring && !usage" class="flex items-center gap-2 text-muted-foreground">
-      <CodiconIcon name="loading" :size="12" class="codicon-modifier-spin" />Measuring…
+      <Spinner label="" />Measuring…
     </div>
     <div v-else-if="!usage" class="flex flex-wrap items-center gap-3 text-muted-foreground">
       <span>Not measured. Measuring scans the engine's storage and can take a while.</span>

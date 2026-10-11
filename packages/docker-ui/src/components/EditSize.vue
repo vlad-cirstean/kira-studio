@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { Switch } from '@theme/components/ui/switch';
 import { computed, ref } from 'vue';
 import { toNumber } from '../lib/editDiff';
 
@@ -40,7 +40,7 @@ function setAmount(v: string | number): void {
       <option value="GiB">GiB</option>
     </NativeSelect>
     <span v-if="allowUnlimited" class="flex items-center gap-1.5 text-muted-foreground">
-      <Switch
+      <Checkbox
         :model-value="unlimited"
         :disabled="disabled"
         :data-testid="`${testid}-unlimited`"
