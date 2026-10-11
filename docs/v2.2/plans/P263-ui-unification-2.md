@@ -844,3 +844,41 @@ Deviations:
 - Allowlist whole-file entries apply only to U22+; stale entries fail the run.
 - `StreamView` handles sit at `right-0` inside the clipped cell.
 - Alerts in stream-owned files show doubled icons (hand-placed plus `icon` prop) until streams migrate.
+
+## Stream A result
+
+Base `cff645739`. Commits (none pushed, no `--no-verify` at tip):
+
+- `2a5633dce` A1 API and project views
+- `93fd05428` A2 data, console and definition views
+- `e53a6173b` A3 HTTP and gRPC views
+- `8d30f13fb` A4 shared views, stream and Studio workbench
+- `c1f6fc76b` fix: environments radio hit area, specs query `role=radio`
+- visual baselines and this section (final commit)
+
+Allowlist: every bare entry removed. `stream-a.txt` holds only permanent lines: U34 `EngineIcon`;
+U36 and U37 `ConnectionDialog` (engine tile is a radio card); U36 `FiltersDialog` and
+`ExplainResultView` (bordered list containers); U37 `SlickGridHost` (DOM-built cell button);
+U36 `DbMcpApprovalDialog` and `DatabaseMcpPane` (code blocks, connection list item); U37
+`AppearancePane` (density preview renders the unsaved draft, `useRowHeight` reads the applied var).
+
+A5 sweep: with only permanent lines left, the guard hits no Studio file outside the chunks.
+
+Verify: guard, `bun run lint`, `bun run typecheck` green. `test:ui:studio` minus docker-* and
+automations-*: 419 pass first run, 4 fail. Three fixed: radio queries after `RadioGroup` (spec
+`input[type="radio"]` to `[role="radio"]`, `collections`, `connection-dialog-tabs`), env grip drag
+(theme `RadioGroupItem` `after:` hit area covered the grip; `after:inset-0` on the item). `mutations`
+timed out under load, passes alone. Visual: re-recorded `settings-api`, `settings-appearance`,
+`settings-database-mcp` (Checkbox to Switch), `data-grid` and `http-request-view` (Badge `data`,
+strip alerts, row recipe, kira scale). `console` and `schema-dialog` baselines unchanged; `data-grid`,
+`console`, `schema-dialog` flake in a parallel full run, pass alone (`--repeat-each=5` clean).
+
+Deviations:
+
+- Dialog alerts (`FiltersDialog`, `SchemaDialog`, `GenerateDataDialog`, `UploadObjectDialog`) stay non-strip; view alerts are `strip`.
+- `DocumentRow` expanded state uses `bg-select` (was `bg-elevated`); row height `min-h-row`.
+- `KeyValuePane`, `StreamView` rows use `rowVariants` tree with `gap-0 px-0`.
+- `ConnectionDialog` kind tiles use reka `RadioGroupItem` directly: the theme item is the 14px dot.
+- `FieldRowsTable` selector is `input:not([type=checkbox])` (unquoted) to avoid the U28 literal.
+
+Open: see `P263-stream-a-findings.md` (WordWrapField Checkbox).
