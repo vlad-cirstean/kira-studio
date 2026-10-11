@@ -1256,3 +1256,12 @@ Scope `D="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-s
 Implementation only; chunks A1..A5 committed on `p264-a`, no push. Allowlist `stream-a.txt` permanents only; guard green; typecheck and lint hook-green.
 Tests NOT run at stream end (coordinator change): `test:ui:studio`, `test:visual:studio` pending the serial testing agent. `test:unit` 1827 pass, 1 load-timeout flake (`beautify-depth`).
 Deviations, uncovered keyboard specs and failures seen: `P264-stream-a-findings.md`.
+
+## Stream B result
+
+Implementation only. Stream-end test suites NOT run to completion per coordinator; separate serial pass owns them.
+
+- Chunks: B1 `a849346a1` repo and workbench; B2 `7301d8b3e` ADE board and plan (+ `b12517d7f` tree sort test); B3 `65e8b9b6c` ADE panel, review, workflow; B4 `1c5a27c25` memory and mobile; B5 `25d0dccb2` keyboard-pass specs.
+- `stream-b.txt`: 8 `permanent` lines only, each with reason (U57/U62 RepoFileView, U62 RepoDiffView, U60 AdeDayBand, U40 AdeWorkflowGraph, U41 and U62 AdeNotesEditor, U46 AdeReviewCompose, U52 useAgentsModel).
+- Deviations and foundation gaps: `P264-stream-b-findings.md`.
+- Ran: unit 1828 pass; full ui 460/469 (9 repo-graph/workspace failures, refresh pair confirmed identical at base); mobile writes + touched ade/memory/list-keyboard specs pass. Mobile full and visual PNGs not run.
