@@ -188,7 +188,7 @@ async function send(): Promise<void> {
             </p>
           </div>
         </div>
-        <Alert v-if="error" variant="destructive" data-testid="ade-run-error">
+        <Alert v-if="error" variant="error" data-testid="ade-run-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
       </DialogBody>

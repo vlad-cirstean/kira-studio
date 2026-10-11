@@ -199,13 +199,13 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
     <template v-if="activeTimeline && activeTimeline.hops.length > 0">
       <!-- D15: a failed send's own partial timeline — the failure sentence names the phase the
            request never got past, from the same measured phases the hop below already shows. -->
-      <Alert v-if="failedTimeline" variant="destructive" data-testid="http-timeline-failure-note">
+      <Alert v-if="failedTimeline" variant="error" data-testid="http-timeline-failure-note">
         <AlertDescription>
           The request failed during {{ failurePhaseText(failedTimeline.hops[failedTimeline.hops.length - 1]) }}.
           The steps below are what completed before it did.
         </AlertDescription>
       </Alert>
-      <Alert v-else-if="viewingStored" variant="note" data-testid="http-timeline-stored-note">
+      <Alert v-else-if="viewingStored" variant="info" data-testid="http-timeline-stored-note">
         <AlertDescription>
           This timeline was recorded when the response was received.
         </AlertDescription>
@@ -243,7 +243,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(hop.status) }}</TooltipContent>
             </Tooltip>
-            <Badge v-else variant="err" data-testid="http-timeline-hop-failed-chip">
+            <Badge v-else variant="error" data-testid="http-timeline-hop-failed-chip">
               {{ hop.error || 'failed' }}
             </Badge>
           </div>

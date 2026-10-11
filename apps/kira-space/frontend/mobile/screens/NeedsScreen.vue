@@ -58,7 +58,7 @@ async function confirmTakeOver(): Promise<void> {
 <template>
   <section class="flex flex-col" data-testid="needs-screen">
     <p v-if="boardQuery.isPending.value" class="m-0 p-4 text-muted-foreground">Loading</p>
-    <Alert v-else-if="boardQuery.isError.value" variant="destructive" class="m-3 w-auto" data-testid="needs-error">
+    <Alert v-else-if="boardQuery.isError.value" variant="error" class="m-3 w-auto" data-testid="needs-error">
       Could not load the board.
     </Alert>
     <template v-else-if="model">

@@ -254,7 +254,7 @@ onUnmounted(() => {
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="http-response-pane">
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="http-send-error">
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="http-send-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
@@ -320,7 +320,7 @@ onUnmounted(() => {
       @close="closeFind"
     />
 
-    <Alert v-if="viewing" variant="note" data-testid="http-history-band">
+    <Alert v-if="viewing" variant="info" data-testid="http-history-band">
       <AlertDescription class="flex items-start gap-1.5">
         <span>
           Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
@@ -337,17 +337,17 @@ onUnmounted(() => {
         Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
       </AlertDescription>
     </Alert>
-    <Alert v-if="bodyStorageTruncated" variant="note" data-testid="http-history-truncated">
+    <Alert v-if="bodyStorageTruncated" variant="info" data-testid="http-history-truncated">
       <AlertDescription>
         Only the first 256 KB of this response was kept in history.
       </AlertDescription>
     </Alert>
-    <Alert v-if="requestFieldsElided" variant="note" data-testid="http-history-fields-elided">
+    <Alert v-if="requestFieldsElided" variant="info" data-testid="http-history-fields-elided">
       <AlertDescription>
         Request field values were not stored — too large for history.
       </AlertDescription>
     </Alert>
-    <Alert v-if="bodyNotStored" variant="note" data-testid="http-history-binary-note">
+    <Alert v-if="bodyNotStored" variant="info" data-testid="http-history-binary-note">
       <AlertDescription>
         This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
       </AlertDescription>

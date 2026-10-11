@@ -544,7 +544,7 @@ function onBulkClose(): void {
       class="flex flex-col gap-0.5 p-1 flex-1 min-h-0 overflow-y-auto"
       data-testid="variables-list"
     >
-      <Alert v-if="error" variant="destructive" data-testid="variables-error">
+      <Alert v-if="error" variant="error" data-testid="variables-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
       <Alert

@@ -131,7 +131,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       >
         {{ filteredRequestCookies.length }} of {{ requestCookies.length }} cookies
       </span>
-      <Alert v-if="requestError" variant="destructive" data-testid="http-cookies-error">
+      <Alert v-if="requestError" variant="error" data-testid="http-cookies-error">
         <AlertDescription>{{ requestError }}</AlertDescription>
       </Alert>
       <div v-if="requestCookies.length > 0" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">

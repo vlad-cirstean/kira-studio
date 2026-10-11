@@ -140,7 +140,7 @@ function run(): void {
       </DialogHeader>
 
       <DialogBody>
-        <Alert v-if="!script" variant="destructive" class="w-auto">
+        <Alert v-if="!script" variant="error" class="w-auto">
           <AlertDescription>This script no longer exists.</AlertDescription>
         </Alert>
         <template v-else>
@@ -183,14 +183,14 @@ function run(): void {
           />
 
           <RunPreview v-if="pv" :preview="pv" />
-          <Alert v-if="preview.isError.value" variant="destructive" class="w-auto" data-testid="run-preview-error">
+          <Alert v-if="preview.isError.value" variant="error" class="w-auto" data-testid="run-preview-error">
             <AlertDescription>{{ preview.error.value?.message }}</AlertDescription>
           </Alert>
           <span v-if="pv && pv.missing.length > 0" class="text-kira-sm text-error" data-testid="run-missing">
             Fill in: {{ pv.missing.join(', ') }}
           </span>
           <span v-if="pv?.blocker" class="text-kira-sm text-error" data-testid="run-blocker">{{ pv.blocker }}</span>
-          <Alert v-if="startError" variant="destructive" class="w-auto" data-testid="run-error">
+          <Alert v-if="startError" variant="error" class="w-auto" data-testid="run-error">
             <AlertDescription>{{ startError }}</AlertDescription>
           </Alert>
         </template>

@@ -176,7 +176,7 @@ function selectMethod(service: string, method: string): void {
       </div>
     </div>
 
-    <Alert v-if="error" variant="destructive" data-testid="grpc-schema-error">
+    <Alert v-if="error" variant="error" data-testid="grpc-schema-error">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
 

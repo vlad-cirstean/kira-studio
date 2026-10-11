@@ -54,7 +54,7 @@ const enabled = computed(() => smart.value.mcp.map((c) => c.server));
     <span v-if="servers.data.value?.length === 0" class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-none">
       No MCP servers.
     </span>
-    <Alert v-if="servers.isError.value" variant="destructive" class="w-auto">
+    <Alert v-if="servers.isError.value" variant="error" class="w-auto">
       <AlertDescription>{{ servers.error.value?.message }}</AlertDescription>
     </Alert>
     <div v-for="s in servers.data.value ?? []" :key="s.name" class="flex flex-col gap-1" data-testid="smart-mcp-server" :data-server="s.name">

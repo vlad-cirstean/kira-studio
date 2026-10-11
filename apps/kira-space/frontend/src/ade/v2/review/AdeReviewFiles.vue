@@ -50,7 +50,7 @@ onUnmounted(() => {
 
 <template>
   <div v-if="!errorMessage" ref="container" class="h-full w-full" data-testid="ade-review-files" />
-  <Alert v-else variant="note">
+  <Alert v-else variant="info">
     <AlertDescription>{{ errorMessage }}</AlertDescription>
   </Alert>
 </template>

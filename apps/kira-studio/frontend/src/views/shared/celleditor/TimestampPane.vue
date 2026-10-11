@@ -93,7 +93,7 @@ watch(calendarOpen, (open) => {
 
 <template>
   <div class="flex flex-col h-full min-h-0" data-testid="cell-editor-timestamp-pane">
-    <Alert class="shrink-0" variant="note" data-testid="cell-editor-timestamp">
+    <Alert class="shrink-0" variant="info" data-testid="cell-editor-timestamp">
       <AlertDescription class="flex items-center gap-1">
         <CodiconIcon name="clock" :size="13" />
         <template v-if="reading">

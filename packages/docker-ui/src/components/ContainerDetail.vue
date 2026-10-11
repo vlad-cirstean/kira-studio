@@ -67,7 +67,7 @@ const stateVariant = computed(() => {
     case 'restarting':
       return 'warn';
     case 'dead':
-      return 'err';
+      return 'error';
     default:
       return 'default';
   }

@@ -31,7 +31,7 @@ const canShowOperations = computed(() => props.notice.logged && props.showOperat
   <div class="shrink-0 p-1.5">
   <!-- biome-ignore lint/a11y/useSemanticElements: Alert's root is a themed div; role="region" only replaces its role="alert" -->
   <Alert
-    variant="destructive"
+    variant="error"
     role="region"
     aria-label="Last failure"
     data-testid="failure-banner"

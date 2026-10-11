@@ -38,11 +38,11 @@ const OUTLOOK_LABEL: Record<string, string> = {
   'not-saved': 'DataGrip did not save a password',
   'store-unsupported': 'password store not supported here',
 };
-const OUTLOOK_TONE: Record<string, 'ok' | 'warn' | 'err'> = {
+const OUTLOOK_TONE: Record<string, 'ok' | 'warn' | 'error'> = {
   'will-attempt': 'ok',
   'from-url': 'ok',
   'not-saved': 'warn',
-  'store-unsupported': 'err',
+  'store-unsupported': 'error',
 };
 
 const SKIP_LABEL: Record<string, (row: DataGripPreviewRow) => string> = {
@@ -92,8 +92,8 @@ const reportSummary = computed(() => {
   if (failed > 0) parts.push(`${failed} failed`);
   return parts.join(' — ');
 });
-const reportTone = computed<'note' | 'warn'>(() =>
-  (report.value?.rows.some((row) => !row.created) ?? false) ? 'warn' : 'note',
+const reportTone = computed<'info' | 'warn'>(() =>
+  (report.value?.rows.some((row) => !row.created) ?? false) ? 'warn' : 'info',
 );
 
 function skipLabel(row: DataGripPreviewRow): string {
@@ -121,8 +121,8 @@ function reportErrorLabel(row: DataGripReportRow): string {
   return detail ? `${label} (${detail})` : label;
 }
 
-function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'warn' | 'err' } {
-  if (!row.created) return { label: `Not created — ${reportErrorLabel(row)}`, tone: 'err' };
+function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'warn' | 'error' } {
+  if (!row.created) return { label: `Not created — ${reportErrorLabel(row)}`, tone: 'error' };
   if (row.passwordImported) return { label: 'Created — password imported', tone: 'ok' };
   if (row.error) return { label: `Created — ${reportErrorLabel(row)}`, tone: 'warn' };
   return { label: 'Created', tone: 'ok' };
@@ -154,7 +154,7 @@ async function onConfirm(): Promise<void> {
           {{ secretStatus.reason ?? 'Passwords cannot be saved on this machine, so every connection will import without one.' }}
         </AlertDescription>
       </Alert>
-      <Alert v-if="datagripImportStore.error" variant="destructive" data-testid="datagrip-import-error">
+      <Alert v-if="datagripImportStore.error" variant="error" data-testid="datagrip-import-error">
         <AlertDescription>{{ datagripImportStore.error }}</AlertDescription>
       </Alert>
 

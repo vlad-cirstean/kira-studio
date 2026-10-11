@@ -49,7 +49,7 @@ const emit = defineEmits<{ cancel: []; confirm: [] }>();
           {{ spec.dependents.join(', ') }} share this container's network and lose it until restarted.
         </AlertDescription>
       </Alert>
-      <Alert v-if="spec.origin === 'compose'" variant="note" data-testid="docker-edit-compose">
+      <Alert v-if="spec.origin === 'compose'" variant="info" data-testid="docker-edit-compose">
         <AlertDescription>
           Part of Compose project {{ spec.originName }}. Compose will see a different container.
         </AlertDescription>

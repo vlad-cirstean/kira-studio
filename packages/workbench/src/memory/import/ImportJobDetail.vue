@@ -74,10 +74,10 @@ async function discard(): Promise<void> {
         <Button v-if="job.state === 'done' || job.state === 'cancelled' || job.state === 'failed'" variant="toolbar" size="kira" data-testid="import-dismiss" @click="run('dismiss')">Dismiss</Button>
         <Button v-if="job.state !== 'running'" variant="toolbar" size="kira" data-testid="import-discard" @click="discard">Discard</Button>
       </div>
-      <Alert v-if="job.reason && (job.state === 'paused' || job.state === 'failed')" variant="destructive" data-testid="import-reason">
+      <Alert v-if="job.reason && (job.state === 'paused' || job.state === 'failed')" variant="error" data-testid="import-reason">
         <AlertDescription>{{ job.reason }}</AlertDescription>
       </Alert>
-      <Alert v-if="act.isError.value" variant="destructive" data-testid="import-action-error">
+      <Alert v-if="act.isError.value" variant="error" data-testid="import-action-error">
         <AlertDescription>{{ act.error.value?.message }}</AlertDescription>
       </Alert>
       <Progress v-if="job.state === 'running' || job.state === 'paused'" :model-value="percent" />

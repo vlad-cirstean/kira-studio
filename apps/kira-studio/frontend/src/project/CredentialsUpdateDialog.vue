@@ -54,7 +54,7 @@ function onOpenChange(open: boolean): void {
         <p v-if="live" class="m-0 text-kira-sm text-muted-foreground" data-testid="credentials-update-live-note">
           Reconnects the live connection.
         </p>
-        <Alert v-if="update.error.value" variant="destructive" data-testid="credentials-update-error">
+        <Alert v-if="update.error.value" variant="error" data-testid="credentials-update-error">
           <AlertDescription>{{ update.error.value.message }}</AlertDescription>
         </Alert>
       </DialogBody>

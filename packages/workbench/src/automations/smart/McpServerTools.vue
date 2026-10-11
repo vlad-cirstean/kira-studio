@@ -34,7 +34,7 @@ const extra = computed(() => props.chosen.filter((c) => !listed.value.some((t) =
 
 <template>
   <div class="ml-9 flex flex-col gap-1" data-testid="smart-mcp-tools">
-    <Alert v-if="tools.isError.value" variant="destructive" class="w-auto" data-testid="smart-mcp-error">
+    <Alert v-if="tools.isError.value" variant="error" class="w-auto" data-testid="smart-mcp-error">
       <AlertDescription>{{ tools.error.value?.message }}</AlertDescription>
     </Alert>
     <div v-for="t in listed" :key="t.name" class="flex items-start gap-1.5">

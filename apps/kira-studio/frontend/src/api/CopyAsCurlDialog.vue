@@ -23,7 +23,7 @@ const hasRevealedAny = computed(
   () => Object.keys(copyAsCurlStore.revealedSecretValues).length > 0,
 );
 
-const stripTone = computed<'note' | 'warn'>(() => (hasRevealedAny.value ? 'warn' : 'note'));
+const stripTone = computed<'info' | 'warn'>(() => (hasRevealedAny.value ? 'warn' : 'info'));
 // D10 step 5: "the strip says which names are still masked" — true whether nothing has been
 // revealed yet, or a reveal for one name succeeded while another was cancelled/errored/declined.
 const stripText = computed(() => {
@@ -103,7 +103,7 @@ function close(): void {
         {{ dynamicNote }}
       </div>
 
-      <Alert v-if="copyAsCurlStore.error" variant="destructive" data-testid="copy-as-curl-error">
+      <Alert v-if="copyAsCurlStore.error" variant="error" data-testid="copy-as-curl-error">
         <AlertDescription>{{ copyAsCurlStore.error }}</AlertDescription>
       </Alert>
       </DialogBody>

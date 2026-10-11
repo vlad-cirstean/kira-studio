@@ -96,7 +96,7 @@ function editEnvironmentVariables(): void {
     <div class="flex max-h-105 flex-col">
       <SearchField v-model="filterQuery" placeholder="Filter by name" data-testid="variables-overview-filter" />
 
-      <Alert v-if="copyError" variant="destructive" data-testid="variables-overview-copy-error">
+      <Alert v-if="copyError" variant="error" data-testid="variables-overview-copy-error">
         <AlertDescription>{{ copyError }}</AlertDescription>
       </Alert>
 

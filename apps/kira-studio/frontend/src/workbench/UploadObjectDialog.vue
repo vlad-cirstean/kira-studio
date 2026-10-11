@@ -124,7 +124,7 @@ watch(
           </Field>
         </template>
 
-        <Alert v-if="error" variant="destructive" data-testid="upload-error">
+        <Alert v-if="error" variant="error" data-testid="upload-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
       </DialogBody>

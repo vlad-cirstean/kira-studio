@@ -84,7 +84,7 @@ function close(): void {
         />
       </div>
 
-      <Alert v-if="preview.error" variant="destructive" data-testid="edit-raw-error">
+      <Alert v-if="preview.error" variant="error" data-testid="edit-raw-error">
         <AlertDescription>{{ preview.error }}</AlertDescription>
       </Alert>
       <template v-else>

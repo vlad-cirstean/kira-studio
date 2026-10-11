@@ -130,7 +130,7 @@ function run(): void {
       </DialogHeader>
 
       <DialogBody>
-        <Alert v-if="!script" variant="destructive" class="w-auto">
+        <Alert v-if="!script" variant="error" class="w-auto">
           <AlertDescription>This script no longer exists.</AlertDescription>
         </Alert>
         <template v-else>
@@ -146,14 +146,14 @@ function run(): void {
           </Field>
           <ParamsForm v-if="secretParams.length > 0" v-model="secrets" :params="secretParams" />
           <RunPreview v-if="pv" :preview="pv" />
-          <Alert v-if="preview.isError.value" variant="destructive" class="w-auto" data-testid="schedule-confirm-preview-error">
+          <Alert v-if="preview.isError.value" variant="error" class="w-auto" data-testid="schedule-confirm-preview-error">
             <AlertDescription>{{ preview.error.value?.message }}</AlertDescription>
           </Alert>
           <span v-if="pv && pv.missing.length > 0" class="text-kira-sm text-error" data-testid="schedule-confirm-missing">
             Fill in: {{ pv.missing.join(', ') }}
           </span>
           <span v-if="pv?.blocker" class="text-kira-sm text-error" data-testid="schedule-confirm-blocker">{{ pv.blocker }}</span>
-          <Alert v-if="error" variant="destructive" class="w-auto" data-testid="schedule-confirm-error">
+          <Alert v-if="error" variant="error" class="w-auto" data-testid="schedule-confirm-error">
             <AlertDescription>{{ error }}</AlertDescription>
           </Alert>
         </template>

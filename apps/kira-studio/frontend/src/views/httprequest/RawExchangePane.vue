@@ -88,10 +88,10 @@ const FIDELITY_TEXT: Readonly<Record<HttpWireFidelity, string>> = {
 };
 const fidelityText = computed(() => (wire.value ? FIDELITY_TEXT[wire.value.fidelity] : ''));
 // D3 calls for an "info" tone on 'exact' — MessageStrip's own vocabulary (warn/err/note, no
-// separate info) makes 'note' its informational tone (the same one the history viewing band uses),
+// separate info) makes 'info' its informational tone (the same one the history viewing band uses),
 // so 'exact' reuses it rather than widening a shared primitive for this one caller (§0.2/§3).
-const fidelityTone = computed<'note' | 'warn'>(() =>
-  wire.value?.fidelity === 'exact' ? 'note' : 'warn',
+const fidelityTone = computed<'info' | 'warn'>(() =>
+  wire.value?.fidelity === 'exact' ? 'info' : 'warn',
 );
 
 const maskingNote = computed(() => {
@@ -214,7 +214,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
         <Alert :variant="fidelityTone" data-testid="http-wire-fidelity">
           <AlertDescription>{{ fidelityText }}</AlertDescription>
         </Alert>
-        <Alert v-if="maskingNote" variant="note" data-testid="http-wire-masking-note">
+        <Alert v-if="maskingNote" variant="info" data-testid="http-wire-masking-note">
           <AlertDescription>{{ maskingNote }}</AlertDescription>
         </Alert>
       </template>
@@ -223,17 +223,17 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
            as one of P9 D3's three HttpWireFidelity values — a reconstruction is none of them — so
            this gets its own honest strip rather than a fourth, misleading fidelity value. -->
       <template v-else>
-        <Alert variant="note" data-testid="http-raw-reconstructed">
+        <Alert variant="info" data-testid="http-raw-reconstructed">
           <AlertDescription>
             Reconstructed from what this request was recorded as — not the exact bytes on the wire.
           </AlertDescription>
         </Alert>
-        <Alert v-if="requestBodyStorageTruncated" variant="note" data-testid="http-history-request-truncated">
+        <Alert v-if="requestBodyStorageTruncated" variant="info" data-testid="http-history-request-truncated">
           <AlertDescription>
             Only the first 256 KB of this request's body was kept in history.
           </AlertDescription>
         </Alert>
-        <Alert v-if="requestFieldsElided" variant="note" data-testid="http-history-request-fields-elided">
+        <Alert v-if="requestFieldsElided" variant="info" data-testid="http-history-request-fields-elided">
           <AlertDescription>
             Request field values were not stored — too large for history.
           </AlertDescription>
@@ -254,7 +254,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
               @click="section.onCopy"
             />
           </div>
-          <Alert v-if="section.noteBefore" variant="note" :data-testid="section.noteBeforeTestid">
+          <Alert v-if="section.noteBefore" variant="info" :data-testid="section.noteBeforeTestid">
             <AlertDescription>{{ section.noteBefore }}</AlertDescription>
           </Alert>
           <div class="flex-1 min-h-52 overflow-hidden rounded-kira border border-border">
@@ -267,7 +267,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
               :data-testid="section.editorTestid"
             />
           </div>
-          <Alert v-if="section.noteAfter" variant="note" :data-testid="section.noteAfterTestid">
+          <Alert v-if="section.noteAfter" variant="info" :data-testid="section.noteAfterTestid">
             <AlertDescription>{{ section.noteAfter }}</AlertDescription>
           </Alert>
         </div>

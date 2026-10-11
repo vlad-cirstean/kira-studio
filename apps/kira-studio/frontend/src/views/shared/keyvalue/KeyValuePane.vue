@@ -956,13 +956,13 @@ onUnmounted(() => {
         </div>
       </ViewToolbar>
 
-      <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="keyvalue-error">
+      <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="keyvalue-error">
         <AlertDescription>{{ rt.error.message }}</AlertDescription>
       </Alert>
       <!-- P43 F6/D7: a failed delete — the edit/add popovers already show their own failures
            inline (editError/objectSaveError/addError above); delete has no popover of its own
            to hold one, so it uses the shared per-tab field every other view's own strip does. -->
-      <Alert v-if="rt?.actionError" variant="destructive" data-testid="keyvalue-action-error">
+      <Alert v-if="rt?.actionError" variant="error" data-testid="keyvalue-action-error">
         <AlertDescription>{{ rt.actionError }}</AlertDescription>
       </Alert>
       <!-- P33 D4: an object over SINGLE_ROW_MAX_BYTES has no Body row at all — this is the

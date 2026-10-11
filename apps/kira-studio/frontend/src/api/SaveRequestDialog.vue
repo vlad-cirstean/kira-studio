@@ -98,7 +98,7 @@ function splitTarget(value: string): [string, string | null] {
           Create a collection first — a request needs somewhere to live.
         </AlertDescription>
       </Alert>
-      <Alert v-if="error" variant="destructive" data-testid="save-request-error">
+      <Alert v-if="error" variant="error" data-testid="save-request-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
       </DialogBody>

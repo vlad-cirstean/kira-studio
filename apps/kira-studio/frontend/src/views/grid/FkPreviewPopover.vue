@@ -156,8 +156,8 @@ onUnmounted(() => {
         <div v-if="state.status === 'loading'" class="flex items-center justify-center h-10 text-muted-foreground">
           <CodiconIcon name="loading" class="animate-spin" :size="12" />
         </div>
-        <Badge v-else-if="state.status === 'error'" variant="err">{{ state.message }}</Badge>
-        <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="note" data-testid="fk-preview-empty">
+        <Badge v-else-if="state.status === 'error'" variant="error">{{ state.message }}</Badge>
+        <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="info" data-testid="fk-preview-empty">
           <AlertDescription>No matching row in {{ tableLabel }}</AlertDescription>
         </Alert>
         <!-- `header-key` marker; look matches SlickGridHost header badges. -->

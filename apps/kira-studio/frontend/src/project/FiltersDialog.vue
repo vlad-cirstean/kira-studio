@@ -281,7 +281,7 @@ const connectionName = computed(
         </div>
       </section>
 
-      <Alert variant="note" class="self-stretch rounded-kira-sm border border-border" data-testid="filters-preview">
+      <Alert variant="info" class="self-stretch rounded-kira-sm border border-border" data-testid="filters-preview">
         <AlertDescription class="flex items-start gap-1.5">
           <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
           <span>
@@ -294,7 +294,7 @@ const connectionName = computed(
         Only cached nodes are listed here — expand more of the tree to include them.
       </span>
 
-      <Alert v-if="loadError || saveError" variant="destructive" class="self-stretch" data-testid="filters-error">
+      <Alert v-if="loadError || saveError" variant="error" class="self-stretch" data-testid="filters-error">
         <AlertDescription>{{ loadError ?? saveError }}</AlertDescription>
       </Alert>
       </DialogBody>

@@ -105,7 +105,7 @@ async function onClear(): Promise<void> {
       </Button>
     </ViewToolbar>
 
-    <Alert v-if="errorMessage" variant="destructive">
+    <Alert v-if="errorMessage" variant="error">
       <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
     <Empty v-else-if="entries.length === 0">

@@ -852,22 +852,22 @@ const statusLine = computed(() => {
       <div class="flex items-center gap-1.5 min-w-0"></div>
     </ViewToolbar>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="console-error">
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="console-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
-    <Alert v-if="formatError" variant="destructive" data-testid="console-format-error">
+    <Alert v-if="formatError" variant="error" data-testid="console-format-error">
       <AlertDescription>{{ formatError }}</AlertDescription>
     </Alert>
     <Alert v-if="formatWarning" variant="warn" data-testid="console-format-warning">
       <AlertDescription>{{ formatWarning }}</AlertDescription>
     </Alert>
-    <Alert v-if="formatNote" variant="note" data-testid="console-format-note">
+    <Alert v-if="formatNote" variant="info" data-testid="console-format-note">
       <AlertDescription>{{ formatNote }}</AlertDescription>
     </Alert>
-    <Alert v-if="connectError" variant="destructive" data-testid="console-connect-error">
+    <Alert v-if="connectError" variant="error" data-testid="console-connect-error">
       <AlertDescription>{{ connectError }}</AlertDescription>
     </Alert>
-    <Alert v-if="explainError" variant="destructive" data-testid="console-explain-error">
+    <Alert v-if="explainError" variant="error" data-testid="console-explain-error">
       <AlertDescription>{{ explainError }}</AlertDescription>
     </Alert>
     <!-- P18 D19: warns, never blocks — the query underneath this strip already ran (or is

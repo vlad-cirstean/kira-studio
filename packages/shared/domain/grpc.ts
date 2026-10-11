@@ -105,12 +105,12 @@ export const GRPC_CODE_NAMES: Readonly<Record<number, string>> = {
 
 /** D14: the status chip's colour — OK is 'ok', a handful of "try again"-shaped codes are 'warn',
  *  everything else (including Canceled, which the app itself only ever produces via Stop) is
- *  'err'. Mirrors statusClass's own four-value vocabulary (domain/http.ts) over .p-chip's existing
+ *  'error'. Mirrors statusClass's own four-value vocabulary (domain/http.ts) over .p-chip's existing
  *  ok/warn/err/info variants (P2 F17) — no new colour token (F23). */
-export function grpcCodeClass(code: number): 'info' | 'ok' | 'warn' | 'err' {
+export function grpcCodeClass(code: number): 'info' | 'ok' | 'warn' | 'error' {
   if (code === 0) return 'ok';
   if (code === 4 || code === 8 || code === 14) return 'warn'; // DeadlineExceeded/ResourceExhausted/Unavailable
-  return 'err';
+  return 'error';
 }
 
 /** P4 D16's exact reason, applied to gRPC (D12): the collections tree's own row needs a class for
@@ -122,7 +122,7 @@ export function grpcCodeClass(code: number): 'info' | 'ok' | 'warn' | 'err' {
  *  in favour of `httpMethodToken`'s own seven-plus-'other' vocabulary for HTTP methods
  *  specifically; a gRPC call has no per-verb distinction to colour-code at all, so this stays on
  *  the plain status palette rather than adopting that new one). */
-export function grpcMethodClass(_method: string): 'info' | 'ok' | 'warn' | 'err' {
+export function grpcMethodClass(_method: string): 'info' | 'ok' | 'warn' | 'error' {
   return 'info';
 }
 

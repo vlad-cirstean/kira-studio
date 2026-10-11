@@ -123,7 +123,7 @@ const saveCurrent = (): Promise<void> =>
     </template>
     <template #footer>
       <Separator class="my-1" />
-      <Alert v-if="error" variant="destructive" data-testid="console-saved-error">
+      <Alert v-if="error" variant="error" data-testid="console-saved-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
       <!-- text-primary not text-hover: hover reads --kira-hover (grey); --primary maps to

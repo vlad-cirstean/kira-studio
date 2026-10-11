@@ -486,11 +486,11 @@ export function statusHint(status: number): string {
   return 'unrecognised status code';
 }
 
-export function statusClass(status: number): 'info' | 'ok' | 'warn' | 'err' {
+export function statusClass(status: number): 'info' | 'ok' | 'warn' | 'error' {
   if (status >= 100 && status < 200) return 'info';
   if (status >= 200 && status < 300) return 'ok';
   if (status >= 300 && status < 400) return 'warn';
-  return 'err';
+  return 'error';
 }
 
 // P4 D16, P17 D19: statusClass's exact sibling, in its exact home. Three surfaces need the same

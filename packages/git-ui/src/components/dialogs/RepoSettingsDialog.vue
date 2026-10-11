@@ -300,7 +300,7 @@ async function save(): Promise<void> {
           </Field>
         </FieldSet>
 
-        <Alert v-if="saveError" variant="destructive">
+        <Alert v-if="saveError" variant="error">
           <AlertDescription>Couldn't save settings — {{ saveError }}</AlertDescription>
         </Alert>
       </DialogBody>

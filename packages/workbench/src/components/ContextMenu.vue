@@ -80,7 +80,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                   <TooltipTrigger as-child>
                     <DropdownMenuItem
                       :disabled="sub.type === 'item' && !!sub.disabled"
-                      :variant="sub.type === 'item' && sub.danger ? 'destructive' : 'default'"
+                      :variant="sub.type === 'item' && sub.danger ? 'danger' : 'default'"
                       :class="sub.type === 'item' && sub.hint && HINT_WHEN_DISABLED"
                       :data-testid="`menu-item-${sub.id}`"
                       @select="sub.type === 'item' && onItemClick(sub)"
@@ -125,7 +125,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
           <TooltipTrigger as-child>
             <DropdownMenuItem
               :disabled="!!item.disabled"
-              :variant="item.danger ? 'destructive' : 'default'"
+              :variant="item.danger ? 'danger' : 'default'"
               :class="item.hint && HINT_WHEN_DISABLED"
               :data-testid="`menu-item-${item.id}`"
               @select="onItemClick(item)"

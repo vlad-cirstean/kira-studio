@@ -81,7 +81,7 @@ function close(): void {
       </DialogHeader>
       <DialogBody class="gap-1.5">
       <SearchField v-model="filterQuery" size="kira-lg" placeholder="Filter" data-testid="dynamic-values-filter" />
-      <Alert v-if="error" variant="destructive" data-testid="dynamic-values-error">
+      <Alert v-if="error" variant="error" data-testid="dynamic-values-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
       <Empty

@@ -278,7 +278,7 @@ function onForcePush(row: BranchRowModel): void {
 
 <template>
   <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg" data-testid="ade-plan">
-    <Alert v-if="boardQuery.isError.value" variant="destructive" class="m-3 w-auto" data-testid="ade-board-error">
+    <Alert v-if="boardQuery.isError.value" variant="error" class="m-3 w-auto" data-testid="ade-board-error">
       <AlertTitle>Couldn't load the board</AlertTitle>
       <AlertDescription>{{ (boardQuery.error.value as Error | null)?.message }}</AlertDescription>
       <Button variant="dialog" size="kira" class="mt-2" @click="() => boardQuery.refetch()">Retry</Button>
@@ -297,7 +297,7 @@ function onForcePush(row: BranchRowModel): void {
         <AdeHistoryBar v-if="inHistory" @go-to-date="onGoToDate" @hide="hideHistory" @current="scrollToDay(0)" />
       </div>
       <div class="px-4 pb-4 pt-3">
-      <Alert v-if="setPlan.isError.value" variant="destructive" class="mb-2" data-testid="ade-plan-error">
+      <Alert v-if="setPlan.isError.value" variant="error" class="mb-2" data-testid="ade-plan-error">
         <AlertDescription class="flex items-center gap-2">
           <span class="flex-1">{{ (setPlan.error.value as Error | null)?.message }}</span>
           <Button variant="link" size="kira" @click="setPlan.reset()">Dismiss</Button>

@@ -87,7 +87,7 @@ function select(id: string): void {
         <DialogTitle>Add memory</DialogTitle>
       </DialogHeader>
       <DialogBody>
-        <Alert v-if="store.isError.value" variant="destructive" data-testid="add-memory-error">
+        <Alert v-if="store.isError.value" variant="error" data-testid="add-memory-error">
           <AlertDescription>{{ store.error.value?.message }}</AlertDescription>
         </Alert>
 

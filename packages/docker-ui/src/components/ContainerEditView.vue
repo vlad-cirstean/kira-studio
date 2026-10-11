@@ -155,12 +155,12 @@ const originNotice = computed(() => {
           This container is managed by {{ base.managed === 'kubernetes' ? 'Kubernetes' : 'Swarm' }}. Edit the workload instead; the orchestrator replaces edited containers.
         </AlertDescription>
       </Alert>
-      <Alert v-if="originNotice" variant="note" data-testid="docker-edit-origin">
+      <Alert v-if="originNotice" variant="info" data-testid="docker-edit-origin">
         <AlertDescription class="flex items-center gap-2">
           <OriginIcon :origin="base.origin" :name="base.originName" />{{ originNotice }}
         </AlertDescription>
       </Alert>
-      <Alert v-if="base.autoRemove" variant="note" data-testid="docker-edit-autoremove">
+      <Alert v-if="base.autoRemove" variant="info" data-testid="docker-edit-autoremove">
         <AlertDescription>Auto-remove container: it cannot be recreated, and its restart policy cannot change.</AlertDescription>
       </Alert>
       <Alert v-if="draft.stale" variant="warn" data-testid="docker-edit-stale">
@@ -169,7 +169,7 @@ const originNotice = computed(() => {
           <Button size="kira" variant="toolbar" data-testid="docker-edit-reload" @click="reload">Reload</Button>
         </AlertDescription>
       </Alert>
-      <Alert v-if="failure" variant="destructive" data-testid="docker-edit-error">
+      <Alert v-if="failure" variant="error" data-testid="docker-edit-error">
         <AlertDescription>
           {{ failure.message }}
           <template v-if="failure.code === 'E_RECREATE_FAILED' && failure.restored"> The original container was restored.</template>

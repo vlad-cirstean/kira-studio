@@ -232,7 +232,7 @@ onUnmounted(() => {
       </DialogHeader>
       <DialogBody flush>
     <div v-if="loadingSnapshots" class="p-2 text-kira-sm text-subtle">Loading…</div>
-    <Alert v-else-if="loadError" variant="destructive"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
+    <Alert v-else-if="loadError" variant="error"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
     <div v-else-if="snapA && snapB" class="flex h-full min-h-0 flex-col">
       <div class="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5" data-testid="http-diff-summary">
         <div class="flex flex-col gap-0.5">
@@ -319,7 +319,7 @@ onUnmounted(() => {
         </details>
       </div>
 
-      <Alert v-if="!bothStored" variant="note" data-testid="http-diff-not-comparable">
+      <Alert v-if="!bothStored" variant="info" data-testid="http-diff-not-comparable">
         <AlertDescription>
           At least one response's body was not kept in history, so it can't be compared.
         </AlertDescription>

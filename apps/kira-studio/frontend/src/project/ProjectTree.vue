@@ -282,7 +282,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
     </div>
     <Alert
       v-if="treeStore.searchIncomplete"
-      variant="note"
+      variant="info"
       data-testid="search-incomplete-note"
     >
       <AlertDescription>

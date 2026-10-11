@@ -337,11 +337,11 @@ onMounted(() => {
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
           <div class="flex w-full font-ui"><SearchField :model-value="filterText" placeholder="Filter" data-testid="browse-filter" @update:model-value="(v: string | number) => (filterText = String(v))" /></div>
         </div>
-        <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="browse-error">
+        <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="browse-error">
           <AlertDescription>{{ rt.error.message }}</AlertDescription>
         </Alert>
         <!-- P43 F6/D7: a failed delete from this level, distinct from a failed load above. -->
-        <Alert v-if="rt?.actionError" variant="destructive" data-testid="browse-action-error">
+        <Alert v-if="rt?.actionError" variant="error" data-testid="browse-action-error">
           <AlertDescription>{{ rt.actionError }}</AlertDescription>
         </Alert>
         <!-- P43 iter2 F16/D23: the adapter's own round budget cut this level's listing short —

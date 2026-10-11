@@ -6,28 +6,31 @@ export { default as AlertAction } from '@theme/components/ui/alert/AlertAction.v
 export { default as AlertDescription } from '@theme/components/ui/alert/AlertDescription.vue';
 export { default as AlertTitle } from '@theme/components/ui/alert/AlertTitle.vue';
 
+// P263 §2.7: two-column grid (tone icon, content). Banner tint /10 on fill, /20 on border; text uses
+// the tone's readable token (`warn-text`, `note-text` for info). A grid block fills its row, so no
+// width class; spacing between blocks belongs to the parent.
 export const alertVariants = cva(
-  'grid gap-0.5 rounded-kira border px-2.5 py-2 text-left text-kira-md has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*=size-])]:size-4 group/alert relative w-full',
+  'group/alert relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-0.5 rounded-kira border px-2.5 py-2 text-left text-kira-md has-data-[slot=alert-action]:pr-18 *:col-start-2 *:data-[slot=alert-icon]:col-start-1 *:data-[slot=alert-icon]:row-start-1',
   {
     variants: {
       variant: {
-        default: 'bg-elevated text-fg',
-        destructive:
-          'text-error bg-elevated *:data-[slot=alert-description]:text-error/90 *:[svg]:text-current',
-        // P108 F15: `warn`/`note` fold in the `.strip-warn`/`.strip-note` (+ `-text`) tone classes
-        // that used to be hand-copied, byte-for-byte, into 12 separate `<style scoped>` blocks
-        // (ImportReportStrip.vue's own D16 comment named it "the same tone vocabulary
-        // RawExchangePane.vue's own dynamic-tone strip uses" — it was never actually shared code,
-        // just a convention). Same tokens, same destructive-style
-        // `*:data-[slot=alert-description]:…` targeting.
-        warn: 'bg-warn/10 border-warn/20 *:data-[slot=alert-description]:text-warn-text *:[svg]:text-current',
-        note: 'bg-info/8 border-info/20 *:data-[slot=alert-description]:text-note-text *:[svg]:text-current',
+        error:
+          'bg-error/10 border-error/20 text-error *:data-[slot=alert-description]:text-error *:data-[slot=alert-icon]:text-error',
+        warn: 'bg-warn/10 border-warn/20 text-warn-text *:data-[slot=alert-description]:text-warn-text *:data-[slot=alert-icon]:text-warn',
+        info: 'bg-info/10 border-info/20 text-note-text *:data-[slot=alert-description]:text-note-text *:data-[slot=alert-icon]:text-info',
+      },
+      strip: {
+        true: 'rounded-none border-x-0 border-t-0',
+        false: '',
       },
     },
     defaultVariants: {
-      variant: 'default',
+      variant: 'info',
+      strip: false,
     },
   },
 );
 
 export type AlertVariants = VariantProps<typeof alertVariants>;
+
+export const ALERT_ICONS = { error: 'error', warn: 'warning', info: 'info' } as const;

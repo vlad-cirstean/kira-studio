@@ -255,7 +255,7 @@ function onClose(): void {
           </Field>
 
           <template v-if="preflight">
-            <Alert v-for="blocker in preflight.blockers" :key="blocker.kind" variant="destructive"><AlertDescription>
+            <Alert v-for="blocker in preflight.blockers" :key="blocker.kind" variant="error"><AlertDescription>
               <template v-if="blocker.kind === 'invalidPath'">The path is invalid.</template>
               <template v-else-if="blocker.kind === 'pathExists'">
                 <code class="font-data">{{ blocker.path }}</code> already exists.

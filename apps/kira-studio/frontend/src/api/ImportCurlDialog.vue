@@ -61,7 +61,7 @@ onMounted(() => {
         data-testid="import-curl-textarea"
       />
 
-      <Alert v-if="preview.error" variant="destructive" data-testid="import-curl-error">
+      <Alert v-if="preview.error" variant="error" data-testid="import-curl-error">
         <AlertDescription>{{ preview.error }}</AlertDescription>
       </Alert>
       <template v-else-if="text.trim() !== ''">

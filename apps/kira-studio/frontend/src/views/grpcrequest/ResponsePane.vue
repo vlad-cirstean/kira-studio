@@ -265,7 +265,7 @@ onUnmounted(() => {
   <div class="flex h-full min-h-0 flex-col" data-testid="grpc-response-pane">
     <Alert
       v-if="rt?.status === 'error' && rt.error"
-      variant="destructive"
+      variant="error"
       data-testid="grpc-call-error"
     >
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
@@ -312,7 +312,7 @@ onUnmounted(() => {
          restatement of the code, so it stays on its own line free to wrap. -->
     <div v-if="statusMessage" class="text-kira-sm text-subtle px-1.5 pt-0 pb-1" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
-    <Alert v-if="viewing" variant="note" data-testid="grpc-history-band">
+    <Alert v-if="viewing" variant="info" data-testid="grpc-history-band">
       <AlertDescription class="flex items-center gap-3">
         Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}
         <Button
@@ -331,7 +331,7 @@ onUnmounted(() => {
          actually fills Messages/MessageCount in. -->
     <Alert
       v-if="viewing?.snapshot.messagesElided"
-      variant="note"
+      variant="info"
       data-testid="grpc-history-messages-elided"
     >
       <AlertDescription>
@@ -344,7 +344,7 @@ onUnmounted(() => {
          surface for requestMessageTruncated. -->
     <Alert
       v-if="requestMessageTruncated"
-      variant="note"
+      variant="info"
       data-testid="grpc-request-message-truncated"
     >
       <AlertDescription>
@@ -352,7 +352,7 @@ onUnmounted(() => {
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="metadataElided" variant="note" data-testid="grpc-history-metadata-elided">
+    <Alert v-if="metadataElided" variant="info" data-testid="grpc-history-metadata-elided">
       <AlertDescription>
         Metadata, headers and trailers were not stored — too large for history.
       </AlertDescription>
@@ -365,7 +365,7 @@ onUnmounted(() => {
     </Alert>
 
     <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
-    <Alert v-if="liveMessagesElided" variant="note" data-testid="grpc-live-messages-elided">
+    <Alert v-if="liveMessagesElided" variant="info" data-testid="grpc-live-messages-elided">
       <AlertDescription>
         Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
       </AlertDescription>

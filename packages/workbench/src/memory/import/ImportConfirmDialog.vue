@@ -54,11 +54,11 @@ async function dismiss(): Promise<void> {
         <DialogTitle>Import documents</DialogTitle>
       </DialogHeader>
       <DialogBody class="text-kira-md">
-        <Alert v-if="act.isError.value" variant="destructive" data-testid="import-confirm-error">
+        <Alert v-if="act.isError.value" variant="error" data-testid="import-confirm-error">
           <AlertDescription>{{ act.error.value?.message }}</AlertDescription>
         </Alert>
         <p v-if="scanning" class="m-0 text-muted-foreground" data-testid="import-scanning">Scanning…</p>
-        <Alert v-else-if="failed" variant="destructive">
+        <Alert v-else-if="failed" variant="error">
           <AlertDescription>{{ job?.reason }}</AlertDescription>
         </Alert>
         <p v-else-if="empty" class="m-0" data-testid="import-nothing">

@@ -144,7 +144,7 @@ async function onSave(): Promise<void> {
           @update:doc="onDocChange"
         />
       </div>
-      <Alert variant="note" class="self-stretch rounded-kira-sm border border-border" data-testid="schema-parse-summary">
+      <Alert variant="info" class="self-stretch rounded-kira-sm border border-border" data-testid="schema-parse-summary">
         <AlertDescription>
           <span v-if="parseSummary">{{ parseSummary }}</span>
           <span v-else class="text-subtle text-kira-sm">

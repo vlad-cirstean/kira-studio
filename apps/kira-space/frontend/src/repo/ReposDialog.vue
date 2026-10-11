@@ -160,7 +160,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
         </nav>
 
         <section class="flex min-w-0 flex-1 flex-col overflow-y-auto">
-          <Alert v-if="error" variant="destructive" class="m-3 w-auto" data-testid="repos-dialog-error">
+          <Alert v-if="error" variant="error" class="m-3 w-auto" data-testid="repos-dialog-error">
             <AlertDescription>{{ error }}</AlertDescription>
           </Alert>
           <template v-if="showRepos">

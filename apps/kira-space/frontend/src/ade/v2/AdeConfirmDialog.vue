@@ -55,7 +55,7 @@ async function onYes(): Promise<void> {
       </DialogHeader>
       <DialogBody>
         <p v-if="text" class="m-0">{{ text }}</p>
-        <Alert v-if="error" variant="destructive" data-testid="ade-confirm-error">
+        <Alert v-if="error" variant="error" data-testid="ade-confirm-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
       </DialogBody>

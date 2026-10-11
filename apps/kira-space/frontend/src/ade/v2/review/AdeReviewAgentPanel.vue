@@ -85,7 +85,7 @@ async function focus(): Promise<void> {
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="ade-review-agent">
-    <Alert v-if="note" variant="note" class="m-2" data-testid="ade-review-note">
+    <Alert v-if="note" variant="info" class="m-2" data-testid="ade-review-note">
       <AlertDescription>{{ note }}</AlertDescription>
     </Alert>
     <template v-if="session && running && view">

@@ -35,7 +35,7 @@ const message = computed(() => {
       memory_history tools and the /mcp__kira-memory__remember command. The Claude Code CLI must be on
       PATH for the store check to run.
     </FieldDescription>
-    <Alert v-if="status.isError.value" variant="destructive">
+    <Alert v-if="status.isError.value" variant="error">
       <AlertDescription>{{ status.error.value?.message }}</AlertDescription>
     </Alert>
     <p

@@ -245,7 +245,7 @@ useEventListener(listEl, 'keydown', (e) => {
       </div>
     </ViewToolbar>
 
-    <Alert v-if="variablesStore.error" variant="destructive" data-testid="environments-error">
+    <Alert v-if="variablesStore.error" variant="error" data-testid="environments-error">
       <AlertDescription class="flex items-start gap-1.5">
         <div class="flex-1">{{ variablesStore.error }}</div>
         <Button

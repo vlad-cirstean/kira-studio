@@ -1228,7 +1228,7 @@ const preconnectText = computed({
             </Alert>
             <Alert
               v-else-if="secretStatus"
-              variant="destructive"
+              variant="error"
               data-testid="connection-credential-note"
             >
               <AlertDescription>
@@ -1259,7 +1259,7 @@ const preconnectText = computed({
             <TooltipTrigger as-child>
               <Badge
                 class="overflow-hidden text-ellipsis whitespace-nowrap"
-                :variant="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
+                :variant="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'error' : 'info'"
                 data-testid="connection-test-result"
               >
                 {{

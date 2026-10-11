@@ -339,7 +339,7 @@ function onSequenceStartChange(index: number, start: number): void {
         </div>
       </div>
 
-      <Alert v-if="runError" variant="destructive" data-testid="generate-data-error">
+      <Alert v-if="runError" variant="error" data-testid="generate-data-error">
         <CodiconIcon name="warning" :size="13" />
         <AlertDescription>{{ runError }}</AlertDescription>
       </Alert>

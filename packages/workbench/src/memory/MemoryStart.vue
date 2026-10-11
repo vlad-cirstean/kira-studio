@@ -30,7 +30,7 @@ function when(iso: string): string {
 <template>
   <ImportView v-if="imports.view === 'imports'" />
   <div v-else class="h-full overflow-y-auto" data-testid="memory-start">
-    <Alert v-if="history.isError.value" variant="destructive" class="m-3 w-auto">
+    <Alert v-if="history.isError.value" variant="error" class="m-3 w-auto">
       <AlertDescription>{{ history.error.value?.message }}</AlertDescription>
     </Alert>
     <Empty v-else-if="!selectedId" class="h-full" data-testid="memory-detail-empty">

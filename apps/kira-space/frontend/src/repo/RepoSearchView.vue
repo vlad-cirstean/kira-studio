@@ -144,12 +144,12 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
          than on AlertDescription itself: the note variant's own
          `*:data-[slot=alert-description]:text-note-text` selector out-specifies a bare class on
          that same [data-slot] element. -->
-    <Alert v-if="error" variant="note" data-testid="repo-search-error">
+    <Alert v-if="error" variant="info" data-testid="repo-search-error">
       <AlertDescription><span class="text-error">{{ error }}</span></AlertDescription>
     </Alert>
     <Alert
       v-else-if="statusLine"
-      variant="note"
+      variant="info"
       class="mt-0 mx-2 mb-1"
       data-testid="repo-search-status"
     >

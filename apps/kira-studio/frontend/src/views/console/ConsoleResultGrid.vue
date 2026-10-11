@@ -337,7 +337,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 
 <template>
   <div class="h-full min-h-0 flex flex-col text-kira-md font-data" data-testid="console-result-grid">
-    <Alert v-if="copyError" variant="destructive" data-testid="console-copy-error">
+    <Alert v-if="copyError" variant="error" data-testid="console-copy-error">
       <AlertDescription>{{ copyError }}</AlertDescription>
     </Alert>
     <div v-if="!page || page.rowCount === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm">{{ page ? 'No rows' : '' }}</div>

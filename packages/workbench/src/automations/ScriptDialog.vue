@@ -215,7 +215,7 @@ function onOpenAutoFocus(e: Event): void {
               {{ item.label }}
               <Badge
                 v-if="tabErrorCount(errors, item.value as EditorTab) > 0"
-                variant="err"
+                variant="error"
                 :data-testid="`script-dialog-tab-${item.value}-errors`"
                 >{{ tabErrorCount(errors, item.value as EditorTab) }}</Badge
               >

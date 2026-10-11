@@ -6,7 +6,7 @@ defineProps<{ what: string }>();
 </script>
 
 <template>
-  <Alert variant="note" class="m-3 w-auto" data-testid="permission-hint">
+  <Alert variant="info" class="m-3 w-auto" data-testid="permission-hint">
     <AlertDescription>
       {{ what }} To allow it, open Settings > Mobile access in Kira Space on the computer.
     </AlertDescription>

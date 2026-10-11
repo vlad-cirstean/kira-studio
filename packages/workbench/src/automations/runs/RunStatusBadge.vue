@@ -10,7 +10,7 @@ const props = defineProps<{ state: ScriptRunState }>();
 const VARIANT: Record<ScriptRunState, NonNullable<BadgeVariants['variant']>> = {
   running: 'info',
   done: 'ok',
-  failed: 'err',
+  failed: 'error',
   cancelled: 'default',
   blocked: 'warn',
   waiting: 'warn',

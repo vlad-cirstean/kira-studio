@@ -135,7 +135,7 @@ async function onClear(): Promise<void> {
         Clear history
       </Button>
     </ViewToolbar>
-    <Alert v-if="errorMessage" variant="destructive" data-testid="http-history-error">
+    <Alert v-if="errorMessage" variant="error" data-testid="http-history-error">
       <AlertDescription>{{ errorMessage }}</AlertDescription>
     </Alert>
 

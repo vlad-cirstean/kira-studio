@@ -476,7 +476,7 @@ onUnmounted(() => {
         :order="1"
         @resize="onResizeRequestPane"
       >
-        <Alert v-if="beautifyError && tab.state.requestPane === 'message'" variant="destructive" data-testid="grpc-beautify-error">
+        <Alert v-if="beautifyError && tab.state.requestPane === 'message'" variant="error" data-testid="grpc-beautify-error">
           <AlertDescription>{{ beautifyError }}</AlertDescription>
         </Alert>
         <MonacoHost

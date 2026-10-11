@@ -21,7 +21,7 @@ const collectionsStore = useCollectionsStore();
 // vocabulary RawExchangePane.vue's own dynamic-tone strip uses.
 const report = computed(() => collectionsStore.report);
 
-const tone = computed(() => ((report.value?.warnings.length ?? 0) > 0 ? 'warn' : 'note'));
+const tone = computed(() => ((report.value?.warnings.length ?? 0) > 0 ? 'warn' : 'info'));
 
 const summary = computed(() => {
   const r = report.value;
@@ -72,7 +72,7 @@ function plural(n: number, noun: string): string {
        let its own failure throw uncaught from a fire-and-forget `void` call — nothing told the
        user why a row didn't change. `variant="destructive"` mirrors the existing pattern
        VariableSetView.vue/BulkVariablesEditor.vue already use for their own store-level errors. -->
-  <Alert v-if="collectionsStore.error" variant="destructive" data-testid="collections-error">
+  <Alert v-if="collectionsStore.error" variant="error" data-testid="collections-error">
     <AlertDescription class="flex items-start gap-1.5">
       <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.error }}</div>
       <TooltipIconButton
@@ -89,7 +89,7 @@ function plural(n: number, noun: string): string {
        clears itself once the query's own retry/next refetch succeeds. -->
   <Alert
     v-if="collectionsStore.treeLoadError"
-    variant="destructive"
+    variant="error"
     data-testid="collections-tree-load-error"
   >
     <AlertDescription>{{ collectionsStore.treeLoadError }}</AlertDescription>

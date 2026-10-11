@@ -58,7 +58,7 @@ const notice = computed(() => {
     </template>
 
     <template v-else>
-      <Alert v-if="notice" variant="destructive" data-testid="pair-notice">{{ notice }}</Alert>
+      <Alert v-if="notice" variant="error" data-testid="pair-notice">{{ notice }}</Alert>
       <div class="flex flex-col gap-1">
         <Label :for="labelId">Name this phone</Label>
         <Input :id="labelId" v-model="label" maxlength="64" autocomplete="off" data-testid="pair-label" />

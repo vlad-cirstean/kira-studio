@@ -968,12 +968,12 @@ onUnmounted(() => {
       </Tooltip>
     </ViewToolbar>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="document-error">
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="document-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
     <!-- P43 F6/D7: a failed insert/edit/delete, distinct from a failed load above — the list
          is still showing a perfectly valid page, only the write was refused. -->
-    <Alert v-if="rt?.actionError" variant="destructive" data-testid="document-action-error">
+    <Alert v-if="rt?.actionError" variant="error" data-testid="document-action-error">
       <AlertDescription>{{ rt.actionError }}</AlertDescription>
     </Alert>
     <!-- Below the filter/sort row, above the list it searches — views/shared/page/SearchToolbar.vue's own

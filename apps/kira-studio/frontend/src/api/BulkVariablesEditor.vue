@@ -141,7 +141,7 @@ function onCancel(): void {
 
 <template>
   <div class="flex h-full min-h-0 flex-col gap-1 px-1.5 py-1" data-testid="variables-bulk-editor">
-    <Alert variant="note" data-testid="variables-bulk-hint">
+    <Alert variant="info" data-testid="variables-bulk-hint">
       <AlertDescription>
         Bulk edit cannot create or remove the secret flag on a row — a new <code>KEY=value</code>
         line always creates a non-secret variable, and a secret's own line stays
@@ -160,7 +160,7 @@ function onCancel(): void {
       />
     </div>
 
-    <Alert v-if="parseError" variant="destructive" data-testid="variables-bulk-error">
+    <Alert v-if="parseError" variant="error" data-testid="variables-bulk-error">
       <AlertDescription>{{ parseError.message }}</AlertDescription>
     </Alert>
     <template v-else-if="diff">
@@ -173,7 +173,7 @@ function onCancel(): void {
       </Alert>
     </template>
 
-    <Alert v-if="applyError" variant="destructive" data-testid="variables-bulk-apply-error">
+    <Alert v-if="applyError" variant="error" data-testid="variables-bulk-apply-error">
       <AlertDescription>{{ applyError }}</AlertDescription>
     </Alert>
 

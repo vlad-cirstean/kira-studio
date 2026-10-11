@@ -627,14 +627,14 @@ onUnmounted(() => {
                      bare class on that same [data-slot] element. -->
                 <Alert
                   v-if="fileTreeStore.repoTreeError(repoId)"
-                  variant="note"
+                  variant="info"
                   data-testid="repo-tree-error"
                 >
                   <AlertDescription><span class="text-error">{{ fileTreeStore.repoTreeError(repoId) }}</span></AlertDescription>
                 </Alert>
                 <Alert
                   v-if="fileTreeStore.repoTreeTruncated(repoId)"
-                  variant="note"
+                  variant="info"
                   data-testid="repo-tree-truncated"
                 >
                   <AlertDescription>Showing the first 200,000 files.</AlertDescription>

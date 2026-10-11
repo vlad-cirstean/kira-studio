@@ -1057,13 +1057,13 @@ onUnmounted(() => {
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="stream-error">
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="stream-error">
       <CodiconIcon name="error" :size="13" />
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
     <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
-    <Alert v-if="rt?.actionError" variant="destructive" data-testid="stream-action-error">
+    <Alert v-if="rt?.actionError" variant="error" data-testid="stream-action-error">
       <CodiconIcon name="error" :size="13" />
       <AlertDescription>{{ rt.actionError }}</AlertDescription>
     </Alert>

@@ -77,7 +77,7 @@ const historyToggleId = useId();
       <ImportStatus />
     </PanelBar>
     <div class="min-h-0 flex-1 overflow-y-auto" data-testid="memory-results">
-      <Alert v-if="search.isError.value" variant="destructive" class="m-1.5 w-auto" data-testid="memory-error">
+      <Alert v-if="search.isError.value" variant="error" class="m-1.5 w-auto" data-testid="memory-error">
         <AlertDescription>{{ search.error.value?.message }}</AlertDescription>
       </Alert>
       <Empty v-else-if="search.isPending.value" class="h-full">

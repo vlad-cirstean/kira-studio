@@ -331,7 +331,7 @@ function onCloseSearch(): void {
                bar of its own to say so. -->
           <Alert
             v-if="rt?.status === 'error' && rt.error"
-            variant="destructive"
+            variant="error"
             data-testid="error-strip"
             class="whitespace-pre-wrap font-data"
           >
@@ -342,7 +342,7 @@ function onCloseSearch(): void {
                showing a perfectly valid page, only the write was refused. -->
           <Alert
             v-if="rt?.actionError"
-            variant="destructive"
+            variant="error"
             data-testid="data-action-error"
             class="whitespace-pre-wrap font-data"
           >
@@ -353,7 +353,7 @@ function onCloseSearch(): void {
                stored data — a preview convenience (§6.1), not the security boundary, but a user
                switching tabs or taking a screenshot must not mistake a bucket string for a literal
                value. -->
-          <Alert v-if="rt?.maskPreview" variant="note" data-testid="mask-preview-strip">
+          <Alert v-if="rt?.maskPreview" variant="info" data-testid="mask-preview-strip">
             <CodiconIcon name="eye-closed" :size="16" />
             <AlertDescription>
               Values shown are masked for this preview — not the stored data. Editing is off while it's on.

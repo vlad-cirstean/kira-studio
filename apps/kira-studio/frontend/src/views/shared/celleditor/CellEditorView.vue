@@ -545,7 +545,7 @@ const statusLine = computed(() => {
       </Tooltip>
       <Tooltip v-if="formatProblem">
         <TooltipTrigger as-child>
-          <Badge variant="err" class="max-w-56 overflow-hidden text-ellipsis whitespace-nowrap" data-testid="cell-editor-invalid">{{ formatProblem.message }}</Badge>
+          <Badge variant="error" class="max-w-56 overflow-hidden text-ellipsis whitespace-nowrap" data-testid="cell-editor-invalid">{{ formatProblem.message }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ formatProblem.message }}</TooltipContent>
       </Tooltip>
@@ -694,7 +694,7 @@ const statusLine = computed(() => {
         </div>
         <Alert
           v-else
-          variant="note"
+          variant="info"
           class="flex-1 basis-5/12 items-center text-subtle"
           data-testid="cell-editor-decoded-empty"
         >

@@ -13,7 +13,7 @@ const variant = computed(() => {
     case 'done':
       return 'ok';
     case 'failed':
-      return 'err';
+      return 'error';
     case 'skipped':
     case 'cancelled':
       return 'default';

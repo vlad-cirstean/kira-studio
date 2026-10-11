@@ -28,7 +28,7 @@ const emit = defineEmits<(e: 'select', id: string) => void>();
       v-for="item in section.items"
       :key="item.id"
       :disabled="item.disabled"
-      :variant="item.danger ? 'destructive' : 'default'"
+      :variant="item.danger ? 'danger' : 'default'"
       :data-testid="item.id"
       :aria-describedby="item.disabled && item.disabledReason ? `${item.id}-reason` : undefined"
       @select="emit('select', item.id)"

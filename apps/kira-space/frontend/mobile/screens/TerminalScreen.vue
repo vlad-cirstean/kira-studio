@@ -147,7 +147,7 @@ function leave(): void {
 
     <PermissionHint v-if="!permissions.agentInput" what="Controlling terminals is off for this phone." />
     <template v-else>
-      <Alert v-if="remote.status.value === 'ended'" variant="note" class="m-2 w-auto" data-testid="term-ended">
+      <Alert v-if="remote.status.value === 'ended'" variant="info" class="m-2 w-auto" data-testid="term-ended">
         <AlertDescription>{{ remote.endReason.value }}</AlertDescription>
       </Alert>
       <p v-if="remote.notice.value" class="m-0 px-3 py-1 text-kira-sm text-warn" data-testid="term-notice">{{ remote.notice.value }}</p>

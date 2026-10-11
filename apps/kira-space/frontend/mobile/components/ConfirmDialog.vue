@@ -32,7 +32,7 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>();
         <DialogDescription>{{ text }}</DialogDescription>
       </DialogHeader>
       <DialogBody v-if="error">
-        <Alert variant="destructive" data-testid="confirm-error">
+        <Alert variant="error" data-testid="confirm-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
       </DialogBody>

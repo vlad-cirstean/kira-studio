@@ -129,10 +129,10 @@ async function discard(): Promise<void> {
       </DialogHeader>
 
       <DialogBody>
-        <Alert v-if="view.headless" variant="destructive" data-testid="ade-dialog-headless">
+        <Alert v-if="view.headless" variant="error" data-testid="ade-dialog-headless">
           <AlertDescription>{{ view.headless }}</AlertDescription>
         </Alert>
-        <Alert v-else-if="view.busyShown" variant="destructive" data-testid="ade-dialog-busy">
+        <Alert v-else-if="view.busyShown" variant="error" data-testid="ade-dialog-busy">
           <AlertDescription>
             <div class="flex items-start gap-2.5">
               <div class="flex min-w-0 flex-1 flex-col gap-1">
@@ -175,7 +175,7 @@ async function discard(): Promise<void> {
           />
         </div>
 
-        <Alert v-for="b in view.blockers" :key="b.branchId + b.kind" variant="destructive" data-testid="ade-dialog-blocker" :data-kind="b.kind">
+        <Alert v-for="b in view.blockers" :key="b.branchId + b.kind" variant="error" data-testid="ade-dialog-blocker" :data-kind="b.kind">
           <AlertDescription>{{ b.text }}</AlertDescription>
         </Alert>
         <Label v-if="view.canAutostash" for="ade-dialog-autostash" class="text-kira-sm">
@@ -242,11 +242,11 @@ async function discard(): Promise<void> {
           >
         </div>
 
-        <Alert v-if="previewError" variant="destructive" data-testid="ade-dialog-preview-error">
+        <Alert v-if="previewError" variant="error" data-testid="ade-dialog-preview-error">
           <AlertDescription>{{ previewError }}</AlertDescription>
         </Alert>
 
-        <Alert v-if="dialogs.error" variant="destructive" data-testid="ade-dialog-error">
+        <Alert v-if="dialogs.error" variant="error" data-testid="ade-dialog-error">
           <AlertDescription>{{ dialogs.error }}</AlertDescription>
         </Alert>
       </DialogBody>

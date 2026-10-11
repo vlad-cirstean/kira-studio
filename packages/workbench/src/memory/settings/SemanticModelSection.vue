@@ -32,7 +32,7 @@ function download(): void {
     <FieldLegend>Semantic search</FieldLegend>
     <template v-if="data.state === 'notInstalled'">
       <FieldDescription>Finds memories by meaning. Runs a local embedding model.</FieldDescription>
-      <Alert v-if="install.isError.value" variant="destructive" class="w-auto" data-testid="memory-semantic-error">
+      <Alert v-if="install.isError.value" variant="error" class="w-auto" data-testid="memory-semantic-error">
         <AlertDescription>{{ install.error.value?.message }}</AlertDescription>
       </Alert>
       <Button variant="dialog" size="kira-lg" class="self-start" data-testid="memory-semantic-download" @click="download">
@@ -57,7 +57,7 @@ function download(): void {
       <Progress :model-value="percent" />
     </template>
     <template v-else-if="data.state === 'unavailable'">
-      <Alert variant="destructive" class="w-auto" data-testid="memory-semantic-error">
+      <Alert variant="error" class="w-auto" data-testid="memory-semantic-error">
         <AlertDescription>Semantic search unavailable: {{ data.message }}</AlertDescription>
       </Alert>
       <Button variant="dialog" size="kira-lg" class="self-start" data-testid="memory-semantic-retry" @click="retry.mutate()">

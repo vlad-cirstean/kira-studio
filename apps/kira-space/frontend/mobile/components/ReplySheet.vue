@@ -62,7 +62,7 @@ async function send(): Promise<void> {
           data-testid="reply-input"
           @update:model-value="(v) => (message = String(v))"
         />
-        <Alert v-if="error" variant="destructive" data-testid="reply-error">
+        <Alert v-if="error" variant="error" data-testid="reply-error">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>
       </DialogBody>
