@@ -12,7 +12,7 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { t } from '@theme/i18n';
+import { type MessageKey, t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import type { RangeHighlight } from '@workbench/editor/ranges';
 import { computed, ref } from 'vue';
@@ -164,12 +164,32 @@ const caption = computed(() =>
   ),
 );
 
-const BODY_MODE_ITEMS = BODY_MODE_OPTIONS.map((opt) => ({
-  value: opt.value,
-  label: opt.label,
-  testid: opt.testid,
-  tooltip: opt.title,
-}));
+const BODY_MODE_LABEL = {
+  none: 'common.state.none.option',
+  formdata: 'studio.http.bodyMode.formdata.label',
+  urlencoded: 'studio.http.bodyMode.urlencoded.label',
+  raw: 'common.raw.label',
+  json: 'studio.copy.format.json.label',
+  code: 'common.code.label',
+  file: 'studio.http.bodyMode.file.label',
+} as const satisfies Record<HttpBodySelection, MessageKey>;
+const BODY_MODE_TOOLTIP = {
+  none: 'studio.http.bodyMode.none.tooltip',
+  formdata: 'studio.http.bodyMode.formdata.tooltip',
+  urlencoded: 'studio.http.bodyMode.urlencoded.tooltip',
+  raw: 'common.plainText.label',
+  json: 'studio.http.bodyMode.json.tooltip',
+  code: 'studio.http.bodyMode.code.tooltip',
+  file: 'studio.http.bodyMode.file.tooltip',
+} as const satisfies Record<HttpBodySelection, MessageKey>;
+const BODY_MODE_ITEMS = computed(() =>
+  BODY_MODE_OPTIONS.map((opt) => ({
+    value: opt.value,
+    label: t(BODY_MODE_LABEL[opt.value]),
+    testid: opt.testid,
+    tooltip: t(BODY_MODE_TOOLTIP[opt.value]),
+  })),
+);
 </script>
 
 <template>

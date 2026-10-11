@@ -54,8 +54,10 @@ export function fontStackAvailable(stack: string): boolean {
 }
 
 export interface FontChoice {
+  /** A typeface name; for the `system` entry only a fallback, the pane shows a catalog label. */
   label: string;
   stack: string;
+  system?: true;
 }
 
 // P28 §1.2: 15 named monospace stacks, macOS-first — system faces, Apple's own developer face,
@@ -65,7 +67,7 @@ export interface FontChoice {
 // a monospace face there rather than the browser's proportional default. `body` moved to the
 // fixed, non-customizable --kira-font-ui in P26 and is no longer affected by this choice at all.
 export const FONT_CHOICES: readonly FontChoice[] = [
-  { label: 'System monospace', stack: 'ui-monospace, Menlo, monospace' },
+  { label: 'System monospace', stack: 'ui-monospace, Menlo, monospace', system: true },
   { label: 'Menlo', stack: 'Menlo, monospace' },
   { label: 'SF Mono', stack: "'SF Mono', Menlo, monospace" },
   { label: 'Monaco', stack: 'Monaco, monospace' },

@@ -4,6 +4,7 @@
 // the URL field updates the Params table and never rewrites the URL; editing the table rewrites
 // the URL (HttpRequestView.vue owns that direction — this module only splits/builds strings).
 
+import { t } from '@theme/i18n';
 import { splitTemplateSpans } from './substitute';
 
 export interface SplitUrl {
@@ -130,7 +131,7 @@ function withScheme(base: string): string {
 export function httpRequestTitle(state: { url: string; name?: string }): string {
   if (state.name) return state.name;
   const url = state.url.trim();
-  if (!url) return 'New request';
+  if (!url) return t('studio.api.common.newRequest.label');
   const { base } = splitUrl(url);
   try {
     const parsed = new URL(withScheme(base));

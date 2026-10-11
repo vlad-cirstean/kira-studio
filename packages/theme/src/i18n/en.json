@@ -993,6 +993,9 @@
     "closed": {
       "status": "Closed"
     },
+    "code": {
+      "label": "Code"
+    },
     "collection": {
       "label": "Collection"
     },
@@ -1308,6 +1311,9 @@
     },
     "path": {
       "label": "Path"
+    },
+    "plainText": {
+      "label": "Plain text"
     },
     "port": {
       "label": "Port"
@@ -5525,9 +5531,6 @@
         "checklist": {
           "tooltip": "Checklist"
         },
-        "code": {
-          "tooltip": "Code"
-        },
         "formatting": {
           "aria": "Formatting"
         },
@@ -7576,8 +7579,7 @@
           "label": "SQL"
         },
         "text": {
-          "description": "No decoding. The value shows exactly as stored.",
-          "label": "Plain text"
+          "description": "No decoding. The value shows exactly as stored."
         },
         "xml": {
           "description": "XML or HTML markup. Tags get syntax highlighting and can be beautified.",
@@ -8972,6 +8974,29 @@
           "placeholder": "Content type"
         }
       },
+      "bodyMode": {
+        "code": {
+          "tooltip": "JavaScript, HTML or XML"
+        },
+        "file": {
+          "label": "Binary",
+          "tooltip": "One local file, sent as the request’s entire body"
+        },
+        "formdata": {
+          "label": "Form data",
+          "tooltip": "Multipart fields, including real files"
+        },
+        "json": {
+          "tooltip": "A JSON body"
+        },
+        "none": {
+          "tooltip": "No request body"
+        },
+        "urlencoded": {
+          "label": "URL encoded",
+          "tooltip": "URL-encoded form fields"
+        }
+      },
       "cookies": {
         "clearConfirm": {
           "body": "Every cookie for every host is removed.",
@@ -10218,6 +10243,9 @@
         },
         "fontPreview": {
           "label": "The quick brown fox jumps over the lazy dog. 0123456789"
+        },
+        "fontSystem": {
+          "label": "System monospace"
         },
         "fontUnavailable": {
           "error": "Not installed. Text falls back to the browser’s default.",

@@ -13,53 +13,21 @@ import {
 // `selection` computed for the mapping.
 export type HttpBodySelection = HttpBodyMode | 'json';
 
-// C5/D9: the body-mode labels, in the builder's own order. `title` is the tooltip F12 leans on
-// instead of widening SegmentedControl for this one caller's label widths. P15 D6: `json` is a
-// presentation-only segment between raw and code — selecting it patches
-// `{bodyMode: 'code', codeLanguage: 'json'}`, so it needs no schema/wire value of its own.
+// C5/D9: the body-mode segments, in the builder's own order; the visible label and tooltip live in
+// the catalog (`studio.http.bodyMode.<value>`). P15 D6: `json` is a presentation-only segment
+// between raw and code — selecting it patches `{bodyMode: 'code', codeLanguage: 'json'}`, so it
+// needs no schema/wire value of its own.
 export const BODY_MODE_OPTIONS: readonly {
   value: HttpBodySelection;
-  label: string;
-  title: string;
   testid: string;
 }[] = [
-  { value: 'none', label: 'none', title: 'No request body', testid: 'http-body-mode-none' },
-  {
-    value: 'formdata',
-    label: 'form-data',
-    title: 'Multipart fields, including real files',
-    testid: 'http-body-mode-formdata',
-  },
-  {
-    value: 'urlencoded',
-    label: 'x-www-form-urlencoded',
-    title: 'URL-encoded form fields',
-    testid: 'http-body-mode-urlencoded',
-  },
-  {
-    value: 'raw',
-    label: 'raw',
-    title: 'Plain text',
-    testid: 'http-body-mode-raw',
-  },
-  {
-    value: 'json',
-    label: 'JSON',
-    title: 'A JSON body',
-    testid: 'http-body-mode-json',
-  },
-  {
-    value: 'code',
-    label: 'Code',
-    title: 'JavaScript, HTML or XML',
-    testid: 'http-body-mode-code',
-  },
-  {
-    value: 'file',
-    label: 'binary',
-    title: "One local file, sent as the request's entire body",
-    testid: 'http-body-mode-file',
-  },
+  { value: 'none', testid: 'http-body-mode-none' },
+  { value: 'formdata', testid: 'http-body-mode-formdata' },
+  { value: 'urlencoded', testid: 'http-body-mode-urlencoded' },
+  { value: 'raw', testid: 'http-body-mode-raw' },
+  { value: 'json', testid: 'http-body-mode-json' },
+  { value: 'code', testid: 'http-body-mode-code' },
+  { value: 'file', testid: 'http-body-mode-file' },
 ];
 
 // The `code` mode's sub-selector, in the same order raw's own sub-selector used to list them

@@ -9,14 +9,11 @@ import type { HTMLAttributes } from 'vue'
 
 // P262 §2.2 exempt: the command surface keeps its own top-anchored, header-less box, so it renders
 // reka's content directly instead of the sized DialogContent.
-const props = withDefaults(defineProps<DialogRootProps & {
+const props = defineProps<DialogRootProps & {
   title?: string
   description?: string
   class?: HTMLAttributes['class']
-}>(), {
-  title: () => t('theme.commandDialog.title'),
-  description: () => t('theme.commandDialog.description'),
-})
+}>()
 const emits = defineEmits<DialogRootEmits>()
 
 const forwarded = useForwardPropsEmits(props, emits)
@@ -31,8 +28,8 @@ const forwarded = useForwardPropsEmits(props, emits)
         :class="cn('bg-elevated text-fg data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-fg/10 fixed left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 gap-4 overflow-hidden rounded-kira-pill p-0 text-kira-md ring-1 duration-100 outline-none top-1/3 translate-y-0', props.class)"
       >
         <DialogHeader class="sr-only" :closable="false">
-          <DialogTitle>{{ title }}</DialogTitle>
-          <DialogDescription>{{ description }}</DialogDescription>
+          <DialogTitle>{{ title ?? t('theme.commandDialog.title') }}</DialogTitle>
+          <DialogDescription>{{ description ?? t('theme.commandDialog.description') }}</DialogDescription>
         </DialogHeader>
         <Command>
           <slot v-bind="slotProps" />

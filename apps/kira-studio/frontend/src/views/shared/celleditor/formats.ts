@@ -26,7 +26,7 @@ export const CELL_FORMATS = [
 export type CellFormat = (typeof CELL_FORMATS)[number];
 
 const FORMAT_LABEL_KEY: Record<CellFormat, MessageKey> = {
-  text: 'studio.cellEditor.format.text.label',
+  text: 'common.plainText.label',
   json: 'studio.copy.format.json.label',
   xml: 'studio.cellEditor.format.xml.label',
   csv: 'studio.copy.format.csv.label',

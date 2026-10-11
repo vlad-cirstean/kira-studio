@@ -9,7 +9,7 @@ import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
 import { computed, useId } from 'vue';
-import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../../fonts';
+import { FONT_CHOICES, type FontChoice, fontStackAvailable, resolveFontFallback } from '../../fonts';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -22,6 +22,10 @@ const fontFamilyFallback = computed(() => resolveFontFallback(props.draft.appear
 // P28 §1.2: computed once — fontStackAvailable's canvas probe is a per-call measurement, but the
 // pane is created on open and destroyed on close (P17 D1), so no invalidation is needed for its
 // lifetime.
+function fontLabel(f: FontChoice): string {
+  return f.system ? t('studio.settings.appearance.fontSystem.label') : f.label;
+}
+
 const availableStacks = computed(() => {
   const on = FONT_CHOICES.filter((f) => fontStackAvailable(f.stack));
   const off = FONT_CHOICES.filter((f) => !fontStackAvailable(f.stack));
@@ -94,7 +98,7 @@ const rowColoringId = useId();
             :value="f.stack"
             :style="{ fontFamily: f.stack }"
           >
-            {{ f.label }}
+            {{ fontLabel(f) }}
           </option>
         </optgroup>
         <optgroup :label="t('studio.settings.appearance.fontNotInstalled.label')">
@@ -104,7 +108,7 @@ const rowColoringId = useId();
             :value="f.stack"
             :style="{ fontFamily: f.stack }"
           >
-            {{ f.label }}
+            {{ fontLabel(f) }}
           </option>
         </optgroup>
       </NativeSelect>

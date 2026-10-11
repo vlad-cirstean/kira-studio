@@ -122,7 +122,7 @@ const toolbar = computed<ToolbarButton[]>(() => {
       active: ed.isActive('italic'),
       run: () => chain().toggleItalic().run(),
     },
-    { label: t('space.ade.notes.code.tooltip'), icon: 'code', glyph: '</>', active: ed.isActive('code'), run: () => chain().toggleCode().run() },
+    { label: t('common.code.label'), icon: 'code', glyph: '</>', active: ed.isActive('code'), run: () => chain().toggleCode().run() },
     {
       label: t('space.ade.notes.heading.tooltip'),
       icon: '',
