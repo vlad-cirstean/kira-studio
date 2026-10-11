@@ -1372,8 +1372,11 @@ SlickGrid on every ResizeObserver tick, so px panes are plain flex (`flex: 0 1 <
 beside a handle takes `flex-1`, and the Operations dock stays a full-width sibling below the row. A drag
 previews through `useLiveSize` and commits once on release; pointercancel, window blur and unmount
 cancel. `panel-resize.spec.ts` in each app guards release paths. Guards U39-U63 in
-`scripts/check-ui-primitives.sh` enforce all of it; unmigrated files sit in
-`scripts/ui-primitives-allowlist/stream-*.txt` until their stream deletes the line. Full rules:
+`scripts/check-ui-primitives.sh` enforce all of it, hold named permanent exemptions only (engine hosts
+for Monaco, SlickGrid and TipTap, combobox focus, protocol timeouts, domain text formats) and never scan
+`behaviour/` or `testing/`; an exemption that stops matching fails the run. The git module reuses the host
+Pinia and `<ContextMenu />`. `afterClose` on the context-menu store defers an inline rename until the menu
+releases focus. Full rules:
 `docs/v2.2/plans/P264-behaviour-unification.md`.
 
 **A view is chosen by page kind, never by database type.** `Page` is a discriminated union
@@ -5151,6 +5154,15 @@ slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exit
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **`ui-timing` budgets fail on slow hosts (P264).** Console keystroke p50 (53 ms vs 50 bound) and
+  scroll frame p95 (81-134 ms vs 80) fail on a host about 2x slower than the budgets assume, and at
+  the pre-P263 base `d381439d6`. Not a regression. Delete once the project passes on the CI runner.
+- **Visual baselines were recorded in the sandbox, not CI (P264).** CI render drifted 0.6-1% on 13
+  specs before the re-record. Delete once the CI visual job is green on the recorded PNGs.
+- **`internal/docker` `TestEngine` fix is unconfirmed (P264).** The test container traps TERM and state
+  checks poll up to 15 s; no Docker in the sandbox to run it. Delete once a container-tests run passes.
+- **Space repo-graph specs are sensitive to host load (P264).** Refresh, paging, columns, badges and
+  workspace specs use 1 s-class budgets and fail intermittently under load; they pass on a quiet host.
 - **Claude Code usage limits show only what Kira-started sessions report (P239).** Claude Code sends
   `rate_limits` only for claude.ai Pro and Max plans and only after the first API response of a
   session, so the item reads `Usage: –` until then. A session in another terminal is invisible.

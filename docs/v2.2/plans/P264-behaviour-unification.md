@@ -1255,7 +1255,7 @@ Scope `D="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-s
 
 Implementation only; chunks A1..A5 committed on `p264-a`, no push. Allowlist `stream-a.txt` permanents only; guard green; typecheck and lint hook-green.
 Tests NOT run at stream end (coordinator change): `test:ui:studio`, `test:visual:studio` pending the serial testing agent. `test:unit` 1827 pass, 1 load-timeout flake (`beautify-depth`).
-Deviations, uncovered keyboard specs and failures seen: `P264-stream-a-findings.md`.
+Deviations: see Close-out.
 
 ## Stream B result
 
@@ -1263,7 +1263,7 @@ Implementation only. Stream-end test suites NOT run to completion per coordinato
 
 - Chunks: B1 `a849346a1` repo and workbench; B2 `7301d8b3e` ADE board and plan (+ `b12517d7f` tree sort test); B3 `65e8b9b6c` ADE panel, review, workflow; B4 `1c5a27c25` memory and mobile; B5 `25d0dccb2` keyboard-pass specs.
 - `stream-b.txt`: 8 `permanent` lines only, each with reason (U57/U62 RepoFileView, U62 RepoDiffView, U60 AdeDayBand, U40 AdeWorkflowGraph, U41 and U62 AdeNotesEditor, U46 AdeReviewCompose, U52 useAgentsModel).
-- Deviations and foundation gaps: `P264-stream-b-findings.md`.
+- Deviations and foundation gaps: see Close-out.
 - Ran: unit 1828 pass; full ui 460/469 (9 repo-graph/workspace failures, refresh pair confirmed identical at base); mobile writes + touched ade/memory/list-keyboard specs pass. Mobile full and visual PNGs not run.
 
 ## Stream C result
@@ -1273,7 +1273,6 @@ Chunks, commits:
 - C2 `95e1d8be0`: git-ui state timers, docker-ui lists and formats.
 - C3 `2fbbdb3c1`: Automations and workbench chrome.
 - C4 `24c5191c2`: `list-keyboard-git` (Space) and `list-keyboard-docker` (Studio) specs; App.vue Escape no longer closes detail pane after closing a menu.
-- Findings `0217b02d3`: `P264-stream-c-findings.md`.
 
 Permanents in `stream-c.txt`: U41 App.vue, gridKeyboard.ts, AutocompleteField.vue; U62 CommitGrid.vue, AutocompleteField.vue; U52 scheduleText.ts; U47 SearchBox.vue, SearchResults.vue, gridKeyboard.ts, AutocompleteField.vue; U58 AutocompleteField.vue; U46 layoutClient.ts. Each has a reason. Guard passes.
 
@@ -1316,7 +1315,7 @@ Failures root-caused:
 - Studio api-cross-window-sync, api-secret-reveal-isolation: 60s page-ready timeouts under 4-worker load; pass alone.
 - slick-grid.spec.ts:1259, console saved-queries: pass.
 - slick-grid.spec.ts "P22 iter2-onset": was 9/10 failing on a quiet host. Cause: wheel flings open with 2-3px WebKit smooth-scroll events, below the grid's dy > 20 render threshold, so the first render lands after the host sampler already holds a sample and the pre-fix defect never shows (0 stale frames). Fixed: `jumpFromRest` (scrollTop += 120 from rest) makes the first scroll event clear the threshold, so the render runs ahead of the host listener. Step (c) now asserts exactly 3 stale frames pre-fix (proves the harness reproduces the defect); step (a) adds 3 jump onsets and still asserts 0 with the fix. 30/30 serial, quiet host.
-- ci-fix branch merged (rebased on v2.0): U59 guard commit dropped as duplicate of `b6f24b2f4`; kept docker engine test fix and `P264-ci-fixes.md`. `bun run lint` passes under LC_ALL=C and LC_ALL=C.UTF-8; typecheck and lint:dead pass.
+- ci-fix branch merged (rebased on v2.0): U59 guard commit dropped as duplicate of `b6f24b2f4`; kept docker engine test fix (CI notes in Close-out). `bun run lint` passes under LC_ALL=C and LC_ALL=C.UTF-8; typecheck and lint:dead pass.
 
 Suites (serial):
 - typecheck, lint (all guards), lint:dead, test:unit 1824 pass.
@@ -1333,3 +1332,42 @@ ui-timing (Studio `--no-deps`, workers 1, shared host load ~2.3):
 Not achievable:
 - Interactive human keyboard pass: not possible in this sandbox. Covered by passing specs against the real built UI: right-click select (project tree), confirm focus (`confirm-focus`), splitters and dock (`panel-resize`, `repo-resize`), Force push (`ade-v2-force-push`), ADE Esc edits, mobile suite.
 - ui-timing bounds cannot pass on this host (base fails too).
+
+## Close-out
+
+Findings files and CI-fix notes merged here, then deleted. `scripts/ui-primitives-allowlist/` deleted; its `permanent` lines are named exemptions in `scripts/check-ui-primitives.sh`. An exemption that stops matching fails the run.
+
+Shipped: `behaviour/` composables, context-menu and confirm stores, `usePaneResize`/`ResizeHandle` (reka `SplitterGroup` retired), `QueryState` over one `createQueryClient`, `useShortcut` over `SHORTCUTS`, `behaviour/format.ts`, guards U39-U63. Specs: unit `listNavigation`, `paneResizeMath`, `format`, `shortcuts-conflicts`; UI `list-keyboard*` (both apps, Docker, Git), `confirm-focus`, `repo-resize`, `panel-resize`.
+
+Permanent exemptions (reasons in the script):
+- U41 modifier-key reads: engine hosts (Monaco, SlickGrid, git `App.vue`), `AutocompleteField`, `AdeNotesEditor` mouse modifier.
+- U46 timing: `bridge/port.ts` transport timeout; `SlickGridHost` scroll persist 300 ms (`TIMING.persist` 150 breaks `cell-editor.spec`); `AdeReviewCompose` 10 s protocol wait; `layoutClient.ts` worker fallback.
+- U47 list keys: Alt+Up/Down reorder, 2D `FieldRowsTable` navigation, combobox/listbox focus (`SearchBox`, `SearchResults`, `AutocompleteField`), grid cell nav.
+- U62 focus: Monaco/TipTap/SlickGrid engine focus, caret-popup and sibling-input focus.
+- U52 formats: `timestamp.ts` spelling-preserving re-encoding, `scheduleText.ts` cron wording.
+- U57 `RepoFileView` anchor scroll; U60 `AdeDayBand` cross-list drag; U40 `AdeWorkflowGraph` plain Delete; U42/U61 `scrollTrace.ts` dev trace; U42 `SlickGridHost` paste; U58 `AutocompleteField`.
+
+Accepted behaviour shifts realised:
+- Needs age column reads "5m ago" (was "5m"), column `w-19`.
+- Repo tree sort is natural (`file2` before `file10`).
+- Confirm cancel buttons read "Cancel", "Keep" or "Leave it" via `cancelLabel`.
+- Capture note and terminal notice use `copiedFeedback` (1500 ms, was 2000/3000).
+- `AdeTaskCard` ContextMenu key goes through `menu.open` (Shift+F10 and ContextMenu).
+- Specs press Meta/Control by `navigator.userAgent` (WebKit UA is Mac); clipboard stubs target `navigator.clipboard.writeText`.
+- Playwright click on a repo-tree dir leaves it collapsed (also at base `b4c455db1`); spec uses ArrowRight.
+
+Fixed along the way:
+- `revealExpiry.ts`: VueUse `useTimeoutFn` gates `immediate` on `isClient`; armed with `{ immediate: false }` plus `start()`.
+- Git-ui `cancellableTimer.ts` (debounce plus generation guard); VueUse `useTimeoutFn` never starts without `window`, `useDebounceFn` has no cancel.
+- git-ui `App.vue` records menu open state in a capture-phase Escape listener (reka closes menus on Escape without stopping propagation). git-ui reuses the host Pinia and `<ContextMenu />`; its own Pinia breaks it.
+- U59 guard: `[—-]` missed literal em dashes under `LC_ALL=C`, matched under UTF-8 (macOS CI lint failure). Now `(?:—|-)`, `LC_ALL=C` exported; four files moved to `displayValue`.
+- `internal/docker` TestEngine: test container traps TERM; state checks poll up to 15 s (`acc00ac82`).
+- Left on purpose (no caller): `plural` thousands grouping, `formatRelative` future form, `TIMING` transient-note and refit keys, "5.0 s" duration, generic Delete shortcut. `docker-ui` `ListState.vue` stays (named in the script's side-panel list), now the empty block.
+
+Known open items (also in `docs/ARCHITECTURE.md`):
+- `ui-timing` budgets fail on this ~2x slower host and at base `d381439d6`: console keystroke p50 53 ms vs 50, scroll p95 81-134 ms vs 80.
+- Visual baselines recorded in the sandbox, not CI; CI run 37888912351 showed 0.6-1% diffs on 13 specs before re-record. Needs CI confirmation.
+- TestEngine fix unconfirmed without Docker. `TestFixture_SQS` pull failure (`unauthorized`) looked like a Docker Hub transient; re-run.
+- Space repo-graph specs (refresh, paging, columns, badges, workspace) fail under host load; pass on a quiet host.
+- Keyboard coverage gaps and no interactive human keyboard pass (sandbox).
+- Linux CI jobs never ran on `f1129b91e` (skipped after macOS lint failure).
