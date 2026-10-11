@@ -1,49 +1,38 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
+import { useTemplateRef } from 'vue';
+import { useFocusOnMount } from '../behaviour/focus';
+import { useInlineEdit } from '../behaviour/inlineEdit';
 
-// Inline naming field shared by the API collection tree and the Automations panel: Enter and blur
-// commit, Esc cancels, an empty or unchanged name is a cancel (the row would become unclickable).
-const props = defineProps<{ name: string }>();
+// The inline row-name field (API collection tree, Automations panel): Enter and blur commit, Esc
+// cancels, a blank or unchanged name is a cancel (the row would become unclickable). The parent
+// swaps the field out on `commit`/`cancel`.
+const props = withDefaults(defineProps<{ name: string; selectOnFocus?: boolean }>(), {
+  selectOnFocus: true,
+});
 const emit = defineEmits<{ commit: [name: string]; cancel: [] }>();
 
-const draft = ref(props.name);
-const inputRef = ref<HTMLInputElement | null>(null);
-let settled = false;
+const input = useTemplateRef<HTMLInputElement>('input');
+useFocusOnMount(input, { select: props.selectOnFocus });
 
-onMounted(() => {
-  void nextTick(() => {
-    inputRef.value?.focus();
-    inputRef.value?.select();
-  });
+const edit = useInlineEdit({
+  source: () => props.name,
+  commit: (text) => emit('commit', text),
+  cancel: () => emit('cancel'),
+  once: true,
 });
-
-function commit(): void {
-  if (settled) return;
-  settled = true;
-  const name = draft.value.trim();
-  if (!name || name === props.name) {
-    emit('cancel');
-    return;
-  }
-  emit('commit', name);
-}
-
-function cancel(): void {
-  if (settled) return;
-  settled = true;
-  emit('cancel');
-}
 </script>
 
 <template>
   <input
-    ref="inputRef"
-    v-model="draft"
+    ref="input"
+    :value="edit.text.value"
     class="min-w-0 flex-1 rounded-kira-sm border px-0.5 py-0 text-fg bg-field outline-none border-primary"
+    :aria-invalid="edit.error.value ? true : undefined"
+    :title="edit.error.value || undefined"
+    @input="edit.onInput(($event.target as HTMLInputElement).value)"
     @click.stop
     @dblclick.stop
-    @keydown.enter.prevent="commit"
-    @keydown.esc.prevent="cancel"
-    @blur="commit"
+    @keydown="edit.onKeydown"
+    @blur="edit.onCommit"
   />
 </template>

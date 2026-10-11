@@ -37,6 +37,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
         refetchInterval: POLL_MS,
         // Today's setInterval poll ran regardless of window focus — kept, not tightened.
         refetchIntervalInBackground: true,
+        staleTime: 0,
         enabled,
       },
       queryClient,

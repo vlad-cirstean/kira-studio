@@ -20,8 +20,8 @@ const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 
 // P99 §5.5: a plain preview of the *currently staged* edits — nothing pushes a change event for
-// it, and it must reflect this open's own pending state, so default staleTime (always refetch on
-// mount) replaces the old ref([])/loading/error triple rather than staleTime: Infinity.
+// it, and it must reflect this open's own pending state, so `staleTime: 0` (always refetch on
+// mount) replaces the old ref([])/loading/error triple rather than the Infinity default.
 const { data, isLoading, error } = useQuery(() => ({
   queryKey: ['previewPending', props.tabId] as const,
   queryFn: () => {
@@ -35,6 +35,7 @@ const { data, isLoading, error } = useQuery(() => ({
   // component fully unmounts on close (DataView.vue's v-if="previewOpen"), so gcTime: 0 discards
   // the cache entry immediately and the next open starts empty until its own fetch lands.
   gcTime: 0,
+  staleTime: 0,
 }));
 
 const statements = computed(() => data.value ?? []);

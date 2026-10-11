@@ -17,6 +17,7 @@
     // migrated dialog imports shadcn components from `@theme/components/ui/*`).
     "paths": {
       "@workbench/*": ["../workbench/src/*"],
+      "@shared/*": ["../shared/*"],
       "@theme/*": ["../theme/src/*"]
     }
   },

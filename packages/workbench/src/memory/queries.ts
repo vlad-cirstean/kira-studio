@@ -20,6 +20,7 @@ export function useMemorySearch(
       queryKey: [...MEMORY_KEY, 'search', q, history] as const,
       queryFn: () => (q === '' ? control.memoryRecent() : control.memorySearch(q, history)),
       placeholderData: keepPreviousData,
+      staleTime: 0,
     };
   }, queryClient);
 }
@@ -32,6 +33,7 @@ export function useMemoryHistory(id: MaybeRefOrGetter<string | null>) {
       queryKey: [...MEMORY_KEY, 'history', memoryId] as const,
       queryFn: () => control.memoryHistory(memoryId ?? ''),
       enabled: memoryId !== null,
+      staleTime: 0,
     };
   }, queryClient);
 }
@@ -58,7 +60,11 @@ export function useStoreMemory() {
 export function useMemoryMcpStatus() {
   const { control } = useMemoryModule();
   return useQuery(
-    { queryKey: [...MEMORY_KEY, 'mcp'] as const, queryFn: () => control.memoryMcpStatus() },
+    {
+      queryKey: [...MEMORY_KEY, 'mcp'] as const,
+      queryFn: () => control.memoryMcpStatus(),
+      staleTime: 0,
+    },
     queryClient,
   );
 }
@@ -80,7 +86,7 @@ export function useMemorySemanticStatus() {
   });
   tryOnScopeDispose(off);
   return useQuery(
-    { queryKey: SEMANTIC_KEY, queryFn: () => control.memorySemanticStatus() },
+    { queryKey: SEMANTIC_KEY, queryFn: () => control.memorySemanticStatus(), staleTime: 0 },
     queryClient,
   );
 }

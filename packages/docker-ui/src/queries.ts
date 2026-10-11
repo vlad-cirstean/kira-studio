@@ -66,6 +66,7 @@ export function useContainers() {
   return useQuery({
     queryKey: computed(() => ['docker', scope.value, 'containers'] as const),
     queryFn: () => control.containers(true),
+    staleTime: 0,
     enabled: ready,
   });
 }
@@ -76,6 +77,7 @@ export function useImages() {
   return useQuery({
     queryKey: computed(() => ['docker', scope.value, 'images'] as const),
     queryFn: () => control.images(),
+    staleTime: 0,
     enabled: ready,
   });
 }
@@ -86,6 +88,7 @@ export function useVolumes() {
   return useQuery({
     queryKey: computed(() => ['docker', scope.value, 'volumes'] as const),
     queryFn: () => control.volumes(),
+    staleTime: 0,
     enabled: ready,
   });
 }
@@ -96,6 +99,7 @@ export function useNetworks() {
   return useQuery({
     queryKey: computed(() => ['docker', scope.value, 'networks'] as const),
     queryFn: () => control.networks(),
+    staleTime: 0,
     enabled: ready,
   });
 }
@@ -106,6 +110,7 @@ export function useContainerDetail(id: Ref<string>) {
   return useQuery({
     queryKey: computed(() => ['docker', scope.value, 'container', id.value] as const),
     queryFn: () => control.inspectContainer(id.value),
+    staleTime: 0,
     enabled: computed(() => ready.value && id.value !== ''),
   });
 }
@@ -116,6 +121,7 @@ export function useContainerEditSpec(id: Ref<string>) {
   return useQuery({
     queryKey: computed(() => ['docker', scope.value, 'edit-spec', id.value] as const),
     queryFn: () => control.editSpec(id.value),
+    staleTime: 0,
     enabled: computed(() => ready.value && id.value !== ''),
   });
 }
@@ -145,6 +151,7 @@ export function useInspect(kind: Ref<InspectKind>, id: Ref<string>) {
   return useQuery({
     queryKey: computed(() => ['docker', scope.value, 'inspect', kind.value, id.value] as const),
     queryFn: () => control.inspect(kind.value, id.value),
+    staleTime: 0,
     enabled: computed(() => ready.value && id.value !== ''),
   });
 }

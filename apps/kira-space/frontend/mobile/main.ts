@@ -1,7 +1,8 @@
 import { adeReaderKey } from '@ade/reader';
 import { repoNamesKey } from '@ade/readQueries';
 import { installAdeReadSignals } from '@ade/readSignals';
-import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
+import { VueQueryPlugin } from '@tanstack/vue-query';
+import { createQueryClient } from '@workbench/state/queryClient';
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';
 import App from './App.vue';
@@ -13,11 +14,7 @@ import { useAuthStore } from './state/auth';
 import './styles.css';
 
 // Reads are push-invalidated (staleTime Infinity); a reconnect or a refocus refetches the rest.
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: true, refetchOnReconnect: true },
-  },
-});
+const queryClient = createQueryClient({ remote: true });
 installAdeReadSignals(queryClient, sseSignalSource);
 onChannel('kira:adetask:repos', () => {
   void queryClient.invalidateQueries({ queryKey: repoNamesKey, exact: true });

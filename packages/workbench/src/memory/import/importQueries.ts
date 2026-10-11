@@ -11,7 +11,11 @@ const IMPORT_KEY = ['memory', 'import'] as const;
 export function useImportJobs() {
   const { control } = useMemoryModule();
   return useQuery(
-    { queryKey: [...IMPORT_KEY, 'jobs'] as const, queryFn: () => control.memoryImportJobs() },
+    {
+      queryKey: [...IMPORT_KEY, 'jobs'] as const,
+      queryFn: () => control.memoryImportJobs(),
+      staleTime: 0,
+    },
     queryClient,
   );
 }
@@ -24,6 +28,7 @@ export function useImportJob(id: MaybeRefOrGetter<string | null>) {
       queryKey: [...IMPORT_KEY, 'job', jobId] as const,
       queryFn: () => control.memoryImportJob(jobId ?? ''),
       enabled: jobId !== null,
+      staleTime: 0,
     };
   }, queryClient);
 }

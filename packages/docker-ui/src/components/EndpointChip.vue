@@ -22,7 +22,11 @@ const AUTOMATIC = '__automatic__';
 const { control } = useDocker();
 const qc = useQueryClient();
 const status = useDockerStatus();
-const contexts = useQuery({ queryKey: ['docker', 'contexts'], queryFn: () => control.contexts() });
+const contexts = useQuery({
+  queryKey: ['docker', 'contexts'],
+  queryFn: () => control.contexts(),
+  staleTime: 0,
+});
 
 const endpoint = computed(() => status.data.value?.endpoint);
 const ok = computed(() => status.data.value?.state === 'ok');

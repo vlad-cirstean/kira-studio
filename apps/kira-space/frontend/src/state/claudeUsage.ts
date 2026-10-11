@@ -24,6 +24,7 @@ export function useClaudeUsage() {
     queryFn: () => control.claudeUsageGet(),
     enabled,
     refetchInterval: 60_000,
+    staleTime: 0,
     refetchOnWindowFocus: true,
   });
 }
