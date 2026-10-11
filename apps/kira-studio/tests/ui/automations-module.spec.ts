@@ -355,6 +355,35 @@ test('header New collection creates one and names it inline', async ({ relaunch 
   await expect(input).toHaveCount(0);
 });
 
+test('Escape cancels an inline collection rename without renaming', async ({ relaunch }) => {
+  const created = {
+    id: 'c-esc',
+    name: 'New collection',
+    sortOrder: 0,
+    createdAt: SCRIPT.createdAt,
+    updatedAt: SCRIPT.createdAt,
+  };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsCreateCollection, response: created },
+      { channel: IPC.customScriptsRenameCollection, response: null },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="automations-new-collection"]').click();
+  await emitWailsEvent(page, IPC.customScriptsChanged, { collections: [created], scripts: [] });
+  const input = page.locator('[data-testid="script-collection-rename-input"]');
+  await expect(input).toBeFocused();
+  await input.fill('Discarded');
+  await input.press('Escape');
+  await expect(input).toHaveCount(0);
+  await expect(page.locator('[data-testid="script-group"][data-id="c-esc"]')).toContainText(
+    'New collection',
+  );
+  expect(control.log().some((e) => e.channel === IPC.customScriptsRenameCollection)).toBe(false);
+});
+
 test('the collection menu Delete confirms and deletes it', async ({ relaunch }) => {
   const collection = {
     id: 'c-be',

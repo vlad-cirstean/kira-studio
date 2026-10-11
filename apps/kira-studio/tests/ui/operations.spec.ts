@@ -204,3 +204,47 @@ test('Operations panel — the dock resize handle drags, steps by keyboard, and 
   const clampedHeight = (await dock.boundingBox())?.height ?? 0;
   expect(Math.abs(clampedHeight - 500)).toBeLessThanOrEqual(1);
 });
+
+// P264: the op log is one list on the shared key set — Up/Down/Home/End move, Enter and Space
+// toggle the row's detail, Shift+F10 opens the row menu and Esc returns focus to the row.
+test('Operations panel — arrows, Home/End, Enter and Space toggle detail, Shift+F10 menu', async ({
+  relaunch,
+}) => {
+  const ops = ['op-a', 'op-b', 'op-c'].map((id, i) =>
+    opRecord({ id, command: `select ${i}`, startedAt: `2026-01-01T00:0${i}:00.000Z` }),
+  );
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.opsRecent, response: ops }],
+  });
+
+  await page.click('[data-testid="toggle-operations-panel"]');
+  const rows = page.locator('[data-testid="op-row"]');
+  const items = page.locator('ul[aria-label="Operations"] > li');
+  await expect(rows).toHaveCount(3);
+  await expect(items).toHaveCount(3);
+
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await expect(page.locator('[data-testid="op-row"][tabindex="0"]')).toHaveCount(1);
+  await page.keyboard.press('End');
+  await expect(rows.nth(2)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(2)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  await expect(items).toHaveCount(4);
+  await page.keyboard.press('Space');
+  await expect(items).toHaveCount(3);
+
+  await page.keyboard.press('Shift+F10');
+  const menu = page.locator('[data-testid="context-menu"]');
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(rows.first()).toBeFocused();
+});

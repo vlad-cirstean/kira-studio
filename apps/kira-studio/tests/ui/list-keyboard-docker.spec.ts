@@ -238,3 +238,28 @@ test('image, network and volume lists: arrows and Home/End move focus, Enter sel
     await expect(rows.last()).toHaveAttribute('aria-selected', 'true');
   }
 });
+
+test('overview container table: arrows, Home/End and Enter open the container', async ({
+  relaunch,
+}) => {
+  const { page } = await setup(relaunch);
+  await openDocker(page);
+
+  const rows = page.locator('[data-testid="docker-table-row"]');
+  await expect(rows).toHaveCount(4);
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await expect(page.locator('[data-testid="docker-table-row"][tabindex="0"]')).toHaveCount(1);
+  await page.keyboard.press('End');
+  await expect(rows.last()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.last()).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-testid="docker-container-detail"]')).toBeVisible();
+});

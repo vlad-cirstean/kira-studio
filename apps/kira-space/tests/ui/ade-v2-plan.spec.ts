@@ -156,6 +156,21 @@ test('dragging a card to another day writes the plan once, with no dialog', asyn
   await expect(page.locator('[data-testid="ade-confirm-dialog"]')).toHaveCount(0);
 });
 
+test('the day-off confirm names its cancel button "Leave it" and Escape leaves the plan alone', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await page.setViewportSize({ width: 1440, height: 2400 });
+  // Today (Tue 22) has T_bill planned on it, so marking it a day off asks to move that task.
+  await bandOf(page, 0).locator('[data-testid="ade-band-label"]').click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-ade-day-toggle"]').click();
+  const dialog = page.locator('[data-testid="ade-confirm-dialog"]');
+  await expect(dialog.locator('[data-testid="ade-confirm-no"]')).toHaveText('Leave it');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  expect(control.log().filter((e) => e.channel === IPC.adeTaskSetPlan)).toHaveLength(0);
+});
+
 test('a card is a 10px rounded box with a 4px task edge, a 68px header and 10px gaps', async ({
   relaunch,
 }) => {

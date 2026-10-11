@@ -48,6 +48,17 @@ test('selecting a task shows its facts; status is read-only', async ({ relaunch 
   await expect(page.locator('[data-testid="ade-task-branch"]')).toHaveCount(3);
 });
 
+test('Escape in the task name reverts the text and writes nothing', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await openTask(page, 'T_notif');
+  const name = page.locator('[data-testid="ade-task-name"]');
+  const original = await name.inputValue();
+  await name.fill('Discard me');
+  await name.press('Escape');
+  await expect(name).toHaveValue(original);
+  expect(updates(control)).toHaveLength(0);
+});
+
 test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_notif');

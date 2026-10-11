@@ -32,6 +32,7 @@ import { useEventListener, useFocus } from '@vueuse/core';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
+import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { codiconName, PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -366,6 +367,7 @@ async function checkoutRemote(row: RefRow): Promise<void> {
 // opens its own for tag rows, since its rows are not in this file's own DOM).
 // ---------------------------------------------------------------------------------------
 const rowMenu = useSectionMenu();
+const contextMenuStore = useContextMenuStore();
 const renaming = ref<string | undefined>(undefined);
 const forceDeleteCandidate = ref<string | undefined>(undefined);
 
@@ -397,7 +399,9 @@ async function onRefMenuSelect(row: RefRow, id: string): Promise<void> {
     return;
   }
   if (id === 'renameRef') {
-    renaming.value = row.shortName;
+    contextMenuStore.afterClose(() => {
+      renaming.value = row.shortName;
+    });
     return;
   }
   if (id === 'reviewBranch') {

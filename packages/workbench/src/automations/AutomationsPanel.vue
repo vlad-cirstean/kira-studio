@@ -290,9 +290,10 @@ function onCollectionContextMenu(e: MouseEvent, collection: ScriptCollection): v
       id: 'rename',
       label: 'Rename',
       icon: 'edit',
-      run: () => {
-        renamingId.value = collection.id;
-      },
+      run: () =>
+        contextMenuStore.afterClose(() => {
+          renamingId.value = collection.id;
+        }),
     },
     { type: 'separator' },
     {

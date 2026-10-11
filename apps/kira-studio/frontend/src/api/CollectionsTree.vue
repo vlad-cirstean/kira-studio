@@ -71,7 +71,7 @@ const actions: CollectionMenuActions = {
   newGrpcRequest: (row) => void collectionsStore.createGrpcItem(row.collectionId, folderTarget(row)),
   newFolder: (row) => void collectionsStore.createItem(row.collectionId, folderTarget(row), 'folder'),
   newCollection: () => void collectionsStore.createCollection(),
-  rename: collectionsStore.beginRename,
+  rename: (row) => contextMenuStore.afterClose(() => collectionsStore.beginRename(row)),
   collections: () => collectionsStore.collections,
   moveTo: (row, collectionId) => void collectionsStore.moveRow(row, collectionId),
   moveToNewCollection: (row) => void collectionsStore.moveRowToNewCollection(row),

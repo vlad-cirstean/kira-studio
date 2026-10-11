@@ -299,6 +299,7 @@ test('a pending base shows its tag, Retry rebase, and Abort rebase asks first', 
   await expect(page.locator(t('ade-panel-action-rebase-retry'))).toContainText('Retry rebase');
   await page.locator(t('ade-panel-action-abort-rebase')).click();
   await expect(page.getByText('Abort the rebase of feat/oauth-login?')).toBeVisible();
+  await expect(page.locator(t('ade-confirm-no'))).toHaveText('Keep');
   expect(calls(control, IPC.adeTaskAbortRebase)).toHaveLength(0);
   await page.getByRole('button', { name: 'Abort rebase' }).click();
   await expect.poll(() => calls(control, IPC.adeTaskAbortRebase)).toHaveLength(1);

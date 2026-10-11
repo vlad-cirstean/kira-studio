@@ -48,6 +48,7 @@ export const useContextMenuStore = defineStore('contextMenu', () => {
   });
   const focusReturn = useFocusReturn();
   let onRestoreFocus: (() => void) | undefined;
+  const pendingAfterClose: (() => void)[] = [];
 
   // P83 §9.2: a point, not an event — a dropdown anchored under a button (TabStrip.vue's "+") has
   // no MouseEvent of its own to read clientX/clientY from. openContextMenu below is now this plus
@@ -87,6 +88,19 @@ export const useContextMenuStore = defineStore('contextMenu', () => {
     focusReturn.restore(fallback);
   }
 
+  /** Runs `fn` once the menu has closed and given focus back. For an item that moves focus itself
+   *  (inline rename): the open menu traps focus, and its close would take it back from the field. */
+  function afterClose(fn: () => void): void {
+    if (state.open) pendingAfterClose.push(fn);
+    else fn();
+  }
+
+  /** Called by the menu once its close has finished. */
+  function runAfterClose(): void {
+    const pending = pendingAfterClose.splice(0);
+    for (const fn of pending) fn();
+  }
+
   return {
     ...toRefs(state),
     openContextMenuAt,
@@ -94,6 +108,8 @@ export const useContextMenuStore = defineStore('contextMenu', () => {
     openContextMenuFor,
     closeContextMenu,
     restoreFocus,
+    afterClose,
+    runAfterClose,
   };
 });
 

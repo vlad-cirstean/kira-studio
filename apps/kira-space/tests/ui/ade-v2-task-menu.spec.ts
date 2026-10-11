@@ -91,6 +91,11 @@ test('Shift+F10 on the card head and the panel More button open it', async ({ re
   await page.keyboard.press('Escape');
   await expect(page.locator(t('context-menu'))).toHaveCount(0);
 
+  await page.keyboard.press('ContextMenu');
+  await expect(page.locator(item('ade-task-sessions'))).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(t('context-menu'))).toHaveCount(0);
+
   await page.locator(t('ade-panel-more')).click();
   await expect(page.locator(item('ade-task-sessions'))).toBeVisible();
 });

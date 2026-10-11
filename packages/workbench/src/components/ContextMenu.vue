@@ -38,14 +38,11 @@ function hintParts(hint: string | readonly TextPart[] | undefined): readonly Tex
 }
 
 // reka would return focus to the 0x0 trigger; the element that held it before the menu opened gets
-// it instead, unless the chosen item already moved focus into a dialog or a text field (inline
-// rename).
+// it instead, unless the chosen item already moved focus into a dialog.
 function onCloseAutoFocus(event: Event): void {
   event.preventDefault();
-  const active = document.activeElement;
-  if (active?.closest('[data-slot="dialog-content"]')) return;
-  if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
-  contextMenuStore.restoreFocus();
+  if (!document.activeElement?.closest('[data-slot="dialog-content"]')) contextMenuStore.restoreFocus();
+  contextMenuStore.runAfterClose();
 }
 
 async function onItemClick(item: MenuItem): Promise<void> {

@@ -14,7 +14,6 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
-import { until } from '@vueuse/core';
 import { copyAnnounced } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -126,10 +125,10 @@ const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: canc
 // the prompt.
 const renamingRepoId = ref<string | null>(null);
 
-// Start the rename once the menu closes; the menu leaves focus alone when a text field holds it.
-async function startRepoRename(id: string): Promise<void> {
-  await until(() => contextMenuStore.open).toBe(false);
-  renamingRepoId.value = id;
+function startRepoRename(id: string): void {
+  contextMenuStore.afterClose(() => {
+    renamingRepoId.value = id;
+  });
 }
 
 async function onRenameWorktreeRecord(id: string, currentName: string): Promise<void> {
