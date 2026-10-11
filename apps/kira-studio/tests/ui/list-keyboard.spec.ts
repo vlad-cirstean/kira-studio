@@ -1,8 +1,29 @@
+import type { Page } from '@playwright/test';
+import { DATA_OP } from '@shared/protocol/data-ops';
+import {
+  controlSnapshots as redisControl,
+  portSnapshots as redisPorts,
+} from '../ipc/redis/redis.fixture';
+import { controlSnapshots as sqsControl, portSnapshots as sqsPorts } from '../ipc/sqs/sqs.fixture';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { grpcTab, modeTab, openHttpModeAndNewRequest } from './support/apiMode';
+import { connectAndExpand, connectionCreateArgs, openConsoleFromMenu } from './support/connect';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
-import { postgresConnectionSummary } from './support/postgresFixture';
+import {
+  mongoConnectionSummary,
+  WIDGETS_BODIES,
+  WIDGETS_IDS,
+  WIDGETS_PATH,
+  widgetsFixture,
+} from './support/mongoFixture';
+import {
+  ORDER_ITEMS_PATH,
+  orderItemsFixture,
+  postgresConnectionSummary,
+} from './support/postgresFixture';
+import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // P264: one key set for every list. The project tree is the Studio list bound through the shared
 // useListNavigation today (Left/Right and expansion are covered in tree.spec.ts); rows here are
@@ -263,4 +284,411 @@ test('grpc history — arrows and Home/End move between calls', async ({ relaunc
   await page.keyboard.press('Home');
   await expect(rows.nth(0)).toBeFocused();
   await expect(page.locator('[data-testid="grpc-history-row"][tabindex="0"]')).toHaveCount(1);
+});
+
+// --- redis Browse and KeyValue ----------------------------------------------------------------
+
+const REDIS_DB0 = 'database:db0';
+const REDIS_USER_NS = `${REDIS_DB0}/namespace:user`;
+const REDIS_USER1_NS = `${REDIS_USER_NS}/namespace:1`;
+const REDIS_BIGHASH = `${REDIS_USER1_NS}/key:user%3A1%3Abighash`;
+const MENU = '[data-testid="context-menu"]';
+
+async function openRedisBrowse(page: Page): Promise<void> {
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await (await findRow(page, REDIS_DB0)).dblclick();
+  await expect(page.locator('[data-testid="browse-view"]')).toHaveAttribute(
+    'data-level',
+    REDIS_DB0,
+  );
+}
+
+test('browse — arrows, Home/End, Space selects, Enter opens, Shift+F10 menu and focus return', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: redisControl, stream: redisPorts });
+  await openRedisBrowse(page);
+  const view = page.locator('[data-testid="browse-view"]');
+  const rows = view.locator('[data-testid="browse-row"]');
+  await expect(rows).toHaveCount(7);
+
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await expect(view.locator('[data-testid="browse-row"][tabindex="0"]')).toHaveCount(1);
+  await page.keyboard.press('End');
+  await expect(rows.nth(6)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(6)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(rows.nth(0)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.nth(0)).toBeFocused();
+
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Space');
+  await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true');
+
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator(MENU)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(MENU)).toHaveCount(0);
+  await expect(rows.nth(1)).toBeFocused();
+
+  const userRow = view.locator(`[data-testid="browse-row"][data-path="${REDIS_USER_NS}"]`);
+  await userRow.focus();
+  await page.keyboard.press('Enter');
+  await expect(view).toHaveAttribute('data-level', REDIS_USER_NS);
+});
+
+test('keyvalue — arrows, Home/End, Space selects, Shift+F10 menu and focus return', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: redisControl, stream: redisPorts });
+  await openRedisBrowse(page);
+  const browse = page.locator('[data-testid="browse-view"]');
+  await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_USER_NS}"]`).dblclick();
+  await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_USER1_NS}"]`).dblclick();
+  await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_BIGHASH}"]`).dblclick();
+  const view = page.locator(`[data-testid="keyvalue-view"][data-path="${REDIS_BIGHASH}"]`);
+  const rows = view.locator('[data-testid="keyvalue-row"]');
+  await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await expect(view.locator('[data-testid="keyvalue-row"][tabindex="0"]')).toHaveCount(1);
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.nth(0)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.nth(0)).toBeFocused();
+
+  // 100 rows are virtualized: End jumps past the rendered window and renders the last row.
+  await page.keyboard.press('End');
+  await expect(rows.last()).toBeFocused();
+  await expect(rows.last()).toContainText('100');
+  await page.keyboard.press('Home');
+  await expect(rows.first()).toBeFocused();
+  await expect(rows.first()).toContainText('1');
+
+  // Selecting a row publishes it to the cell editor panel.
+  await expect(page.locator('[data-testid="cell-editor-panel"]')).toHaveCount(0);
+  await page.keyboard.press('Space');
+  await expect(page.locator('[data-testid="cell-editor-panel"]')).toBeVisible();
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator(MENU)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(MENU)).toHaveCount(0);
+  await expect(rows.first()).toBeFocused();
+});
+
+// --- documents ----------------------------------------------------------------------------------
+
+test('documents — arrows, Home/End, Space selects, Enter expands, Shift+F10 menu and focus return', async ({
+  relaunch,
+}) => {
+  const fixture = widgetsFixture('conn-doc-kb');
+  const { window: page } = await relaunch({
+    control: [
+      {
+        channel: IPC.connectionsList,
+        response: [mongoConnectionSummary('conn-doc-kb', 'Mongo KB', 'red')],
+      },
+      ...fixture.control,
+    ],
+    stream: fixture.port,
+  });
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await expandRow(page, 'database:kira_test');
+  await (await findRow(page, WIDGETS_PATH)).dblclick();
+  const view = page.locator('[data-testid="document-view"]');
+  const rows = view.locator('[data-testid="document-row"] [role="option"][data-nav-key]');
+  await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await expect(view.locator('[role="option"][data-nav-key][tabindex="0"]')).toHaveCount(1);
+  await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toBeFocused();
+
+  await page.keyboard.press('End');
+  await expect(rows.last()).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(rows.first()).toBeFocused();
+
+  const toggle = rows.first().locator('[data-testid="document-toggle-expand"]');
+  await expect(toggle).toHaveAttribute('aria-label', 'Collapse');
+  await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-label', 'Expand');
+  await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-label', 'Collapse');
+
+  await page.keyboard.press('Space');
+  await expect(rows.first()).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator(MENU)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(MENU)).toHaveCount(0);
+  await expect(rows.first()).toBeFocused();
+});
+
+// --- stream ---------------------------------------------------------------------------------------
+
+test('stream — arrows, Home/End, Space selects, Shift+F10 menu and focus return', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: sqsControl, stream: sqsPorts });
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await (await findRow(page, 'queue:orders-queue')).dblclick();
+  const view = page.locator('[data-testid="stream-view"][data-path="queue:orders-queue"]');
+  await view.locator('[data-testid="stream-poll"]').click();
+  const rows = view.locator('[data-testid="stream-row"] [role="option"][data-nav-key]');
+  await expect(rows).toHaveCount(5, { timeout: 15_000 });
+
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await expect(view.locator('[data-testid="stream-row"] [data-nav-key][tabindex="0"]')).toHaveCount(
+    1,
+  );
+  await page.keyboard.press('End');
+  await expect(rows.nth(4)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(4)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toBeFocused();
+
+  await page.keyboard.press('Space');
+  await expect(rows.first()).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator(MENU)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(MENU)).toHaveCount(0);
+  await expect(rows.first()).toBeFocused();
+});
+
+// --- console result grid ----------------------------------------------------------------------
+
+test('console key-value result — arrows, Home/End, Space selects, Shift+F10 menu and focus return', async ({
+  relaunch,
+}) => {
+  const ports = structuredClone(redisPorts);
+  const exec = ports.find((p) => p.op === DATA_OP.execute);
+  if (!exec) throw new Error('redis fixture has no execute snapshot');
+  const page0 = (exec.response as { pages: { fields: string[]; values: string[] }[] }).pages[0];
+  page0.fields = ['alpha', 'bravo', 'charlie', 'delta'];
+  page0.values = ['1', '2', '3', '4'];
+  const { window: page } = await relaunch({ control: redisControl, stream: ports });
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await openRowMenu(page, REDIS_DB0);
+  await page.click('[data-testid="menu-item-open-console"]');
+  const consoleView = page.locator('[data-testid="console-view"]');
+  await consoleView.locator('.view-lines').click();
+  await page.keyboard.type('DBSIZE');
+  await page.click('[data-testid="console-run-statement"]');
+  const rows = consoleView.locator('[data-testid="console-result-kv-row"]');
+  await expect(rows).toHaveCount(4);
+
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await expect(
+    consoleView.locator('[data-testid="console-result-kv-row"][tabindex="0"]'),
+  ).toHaveCount(1);
+  await page.keyboard.press('End');
+  await expect(rows.nth(3)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(3)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(rows.nth(0)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.nth(0)).toBeFocused();
+
+  await page.keyboard.press('Space');
+  await expect(rows.first()).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator(MENU)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(MENU)).toHaveCount(0);
+  await expect(rows.first()).toBeFocused();
+});
+
+test('console document result — arrows, Home/End, Enter expands, Shift+F10 menu and focus return', async ({
+  relaunch,
+}) => {
+  const fixture = widgetsFixture('conn-doc-kb');
+  const statement = 'db.widgets.find()';
+  const { window: page } = await relaunch({
+    control: [
+      {
+        channel: IPC.connectionsList,
+        response: [mongoConnectionSummary('conn-doc-kb', 'Mongo KB', 'red')],
+      },
+      ...fixture.control,
+    ],
+    stream: [
+      ...fixture.port,
+      {
+        op: DATA_OP.execute,
+        payload: {
+          connectionId: 'conn-doc-kb',
+          path: 'database:kira_test',
+          statements: [statement],
+        },
+        response: {
+          kind: 'execute',
+          pages: [
+            {
+              kind: 'document',
+              ids: WIDGETS_IDS.slice(0, 4),
+              bodies: WIDGETS_BODIES.slice(0, 4),
+              position: {
+                offset: 0,
+                pageSize: 4,
+                hasMore: false,
+                nextToken: null,
+                prevToken: null,
+                strategy: 'offset',
+              },
+            },
+          ],
+        },
+      },
+    ],
+  });
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await openRowMenu(page, 'database:kira_test');
+  await page.click('[data-testid="menu-item-open-console"]');
+  const consoleView = page.locator('[data-testid="console-view"]');
+  await consoleView.locator('.view-lines').click();
+  await page.keyboard.type(statement);
+  await page.click('[data-testid="console-run-statement"]');
+  const rows = consoleView.locator(
+    '[data-testid="console-result-doc-row"] [role="option"][data-nav-key]',
+  );
+  await expect(rows).toHaveCount(4);
+
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(rows.nth(3)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(rows.first()).toBeFocused();
+
+  const toggle = rows.first().locator('[data-testid="document-toggle-expand"]');
+  const before = await toggle.getAttribute('aria-label');
+  await page.keyboard.press('Enter');
+  await expect(toggle).not.toHaveAttribute('aria-label', before ?? '');
+  await page.keyboard.press('Space');
+  await expect(rows.first()).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator(MENU)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(MENU)).toHaveCount(0);
+  await expect(rows.first()).toBeFocused();
+});
+
+// --- saved list menu type-ahead -----------------------------------------------------------------
+
+test('saved queries popover — type-ahead jumps by first letter and prefix, Enter applies', async ({
+  relaunch,
+}) => {
+  const id = 'conn-saved-kb';
+  const saved = ['Alpha', 'Apple', 'Bravo', 'Beta'].map((name, i) => ({
+    kind: 'console' as const,
+    id: `saved-${i}`,
+    connectionId: id,
+    path: ORDER_ITEMS_PATH,
+    name,
+    pinned: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    usedAt: null,
+    body: { text: `SELECT '${name}';` },
+  }));
+  const fixture = orderItemsFixture(id);
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [] },
+      {
+        channel: IPC.connectionsCreate,
+        args: connectionCreateArgs('Saved DB', 'green'),
+        response: postgresConnectionSummary(id, 'Saved DB', 'green'),
+      },
+      ...fixture.control,
+      {
+        channel: IPC.queriesListConsole,
+        args: { connectionId: id, path: ORDER_ITEMS_PATH },
+        response: saved,
+      },
+      { channel: IPC.queriesTouch, args: { id: 'saved-3' }, response: undefined },
+    ],
+    stream: fixture.port,
+  });
+  await connectAndExpand(page, 'Saved DB', 'green');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  await page.click('[data-testid="console-saved-toggle"]');
+  const entries = page.locator('[data-testid="console-saved-entry"]');
+  await expect(entries).toHaveCount(4);
+
+  await entries.first().focus();
+  await page.keyboard.press('b');
+  await expect(entries.nth(2)).toBeFocused();
+  await page.keyboard.press('b');
+  await expect(entries.nth(3)).toBeFocused();
+  await page.keyboard.press('b');
+  await expect(entries.nth(2)).toBeFocused();
+  // After the buffer resets, a two-letter prefix picks the matching row.
+  await page.waitForTimeout(600);
+  await page.keyboard.type('be');
+  await expect(entries.nth(3)).toBeFocused();
+  await page.waitForTimeout(600);
+  await page.keyboard.press('a');
+  await expect(entries.nth(0)).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => editorText(page.locator('[data-testid="console-view"]')))
+    .toContain("SELECT 'Alpha';");
 });
