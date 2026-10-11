@@ -15,7 +15,7 @@ interface ActBase {
 }
 
 export type RebaseAct =
-  | (ActBase & { kind: 'rebase'; onto: BaseChoice | null; retry: boolean })
+  | (ActBase & { kind: 'rebase'; onto: BaseChoice | null; isRetry: boolean })
   | (ActBase & { kind: 'queue'; withId: string })
   | (ActBase & { kind: 'changeBase'; draft: boolean })
   | (ActBase & { kind: 'abortRebase' });
@@ -86,19 +86,19 @@ function lastRebaseRun(i: RebaseActInput, branchId: string): Run | null {
     .reduce<Run | null>((best, r) => (!best || r.attempt >= best.attempt ? r : best), null);
 }
 
-function rebaseTargets(i: RebaseActInput, rootId: string): { id: string; retry: boolean }[] {
+function rebaseTargets(i: RebaseActInput, rootId: string): { id: string; isRetry: boolean }[] {
   const b = i.branch;
   const root = i.graph.byBranch.get(rootId) as Branch;
   const conflicts = b.conflictCheck === 'done' && b.conflictsIfRebased.length > 0;
   const lastRun = lastRebaseRun(i, b.id);
-  const retry =
+  const isRetry =
     b.basePendingFrom !== '' || lastRun?.state === 'failed' || lastRun?.state === 'stuck';
-  const targets: { id: string; retry: boolean }[] = [];
-  if (retry) targets.push({ id: b.id, retry: true });
-  else if (conflicts && rootId !== b.id) targets.push({ id: b.id, retry: false });
+  const targets: { id: string; isRetry: boolean }[] = [];
+  if (isRetry) targets.push({ id: b.id, isRetry: true });
+  else if (conflicts && rootId !== b.id) targets.push({ id: b.id, isRetry: false });
   const rootStale = root.behind > 0 || (conflicts && rootId === b.id);
-  if (root.kind === 'mine' && rootStale && !(retry && rootId === b.id)) {
-    targets.push({ id: rootId, retry: false });
+  if (root.kind === 'mine' && rootStale && !(isRetry && rootId === b.id)) {
+    targets.push({ id: rootId, isRetry: false });
   }
   return targets;
 }
@@ -108,15 +108,15 @@ function rebaseBaseActs(i: RebaseActInput, rootId: string): RebaseAct[] {
   return rebaseTargets(i, rootId).map((t) => {
     const why = blocker(i, t.id, true);
     let id = 'rebase-base';
-    if (t.retry) id = 'rebase-retry';
+    if (t.isRetry) id = 'rebase-retry';
     else if (t.id === b.id && rootId !== b.id) id = 'rebase-self';
     return {
       kind: 'rebase',
       id,
-      label: [t.retry ? 'Retry rebase onto ' : 'Rebase onto ', baseLabel(i, t.id)],
+      label: [t.isRetry ? 'Retry rebase onto ' : 'Rebase onto ', baseLabel(i, t.id)],
       branchId: t.id,
       onto: null,
-      retry: t.retry,
+      isRetry: t.isRetry,
       tip: why ?? [
         'Rebase ',
         part('branch', (i.graph.byBranch.get(t.id) as Branch).name),
@@ -141,7 +141,7 @@ function followAct(i: RebaseActInput): RebaseAct[] {
       label: ['Rebase onto ', part('base', followName)],
       branchId: b.id,
       onto: { ref: '', branchId: follow.id },
-      retry: false,
+      isRetry: false,
       tip: why ?? ['Shares ', follow.file, ' with ', part('base', followName), '; rebase onto it'],
       disabled: why !== null,
     },
@@ -179,7 +179,7 @@ function queueAct(i: RebaseActInput, rootId: string): RebaseAct[] {
       label,
       branchId: rootId,
       onto: { ref: '', branchId: conf.with },
-      retry: false,
+      isRetry: false,
       tip,
       disabled: why !== null,
     },

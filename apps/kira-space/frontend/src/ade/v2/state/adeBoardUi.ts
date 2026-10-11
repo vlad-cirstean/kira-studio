@@ -1,4 +1,4 @@
-import { useLocalStorage } from '@vueuse/core';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { OpenSessionEvent } from '../wire';
@@ -27,9 +27,9 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const actionError = ref<Record<string, string>>({});
   /** Per repo: what the last fetch changed, shown on its chip until the next fetch. */
   const refreshSummary = ref<Record<string, string>>({});
-  const showAllItems = useLocalStorage('kira.ade.showAllItems', false);
-  const showHistory = useLocalStorage('kira.ade.showHistory', false);
-  const hiddenRepoIds = useLocalStorage<string[]>('kira.ade.hiddenRepoIds', []);
+  const showAllItems = usePersistedState('kira.ade.showAllItems', false);
+  const showHistory = usePersistedState('kira.ade.showHistory', false);
+  const hiddenRepoIds = usePersistedState<string[]>('kira.ade.hiddenRepoIds', []);
 
   function select(taskId: string | null): void {
     selectedTaskId.value = taskId;

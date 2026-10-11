@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
-import { useTimeAgo } from '@vueuse/core';
+import { useRelativeTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useRepoLinksStore } from '../../repo/state/repoLinks';
 import { repoText } from '../../state/coderepos';
-import { adeAgoOptions } from './ago';
 import type { CandidateBranch } from './wire';
 
 const props = defineProps<{ branch: CandidateBranch; repo: string }>();
 const emit = defineEmits<{ pick: [] }>();
 
-const ago = useTimeAgo(() => props.branch.lastCommitAt, adeAgoOptions);
+const ago = useRelativeTime(() => props.branch.lastCommitAt);
 const repoLinks = useRepoLinksStore();
 const repoLabel = computed(() => repoText(repoLinks.repoColorOf(props.branch.codeRepoId)));
 </script>

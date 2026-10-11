@@ -3,12 +3,12 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
-import { useTimeAgo } from '@vueuse/core';
+import { useRelativeTime } from '@workbench/behaviour/format';
+import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
-import { adeAgoOptions } from '../ago';
 import { backlogPatch, parseGithub } from '../board/panelFacts';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import AdeLinkRow from '../panel/AdeLinkRow.vue';
@@ -23,14 +23,7 @@ const emit = defineEmits<{ promote: []; remove: [] }>();
 
 const update = useUpdateBacklogItem();
 const error = ref('');
-const title = ref(props.item.text);
-watch(
-  () => props.item.text,
-  (t) => {
-    title.value = t;
-  },
-);
-const ago = useTimeAgo(() => props.item.addedAt, adeAgoOptions);
+const ago = useRelativeTime(() => props.item.addedAt);
 
 async function write(over: Parameters<typeof backlogPatch>[0]): Promise<boolean> {
   error.value = '';
@@ -43,20 +36,18 @@ async function write(over: Parameters<typeof backlogPatch>[0]): Promise<boolean>
   }
 }
 
+const titleEdit = useInlineEdit({
+  source: () => props.item.text,
+  commit: async (text) => {
+    await write({ text });
+  },
+});
+
 const links = useLinkFields(
   () => props.item.githubUrl,
   async (patch: LinkPatch) => ((await write(patch)) ? null : error.value),
 );
 const jira = computed(() => props.item.jira);
-
-async function commitTitle(): Promise<void> {
-  const text = title.value.trim();
-  if (!text) {
-    title.value = props.item.text;
-    return;
-  }
-  if (text !== props.item.text) await write({ text });
-}
 
 function saveNotes(_id: string, value: string): void {
   void write({ notes: value });
@@ -97,11 +88,12 @@ function saveNotes(_id: string, value: string): void {
       <Label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">Title</Label>
       <Input
         id="ade-backlog-title-input"
-        v-model="title"
+        :model-value="titleEdit.text.value"
         class="font-medium"
         data-testid="ade-backlog-title-input"
-        @blur="commitTitle"
-        @keydown.enter="commitTitle"
+        @update:model-value="titleEdit.onInput"
+        @blur="titleEdit.onCommit"
+        @keydown="titleEdit.onKeydown"
       />
       <AdeLinkRow
         id="ade-backlog-jira"

@@ -1,4 +1,4 @@
-import { useClipboard } from '@vueuse/core';
+import { useCopy } from '@workbench/behaviour/clipboard';
 import { errorText } from '@workbench/bridge/codedError';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { type MaybeRefOrGetter, toValue } from 'vue';
@@ -40,7 +40,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
   const setPlan = useSetPlan();
   const stopRun = useStopRun();
   const update = useUpdateTask();
-  const { copy } = useClipboard();
+  const { copy } = useCopy();
   const reviewCode = useReviewCode();
   const automation = useRunAutomation();
   let anchor: HTMLElement | null = null;
@@ -97,7 +97,8 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
         case 'link':
           return await control.linkOpenExternal(cmd.url);
         case 'copy':
-          return await copy(cmd.text);
+          await copy(cmd.text);
+          return;
         case 'review':
           return reviewCode.open(taskId, cmd.branchId, anchor);
         case 'archive':

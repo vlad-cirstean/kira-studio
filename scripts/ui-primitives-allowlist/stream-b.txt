@@ -9,18 +9,6 @@ apps/kira-space/frontend/mobile/screens/TerminalScreen.vue
 apps/kira-space/frontend/mobile/state/useAdeWrites.ts
 apps/kira-space/frontend/mobile/state/useAgentsModel.ts
 apps/kira-space/frontend/mobile/terminal/useRemoteTerminal.ts
-apps/kira-space/frontend/src/ade/v2/AdeAbortRebaseDialog.vue
-apps/kira-space/frontend/src/ade/v2/AdeAddPopover.vue
-apps/kira-space/frontend/src/ade/v2/AdeCandidateRow.vue
-apps/kira-space/frontend/src/ade/v2/AdeConfirmDialog.vue
-apps/kira-space/frontend/src/ade/v2/AdeForcePushDialog.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPanel.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue
-apps/kira-space/frontend/src/ade/v2/board/actions.ts
-apps/kira-space/frontend/src/ade/v2/board/rebaseActions.ts
-apps/kira-space/frontend/src/ade/v2/dialog/mobileLaunch.ts
-apps/kira-space/frontend/src/ade/v2/needs/AdeAllSessionRow.vue
-apps/kira-space/frontend/src/ade/v2/needs/useNeedsAction.ts
 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeBranchPanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeLinkRow.vue
@@ -28,24 +16,9 @@ apps/kira-space/frontend/src/ade/v2/panel/AdeRunLog.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeRunOutcome.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeTaskTab.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeWorktreeSetup.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdePlanView.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdeRepoChip.vue
-apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue
-apps/kira-space/frontend/src/ade/v2/plan/usePlanModel.ts
-apps/kira-space/frontend/src/ade/v2/plan/useTaskMenu.ts
-apps/kira-space/frontend/src/ade/v2/queries.ts
-apps/kira-space/frontend/src/ade/v2/readQueries.ts
 apps/kira-space/frontend/src/ade/v2/review/AdeReviewCompose.vue
-apps/kira-space/frontend/src/ade/v2/run/AdeRunDialog.vue
-apps/kira-space/frontend/src/ade/v2/run/useTaskAction.ts
-apps/kira-space/frontend/src/ade/v2/sessions/AdeHeadlessPane.vue
 apps/kira-space/frontend/src/ade/v2/sessions/AdeSessionId.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedRow.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeTakeOverDialog.vue
-apps/kira-space/frontend/src/ade/v2/sessions/AdeTuiPane.vue
 apps/kira-space/frontend/src/ade/v2/shell/AdeCaptureBox.vue
-apps/kira-space/frontend/src/ade/v2/state/adeBoardUi.ts
 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowEditor.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue
 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowYaml.vue
@@ -61,3 +34,4 @@ packages/workbench/src/memory/settings/SemanticModelSection.vue
 permanent U57 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # markdown heading anchors scroll the target to the pane top; revealElement's nearest would leave it at an edge
 permanent U62 apps/kira-space/frontend/src/views/repo/RepoFileView.vue # Monaco editor.focus(), not DOM focus
 permanent U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
+permanent U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards between day lists with sort off; useSortableReorder only reorders within one list

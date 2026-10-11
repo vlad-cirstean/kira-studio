@@ -4,8 +4,8 @@ import { toValue } from 'vue';
 import { useAdeReader } from './reader';
 import type { LogKind } from './wire';
 
-// Read side of the ADE queries, transport-agnostic (`useAdeReader`). Push-driven: every query is
-// `staleTime: Infinity` and the signals installed per app (`installAdeReadSignals`) invalidate.
+// Read side of the ADE queries, transport-agnostic (`useAdeReader`). Push-driven: the client's default
+// staleTime is Infinity and the signals installed per app (`installAdeReadSignals`) invalidate.
 
 export const boardKey = ['adetask', 'board'] as const;
 export const prsKey = ['adetask', 'prs'] as const;
@@ -20,7 +20,6 @@ export function useBoard() {
   return useQuery({
     queryKey: boardKey,
     queryFn: () => reader.board(),
-    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
@@ -29,7 +28,6 @@ export function usePrs() {
   return useQuery({
     queryKey: prsKey,
     queryFn: () => reader.prs(),
-    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
@@ -38,7 +36,6 @@ export function useWorkflows() {
   return useQuery({
     queryKey: workflowsKey,
     queryFn: () => reader.workflows(),
-    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
@@ -47,7 +44,6 @@ export function useSessions() {
   return useQuery({
     queryKey: sessionsKey,
     queryFn: () => reader.sessions(),
-    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
@@ -56,7 +52,6 @@ export function useBacklog() {
   return useQuery({
     queryKey: backlogKey,
     queryFn: () => reader.backlog(),
-    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
@@ -66,7 +61,6 @@ export function useRepoNames() {
   return useQuery({
     queryKey: repoNamesKey,
     queryFn: () => reader.repos(),
-    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
@@ -76,7 +70,6 @@ export function useLog(kind: MaybeRefOrGetter<LogKind>, id: MaybeRefOrGetter<str
   return useQuery(() => ({
     queryKey: logKey(toValue(kind), toValue(id)),
     queryFn: () => reader.readLog({ kind: toValue(kind), id: toValue(id), afterSeq: 0 }),
-    staleTime: Number.POSITIVE_INFINITY,
     gcTime: 30_000,
   }));
 }

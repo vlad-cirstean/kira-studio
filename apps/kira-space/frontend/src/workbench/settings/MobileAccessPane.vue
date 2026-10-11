@@ -12,11 +12,11 @@ import { formatDateTime, formatRelative } from '@workbench/behaviour/format';
 import { TIMING } from '@workbench/behaviour/timing';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref, useId, watch } from 'vue';
+import RelativeTime from '../../components/RelativeTime.vue';
 import { useMobileAccessStore } from '../../state/mobileAccess';
 import { useMobileTerminalsStore } from '../../state/mobileTerminals';
 import { MOBILE_PORT_RANGE } from '../../state/settingsDomain';
 import MobileQr from './MobileQr.vue';
-import RelativeTime from './RelativeTime.vue';
 import type { SettingsPaneProps } from './types';
 
 // Bypasses draft/Save like ConnectedEditorsPane: enabling, trusting a network, port changes and

@@ -1,4 +1,5 @@
 import type { TextPart } from '@theme/varText';
+import { formatDuration } from '@workbench/behaviour/format';
 import type { Branch, Plan, Run, Session, Task } from '../wire';
 import { type BranchGraph, shortBranchName } from './branchGraph';
 import type { TaskProgress } from './progress';
@@ -223,7 +224,7 @@ export interface BranchTag {
 }
 
 export function tagLabel(tag: { label: string; since?: number }, nowMs: number): string {
-  return tag.since === undefined ? tag.label : `⚙ preparing ${formatElapsed(nowMs - tag.since)}`;
+  return tag.since === undefined ? tag.label : `⚙ preparing ${formatDuration(nowMs - tag.since)}`;
 }
 
 export interface BranchTagInput {
@@ -249,14 +250,6 @@ const tag = (label: string, tone: Tone, tip: string, actions: BranchAction[] = [
   tip,
   actions,
 });
-
-export function formatElapsed(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${s % 60}s`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
-}
 
 function nameOf(i: BranchTagInput, id: string): string {
   return i.graph.byBranch.get(id)?.name ?? id;
@@ -286,7 +279,7 @@ const preparing: Rule = (i) => {
   if (s?.state !== 'running') return null;
   return {
     ...tag(
-      `⚙ preparing ${formatElapsed(i.nowMs - s.startedAt)}`,
+      `⚙ preparing ${formatDuration(i.nowMs - s.startedAt)}`,
       'blue',
       'running the prepare-worktree script',
     ),
@@ -335,7 +328,7 @@ const SHORT: Record<RebaseAct['kind'], string> = {
 };
 
 function actionOf(act: RebaseAct): BranchAction {
-  const label = act.kind === 'rebase' && act.retry ? 'Retry rebase' : SHORT[act.kind];
+  const label = act.kind === 'rebase' && act.isRetry ? 'Retry rebase' : SHORT[act.kind];
   return {
     kind: act.kind,
     label,

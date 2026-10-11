@@ -4,10 +4,10 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { cn } from '@theme/lib/utils';
-import { useTimeAgo } from '@vueuse/core';
-import { computed, ref, watch } from 'vue';
+import { useRelativeTime } from '@workbench/behaviour/format';
+import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
+import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
-import { adeAgoOptions } from '../ago';
 import { parseGithub } from '../board/panelFacts';
 import { TONE_SOLID_CLASS } from '../tones';
 import type { BacklogItem } from '../wire';
@@ -22,14 +22,8 @@ const emit = defineEmits<{
   edit: [text: string];
 }>();
 
-const ago = useTimeAgo(() => props.item.addedAt, adeAgoOptions);
-const draft = ref(props.item.text);
-watch(
-  () => props.item.text,
-  (t) => {
-    draft.value = t;
-  },
-);
+const ago = useRelativeTime(() => props.item.addedAt);
+const edit = useInlineEdit({ source: () => props.item.text, commit: (text) => emit('edit', text) });
 
 const facts = computed(() => {
   const gh = parseGithub(props.item.githubUrl);
@@ -41,15 +35,6 @@ const facts = computed(() => {
     .filter(Boolean)
     .join(' · ');
 });
-
-function commit(): void {
-  const text = draft.value.trim();
-  if (!text) {
-    draft.value = props.item.text;
-    return;
-  }
-  if (text !== props.item.text) emit('edit', text);
-}
 </script>
 
 <template>
@@ -115,11 +100,12 @@ function commit(): void {
     <Label :for="`ade-backlog-${item.id}`" class="sr-only">Backlog item</Label>
     <Input
       :id="`ade-backlog-${item.id}`"
-      v-model="draft"
+      :model-value="edit.text.value"
       class="min-w-0 flex-1 border-transparent bg-transparent px-2 dark:bg-transparent"
       data-testid="ade-backlog-text"
-      @blur="commit"
-      @keydown.enter="commit"
+      @update:model-value="edit.onInput"
+      @blur="edit.onCommit"
+      @keydown="edit.onKeydown"
     />
     <span v-if="facts" class="max-w-2/5 shrink-0 truncate text-kira-sm text-subtle" data-testid="ade-backlog-facts">{{ facts }}</span>
   </div>

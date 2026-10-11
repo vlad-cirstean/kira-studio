@@ -38,8 +38,8 @@ test('Mark as not merging, Copy task id and Archive call their backends', async 
   await page.evaluate(() => {
     const w = window as unknown as { __clipboard: string[] };
     w.__clipboard = [];
-    navigator.clipboard.write = async (items: ClipboardItem[]) => {
-      for (const it of items) w.__clipboard.push(await (await it.getType('text/plain')).text());
+    navigator.clipboard.writeText = async (text: string) => {
+      w.__clipboard.push(text);
     };
   });
   const open = () =>

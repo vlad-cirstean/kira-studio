@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
-import { useTimeAgo } from '@vueuse/core';
+import { useRelativeTime } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import AdeTip from '../AdeTip.vue';
-import { adeAgoOptions } from '../ago';
 import AdeRunLog from '../panel/AdeRunLog.vue';
 import { useStopRun } from '../queries';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
@@ -21,7 +20,7 @@ const props = defineProps<{ view: SessionView; archived?: boolean }>();
 const takeOver = useAdeTakeOverStore();
 const stop = useStopRun();
 const error = ref('');
-const ago = useTimeAgo(() => props.view.session.lastActiveAt, adeAgoOptions);
+const ago = useRelativeTime(() => props.view.session.lastActiveAt);
 
 const runState = computed(() => props.view.run?.state ?? '');
 const needsYou = computed(() => runState.value === 'stuck' || props.view.session.activity === 'input');

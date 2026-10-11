@@ -1,5 +1,6 @@
 import type { AgentActivity } from '@shared/domain/agent';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { computed, ref, watch } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
 import { useCodeReposStore } from '../../../state/coderepos';
@@ -233,7 +234,7 @@ function buildPlanModel() {
   useIntervalFn(() => {
     now.value = new Date();
     liveNow.value = now.value;
-  }, 60_000);
+  }, TIMING.clockTickSlow);
   const setupRunning = computed(
     () => board.data.value?.branches.some((b) => b.setup?.state === 'running') ?? false,
   );
@@ -241,7 +242,7 @@ function buildPlanModel() {
     () => {
       liveNow.value = new Date();
     },
-    1000,
+    TIMING.clockTick,
     { immediate: false },
   );
   watch(

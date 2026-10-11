@@ -61,7 +61,7 @@ function rbSpec(c: DialogCtx, branchId: string) {
     label: ['Rebase onto main'],
     branchId,
     onto: null,
-    retry: false,
+    isRetry: false,
     tip: [],
     disabled: false,
   });

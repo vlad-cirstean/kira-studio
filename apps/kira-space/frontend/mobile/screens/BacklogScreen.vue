@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { adeAgoOptions } from '@ade/ago';
 import { parseGithub } from '@ade/board/panelFacts';
 import { useBacklog } from '@ade/readQueries';
 import type { BacklogItem } from '@ade/wire';
@@ -8,11 +7,11 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
-import { useTimeAgo } from '@vueuse/core';
 import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { errorText } from '@workbench/bridge/codedError';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
+import RelativeTime from '@/components/RelativeTime.vue';
 import PermissionHint from '../components/PermissionHint.vue';
 import { useAuthStore } from '../state/auth';
 import { newIntentKey, useAdeWrites } from '../state/useAdeWrites';
@@ -35,7 +34,6 @@ function facts(item: BacklogItem): string {
     .filter(Boolean)
     .join(' · ');
 }
-const ago = (at: number) => useTimeAgo(at, adeAgoOptions);
 const message = (err: unknown) => (errorText(err));
 
 async function add(): Promise<void> {
@@ -125,7 +123,7 @@ useSortableReorder(
             <span class="flex min-w-0 flex-1 flex-col gap-0.5">
               <span class="text-kira-md">{{ item.text }}</span>
               <span class="text-kira-sm text-subtle">
-                <template v-if="facts(item)">{{ facts(item) }} · </template>{{ ago(item.addedAt).value }}
+                <template v-if="facts(item)">{{ facts(item) }} · </template><RelativeTime :at="item.addedAt" />
               </span>
             </span>
           </button>

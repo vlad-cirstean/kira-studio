@@ -9,7 +9,7 @@ import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import VarText from '@theme/components/VarText.vue';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
-import { errorText } from '@workbench/bridge/codedError';
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../../state/customScripts';
 import AdeRepoTag from '../AdeRepoTag.vue';
@@ -67,8 +67,6 @@ const setups = computed(() =>
 
 const message = ref('');
 const names = ref<Record<string, string>>({});
-const error = ref('');
-const busy = ref(false);
 // Snapshot at open: a board push that renames the task must not make an untouched message read as edited.
 const opening = ref('');
 const edited = computed(() => message.value !== opening.value);
@@ -80,29 +78,23 @@ watch(
     opening.value = initial.value;
     message.value = initial.value;
     names.value = {};
-    error.value = '';
+    sending.error.value = null;
   },
 );
 
-async function send(): Promise<void> {
+const sending = useAsyncAction(async () => {
   if (!card.value) return;
-  busy.value = true;
-  error.value = '';
-  try {
-    const branchNames: Record<string, string> = {};
-    for (const r of named.value) branchNames[r.id] = (names.value[r.id] ?? '').trim();
-    await start.mutateAsync({
-      taskId: card.value.task.id,
-      branchNames,
-      message: edited.value && !smartStep.value ? message.value : '',
-    });
-    close();
-  } catch (err) {
-    error.value = errorText(err);
-  } finally {
-    busy.value = false;
-  }
-}
+  const branchNames: Record<string, string> = {};
+  for (const r of named.value) branchNames[r.id] = (names.value[r.id] ?? '').trim();
+  await start.mutateAsync({
+    taskId: card.value.task.id,
+    branchNames,
+    message: edited.value && !smartStep.value ? message.value : '',
+  });
+  close();
+});
+const { pending: busy, error } = sending;
+const send = sending.run;
 </script>
 
 <template>

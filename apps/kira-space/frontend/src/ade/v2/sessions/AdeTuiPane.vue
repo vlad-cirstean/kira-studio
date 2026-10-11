@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
-import { useDateFormat, useTimeAgo } from '@vueuse/core';
+import { useDateFormat } from '@vueuse/core';
 import { useAutomationsModule } from '@workbench/automations/module';
+import { useRelativeTime } from '@workbench/behaviour/format';
 import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref } from 'vue';
 import { useMobileTerminalsStore } from '../../../state/mobileTerminals';
 import { useTerminalsStore } from '../../../state/terminals';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import { ACTIVITY_LABEL } from '../activity';
-import { adeAgoOptions } from '../ago';
 import { useFocusSession } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeSessionId from './AdeSessionId.vue';
@@ -24,7 +24,7 @@ const terminal = useAutomationsModule();
 const focus = useFocusSession();
 const ui = useAdeBoardUiStore();
 const missing = ref(false);
-const ago = useTimeAgo(() => props.view.session.lastActiveAt, adeAgoOptions);
+const ago = useRelativeTime(() => props.view.session.lastActiveAt);
 
 const held = computed(() => terminals.terminalSession(props.view.session.terminalId) !== undefined);
 const hold = computed(() => phones.holdOf(props.view.session.terminalId));

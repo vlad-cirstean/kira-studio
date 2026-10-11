@@ -18,6 +18,8 @@ export function installMobileLaunch(): () => void {
     } catch (err) {
       failure = errorText(err);
     }
-    await control.mobileLaunchOpened(event.launch.terminalId, failure).catch(() => undefined);
+    await control.mobileLaunchOpened(event.launch.terminalId, failure).catch(() => {
+      // The phone gives up waiting on its own when this answer cannot be delivered.
+    });
   });
 }

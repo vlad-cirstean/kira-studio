@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import Spinner from '@theme/components/Spinner.vue';
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { useElementSize, useScroll } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
+import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
+import QueryState from '@workbench/components/QueryState.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, ref } from 'vue';
 import { useSettingsStore } from '../../../state/settings';
-import AdeConfirmDialog from '../AdeConfirmDialog.vue';
 import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import { dayLabel, firstWork, isoToOffset, nextWork, offsetToIso } from '../board/calendar';
 import { dayMenuFor } from '../board/dayMenu';
@@ -17,6 +16,7 @@ import { refreshNote, remoteErrorText } from '../board/panelFacts';
 import type { TimelineBand } from '../board/timeline';
 import { useRefresh, useSetPlan } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useConfirmRun } from '../useConfirmRun';
 import AdeDayBand from './AdeDayBand.vue';
 import AdeDayControls from './AdeDayControls.vue';
 import AdeHistoryBar from './AdeHistoryBar.vue';
@@ -195,20 +195,27 @@ function onDayMenu(band: TimelineBand, ev: MouseEvent): void {
   contextMenu.openContextMenu(ev, items);
 }
 
-async function runDayOff(): Promise<string | null> {
-  const d = dayOff.value;
-  const m = model.value;
-  if (!d || !m) return null;
-  await setPlan.mutateAsync(shiftPlanArgs(m.board.plan, today.value, d.ids, d.to));
-  return null;
-}
+const dayOffRun = useConfirmRun(
+  () => dayOff.value !== null,
+  async () => {
+    const d = dayOff.value;
+    const m = model.value;
+    if (!d || !m) return null;
+    await setPlan.mutateAsync(shiftPlanArgs(m.board.plan, today.value, d.ids, d.to));
+    return null;
+  },
+  () => {
+    dayOff.value = null;
+  },
+);
+const planError = computed(() => (setPlan.isError.value ? errorText(setPlan.error.value) : ''));
 
 // ---- scroll and horizon
 function scrollToDay(k: number): void {
   const el = scrollEl.value;
   const target = el?.querySelector<HTMLElement>(`[data-ade-day="${k}"]`);
   if (!el || !target) return;
-  el.scrollTop += target.getBoundingClientRect().top - el.getBoundingClientRect().top - headerHeight.value - 2;
+  scrollY.value = el.scrollTop + target.getBoundingClientRect().top - el.getBoundingClientRect().top - headerHeight.value - 2;
 }
 
 async function openHistory(): Promise<void> {
@@ -217,13 +224,13 @@ async function openHistory(): Promise<void> {
   const before = el.scrollHeight;
   ui.showHistory = true;
   await nextTick();
-  el.scrollTop = el.scrollHeight - before - 60;
+  scrollY.value = el.scrollHeight - before - 60;
 }
 
 function hideHistory(): void {
   ui.showHistory = false;
   ui.historyReach = null;
-  if (scrollEl.value) scrollEl.value.scrollTop = 0;
+  scrollY.value = 0;
 }
 
 const inHistory = computed(() => {
@@ -281,20 +288,8 @@ function onForcePush(row: BranchRowModel): void {
 
 <template>
   <div ref="scrollEl" class="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-kira border border-border bg-bg" data-testid="ade-plan">
-    <Alert v-if="boardQuery.isError.value" variant="error" strip data-testid="ade-board-error">
-      <AlertTitle>Couldn't load the board</AlertTitle>
-      <AlertDescription>{{ (boardQuery.error.value as Error | null)?.message }}</AlertDescription>
-      <AlertAction>
-        <Button variant="dialog" size="kira" @click="() => boardQuery.refetch()">Retry</Button>
-      </AlertAction>
-    </Alert>
-    <Empty v-else-if="!model" class="h-full" data-testid="ade-plan-loading">
-      <EmptyHeader>
-        <EmptyMedia><Spinner :size="24" /></EmptyMedia>
-        <EmptyTitle>Loading board…</EmptyTitle>
-      </EmptyHeader>
-    </Empty>
-    <template v-else>
+    <QueryState :query="boardQuery" :is-empty="() => false" loading-label="Loading board…">
+    <template v-if="model">
       <div ref="headerEl" class="sticky top-0 z-10 bg-bg">
         <AdePlanHeader
           :repos="chips"
@@ -307,9 +302,9 @@ function onForcePush(row: BranchRowModel): void {
         <AdeHistoryBar v-if="inHistory" @go-to-date="onGoToDate" @hide="hideHistory" @current="scrollToDay(0)" />
       </div>
       <div class="px-4 pb-4 pt-3">
-      <div v-if="setPlan.isError.value" class="mb-2">
+      <div v-if="planError" class="mb-2">
         <Alert variant="error" data-testid="ade-plan-error">
-          <AlertDescription>{{ (setPlan.error.value as Error | null)?.message }}</AlertDescription>
+          <AlertDescription>{{ planError }}</AlertDescription>
           <AlertAction>
             <Button variant="link" size="kira" @click="setPlan.reset()">Dismiss</Button>
           </AlertAction>
@@ -370,14 +365,18 @@ function onForcePush(row: BranchRowModel): void {
       </div>
       </div>
     </template>
-    <AdeConfirmDialog
+    </QueryState>
+    <ConfirmDialogView
       :open="dayOff !== null"
       :title="dayOff?.title ?? ''"
-      :text="dayOff?.text ?? ''"
-      :yes-label="dayOff?.yes ?? ''"
-      no-label="Leave it"
-      :run="runDayOff"
-      @close="dayOff = null"
+      :message="dayOff?.text ?? ''"
+      :confirm-label="dayOff?.yes ?? ''"
+      tone="primary"
+      :busy="dayOffRun.busy.value"
+      :error="dayOffRun.error.value ?? ''"
+      :testids="{ root: 'ade-confirm-dialog', cancel: 'ade-confirm-no', confirm: 'ade-confirm-yes', error: 'ade-confirm-error' }"
+      @confirm="dayOffRun.confirm"
+      @cancel="dayOff = null"
     />
     <AdeForcePushDialog :target="forcePushTarget" @close="forcePushTarget = null" />
   </div>

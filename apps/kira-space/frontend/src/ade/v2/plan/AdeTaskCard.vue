@@ -12,7 +12,8 @@ import { Kbd } from '@theme/components/ui/kbd';
 import VarText from '@theme/components/VarText.vue';
 import { errorText } from '@workbench/bridge/codedError';
 import { formatShortcut } from '@workbench/shortcuts/keys';
-import { computed } from 'vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
+import { computed, useTemplateRef } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import AdeAutomationChip from '../automation/AdeAutomationChip.vue';
 import type { BranchAction } from '../board/actions';
@@ -42,9 +43,10 @@ const reviewCode = useReviewCode();
 const choices = computed(() => reviewCode.choicesOf(props.card));
 const reviewTip = computed(() => taskReviewTip(choices.value));
 
-function onMenuKey(ev: KeyboardEvent): void {
-  if (ev.currentTarget instanceof Element) taskMenu.openAt(ev.currentTarget);
-}
+const head = useTemplateRef<HTMLElement>('head');
+useShortcut(head, ['menu.open'], () => {
+  if (head.value) taskMenu.openAt(head.value);
+});
 
 // One branch opens Change base at once; several ask which.
 const baseChoices = computed(() => {
@@ -134,6 +136,7 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
       <!-- biome-ignore lint/a11y/useSemanticElements: the header holds block content a button cannot. -->
       <div
         v-if="!card.review"
+        ref="head"
         class="box-border flex h-17 w-full cursor-pointer flex-col justify-center gap-1 border-b border-l-3 border-b-border px-2.5 py-1.5"
         :class="card.selected ? 'border-l-focus bg-hover' : 'border-l-transparent'"
         :style="headStyle"
@@ -143,8 +146,6 @@ const headStyle = computed(() => (props.card.selected ? undefined : { background
         @click="emit('select')"
         @keydown.enter.self="emit('select')"
         @keydown.space.self.prevent="emit('select')"
-        @keydown.shift.f10.prevent="onMenuKey"
-        @keydown.context-menu.prevent="onMenuKey"
       >
         <div class="flex h-4.5 min-w-0 items-center gap-1.5">
           <span

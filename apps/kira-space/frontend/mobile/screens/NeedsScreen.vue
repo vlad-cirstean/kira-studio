@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { shortAge } from '@ade/ago';
 import { TONE_TAG_CLASS } from '@ade/tones';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Alert } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@theme/components/ui/empty';
+import { formatRelative } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
@@ -83,7 +83,7 @@ async function confirmTakeOver(): Promise<void> {
           >
             <span class="flex items-center gap-2">
               <Badge variant="chip" :class="TONE_TAG_CLASS[item.tone]">{{ item.kind }}</Badge>
-              <span class="text-kira-sm text-subtle">{{ shortAge(item.ageMs) }}</span>
+              <span class="text-kira-sm text-subtle">{{ item.ageMs === null ? '' : formatRelative(0, item.ageMs) }}</span>
               <span class="ml-auto flex min-w-0 items-center gap-1.5 text-kira-sm text-subtle">
                 <StatusDot :color="model.cards.get(item.taskId)?.color" />
                 <span class="truncate">{{ model.cards.get(item.taskId)?.title }}</span>

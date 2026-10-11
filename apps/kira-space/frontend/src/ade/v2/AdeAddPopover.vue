@@ -9,6 +9,7 @@ import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Toggle } from '@theme/components/ui/toggle';
+import { matchesQuery } from '@workbench/behaviour/match';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import { useRepoLinksStore } from '../../repo/state/repoLinks';
@@ -106,12 +107,8 @@ const q = ref('');
 const candidates = useCandidates(() => open.value && tab.value === 'branch');
 const addBranch = useAddExistingBranch();
 const shown = computed<CandidateBranch[]>(() => {
-  const needle = q.value.trim().toLowerCase();
   const all = candidates.data.value?.branches ?? [];
-  if (!needle) return all;
-  return all.filter((b) =>
-    `${b.name} ${repoLabel(b.codeRepoId)} ${b.author}`.toLowerCase().includes(needle),
-  );
+  return all.filter((b) => matchesQuery(`${b.name} ${repoLabel(b.codeRepoId)} ${b.author}`, q.value));
 });
 
 async function pick(b: CandidateBranch): Promise<void> {

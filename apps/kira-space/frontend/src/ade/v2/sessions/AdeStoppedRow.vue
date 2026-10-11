@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
-import { useTimeAgo } from '@vueuse/core';
+import { useRelativeTime } from '@workbench/behaviour/format';
 import { ref } from 'vue';
-import { adeAgoOptions } from '../ago';
 import AdeRunLog from '../panel/AdeRunLog.vue';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import type { SessionView } from './sessionView';
@@ -10,7 +9,7 @@ import type { SessionView } from './sessionView';
 const props = defineProps<{ view: SessionView; archived?: boolean }>();
 
 const takeOver = useAdeTakeOverStore();
-const ago = useTimeAgo(() => props.view.session.lastActiveAt, adeAgoOptions);
+const ago = useRelativeTime(() => props.view.session.lastActiveAt);
 const open = ref(false);
 </script>
 

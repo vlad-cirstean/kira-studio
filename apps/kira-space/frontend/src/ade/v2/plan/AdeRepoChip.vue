@@ -3,12 +3,11 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Toggle } from '@theme/components/ui/toggle';
-import { useTimeAgo } from '@vueuse/core';
+import { useRelativeTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useRepoLinksStore } from '../../../repo/state/repoLinks';
 import { repoTint } from '../../../state/coderepos';
 import AdeTip from '../AdeTip.vue';
-import { adeAgoOptions } from '../ago';
 
 // One repo of the plan: name toggles its branches on and off, `↻` fetches just this repo.
 const props = defineProps<{
@@ -24,7 +23,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ toggle: []; refresh: [] }>();
 
-const ago = useTimeAgo(() => props.lastFetchAt ?? 0, adeAgoOptions);
+const ago = useRelativeTime(() => props.lastFetchAt ?? 0);
 const note = computed(() => {
   if (props.busy) return 'fetching…';
   if (props.error) return props.error;

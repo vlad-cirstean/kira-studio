@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { formatRelative } from '@workbench/behaviour/format';
 import { computed, ref } from 'vue';
-import { shortAge } from '../ago';
 import type { Tone } from '../board/actions';
 import type { NeedsItem } from '../board/needsYou';
 import AdeRunLog from '../panel/AdeRunLog.vue';
@@ -42,7 +42,7 @@ const ROW_BG_CLASS: Record<Tone, string> = {
         data-testid="ade-needs-kind"
         >{{ item.kind }}</span
       >
-      <span class="w-15 shrink-0 text-kira-md text-muted-foreground" data-testid="ade-needs-age">{{ shortAge(item.ageMs) }}</span>
+      <span class="w-19 shrink-0 text-kira-md text-muted-foreground" data-testid="ade-needs-age">{{ item.ageMs === null ? '' : formatRelative(0, item.ageMs) }}</span>
       <Button variant="dialog"
         size="kira-lg"
         class="w-23 shrink-0 "

@@ -1,5 +1,5 @@
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { errorText } from '@workbench/bridge/codedError';
-import { ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
 import type { NeedsItem } from '../board/needsYou';
 import { useApprove, useFocusSession, useRetryRun } from '../queries';
@@ -59,15 +59,10 @@ export function useNeedsAction() {
   }
 
   /** True while an action is in flight: a repeat click must not run it twice. */
-  const busy = ref(false);
+  const guarded = useAsyncAction(run);
+  const busy = guarded.pending;
   async function perform(n: NeedsItem): Promise<void> {
-    if (busy.value) return;
-    busy.value = true;
-    try {
-      await run(n);
-    } finally {
-      busy.value = false;
-    }
+    if (!busy.value) await guarded.run(n);
   }
 
   return { perform, openSession, busy };

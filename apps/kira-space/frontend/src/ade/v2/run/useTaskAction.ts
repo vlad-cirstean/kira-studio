@@ -1,5 +1,6 @@
+import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { errorText } from '@workbench/bridge/codedError';
-import { computed, type MaybeRefOrGetter, ref, toValue } from 'vue';
+import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import type { TaskAction } from '../board/actions';
 import type { CardModel } from '../plan/usePlanModel';
 import { useApprove, useRetryRun, useStageDone, useStartRun } from '../queries';
@@ -51,15 +52,10 @@ export function useTaskAction(card: MaybeRefOrGetter<CardModel>) {
   }
 
   /** True while a call is in flight: a repeat click must not launch the stage twice. */
-  const busy = ref(false);
+  const guarded = useAsyncAction(run);
+  const busy = guarded.pending;
   async function perform(): Promise<void> {
-    if (busy.value) return;
-    busy.value = true;
-    try {
-      await run();
-    } finally {
-      busy.value = false;
-    }
+    if (!busy.value) await guarded.run();
   }
 
   return { action, perform, busy };

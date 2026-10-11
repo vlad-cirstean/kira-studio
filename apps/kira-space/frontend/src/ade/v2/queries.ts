@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/vue-query';
+import { optimisticUpdate } from '@workbench/behaviour/optimistic';
 import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
 import { computed, toValue } from 'vue';
@@ -58,8 +59,8 @@ export {
   useWorkflows,
 } from './readQueries';
 
-// Board state is push-driven (`kira:adetask:board`, subscribed once in `ade/queries.ts`), so every
-// query is `staleTime: Infinity` and a write relies on the backend's own push instead of
+// Board state is push-driven (`kira:adetask:board`, subscribed once in `ade/queries.ts`), so the
+// client default keeps data fresh forever and a write relies on the backend's own push instead of
 // invalidating. The two exceptions refetch on their own: the candidate list (`staleTime: 0`, the
 // popover opens on demand) and a failed optimistic write.
 
@@ -142,16 +143,7 @@ function withTaskPatch(board: Board, args: UpdateTaskArgs): Board {
 export function useUpdateTask() {
   return useMutation({
     mutationFn: (args: UpdateTaskArgs) => control.adeTaskUpdateTask(args),
-    onMutate: async (args) => {
-      await queryClient.cancelQueries({ queryKey: boardKey, exact: true });
-      const prev = queryClient.getQueryData<Board>(boardKey);
-      if (prev) queryClient.setQueryData<Board>(boardKey, withTaskPatch(prev, args));
-      return { prev };
-    },
-    onError: (_err, _args, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData<Board>(boardKey, ctx.prev);
-      void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
-    },
+    ...optimisticUpdate<Board, UpdateTaskArgs>(queryClient, boardKey, withTaskPatch),
   });
 }
 
@@ -164,16 +156,7 @@ export function useUpdateBacklogItem() {
 export function useMoveBacklogItem() {
   return useMutation({
     mutationFn: (args: MoveBacklogItemArgs) => control.adeTaskMoveBacklogItem(args),
-    onMutate: async (args) => {
-      await queryClient.cancelQueries({ queryKey: backlogKey, exact: true });
-      const prev = queryClient.getQueryData<BacklogResult>(backlogKey);
-      if (prev) queryClient.setQueryData<BacklogResult>(backlogKey, withMovedItem(prev, args));
-      return { prev };
-    },
-    onError: (_err, _args, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData<BacklogResult>(backlogKey, ctx.prev);
-      void queryClient.invalidateQueries({ queryKey: backlogKey, exact: true });
-    },
+    ...optimisticUpdate<BacklogResult, MoveBacklogItemArgs>(queryClient, backlogKey, withMovedItem),
   });
 }
 
@@ -203,16 +186,7 @@ function withPlan(board: Board, args: SetPlanArgs): Board {
 export function useSetPlan() {
   return useMutation({
     mutationFn: (args: SetPlanArgs) => control.adeTaskSetPlan(args),
-    onMutate: async (args) => {
-      await queryClient.cancelQueries({ queryKey: boardKey, exact: true });
-      const prev = queryClient.getQueryData<Board>(boardKey);
-      if (prev) queryClient.setQueryData<Board>(boardKey, withPlan(prev, args));
-      return { prev };
-    },
-    onError: (_err, _args, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData<Board>(boardKey, ctx.prev);
-      void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
-    },
+    ...optimisticUpdate<Board, SetPlanArgs>(queryClient, boardKey, withPlan),
   });
 }
 
@@ -220,7 +194,6 @@ export function useWorkflowYaml(fileName: MaybeRefOrGetter<string>) {
   return useQuery(() => ({
     queryKey: [...workflowYamlKey, toValue(fileName)] as const,
     queryFn: () => control.adeTaskWorkflowYaml({ fileName: toValue(fileName) }),
-    staleTime: Number.POSITIVE_INFINITY,
     enabled: toValue(fileName) !== '',
   }));
 }
@@ -292,16 +265,7 @@ function withStage(board: Board, args: SetTaskStageArgs): Board {
 export function useSetTaskStage() {
   return useMutation({
     mutationFn: (args: SetTaskStageArgs) => control.adeTaskSetTaskStage(args),
-    onMutate: async (args) => {
-      await queryClient.cancelQueries({ queryKey: boardKey, exact: true });
-      const prev = queryClient.getQueryData<Board>(boardKey);
-      if (prev) queryClient.setQueryData<Board>(boardKey, withStage(prev, args));
-      return { prev };
-    },
-    onError: (_err, _args, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData<Board>(boardKey, ctx.prev);
-      void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
-    },
+    ...optimisticUpdate<Board, SetTaskStageArgs>(queryClient, boardKey, withStage),
   });
 }
 
@@ -354,7 +318,6 @@ export function useReviewAgent(taskId: MaybeRefOrGetter<string>) {
   return useQuery({
     queryKey: ['adetask', 'reviewAgent', taskId] as const,
     queryFn: () => control.adeTaskReviewAgent({ taskId: toValue(taskId) }),
-    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 

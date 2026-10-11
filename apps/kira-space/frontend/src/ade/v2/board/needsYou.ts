@@ -1,5 +1,5 @@
+import { formatDuration } from '@workbench/behaviour/format';
 import type { Board, Branch, Run, Session } from '../wire';
-import { formatElapsed } from './actions';
 import type { TaskProgress } from './progress';
 
 // Needs-you list (SPEC2 §11), mockup v2 lines 2490-2520. No CI item: D9 has no CI badge.
@@ -246,7 +246,7 @@ function branchItems(c: Ctx): NeedsItem[] {
           detail:
             b.setup.note ||
             (b.setup.finishedAt
-              ? `took ${formatElapsed(b.setup.finishedAt - b.setup.startedAt)}`
+              ? `took ${formatDuration(b.setup.finishedAt - b.setup.startedAt)}`
               : ''),
           ageMs: c.age(b.setup.finishedAt),
         }),
