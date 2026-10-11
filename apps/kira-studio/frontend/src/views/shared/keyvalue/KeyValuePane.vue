@@ -426,7 +426,7 @@ async function saveObjectEdit(): Promise<void> {
 }
 
 // --- delete: type-agnostic (DEL works for any of the six types) — confirmed inline, mirrors
-// documents/menu.ts's confirmDialogStore.confirmDialog() precedent for a destructive, un-staged action. S3's object
+// documents/menu.ts's confirmDialogStore.confirm() precedent for a destructive, un-staged action. S3's object
 // delete rides state/objectStore.ts's deleteObject() instead of mutations.ts's deleteKey(),
 // since it needs the object's whole path (not just its key name) to satisfy s3/mutate.ts's
 // bucket-rooted MutationPlan.path. ----------------------------------------------------------
@@ -434,7 +434,7 @@ async function onDeleteKey(): Promise<void> {
   if (!canDelete.value || !keyName.value) return;
   const label = isSingleObjectPage.value ? 'object' : 'key';
   if (
-    !(await confirmDialogStore.confirmDialog(`Delete ${label} "${keyName.value}"? This removes the entire ${label}.`))
+    !(await confirmDialogStore.confirm({ message: `Delete ${label} "${keyName.value}"? This removes the entire ${label}.`, confirmLabel: 'Delete', tone: 'danger' }))
   ) {
     return;
   }

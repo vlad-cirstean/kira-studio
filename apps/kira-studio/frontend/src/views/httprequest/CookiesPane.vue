@@ -83,7 +83,7 @@ async function onRemove(c: HttpCookieWire): Promise<void> {
 }
 async function onClearAll(): Promise<void> {
   // Go's jar is process-wide: this empties every host, not just this request's URL.
-  if (!(await confirmDialogStore.confirmDialog('Clear all cookies for every host?'))) return;
+  if (!(await confirmDialogStore.confirm({ message: 'Clear all cookies for every host?', confirmLabel: 'Delete', tone: 'danger' }))) return;
   removeMutation.reset();
   await clearMutation.mutateAsync().catch(() => {});
 }

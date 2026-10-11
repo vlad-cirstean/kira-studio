@@ -11,10 +11,11 @@ export function useRemoveScript(): (
   const confirmDialogStore = useConfirmDialogStore();
 
   return async (scripts, script) => {
-    const ok = await confirmDialogStore.confirmDialog(
-      `Remove "${script.name}"? It will no longer appear in Automations.`,
-      { danger: true, confirmLabel: 'Remove' },
-    );
+    const ok = await confirmDialogStore.confirm({
+      message: `Remove "${script.name}"? It will no longer appear in Automations.`,
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    });
     if (!ok) return false;
     await scripts.remove(script.id);
     return true;

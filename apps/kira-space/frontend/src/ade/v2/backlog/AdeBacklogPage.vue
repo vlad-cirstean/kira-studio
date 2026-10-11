@@ -71,7 +71,7 @@ async function onPromote(id: string): Promise<void> {
 async function onRemove(id: string): Promise<void> {
   const item = items.value.find((i) => i.id === id);
   if (!item) return;
-  if (!(await confirmDialogStore.confirmDialog(`Delete this backlog item?\n\n${item.text}`))) return;
+  if (!(await confirmDialogStore.confirm({ message: `Delete this backlog item?\n\n${item.text}`, confirmLabel: 'Delete', tone: 'danger' }))) return;
   await run(() => remove.mutateAsync({ id }));
 }
 

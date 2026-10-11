@@ -28,7 +28,11 @@ export async function runReveal(
       case 'cancelled':
         return undefined;
       case 'confirmation-required': {
-        const ok = await useConfirmDialogStore().confirmDialog(prompt, { danger: false });
+        const ok = await useConfirmDialogStore().confirm({
+          message: prompt,
+          confirmLabel: 'Continue',
+          tone: 'primary',
+        });
         return ok ? await handle(await call(true)) : undefined;
       }
       default:

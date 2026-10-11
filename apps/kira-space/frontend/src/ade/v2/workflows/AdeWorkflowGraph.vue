@@ -217,7 +217,7 @@ onKeyStroke(
       draft.clear(edge.stageId, edge.stepId, edge.results);
       edgeSel.value = '';
     } else if (sel?.kind === 'step') {
-      const ok = await confirm.confirmDialog('Remove this step?', { danger: true, confirmLabel: 'Remove' });
+      const ok = await confirm.confirm({ message: 'Remove this step?', confirmLabel: 'Remove', tone: 'danger' });
       if (ok) draft.deleteStep(sel.stageId, sel.stepId);
     }
   },

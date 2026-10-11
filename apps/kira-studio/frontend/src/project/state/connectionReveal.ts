@@ -26,10 +26,11 @@ export async function revealConnectionSecret(
       // D11: the user cancelled the OS prompt on purpose — nothing to show for it.
       return undefined;
     case 'confirmation-required': {
-      const ok = await useConfirmDialogStore().confirmDialog(
-        `Show the saved ${noun} for "${name}"? It will be displayed in plain text.`,
-        { danger: false },
-      );
+      const ok = await useConfirmDialogStore().confirm({
+        message: `Show the saved ${noun} for "${name}"? It will be displayed in plain text.`,
+        confirmLabel: 'Continue',
+        tone: 'primary',
+      });
       if (!isCurrent() || !ok) return undefined;
       return revealConnectionSecret(id, name, mode, isCurrent, true);
     }

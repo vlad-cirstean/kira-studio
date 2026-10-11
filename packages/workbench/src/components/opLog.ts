@@ -1,5 +1,5 @@
 import type { OpLogRecord } from '@shared/domain/ops';
-import { copyText } from '../behaviour/clipboard';
+import { copyAnnounced } from '../behaviour/clipboard';
 import type { MenuItem } from '../state/contextMenu';
 
 // P132 Part 1 (§2.3): OpLogPanel.vue's own column contract — `columns` is a plain prop array
@@ -26,6 +26,8 @@ export function opLogMenuItems<R extends OpLogRecord>(
   record: R,
   cancel: () => void,
   canCancel = true,
+  copy: (text: string, opts: { what: string }) => Promise<boolean> = (text, { what }) =>
+    copyAnnounced(text, what),
 ): MenuItem[] {
   return [
     {
@@ -34,7 +36,7 @@ export function opLogMenuItems<R extends OpLogRecord>(
       label: 'Copy command',
       icon: 'copy',
       disabled: !record.command,
-      run: () => copyText(record.command ?? ''),
+      run: () => void copy(record.command ?? '', { what: 'command' }),
     },
     {
       type: 'item',
@@ -42,7 +44,7 @@ export function opLogMenuItems<R extends OpLogRecord>(
       label: 'Copy error',
       icon: 'copy',
       disabled: !record.error,
-      run: () => copyText(record.error ?? ''),
+      run: () => void copy(record.error ?? '', { what: 'error' }),
     },
     {
       type: 'item',

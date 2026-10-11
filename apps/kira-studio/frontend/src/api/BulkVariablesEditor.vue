@@ -116,7 +116,7 @@ async function onApply(): Promise<void> {
       );
     }
     const confirmLabel = live.removed.length > 0 ? 'Remove' : 'Apply';
-    if (!(await confirmDialogStore.confirmDialog(parts.join(' '), { confirmLabel }))) return;
+    if (!(await confirmDialogStore.confirm({ message: parts.join(' '), confirmLabel, tone: 'danger' }))) return;
   }
   applying.value = true;
   applyError.value = null;

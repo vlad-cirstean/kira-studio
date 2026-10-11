@@ -83,9 +83,7 @@ function onDelete(id: string): void {
 }
 
 async function onClear(): Promise<void> {
-  const ok = await confirmDialogStore.confirmDialog('Clear this request’s call history? This cannot be undone.', {
-    danger: true,
-  });
+  const ok = await confirmDialogStore.confirm({ message: 'Clear this request’s call history? This cannot be undone.', confirmLabel: 'Delete', tone: 'danger' });
   if (ok) await grpcCallHistoryStore.clearGrpcHistory(props.tab.id);
 }
 </script>

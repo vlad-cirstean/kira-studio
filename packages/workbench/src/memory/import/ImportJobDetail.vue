@@ -21,7 +21,7 @@ const { selectedFileId } = storeToRefs(ui);
 const detail = useImportJob(() => props.jobId);
 const act = useImportAction();
 const retryFile = useRetryImportFile();
-const { confirmDialog } = useConfirmDialogStore();
+const { confirm } = useConfirmDialogStore();
 
 const ROW_HEIGHT = 32;
 const job = computed(() => detail.data.value?.job);
@@ -47,9 +47,7 @@ function run(action: ImportAction): void {
 }
 
 async function discard(): Promise<void> {
-  const ok = await confirmDialog('Remove this import and its progress? Memories already stored stay.', {
-    confirmLabel: 'Discard',
-  });
+  const ok = await confirm({ message: 'Remove this import and its progress? Memories already stored stay.', confirmLabel: 'Discard', tone: 'danger' });
   if (ok) run('discard');
 }
 </script>

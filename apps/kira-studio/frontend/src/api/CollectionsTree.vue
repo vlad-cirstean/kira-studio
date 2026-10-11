@@ -97,7 +97,7 @@ async function confirmAndDelete(row: CollectionRowVm): Promise<void> {
   // A folder and a collection take their whole subtree with them (the migration's own cascade),
   // which the prompt says out loud rather than leaving to be discovered.
   const suffix = row.kind === 'request' ? '' : ' and everything inside it';
-  if (!(await confirmDialogStore.confirmDialog(`Delete ${what} "${row.name}"${suffix}?`))) return;
+  if (!(await confirmDialogStore.confirm({ message: `Delete ${what} "${row.name}"${suffix}?`, confirmLabel: 'Delete', tone: 'danger' }))) return;
   await collectionsStore.deleteRow(row);
 }
 

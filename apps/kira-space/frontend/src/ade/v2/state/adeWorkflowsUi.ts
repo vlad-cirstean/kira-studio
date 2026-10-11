@@ -14,13 +14,11 @@ export const useAdeWorkflowsUiStore = defineStore('adeWorkflowsUi', () => {
   /** Resolves true when the caller may leave the editor: nothing unsaved, or the user discards it. */
   async function leave(): Promise<boolean> {
     if (!dirty.value) return true;
-    const discard = await useConfirmDialogStore().confirmDialog(
-      'Discard unsaved workflow changes?',
-      {
-        danger: true,
-        confirmLabel: 'Discard',
-      },
-    );
+    const discard = await useConfirmDialogStore().confirm({
+      message: 'Discard unsaved workflow changes?',
+      confirmLabel: 'Discard',
+      tone: 'danger',
+    });
     if (discard) dirty.value = false;
     return discard;
   }

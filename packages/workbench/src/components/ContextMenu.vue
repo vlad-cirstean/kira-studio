@@ -37,6 +37,14 @@ function hintParts(hint: string | readonly TextPart[] | undefined): readonly Tex
   return typeof hint === 'string' ? [hint] : (hint ?? []);
 }
 
+// reka would return focus to the 0x0 trigger; the element that held it before the menu opened gets
+// it instead, unless the chosen item already moved focus into a dialog.
+function onCloseAutoFocus(event: Event): void {
+  event.preventDefault();
+  if (document.activeElement?.closest('[data-slot="dialog-content"]')) return;
+  contextMenuStore.restoreFocus();
+}
+
 async function onItemClick(item: MenuItem): Promise<void> {
   if (item.type !== 'item' || item.disabled) return;
   await item.run();
@@ -52,7 +60,15 @@ async function onItemClick(item: MenuItem): Promise<void> {
         aria-hidden="true"
       />
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" :side-offset="0" data-testid="context-menu">
+    <!-- prioritize-position: flip before shift. With a 0x0 point anchor, shift alone clamps the
+         overflow to zero and flip never reacts, leaving a sliver near the viewport edge. -->
+    <DropdownMenuContent
+      align="start"
+      :side-offset="0"
+      prioritize-position
+      data-testid="context-menu"
+      @close-auto-focus="onCloseAutoFocus"
+    >
       <template
         v-for="(item, idx) in contextMenuStore.items"
         :key="item.type === 'separator' || item.type === 'label' ? `${item.type}-${idx}` : item.id"

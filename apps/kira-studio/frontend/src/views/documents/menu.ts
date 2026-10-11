@@ -147,7 +147,13 @@ export function rowMenu(
       // P43 F6/D8: this runs inside contextMenu.ts's own `void item.run()` — an unhandled
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
       run: async () => {
-        if (!(await useConfirmDialogStore().confirmDialog(`Delete this document (_id: ${id})?`)))
+        if (
+          !(await useConfirmDialogStore().confirm({
+            message: `Delete this document (_id: ${id})?`,
+            confirmLabel: 'Delete',
+            tone: 'danger',
+          }))
+        )
           return;
         try {
           await deleteDocument(tabId, id);

@@ -174,7 +174,7 @@ export function createHistoryQueries<
     await refreshApiQuery(key);
   }
 
-  /** The destructive, unrecoverable action — the caller gates this behind confirmDialog(). */
+  /** The destructive, unrecoverable action — the caller gates this behind confirm(). */
   async function clearAll(tabId: string): Promise<void> {
     const tab = opts.findTab(tabId);
     if (!tab) return;

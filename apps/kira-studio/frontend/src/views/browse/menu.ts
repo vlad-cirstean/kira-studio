@@ -97,9 +97,11 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
       run: async () => {
         if (
-          !(await useConfirmDialogStore().confirmDialog(
-            `Delete object "${node.name}"? This cannot be undone.`,
-          ))
+          !(await useConfirmDialogStore().confirm({
+            message: `Delete object "${node.name}"? This cannot be undone.`,
+            confirmLabel: 'Delete',
+            tone: 'danger',
+          }))
         )
           return;
         try {

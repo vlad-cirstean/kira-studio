@@ -4,6 +4,7 @@
 import { TooltipProvider } from '@theme/components/ui/tooltip';
 import { automationsModuleKey } from '@workbench/automations/module';
 import ScheduleConfirmPrompt from '@workbench/automations/schedule/ScheduleConfirmPrompt.vue';
+import AppLiveRegion from '@workbench/components/AppLiveRegion.vue';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
@@ -90,6 +91,7 @@ onUnmounted(() => {
     </div>
     <PromptHost :kinds="promptKinds" />
     <ConfirmDialog />
+    <AppLiveRegion />
     <UpdateDialog v-if="appUpdateStore.dialogOpen" :store="appUpdateStore" />
     <ContextMenu />
   </TooltipProvider>

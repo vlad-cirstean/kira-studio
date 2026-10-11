@@ -45,7 +45,7 @@ export const useHttpHistoryStore = defineStore('httpHistory', () => {
     if (state) state.selected = state.selected.filter((s) => s !== id);
   }
 
-  /** D15's destructive, unrecoverable action — the caller gates this behind confirmDialog(). */
+  /** D15's destructive, unrecoverable action — the caller gates this behind confirm(). */
   async function clearHistory(tabId: string): Promise<void> {
     await history.clearAll(tabId);
     const state = ui[tabId];

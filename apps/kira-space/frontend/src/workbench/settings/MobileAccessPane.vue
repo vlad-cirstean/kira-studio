@@ -91,26 +91,17 @@ const canTrust = computed(() => {
 async function onTrust(): Promise<void> {
   const now = current.value;
   if (!now) return;
-  const ok = await confirmDialogStore.confirmDialog(
-    `Trust ${now.subnet} (router ${now.routerMac})? The phone talks to Kira Space over plain HTTP: anyone on this network can read what it shows. Turn this on only on a network you control, such as your home Wi-Fi.`,
-    { confirmLabel: 'Trust' },
-  );
+  const ok = await confirmDialogStore.confirm({ message: `Trust ${now.subnet} (router ${now.routerMac})? The phone talks to Kira Space over plain HTTP: anyone on this network can read what it shows. Turn this on only on a network you control, such as your home Wi-Fi.`, confirmLabel: 'Trust', tone: 'danger' });
   if (ok) await runTrust();
 }
 
 async function onForget(): Promise<void> {
-  const ok = await confirmDialogStore.confirmDialog(
-    'Forget the trusted network? The phone server stops until you trust a network again.',
-    { danger: true, confirmLabel: 'Forget' },
-  );
+  const ok = await confirmDialogStore.confirm({ message: 'Forget the trusted network? The phone server stops until you trust a network again.', confirmLabel: 'Forget', tone: 'danger' });
   if (ok) await runForget();
 }
 
 async function onRevoke(id: string, label: string): Promise<void> {
-  const ok = await confirmDialogStore.confirmDialog(
-    `Revoke access for "${label || id}"? It will need to be re-approved.`,
-    { danger: true, confirmLabel: 'Revoke' },
-  );
+  const ok = await confirmDialogStore.confirm({ message: `Revoke access for "${label || id}"? It will need to be re-approved.`, confirmLabel: 'Revoke', tone: 'danger' });
   if (ok) await store.revoke(id);
 }
 

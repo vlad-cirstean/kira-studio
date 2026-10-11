@@ -137,10 +137,11 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     const rescan = folder
       ? ` A rescan of ${folder} imports it again; hide it to keep it out of the list.`
       : '';
-    const ok = await confirmDialogStore.confirmDialog(
-      `Remove repository "${name}" from Kira Space? Files on disk stay.${rescan}`,
-      { danger: true, confirmLabel: 'Remove' },
-    );
+    const ok = await confirmDialogStore.confirm({
+      message: `Remove repository "${name}" from Kira Space? Files on disk stay.${rescan}`,
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    });
     if (ok) await removeCodeRepo(id);
     return ok;
   }

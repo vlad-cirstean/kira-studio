@@ -176,7 +176,7 @@ async function onSetActive(id: string): Promise<void> {
 }
 
 async function onDelete(id: string, name: string): Promise<void> {
-  if (!(await confirmDialogStore.confirmDialog(`Delete environment "${name}"? Its variables go with it.`))) return;
+  if (!(await confirmDialogStore.confirm({ message: `Delete environment "${name}"? Its variables go with it.`, confirmLabel: 'Delete', tone: 'danger' }))) return;
   await variablesStore.deleteEnvironment(id);
 }
 

@@ -2,6 +2,7 @@ import type { ShortcutId } from '@shared/domain/shortcuts';
 import type { TextPart } from '@theme/varText';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
+import { useFocusReturn } from '../behaviour/focus';
 
 export type MenuItem =
   | {
@@ -32,6 +33,12 @@ export type MenuItem =
    *  context menu: the day's own `dayLong` above its one toggle). */
   | { type: 'label'; label: string };
 
+export interface ContextMenuOptions {
+  /** Runs on close when the invoking element is gone (a virtual row that scrolled away); focus the
+   *  owning list instead. */
+  onRestoreFocus?: () => void;
+}
+
 export const useContextMenuStore = defineStore('contextMenu', () => {
   const state = reactive({
     open: false,
@@ -39,26 +46,55 @@ export const useContextMenuStore = defineStore('contextMenu', () => {
     y: 0,
     items: [] as MenuItem[],
   });
+  const focusReturn = useFocusReturn();
+  let onRestoreFocus: (() => void) | undefined;
 
   // P83 §9.2: a point, not an event — a dropdown anchored under a button (TabStrip.vue's "+") has
   // no MouseEvent of its own to read clientX/clientY from. openContextMenu below is now this plus
   // one destructure.
-  function openContextMenuAt(x: number, y: number, items: MenuItem[]): void {
+  function openContextMenuAt(
+    x: number,
+    y: number,
+    items: MenuItem[],
+    options?: ContextMenuOptions,
+  ): void {
+    if (!state.open) focusReturn.capture();
+    onRestoreFocus = options?.onRestoreFocus;
     state.items = items;
     state.x = x;
     state.y = y;
     state.open = true;
   }
 
-  function openContextMenu(ev: MouseEvent, items: MenuItem[]): void {
-    openContextMenuAt(ev.clientX, ev.clientY, items);
+  function openContextMenu(ev: MouseEvent, items: MenuItem[], options?: ContextMenuOptions): void {
+    openContextMenuAt(ev.clientX, ev.clientY, items, options);
+  }
+
+  /** Keyboard open (ContextMenu key, Shift+F10): anchored at the element's bottom-left. */
+  function openContextMenuFor(el: Element, items: MenuItem[], options?: ContextMenuOptions): void {
+    const rect = el.getBoundingClientRect();
+    openContextMenuAt(rect.left, rect.bottom, items, options);
   }
 
   function closeContextMenu(): void {
     state.open = false;
   }
 
-  return { ...toRefs(state), openContextMenuAt, openContextMenu, closeContextMenu };
+  /** Called by the menu on close: focus goes back to the element that held it at open. */
+  function restoreFocus(): void {
+    const fallback = onRestoreFocus;
+    onRestoreFocus = undefined;
+    focusReturn.restore(fallback);
+  }
+
+  return {
+    ...toRefs(state),
+    openContextMenuAt,
+    openContextMenu,
+    openContextMenuFor,
+    closeContextMenu,
+    restoreFocus,
+  };
 });
 
 // P21 D5: a new local keybinding dispatches through the same menu-builder function a right-click

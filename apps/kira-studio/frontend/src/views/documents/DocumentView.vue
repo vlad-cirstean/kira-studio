@@ -667,7 +667,7 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
 // D6: the same confirm + deleteDocument path the context menu's own Delete item already uses
 // (documents/menu.ts) — one delete path, not two.
 async function onDeleteRow(id: string): Promise<void> {
-  if (!(await confirmDialogStore.confirmDialog(`Delete this document (_id: ${id})?`))) return;
+  if (!(await confirmDialogStore.confirm({ message: `Delete this document (_id: ${id})?`, confirmLabel: 'Delete', tone: 'danger' }))) return;
   deleteDocument(props.tab.id, id)
     .then(() => documentViewStore.setActionError(props.tab.id, null))
     .catch((err: unknown) => {

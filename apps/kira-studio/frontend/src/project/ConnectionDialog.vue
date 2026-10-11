@@ -602,13 +602,10 @@ async function onRemoveMaskRule(ruleId: string): Promise<void> {
 async function onRegenerateMaskKey(): Promise<void> {
   const connectionId = editingConnectionId.value;
   if (!connectionId) return;
-  const ok = await confirmDialogStore.confirmDialog(
-    'Regenerating the correlation key changes every masked correlation tag for this connection. ' +
+  const ok = await confirmDialogStore.confirm({ message: 'Regenerating the correlation key changes every masked correlation tag for this connection. ' +
       'Masked results already given to an AI client, or saved anywhere outside this app, will no ' +
       'longer correlate with results produced after the change. The real values are not affected, ' +
-      'and this cannot be undone.',
-    { confirmLabel: 'Regenerate' },
-  );
+      'and this cannot be undone.', confirmLabel: 'Regenerate', tone: 'danger' });
   if (!ok) return;
   await regenerateMaskKey(connectionId);
 }

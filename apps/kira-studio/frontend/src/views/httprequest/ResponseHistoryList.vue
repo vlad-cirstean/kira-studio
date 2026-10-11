@@ -105,9 +105,7 @@ function onCompare(): void {
 }
 
 async function onClear(): Promise<void> {
-  const ok = await confirmDialogStore.confirmDialog('Clear this request’s response history? This cannot be undone.', {
-    danger: true,
-  });
+  const ok = await confirmDialogStore.confirm({ message: 'Clear this request’s response history? This cannot be undone.', confirmLabel: 'Delete', tone: 'danger' });
   if (ok) await httpHistoryStore.clearHistory(props.tab.id);
 }
 </script>

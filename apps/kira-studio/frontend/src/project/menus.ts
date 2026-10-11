@@ -227,10 +227,11 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       run: async () => {
         if (
           isLive &&
-          !(await useConfirmDialogStore().confirmDialog(
-            'This connection is live — changing read-only will reconnect it. Continue?',
-            { danger: false },
-          ))
+          !(await useConfirmDialogStore().confirm({
+            message: 'This connection is live — changing read-only will reconnect it. Continue?',
+            confirmLabel: 'Continue',
+            tone: 'primary',
+          }))
         ) {
           return;
         }
@@ -249,7 +250,13 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       danger: true,
       shortcut: 'tree.delete',
       run: async () => {
-        if (!(await useConfirmDialogStore().confirmDialog(`Delete connection "${row.name}"?`)))
+        if (
+          !(await useConfirmDialogStore().confirm({
+            message: `Delete connection "${row.name}"?`,
+            confirmLabel: 'Delete',
+            tone: 'danger',
+          }))
+        )
           return;
         await useConnectionsStore().deleteConnection(row.connectionId);
       },

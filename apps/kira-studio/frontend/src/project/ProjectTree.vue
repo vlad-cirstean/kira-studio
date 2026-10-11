@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { useEventListener } from '@vueuse/core';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { shortcutFor } from '@workbench/shortcuts/keys';
-import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
+import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useRowHeight } from '@workbench/util/rowHeight';
-import { nextTick, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
@@ -129,7 +130,7 @@ function onOpen(row: TreeRowVm): void {
   else void treeStore.expand(row.connectionId, row.path);
 }
 
-async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
+async function rowMenuItems(row: TreeRowVm): Promise<MenuItem[]> {
   // The "Saved filters ▸" submenu (Step 13) is built synchronously by menuForRow() from
   // treeStore.savedQueries, so it must already be populated by the time the menu opens.
   if (OPENABLE_KINDS.has(row.kind)) {
@@ -141,7 +142,15 @@ async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
       // submenu (treeStore.savedQueries has no entry for this row) instead.
     }
   }
-  contextMenuStore.openContextMenu(event, menuForRow(row));
+  return menuForRow(row);
+}
+
+async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
+  // Right-click selects the row (without opening anything) before its menu opens.
+  treeStore.selectRow(row.key);
+  contextMenuStore.openContextMenu(event, await rowMenuItems(row), {
+    onRestoreFocus: () => void nav.focusKey(row.key),
+  });
 }
 
 function onBackgroundContextMenu(event: MouseEvent): void {
@@ -151,55 +160,39 @@ function onBackgroundContextMenu(event: MouseEvent): void {
   contextMenuStore.openContextMenu(event, emptyBackgroundMenu());
 }
 
-async function selectAndFocus(row: TreeRowVm): Promise<void> {
-  treeStore.selectRow(row.key);
-  await revealKey(row.key);
-  await nextTick();
-  scrollEl.value?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"]')?.focus();
-}
-
-// WAI-ARIA tree pattern: Up/Down/Home/End move the selection, Right expands or enters the first
-// child, Left collapses or goes to the parent.
-function onArrowNavigation(e: KeyboardEvent): boolean {
-  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
-  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
-    return false;
-  }
-  const rows = treeStore.visibleRows;
-  const index = rows.findIndex((r) => r.key === treeStore.selected);
-  if (index === -1) return false;
-  const row = rows[index];
-  e.preventDefault();
-  let target: TreeRowVm | undefined;
-  switch (e.key) {
-    case 'ArrowUp':
-      target = rows[index - 1];
-      break;
-    case 'ArrowDown':
-      target = rows[index + 1];
-      break;
-    case 'Home':
-      target = rows[0];
-      break;
-    case 'End':
-      target = rows[rows.length - 1];
-      break;
-    case 'ArrowRight':
-      if (row.hasChildren && !row.expanded) onToggle(row);
-      else if (row.expanded && rows[index + 1] && rows[index + 1].depth > row.depth) {
-        target = rows[index + 1];
-      }
-      break;
-    default:
-      if (row.expanded && row.hasChildren) onToggle(row);
-      else target = rows.slice(0, index).findLast((r) => r.depth < row.depth);
-  }
-  if (target && target.key !== row.key) void selectAndFocus(target);
-  return true;
-}
+// Arrows, Home/End, Right/Left expand and parent, Enter (the row's primary action, the same one
+// double-click performs), Space and Shift+F10 come from the shared list navigation. The selection
+// is the roving stop. The pinned sticky-band rows carry no tabindex of their own.
+const activeKey = computed({
+  get: () => treeStore.selected,
+  set: (key) => {
+    if (key) treeStore.selectRow(key);
+  },
+});
+const nav = useListNavigation<TreeRowVm>({
+  container: scrollEl,
+  items: () => treeStore.visibleRows,
+  key: (row) => row.key,
+  activeKey,
+  tree: {
+    depth: (row) => row.depth,
+    isExpanded: (row) => row.expanded,
+    hasChildren: (row) => row.hasChildren,
+    expand: onToggle,
+    collapse: onToggle,
+  },
+  onOpen,
+  onSelect,
+  onMenu: async (row, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, await rowMenuItems(row), {
+      onRestoreFocus: () => void nav.focusKey(row.key),
+    }),
+  scrollToIndex: (_index, key) => revealKey(key),
+  rendered: () => virtualItems.value,
+  rowSelector: () => '[role="treeitem"][tabindex="0"]',
+});
 
 const TREE_SHORTCUTS = [
-  'tree.open',
   'tree.copyName',
   'tree.copyUri',
   'tree.rename',
@@ -215,18 +208,10 @@ function onTreeKeydown(e: KeyboardEvent): void {
   if (e.defaultPrevented || e.isComposing) return;
   const target = e.target as HTMLElement | null;
   if (target?.closest('input, textarea, [contenteditable="true"]')) return;
-  if (onArrowNavigation(e)) return;
   const id = shortcutFor(e, TREE_SHORTCUTS);
   if (!id) return;
   const row = treeStore.visibleRows.find((r) => r.key === treeStore.selected);
   if (!row) return;
-  if (id === 'tree.open') {
-    // Enter is the row's primary action, not a menu item — the same action double-click
-    // performs, so it dispatches directly rather than through runMenuShortcut.
-    e.preventDefault();
-    onOpen(row);
-    return;
-  }
   if (runMenuShortcut(menuForRow(row), id)) e.preventDefault();
 }
 

@@ -328,9 +328,7 @@ async function onPoll(): Promise<void> {
   if (isReadOnlyBatch.value && !visibilityValid.value) return;
   if (isReadOnlyBatch.value && !rt.value?.receiveAcknowledged) {
     const limit = redriveLimit.value ?? (await streamViewStore.fetchRedriveLimit(props.tab.id));
-    const ok = await confirmDialogStore.confirmDialog(
-      `Each poll hides received messages from other consumers for ${hideDuration.value} and raises their receive count. ${redriveSentence(limit)}. Poll anyway?`,
-    );
+    const ok = await confirmDialogStore.confirm({ message: `Each poll hides received messages from other consumers for ${hideDuration.value} and raises their receive count. ${redriveSentence(limit)}. Poll anyway?`, confirmLabel: 'Delete', tone: 'danger' });
     if (!ok) return;
     streamViewStore.acknowledgeReceive(props.tab.id);
   }
@@ -538,7 +536,7 @@ async function onDeleteMessage(): Promise<void> {
   if (selectedRow === null || selectedRow === undefined) return;
   const row = rowAt(selectedRow);
   if (!row?.key) return;
-  if (!(await confirmDialogStore.confirmDialog(`Delete this message (id: ${row.key})? This cannot be undone.`))) {
+  if (!(await confirmDialogStore.confirm({ message: `Delete this message (id: ${row.key})? This cannot be undone.`, confirmLabel: 'Delete', tone: 'danger' }))) {
     return;
   }
   try {

@@ -1,24 +1,21 @@
 <script setup lang="ts">
-import { Button } from '@theme/components/ui/button';
-import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@theme/components/ui/dialog';
+import { watch } from 'vue';
+import { useFocusReturn } from '../behaviour/focus';
 import { useConfirmDialogStore } from '../state/confirmDialog';
+import ConfirmDialogView from './ConfirmDialogView.vue';
 
 const confirmDialogStore = useConfirmDialogStore();
 
-function onCancel(): void {
-  confirmDialogStore.settleConfirmDialog(false);
-}
-
-function onConfirm(): void {
-  confirmDialogStore.settleConfirmDialog(true);
-}
+// Focus goes back to whatever held it when the dialog opened (a row, a toolbar button).
+const focusReturn = useFocusReturn();
+watch(
+  () => confirmDialogStore.open,
+  (open) => {
+    if (open) focusReturn.capture();
+    else focusReturn.restore();
+  },
+  { flush: 'sync' },
+);
 </script>
 
 <template>
@@ -29,31 +26,16 @@ function onConfirm(): void {
        under any dialog opened later — exactly the DbMcpApprovalDialog.vue precedent this mirrors.
        Losing the closing fade (v-if unmounts immediately, no exit transition) is the accepted
        trade-off for correct stacking when nested under another open dialog. -->
-  <Dialog v-if="confirmDialogStore.open" :open="true" @update:open="(v) => !v && onCancel()">
-    <DialogContent size="sm" data-testid="confirm-dialog">
-      <DialogHeader close-testid="confirm-dialog-close">
-        <DialogTitle>Confirm</DialogTitle>
-      </DialogHeader>
-
-      <DialogBody>
-        <p class="m-0 whitespace-pre-wrap" data-testid="confirm-dialog-message">
-          {{ confirmDialogStore.message }}
-        </p>
-      </DialogBody>
-
-      <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="confirm-dialog-cancel" @click="onCancel">
-          Cancel
-        </Button>
-        <Button
-          :variant="confirmDialogStore.danger ? 'dialog-danger' : 'dialog-primary'"
-          size="kira-lg"
-          data-testid="confirm-dialog-confirm"
-          @click="onConfirm"
-        >
-          {{ confirmDialogStore.confirmLabel || (confirmDialogStore.danger ? 'Delete' : 'Continue') }}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+  <ConfirmDialogView
+    v-if="confirmDialogStore.open"
+    :open="true"
+    :title="confirmDialogStore.title"
+    :message="confirmDialogStore.message"
+    :confirm-label="confirmDialogStore.confirmLabel"
+    :tone="confirmDialogStore.tone"
+    :busy="confirmDialogStore.busy"
+    :error="confirmDialogStore.error"
+    @confirm="confirmDialogStore.acceptConfirm()"
+    @cancel="confirmDialogStore.cancelConfirm()"
+  />
 </template>

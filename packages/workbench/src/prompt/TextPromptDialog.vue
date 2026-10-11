@@ -5,7 +5,8 @@ import { Input } from '@theme/components/ui/input';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener } from '@vueuse/core';
 import { FocusScope } from 'reka-ui';
-import { nextTick, onMounted, ref, useId, useTemplateRef } from 'vue';
+import { type ComponentPublicInstance, onBeforeUnmount, ref, useId, useTemplateRef } from 'vue';
+import { useFocusOnMount, useFocusReturn } from '../behaviour/focus';
 
 // P107 T2-19: deliberately NOT built on shadcn-vue's Dialog (declined, real requirement) — its
 // DialogContent wraps reka-ui's DialogPortal, which teleports to document.body. Two of this
@@ -22,10 +23,11 @@ const titleId = useId();
 
 // ui/input's root IS the <input> element itself — no querySelector needed. onMounted fires each
 // time this component is created, i.e. exactly when the caller's prompt state goes non-null.
-const inputRef = ref<{ $el: HTMLInputElement } | null>(null);
-onMounted(() => {
-  void nextTick(() => inputRef.value?.$el.focus());
-});
+const inputRef = ref<ComponentPublicInstance | null>(null);
+const focusReturn = useFocusReturn();
+focusReturn.capture();
+useFocusOnMount(inputRef);
+onBeforeUnmount(() => focusReturn.restore());
 
 // P105 §5.2(b): the scrim is a pointer-event shield, not an interactive element — it absorbs a
 // click so it never reaches the ancestor Popover's own outside-click dismiss layer (see the

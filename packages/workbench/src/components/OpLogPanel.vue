@@ -10,7 +10,9 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui
 import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { cn } from '@theme/lib/utils';
-import { computed, nextTick, ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useCopy } from '../behaviour/clipboard';
+import { useListNavigation } from '../behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from './opLog';
@@ -43,6 +45,7 @@ const emit = defineEmits<{
 }>();
 
 const contextMenuStore = useContextMenuStore();
+const { copy } = useCopy();
 
 // `defineProps`' own default values can't reference `emit` (a local, hoisted out of setup()) —
 // these stand in for withDefaults' canCancel/menuFor defaults instead, resolved per call so a
@@ -54,7 +57,7 @@ function canCancelRecord(record: R): boolean {
 function menuForRecord(record: R): MenuItem[] {
   return props.menuFor
     ? props.menuFor(record)
-    : opLogMenuItems(record, () => emit('cancel', record), canCancelRecord(record));
+    : opLogMenuItems(record, () => emit('cancel', record), canCancelRecord(record), copy);
 }
 
 interface OpsListItem {
@@ -98,10 +101,16 @@ const listItems = computed<OpsListItem[]>(() => {
 // useVirtualRows composable -- every row here is a fixed 18px (the same JS/CSS-numeric
 // requirement the component's own comment below states).
 const scrollEl = ref<HTMLElement | null>(null);
-const { virtualItems, totalSize, onScroll } = useVirtualRows({
+const activeId = ref<string | null>(null);
+const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => listItems.value.length,
   rowHeight: () => 18,
   scrollElement: scrollEl,
+  // The roving row stays mounted when it scrolls away, so it keeps focus.
+  pinned: () => {
+    const index = listItems.value.findIndex((item) => item.key === activeId.value);
+    return index < 0 ? null : index;
+  },
 });
 
 function formatTime(iso: string): string {
@@ -118,39 +127,30 @@ function formatDuration(ms: number | null): string {
 function onRowClick(record: R): void {
   toggleExpanded(record);
 }
-// P105 §5.2(c): Enter/Space mirror a single click — the Cancel button nested inside stays its own
-// tab stop, so this handler never claims either key from it.
-function onRowKeydown(e: KeyboardEvent, record: R): void {
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    moveRowFocus(record, e.key === 'ArrowDown' ? 1 : -1);
-    return;
-  }
-  if (e.key !== 'Enter' && e.key !== ' ') return;
-  e.preventDefault();
-  onRowClick(record);
-}
 
-// One roving tab stop for the whole list: Tab enters at the current row, arrows move within it.
-const focusedRowId = ref<string | null>(null);
-const tabStopId = computed(() =>
-  props.records.some((r) => r.id === focusedRowId.value)
-    ? focusedRowId.value
-    : (props.records[0]?.id ?? null),
-);
-
-function moveRowFocus(from: R, step: 1 | -1): void {
-  const index = props.records.findIndex((r) => r.id === from.id);
-  const target = props.records[index + step];
-  if (!target) return;
-  focusedRowId.value = target.id;
-  void nextTick(() => {
-    scrollEl.value?.querySelector<HTMLElement>(`[data-op-id="${CSS.escape(target.id)}"]`)?.focus();
-  });
-}
+// One roving tab stop for the whole list: Tab enters at the current row, arrows move within it. The
+// panel has its own filter field, so no first-letter type-ahead. Enter and Space mirror a single
+// click; the Cancel button nested inside keeps its own Enter and Space.
+const nav = useListNavigation<R>({
+  container: scrollEl,
+  items: () => props.records,
+  key: (record) => record.id,
+  activeKey: activeId,
+  onOpen: onRowClick,
+  onSelect: onRowClick,
+  onMenu: (record, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, menuForRecord(record), {
+      onRestoreFocus: () => void nav.focusKey(record.id),
+    }),
+  scrollToIndex: (_index, key) =>
+    scrollToIndex(listItems.value.findIndex((item) => item.key === key)),
+  rendered: () => virtualItems.value,
+});
 
 function onRowContextMenu(record: R, event: MouseEvent): void {
-  contextMenuStore.openContextMenu(event, menuForRecord(record));
+  contextMenuStore.openContextMenu(event, menuForRecord(record), {
+    onRestoreFocus: () => void nav.focusKey(record.id),
+  });
 }
 
 defineSlots<{
@@ -213,6 +213,7 @@ defineSlots<{
         -->
         <ul aria-label="Operations" class="relative m-0 p-0" :style="{ height: `${totalSize}px` }">
           <template v-for="vi in virtualItems" :key="String(vi.key)">
+            <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the list container. -->
             <li
               v-if="listItems[vi.index].kind === 'op'"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px`, gridTemplateColumns }"
@@ -220,10 +221,8 @@ defineSlots<{
               data-testid="op-row"
               :data-status="listItems[vi.index].record.status"
               :data-op-id="listItems[vi.index].record.id"
-              :tabindex="listItems[vi.index].record.id === tabStopId ? 0 : -1"
-              @focus="focusedRowId = listItems[vi.index].record.id"
+              v-bind="nav.rowProps(listItems[vi.index].record.id)"
               @click="onRowClick(listItems[vi.index].record)"
-              @keydown="onRowKeydown($event, listItems[vi.index].record)"
               @contextmenu.prevent="onRowContextMenu(listItems[vi.index].record, $event)"
             >
               <template v-for="column in columns" :key="column.id">

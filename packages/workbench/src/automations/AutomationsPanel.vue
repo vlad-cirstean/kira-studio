@@ -155,10 +155,7 @@ function commitRename(collection: ScriptCollection, name: string): void {
 }
 
 async function confirmDeleteCollection(collection: ScriptCollection): Promise<void> {
-  const ok = await confirmDialogStore.confirmDialog(
-    `Delete collection "${collection.name}" and everything inside it?`,
-    { danger: true, confirmLabel: 'Delete' },
-  );
+  const ok = await confirmDialogStore.confirm({ message: `Delete collection "${collection.name}" and everything inside it?`, confirmLabel: 'Delete', tone: 'danger' });
   if (!ok) return;
   await guarded(() => scripts.removeCollection(collection.id));
 }
