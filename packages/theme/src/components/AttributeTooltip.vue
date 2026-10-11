@@ -105,7 +105,7 @@ useEventListener(containerRef, 'focusout', onFocusOut);
 </script>
 
 <template>
-  <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
+  <TooltipProvider>
     <Tooltip>
       <!-- reka's raw PopperAnchor (what a `reference` point normally anchors through, per
            ContextMenu.vue's own §5.2 precedent) is not a public export -- TooltipTrigger's own

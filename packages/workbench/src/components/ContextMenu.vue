@@ -52,7 +52,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
         aria-hidden="true"
       />
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" :side-offset="0" data-testid="context-menu" class="min-w-45">
+    <DropdownMenuContent align="start" :side-offset="0" data-testid="context-menu">
       <template
         v-for="(item, idx) in contextMenuStore.items"
         :key="item.type === 'separator' || item.type === 'label' ? `${item.type}-${idx}` : item.id"
@@ -112,7 +112,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                       </span>
                     </DropdownMenuItem>
                   </TooltipTrigger>
-                  <TooltipContent v-if="sub.type === 'item' && sub.hint" class="whitespace-pre-line"
+                  <TooltipContent v-if="sub.type === 'item' && sub.hint"
                     ><VarText :parts="hintParts(sub.hint)"
                   /></TooltipContent>
                 </Tooltip>
@@ -147,7 +147,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
               </span>
             </DropdownMenuItem>
           </TooltipTrigger>
-          <TooltipContent v-if="item.hint" class="whitespace-pre-line"
+          <TooltipContent v-if="item.hint"
             ><VarText :parts="hintParts(item.hint)"
           /></TooltipContent>
         </Tooltip>

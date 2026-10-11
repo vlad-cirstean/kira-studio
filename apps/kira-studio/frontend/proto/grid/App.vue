@@ -8,7 +8,7 @@ const Hud = __KIRA_DEBUG_HOOKS__ ? defineAsyncComponent(() => import('./Hud.vue'
 </script>
 
 <template>
-  <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
+  <TooltipProvider>
     <div class="flex h-screen w-screen flex-col bg-bg text-fg">
       <CheetahProto />
     </div>

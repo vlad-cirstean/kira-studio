@@ -82,7 +82,7 @@ onUnmounted(() => {
 
 <template>
   <!-- P104 §6.1: disable-hoverable-content matches the app's pointer-events: none tooltip. -->
-  <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
+  <TooltipProvider>
     <AdeReviewWindow v-if="reviewWindow.target" />
     <div v-else class="h-full flex flex-col">
       <TitleBar />

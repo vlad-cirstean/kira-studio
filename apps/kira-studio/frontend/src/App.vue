@@ -113,7 +113,7 @@ onUnmounted(() => {
 
 <template>
   <!-- P104 §6.1: disable-hoverable-content matches the app's pointer-events: none tooltip. -->
-  <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
+  <TooltipProvider>
     <!-- P1 C8: the frame TitleBar + WorkbenchShell now share — WorkbenchShell.vue's own root swapped
          `height: 100%` for `flex: 1; min-height: 0` to match. -->
     <div class="h-full flex flex-col">

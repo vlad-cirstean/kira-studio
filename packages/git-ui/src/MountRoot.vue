@@ -10,7 +10,7 @@ defineProps<{ root: Component; rootProps: Record<string, unknown> }>();
 </script>
 
 <template>
-  <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
+  <TooltipProvider>
     <component :is="root" v-bind="rootProps" />
   </TooltipProvider>
 </template>
