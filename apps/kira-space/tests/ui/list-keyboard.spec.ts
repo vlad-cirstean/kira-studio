@@ -273,3 +273,57 @@ test('repo search results — arrows, Enter on a file header and Home/End', asyn
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-testid="repo-search-match-row"]')).toHaveCount(1);
 });
+
+function memoryRecord(id: string, fact: string): Record<string, unknown> {
+  return {
+    id,
+    lineageId: id,
+    version: 1,
+    fact,
+    reason: 'Because.',
+    keywords: [],
+    author: 'user',
+    status: 'current',
+    historical: false,
+    supersedesId: null,
+    supersededById: null,
+    createdAt: NOW,
+    supersededAt: null,
+    versions: 1,
+  };
+}
+
+test('memory list — focus on mount, arrows, Home/End, Enter selects and a typed key lands in search', async ({
+  relaunch,
+}) => {
+  const first = memoryRecord('ma', 'First fact.');
+  const second = memoryRecord('mb', 'Second fact.');
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.memoryRecent, response: [first, second] },
+      { channel: IPC.memoryHistory, response: { memories: [second], events: [] } },
+    ],
+  });
+  await page.locator('[data-testid="mode-tab"][data-mode="memory"]').click();
+  const search = page.locator('[data-testid="memory-search"]');
+  await expect(search).toBeFocused();
+
+  const row = (id: string) => page.locator(`[data-testid="memory-row-${id}"]`);
+  await expect(page.locator('[data-testid^="memory-row-"][tabindex="0"]')).toHaveCount(1);
+  await row('ma').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(row('mb')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(row('mb')).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(row('ma')).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(row('mb')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-testid="memory-detail-fact"]')).toContainText('Second fact.');
+
+  await row('ma').focus();
+  await page.keyboard.press('z');
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('z');
+});

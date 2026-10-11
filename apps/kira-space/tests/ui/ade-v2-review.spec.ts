@@ -197,6 +197,18 @@ reviewTest(
   },
 );
 
+reviewTest('arrow keys on a pane handle resize and store the left width', async ({ relaunch }) => {
+  const page = await openReview(relaunch);
+  const left = page.locator(t('ade-review-left'));
+  const handle = page.locator(t('ade-panel-resize-handle')).first();
+  const start = (await left.boundingBox())?.width ?? 0;
+  await handle.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await left.boundingBox())?.width ?? 0).toBeGreaterThan(start);
+  const stored = await page.evaluate(() => localStorage.getItem('kira.ade.review.leftWidth'));
+  expect(Number(stored)).toBeGreaterThan(start);
+});
+
 reviewTest(
   'the sync button stays visible and disabled when its plan fails to load',
   async ({ relaunch }) => {

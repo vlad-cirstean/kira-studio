@@ -94,6 +94,16 @@ test('inline edit saves the text on Enter', async ({ relaunch }) => {
   });
 });
 
+test('Escape in an inline edit reverts the text and saves nothing', async ({ relaunch }) => {
+  const { window: page, control } = await openBacklog(relaunch);
+  const text = rows(page).nth(2).locator('[data-testid="ade-backlog-text"]');
+  const original = await text.inputValue();
+  await text.fill('Discard me');
+  await text.press('Escape');
+  await expect(text).toHaveValue(original);
+  expect(calls(control, IPC.adeTaskUpdateBacklogItem)).toHaveLength(0);
+});
+
 test('the panel edits links and notes of the selected item', async ({ relaunch }) => {
   const { window: page, control } = await openBacklog(relaunch);
   await rows(page).nth(2).click();

@@ -53,6 +53,19 @@ test.describe('with write access', () => {
     expect(body.toIndex).toBeGreaterThan(0);
   });
 
+  test('confirm buttons are at least 44px tall', async ({ page }) => {
+    await page.locator(t('tab-plan')).click();
+    const card = page
+      .locator(t('plan-task'))
+      .filter({ hasText: 'Cart total test fails intermittently' });
+    await card.locator('button').first().click();
+    await card.locator(t('plan-stage-next')).click();
+    for (const id of ['confirm-cancel', 'confirm-yes']) {
+      const box = await page.locator(t(id)).boundingBox();
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+  });
+
   test('Next asks first, then moves the task from the stage the phone saw', async ({
     page,
     server,

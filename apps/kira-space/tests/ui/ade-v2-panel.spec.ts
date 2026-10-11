@@ -298,6 +298,24 @@ test('dragging the handle persists the dragged width; a click persists nothing',
   expect(widthWrites()[0]?.args).toEqual({ patch: { ade: { panelWidth: startWidth + 120 } } });
 });
 
+test('arrow keys on the handle resize and persist the panel width', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await openTask(page, 'T_bill');
+  const handle = page.locator('[data-testid="ade-panel-resize-handle"]');
+  const startWidth = Number(await handle.getAttribute('aria-valuenow'));
+  await handle.focus();
+  await page.keyboard.press('ArrowLeft');
+  const writes = () =>
+    control
+      .log()
+      .filter(
+        (e) => e.channel === IPC.settingsSet && JSON.stringify(e.args).includes('panelWidth'),
+      );
+  await expect.poll(() => writes().length).toBe(1);
+  const patch = writes()[0]?.args as { patch: { ade: { panelWidth: number } } };
+  expect(patch.patch.ade.panelWidth).toBeGreaterThan(startWidth);
+});
+
 test('the Advanced switch saves ade.headlessSettingSources with the dialog', async ({
   relaunch,
 }) => {
