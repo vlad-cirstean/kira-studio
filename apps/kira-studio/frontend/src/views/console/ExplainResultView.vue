@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { computed, reactive, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useSettingsStore } from '../../state/settings';
@@ -133,7 +135,7 @@ const rawLanguage = computed(() =>
         <div
           v-for="row in flatRows"
           :key="row.id"
-          class="flex items-baseline flex-wrap gap-1.5 py-0.5 px-1.5 hover:bg-hover"
+          :class="cn(rowVariants({ layout: 'tree' }), 'flex-wrap items-baseline gap-1.5 py-0.5 pr-1.5 whitespace-normal')"
           data-testid="explain-plan-node"
           :style="{ paddingLeft: `${row.depth * 18 + 4}px` }"
         >

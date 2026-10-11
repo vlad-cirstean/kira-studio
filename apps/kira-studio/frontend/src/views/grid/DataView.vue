@@ -214,7 +214,7 @@ function onCloseSearch(): void {
         >Σ {{ rt.count.value.toLocaleString() }} rows</Badge
       >
       <span class="ml-auto flex items-center gap-1">
-        <Badge v-if="primaryKeyLabel" variant="info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</Badge>
+        <Badge data v-if="primaryKeyLabel" variant="info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</Badge>
       </span>
     </ViewToolbar>
 
@@ -329,32 +329,29 @@ function onCloseSearch(): void {
                that started it (RunState, above), never a bar across the top of the view — §8.5's
                "never a spinner that replaces the previous page" still holds, it just no longer needs a
                bar of its own to say so. -->
-          <Alert
+          <Alert strip
             v-if="rt?.status === 'error' && rt.error"
             variant="error"
             data-testid="error-strip"
             class="whitespace-pre-wrap font-data"
           >
-            <CodiconIcon name="warning" :size="16" />
             <AlertDescription>{{ rt.error.message }}</AlertDescription>
           </Alert>
           <!-- P43 F5/D7: a failed commit, distinct from a failed load above — the grid is still
                showing a perfectly valid page, only the write was refused. -->
-          <Alert
+          <Alert strip
             v-if="rt?.actionError"
             variant="error"
             data-testid="data-action-error"
             class="whitespace-pre-wrap font-data"
           >
-            <CodiconIcon name="warning" :size="16" />
             <AlertDescription>{{ rt.actionError }}</AlertDescription>
           </Alert>
           <!-- M5 §6.4: the one place this view states, in prose, that what's on screen is not the
                stored data — a preview convenience (§6.1), not the security boundary, but a user
                switching tabs or taking a screenshot must not mistake a bucket string for a literal
                value. -->
-          <Alert v-if="rt?.maskPreview" variant="info" data-testid="mask-preview-strip">
-            <CodiconIcon name="eye-closed" :size="16" />
+          <Alert strip v-if="rt?.maskPreview" variant="info" icon="eye-closed" data-testid="mask-preview-strip">
             <AlertDescription>
               Values shown are masked for this preview — not the stored data. Editing is off while it's on.
             </AlertDescription>
@@ -368,7 +365,7 @@ function onCloseSearch(): void {
            component -- `.cell-splitter` is a bare marker class, kept only because
            cell-editor.spec.ts polls its box-shadow via getComputedStyle (no rule of its own
            attaches to the name any more). -->
-      <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+      <ResizableHandle v-if="hasCellDock" class="cell-splitter" />
       <CellEditorDock :tab-id="tab.id" />
     </ResizablePanelGroup>
   </div>

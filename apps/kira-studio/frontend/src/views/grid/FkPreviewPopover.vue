@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { ForeignKeyMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
 import { onClickOutside, useEventListener } from '@vueuse/core';
 import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -153,23 +155,23 @@ onUnmounted(() => {
       <!-- flex-1 min-h-0 is load-bearing: without it a flex child refuses to shrink below its
            content height, and the panel overflows its own max-height instead of scrolling here. -->
       <div class="flex-1 min-h-0 overflow-y-auto p-1.5">
-        <div v-if="state.status === 'loading'" class="flex items-center justify-center h-10 text-muted-foreground">
-          <CodiconIcon name="loading" class="animate-spin" :size="12" />
+        <div v-if="state.status === 'loading'" class="flex items-center justify-center py-2 text-muted-foreground">
+          <Spinner :size="13" />
         </div>
         <Badge v-else-if="state.status === 'error'" variant="error">{{ state.message }}</Badge>
         <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="info" data-testid="fk-preview-empty">
           <AlertDescription>No matching row in {{ tableLabel }}</AlertDescription>
         </Alert>
         <!-- `header-key` marker; look matches SlickGridHost header badges. -->
-        <table v-else-if="state.status === 'ready'" class="w-full border-collapse text-kira-md">
-          <tbody>
-            <tr v-for="(col, i) in state.columns" :key="col.name">
-              <th class="text-left font-medium whitespace-nowrap align-top py-0.5 pl-0 pr-1" :class="typeClassTextClass(col.typeClass)">
+        <Table v-else-if="state.status === 'ready'" columns>
+          <TableBody>
+            <TableRow v-for="(col, i) in state.columns" :key="col.name">
+              <TableCell class="whitespace-nowrap align-top font-medium" :class="typeClassTextClass(col.typeClass)">
                 {{ col.name }}
                 <span v-if="col.isPrimaryKey" class="header-key ml-1 shrink-0 text-warn">PK</span>
                 <span v-if="col.isTarget" class="header-key ml-1 shrink-0 text-info">FK</span>
-              </th>
-              <td class="break-words py-0.5">
+              </TableCell>
+              <TableCell class="break-words">
                 <Badge
                   v-if="state.rows[0]?.values[i]?.isNull"
                   variant="info"
@@ -178,10 +180,10 @@ onUnmounted(() => {
                 >
                 <span v-else>{{ state.rows[0]?.values[i]?.text }}</span>
                 <Badge v-if="state.rows[0]?.values[i]?.truncated" variant="warn">truncated</Badge>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
       </div>
     </div>
   </div>

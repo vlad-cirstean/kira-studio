@@ -529,11 +529,11 @@ const statusLine = computed(() => {
       >
       <Tooltip v-if="dataTypeHint">
         <TooltipTrigger as-child>
-          <Badge :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
+          <Badge data :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ dataTypeHint }}</TooltipContent>
       </Tooltip>
-      <Badge v-else :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
+      <Badge data v-else :class="dataTypeClass">{{ selectedCell.column.dataType }}</Badge>
       <Badge v-if="isNullValue" variant="info" data-testid="cell-editor-badge-null">NULL</Badge>
       <Badge v-if="isEmptyValue" variant="info" data-testid="cell-editor-badge-empty">empty</Badge>
       <Badge v-if="isTruncatedValue" variant="warn" data-testid="cell-editor-badge-truncated">truncated</Badge>

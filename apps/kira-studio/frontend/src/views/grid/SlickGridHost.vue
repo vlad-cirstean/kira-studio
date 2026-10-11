@@ -13,6 +13,7 @@ import { useDebounceFn } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import type {
   Column,
   CustomDataView,
@@ -150,7 +151,7 @@ function tab() {
   return tabsStore.findDataTab(props.tabId);
 }
 
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 
 // Same P24 D3/D4 split DataGrid.vue's own displayRows/displayRowCount use — kept as a plain,
 // non-reactive read at mount and on an explicit page reload (below), not a live `watch` on the

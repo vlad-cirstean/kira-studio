@@ -239,11 +239,11 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <span>→</span>
             <Tooltip v-if="hop.status > 0">
               <TooltipTrigger as-child>
-                <Badge :variant="statusClass(hop.status)">{{ hop.status }} {{ hop.statusText }}</Badge>
+                <Badge data :variant="statusClass(hop.status)">{{ hop.status }} {{ hop.statusText }}</Badge>
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(hop.status) }}</TooltipContent>
             </Tooltip>
-            <Badge v-else variant="error" data-testid="http-timeline-hop-failed-chip">
+            <Badge data v-else variant="error" data-testid="http-timeline-hop-failed-chip">
               {{ hop.error || 'failed' }}
             </Badge>
           </div>

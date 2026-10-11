@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { SavedConsoleQuery } from '@shared/domain/queries';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
 import { onMounted, ref } from 'vue';
@@ -130,7 +132,7 @@ const saveCurrent = (): Promise<void> =>
            --kira-accent, same workaround as api/CollectionRow.vue's rename-input (Part 3). P110
            I2-37 retired the shadcn accent alias this comment used to warn against; hover is its
            I2-37 replacement name. -->
-      <button type="button" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full text-primary" data-testid="console-save-current" @click="saveCurrent">
+      <button type="button" :class="cn(rowVariants(), 'w-full text-primary')" data-testid="console-save-current" @click="saveCurrent">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
         Save current query…
       </button>

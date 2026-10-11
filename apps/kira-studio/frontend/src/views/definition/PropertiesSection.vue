@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DefinitionSection } from '@shared/domain/definition';
 import { Badge } from '@theme/components/ui/badge';
+import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
 
 // P23 D6/D5/D9: one `definition.sections[]` entry — a Kafka topic's Partitions/Configuration, a
 // consumer group's Group/Members/Committed offsets, an SQS queue's Attributes. Same section chrome
@@ -9,11 +10,6 @@ import { Badge } from '@theme/components/ui/badge';
 defineProps<{
   section: DefinitionSection;
 }>();
-
-// P110 B30: ColumnsSection.vue's own DEF_TD constant (see its comment) -- folded off
-// primitives.css's old shared body-cell rule. No thead/border-r override here (see
-// ColumnsSection.vue's own scoped-style comment on why).
-const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
 </script>
 
 <template>
@@ -25,14 +21,14 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
 
     <p v-if="section.rows.length === 0" class="text-muted-foreground m-0">Nothing to show.</p>
 
-    <table v-else class="w-full border-collapse text-kira-md">
-      <tbody>
-        <tr v-for="row in section.rows" :key="row.name" class="border-b border-border hover:bg-hover" data-testid="definition-row">
-          <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">{{ row.name }}</td>
-          <td :class="DEF_TD" class="def-prop-value font-data">{{ row.value }}</td>
-          <td :class="DEF_TD" class="text-subtle text-kira-sm">{{ row.detail ?? '' }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <Table v-else>
+      <TableBody>
+        <TableRow v-for="row in section.rows" :key="row.name" data-testid="definition-row">
+          <TableCell class="whitespace-nowrap font-data text-muted-foreground">{{ row.name }}</TableCell>
+          <TableCell class="def-prop-value font-data">{{ row.value }}</TableCell>
+          <TableCell class="text-subtle text-kira-sm">{{ row.detail ?? '' }}</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
   </section>
 </template>

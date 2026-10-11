@@ -468,7 +468,7 @@ onUnmounted(() => {
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="globe" :size="13" /></span>
       <span class="text-kira-md text-fg truncate" data-testid="http-request-target">{{ title }}</span>
-      <Badge variant="chip" :class="methodTextClass(methodToken)" data-testid="http-method-chip">{{ tab.state.method }}</Badge>
+      <Badge data variant="chip" :class="methodTextClass(methodToken)" data-testid="http-method-chip">{{ tab.state.method }}</Badge>
       <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,
            which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
            eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
@@ -724,7 +724,7 @@ onUnmounted(() => {
         />
       </ResizablePanel>
 
-      <ResizableHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+      <ResizableHandle class="request-splitter" />
 
       <ResizablePanel class="min-h-0" data-testid="http-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />

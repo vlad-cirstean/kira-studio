@@ -12,7 +12,7 @@ import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
@@ -852,39 +852,38 @@ const statusLine = computed(() => {
       <div class="flex items-center gap-1.5 min-w-0"></div>
     </ViewToolbar>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="console-error">
+    <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="console-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
-    <Alert v-if="formatError" variant="error" data-testid="console-format-error">
+    <Alert strip v-if="formatError" variant="error" data-testid="console-format-error">
       <AlertDescription>{{ formatError }}</AlertDescription>
     </Alert>
-    <Alert v-if="formatWarning" variant="warn" data-testid="console-format-warning">
+    <Alert strip v-if="formatWarning" variant="warn" data-testid="console-format-warning">
       <AlertDescription>{{ formatWarning }}</AlertDescription>
     </Alert>
-    <Alert v-if="formatNote" variant="info" data-testid="console-format-note">
+    <Alert strip v-if="formatNote" variant="info" data-testid="console-format-note">
       <AlertDescription>{{ formatNote }}</AlertDescription>
     </Alert>
-    <Alert v-if="connectError" variant="error" data-testid="console-connect-error">
+    <Alert strip v-if="connectError" variant="error" data-testid="console-connect-error">
       <AlertDescription>{{ connectError }}</AlertDescription>
     </Alert>
-    <Alert v-if="explainError" variant="error" data-testid="console-explain-error">
+    <Alert strip v-if="explainError" variant="error" data-testid="console-explain-error">
       <AlertDescription>{{ explainError }}</AlertDescription>
     </Alert>
     <!-- P18 D19: warns, never blocks — the query underneath this strip already ran (or is
          running). "Show plan" pushes the plan this strip already parsed, no second round trip. -->
-    <Alert v-if="rt?.autoExplain" variant="warn" data-testid="console-auto-explain">
-      <AlertDescription class="flex items-center gap-1.5">
-        <span class="flex-1">{{ autoExplainMessage }}</span>
+    <Alert strip v-if="rt?.autoExplain" variant="warn" data-testid="console-auto-explain">
+      <AlertDescription>{{ autoExplainMessage }}</AlertDescription>
+      <AlertAction v-if="canShowAutoExplainPlan">
         <button
-          v-if="canShowAutoExplainPlan"
           type="button"
-          class="border-0 bg-none p-0 text-inherit underline cursor-pointer shrink-0"
+          class="border-0 bg-none p-0 text-inherit underline cursor-pointer"
           data-testid="console-auto-explain-show-plan"
           @click="onShowAutoExplainPlan"
         >
           Show plan
         </button>
-      </AlertDescription>
+      </AlertAction>
     </Alert>
 
       <!-- Item 4/2 (regression pass, task batch P46-3/4): every other gated view replaced its
@@ -950,16 +949,17 @@ const statusLine = computed(() => {
                 <CodiconIcon :name="iconForResult(result.key)" :size="13" class="shrink-0" />
                 <span class="overflow-hidden text-ellipsis whitespace-nowrap min-w-0">Result {{ i + 1 }}</span>
               </button>
-              <button
-                type="button"
-                class="inline-flex items-center justify-center shrink-0 w-4 h-4 cursor-pointer rounded-kira-sm border-0 bg-transparent p-0 hover:bg-hover"
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                class="size-4"
                 :class="result.key === rt.activeKey ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
                 aria-label="Close result"
                 data-testid="console-result-close"
                 @click="consoleViewStore.closeResult(tab.id, result.key)"
               >
                 <CodiconIcon name="close" :size="13" />
-              </button>
+              </Button>
             </div>
           </div>
           <span class="text-kira-sm text-muted-foreground ml-auto" data-testid="console-status">{{ statusLine }}</span>
@@ -991,7 +991,7 @@ const statusLine = computed(() => {
           @go-to-match="onGoToMatch"
           @close="onCloseSearch"
         />
-        <Alert v-if="activeResultTruncated?.truncated" variant="warn" data-testid="console-result-truncated">
+        <Alert strip v-if="activeResultTruncated?.truncated" variant="warn" data-testid="console-result-truncated">
           <AlertDescription>
             Result stopped at {{ activeResultTruncated.rows.toLocaleString() }} rows (console limit). Narrow the query to see the rest.
           </AlertDescription>
@@ -1017,7 +1017,7 @@ const statusLine = computed(() => {
            viewer, not an editor refusing this particular cell (F12/F13). -->
       <!-- P110 B32: `.cell-splitter` stays a bare marker class with no rule of its own --
            cell-editor.spec.ts polls its box-shadow via getComputedStyle. -->
-      <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+      <ResizableHandle v-if="hasCellDock" class="cell-splitter" />
       <CellEditorDock :tab-id="tab.id" :read-only="true" />
       </ResizablePanelGroup>
   </div>
@@ -1025,5 +1025,5 @@ const statusLine = computed(() => {
        `group/tab` on the tab, its own ternary for the inactive-hover background (`is-active` stays
        a real marker class, console.spec.ts's own `toHaveClass(/is-active/)` assertion); the close
        button's opacity is `isActive ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'`, its
-       own hover background a plain `hover:bg-hover`. -->
+       own hover background now the toolbar Button variant's. -->
 </template>

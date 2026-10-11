@@ -4,6 +4,8 @@ import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import Spinner from '@theme/components/Spinner.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
@@ -828,10 +830,7 @@ onUnmounted(() => {
                 @click="projectionOpen = !projectionOpen"
               >
                 <CodiconIcon name="list-selection" :size="13" />
-                <span
-                  v-if="tab.state.projection !== null"
-                  class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-state-on"
-                />
+                <StatusDot v-if="tab.state.projection !== null" tone="state-on" class="absolute top-0.5 right-0.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{
@@ -968,12 +967,12 @@ onUnmounted(() => {
       </Tooltip>
     </ViewToolbar>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="document-error">
+    <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="document-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
     <!-- P43 F6/D7: a failed insert/edit/delete, distinct from a failed load above — the list
          is still showing a perfectly valid page, only the write was refused. -->
-    <Alert v-if="rt?.actionError" variant="error" data-testid="document-action-error">
+    <Alert strip v-if="rt?.actionError" variant="error" data-testid="document-action-error">
       <AlertDescription>{{ rt.actionError }}</AlertDescription>
     </Alert>
     <!-- Below the filter/sort row, above the list it searches — views/shared/page/SearchToolbar.vue's own
@@ -1020,7 +1019,7 @@ onUnmounted(() => {
     <div class="flex-1 min-h-0 overflow-y-auto" data-testid="document-list">
       <Empty v-if="!rt || rt.rowCount === 0" class="h-full">
         <EmptyHeader>
-          <EmptyMedia><CodiconIcon :name="rt ? 'json' : 'loading'" :size="24" /></EmptyMedia>
+          <EmptyMedia><CodiconIcon v-if="rt" name="json" :size="24" /><Spinner v-else :size="24" /></EmptyMedia>
           <EmptyTitle>{{ rt ? 'No documents' : 'Loading…' }}</EmptyTitle>
         </EmptyHeader>
       </Empty>

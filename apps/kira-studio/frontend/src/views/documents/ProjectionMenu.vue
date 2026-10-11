@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
@@ -85,11 +87,9 @@ onUnmounted(() => {
         >None</Button
       >
     </div>
-    <div v-if="fieldNames.length === 0" class="p-2 text-kira-sm text-muted-foreground">
-      No fields seen yet — load a page first.
-    </div>
+    <InlineState v-if="fieldNames.length === 0" kind="empty">No fields seen yet — load a page first.</InlineState>
     <div v-else class="overflow-y-auto p-0.5">
-      <Label v-for="name in fieldNames" :key="name" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover">
+      <Label v-for="name in fieldNames" :key="name" :class="rowVariants()">
         <Checkbox
           :model-value="selected.has(name)"
           class="size-3.5"

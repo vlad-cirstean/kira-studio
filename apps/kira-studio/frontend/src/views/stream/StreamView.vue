@@ -1226,7 +1226,7 @@ onUnmounted(() => {
                   @click="onKeyCellClickFromEvent"
                   @keydown="onCellKeydownFromEvent($event, 'key')"
                 >
-                  <Badge v-if="rowAt(rowIndices[vi.index])?.keyBinary" class="mr-1" data-testid="stream-key-binary">base64</Badge>
+                  <Badge data v-if="rowAt(rowIndices[vi.index])?.keyBinary" class="mr-1" data-testid="stream-key-binary">base64</Badge>
                   {{ rowAt(rowIndices[vi.index])?.key ?? '(none)' }}
                 </div>
                 <div
@@ -1300,7 +1300,7 @@ onUnmounted(() => {
       </div>
       </template>
     </ResizablePanel>
-    <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+    <ResizableHandle v-if="hasCellDock" class="cell-splitter" />
     <CellEditorDock :tab-id="tab.id" :read-only="true" />
     </ResizablePanelGroup>
     <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared

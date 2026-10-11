@@ -279,13 +279,13 @@ onUnmounted(() => {
       <template v-if="hasCode">
         <Tooltip v-if="codeHint">
           <TooltipTrigger as-child>
-            <Badge :variant="grpcCodeClass(code)" data-testid="grpc-status-chip">
+            <Badge data :variant="grpcCodeClass(code)" data-testid="grpc-status-chip">
               {{ codeName }} ({{ code }})
             </Badge>
           </TooltipTrigger>
           <TooltipContent>{{ codeHint }}</TooltipContent>
         </Tooltip>
-        <Badge v-else :variant="grpcCodeClass(code)" data-testid="grpc-status-chip">
+        <Badge data v-else :variant="grpcCodeClass(code)" data-testid="grpc-status-chip">
           {{ codeName }} ({{ code }})
         </Badge>
         <span class="ml-auto" />

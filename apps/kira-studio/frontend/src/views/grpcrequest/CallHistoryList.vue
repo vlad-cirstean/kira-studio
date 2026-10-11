@@ -144,7 +144,7 @@ async function onClear(): Promise<void> {
       >
         <Tooltip>
           <TooltipTrigger as-child>
-            <Badge :variant="grpcCodeClass(entry.code)">{{ entry.codeName }}</Badge>
+            <Badge data :variant="grpcCodeClass(entry.code)">{{ entry.codeName }}</Badge>
           </TooltipTrigger>
           <TooltipContent>{{ grpcCodeHint(entry.code) }}</TooltipContent>
         </Tooltip>

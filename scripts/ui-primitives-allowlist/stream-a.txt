@@ -1,21 +1,4 @@
 # P263 allowlist, one entry per line. See scripts/check-ui-primitives.sh.
-apps/kira-studio/frontend/src/views/browse/BrowseView.vue
-apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue
-apps/kira-studio/frontend/src/views/console/ConsoleSavedMenu.vue
-apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue
-apps/kira-studio/frontend/src/views/console/ConsoleView.vue
-apps/kira-studio/frontend/src/views/console/ExplainResultView.vue
-apps/kira-studio/frontend/src/views/definition/ColumnsSection.vue
-apps/kira-studio/frontend/src/views/definition/ConstraintsSection.vue
-apps/kira-studio/frontend/src/views/definition/DefinitionView.vue
-apps/kira-studio/frontend/src/views/definition/IndexesSection.vue
-apps/kira-studio/frontend/src/views/definition/PropertiesSection.vue
-apps/kira-studio/frontend/src/views/definition/ValidationSection.vue
-apps/kira-studio/frontend/src/views/documents/ProjectionMenu.vue
-apps/kira-studio/frontend/src/views/grid/ColumnsMenu.vue
-apps/kira-studio/frontend/src/views/grid/FkPreviewPopover.vue
-apps/kira-studio/frontend/src/views/grid/PreviewCommandPanel.vue
-apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue
 apps/kira-studio/frontend/src/views/grpcrequest/CallHistoryList.vue
 apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue
 apps/kira-studio/frontend/src/views/grpcrequest/SchemaBrowser.vue
@@ -42,3 +25,5 @@ permanent U34 apps/kira-studio/frontend/src/theme/EngineIcon.vue # engine brand 
 permanent U36 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile is a selectable radio card, not a content box
 permanent U37 apps/kira-studio/frontend/src/project/ConnectionDialog.vue # engine tile hover fill (radio card, not a row)
 permanent U36 apps/kira-studio/frontend/src/project/FiltersDialog.vue # bordered scroll list box (input-like), rows own the look
+permanent U36 apps/kira-studio/frontend/src/views/console/ExplainResultView.vue # bordered plan-tree list container, rows own the look
+permanent U37 apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue # DOM-built grid cell navigation button hover, no Vue Button

@@ -52,7 +52,7 @@ const resetTitle = computed<string>(
     >
       modified
     </Badge>
-    <Badge v-if="showBytes" :data-testid="`${testidPrefix}-byte-badge`">{{
+    <Badge data v-if="showBytes" :data-testid="`${testidPrefix}-byte-badge`">{{
       buffer.byteLabel.value
     }}</Badge>
     <TooltipIconButton

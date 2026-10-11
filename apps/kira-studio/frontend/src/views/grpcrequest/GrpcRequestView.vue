@@ -280,7 +280,7 @@ onUnmounted(() => {
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="symbol-interface" :size="13" /></span>
       <span class="text-kira-md text-fg truncate" data-testid="grpc-request-target">{{ title }}</span>
-      <Badge v-if="tab.state.service && tab.state.method" variant="info" data-testid="grpc-method-chip">
+      <Badge data v-if="tab.state.service && tab.state.method" variant="info" data-testid="grpc-method-chip">
         {{ tab.state.service }}/{{ tab.state.method }}
       </Badge>
       <Tooltip v-if="dirty">
@@ -504,7 +504,7 @@ onUnmounted(() => {
         <SchemaBrowser v-else :tab="tab" :schema="schema" :loading="schemaLoading" :error="schemaError" @reload="reloadSchema" />
       </ResizablePanel>
 
-      <ResizableHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+      <ResizableHandle class="request-splitter" />
 
       <ResizablePanel class="min-h-0" data-testid="grpc-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />

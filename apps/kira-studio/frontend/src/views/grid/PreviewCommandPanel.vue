@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { computed } from 'vue';
@@ -68,17 +69,11 @@ function close(): void {
           @click="close"
         />
       </div>
-      <div v-if="isLoading" class="p-2 text-kira-sm text-muted-foreground">Loading…</div>
-      <div
-        v-else-if="errorMessage"
-        class="text-error p-2 text-kira-sm"
-        data-testid="preview-command-error"
-      >
+      <InlineState v-if="isLoading" kind="loading">Loading…</InlineState>
+      <InlineState v-else-if="errorMessage" kind="error" data-testid="preview-command-error">
         {{ errorMessage }}
-      </div>
-      <div v-else-if="statements.length === 0" class="p-2 text-kira-sm text-muted-foreground">
-        No pending changes.
-      </div>
+      </InlineState>
+      <InlineState v-else-if="statements.length === 0" kind="empty">No pending changes.</InlineState>
       <div v-else class="h-60">
         <MonacoHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
       </div>

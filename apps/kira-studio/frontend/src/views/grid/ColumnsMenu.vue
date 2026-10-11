@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { moveId, useSortableReorder } from '@workbench/util/useSortableReorder';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { useTabsStore } from '../../state/tabs';
@@ -129,12 +132,11 @@ onBeforeUnmount(() => {
            (columns.ts's resolveColumnOrder). Checkbox toggles visibility; the PK's is locked.
            The container is always mounted: the sortable binds to it once, at mount. -->
       <div ref="listEl" class="overflow-y-auto p-0.5">
-        <div v-if="!meta" class="p-1.5 text-kira-sm text-muted-foreground">Loading columns…</div>
+        <InlineState v-if="!meta" kind="loading">Loading columns…</InlineState>
         <Label
           v-for="name in order"
           :key="name"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover columns-menu-item"
-          :class="{ 'is-pk': pkNames.has(name) }"
+          :class="cn(rowVariants(), 'columns-menu-item', { 'is-pk': pkNames.has(name) })"
           data-testid="columns-menu-row"
           :data-name="name"
         >

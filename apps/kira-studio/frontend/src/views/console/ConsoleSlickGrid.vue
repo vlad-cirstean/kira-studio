@@ -2,6 +2,7 @@
 import type { TabularPage } from '@shared/protocol/page';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyOrReportError } from '@workbench/util/clipboard';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import type {
   Column,
   CustomDataView,
@@ -11,7 +12,7 @@ import type {
   SlickEventData,
 } from 'slickgrid';
 import { SlickEventHandler, type SlickHybridSelectionModel, type SlickRange } from 'slickgrid';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useCellSelectionStore } from '../../state/cellSelection';
 import { useSettingsStore } from '../../state/settings';
 import { classesFrom } from '../../theme/cellClass';
@@ -245,7 +246,7 @@ function buildColumns(page: TabularPage): KiraColumn[] {
   return cols;
 }
 
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 
 const rootRef = ref<HTMLElement | null>(null);
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DocumentSchemaMeta } from '@shared/domain/definition';
 import { Badge } from '@theme/components/ui/badge';
+import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
 import { computed } from 'vue';
 import { jsonSchemaFields } from './structure';
 
@@ -17,21 +18,16 @@ const fields = computed(() =>
 // Raw JSON fallback: no validator, a validator that isn't a $jsonSchema, or a $jsonSchema this
 // parser could not turn into field rows (P19 D12) — never an empty table pretending to be one.
 const showRaw = computed(() => props.documentSchema?.validator != null && fields.value === null);
-
-// P110 B30: ColumnsSection.vue's own DEF_TD constant (see its comment) -- folded off
-// primitives.css's old shared body-cell rule. No thead/border-r override here (see
-// ColumnsSection.vue's own scoped-style comment on why).
-const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
 </script>
 
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-validation">
     <header class="flex items-center gap-1.5">
       <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Validation</span>
-      <Badge v-if="documentSchema?.validationLevel" variant="chip">
+      <Badge v-if="documentSchema?.validationLevel" variant="chip" data>
         {{ documentSchema.validationLevel }}
       </Badge>
-      <Badge v-if="documentSchema?.validationAction" variant="chip">
+      <Badge v-if="documentSchema?.validationAction" variant="chip" data>
         {{ documentSchema.validationAction }}
       </Badge>
     </header>
@@ -40,18 +36,18 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
       No validator is set for this collection.
     </p>
 
-    <table v-else-if="fields" class="w-full border-collapse text-kira-md">
-      <tbody>
-        <tr v-for="f in fields" :key="f.name" class="border-b border-border hover:bg-hover" data-testid="definition-row">
-          <td :class="DEF_TD" class="def-val-name font-data">{{ f.name }}</td>
-          <td :class="DEF_TD" class="def-val-type font-data">{{ f.bsonType ?? '' }}</td>
-          <td :class="DEF_TD" class="def-val-required">
+    <Table v-else-if="fields">
+      <TableBody>
+        <TableRow v-for="f in fields" :key="f.name" data-testid="definition-row">
+          <TableCell class="def-val-name font-data">{{ f.name }}</TableCell>
+          <TableCell class="def-val-type font-data">{{ f.bsonType ?? '' }}</TableCell>
+          <TableCell class="def-val-required">
             <Badge v-if="f.required">required</Badge>
-          </td>
-          <td :class="DEF_TD" class="text-muted-foreground">{{ f.description ?? '' }}</td>
-        </tr>
-      </tbody>
-    </table>
+          </TableCell>
+          <TableCell class="text-muted-foreground">{{ f.description ?? '' }}</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
 
     <pre v-else-if="showRaw" class="m-0 whitespace-pre-wrap rounded-kira-sm bg-field text-fg p-2 font-data">{{ documentSchema?.validator }}</pre>
   </section>

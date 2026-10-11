@@ -773,7 +773,7 @@ onUnmounted(() => {
     </Empty>
     <template v-else>
       <ViewToolbar v-if="page" data-testid="keyvalue-badges">
-        <Badge data-testid="keyvalue-type">{{ page.redisType }}</Badge>
+        <Badge data data-testid="keyvalue-type">{{ page.redisType }}</Badge>
         <!-- TTL is a Redis-only concept (always null for an S3 object — read.ts never computes
              it) — showing "no expiry" for every object would be a permanently-meaningless chip,
              not real information. Memory/size (P33 D5) is real for both: read.ts now sets
@@ -781,12 +781,12 @@ onUnmounted(() => {
         <template v-if="!isSingleObjectPage">
           <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
                vanish should look like one (see the mockup's KeyValue.html). -->
-          <Badge :variant="page.ttlMs !== null ? 'warn' : 'chip'" data-testid="keyvalue-ttl">
+          <Badge data :variant="page.ttlMs !== null ? 'warn' : 'chip'" data-testid="keyvalue-ttl">
             <CodiconIcon name="history" :size="13" />
             {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
           </Badge>
         </template>
-        <Badge data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</Badge>
+        <Badge data data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</Badge>
         <Badge v-if="connRecord">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</Badge>
       </ViewToolbar>
 
@@ -1128,7 +1128,7 @@ onUnmounted(() => {
       </div>
     </template>
     </ResizablePanel>
-    <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+    <ResizableHandle v-if="hasCellDock" class="cell-splitter" />
     <CellEditorDock :tab-id="viewKey" />
     </ResizablePanelGroup>
     <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared

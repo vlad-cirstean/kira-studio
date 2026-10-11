@@ -300,19 +300,19 @@ const breadcrumb = computed(() => {
       </div>
     </ViewToolbar>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="definition-error">
+    <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="definition-error">
       <AlertDescription><span class="whitespace-pre-wrap font-data">{{ rt.error }}</span></AlertDescription>
     </Alert>
-    <Alert v-if="copyError" variant="error" data-testid="definition-copy-error">
+    <Alert strip v-if="copyError" variant="error" data-testid="definition-copy-error">
       <AlertDescription>{{ copyError }}</AlertDescription>
     </Alert>
     <Alert
       v-if="pane === 'source' && definition && definition.notes.length > 0"
+      strip
       variant="info"
       data-testid="definition-notes"
     >
-      <AlertDescription class="flex items-start gap-1.5">
-        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
+      <AlertDescription>
         <ul class="m-0 pl-3">
           <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
         </ul>

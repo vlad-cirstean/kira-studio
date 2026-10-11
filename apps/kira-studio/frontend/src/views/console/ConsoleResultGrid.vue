@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
+import { rowVariants } from '@theme/components/rowVariants';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { cn } from '@theme/lib/utils';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { useRowHeight } from '@workbench/util/rowHeight';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
-import { useSettingsStore } from '../../state/settings';
 import { INLINE_CHARS, parseInline } from '../../workers/parse/client';
 import { useParseWorker } from '../../workers/parse/useParseWorker';
 import DocumentRow from '../shared/document/DocumentRow.vue';
@@ -25,7 +27,6 @@ const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 const parse = useParseWorker();
 const documentRowsStore = useDocumentRowsStore();
-const settingsStore = useSettingsStore();
 const consoleViewStore = useConsoleViewStore();
 
 // A three-way switch over a console result's own kind (P8) — tabular results render through
@@ -48,7 +49,7 @@ const props = defineProps<{
   path: string;
 }>();
 
-const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+const { single: rowHeight } = useRowHeight();
 
 const page = computed(() => {
   // Establishes the reactive dependency — the page object itself is frozen and non-reactive.
@@ -337,7 +338,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 
 <template>
   <div class="h-full min-h-0 flex flex-col text-kira-md font-data" data-testid="console-result-grid">
-    <Alert v-if="copyError" variant="error" data-testid="console-copy-error">
+    <Alert strip v-if="copyError" variant="error" data-testid="console-copy-error">
       <AlertDescription>{{ copyError }}</AlertDescription>
     </Alert>
     <div v-if="!page || page.rowCount === 0" class="no-rows absolute inset-0 h-full flex items-center justify-center text-muted-foreground text-kira-sm">{{ page ? 'No rows' : '' }}</div>
@@ -417,7 +418,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
         <div
           v-for="vi in kvVirtual.virtualItems.value"
           :key="String(vi.key)"
-          class="group/row flex border-b border-border w-(--total-width)"
+          class="flex border-b border-border w-(--total-width)"
           data-testid="console-result-kv-row"
           :data-row="rowIndices[vi.index]"
           :class="VIRTUAL_ROW_CLASS"
@@ -430,33 +431,39 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           @contextmenu="onKeyValueRowContextMenuFromEvent"
         >
           <div
-            class="cell overflow-hidden whitespace-nowrap cursor-default w-52 flex items-center text-ellipsis px-2"
-            :class="[
-              isSelected(rowIndices[vi.index]!, 0) ? 'bg-select' : 'group-hover/row:bg-hover',
-              {
-                'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 0),
-                'search-match-current bg-search-match-current': isCurrentSearchMatch(
-                  rowIndices[vi.index]!,
-                  0,
-                ),
-              },
-              isCurrentSearchMatch(rowIndices[vi.index]!, 0) ? 'text-bg' : 'text-muted-foreground',
-            ]"
+            class="cell"
+            :class="
+              cn(
+                rowVariants({ layout: 'tree', selected: isSelected(rowIndices[vi.index]!, 0), muted: true }),
+                'w-52 select-text overflow-hidden text-ellipsis px-2',
+                {
+                  'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 0),
+                  'search-match-current bg-search-match-current': isCurrentSearchMatch(
+                    rowIndices[vi.index]!,
+                    0,
+                  ),
+                },
+                isCurrentSearchMatch(rowIndices[vi.index]!, 0) && 'text-bg',
+              )
+            "
           >
             {{ kvRowAt(rowIndices[vi.index]!).field }}
           </div>
           <div
-            class="cell overflow-hidden cursor-default flex-1 flex items-center whitespace-pre-wrap break-words px-2"
-            :class="[
-              isSelected(rowIndices[vi.index]!, 1) ? 'bg-select' : 'group-hover/row:bg-hover',
-              {
-                'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 1),
-                'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
-                  rowIndices[vi.index]!,
-                  1,
-                ),
-              },
-            ]"
+            class="cell"
+            :class="
+              cn(
+                rowVariants({ layout: 'tree', selected: isSelected(rowIndices[vi.index]!, 1) }),
+                'flex-1 select-text overflow-hidden whitespace-pre-wrap break-words px-2',
+                {
+                  'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 1),
+                  'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
+                    rowIndices[vi.index]!,
+                    1,
+                  ),
+                },
+              )
+            "
           >
             {{ kvRowAt(rowIndices[vi.index]!).value }}
           </div>

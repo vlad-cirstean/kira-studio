@@ -3,6 +3,7 @@ import type { PageSize } from '@shared/domain/tabs';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
@@ -305,10 +306,7 @@ function onDeleteRow(): void {
               @click="columnsOpen = !columnsOpen"
             >
               <CodiconIcon name="list-selection" :size="13" />
-              <span
-                v-if="columnsIndicator"
-                class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-state-on"
-              />
+              <StatusDot v-if="columnsIndicator" tone="state-on" class="absolute top-0.5 right-0.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{{ columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns' }}</TooltipContent>

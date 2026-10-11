@@ -1,18 +1,11 @@
 <script setup lang="ts">
 import type { IndexMeta } from '@shared/domain/tree';
 import { Badge } from '@theme/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@theme/components/ui/table';
 
 defineProps<{
   indexes: IndexMeta[];
 }>();
-
-// P110 B30: ColumnsSection.vue's own DEF_TH/DEF_TH_LAST/DEF_TD constants (see its comment) --
-// folded off primitives.css's old shared header-row and body-cell rules.
-const DEF_TH =
-  'text-left px-1.5 py-1 bg-elevated border-b border-border-strong border-r border-border text-muted-foreground text-kira-sm whitespace-nowrap';
-const DEF_TH_LAST =
-  'text-left px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap';
-const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:border-r-0';
 </script>
 
 <template>
@@ -21,28 +14,26 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:bor
       <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Indexes</span>
       <Badge>{{ indexes.length }}</Badge>
     </header>
-    <table class="w-full border-collapse text-kira-md">
-      <thead>
-        <tr>
-          <th :class="DEF_TH">Name</th>
-          <th :class="DEF_TH">Kind</th>
-          <th :class="DEF_TH">Method</th>
-          <th :class="DEF_TH_LAST">Columns</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="idx in indexes" :key="idx.name" class="border-b border-border hover:bg-hover" data-testid="definition-row">
-          <td :class="DEF_TD" class="def-idx-name">{{ idx.name }}</td>
-          <td :class="DEF_TD" class="def-idx-badges">
+    <Table columns>
+      <TableHeader>
+        <TableRow class="hover:bg-transparent">
+          <TableHead>Name</TableHead>
+          <TableHead>Kind</TableHead>
+          <TableHead>Method</TableHead>
+          <TableHead>Columns</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <TableRow v-for="idx in indexes" :key="idx.name" data-testid="definition-row">
+          <TableCell class="def-idx-name">{{ idx.name }}</TableCell>
+          <TableCell class="def-idx-badges">
             <Badge v-if="idx.primary">primary</Badge>
             <Badge v-else-if="idx.unique">unique</Badge>
-          </td>
-          <td :class="DEF_TD" class="def-idx-method font-data">{{ idx.method ?? '' }}</td>
-          <td :class="DEF_TD" class="text-muted-foreground font-data">({{ idx.columns.join(', ') }})</td>
-        </tr>
-      </tbody>
-    </table>
+          </TableCell>
+          <TableCell class="def-idx-method font-data">{{ idx.method ?? '' }}</TableCell>
+          <TableCell class="font-data text-muted-foreground">({{ idx.columns.join(', ') }})</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
   </section>
-  <!-- P110 I2-16: `.definition-table td`/`td:last-child` folded into DEF_TD (matches
-       ColumnsSection.vue's own comment). -->
 </template>

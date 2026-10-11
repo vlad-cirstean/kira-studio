@@ -262,7 +262,7 @@ onUnmounted(() => {
       <template v-if="response">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Badge :variant="statusClass(response.status)" data-testid="http-status">
+            <Badge data :variant="statusClass(response.status)" data-testid="http-status">
               {{ response.status }} {{ response.statusText }}
             </Badge>
           </TooltipTrigger>

@@ -2,6 +2,7 @@
 import type { ColumnMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { columnTypeIcon, columnTypeTextClass } from '../../theme/icons';
@@ -9,17 +10,6 @@ import { typeDescription } from '../shared/typeGlossary';
 import { columnsSectionMenu } from './columnsMenu';
 
 const contextMenuStore = useContextMenuStore();
-
-// P110 B30: the shared definition-table header/body cell shape, folded off primitives.css's old
-// shared header-row and body-cell rules into these two constants -- the class string repeats
-// across 7 columns in this file alone (plan §5.11's "4+ times, extract a const" rule). DEF_TH_LAST
-// omits the column-divider border for the last header cell, matching the old rule's own
-// last-child exception.
-const DEF_TH =
-  'text-left px-1.5 py-1 bg-elevated border-b border-border-strong border-r border-border text-muted-foreground text-kira-sm whitespace-nowrap';
-const DEF_TH_LAST =
-  'text-left px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap';
-const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:border-r-0';
 
 const props = defineProps<{
   columns: ColumnMeta[];
@@ -52,39 +42,38 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
       <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Columns</span>
       <Badge>{{ columns.length }}</Badge>
     </header>
-    <table class="w-full border-collapse text-kira-md">
-      <thead>
-        <tr>
-          <th :class="DEF_TH" class="text-muted-foreground w-4"></th>
-          <th :class="DEF_TH" class="def-col-name">Name</th>
-          <th :class="DEF_TH" class="w-6">Key</th>
-          <th :class="DEF_TH" class="whitespace-nowrap text-muted-foreground">Type</th>
-          <th :class="DEF_TH" class="whitespace-nowrap text-muted-foreground w-20">Null?</th>
-          <th :class="DEF_TH" class="whitespace-nowrap text-muted-foreground">Default</th>
-          <th :class="DEF_TH_LAST" class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground max-w-60">Comment</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
+    <Table columns>
+      <TableHeader>
+        <TableRow class="hover:bg-transparent">
+          <TableHead class="w-4"></TableHead>
+          <TableHead class="def-col-name">Name</TableHead>
+          <TableHead class="w-6">Key</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead class="w-20">Null?</TableHead>
+          <TableHead>Default</TableHead>
+          <TableHead class="max-w-60 overflow-hidden text-ellipsis">Comment</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <TableRow
           v-for="col in columns"
           :key="col.name"
-          class="border-b border-border hover:bg-hover"
           data-testid="definition-row"
           @contextmenu="onContextMenu($event, col)"
         >
-          <td :class="DEF_TD" class="text-muted-foreground w-4">
+          <TableCell class="w-4 text-muted-foreground">
             <CodiconIcon
               :name="columnTypeIcon(col.dataType)"
               :size="13"
               :class="columnTypeTextClass(col.dataType)"
             />
-          </td>
-          <td :class="DEF_TD" class="def-col-name">{{ col.name }}</td>
-          <td :class="DEF_TD" class="w-6">
+          </TableCell>
+          <TableCell class="def-col-name">{{ col.name }}</TableCell>
+          <TableCell class="w-6">
             <span v-if="keyLabel(col) === 'PK'" class="text-warn text-kira-sm">PK</span>
             <span v-else-if="keyLabel(col) === 'FK'" class="text-info text-kira-sm">FK</span>
-          </td>
-          <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">
+          </TableCell>
+          <TableCell class="whitespace-nowrap font-data text-muted-foreground">
             <span :class="columnTypeTextClass(col.dataType)">{{ col.dataType }}</span>
             <Tooltip v-if="typeDescription(col.dataType)">
               <TooltipTrigger as-child>
@@ -94,18 +83,12 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
               </TooltipTrigger>
               <TooltipContent>{{ typeDescription(col.dataType) }}</TooltipContent>
             </Tooltip>
-          </td>
-          <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground w-20 font-data">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
-          <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">{{ col.defaultExpr ?? '' }}</td>
-          <td :class="DEF_TD" class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground max-w-60">{{ col.comment ?? '' }}</td>
-        </tr>
-      </tbody>
-    </table>
+          </TableCell>
+          <TableCell class="w-20 whitespace-nowrap font-data text-muted-foreground">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</TableCell>
+          <TableCell class="whitespace-nowrap font-data text-muted-foreground">{{ col.defaultExpr ?? '' }}</TableCell>
+          <TableCell class="max-w-60 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">{{ col.comment ?? '' }}</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
   </section>
-  <!-- P110 I2-16: `.definition-table td`/`td:last-child` folded into DEF_TD (`border-r border-border
-       last:border-r-0`, `last:` compiles to `:last-child` — every DEF_TD <td> is a direct <tr> child).
-       `.header-key`/`.is-fk` dropped from this file: checked slick-grid.spec.ts/clickhouse.frontend.
-       spec.ts (the only 2 test files referencing either name) — both assertions are scoped to the
-       SlickGrid column header (columns.ts/SlickGridHost.vue), never to this table, so no test
-       dependency exists here. PK/FK now a plain ternary (text-warn/text-info) on the <span> itself. -->
 </template>

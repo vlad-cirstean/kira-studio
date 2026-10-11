@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
+import Spinner from '@theme/components/Spinner.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
@@ -10,6 +12,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -337,17 +340,16 @@ onMounted(() => {
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
           <div class="flex w-full font-ui"><SearchField :model-value="filterText" placeholder="Filter" data-testid="browse-filter" @update:model-value="(v: string | number) => (filterText = String(v))" /></div>
         </div>
-        <Alert v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="browse-error">
+        <Alert strip v-if="rt?.status === 'error' && rt.error" variant="error" data-testid="browse-error">
           <AlertDescription>{{ rt.error.message }}</AlertDescription>
         </Alert>
         <!-- P43 F6/D7: a failed delete from this level, distinct from a failed load above. -->
-        <Alert v-if="rt?.actionError" variant="error" data-testid="browse-action-error">
+        <Alert strip v-if="rt?.actionError" variant="error" data-testid="browse-action-error">
           <AlertDescription>{{ rt.actionError }}</AlertDescription>
         </Alert>
         <!-- P43 iter2 F16/D23: the adapter's own round budget cut this level's listing short —
              nothing failed, the listing is real, it's just incomplete. -->
-        <Alert v-if="rt?.truncated" variant="warn" data-testid="browse-truncated">
-          <CodiconIcon name="warning" :size="13" class="text-warn-text" />
+        <Alert strip v-if="rt?.truncated" variant="warn" data-testid="browse-truncated">
           <AlertDescription>
             This level stopped short of the full listing — Refresh to try again.
           </AlertDescription>
@@ -408,7 +410,10 @@ onMounted(() => {
             <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
           </ViewToolbar>
           <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
-            <div v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full flex items-center justify-center text-kira-md text-muted-foreground">Loading…</div>
+            <Empty v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full">
+              <EmptyMedia><Spinner :size="24" /></EmptyMedia>
+              <EmptyTitle>Loading…</EmptyTitle>
+            </Empty>
             <div v-else-if="rt.nodes.length === 0" class="h-full flex items-center justify-center text-kira-md text-muted-foreground" data-testid="browse-empty">
               No items
             </div>
@@ -434,14 +439,16 @@ onMounted(() => {
                 <div
                   v-for="vi in virtualItems"
                   :key="String(vi.key)"
-                  class="flex items-center cursor-default border-b border-border gap-1 px-2"
                   data-testid="browse-row"
                   :data-path="filteredNodes[vi.index]?.path"
                   :data-kind="filteredNodes[vi.index]?.kind"
-                  :class="[
-                    VIRTUAL_ROW_CLASS,
-                    rt?.selected === filteredNodes[vi.index]?.path ? 'bg-select' : 'hover:bg-hover',
-                  ]"
+                  :class="
+                    cn(
+                      rowVariants({ layout: 'tree', selected: rt?.selected === filteredNodes[vi.index]?.path }),
+                      'border-b border-border px-2',
+                      VIRTUAL_ROW_CLASS,
+                    )
+                  "
                   :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
                   role="option"
                   tabindex="0"
@@ -465,6 +472,7 @@ onMounted(() => {
                   /></span>
                   <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ filteredNodes[vi.index]?.name }}</span>
                   <Badge
+                    data
                     v-if="
                       filteredNodes[vi.index]?.kind === 'key' &&
                       redisTypeLabel(keyType(filteredNodes[vi.index]!.path))
@@ -484,7 +492,7 @@ onMounted(() => {
         <!-- P110 B32: the divider styling itself (col-resize, horizontal orientation) moved into
              ResizableHandle.vue's own shared component -- no test polls this handle by class, so no
              marker class belongs on it either. -->
-        <ResizableHandle :hit-area-margins="{ coarse: 8, fine: 4 }" />
+        <ResizableHandle />
 
         <ResizablePanel class="min-w-0 flex flex-col min-h-0" data-testid="browse-detail-pane" :order="2">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />

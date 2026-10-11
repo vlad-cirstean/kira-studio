@@ -245,7 +245,7 @@ onUnmounted(() => {
           <div class="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger as-child>
-                <Badge :variant="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
+                <Badge data :variant="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
                   {{ snapA.entry.status }} {{ snapA.entry.statusText }}
                 </Badge>
               </TooltipTrigger>
@@ -266,7 +266,7 @@ onUnmounted(() => {
           <div class="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger as-child>
-                <Badge :variant="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
+                <Badge data :variant="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
                   {{ snapB.entry.status }} {{ snapB.entry.statusText }}
                 </Badge>
               </TooltipTrigger>
