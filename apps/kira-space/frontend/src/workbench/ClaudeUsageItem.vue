@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useIntervalFn, useNow } from '@vueuse/core';
 import { computed } from 'vue';
@@ -69,14 +70,16 @@ const detail = computed(() => {
 <template>
   <Tooltip>
     <TooltipTrigger as-child>
-      <span
-        class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-kira-sm cursor-default border-0 bg-none hover:bg-hover"
+      <Button
+        variant="toolbar"
+        size="kira"
+        class="h-control-sm gap-1 px-1.5 text-kira-sm"
         :class="tone"
         data-testid="claude-usage-status"
       >
         <CodiconIcon name="dashboard" :size="13" />
         <span class="font-data" data-testid="claude-usage-text">{{ text }}</span>
-      </span>
+      </Button>
     </TooltipTrigger>
     <TooltipContent>
       <div class="flex flex-col gap-0.5" data-testid="claude-usage-tooltip">

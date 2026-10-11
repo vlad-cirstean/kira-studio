@@ -17,7 +17,7 @@ export function repoTint(
   withBorder = false,
 ): { style: Record<string, string>; class: string } {
   const v = connColorVar(color);
-  if (!v) return { style: {}, class: 'bg-hover text-muted-foreground' };
+  if (!v) return { style: {}, class: 'bg-field text-muted-foreground' };
   return {
     style: { '--repo': v },
     class: `bg-(--repo)/12 text-(--repo)${withBorder ? ' border-(--repo)' : ''}`,

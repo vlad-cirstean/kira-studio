@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { Switch } from '@theme/components/ui/switch';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
@@ -46,15 +45,12 @@ const inlineBlameId = useId();
 
     <FieldGroup>
       <Field orientation="horizontal" class="items-start">
-        <Checkbox
+        <Switch
           :id="inlineBlameId"
-          class="size-3.5"
           :model-value="draft.appearance.inlineBlame"
           data-testid="settings-inline-blame"
           @update:model-value="(v) => onInlineBlameChange(v === true)"
-        >
-          <CodiconIcon name="check" :size="12" />
-        </Checkbox>
+        />
         <FieldContent>
           <Label :for="inlineBlameId">Inline blame</Label>
           <FieldDescription

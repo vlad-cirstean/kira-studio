@@ -65,10 +65,7 @@ onUnmounted(() => {
     class="h-full w-full"
     data-testid="repo-review-host"
   />
-  <!-- error-note here never had a backing rule in this file's own scoped block (unlike
-       GitPanel.vue/RepoSearchView.vue's own local .error-note{text-error}), so it was already
-       plain note-tinted text -- kept that way, not given a tint it never actually had. -->
-  <Alert v-else variant="info">
+  <Alert v-else variant="error">
     <AlertDescription>{{ errorMessage }}</AlertDescription>
   </Alert>
 </template>

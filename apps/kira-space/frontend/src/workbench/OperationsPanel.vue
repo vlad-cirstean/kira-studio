@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import type { OpLogColumn } from '@workbench/components/opLog';
 import { useOpsStore } from '../state/ops';
@@ -36,7 +37,12 @@ function canCancel(record: SpaceOpRecord): boolean {
     @cancel="(record) => opsStore.cancelOp(record.id)"
   >
     <template #cell="{ column, record }">
-      <span v-if="column.id === 'repo'" class="truncate min-w-0" :title="record.repoRoot">{{ record.repoName }}</span>
+      <Tooltip v-if="column.id === 'repo'">
+        <TooltipTrigger as-child>
+          <span class="truncate min-w-0">{{ record.repoName }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ record.repoRoot }}</TooltipContent>
+      </Tooltip>
       <span v-else-if="column.id === 'source'" class="truncate min-w-0">{{ record.source }}</span>
     </template>
   </OpLogPanel>

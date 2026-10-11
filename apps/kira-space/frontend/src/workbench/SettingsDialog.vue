@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
 import { sections, useSettingsStore } from '../state/settings';
@@ -100,18 +101,12 @@ async function save(patch: SettingsPatch): Promise<void> {
     </template>
 
     <template #footer="f">
-      <span class="mr-auto min-w-0">
-        <!-- P110 B12/B36: no `flex` here (unlike Kira Studio's own copy) -- its children are
-             plain inline spans today, so kept as spans with .field-error's/.helper-text's own
-             utility-class equivalent, not FieldError/FieldDescription (a <div>/<p>), which would
-             introduce blockification that isn't there now. -->
-        <span v-if="f.saveError" class="text-error text-kira-sm leading-normal" data-testid="settings-save-error">{{
-          f.saveError
-        }}</span>
+      <div class="mr-auto min-w-0">
+        <FieldError v-if="f.saveError" data-testid="settings-save-error">{{ f.saveError }}</FieldError>
         <span v-else class="text-subtle text-kira-sm leading-normal" data-testid="settings-footer-status">{{
           f.isDirty ? 'Unsaved changes' : ''
         }}</span>
-      </span>
+      </div>
       <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">Cancel</Button>
       <Button
         variant="dialog-primary"

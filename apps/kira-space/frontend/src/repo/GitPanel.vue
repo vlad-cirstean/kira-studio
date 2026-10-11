@@ -3,6 +3,7 @@ import type { WorktreeEntry } from '@kira/git-ipc';
 import { PALETTE_COLOR_CHOICES } from '@shared/domain/color';
 import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
@@ -325,7 +326,7 @@ watch(
     reviewActivatedRepoIds.add(repoId.value);
     // §14 OQ2: widen once, only if the user has never manually resized the panel — checked inside
     // ensureReviewPanelWidth itself (state/layout.ts's own widthUserSet). 320px: VS Code's ~300px
-    // sidebar default, rounded up a little for the review panes' own extra density.
+    // sidebar default, raised a little for the review panes' own extra density.
     layoutStore.ensureReviewPanelWidth(320);
   },
   { immediate: true },
@@ -588,24 +589,24 @@ onUnmounted(() => {
                   </Tooltip>
                 </div>
                 <!-- Same indent as the worktree row above. -->
-                <div
+                <InlineState
                   v-if="worktreesStore.worktreesError(repo.id)"
-                  class="py-1 pr-1.5 text-kira-sm text-error"
+                  kind="error"
                   :style="rowIndent(1)"
                   data-testid="repo-worktree-error"
                 >
                   {{ worktreesStore.worktreesError(repo.id) }}
-                </div>
-                <div
+                </InlineState>
+                <InlineState
                   v-else-if="worktreesStore.worktreesLoading(repo.id) && worktreesStore.worktreeEntries(repo.id).length === 0"
-                  class="py-1 pr-1.5 text-kira-sm text-subtle"
+                  kind="loading"
                   :style="rowIndent(1)"
                 >
                   Loading…
-                </div>
-                <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="py-1 pr-1.5 text-kira-sm text-subtle" :style="rowIndent(1)">
+                </InlineState>
+                <InlineState v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" kind="empty" :style="rowIndent(1)">
                   No worktrees
-                </div>
+                </InlineState>
               </section>
             </div>
           </div>
@@ -621,16 +622,12 @@ onUnmounted(() => {
                 />
               </PanelBar>
               <template v-if="view === 'files'">
-                <!-- Note-tinted background, error-tinted text -- the span carries text-error
-                     directly rather than on AlertDescription itself: the note variant's own
-                     `*:data-[slot=alert-description]:text-note-text` selector out-specifies a
-                     bare class on that same [data-slot] element. -->
                 <Alert
                   v-if="fileTreeStore.repoTreeError(repoId)"
-                  variant="info"
+                  variant="error"
                   data-testid="repo-tree-error"
                 >
-                  <AlertDescription><span class="text-error">{{ fileTreeStore.repoTreeError(repoId) }}</span></AlertDescription>
+                  <AlertDescription>{{ fileTreeStore.repoTreeError(repoId) }}</AlertDescription>
                 </Alert>
                 <Alert
                   v-if="fileTreeStore.repoTreeTruncated(repoId)"

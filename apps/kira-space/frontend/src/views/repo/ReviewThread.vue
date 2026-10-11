@@ -10,6 +10,7 @@
 import type { ReviewComment } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Textarea } from '@theme/components/ui/textarea';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
@@ -73,9 +74,9 @@ function submit(): void {
       </div>
     </template>
     <template v-else>
-      <textarea
+      <Textarea
         v-model="draft"
-        class="box-border w-full resize-y bg-field text-fg border border-border-strong rounded-kira-sm font-[inherit] py-1.5 px-2 focus:outline-none focus:border-focus"
+        class="resize-y"
         placeholder="Leave a review comment…"
         rows="3"
         data-testid="review-thread-input"

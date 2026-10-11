@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
@@ -51,16 +52,17 @@ function onRevealBlameCommit(): void {
       <Tooltip v-if="blame">
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger>
-            <button
-              type="button"
-              class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg cursor-pointer border-0 bg-none hover:bg-hover disabled:cursor-default"
+            <Button
+              variant="toolbar"
+              size="kira"
+              class="h-control-sm gap-1 px-1.5 text-fg"
               data-testid="blame-status"
               :disabled="!blameStatusStore.reveal"
               @click="onRevealBlameCommit"
             >
               <CodiconIcon name="git-commit" :size="13" />
               <span class="max-w-80 overflow-hidden text-ellipsis whitespace-nowrap">{{ blameText }}</span>
-            </button>
+            </Button>
           </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>{{ blameTooltip }}</TooltipContent>

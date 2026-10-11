@@ -214,9 +214,23 @@ async function chooseColor(next: PaletteColor): Promise<void> {
       </Field>
       <dl class="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-kira-md">
         <dt class="text-muted-foreground">Repo</dt>
-        <dd class="m-0 truncate font-data" :title="repo.name" data-testid="repo-full">{{ repo.name }}</dd>
+        <dd class="m-0 min-w-0">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span class="block truncate font-data" data-testid="repo-full">{{ repo.name }}</span>
+            </TooltipTrigger>
+            <TooltipContent>{{ repo.name }}</TooltipContent>
+          </Tooltip>
+        </dd>
         <dt class="text-muted-foreground">Path</dt>
-        <dd class="m-0 truncate font-data" :title="repo.path" data-testid="repo-path">{{ repo.path }}</dd>
+        <dd class="m-0 min-w-0">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span class="block truncate font-data" data-testid="repo-path">{{ repo.path }}</span>
+            </TooltipTrigger>
+            <TooltipContent>{{ repo.path }}</TooltipContent>
+          </Tooltip>
+        </dd>
         <dt class="text-muted-foreground">Source</dt>
         <dd class="m-0" data-testid="repo-source">
           {{ source }} · {{ repo.usedByTasks ? 'used by tasks on the plan' : 'not on the plan' }}

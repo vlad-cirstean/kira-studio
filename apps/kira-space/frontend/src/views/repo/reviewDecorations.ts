@@ -211,7 +211,7 @@ export function attachReviewDecorations(
     // unreachable.
     domNode.style.zIndex = VIEW_ZONE_Z_INDEX;
     domNode.className =
-      'kira-review-load-error flex h-full items-center gap-2 bg-error/12 px-3 text-kira-md text-error';
+      'kira-review-load-error flex h-full items-center gap-2 bg-error/10 px-3 text-kira-md text-error';
     const span = document.createElement('span');
     span.textContent = message;
     domNode.append(span);

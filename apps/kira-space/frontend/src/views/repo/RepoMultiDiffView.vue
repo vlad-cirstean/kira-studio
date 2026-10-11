@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
 // P92 item 5/§7.3: one commit's whole changed-file set, one tab — VS Code's own multi-file diff
@@ -135,8 +136,18 @@ onUnmounted(() => {
           data-testid="repo-multi-diff-toggle"
           @click="toggle(section)"
         />
-        <span class="shrink-0 text-kira-md text-fg whitespace-nowrap" :title="section.path">{{ basename(section.path) }}</span>
-        <span class="path-dir flex-auto min-w-0 truncate text-kira-md text-subtle" :title="section.path">{{ section.path }}</span>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="shrink-0 text-kira-md text-fg whitespace-nowrap">{{ basename(section.path) }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ section.path }}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="path-dir flex-auto min-w-0 truncate text-kira-md text-subtle">{{ section.path }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ section.path }}</TooltipContent>
+        </Tooltip>
         <Button
           v-if="section.expanded && sectionState[section.path] === 'found'"
           variant="toolbar"

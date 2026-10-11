@@ -17,6 +17,7 @@ import {
 } from '@theme/components/ui/dialog';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
@@ -121,24 +122,26 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
         <nav class="flex w-44 shrink-0 flex-col border-r border-border">
           <div class="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 py-1.5" role="listbox" aria-label="Repositories" data-testid="repos-dialog-repos">
             <p v-if="codeRepos.records.length === 0" class="m-0 px-1.5 py-1 text-kira-md text-muted-foreground">No repositories imported.</p>
-            <button
-              v-for="r in codeRepos.records"
-              :key="r.id"
-              type="button"
-              role="option"
-              class="relative flex w-full shrink-0 cursor-pointer items-center gap-1.5 border-none text-left"
-              :class="repoRowClass(r)"
-              :aria-selected="showRepos && selected?.id === r.id"
-              :title="r.root"
-              data-testid="repos-dialog-repo"
-              :data-repo-id="r.id"
-              :data-hidden="r.hidden"
-              @click="pickRepo(r.id)"
-            >
-              <span :class="colorMarkClass('rail', r.color)" data-testid="repos-dialog-repo-rail" aria-hidden="true" />
-              <span class="min-w-0 flex-1 truncate">{{ nickOf(r.id) || r.name }}</span>
-              <CodiconIcon v-if="r.hidden" name="eye-closed" :size="13" class="shrink-0" data-testid="repos-dialog-repo-hidden-mark" />
-            </button>
+            <Tooltip v-for="r in codeRepos.records" :key="r.id">
+              <TooltipTrigger as-child>
+                <button
+                  type="button"
+                  role="option"
+                  class="relative flex w-full shrink-0 cursor-pointer items-center gap-1.5 border-none text-left"
+                  :class="repoRowClass(r)"
+                  :aria-selected="showRepos && selected?.id === r.id"
+                  data-testid="repos-dialog-repo"
+                  :data-repo-id="r.id"
+                  :data-hidden="r.hidden"
+                  @click="pickRepo(r.id)"
+                >
+                  <span :class="colorMarkClass('rail', r.color)" data-testid="repos-dialog-repo-rail" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate">{{ nickOf(r.id) || r.name }}</span>
+                  <CodiconIcon v-if="r.hidden" name="eye-closed" :size="13" class="shrink-0" data-testid="repos-dialog-repo-hidden-mark" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{{ r.root }}</TooltipContent>
+            </Tooltip>
           </div>
           <div class="flex flex-col gap-px border-t border-border px-1 py-1.5">
             <button
@@ -160,7 +163,7 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
         </nav>
 
         <section class="flex min-w-0 flex-1 flex-col overflow-y-auto">
-          <Alert v-if="error" variant="error" class="m-3 w-auto" data-testid="repos-dialog-error">
+          <Alert v-if="error" variant="error" strip data-testid="repos-dialog-error">
             <AlertDescription>{{ error }}</AlertDescription>
           </Alert>
           <template v-if="showRepos">
@@ -170,17 +173,23 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 <span class="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
                   <CodiconIcon name="repo" :size="13" />
                 </span>
-                <span class="min-w-0 truncate text-kira-md text-fg" :title="selected.root" data-testid="repos-dialog-selected"
-                  ><span v-if="parentDir(selected.root)" class="text-subtle">{{ parentDir(selected.root) }}</span
-                  >{{ selected.name }}</span
-                >
-                <Badge
-                  v-if="selectedConfig"
-                  class="shrink-0"
-                  :title="selectedConfig.source === 'added' ? undefined : selectedConfig.source"
-                  data-testid="repos-dialog-repo-source"
-                  >{{ selectedConfig.source === 'added' ? 'Added' : baseName(selectedConfig.source) }}</Badge
-                >
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <span class="min-w-0 truncate text-kira-md text-fg" data-testid="repos-dialog-selected"
+                      ><span v-if="parentDir(selected.root)" class="text-subtle">{{ parentDir(selected.root) }}</span
+                      >{{ selected.name }}</span
+                    >
+                  </TooltipTrigger>
+                  <TooltipContent>{{ selected.root }}</TooltipContent>
+                </Tooltip>
+                <Tooltip v-if="selectedConfig" :disabled="selectedConfig.source === 'added'">
+                  <TooltipTrigger as-child>
+                    <Badge class="shrink-0" data-testid="repos-dialog-repo-source">{{
+                      selectedConfig.source === 'added' ? 'Added' : baseName(selectedConfig.source)
+                    }}</Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ selectedConfig.source }}</TooltipContent>
+                </Tooltip>
                 <Badge v-if="selected.hidden" variant="warn" class="shrink-0" data-testid="repos-dialog-repo-hidden-badge">Hidden</Badge>
                 <div class="ml-auto flex shrink-0 items-center gap-1">
                   <TooltipIconButton
@@ -225,19 +234,29 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
               data-testid="repos-dialog-folder"
               :data-path="f.path"
             >
-              <span class="min-w-0 flex-1 truncate font-data" :title="f.path">{{ f.path }}</span>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span class="min-w-0 flex-1 truncate font-data">{{ f.path }}</span>
+                </TooltipTrigger>
+                <TooltipContent>{{ f.path }}</TooltipContent>
+              </Tooltip>
               <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="repos-dialog-folder-count">{{
                 f.hiddenCount > 0 ? `${f.repoCount} repos · ${f.hiddenCount} hidden` : `${f.repoCount} repos`
               }}</span>
-              <div class="flex shrink-0 items-center gap-1.5" title="Import new repositories that appear in this folder">
-                <Switch
-                  :id="`repos-dialog-watch-${i}`"
-                  :model-value="f.watch"
-                  data-testid="repos-dialog-folder-watch"
-                  @update:model-value="(v: boolean) => onWatch(f.path, v)"
-                />
-                <Label :for="`repos-dialog-watch-${i}`" class="text-kira-sm text-muted-foreground">watch</Label>
-              </div>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <div class="flex shrink-0 items-center gap-1.5">
+                    <Switch
+                      :id="`repos-dialog-watch-${i}`"
+                      :model-value="f.watch"
+                      data-testid="repos-dialog-folder-watch"
+                      @update:model-value="(v: boolean) => onWatch(f.path, v)"
+                    />
+                    <Label :for="`repos-dialog-watch-${i}`" class="text-kira-sm text-muted-foreground">watch</Label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Import new repositories that appear in this folder</TooltipContent>
+              </Tooltip>
               <TooltipIconButton
                 :icon="f.hidden ? 'eye' : 'eye-closed'"
                 :label="f.hidden ? 'Show all' : 'Hide all'"
