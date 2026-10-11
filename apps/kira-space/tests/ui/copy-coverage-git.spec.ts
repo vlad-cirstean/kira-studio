@@ -5,6 +5,7 @@ import {
 } from '../../../../packages/workbench/src/testing/ui/copyCoverage';
 import { expect, test } from './fixtures';
 import {
+  COMMIT_DETAIL,
   openPortGraph,
   openReviewListing,
   PICKER_RESULTS,
@@ -29,6 +30,13 @@ const GIT_DATA = [
   /Paragraph \d|This paragraph exists|Co-authored-by|Signed-off-by/,
   /\bago\b|\d{4}|\bnow\b|\b\d+\s?(second|minute|hour|day|month|year)s?\b/,
   /^\s*[+-]?\d+\s*$/,
+  // git-core's compact ages (`2y`) and its preflight messages mirror Go and stay English (P266);
+  // `connection-state` is a text hook the e2e specs wait on.
+  /^\d+[smhdwy]$/,
+  /^Name cannot be empty\.$/,
+  /^(connecting|connected|error)$/,
+  /^tmp\/$/,
+  /^src$/,
 ];
 
 const tid = (page: Page, id: string) => page.locator(`[data-testid="${id}"]`);
@@ -77,6 +85,7 @@ const SETTINGS = {
 
 const RESULTS = {
   ...PICKER_RESULTS,
+  'commit.detail': COMMIT_DETAIL,
   'refs.list': REFS,
   'status.get': STATUS,
   'repoSettings.get': SETTINGS,
@@ -213,13 +222,20 @@ test('branch picker tabs and row menu use catalog text', async ({ relaunch }) =>
   }
 
   await tabs.nth(0).click();
-  await page.locator('[data-row-id="branch:refs/heads/feature-auth"]').click({ button: 'right' });
+  await page
+    .locator('[data-row-id="branch:refs/heads/feature-auth"]')
+    .getByRole('button', { name: /More actions/ })
+    .click();
   await expect(tid(page, 'context-menu')).toBeVisible();
   await expectCatalogText(tid(page, 'context-menu'), { allow: GIT_DATA });
 });
 
 test('commit detail and the row menus use catalog text', async ({ relaunch }) => {
   const page = await openGraph(relaunch);
+
+  await gridRow(page).locator('[data-testid="message-subject"]').click();
+  await expect(tid(page, 'meta-subject')).toBeVisible();
+  await expectCatalogText(tid(page, 'detail-region'), { allow: GIT_DATA });
 
   await openCommitMenu(page);
   await expectCatalogText(tid(page, 'context-menu'), { allow: GIT_DATA });
@@ -230,11 +246,6 @@ test('commit detail and the row menus use catalog text', async ({ relaunch }) =>
     .click({ button: 'right' });
   await expect(tid(page, 'context-menu')).toBeVisible();
   await expectCatalogText(tid(page, 'context-menu'), { allow: GIT_DATA });
-  await page.keyboard.press('Escape');
-
-  await gridRow(page).locator('[data-testid="message-subject"]').click();
-  await expect(tid(page, 'meta-subject')).toBeVisible();
-  await expectCatalogText(tid(page, 'detail-region'), { allow: GIT_DATA });
 });
 
 // One dialog per commit menu entry: branch, tag, worktree, checkout, revert, reset, cherry-pick.
@@ -270,7 +281,10 @@ test('stack dialog from the branch picker uses catalog text', async ({ relaunch 
   const page = await openGraph(relaunch);
 
   await tid(page, 'branch-trigger').click();
-  await page.locator('[data-row-id="branch:refs/heads/feature-auth"]').click({ button: 'right' });
+  await page
+    .locator('[data-row-id="branch:refs/heads/feature-auth"]')
+    .getByRole('button', { name: /More actions/ })
+    .click();
   await tid(page, 'menu-item-stackSetParent').click();
   const dialogs = page.getByRole('dialog');
   await expect(dialogs.last()).toBeVisible();

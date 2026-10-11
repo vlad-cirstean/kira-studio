@@ -41,7 +41,7 @@ test('an empty backlog explains where items come from', async ({ page, app, serv
 test.describe('with write access', () => {
   test.beforeEach(async ({ app, server }) => {
     server.state.auth = 'ok';
-    server.state.permissions = { write: true, agentInput: false };
+    server.state.permissions = { write: true, agentInput: true };
     server.state.replies.board = stuckBoard();
     await app();
   });

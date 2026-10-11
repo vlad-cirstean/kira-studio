@@ -1,10 +1,13 @@
+import { readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import {
   expectCatalogText,
   setPseudoLocale,
 } from '../../../../packages/workbench/src/testing/ui/copyCoverage';
 import { expect, reviewTest, test } from './fixtures';
-import { adeFixture, adeV2Control, openPlan } from './support/adeV2';
+import { adeFixture, adeV2Control, bandOf, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -13,6 +16,7 @@ import { emitWailsEvent } from './support/mockRuntime';
 // markers. Fixture data (names, titles, ids, paths, times) is allowed by exact match. The git
 // surfaces are covered by copy-coverage-git.spec.ts.
 
+const FIXTURES = resolve(__dirname, '../fixtures/ade-v2');
 const t = (id: string) => `[data-testid="${id}"]`;
 
 /** Every short string in the ADE fixtures, anchored: a whole text node equal to fixture data. */
@@ -20,20 +24,28 @@ function fixtureData(): RegExp[] {
   const strings = new Set<string>();
   const walk = (value: unknown): void => {
     if (typeof value === 'string') {
-      if (value.length < 80 && value.trim()) strings.add(value.trim());
+      // A prompt renders as fragments around its `{variable}` chips, so each piece is data too.
+      if (value.trim() && value.length < 200) strings.add(value.trim());
+      for (const piece of value.split(/\{[^}]*\}/)) if (piece.trim()) strings.add(piece.trim());
     } else if (Array.isArray(value)) value.forEach(walk);
     else if (value && typeof value === 'object') Object.values(value).forEach(walk);
   };
-  for (const name of ['board', 'backlog', 'workflows', 'repos', 'sessions']) {
-    walk(adeFixture(name));
-  }
-  const escaped = [...strings].map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  for (const file of readdirSync(FIXTURES)) walk(adeFixture(file.replace(/\.json$/, '')));
+  const escaped = [...strings]
+    .sort((x, y) => y.length - x.length)
+    .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const token = `${escaped.join('|')}|TUI|dev|stg|rel|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\\d+[smhdwy]|[0-9a-f]{7,40}`;
   return [
-    new RegExp(`^(?:${escaped.join('|')})$`),
-    /[0-9a-f]{7,40}/,
+    // A node made only of fixture strings joined by digits and punctuation, e.g. `WEB-311 · web-app`.
+    new RegExp(`^(?:${token}|⟦[^⟧]*⟧|[\\s\\d.,:%·–—+\\-/→✓⚠▲›…↩≤])+$`),
     /\b\d{4}\b|\b\d+\s?(second|minute|hour|day|month|year)s?\b|\bago\b/,
-    /^[\s\d.,:%·–—+\-/]*$/,
-    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/,
+    // Sent to Claude, not shown as chrome; notes toolbar glyph letters; palette ids stay raw by decision.
+    /^When this step is done, call the finish_step tool/,
+    /^(red|amber|green|cyan|blue|magenta|grey)$/,
+    /^(connecting|connected|error)$/,
+    /^[BIH]$/,
+    /^acme$/,
+    /^\/?tmp\/$/,
   ];
 }
 
@@ -53,7 +65,8 @@ test('plan board, task card menu and day menu', async ({ relaunch }) => {
   await expect(page.locator(t('context-menu'))).toBeVisible();
   await expectCatalogText(page.locator(t('context-menu')), { allow });
   await page.keyboard.press('Escape');
-  await page.locator(t('ade-band-label')).first().click({ button: 'right' });
+  await page.setViewportSize({ width: 1440, height: 2400 });
+  await bandOf(page, 0).locator(t('ade-band-label')).click({ button: 'right' });
   await expect(page.locator(t('context-menu'))).toBeVisible();
   await expectCatalogText(page.locator(t('context-menu')), { allow });
 });
@@ -72,7 +85,9 @@ test('task panel, every tab', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await pseudo(page);
   const allow = fixtureData();
-  await page.locator('[data-testid="ade-card"][data-task-id="T_bill"]').click();
+  await page
+    .locator('[data-testid="ade-card"][data-task-id="T_bill"] [data-testid="ade-card-head"]')
+    .click();
   const panel = page.locator(t('ade-panel'));
   await expect(panel).toBeVisible();
   for (const tab of ['task', 'notes', 'sessions']) {
@@ -184,7 +199,10 @@ test('repositories dialog', async ({ relaunch }) => {
 });
 
 test('settings dialog, every pane', async ({ relaunch }) => {
-  const { window: page } = await relaunch();
+  const status = contract<{ command: string }>('memory-settings', 'MemoryService.McpStatus');
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.memoryMcpStatus, response: status }],
+  });
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator(t('settings-dialog')).waitFor();
   await pseudo(page);

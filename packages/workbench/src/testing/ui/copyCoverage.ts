@@ -4,9 +4,10 @@ import { expect, type Locator, type Page } from '@playwright/test';
 // `⟦…⟧`, so any visible letter outside a marker is a literal that bypassed `t()`. Test builds only:
 // `window.__kiraSetLocale` is installed under __KIRA_DEBUG_HOOKS__ (packages/theme/src/i18n).
 
-/** Subtrees whose text is data, not chrome: code, grid cells, editors, terminals, variable chips. */
+/** Subtrees whose text is data, not chrome: code, grid cells, editors (Monaco, ProseMirror), terminals, variable chips. */
+// `[id^="vue-flow__"]` is the flow engine's own keyboard hint text (not localisable, P265 open item).
 const SKIP_SUBTREE =
-  'pre, code, .font-data, [data-var], .monaco-editor, .xterm, .slick-cell, [data-testid$="-shortcut"]';
+  'pre, code, .font-data, [data-var], .monaco-editor, .ProseMirror, .xterm, .slick-cell, [data-testid$="-shortcut"], [id^="vue-flow__"]';
 const SKIP_TAGS = 'script, style, noscript, template';
 const TEXT_ATTRIBUTES = ['aria-label', 'title', 'placeholder'] as const;
 
@@ -65,7 +66,14 @@ export async function expectCatalogText(
         return id ? `${el.tagName.toLowerCase()}[data-testid=${id}]` : el.tagName.toLowerCase();
       };
       const scanAttributes = (el: Element): void => {
+        // reka's Switch copies its `label[for]` text into aria-label once at mount, so it keeps the
+        // old locale after a switch; the visible label is checked as text.
+        const derivedSwitch =
+          el.getAttribute('role') === 'switch' &&
+          !!el.id &&
+          !!el.ownerDocument.querySelector(`label[for="${el.id}"]`);
         for (const name of args.attributes) {
+          if (name === 'aria-label' && derivedSwitch) continue;
           const value = el.getAttribute(name)?.trim();
           if (!value) continue;
           const saved = depth;

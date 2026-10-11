@@ -17,7 +17,7 @@ const featureRow = (page: Page) => page.locator('[data-row-id="branch:refs/heads
 test('branch row menu labels', async ({ relaunch }) => {
   const page = await openBranchPicker(relaunch);
 
-  await featureRow(page).click({ button: 'right' });
+  await featureRow(page).getByRole('button', { name: 'More actions' }).click();
   await expect(tid(page, 'context-menu')).toBeVisible();
   await expect(tid(page, 'menu-item-checkoutRef')).toHaveText('Check out');
   // Deviation: the plan listed `Rename…`; the shared label is `Rename` and the field is inline.
@@ -56,7 +56,7 @@ test('deleting an unmerged branch asks to force delete', async ({ relaunch }) =>
   await tid(page, 'branch-trigger').click();
   await expect(page.getByRole('dialog')).toBeVisible();
 
-  await featureRow(page).click({ button: 'right' });
+  await featureRow(page).getByRole('button', { name: 'More actions' }).click();
   await tid(page, 'menu-item-deleteRef').click();
 
   await expect(page.getByText('“feature-auth” is not fully merged.')).toBeVisible();
