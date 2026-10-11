@@ -34,10 +34,16 @@ export function createRevealExpiry(map: Record<string, string>) {
 
   function schedule(key: string): void {
     clear(key);
-    timers[key] = useTimeoutFn(() => {
-      delete timers[key];
-      delete map[key];
-    }, REVEAL_GRACE_WINDOW_MS);
+    const timer = useTimeoutFn(
+      () => {
+        delete timers[key];
+        delete map[key];
+      },
+      REVEAL_GRACE_WINDOW_MS,
+      { immediate: false },
+    );
+    timers[key] = timer;
+    timer.start();
   }
 
   function clearAll(): void {
