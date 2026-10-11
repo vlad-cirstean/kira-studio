@@ -1292,3 +1292,43 @@ Verify:
 - Space visual git-module: not run (host load; see handback).
 
 Note: per coordinator, stream-end testing moves to a separate serial run after landing. Results above ran before that call. Space visual `git-module` and a clean re-run of the load-flaky repo-graph specs were NOT run.
+
+## Test and gap-fill result
+
+Commits: `659d6cc5a` foundation, `9802e671f` Studio list-keyboard specs, `b6f24b2f4` U59 guard, `b67310c4e` stream gaps, `c6190921f` nav focus fix.
+
+Specs added:
+- Studio `list-keyboard.spec.ts`: browse, keyvalue, documents, stream, console key-value result, console document result, saved-queries type-ahead, collections Esc rename.
+- New `list-keyboard-docker.spec.ts` (ContainerTable); `operations.spec.ts` op log keyboard; `automations-module.spec.ts` rename Esc.
+- Space: new `repo-resize.spec.ts` (detail pane, graph columns via aria-valuenow); `ade-v2-panel` Esc revert; `ade-v2-plan` day-off confirm and band menu; `ade-v2-base-rebase` abort label; `ade-v2-task-menu` ContextMenu key.
+
+Foundation gaps fixed:
+- `ConfirmDialogView` `cancelLabel` ("Keep", "Leave it").
+- ContextMenu key: `matchesShortcut('menu.open')` accepts `ContextMenu`; `listNavigation` uses it.
+- Context menu store `afterClose`: inline rename opened from a menu kept losing input focus (menu focus trap, then focus restore to the row). Used by CollectionsTree, AutomationsPanel, BranchPicker, GitPanel.
+- `formatWeekdayDate` replaces hand-rolled weekday text; permanent U52 line dropped.
+- `useListNavigation` derives the current row from the focused element before the roving stop. Cause of intermittent documents failure (about 1 in 24): a selection reset left the stop on unrendered row 0, so Home from the focused last row was a no-op. Also pinned the selected row in DocumentView's virtualizer.
+- U59 guard (`b6f24b2f4`, coordinator asked to report): `[—-]` class is multibyte, missed literal em dashes under the C locale (local) but matched under UTF-8 (CI). Regex now `(?:—|-)`, `LC_ALL=C` set; `?? '—'` sites moved to `displayValue` (ResponseDiffDialog, OperationsPanel, CachePane, OpLogPanel).
+- Left unchanged on purpose (no real callers or permanent U40/U52): `plural` thousands grouping, `formatRelative` future form, TIMING transient-note and refit keys, "5.0 s" duration format, generic Delete shortcut.
+
+Failures root-caused:
+- repo-graph-columns/paging/refresh/badges, review-interaction, workspace ("Loading… (59 remaining)"): host load (average ~30 with parallel workers). Pass on a quiet machine; Space ui 477/477 at 2 workers. Not caused by `cancellableTimer.ts` or `graphView.ts`.
+- Studio api-cross-window-sync, api-secret-reveal-isolation: 60s page-ready timeouts under 4-worker load; pass alone.
+- slick-grid.spec.ts:1259, console saved-queries: pass.
+- slick-grid.spec.ts:827 "P22 iter2-onset": fails 9/10 serial on a quiet host, also 5/5 at base `d381439d6`. Step (c) requires stale-velocity frames with `freshVelocitySampleOverride=false`; this WebKit delivers scroll events before the chase render, so the defect never shows (0 stale frames). Passes only under heavy load. NOT fixed: needs a deterministic harness for event ordering; follow-up.
+
+Suites (serial):
+- typecheck, lint (all guards), lint:dead, test:unit 1824 pass.
+- Studio ui full (4 workers): 437 pass, 5 load-induced fails, all pass alone; list-keyboard 225/225 at 15x; documents 80/80 at 80x.
+- Space ui 477 pass; space-mobile 55 pass.
+- Visual studio 13 pass, space 13 pass, no diffs, no baseline updates.
+- P132 10x serial: Space panel-resize and operations 150/150. Studio panel-resize, operations, tree, slick-grid: 361/370; the 9 failures are the iter2-onset spec above only. No hangs.
+
+ui-timing (Studio `--no-deps`, workers 1, shared host load ~2.3):
+- Console keystroke to completion popup p50 53 ms / p95 72 (bound 50, fail). Base `d381439d6`: p50 67 / p95 94 (also over).
+- Scroll frame (perf.spec) p50 74 / p95 95; reruns p95 81 and 134 (bound 80, fail). Base: p95 76, 96, 94.
+- Scroll work p50 15-19 ms tip, 14-19 base. No regression vs base; the host runs about 2x slower than the budgets assume. Budgets not scaled.
+
+Not achievable:
+- Interactive human keyboard pass: not possible in this sandbox. Covered by passing specs against the real built UI: right-click select (project tree), confirm focus (`confirm-focus`), splitters and dock (`panel-resize`, `repo-resize`), Force push (`ade-v2-force-push`), ADE Esc edits, mobile suite.
+- ui-timing bounds cannot pass on this host (base fails too).
