@@ -47,6 +47,9 @@ const SETTINGS = {
 
 // The product words differ from the mockup's only by sentence case (P265): compare lowercased.
 const lc = (v: string | undefined) => v?.toLowerCase();
+// P265: the run state `stuck` reads "Needs you" and `back` reads "sent back" in the catalog.
+const oursWording = (v: string | undefined) =>
+  v?.replace(/\bstuck\b/g, 'needs you').replace(/\bback\b/g, 'sent back');
 const lcAll = (v: readonly string[]) => v.map((x) => x.toLowerCase());
 
 /** Branch id -> what the new logic shows instead of the mockup, with the reason. */
@@ -219,8 +222,8 @@ describe('per task', () => {
     for (const t of tasks().filter((x) => x.kind === 'task')) {
       const p = progress.get(t.id) as TaskProgress;
       const phase = boxOf(t.id).rows[0].phase;
-      expect([t.id, lc(p.workflowTip)]).toEqual([t.id, lc(phase.tip)]);
-      if (p.showBar) expect([t.id, lc(p.barTip)]).toEqual([t.id, lc(phase.barTip)]);
+      expect([t.id, lc(p.workflowTip)]).toEqual([t.id, oursWording(lc(phase.tip))]);
+      if (p.showBar) expect([t.id, lc(p.barTip)]).toEqual([t.id, oursWording(lc(phase.barTip))]);
     }
   });
 });

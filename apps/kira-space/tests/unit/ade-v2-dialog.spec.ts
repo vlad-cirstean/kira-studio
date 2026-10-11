@@ -155,7 +155,7 @@ describe('busy and headless blocks', () => {
     const v = composeDialog(c, rbSpec(c, 'b_bill'), { ...STATE, override: true });
     expect(v.blocked).toBe(true);
     expect(v.headless).toBe(
-      'A background run is active on feat/billing-dashboard. Stop it in Sessions, or wait.',
+      'A background run is active on feat/billing-dashboard. Stop it on the sessions tab, or wait.',
     );
   });
 
@@ -231,7 +231,7 @@ describe('archive', () => {
     });
     expect(spec.targets.map((t) => t.branchId)).toEqual(['b_bill']);
     const v = composeDialog(ctx, spec, STATE);
-    expect(v.riskText).toBe('web-app: 1 uncommitted, 5 unmerged commits');
+    expect(v.riskText).toBe('web-app has 1 uncommitted, 5 unmerged commits');
     expect(v.message).toBe(
       [
         'Task "Usage-based billing" is being archived and its worktrees will be deleted.',
