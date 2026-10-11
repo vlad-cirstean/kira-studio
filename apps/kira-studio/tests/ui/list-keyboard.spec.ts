@@ -22,6 +22,13 @@ test('project tree — arrows, Home/End, right-click select, Shift+F10 and focus
   await expect(rows).toHaveCount(CONNS.length);
   const row = (i: number) => rows.filter({ hasText: CONNS[i].name });
 
+  await row(1).focus();
+  await expect(row(1)).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+
   await row(0).focus();
   await page.keyboard.press('ArrowDown');
   await expect(row(1)).toBeFocused();

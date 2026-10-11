@@ -992,7 +992,9 @@ shared views, A5 sweep.
 
 #### A5 (sweep, no new files)
 Run `check-ui-primitives.sh` with only `permanent` lines in `stream-a.txt` to list any Studio file
-the guards hit that no chunk named (fix in this commit, record in the result). Keyboard pass by
+the guards hit that no chunk named (fix in this commit, record in the result). List-keyboard specs: extend `apps/kira-studio/tests/ui/list-keyboard.spec.ts` for every list the
+stream binds (Browse, HTTP/gRPC history, KeyValuePane, Documents, Stream, SavedListMenu type-ahead).
+Keyboard pass by
 hand in the running app: project tree, collections, every history list, Browse, KeyValue,
 Documents, Stream, Console results; right-click selection; confirm focus; a resize of every
 Studio splitter and the dock.
@@ -1016,7 +1018,8 @@ sessions/workflows, B4 memory + mobile, B5 sweep.
 that moves their last caller; foundation deletes nothing a stream still imports.
 
 #### B5 (sweep, no new files)
-Empty `stream-b.txt` check as A5; keyboard pass: repo tree, repo search, GitPanel, ReposDialog,
+Empty `stream-b.txt` check as A5; extend the Space `list-keyboard.spec.ts` for every list the
+stream binds (repo tree, repo search list, GitPanel repo list, ReposDialog, Memory list); keyboard pass: repo tree, repo search, GitPanel, ReposDialog,
 Memory list; ADE inline edits with Esc; ADE confirms (Force push danger focus); review window and
 ADE panel resize; mobile screens (confirm touch buttons, font key migration).
 
@@ -1036,7 +1039,8 @@ sweep.
 foundation commit 4.
 
 #### C4 (sweep, no new files)
-Empty `stream-c.txt` check as A5; keyboard pass: git file tree, branch picker, review list,
+Empty `stream-c.txt` check as A5; extend a list-keyboard spec for every list the stream binds
+(git file tree, branch picker, review list, docker lists); keyboard pass: git file tree, branch picker, review list,
 docker lists; git menus (focus return, flip); Automations inline rename; OpLog list; resize of git
 detail pane and commit grid columns.
 

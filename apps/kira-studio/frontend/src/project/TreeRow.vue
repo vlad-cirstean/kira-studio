@@ -92,6 +92,11 @@ function highlightParts(): { text: string; hit: boolean }[] {
 
 const parts = computed(highlightParts);
 
+// A focused row is the roving stop, so Shift+F10 and arrows act on it.
+function onFocus(): void {
+  if (!props.sticky && !props.selected) emit('select', props.row);
+}
+
 function onClick(): void {
   emit('select', props.row);
 }
@@ -138,6 +143,7 @@ function onKeydown(e: KeyboardEvent): void {
     :aria-expanded="row.hasChildren ? row.expanded : undefined"
     :aria-selected="selected"
     :tabindex="sticky ? -1 : selected ? 0 : -1"
+    @focus="onFocus"
     @click="onClick"
     @dblclick="onDblClick"
     @keydown="onKeydown"
