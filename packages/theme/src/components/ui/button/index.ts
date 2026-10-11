@@ -4,7 +4,7 @@ import { cva } from 'class-variance-authority';
 export { default as Button } from '@theme/components/ui/button/Button.vue';
 
 export const buttonVariants = cva(
-  'focus-visible:border-focus aria-invalid:ring-error/20 dark:aria-invalid:ring-error/40 aria-invalid:border-error dark:aria-invalid:border-error/50 rounded-kira border border-transparent bg-clip-padding text-kira-md font-medium aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*=size-])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  'aria-invalid:border-error rounded-kira border border-transparent bg-clip-padding text-kira-md font-medium active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*=size-])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -16,13 +16,12 @@ export const buttonVariants = cva(
         // Geometry stays on the `kira`/`kira-lg`/`kira-icon` sizes below (design-system tokens,
         // runtime-adjustable via @theme's --spacing-control* -- see base.css §7.2).
         toolbar: 'rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg',
-        'toolbar-primary':
-          'rounded-kira-sm bg-primary text-primary-foreground hover:bg-primary/80 disabled:opacity-45',
+        'toolbar-primary': 'rounded-kira-sm bg-primary text-primary-foreground hover:bg-primary/80',
         dialog: 'justify-center rounded-kira-sm border border-border-strong bg-field text-fg',
         'dialog-primary':
-          'justify-center rounded-kira-sm border border-primary bg-primary text-primary-foreground disabled:opacity-45',
+          'justify-center rounded-kira-sm border border-primary bg-primary text-primary-foreground',
         'dialog-danger':
-          'justify-center rounded-kira-sm border border-error bg-error/10 text-error hover:bg-error/20 disabled:opacity-45',
+          'justify-center rounded-kira-sm border border-error bg-error/10 text-error hover:bg-error/20',
         danger: 'rounded-kira-sm text-error hover:bg-hover',
         // P110 B13: TitleBar.vue's own action row -- `aria-pressed` replaces `.is-on`'s own class
         // toggle, fixing the state's previously unexposed accessibility gap.
