@@ -6,7 +6,8 @@ import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
+import { ResizeHandle } from '@theme/components/ui/resizable';
+import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { type Connection, type Edge, type Node, useVueFlow, VueFlow } from '@vue-flow/core';
 import { onKeyStroke, useElementSize } from '@vueuse/core';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -193,6 +194,16 @@ function onPaneClick(): void {
 
 const root = useTemplateRef<HTMLElement>('root');
 const scroller = useTemplateRef<HTMLElement>('scroller');
+const split = useTemplateRef<HTMLElement>('split');
+const GRAPH_MIN_PCT = 35;
+const GRAPH_MAX_PCT = 78;
+const graphPct = ref(66);
+const graphPane = useLiveSize(
+  () => graphPct.value,
+  (pct) => {
+    graphPct.value = pct;
+  },
+);
 useSaveShortcut(root, () => void saveNow());
 
 const PAD = 24;
@@ -299,8 +310,8 @@ onBeforeUnmount(() => {
         + Add stage
       </Button>
     </div>
-    <ResizablePanelGroup direction="horizontal" class="min-h-96 flex-1 rounded-kira border border-border bg-bg">
-      <ResizablePanel :default-size="66" :min-size="35" class="relative">
+    <div ref="split" class="flex min-h-96 flex-1 rounded-kira border border-border bg-bg">
+      <div class="relative min-w-0" :style="{ flex: `0 0 ${graphPane.size.value}%` }">
         <div ref="scroller" class="absolute inset-0 overflow-y-auto overflow-x-hidden" data-testid="ade-wf-graph">
           <div class="relative min-h-full w-full" :style="{ height: `${contentH}px` }">
           <svg class="absolute size-0" aria-hidden="true">
@@ -355,9 +366,17 @@ onBeforeUnmount(() => {
           </VueFlow>
           </div>
         </div>
-      </ResizablePanel>
-      <ResizableHandle />
-      <ResizablePanel :default-size="34" :min-size="22">
+      </div>
+      <ResizeHandle
+        label="Resize inspector"
+        line
+        unit="percent"
+        :container="split"
+        :min="GRAPH_MIN_PCT"
+        :max="GRAPH_MAX_PCT"
+        v-bind="graphPane.bind"
+      />
+      <div class="min-w-0 flex-1">
         <div class="h-full overflow-auto p-3" data-testid="ade-wf-inspector">
           <AdeStepInspector
             v-if="draft.step && draft.stage"
@@ -373,8 +392,8 @@ onBeforeUnmount(() => {
             <span class="font-data">{task} {jira} {repo} {branch} {worktree}</span> are filled in per run.
           </p>
         </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      </div>
+    </div>
     <FieldError v-if="draft.error" data-testid="ade-wf-save-error">
       {{ draft.error }}
       <template v-if="draft.conflict">

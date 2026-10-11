@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ResizablePanel } from '@theme/components/ui/resizable';
+import { ResizeHandle } from '@theme/components/ui/resizable';
+import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { computed } from 'vue';
 import { useCellSelectionStore } from '../../../state/cellSelection';
 import { useLayoutStore } from '../../../state/layout';
@@ -18,29 +19,33 @@ const props = withDefaults(defineProps<{ tabId: string; readOnly?: boolean }>(),
 });
 
 const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
+const pane = useLiveSize(
+  () => layoutStore.panel.cellEditor.height,
+  (height) => layoutStore.setCellEditorHeight(height),
+);
 </script>
 
 <template>
-  <!-- P104/I2-39: a plain content panel — the drag handle (ResizableHandle, wrapping reka's
-       SplitterResizeHandle) that used to be this component's own first template child now lives
-       in each mounting view's own ResizablePanelGroup, since a resize handle must be reka's
-       direct child alongside the panel it sits next to (reka's SplitterPanel `order` doc:
-       "required for groups with conditionally rendered panels" — every mounting view gates that
-       handle on the same `cell` condition this panel's own `v-if` uses). Still owns its own
-       size/min/max/resize wiring (layoutStore), so there is exactly one place that reads/writes
-       the cell-editor height, not one per mounting view. -->
-  <ResizablePanel
-    v-if="cell"
-    class="min-h-0 overflow-hidden bg-bg"
-    data-testid="cell-editor"
-    :data-tab-id="tabId"
-    size-unit="px"
-    :default-size="layoutStore.panel.cellEditor.height"
-    :min-size="120"
-    :max-size="480"
-    :order="2"
-    @resize="layoutStore.setCellEditorHeight"
-  >
-    <CellEditorView :cell="cell" :read-only="readOnly" />
-  </ResizablePanel>
+  <!-- Handle and panel are siblings in the mounting view's flex column: the view puts this below its
+       `flex-1` body. The height lives in the layout store, one place for every mounting view. -->
+  <template v-if="cell">
+    <ResizeHandle
+      class="cell-splitter"
+      label="Resize cell editor"
+      axis="y"
+      direction="reverse"
+      line
+      :min="120"
+      :max="480"
+      v-bind="pane.bind"
+    />
+    <div
+      class="min-h-0 overflow-hidden bg-bg"
+      data-testid="cell-editor"
+      :data-tab-id="tabId"
+      :style="{ flex: `0 1 ${pane.size.value}px` }"
+    >
+      <CellEditorView :cell="cell" :read-only="readOnly" />
+    </div>
+  </template>
 </template>

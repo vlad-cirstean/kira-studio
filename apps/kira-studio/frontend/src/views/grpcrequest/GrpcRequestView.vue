@@ -10,7 +10,8 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
+import { ResizeHandle } from '@theme/components/ui/resizable';
+import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
@@ -231,12 +232,10 @@ function onMessageInput(value: string): void {
 }
 
 const DEFAULT_REQUEST_PANE_HEIGHT = 260;
-const requestPaneHeight = computed(
+const requestPane = useLiveSize(
   () => props.tab.state.requestPaneHeight || DEFAULT_REQUEST_PANE_HEIGHT,
+  (size) => patchGrpcRequestTabState(props.tab.id, { requestPaneHeight: size }),
 );
-function onResizeRequestPane(size: number): void {
-  patchGrpcRequestTabState(props.tab.id, { requestPaneHeight: size });
-}
 
 const parse = useParseWorker();
 async function onBeautify(): Promise<void> {
@@ -465,16 +464,11 @@ onUnmounted(() => {
       <EnvironmentSelect :tab-id="tab.id" />
     </ViewToolbar>
 
-    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
-      <ResizablePanel
+    <div class="flex flex-1 min-h-0 flex-col">
+      <div
         class="request-pane flex min-h-0 flex-col overflow-hidden"
         data-testid="grpc-request-pane"
-        size-unit="px"
-        :default-size="requestPaneHeight"
-        :min-size="120"
-        :max-size="800"
-        :order="1"
-        @resize="onResizeRequestPane"
+        :style="{ flex: `0 1 ${requestPane.size.value}px` }"
       >
         <Alert strip v-if="beautifyError && tab.state.requestPane === 'message'" variant="error" data-testid="grpc-beautify-error">
           <AlertDescription>{{ beautifyError }}</AlertDescription>
@@ -502,14 +496,22 @@ onUnmounted(() => {
           />
         </template>
         <SchemaBrowser v-else :tab="tab" :schema="schema" :loading="schemaLoading" :error="schemaError" @reload="reloadSchema" />
-      </ResizablePanel>
+      </div>
 
-      <ResizableHandle class="request-splitter" />
+      <ResizeHandle
+        class="request-splitter"
+        label="Resize request pane"
+        axis="y"
+        line
+        :min="120"
+        :max="800"
+        v-bind="requestPane.bind"
+      />
 
-      <ResizablePanel class="min-h-0" data-testid="grpc-response-pane-slot" :order="2">
+      <div class="min-h-0 flex-1" data-testid="grpc-response-pane-slot">
         <ResponsePane :tab="tab" />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      </div>
+    </div>
     <!-- P110 B40: every plain single-selector rule this file had moved onto the template as
          Tailwind utilities. `.grpc-target-field` and `.request-pane` stay bare markers:
          api-ui-consistency.spec.ts selects both directly (no rule of their own attaches to either

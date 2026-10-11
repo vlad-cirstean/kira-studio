@@ -160,7 +160,7 @@ test('Operations panel — the dock spans the full shell width, flush under proj
   expect(marginBottom).toBe('0px');
 });
 
-// P132 Part 1 (§4.1): drag, keyboard step, and clamp — DockResizeHandle.vue's own three behaviours
+// P132 Part 1 (§4.1): drag, keyboard step, and clamp — the dock ResizeHandle's three behaviours
 // (§2.4), exercised through the real separator rather than unit-testing its clamp math directly.
 test('Operations panel — the dock resize handle drags, steps by keyboard, and clamps (P132 Part 1)', async ({
   kira,
@@ -170,7 +170,7 @@ test('Operations panel — the dock resize handle drags, steps by keyboard, and 
   const dock = window.locator('[data-testid="operations-panel"]');
   await expect(dock).toBeVisible();
   // The project panel's own reka SplitterResizeHandle is also role="separator" — this one is
-  // named (DockResizeHandle.vue's own aria-label) to disambiguate.
+  // named (its aria-label) to disambiguate.
   const handle = window.getByRole('separator', { name: 'Resize operations panel' });
 
   const initialBox = await dock.boundingBox();

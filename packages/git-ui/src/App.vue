@@ -20,9 +20,9 @@ import type { CommitRecord, FileChangeKind, TipRef } from '@kira/git-core';
 import { describeInProgress, SETTINGS } from '@kira/git-core';
 import type { StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
+import { ResizeHandle } from '@theme/components/ui/resizable';
 import { onClickOutside, useEventListener, useResizeObserver } from '@vueuse/core';
 import { useLiveRegion } from '@workbench/behaviour/liveRegion';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
@@ -1600,11 +1600,7 @@ function setDetailWidth(next: number): void {
   detailWidth.value = Math.max(MIN_DETAIL_WIDTH, Math.min(MAX_DETAIL_WIDTH, Math.round(next)));
 }
 
-// P118 H4: this was a third hand-rolled copy of `KuiColumnResizeHandle` (kira-ui) — P105 §5.2(a)'s
-// own extraction of the identical drag/keyboard shape from CommitGrid/StreamView — and it lacked
-// that component's primary-button guard (P108 Part 11 F10), so a right-click here started a drag.
-// `direction="reverse"` below covers the one real difference: this pane is right-docked, so it
-// widens as the handle moves left, opposite the shared component's own left-to-right convention.
+// The detail pane is right-docked: `direction="reverse"` widens it as the handle moves left.
 const detailWidthPx = computed(() => `${detailWidth.value}px`);
 
 // `exactOptionalPropertyTypes` (tsconfig.base.json) treats an explicit `undefined` differently
@@ -1806,16 +1802,16 @@ onBeforeUnmount(() => {
             aria-label="Commit detail"
             :style="{ width: detailWidthPx }"
           >
-            <KuiColumnResizeHandle
+            <ResizeHandle
               v-if="breakpoint === 'wide'"
               class="absolute inset-y-0 left-0 -ml-px z-2"
               label="Resize detail pane"
               direction="reverse"
-              :value="detailWidth"
+              :size="detailWidth"
               :min="MIN_DETAIL_WIDTH"
               :max="MAX_DETAIL_WIDTH"
-              @update:value="setDetailWidth"
-              @change="setDetailWidth"
+              @live="setDetailWidth"
+              @commit="setDetailWidth"
             />
             <Empty v-if="!hasSelection" class="h-full p-6">
               <EmptyMedia><CodiconIcon name="git-commit" :size="24" /></EmptyMedia>

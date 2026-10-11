@@ -49,7 +49,6 @@ import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
@@ -99,11 +98,6 @@ const props = defineProps<{
 }>();
 
 const host = computed(() => keyValueHost(props.viewKey));
-
-// P104/I2-39: CellEditorDock.vue is now a plain ResizablePanel (its own header comment) — the
-// resize handle beside it must be this view's own direct ResizablePanelGroup child, gated on
-// the same condition CellEditorDock's own `v-if` uses, or the handle would sit next to nothing.
-const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.viewKey) !== null);
 
 // Reconnect gating only applies in tab mode (see the module doc comment above) — useConnectionGate
 // needs a stable {id, connectionId}, which only a real tab record's lifetime guarantees.
@@ -761,13 +755,8 @@ onUnmounted(() => {
       </ViewToolbar>
     </template>
 
-    <!-- P104/I2-39: the ResizablePanelGroup wrapping the reconnect/main content +
-         CellEditorDock.vue's own dock panel — the vertical split (row-resize) that used to be
-         CellEditorDock's own internal PanelSplitter. -->
-    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
-    <!-- ResizablePanel's own inline style owns flex-grow/basis (it always wins over a class rule) —
-         the badges/strips/table still stack in a column inside it, same as before. -->
-    <ResizablePanel class="flex flex-col min-h-0" :order="1">
+        <div class="flex flex-1 min-h-0 flex-col">
+    <div class="flex min-h-0 flex-1 flex-col">
     <!-- Item 4: only the body swaps for the reconnect gate — ViewChrome (when present) always
          renders its own header, same discipline every other main-tab view follows.
          P104 §3: ReconnectGate inlined (no library counterpart). -->
@@ -1130,16 +1119,8 @@ onUnmounted(() => {
         </div>
       </div>
     </template>
-    </ResizablePanel>
-    <ResizableHandle v-if="hasCellDock" class="cell-splitter" />
+    </div>
     <CellEditorDock :tab-id="viewKey" />
-    </ResizablePanelGroup>
-    <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared
-         component -- `.cell-splitter` above is a bare marker class, kept only because
-         cell-editor.spec.ts polls its box-shadow via getComputedStyle.
-         P110 B34: `.search-match`/`.search-match-current` above carry no rule of their own here --
-         kept as bare marker classes (the shared vocabulary name cellClass.ts/DocumentRow.vue/
-         ConsoleResultGrid.vue also use). The actual tint/text-colour is
-         `bg-search-match[-current] text-bg` alongside on the same element. -->
+    </div>
   </div>
 </template>

@@ -1,37 +1,11 @@
 <script setup lang="ts">
-// P104 §3.3: PanelSplitter (hand-rolled pointer-drag maths + a CSS-grid column/row template) →
-// reka's own SplitterGroup/SplitterPanel/SplitterResizeHandle.
-//
-// P110 I2-39: every direct reka SplitterGroup/SplitterPanel below goes through the shadcn-vue
-// ResizablePanelGroup/ResizablePanel wrapper instead — the comments here that describe reka's own
-// underlying behaviour still say "SplitterGroup"/"SplitterPanel" on purpose, since that is the real
-// component these wrappers forward props/emits to unchanged.
-//
-// P132 Part 1 (§0.1/§2.4): the Operations dock is a full-width flex sibling below the horizontal
-// group, outside every SplitterGroup — not a second, nested vertical group the way it used to be.
-// Two hazards, both from source at the P104/P110 shape this replaced: (1) a real, non-deterministic
-// reka defect — outer-vertical nesting (top row | ops) intermittently hung the whole render process
-// on a tree-row click after opening ops (tree.spec.ts caught it; clean on a short timeout, hung on
-// a long one against identical steps — never fully root-caused beyond "this nesting direction,
-// reliably"). (2) a `sizeUnit="px"` ops panel makes reka re-run its own pixel-layout recompute on
-// every ResizeObserver tick of the group's own container, which fought a virtualized SlickGrid
-// living in the sibling editor-area panel and hung the tab on the first grid interaction after
-// opening ops (a 15s A/B, only that one prop removed, isolated it). Putting the dock in no
-// SplitterGroup at all rules out both, rather than re-proving either is absent. It also deletes the
-// margin-hack/percent-bridge machinery the nested shape needed to keep project's height in sync
-// with main's (project and main are now siblings in the *same* row, so they already share one).
-//
-// The project panel keeps `sizeUnit="px"` — it's the one rarely-resized SplitterGroup left, the
-// same shape already proven safe.
-import { RESIZE_KEY_STEP, ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import { useElementSize } from '@vueuse/core';
-// I2-39: type-only -- resize() is exposed by reka's SplitterPanel at runtime (ResizablePanel
-// forwards it unchanged) but isn't in ResizablePanel's own public prop/emit type, so the typed
-// ref below still names SplitterPanel directly. No value import: the template uses the
-// ResizablePanel/ResizablePanelGroup wrappers above.
-import type { SplitterPanel } from 'reka-ui';
-import { computed, ref, useTemplateRef, watch } from 'vue';
-import DockResizeHandle from './DockResizeHandle.vue';
+// P264 §2.8: the project panel and the Operations dock resize through ResizeHandle (VueUse
+// `useDraggable`), plain flex layout. The dock stays a full-width flex sibling below the row, never
+// nested in a split group (P132 Part 1: nested reka groups hung the render process, and a px panel
+// re-ran reka's layout on every ResizeObserver tick beside a virtualized SlickGrid). The handles
+// emit the size on release; a drag previews through local state, so the parent store sees one write.
+import { ResizeHandle } from '@theme/components/ui/resizable';
+import { computed, ref } from 'vue';
 import MainView from './MainView.vue';
 import TabStrip from './TabStrip.vue';
 
@@ -54,48 +28,29 @@ const emit = defineEmits<{
   'resize-ops': [size: number];
 }>();
 
+const PROJECT_MIN_PX = 180;
+const PROJECT_MAX_PX = 480;
 const OPS_MIN_PX = 100;
 const OPS_MAX_PX = 500;
-const dockHeight = computed(() =>
-  Math.min(OPS_MAX_PX, Math.max(OPS_MIN_PX, props.opsHeight)),
+
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
+
+const liveProject = ref<number | null>(null);
+const liveOps = ref<number | null>(null);
+const projectSize = computed(() =>
+  clamp(liveProject.value ?? props.projectWidth, PROJECT_MIN_PX, PROJECT_MAX_PX),
 );
+const dockHeight = computed(() => clamp(liveOps.value ?? props.opsHeight, OPS_MIN_PX, OPS_MAX_PX));
 const dockDragging = ref(false);
 
-// SplitterPanel's `defaultSize` only seeds the *initial* render — an external width change
-// (mode-switch's own first-activation widen, C11 §14 OQ2) needs the panel's own imperative
-// `resize()` to follow it, the same way the old CSS-custom-property binding did for free.
-const projectPanelRef = useTemplateRef<InstanceType<typeof SplitterPanel>>('projectPanel');
-
-// reka's keyboard step is a percentage of the group; the shared handle step is RESIZE_KEY_STEP px.
-const panelGroupRef = useTemplateRef<{ $el: HTMLElement }>('panelGroup');
-const { width: groupWidth } = useElementSize(() => panelGroupRef.value?.$el);
-const keyboardResizeBy = computed(() => (groupWidth.value > 0 ? (RESIZE_KEY_STEP / groupWidth.value) * 100 : null));
-
-// A drag emits resize-project, the parent persists it and the same value comes back down as
-// projectWidth — the round trip through SplitterPanel's own %-to-px conversion doesn't land on the
-// exact same float, so an unguarded watcher calling resize() on every prop change ping-pongs
-// forever (resize → emit → prop update → resize → …), hanging the tab. Only a genuinely *external*
-// width change (nothing this component itself just emitted) should drive the panel. The dock has
-// no such guard to keep: it emits its own px height directly (no SplitterPanel, no %-to-px round
-// trip to ping-pong against).
-let lastEmittedProjectWidth: number | undefined;
-
-watch(
-  () => props.projectWidth,
-  (width) => {
-    if (Math.abs(width - (lastEmittedProjectWidth ?? Number.NaN)) < 1) return;
-    projectPanelRef.value?.resize(width);
-  },
-);
-
-function onProjectResize(size: number): void {
-  // reka also fires onResize on first layout and on programmatic resize(); neither is a user drag.
-  if (Math.abs(size - props.projectWidth) < 1) return;
-  lastEmittedProjectWidth = size;
+function commitProject(size: number): void {
+  liveProject.value = null;
   emit('resize-project', size);
 }
-function onOpsResize(px: number): void {
-  emit('resize-ops', px);
+function commitOps(size: number): void {
+  liveOps.value = null;
+  emit('resize-ops', size);
 }
 </script>
 
@@ -109,31 +64,27 @@ function onOpsResize(px: number): void {
     class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5 px-1.5 pb-0.5 bg-chrome"
     :class="{ 'cursor-ns-resize select-none': dockDragging }"
   >
-    <ResizablePanelGroup
-      ref="panelGroup"
-      direction="horizontal"
-      class="flex-1 min-h-0 gap-0.5"
-      :keyboard-resize-by="keyboardResizeBy"
-    >
-      <ResizablePanel
+    <div class="flex flex-1 min-h-0 gap-0.5">
+      <div
         v-if="projectVisible"
-        ref="projectPanel"
         class="overflow-hidden min-w-0 min-h-0 rounded-kira border border-border bg-bg"
         data-testid="project-panel"
-        size-unit="px"
-        :default-size="projectWidth"
-        :min-size="180"
-        :max-size="480"
-        :order="1"
-        @resize="onProjectResize"
+        :style="{ flex: `0 0 ${projectSize}px` }"
       >
         <slot name="panel" />
-      </ResizablePanel>
-      <ResizableHandle v-if="projectVisible" :line="false" />
+      </div>
+      <ResizeHandle
+        v-if="projectVisible"
+        label="Resize project panel"
+        :size="projectSize"
+        :min="PROJECT_MIN_PX"
+        :max="PROJECT_MAX_PX"
+        @live="liveProject = $event"
+        @commit="commitProject"
+        @cancel="liveProject = null"
+      />
 
-      <!-- Border/rounding stay on the inner div: a border on the panel itself shifts reka's px-to-%
-           conversion for the project panel by ~0.4px (visual snapshots caught it). -->
-      <ResizablePanel class="min-w-0" data-testid="main-panel" :order="2">
+      <div class="min-w-0 flex-1" data-testid="main-panel">
         <div
           class="h-full flex flex-col min-w-0 min-h-0 overflow-hidden"
           :class="{ 'rounded-kira border border-border bg-bg': mainFramed }"
@@ -148,15 +99,20 @@ function onOpsResize(px: number): void {
             <slot name="main"><MainView /></slot>
           </div>
         </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      </div>
+    </div>
 
     <template v-if="opsVisible">
-      <DockResizeHandle
-        :height="dockHeight"
+      <ResizeHandle
+        label="Resize operations panel"
+        axis="y"
+        direction="reverse"
+        :size="dockHeight"
         :min="OPS_MIN_PX"
         :max="OPS_MAX_PX"
-        @resize="onOpsResize"
+        @live="liveOps = $event"
+        @commit="commitOps"
+        @cancel="liveOps = null"
         @dragging="dockDragging = $event"
       />
       <div

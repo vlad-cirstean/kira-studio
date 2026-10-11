@@ -16,8 +16,8 @@
  * invalidates exactly the two affected rows (`#watchSelection` below), never the whole grid.
  */
 import type { CommitRecord, RowPlan } from '@kira/git-core';
-import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useEventListener, useResizeObserver } from '@vueuse/core';
 import type { Column, OnRenderedEventArgs } from 'slickgrid';
 import { SlickGrid } from 'slickgrid';
@@ -1328,36 +1328,36 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       class="kira-cell-date tabular-nums absolute invisible pointer-events-none whitespace-nowrap"
       aria-hidden="true"
     ></span>
-    <KuiColumnResizeHandle
+    <ResizeHandle
       class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftGraph}px` }"
       label="Resize graph column"
-      :value="effectiveWidths.graph"
+      :size="effectiveWidths.graph"
       :min="minWidthFor('graph')"
       :max="maxGraph"
-      @update:value="(w) => setColumnWidth('graph', w)"
+      @live="(w) => setColumnWidth('graph', w)"
     />
-    <KuiColumnResizeHandle
+    <ResizeHandle
       v-if="!detailOpen"
       class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftAuthor}px` }"
       label="Resize author column"
       direction="reverse"
-      :value="effectiveWidths.author"
+      :size="effectiveWidths.author"
       :min="MIN_COLUMN_WIDTH"
       :max="maxAuthor"
-      @update:value="(w) => setColumnWidth('author', w)"
+      @live="(w) => setColumnWidth('author', w)"
     />
-    <KuiColumnResizeHandle
+    <ResizeHandle
       v-if="!detailOpen"
       class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftDate}px` }"
       label="Resize date column"
       direction="reverse"
-      :value="effectiveWidths.date"
+      :size="effectiveWidths.date"
       :min="minWidthFor('date')"
       :max="maxDate"
-      @update:value="(w) => setColumnWidth('date', w)"
+      @live="(w) => setColumnWidth('date', w)"
     />
   </div>
 </template>

@@ -248,7 +248,7 @@ packages/workbench   the shared workbench shell (TitleBar/StatusBar/MainView/Tab
 packages/git-ipc     the git contract, RPC/codec/validation, the stream channel, the FlatBuffers schema
 packages/git-core    client-side git logic: commit store, lane layout, the client half of search, settings schema
 packages/git-ui      the git graph/review UI, hosted by this app's native Git module
-packages/kira-ui     KuiColumnResizeHandle plus a Floating-UI positioning primitive workbench wraps
+packages/kira-ui     a Floating-UI positioning primitive workbench wraps
 packages/theme       shared design tokens/CSS both apps' frontends import, plus the shadcn-vue `components/ui/*` sets
 ```
 

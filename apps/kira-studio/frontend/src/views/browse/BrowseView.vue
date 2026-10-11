@@ -9,7 +9,8 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
+import { ResizeHandle } from '@theme/components/ui/resizable';
+import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
@@ -131,10 +132,10 @@ const countText = computed(() => {
 // requestPaneHeight persistence idiom — `0` means "the default", so a tab saved before this field
 // existed restores unchanged.
 const DEFAULT_LIST_WIDTH = 320;
-const listWidth = computed(() => props.tab.state.listWidth || DEFAULT_LIST_WIDTH);
-function onResizeList(size: number): void {
-  tabsStore.patchBrowseTabState(props.tab.id, { listWidth: size });
-}
+const listPane = useLiveSize(
+  () => props.tab.state.listWidth || DEFAULT_LIST_WIDTH,
+  (size) => tabsStore.patchBrowseTabState(props.tab.id, { listWidth: size }),
+);
 
 // The detail pane previews the selected row when it's a leaf (hasChildren: false) — a container
 // row, or nothing selected, has no value of its own to show (§2.3).
@@ -366,16 +367,8 @@ onMounted(() => {
           Reconnect & load
         </Button>
       </Empty>
-      <ResizablePanelGroup v-else direction="horizontal" class="flex flex-row flex-1 min-h-0">
-        <ResizablePanel
-          class="min-w-0 flex flex-col min-h-0"
-          size-unit="px"
-          :default-size="listWidth"
-          :min-size="220"
-          :max-size="900"
-          :order="1"
-          @resize="onResizeList"
-        >
+      <div v-else class="flex flex-row flex-1 min-h-0">
+        <div class="min-w-0 flex flex-col min-h-0" :style="{ flex: `0 1 ${listPane.size.value}px` }">
           <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
                ViewChrome's own toolbar into the pane whose list they act on. Reuses the same
                toolbar utility band (the same 26px in-view band every other toolbar already is)
@@ -487,14 +480,17 @@ onMounted(() => {
               </div>
             </div>
           </div>
-        </ResizablePanel>
+        </div>
 
-        <!-- P110 B32: the divider styling itself (col-resize, horizontal orientation) moved into
-             ResizableHandle.vue's own shared component -- no test polls this handle by class, so no
-             marker class belongs on it either. -->
-        <ResizableHandle />
+        <ResizeHandle
+          label="Resize list"
+          line
+          :min="220"
+          :max="900"
+          v-bind="listPane.bind"
+        />
 
-        <ResizablePanel class="min-w-0 flex flex-col min-h-0" data-testid="browse-detail-pane" :order="2">
+        <div class="min-w-0 flex flex-1 flex-col min-h-0" data-testid="browse-detail-pane">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
           <Empty v-else class="min-h-0 flex-1" data-testid="browse-preview-empty">
             <EmptyHeader>
@@ -502,7 +498,7 @@ onMounted(() => {
               <EmptyTitle>{{ emptyPreviewLabel }}</EmptyTitle>
             </EmptyHeader>
           </Empty>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        </div>
+      </div>
   </div>
 </template>

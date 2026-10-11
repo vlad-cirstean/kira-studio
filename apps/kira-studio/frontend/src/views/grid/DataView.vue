@@ -7,14 +7,12 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
 import { useRunState } from '../../state/runState';
@@ -41,13 +39,7 @@ const fakeDataStore = useFakeDataStore();
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
 const gridViewStore = useGridViewStore();
-const cellSelectionStore = useCellSelectionStore();
 const props = defineProps<{ tab: DataTabRecord }>();
-
-// P104/I2-39: CellEditorDock.vue is now a plain ResizablePanel (its own header comment) — the
-// resize handle beside it must be this view's own direct ResizablePanelGroup child, gated on
-// the same condition CellEditorDock's own `v-if` uses, or the handle would sit next to nothing.
-const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.tab.id) !== null);
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -313,8 +305,8 @@ function onCloseSearch(): void {
       @close="onCloseSearch"
     />
 
-    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
-      <ResizablePanel class="flex flex-col min-h-0" :order="1">
+    <div class="flex flex-1 min-h-0 flex-col">
+      <div class="flex min-h-0 flex-1 flex-col">
         <Empty v-if="needsReconnect" data-testid="reconnect-panel">
           <Button
             variant="dialog-primary"
@@ -361,13 +353,8 @@ function onCloseSearch(): void {
             <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />
           </div>
         </template>
-      </ResizablePanel>
-      <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared
-           component -- `.cell-splitter` is a bare marker class, kept only because
-           cell-editor.spec.ts polls its box-shadow via getComputedStyle (no rule of its own
-           attaches to the name any more). -->
-      <ResizableHandle v-if="hasCellDock" class="cell-splitter" />
+      </div>
       <CellEditorDock :tab-id="tab.id" />
-    </ResizablePanelGroup>
+    </div>
   </div>
 </template>

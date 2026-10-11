@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { tryOnScopeDispose, useStorage } from '@vueuse/core';
+import { ResizeHandle } from '@theme/components/ui/resizable';
+import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
+import { tryOnScopeDispose } from '@vueuse/core';
+import { usePersistedState } from '@workbench/behaviour/persisted';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { queryClient } from '@workbench/state/queryClient';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { onReviewRepaint } from '../../../repo/git/transport';
-import AdePanelResizeHandle from '../panel/AdePanelResizeHandle.vue';
 import { ghSyncPlanPrefix } from '../queries';
 import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
 import AdeReviewAgentPanel from './AdeReviewAgentPanel.vue';
@@ -32,26 +34,24 @@ tryOnScopeDispose(
 
 const LEFT_MIN = 180;
 const LEFT_MAX = 480;
-const storedLeft = useStorage('kira.ade.review.leftWidth', 260);
-const liveLeft = ref<number | null>(null);
+const storedLeft = usePersistedState('kira.ade.review.leftWidth', 260);
 // A width stored under the older 220-560 bounds is clamped, not reset.
-const leftWidth = computed(() => Math.max(LEFT_MIN, Math.min(LEFT_MAX, liveLeft.value ?? storedLeft.value)));
-
-function commitLeft(w: number): void {
-  storedLeft.value = Math.round(Math.max(LEFT_MIN, Math.min(LEFT_MAX, w)));
-  liveLeft.value = null;
-}
+const left = useLiveSize(
+  () => Math.max(LEFT_MIN, Math.min(LEFT_MAX, storedLeft.value)),
+  (w) => {
+    storedLeft.value = w;
+  },
+);
 
 const RIGHT_MIN = 280;
 const RIGHT_MAX = 720;
-const storedRight = useStorage('kira.ade.review.rightWidth', 380);
-const liveRight = ref<number | null>(null);
-const rightWidth = computed(() => liveRight.value ?? storedRight.value);
-
-function commitRight(w: number): void {
-  storedRight.value = Math.round(Math.max(RIGHT_MIN, Math.min(RIGHT_MAX, w)));
-  liveRight.value = null;
-}
+const storedRight = usePersistedState('kira.ade.review.rightWidth', 380);
+const right = useLiveSize(
+  () => Math.max(RIGHT_MIN, Math.min(RIGHT_MAX, storedRight.value)),
+  (w) => {
+    storedRight.value = w;
+  },
+);
 </script>
 
 <template>
@@ -63,19 +63,18 @@ function commitRight(w: number): void {
     <div class="flex min-h-0 flex-1 gap-0.5 bg-chrome px-1.5 pb-0.5">
       <section
         class="min-h-0 flex-none overflow-hidden rounded-kira border border-border bg-bg"
-        :style="{ width: `${leftWidth}px` }"
+        :style="{ width: `${left.size.value}px` }"
         aria-label="Files to review"
         data-testid="ade-review-left"
       >
         <AdeReviewFiles :target="target" @marked="refreshSyncPlan" />
       </section>
-      <AdePanelResizeHandle
-        invert
-        :value="leftWidth"
+      <ResizeHandle
+        label="Resize panel"
+        data-testid="ade-panel-resize-handle"
         :min="LEFT_MIN"
         :max="LEFT_MAX"
-        @resize="(w) => (liveLeft = w)"
-        @commit="commitLeft"
+        v-bind="left.bind"
       />
       <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg" aria-label="Diffs" data-testid="ade-review-centre">
         <div class="h-tabbar min-h-0 shrink-0 overflow-hidden border-b border-border bg-chrome" data-testid="ade-review-tabs">
@@ -89,16 +88,17 @@ function commitRight(w: number): void {
           </MainView>
         </div>
       </section>
-      <AdePanelResizeHandle
-        :value="rightWidth"
+      <ResizeHandle
+        label="Resize panel"
+        data-testid="ade-panel-resize-handle"
+        direction="reverse"
         :min="RIGHT_MIN"
         :max="RIGHT_MAX"
-        @resize="(w) => (liveRight = w)"
-        @commit="commitRight"
+        v-bind="right.bind"
       />
       <section
         class="min-h-0 flex-none overflow-hidden rounded-kira border border-border bg-bg"
-        :style="{ width: `${rightWidth}px` }"
+        :style="{ width: `${right.size.value}px` }"
         aria-label="Review agent"
         data-testid="ade-review-right"
       >

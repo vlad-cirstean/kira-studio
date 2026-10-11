@@ -15,7 +15,6 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
@@ -28,7 +27,6 @@ import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { wheelToHorizontal } from '@workbench/util/wheelScroll';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import { useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { useRunState } from '../../state/runState';
 import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColumns';
@@ -58,11 +56,9 @@ const contextMenuStore = useContextMenuStore();
 const schemaColumnsStore = useSchemaColumnsStore();
 const connectionsStore = useConnectionsStore();
 const consoleViewStore = useConsoleViewStore();
-const cellSelectionStore = useCellSelectionStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
-const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.tab.id) !== null);
 
 // A console tab hydrates without loading anything (there is nothing to load until a statement
 // runs), so no onLoad is passed.
@@ -895,11 +891,8 @@ const statusLine = computed(() => {
            nothing left to gate — the editor already stayed visible behind it (item 2), and running
            a restored tab's query now reconnects itself, so the button was just a second, redundant
            way to do what pressing Run already does. Removed rather than kept as a no-op. -->
-      <!-- P104/I2-39: ResizablePanelGroup wrapping the editor+results body and CellEditorDock.vue's
-           own dock panel — the resize handle must sit as reka's own direct child alongside the
-           panel it resizes (CellEditorDock.vue's own header comment). -->
-      <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
-      <ResizablePanel class="flex flex-col min-h-0" :order="1">
+      <div class="flex flex-1 min-h-0 flex-col">
+      <div class="flex min-h-0 flex-1 flex-col">
       <div class="flex-1 basis-2/5 min-h-0 border-b border-border">
         <MonacoHost
           ref="editorHost"
@@ -1013,14 +1006,11 @@ const statusLine = computed(() => {
         </div>
       </div>
 
-      </ResizablePanel>
+      </div>
       <!-- P40 D11: a console result has no addressable row/table to write back to at all — a
            viewer, not an editor refusing this particular cell (F12/F13). -->
-      <!-- P110 B32: `.cell-splitter` stays a bare marker class with no rule of its own --
-           cell-editor.spec.ts polls its box-shadow via getComputedStyle. -->
-      <ResizableHandle v-if="hasCellDock" class="cell-splitter" />
       <CellEditorDock :tab-id="tab.id" :read-only="true" />
-      </ResizablePanelGroup>
+      </div>
   </div>
   <!-- P110 I2-16: `.result-tab`/`.result-close`'s own hover/active rules moved onto the template --
        `group/tab` on the tab, its own ternary for the inactive-hover background (`is-active` stays

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import {
   SQS_MAX_VISIBILITY_TIMEOUT_SECONDS,
   SQS_MIN_VISIBILITY_TIMEOUT_SECONDS,
@@ -20,7 +19,7 @@ import { FieldError } from '@theme/components/ui/field';
 import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
+import { ResizeHandle } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
@@ -58,7 +57,6 @@ import { useStreamSearchStore } from './search';
 import { useStreamViewStore } from './state';
 
 const cellSelectionStore = useCellSelectionStore();
-const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.tab.id) !== null);
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
@@ -642,7 +640,7 @@ function widthFor(column: string): number {
   return props.tab.state.columnWidths[column] ?? DEFAULT_COLUMN_WIDTHS[column] ?? 96;
 }
 
-// P105 §5.2(a): KuiColumnResizeHandle owns the pointer/keyboard drag mechanics now — this view
+// P105 §5.2(a): ResizeHandle owns the pointer/keyboard drag mechanics — this view
 // keeps only its own live-preview-then-single-commit split (P21 round 2 finding 10c's own reason,
 // still the point: patchStreamTabState's own skipUnchanged: false makes a per-pixel-move commit
 // allocate + re-render + re-arm the debounced save on every pixel).
@@ -658,7 +656,7 @@ function onResizeCommit(column: string, width: number): void {
 // P108 Part 11 F10: a drag ended by pointercancel/lostpointercapture (the OS hands the gesture off
 // elsewhere) used to never reach onResizeCommit, so liveResizeWidth stuck at the aborted drag's
 // last live value -- shown but never saved, until a later drag on some other column overwrote it
-// and this column snapped back. KuiColumnResizeHandle's own `cancel` emit is the fix's other half.
+// and this column snapped back. ResizeHandle's own `cancel` emit is the fix's other half.
 // Guarded by column, same as widthFor's own read: an unrelated drag already started on another
 // column by the time this fires must not clear ITS live preview.
 function onResizeCancel(column: string): void {
@@ -686,11 +684,8 @@ onUnmounted(() => {
 
 <template>
   <div class="h-full flex flex-col min-h-0" data-testid="stream-view" :data-path="tab.path">
-    <!-- P104/I2-39: ResizablePanelGroup wraps the inlined header+toolbar chrome + CellEditorDock,
-         since the resize handle must sit as reka's own direct child alongside the panel it
-         resizes (CellEditorDock.vue's own comment) -- mirrors DataView.vue/KeyValuePane.vue. -->
-    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
-    <ResizablePanel class="flex flex-col min-h-0" :order="1">
+    <div class="flex flex-1 min-h-0 flex-col">
+    <div class="flex min-h-0 flex-1 flex-col">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore.
          Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
          `false`, not `undefined` — the old ViewChrome's own `:disabled="canRefresh === false"`
@@ -1117,60 +1112,60 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative w-10" />
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('key')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">key</span>
-              <KuiColumnResizeHandle
+              <ResizeHandle
                 class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-key"
                 label="Resize key column"
-                :value="widthFor('key')"
+                :size="widthFor('key')"
                 :min="40"
-                @update:value="(w) => onResizeLive('key', w)"
-                @change="(w) => onResizeCommit('key', w)"
+                @live="(w) => onResizeLive('key', w)"
+                @commit="(w) => onResizeCommit('key', w)"
                 @cancel="() => onResizeCancel('key')"
                 @click.stop
               />
             </div>
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('timestamp')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">timestamp</span>
-              <KuiColumnResizeHandle
+              <ResizeHandle
                 class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-timestamp"
                 label="Resize timestamp column"
-                :value="widthFor('timestamp')"
+                :size="widthFor('timestamp')"
                 :min="40"
-                @update:value="(w) => onResizeLive('timestamp', w)"
-                @change="(w) => onResizeCommit('timestamp', w)"
+                @live="(w) => onResizeLive('timestamp', w)"
+                @commit="(w) => onResizeCommit('timestamp', w)"
                 @cancel="() => onResizeCancel('timestamp')"
                 @click.stop
               />
             </div>
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('headers')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">headers</span>
-              <KuiColumnResizeHandle
+              <ResizeHandle
                 class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-headers"
                 label="Resize headers column"
-                :value="widthFor('headers')"
+                :size="widthFor('headers')"
                 :min="40"
-                @update:value="(w) => onResizeLive('headers', w)"
-                @change="(w) => onResizeCommit('headers', w)"
+                @live="(w) => onResizeLive('headers', w)"
+                @commit="(w) => onResizeCommit('headers', w)"
                 @cancel="() => onResizeCancel('headers')"
                 @click.stop
               />
             </div>
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('attrs')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">attrs</span>
-              <KuiColumnResizeHandle
+              <ResizeHandle
                 class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-attrs"
                 label="Resize attrs column"
-                :value="widthFor('attrs')"
+                :size="widthFor('attrs')"
                 :min="40"
-                @update:value="(w) => onResizeLive('attrs', w)"
-                @change="(w) => onResizeCommit('attrs', w)"
+                @live="(w) => onResizeLive('attrs', w)"
+                @commit="(w) => onResizeCommit('attrs', w)"
                 @cancel="() => onResizeCancel('attrs')"
                 @click.stop
               />
@@ -1287,22 +1282,8 @@ onUnmounted(() => {
         </template>
       </div>
       </template>
-    </ResizablePanel>
-    <ResizableHandle v-if="hasCellDock" class="cell-splitter" />
+    </div>
     <CellEditorDock :tab-id="tab.id" :read-only="true" />
-    </ResizablePanelGroup>
-    <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared
-         component -- `.cell-splitter` above is a bare marker class, kept only because
-         cell-editor.spec.ts polls its box-shadow via getComputedStyle.
-         P110 I2-17: `.stream-row:hover`/`.selected`/`.search-match[-current]` folded into
-         streamRowClass()'s own priority lookup (script setup) -- current beats match beats
-         selected beats hover, matching the pre-phase source-order winner exactly (all 4 rules
-         shared identical specificity). `.list-body .no-rows { h-full }` folded onto each `.no-rows`
-         element directly; `.list-body` itself dropped (its only other job, `position: relative` for
-         `.no-rows`'s own inset:0 rule, was already a plain Tailwind utility on the same div).
-         `.no-rows` stays a bare marker -- polled directly by interaction.spec.ts/
-         sqs.frontend.spec.ts/kafka.frontend.spec.ts. `.partition-option` stays (kafka.frontend.spec.ts).
-         P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
-         virtualRows.ts), bound on the row's own `:class` -- see ProjectTree.vue's identical note. -->
+    </div>
   </div>
 </template>

@@ -63,7 +63,6 @@ apps/kira-space/frontend/src/ade/v2/review/AdeReviewFiles.vue
 apps/kira-space/frontend/src/ade/v2/review/AdeReviewAgentPanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdePanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdePanelFrame.vue
-apps/kira-space/frontend/src/ade/v2/panel/AdePanelResizeHandle.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeTaskPanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeBranchPanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeArchivedPanel.vue
@@ -150,7 +149,7 @@ U28@@vS@@@@Checkbox in a settings pane (a live boolean is a Switch)@@<Checkbox\b
 U28@@v@@/settings/|MemoryPanel.vue|AdeTaskTab.vue|ReposDialog.vue@@Switch outside settings panes (a form option is a Checkbox)@@<Switch\b
 U29@@v@@@@TooltipProvider with props (the theme owns the delays), or TooltipContent class other than whitespace-pre-wrap@@<TooltipProvider\b(?!\s*>)|<TooltipContent\b(?&t)\s:?class="(?!whitespace-pre-wrap")
 U30@@v@@@@DropdownMenuContent width, or DropdownMenuItem height/padding/gap class@@<DropdownMenuContent\b(?&t)\s:?class="[^"]*${TOK}(?:w|min-w|max-w)-|<DropdownMenuItem\b(?&t)\s:?class="[^"]*${TOK}(?:h|py|px|gap)-
-U31@@v@@@@hand-written resize cursor or handle look, or a separator without resizeHandleVariants@@${TOK}cursor-(?:col|row|ew|ns)-resize|<(?:ResizableHandle|KuiColumnResizeHandle)\b(?&t)\s:?class="[^"]*${TOK}(?:w-|h-|bg-|shadow|cursor|outline)|(?s)\A(?!.*resizeHandleVariants).*role="separator"
+U31@@v@@@@hand-written resize cursor or handle look, or a separator without resizeHandleVariants@@${TOK}cursor-(?:col|row|ew|ns)-resize|<ResizeHandle\b(?&t)\s:?class="[^"]*${TOK}(?:w-|h-|bg-|shadow|cursor|outline)|(?s)\A(?!.*resizeHandleVariants).*role="separator"
 U32@@v@@@@scrollbar styling in a component (use scrollbar-none, base.css)@@\[scrollbar-|${TOK}scrollbar-(?!none(?![\w-]))[\w-]+|::-webkit-scrollbar
 U33@@v@@@@keyboard hint text (use Kbd)@@Cmd/Ctrl|\(\{\{\s*formatShortcut
 U34@@vt@@monacoTheme.ts|ansi.ts|/setiFileIcon|/ade/v2/palette.ts@@colour literal in app code (use tokens)@@(?:["'\`\[(]|:\s*)#(?:[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|(?=[0-9]*[a-fA-F])[0-9a-fA-F]{3,4}|(?<d>\d)\k<d>\k<d>\k<d>?)\b|${TOK}(?:bg|text|border)-(?:black|white)(?![\w-])

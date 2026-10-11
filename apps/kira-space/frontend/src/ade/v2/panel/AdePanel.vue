@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import { ResizeHandle } from '@theme/components/ui/resizable';
+import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { useElementSize, useParentElement } from '@vueuse/core';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useSettingsStore } from '../../../state/settings';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeArchivedPanel from './AdeArchivedPanel.vue';
 import AdeBranchPanel from './AdeBranchPanel.vue';
-import AdePanelResizeHandle from './AdePanelResizeHandle.vue';
 import AdeTaskPanel from './AdeTaskPanel.vue';
 
 // Right-hand panel of the Plan: the selected task, or one of its branches. Width is
@@ -20,19 +21,17 @@ const { model } = usePlanModel();
 
 const parent = useParentElement();
 const { width: rowWidth } = useElementSize(parent);
-const live = ref<number | null>(null);
 
 const maxWidth = computed(() => Math.max(MIN_WIDTH, rowWidth.value - MIN_PLAN));
-const width = computed(() => {
-  const stored = settingsStore.ade.panelWidth;
-  const base = stored > 0 ? stored : Math.round(rowWidth.value / 2);
-  return Math.max(MIN_WIDTH, Math.min(maxWidth.value, live.value ?? base));
-});
-
-async function commit(w: number): Promise<void> {
-  live.value = null;
-  await settingsStore.patchSettings({ ade: { panelWidth: Math.round(w) } });
-}
+const pane = useLiveSize(
+  () => {
+    const stored = settingsStore.ade.panelWidth;
+    const base = stored > 0 ? stored : Math.round(rowWidth.value / 2);
+    return Math.max(MIN_WIDTH, Math.min(maxWidth.value, base));
+  },
+  (w) => void settingsStore.patchSettings({ ade: { panelWidth: Math.round(w) } }),
+);
+const width = pane.size;
 
 const card = computed(() => (ui.selectedTaskId ? (model.value?.cardFor(ui.selectedTaskId) ?? null) : null));
 /** The selected task when it is archived: it left the board and survives in History. */
@@ -43,7 +42,14 @@ const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBran
 </script>
 
 <template>
-  <AdePanelResizeHandle :value="width" :min="MIN_WIDTH" :max="maxWidth" @resize="(w) => (live = w)" @commit="commit" />
+  <ResizeHandle
+    label="Resize panel"
+    data-testid="ade-panel-resize-handle"
+    direction="reverse"
+    :min="MIN_WIDTH"
+    :max="maxWidth"
+    v-bind="pane.bind"
+  />
   <aside
     class="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg"
     :style="{ width: `${width}px` }"

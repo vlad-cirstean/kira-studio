@@ -21,7 +21,8 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
+import { ResizeHandle } from '@theme/components/ui/resizable';
+import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { methodTextClass } from '@theme/methodColor';
@@ -424,12 +425,10 @@ function toggleFieldDescriptions(): void {
 
 // D6: 0 means "the default half" — PanelSplitter itself needs a real pixel size.
 const DEFAULT_REQUEST_PANE_HEIGHT = 260;
-const requestPaneHeight = computed(
+const requestPane = useLiveSize(
   () => props.tab.state.requestPaneHeight || DEFAULT_REQUEST_PANE_HEIGHT,
+  (size) => patchHttpRequestTabState(props.tab.id, { requestPaneHeight: size }),
 );
-function onResizeRequestPane(size: number): void {
-  patchHttpRequestTabState(props.tab.id, { requestPaneHeight: size });
-}
 
 // F15: view.run (⌘Return) and view.refresh (the refresh shortcut) both already route through
 // this per-mounted-view registry with no menu/accelerator change (D13) — they both just trigger
@@ -677,16 +676,11 @@ onUnmounted(() => {
       @close="closeRequestFind"
     />
 
-    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
-      <ResizablePanel
+    <div class="flex flex-1 min-h-0 flex-col">
+      <div
         class="request-pane flex min-h-0 flex-col overflow-hidden"
         data-testid="http-request-pane"
-        size-unit="px"
-        :default-size="requestPaneHeight"
-        :min-size="120"
-        :max-size="800"
-        :order="1"
-        @resize="onResizeRequestPane"
+        :style="{ flex: `0 1 ${requestPane.size.value}px` }"
       >
         <SearchField v-if="fieldFilterOpen && showFieldFilterToggle" v-model="fieldFilterQuery" placeholder="Filter" data-testid="http-field-filter" />
         <QueryParamsTable
@@ -722,17 +716,25 @@ onUnmounted(() => {
           :filter-query="fieldFilterQuery"
           :show-descriptions="tab.state.fieldDescriptions"
         />
-      </ResizablePanel>
+      </div>
 
-      <ResizableHandle class="request-splitter" />
+      <ResizeHandle
+        class="request-splitter"
+        label="Resize request pane"
+        axis="y"
+        line
+        :min="120"
+        :max="800"
+        v-bind="requestPane.bind"
+      />
 
-      <ResizablePanel class="min-h-0" data-testid="http-response-pane-slot" :order="2">
+      <div class="min-h-0 flex-1" data-testid="http-response-pane-slot">
         <ResponsePane :tab="tab" />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      </div>
+    </div>
     <!-- P110 B40: every plain single-selector rule this file had moved onto the template as
          Tailwind utilities. `.url-field` and `.request-pane` stay bare markers —
-         api-ui-consistency.spec.ts selects both directly. `.request-splitter` (ResizableHandle
+         api-ui-consistency.spec.ts selects both directly. `.request-splitter` (ResizeHandle
          below) already carried no rule of its own (P110 B32) — http-request.spec.ts/
          grpc-request.spec.ts poll its box-shadow instead.
          P110 I2-17: this file's own <style> block was comment-only (dead, still triggering an
