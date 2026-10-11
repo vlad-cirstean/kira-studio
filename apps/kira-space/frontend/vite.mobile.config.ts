@@ -22,7 +22,12 @@ export default defineConfig({
       '@workbench': at('../../../packages/workbench/src'),
     },
   },
-  define: { __KIRA_DEBUG_HOOKS__: 'false' },
+  define: {
+    __KIRA_DEBUG_HOOKS__: 'false',
+    __VUE_I18N_FULL_INSTALL__: 'false',
+    __VUE_I18N_LEGACY_API__: 'false',
+    __INTLIFY_PROD_DEVTOOLS__: 'false',
+  },
   build: {
     outDir: at('./dist-mobile'),
     emptyOutDir: true,

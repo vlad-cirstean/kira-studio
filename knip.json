@@ -63,7 +63,9 @@
       // time), knip resolves real cross-workspace `@theme/lib/utils`/`@theme/components/ui/*`
       // usage here fine — no ignore needed.
       "entry": ["src/**/*.{ts,vue}"],
-      "project": ["src/**/*.{ts,vue}"]
+      "project": ["src/**/*.{ts,vue}"],
+      // Typecheck fixture only (P265): `@ts-expect-error` lines, never imported.
+      "ignore": ["src/i18n/types.check.ts"]
     },
     "packages/workbench": {
       // Same alias-boundary reasoning as packages/theme above (`@workbench/*`, P103 Part 1) —

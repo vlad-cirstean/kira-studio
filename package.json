@@ -90,7 +90,9 @@
     "dedup:go": "git ls-files '*.go' | grep -v -e /page/wire/ -e /gitwire/ | go tool dupl -files -t 100"
   },
   "devDependencies": {
+    "@babel/parser": "7.29.8",
     "@biomejs/biome": "2.5.13",
+    "@intlify/message-compiler": "11.4.12",
     "@playwright/test": "1.63.0",
     "@testcontainers/kafka": "12.1.0",
     "@testcontainers/mariadb": "12.1.0",

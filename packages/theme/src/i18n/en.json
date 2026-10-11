@@ -1,0 +1,71 @@
+{
+  "automations": {
+    "module": {
+      "title": "Automations"
+    }
+  },
+  "backend": {
+    "menu": {
+      "edit": {
+        "label": "Edit"
+      }
+    }
+  },
+  "common": {
+    "action": {
+      "cancel": {
+        "label": "Cancel"
+      }
+    }
+  },
+  "docker": {
+    "module": {
+      "title": "Docker"
+    }
+  },
+  "format": {
+    "relative": {
+      "justNow": "just now"
+    }
+  },
+  "git": {
+    "module": {
+      "title": "Git"
+    }
+  },
+  "memory": {
+    "module": {
+      "title": "Memory"
+    }
+  },
+  "mobile": {
+    "module": {
+      "title": "Kira Space"
+    }
+  },
+  "shared": {
+    "module": {
+      "title": "Shared"
+    }
+  },
+  "space": {
+    "module": {
+      "title": "Kira Space"
+    }
+  },
+  "studio": {
+    "module": {
+      "title": "Kira Studio"
+    }
+  },
+  "theme": {
+    "module": {
+      "title": "Theme"
+    }
+  },
+  "workbench": {
+    "module": {
+      "title": "Workbench"
+    }
+  }
+}
