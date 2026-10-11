@@ -9,6 +9,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Label } from '@theme/components/ui/label';
+import { type MessageKey, t } from '@theme/i18n';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
@@ -49,15 +50,15 @@ const { retrying, retry } = useRetryStatus();
 
 const ok = computed(() => status.data.value?.state === 'ok');
 
-const sections = computed<{ id: DockerSection; label: string; count: number }[]>(() => [
-  { id: 'containers', label: 'Containers', count: containers.data.value?.length ?? 0 },
-  { id: 'images', label: 'Images', count: images.data.value?.length ?? 0 },
-  { id: 'volumes', label: 'Volumes', count: volumes.data.value?.length ?? 0 },
-  { id: 'networks', label: 'Networks', count: networks.data.value?.length ?? 0 },
+const sections = computed<{ id: DockerSection; label: MessageKey; count: number }[]>(() => [
+  { id: 'containers', label: 'docker.section.containers.label', count: containers.data.value?.length ?? 0 },
+  { id: 'images', label: 'docker.section.images.label', count: images.data.value?.length ?? 0 },
+  { id: 'volumes', label: 'docker.section.volumes.label', count: volumes.data.value?.length ?? 0 },
+  { id: 'networks', label: 'docker.field.networks.label', count: networks.data.value?.length ?? 0 },
 ]);
 
 const sectionItems = computed(() =>
-  sections.value.map((x) => ({ value: x.id, label: x.label, count: x.count, testid: `docker-section-${x.id}` })),
+  sections.value.map((x) => ({ value: x.id, label: t(x.label), count: x.count, testid: `docker-section-${x.id}` })),
 );
 
 const running = computed(() => (containers.data.value ?? []).filter((c) => c.state === 'running').length);
@@ -86,12 +87,12 @@ async function refresh(): Promise<void> {
 <template>
   <div ref="rootEl" class="flex h-full flex-col" data-testid="docker-panel">
     <PanelHeader>
-      Docker
+      {{ t('docker.module.title') }}
       <EndpointChip />
       <template #actions>
         <TooltipIconButton
           icon="search"
-          :label="showSearch ? 'Hide search' : 'Search'"
+          :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
           :pressed="showSearch"
           :disabled="!ok"
           data-testid="toggle-search"
@@ -99,12 +100,12 @@ async function refresh(): Promise<void> {
         />
         <TooltipIconButton
           icon="dashboard"
-          label="Engine overview"
+          :label="t('docker.panel.engineOverview.tooltip')"
           :disabled="!ok || !ui.selection"
           data-testid="docker-overview-home"
           @click="ui.select(null)"
         />
-        <TooltipIconButton icon="refresh" label="Refresh" data-testid="docker-refresh" :disabled="refreshing" @click="refresh" />
+        <TooltipIconButton icon="refresh" :label="t('common.action.refresh.label')" data-testid="docker-refresh" :disabled="refreshing" @click="refresh" />
       </template>
     </PanelHeader>
     <PanelBar v-if="ok && showSearch">
@@ -115,7 +116,7 @@ async function refresh(): Promise<void> {
         <SecondaryTabs
           :model-value="ui.section"
           :items="sectionItems"
-          aria-label="Docker resources"
+          :aria-label="t('docker.panel.sections.aria')"
           @update:model-value="(v) => ui.setSection(v as DockerSection)"
         >
           <template #item="{ item }">
@@ -129,8 +130,8 @@ async function refresh(): Promise<void> {
         class="flex h-control shrink-0 cursor-default items-center gap-1.5 border-b border-border px-1.5 text-kira-sm text-muted-foreground"
       >
         <Checkbox id="docker-show-stopped" v-model="ui.showStopped" data-testid="docker-show-stopped" />
-        <Label for="docker-show-stopped" class="cursor-default">Show stopped</Label>
-        <span class="ml-auto" data-testid="docker-summary">{{ running }} running<template v-if="stopped"> · {{ stopped }} stopped</template></span>
+        <Label for="docker-show-stopped" class="cursor-default">{{ t('docker.panel.showStopped.label') }}</Label>
+        <span class="ml-auto" data-testid="docker-summary">{{ stopped ? t('docker.panel.summaryStopped.label', { running, stopped }) : t('docker.panel.summary.label', { running }) }}</span>
       </div>
       <ContainerList v-if="ui.section === 'containers'" />
       <ImageList v-else-if="ui.section === 'images'" />
@@ -143,10 +144,10 @@ async function refresh(): Promise<void> {
           <CodiconIcon v-if="status.data.value" name="debug-disconnect" :size="24" class="text-error" />
           <Spinner v-else :size="24" label="" />
         </EmptyMedia>
-        <EmptyTitle>{{ status.data.value ? 'Docker unavailable' : 'Connecting…' }}</EmptyTitle>
-        <EmptyDescription v-if="status.data.value">Details are in the main pane.</EmptyDescription>
+        <EmptyTitle>{{ status.data.value ? t('docker.panel.unavailable.title') : t('docker.panel.connecting.loading') }}</EmptyTitle>
+        <EmptyDescription v-if="status.data.value">{{ t('docker.panel.unavailable.description') }}</EmptyDescription>
       </EmptyHeader>
-      <Button v-if="status.data.value" size="kira" variant="toolbar" :disabled="retrying" @click="retry">Retry</Button>
+      <Button v-if="status.data.value" size="kira" variant="toolbar" :disabled="retrying" @click="retry">{{ t('common.action.retry.label') }}</Button>
     </Empty>
   </div>
 </template>

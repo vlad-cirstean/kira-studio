@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Skeleton } from '@theme/components/ui/skeleton';
 import { Tabs, TabsContent } from '@theme/components/ui/tabs';
+import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 import { useDocker } from '../context';
 import { fieldErrors, hasNowChanges, inPlaceForApply } from '../lib/editDiff';
@@ -35,10 +36,10 @@ const update = useUpdateContainer();
 const recreate = useRecreateContainer();
 const confirming = ref(false);
 const tab = ref<'inPlace' | 'recreate'>('inPlace');
-const EDIT_TABS = [
-  { value: 'inPlace', label: 'In place', testid: 'docker-edit-tab-inplace' },
-  { value: 'recreate', label: 'Recreate', testid: 'docker-edit-tab-recreate' },
-];
+const EDIT_TABS = computed(() => [
+  { value: 'inPlace', label: t('docker.edit.tab.inPlace.label'), testid: 'docker-edit-tab-inplace' },
+  { value: 'recreate', label: t('docker.edit.tab.recreate.label'), testid: 'docker-edit-tab-recreate' },
+]);
 
 watch(
   () => specQuery.data.value,
@@ -125,20 +126,22 @@ async function reload(): Promise<void> {
   if (fresh) store.ensure(fresh);
 }
 
+const orchestratorName = computed(() => (base.value?.managed === 'kubernetes' ? 'Kubernetes' : 'Swarm'));
+
 const originNotice = computed(() => {
   const b = base.value;
   if (!b) return '';
   switch (b.origin) {
     case 'compose':
-      return `Managed by Compose project ${b.originName}. Edits here are not written to the compose file; the next docker compose up may revert them. A recreate makes Compose see a different container.`;
+      return t('docker.edit.origin.compose.body', { tool: 'Compose', name: b.originName });
     case 'devcontainer':
-      return `Dev container for ${b.originName}. The editor that created it may recreate it and drop these edits.`;
+      return t('docker.edit.origin.devcontainer.body', { name: b.originName });
     case 'kind':
-      return `Node of kind cluster ${b.originName}. Recreating it can break the cluster.`;
+      return t('docker.edit.origin.kind.body', { name: b.originName });
     case 'testcontainers':
-      return 'Created by Testcontainers. Its session reaper still owns this container and removes it when the session ends.';
+      return t('docker.edit.origin.testcontainers.body', { tool: 'Testcontainers' });
     case 'buildx':
-      return `Buildx builder ${b.originName}. Builds may recreate it.`;
+      return t('docker.edit.origin.buildx.body', { tool: 'Buildx', name: b.originName });
     default:
       return '';
   }
@@ -154,7 +157,7 @@ const originNotice = computed(() => {
     <div v-else class="flex flex-col gap-3">
       <Alert v-if="base.managed" variant="warn" data-testid="docker-edit-managed">
         <AlertDescription>
-          This container is managed by {{ base.managed === 'kubernetes' ? 'Kubernetes' : 'Swarm' }}. Edit the workload instead; the orchestrator replaces edited containers.
+          {{ t('docker.edit.managed.body', { orchestrator: orchestratorName }) }}
         </AlertDescription>
       </Alert>
       <Alert v-if="originNotice" variant="info" data-testid="docker-edit-origin">
@@ -165,20 +168,20 @@ const originNotice = computed(() => {
         </AlertDescription>
       </Alert>
       <Alert v-if="base.autoRemove" variant="info" data-testid="docker-edit-autoremove">
-        <AlertDescription>Auto-remove container: it cannot be recreated, and its restart policy cannot change.</AlertDescription>
+        <AlertDescription>{{ t('docker.edit.autoRemove.body') }}</AlertDescription>
       </Alert>
       <Alert v-if="draft.stale" variant="warn" data-testid="docker-edit-stale">
         <AlertDescription>
           <div class="flex items-center gap-2">
-            The container changed since the editor loaded.
-            <Button size="kira" variant="toolbar" data-testid="docker-edit-reload" @click="reload">Reload</Button>
+            {{ t('docker.edit.stale.body') }}
+            <Button size="kira" variant="toolbar" data-testid="docker-edit-reload" @click="reload">{{ t('common.action.refresh.label') }}</Button>
           </div>
         </AlertDescription>
       </Alert>
       <Alert v-if="failure" variant="error" data-testid="docker-edit-error">
         <AlertDescription>
           {{ failure.message }}
-          <template v-if="failure.code === 'E_RECREATE_FAILED' && failure.restored"> The original container was restored.</template>
+          <template v-if="failure.code === 'E_RECREATE_FAILED' && failure.restored"> {{ t('docker.edit.restored.body') }}</template>
         </AlertDescription>
       </Alert>
       <Alert v-if="outcome?.warnings.length" variant="warn" data-testid="docker-edit-warnings">
@@ -187,7 +190,7 @@ const originNotice = computed(() => {
         </AlertDescription>
       </Alert>
 
-      <DetailSection v-if="changes.length" title="Pending changes">
+      <DetailSection v-if="changes.length" :title="t('docker.edit.pending.title')">
         <EditPendingSummary :changes="changes" />
       </DetailSection>
 
@@ -195,7 +198,7 @@ const originNotice = computed(() => {
         <SecondaryTabs
           :model-value="tab"
           :items="EDIT_TABS"
-          aria-label="Edit mode"
+          :aria-label="t('docker.edit.mode.aria')"
           @update:model-value="(v) => (tab = v as typeof tab)"
         >
           <template #item="{ item }">
@@ -211,9 +214,9 @@ const originNotice = computed(() => {
         <TabsContent value="inPlace" class="flex flex-col gap-3" data-testid="docker-edit-section-inplace">
           <EditInPlaceSection :draft="draft" :errors="errors" :disabled="readOnly || !!applying" :network-locked="networkLocked" :engine-cpus="engineCpus" :all-networks="allNetworks" />
           <div class="flex items-center justify-end gap-1">
-            <TooltipIconButton icon="discard" label="Reset" :disabled="!inPlaceCount" data-testid="docker-edit-reset-inplace" @click="store.reset(containerId, 'inPlace')" />
+            <TooltipIconButton icon="discard" :label="t('common.action.reset.label')" :disabled="!inPlaceCount" data-testid="docker-edit-reset-inplace" @click="store.reset(containerId, 'inPlace')" />
             <Button v-if="!readOnly" size="kira" variant="toolbar" :disabled="!canApplyNow" data-testid="docker-edit-apply-now" @click="applyNow">
-              <Spinner v-if="applying === 'inPlace'" label="" />Apply
+              <Spinner v-if="applying === 'inPlace'" label="" />{{ t('common.action.apply.label') }}
             </Button>
           </div>
         </TabsContent>
@@ -221,9 +224,9 @@ const originNotice = computed(() => {
         <TabsContent value="recreate" class="flex flex-col gap-3" data-testid="docker-edit-section-recreate">
           <EditRecreateSection :draft="draft" :errors="errors" :disabled="readOnly || !!applying" :preserved="base.preserved" />
           <div class="flex items-center justify-end gap-1">
-            <TooltipIconButton icon="discard" label="Reset" :disabled="!recreateCount" data-testid="docker-edit-reset-recreate" @click="store.reset(containerId, 'recreate')" />
+            <TooltipIconButton icon="discard" :label="t('common.action.reset.label')" :disabled="!recreateCount" data-testid="docker-edit-reset-recreate" @click="store.reset(containerId, 'recreate')" />
             <Button v-if="!readOnly" size="kira" variant="toolbar" :disabled="!canRecreate" data-testid="docker-edit-apply-recreate" @click="confirming = true">
-              <Spinner v-if="applying === 'recreate'" label="" />Recreate…
+              <Spinner v-if="applying === 'recreate'" label="" />{{ t('docker.edit.recreate.label') }}
             </Button>
           </div>
         </TabsContent>

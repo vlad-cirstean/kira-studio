@@ -9,6 +9,7 @@ import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { FieldError } from '@theme/components/ui/field';
 import { Skeleton } from '@theme/components/ui/skeleton';
+import { type MessageKey, t } from '@theme/i18n';
 import { copyText } from '@workbench/behaviour/clipboard';
 import { formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
@@ -47,22 +48,22 @@ const live = computed(() => (running.value ? stats.latest.get(props.containerId)
 const recreating = computed(() => edits.applying[props.containerId] === 'recreate');
 const busy = computed(() => actions.isBusy(props.containerId) || edits.applying[props.containerId] !== undefined);
 
-const TABS: ReadonlyArray<{ id: DockerDetailTab; label: string; icon: string; needsRunning: boolean }> = [
-  { id: 'overview', label: 'Overview', icon: 'info', needsRunning: false },
-  { id: 'logs', label: 'Logs', icon: 'output', needsRunning: false },
-  { id: 'terminal', label: 'Terminal', icon: 'terminal', needsRunning: true },
-  { id: 'stats', label: 'Stats', icon: 'graph', needsRunning: false },
-  { id: 'inspect', label: 'Inspect', icon: 'json', needsRunning: false },
-  { id: 'edit', label: 'Edit', icon: 'edit', needsRunning: false },
+const TABS: ReadonlyArray<{ id: DockerDetailTab; label: MessageKey; icon: string; needsRunning: boolean }> = [
+  { id: 'overview', label: 'docker.tab.overview.label', icon: 'info', needsRunning: false },
+  { id: 'logs', label: 'docker.tab.logs.label', icon: 'output', needsRunning: false },
+  { id: 'terminal', label: 'common.module.terminal.label', icon: 'terminal', needsRunning: true },
+  { id: 'stats', label: 'docker.tab.stats.label', icon: 'graph', needsRunning: false },
+  { id: 'inspect', label: 'docker.tab.inspect.label', icon: 'json', needsRunning: false },
+  { id: 'edit', label: 'common.action.edit.label', icon: 'edit', needsRunning: false },
 ];
 
 const tabItems = computed(() =>
-  TABS.map((t) => ({
-    value: t.id,
-    label: t.label,
-    icon: t.icon,
-    disabled: t.needsRunning && !running.value,
-    testid: `docker-tab-${t.id}`,
+  TABS.map((tab) => ({
+    value: tab.id,
+    label: t(tab.label),
+    icon: tab.icon,
+    disabled: tab.needsRunning && !running.value,
+    testid: `docker-tab-${tab.id}`,
   })),
 );
 
@@ -104,17 +105,17 @@ function act(action: 'start' | 'stop' | 'restart'): void {
 <template>
   <div class="flex h-full flex-col" data-testid="docker-container-detail">
     <div v-if="recreating" class="flex items-center gap-2 p-4 text-muted-foreground" data-testid="docker-detail-recreating">
-      <Spinner label="" />Recreating…
+      <Spinner label="" />{{ t('docker.detail.recreating.loading') }}
     </div>
     <QueryState v-else :query="detail" :is-empty="() => false">
     <template #error>
       <Empty class="h-full" data-testid="docker-detail-error">
         <EmptyHeader>
           <EmptyMedia><CodiconIcon name="warning" :size="24" class="text-warn" /></EmptyMedia>
-          <EmptyTitle>Container not found</EmptyTitle>
-          <EmptyDescription>It was removed, or the engine changed.</EmptyDescription>
+          <EmptyTitle>{{ t('docker.detail.notFound.title') }}</EmptyTitle>
+          <EmptyDescription>{{ t('docker.detail.notFound.description') }}</EmptyDescription>
         </EmptyHeader>
-        <Button size="kira" variant="toolbar" @click="ui.select(null)">Back to overview</Button>
+        <Button size="kira" variant="toolbar" @click="ui.select(null)">{{ t('docker.detail.backToOverview.label') }}</Button>
       </Empty>
     </template>
     <template #loading>
@@ -131,13 +132,13 @@ function act(action: 'start' | 'stop' | 'restart'): void {
           <Badge :variant="stateVariant" data-testid="docker-detail-state">{{ c.state }}</Badge>
           <span class="ml-auto flex shrink-0 items-center gap-1">
             <Button size="kira" variant="toolbar" :disabled="busy || running" data-testid="docker-action-start" @click="act('start')">
-              <CodiconIcon name="play" :size="12" class="text-ok" />Start
+              <CodiconIcon name="play" :size="12" class="text-ok" />{{ t('common.action.start.label') }}
             </Button>
             <Button size="kira" variant="toolbar" :disabled="busy || !running" data-testid="docker-action-stop" @click="act('stop')">
-              <CodiconIcon name="debug-stop" :size="12" class="text-error" />Stop
+              <CodiconIcon name="debug-stop" :size="12" class="text-error" />{{ t('common.action.stop.label') }}
             </Button>
             <Button size="kira" variant="toolbar" :disabled="busy || !running" data-testid="docker-action-restart" @click="act('restart')">
-              <CodiconIcon name="debug-restart" :size="12" />Restart
+              <CodiconIcon name="debug-restart" :size="12" />{{ t('docker.action.restart.label') }}
             </Button>
           </span>
         </div>
@@ -146,23 +147,23 @@ function act(action: 'start' | 'stop' | 'restart'): void {
           <TooltipIconButton
             v-if="registryUrl"
             icon="link-external"
-            label="Open in registry"
+            :label="t('docker.detail.openRegistry.tooltip')"
             data-testid="docker-detail-registry"
             @click="openRegistry(registryUrl)"
           />
           <span class="inline-flex items-center gap-0.5 font-data" data-testid="docker-detail-id">
             {{ shortId(c.id) }}
-            <TooltipIconButton icon="copy" label="Copy ID" @click="copyText(c.id)" />
+            <TooltipIconButton icon="copy" :label="t('common.action.copyId.label')" @click="copyText(c.id)" />
           </span>
           <span v-if="c.status">{{ c.status }}</span>
           <span v-for="p in publishedPorts(c.ports)" :key="p" class="font-data" data-testid="docker-detail-port">:{{ p }}</span>
           <span v-if="live" class="ml-auto flex items-center gap-3" data-testid="docker-detail-live">
             <span class="flex w-28 items-center gap-1.5">
-              CPU <span class="font-data text-fg">{{ formatPercent(live.cpuPercent) }}</span>
+              {{ t('docker.metric.cpu.label') }} <span class="font-data text-fg">{{ formatPercent(live.cpuPercent) }}</span>
               <UsageBar :percent="live.cpuPercent" class="flex-1" />
             </span>
             <span class="flex w-32 items-center gap-1.5">
-              RAM <span class="font-data text-fg">{{ formatBytes(live.memUsage) }}</span>
+              {{ t('docker.metric.ram.label') }} <span class="font-data text-fg">{{ formatBytes(live.memUsage) }}</span>
               <UsageBar :percent="live.memPercent" class="flex-1" />
             </span>
           </span>
@@ -175,7 +176,7 @@ function act(action: 'start' | 'stop' | 'restart'): void {
         <SecondaryTabs
           :model-value="ui.detailTab"
           :items="tabItems"
-          aria-label="Container sections"
+          :aria-label="t('docker.detail.sections.aria')"
           @update:model-value="(v) => (ui.detailTab = v as DockerDetailTab)"
         />
       </ViewToolbar>

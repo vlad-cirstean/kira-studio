@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import { CatalogText, t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { PendingChange } from '../lib/editDiff';
 
 const props = defineProps<{ changes: PendingChange[] }>();
 
 const groups = computed(() => [
-  { mode: 'now' as const, title: 'Applies now', rows: props.changes.filter((c) => c.mode === 'now') },
-  { mode: 'recreate' as const, title: 'Recreates container', rows: props.changes.filter((c) => c.mode === 'recreate') },
+  { mode: 'now' as const, title: t('docker.edit.appliesNow.title'), rows: props.changes.filter((c) => c.mode === 'now') },
+  { mode: 'recreate' as const, title: t('docker.edit.recreates.title'), rows: props.changes.filter((c) => c.mode === 'recreate') },
 ]);
 </script>
 
@@ -23,7 +24,9 @@ const groups = computed(() => [
           :data-mode="c.mode"
           :data-field="c.field"
         >
-          {{ c.label }}: <span class="text-muted-foreground">{{ c.from }}</span> -> {{ c.to }}
+          <CatalogText k="docker.edit.change.label" :params="{ label: c.label, to: c.to }">
+            <template #from><span class="text-muted-foreground">{{ c.from }}</span></template>
+          </CatalogText>
         </div>
       </div>
     </template>

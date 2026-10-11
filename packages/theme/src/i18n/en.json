@@ -675,8 +675,438 @@
     }
   },
   "docker": {
+    "action": {
+      "restart": {
+        "label": "Restart"
+      }
+    },
+    "container": {
+      "noMatches": {
+        "emptyHint": "No container matches the search."
+      },
+      "none": {
+        "empty": "No containers yet",
+        "emptyHint": "Start one with docker run or docker compose up."
+      },
+      "noRunning": {
+        "empty": "No running containers",
+        "emptyHint": "Turn on the show stopped option to list exited ones."
+      }
+    },
+    "detail": {
+      "backToOverview": {
+        "label": "Back to overview"
+      },
+      "notFound": {
+        "description": "It was removed, or the engine changed.",
+        "title": "Container not found"
+      },
+      "openRegistry": {
+        "tooltip": "Open in registry"
+      },
+      "recreating": {
+        "loading": "Recreating…"
+      },
+      "sections": {
+        "aria": "Container sections"
+      }
+    },
+    "disk": {
+      "buildCache": {
+        "label": "Build cache"
+      },
+      "countActive": {
+        "label": "Count (active)"
+      },
+      "measure": {
+        "tooltip": "Measure disk usage"
+      },
+      "more": {
+        "label": "Plus {count} more"
+      },
+      "notMeasured": {
+        "body": "Not measured. Measuring scans the engine’s storage and can take a while."
+      },
+      "reclaimable": {
+        "label": "Reclaimable"
+      },
+      "title": "Disk",
+      "usedByDocker": {
+        "label": "Used by Docker"
+      },
+      "volumesBySize": {
+        "label": "Volumes by size"
+      }
+    },
+    "edit": {
+      "addCap": {
+        "label": "Add capability"
+      },
+      "addLabel": {
+        "label": "Add label"
+      },
+      "addMount": {
+        "label": "Add mount"
+      },
+      "addPort": {
+        "label": "Add port"
+      },
+      "addVariable": {
+        "label": "Add variable"
+      },
+      "aliases": {
+        "placeholder": "Aliases, comma separated"
+      },
+      "aliasesChange": {
+        "hint": "Changing aliases briefly disconnects that network."
+      },
+      "appliesNow": {
+        "title": "Applies now"
+      },
+      "attach": {
+        "label": "Attach"
+      },
+      "attachNetwork": {
+        "option": "Attach to network…"
+      },
+      "autoRemove": {
+        "body": "This is an auto-remove container. It can’t be recreated, and its restart policy can’t change."
+      },
+      "blkio": {
+        "label": "IO weight (block devices)"
+      },
+      "capAdd": {
+        "example": "NET_ADMIN",
+        "label": "Add capabilities"
+      },
+      "capDrop": {
+        "example": "MKNOD",
+        "label": "Drop capabilities"
+      },
+      "change": {
+        "label": "{label}: {from} -> {to}"
+      },
+      "changed": {
+        "status": "Changed"
+      },
+      "command": {
+        "label": "Command (one argument per line)"
+      },
+      "containerPort": {
+        "placeholder": "Container"
+      },
+      "cpuPeriod": {
+        "label": "CPU period (µs)"
+      },
+      "cpuQuota": {
+        "label": "CPU quota (µs per period)"
+      },
+      "cpuShares": {
+        "label": "CPU shares"
+      },
+      "cpus": {
+        "label": "CPUs"
+      },
+      "cpuset": {
+        "label": "Allowed CPU cores"
+      },
+      "cpusetCpus": {
+        "example": "0-2"
+      },
+      "cpusetMems": {
+        "example": "0",
+        "label": "Cpuset memory nodes"
+      },
+      "detach": {
+        "tooltip": "Detach"
+      },
+      "dropCap": {
+        "label": "Drop capability"
+      },
+      "engineCpus": {
+        "hint": "The engine has {count} CPU core. | The engine has {count} CPU cores."
+      },
+      "engineCpuset": {
+        "hint": "The engine has {count} CPU core (0-{last}). | The engine has {count} CPU cores (0-{last})."
+      },
+      "entrypoint": {
+        "label": "Entrypoint (one argument per line)"
+      },
+      "envKey": {
+        "example": "NODE_ENV"
+      },
+      "hostIp": {
+        "placeholder": "Host IP"
+      },
+      "hostname": {
+        "hint": "Empty uses the container ID.",
+        "label": "Hostname"
+      },
+      "hostPort": {
+        "placeholder": "Host port"
+      },
+      "imageDefault": {
+        "placeholder": "Image default"
+      },
+      "imagePresent": {
+        "hint": "The image must already be present locally."
+      },
+      "managed": {
+        "body": "This container is managed by {orchestrator}. Edit the workload instead. The orchestrator replaces edited containers."
+      },
+      "memoryReservation": {
+        "label": "Memory reservation"
+      },
+      "mode": {
+        "aria": "Edit mode"
+      },
+      "mountSource": {
+        "placeholder": "Volume name or host path"
+      },
+      "mountTarget": {
+        "example": "/path/in/container"
+      },
+      "needsRecreate": {
+        "hint": "This change needs a recreate."
+      },
+      "networkLocked": {
+        "hint": "Networks can’t change in this network mode."
+      },
+      "noLimit": {
+        "placeholder": "No limit"
+      },
+      "origin": {
+        "buildx": {
+          "body": "{tool} builder {name}. Builds may recreate it."
+        },
+        "compose": {
+          "body": "Managed by {tool} project {name}. Edits here are not written to the compose file. The next docker compose up may revert them. A recreate makes {tool} see a different container."
+        },
+        "devcontainer": {
+          "body": "Dev container for {name}. The editor that created it may recreate it and drop these edits."
+        },
+        "kind": {
+          "body": "Node of kind cluster {name}. Recreating it can break the cluster."
+        },
+        "testcontainers": {
+          "body": "Created by {tool}. Its session reaper still owns this container and removes it when the session ends."
+        }
+      },
+      "pending": {
+        "title": "Pending changes"
+      },
+      "pids": {
+        "label": "PIDs limit"
+      },
+      "preserved": {
+        "label": "Kept as is"
+      },
+      "readOnlyShort": {
+        "example": "ro"
+      },
+      "recreate": {
+        "label": "Recreate…"
+      },
+      "recreates": {
+        "title": "Recreates container"
+      },
+      "restored": {
+        "body": "The original container was restored."
+      },
+      "retries": {
+        "placeholder": "Retries"
+      },
+      "stale": {
+        "body": "The container changed since the editor loaded."
+      },
+      "staticAddress": {
+        "tooltip": "Static address, kept as is"
+      },
+      "swap": {
+        "hint": "Swap limits need swap accounting. Some engines ignore them with a warning.",
+        "label": "Swap (memory + swap)"
+      },
+      "tab": {
+        "inPlace": {
+          "label": "In place"
+        },
+        "recreate": {
+          "label": "Needs recreate"
+        }
+      },
+      "unlimited": {
+        "label": "Unlimited"
+      }
+    },
+    "endpoint": {
+      "automatic": {
+        "option": "Automatic"
+      },
+      "chip": {
+        "aria": "Docker endpoint {context}"
+      },
+      "insecure": {
+        "tooltip": "Unencrypted connection"
+      }
+    },
+    "env": {
+      "hideValue": {
+        "tooltip": "Hide value"
+      },
+      "revealValue": {
+        "tooltip": "Reveal value"
+      }
+    },
+    "field": {
+      "created": {
+        "label": "Created"
+      },
+      "entrypoint": {
+        "label": "Entrypoint"
+      },
+      "env": {
+        "label": "Environment"
+      },
+      "exitCode": {
+        "label": "Exit code"
+      },
+      "finished": {
+        "label": "Finished"
+      },
+      "health": {
+        "label": "Health"
+      },
+      "image": {
+        "label": "Image"
+      },
+      "labels": {
+        "label": "Labels"
+      },
+      "mounts": {
+        "label": "Mounts"
+      },
+      "networks": {
+        "label": "Networks"
+      },
+      "ports": {
+        "label": "Ports"
+      },
+      "restartPolicy": {
+        "label": "Restart policy"
+      },
+      "size": {
+        "label": "Size"
+      },
+      "started": {
+        "label": "Started"
+      },
+      "user": {
+        "label": "User"
+      },
+      "workingFolder": {
+        "label": "Working folder"
+      }
+    },
+    "measure": {
+      "label": "Measure"
+    },
+    "measuring": {
+      "loading": "Measuring…"
+    },
+    "metric": {
+      "cpu": {
+        "label": "CPU"
+      },
+      "ram": {
+        "label": "RAM"
+      }
+    },
     "module": {
       "title": "Docker"
+    },
+    "mount": {
+      "readOnly": {
+        "label": "{type}, read-only"
+      }
+    },
+    "overview": {
+      "bare": {
+        "emptyHint": "No ports, networks or mounts."
+      }
+    },
+    "panel": {
+      "connecting": {
+        "loading": "Connecting…"
+      },
+      "engineOverview": {
+        "tooltip": "Engine overview"
+      },
+      "sections": {
+        "aria": "Docker resources"
+      },
+      "showStopped": {
+        "label": "Show stopped"
+      },
+      "summary": {
+        "label": "{running} running"
+      },
+      "summaryStopped": {
+        "label": "{running} running · {stopped} stopped"
+      },
+      "unavailable": {
+        "description": "Details are in the main pane.",
+        "title": "Docker unavailable"
+      }
+    },
+    "section": {
+      "containers": {
+        "label": "Containers"
+      },
+      "details": {
+        "title": "Details"
+      },
+      "images": {
+        "label": "Images"
+      },
+      "volumes": {
+        "label": "Volumes"
+      }
+    },
+    "size": {
+      "measure": {
+        "tooltip": "Measure size"
+      },
+      "notMeasured": {
+        "body": "Not measured. Measuring walks the container’s filesystem and can take a while."
+      },
+      "total": {
+        "label": "Total (with image)"
+      },
+      "writableLayer": {
+        "label": "Writable layer"
+      }
+    },
+    "tab": {
+      "inspect": {
+        "label": "Inspect"
+      },
+      "logs": {
+        "label": "Logs"
+      },
+      "overview": {
+        "label": "Overview"
+      },
+      "stats": {
+        "label": "Stats"
+      }
+    },
+    "unit": {
+      "gib": {
+        "option": "GiB"
+      },
+      "mib": {
+        "option": "MiB"
+      }
     }
   },
   "format": {

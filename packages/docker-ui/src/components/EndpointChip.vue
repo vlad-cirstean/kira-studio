@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useDocker } from '../context';
 import { useDockerStatus } from '../queries';
@@ -50,7 +51,7 @@ async function onSelect(value: unknown): Promise<void> {
         size="kira"
         class="h-control-sm min-w-0 gap-1 px-1 normal-case tracking-normal text-kira-sm font-normal text-fg"
         data-testid="docker-endpoint-chip"
-        :aria-label="`Docker endpoint ${endpoint?.context ?? ''}`"
+        :aria-label="t('docker.endpoint.chip.aria', { context: endpoint?.context ?? '' })"
       >
         <StatusDot
           :tone="ok ? 'ok' : 'error'"
@@ -64,7 +65,7 @@ async function onSelect(value: unknown): Promise<void> {
     <DropdownMenuContent align="start" data-testid="docker-context-menu">
       <DropdownMenuRadioGroup :model-value="selected" @update:model-value="onSelect">
         <DropdownMenuRadioItem :value="AUTOMATIC" class="h-auto min-h-control py-1" data-testid="docker-context-automatic">
-          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Automatic</span>
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ t('docker.endpoint.automatic.option') }}</span>
           <template #indicator-icon><CodiconIcon name="check" :size="13" /></template>
         </DropdownMenuRadioItem>
         <DropdownMenuSeparator />
@@ -88,10 +89,10 @@ async function onSelect(value: unknown): Promise<void> {
   <Tooltip v-if="endpoint && !endpoint.secure">
     <TooltipTrigger as-child>
       <span class="flex items-center text-warn" data-testid="docker-insecure">
-        <span class="sr-only">Unencrypted connection</span>
+        <span class="sr-only">{{ t('docker.endpoint.insecure.tooltip') }}</span>
         <CodiconIcon name="warning" :size="12" />
       </span>
     </TooltipTrigger>
-    <TooltipContent>Unencrypted connection</TooltipContent>
+    <TooltipContent>{{ t('docker.endpoint.insecure.tooltip') }}</TooltipContent>
   </Tooltip>
 </template>

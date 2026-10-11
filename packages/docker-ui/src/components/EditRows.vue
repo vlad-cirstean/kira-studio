@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 
 defineProps<{ items: T[]; addLabel: string; disabled?: boolean; testid: string }>();
 const emit = defineEmits<{ add: []; remove: [index: number] }>();
@@ -14,7 +15,7 @@ const emit = defineEmits<{ add: []; remove: [index: number] }>();
       </div>
       <TooltipIconButton
         icon="trash"
-        label="Remove"
+        :label="t('common.action.remove.label')"
         :disabled="disabled"
         data-testid="docker-edit-row-remove"
         @click="emit('remove', index)"

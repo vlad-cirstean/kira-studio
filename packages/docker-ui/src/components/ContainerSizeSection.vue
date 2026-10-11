@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { formatBytes, formatDateTime, useRelativeTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useContainerSize } from '../queries';
@@ -20,7 +21,7 @@ const ago = useRelativeTime(takenAt);
 </script>
 
 <template>
-  <DetailSection title="Size">
+  <DetailSection :title="t('docker.field.size.label')">
     <template #actions>
       <span class="ml-auto flex items-center gap-1 normal-case tracking-normal">
         <Tooltip v-if="size">
@@ -31,7 +32,7 @@ const ago = useRelativeTime(takenAt);
         </Tooltip>
         <TooltipIconButton
           icon="refresh"
-          label="Measure size"
+          :label="t('docker.size.measure.tooltip')"
           :disabled="measuring"
           data-testid="docker-size-refresh"
           @click="refresh"
@@ -42,16 +43,16 @@ const ago = useRelativeTime(takenAt);
     <FieldError v-if="query.error.value" class="mb-2" data-testid="docker-size-error">{{ query.error.value.message }}</FieldError>
 
     <div v-if="measuring && !size" class="flex items-center gap-2 text-muted-foreground">
-      <Spinner label="" />Measuring…
+      <Spinner label="" />{{ t('docker.measuring.loading') }}
     </div>
     <div v-else-if="!size" class="flex flex-wrap items-center gap-3 text-muted-foreground">
-      <span>Not measured. Measuring walks the container's filesystem and can take a while.</span>
-      <Button size="kira" variant="toolbar" data-testid="docker-size-measure" @click="refresh">Measure</Button>
+      <span>{{ t('docker.size.notMeasured.body') }}</span>
+      <Button size="kira" variant="toolbar" data-testid="docker-size-measure" @click="refresh">{{ t('docker.measure.label') }}</Button>
     </div>
     <dl v-else class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-      <dt class="text-muted-foreground">Writable layer</dt>
+      <dt class="text-muted-foreground">{{ t('docker.size.writableLayer.label') }}</dt>
       <dd class="font-data" data-testid="docker-size-rw">{{ formatBytes(size.sizeRw) }}</dd>
-      <dt class="text-muted-foreground">Total (with image)</dt>
+      <dt class="text-muted-foreground">{{ t('docker.size.total.label') }}</dt>
       <dd class="font-data" data-testid="docker-size-rootfs">{{ formatBytes(size.sizeRootFs) }}</dd>
     </dl>
   </DetailSection>

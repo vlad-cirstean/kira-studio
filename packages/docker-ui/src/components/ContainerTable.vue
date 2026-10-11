@@ -3,6 +3,7 @@ import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/components/ui/table';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { displayValue, formatBytes, formatPercent } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
@@ -57,16 +58,16 @@ const nav = useListNavigation<DockerContainer>({
 <template>
   <QueryState :query="containers" :is-empty="() => rows.length === 0">
     <template #empty>
-      <ListState icon="server" title="No containers yet" hint="Start one with docker run or docker compose up." />
+      <ListState icon="server" :title="t('docker.container.none.empty')" :hint="t('docker.container.none.emptyHint')" />
     </template>
   <div ref="tableEl" class="@container" role="listbox" data-testid="docker-table">
     <div :class="cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-x-3 px-3', COLUMNS)">
       <span />
-      <span>Name</span>
-      <span class="hidden @4xl:block">Image</span>
-      <span class="hidden @4xl:block">Ports</span>
-      <span class="text-right">CPU</span>
-      <span class="text-right">Memory</span>
+      <span>{{ t('common.field.name.label') }}</span>
+      <span class="hidden @4xl:block">{{ t('docker.field.image.label') }}</span>
+      <span class="hidden @4xl:block">{{ t('docker.field.ports.label') }}</span>
+      <span class="text-right">{{ t('docker.metric.cpu.label') }}</span>
+      <span class="text-right">{{ t('common.module.memory.label') }}</span>
       <span />
     </div>
     <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
@@ -111,9 +112,9 @@ const nav = useListNavigation<DockerContainer>({
       <span class="flex items-center justify-end">
         <Spinner v-if="actions.isBusy(c.id)" label="" />
         <span v-else class="invisible flex group-hover/row:visible group-focus-within/row:visible">
-          <TooltipIconButton icon="output" label="Logs" @click.stop="open(c, 'logs')" />
-          <TooltipIconButton v-if="c.state === 'running'" icon="debug-stop" label="Stop" class="text-error hover:text-error" data-testid="docker-table-stop" @click.stop="act(c, 'stop')" />
-          <TooltipIconButton v-else icon="play" label="Start" class="text-ok hover:text-ok" data-testid="docker-table-start" @click.stop="act(c, 'start')" />
+          <TooltipIconButton icon="output" :label="t('docker.tab.logs.label')" @click.stop="open(c, 'logs')" />
+          <TooltipIconButton v-if="c.state === 'running'" icon="debug-stop" :label="t('common.action.stop.label')" class="text-error hover:text-error" data-testid="docker-table-stop" @click.stop="act(c, 'stop')" />
+          <TooltipIconButton v-else icon="play" :label="t('common.action.start.label')" class="text-ok hover:text-ok" data-testid="docker-table-start" @click.stop="act(c, 'start')" />
         </span>
       </span>
     </div>

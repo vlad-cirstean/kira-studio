@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { displayValue, formatBytes, formatDateTime, useRelativeTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import { useEngineDiskUsage } from '../queries';
@@ -22,10 +23,10 @@ const categories = computed(() => {
   const u = usage.value;
   if (!u) return [];
   return [
-    { key: 'images', label: 'Images', c: u.images },
-    { key: 'containers', label: 'Containers', c: u.containers },
-    { key: 'volumes', label: 'Volumes', c: u.volumes },
-    { key: 'build-cache', label: 'Build cache', c: u.buildCache },
+    { key: 'images', label: t('docker.section.images.label'), c: u.images },
+    { key: 'containers', label: t('docker.section.containers.label'), c: u.containers },
+    { key: 'volumes', label: t('docker.section.volumes.label'), c: u.volumes },
+    { key: 'build-cache', label: t('docker.disk.buildCache.label'), c: u.buildCache },
   ];
 });
 
@@ -35,7 +36,7 @@ const sizeText = (n: number): string => (n < 0 ? displayValue(null) : formatByte
 </script>
 
 <template>
-  <DetailSection title="Disk" class="shrink-0">
+  <DetailSection :title="t('docker.disk.title')" class="shrink-0">
     <template #actions>
       <span class="ml-auto flex items-center gap-1 normal-case tracking-normal">
         <Tooltip v-if="usage">
@@ -46,7 +47,7 @@ const sizeText = (n: number): string => (n < 0 ? displayValue(null) : formatByte
         </Tooltip>
         <TooltipIconButton
           icon="refresh"
-          label="Measure disk usage"
+          :label="t('docker.disk.measure.tooltip')"
           :disabled="measuring"
           data-testid="docker-disk-refresh"
           @click="refresh"
@@ -57,31 +58,31 @@ const sizeText = (n: number): string => (n < 0 ? displayValue(null) : formatByte
     <FieldError v-if="query.error.value" class="mb-2" data-testid="docker-disk-error">{{ query.error.value.message }}</FieldError>
 
     <div v-if="measuring && !usage" class="flex items-center gap-2 text-muted-foreground">
-      <Spinner label="" />Measuring…
+      <Spinner label="" />{{ t('docker.measuring.loading') }}
     </div>
     <div v-else-if="!usage" class="flex flex-wrap items-center gap-3 text-muted-foreground">
-      <span>Not measured. Measuring scans the engine's storage and can take a while.</span>
-      <Button size="kira" variant="toolbar" data-testid="docker-disk-measure" @click="refresh">Measure</Button>
+      <span>{{ t('docker.disk.notMeasured.body') }}</span>
+      <Button size="kira" variant="toolbar" data-testid="docker-disk-measure" @click="refresh">{{ t('docker.measure.label') }}</Button>
     </div>
     <template v-else>
       <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-6 gap-y-1">
         <span />
-        <span class="text-right text-kira-sm text-muted-foreground">Size</span>
-        <span class="text-right text-kira-sm text-muted-foreground">Count (active)</span>
-        <span class="text-right text-kira-sm text-muted-foreground">Reclaimable</span>
+        <span class="text-right text-kira-sm text-muted-foreground">{{ t('docker.field.size.label') }}</span>
+        <span class="text-right text-kira-sm text-muted-foreground">{{ t('docker.disk.countActive.label') }}</span>
+        <span class="text-right text-kira-sm text-muted-foreground">{{ t('docker.disk.reclaimable.label') }}</span>
         <template v-for="r in categories" :key="r.key">
           <span>{{ r.label }}</span>
           <span class="text-right font-data" :data-testid="`docker-disk-${r.key}`">{{ formatBytes(r.c.size) }}</span>
           <span class="text-right font-data">{{ r.c.count }} ({{ r.c.active }})</span>
           <span class="text-right font-data">{{ formatBytes(r.c.reclaimable) }}</span>
         </template>
-        <span class="font-medium">Used by Docker</span>
+        <span class="font-medium">{{ t('docker.disk.usedByDocker.label') }}</span>
         <span class="text-right font-data font-medium" data-testid="docker-disk-total">{{ formatBytes(usage.total) }}</span>
         <span />
         <span />
       </div>
       <div v-if="topVolumes.length" class="mt-3">
-        <div class="mb-1 text-kira-sm text-muted-foreground">Volumes by size</div>
+        <div class="mb-1 text-kira-sm text-muted-foreground">{{ t('docker.disk.volumesBySize.label') }}</div>
         <div
           v-for="v in topVolumes"
           :key="v.name"
@@ -92,7 +93,7 @@ const sizeText = (n: number): string => (n < 0 ? displayValue(null) : formatByte
           <span class="min-w-0 flex-1 truncate font-data">{{ v.name }}</span>
           <span class="font-data">{{ sizeText(v.size) }}</span>
         </div>
-        <div v-if="moreVolumes" class="text-muted-foreground" data-testid="docker-disk-more">{{ moreVolumes }} more</div>
+        <div v-if="moreVolumes" class="text-muted-foreground" data-testid="docker-disk-more">{{ t('docker.disk.more.label', { count: moreVolumes }) }}</div>
       </div>
     </template>
   </DetailSection>

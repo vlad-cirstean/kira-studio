@@ -2,6 +2,7 @@
 import StatusDot from '@theme/components/StatusDot.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { computed, inject } from 'vue';
 import type { EditMode } from '../lib/editDiff';
 import { inPlaceSectionKey } from '../lib/editSection';
@@ -30,14 +31,14 @@ const needsRecreate = computed(() => inPlaceTab === true && props.mode === 'recr
       <span class="text-muted-foreground">{{ label }}</span>
       <Tooltip v-if="changed">
         <TooltipTrigger as-child>
-          <StatusDot tone="muted" label="Changed" />
+          <StatusDot tone="muted" :label="t('docker.edit.changed.status')" />
         </TooltipTrigger>
-        <TooltipContent>Changed</TooltipContent>
+        <TooltipContent>{{ t('docker.edit.changed.status') }}</TooltipContent>
       </Tooltip>
     </div>
     <slot />
     <FieldError v-if="error" data-testid="docker-edit-field-error">{{ error }}</FieldError>
-    <p v-else-if="needsRecreate" class="text-muted-foreground" data-testid="docker-edit-field-recreate-hint">This change needs a recreate.</p>
+    <p v-else-if="needsRecreate" class="text-muted-foreground" data-testid="docker-edit-field-recreate-hint">{{ t('docker.edit.needsRecreate.hint') }}</p>
     <p v-else-if="hint" class="text-muted-foreground">{{ hint }}</p>
   </fieldset>
 </template>

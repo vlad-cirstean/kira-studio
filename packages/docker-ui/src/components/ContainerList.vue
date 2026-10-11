@@ -3,6 +3,7 @@ import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import Spinner from '@theme/components/Spinner.vue';
 import StatusDot from '@theme/components/StatusDot.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { copyText } from '@workbench/behaviour/clipboard';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
@@ -77,11 +78,11 @@ const rows = computed<Row[]>(() => {
 const rowHeights = computed(() => rows.value.map((r) => (r.kind === 'group' ? groupRowHeight.value : containerRowHeight.value)));
 
 const emptyCopy = computed(() => {
-  if (searching.value) return { title: 'No matches', hint: 'No container matches the search.' };
+  if (searching.value) return { title: t('common.state.noMatches.empty'), hint: t('docker.container.noMatches.emptyHint') };
   if ((containers.data.value ?? []).length > 0 && !ui.showStopped) {
-    return { title: 'No running containers', hint: 'Turn on Show stopped to list exited ones.' };
+    return { title: t('docker.container.noRunning.empty'), hint: t('docker.container.noRunning.emptyHint') };
   }
-  return { title: 'No containers', hint: 'Start one with docker run or docker compose up.' };
+  return { title: t('docker.container.none.empty'), hint: t('docker.container.none.emptyHint') };
 });
 
 function portLabel(c: DockerContainer): string {
@@ -115,15 +116,15 @@ function groupAction(g: GroupRow, action: 'start' | 'stop'): void {
 function menuItems(c: DockerContainer): MenuItem[] {
   const running = c.state === 'running';
   const items: MenuItem[] = [
-    { type: 'item', id: 'start', label: 'Start', icon: 'play', iconClass: 'text-ok', disabled: running, run: () => act(c, 'start') },
-    { type: 'item', id: 'stop', label: 'Stop', icon: 'debug-stop', iconClass: 'text-error', disabled: !isActiveState(c.state), run: () => act(c, 'stop') },
-    { type: 'item', id: 'restart', label: 'Restart', icon: 'debug-restart', disabled: !running, run: () => act(c, 'restart') },
+    { type: 'item', id: 'start', label: t('common.action.start.label'), icon: 'play', iconClass: 'text-ok', disabled: running, run: () => act(c, 'start') },
+    { type: 'item', id: 'stop', label: t('common.action.stop.label'), icon: 'debug-stop', iconClass: 'text-error', disabled: !isActiveState(c.state), run: () => act(c, 'stop') },
+    { type: 'item', id: 'restart', label: t('docker.action.restart.label'), icon: 'debug-restart', disabled: !running, run: () => act(c, 'restart') },
     { type: 'separator' },
-    { type: 'item', id: 'logs', label: 'Logs', icon: 'output', run: () => ui.select({ kind: 'container', id: c.id }, 'logs') },
-    { type: 'item', id: 'terminal', label: 'Open terminal', icon: 'terminal', disabled: !running, run: () => ui.select({ kind: 'container', id: c.id }, 'terminal') },
+    { type: 'item', id: 'logs', label: t('docker.tab.logs.label'), icon: 'output', run: () => ui.select({ kind: 'container', id: c.id }, 'logs') },
+    { type: 'item', id: 'terminal', label: t('common.action.openTerminal.label'), icon: 'terminal', disabled: !running, run: () => ui.select({ kind: 'container', id: c.id }, 'terminal') },
     { type: 'separator' },
-    { type: 'item', id: 'copy-id', label: 'Copy ID', icon: 'copy', run: () => copyText(c.id) },
-    { type: 'item', id: 'copy-name', label: 'Copy name', icon: 'copy', run: () => copyText(c.name) },
+    { type: 'item', id: 'copy-id', label: t('common.action.copyId.label'), icon: 'copy', run: () => copyText(c.id) },
+    { type: 'item', id: 'copy-name', label: t('common.action.copyName.label'), icon: 'copy', run: () => copyText(c.name) },
   ];
   return items;
 }
@@ -187,8 +188,8 @@ const groupTree = {
         >{{ row.name }}</button>
         <span class="text-kira-sm text-muted-foreground group-hover/row:hidden">{{ runningCount(row) }}/{{ row.members.length }}</span>
         <span class="hidden items-center group-hover/row:flex">
-          <TooltipIconButton icon="play" label="Start all" class="text-ok hover:text-ok" data-testid="docker-group-start" @click="groupAction(row, 'start')" />
-          <TooltipIconButton icon="debug-stop" label="Stop all" class="text-error hover:text-error" data-testid="docker-group-stop" @click="groupAction(row, 'stop')" />
+          <TooltipIconButton icon="play" :label="t('common.action.startAll.label')" class="text-ok hover:text-ok" data-testid="docker-group-start" @click="groupAction(row, 'start')" />
+          <TooltipIconButton icon="debug-stop" :label="t('common.action.stopAll.label')" class="text-error hover:text-error" data-testid="docker-group-stop" @click="groupAction(row, 'stop')" />
         </span>
       </div>
       <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
@@ -234,7 +235,7 @@ const groupTree = {
             <TooltipIconButton
               v-if="row.container.state !== 'running'"
               icon="play"
-              label="Start"
+              :label="t('common.action.start.label')"
               class="text-ok hover:text-ok"
               data-testid="docker-row-start"
               @click.stop="act(row.container, 'start')"
@@ -242,7 +243,7 @@ const groupTree = {
             <TooltipIconButton
               v-else
               icon="debug-stop"
-              label="Stop"
+              :label="t('common.action.stop.label')"
               class="text-error hover:text-error"
               data-testid="docker-row-stop"
               @click.stop="act(row.container, 'stop')"
