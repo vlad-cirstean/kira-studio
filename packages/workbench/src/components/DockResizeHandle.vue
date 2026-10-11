@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RESIZE_KEY_STEP, resizeHandleVariants } from '@theme/components/ui/resizable';
 import { useDragReleaseFallback } from '@theme/components/ui/resizable/useDragReleaseFallback';
 import { useDraggable } from '@vueuse/core';
 import { useTemplateRef, watch } from 'vue';
@@ -46,10 +47,10 @@ watch(isDragging, (dragging) => emit('dragging', dragging));
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'ArrowUp') {
     e.preventDefault();
-    emit('resize', clamp(props.height + 10));
+    emit('resize', clamp(props.height + RESIZE_KEY_STEP));
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
-    emit('resize', clamp(props.height - 10));
+    emit('resize', clamp(props.height - RESIZE_KEY_STEP));
   } else if (e.key === 'Home') {
     e.preventDefault();
     emit('resize', props.min);
@@ -64,7 +65,7 @@ function onKeydown(e: KeyboardEvent): void {
   <!-- biome-ignore lint/a11y/useSemanticElements: ARIA separator widget — <hr> can't carry aria-valuenow/tabindex/keydown (KuiColumnResizeHandle.vue's own precedent) -->
   <div
     ref="handle"
-    class="relative shrink-0 h-0.5 bg-transparent hover:bg-focus data-[state=drag]:bg-focus cursor-row-resize before:absolute before:inset-x-0 before:-inset-y-1 pointer-coarse:before:-inset-y-2"
+    :class="resizeHandleVariants({ axis: 'y', line: false })"
     :data-state="isDragging ? 'drag' : undefined"
     role="separator"
     aria-orientation="horizontal"

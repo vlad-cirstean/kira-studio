@@ -30,11 +30,12 @@ tryOnScopeDispose(
   }),
 );
 
-const LEFT_MIN = 220;
-const LEFT_MAX = 560;
-const storedLeft = useStorage('kira.ade.review.leftWidth', 320);
+const LEFT_MIN = 180;
+const LEFT_MAX = 480;
+const storedLeft = useStorage('kira.ade.review.leftWidth', 260);
 const liveLeft = ref<number | null>(null);
-const leftWidth = computed(() => liveLeft.value ?? storedLeft.value);
+// A width stored under the older 220-560 bounds is clamped, not reset.
+const leftWidth = computed(() => Math.max(LEFT_MIN, Math.min(LEFT_MAX, liveLeft.value ?? storedLeft.value)));
 
 function commitLeft(w: number): void {
   storedLeft.value = Math.round(Math.max(LEFT_MIN, Math.min(LEFT_MAX, w)));
@@ -59,9 +60,9 @@ function commitRight(w: number): void {
       <span class="truncate text-kira-md text-muted-foreground">Review · {{ target.branch }}</span>
     </TitleBarBase>
     <AdeReviewHeader :target="target" />
-    <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 flex-1 gap-0.5 bg-chrome px-1.5 pb-0.5">
       <section
-        class="min-h-0 flex-none overflow-hidden"
+        class="min-h-0 flex-none overflow-hidden rounded-kira border border-border bg-bg"
         :style="{ width: `${leftWidth}px` }"
         aria-label="Files to review"
         data-testid="ade-review-left"
@@ -76,7 +77,7 @@ function commitRight(w: number): void {
         @resize="(w) => (liveLeft = w)"
         @commit="commitLeft"
       />
-      <section class="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Diffs" data-testid="ade-review-centre">
+      <section class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg" aria-label="Diffs" data-testid="ade-review-centre">
         <div class="h-tabbar min-h-0 shrink-0 overflow-hidden border-b border-border bg-chrome" data-testid="ade-review-tabs">
           <TabStrip />
         </div>
@@ -96,7 +97,7 @@ function commitRight(w: number): void {
         @commit="commitRight"
       />
       <section
-        class="min-h-0 flex-none overflow-hidden"
+        class="min-h-0 flex-none overflow-hidden rounded-kira border border-border bg-bg"
         :style="{ width: `${rightWidth}px` }"
         aria-label="Review agent"
         data-testid="ade-review-right"

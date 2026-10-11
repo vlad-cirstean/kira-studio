@@ -1329,7 +1329,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       aria-hidden="true"
     ></span>
     <KuiColumnResizeHandle
-      class="absolute top-0 bottom-0 w-1.25 -ml-0.5 cursor-col-resize z-2 bg-transparent hover:bg-focus focus-visible:bg-focus focus-visible:outline-none"
+      class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftGraph}px` }"
       label="Resize graph column"
       :value="effectiveWidths.graph"
@@ -1339,7 +1339,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
     <KuiColumnResizeHandle
       v-if="!detailOpen"
-      class="absolute top-0 bottom-0 w-1.25 -ml-0.5 cursor-col-resize z-2 bg-transparent hover:bg-focus focus-visible:bg-focus focus-visible:outline-none"
+      class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftAuthor}px` }"
       label="Resize author column"
       direction="reverse"
@@ -1350,7 +1350,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
     <KuiColumnResizeHandle
       v-if="!detailOpen"
-      class="absolute top-0 bottom-0 w-1.25 -ml-0.5 cursor-col-resize z-2 bg-transparent hover:bg-focus focus-visible:bg-focus focus-visible:outline-none"
+      class="absolute inset-y-0 -ml-px z-2"
       :style="{ left: `${handleLeftDate}px` }"
       label="Resize date column"
       direction="reverse"

@@ -1128,7 +1128,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('key')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">key</span>
               <KuiColumnResizeHandle
-                class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-1"
+                class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-key"
                 label="Resize key column"
@@ -1143,7 +1143,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('timestamp')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">timestamp</span>
               <KuiColumnResizeHandle
-                class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-1"
+                class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-timestamp"
                 label="Resize timestamp column"
@@ -1158,7 +1158,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('headers')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">headers</span>
               <KuiColumnResizeHandle
-                class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-1"
+                class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-headers"
                 label="Resize headers column"
@@ -1173,7 +1173,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('attrs')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">attrs</span>
               <KuiColumnResizeHandle
-                class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-1"
+                class="absolute inset-y-0 right-0 z-1"
                 draggable="false"
                 data-testid="stream-column-resize-attrs"
                 label="Resize attrs column"

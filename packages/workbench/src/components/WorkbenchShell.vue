@@ -23,7 +23,8 @@
 //
 // The project panel keeps `sizeUnit="px"` — it's the one rarely-resized SplitterGroup left, the
 // same shape already proven safe.
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
+import { RESIZE_KEY_STEP, ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
+import { useElementSize } from '@vueuse/core';
 // I2-39: type-only -- resize() is exposed by reka's SplitterPanel at runtime (ResizablePanel
 // forwards it unchanged) but isn't in ResizablePanel's own public prop/emit type, so the typed
 // ref below still names SplitterPanel directly. No value import: the template uses the
@@ -65,6 +66,11 @@ const dockDragging = ref(false);
 // `resize()` to follow it, the same way the old CSS-custom-property binding did for free.
 const projectPanelRef = useTemplateRef<InstanceType<typeof SplitterPanel>>('projectPanel');
 
+// reka's keyboard step is a percentage of the group; the shared handle step is RESIZE_KEY_STEP px.
+const panelGroupRef = useTemplateRef<{ $el: HTMLElement }>('panelGroup');
+const { width: groupWidth } = useElementSize(() => panelGroupRef.value?.$el);
+const keyboardResizeBy = computed(() => (groupWidth.value > 0 ? (RESIZE_KEY_STEP / groupWidth.value) * 100 : null));
+
 // A drag emits resize-project, the parent persists it and the same value comes back down as
 // projectWidth — the round trip through SplitterPanel's own %-to-px conversion doesn't land on the
 // exact same float, so an unguarded watcher calling resize() on every prop change ping-pongs
@@ -103,7 +109,12 @@ function onOpsResize(px: number): void {
     class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5 px-1.5 pb-0.5 bg-chrome"
     :class="{ 'cursor-row-resize select-none': dockDragging }"
   >
-    <ResizablePanelGroup direction="horizontal" class="flex-1 min-h-0 gap-0.5">
+    <ResizablePanelGroup
+      ref="panelGroup"
+      direction="horizontal"
+      class="flex-1 min-h-0 gap-0.5"
+      :keyboard-resize-by="keyboardResizeBy"
+    >
       <ResizablePanel
         v-if="projectVisible"
         ref="projectPanel"
@@ -118,15 +129,7 @@ function onOpsResize(px: number): void {
       >
         <slot name="panel" />
       </ResizablePanel>
-      <!-- P110 B32: ResizableHandle's own shared defaults add the P16 divider look (a static
-           shadow line, cleared on hover/drag) that this handle never had -- overridden back to
-           2px/no-shadow here to keep today's exact appearance; everything else (bg-transparent,
-           hover:/drag:bg-focus, cursor) already matches the shared default byte-for-byte. -->
-      <ResizableHandle
-        v-if="projectVisible"
-        class="data-[orientation=horizontal]:w-0.5 data-[orientation=horizontal]:shadow-none"
-        :hit-area-margins="{ coarse: 8, fine: 4 }"
-      />
+      <ResizableHandle v-if="projectVisible" :line="false" />
 
       <!-- Border/rounding stay on the inner div: a border on the panel itself shifts reka's px-to-%
            conversion for the project panel by ~0.4px (visual snapshots caught it). -->

@@ -690,12 +690,28 @@
   padding: 0 2px;
 }
 
-/* F9 — the app's own 4px handle, DataGrid.vue's own `.resize-handle` retokenised (the shipped
-   9px/right:-5px is wider than this app's design). */
+/* P263 §2.9: the shared resize-handle look. A 10px hit box (right: -5px) around a centred 2px bar
+   that fills with --kira-focus on hover and while the column drags (SlickGrid marks the dragged
+   header `.slick-header-column-active`). */
 .slick-grid-host .slick-resizable-handle {
-  width: 4px;
-  right: -2px;
+  width: 10px;
+  right: -5px;
   @apply cursor-col-resize;
+}
+
+.slick-grid-host .slick-resizable-handle::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: transparent;
+}
+
+.slick-grid-host .slick-resizable-handle:hover::after,
+.slick-grid-host .slick-header-column-active .slick-resizable-handle::after {
+  background: var(--kira-focus);
 }
 
 /* DataGrid.vue's own `.header-select-zone` started as a narrow 10px strip at the header cell's

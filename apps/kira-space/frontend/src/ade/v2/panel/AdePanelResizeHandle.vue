@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RESIZE_KEY_STEP, resizeHandleVariants } from '@theme/components/ui/resizable';
 import { useDragReleaseFallback } from '@theme/components/ui/resizable/useDragReleaseFallback';
 import { useDebounceFn, useDraggable } from '@vueuse/core';
 import { ref } from 'vue';
@@ -62,9 +63,13 @@ const { isDragging } = useDraggable(handleEl, {
 useDragReleaseFallback(isDragging, 'pointerup');
 
 function onKeydown(e: KeyboardEvent): void {
-  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  let next: number;
+  if (e.key === 'Home') next = props.min;
+  else if (e.key === 'End') next = props.max;
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+    next = clamp(props.value + (e.key === 'ArrowLeft' ? -sign() : sign()) * RESIZE_KEY_STEP);
+  else return;
   e.preventDefault();
-  const next = clamp(props.value + (e.key === 'ArrowLeft' ? -sign() : sign()) * 16);
   emit('resize', next);
   void commitDebounced(next);
 }
@@ -81,12 +86,8 @@ function onKeydown(e: KeyboardEvent): void {
     :aria-valuemin="min"
     :aria-valuemax="max"
     tabindex="0"
-    class="w-1 shrink-0 cursor-col-resize outline-none"
-    :class="
-      isDragging
-        ? 'bg-focus'
-        : 'bg-transparent shadow-[inset_calc(var(--kira-border-width)*-1)_0_0_0_var(--kira-border)] hover:bg-focus hover:shadow-none focus-visible:bg-focus focus-visible:shadow-none'
-    "
+    :class="resizeHandleVariants({ axis: 'x', line: false })"
+    :data-state="isDragging ? 'drag' : undefined"
     data-testid="ade-panel-resize-handle"
     @keydown="onKeydown"
   />

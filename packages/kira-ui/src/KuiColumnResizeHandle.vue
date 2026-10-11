@@ -10,7 +10,10 @@
  * right-docked detail pane, which drags/steps in the opposite screen direction from `value`
  * (dragging left widens it) — `direction: 'reverse'` covers that without a fourth copy.
  */
-import { onBeforeUnmount } from 'vue';
+import { resizeHandleVariants } from '@theme/components/ui/resizable';
+import { cn } from '@theme/lib/utils';
+import type { HTMLAttributes } from 'vue';
+import { onBeforeUnmount, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -24,8 +27,9 @@ const props = withDefaults(
     /** 'reverse' inverts both the pointer-drag delta and the arrow-key step, for a handle whose
      *  drag direction runs opposite its value (App.vue's right-docked detail pane). */
     direction?: 'normal' | 'reverse';
+    class?: HTMLAttributes['class'];
   }>(),
-  { max: Number.POSITIVE_INFINITY, step: 8, direction: 'normal' },
+  { max: Number.POSITIVE_INFINITY, step: 10, direction: 'normal', class: undefined },
 );
 
 const emit = defineEmits<{
@@ -56,6 +60,7 @@ function directionSign(): number {
 // App.vue's own former copy of this handle needed exactly this (P108 F11's own fix), and this
 // component had no equivalent until now.
 let activeCleanup: (() => void) | undefined;
+const dragging = ref(false);
 
 function onPointerDown(e: PointerEvent): void {
   // P108 Part 11 F10: a right-button (or any non-primary) pointerdown started a drag and captured
@@ -69,6 +74,7 @@ function onPointerDown(e: PointerEvent): void {
   const startX = e.clientX;
   const startValue = props.value;
   target.setPointerCapture(e.pointerId);
+  dragging.value = true;
   const onMove = (moveEvent: PointerEvent): void => {
     emit('update:value', clamp(startValue + directionSign() * (moveEvent.clientX - startX)));
   };
@@ -83,6 +89,7 @@ function onPointerDown(e: PointerEvent): void {
     window.removeEventListener('pointercancel', onCancel);
     window.removeEventListener('lostpointercapture', onCancel);
     activeCleanup = undefined;
+    dragging.value = false;
   };
   const onUp = (upEvent: PointerEvent): void => {
     target.releasePointerCapture?.(upEvent.pointerId);
@@ -107,10 +114,14 @@ onBeforeUnmount(() => {
 });
 
 function onKeydown(e: KeyboardEvent): void {
-  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  let next: number;
+  if (e.key === 'Home') next = props.min;
+  else if (e.key === 'End' && Number.isFinite(props.max)) next = props.max;
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const step = e.key === 'ArrowRight' ? props.step : -props.step;
+    next = clamp(props.value + directionSign() * step);
+  } else return;
   e.preventDefault();
-  const step = e.key === 'ArrowRight' ? props.step : -props.step;
-  const next = clamp(props.value + directionSign() * step);
   emit('update:value', next);
   emit('change', next);
 }
@@ -129,6 +140,8 @@ function onKeydown(e: KeyboardEvent): void {
     :aria-valuemax="max === Number.POSITIVE_INFINITY ? undefined : max"
     :aria-valuetext="`${value} pixels`"
     tabindex="0"
+    :class="cn(resizeHandleVariants({ axis: 'x', line: false }), props.class)"
+    :data-state="dragging ? 'drag' : undefined"
     @pointerdown="onPointerDown"
     @keydown="onKeydown"
   ></div>

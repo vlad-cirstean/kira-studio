@@ -1807,13 +1807,12 @@ onBeforeUnmount(() => {
           >
             <KuiColumnResizeHandle
               v-if="breakpoint === 'wide'"
-              class="absolute top-0 bottom-0 left-0 w-1.25  -ml-0.5 cursor-col-resize z-2 bg-transparent hover:bg-focus focus-visible:bg-focus focus-visible:outline-none"
+              class="absolute inset-y-0 left-0 -ml-px z-2"
               label="Resize detail pane"
               direction="reverse"
               :value="detailWidth"
               :min="MIN_DETAIL_WIDTH"
               :max="MAX_DETAIL_WIDTH"
-              :step="16"
               @update:value="setDetailWidth"
               @change="setDetailWidth"
             />
