@@ -1,4 +1,5 @@
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
+import { t } from '@theme/i18n';
 import type { Launch, LaunchStageArgs, SendArgs, StartBranchArgs } from '../wire';
 
 // One target's delivery: a running TUI session (`Send`) or a fresh launch whose terminal this window
@@ -43,7 +44,8 @@ export async function openLaunch(
     'claude-code',
   );
   const entry = deps.terminalSession(launch.terminalId);
-  if (entry?.status === 'failed') throw new Error(entry.error || 'Launch failed');
+  if (entry?.status === 'failed')
+    throw new Error(entry.error || t('space.ade.claudeDialog.launchFailed.error'));
 }
 
 /** Delivers one message; returns the launch for a new session, `null` for a `Send`. */

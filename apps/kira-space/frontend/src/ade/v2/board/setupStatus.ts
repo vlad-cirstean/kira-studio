@@ -1,16 +1,17 @@
+import { type MessageKey, t } from '@theme/i18n';
 import type { WorktreeSetup } from '../wire';
 
-const TITLE: Record<WorktreeSetup['state'], string> = {
-  running: 'Preparing worktree',
-  ready: 'Worktree ready',
-  failed: 'Worktree setup failed',
-};
+const TITLE = {
+  running: 'space.ade.board.setup.running.title',
+  ready: 'space.ade.board.setup.ready.title',
+  failed: 'space.ade.board.setup.failed.title',
+} as const satisfies Record<WorktreeSetup['state'], MessageKey>;
 
 /** The `ScriptProgress` props of one branch's setup. */
 export function setupStatus(setup: WorktreeSetup, repo: string, branch: string, timeout: string) {
   return {
     state: setup.state,
-    title: `${TITLE[setup.state]} · ${repo} ${branch}`,
+    title: `${t(TITLE[setup.state])} · ${repo} ${branch}`,
     startedAt: setup.startedAt,
     finishedAt: setup.finishedAt,
     timeout: timeout || undefined,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import AdeTip from './AdeTip.vue';
-import { ACTIVITY_LABEL, type ActivityKind } from './activity';
+import { type ActivityKind, activityLabel } from './activity';
 
 // Activity glyph of a session: `!` needs input, a green dot working, `z` waiting on a monitor, an
 // open dot idle, a square stopped (mockup `act`).
@@ -13,7 +13,7 @@ const dot = computed(() => (big.value ? 'size-2.5' : 'size-2'));
 </script>
 
 <template>
-  <AdeTip :text="ACTIVITY_LABEL[kind]">
+  <AdeTip :text="activityLabel(kind)">
   <span :data-activity="kind" class="inline-flex shrink-0 items-center justify-center">
     <span
       v-if="kind === 'input'"

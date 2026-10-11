@@ -168,6 +168,6 @@ test('an empty backlog says so and the panel asks to select', async ({ relaunch 
   const { window: page } = await openBacklog(relaunch, [
     { channel: IPC.adeTaskBacklog, response: { items: [] } },
   ]);
-  await expect(page.getByText('Backlog is empty.')).toBeVisible();
+  await expect(page.getByText('No backlog items yet')).toBeVisible();
   await expect(page.getByText('Select an item to add links and notes.')).toBeVisible();
 });

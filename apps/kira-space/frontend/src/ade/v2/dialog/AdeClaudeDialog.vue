@@ -8,6 +8,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { FieldLabel } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
@@ -167,7 +168,7 @@ async function discard(): Promise<void> {
         />
 
         <div v-if="baseBranch" class="flex items-center gap-2" data-testid="ade-dialog-base">
-          <span class="text-muted-foreground">Base</span>
+          <span class="text-muted-foreground">{{ t('space.ade.claudeDialog.base.label') }}</span>
           <AdeBasePicker
             :code-repo-id="baseBranch.codeRepoId"
             :branch-id="baseBranch.id"
@@ -182,14 +183,14 @@ async function discard(): Promise<void> {
         </Alert>
         <Label v-if="view.canAutostash" for="ade-dialog-autostash" class="text-kira-sm">
           <Checkbox id="ade-dialog-autostash" v-model="dialogs.autostash" data-testid="ade-dialog-autostash" />
-          <span>Autostash: stash the uncommitted changes, rebase, then restore them</span>
+          <span>{{ t('space.ade.claudeDialog.autostash.label') }}</span>
         </Label>
         <p v-if="view.noOp" class="m-0 text-kira-sm text-muted-foreground" data-testid="ade-dialog-noop">
-          The branch already sits on this base: saving only records it.
+          {{ t('space.ade.claudeDialog.noOp.hint') }}
         </p>
 
         <div v-if="view.isArchive" class="text-kira-md text-tone-amber" data-testid="ade-dialog-risk">
-          {{ view.riskText }}. Tell Claude what to do with it, or delete the worktrees anyway.
+          {{ t('space.ade.claudeDialog.risk.body', { risk: view.riskText }) }}
         </div>
 
         <div v-for="(tg, i) in view.targets" :key="tg.branchId" class="flex flex-col gap-1.5" data-testid="ade-dialog-target">
@@ -211,13 +212,13 @@ async function discard(): Promise<void> {
           <Checkbox id="ade-dialog-push" v-model="dialogs.push" data-testid="ade-dialog-push" />
           <span>
             <span data-testid="ade-dialog-push-label">{{ view.pushLabel }}</span>
-            <span v-if="!dialogs.push" class="text-subtle"> (off: stays local, push it yourself later)</span>
+            <span v-if="!dialogs.push" class="text-subtle"> {{ t('space.ade.claudeDialog.pushOff.hint') }}</span>
           </span>
         </Label>
 
         <div v-if="view.showMessage" class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <FieldLabel for="ade-dialog-message" class="flex-1">Message to Claude</FieldLabel>
+            <FieldLabel for="ade-dialog-message" class="flex-1">{{ t('space.ade.claudeDialog.message.label') }}</FieldLabel>
             <Button
               v-if="view.edited"
               variant="toolbar"
@@ -226,7 +227,7 @@ async function discard(): Promise<void> {
               data-testid="ade-dialog-reset"
               @click="dialogs.msg = null"
             >
-              Reset
+              {{ t('common.action.reset.label') }}
             </Button>
           </div>
           <Textarea
@@ -254,8 +255,8 @@ async function discard(): Promise<void> {
       </DialogBody>
 
       <DialogFooter>
-        <Button variant="dialog" size="kira-lg" data-testid="ade-dialog-cancel" @click="dialogs.close()">Cancel</Button>
-        <AdeTip v-if="view.isArchive" text="Skip Claude: delete the worktrees now; uncommitted changes are lost">
+        <Button variant="dialog" size="kira-lg" data-testid="ade-dialog-cancel" @click="dialogs.close()">{{ t('common.action.cancel.label') }}</Button>
+        <AdeTip v-if="view.isArchive" :text="t('space.ade.claudeDialog.deleteAnyway.tooltip')">
           <Button
             variant="dialog"
             size="kira-lg"
@@ -264,7 +265,7 @@ async function discard(): Promise<void> {
             data-testid="ade-dialog-delete"
             @click="discard"
           >
-            Delete anyway
+            {{ t('space.ade.claudeDialog.deleteAnyway.label') }}
           </Button>
         </AdeTip>
         <Button
@@ -275,7 +276,7 @@ async function discard(): Promise<void> {
           data-testid="ade-dialog-send"
           @click="send"
         >
-          {{ dialogs.waitingSetup ? 'Starts when ready…' : view.sendLabel }}
+          {{ dialogs.waitingSetup ? t('space.ade.claudeDialog.startsWhenReady.loading') : view.sendLabel }}
         </Button>
       </DialogFooter>
     </DialogContent>

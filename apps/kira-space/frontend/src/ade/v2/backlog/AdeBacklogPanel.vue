@@ -3,6 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { useRelativeTime } from '@workbench/behaviour/format';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
@@ -56,23 +57,23 @@ function saveNotes(_id: string, value: string): void {
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col" data-testid="ade-backlog-panel">
-    <PanelHeader>Backlog item</PanelHeader>
+    <PanelHeader>{{ t('space.ade.backlog.item.label') }}</PanelHeader>
     <header class="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2">
       <div class="flex items-center gap-2">
-        <AdeChip label="backlog · not planned" tone="grey" />
+        <AdeChip :label="t('space.ade.backlog.notPlanned.label')" tone="grey" />
         <h3 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-medium" data-testid="ade-backlog-title">{{ item.text }}</h3>
       </div>
-      <div class="text-kira-sm text-muted-foreground">captured {{ ago }}</div>
+      <div class="text-kira-sm text-muted-foreground">{{ t('space.ade.backlog.captured.label', { ago }) }}</div>
       <div class="flex gap-2">
         <Button variant="dialog"
           size="kira-lg"
           
           :class="TONE_SOLID_CLASS.amber"
-          title="Turn into a task in the Spec phase, unscheduled (Later)"
+          :title="t('space.ade.backlog.promotePanel.tooltip')"
           data-testid="ade-backlog-panel-promote"
           @click="emit('promote')"
         >
-          → Plan as task
+          {{ t('space.ade.backlog.promotePanel.label') }}
         </Button>
         <Button
           variant="dialog"
@@ -80,12 +81,12 @@ function saveNotes(_id: string, value: string): void {
           data-testid="ade-backlog-panel-delete"
           @click="emit('remove')"
         >
-          Delete
+          {{ t('common.action.delete.label') }}
         </Button>
       </div>
     </header>
     <div class="grid shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-3 text-kira-md">
-      <Label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">Title</Label>
+      <Label for="ade-backlog-title-input" class="text-kira-sm text-muted-foreground">{{ t('common.field.title.label') }}</Label>
       <Input
         id="ade-backlog-title-input"
         :model-value="titleEdit.text.value"
@@ -97,22 +98,22 @@ function saveNotes(_id: string, value: string): void {
       />
       <AdeLinkRow
         id="ade-backlog-jira"
-        label="Jira"
+        :label="t('common.product.jira.label')"
         chip=""
         :text="jira?.key ?? ''"
         :url="jira?.url ?? ''"
-        placeholder="paste Jira link or key"
+        :placeholder="t('space.ade.backlog.jira.placeholder')"
         :error="links.jiraError.value"
         @save="links.saveJira"
         @clear="links.clearJira"
       />
       <AdeLinkRow
         id="ade-backlog-github"
-        label="GitHub"
+        :label="t('common.product.github.label')"
         :chip="links.github.value?.kind ?? ''"
         :text="links.github.value?.ref ?? ''"
         :url="parseGithub(item.githubUrl) ? item.githubUrl : ''"
-        placeholder="paste GitHub PR or issue link"
+        :placeholder="t('space.ade.backlog.github.placeholder')"
         :error="links.githubError.value"
         @save="links.saveGithub"
         @clear="links.clearGithub"

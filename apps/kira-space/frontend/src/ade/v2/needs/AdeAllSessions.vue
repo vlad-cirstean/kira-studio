@@ -2,7 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
-import { ACTIVITY_LABEL, ACTIVITY_RANK, type ActivityKind } from '../activity';
+import { ACTIVITY_RANK, type ActivityKind, activityLabel } from '../activity';
 import { usePlanModel } from '../plan/usePlanModel';
 import type { SessionView } from '../sessions/sessionView';
 import { useSessionViews } from '../sessions/useSessionViews';
@@ -61,7 +61,7 @@ const summary = computed(() => {
   }
   return (['input', 'working', 'waiting'] as const)
     .filter((k) => counts.has(k))
-    .map((k) => ({ kind: k, text: `${counts.get(k)} ${ACTIVITY_LABEL[k]}` }));
+    .map((k) => ({ kind: k, text: `${counts.get(k)} ${activityLabel(k)}` }));
 });
 
 </script>

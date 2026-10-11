@@ -1,25 +1,5 @@
 # Stream B (Kira Space, mobile, memory). Whole-file entries leave as files migrate; permanent lines name the rule, file and reason.
-apps/kira-space/frontend/src/ade/AdeView.vue
-apps/kira-space/frontend/src/ade/v2/AdeAbortRebaseDialog.vue
-apps/kira-space/frontend/src/ade/v2/AdeActivityIcon.vue
-apps/kira-space/frontend/src/ade/v2/AdeAddPopover.vue
-apps/kira-space/frontend/src/ade/v2/AdeBasePicker.vue
-apps/kira-space/frontend/src/ade/v2/AdeForcePushDialog.vue
-apps/kira-space/frontend/src/ade/v2/automation/AdeAutomationsBlock.vue
-apps/kira-space/frontend/src/ade/v2/automation/automationItems.ts
-apps/kira-space/frontend/src/ade/v2/automation/useRunAutomation.ts
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPage.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPanel.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue
-apps/kira-space/frontend/src/ade/v2/board/actions.ts
-apps/kira-space/frontend/src/ade/v2/board/dayMenu.ts
-apps/kira-space/frontend/src/ade/v2/board/fixMenu.ts
-apps/kira-space/frontend/src/ade/v2/board/taskMenu.ts
-apps/kira-space/frontend/src/ade/v2/board/timeline.ts
-apps/kira-space/frontend/src/ade/v2/dialog/AdeClaudeDialog.vue
-apps/kira-space/frontend/src/ade/v2/dialog/compose.ts
-apps/kira-space/frontend/src/ade/v2/dialog/deliver.ts
-apps/kira-space/frontend/src/ade/v2/needs/AdeAllSessionRow.vue
+permanent U64 apps/kira-space/frontend/src/ade/v2/AdeActivityIcon.vue # `z` is the waiting-on-monitor glyph, not text
 apps/kira-space/frontend/src/ade/v2/needs/AdeAllSessions.vue
 apps/kira-space/frontend/src/ade/v2/needs/AdeNeedsPage.vue
 apps/kira-space/frontend/src/ade/v2/needs/AdeNeedsRow.vue

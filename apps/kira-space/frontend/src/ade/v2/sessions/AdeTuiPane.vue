@@ -8,7 +8,7 @@ import { computed, ref } from 'vue';
 import { useMobileTerminalsStore } from '../../../state/mobileTerminals';
 import { useTerminalsStore } from '../../../state/terminals';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
-import { ACTIVITY_LABEL } from '../activity';
+import { activityLabel } from '../activity';
 import { useFocusSession } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeSessionId from './AdeSessionId.vue';
@@ -57,7 +57,7 @@ async function show(): Promise<void> {
       :class="needsYou ? 'bg-tone-amber-solid/8 text-tone-amber' : 'text-muted-foreground'"
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
-      <span class="truncate" data-testid="ade-tui-label">interactive · {{ ACTIVITY_LABEL[view.kind] }} · {{ ago }}</span>
+      <span class="truncate" data-testid="ade-tui-label">interactive · {{ activityLabel(view.kind) }} · {{ ago }}</span>
       <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
     </div>
     <div v-if="held" class="relative flex min-h-0 flex-1 flex-col">

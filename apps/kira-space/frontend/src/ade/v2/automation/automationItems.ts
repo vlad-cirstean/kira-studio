@@ -1,4 +1,5 @@
 import type { CustomScript } from '@shared/domain/scripts';
+import { t } from '@theme/i18n';
 import type { TaskMenuItem } from '../board/taskMenu';
 
 /** The Run automation submenu: one item per saved script, smart ones marked; a hint when none. */
@@ -7,7 +8,7 @@ export function automationItems(scripts: readonly CustomScript[]): TaskMenuItem[
     return [
       {
         id: 'ade-automation-none',
-        label: 'No automations yet',
+        label: t('space.ade.automation.none.empty'),
         cmd: { kind: 'automation', scriptId: '' },
         disabled: true,
       },

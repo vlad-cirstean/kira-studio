@@ -144,7 +144,7 @@ function select(id: string): void {
       </DialogBody>
       <DialogFooter>
         <template v-if="stored">
-          <Button variant="dialog-primary" size="kira-lg" data-testid="add-memory-done" @click="emit('close')">{{ t('memory.common.done.label') }}</Button>
+          <Button variant="dialog-primary" size="kira-lg" data-testid="add-memory-done" @click="emit('close')">{{ t('space.common.status.done.status') }}</Button>
         </template>
         <template v-else>
           <Button v-if="busy" variant="dialog" size="kira-lg" data-testid="add-memory-cancel" @click="cancel">{{ t('common.action.cancel.label') }}</Button>

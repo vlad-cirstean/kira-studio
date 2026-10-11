@@ -156,7 +156,7 @@ test('+ Add branch attaches an existing branch to this task', async ({ relaunch 
   ]);
   await openTask(page, 'T_bill');
   await page.locator('[data-testid="ade-add-branch"]').click();
-  await expect(page.locator('[data-testid="ade-add-attach"]')).toContainText('adding to');
+  await expect(page.locator('[data-testid="ade-add-attach"]')).toContainText('Adding to');
   await expect(page.locator('[data-testid="ade-add-tab-new"]')).toHaveCount(0);
   await page.locator('[data-testid="ade-branch-search"]').fill('invoice');
   await page.locator('[data-testid="ade-candidate"]').first().click();

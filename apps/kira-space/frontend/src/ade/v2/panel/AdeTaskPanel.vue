@@ -9,7 +9,7 @@ import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import AdeAutomationsBlock from '../automation/AdeAutomationsBlock.vue';
-import { ARCHIVE_TIP, STATUS_TONE } from '../board/actions';
+import { archiveTip, STATUS_TONE } from '../board/actions';
 import { dayLabel, LATER } from '../board/calendar';
 import { taskFacts, taskPatch } from '../board/panelFacts';
 import { taskReviewTip } from '../board/reviewCode';
@@ -94,7 +94,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
   >
     <template #actions>
       <AdeTaskActionButton :card="card" />
-      <AdeTip v-if="quietArchive" :text="ARCHIVE_TIP">
+      <AdeTip v-if="quietArchive" :text="archiveTip()">
         <Button
           variant="dialog"
           size="kira-lg"

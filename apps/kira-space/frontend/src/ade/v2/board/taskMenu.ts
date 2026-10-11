@@ -1,4 +1,5 @@
 import type { ShortcutId } from '@shared/domain/shortcuts';
+import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import type { CardModel } from '../plan/usePlanModel';
 import type { Plan, Session } from '../wire';
@@ -62,17 +63,25 @@ export interface TaskMenuInput {
 }
 
 const DONE = 'done';
-const LIVE_HINT = 'Stop its running agents first';
+const liveHint = (): string => t('space.ade.board.taskMenu.liveBlocked.tooltip');
 
 function copyItems(c: CardModel, sessions: readonly Session[]): TaskMenuItem[] {
   const items: TaskMenuItem[] = [];
   if (c.title)
-    items.push({ id: 'ade-task-copy-title', label: 'Title', cmd: { kind: 'copy', text: c.title } });
-  items.push({ id: 'ade-task-copy-id', label: 'Task id', cmd: { kind: 'copy', text: c.task.id } });
+    items.push({
+      id: 'ade-task-copy-title',
+      label: t('common.field.title.label'),
+      cmd: { kind: 'copy', text: c.title },
+    });
+  items.push({
+    id: 'ade-task-copy-id',
+    label: t('space.ade.board.taskMenu.taskId.label'),
+    cmd: { kind: 'copy', text: c.task.id },
+  });
   if (c.task.jira) {
     items.push({
       id: 'ade-task-copy-jira',
-      label: 'Jira link',
+      label: t('space.ade.board.taskMenu.jiraLink.label'),
       cmd: { kind: 'copy', text: c.task.jira.url },
     });
   }
@@ -82,7 +91,7 @@ function copyItems(c: CardModel, sessions: readonly Session[]): TaskMenuItem[] {
   if (names.length) {
     items.push({
       id: 'ade-task-copy-branches',
-      label: 'Branch names',
+      label: t('space.ade.board.taskMenu.branchNames.label'),
       cmd: { kind: 'copy', text: names.join('\n') },
     });
   }
@@ -92,7 +101,7 @@ function copyItems(c: CardModel, sessions: readonly Session[]): TaskMenuItem[] {
   if (latest) {
     items.push({
       id: 'ade-task-copy-session',
-      label: 'Latest Claude session id',
+      label: t('space.ade.board.taskMenu.latestSessionId.label'),
       cmd: { kind: 'copy', text: latest.claudeSessionId },
     });
   }
@@ -109,29 +118,34 @@ function stageEntries(c: CardModel, live: boolean): TaskMenuEntry[] {
       cmd: { kind: 'moveStage', stageId: b.stage.id } as const,
       checked: b.stage.id === current,
       disabled: live || (b.state === 'skipped' && b.stage.id !== current),
-      hint: live ? LIVE_HINT : undefined,
+      hint: live ? liveHint() : undefined,
     })),
     {
       id: 'ade-task-stage-done',
-      label: 'Done',
+      label: t('space.common.status.done.status'),
       cmd: { kind: 'moveStage', stageId: DONE },
       checked: current === DONE,
       disabled: live,
-      hint: live ? LIVE_HINT : undefined,
+      hint: live ? liveHint() : undefined,
     },
   ];
   const out: TaskMenuEntry[] = [
-    { type: 'submenu', id: 'ade-task-stage', label: 'Move to stage', items },
+    {
+      type: 'submenu',
+      id: 'ade-task-stage',
+      label: t('space.ade.board.taskMenu.moveToStage.label'),
+      items,
+    },
   ];
   const at = c.blocks.find((b) => b.stage.id === current);
   if (at) {
     out.push({
       type: 'item',
       id: 'ade-task-skip',
-      label: `Skip ${at.stage.name}`,
+      label: t('space.ade.board.taskMenu.skipStage.label', { stage: at.stage.name }),
       cmd: { kind: 'moveStage', stageId: nextStageId(c.blocks, current) },
       disabled: live,
-      hint: live ? LIVE_HINT : undefined,
+      hint: live ? liveHint() : undefined,
     });
   }
   return out;
@@ -150,7 +164,7 @@ function reviewEntry(choices: readonly ReviewChoice[]): TaskMenuEntry[] {
     return [
       {
         type: 'item',
-        ...item(choices[0], 'ade-task-review', 'Review code'),
+        ...item(choices[0], 'ade-task-review', t('space.ade.board.taskMenu.reviewCode.label')),
         shortcut: 'ade.reviewCode',
       },
     ];
@@ -159,7 +173,7 @@ function reviewEntry(choices: readonly ReviewChoice[]): TaskMenuEntry[] {
     {
       type: 'submenu',
       id: 'ade-task-review',
-      label: 'Review code',
+      label: t('space.ade.board.taskMenu.reviewCode.label'),
       items: choices.map((c) => item(c, `ade-task-review-${c.branchId}`, c.label)),
     },
   ];
@@ -175,13 +189,18 @@ function changeBaseEntry(choices: readonly ChangeBaseChoice[]): TaskMenuEntry[] 
   });
   if (choices.length === 0) return [];
   if (choices.length === 1) {
-    return [{ type: 'item', ...item(choices[0], 'ade-task-change-base', 'Change base…') }];
+    return [
+      {
+        type: 'item',
+        ...item(choices[0], 'ade-task-change-base', t('space.ade.rebase.changeBase.label')),
+      },
+    ];
   }
   return [
     {
       type: 'submenu',
       id: 'ade-task-change-base',
-      label: 'Change base…',
+      label: t('space.ade.rebase.changeBase.label'),
       items: choices.map((c) => item(c, `ade-task-change-base-${c.branchId}`, c.label)),
     },
   ];
@@ -199,11 +218,15 @@ function planEntry(i: TaskMenuInput): TaskMenuEntry {
   return {
     type: 'submenu',
     id: 'ade-task-plan',
-    label: 'Plan',
+    label: t('space.common.plan.label'),
     items: [
-      at('ade-task-plan-today', 'Move to today', 0),
-      at('ade-task-plan-next', 'Move to next work day', nextWork(i.cal, 0)),
-      at('ade-task-plan-later', 'Move to Later', LATER),
+      at('ade-task-plan-today', t('space.ade.board.taskMenu.moveToday.label'), 0),
+      at(
+        'ade-task-plan-next',
+        t('space.ade.board.taskMenu.moveNextWorkDay.label'),
+        nextWork(i.cal, 0),
+      ),
+      at('ade-task-plan-later', t('space.ade.board.taskMenu.moveLater.label'), LATER),
     ],
   };
 }
@@ -230,7 +253,7 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
       out.push({
         type: 'item',
         id: 'ade-task-stop',
-        label: 'Stop running agents',
+        label: t('space.ade.board.taskMenu.stopRuns.label'),
         cmd: { kind: 'stopRuns' },
       });
     }
@@ -241,7 +264,7 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
     out.push({
       type: 'submenu',
       id: 'ade-task-open-session',
-      label: 'Open session',
+      label: t('space.ade.board.taskMenu.openSession.label'),
       items: running.map((s) => ({
         id: `ade-task-open-session-${s.id}`,
         label: i.sessionLabel(s),
@@ -252,13 +275,13 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
   out.push({
     type: 'item',
     id: 'ade-task-sessions',
-    label: 'Show sessions',
+    label: t('space.ade.board.taskMenu.showSessions.label'),
     cmd: { kind: 'showSessions' },
   });
   out.push({
     type: 'submenu',
     id: 'ade-task-automation',
-    label: 'Run automation',
+    label: t('space.ade.board.taskMenu.runAutomation.label'),
     items: [...i.automations],
   });
 
@@ -267,7 +290,11 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
     out.push({
       type: 'item',
       id: 'ade-task-park',
-      label: c.parked ? 'Mark as merging' : 'Mark as not merging',
+      label: t(
+        c.parked
+          ? 'space.ade.board.taskMenu.markMerging.label'
+          : 'space.ade.board.taskMenu.markNotMerging.label',
+      ),
       cmd: { kind: 'park', parked: !c.parked },
     });
     out.push(...changeBaseEntry(i.baseChoices));
@@ -277,14 +304,14 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
   if (c.task.jira) {
     links.push({
       id: 'ade-task-jira',
-      label: 'Open Jira issue',
+      label: t('space.ade.board.taskMenu.openJira.label'),
       cmd: { kind: 'link', url: c.task.jira.url },
     });
   }
   if (c.task.githubUrl) {
     links.push({
       id: 'ade-task-github',
-      label: 'Open on GitHub',
+      label: t('space.ade.board.taskMenu.openGithub.label'),
       cmd: { kind: 'link', url: c.task.githubUrl },
     });
   }
@@ -292,13 +319,18 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
     out.push({ type: 'separator' }, ...links.map((l) => ({ type: 'item' as const, ...l })));
 
   const copy = copyItems(c, i.sessions);
-  out.push({ type: 'submenu', id: 'ade-task-copy', label: 'Copy', items: copy });
+  out.push({
+    type: 'submenu',
+    id: 'ade-task-copy',
+    label: t('common.action.copy.label'),
+    items: copy,
+  });
   out.push(
     { type: 'separator' },
     {
       type: 'item',
       id: 'ade-task-archive',
-      label: 'Archive…',
+      label: t('space.common.archive.label'),
       cmd: { kind: 'archive' },
       danger: true,
       disabled: i.archivePending,

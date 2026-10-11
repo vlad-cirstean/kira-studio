@@ -298,10 +298,11 @@ test('a pending base shows its tag, Retry rebase, and Abort rebase asks first', 
   await page.locator(row('b_auth')).click();
   await expect(page.locator(t('ade-panel-action-rebase-retry'))).toContainText('Retry rebase');
   await page.locator(t('ade-panel-action-abort-rebase')).click();
-  await expect(page.getByText('Abort the rebase of feat/oauth-login?')).toBeVisible();
-  await expect(page.locator(t('ade-confirm-no'))).toHaveText('Keep');
+  await expect(page.getByText('Abort rebase?')).toBeVisible();
+  await expect(page.locator(t('ade-confirm-no'))).toHaveText('Cancel');
+  await expect(page.locator(t('ade-confirm-yes'))).toHaveText('Abort');
   expect(calls(control, IPC.adeTaskAbortRebase)).toHaveLength(0);
-  await page.getByRole('button', { name: 'Abort rebase' }).click();
+  await page.locator(t('ade-confirm-yes')).click();
   await expect.poll(() => calls(control, IPC.adeTaskAbortRebase)).toHaveLength(1);
 });
 
@@ -474,6 +475,6 @@ test('contract: a conflicting rebase is reported, left in progress, and Abort re
     await expect(out.locator(t('ade-outcome-files'))).toContainText(file);
   }
   await page.locator(t('ade-panel-action-abort-rebase')).click();
-  await page.getByRole('button', { name: 'Abort rebase' }).click();
+  await page.locator(t('ade-confirm-yes')).click();
   await expect.poll(() => calls(control, IPC.adeTaskAbortRebase)).toHaveLength(1);
 });

@@ -11,6 +11,7 @@ import {
 } from '@theme/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import VarText from '@theme/components/VarText.vue';
+import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import { computed, ref } from 'vue';
 import AdeTip from './AdeTip.vue';
@@ -70,10 +71,10 @@ const pickOf = (b: BasePick): BaseChoice =>
     </PopoverTrigger>
     <PopoverContent align="start" class="w-80 gap-0 p-0" data-testid="ade-base-popover">
       <Command>
-        <CommandInput placeholder="Search branches…" data-testid="ade-base-search" />
+        <CommandInput :placeholder="t('space.ade.basePicker.search.placeholder')" data-testid="ade-base-search" />
         <CommandList class="max-h-72">
-          <CommandEmpty>{{ branches.isPending.value ? 'Loading…' : 'No branches' }}</CommandEmpty>
-          <CommandGroup v-if="data?.previous" heading="Previous base">
+          <CommandEmpty>{{ branches.isPending.value ? t('common.state.loading.loading') : t('space.common.noBranches.empty') }}</CommandEmpty>
+          <CommandGroup v-if="data?.previous" :heading="t('space.ade.basePicker.previous.label')">
             <CommandItem
               :value="`previous ${data.previous}`"
               data-testid="ade-base-option-previous"
@@ -82,7 +83,7 @@ const pickOf = (b: BasePick): BaseChoice =>
               <VarText :parts="[{ name: 'base', value: data.previous }]" />
             </CommandItem>
           </CommandGroup>
-          <CommandGroup heading="Main">
+          <CommandGroup :heading="t('space.ade.basePicker.main.label')">
             <CommandItem
               :value="`main ${data?.mainName ?? 'main'}`"
               :data-testid="`ade-base-option-${data?.mainName ?? 'main'}`"
@@ -91,7 +92,7 @@ const pickOf = (b: BasePick): BaseChoice =>
               <VarText :parts="[{ name: 'base', value: data?.mainName ?? 'main' }]" />
             </CommandItem>
           </CommandGroup>
-          <CommandGroup v-if="planner.length" heading="Planner branches">
+          <CommandGroup v-if="planner.length" :heading="t('space.ade.basePicker.planner.label')">
             <AdeTip v-for="b in planner" :key="b.branchId" :text="b.excluded">
               <CommandItem
                 :value="`${b.taskTitle} ${label(b)}`"
@@ -102,12 +103,12 @@ const pickOf = (b: BasePick): BaseChoice =>
                 <span class="min-w-0 flex-1 truncate">
                   {{ b.taskTitle }} ·
                   <VarText v-if="b.name" :parts="[{ name: 'base', value: b.name }]" />
-                  <span v-else class="text-subtle">not created</span>
+                  <span v-else class="text-subtle">{{ t('space.ade.board.branchTag.notCreated.label') }}</span>
                 </span>
               </CommandItem>
             </AdeTip>
           </CommandGroup>
-          <CommandGroup v-if="plain.length" heading="Branches">
+          <CommandGroup v-if="plain.length" :heading="t('common.module.branches.label')">
             <AdeTip v-for="b in plain" :key="b.name" :text="b.excluded">
               <CommandItem
                 :value="b.name"
@@ -116,7 +117,7 @@ const pickOf = (b: BasePick): BaseChoice =>
                 @select="choose(pickOf(b))"
               >
                 <VarText :parts="[{ name: 'base', value: b.name }]" />
-                <span v-if="!b.local" class="ml-auto text-kira-sm text-subtle">remote</span>
+                <span v-if="!b.local" class="ml-auto text-kira-sm text-subtle">{{ t('space.ade.basePicker.remote.status') }}</span>
               </CommandItem>
             </AdeTip>
           </CommandGroup>

@@ -1,4 +1,6 @@
-import { ACTIVITY_LABEL, type ActivityKind, activityKind, shortId } from '../activity';
+import { t } from '@theme/i18n';
+import { plainText } from '@theme/varText';
+import { type ActivityKind, activityKind, activityLabel, shortId } from '../activity';
 import type { BranchGraph } from '../board/branchGraph';
 import { type RebaseAct, stackIds } from '../board/rebaseActions';
 import type {
@@ -166,7 +168,7 @@ export function rebaseSpec(
 ): DialogSpec {
   return {
     kind: act.kind,
-    title: act.label.map((p) => (typeof p === 'string' ? p : p.value)).join(''),
+    title: plainText(act.label),
     branchId: act.branchId,
     onto: act.kind === 'rebase' ? act.onto : null,
     queueWith: act.kind === 'queue' ? act.withId : '',
@@ -181,7 +183,7 @@ export function changeBaseSpec(
 ): DialogSpec {
   return {
     kind: 'changeBase',
-    title: 'Change base',
+    title: t('space.ade.claudeDialog.changeBase.title'),
     branchId: act.branchId,
     onto: null,
     draft: act.draft,
@@ -195,7 +197,12 @@ export function mergeSpec(ctx: DialogCtx, branchId: string, target: string): Dia
     branchOf(ctx, branchId)?.integration.find((i) => i.target === target)?.status === 'stale';
   return {
     kind: 'merge',
-    title: `${stale ? 'Re-merge' : 'Merge'} into ${target}`,
+    title: t(
+      stale ? 'space.ade.claudeDialog.reMerge.title' : 'space.ade.board.fixMenu.merge.label',
+      {
+        target,
+      },
+    ),
     branchId,
     target,
     targets: targetsFor(ctx, [branchId]),
@@ -203,12 +210,18 @@ export function mergeSpec(ctx: DialogCtx, branchId: string, target: string): Dia
 }
 
 export function stageSpec(ctx: DialogCtx, taskId: string): DialogSpec {
-  const name = taskOf(ctx, taskId)?.currentStage?.name ?? 'Stage';
-  return { kind: 'stage', title: `${name} · interactive Claude Code`, taskId, targets: [] };
+  const stage =
+    taskOf(ctx, taskId)?.currentStage?.name ?? t('space.ade.claudeDialog.stageFallback.label');
+  return {
+    kind: 'stage',
+    title: t('space.ade.claudeDialog.stage.title', { stage }),
+    taskId,
+    targets: [],
+  };
 }
 
 export function startSpec(branchId: string): DialogSpec {
-  return { kind: 'start', title: 'Start Claude Code (interactive)', branchId, targets: [] };
+  return { kind: 'start', title: t('space.ade.claudeDialog.start.title'), branchId, targets: [] };
 }
 
 /** Work that archiving would lose: uncommitted files or commits no integration branch holds. */
@@ -218,7 +231,7 @@ export function archiveSpec(ctx: DialogCtx, risk: ArchiveRisk): DialogSpec {
   const atRiskBranches = risk.branches.filter(atRisk);
   return {
     kind: 'archive',
-    title: 'Archive: work would be lost',
+    title: t('space.ade.claudeDialog.archive.title'),
     taskId: risk.taskId,
     risk: { ...risk, branches: atRiskBranches },
     targets: targetsFor(
@@ -365,7 +378,7 @@ function busyFor(ctx: DialogCtx, spec: DialogSpec): DialogView['busy'] {
       const kind = activityKind(s);
       if (kind === 'working' || kind === 'waiting') {
         out.push({
-          text: `${ctx.repo(b.codeRepoId).nick} · ${b.name} · claude ${shortId(s.id)} · ${ACTIVITY_LABEL[kind]}`,
+          text: `${ctx.repo(b.codeRepoId).nick} · ${b.name} · ${t('space.common.claudeSession.label', { id: shortId(s.id) })} · ${activityLabel(kind)}`,
           kind,
         });
       }
@@ -380,7 +393,7 @@ function headlessFor(ctx: DialogCtx, spec: DialogSpec): string {
     if (
       ctx.sessions.some((s) => s.branchId === id && s.mode === 'headless' && s.state === 'running')
     ) {
-      return `A background run is active on ${branchOf(ctx, id)?.name ?? id}. Stop it in Sessions, or wait.`;
+      return t('space.ade.claudeDialog.headless.body', { branch: branchOf(ctx, id)?.name ?? id });
     }
   }
   return '';
@@ -392,30 +405,36 @@ function riskText(ctx: DialogCtx, spec: DialogSpec): string {
     .map((r) => {
       const b = branchOf(ctx, r.branchId);
       const facts = [
-        r.dirty.length ? `${r.dirty.length} uncommitted` : '',
-        r.unmerged ? `${r.unmerged} unmerged commits` : '',
+        r.dirty.length
+          ? t('space.ade.claudeDialog.riskUncommitted.label', { count: r.dirty.length })
+          : '',
+        r.unmerged ? t('space.ade.claudeDialog.riskUnmerged.label', { count: r.unmerged }) : '',
       ].filter(Boolean);
-      return `${b ? ctx.repo(b.codeRepoId).nick : r.branchId}: ${facts.join(', ')}`;
+      return t('space.ade.claudeDialog.riskRepo.label', {
+        repo: b ? ctx.repo(b.codeRepoId).nick : r.branchId,
+        facts: facts.join(', '),
+      });
     })
     .join(' · ');
 }
 
 function sendLabel(spec: DialogSpec, overridden: boolean, noOp: boolean): string {
-  if (overridden) return 'Send anyway';
-  if (spec.kind === 'changeBase' && (spec.draft || noOp)) return 'Save base';
+  if (overridden) return t('space.ade.claudeDialog.sendAnyway.label');
+  if (spec.kind === 'changeBase' && (spec.draft || noOp))
+    return t('space.ade.claudeDialog.saveBase.label');
   switch (spec.kind) {
     case 'rebase':
     case 'queue':
     case 'changeBase':
-      return 'Run in background';
+      return t('space.ade.claudeDialog.runInBackground.label');
     case 'stage':
-      return 'Open session';
+      return t('space.ade.board.taskMenu.openSession.label');
     case 'start':
-      return 'Start';
+      return t('common.action.start.label');
     case 'archive':
-      return 'Send to Claude, then archive';
+      return t('space.ade.claudeDialog.sendAndArchive.label');
     default:
-      return 'Send to Claude';
+      return t('space.ade.claudeDialog.send.label');
   }
 }
 
@@ -443,8 +462,11 @@ export function composeDialog(ctx: DialogCtx, spec: DialogSpec, state: DialogSta
     const running = runningTui(ctx, tg.branchId);
     const chosen = resolvedChoice(ctx, tg);
     const opts = running.length
-      ? running.map((s) => ({ value: s.id, label: `claude ${shortId(s.id)}` }))
-      : [{ value: 'new', label: 'new session' }];
+      ? running.map((s) => ({
+          value: s.id,
+          label: t('space.common.claudeSession.label', { id: shortId(s.id) }),
+        }))
+      : [{ value: 'new', label: t('space.ade.claudeDialog.newSession.label') }];
     return {
       repo: b ? ctx.repo(b.codeRepoId).nick : '',
       repoId: b?.codeRepoId ?? '',
@@ -452,7 +474,10 @@ export function composeDialog(ctx: DialogCtx, spec: DialogSpec, state: DialogSta
       branchId: tg.branchId,
       options: opts.map((o) => ({
         value: o.value,
-        label: o.label + (running.length === 1 ? ' (only agent)' : ''),
+        label:
+          running.length === 1
+            ? t('space.ade.claudeDialog.onlyAgent.label', { session: o.label })
+            : o.label,
         on: chosen === o.value,
       })),
     };
@@ -465,10 +490,16 @@ export function composeDialog(ctx: DialogCtx, spec: DialogSpec, state: DialogSta
     blocked: headless !== '' || (busy.length > 0 && !state.override),
     busy,
     busyShown: busy.length > 0,
-    busyTitle: state.override
-      ? 'Override on: this will be sent even though these agents are busy.'
-      : "Agents are busy on branches this would rewrite. Wait until they're idle or need input.",
-    overrideLabel: state.override ? 'Undo override' : 'Override…',
+    busyTitle: t(
+      state.override
+        ? 'space.ade.claudeDialog.busyOverridden.hint'
+        : 'space.ade.claudeDialog.busy.hint',
+    ),
+    overrideLabel: t(
+      state.override
+        ? 'space.ade.claudeDialog.undoOverride.label'
+        : 'space.ade.claudeDialog.override.label',
+    ),
     overridden,
     headless,
     showMessage: !draft && !noOp,
@@ -480,7 +511,9 @@ export function composeDialog(ctx: DialogCtx, spec: DialogSpec, state: DialogSta
     canPush: (rebase && !draft && !noOp) || spec.kind === 'merge',
     pushOn: state.push,
     pushLabel:
-      spec.kind === 'merge' ? `Also push ${spec.target}` : 'Also force-push after rebasing',
+      spec.kind === 'merge'
+        ? t('space.ade.claudeDialog.pushMerge.label', { target: spec.target ?? '' })
+        : t('space.ade.claudeDialog.pushRebase.label'),
     isArchive: spec.kind === 'archive',
     riskText: riskText(ctx, spec),
     targets,

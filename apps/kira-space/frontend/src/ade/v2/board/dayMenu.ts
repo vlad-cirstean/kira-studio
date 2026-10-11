@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { Settings, SettingsPatch } from '../../../state/settingsDomain';
 import { type Calendar, isWeekend, LATER, offsetToIso } from './calendar';
 
@@ -20,7 +21,7 @@ export function dayMenuFor(
   const iso = offsetToIso(today, day);
   if (cal.offDays.has(day)) {
     return {
-      label: 'Mark as working day',
+      label: t('space.ade.board.dayMenu.workingDay.label'),
       patch: { offDays: settings.offDays.filter((d) => d !== iso) },
       confirm: false,
     };
@@ -28,18 +29,18 @@ export function dayMenuFor(
   if (isWeekend(cal, day)) {
     return cal.workWeekend.has(day)
       ? {
-          label: 'Mark as weekend (off)',
+          label: t('space.ade.board.dayMenu.weekend.label'),
           patch: { workWeekendDays: settings.workWeekendDays.filter((d) => d !== iso) },
           confirm: false,
         }
       : {
-          label: 'Work this day',
+          label: t('space.ade.board.dayMenu.workThisDay.label'),
           patch: { workWeekendDays: [...settings.workWeekendDays, iso] },
           confirm: false,
         };
   }
   return {
-    label: 'Mark as day off',
+    label: t('space.ade.board.dayMenu.dayOff.label'),
     patch: { offDays: [...settings.offDays.filter((d) => d >= today), iso] },
     confirm: startCount > 0,
   };

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { useScriptRunDialogStore } from '@workbench/automations/run/runDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { useCustomScriptsStore } from '../../../state/customScripts';
@@ -29,7 +30,7 @@ export function useRunAutomation() {
     return {
       type: 'submenu',
       id: 'ade-automation-menu',
-      label: 'Run automation',
+      label: t('space.ade.board.taskMenu.runAutomation.label'),
       items: menuItems(taskId, branchId),
     };
   }

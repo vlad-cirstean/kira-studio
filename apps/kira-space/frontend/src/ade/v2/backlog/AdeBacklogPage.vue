@@ -2,6 +2,7 @@
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -71,7 +72,12 @@ async function onPromote(id: string): Promise<void> {
 async function onRemove(id: string): Promise<void> {
   const item = items.value.find((i) => i.id === id);
   if (!item) return;
-  if (!(await confirmDialogStore.confirm({ message: `Delete this backlog item?\n\n${item.text}`, confirmLabel: 'Delete', tone: 'danger' }))) return;
+  if (!(await confirmDialogStore.confirm({
+      title: t('space.ade.backlog.deleteConfirm.title'),
+      message: t('space.ade.backlog.deleteConfirm.body', { text: item.text }),
+      confirmLabel: t('common.action.delete.label'),
+      tone: 'danger',
+    }))) return;
   await run(() => remove.mutateAsync({ id }));
 }
 
@@ -83,14 +89,14 @@ function onEdit(id: string, value: string): void {
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 gap-0.5" data-testid="ade-backlog">
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg">
-      <PanelHeader>Backlog</PanelHeader>
+      <PanelHeader>{{ t('space.common.backlog.label') }}</PanelHeader>
       <div class="flex shrink-0 flex-col gap-2 border-b border-border p-3">
-        <span class="text-kira-md text-muted-foreground">Get it out of your head. Order it later: top is most important. Not on the plan yet.</span>
-      <Label for="ade-backlog-add" class="sr-only">Add to backlog</Label>
+        <span class="text-kira-md text-muted-foreground">{{ t('space.ade.backlog.intro.hint') }}</span>
+      <Label for="ade-backlog-add" class="sr-only">{{ t('space.ade.backlog.add.label') }}</Label>
       <Input
         id="ade-backlog-add"
         v-model="text"
-        placeholder="Type a thought and press Enter"
+        :placeholder="t('space.ade.backlog.add.placeholder')"
         size="kira-lg"
         data-testid="ade-backlog-add"
         @keydown.enter="capture"
@@ -109,7 +115,7 @@ function onEdit(id: string, value: string): void {
         @remove="onRemove(item.id)"
         @edit="(v) => onEdit(item.id, v)"
       />
-      <div v-if="!items.length" class="px-3 py-6 text-kira-lg text-subtle">Backlog is empty.</div>
+      <div v-if="!items.length" class="px-3 py-6 text-kira-lg text-subtle">{{ t('space.common.backlogEmpty.empty') }}</div>
       </div>
     </div>
     <aside class="flex min-h-0 w-130 shrink-0 flex-col overflow-hidden rounded-kira border border-border bg-bg">
@@ -120,7 +126,7 @@ function onEdit(id: string, value: string): void {
         @promote="onPromote(selected.id)"
         @remove="onRemove(selected.id)"
       />
-      <div v-else class="p-5 text-kira-md text-subtle">Select an item to add links and notes.</div>
+      <div v-else class="p-5 text-kira-md text-subtle">{{ t('space.ade.backlog.selectHint.hint') }}</div>
     </aside>
   </div>
 </template>

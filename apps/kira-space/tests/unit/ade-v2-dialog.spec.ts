@@ -136,7 +136,7 @@ describe('busy and headless blocks', () => {
     const spec = rbSpec(c, 'b_bill');
     const blocked = composeDialog(c, spec, STATE);
     expect(blocked.blocked).toBe(true);
-    expect(blocked.busy[0]?.text).toBe('web-app · feat/billing-dashboard · claude aaaa · working');
+    expect(blocked.busy[0]?.text).toBe('web-app · feat/billing-dashboard · Claude aaaa · Working');
     const over = composeDialog(c, spec, { ...STATE, override: true });
     expect(over.blocked).toBe(false);
     expect(over.sendLabel).toBe('Send anyway');
@@ -188,14 +188,14 @@ describe('targets', () => {
 
   test('no running session offers a new one', () => {
     const v = composeDialog(ctxWith([]), mergeSpec(ctxWith([]), 'b_bill', 'develop'), STATE);
-    expect(v.targets[0]?.options).toEqual([{ value: 'new', label: 'new session', on: true }]);
+    expect(v.targets[0]?.options).toEqual([{ value: 'new', label: 'New session', on: true }]);
   });
 
   test('one running session is the only agent and the default', () => {
     const c = ctxWith([running('9ab01234', 'b_bill')]);
     const v = composeDialog(c, mergeSpec(c, 'b_bill', 'develop'), STATE);
     expect(v.targets[0]?.options).toEqual([
-      { value: '9ab01234', label: 'claude 9ab0 (only agent)', on: true },
+      { value: '9ab01234', label: 'Claude 9ab0 (only agent)', on: true },
     ]);
   });
 

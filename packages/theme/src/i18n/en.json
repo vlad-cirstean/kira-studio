@@ -4042,9 +4042,6 @@
           "label": "User"
         }
       },
-      "done": {
-        "label": "Done"
-      },
       "historical": {
         "status": "Historical"
       },
@@ -4322,7 +4319,6 @@
         "aria": "Drag to reorder"
       },
       "list": {
-        "empty": "No backlog items yet",
         "emptyHint": "Items added here or in Kira Space appear here."
       },
       "loadError": {
@@ -4644,6 +4640,548 @@
   },
   "space": {
     "ade": {
+      "abortConfirm": {
+        "body": "Runs git rebase --abort on “{branch}”. The branch returns to where it was before the rebase; the base stays changed until a rebase completes.",
+        "title": "Abort rebase?"
+      },
+      "activity": {
+        "input": {
+          "status": "Needs input"
+        },
+        "stopped": {
+          "status": "Stopped"
+        },
+        "waiting": {
+          "status": "Waiting on monitor"
+        },
+        "working": {
+          "status": "Working"
+        }
+      },
+      "add": {
+        "addToLater": {
+          "label": "Add to later"
+        },
+        "attach": {
+          "label": "Adding to: {title}"
+        },
+        "base": {
+          "label": "Base · {repo}"
+        },
+        "jira": {
+          "placeholder": "Paste a link or key (optional)"
+        },
+        "noBranchesYet": {
+          "hint": "No branches yet. Claude creates one per repository on start."
+        },
+        "notes": {
+          "placeholder": "Context for Claude (optional)"
+        },
+        "searchBranches": {
+          "placeholder": "Search branches in all repositories"
+        },
+        "tabBranch": {
+          "label": "Existing branch"
+        },
+        "title": {
+          "placeholder": "What needs doing"
+        },
+        "trigger": {
+          "label": "Add task"
+        }
+      },
+      "allSessions": {
+        "archived": {
+          "status": "Stopped · archived"
+        },
+        "stuck": {
+          "status": "Stuck · needs you"
+        }
+      },
+      "automation": {
+        "chipBlocked": {
+          "label": "{name} · needs you"
+        },
+        "chipFailed": {
+          "label": "{name} · failed"
+        },
+        "none": {
+          "empty": "No automations yet"
+        }
+      },
+      "backlog": {
+        "add": {
+          "label": "Add to backlog",
+          "placeholder": "Type a thought and press Enter"
+        },
+        "captured": {
+          "label": "Captured {ago}"
+        },
+        "deleteConfirm": {
+          "body": "Deletes “{text}” from the backlog. This can’t be undone.",
+          "title": "Delete backlog item?"
+        },
+        "github": {
+          "placeholder": "Paste a GitHub PR or issue link"
+        },
+        "intro": {
+          "hint": "Get it out of your head and order it later, most important first. Nothing here is on the plan yet."
+        },
+        "item": {
+          "label": "Backlog item"
+        },
+        "jira": {
+          "placeholder": "Paste a Jira link or key"
+        },
+        "moveDown": {
+          "tooltip": "Move down"
+        },
+        "moveUp": {
+          "tooltip": "Move up"
+        },
+        "notPlanned": {
+          "label": "Backlog · not planned"
+        },
+        "promotePanel": {
+          "label": "→ Plan as task",
+          "tooltip": "Turn into a task in the spec phase, unscheduled"
+        },
+        "promoteRow": {
+          "label": "→ Task",
+          "tooltip": "Turn into a task, unscheduled"
+        },
+        "selectHint": {
+          "hint": "Select an item to add links and notes."
+        }
+      },
+      "basePicker": {
+        "main": {
+          "label": "Main"
+        },
+        "planner": {
+          "label": "Planner branches"
+        },
+        "previous": {
+          "label": "Previous base"
+        },
+        "remote": {
+          "status": "Remote"
+        },
+        "search": {
+          "placeholder": "Search branches"
+        }
+      },
+      "board": {
+        "branchTag": {
+          "baseAttention": {
+            "tooltip": "The branch it is stacked on needs attention"
+          },
+          "baseBehind": {
+            "label": "Base behind"
+          },
+          "baseConflict": {
+            "label": "Base conflict"
+          },
+          "baseMissing": {
+            "label": "✕ Base missing",
+            "tooltip": "Base {base} no longer exists"
+          },
+          "behind": {
+            "label": "↓{behind} {base}",
+            "tooltip": "{count} commit behind {base} | {count} commits behind {base}"
+          },
+          "checkFailed": {
+            "label": "Conflict check failed"
+          },
+          "checking": {
+            "loading": "Checking…",
+            "tooltip": "Checking whether a rebase would conflict"
+          },
+          "clean": {
+            "label": "✓ Clean",
+            "tooltip": "No shared files with work merging before it"
+          },
+          "conflict": {
+            "label": "✕ Conflict"
+          },
+          "merged": {
+            "tooltip": "Landed on main"
+          },
+          "notCreated": {
+            "label": "Not created",
+            "tooltip": "Claude creates it when the task starts"
+          },
+          "notPushed": {
+            "label": "↑ Not pushed",
+            "tooltip": "Rebased locally; the remote still has the old commits"
+          },
+          "parked": {
+            "tooltip": "Kept out of the merge order"
+          },
+          "preparing": {
+            "label": "⚙ Preparing {duration}",
+            "tooltip": "Running the prepare-worktree script"
+          },
+          "rebaseConflicts": {
+            "tooltip": "Conflicts with {base} if rebased: {files}"
+          },
+          "rebaseFailed": {
+            "label": "✕ Rebase failed",
+            "tooltip": "The last rebase failed"
+          },
+          "rebaseInProgress": {
+            "label": "⚠ Rebase in progress",
+            "tooltip": "A rebase is left half-done in the worktree"
+          },
+          "rebaseNeedsYou": {
+            "label": "✋ Rebase needs you",
+            "tooltip": "The rebase agent needs you"
+          },
+          "rebasePending": {
+            "label": "⚠ Base changed, rebase pending"
+          },
+          "rebasePendingNote": {
+            "hint": "Base changed from {from} to {to}. The branch isn’t rebased onto it yet."
+          },
+          "rebasing": {
+            "label": "⟳ Rebasing",
+            "tooltip": "A background run is rebasing this branch"
+          },
+          "review": {
+            "label": "Review",
+            "tooltip": "Someone else’s branch"
+          },
+          "reviewOverlap": {
+            "tooltip": "Overlaps {branch}: {files}"
+          },
+          "seeLog": {
+            "label": "See log",
+            "tooltip": "Open the rebase log"
+          },
+          "setupFailed": {
+            "label": "✕ Setup failed",
+            "tooltip": "The prepare-worktree script failed"
+          },
+          "setupLog": {
+            "tooltip": "Open the setup log"
+          },
+          "sharesFiles": {
+            "label": "↻ {branch}",
+            "tooltip": "Shares {file} with {branch}; merges after it"
+          },
+          "start": {
+            "label": "▶ Start",
+            "tooltip": "Start Claude Code in its worktree"
+          },
+          "takeOver": {
+            "tooltip": "Continue the rebase yourself in Claude Code"
+          },
+          "waiting": {
+            "label": "⏳ {owner}",
+            "tooltip": "Based on {branch}"
+          }
+        },
+        "chip": {
+          "deployed": {
+            "tooltip": "Deployed: {env} runs {sha}, which contains this branch"
+          },
+          "deployStale": {
+            "tooltip": "Stale on {env}: {note}"
+          },
+          "deployStaleDefault": {
+            "tooltip": "Stale on {env}: {env} runs {sha}, missing changes of this branch"
+          },
+          "deployUnknown": {
+            "tooltip": "Deployed SHA of {env} unknown"
+          },
+          "mergedUpToDate": {
+            "tooltip": "Merged into {target}, up to date"
+          },
+          "stale": {
+            "hint": "Stale in {target}: {note}. Right-click to re-merge."
+          },
+          "staleDefault": {
+            "hint": "Stale in {target}, missing changes of this branch. Right-click to re-merge."
+          }
+        },
+        "dayMenu": {
+          "dayOff": {
+            "label": "Mark as day off"
+          },
+          "weekend": {
+            "label": "Mark as weekend"
+          },
+          "workingDay": {
+            "label": "Mark as working day"
+          },
+          "workThisDay": {
+            "label": "Work this day"
+          }
+        },
+        "fixMenu": {
+          "merge": {
+            "label": "Merge into {target}"
+          },
+          "reMerge": {
+            "label": "Re-merge into {target} (stale)"
+          }
+        },
+        "merged": {
+          "label": "✓ Merged"
+        },
+        "newTask": {
+          "label": "New task"
+        },
+        "nothingToRebase": {
+          "label": "Nothing to rebase"
+        },
+        "notMerging": {
+          "label": "Not merging"
+        },
+        "rebaseList": {
+          "label": "Rebase {names}"
+        },
+        "reviewChoice": {
+          "createFirst": {
+            "tooltip": "Create the branch first"
+          },
+          "noCommits": {
+            "tooltip": "No commits on top of {base} yet"
+          },
+          "pick": {
+            "tooltip": "Choose a branch to review"
+          },
+          "review": {
+            "tooltip": "Review {branch} against {base}"
+          },
+          "uncommitted": {
+            "hint": "Only uncommitted changes on {branch}. Commit them to review against {base}."
+          },
+          "working": {
+            "tooltip": "An agent is still working; the review updates as it commits"
+          }
+        },
+        "setup": {
+          "failed": {
+            "title": "Worktree setup failed"
+          },
+          "ready": {
+            "title": "Worktree ready"
+          },
+          "running": {
+            "title": "Preparing worktree"
+          }
+        },
+        "taskAction": {
+          "approve": {
+            "tooltip": "Run “{step}”"
+          },
+          "archive": {
+            "hint": "Stops its agents, deletes its worktrees and hides it. Branches, notes and links are kept; it stays in history."
+          },
+          "done": {
+            "label": "Done ›",
+            "tooltip": "{stage} is done; move to {next}"
+          },
+          "doneLast": {
+            "tooltip": "{stage} is done"
+          },
+          "finish": {
+            "label": "Finish ✓",
+            "tooltip": "Finish the workflow"
+          },
+          "retryFailed": {
+            "tooltip": "{stage} failed; see its output on the task tab"
+          },
+          "retryStuck": {
+            "tooltip": "{stage} is stuck; see its output on the task tab"
+          },
+          "run": {
+            "label": "▶ Run"
+          },
+          "runAgents": {
+            "tooltip": "Run {stage} with background agents (claude -p)"
+          },
+          "runScript": {
+            "tooltip": "Run: {command}"
+          },
+          "stage": {
+            "label": "▶ {stage}",
+            "tooltip": "Open an interactive Claude Code session for {stage}"
+          },
+          "takeOver": {
+            "tooltip": "{step} needs you; continue it yourself in Claude Code"
+          }
+        },
+        "taskMenu": {
+          "branchNames": {
+            "label": "Branch names"
+          },
+          "jiraLink": {
+            "label": "Jira link"
+          },
+          "latestSessionId": {
+            "label": "Latest Claude session ID"
+          },
+          "liveBlocked": {
+            "tooltip": "Stop its running agents first"
+          },
+          "markMerging": {
+            "label": "Mark as merging"
+          },
+          "markNotMerging": {
+            "label": "Mark as not merging"
+          },
+          "moveLater": {
+            "label": "Move to later"
+          },
+          "moveNextWorkDay": {
+            "label": "Move to next work day"
+          },
+          "moveToday": {
+            "label": "Move to today"
+          },
+          "moveToStage": {
+            "label": "Move to stage"
+          },
+          "openGithub": {
+            "label": "Open on GitHub"
+          },
+          "openJira": {
+            "label": "Open Jira issue"
+          },
+          "openSession": {
+            "label": "Open session"
+          },
+          "reviewCode": {
+            "label": "Review code"
+          },
+          "runAutomation": {
+            "label": "Run automation"
+          },
+          "showSessions": {
+            "label": "Show sessions"
+          },
+          "skipStage": {
+            "label": "Skip {stage}"
+          },
+          "stopRuns": {
+            "label": "Stop running agents"
+          },
+          "taskId": {
+            "label": "Task ID"
+          }
+        },
+        "taskMerged": {
+          "tooltip": "Every branch landed on main"
+        },
+        "taskStatus": {
+          "tooltip": "Task status"
+        }
+      },
+      "claudeDialog": {
+        "archive": {
+          "title": "Archive would lose work"
+        },
+        "autostash": {
+          "label": "Autostash the uncommitted changes, rebase, then restore them"
+        },
+        "base": {
+          "label": "Base"
+        },
+        "busy": {
+          "hint": "Agents are busy on branches this would rewrite. Wait until they’re idle or need input."
+        },
+        "busyOverridden": {
+          "hint": "Override is on. This is sent even though these agents are busy."
+        },
+        "changeBase": {
+          "title": "Change the base"
+        },
+        "deleteAnyway": {
+          "label": "Delete anyway",
+          "tooltip": "Skip Claude and delete the worktrees now. Uncommitted changes are lost"
+        },
+        "headless": {
+          "body": "A background run is active on {branch}. Stop it on the sessions tab, or wait."
+        },
+        "launchFailed": {
+          "error": "Couldn’t launch the session."
+        },
+        "message": {
+          "label": "Message to Claude"
+        },
+        "newSession": {
+          "label": "New session"
+        },
+        "noOp": {
+          "hint": "The branch already sits on this base. Saving only records it."
+        },
+        "onlyAgent": {
+          "label": "{session} (only agent)"
+        },
+        "override": {
+          "label": "Override…"
+        },
+        "pushMerge": {
+          "label": "Also push {target}"
+        },
+        "pushOff": {
+          "hint": "Off. It stays local; push it yourself later."
+        },
+        "pushRebase": {
+          "label": "Also force-push after rebasing"
+        },
+        "reMerge": {
+          "title": "Re-merge into {target}"
+        },
+        "risk": {
+          "body": "{risk}. Tell Claude what to do with it, or delete the worktrees anyway."
+        },
+        "riskRepo": {
+          "label": "{repo} has {facts}"
+        },
+        "riskUncommitted": {
+          "label": "{count} uncommitted"
+        },
+        "riskUnmerged": {
+          "label": "{count} unmerged commit | {count} unmerged commits"
+        },
+        "runInBackground": {
+          "label": "Run in background"
+        },
+        "saveBase": {
+          "label": "Save base"
+        },
+        "send": {
+          "label": "Send to Claude"
+        },
+        "sendAndArchive": {
+          "label": "Send to Claude, then archive"
+        },
+        "sendAnyway": {
+          "label": "Send anyway"
+        },
+        "stage": {
+          "title": "{stage} · interactive Claude Code"
+        },
+        "stageFallback": {
+          "label": "Stage"
+        },
+        "start": {
+          "title": "Start Claude Code (interactive)"
+        },
+        "startsWhenReady": {
+          "loading": "Starts when ready…"
+        },
+        "undoOverride": {
+          "label": "Undo override"
+        }
+      },
+      "forcePushConfirm": {
+        "body": "Replaces the remote branch “{branch}” in {repo} with your local one. Refused when someone else pushed since your last fetch.",
+        "title": "Force push?"
+      },
       "needs": {
         "action": {
           "reMerge": {
@@ -4673,9 +5211,6 @@
           },
           "question": {
             "label": "Question"
-          },
-          "rebase": {
-            "label": "Rebase"
           },
           "setupFailed": {
             "label": "Setup failed"
@@ -4727,11 +5262,73 @@
             "label": "Step “{name}” is stuck on {branch}"
           }
         }
+      },
+      "rebase": {
+        "abort": {
+          "label": "Abort rebase",
+          "tooltip": "Run git rebase --abort in {branch}"
+        },
+        "baseMissing": {
+          "tooltip": "Base {base} no longer exists; change the base first"
+        },
+        "busy": {
+          "tooltip": "A run is working on {branch}"
+        },
+        "changeBase": {
+          "label": "Change base…",
+          "tooltip": "Change base of {branch} (now {base})"
+        },
+        "changeBaseDraft": {
+          "tooltip": "Change base of the new branch (now {base})"
+        },
+        "conflictWith": {
+          "tooltip": "Conflicts with {base}: {files}"
+        },
+        "onto": {
+          "label": "Rebase onto {base}",
+          "tooltip": "Rebase {branch} onto {base}"
+        },
+        "queueAfter": {
+          "label": "Queue after {base}"
+        },
+        "queueAfterShort": {
+          "label": "Queue after"
+        },
+        "retry": {
+          "label": "Retry rebase"
+        },
+        "retryOnto": {
+          "label": "Retry rebase onto {base}"
+        },
+        "sharesFile": {
+          "tooltip": "Shares {file} with {base}; rebase onto it"
+        }
+      },
+      "view": {
+        "empty": {
+          "hint": "Add repositories from the Git module to start planning agent work.",
+          "title": "No repositories yet"
+        },
+        "import": {
+          "label": "Import repositories…"
+        }
       }
     },
     "common": {
+      "abort": {
+        "label": "Abort"
+      },
+      "archive": {
+        "label": "Archive"
+      },
       "backlog": {
         "label": "Backlog"
+      },
+      "backlogEmpty": {
+        "empty": "No backlog items yet"
+      },
+      "claudeSession": {
+        "label": "Claude {id}"
       },
       "day": {
         "earlier": {
@@ -4747,6 +5344,9 @@
           "label": "Tomorrow"
         }
       },
+      "forcePush": {
+        "label": "Force push"
+      },
       "githubIssue": {
         "label": "Issue {ref}"
       },
@@ -4759,14 +5359,40 @@
       "newBranch": {
         "label": "New branch"
       },
+      "noBranches": {
+        "empty": "No branches"
+      },
+      "notes": {
+        "label": "Notes"
+      },
       "plan": {
         "label": "Plan"
+      },
+      "rebase": {
+        "label": "Rebase"
       },
       "reply": {
         "label": "Reply"
       },
       "skipped": {
         "status": "Skipped"
+      },
+      "status": {
+        "blocked": {
+          "status": "Blocked"
+        },
+        "done": {
+          "status": "Done"
+        },
+        "inProgress": {
+          "status": "In progress"
+        },
+        "inReview": {
+          "status": "In review"
+        },
+        "todo": {
+          "status": "To do"
+        }
       }
     },
     "module": {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { useAutomationsModule } from '@workbench/automations/module';
 import RunElapsed from '@workbench/automations/runs/RunElapsed.vue';
 import RunOutcomeBlock from '@workbench/automations/runs/RunOutcomeBlock.vue';
@@ -24,7 +25,7 @@ function toggle(id: string): void {
 
 <template>
   <section v-if="rows.length > 0" class="flex max-h-48 flex-col gap-1 overflow-y-auto" data-testid="ade-automations">
-    <h4 class="m-0 text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">Automations</h4>
+    <h4 class="m-0 text-kira-sm font-medium uppercase tracking-wider text-muted-foreground">{{ t('common.module.automations.label') }}</h4>
     <div v-for="run in rows" :key="run.id" class="flex flex-col" data-testid="ade-automation-row" :data-state="run.state">
       <div class="flex items-center gap-1.5">
         <button
@@ -46,10 +47,10 @@ function toggle(id: string): void {
           data-testid="ade-automation-open"
           @click="ctx.showAutomations(); ctx.openRunTab(run.id, run.scriptName)"
         >
-          Open
+          {{ t('common.action.open.label') }}
         </Button>
         <Button v-if="run.state === 'running'" variant="dialog" size="kira-lg" data-testid="ade-automation-stop" @click="stop.mutate(run.id)">
-          Stop
+          {{ t('common.action.stop.label') }}
         </Button>
       </div>
       <div v-if="expanded === run.id" class="pt-1">

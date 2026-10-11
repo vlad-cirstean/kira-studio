@@ -45,9 +45,13 @@ const SETTINGS = {
   headlessSettingSources: 'all' as const,
 };
 
+// The product words differ from the mockup's only by sentence case (P265): compare lowercased.
+const lc = (v: string | undefined) => v?.toLowerCase();
+const lcAll = (v: readonly string[]) => v.map((x) => x.toLowerCase());
+
 /** Branch id -> what the new logic shows instead of the mockup, with the reason. */
 const DIVERGENCE: Record<string, { mockup: string; ours: string; why: string }> = {
-  b_deps: { mockup: 'CI failing', ours: '✓ clean', why: 'D9: no CI badge' },
+  b_deps: { mockup: 'CI failing', ours: '✓ Clean', why: 'D9: no CI badge' },
 };
 
 let board: Board;
@@ -183,10 +187,10 @@ describe('per task', () => {
     for (const t of tasks()) {
       const box = boxOf(t.id);
       const { cell } = cellOf(t.id);
-      expect([t.id, cell?.tag.label]).toEqual([t.id, box.cells[0].tag]);
-      expect([t.id, cell?.action ? [cell.action.label] : []]).toEqual([
+      expect([t.id, lc(cell?.tag.label)]).toEqual([t.id, lc(box.cells[0].tag)]);
+      expect([t.id, lcAll(cell?.action ? [cell.action.label] : [])]).toEqual([
         t.id,
-        box.cells[0].btns.map((b: MockupComponent) => b.label),
+        lcAll(box.cells[0].btns.map((b: MockupComponent) => b.label)),
       ]);
     }
   });
@@ -262,10 +266,10 @@ describe('per branch', () => {
           expect([b.id, ours.label]).toEqual([b.id, expected.ours]);
           continue;
         }
-        expect([b.id, ours.label]).toEqual([b.id, cell.tag]);
-        expect([b.id, ours.actions.map((a) => a.label)]).toEqual([
+        expect([b.id, lc(ours.label)]).toEqual([b.id, lc(cell.tag)]);
+        expect([b.id, lcAll(ours.actions.map((a) => a.label))]).toEqual([
           b.id,
-          cell.btns.map((x: MockupComponent) => x.label),
+          lcAll(cell.btns.map((x: MockupComponent) => x.label)),
         ]);
       }
     }
@@ -317,7 +321,14 @@ describe('branch second line', () => {
         // Re-merge is out of scope (P146 R5): the mockup's `Right-click to re-merge.` tip suffix is dropped.
         const pick = (c: { label: string; tip: string }) => [
           c.label,
-          c.tip.replace('. Right-click to re-merge.', ''),
+          c.tip
+            .replace('. Right-click to re-merge.', '')
+            .replace(
+              /^stale in (\S+): has changes not in \S+$/i,
+              'stale in $1, missing changes of this branch',
+            )
+            .replace(/^(\S+): deployed sha unknown$/i, 'deployed sha of $1 unknown')
+            .toLowerCase(),
         ];
         expect([b.id, line.context]).toEqual([b.id, row.hasSub ? row.sub : '']);
         expect([b.id, line.merged.map(pick)]).toEqual([b.id, row.into.map(pick)]);
@@ -340,11 +351,13 @@ describe('Needs you', () => {
   test('same items (kind, text, action, scope) as the mockup', () => {
     const key = (kind: string, what: string, action: string, scope: string) =>
       [kind, what, action, scope].join('|');
+    // The product words differ from the mockup's by the P265 style rules: curly quotes, a capitalised scope.
+    const curly = (s: string) => s.replace(/"([^"]*)"/g, '“$1”');
     const theirs = oracle.needs.items
-      .map((n: MockupComponent) => key(n.kind, n.what, n.btn, n.repo))
+      .map((n: MockupComponent) => key(n.kind, curly(n.what), n.btn, (n.repo ?? '').toLowerCase()))
       .sort();
     const mine = ours()
-      .items.map((n) => key(n.kind, n.what, n.action, n.scope))
+      .items.map((n) => key(n.kind, n.what, n.action, n.scope.toLowerCase()))
       .sort();
     expect(mine).toEqual(theirs);
   });
@@ -362,7 +375,9 @@ describe('Needs you', () => {
   test('badge counts the items; footer drops the CI count', () => {
     const n = ours();
     expect(n.badge).toBe(oracle.needs.items.length);
-    expect(n.footer).toBe(oracle.needs.load.replace(/ · \d+ waiting on CI/, ''));
+    const singular = (s: string) =>
+      s.replace(/\b1 (background run|interactive session)s\b/g, '1 $1');
+    expect(n.footer).toBe(singular(oracle.needs.load.replace(/ · \d+ waiting on CI/, '')));
   });
 });
 
@@ -391,18 +406,18 @@ describe('rebase-conflict check states', () => {
 
   test('done with paths is a conflict with Rebase, done without is clean', () => {
     expect(tagFor({ conflictsIfRebased: ['a.ts', 'b.ts'] })).toEqual([
-      '✕ conflict',
+      '✕ Conflict',
       ['Rebase'],
-      'conflicts with main if rebased: a.ts, b.ts',
+      'Conflicts with main if rebased: a.ts, b.ts',
     ]);
-    expect(tagFor({})[0]).toBe('✓ clean');
+    expect(tagFor({})[0]).toBe('✓ Clean');
   });
 
   test('checking and failed never read as clean', () => {
-    expect(tagFor({ conflictCheck: 'checking' })[0]).toBe('checking…');
+    expect(tagFor({ conflictCheck: 'checking' })[0]).toBe('Checking…');
     expect(
       tagFor({ conflictCheck: 'failed', conflictCheckReason: 'git 2.30 is older than 2.38' }),
-    ).toEqual(['conflict check failed', [], 'git 2.30 is older than 2.38']);
+    ).toEqual(['Conflict check failed', [], 'git 2.30 is older than 2.38']);
   });
 });
 

@@ -1,6 +1,7 @@
 import type { TextPart } from '@theme/varText';
 import type { BaseChoice, Branch, Run } from '../wire';
 import type { BranchGraph } from './branchGraph';
+import { catalogParts } from './catalogParts';
 
 // The one rule behind every rebase control: tag action, fix menu, panel header, task menu and card
 // button. `rebaseActs` says which acts a branch has; `adeDialogs.act` runs one.
@@ -30,8 +31,6 @@ export interface RebaseActInput {
   /** Short name of the repo's main branch, `''` when unresolved. */
   mainName: string;
 }
-
-const part = (name: string, value: string): TextPart => ({ name, value });
 
 /** The base a branch shows: its stacking parent, else its stored base, else main. */
 export function baseOf(b: Branch, graph: BranchGraph, mainName: string): string {
@@ -67,17 +66,17 @@ function workingOn(i: RebaseActInput, rootId: string): Branch | null {
 /** Why an act on `rootId` cannot start now, `null` when it can. */
 function blocker(i: RebaseActInput, rootId: string, needsBase: boolean): TextPart[] | null {
   const busy = workingOn(i, rootId);
-  if (busy) return ['A run is working on ', part('branch', busy.name)];
+  if (busy) return catalogParts('space.ade.rebase.busy.tooltip', { branch: busy.name });
   if (needsBase) {
     const b = i.graph.byBranch.get(rootId);
     if (b?.baseMissing)
-      return ['Base ', part('base', b.base), ' no longer exists. Change the base first'];
+      return catalogParts('space.ade.rebase.baseMissing.tooltip', { base: b.base });
   }
   return null;
 }
 
-function baseLabel(i: RebaseActInput, id: string): TextPart {
-  return part('base', baseOf(i.graph.byBranch.get(id) as Branch, i.graph, i.mainName));
+function baseLabel(i: RebaseActInput, id: string): string {
+  return baseOf(i.graph.byBranch.get(id) as Branch, i.graph, i.mainName);
 }
 
 function lastRebaseRun(i: RebaseActInput, branchId: string): Run | null {
@@ -113,16 +112,19 @@ function rebaseBaseActs(i: RebaseActInput, rootId: string): RebaseAct[] {
     return {
       kind: 'rebase',
       id,
-      label: [t.isRetry ? 'Retry rebase onto ' : 'Rebase onto ', baseLabel(i, t.id)],
+      label: catalogParts(
+        t.isRetry ? 'space.ade.rebase.retryOnto.label' : 'space.ade.rebase.onto.label',
+        { base: baseLabel(i, t.id) },
+      ),
       branchId: t.id,
       onto: null,
       isRetry: t.isRetry,
-      tip: why ?? [
-        'Rebase ',
-        part('branch', (i.graph.byBranch.get(t.id) as Branch).name),
-        ' onto ',
-        baseLabel(i, t.id),
-      ],
+      tip:
+        why ??
+        catalogParts('space.ade.rebase.onto.tooltip', {
+          branch: (i.graph.byBranch.get(t.id) as Branch).name,
+          base: baseLabel(i, t.id),
+        }),
       disabled: why !== null,
     };
   });
@@ -138,11 +140,17 @@ function followAct(i: RebaseActInput): RebaseAct[] {
     {
       kind: 'rebase',
       id: 'rebase-onto',
-      label: ['Rebase onto ', part('base', followName)],
+      label: catalogParts('space.ade.rebase.onto.label', { base: followName }),
       branchId: b.id,
       onto: { ref: '', branchId: follow.id },
       isRetry: false,
-      tip: why ?? ['Shares ', follow.file, ' with ', part('base', followName), '; rebase onto it'],
+      tip:
+        why ??
+        catalogParts(
+          'space.ade.rebase.sharesFile.tooltip',
+          { base: followName },
+          { file: follow.file },
+        ),
       disabled: why !== null,
     },
   ];
@@ -153,12 +161,14 @@ function queueAct(i: RebaseActInput, rootId: string): RebaseAct[] {
   const confBranch = conf ? i.graph.byBranch.get(conf.with) : undefined;
   if (!conf || !confBranch) return [];
   const why = blocker(i, rootId, false);
-  const label: TextPart[] = ['Queue after ', part('base', confBranch.name)];
-  const tip = why ?? [
-    'Conflicts with ',
-    part('base', confBranch.name),
-    `: ${conf.files.join(', ')}`,
-  ];
+  const label = catalogParts('space.ade.rebase.queueAfter.label', { base: confBranch.name });
+  const tip =
+    why ??
+    catalogParts(
+      'space.ade.rebase.conflictWith.tooltip',
+      { base: confBranch.name },
+      { files: conf.files.join(', ') },
+    );
   if (confBranch.kind === 'review') {
     return [
       {
@@ -195,16 +205,14 @@ function baseActs(i: RebaseActInput): RebaseAct[] {
     {
       kind: 'changeBase',
       id: 'change-base',
-      label: ['Change base…'],
+      label: catalogParts('space.ade.rebase.changeBase.label'),
       branchId: b.id,
       draft,
-      tip: cbWhy ?? [
-        'Change base of ',
-        part('branch', draft ? 'the new branch' : b.name),
-        ' (now ',
-        part('base', nowOn),
-        ')',
-      ],
+      tip:
+        cbWhy ??
+        (draft
+          ? catalogParts('space.ade.rebase.changeBaseDraft.tooltip', { base: nowOn })
+          : catalogParts('space.ade.rebase.changeBase.tooltip', { branch: b.name, base: nowOn })),
       disabled: cbWhy !== null,
     },
   ];
@@ -212,9 +220,9 @@ function baseActs(i: RebaseActInput): RebaseAct[] {
     out.push({
       kind: 'abortRebase',
       id: 'abort-rebase',
-      label: ['Abort rebase'],
+      label: catalogParts('space.ade.rebase.abort.label'),
       branchId: b.id,
-      tip: ['Run git rebase --abort in ', part('branch', b.name)],
+      tip: catalogParts('space.ade.rebase.abort.tooltip', { branch: b.name }),
       disabled: workingOn(i, b.id) !== null,
     });
   }

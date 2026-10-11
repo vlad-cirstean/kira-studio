@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
-import { computed } from 'vue';
 import { remoteErrorText } from './board/panelFacts';
 import { useForcePush } from './queries';
 import { useConfirmRun } from './useConfirmRun';
@@ -10,10 +10,6 @@ const props = defineProps<{ target: { branchId: string; branchName: string; repo
 const emit = defineEmits<{ close: [] }>();
 
 const forcePush = useForcePush();
-const title = computed(() =>
-  props.target ? `Force push ${props.target.branchName} (repo ${props.target.repo}) with lease?` : '',
-);
-
 const { busy, error, confirm } = useConfirmRun(
   () => props.target !== null,
   async () => {
@@ -28,9 +24,9 @@ const { busy, error, confirm } = useConfirmRun(
 <template>
   <ConfirmDialogView
     :open="target !== null"
-    :title="title"
-    message="Replaces the remote branch with your local one; refused when someone else pushed since your last fetch."
-    confirm-label="Force push"
+    :title="t('space.ade.forcePushConfirm.title')"
+    :message="t('space.ade.forcePushConfirm.body', { branch: target?.branchName ?? '', repo: target?.repo ?? '' })"
+    :confirm-label="t('space.common.forcePush.label')"
     tone="danger"
     :busy="busy"
     :error="error ?? ''"

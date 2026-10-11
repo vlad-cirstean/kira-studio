@@ -1,7 +1,9 @@
+import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import type { BranchRowModel, CardModel } from '../plan/usePlanModel';
 import type { Task } from '../wire';
 import type { BranchGraph } from './branchGraph';
+import { catalogParts } from './catalogParts';
 
 // One rule for every Review code control: hidden, disabled with a reason, or enabled with a preview.
 
@@ -27,31 +29,27 @@ export function reviewChoice(
 ): ReviewChoice | null {
   const b = row.branch;
   if (b.kind === 'parked') return null;
-  const base: TextPart = { name: 'base', value: baseNameOf(row, graph) };
-  const branch: TextPart = { name: 'branch', value: b.name };
+  const vars = { base: baseNameOf(row, graph), branch: b.name };
   const choice = (disabled: boolean, tip: readonly TextPart[]): ReviewChoice => ({
     branchId: row.id,
     label: `${row.repo} · ${row.name}`,
     disabled,
     tip,
   });
-  if (b.name === '') return choice(true, ['Create the branch first']);
+  if (b.name === '')
+    return choice(true, catalogParts('space.ade.board.reviewChoice.createFirst.tooltip'));
   if (b.baseMissing) {
-    return choice(true, ['Base ', base, ' no longer exists. Change the base first']);
+    return choice(true, catalogParts('space.ade.rebase.baseMissing.tooltip', vars));
   }
   if (b.ahead === 0 && b.dirty.length > 0) {
-    return choice(true, [
-      'Only uncommitted changes on ',
-      branch,
-      '. Commit them to review against ',
-      base,
-      '.',
-    ]);
+    return choice(true, catalogParts('space.ade.board.reviewChoice.uncommitted.hint', vars));
   }
-  if (b.ahead === 0) return choice(true, ['No commits on top of ', base, ' yet']);
+  if (b.ahead === 0) {
+    return choice(true, catalogParts('space.ade.board.reviewChoice.noCommits.tooltip', vars));
+  }
   const working = task.runs.some((r) => r.branchId === row.id && r.state === 'running');
-  const tip: TextPart[] = ['Review ', branch, ' against ', base];
-  if (working) tip.push('\nAn agent is still working: the review updates as it commits');
+  const tip = catalogParts('space.ade.board.reviewChoice.review.tooltip', vars);
+  if (working) tip.push(`\n${t('space.ade.board.reviewChoice.working.tooltip')}`);
   return choice(false, tip);
 }
 
@@ -61,5 +59,7 @@ export function reviewChoices(card: CardModel, graph: BranchGraph): ReviewChoice
 
 /** Tooltip of a task-level control: the branch's own tip when there is one, else a prompt to pick. */
 export function taskReviewTip(choices: readonly ReviewChoice[]): readonly TextPart[] {
-  return choices.length === 1 ? choices[0].tip : ['Pick a branch to review'];
+  return choices.length === 1
+    ? choices[0].tip
+    : catalogParts('space.ade.board.reviewChoice.pick.tooltip');
 }

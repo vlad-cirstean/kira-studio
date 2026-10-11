@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { useAutomationsModule } from '@workbench/automations/module';
 import RunElapsed from '@workbench/automations/runs/RunElapsed.vue';
 import { useScriptRuns, useSeenRuns } from '@workbench/automations/runs/runsQueries';
@@ -21,10 +22,11 @@ const tone = computed(() => {
   if (state === 'failed') return 'red';
   return state === 'blocked' ? 'amber' : 'blue';
 });
-const word = computed(() => {
+const label = computed(() => {
+  const name = run.value?.scriptName ?? '';
   const state = run.value?.state;
-  if (state === 'failed') return 'failed';
-  return state === 'blocked' ? 'needs you' : '';
+  if (state === 'failed') return t('space.ade.automation.chipFailed.label', { name });
+  return state === 'blocked' ? t('space.ade.automation.chipBlocked.label', { name }) : name;
 });
 const tip = computed(() => (run.value ? runReason(run.value) || run.value.scriptName : ''));
 
@@ -48,7 +50,7 @@ function open(): void {
       @click.stop="open"
     >
       <SmartBadge v-if="run.kind === 'smart'" />
-      <AdeChip :label="word ? `${run.scriptName} · ${word}` : run.scriptName" :tone="tone" class="max-w-40 truncate" />
+      <AdeChip :label="label" :tone="tone" class="max-w-40 truncate" />
       <RunElapsed v-if="run.state === 'running'" :run="run" class="text-kira-sm text-muted-foreground" />
     </button>
   </AdeTip>

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { Branch, Task } from '../wire';
 import { baseContext } from './baseMarker';
 import type { BranchGraph } from './branchGraph';
@@ -31,8 +32,10 @@ export function integrationChips(b: Branch): LabelChip[] {
       label: `${integrationLabel(i.target)} ${merged ? '✓' : '⚠'}`,
       tone: merged ? 'muted' : 'stale',
       tip: merged
-        ? `merged into ${i.target}, up to date`
-        : `stale in ${i.target}${i.note ? `: ${i.note}` : `: has changes not in ${i.target}`}. Right-click to re-merge.`,
+        ? t('space.ade.board.chip.mergedUpToDate.tooltip', { target: i.target })
+        : i.note
+          ? t('space.ade.board.chip.stale.hint', { target: i.target, note: i.note })
+          : t('space.ade.board.chip.staleDefault.hint', { target: i.target }),
     });
   }
   return out;
@@ -48,19 +51,24 @@ function deploymentChips(b: Branch): LabelChip[] {
       out.push({
         label: `▲${d.env} ?`,
         tone: 'unknown',
-        tip: d.error || `${d.env}: deployed sha unknown`,
+        tip: d.error || t('space.ade.board.chip.deployUnknown.tooltip', { env: d.env }),
       });
     } else if (d.status === 'deployed') {
       out.push({
         label: `▲${d.env} ✓`,
         tone: 'muted',
-        tip: `deployed: ${d.env} runs ${d.deployedSha}, which contains this branch`,
+        tip: t('space.ade.board.chip.deployed.tooltip', { env: d.env, sha: d.deployedSha }),
       });
     } else {
       out.push({
         label: `▲${d.env} ⚠`,
         tone: 'stale',
-        tip: `stale on ${d.env}: ${d.note || `${d.env} runs ${d.deployedSha}, missing changes of this branch`}`,
+        tip: d.note
+          ? t('space.ade.board.chip.deployStale.tooltip', { env: d.env, note: d.note })
+          : t('space.ade.board.chip.deployStaleDefault.tooltip', {
+              env: d.env,
+              sha: d.deployedSha,
+            }),
       });
     }
   }
@@ -89,6 +97,12 @@ export function branchLine2(b: Branch, graph: BranchGraph, prTitle: string): Bra
 }
 
 /** Task title: its own title, else Jira key, else PR title, else branch name, else `New task`. */
-export function taskTitle(t: Task, firstBranch: Branch | undefined, prTitle: string): string {
-  return t.title || t.jira?.key || prTitle || firstBranch?.name || 'New task';
+export function taskTitle(task: Task, firstBranch: Branch | undefined, prTitle: string): string {
+  return (
+    task.title ||
+    task.jira?.key ||
+    prTitle ||
+    firstBranch?.name ||
+    t('space.ade.board.newTask.label')
+  );
 }

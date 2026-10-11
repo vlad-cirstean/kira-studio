@@ -107,7 +107,7 @@ useSortableReorder(
     <template #empty>
       <Empty class="py-10" data-testid="backlog-empty">
         <EmptyHeader>
-          <EmptyTitle>{{ t('mobile.backlog.list.empty') }}</EmptyTitle>
+          <EmptyTitle>{{ t('space.common.backlogEmpty.empty') }}</EmptyTitle>
           <EmptyDescription>{{ t('mobile.backlog.list.emptyHint') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>

@@ -21,7 +21,9 @@ test('asks first, names the repo and sends the branch', async ({ relaunch }) => 
   ]);
   await page.locator('[data-testid="ade-force-push"]').click();
   const dialog = page.locator('[data-testid="ade-confirm-dialog"]');
-  await expect(dialog).toContainText('Force push chore/deps-bump (repo web-app) with lease?');
+  await expect(dialog).toContainText('Force push?');
+  await expect(dialog).toContainText('“chore/deps-bump” in web-app');
+  await expect(dialog.locator('[data-testid="ade-confirm-yes"]')).toHaveText('Force push');
   expect(control.log().filter((e) => e.channel === IPC.adeTaskForcePush)).toHaveLength(0);
   await dialog.locator('[data-testid="ade-confirm-yes"]').click();
   await expect

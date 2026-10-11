@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { Settings } from '../../../state/settingsDomain';
 import type { Board, Branch, HistoryEntry, Task } from '../wire';
 import { type BranchGraph, buildBranchGraph, isDraft, shortBranchName } from './branchGraph';
@@ -541,7 +542,9 @@ export function rippleOf(
   return {
     branchIds: out,
     taskIds,
-    text: out.length ? `rebase ${names.join(', ')}` : 'nothing to rebase',
+    text: out.length
+      ? t('space.ade.board.rebaseList.label', { names: names.join(', ') })
+      : t('space.ade.board.nothingToRebase.label'),
     tone: out.length ? 'amber' : 'grey',
   };
 }

@@ -3,6 +3,7 @@ import { rowIndent, rowVariants } from '@theme/components/rowVariants';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { useRelativeTime } from '@workbench/behaviour/format';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
@@ -29,8 +30,12 @@ const facts = computed(() => {
   const gh = parseGithub(props.item.githubUrl);
   return [
     props.item.jira?.key ?? '',
-    gh ? `${gh.kind === 'PR' ? 'PR' : 'issue'} ${gh.ref}` : '',
-    props.item.notes ? 'notes' : '',
+    gh
+      ? t(gh.kind === 'PR' ? 'space.common.githubPr.label' : 'space.common.githubIssue.label', {
+          ref: gh.ref,
+        })
+      : '',
+    props.item.notes ? t('space.common.notes.label') : '',
   ]
     .filter(Boolean)
     .join(' · ');
@@ -51,29 +56,29 @@ const facts = computed(() => {
     @keydown.self.enter="emit('pick')"
     @keydown.self.space.prevent="emit('pick')"
   >
-    <AdeTip text="Higher priority">
+    <AdeTip :text="t('space.ade.backlog.moveUp.tooltip')">
       <Button
         variant="toolbar"
         size="kira-icon"
-        aria-label="Move up"
+        :aria-label="t('space.ade.backlog.moveUp.tooltip')"
         data-testid="ade-backlog-up"
         @click.stop="emit('move', -1)"
       >
         ↑
       </Button>
     </AdeTip>
-    <AdeTip text="Lower priority">
+    <AdeTip :text="t('space.ade.backlog.moveDown.tooltip')">
       <Button
         variant="toolbar"
         size="kira-icon"
-        aria-label="Move down"
+        :aria-label="t('space.ade.backlog.moveDown.tooltip')"
         data-testid="ade-backlog-down"
         @click.stop="emit('move', 1)"
       >
         ↓
       </Button>
     </AdeTip>
-    <AdeTip text="Turn into a task (lands in Later on the plan)">
+    <AdeTip :text="t('space.ade.backlog.promoteRow.tooltip')">
       <Button variant="dialog"
         size="kira"
         class="shrink-0 "
@@ -81,15 +86,15 @@ const facts = computed(() => {
         data-testid="ade-backlog-promote"
         @click.stop="emit('promote')"
       >
-        → Task
+        {{ t('space.ade.backlog.promoteRow.label') }}
       </Button>
     </AdeTip>
-    <AdeTip text="Delete">
+    <AdeTip :text="t('common.action.delete.label')">
       <Button
         variant="toolbar"
         size="kira-icon"
         class="text-error"
-        aria-label="Delete"
+        :aria-label="t('common.action.delete.label')"
         data-testid="ade-backlog-delete"
         @click.stop="emit('remove')"
       >
@@ -97,7 +102,7 @@ const facts = computed(() => {
       </Button>
     </AdeTip>
     <span class="w-16 shrink-0 text-kira-sm text-subtle" data-testid="ade-backlog-ago">{{ ago }}</span>
-    <Label :for="`ade-backlog-${item.id}`" class="sr-only">Backlog item</Label>
+    <Label :for="`ade-backlog-${item.id}`" class="sr-only">{{ t('space.ade.backlog.item.label') }}</Label>
     <Input
       :id="`ade-backlog-${item.id}`"
       :model-value="edit.text.value"

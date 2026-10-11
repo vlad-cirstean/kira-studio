@@ -13,7 +13,7 @@ export const JOB_STATE_LABEL = {
   awaiting: 'memory.import.state.awaiting.status',
   running: 'common.state.running.status',
   paused: 'memory.import.state.paused.status',
-  done: 'memory.common.done.label',
+  done: 'space.common.status.done.status',
   cancelled: 'memory.import.state.cancelled.status',
   failed: 'common.state.failed.status',
 } as const satisfies Record<ImportJobState, MessageKey>;
@@ -24,7 +24,7 @@ export const FILE_STATE_LABEL = {
   extracting: 'memory.import.fileState.extracting.status',
   extracted: 'memory.import.fileState.extracted.status',
   finalizing: 'memory.import.fileState.finalizing.status',
-  done: 'memory.common.done.label',
+  done: 'space.common.status.done.status',
   failed: 'common.state.failed.status',
   cancelled: 'memory.import.state.cancelled.status',
 } as const satisfies Record<ImportFileState, MessageKey>;

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import type { Run } from '../wire';
 import type { BranchGraph } from './branchGraph';
@@ -38,7 +39,12 @@ export function fixItems(i: FixInput): FixItem[] | null {
     out.push({
       id: `ade-fix-merge-${target}`,
       kind: 'merge',
-      label: status === 'stale' ? `Re-merge into ${target} (stale)` : `Merge into ${target}`,
+      label: t(
+        status === 'stale'
+          ? 'space.ade.board.fixMenu.reMerge.label'
+          : 'space.ade.board.fixMenu.merge.label',
+        { target },
+      ),
       target,
     });
   }
@@ -53,6 +59,10 @@ export function fixItems(i: FixInput): FixItem[] | null {
     out.push({ id: `ade-fix-${act.id}`, kind: 'act', label: plain(act.label), act, hint: act.tip });
   }
   if (i.unpushed[b.id])
-    out.push({ id: 'ade-fix-force-push', kind: 'forcePush', label: 'Force push' });
+    out.push({
+      id: 'ade-fix-force-push',
+      kind: 'forcePush',
+      label: t('space.common.forcePush.label'),
+    });
   return out;
 }

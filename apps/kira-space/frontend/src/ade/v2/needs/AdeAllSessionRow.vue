@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { t } from '@theme/i18n';
 import { useRelativeTime } from '@workbench/behaviour/format';
 import { computed } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
-import { ACTIVITY_LABEL, shortId } from '../activity';
+import { activityLabel, shortId } from '../activity';
 import type { SessionView } from '../sessions/sessionView';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { ACTION_CLASS } from '../tones';
@@ -20,9 +21,9 @@ const ago = useRelativeTime(() => props.view.session.lastActiveAt);
 const running = computed(() => props.view.session.state === 'running');
 const input = computed(() => running.value && props.view.kind === 'input');
 const state = computed(() => {
-  if (props.archived) return 'stopped · archived';
-  if (props.view.headless && input.value) return 'stuck · needs you';
-  return ACTIVITY_LABEL[props.view.kind];
+  if (props.archived) return t('space.ade.allSessions.archived.status');
+  if (props.view.headless && input.value) return t('space.ade.allSessions.stuck.status');
+  return activityLabel(props.view.kind);
 });
 const stateClass = computed(() => {
   if (!running.value) return 'text-muted-foreground';
@@ -65,11 +66,11 @@ function open(): void {
       data-testid="ade-all-action"
       @click.stop="opens ? open() : takeOver.request(view.session.id)"
     >
-      {{ opens ? 'Open' : 'Take over' }}
+      {{ opens ? t('common.action.open.label') : t('common.action.takeOver.label') }}
     </Button>
     <span v-else class="w-23 shrink-0" />
-    <span class="w-22.5 shrink-0 font-data text-kira-sm text-muted-foreground">claude {{ shortId(view.session.id) }}</span>
-    <span class="w-16 shrink-0 truncate text-kira-sm text-subtle">{{ view.repo || 'spec' }}</span>
+    <span class="w-22.5 shrink-0 font-data text-kira-sm text-muted-foreground">{{ t('space.common.claudeSession.label', { id: shortId(view.session.id) }) }}</span>
+    <span class="w-16 shrink-0 truncate text-kira-sm text-subtle">{{ view.repo || t('space.ade.needs.scope.spec.label') }}</span>
     <div class="flex min-w-0 flex-1 flex-col">
       <span class="truncate text-kira-md">{{ view.allLabel }}</span>
       <span class="truncate font-data text-kira-sm text-subtle">{{ view.branch }} {{ view.worktree }}</span>

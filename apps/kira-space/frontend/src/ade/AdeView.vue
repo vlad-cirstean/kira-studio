@@ -9,6 +9,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import { useReposDialogStore } from '../repo/state/reposDialog';
 import { useCodeReposStore } from '../state/coderepos';
 import AdeShell from './v2/shell/AdeShell.vue';
@@ -25,13 +26,13 @@ const reposDialog = useReposDialogStore();
         <EmptyMedia>
           <CodiconIcon name="robot" :size="24" />
         </EmptyMedia>
-        <EmptyTitle>No repository imported yet</EmptyTitle>
-        <EmptyDescription>Add repositories from the Git module to start planning agent work.</EmptyDescription>
+        <EmptyTitle>{{ t('space.ade.view.empty.title') }}</EmptyTitle>
+        <EmptyDescription>{{ t('space.ade.view.empty.hint') }}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button variant="dialog-primary" size="kira-lg" data-testid="ade-import" @click="reposDialog.show()">
           <CodiconIcon name="repo" :size="13" />
-          Add repositories…
+          {{ t('space.ade.view.import.label') }}
         </Button>
       </EmptyContent>
     </Empty>

@@ -9,6 +9,7 @@ import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Toggle } from '@theme/components/ui/toggle';
+import { CatalogText, t } from '@theme/i18n';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
@@ -35,8 +36,8 @@ const open = computed({
 const attachTo = computed(() => addUi.attachTo);
 const tab = ref('new');
 const tabItems = computed(() => [
-  ...(addUi.attachTo ? [] : [{ value: 'new', label: 'New task', testid: 'ade-add-tab-new' }]),
-  { value: 'branch', label: 'Existing branch', testid: 'ade-add-tab-branch' },
+  ...(addUi.attachTo ? [] : [{ value: 'new', label: t('space.ade.board.newTask.label'), testid: 'ade-add-tab-new' }]),
+  { value: 'branch', label: t('space.ade.add.tabBranch.label'), testid: 'ade-add-tab-branch' },
 ]);
 const error = ref('');
 
@@ -132,7 +133,7 @@ async function pick(b: CandidateBranch): Promise<void> {
     <PopoverTrigger as-child>
       <Button variant="dialog" size="kira-lg" data-testid="ade-add">
         <CodiconIcon name="add" :size="12" />
-        Add task
+        {{ t('space.ade.add.trigger.label') }}
       </Button>
     </PopoverTrigger>
     <PopoverContent align="end" class="w-120 gap-0 overflow-hidden p-0" data-testid="ade-add-popover">
@@ -140,17 +141,17 @@ async function pick(b: CandidateBranch): Promise<void> {
         <SecondaryTabs v-model="tab" :items="tabItems" size="kira-lg" class="w-full" />
       </div>
       <div v-if="tab === 'new'" class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 p-3 text-kira-md">
-        <Label for="ade-nw-title" class="text-muted-foreground">Title</Label>
-        <Input id="ade-nw-title" v-model="title" placeholder="What needs doing" data-testid="ade-nw-title" />
-        <Label for="ade-nw-jira" class="text-muted-foreground">Jira</Label>
+        <Label for="ade-nw-title" class="text-muted-foreground">{{ t('common.field.title.label') }}</Label>
+        <Input id="ade-nw-title" v-model="title" :placeholder="t('space.ade.add.title.placeholder')" data-testid="ade-nw-title" />
+        <Label for="ade-nw-jira" class="text-muted-foreground">{{ t('common.product.jira.label') }}</Label>
         <Input
           id="ade-nw-jira"
           v-model="jira"
-          placeholder="paste link or key (optional)"
+          :placeholder="t('space.ade.add.jira.placeholder')"
           data-testid="ade-nw-jira"
         />
-        <span class="text-muted-foreground">Repos</span>
-        <fieldset aria-label="Repos" class="m-0 flex min-w-0 flex-wrap gap-1.5 border-0 p-0">
+        <span class="text-muted-foreground">{{ t('common.module.repositories.label') }}</span>
+        <fieldset :aria-label="t('common.module.repositories.label')" class="m-0 flex min-w-0 flex-wrap gap-1.5 border-0 p-0">
           <Toggle
             v-for="r in repos.data.value?.repos ?? []"
             :key="r.codeRepoId"
@@ -167,7 +168,7 @@ async function pick(b: CandidateBranch): Promise<void> {
           </Toggle>
         </fieldset>
         <template v-for="id in picked" :key="id">
-          <span class="text-muted-foreground" data-testid="ade-nw-base-label">Base · {{ repoLabel(id) }}</span>
+          <span class="text-muted-foreground" data-testid="ade-nw-base-label">{{ t('space.ade.add.base.label', { repo: repoLabel(id) }) }}</span>
           <div class="min-w-0" :data-repo-id="id" data-testid="ade-nw-base">
             <AdeBasePicker
               :code-repo-id="id"
@@ -176,20 +177,20 @@ async function pick(b: CandidateBranch): Promise<void> {
             />
           </div>
         </template>
-        <Label for="ade-nw-notes" class="self-start pt-1.5 text-muted-foreground">Notes</Label>
+        <Label for="ade-nw-notes" class="self-start pt-1.5 text-muted-foreground">{{ t('space.common.notes.label') }}</Label>
         <Textarea
           id="ade-nw-notes"
           v-model="notes"
-          placeholder="Context for Claude (optional)"
+          :placeholder="t('space.ade.add.notes.placeholder')"
           class="resize-y"
           data-testid="ade-nw-notes"
         />
         <span />
         <div class="flex items-center gap-2.5">
           <Button variant="dialog-primary" size="kira-lg" :disabled="cantAdd" data-testid="ade-nw-add" @click="addNew">
-            Add to Later
+            {{ t('space.ade.add.addToLater.label') }}
           </Button>
-          <span class="text-kira-sm text-subtle">No branches yet. Claude creates one per repo on Start.</span>
+          <span class="text-kira-sm text-subtle">{{ t('space.ade.add.noBranchesYet.hint') }}</span>
         </div>
       </div>
       <div v-else>
@@ -198,20 +199,22 @@ async function pick(b: CandidateBranch): Promise<void> {
           class="truncate border-b border-border px-3 py-1.5 text-kira-sm text-muted-foreground"
           data-testid="ade-add-attach"
         >
-          adding to: <span class="font-medium text-fg">{{ attachTo.title }}</span>
+          <CatalogText k="space.ade.add.attach.label">
+            <template #title><span class="font-medium text-fg">{{ attachTo.title }}</span></template>
+          </CatalogText>
         </p>
         <div class="border-b border-border p-1">
           <SearchField
             v-model="q"
             size="kira-lg"
-            placeholder="Search branches in all repos…"
-            aria-label="Search branches"
+            :placeholder="t('space.ade.add.searchBranches.placeholder')"
+            :aria-label="t('space.ade.add.searchBranches.placeholder')"
             data-testid="ade-branch-search"
           />
         </div>
         <div class="max-h-70 overflow-auto p-1">
           <AdeCandidateRow v-for="b in shown" :key="`${b.codeRepoId}/${b.name}`" :branch="b" :repo="repoLabel(b.codeRepoId)" @pick="pick(b)" />
-          <div v-if="shown.length === 0" class="p-2.5 text-kira-md text-muted-foreground">No branches</div>
+          <div v-if="shown.length === 0" class="p-2.5 text-kira-md text-muted-foreground">{{ t('space.common.noBranches.empty') }}</div>
         </div>
       </div>
       <FieldError v-if="error" class="px-3 pb-2" data-testid="ade-add-error">{{ error }}</FieldError>

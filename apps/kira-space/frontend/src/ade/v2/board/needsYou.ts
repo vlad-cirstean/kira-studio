@@ -41,7 +41,7 @@ const ACTION: Record<
 const KIND_LABEL = {
   'stuck run': 'space.ade.needs.kind.stuckRun.label',
   failed: 'common.state.failed.status',
-  rebase: 'space.ade.needs.kind.rebase.label',
+  rebase: 'space.common.rebase.label',
   question: 'space.ade.needs.kind.question.label',
   approval: 'space.ade.needs.kind.approval.label',
   'setup failed': 'space.ade.needs.kind.setupFailed.label',

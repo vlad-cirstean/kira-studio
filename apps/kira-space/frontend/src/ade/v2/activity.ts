@@ -1,15 +1,18 @@
 import type { AgentActivity } from '@shared/domain/agent';
+import { type MessageKey, t } from '@theme/i18n';
 import type { Session } from './wire';
 
 export type ActivityKind = 'input' | 'working' | 'waiting' | 'idle' | 'stopped';
 
-export const ACTIVITY_LABEL: Record<ActivityKind, string> = {
-  input: 'needs input',
-  working: 'working',
-  waiting: 'waiting on monitor',
-  idle: 'idle',
-  stopped: 'stopped',
-};
+const ACTIVITY_KEY = {
+  input: 'space.ade.activity.input.status',
+  working: 'space.ade.activity.working.status',
+  waiting: 'space.ade.activity.waiting.status',
+  idle: 'common.state.idle.status',
+  stopped: 'space.ade.activity.stopped.status',
+} as const satisfies Record<ActivityKind, MessageKey>;
+
+export const activityLabel = (kind: ActivityKind): string => t(ACTIVITY_KEY[kind]);
 
 /** Urgency order of the All sessions list: input first. */
 export const ACTIVITY_RANK: Record<ActivityKind, number> = {
