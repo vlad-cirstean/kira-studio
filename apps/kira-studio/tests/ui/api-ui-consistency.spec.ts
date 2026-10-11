@@ -363,7 +363,7 @@ test('hovering a resolved reference shows its value; hovering a secret never doe
   const hover = page.locator('[data-testid="autocomplete-hover"]');
   await expect(hover).toBeVisible();
   await expect(hover).toContainText('api.example.com');
-  await expect(hover).toContainText('environment variable');
+  await expect(hover).toContainText('Environment variable');
 
   // Move away, then hover the secret reference — a fresh token, so the panel re-arms.
   await page.mouse.move(0, 0);

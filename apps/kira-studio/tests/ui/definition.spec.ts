@@ -178,7 +178,7 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   await expect(constraintsSection).toBeVisible();
   await expect(constraintsSection).toContainText('PK');
   await expect(constraintsSection).toContainText('FK');
-  await expect(constraintsSection).toContainText('check');
+  await expect(constraintsSection).toContainText('Check');
 
   const idColumnRow = columnsSection.locator('tr', { has: page.getByText('id', { exact: true }) });
   await idColumnRow.scrollIntoViewIfNeeded();

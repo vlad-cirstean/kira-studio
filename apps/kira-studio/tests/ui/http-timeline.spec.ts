@@ -371,7 +371,7 @@ test('Http timeline — a failed send carries the timeline it got as far as', as
   // because the connect itself never completed.
   await hops.first().locator('[data-testid="http-timeline-phase-download"]').hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
-    'No download — no response bytes ever arrived.',
+    'No download because no response bytes ever arrived',
   );
 
   // The error strip at the top of the pane is unaffected by this — the same message a failed

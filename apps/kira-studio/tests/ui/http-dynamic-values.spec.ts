@@ -122,7 +122,7 @@ test('the preview never generates: a catalogued name is not a warning and stays 
   await expect(chip).toContainText('1 unresolved');
   await chip.hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
-    /\$nope — unknown dynamic value/,
+    /\$nope is an unknown dynamic value/,
   );
 });
 

@@ -102,7 +102,7 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">
         <CatalogText k="common.matchPosition.status">
-          <template #index><b class="font-data">{{ entry.index + 1 }}</b></template>
+          <template #position><b class="font-data">{{ entry.index + 1 }}</b></template>
           <template #total><b class="font-data">{{ entry.matches.length }}</b></template>
         </CatalogText>
       </template>

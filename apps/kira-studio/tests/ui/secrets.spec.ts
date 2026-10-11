@@ -50,7 +50,7 @@ test('keychain available shows the keychain-encrypted note', async ({ relaunch }
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
   await expect(page.locator('[data-testid="connection-credential-note"]')).toContainText(
-    'Credentials are encrypted with your macOS Keychain.',
+    'Credentials are encrypted with the macOS keychain.',
   );
 });
 

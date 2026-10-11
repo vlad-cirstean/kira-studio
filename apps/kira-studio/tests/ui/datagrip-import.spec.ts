@@ -142,7 +142,7 @@ test('datagrip import — the preview lists every row, greys the unsupported one
   const notSavedRow = page.locator('[data-testid="datagrip-row-uuid-not-saved"]');
   await expect(notSavedRow.locator('[data-slot="checkbox"]')).toBeChecked();
   await expect(notSavedRow.locator('[data-testid="datagrip-row-outlook"]')).toContainText(
-    'did not save',
+    'didn’t save',
   );
 
   // The row matching an existing connection is badged and starts unchecked (D10).
@@ -168,7 +168,7 @@ test('datagrip import — the preview lists every row, greys the unsupported one
   await expect(dialog).toBeVisible();
   await expect(page.locator('[data-testid="datagrip-import-confirm"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="datagrip-report-row-uuid-pg"]')).toContainText(
-    'password imported',
+    'Created with password',
   );
   await expect(page.locator('[data-testid="datagrip-report-row-uuid-not-saved"]')).toContainText(
     'Created',
@@ -211,7 +211,7 @@ test('datagrip import — the report renders every row outcome, including a fail
 
   const okRow = page.locator('[data-testid="datagrip-report-row-uuid-pg"]');
   await expect(okRow.locator('[data-testid="datagrip-report-row-outcome"]')).toContainText(
-    'password imported',
+    'Created with password',
   );
 
   const failedRow = page.locator('[data-testid="datagrip-report-row-uuid-not-saved"]');

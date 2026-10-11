@@ -402,7 +402,7 @@ test('gRPC request — a server-streaming call appends messages as they arrive',
     done: false,
   });
   await expect(page.locator('[data-testid="grpc-message-entry"]')).toHaveCount(2);
-  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('+4 ms');
+  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('At 4 ms');
 
   await emitWailsEvent(page, IPC.grpcCall, {
     callId,
@@ -479,7 +479,7 @@ test('gRPC request — the live message list caps at 10,000 and shows the true t
     `Showing the most recent 10000 of ${total} messages.`,
   );
   // The oldest 37 messages were dropped, not the newest — the ones a live user is watching arrive.
-  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('+37 ms');
+  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('At 37 ms');
 
   await emitWailsEvent(page, IPC.grpcCall, {
     callId,
@@ -504,7 +504,7 @@ test('gRPC request — the live message list caps at 10,000 and shows the true t
   // messages.length (capped at 10,000) — the old capped reading contradicted the elided-messages
   // strip's own "10000 of 10037" right below it.
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText(
-    `${total} messages`,
+    `${total.toLocaleString('en-US')} messages`,
   );
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('98.0 KB');
   await expect(page.locator('[data-testid="grpc-live-messages-elided"]')).toHaveText(
@@ -874,7 +874,7 @@ test('gRPC request — a stored streaming history entry with elided messages sho
     'Showing the first 100 of 137 messages.',
   );
   await expect(page.locator('[data-testid="grpc-history-metadata-elided"]')).toHaveText(
-    'Metadata, headers and trailers were not stored — too large for history.',
+    'Metadata, headers and trailers weren’t stored because they were too large for history.',
   );
   await page.click('[data-testid="grpc-response-pane-messages"]');
   // The message list is virtualized (finding 11) — only the visible window actually renders, so

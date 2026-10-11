@@ -304,7 +304,7 @@ useFocusOnMount(computed(() => fieldWrap.value?.querySelector('input')));
         <template v-if="scanning">{{ t('studio.search.scanning.loading', { count: foundSoFar }) }}</template>
         <template v-else-if="entry && entry.matches.length > 0">
           <CatalogText k="common.matchPosition.status">
-            <template #index><b class="font-data">{{ entry.index + 1 }}</b></template>
+            <template #position><b class="font-data">{{ entry.index + 1 }}</b></template>
             <template #total><b class="font-data">{{ formatCount(entry.found ?? entry.matches.length) }}</b></template>
           </CatalogText>
           <!-- P5 C4/F6: `found` only exceeds `matches.length` once a scan hit MAX_SCAN_MATCHES —

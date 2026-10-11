@@ -274,7 +274,7 @@ test('Http history — restore, and the storage notices', async ({ relaunch }) =
   await expect(page.locator('[data-testid="http-history-truncated"]')).toBeVisible();
   await expect(page.locator('[data-testid="http-body-truncated"]')).toBeVisible();
   await expect(page.locator('[data-testid="http-history-fields-elided"]')).toHaveText(
-    'Request field values were not stored — too large for history.',
+    'Request field values weren’t stored because they were too large for history.',
   );
 });
 
@@ -390,8 +390,8 @@ test('Http history — compare two responses', async ({ relaunch }) => {
   // collapsed behind the disclosure by default.
   const headerRows = dialog.locator('[data-testid="http-diff-header-row"]');
   await expect(headerRows).toHaveCount(2);
-  await expect(headerRows.filter({ hasText: 'x-total' })).toContainText('changed');
-  await expect(headerRows.filter({ hasText: 'x-new' })).toContainText('added');
+  await expect(headerRows.filter({ hasText: 'x-total' })).toContainText('Changed');
+  await expect(headerRows.filter({ hasText: 'x-new' })).toContainText('Added');
 
   // Both bodies are pretty-printed (indented) before diffing, since both are JSON — the seeded
   // bodies above are minified, so an unindented render here is a failing assertion (D12).

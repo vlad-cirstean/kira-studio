@@ -254,7 +254,7 @@ test('grid mask preview — mark a column PII, preview masks and locks editing, 
   // NULL stays NULL — masking a NULL would invent a value that is not there (§2.3).
   await expect(gridCell(page, 1, 'email')).toHaveText('NULL');
   await expect(page.locator('[data-testid="mask-preview-strip"]')).toBeVisible();
-  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('read-only');
+  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('Read-only');
 
   // Edit lockout (§6.4): the grid is read-only while masked, and the cell editor panel shows the
   // 'masked' reason first.
@@ -303,7 +303,7 @@ test('grid mask preview — mark a column PII, preview masks and locks editing, 
   await expect(toggle).toHaveClass(/is-active/);
   await expect(gridCell(page, 0, 'email')).toHaveText('m•••••••••••••@acme.example');
   await expect(gridCell(page, 0, 'email')).toHaveClass(/cell-masked/);
-  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('read-only');
+  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('Read-only');
 });
 
 // M7 finding #11: correlationKeyFor's own IPC call can reject (an unwrapped business-rule failure,

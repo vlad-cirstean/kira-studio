@@ -604,7 +604,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await scrollColumnIntoView(page, 'big_text', 3);
   await selectCell(page, 3, 'big_text');
   await expect(page.locator('[data-testid="cell-editor-badge-truncated"]')).toBeVisible();
-  await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('64 KB');
+  await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('64.0 KB');
   // P24 D27: a truncated value is read-only — see the sibling test's dedicated scenario for the
   // full behaviour (both editors refuse it, the value stays readable).
   await expect(panel).toHaveAttribute('data-read-only-reason', 'value-truncated');

@@ -156,7 +156,7 @@ test('Schema (DDL)… dialog stages until Save (D3)', async ({ relaunch }) => {
   await dialog.locator('.view-lines').click();
   await page.keyboard.type(TWO_TABLE_DDL);
   const opsBeforeSave = control.log().length;
-  await page.locator('[data-slot="dialog-footer"] button', { hasText: 'Save schema' }).click();
+  await page.locator('[data-slot="dialog-footer"] button', { hasText: /^Save$/ }).click();
   await expect(dialog).toHaveCount(0);
   expect(control.log().length).toBeGreaterThan(opsBeforeSave);
 
@@ -229,7 +229,7 @@ test('a rejected Save shows the error and leaves the dialog open', async ({ rela
 
   await dialog.locator('.view-lines').click();
   await page.keyboard.type(TWO_TABLE_DDL);
-  await page.locator('[data-slot="dialog-footer"] button', { hasText: 'Save schema' }).click();
+  await page.locator('[data-slot="dialog-footer"] button', { hasText: /^Save$/ }).click();
 
   await expect(dialog.locator('[data-testid="schema-save-error"]')).toContainText(
     'schema write failed',
@@ -684,6 +684,6 @@ test('the "Fill from connection" button and the no-schema hint are gone (D7)', a
   // The dialog still saves.
   await dialog.locator('.view-lines').click();
   await page.keyboard.type('CREATE TABLE t (id integer PRIMARY KEY);');
-  await page.locator('[data-slot="dialog-footer"] button', { hasText: 'Save schema' }).click();
+  await page.locator('[data-slot="dialog-footer"] button', { hasText: /^Save$/ }).click();
   await expect(dialog).toHaveCount(0);
 });
