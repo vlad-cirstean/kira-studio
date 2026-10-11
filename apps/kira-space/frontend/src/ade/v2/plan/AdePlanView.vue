@@ -371,6 +371,7 @@ function onForcePush(row: BranchRowModel): void {
       :title="dayOff?.title ?? ''"
       :message="dayOff?.text ?? ''"
       :confirm-label="dayOff?.yes ?? ''"
+      cancel-label="Leave it"
       tone="primary"
       :busy="dayOffRun.busy.value"
       :error="dayOffRun.error.value ?? ''"

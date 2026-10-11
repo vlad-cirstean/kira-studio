@@ -56,7 +56,7 @@ export const SHORTCUTS = {
 
   'form.submit': { scope: 'form', chord: { key: 'Return', cmdOrCtrl: true } },
   'form.save': { scope: 'form', chord: { key: 'S', cmdOrCtrl: true } },
-  // The ContextMenu key opens the same menu (matched alongside in useListNavigation).
+  // The ContextMenu key opens the same menu (matched alongside in shortcutFor).
   'menu.open': { scope: 'view', chord: { key: 'F10', shift: true } },
 
   'tree.open': { scope: 'tree', chord: { key: 'Return' } },

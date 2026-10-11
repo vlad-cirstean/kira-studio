@@ -58,6 +58,7 @@ function domCodeForKey(key: string): string | null {
 // tab-navigation bindings (shared/domain/shortcuts.ts), which the Go menu accelerator owns, never a
 // local keydown handler — so a local match only needs cmdOrCtrl/shift/alt.
 function matchesShortcut(id: ShortcutId, e: KeyboardEvent): boolean {
+  if (id === 'menu.open' && e.key === 'ContextMenu') return true;
   const chord = resolveChord(id);
   const cmdOrCtrlPressed = isMac ? e.metaKey : e.ctrlKey;
   const otherPlatformModPressed = isMac ? e.ctrlKey : e.metaKey;

@@ -83,6 +83,17 @@ export function formatDateTime(at: Instant): string {
   return DATE_TIME_FORMAT.format(toMillis(at));
 }
 
+const WEEKDAY_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
+/** A date without a time, with its weekday: 'Tue, 14 Oct' in the user's locale. */
+export function formatWeekdayDate(at: Instant): string {
+  return WEEKDAY_DATE_FORMAT.format(toMillis(at));
+}
+
 /** '04:29:57.123' in local time. */
 export function formatClockTime(at: Instant): string {
   const d = new Date(toMillis(at));

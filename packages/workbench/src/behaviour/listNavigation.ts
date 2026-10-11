@@ -220,7 +220,7 @@ export function useListNavigation<T>(opts: ListNavigationOptions<T>) {
   }
 
   function onMenuKey(e: KeyboardEvent, cx: KeyContext): boolean {
-    const menuKey = e.key === 'ContextMenu' || shortcutFor(e, ['menu.open']) !== null;
+    const menuKey = shortcutFor(e, ['menu.open']) !== null;
     if (!menuKey || cx.item === undefined || !opts.onMenu) return false;
     const row = rowElement(opts.key(cx.item));
     if (row?.contains(cx.target)) {

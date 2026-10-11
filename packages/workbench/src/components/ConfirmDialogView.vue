@@ -19,13 +19,14 @@ const props = withDefaults(
     title?: string;
     message: string;
     confirmLabel: string;
+    cancelLabel?: string;
     tone: 'danger' | 'primary';
     busy?: boolean;
     error?: string;
     touch?: boolean;
     testids?: Partial<Record<'root' | 'close' | 'message' | 'cancel' | 'confirm' | 'error', string>>;
   }>(),
-  { title: 'Confirm', busy: false, error: '', touch: false, testids: () => ({}) },
+  { title: 'Confirm', cancelLabel: 'Cancel', busy: false, error: '', touch: false, testids: () => ({}) },
 );
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
 
@@ -69,7 +70,7 @@ const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
           :data-testid="id('cancel')"
           @click="emit('cancel')"
         >
-          Cancel
+          {{ cancelLabel }}
         </Button>
         <Button
           data-dialog-initial

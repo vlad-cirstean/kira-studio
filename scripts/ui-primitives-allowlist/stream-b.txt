@@ -8,4 +8,3 @@ permanent U40 apps/kira-space/frontend/src/ade/v2/workflows/AdeWorkflowGraph.vue
 permanent U41 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # Cmd/Ctrl-click link open reads a mouse event modifier, not a key chord
 permanent U46 apps/kira-space/frontend/src/ade/v2/review/AdeReviewCompose.vue # 10 s wait for Claude Code to take a pasted message; a protocol timeout, not UI timing
 permanent U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain().focus() commands, not DOM focus
-permanent U52 apps/kira-space/frontend/mobile/state/useAgentsModel.ts # plan group label 'Tue, 14 Oct' (weekday, day, month); behaviour/format has no date-only form

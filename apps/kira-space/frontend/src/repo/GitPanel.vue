@@ -14,7 +14,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
 import { cn } from '@theme/lib/utils';
-import { promiseTimeout, until } from '@vueuse/core';
+import { until } from '@vueuse/core';
 import { copyAnnounced } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -126,11 +126,9 @@ const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: canc
 // the prompt.
 const renamingRepoId = ref<string | null>(null);
 
-// The menu returns focus to the row in a timer queued when it unmounts; start the rename after
-// that, or the new field loses focus to the row.
+// Start the rename once the menu closes; the menu leaves focus alone when a text field holds it.
 async function startRepoRename(id: string): Promise<void> {
   await until(() => contextMenuStore.open).toBe(false);
-  await promiseTimeout(0);
   renamingRepoId.value = id;
 }
 

@@ -22,6 +22,7 @@ const { busy, error, confirm } = useConfirmRun(
     :title="title"
     message="Runs git rebase --abort: the branch returns to where it was before the rebase. The base stays changed until a rebase completes."
     confirm-label="Abort rebase"
+    cancel-label="Keep"
     tone="danger"
     :busy="busy"
     :error="error ?? ''"

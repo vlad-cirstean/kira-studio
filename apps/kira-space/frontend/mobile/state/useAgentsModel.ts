@@ -11,6 +11,7 @@ import { taskColor } from '@ade/palette';
 import { useBoard, useRepoNames, useSessions, useWorkflows } from '@ade/readQueries';
 import type { Branch, Session, Task, Workflow } from '@ade/wire';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
+import { formatWeekdayDate } from '@workbench/behaviour/format';
 import { compareNatural } from '@workbench/behaviour/match';
 import { TIMING } from '@workbench/behaviour/timing';
 import { computed, ref } from 'vue';
@@ -48,7 +49,7 @@ function dayLabel(iso: string, today: string): string {
   if (iso === today) return 'Today';
   const date = new Date(`${iso}T00:00:00`);
   if (localIso(new Date(date.getTime() - DAY_MS)) === today) return 'Tomorrow';
-  return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  return formatWeekdayDate(date);
 }
 
 /** The three tabs' data, derived from the cached read queries. One instance serves every screen. */
