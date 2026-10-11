@@ -917,3 +917,64 @@ Deviations:
 - Permanent lines in `scripts/copy-allowlist/foundation.txt`: `packages/shared/protocol/frame.ts` (protocol decode diagnostic, same class as backend errors, P266) and `packages/theme/src/components/ui/button/index.ts` (`title` is a variant name). Close-out folds them into `check-copy.ts`.
 - Catalog duplicates (C3) from F0 seeds still covered by `ALLOWED_DUPLICATES`; not tightened (carry to close-out).
 - Not pushed (caller instruction).
+
+## Streams result
+
+Streams A (Kira Studio), B (Kira Space, mobile, memory), C (git-ui, docker-ui, workbench) ran as worktrees `p265-a`, `p265-b`, `p265-c` off `51527fd7e`. Landed in order C, B, A with fast-forward merges, then fixed in close-out commits. No UI, visual, e2e suite ran; the specs below are written, not run.
+
+Commits on `p265-c`: `4fdbc079d` C1, `f1fffde2a` C2, `5f9d93fa0` C3, `c73df4c8a` C4a, `fd11e2349` C4b, `96bec73e2` C5, `73ffe590d` C6, `d5bcda4ad` C7 sweep, `0d9afa666` specs.
+Commits on `p265-b`: `bdac2440d` B1, `ba93c66b0` B2, `2ce1d8df6` B3, `83ef2c076` B4, `5b661a746` B5, `523742681` B6, B7 sweep and specs (see `git log`).
+Commits on `p265-a`: `2c856487e` A1, `68b1962e3` A2, `f643e6969` A3, `50353e362` A4, `416393557` A5, `3f03f76e6` A6 stream and views, `c2262bc07` A6 workbench, `d27b5b816` A7 sweep, `2dc641bc9` specs.
+
+Close-out fixes:
+
+- Cross-stream C3/C4 duplicates (about 100 keys) promoted to `common.*`, callers repointed in the same commit. Wording unified: generic placeholders (`{first}`/`{second}`, `{name}`, `{value}`, `{position}`), `New branch` and `Force push` without ellipsis, `No output yet.`, `Connecting…`, git worktree start point example `origin/main`.
+- `nodeKindLabel` view uses `common.view.label`.
+- `SettingsShell` takes a required `sectionLabels` prop; ids stay the testid and deep-link key. Studio and Space pass catalog labels (mode label `API`). Both coverage specs dropped their section-name `allow` patterns.
+- `ALLOWED_DUPLICATES` is empty. Unused `*.module.title` seed keys deleted.
+- Unit specs `ade-v2-dialog.spec.ts` and `ade-v2-board-parity.spec.ts` follow the new wording (`Needs you`, `sent back`).
+- Allowlists in `scripts/copy-allowlist/` hold permanent lines only.
+
+### Specs written, not run
+
+- Studio: `copy-wording.spec.ts`, `copy-coverage.spec.ts`, `support/copyScenarios.ts`, `copy-wording-docker-automations.spec.ts`, `copy-coverage-docker-automations.spec.ts`.
+- Space: `copy-wording.spec.ts`, `copy-coverage.spec.ts`, `copy-wording-git.spec.ts`, `copy-coverage-git.spec.ts`; mobile `copy-wording.spec.ts` and `support/mockServer.ts` (`replies.board` override).
+- Expect tuning on first run: `allow` patterns for fixture data, selectors, mocked git preflight shapes (`preflight.*`, `remote.pushPreflight`, `remote.pullPreflight`, `repoSettings.get`), boot error via `'app.init': null`, a surface that caches `t()` at setup under the pseudo-locale, Studio context-menu label extraction via `.flex-1`, QueryState trigger via Docker `Containers` error.
+- `apps/kira-studio/tests/ui/automations-module.spec.ts:406` (Stream C): collection delete confirm is now `“Backend” and everything inside it will be deleted. This can’t be undone.` under title `Delete collection?`.
+- `copy-wording-git.spec.ts` pins the commit row menu as `New branch` (no ellipsis).
+
+### Deviations
+
+Stream A:
+- Colour names show as raw palette ids. Engine plan-node labels, SQL keywords and code samples stay as-is.
+- `bodyBadgeLabel` in api-core is unused.
+- `timestamp.ts` `MONTH_ABBR` stays: data formatting. KeyValuePane data-type strings (`s3 object field`, `redis <type>`) stay.
+- `beautify.ts` is worker-bound; workers cannot import `t`.
+- `Kira Studio` app-name args in `appUpdate.ts` and `main.ts` stay: module top-level `t` is banned by U70.
+- `studio.api.curl.dynamicValues.hint` dropped the `{{$…}}` sample.
+- Font group `On this Mac` is now `Installed`. Mode label `Api` is now `API`.
+- Stream C committed the Docker/automations specs; Stream A wrote none of them.
+- Checker: C6 treats the word after ` — `, `: ` and `. ` as a sentence start, so a lowercase word there fails; messages were reworded. `AI`, `SSO`, `PII`, `CDATA`, `DOCTYPE` are not in `PROPER_NOUNS`.
+
+Stream B:
+- Memory delete confirm spec covers the discard-import confirm; no other memory delete confirm exists.
+- Plan board empty state spec uses the no-repositories view (`space.ade.view.empty.*`).
+- Needs plural spec checks the footer `1 interactive session`.
+- Left literal on purpose: Claude prompt text in `ade/v2/dialog/compose.ts` and `board/runMessage.ts`; persisted `MANUAL_REASON` in AddMemoryDialog; weekday and month names; server run notes; `formatRelativeDate` and `formatAbsoluteDate` from `@kira/git-core`; raw palette colour names in swatch tooltips and menus; `needsYou` scope shows raw `runsOn` ('each repo'; parity spec compares it lowercase); product name `Kira Space` passed to `createAppUpdateStore`.
+- Checker: `PROPER_NOUNS` lacks PATH, MB, AC, Max, Agents; worded around. Plural `{count}` shows no thousands separator in search results.
+- Shared fields `LogLevelField`, `FontSizeField` are Stream C.
+
+Stream C:
+- Container delete confirm has no flow in the app; the spec pins the recreate confirm (`Recreate container?`, `Recreate now`).
+- Branch row menu pins `Rename`, not `Rename…`: `common.action.rename.label` has no ellipsis and renaming from the picker is an inline field.
+- No delete branch dialog exists; the spec pins the force delete prompt (`“name” is not fully merged.`, `Force delete`).
+- Force push body gets a second message when the remote has no tip, replacing the literal `nothing yet`.
+- Search field labels, ref decoration labels and stack counts are capitalised catalog text.
+- `Apply here (from {origin})` keeps its wording.
+- Setup-time `t()` constants became `computed` so they follow locale switches: operations log status filter, runs filter, script dialog tabs, schedule presets, row density items.
+
+### Leftovers
+
+- Allowlists hold 9 permanent lines: foundation 2 (`protocol/frame.ts`, `button/index.ts`), stream-a 4, stream-b 1, stream-c 2 (check `scripts/copy-allowlist/*.txt`).
+- `check-catalog --unused` (C10) reports 13 unused keys, among them `workbench.module.title`, `common.state.saving.loading`, `backend.prompt.*.title`. Not part of `bun run lint`.
+- Go tests `grpcflow` (protojson whitespace) and `queryplan` `TestParityFixtures` fail; no Go file changed since `51527fd7e`.
