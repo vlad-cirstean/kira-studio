@@ -1,6 +1,7 @@
 import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protocol/data-ops';
 import { pageChunks } from '@shared/protocol/page';
 import { VueQueryPlugin } from '@tanstack/vue-query';
+import { i18n, installCopyTestHook } from '@theme/i18n';
 import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
@@ -242,6 +243,7 @@ declare global {
 // way the deleted window.__kiraGridEngine once could. scripts/verify-packaging.sh's S6/S7 guard
 // this from regressing.
 if (__KIRA_DEBUG_HOOKS__) {
+  installCopyTestHook();
   window.__kiraScrollTrace = { start: startScrollTrace, stop: stopScrollTrace };
   window.__kiraGridTuning = {};
   window.__kiraGridRetainedBytes = totalRetainedBytes;
@@ -349,6 +351,7 @@ async function mountShell(): Promise<void> {
     tabsStore.hydrateTabs(),
   ]);
   const app = createApp(App);
+  app.use(i18n);
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
   app.mount('#app');

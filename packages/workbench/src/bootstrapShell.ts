@@ -1,3 +1,4 @@
+import { i18n } from '@theme/i18n';
 import { createApp } from 'vue';
 import { errorText } from './bridge/codedError';
 import BootFailure from './components/BootFailure.vue';
@@ -24,6 +25,7 @@ export async function bootstrapShell(
         void bootstrapShell(mountShell, appName);
       },
     });
+    failureApp.use(i18n);
     failureApp.mount('#app');
   }
 }

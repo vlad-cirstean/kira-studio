@@ -31,6 +31,7 @@ import type {
   Transport,
 } from '@kira/git-ipc';
 import { buttonVariants } from '@theme/components/ui/button';
+import { i18n } from '@theme/i18n';
 import { type App, createApp, nextTick } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
@@ -493,6 +494,7 @@ export function attachReviewDecorations(
         onClose: () => closeZone(),
         onDelete: () => void handleDelete(comment),
       });
+      app.use(i18n);
       app.mount(container);
       return app;
     });
@@ -506,6 +508,7 @@ export function attachReviewDecorations(
         onCancel: () => closeZone(),
         onSubmit: (body: string) => void handleSubmit(line, body),
       });
+      app.use(i18n);
       app.mount(container);
       return app;
     });

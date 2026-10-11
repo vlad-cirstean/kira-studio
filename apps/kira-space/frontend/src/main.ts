@@ -1,4 +1,5 @@
 import { VueQueryPlugin } from '@tanstack/vue-query';
+import { i18n, installCopyTestHook } from '@theme/i18n';
 import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
 import { windowKey } from '@workbench/util/window';
@@ -149,6 +150,7 @@ async function mountShell(): Promise<void> {
   }
 
   const app = createApp(App);
+  app.use(i18n);
   app.provide(adeReaderKey, controlAdeReader);
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
@@ -164,4 +166,7 @@ async function mountShell(): Promise<void> {
 // error, or a busy DB past the 5s _busy_timeout (F7's second-instance case makes this plausible).
 // P113 F6: the catch-and-retry wrapper itself moved to workbench/bootstrapShell.ts, shared with
 // kira-studio's own identical copy.
+// Test builds only: the copy-coverage specs switch the locale to the pseudo-locale.
+if (__KIRA_DEBUG_HOOKS__) installCopyTestHook();
+
 void bootstrapShell(mountShell, 'Kira Space');
