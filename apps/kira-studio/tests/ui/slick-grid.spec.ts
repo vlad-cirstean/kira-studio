@@ -812,6 +812,28 @@ async function flingFromRest(
   await wheelFling(page, viewport, 40, 60);
 }
 
+// Deterministic onset: a programmatic scrollTop jump from rest delivers one scroll event whose
+// dy alone clears the grid's dy > 20 render threshold, so the render is driven by the *first*
+// event of the gesture, ahead of the host's own scroll listener. That is exactly the ordering the
+// defect needs. A wheel fling cannot guarantee it: WebKit's smooth-scroll animation opens with
+// 2-3px events (below the render threshold), so the first render lands after the sampler already
+// holds a non-zero sample and the defect never shows on a quiet host (it only showed when load
+// coalesced events into a large first delta).
+async function jumpFromRest(
+  page: import('@playwright/test').Page,
+  viewport: ReturnType<typeof rightViewport>,
+): Promise<void> {
+  // Past the sampler's 150ms at-rest threshold (SlickGridHost.vue's velocity()).
+  await page.waitForTimeout(400);
+  await viewport.evaluate(
+    (el) =>
+      new Promise<void>((resolve) => {
+        el.scrollTop += 120;
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+}
+
 /** The gate itself: frames that rendered while the viewport was measurably moving at a plausible
  *  fling speed, yet fed zero velocity into the runway arithmetic. `summary.staleVelocityFrames` is
  *  the same tally without the 800px guard — applied here so a stacked-wheel frame that the sampler
@@ -838,6 +860,7 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   });
   await page.evaluate(() => window.__kiraScrollTrace?.start());
   for (let burst = 0; burst < 3; burst++) await flingFromRest(page, viewport);
+  for (let burst = 0; burst < 3; burst++) await jumpFromRest(page, viewport);
   await page.waitForTimeout(300);
   const fixed = await page.evaluate(() => window.__kiraScrollTrace?.stop());
   expect(fixed).not.toBeNull();
@@ -856,8 +879,8 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   // --- (c) freshVelocitySampleOverride = false reproduces the pre-fix behaviour ------------------
   // The self-verifying half of (a), exactly as T3 is for T1: if the pre-fix run does NOT show
   // stale-velocity frames, this harness is not reproducing the condition at all and (a) is a
-  // tautology. Two of the three onsets, not three, so a burst that happens to start below the
-  // dy > 20 render threshold (slickgrid dist/esm/index.js:10589) doesn't flake the gate.
+  // tautology. Driven by jumpFromRest (each onset's first scroll event clears the dy > 20 render
+  // threshold, slickgrid dist/esm/index.js:10589), so every onset must show the defect.
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -866,14 +889,14 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
     window.__kiraGridTuning.freshVelocitySampleOverride = false;
   });
   await page.evaluate(() => window.__kiraScrollTrace?.start());
-  for (let burst = 0; burst < 3; burst++) await flingFromRest(page, viewport);
+  for (let burst = 0; burst < 3; burst++) await jumpFromRest(page, viewport);
   await page.waitForTimeout(300);
   const preFix = await page.evaluate(() => window.__kiraScrollTrace?.stop());
   await page.evaluate(() => {
     if (window.__kiraGridTuning) window.__kiraGridTuning.freshVelocitySampleOverride = undefined;
   });
   expect(preFix).not.toBeNull();
-  expect(staleRunwayFrames(preFix?.frames ?? [])).toBeGreaterThanOrEqual(2);
+  expect(staleRunwayFrames(preFix?.frames ?? [])).toBe(3);
 
   // --- (d) the per-frame chase gate is what makes (b) hold, not the wall-clock one --------------
   // P22 iter2-onset D2. CHASE_QUIET_MS is 24ms and frames here run p50 ~28 / p95 ~55 / max ~70ms

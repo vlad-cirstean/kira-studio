@@ -1315,7 +1315,8 @@ Failures root-caused:
 - repo-graph-columns/paging/refresh/badges, review-interaction, workspace ("Loading… (59 remaining)"): host load (average ~30 with parallel workers). Pass on a quiet machine; Space ui 477/477 at 2 workers. Not caused by `cancellableTimer.ts` or `graphView.ts`.
 - Studio api-cross-window-sync, api-secret-reveal-isolation: 60s page-ready timeouts under 4-worker load; pass alone.
 - slick-grid.spec.ts:1259, console saved-queries: pass.
-- slick-grid.spec.ts:827 "P22 iter2-onset": fails 9/10 serial on a quiet host, also 5/5 at base `d381439d6`. Step (c) requires stale-velocity frames with `freshVelocitySampleOverride=false`; this WebKit delivers scroll events before the chase render, so the defect never shows (0 stale frames). Passes only under heavy load. NOT fixed: needs a deterministic harness for event ordering; follow-up.
+- slick-grid.spec.ts "P22 iter2-onset": was 9/10 failing on a quiet host. Cause: wheel flings open with 2-3px WebKit smooth-scroll events, below the grid's dy > 20 render threshold, so the first render lands after the host sampler already holds a sample and the pre-fix defect never shows (0 stale frames). Fixed: `jumpFromRest` (scrollTop += 120 from rest) makes the first scroll event clear the threshold, so the render runs ahead of the host listener. Step (c) now asserts exactly 3 stale frames pre-fix (proves the harness reproduces the defect); step (a) adds 3 jump onsets and still asserts 0 with the fix. 30/30 serial, quiet host.
+- ci-fix branch merged (rebased on v2.0): U59 guard commit dropped as duplicate of `b6f24b2f4`; kept docker engine test fix and `P264-ci-fixes.md`. `bun run lint` passes under LC_ALL=C and LC_ALL=C.UTF-8; typecheck and lint:dead pass.
 
 Suites (serial):
 - typecheck, lint (all guards), lint:dead, test:unit 1824 pass.
