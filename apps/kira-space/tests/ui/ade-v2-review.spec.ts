@@ -188,7 +188,7 @@ reviewTest(
     const y = box.y + 200;
     const stored = () => page.evaluate(() => localStorage.getItem('kira.ade.review.leftWidth'));
     await page.mouse.click(x, y);
-    expect(await stored()).toBe(String(start));
+    expect(await stored()).toBeNull();
     await page.mouse.move(x, y);
     await page.mouse.down();
     await page.mouse.move(x + 60, y, { steps: 6 });
