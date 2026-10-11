@@ -4,6 +4,7 @@ import InlineState from '@theme/components/InlineState.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 import type { Ref } from 'vue';
 import { computed } from 'vue';
 import { errorText } from '../bridge/codedError';
@@ -27,7 +28,7 @@ const props = withDefaults(
     isEmpty?: (data: T) => boolean;
     loadingLabel?: string;
   }>(),
-  { variant: 'pane', loadingLabel: 'Loading…', isEmpty: undefined },
+  { variant: 'pane', loadingLabel: () => t('common.state.loading.loading'), isEmpty: undefined },
 );
 
 defineSlots<{
@@ -68,10 +69,10 @@ function retry(): void {
       <Empty v-if="variant === 'pane'" class="h-full" data-testid="query-error">
         <EmptyHeader>
           <EmptyMedia><CodiconIcon name="error" :size="24" class="text-error" /></EmptyMedia>
-          <EmptyTitle>Could not load</EmptyTitle>
+          <EmptyTitle>{{ t('common.state.loadFailed.title') }}</EmptyTitle>
           <EmptyDescription>{{ message }}</EmptyDescription>
         </EmptyHeader>
-        <Button size="kira" variant="toolbar" data-testid="query-retry" @click="retry">Retry</Button>
+        <Button size="kira" variant="toolbar" data-testid="query-retry" @click="retry">{{ t('common.action.retry.label') }}</Button>
       </Empty>
       <InlineState v-else kind="error" data-testid="query-error">{{ message }}</InlineState>
     </slot>

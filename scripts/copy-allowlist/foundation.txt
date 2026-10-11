@@ -1,0 +1,3 @@
+# Permanent exemptions in foundation-owned files (P265 F4). Folded into check-copy.ts at close-out.
+permanent U67 packages/shared/protocol/frame.ts # protocol decode diagnostic, same class as backend error text (P266)
+permanent U67 packages/theme/src/components/ui/button/index.ts # `title` is a button variant name, not text

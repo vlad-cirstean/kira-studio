@@ -9,6 +9,7 @@
 // P60b §3.1: the quote/comment/dollar-quote scanning itself is `sql-lex.ts`'s `scanSqlSpan` —
 // hoisted out of here (and `sql-split.ts`) into one shared scanner both now call. No behaviour
 // change: this file keeps its own paren-balance/issue-reporting logic exactly.
+import { t } from '@theme/i18n';
 import { resolveLexOptions, type SqlScanOptions, scanSqlSpan } from './sql-lex';
 
 export interface LintIssue {
@@ -26,10 +27,12 @@ function spanMessage(
   kind: 'blockComment' | 'quote' | 'dollarQuote' | 'bracketIdent',
   quoteChar?: string,
 ): string {
-  if (kind === 'blockComment') return 'unterminated block comment';
-  if (kind === 'dollarQuote') return 'unterminated dollar-quoted string';
-  if (kind === 'bracketIdent') return 'unterminated quoted identifier';
-  return quoteChar === '`' ? 'unterminated quoted identifier' : 'unterminated string literal';
+  if (kind === 'blockComment') return t('shared.sqlLint.unterminatedBlockComment.error');
+  if (kind === 'dollarQuote') return t('shared.sqlLint.unterminatedDollarQuote.error');
+  if (kind === 'bracketIdent') return t('shared.sqlLint.unterminatedIdentifier.error');
+  return quoteChar === '`'
+    ? t('shared.sqlLint.unterminatedIdentifier.error')
+    : t('shared.sqlLint.unterminatedString.error');
 }
 
 export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
@@ -45,7 +48,7 @@ export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
         from: pos,
         to: pos + 1,
         severity: 'error',
-        message: 'unbalanced parenthesis',
+        message: t('shared.sqlLint.unbalancedParenthesis.error'),
       });
     }
     parenStack = [];
@@ -74,7 +77,13 @@ export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
     }
     if (c === ')') {
       if (parenStack.length > 0) parenStack.pop();
-      else issues.push({ from: i, to: i + 1, severity: 'error', message: 'unmatched )' });
+      else
+        issues.push({
+          from: i,
+          to: i + 1,
+          severity: 'error',
+          message: t('shared.sqlLint.unmatchedParenthesis.error'),
+        });
       i++;
       continue;
     }

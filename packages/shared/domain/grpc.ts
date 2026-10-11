@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { z } from 'zod';
 
 // P11 D5: the wire shapes live in Go (internal/grpcclient) and are mirrored, not re-validated,
@@ -225,7 +226,7 @@ export function grpcRequestTitle(state: {
   if (state.name) return state.name;
   if (state.service && state.method) return `${state.service}/${state.method}`;
   if (state.target) return state.target;
-  return 'New gRPC request';
+  return t('shared.grpc.newRequest.title');
 }
 
 /** D12: the streaming-kind chip's own two values, mirrored from grpc_call_history.streaming
@@ -234,5 +235,7 @@ export const GRPC_STREAMING_KINDS = ['unary', 'server'] as const;
 export type GrpcStreamingKind = (typeof GRPC_STREAMING_KINDS)[number];
 
 export function grpcStreamingLabel(kind: GrpcStreamingKind): string {
-  return kind === 'server' ? 'STREAM' : 'UNARY';
+  return kind === 'server'
+    ? t('shared.grpc.streaming.stream.label')
+    : t('shared.grpc.streaming.unary.label');
 }

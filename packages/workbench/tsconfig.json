@@ -15,7 +15,8 @@
     // a real (non-type-only) cross-package import reached with packages/workbench/src itself as
     // the nearest tsconfig, the way createTerminalTabs.ts's canonicalPath import needs.
     "paths": {
-      "@shared/*": ["../shared/*"]
+      "@shared/*": ["../shared/*"],
+      "@theme/*": ["../theme/src/*"]
     }
   },
   "include": ["src/**/*.ts"]

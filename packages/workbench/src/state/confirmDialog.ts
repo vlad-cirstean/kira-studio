@@ -1,10 +1,11 @@
+import { t } from '@theme/i18n';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { errorText } from '../bridge/codedError';
 
 export interface ConfirmOptions {
   message: string;
-  /** Dialog title. Default "Confirm". */
+  /** Dialog title, a question naming the action. Required by convention; the fallback is transitional. */
   title?: string;
   confirmLabel: string;
   /** `danger` discards or deletes (confirm button red, focus starts on Cancel). Always stated. */
@@ -20,7 +21,7 @@ export interface ConfirmOptions {
 export const useConfirmDialogStore = defineStore('confirmDialog', () => {
   const state = reactive({
     open: false,
-    title: 'Confirm',
+    title: '',
     message: '',
     tone: 'danger' as 'danger' | 'primary',
     confirmLabel: '',
@@ -35,7 +36,7 @@ export const useConfirmDialogStore = defineStore('confirmDialog', () => {
       // F9: a second call before the first settles would otherwise overwrite `state.resolve`,
       // leaving the first caller's promise pending forever. Settle it (as a decline) first.
       state.resolve?.(false);
-      state.title = options.title ?? 'Confirm';
+      state.title = options.title ?? t('workbench.confirmDialog.title');
       state.message = options.message;
       state.tone = options.tone;
       state.confirmLabel = options.confirmLabel;

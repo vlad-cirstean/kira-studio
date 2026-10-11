@@ -488,6 +488,9 @@
       "copiedValue": {
         "announce": "Copied value"
       },
+      "copiedWhat": {
+        "announce": "Copied {what}"
+      },
       "failed": {
         "error": "Couldn’t copy: {error}"
       }

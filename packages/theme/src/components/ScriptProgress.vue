@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Spinner from '@theme/components/Spinner.vue';
 import { Card } from '@theme/components/ui/card';
+import { t } from '@theme/i18n';
 import { useIntervalFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 
@@ -32,10 +33,12 @@ watch(
 
 function format(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
-  if (total < 60) return `${total}s`;
+  if (total < 60) return t('format.duration.secondsCompact', { seconds: total });
   const m = Math.floor(total / 60);
   const s = total % 60;
-  return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  return s === 0
+    ? t('format.relative.unitMinute', { count: m })
+    : t('format.duration.minutesSeconds', { minutes: m, seconds: s });
 }
 
 const elapsed = computed(() => {
@@ -47,12 +50,12 @@ const elapsed = computed(() => {
 <template>
   <Card :class="state === 'failed' && 'border-error'" :data-state="state" data-testid="script-progress">
     <div class="flex min-w-0 items-center gap-2 text-kira-md">
-      <Spinner v-if="state === 'running'" :size="12" class="text-info" label="Running" />
+      <Spinner v-if="state === 'running'" :size="12" class="text-info" :label="t('common.state.running.status')" />
       <i v-else-if="state === 'ready'" class="codicon codicon-check shrink-0 text-ok" aria-hidden="true" />
       <i v-else class="codicon codicon-error shrink-0 text-error" aria-hidden="true" />
       <span class="min-w-0 truncate font-medium" data-testid="script-progress-title">{{ title }}</span>
       <span v-if="elapsed" class="shrink-0 font-data text-kira-sm text-muted-foreground" data-testid="script-progress-elapsed">
-        {{ elapsed }}<template v-if="state === 'running' && timeout"> of {{ timeout }}</template>
+        {{ state === 'running' && timeout ? t('theme.scriptProgress.elapsedOf.label', { elapsed, timeout }) : elapsed }}
       </span>
       <span class="flex-1" />
       <slot name="actions" />

@@ -12,7 +12,7 @@ describe('lintSql — backslash escaping is dialect-conditional (P2 R2, task #92
     // quote — genuinely unterminated here since there is no second closing quote.
     const issues = lintSql(`SELECT '\\'`, { backslashEscapes: true });
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.message).toBe('unterminated string literal');
+    expect(issues[0]?.message).toBe('Unterminated string literal.');
   });
 
   test('Postgres/SQLite: backslashEscapes false treats \\ as an ordinary character', () => {
@@ -20,13 +20,13 @@ describe('lintSql — backslash escaping is dialect-conditional (P2 R2, task #92
     // The literal 'foo\' closes normally at the real quote; the only real defect is the
     // unbalanced '(' in the second statement.
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.message).toBe('unbalanced parenthesis');
+    expect(issues[0]?.message).toBe('Unbalanced parenthesis.');
   });
 
   test('defaults to backslashEscapes: true when no options are given', () => {
     const issues = lintSql(`SELECT '\\'`);
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.message).toBe('unterminated string literal');
+    expect(issues[0]?.message).toBe('Unterminated string literal.');
   });
 });
 
@@ -42,6 +42,6 @@ describe('lintSql — dollar-quoting is dialect-conditional (F10/P21 round 1)', 
   test('defaults to dollarQuoting: true when no options are given (a real Postgres tag)', () => {
     const issues = lintSql('SELECT $$ never closes');
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.message).toBe('unterminated dollar-quoted string');
+    expect(issues[0]?.message).toBe('Unterminated dollar-quoted string.');
   });
 });

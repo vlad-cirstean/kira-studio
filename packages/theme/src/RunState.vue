@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 
 // P110 I2-4: the toolbar run-state ring + elapsed-time label, pasted into 11 Studio views (§2.2
@@ -27,11 +28,11 @@ const RING: Record<RunState['status'], string> = {
 };
 
 const label = computed(() => {
-  if (props.state.status === 'error') return 'failed';
+  if (props.state.status === 'error') return t('common.state.failed.status');
   if (props.state.elapsedMs === null) return '—';
   return props.state.elapsedMs < 1000
-    ? `${Math.round(props.state.elapsedMs)} ms`
-    : `${(props.state.elapsedMs / 1000).toFixed(1)} s`;
+    ? t('format.duration.ms', { value: Math.round(props.state.elapsedMs) })
+    : t('format.duration.seconds', { value: (props.state.elapsedMs / 1000).toFixed(1) });
 });
 </script>
 

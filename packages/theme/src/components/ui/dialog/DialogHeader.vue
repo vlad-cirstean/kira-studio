@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue'
 import { Button } from '@theme/components/ui/button'
 import DialogClose from '@theme/components/ui/dialog/DialogClose.vue'
+import { t } from '@theme/i18n'
 import { cn } from '@theme/lib/utils'
 import type { HTMLAttributes } from 'vue'
 import { dialogHeaderClass } from '.'
@@ -33,7 +34,7 @@ const props = withDefaults(defineProps<{
         variant="ghost"
         size="icon-sm"
         class="ml-auto"
-        aria-label="Close"
+        :aria-label="t('common.action.close.label')"
         :data-testid="closeTestid"
       >
         <CodiconIcon name="close" :size="13" />

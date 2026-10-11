@@ -6,6 +6,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@theme/components/ui/input-group'
+import { t } from '@theme/i18n'
 import { useTemplateRef } from 'vue'
 
 // P262 §2.5: the one search/filter text box. Attrs (data-testid, @keydown, @keydown.enter, ...) land
@@ -20,7 +21,7 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string
   size?: 'kira' | 'kira-lg'
 }>(), {
-  placeholder: 'Search',
+  placeholder: () => t('common.action.search.label'),
   ariaLabel: undefined,
   size: 'kira',
 })
@@ -63,7 +64,7 @@ defineExpose({ focus })
       @keydown.escape="onEscape"
     />
     <InputGroupAddon v-if="modelValue !== ''" align="inline-end">
-      <InputGroupButton size="icon-xs" class="size-4" aria-label="Clear search" @click="clear">
+      <InputGroupButton size="icon-xs" class="size-4" :aria-label="t('common.action.clearSearch.label')" @click="clear">
         <CodiconIcon name="close" :size="12" />
       </InputGroupButton>
     </InputGroupAddon>

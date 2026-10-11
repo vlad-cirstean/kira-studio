@@ -3,6 +3,7 @@
 // times (ScriptDialog.vue x2, VariableSetView.vue, ConnectionDialog.vue). The outline fix from
 // I2-8 is already reflected here: peer-focus-visible:outline-* stays always-on utility, the
 // selected-state outline is the only conditional class.
+import { t } from '@theme/i18n';
 import { connBgClass } from './connColor';
 
 defineProps<{
@@ -23,7 +24,7 @@ const emit = defineEmits<{ change: [value: string] }>();
       class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
       :value="value"
       :checked="checked"
-      :aria-label="color === 'none' ? 'No colour' : color"
+      :aria-label="color === 'none' ? t('common.field.noColour.label') : color"
       :data-testid="`color-${color}`"
       @change="emit('change', value)"
     />

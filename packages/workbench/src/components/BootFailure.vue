@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { t } from '@theme/i18n';
 
 // P113 F6: main.ts's own boot-failure fallback, both apps — mounted in place of App.vue when
 // bootstrap()'s own hydrates reject, so a bad DB read or a busy DB shows this instead of a
@@ -20,7 +21,7 @@ const emit = defineEmits<{ retry: [] }>();
       <Empty>
         <EmptyHeader>
           <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ appName }} failed to start</EmptyTitle>
+          <EmptyTitle>{{ t('workbench.bootFailure.title', { product: appName }) }}</EmptyTitle>
           <EmptyDescription class="whitespace-pre-wrap">{{ message }}</EmptyDescription>
         </EmptyHeader>
         <Button
@@ -30,7 +31,7 @@ const emit = defineEmits<{ retry: [] }>();
           @click="emit('retry')"
         >
           <CodiconIcon name="refresh" :size="13" />
-          Retry
+          {{ t('common.action.retry.label') }}
         </Button>
       </Empty>
     </div>

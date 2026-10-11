@@ -2,6 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { dialogBodyClass, dialogFooterClass, dialogHeaderClass } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener } from '@vueuse/core';
 import { FocusScope } from 'reka-ui';
@@ -73,10 +74,10 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
       </div>
       <div :class="dialogFooterClass">
         <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="emit('cancel')"
-          >Cancel</Button
+          >{{ t('common.action.cancel.label') }}</Button
         >
         <Button variant="dialog-primary" size="kira-lg" data-testid="text-prompt-ok" @click="emit('submit')"
-          >OK</Button
+          >{{ t('common.action.save.label') }}</Button
         >
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { useTimeoutFn } from '@vueuse/core';
 import { ref } from 'vue';
 import { errorText } from '../bridge/codedError';
@@ -62,22 +63,29 @@ export async function copyOrReportErrorLazy(
   }
 }
 
-async function copyWithAnnouncement(text: string, what?: string): Promise<string | null> {
+async function copyWithAnnouncement(text: string, message?: string): Promise<string | null> {
   try {
     await copyText(text);
   } catch (err) {
-    const message = errorText(err);
-    announceApp(`Couldn't copy — ${message}`);
-    return message;
+    const detail = errorText(err);
+    announceApp(t('common.copy.failed.error', { error: detail }));
+    return detail;
   }
-  announceApp(what ? `Copied ${what}` : 'Copied');
+  announceApp(message ?? t('common.copy.copied.announce'));
   return null;
 }
 
-/** Copy and announce through the app live region, nothing else: for menu items, which close and
- *  have no control to flash. Resolves `false` after announcing a rejection. */
+/** Copy and announce a whole message (`Copied name`) through the app live region, nothing else:
+ *  for menu items, which close and have no control to flash. Resolves `false` after announcing a
+ *  rejection. */
+export async function copyAndAnnounce(text: string, message?: string): Promise<boolean> {
+  return (await copyWithAnnouncement(text, message)) === null;
+}
+
+/** @deprecated Composes `Copied {what}` from a noun fragment; pass a whole message to
+ *  `copyAndAnnounce` instead. Removed at P265 close-out. */
 export async function copyAnnounced(text: string, what?: string): Promise<boolean> {
-  return (await copyWithAnnouncement(text, what)) === null;
+  return copyAndAnnounce(text, what ? t('common.copy.copiedWhat.announce', { what }) : undefined);
 }
 
 /**
@@ -96,8 +104,14 @@ export function useCopy() {
     TIMING.copiedFeedback,
     { immediate: false },
   );
-  async function copy(text: string, opts: { what?: string } = {}): Promise<boolean> {
-    error.value = await copyWithAnnouncement(text, opts.what);
+  async function copy(
+    text: string,
+    opts: { what?: string; message?: string } = {},
+  ): Promise<boolean> {
+    const message =
+      opts.message ??
+      (opts.what ? t('common.copy.copiedWhat.announce', { what: opts.what }) : undefined);
+    error.value = await copyWithAnnouncement(text, message);
     copied.value = error.value === null;
     if (copied.value) start();
     return copied.value;

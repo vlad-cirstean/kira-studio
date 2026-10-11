@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip'
+import { t } from '@theme/i18n'
 import { cn } from '@theme/lib/utils'
 import type { HTMLAttributes } from 'vue'
 import { ref, useAttrs } from 'vue'
@@ -58,7 +59,7 @@ function stepBy(dir: 1 | -1): void {
               <CodiconIcon name="chevron-up" :size="9" />
             </InputGroupButton>
           </TooltipTrigger>
-          <TooltipContent>Increase</TooltipContent>
+          <TooltipContent>{{ t('theme.numberStepper.increase.tooltip') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -73,7 +74,7 @@ function stepBy(dir: 1 | -1): void {
               <CodiconIcon name="chevron-down" :size="9" />
             </InputGroupButton>
           </TooltipTrigger>
-          <TooltipContent>Decrease</TooltipContent>
+          <TooltipContent>{{ t('theme.numberStepper.decrease.tooltip') }}</TooltipContent>
         </Tooltip>
       </InputGroupAddon>
     </InputGroup>

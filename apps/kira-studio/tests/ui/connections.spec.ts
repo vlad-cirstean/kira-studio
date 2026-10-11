@@ -511,7 +511,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-sqlite"]');
   await expect(page.locator('[data-testid="connection-min-version"]')).toHaveText(
-    'Reads any SQLite 3 database file — no server required.',
+    'Reads any SQLite 3 database file. No server required.',
   );
   await page.click('[data-testid="connection-cancel"]');
 });

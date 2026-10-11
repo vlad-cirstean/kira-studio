@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Command from '@theme/components/ui/command/Command.vue'
 import { Dialog, DialogDescription, DialogHeader, DialogOverlay, DialogTitle } from '@theme/components/ui/dialog'
+import { t } from '@theme/i18n'
 import { cn } from '@theme/lib/utils'
 import type { DialogRootEmits, DialogRootProps } from 'reka-ui'
 import { DialogContent, DialogPortal, useForwardPropsEmits } from 'reka-ui'
@@ -13,8 +14,8 @@ const props = withDefaults(defineProps<DialogRootProps & {
   description?: string
   class?: HTMLAttributes['class']
 }>(), {
-  title: 'Command Palette',
-  description: 'Search for a command to run...',
+  title: () => t('theme.commandDialog.title'),
+  description: () => t('theme.commandDialog.description'),
 })
 const emits = defineEmits<DialogRootEmits>()
 

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { type UseTimeAgoOptions, useTimeAgo } from '@vueuse/core';
 import type { MaybeRefOrGetter } from 'vue';
 
@@ -32,20 +33,26 @@ export function formatCount(n: number): string {
   return COUNT_FORMAT.format(n);
 }
 
-/** '1 file' / '2 files'. */
+/** '1 file' / '2 files'.
+ *  @deprecated Use a plural catalog message with `{count}`. Removed at P265 close-out. */
 export function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
 }
 
 /** A finished duration: '240 ms' / '3.4 s' / '2m 5s' / '1h 2m'. */
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 1000) return t('format.duration.ms', { value: Math.round(ms) });
   const tenths = Math.round(ms / 100) / 10;
-  if (tenths < 60) return `${tenths.toFixed(1)} s`;
+  if (tenths < 60) return t('format.duration.seconds', { value: tenths.toFixed(1) });
   const totalSeconds = Math.round(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
-  if (minutes < 60) return `${minutes}m ${totalSeconds % 60}s`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  if (minutes < 60) {
+    return t('format.duration.minutesSeconds', { minutes, seconds: totalSeconds % 60 });
+  }
+  return t('format.duration.hoursMinutes', {
+    hours: Math.floor(minutes / 60),
+    minutes: minutes % 60,
+  });
 }
 
 /** A running clock: 'm:ss', or 'h:mm:ss' from the first hour. */
@@ -66,11 +73,11 @@ function toMillis(at: Instant): number {
 /** 'just now' / '5m ago' / '3h ago' / '2d ago'. */
 export function formatRelative(at: Instant, now: number = Date.now()): string {
   const minutes = Math.floor((now - toMillis(at)) / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t('format.relative.justNow');
+  if (minutes < 60) return t('format.relative.minutes', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 24) return t('format.relative.hours', { count: hours });
+  return t('format.relative.days', { count: Math.floor(hours / 24) });
 }
 
 const DATE_TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -106,24 +113,27 @@ export function displayValue(value: string | number | null | undefined): string 
   return value === null || value === undefined || value === '' ? '—' : String(value);
 }
 
-const RELATIVE_OPTIONS: UseTimeAgoOptions<false, 'minute' | 'hour' | 'day'> = {
-  messages: {
-    justNow: 'just now',
-    past: (n: string) => `${n} ago`,
-    future: (n: string) => `in ${n}`,
-    invalid: '',
-    minute: (n: number) => `${n}m`,
-    hour: (n: number) => `${n}h`,
-    day: (n: number) => `${n}d`,
-  },
-  units: [
-    { max: 3_600_000, value: 60_000, name: 'minute' },
-    { max: 86_400_000, value: 3_600_000, name: 'hour' },
-    { max: Number.POSITIVE_INFINITY, value: 86_400_000, name: 'day' },
-  ],
-};
+// `justNow` is a plain string in VueUse, so the options resolve per call, not at module load.
+function relativeOptions(): UseTimeAgoOptions<false, 'minute' | 'hour' | 'day'> {
+  return {
+    messages: {
+      justNow: t('format.relative.justNow'),
+      past: (n: string) => t('format.relative.past', { time: n }),
+      future: (n: string) => t('format.relative.future', { time: n }),
+      invalid: '',
+      minute: (n: number) => t('format.relative.unitMinute', { count: n }),
+      hour: (n: number) => t('format.relative.unitHour', { count: n }),
+      day: (n: number) => t('format.relative.unitDay', { count: n }),
+    },
+    units: [
+      { max: 3_600_000, value: 60_000, name: 'minute' },
+      { max: 86_400_000, value: 3_600_000, name: 'hour' },
+      { max: Number.POSITIVE_INFINITY, value: 86_400_000, name: 'day' },
+    ],
+  };
+}
 
 /** A reactive `formatRelative`: the same words, kept current as time passes. */
 export function useRelativeTime(at: MaybeRefOrGetter<Date | number | string>) {
-  return useTimeAgo(at, RELATIVE_OPTIONS);
+  return useTimeAgo(at, relativeOptions());
 }

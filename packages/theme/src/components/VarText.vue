@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 
 defineProps<{ parts: readonly TextPart[] }>();
@@ -14,7 +15,7 @@ defineProps<{ parts: readonly TextPart[] }>();
       class="inline-flex items-center gap-0.5 rounded-kira-xs border border-dashed border-info/60 bg-info/10 px-1 font-data text-info"
       data-testid="var-chip"
       :data-var="p.name"
-      :aria-label="`${p.name}: ${p.value}`"
+      :aria-label="t('theme.varText.aria', { name: p.name, value: p.value })"
     >
       <CodiconIcon name="symbol-variable" :size="11" /><span>{{ p.value }}</span>
     </span>

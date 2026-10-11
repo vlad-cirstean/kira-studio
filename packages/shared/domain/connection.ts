@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { z } from 'zod';
 import { capsSchema } from '../caps';
 import { PALETTE_COLOR_CHOICES, type PaletteColor, paletteColorSchema } from './color';
@@ -34,15 +35,32 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
 // actually supports — the verified floor of the on-demand compatibility suite
 // (docs/v1.1/plans/P16-db-compat-suite.md §3), not a marketing claim. SQS/S3 have no server
 // version at all (AWS's APIs are versionless), so they have no entry.
+// Getters, not values: the text resolves through the catalog when read, never at module load.
 export const MIN_SERVER_VERSION: Partial<Record<ConnectionKind, string>> = {
-  postgres: 'Requires PostgreSQL 14 or newer.',
-  mariadb: 'Requires MariaDB 10.11 or newer.',
-  mysql: 'Requires MySQL 8.0 or newer.',
-  clickhouse: 'Requires ClickHouse 25.3 or newer.',
-  mongodb: 'Requires MongoDB 4.4 or newer.',
-  redis: 'Requires Redis 7.0 or newer.',
-  kafka: 'Requires Apache Kafka 3.4 or newer.',
-  sqlite: 'Reads any SQLite 3 database file — no server required.',
+  get postgres() {
+    return t('shared.connection.minVersion.postgres.hint');
+  },
+  get mariadb() {
+    return t('shared.connection.minVersion.mariadb.hint');
+  },
+  get mysql() {
+    return t('shared.connection.minVersion.mysql.hint');
+  },
+  get clickhouse() {
+    return t('shared.connection.minVersion.clickhouse.hint');
+  },
+  get mongodb() {
+    return t('shared.connection.minVersion.mongodb.hint');
+  },
+  get redis() {
+    return t('shared.connection.minVersion.redis.hint');
+  },
+  get kafka() {
+    return t('shared.connection.minVersion.kafka.hint');
+  },
+  get sqlite() {
+    return t('shared.connection.minVersion.sqlite.hint');
+  },
 };
 
 // P28 §5.3: 0 (unlimited) or 0.01-1000 commands/sec — a token-bucket rate, not a minimum
@@ -170,26 +188,38 @@ export const connectionInputSchema = connectionFieldsSchema.superRefine((input, 
         ctx.addIssue({
           code: 'custom',
           path: ['database'],
-          message: 'A database file is required.',
+          message: t('shared.connection.validation.databaseRequired.error'),
         });
       } else if (!path.startsWith('/')) {
         ctx.addIssue({
           code: 'custom',
           path: ['database'],
-          message: 'The database file must be an absolute path.',
+          message: t('shared.connection.validation.databaseAbsolute.error'),
         });
       }
     } else {
       if (!AWS_STYLE_KINDS.has(input.kind) && !input.host) {
-        ctx.addIssue({ code: 'custom', path: ['host'], message: 'Host is required.' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['host'],
+          message: t('shared.connection.validation.hostRequired.error'),
+        });
       }
       if (!AWS_STYLE_KINDS.has(input.kind) && !input.port) {
-        ctx.addIssue({ code: 'custom', path: ['port'], message: 'Port is required.' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['port'],
+          message: t('shared.connection.validation.portRequired.error'),
+        });
       }
     }
   } else {
     if (input.uri !== null && input.uri.trim() === '') {
-      ctx.addIssue({ code: 'custom', path: ['uri'], message: 'A connection URI is required.' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['uri'],
+        message: t('shared.connection.validation.uriRequired.error'),
+      });
     }
   }
 });

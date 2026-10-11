@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@theme/components/ui/dialog';
+import { t } from '@theme/i18n';
 
 // The one confirm look. A danger confirm opens with focus on Cancel (Enter cancels); a primary one
 // opens on the confirm button. `touch` gives the phone's 44px buttons. Used by the store host
@@ -26,7 +27,14 @@ const props = withDefaults(
     touch?: boolean;
     testids?: Partial<Record<'root' | 'close' | 'message' | 'cancel' | 'confirm' | 'error', string>>;
   }>(),
-  { title: 'Confirm', cancelLabel: 'Cancel', busy: false, error: '', touch: false, testids: () => ({}) },
+  {
+    title: () => t('workbench.confirmDialog.title'),
+    cancelLabel: () => t('common.action.cancel.label'),
+    busy: false,
+    error: '',
+    touch: false,
+    testids: () => ({}),
+  },
 );
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
 
