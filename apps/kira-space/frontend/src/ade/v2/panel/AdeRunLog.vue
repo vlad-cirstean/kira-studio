@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import InlineState from '@theme/components/InlineState.vue';
 import { Card } from '@theme/components/ui/card';
-import { useScroll } from '@vueuse/core';
-import { errorText } from '@workbench/bridge/codedError';
-import { computed, nextTick, useTemplateRef, watch } from 'vue';
+import { useFollowTail } from '@workbench/behaviour/followTail';
+import QueryState from '@workbench/components/QueryState.vue';
+import { computed, useTemplateRef } from 'vue';
 import { useLog } from '../readQueries';
 import type { LogChunk, LogKind } from '../wire';
 
@@ -17,20 +17,12 @@ const log = useLog(
 );
 const card = useTemplateRef<InstanceType<typeof Card>>('card');
 const el = computed<HTMLElement | null>(() => (card.value?.$el as HTMLElement | undefined) ?? null);
-const { arrivedState } = useScroll(el);
+useFollowTail(el, () => log.data.value?.chunks.length);
 
 function failed(c: LogChunk): boolean {
   return c.stream === 'stderr' || /exit code [1-9]/i.test(c.text);
 }
 
-watch(
-  () => log.data.value?.chunks.length,
-  async () => {
-    const follow = arrivedState.bottom;
-    await nextTick();
-    if (follow && el.value) el.value.scrollTop = el.value.scrollHeight;
-  },
-);
 </script>
 
 <template>
@@ -42,22 +34,23 @@ watch(
     data-testid="ade-run-log"
     :data-log-id="id"
   >
-    <InlineState v-if="log.isPending.value" kind="loading">Loading…</InlineState>
-    <InlineState v-else-if="log.isError.value" kind="error" data-testid="ade-run-log-error">
-      {{ errorText(log.error.value) }}
-    </InlineState>
-    <template v-else-if="log.data.value">
-      <div v-if="log.data.value.truncated" class="text-subtle">… earlier output dropped</div>
-      <div v-if="log.data.value.chunks.length === 0" class="text-subtle">No output yet.</div>
-      <div
-        v-for="c in log.data.value.chunks"
-        :key="c.seq"
-        class="whitespace-pre-wrap break-words"
-        :class="failed(c) ? 'text-error' : 'text-fg'"
-        data-testid="ade-run-log-line"
-        :data-stream="c.stream"
-        >{{ c.text.replace(/\n$/, '') }}</div
-      >
-    </template>
+    <QueryState :query="log" variant="inline" :is-empty="() => false">
+      <template #error="{ message }">
+        <InlineState kind="error" data-testid="ade-run-log-error">{{ message }}</InlineState>
+      </template>
+      <template #default="{ data }">
+        <div v-if="data.truncated" class="text-subtle">… earlier output dropped</div>
+        <div v-if="data.chunks.length === 0" class="text-subtle">No output yet.</div>
+        <div
+          v-for="c in data.chunks"
+          :key="c.seq"
+          class="whitespace-pre-wrap break-words"
+          :class="failed(c) ? 'text-error' : 'text-fg'"
+          data-testid="ade-run-log-line"
+          :data-stream="c.stream"
+          >{{ c.text.replace(/\n$/, '') }}</div
+        >
+      </template>
+    </QueryState>
   </Card>
 </template>

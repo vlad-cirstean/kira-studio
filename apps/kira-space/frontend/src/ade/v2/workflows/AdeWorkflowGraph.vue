@@ -10,9 +10,10 @@ import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { type Connection, type Edge, type Node, useVueFlow, VueFlow } from '@vue-flow/core';
 import { onKeyStroke, useElementSize } from '@vueuse/core';
+import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
-import { VueDraggable } from 'vue-draggable-plus';
 import { useRepos } from '../../../repo/state/reposQueries';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
@@ -36,7 +37,6 @@ import AdeStageInspector from './AdeStageInspector.vue';
 import AdeStepInspector from './AdeStepInspector.vue';
 import AdeStepNode from './AdeStepNode.vue';
 import AdeWorkflowSaveBar from './AdeWorkflowSaveBar.vue';
-import { useSaveShortcut } from './useSaveShortcut';
 
 // Graph mode: edits a local draft of the last valid workflow as a canvas of stages and steps, one
 // connector per step result; Save writes it whole, Discard drops the edits. Layout is automatic and
@@ -204,7 +204,7 @@ const graphPane = useLiveSize(
     graphPct.value = pct;
   },
 );
-useSaveShortcut(root, () => void saveNow());
+useShortcut(root, ['form.save'], () => void saveNow());
 
 const PAD = 24;
 const { width: paneW } = useElementSize(scroller);
@@ -235,9 +235,16 @@ onKeyStroke(
   { target: root },
 );
 
-function onStripUpdate(ev: { oldIndex?: number; newIndex?: number }): void {
-  if (ev.oldIndex !== undefined && ev.newIndex !== undefined) draft.reorderStages(ev.oldIndex, ev.newIndex);
-}
+const stripEl = useTemplateRef<HTMLElement>('stripEl');
+useSortableReorder(
+  stripEl,
+  () => strip.value.map((s) => s.id),
+  (from, to) => {
+    const ids = strip.value.map((s) => s.id);
+    draft.reorderStages(ids.indexOf(from), ids.indexOf(to));
+  },
+  { draggable: '[data-testid="ade-wf-strip-chip"]', direction: 'horizontal' },
+);
 
 onBeforeUnmount(() => {
   wfUi.dirty = false;
@@ -271,14 +278,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <div class="flex items-center gap-2" data-testid="ade-wf-strip-row">
-      <VueDraggable
-        :model-value="strip"
-        class="flex min-w-0 flex-wrap items-center gap-1.5"
-        :animation="150"
-        :force-fallback="true"
-        data-testid="ade-wf-strip"
-        @update="onStripUpdate"
-      >
+      <div ref="stripEl" class="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="ade-wf-strip">
         <Button
           v-for="(s, i) in strip"
           :key="s.id"
@@ -299,7 +299,7 @@ onBeforeUnmount(() => {
           <span :class="s.skip ? 'line-through' : ''">{{ s.name }}</span>
           <AdeChip :label="s.kind" :tone="KIND_TONE[s.kind]" />
         </Button>
-      </VueDraggable>
+      </div>
       <Button
         variant="dialog"
         size="kira-lg"

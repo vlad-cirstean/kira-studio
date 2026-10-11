@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
-import { useClipboard } from '@vueuse/core';
+import { useCopy } from '@workbench/behaviour/clipboard';
 import { defineAsyncComponent } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { useWorkflowYaml } from '../queries';
@@ -19,7 +19,7 @@ const MODE_ITEMS = [
 const props = defineProps<{ entry: WorkflowEntry }>();
 const wfUi = useAdeWorkflowsUiStore();
 const yaml = useWorkflowYaml(() => props.entry.fileName);
-const { copy, copied } = useClipboard({ copiedDuring: 1500 });
+const { copy, copied } = useCopy();
 
 async function setMode(v: unknown): Promise<void> {
   if ((v !== 'graph' && v !== 'yaml') || v === wfUi.workflowMode) return;

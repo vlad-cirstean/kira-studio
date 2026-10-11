@@ -4,13 +4,14 @@ import { FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { useDebounceFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import { useSaveWorkflowYaml, useValidateWorkflowYaml, useWorkflowYaml } from '../queries';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { WorkflowEntry, WorkflowError } from '../wire';
 import AdeWorkflowSaveBar from './AdeWorkflowSaveBar.vue';
-import { useSaveShortcut } from './useSaveShortcut';
 
 // YAML mode (R27): validates 300 ms after a keystroke; Save writes the draft, Discard restores the
 // saved text. The draft is the source while it has unsaved edits, so a push never resets it. Save
@@ -58,7 +59,7 @@ const runValidate = useDebounceFn(async () => {
       checked.value = { error: { line: 0, message: errorText(err) } };
     }
   }
-}, 300);
+}, TIMING.preview);
 
 watch(dirty, (v) => {
   wfUi.dirty = v;
@@ -115,7 +116,7 @@ function onInput(v: string | number): void {
 }
 
 const root = useTemplateRef<HTMLElement>('root');
-useSaveShortcut(root, () => void saveNow());
+useShortcut(root, ['form.save'], () => void saveNow());
 
 onBeforeUnmount(() => {
   wfUi.dirty = false;

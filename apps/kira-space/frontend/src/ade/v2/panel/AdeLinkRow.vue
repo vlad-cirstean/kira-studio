@@ -4,7 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
-import { useClipboard } from '@vueuse/core';
+import { useCopy } from '@workbench/behaviour/clipboard';
 import { ref } from 'vue';
 import { control } from '../../../bridge/control';
 import AdeChip from '../AdeChip.vue';
@@ -25,7 +25,7 @@ const props = defineProps<{
 const emit = defineEmits<{ save: [raw: string]; clear: [] }>();
 
 const draft = ref('');
-const { copy, copied } = useClipboard({ copiedDuring: 1500 });
+const { copy, copied } = useCopy();
 
 function onSave(): void {
   const raw = draft.value.trim();

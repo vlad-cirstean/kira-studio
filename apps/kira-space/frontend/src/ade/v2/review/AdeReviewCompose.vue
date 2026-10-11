@@ -3,8 +3,9 @@ import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { onKeyStroke, useTimeoutFn } from '@vueuse/core';
+import { useFocus, useTimeoutFn } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { activityKind } from '../activity';
 import { deliver } from '../dialog/deliver';
@@ -91,20 +92,15 @@ async function send(): Promise<void> {
   }
 }
 
-onKeyStroke(
-  'Enter',
-  (e) => {
-    if (e.metaKey || e.ctrlKey) {
-      e.preventDefault();
-      void send();
-    }
-  },
-  { target: () => box.value?.$el as HTMLElement | undefined },
-);
+const boxEl = computed(() => box.value?.$el as HTMLElement | undefined);
+useShortcut(boxEl, ['form.submit'], () => void send());
 
+const { focused: boxFocused } = useFocus(boxEl);
 watch(
   () => store.askNonce,
-  () => (box.value?.$el as HTMLElement | undefined)?.focus(),
+  () => {
+    boxFocused.value = true;
+  },
 );
 
 onUnmounted(() => {

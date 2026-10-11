@@ -51,8 +51,8 @@ test('tabs are named after the stage; the pane shows the full Claude session id 
   await page.evaluate(() => {
     const w = window as unknown as { __clipboard: string[] };
     w.__clipboard = [];
-    navigator.clipboard.write = async (items: ClipboardItem[]) => {
-      for (const item of items) w.__clipboard.push(await (await item.getType('text/plain')).text());
+    navigator.clipboard.writeText = async (text: string) => {
+      w.__clipboard.push(text);
     };
   });
   await expect(page.locator(t('ade-session-id-text'))).toHaveText('claude-tk01');

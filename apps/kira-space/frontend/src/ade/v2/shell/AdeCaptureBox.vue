@@ -2,11 +2,12 @@
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { useTimeoutFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { ref } from 'vue';
 import { useAddBacklogItem } from '../queries';
 
-// Enter files the text as a backlog item; the note confirms for two seconds.
+// Enter files the text as a backlog item; the note confirms briefly.
 const text = ref('');
 const note = ref('');
 const add = useAddBacklogItem();
@@ -14,7 +15,7 @@ const { start: hideNote } = useTimeoutFn(
   () => {
     note.value = '';
   },
-  2000,
+  TIMING.copiedFeedback,
   { immediate: false },
 );
 

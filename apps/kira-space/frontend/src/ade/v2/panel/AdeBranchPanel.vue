@@ -4,7 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
-import { useClipboard } from '@vueuse/core';
+import { useCopy } from '@workbench/behaviour/clipboard';
 import { errorText } from '@workbench/bridge/codedError';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
@@ -48,7 +48,7 @@ const automation = useRunAutomation();
 const contextMenu = useContextMenuStore();
 const setupError = ref('');
 const forcePush = ref(false);
-const { copy, copied } = useClipboard({ copiedDuring: 1500 });
+const { copy, copied } = useCopy();
 const copiedKey = ref('');
 
 const branch = computed(() => props.row.branch);

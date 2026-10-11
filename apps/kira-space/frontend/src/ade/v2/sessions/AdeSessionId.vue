@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useClipboard } from '@vueuse/core';
+import { useCopy } from '@workbench/behaviour/clipboard';
 
 // The Claude session id of a session, full and copyable, for `claude --resume <id>`.
 const props = defineProps<{ id: string }>();
-const { copy, copied } = useClipboard({ copiedDuring: 1500 });
+const { copy, copied } = useCopy();
 </script>
 
 <template>

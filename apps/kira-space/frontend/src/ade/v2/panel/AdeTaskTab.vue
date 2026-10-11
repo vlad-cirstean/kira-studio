@@ -5,8 +5,9 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
+import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useRepoLinksStore } from '../../../repo/state/repoLinks';
 import { useRepos } from '../../../repo/state/reposQueries';
 import { repoTint } from '../../../state/coderepos';
@@ -54,17 +55,13 @@ async function write(patch: Partial<TaskPatch>): Promise<boolean> {
 }
 
 // ---- name
-const name = ref(task.value.title);
-watch(
-  () => [task.value.id, task.value.title] as const,
-  () => {
-    name.value = task.value.title;
+const nameEdit = useInlineEdit({
+  source: () => task.value.title,
+  commit: async (title) => {
+    await write({ title });
   },
-);
-function commitName(): void {
-  const next = name.value.trim();
-  if (next !== task.value.title) void write({ title: next });
-}
+  allowEmpty: true,
+});
 
 // ---- status
 const statusTone = computed(() =>
@@ -126,12 +123,13 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ?
       <Label for="ade-task-name" class="text-kira-sm text-muted-foreground">Name</Label>
       <Input
         id="ade-task-name"
-        v-model="name"
+        :model-value="nameEdit.text.value"
         :placeholder="card.defaultTitle"
         size="kira-lg" class="font-medium"
         data-testid="ade-task-name"
-        @blur="commitName"
-        @keydown.enter="commitName"
+        @update:model-value="nameEdit.onInput"
+        @blur="nameEdit.onCommit"
+        @keydown="nameEdit.onKeydown"
       />
       <span class="text-kira-sm text-muted-foreground">Status</span>
       <div class="flex min-h-row items-center gap-2">

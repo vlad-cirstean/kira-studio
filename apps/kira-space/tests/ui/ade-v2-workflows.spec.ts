@@ -394,11 +394,11 @@ test('Discard restores the saved form, and leaving with edits asks first', async
   expect(calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(0);
 });
 
-test('Ctrl+S saves the open editor', async ({ relaunch }) => {
+test('Cmd+S saves the open editor', async ({ relaunch }) => {
   const { window: page, control } = await openWorkflows(relaunch);
   const name = page.locator(t('ade-wf-form-name'));
   await name.fill('Via shortcut');
-  await name.press('Control+s');
+  await name.press('Meta+s');
   await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(1);
 });
 

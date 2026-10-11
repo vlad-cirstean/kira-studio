@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { revealElement } from '@workbench/behaviour/focus';
 import { queryClient } from '@workbench/state/queryClient';
 import { nextTick, ref, watch } from 'vue';
 import type { CardModel } from '../plan/usePlanModel';
@@ -26,7 +27,7 @@ watch(
   async ([focus, el]) => {
     if (!focus || !el) return;
     await nextTick();
-    el.scrollIntoView({ block: 'nearest' });
+    revealElement(el);
     ui.focusSetup = false;
   },
   { immediate: true },

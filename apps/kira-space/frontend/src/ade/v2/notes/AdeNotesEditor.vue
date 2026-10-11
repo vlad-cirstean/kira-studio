@@ -5,6 +5,7 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import { useDebounceFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { control } from '../../../bridge/control';
 import { notesExtensions } from './notesExtensions';
@@ -32,7 +33,7 @@ function flush(): void {
   }
 }
 
-const debouncedFlush = useDebounceFn(flush, 600);
+const debouncedFlush = useDebounceFn(flush, TIMING.autosave);
 
 const PROSE = [
   'ade-notes-prose min-h-full px-3 py-2.5 outline-none',

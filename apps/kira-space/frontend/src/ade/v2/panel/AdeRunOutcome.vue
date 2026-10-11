@@ -3,7 +3,7 @@ import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
 import { FieldError } from '@theme/components/ui/field';
 import VarText from '@theme/components/VarText.vue';
-import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { useCopy } from '@workbench/behaviour/clipboard';
 import { computed, ref, watch } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
@@ -28,8 +28,7 @@ const props = defineProps<{
 
 const dialogs = useAdeDialogsStore();
 const ui = useAdeBoardUiStore();
-const copied = ref(false);
-const copyError = ref('');
+const { copy: copyText, copied, error: copyError } = useCopy();
 const showLog = ref(false);
 watch(
   () => props.listen && ui.focusRebaseLog,
@@ -101,16 +100,8 @@ function text(): string {
   return lines.join('\n');
 }
 
-async function copy(): Promise<void> {
-  copyError.value = '';
-  await copyOrReportError(
-    text(),
-    (m) => (copyError.value = m),
-    () => {
-      copied.value = true;
-      setTimeout(() => (copied.value = false), 1500);
-    },
-  );
+function copy(): void {
+  void copyText(text());
 }
 </script>
 
