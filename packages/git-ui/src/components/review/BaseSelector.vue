@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * `docs/plans/P7.md` W12 — §6.8: "shown in the view's header as a picker — never as static text —
  * naming the base and how it was resolved ('upstream', 'default branch')." The trigger names the
@@ -9,8 +11,7 @@
  * Tags are never offered here — `<base>..<branch>` is a question about two branches (§6.8),
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
-import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import SearchField from '@theme/components/SearchField.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
@@ -171,19 +172,19 @@ function onOpenAutoFocus(e: Event): void {
                 <CodiconIcon name="cloud" :size="13" />
                 <span class="truncate">{{ row.shortName }}</span>
               </button>
-              <div
+              <InlineState
                 v-if="hiddenCount > 0"
-                class="text-kira-sm text-subtle py-1 px-1.5"
+                kind="empty"
                 data-testid="base-selector-hidden"
               >
                 {{ hiddenCount }} more — type to filter
-              </div>
-              <div
+              </InlineState>
+              <InlineState
                 v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
-                class="px-1.5 py-1 text-kira-sm text-subtle"
+                :kind="refsLoading ? 'loading' : 'empty'"
               >
                 {{ refsLoading ? 'Loading branches…' : 'No matching branches' }}
-              </div>
+              </InlineState>
             </section>
           </div>
         </div>

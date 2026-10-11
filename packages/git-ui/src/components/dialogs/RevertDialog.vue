@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 /**
  * `docs/plans/P6.md` W15: §7.10's confirm step. `OpsState.runRevert` awaits this dialog whenever
  * the preflight is not a clean, non-merge, single-sha revert (`verdict !== "clean"` or a mainline
@@ -8,8 +10,7 @@
  * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import {
   Dialog,
   DialogBody,
@@ -90,10 +91,9 @@ function confirm(): void {
             (§7.10: git cannot guess this for you):
           </p>
           <RadioGroup v-model="selectedMainline">
-            <div
+            <Card
               v-for="entry in preflight?.mainlineRequired"
               :key="entry.sha"
-              class="p-1 border border-border rounded-kira-sm"
             >
               <p class="m-0 mb-0.5"><code class="font-data">{{ entry.sha.slice(0, 7) }}</code></p>
               <Field
@@ -111,7 +111,7 @@ function confirm(): void {
                   {{ parent.subject }}</span>
                 </FieldLabel>
               </Field>
-            </div>
+            </Card>
           </RadioGroup>
         </template>
 

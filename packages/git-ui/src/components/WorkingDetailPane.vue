@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CommitStore, FileChangeKind } from '@kira/git-core';
 /**
  * P7 (item 2): the uncommitted-changes strip's own click-through target — `DetailPane.vue`'s
  * sibling for the one case that pane can never represent (the working tree is not a commit: no
@@ -11,7 +12,7 @@
  * `openInEditor`/`openAllChanges`, both commit-shaped), so sharing the instance costs nothing and
  * keeps "copy path"/announcements consistent across every pane in the app.
  */
-import type { CommitStore, FileChangeKind } from '@kira/git-core';
+import { FieldError } from '@theme/components/ui/field';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -55,9 +56,9 @@ function onOpenFile(index: number, pinned: boolean): void {
     <ViewToolbar data-testid="detail-head">
       <span class="min-w-0 truncate text-kira-md text-fg">Uncommitted Changes</span>
     </ViewToolbar>
-    <p v-if="workingState.error.value" class="m-0 p-3 text-error">
+    <FieldError v-if="workingState.error.value" class="p-3">
       Couldn't load uncommitted changes — {{ workingState.error.value }}
-    </p>
+    </FieldError>
     <FileTree
       v-else
       class="flex-auto min-h-0"

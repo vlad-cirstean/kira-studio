@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { CommitStore } from '@kira/git-core';
+import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
  * G11 D16 — the review sidebar's Files pane, and the only new component this phase adds to
  * `packages/git-ui` (which SPEC otherwise freezes). `FileTree` over `ReviewFilesState` instead of
@@ -17,10 +20,9 @@
  * owns one toolbar for both the Commits and Files panes, so this component's own toolbar is
  * disabled (`show-toolbar="false"`) rather than duplicated.
  */
-import type { CommitStore } from '@kira/git-core';
-import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import { FieldError } from '@theme/components/ui/field';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { ACTION_ICONS, codiconName } from '../../icons/index.ts';
@@ -134,9 +136,9 @@ function onToggleReviewed(path: string): void {
 
 <template>
   <div class="flex flex-col min-h-0 h-full">
-    <p v-if="reviewFiles.loadError.value" class="m-0 p-3 text-error">
+    <FieldError v-if="reviewFiles.loadError.value" class="p-3">
       Couldn't load the file list — {{ reviewFiles.loadError.value }}
-    </p>
+    </FieldError>
 
     <template v-else>
       <!-- G12 D12/D16: which two revisions a click opens in the host's diff editor — the one real
@@ -156,15 +158,15 @@ function onToggleReviewed(path: string): void {
         </SecondaryTabs>
         <span v-if="deltaStatusText" class="ml-auto text-muted-foreground text-graph-sm">{{ deltaStatusText }}</span>
       </ViewToolbar>
-      <p v-if="reviewFiles.diffError.value" class="m-0 p-3 text-error">
+      <FieldError v-if="reviewFiles.diffError.value" class="p-3">
         Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
-      </p>
+      </FieldError>
       <!-- G30 round-1 functional-correctness review, finding #7: a failed review.mark used to be
            an unhandled promise rejection with nothing shown here — the checkbox just silently
            reverted on the next render. Mirrors loadError/diffError's own pattern exactly. -->
-      <p v-if="reviewFiles.markError.value" class="m-0 p-3 text-error">
+      <FieldError v-if="reviewFiles.markError.value" class="p-3">
         Couldn't update that file's review status — {{ reviewFiles.markError.value }}
-      </p>
+      </FieldError>
 
       <ViewToolbar v-if="hasFilter" class="font-ui">
         <SecondaryTabs
@@ -195,9 +197,9 @@ function onToggleReviewed(path: string): void {
         @open-file="onOpenFileIndex"
         @toggle-reviewed="onToggleReviewed"
       />
-      <p v-if="reviewFiles.loading.value && files.length === 0" class="m-0 p-3 text-muted-foreground">
+      <InlineState v-if="reviewFiles.loading.value && files.length === 0" kind="loading">
         Loading…
-      </p>
+      </InlineState>
     </template>
   </div>
 </template>

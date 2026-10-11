@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { LineRange, ReviewComment } from '@kira/git-ipc';
+import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 /**
  * G13 D10 — the review sidebar's Comments pane, and the only new component this phase adds to
  * `packages/git-ui`: the centralized list, the copy-for-AI action and clear-all. The webview never
@@ -9,11 +11,11 @@
  * this component groups consecutive same-path comments into one visual section without
  * re-sorting.
  */
-import type { LineRange, ReviewComment } from '@kira/git-ipc';
-import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError } from '@theme/components/ui/field';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, useTemplateRef } from 'vue';
 import type { ReviewCommentsState } from '../../state/reviewComments.ts';
@@ -101,9 +103,9 @@ const listEl = useTemplateRef<HTMLElement>('list');
       </div>
     </ViewToolbar>
 
-    <p v-if="reviewComments.loadError.value" class="m-0 p-3 text-error">
+    <FieldError v-if="reviewComments.loadError.value" class="p-3">
       Couldn't load the comment list — {{ reviewComments.loadError.value }}
-    </p>
+    </FieldError>
 
     <template v-else>
       <template v-if="groups.length > 0">
@@ -164,12 +166,9 @@ const listEl = useTemplateRef<HTMLElement>('list');
         No comments yet — open a file from the Files tab and use the + in the diff's gutter.
       </p>
 
-      <p
-        v-if="reviewComments.loading.value && groups.length === 0"
-        class="m-0 p-3 text-muted-foreground"
-      >
+      <InlineState v-if="reviewComments.loading.value && groups.length === 0" kind="loading">
         Loading…
-      </p>
+      </InlineState>
     </template>
   </div>
 </template>

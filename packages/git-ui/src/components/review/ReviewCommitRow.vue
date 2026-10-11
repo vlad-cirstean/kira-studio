@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { CommitStore } from '@kira/git-core';
+import { TransportError } from '@kira/git-ipc';
 /**
  * `docs/plans/P7.md` W13 — one commit in the review list. Collapsed: a disclosure triangle,
  * subject, short sha (`§6.4`'s "clicking a sha copies it"), author, relative date. Expanded:
@@ -14,10 +16,10 @@
  * `ReviewView.vue`'s one panel-level toolbar, not this row's own `DetailState` fields — every
  * row's `FileTree` renders no toolbar of its own (`show-toolbar="false"`).
  */
-import type { CommitStore } from '@kira/git-core';
-import { TransportError } from '@kira/git-ipc';
+import InlineState from '@theme/components/InlineState.vue';
 import { rowVariants } from '@theme/components/rowVariants';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { FieldError } from '@theme/components/ui/field';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
@@ -269,9 +271,9 @@ function onOpenFile(index: number, pinned: boolean): void {
     </div>
 
     <div v-if="expanded" class="border-t border-border min-h-30 max-h-80 flex flex-col">
-      <p v-if="expansion?.detail.error.value" class="m-0 p-2 text-error">
+      <FieldError v-if="expansion?.detail.error.value" class="p-2">
         Couldn't load this commit — {{ expansion.detail.error.value }}
-      </p>
+      </FieldError>
       <FileTree
         v-else-if="expansion?.detail.detail.value"
         :files="expansion.detail.detail.value.files"
@@ -286,7 +288,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         @open-file="onOpenFile"
         @update:parent-index="expansion.detail.setParentIndex($event)"
       />
-      <p v-else class="m-0 p-2 text-muted-foreground">Loading…</p>
+      <InlineState v-else kind="loading">Loading…</InlineState>
     </div>
 
     <RowContextMenu

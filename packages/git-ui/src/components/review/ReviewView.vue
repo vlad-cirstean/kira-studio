@@ -1,4 +1,17 @@
 <script setup lang="ts">
+import { SETTINGS } from '@kira/git-core';
+import type { ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
+import { TransportError } from '@kira/git-ipc';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import InlineState from '@theme/components/InlineState.vue';
+import { rowIndent, rowVariants } from '@theme/components/rowVariants';
+import SearchField from '@theme/components/SearchField.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
+import Spinner from '@theme/components/Spinner.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Badge } from '@theme/components/ui/badge';
+import { Button } from '@theme/components/ui/button';
 /**
  * `docs/plans/P7.md` W11 — the sidebar view's whole root, mounted by `main.ts` in place of
  * `App.vue` when `view === "review"` (§6.8/D41: same bundle, a different root, selected from the
@@ -21,17 +34,8 @@
  *    life of this component, not just at mount.
  * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
  */
-import { SETTINGS } from '@kira/git-core';
-import type { ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
-import { TransportError } from '@kira/git-ipc';
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { rowIndent, rowVariants } from '@theme/components/rowVariants';
-import SearchField from '@theme/components/SearchField.vue';
-import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import SectionHeading from '@theme/components/SectionHeading.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Badge } from '@theme/components/ui/badge';
-import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
+import { FieldError } from '@theme/components/ui/field';
 import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -795,7 +799,10 @@ watch(
     </template>
 
     <template v-else-if="!review">
-      <p class="p-3 text-muted-foreground">Loading…</p>
+      <Empty class="h-full">
+        <EmptyMedia><Spinner :size="24" label="" /></EmptyMedia>
+        <EmptyTitle>Loading review…</EmptyTitle>
+      </Empty>
     </template>
 
     <template v-else-if="noActiveRepo">
@@ -833,12 +840,9 @@ watch(
             >
               {{ row.shortName }}
             </button>
-            <div
-              v-if="branchSections.branches.visible.length === 0"
-              class="px-1.5 py-1 text-kira-sm text-subtle"
-            >
+            <InlineState v-if="branchSections.branches.visible.length === 0" kind="empty">
               No matching branches
-            </div>
+            </InlineState>
           </div>
           <div>
             <SectionHeading label="Remote branches" />
@@ -959,7 +963,7 @@ watch(
           v-else-if="review.phase.value === 'error'"
           class="flex flex-col items-start gap-1 p-3"
         >
-          <p class=" text-error">Couldn't compare — {{ review.resolveError.value }}</p>
+          <FieldError>Couldn't compare — {{ review.resolveError.value }}</FieldError>
           <Button variant="dialog" size="kira" data-testid="review-retry" @click="retryCompare">
             Retry
           </Button>
@@ -1010,7 +1014,7 @@ watch(
 
           <div
             ref="rowsEl"
-            class="flex-1 min-h-0 overflow-auto outline-none"
+            class="flex-1 min-h-0 overflow-auto"
             role="tree"
             aria-label="Commits"
             :tabindex="focusedRowMounted ? -1 : 0"

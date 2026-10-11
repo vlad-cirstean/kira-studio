@@ -129,13 +129,15 @@ function confirmPlain(): void {
 
         <details class="pt-2 border-t border-border text-kira-md">
           <summary class="cursor-pointer text-muted-foreground">Use plain <code class="font-data">--force</code> instead</summary>
-          <Alert variant="warn" class="mt-3">
-            <AlertDescription>
-              This skips the lease check entirely — it will overwrite the remote branch even if someone
-              else has pushed to it since the lease's own tip was read, with no protection against
-              discarding their work.
-            </AlertDescription>
-          </Alert>
+          <div class="mt-3">
+            <Alert variant="warn">
+              <AlertDescription>
+                This skips the lease check entirely — it will overwrite the remote branch even if someone
+                else has pushed to it since the lease's own tip was read, with no protection against
+                discarding their work.
+              </AlertDescription>
+            </Alert>
+          </div>
           <Field orientation="horizontal" class="mt-3">
             <Checkbox :id="plainAckId" v-model="understandPlain" data-testid="force-push-plain-ack" />
             <FieldLabel :for="plainAckId">
