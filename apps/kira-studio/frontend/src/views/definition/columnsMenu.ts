@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { announceApp } from '@workbench/behaviour/liveRegion';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -50,14 +51,17 @@ export function columnsSectionMenu(
     {
       type: 'item',
       id: 'copy-name',
-      label: 'Copy name',
+      label: t('common.action.copyName.label'),
       icon: 'copy',
-      run: () => copyOrReportError(columnName, onCopyError, () => announceApp('Copied name')),
+      run: () =>
+        copyOrReportError(columnName, onCopyError, () =>
+          announceApp(t('common.copy.copiedName.announce')),
+        ),
     },
     {
       type: 'item',
       id: 'add-to-projection',
-      label: 'Add to projection',
+      label: t('studio.definition.menu.addToProjection.label'),
       icon: 'list-selection',
       run: () => {
         const tabId = targetTabForTable(connectionId, tablePath);
@@ -71,7 +75,7 @@ export function columnsSectionMenu(
     {
       type: 'item',
       id: 'sort-by',
-      label: 'Sort by',
+      label: t('studio.definition.menu.sortBy.label'),
       icon: 'sort-precedence',
       run: () => {
         const tabId = targetTabForTable(connectionId, tablePath);

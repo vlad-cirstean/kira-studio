@@ -6,9 +6,9 @@ import { describe, expect, test } from 'bun:test';
 import { consoleLintSource, lintMongoBrackets } from '../../frontend/src/views/console/lint';
 
 describe('lintMongoBrackets', () => {
-  test('unterminated string literal', () => {
+  test('Unterminated string literal.', () => {
     expect(lintMongoBrackets("'unterminated")).toEqual([
-      { from: 0, to: 13, severity: 'error', message: 'unterminated string literal' },
+      { from: 0, to: 13, severity: 'error', message: 'Unterminated string literal.' },
     ]);
   });
 
@@ -18,21 +18,21 @@ describe('lintMongoBrackets', () => {
 
   test('a bracket character inside a // comment is not a real bracket', () => {
     expect(lintMongoBrackets('// (\n)')).toEqual([
-      { from: 5, to: 6, severity: 'error', message: 'unmatched )' },
+      { from: 5, to: 6, severity: 'error', message: 'Unmatched ).' },
     ]);
   });
 
   test('mismatched pair', () => {
     expect(lintMongoBrackets('(]')).toEqual([
-      { from: 1, to: 2, severity: 'error', message: 'unmatched ]' },
-      { from: 0, to: 1, severity: 'error', message: 'unbalanced (' },
+      { from: 1, to: 2, severity: 'error', message: 'Unmatched ].' },
+      { from: 0, to: 1, severity: 'error', message: 'Unbalanced (.' },
     ]);
   });
 
   test('unclosed at EOF', () => {
     expect(lintMongoBrackets('{[')).toEqual([
-      { from: 0, to: 1, severity: 'error', message: 'unbalanced {' },
-      { from: 1, to: 2, severity: 'error', message: 'unbalanced [' },
+      { from: 0, to: 1, severity: 'error', message: 'Unbalanced {.' },
+      { from: 1, to: 2, severity: 'error', message: 'Unbalanced [.' },
     ]);
   });
 });

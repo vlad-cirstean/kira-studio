@@ -1,4 +1,4 @@
-import { formatCount } from '@workbench/behaviour/format';
+import { t } from '@theme/i18n';
 import {
   isOverThreshold,
   maxEstimatedRows,
@@ -87,7 +87,9 @@ function buildNode(raw: RawNode, thresholdRows: number, scans: ScanEstimate[]): 
     node.issues.push({
       severity: 'warn',
       code: 'full-scan',
-      message: `full table scan on "${relation ?? '?'}" with a filter — no index was used`,
+      message: t('studio.console.plan.issue.fullScanFilter.description', {
+        relation: relation ?? '?',
+      }),
     });
   }
   // D15 (info): index-only scan is a good sign, not a problem — the panel is not only bad news.
@@ -95,7 +97,7 @@ function buildNode(raw: RawNode, thresholdRows: number, scans: ScanEstimate[]): 
     node.issues.push({
       severity: 'info',
       code: 'index-only-scan',
-      message: `"${relation ?? '?'}" is read entirely from its index — no heap access needed`,
+      message: t('studio.console.plan.issue.indexOnly.description', { relation: relation ?? '?' }),
     });
   }
   // D15: a nested loop whose inner side is wide re-executes that inner scan once per outer row.
@@ -105,7 +107,12 @@ function buildNode(raw: RawNode, thresholdRows: number, scans: ScanEstimate[]): 
       node.issues.push({
         severity: 'warn',
         code: 'nested-loop-wide-inner',
-        message: `nested loop repeats a scan estimated at ${wideInner.estimatedRows === undefined ? '' : formatCount(wideInner.estimatedRows)} rows for every outer row`,
+        message:
+          wideInner.estimatedRows === undefined
+            ? t('studio.console.plan.issue.nestedLoopWideUnknown.description')
+            : t('studio.console.plan.issue.nestedLoopWide.description', {
+                count: wideInner.estimatedRows,
+              }),
       });
     }
   }

@@ -391,7 +391,7 @@ onMounted(() => {
            just the list — a disconnected connection means neither side has anything live to show. -->
       <Empty v-if="needsReconnect" data-testid="browse-reconnect">
         <Button variant="dialog-primary" size="kira-lg" data-testid="browse-reconnect-load" @click="onReconnectAndLoad">
-          {{ t('studio.browse.reconnectAndLoad.label') }}
+          {{ t('studio.common.reconnectAndLoad.label') }}
         </Button>
       </Empty>
       <div v-else class="flex flex-row flex-1 min-h-0">

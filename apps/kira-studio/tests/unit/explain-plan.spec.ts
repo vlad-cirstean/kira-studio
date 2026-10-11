@@ -61,7 +61,7 @@ describe('parsePostgresPlan — F11', () => {
     const codes = plan.issues.map((i) => i.code);
     expect(codes).toContain('full-scan');
     expect(codes).toContain('wide-scan');
-    expect(plan.issues.find((i) => i.code === 'full-scan')?.message).toContain('"t"');
+    expect(plan.issues.find((i) => i.code === 'full-scan')?.message).toContain('“t”');
   });
 
   test('a lower threshold does not flag the same plan', () => {
@@ -76,7 +76,7 @@ describe('parsePostgresPlan — F11', () => {
       {
         severity: 'info',
         code: 'index-only-scan',
-        message: '"u" is read entirely from its index — no heap access needed',
+        message: '“u” is read entirely from its index. No heap access needed.',
       },
     ]);
   });
@@ -138,7 +138,7 @@ describe('parseSqlitePlan — F14', () => {
       {
         severity: 'warn',
         code: 'full-scan',
-        message: 'SCAN t — a full scan, no index narrowed the read',
+        message: 'SCAN t is a full scan. No index narrowed the read.',
       },
     ]);
   });

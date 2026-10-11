@@ -1178,7 +1178,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect(page.locator('[data-testid="pager-last"]')).toBeDisabled();
   await countButton.click();
   await hoverCount();
-  await expect(countTip).toContainText(/Σ\s*5(?!\d)/, { timeout: 15_000 });
+  await expect(countTip).toContainText(/(?<!\d)5 rows in total/, { timeout: 15_000 });
   await expect(page.locator('[data-testid="pager-last"]')).toBeEnabled();
 
   await page.fill('[data-testid="filter-where-input"]', '');

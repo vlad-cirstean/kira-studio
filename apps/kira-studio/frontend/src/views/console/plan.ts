@@ -1,5 +1,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import { cellText, isNull, isTruncated, type Page, type TabularPage } from '@shared/protocol/page';
+import { t } from '@theme/i18n';
 import type { QueryPlan } from './planModel';
 import { parseClickhousePlan } from './planParsers/clickhouse';
 import { parseMariadbPlan } from './planParsers/mariadb';
@@ -52,7 +53,7 @@ export function parseExplainPages(
 ): QueryPlan {
   const first = pages[0];
   if (first?.kind !== 'tabular') {
-    throw new Error('EXPLAIN did not return a tabular result');
+    throw new Error(t('studio.console.plan.notTabular.error'));
   }
 
   // A page the console cap stopped is an incomplete plan.

@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import type { SqlDialect } from '../shared/sqlIdent';
 import { type DdlSchema, type DdlTable, findTable } from './ddl';
@@ -45,7 +46,7 @@ function unknownRelationDiagnostics(
       from: ref.nodeFrom,
       to: ref.nodeFrom + qualified.length,
       severity: 'warning',
-      message: `unknown table "${qualified}" — not in this connection's DDL`,
+      message: t('studio.console.diagnostics.unknownTable.error', { table: qualified }),
     });
   }
   return out;
@@ -86,7 +87,10 @@ function unknownColumnDiagnostics(
       from: columnNode.from,
       to: columnNode.to,
       severity: 'warning',
-      message: `"${table.name}" has no column "${columnText}"`,
+      message: t('studio.console.diagnostics.unknownColumn.error', {
+        table: table.name,
+        column: columnText,
+      }),
     });
   }
   return out;

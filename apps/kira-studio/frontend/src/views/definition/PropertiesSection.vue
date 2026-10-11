@@ -2,6 +2,7 @@
 import type { DefinitionSection } from '@shared/domain/definition';
 import { Badge } from '@theme/components/ui/badge';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
+import { t } from '@theme/i18n';
 
 // P23 D6/D5/D9: one `definition.sections[]` entry — a Kafka topic's Partitions/Configuration, a
 // consumer group's Group/Members/Committed offsets, an SQS queue's Attributes. Same section chrome
@@ -19,7 +20,7 @@ defineProps<{
       <Badge>{{ section.rows.length }}</Badge>
     </header>
 
-    <p v-if="section.rows.length === 0" class="text-muted-foreground m-0">Nothing to show.</p>
+    <p v-if="section.rows.length === 0" class="text-muted-foreground m-0">{{ t('studio.definition.properties.empty') }}</p>
 
     <Table v-else>
       <TableBody>

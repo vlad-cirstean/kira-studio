@@ -9,7 +9,7 @@
       {
         "severity": "info",
         "code": "index-only-scan",
-        "message": "\"u\" is read entirely from its index — no heap access needed"
+        "message": "“u” is read entirely from its index. No heap access needed."
       }
     ],
     "children": []
@@ -19,7 +19,7 @@
     {
       "severity": "info",
       "code": "index-only-scan",
-      "message": "\"u\" is read entirely from its index — no heap access needed"
+      "message": "“u” is read entirely from its index. No heap access needed."
     }
   ],
   "overThreshold": false,

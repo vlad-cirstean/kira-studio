@@ -15,7 +15,7 @@
           {
             "severity": "warn",
             "code": "filesort",
-            "message": "a temporary sort file (filesort) was used — sort key t.`name`"
+            "message": "A temporary sort file (filesort) was used. Sort key t.`name`."
           }
         ],
         "children": [
@@ -69,7 +69,7 @@
     {
       "severity": "warn",
       "code": "filesort",
-      "message": "a temporary sort file (filesort) was used — sort key t.`name`"
+      "message": "A temporary sort file (filesort) was used. Sort key t.`name`."
     }
   ],
   "overThreshold": false,

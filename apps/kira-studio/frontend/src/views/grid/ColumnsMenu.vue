@@ -9,6 +9,7 @@ import { Label } from '@theme/components/ui/label';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { moveId, useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
@@ -125,14 +126,14 @@ onBeforeUnmount(() => {
   <PopoverContent align="end" class="w-56 gap-0 p-0" data-testid="columns-menu">
     <div class="max-h-80 flex flex-col">
       <div class="flex border-b border-border gap-1 p-1">
-        <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">All</Button>
-        <Button variant="toolbar" size="kira" data-testid="columns-select-none" @click="selectNone">None</Button>
+        <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">{{ t('common.state.all.option') }}</Button>
+        <Button variant="toolbar" size="kira" data-testid="columns-select-none" @click="selectNone">{{ t('common.state.none.option') }}</Button>
       </div>
       <!-- Drag a row to reorder — the same order the grid renders columns in
            (columns.ts's resolveColumnOrder). Checkbox toggles visibility; the PK's is locked.
            The container is always mounted: the sortable binds to it once, at mount. -->
       <div ref="listEl" class="overflow-y-auto p-0.5">
-        <InlineState v-if="!meta" kind="loading">Loading columns…</InlineState>
+        <InlineState v-if="!meta" kind="loading">{{ t('studio.grid.columns.loading.loading') }}</InlineState>
         <Label
           v-for="name in order"
           :key="name"
@@ -152,7 +153,7 @@ onBeforeUnmount(() => {
                 <CodiconIcon name="check" :size="12" />
               </Checkbox>
             </TooltipTrigger>
-            <TooltipContent>Primary key — always shown</TooltipContent>
+            <TooltipContent>{{ t('studio.grid.columns.primaryKey.tooltip') }}</TooltipContent>
           </Tooltip>
           <Checkbox
             v-else
@@ -167,7 +168,7 @@ onBeforeUnmount(() => {
       </div>
       <Separator class="my-1" />
       <div class="px-1.5 pb-1.5 text-kira-sm text-subtle" data-testid="columns-menu-footer">
-        {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
+        {{ t(caps?.projection ? 'studio.grid.columns.footerServer.hint' : 'studio.grid.columns.footerClient.hint') }}
       </div>
     </div>
   </PopoverContent>

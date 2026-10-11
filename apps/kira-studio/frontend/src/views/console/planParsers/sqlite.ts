@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { rollupIssues } from '../planIssues';
 import type { PlanNode, QueryPlan } from '../planModel';
 
@@ -29,7 +30,7 @@ function nodeForRow(detail: string): PlanNode {
     node.issues.push({
       severity: 'warn',
       code: 'full-scan',
-      message: `${detail} — a full scan, no index narrowed the read`,
+      message: t('studio.console.plan.issue.sqliteFullScan.description', { detail }),
     });
   }
   if (detail.includes('USE TEMP B-TREE FOR ')) {
@@ -46,7 +47,12 @@ export function parseSqlitePlan(rows: SqliteExplainRow[]): QueryPlan {
   const nodes = new Map<number, PlanNode>();
   for (const row of rows) nodes.set(row.id, nodeForRow(row.detail));
 
-  const root: PlanNode = { label: 'Query plan', metrics: [], issues: [], children: [] };
+  const root: PlanNode = {
+    label: t('studio.console.plan.root.sqlite.label'),
+    metrics: [],
+    issues: [],
+    children: [],
+  };
   for (const row of rows) {
     const node = nodes.get(row.id);
     if (!node) continue;

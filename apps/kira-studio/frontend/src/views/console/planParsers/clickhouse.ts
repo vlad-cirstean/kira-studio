@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { pushWideScanIssue, rollupIssues } from '../planIssues';
 import type { PlanNode, QueryPlan } from '../planModel';
 
@@ -35,19 +36,30 @@ function indexMetrics(indexes: RawIndex[]): Array<{ label: string; value: string
   const out: Array<{ label: string; value: string }> = [];
   for (const idx of indexes) {
     const type = idx.Type ?? 'Index';
-    if (idx.Keys) out.push({ label: `${type} keys`, value: idx.Keys.join(', ') });
-    if (idx.Condition !== undefined) out.push({ label: `${type} condition`, value: idx.Condition });
+    if (idx.Keys)
+      out.push({
+        label: t('studio.console.plan.metric.keys.label', { type }),
+        value: idx.Keys.join(', '),
+      });
+    if (idx.Condition !== undefined)
+      out.push({
+        label: t('studio.console.plan.metric.condition.label', { type }),
+        value: idx.Condition,
+      });
     if (idx['Search Algorithm'])
-      out.push({ label: `${type} search`, value: idx['Search Algorithm'] });
+      out.push({
+        label: t('studio.console.plan.metric.search.label', { type }),
+        value: idx['Search Algorithm'],
+      });
     if (idx['Initial Parts'] !== undefined || idx['Selected Parts'] !== undefined) {
       out.push({
-        label: `${type} parts`,
+        label: t('studio.console.plan.metric.parts.label', { type }),
         value: `${idx['Selected Parts'] ?? '?'} / ${idx['Initial Parts'] ?? '?'} selected`,
       });
     }
     if (idx['Initial Granules'] !== undefined || idx['Selected Granules'] !== undefined) {
       out.push({
-        label: `${type} granules`,
+        label: t('studio.console.plan.metric.granules.label', { type }),
         value: `${idx['Selected Granules'] ?? '?'} / ${idx['Initial Granules'] ?? '?'} selected`,
       });
     }
@@ -77,7 +89,9 @@ function buildNode(raw: RawNode, mergeTreeNodes: PlanNode[]): PlanNode {
         node.issues.push({
           severity: 'warn',
           code: 'pk-not-narrowed',
-          message: `the primary key on "${node.relation ?? '?'}" did not narrow the read — every granule was selected`,
+          message: t('studio.console.plan.issue.pkNotNarrowed.description', {
+            relation: node.relation ?? '?',
+          }),
         });
       }
       // D15: every part read.
@@ -89,7 +103,10 @@ function buildNode(raw: RawNode, mergeTreeNodes: PlanNode[]): PlanNode {
         node.issues.push({
           severity: 'warn',
           code: 'all-parts-read',
-          message: `every part of "${node.relation ?? '?'}" was read (${pk['Initial Parts']} parts)`,
+          message: t('studio.console.plan.issue.allParts.description', {
+            relation: node.relation ?? '?',
+            count: pk['Initial Parts'] ?? 0,
+          }),
         });
       }
     }

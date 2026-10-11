@@ -2,6 +2,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { lintSql } from '@shared/domain/sql-lint';
 import { splitSqlStatements } from '@shared/domain/sql-split';
+import { t } from '@theme/i18n';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import { tryParseShellText } from '../shared/document/ejson';
 import { lexOptionsFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
@@ -100,7 +101,7 @@ export function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
           from: start,
           to: n,
           severity: 'error',
-          message: 'unterminated string literal',
+          message: t('shared.sqlLint.unterminatedString.error'),
         });
         return issues;
       }
@@ -114,14 +115,25 @@ export function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
     if (c === ')' || c === ']' || c === '}') {
       const top = stack[stack.length - 1];
       if (top && top.ch === MONGO_BRACKET_PAIRS[c]) stack.pop();
-      else issues.push({ from: i, to: i + 1, severity: 'error', message: `unmatched ${c}` });
+      else
+        issues.push({
+          from: i,
+          to: i + 1,
+          severity: 'error',
+          message: t('studio.console.lint.unmatched.error', { char: c }),
+        });
       i++;
       continue;
     }
     i++;
   }
   for (const { pos, ch } of stack) {
-    issues.push({ from: pos, to: pos + 1, severity: 'error', message: `unbalanced ${ch}` });
+    issues.push({
+      from: pos,
+      to: pos + 1,
+      severity: 'error',
+      message: t('studio.console.lint.unbalanced.error', { char: ch }),
+    });
   }
   return issues;
 }
@@ -176,7 +188,9 @@ function lintMongoShape(text: string): ConsoleDiagnostic[] {
         from: 0,
         to: text.length,
         severity: 'error',
-        message: 'expected db.<collection>.<method>(...)',
+        message: t('studio.console.format.mongoShape.error', {
+          pattern: 'db.<collection>.<method>(…)',
+        }),
       },
     ];
   }
@@ -188,7 +202,9 @@ function lintMongoShape(text: string): ConsoleDiagnostic[] {
         from,
         to: from + method.length,
         severity: 'error',
-        message: `unsupported console method: db.${collection}.${method}()`,
+        message: t('studio.console.format.mongoMethod.error', {
+          method: `db.${collection}.${method}()`,
+        }),
       },
     ];
   }
@@ -207,7 +223,7 @@ function lintMongoShape(text: string): ConsoleDiagnostic[] {
           from,
           to: from + trimmed.length,
           severity: 'error',
-          message: `invalid argument at offset ${result.offset}`,
+          message: t('studio.console.lint.invalidArgument.error', { offset: result.offset }),
         },
       ];
     }
@@ -241,7 +257,14 @@ function lintRedisConsole(text: string): ConsoleDiagnostic[] {
         i++;
       }
       if (!closed) {
-        return [{ from: start, to: n, severity: 'error', message: 'unterminated quoted string' }];
+        return [
+          {
+            from: start,
+            to: n,
+            severity: 'error',
+            message: t('studio.console.lint.unterminatedQuote.error'),
+          },
+        ];
       }
       continue;
     }
@@ -257,8 +280,7 @@ function lintRedisConsole(text: string): ConsoleDiagnostic[] {
         from: offset,
         to: offset + stmt.length,
         severity: 'warning',
-        message:
-          'statements are separated by ; not newlines — this spans multiple lines and will run as one command',
+        message: t('studio.console.lint.newlineSeparated.error'),
       });
     }
     offset += stmt.length + 1;

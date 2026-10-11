@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { copyOrReportError, copyOrReportErrorLazy } from '@workbench/behaviour/clipboard';
 import { announceApp } from '@workbench/behaviour/liveRegion';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -34,31 +35,31 @@ export function tabularCellMenu(ctx: TabularCellMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'copy',
-      label: 'Copy',
+      label: t('common.action.copy.label'),
       icon: 'copy',
       run: () =>
         copyOrReportError(ctx.isNull ? '' : ctx.text, ctx.onError, () =>
-          announceApp('Copied cell'),
+          announceApp(t('studio.copy.cell.announce')),
         ),
     },
     {
       type: 'item',
       id: 'copy-with-header',
-      label: 'Copy with header',
+      label: t('studio.copy.withHeader.label'),
       icon: 'copy',
       run: () =>
         copyOrReportError(`${ctx.columnName}\n${ctx.isNull ? '' : ctx.text}`, ctx.onError, () =>
-          announceApp('Copied with header'),
+          announceApp(t('studio.copy.withHeader.announce')),
         ),
     },
     {
       type: 'item',
       id: 'copy-as-json',
-      label: 'Copy as JSON',
+      label: t('common.action.copyAsJson.label'),
       icon: 'copy',
       run: () =>
         copyOrReportError(JSON.stringify(ctx.isNull ? null : ctx.text), ctx.onError, () =>
-          announceApp('Copied as JSON'),
+          announceApp(t('common.copy.copiedJson.announce')),
         ),
     },
   ];
@@ -93,31 +94,31 @@ export function tabularRangeMenu(ctx: TabularRangeMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'copy',
-      label: 'Copy',
+      label: t('common.action.copy.label'),
       icon: 'copy',
       run: () =>
         copyOrReportError(columnsToTsv(ctx.rows, ctx.cols, ctx.cellAt), ctx.onError, () =>
-          announceApp('Copied selection'),
+          announceApp(t('studio.copy.selection.announce')),
         ),
     },
     {
       type: 'item',
       id: 'copy-as-csv',
-      label: 'Copy as CSV',
+      label: t('studio.copy.asCsv.label'),
       icon: 'copy',
       run: () =>
         copyOrReportError(rowsToCsv(rangeSnapshots(ctx)), ctx.onError, () =>
-          announceApp('Copied as CSV'),
+          announceApp(t('studio.copy.csv.announce')),
         ),
     },
     {
       type: 'item',
       id: 'copy-as-json',
-      label: 'Copy as JSON',
+      label: t('common.action.copyAsJson.label'),
       icon: 'copy',
       run: () =>
         copyOrReportError(rowsToJson(rangeSnapshots(ctx)), ctx.onError, () =>
-          announceApp('Copied as JSON'),
+          announceApp(t('common.copy.copiedJson.announce')),
         ),
     },
   ];
@@ -140,34 +141,34 @@ export function tabularRowMenu(ctx: TabularRowMenuContext): MenuItem[] {
     {
       type: 'submenu',
       id: 'copy-rows',
-      label: 'Copy row(s)',
+      label: t('studio.copy.rows.label'),
       icon: 'copy',
       items: [
         {
           type: 'item',
           id: 'copy-rows-tsv',
-          label: 'TSV',
+          label: t('studio.copy.format.tsv.label'),
           run: () =>
             copyOrReportError(rowsToTsv(ctx.snapshots()), ctx.onError, () =>
-              announceApp('Copied as TSV'),
+              announceApp(t('studio.copy.tsv.announce')),
             ),
         },
         {
           type: 'item',
           id: 'copy-rows-csv',
-          label: 'CSV',
+          label: t('studio.copy.format.csv.label'),
           run: () =>
             copyOrReportError(rowsToCsv(ctx.snapshots()), ctx.onError, () =>
-              announceApp('Copied as CSV'),
+              announceApp(t('studio.copy.csv.announce')),
             ),
         },
         {
           type: 'item',
           id: 'copy-rows-json',
-          label: 'JSON',
+          label: t('studio.copy.format.json.label'),
           run: () =>
             copyOrReportError(rowsToJson(ctx.snapshots()), ctx.onError, () =>
-              announceApp('Copied as JSON'),
+              announceApp(t('common.copy.copiedJson.announce')),
             ),
         },
       ],
@@ -190,19 +191,21 @@ export function tabularColumnMenu(ctx: TabularColumnMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'copy-column',
-      label: 'Copy column',
+      label: t('studio.copy.column.label'),
       icon: 'copy',
       run: () =>
         copyOrReportError(columnsToTsv(ctx.rows, [ctx.col], ctx.cellAt), ctx.onError, () =>
-          announceApp('Copied column'),
+          announceApp(t('studio.copy.column.announce')),
         ),
     },
     {
       type: 'item',
       id: 'copy-column-name',
-      label: 'Copy column name',
+      label: t('studio.copy.columnName.label'),
       run: () =>
-        copyOrReportError(ctx.columnName, ctx.onError, () => announceApp('Copied column name')),
+        copyOrReportError(ctx.columnName, ctx.onError, () =>
+          announceApp(t('studio.copy.columnName.announce')),
+        ),
     },
   ];
 }
@@ -230,19 +233,21 @@ export function rowAsJsonMenu(ctx: RowJsonMenuContext): MenuItem[] {
     {
       type: 'item',
       id: 'copy-as-json',
-      label: 'Copy as JSON',
+      label: t('common.action.copyAsJson.label'),
       icon: 'copy',
       run: () =>
-        copyOrReportError(prettyJson(ctx.json), ctx.onError, () => announceApp('Copied as JSON')),
+        copyOrReportError(prettyJson(ctx.json), ctx.onError, () =>
+          announceApp(t('common.copy.copiedJson.announce')),
+        ),
     },
     {
       type: 'item',
       id: 'copy-all-as-json',
-      label: 'Copy all as JSON',
+      label: t('studio.copy.allAsJson.label'),
       icon: 'copy',
       run: () =>
         copyOrReportError(jsonArrayOf(ctx.allJson().map(prettyJson)), ctx.onError, () =>
-          announceApp('Copied all as JSON'),
+          announceApp(t('studio.copy.allAsJson.announce')),
         ),
     },
   ];
@@ -275,43 +280,43 @@ export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem
     {
       type: 'submenu',
       id: 'copy-document-submenu',
-      label: 'Copy document',
+      label: t('studio.copy.document.label'),
       icon: 'copy',
       items: [
         {
           type: 'item',
           id: 'copy-plain-json',
-          label: 'Plain JSON',
+          label: t('studio.copy.plainJson.label'),
           run: () =>
             copyOrReportError(toPlainJson(ctx.body), ctx.onError, () =>
-              announceApp('Copied as Plain JSON'),
+              announceApp(t('studio.copy.plainJson.announce')),
             ),
         },
         {
           type: 'item',
           id: 'copy-document',
-          label: 'Shell mode',
+          label: t('studio.copy.shellMode.label'),
           run: () =>
             copyOrReportError(toShellText(ctx.body), ctx.onError, () =>
-              announceApp('Copied as Shell mode'),
+              announceApp(t('studio.copy.shellMode.announce')),
             ),
         },
         {
           type: 'item',
           id: 'copy-as-json',
-          label: 'Canonical Extended JSON',
+          label: t('studio.copy.canonicalJson.label'),
           run: () =>
             copyOrReportError(prettyJson(ctx.body), ctx.onError, () =>
-              announceApp('Copied as Canonical Extended JSON'),
+              announceApp(t('studio.copy.canonicalJson.announce')),
             ),
         },
         {
           type: 'item',
           id: 'copy-relaxed-json',
-          label: 'Relaxed Extended JSON',
+          label: t('studio.copy.relaxedJson.label'),
           run: () =>
             copyOrReportError(toRelaxedText(ctx.body), ctx.onError, () =>
-              announceApp('Copied as Relaxed Extended JSON'),
+              announceApp(t('studio.copy.relaxedJson.announce')),
             ),
         },
       ],
@@ -319,47 +324,47 @@ export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem
     {
       type: 'submenu',
       id: 'copy-all-submenu',
-      label: 'Copy all',
+      label: t('common.action.copyAll.label'),
       icon: 'copy',
       items: [
         {
           type: 'item',
           id: 'copy-all-plain-json',
-          label: 'Plain JSON',
+          label: t('studio.copy.plainJson.label'),
           run: () =>
             copyOrReportErrorLazy(ctx.allText('plain'), ctx.onError, () =>
-              announceApp('Copied as Plain JSON'),
+              announceApp(t('studio.copy.plainJson.announce')),
             ),
         },
         {
           type: 'item',
           id: 'copy-all-shell',
-          label: 'Shell mode',
+          label: t('studio.copy.shellMode.label'),
           // D11's own shape for "all": documents joined by '\n', one compact literal per line --
           // not a JSON array, and not each document's own multi-line indented form (which would
           // make "joined by \n" meaningless) -- that's what pasting N mongosh literals back into
           // a shell session actually wants.
           run: () =>
             copyOrReportErrorLazy(ctx.allText('shell'), ctx.onError, () =>
-              announceApp('Copied as Shell mode'),
+              announceApp(t('studio.copy.shellMode.announce')),
             ),
         },
         {
           type: 'item',
           id: 'copy-all-as-json',
-          label: 'Canonical Extended JSON',
+          label: t('studio.copy.canonicalJson.label'),
           run: () =>
             copyOrReportErrorLazy(ctx.allText('canonical'), ctx.onError, () =>
-              announceApp('Copied as Canonical Extended JSON'),
+              announceApp(t('studio.copy.canonicalJson.announce')),
             ),
         },
         {
           type: 'item',
           id: 'copy-all-relaxed-json',
-          label: 'Relaxed Extended JSON',
+          label: t('studio.copy.relaxedJson.label'),
           run: () =>
             copyOrReportErrorLazy(ctx.allText('relaxed'), ctx.onError, () =>
-              announceApp('Copied as Relaxed Extended JSON'),
+              announceApp(t('studio.copy.relaxedJson.announce')),
             ),
         },
       ],

@@ -34,17 +34,17 @@
           {
             "severity": "warn",
             "code": "pk-not-narrowed",
-            "message": "the primary key on \"default.t\" did not narrow the read — every granule was selected"
+            "message": "The primary key on “default.t” didn’t narrow the read. Every granule was selected."
           },
           {
             "severity": "warn",
             "code": "all-parts-read",
-            "message": "every part of \"default.t\" was read (3 parts)"
+            "message": "Every part of “default.t” was read (3 parts)."
           },
           {
             "severity": "warn",
             "code": "wide-scan",
-            "message": "ReadFromMergeTree: default.t is estimated to read 500,000 rows"
+            "message": "ReadFromMergeTree: default.t is estimated to read 500,000 rows."
           }
         ],
         "children": []
@@ -56,17 +56,17 @@
     {
       "severity": "warn",
       "code": "pk-not-narrowed",
-      "message": "the primary key on \"default.t\" did not narrow the read — every granule was selected"
+      "message": "The primary key on “default.t” didn’t narrow the read. Every granule was selected."
     },
     {
       "severity": "warn",
       "code": "all-parts-read",
-      "message": "every part of \"default.t\" was read (3 parts)"
+      "message": "Every part of “default.t” was read (3 parts)."
     },
     {
       "severity": "warn",
       "code": "wide-scan",
-      "message": "ReadFromMergeTree: default.t is estimated to read 500,000 rows"
+      "message": "ReadFromMergeTree: default.t is estimated to read 500,000 rows."
     }
   ],
   "overThreshold": true,

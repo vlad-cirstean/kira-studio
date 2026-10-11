@@ -34,7 +34,7 @@
               {
                 "severity": "warn",
                 "code": "full-scan",
-                "message": "full table scan on \"orders\" — no index was used"
+                "message": "Full table scan on “orders”. No index was used."
               }
             ],
             "children": []
@@ -69,7 +69,7 @@
     {
       "severity": "warn",
       "code": "full-scan",
-      "message": "full table scan on \"orders\" — no index was used"
+      "message": "Full table scan on “orders”. No index was used."
     }
   ],
   "overThreshold": false,

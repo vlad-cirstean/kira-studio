@@ -73,12 +73,12 @@
                       {
                         "severity": "warn",
                         "code": "full-scan",
-                        "message": "full table scan on \"t\" with a filter — no index was used"
+                        "message": "Full table scan on “t” with a filter. No index was used."
                       },
                       {
                         "severity": "warn",
                         "code": "wide-scan",
-                        "message": "Seq Scan on t is estimated to read 184,153 rows"
+                        "message": "Seq Scan on t is estimated to read 184,153 rows."
                       }
                     ],
                     "children": []
@@ -118,12 +118,12 @@
     {
       "severity": "warn",
       "code": "full-scan",
-      "message": "full table scan on \"t\" with a filter — no index was used"
+      "message": "Full table scan on “t” with a filter. No index was used."
     },
     {
       "severity": "warn",
       "code": "wide-scan",
-      "message": "Seq Scan on t is estimated to read 184,153 rows"
+      "message": "Seq Scan on t is estimated to read 184,153 rows."
     }
   ],
   "overThreshold": true,

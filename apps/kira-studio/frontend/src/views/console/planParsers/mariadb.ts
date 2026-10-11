@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import {
   isOverThreshold,
   maxEstimatedRows,
@@ -92,8 +93,8 @@ function entryNode(entry: NestedLoopEntry, scans: ScanEstimate[]): PlanNode | nu
         severity: 'warn',
         code: 'filesort',
         message: filesort.sort_key
-          ? `a temporary sort file (filesort) was used — sort key ${filesort.sort_key}`
-          : 'a temporary sort file (filesort) was used',
+          ? t('studio.console.plan.issue.filesortKey.description', { key: filesort.sort_key })
+          : t('studio.console.plan.issue.filesort.description'),
       },
     ]);
   }
@@ -116,7 +117,7 @@ export function parseMariadbPlan(rawText: string, thresholdRows: number): QueryP
   const scans: ScanEstimate[] = [];
   const children = block.nested_loop ? entriesToNodes(block.nested_loop, scans) : [];
   const root: PlanNode = {
-    label: 'Query',
+    label: t('studio.console.plan.root.query.label'),
     cost: block.cost !== undefined ? { total: block.cost } : undefined,
     metrics: [],
     issues: [],

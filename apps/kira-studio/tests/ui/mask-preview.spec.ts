@@ -272,7 +272,7 @@ test('grid mask preview — mark a column PII, preview masks and locks editing, 
   await expect(gridCell(page, 0, 'email')).toHaveText('maria.gonzalez@acme.example');
   await expect(gridCell(page, 0, 'email')).not.toHaveClass(/cell-masked/);
   await expect(page.locator('[data-testid="mask-preview-strip"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('read-write');
+  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('Read-write');
   await expect(page.locator('[data-testid="toolbar-add-row"]')).toBeEnabled();
   await gridCell(page, 0, 'email').click();
   await expect(panel).not.toHaveAttribute('data-read-only-reason');
@@ -424,6 +424,6 @@ test('grid mask preview — turns itself back off when the correlation key fetch
   await expect(toggle).not.toHaveClass(/is-active/);
   await expect(gridCell(page, 0, 'email')).toHaveText('maria.gonzalez@acme.example');
   await expect(gridCell(page, 0, 'email')).not.toHaveClass(/cell-masked/);
-  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('read-write');
+  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('Read-write');
   await expect(page.locator('[data-testid="data-action-error"]')).toBeVisible();
 });

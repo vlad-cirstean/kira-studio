@@ -4,6 +4,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -18,6 +19,10 @@ import {
 import { useGridViewStore } from './state';
 
 // P48 D10: takes `tab` as a prop like every other view's toolbar — see DataToolbar.vue's own note.
+// SQL syntax samples, not wording.
+const WHERE_EXAMPLE = "status = 'paid'";
+const ORDER_BY_EXAMPLE = 'placed_at DESC';
+
 const props = defineProps<{ tab: DataTabRecord }>();
 const connectionsStore = useConnectionsStore();
 const gridViewStore = useGridViewStore();
@@ -138,7 +143,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   <div class="relative">
     <TooltipIconButton
       icon="history"
-      label="Saved & recent filters"
+      :label="t('studio.common.savedAndRecentFilters.label')"
       ref="historyTriggerEl"
       :class="{ 'bg-field text-fg': historyOpen }"
       data-testid="filter-history-button"
@@ -163,7 +168,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       class="w-full"
       prefix="WHERE"
       :prefix-active="!!tab.state.filter"
-      placeholder="status = 'paid'"
+      :placeholder="WHERE_EXAMPLE"
       data-testid="filter-where-input"
       :invalid="hasError"
       :candidates="whereCandidates"
@@ -180,7 +185,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       class="w-full"
       prefix="ORDER BY"
       :prefix-active="!!tab.state.sort"
-      placeholder="placed_at DESC"
+      :placeholder="ORDER_BY_EXAMPLE"
       data-testid="filter-orderby-input"
       :candidates="orderByCandidates"
       language="sql"
@@ -192,8 +197,8 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   </div>
   <Tooltip>
     <TooltipTrigger as-child>
-      <Button variant="toolbar" size="kira" @click="onClear">Clear</Button>
+      <Button variant="toolbar" size="kira" @click="onClear">{{ t('common.action.clear.label') }}</Button>
     </TooltipTrigger>
-    <TooltipContent>Empty both fields and refetch</TooltipContent>
+    <TooltipContent>{{ t('studio.common.clearFilters.tooltip') }}</TooltipContent>
   </Tooltip>
 </template>

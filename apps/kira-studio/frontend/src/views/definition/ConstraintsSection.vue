@@ -3,6 +3,7 @@ import { pathTail } from '@shared/domain/tree';
 import { Badge } from '@theme/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { type MessageKey, t } from '@theme/i18n';
 import { useTabsStore } from '../../state/tabs';
 import type { ConstraintRow } from './structure';
 
@@ -20,13 +21,13 @@ const KEY_LABEL: Partial<Record<ConstraintRow['type'], 'PK' | 'FK'>> = {
   foreignKey: 'FK',
   referencedBy: 'FK',
 };
-const TYPE_LABEL: Record<ConstraintRow['type'], string> = {
-  primaryKey: 'primary key',
-  unique: 'unique',
-  foreignKey: 'foreign key',
-  check: 'check',
-  exclusion: 'exclusion',
-  referencedBy: 'referenced by',
+const TYPE_LABEL_KEY: Record<ConstraintRow['type'], MessageKey> = {
+  primaryKey: 'studio.definition.constraint.type.primaryKey.label',
+  unique: 'studio.definition.unique.label',
+  foreignKey: 'studio.definition.constraint.type.foreignKey.label',
+  check: 'studio.definition.constraint.type.check.label',
+  exclusion: 'studio.definition.constraint.type.exclusion.label',
+  referencedBy: 'studio.definition.constraint.type.referencedBy.label',
 };
 
 function referencedTableName(c: ConstraintRow): string | null {
@@ -45,25 +46,25 @@ function onNavigate(c: ConstraintRow): void {
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-constraints">
     <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Constraints</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.definition.constraints.heading.label') }}</span>
       <Badge>{{ constraints.length }}</Badge>
     </header>
     <Table columns>
       <TableHeader>
         <TableRow class="hover:bg-transparent">
-          <TableHead>Name</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Definition</TableHead>
-          <TableHead>Table</TableHead>
+          <TableHead>{{ t('common.field.name.label') }}</TableHead>
+          <TableHead>{{ t('common.field.type.label') }}</TableHead>
+          <TableHead>{{ t('studio.definition.definition.label') }}</TableHead>
+          <TableHead>{{ t('studio.definition.table.label') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         <TableRow v-for="c in constraints" :key="`${c.type}:${c.name}`" data-testid="definition-row">
           <TableCell class="def-con-name">{{ c.name }}</TableCell>
           <TableCell class="def-con-type">
-            <span v-if="KEY_LABEL[c.type] === 'PK'" class="text-warn text-kira-sm">PK</span>
-            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="text-info text-kira-sm">FK</span>
-            <Badge v-else>{{ TYPE_LABEL[c.type] }}</Badge>
+            <span v-if="KEY_LABEL[c.type] === 'PK'" class="text-warn text-kira-sm">{{ t('studio.definition.primaryKey.label') }}</span>
+            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="text-info text-kira-sm">{{ t('studio.definition.foreignKey.label') }}</span>
+            <Badge v-else>{{ t(TYPE_LABEL_KEY[c.type]) }}</Badge>
           </TableCell>
           <TableCell class="overflow-hidden text-ellipsis whitespace-nowrap font-data text-muted-foreground">{{ c.detail }}</TableCell>
           <TableCell class="def-con-table">
@@ -77,7 +78,7 @@ function onNavigate(c: ConstraintRow): void {
                   {{ referencedTableName(c) }}
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Open {{ referencedTableName(c) }}'s definition</TooltipContent>
+              <TooltipContent>{{ t('studio.definition.constraint.openReferenced.tooltip', { table: referencedTableName(c) ?? '' }) }}</TooltipContent>
             </Tooltip>
           </TableCell>
         </TableRow>

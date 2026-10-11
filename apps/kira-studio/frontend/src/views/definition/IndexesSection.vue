@@ -2,6 +2,7 @@
 import type { IndexMeta } from '@shared/domain/tree';
 import { Badge } from '@theme/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@theme/components/ui/table';
+import { t } from '@theme/i18n';
 
 defineProps<{
   indexes: IndexMeta[];
@@ -11,24 +12,24 @@ defineProps<{
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-indexes">
     <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Indexes</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.definition.indexes.heading.label') }}</span>
       <Badge>{{ indexes.length }}</Badge>
     </header>
     <Table columns>
       <TableHeader>
         <TableRow class="hover:bg-transparent">
-          <TableHead>Name</TableHead>
-          <TableHead>Kind</TableHead>
-          <TableHead>Method</TableHead>
-          <TableHead>Columns</TableHead>
+          <TableHead>{{ t('common.field.name.label') }}</TableHead>
+          <TableHead>{{ t('common.field.kind.label') }}</TableHead>
+          <TableHead>{{ t('studio.definition.method.label') }}</TableHead>
+          <TableHead>{{ t('studio.common.columns.label') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         <TableRow v-for="idx in indexes" :key="idx.name" data-testid="definition-row">
           <TableCell class="def-idx-name">{{ idx.name }}</TableCell>
           <TableCell class="def-idx-badges">
-            <Badge v-if="idx.primary">primary</Badge>
-            <Badge v-else-if="idx.unique">unique</Badge>
+            <Badge v-if="idx.primary">{{ t('studio.definition.index.primary.label') }}</Badge>
+            <Badge v-else-if="idx.unique">{{ t('studio.definition.unique.label') }}</Badge>
           </TableCell>
           <TableCell class="def-idx-method font-data">{{ idx.method ?? '' }}</TableCell>
           <TableCell class="font-data text-muted-foreground">({{ idx.columns.join(', ') }})</TableCell>

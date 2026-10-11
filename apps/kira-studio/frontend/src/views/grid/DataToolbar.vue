@@ -8,7 +8,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { formatCount } from '@workbench/behaviour/format';
+import { t } from '@theme/i18n';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
@@ -82,8 +82,41 @@ const hasMaskRules = computed(
 // forbid the combination outright than to build that distinction for a case nobody needs.
 const hasPendingChanges = computed(() => pendingChangesStore.hasPending(props.tab.id));
 const maskPreviewTooltip = computed(() => {
-  if (hasPendingChanges.value) return 'Commit or discard pending changes first';
-  return rt.value?.maskPreview ? 'Turn off the masking preview' : 'Preview masked values';
+  if (hasPendingChanges.value) return t('studio.grid.maskPreview.pendingFirst.tooltip');
+  return t(
+    rt.value?.maskPreview
+      ? 'studio.grid.maskPreview.off.tooltip'
+      : 'studio.grid.maskPreview.on.tooltip',
+  );
+});
+const addRowTooltip = computed(() => {
+  if (isWritable.value) return t('studio.grid.addRow.label');
+  return t(
+    rt.value?.maskPreview
+      ? 'studio.grid.maskedEdit.tooltip'
+      : 'studio.common.connectionReadOnly.tooltip',
+  );
+});
+// A failed refresh keeps the old count on screen; a failed first count has none to keep.
+const countTooltip = computed(() => {
+  const count = rt.value?.count;
+  const error = rt.value?.countError;
+  if (!count) {
+    return error
+      ? t('studio.common.countFailed.tooltip', { error })
+      : t('studio.grid.count.tooltip');
+  }
+  const total = t(
+    count.exact ? 'studio.grid.count.exact.tooltip' : 'studio.grid.count.approx.tooltip',
+    { count: count.value },
+  );
+  return [
+    total,
+    count.stale ? t('studio.grid.count.stale.tooltip') : null,
+    error ? t('studio.grid.count.refreshFailed.tooltip', { error }) : null,
+  ]
+    .filter(Boolean)
+    .join('. ');
 });
 function onToggleMaskPreview(): void {
   if (hasPendingChanges.value) return;
@@ -115,12 +148,12 @@ const canDeleteRows = computed(
 // connection or an engine that cannot delete is a property of the connection, a missing primary
 // key a property of the table, and an empty selection the one the user can act on right now.
 const deleteRowTooltip = computed(() => {
-  if (canDeleteRows.value) return 'Delete selected row(s)';
-  if (rt.value?.maskPreview) return 'Values are masked — turn the preview off to edit';
-  if (!isWritable.value) return 'Connection is read-only';
-  if (!caps.value?.canDelete) return 'This connection does not support deleting rows';
-  if (!hasPrimaryKey.value) return 'This table has no primary key, so a row cannot be addressed';
-  return 'Select one or more rows first';
+  if (canDeleteRows.value) return t('studio.grid.deleteRows.aria');
+  if (rt.value?.maskPreview) return t('studio.grid.maskedEdit.tooltip');
+  if (!isWritable.value) return t('studio.common.connectionReadOnly.tooltip');
+  if (!caps.value?.canDelete) return t('studio.grid.deleteUnsupported.tooltip');
+  if (!hasPrimaryKey.value) return t('studio.grid.noPrimaryKey.tooltip');
+  return t('studio.grid.selectRowsFirst.tooltip');
 });
 
 // M5 §6.4: canGenerateDataFor doesn't know about mask preview (fakeData/generate.ts's own
@@ -132,10 +165,11 @@ const canGenerateData = computed(
     !rt.value?.maskPreview,
 );
 const generateDataTooltip = computed(() => {
-  if (canGenerateData.value) return 'Generate data…';
-  if (rt.value?.maskPreview) return 'Values are masked — turn the preview off to edit';
-  if (connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly) return 'Connection is read-only';
-  return 'This connection does not support generating rows';
+  if (canGenerateData.value) return t('studio.shortcuts.palette.generateData.label');
+  if (rt.value?.maskPreview) return t('studio.grid.maskedEdit.tooltip');
+  if (connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly)
+    return t('studio.common.connectionReadOnly.tooltip');
+  return t('studio.grid.generateUnsupported.tooltip');
 });
 
 function onFirst(): void {
@@ -173,11 +207,11 @@ const columnsAnchorRef = ref<HTMLElement | null>(null);
 // P16 design system's count Badge on the Columns button: "selected / total" — both counts
 // already live on data this component reads anyway (the projection list and the
 // describe-derived meta), so this is a display-only derivation, not a new data source.
-const columnCountLabel = computed(() => {
+const columnCount = computed(() => {
   const total = rt.value?.meta?.columns.length;
   if (!total) return null;
   const projection = props.tab.state.projection;
-  return `${projection ? projection.length : total} / ${total}`;
+  return { shown: projection ? projection.length : total, total };
 });
 
 // P31 D38/F35: the Columns button's own corner mark — shown only when the tab's column set
@@ -185,7 +219,7 @@ const columnCountLabel = computed(() => {
 // until there's actually something to flag. A plain dot, not a count: "5 / 5" (every column still
 // shown, only the order changed) reads as a count that says nothing, and a four-character label
 // in a 22px button's corner was never going to fit regardless of which deviation triggered it —
-// the exact numbers already live in the tooltip below (columnCountLabel), which is where every
+// the exact numbers already live in the tooltip below (columnCount), which is where every
 // other detail in this icon-only toolbar lives.
 const columnsIndicator = computed(() => {
   const state = props.tab.state;
@@ -250,7 +284,7 @@ function onDeleteRow(): void {
     :count="rt?.count?.value ?? null"
     :has-more="!!rt?.hasMore"
     testid-prefix=""
-    last-tooltip="Count rows first"
+    :last-tooltip="t('studio.grid.pager.countFirst.tooltip')"
     :strategy="rt?.lastStrategy"
     @first="onFirst"
     @prev="onPrev"
@@ -271,7 +305,7 @@ function onDeleteRow(): void {
           size="kira-icon"
           data-testid="toolbar-count"
           :class="rt?.countError ? 'text-error' : rt?.count?.stale ? 'text-warn' : ''"
-          aria-label="Count all rows"
+          :aria-label="t('studio.grid.count.tooltip')"
           @click="onCount"
         >
           <CodiconIcon name="symbol-number" :size="13" />
@@ -283,11 +317,7 @@ function onDeleteRow(): void {
           // before a fresh count runs, so a failure right after has no old count to keep showing;
           // a failed *refresh* of an existing count keeps that count on screen (unchanged) with
           // the error appended, rather than losing it.
-          rt?.count
-            ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${formatCount(rt.count.value)}${rt.count.stale ? ' (stale, click to refresh)' : ''}${rt?.countError ? ` — refresh failed: ${rt.countError}` : ''}`
-            : rt?.countError
-              ? `Count failed: ${rt.countError}`
-              : 'Count all rows'
+          countTooltip
         }}
       </TooltipContent>
     </Tooltip>
@@ -302,14 +332,14 @@ function onDeleteRow(): void {
               class="relative"
               data-testid="toolbar-columns"
               :class="{ 'bg-field text-fg': columnsOpen }"
-              aria-label="Columns"
+              :aria-label="t('studio.common.columns.label')"
               @click="columnsOpen = !columnsOpen"
             >
               <CodiconIcon name="list-selection" :size="13" />
               <StatusDot v-if="columnsIndicator" tone="state-on" class="absolute top-0.5 right-0.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{{ columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns' }}</TooltipContent>
+          <TooltipContent>{{ columnCount ? t('studio.grid.columns.shown.tooltip', columnCount) : t('studio.common.columns.label') }}</TooltipContent>
         </Tooltip>
         <PopoverAnchor :reference="columnsAnchorRef ?? undefined" />
       </div>
@@ -322,12 +352,8 @@ function onDeleteRow(): void {
   <div class="flex items-center gap-1.5 min-w-0">
     <TooltipIconButton
       icon="add"
-      :label="isWritable
-            ? 'Add a row'
-            : rt?.maskPreview
-              ? 'Values are masked — turn the preview off to edit'
-              : 'Connection is read-only'"
-      aria-label="Add a row"
+:label="addRowTooltip"
+      :aria-label="t('studio.grid.addRow.label')"
       disabled-trigger
       data-testid="toolbar-add-row"
       :disabled="!isWritable"
@@ -336,7 +362,7 @@ function onDeleteRow(): void {
     <TooltipIconButton
       icon="wand"
       :label="generateDataTooltip"
-      aria-label="Generate data"
+      :aria-label="t('studio.shortcuts.palette.generateData.label')"
       disabled-trigger
       data-testid="toolbar-generate-data"
       :disabled="!canGenerateData"
@@ -345,7 +371,7 @@ function onDeleteRow(): void {
     <TooltipIconButton
       icon="trash"
       :label="deleteRowTooltip"
-      aria-label="Delete selected row(s)"
+      :aria-label="t('studio.grid.deleteRows.aria')"
       disabled-trigger
       data-testid="toolbar-delete-row"
       :disabled="!canDeleteRows"
@@ -353,7 +379,7 @@ function onDeleteRow(): void {
     />
     <TooltipIconButton
       icon="search"
-      label="Search this page"
+      :label="t('studio.common.searchPage.label')"
       :class="{ 'bg-field text-fg': rt?.searchOpen }"
       data-testid="toolbar-search"
       @click="onToggleSearch"
@@ -362,7 +388,7 @@ function onDeleteRow(): void {
       v-if="hasMaskRules"
       icon="eye-closed"
       :label="maskPreviewTooltip"
-      aria-label="Toggle masking preview"
+      :aria-label="t('studio.grid.maskPreview.aria')"
       disabled-trigger
       :class="{ 'bg-field text-fg is-active': rt?.maskPreview }"
       :disabled="hasPendingChanges"

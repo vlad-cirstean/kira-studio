@@ -34,12 +34,12 @@
           {
             "severity": "warn",
             "code": "full-scan",
-            "message": "full table scan on \"t\" — no index was used"
+            "message": "Full table scan on “t”. No index was used."
           },
           {
             "severity": "warn",
             "code": "wide-scan",
-            "message": "Full scan on t is estimated to read 100,175 rows"
+            "message": "Full scan on t is estimated to read 100,175 rows."
           }
         ],
         "children": []
@@ -55,12 +55,12 @@
     {
       "severity": "warn",
       "code": "full-scan",
-      "message": "full table scan on \"t\" — no index was used"
+      "message": "Full table scan on “t”. No index was used."
     },
     {
       "severity": "warn",
       "code": "wide-scan",
-      "message": "Full scan on t is estimated to read 100,175 rows"
+      "message": "Full scan on t is estimated to read 100,175 rows."
     }
   ],
   "overThreshold": true,

@@ -1,4 +1,4 @@
-import { formatCount } from '@workbench/behaviour/format';
+import { t } from '@theme/i18n';
 import type { PlanIssue, PlanNode, ScanEstimate } from './planModel';
 
 // P18 (v1.1) D15/D16: the pieces every per-dialect parser (planParsers/*.ts) shares once its own
@@ -16,7 +16,10 @@ export function pushWideScanIssue(node: PlanNode, rows: number, thresholdRows: n
   node.issues.push({
     severity: 'warn',
     code: 'wide-scan',
-    message: `${node.label} is estimated to read ${formatCount(rows)} rows`,
+    message: t('studio.console.plan.issue.wideScan.description', {
+      label: node.label,
+      count: rows,
+    }),
   });
 }
 
@@ -93,14 +96,19 @@ export function pushIndexIssues(
     node.issues.push({
       severity: 'warn',
       code: 'full-scan',
-      message: `full table scan on "${node.relation ?? '?'}" — no index was used`,
+      message: t('studio.console.plan.issue.fullScan.description', {
+        relation: node.relation ?? '?',
+      }),
     });
   }
   if (table.possible_keys && table.possible_keys.length > 0 && !table.key) {
     node.issues.push({
       severity: 'warn',
       code: 'unused-index',
-      message: `"${node.relation ?? '?'}" has an index (${table.possible_keys.join(', ')}) the planner did not choose`,
+      message: t('studio.console.plan.issue.unusedIndex.description', {
+        relation: node.relation ?? '?',
+        indexes: table.possible_keys.join(', '),
+      }),
     });
   }
 }

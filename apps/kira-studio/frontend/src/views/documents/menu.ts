@@ -1,3 +1,4 @@
+import { type MessageKey, t } from '@theme/i18n';
 import { copyOrReportError as sharedCopyOrReportError } from '@workbench/behaviour/clipboard';
 import { announceApp } from '@workbench/behaviour/liveRegion';
 import { errorText } from '@workbench/bridge/codedError';
@@ -20,15 +21,27 @@ function prettyJson(text: string): string {
 // way an unhandled promise rejection would — ContextMenu.vue's `onItemClick` is never awaited by
 // its own `@click` binding, so with nothing here to catch it, Copy would fail with zero visible
 // feedback (P43 F6/D7's own `actionError` exists for exactly this).
-function copyOrReportError(tabId: string, text: string, what: string): Promise<void> {
+function copyOrReportError(tabId: string, text: string, announce: MessageKey): Promise<void> {
   return sharedCopyOrReportError(
     text,
     (message) => useDocumentViewStore().setActionError(tabId, message),
     () => {
       useDocumentViewStore().setActionError(tabId, null);
-      announceApp(`Copied ${what}`);
+      announceApp(t(announce));
     },
   );
+}
+
+export function confirmDeleteDocument(id: string): Promise<boolean> {
+  return useConfirmDialogStore().confirm({
+    title: t('studio.documents.deleteConfirm.title'),
+    message: [
+      t('studio.documents.deleteConfirm.body', { id }),
+      t('common.confirm.irreversible.body'),
+    ].join(' '),
+    confirmLabel: t('common.action.delete.label'),
+    tone: 'danger',
+  });
 }
 
 // §8.10's "Document" row: Expand all, Collapse all, Copy document, Copy _id, Edit, Delete —
@@ -58,7 +71,7 @@ export function rowMenu(
     {
       type: 'item',
       id: 'expand-all',
-      label: 'Expand all',
+      label: t('common.action.expandAll.label'),
       // setAllExpanded's own `true` branch never reads its ids argument — no reason to force
       // allIds()'s whole-page decode just to hand it a value it drops.
       run: () => useDocumentViewStore().setAllExpanded(tabId, [], true),
@@ -66,14 +79,14 @@ export function rowMenu(
     {
       type: 'item',
       id: 'collapse-all',
-      label: 'Collapse all',
+      label: t('common.action.collapseAll.label'),
       run: () => useDocumentViewStore().setAllExpanded(tabId, allIds(), false),
     },
     { type: 'separator' },
     {
       type: 'item',
       id: 'toggle-expanded',
-      label: 'Expand/collapse',
+      label: t('studio.documents.menu.toggleExpanded.label'),
       run: () => useDocumentViewStore().toggleExpanded(tabId, id),
     },
     { type: 'separator' },
@@ -93,72 +106,67 @@ export function rowMenu(
       // `toPlainJson` strips every `$`-prefixed wrapper down to its plain-JSON equivalent instead.
       type: 'submenu',
       id: 'copy-document-submenu',
-      label: 'Copy document',
+      label: t('studio.copy.document.label'),
       items: [
         {
           type: 'item',
           id: 'copy-plain-json',
-          label: 'Plain JSON',
-          run: () => copyOrReportError(tabId, toPlainJson(body), 'as plain JSON'),
+          label: t('studio.copy.plainJson.label'),
+          run: () => copyOrReportError(tabId, toPlainJson(body), 'studio.copy.plainJson.announce'),
         },
         {
           type: 'item',
           id: 'copy-document',
-          label: 'Shell mode',
+          label: t('studio.copy.shellMode.label'),
           // P27 D12: the shell form (ObjectId(...), ISODate(...), ...) — what the tree already
           // shows, and what saveDocumentEdit/parseDocumentLiteral already accept back.
-          run: () => copyOrReportError(tabId, toShellText(body), 'as shell mode'),
+          run: () => copyOrReportError(tabId, toShellText(body), 'studio.copy.shellMode.announce'),
         },
         {
           type: 'item',
           id: 'copy-as-json',
-          label: 'Canonical Extended JSON',
+          label: t('studio.copy.canonicalJson.label'),
           // P19 D6: canonical extended JSON, not relaxed and not shell — it's what the app
           // already has in hand (no re-encode) and what mongoimport/mongosh accept.
-          run: () => copyOrReportError(tabId, prettyJson(body), 'as canonical extended JSON'),
+          run: () =>
+            copyOrReportError(tabId, prettyJson(body), 'studio.copy.canonicalJson.announce'),
         },
         {
           type: 'item',
           id: 'copy-relaxed-json',
-          label: 'Relaxed Extended JSON',
-          run: () => copyOrReportError(tabId, toRelaxedText(body), 'as relaxed extended JSON'),
+          label: t('studio.copy.relaxedJson.label'),
+          run: () =>
+            copyOrReportError(tabId, toRelaxedText(body), 'studio.copy.relaxedJson.announce'),
         },
       ],
     },
     {
       type: 'item',
       id: 'copy-id',
-      label: 'Copy _id',
+      label: t('common.action.copyId.label'),
       // The shell form is also what turns *Copy _id* into a working filter (F14, D12/D15): paste
       // it as `{ _id: ObjectId("...") }` and resolveEjsonWrappers/the shell constructor resolve it
       // to the same value either way.
-      run: () => copyOrReportError(tabId, parseIdLabel(id).text, '_id'),
+      run: () => copyOrReportError(tabId, parseIdLabel(id).text, 'common.copy.copiedId.announce'),
     },
     { type: 'separator' },
     {
       type: 'item',
       id: 'edit-document',
-      label: editGate.editable ? 'Edit' : editGate.label,
+      label: editGate.editable ? t('common.action.edit.label') : editGate.label,
       disabled: !editGate.editable,
       run: onEdit,
     },
     {
       type: 'item',
       id: 'delete-document',
-      label: deleteGate.deletable ? 'Delete' : deleteGate.label,
+      label: deleteGate.deletable ? t('common.action.delete.label') : deleteGate.label,
       danger: true,
       disabled: !deleteGate.deletable,
       // P43 F6/D8: this runs inside contextMenu.ts's own `void item.run()` — an unhandled
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
       run: async () => {
-        if (
-          !(await useConfirmDialogStore().confirm({
-            message: `Delete this document (_id: ${id})?`,
-            confirmLabel: 'Delete',
-            tone: 'danger',
-          }))
-        )
-          return;
+        if (!(await confirmDeleteDocument(id))) return;
         try {
           await deleteDocument(tabId, id);
           useDocumentViewStore().setActionError(tabId, null);

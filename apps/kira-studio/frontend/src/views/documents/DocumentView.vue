@@ -14,15 +14,16 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@theme/components/ui
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import RunState from '@theme/RunState.vue';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
+import { formatBytes } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
 import AutocompleteField from '@workbench/components/AutocompleteField.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -42,6 +43,7 @@ import {
   mongoSortCandidates,
   useMongoFieldSampleStore,
 } from '../shared/mongoFieldSample';
+import { nodeKindLabel } from '../shared/nodeKindLabel';
 import PagerControls from '../shared/page/PagerControls.vue';
 import SearchFilterNotice from '../shared/page/SearchFilterNotice.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
@@ -50,7 +52,7 @@ import { setVisibleRows } from '../shared/page/visibleRows';
 import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
-import { rowMenu } from './menu';
+import { confirmDeleteDocument, rowMenu } from './menu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
 import ProjectionMenu from './ProjectionMenu.vue';
 import { documentRow, fieldNamesOnPage, getPage, pageVersion, setVisibleWindow } from './page';
@@ -65,7 +67,6 @@ import {
 import { parseSortText, sortSpecToText } from './sortDocument';
 import { useDocumentViewStore } from './state';
 
-const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const documentRowsStore = useDocumentRowsStore();
 const mongoFieldSampleStore = useMongoFieldSampleStore();
@@ -73,6 +74,10 @@ const connectionsStore = useConnectionsStore();
 const documentViewStore = useDocumentViewStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
+// Mongo syntax samples, not wording.
+const FILTER_EXAMPLE = "{ name: 'a' }";
+const SORT_EXAMPLE = '{ createdAt: -1, name: 1 }';
+
 const props = defineProps<{ tab: DocumentTabRecord }>();
 
 // Item (regression pass, task batch P46-5): registered here, at setup's own top level, rather
@@ -113,13 +118,17 @@ const canDelete = computed(() => !!caps.value?.canDelete && !connRecord.value?.r
 // same tooltip on a control that toggle could never turn back on. Mirrors KeyValueView.vue's own
 // writeDisabledReason exactly.
 function writeDisabledReason(capFlag: boolean | undefined): string {
-  return capFlag === false ? 'Connection does not support this action' : 'Connection is read-only';
+  return t(
+    capFlag === false
+      ? 'studio.common.writeUnsupported.tooltip'
+      : 'studio.common.connectionReadOnly.tooltip',
+  );
 }
 const insertTitle = computed(() =>
-  canInsert.value ? 'Add a document' : writeDisabledReason(caps.value?.canInsert),
+  canInsert.value ? t('studio.documents.add.label') : writeDisabledReason(caps.value?.canInsert),
 );
 const deleteTitle = computed(() =>
-  canDelete.value ? 'Delete' : writeDisabledReason(caps.value?.canDelete),
+  canDelete.value ? t('common.action.delete.label') : writeDisabledReason(caps.value?.canDelete),
 );
 
 const targetTail = computed(() => pathTail(props.tab.path));
@@ -133,23 +142,22 @@ const targetTail = computed(() => pathTail(props.tab.path));
 // document with it, so truncated rows are never editable.
 function editGateFor(row: number): { editable: boolean; label: string } {
   if (!caps.value?.canUpdate) {
-    return { editable: false, label: 'Connection does not support update' };
+    return { editable: false, label: t('studio.documents.gate.noUpdate.tooltip') };
   }
   if (connRecord.value?.readOnly) {
-    return { editable: false, label: 'Connection is read-only' };
+    return { editable: false, label: t('studio.common.connectionReadOnly.tooltip') };
   }
   void pageVersion.n;
   if (documentRow(props.tab.id, row)?.isTruncated) {
-    return { editable: false, label: 'Document truncated at 64 KB — not editable' };
+    return { editable: false, label: t('studio.documents.gate.truncated.tooltip', { size: formatBytes(64 * 1024) }) };
   }
   if (props.tab.state.projection !== null) {
     return {
       editable: false,
-      label:
-        'Clear the field projection before editing — a projected document would replace the full one',
+      label: t('studio.documents.gate.projection.tooltip'),
     };
   }
-  return { editable: true, label: 'Edit' };
+  return { editable: true, label: t('common.action.edit.label') };
 }
 
 // P16 design system LAW: the connection colour reaches a view as a 2px rail (here: the
@@ -201,7 +209,7 @@ function onSearchEscape(): void {
 
 // P18 D9/D13: candidate lists computed here (not inside mongoFieldSample.ts, which is plain and
 // Vue-unaware) so `void pageVersion.n` — fieldNamesOnPage's own non-reactive-Map dependency,
-// same line projectionCountLabel below already carries — is what drives the recompute. Without
+// same line projectionCount below already carries — is what drives the recompute. Without
 // it the candidate list would freeze at whatever the first loaded page happened to contain.
 // `_id` is prepended here (not inside fieldNamesOnPage, which deliberately excludes it for the
 // projection picker) — it is always returned regardless of projection, so it is the single
@@ -306,12 +314,12 @@ const projectionTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 // P16 design system's count Badge on the Columns button (DataToolbar.vue's own
 // `columnCountLabel` precedent) — narrowed to "fields seen so far" since a document collection
 // has no fixed total.
-const projectionCountLabel = computed(() => {
+const projectionCount = computed(() => {
   void pageVersion.n;
   const total = fieldNamesOnPage(props.tab.id).length;
   if (total === 0) return null;
   const projection = props.tab.state.projection;
-  return `${projection ? projection.length : total} / ${total}`;
+  return { shown: projection ? projection.length : total, total };
 });
 
 const creatingNew = ref(false);
@@ -702,7 +710,7 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
 // D6: the same confirm + deleteDocument path the context menu's own Delete item already uses
 // (documents/menu.ts) — one delete path, not two.
 async function onDeleteRow(id: string): Promise<void> {
-  if (!(await confirmDialogStore.confirm({ message: `Delete this document (_id: ${id})?`, confirmLabel: 'Delete', tone: 'danger' }))) return;
+  if (!(await confirmDeleteDocument(id))) return;
   deleteDocument(props.tab.id, id)
     .then(() => documentViewStore.setActionError(props.tab.id, null))
     .catch((err: unknown) => {
@@ -778,7 +786,7 @@ onUnmounted(() => {
         ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
         >{{ targetTail?.name ?? tab.path }}</span
       >
-      <Badge>collection</Badge>
+      <Badge>{{ nodeKindLabel('collection') }}</Badge>
       <span class="ml-auto flex items-center gap-1"></span>
     </ViewToolbar>
 
@@ -787,13 +795,13 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="refresh"
-          label="Refresh"
+          :label="t('common.action.refresh.label')"
           data-testid="document-refresh"
           @click="onRefresh"
         />
         <TooltipIconButton
           icon="debug-stop"
-          label="Stop"
+          :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'text-error': running }"
           data-testid="document-stop"
@@ -819,7 +827,7 @@ onUnmounted(() => {
         :count="rt?.count?.value ?? null"
         :has-more="!!rt?.hasMore"
         testid-prefix="document-"
-        last-tooltip="Count documents first"
+        :last-tooltip="t('studio.documents.pager.countFirst.tooltip')"
         @first="documentViewStore.goFirst(tab.id)"
         @prev="documentViewStore.goPrev(tab.id)"
         @next="documentViewStore.goNext(tab.id)"
@@ -837,7 +845,7 @@ onUnmounted(() => {
               variant="toolbar"
               size="kira-icon"
               :class="rt?.countError ? 'text-error' : ''"
-              aria-label="Run an exact count"
+              :aria-label="t('studio.documents.count.run.aria')"
               data-testid="document-count"
               @click="documentViewStore.runCount(tab.id)"
             >
@@ -848,8 +856,8 @@ onUnmounted(() => {
                is no longer silent. -->
           <TooltipContent data-testid="document-count-tooltip">{{
             rt?.countError
-              ? `Count failed: ${rt.countError}`
-              : 'Run an exact countDocuments() — the estimate above is metadata'
+              ? t('studio.common.countFailed.tooltip', { error: rt.countError })
+              : t('studio.documents.count.run.tooltip')
           }}</TooltipContent>
         </Tooltip>
         <div class="relative">
@@ -861,7 +869,7 @@ onUnmounted(() => {
                 size="kira-icon"
                 class="relative"
                 :class="{ 'bg-field text-fg': projectionOpen }"
-                aria-label="Fields"
+                :aria-label="t('studio.common.fields.label')"
                 data-testid="document-toolbar-projection"
                 @click="projectionOpen = !projectionOpen"
               >
@@ -870,7 +878,9 @@ onUnmounted(() => {
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{
-              projectionCountLabel ? `Fields — ${projectionCountLabel} shown` : 'Fields'
+              projectionCount
+                ? t('studio.documents.projection.shown.tooltip', projectionCount)
+                : t('studio.common.fields.label')
             }}</TooltipContent>
           </Tooltip>
           <!-- P104 §3: PopoverPanel's own `anchor="right"` -> `align="end"`; PopoverAnchor's
@@ -885,13 +895,13 @@ onUnmounted(() => {
         </div>
         <TooltipIconButton
           icon="expand-all"
-          label="Expand all"
+          :label="t('common.action.expandAll.label')"
           data-testid="document-expand-all"
           @click="onExpandAll"
         />
         <TooltipIconButton
           icon="collapse-all"
-          label="Collapse all"
+          :label="t('common.action.collapseAll.label')"
           data-testid="document-collapse-all"
           @click="onCollapseAll"
         />
@@ -903,7 +913,7 @@ onUnmounted(() => {
         <TooltipIconButton
           icon="add"
           :label="insertTitle"
-          aria-label="Add a document"
+          :aria-label="t('studio.documents.add.label')"
           disabled-trigger
           :disabled="!canInsert"
           data-testid="document-add"
@@ -911,7 +921,7 @@ onUnmounted(() => {
         />
         <TooltipIconButton
           icon="search"
-          label="Search this page"
+          :label="t('studio.common.searchPage.label')"
           :class="{ 'bg-field text-fg': rt?.searchOpen }"
           data-testid="document-toolbar-search"
           @click="onToggleSearch"
@@ -935,7 +945,7 @@ onUnmounted(() => {
       <div class="relative">
         <TooltipIconButton
           icon="history"
-          label="Saved & recent filters"
+          :label="t('studio.common.savedAndRecentFilters.label')"
           ref="filterHistoryTriggerEl"
           data-testid="document-filter-history-button"
           @click="filterHistoryOpen = !filterHistoryOpen"
@@ -961,7 +971,7 @@ onUnmounted(() => {
               class="w-full"
               prefix="FILTER"
               :prefix-active="tab.state.search.trim() !== ''"
-              placeholder="{ name: 'a' }"
+              :placeholder="FILTER_EXAMPLE"
               data-testid="document-search"
               :candidates="filterCandidates"
               language="mongo"
@@ -970,7 +980,7 @@ onUnmounted(() => {
               @blur="onSearchInput"
             />
           </TooltipTrigger>
-          <TooltipContent>Mongo filter document — the query find() runs</TooltipContent>
+          <TooltipContent>{{ t('studio.documents.filter.tooltip') }}</TooltipContent>
         </Tooltip>
       </div>
       <div class="w-72 shrink-0">
@@ -981,7 +991,7 @@ onUnmounted(() => {
               class="w-full"
               prefix="SORT"
               :prefix-active="!!tab.state.sort"
-              placeholder="{ createdAt: -1, name: 1 }"
+              :placeholder="SORT_EXAMPLE"
               data-testid="document-sort"
               :candidates="sortCandidates"
               language="mongo"
@@ -990,16 +1000,16 @@ onUnmounted(() => {
               @blur="onSortInput"
             />
           </TooltipTrigger>
-          <TooltipContent>Mongo sort document: 1 = ascending, -1 = descending</TooltipContent>
+          <TooltipContent>{{ t('studio.documents.sort.tooltip') }}</TooltipContent>
         </Tooltip>
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
           <Button variant="toolbar" size="kira" data-testid="document-filter-clear" @click="onClearFilter"
-            >Clear</Button
+            >{{ t('common.action.clear.label') }}</Button
           >
         </TooltipTrigger>
-        <TooltipContent>Empty both fields and refetch</TooltipContent>
+        <TooltipContent>{{ t('studio.common.clearFilters.tooltip') }}</TooltipContent>
       </Tooltip>
     </ViewToolbar>
 
@@ -1034,7 +1044,7 @@ onUnmounted(() => {
         data-testid="document-reconnect-load"
         @click="onReconnectAndLoad"
       >
-        Reconnect & load
+        {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
     </Empty>
     <template v-else>
@@ -1044,10 +1054,10 @@ onUnmounted(() => {
         <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" :show-compact="false" />
         <span class="flex-1 min-w-0"></span>
         <Button variant="toolbar-primary" size="kira" data-testid="document-new-save" :disabled="saving" @click="commitCreate"
-          >Save</Button
+          >{{ t('common.action.save.label') }}</Button
         >
         <Button variant="toolbar" size="kira" data-testid="document-new-cancel" @click="cancelCreate"
-          >Cancel</Button
+          >{{ t('common.action.cancel.label') }}</Button
         >
       </div>
     </div>
@@ -1056,7 +1066,7 @@ onUnmounted(() => {
       <Empty v-if="!rt || rt.rowCount === 0" class="h-full">
         <EmptyHeader>
           <EmptyMedia><CodiconIcon v-if="rt" name="json" :size="24" /><Spinner v-else :size="24" /></EmptyMedia>
-          <EmptyTitle>{{ rt ? 'No documents' : 'Loading…' }}</EmptyTitle>
+          <EmptyTitle>{{ rt ? t('studio.documents.empty') : t('common.state.loading.loading') }}</EmptyTitle>
         </EmptyHeader>
       </Empty>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
@@ -1078,7 +1088,7 @@ onUnmounted(() => {
         class="overflow-y-auto h-full"
         data-testid="virtual-list"
         role="listbox"
-        aria-label="Documents"
+        :aria-label="t('studio.common.documents.aria')"
         @scroll="onListScroll"
         @pointerover="showRowTip"
         @pointerout="hideRowTip"
@@ -1125,11 +1135,11 @@ onUnmounted(() => {
               <template #actions>
                 <span class="flex-1 min-w-0"></span>
                 <div class="flex shrink-0 items-center gap-1">
-                  <Badge v-if="editingRow === rows[vi.index]" variant="warn">editing</Badge>
+                  <Badge v-if="editingRow === rows[vi.index]" variant="warn">{{ t('studio.documents.editing.status') }}</Badge>
                   <RowActionButton
                     icon="edit"
                     :label="editGateFor(rows[vi.index]).label"
-                    aria-label="Edit"
+                    :aria-label="t('common.action.edit.label')"
                     :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
                     :disabled="!editGateFor(rows[vi.index]).editable"
                     data-testid="document-edit"
@@ -1138,7 +1148,7 @@ onUnmounted(() => {
                   <RowActionButton
                     icon="trash"
                     :label="deleteTitle"
-                    aria-label="Delete"
+                    :aria-label="t('common.action.delete.label')"
                     :disabled="!canDelete"
                     data-testid="document-delete"
                     @click.stop="onDeleteRow(rowAt(rows[vi.index])!.view.id)"
@@ -1174,10 +1184,10 @@ onUnmounted(() => {
                       <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
                       <span class="flex-1 min-w-0"></span>
                       <Button variant="toolbar-primary" size="kira" data-testid="document-edit-save" :disabled="saving" @click="commitEdit"
-                        >Save</Button
+                        >{{ t('common.action.save.label') }}</Button
                       >
                       <Button variant="toolbar" size="kira" data-testid="document-edit-cancel" @click="cancelEdit"
-                        >Cancel</Button
+                        >{{ t('common.action.cancel.label') }}</Button
                       >
                     </div>
                   </template>

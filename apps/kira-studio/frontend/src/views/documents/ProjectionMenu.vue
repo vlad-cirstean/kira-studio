@@ -7,6 +7,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
 import { Separator } from '@theme/components/ui/separator';
+import { t } from '@theme/i18n';
 import { onUnmounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import { fieldNamesOnPage } from './page';
@@ -81,13 +82,15 @@ onUnmounted(() => {
   <div class="max-h-80 flex flex-col">
     <div class="flex border-b border-border gap-1 p-1">
       <Button variant="toolbar" size="kira" data-testid="document-projection-select-all" @click="selectAll"
-        >All</Button
+        
+        >{{ t('common.state.all.option') }}</Button
       >
       <Button variant="toolbar" size="kira" data-testid="document-projection-select-none" @click="selectNone"
-        >None</Button
+        
+        >{{ t('common.state.none.option') }}</Button
       >
     </div>
-    <InlineState v-if="fieldNames.length === 0" kind="empty">No fields seen yet — load a page first.</InlineState>
+    <InlineState v-if="fieldNames.length === 0" kind="empty">{{ t('studio.documents.projection.empty') }}</InlineState>
     <div v-else class="overflow-y-auto p-0.5">
       <Label v-for="name in fieldNames" :key="name" :class="rowVariants()">
         <Checkbox
@@ -103,8 +106,7 @@ onUnmounted(() => {
     </div>
     <Separator class="my-1" />
     <div class="px-1.5 pb-1.5 text-kira-sm text-subtle" data-testid="document-projection-menu-footer">
-      {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }} — fields seen on the
-      loaded page; `_id` is always returned.
+      {{ t(caps?.projection ? 'studio.documents.projection.footerServer.hint' : 'studio.documents.projection.footerClient.hint') }}
     </div>
   </div>
 </template>

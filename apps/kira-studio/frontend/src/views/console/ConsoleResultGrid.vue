@@ -417,7 +417,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       class="flex-1 min-h-0 p-1 overflow-auto"
       data-testid="virtual-list"
       role="listbox"
-      :aria-label="t('studio.console.result.documents.aria')"
+      :aria-label="t('studio.common.documents.aria')"
       @scroll="docVirtual.onScroll"
     >
       <div class="relative" :style="{ height: `${docVirtual.totalSize.value}px` }">

@@ -106,7 +106,7 @@ test('clickhouse (frontend, mocked IPC) — tree, filter-by-value quoting, delet
   await assertTooltipShows(
     page,
     deleteRowButton.locator('xpath=..'),
-    /does not support deleting rows/,
+    /doesn’t support deleting rows/,
   );
 
   await idCell.dblclick();

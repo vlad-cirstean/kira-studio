@@ -177,7 +177,7 @@ test('Query console — Explain produces a plan result set', async ({ relaunch }
   await expect(explainView.locator('[data-testid="explain-tree"]')).toContainText('Seq Scan on t');
   await expect(explainView.locator('[data-testid="explain-tree"]')).toContainText('Hash Join');
   await expect(explainView.locator('[data-testid="explain-issues"]')).toContainText(
-    'full table scan',
+    'Full table scan',
   );
 });
 

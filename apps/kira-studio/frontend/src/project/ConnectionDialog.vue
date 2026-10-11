@@ -127,7 +127,7 @@ function mcpModeOptions(
 const MODE_ITEMS = computed(
   () =>
     [
-      { value: 'fields', label: t('studio.project.connectionDialog.mode.fields.label'), testid: 'mode-fields' },
+      { value: 'fields', label: t('studio.common.fields.label'), testid: 'mode-fields' },
       { value: 'uri', label: t('studio.project.connectionDialog.mode.uri.label'), testid: 'mode-uri' },
     ] as const,
 );

@@ -2,6 +2,7 @@
 import type { DocumentSchemaMeta } from '@shared/domain/definition';
 import { Badge } from '@theme/components/ui/badge';
 import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/table';
+import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { jsonSchemaFields } from './structure';
 
@@ -23,7 +24,7 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-validation">
     <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Validation</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.definition.validation.heading.label') }}</span>
       <Badge v-if="documentSchema?.validationLevel" variant="chip" data>
         {{ documentSchema.validationLevel }}
       </Badge>
@@ -33,7 +34,7 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
     </header>
 
     <p v-if="!documentSchema?.validator" class="text-muted-foreground m-0">
-      No validator is set for this collection.
+      {{ t('studio.definition.validation.noValidator.empty') }}
     </p>
 
     <Table v-else-if="fields">
@@ -42,7 +43,7 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
           <TableCell class="def-val-name font-data">{{ f.name }}</TableCell>
           <TableCell class="def-val-type font-data">{{ f.bsonType ?? '' }}</TableCell>
           <TableCell class="def-val-required">
-            <Badge v-if="f.required">required</Badge>
+            <Badge v-if="f.required">{{ t('studio.definition.validation.required.label') }}</Badge>
           </TableCell>
           <TableCell class="text-muted-foreground">{{ f.description ?? '' }}</TableCell>
         </TableRow>

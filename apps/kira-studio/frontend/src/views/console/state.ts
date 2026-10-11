@@ -1,5 +1,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { Page } from '@shared/protocol/page';
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
@@ -574,10 +575,11 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     statement: string,
   ): Promise<{ ok: true } | { ok: false; reason: string }> {
     const tab = useTabsStore().findConsoleTab(tabId);
-    if (!tab?.connectionId) return { ok: false, reason: 'no active connection' };
+    if (!tab?.connectionId)
+      return { ok: false, reason: t('studio.console.explain.noConnection.error') };
     const statements = explainStatementsFor(kind, statement);
     if (statements.length === 0)
-      return { ok: false, reason: 'this console has nothing to explain' };
+      return { ok: false, reason: t('studio.console.explain.nothingToExplain.error') };
 
     // P12 round 1 finding #5: the same opId/status bookkeeping run() uses, so Explain is cancellable
     // via Stop and shows the same busy state — before, this had no opId registered on the runtime at

@@ -11,6 +11,7 @@ import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import RunState from '@theme/RunState.vue';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { matchesQuery } from '@workbench/behaviour/match';
@@ -24,6 +25,7 @@ import { useRunState } from '../../state/runState';
 import type { DefinitionTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import EngineIcon from '../../theme/EngineIcon.vue';
+import { nodeKindLabel } from '../shared/nodeKindLabel';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
@@ -106,8 +108,8 @@ const document = computed(() => (definition.value ? definitionText(definition.va
 // a tab saved under the pre-P19 empty `{}` shape restorable.
 const pane = computed(() => props.tab.state.pane);
 const PANE_OPTIONS = [
-  { value: 'structure' as const, label: 'Structure', testid: 'definition-pane-structure' },
-  { value: 'source' as const, label: 'Source', testid: 'definition-pane-source' },
+  { value: 'structure' as const, label: t('studio.definition.pane.structure.option'), testid: 'definition-pane-structure' },
+  { value: 'source' as const, label: t('common.field.source.label'), testid: 'definition-pane-source' },
 ];
 function setPane(value: 'structure' | 'source'): void {
   tabsStore.patchDefinitionTabState(props.tab.id, { pane: value });
@@ -182,8 +184,10 @@ const docHighlights = computed(() => {
 
 const dialect = computed(() => sqlDialectFor(connectionsStore.connectionRecord(props.tab.connectionId)?.kind));
 
-const originPhrase = computed(() =>
-  definition.value?.origin === 'server' ? 'server definition' : 'composed from catalog metadata',
+const readOnlyLabel = computed(() =>
+  definition.value?.origin === 'server'
+    ? t('studio.definition.readOnlyServer.status')
+    : t('studio.definition.readOnlyComposed.status'),
 );
 
 // P23 D8: Open in console was unconditional before this phase, which only ever mattered because
@@ -237,10 +241,10 @@ const breadcrumb = computed(() => {
       <span class="text-kira-md text-fg truncate" data-testid="definition-target">
         <span v-if="breadcrumb" class="text-subtle">{{ breadcrumb }}</span>{{ targetLabel }}
       </span>
-      <Badge v-if="targetTail">{{ targetTail.kind }}</Badge>
+      <Badge v-if="targetTail">{{ nodeKindLabel(targetTail.kind) }}</Badge>
       <Badge>
         <CodiconIcon name="lock" :size="13" />
-        read-only — {{ originPhrase }}
+        {{ readOnlyLabel }}
       </Badge>
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
@@ -249,7 +253,7 @@ const breadcrumb = computed(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="refresh"
-          label="Refresh"
+          :label="t('common.action.refresh.label')"
           disabled-trigger
           :disabled="loading"
           data-testid="definition-refresh"
@@ -264,8 +268,8 @@ const breadcrumb = computed(() => {
            all — a find-in-document bar for Source, a plain substring filter for Structure. -->
       <TooltipIconButton
         icon="search"
-        :label="pane === 'source' ? 'Find in definition' : 'Filter columns/indexes/constraints'"
-        aria-label="Search"
+        :label="pane === 'source' ? t('studio.definition.search.source.tooltip') : t('studio.definition.structureFilter.placeholder')"
+        :aria-label="t('common.action.search.label')"
         :data-active="searchOpen"
         data-testid="definition-search-toggle"
         @click="toggleSearch"
@@ -281,20 +285,20 @@ const breadcrumb = computed(() => {
             <TooltipTrigger as-child>
               <Button variant="toolbar" size="kira" data-testid="definition-copy" @click="onCopy">
                 <CodiconIcon name="copy" :size="13" />
-                Copy
+                {{ t('common.action.copy.label') }}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Copy definition to clipboard</TooltipContent>
+            <TooltipContent>{{ t('studio.definition.copy.tooltip') }}</TooltipContent>
           </Tooltip>
         </template>
         <Tooltip v-if="canOpenConsole">
           <TooltipTrigger as-child>
             <Button variant="toolbar" size="kira" data-testid="definition-open-console" @click="onOpenConsole">
               <CodiconIcon name="terminal" :size="13" />
-              Open in console
+              {{ t('studio.definition.openConsole.label') }}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Open query console here</TooltipContent>
+          <TooltipContent>{{ t('studio.definition.openConsole.tooltip') }}</TooltipContent>
         </Tooltip>
       </div>
     </ViewToolbar>
@@ -317,7 +321,7 @@ const breadcrumb = computed(() => {
         </ul>
       </AlertDescription>
     </Alert>
-    <SearchField v-if="searchOpen && pane === 'structure'" v-model="structureFilterQuery" placeholder="Filter columns, indexes, constraints" data-testid="definition-structure-filter" />
+    <SearchField v-if="searchOpen && pane === 'structure'" v-model="structureFilterQuery" :placeholder="t('studio.definition.structureFilter.placeholder')" data-testid="definition-structure-filter" />
 
     <!-- Item 4: the reconnect gate used to replace this whole view chrome (header, toolbar and
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
@@ -325,7 +329,7 @@ const breadcrumb = computed(() => {
          a live connection — swaps for the gate. -->
     <Empty v-if="needsReconnect" data-testid="definition-reconnect">
       <Button variant="dialog-primary" size="kira-lg" data-testid="definition-reconnect-load" @click="onReconnectAndLoad">
-        Reconnect &amp; load
+        {{ t('studio.common.reconnectAndLoad.label') }}
       </Button>
     </Empty>
     <template v-else>

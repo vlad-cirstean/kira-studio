@@ -8,8 +8,8 @@ import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { colorMarkClass, connTextClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import RunState from '@theme/RunState.vue';
-import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -20,6 +20,7 @@ import { useRunState } from '../../state/runState';
 import type { DataTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import { nodeKindLabel } from '../shared/nodeKindLabel';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
@@ -85,7 +86,7 @@ const isWritable = computed(() => !!caps.value?.writable && !connRecord.value?.r
 const effectivelyWritable = computed(() => isWritable.value && !rt.value?.maskPreview);
 const primaryKeyLabel = computed(() => {
   const names = rt.value?.meta?.columns.filter((c) => c.isPrimaryKey).map((c) => c.name) ?? [];
-  return names.length ? `PK ${names.join(', ')}` : null;
+  return names.length ? t('studio.grid.primaryKey.status', { names: names.join(', ') }) : null;
 });
 
 // P48 step 14: the pending-changes group moved here from DataToolbar.vue so it can land in
@@ -197,15 +198,15 @@ function onCloseSearch(): void {
       <span class="text-kira-md text-fg truncate" data-testid="grid-target">
         <span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
       </span>
-      <Badge v-if="targetTail?.kind" data-testid="grid-kind-badge">{{ targetTail.kind }}</Badge>
+      <Badge v-if="targetTail?.kind" data-testid="grid-kind-badge">{{ nodeKindLabel(targetTail.kind) }}</Badge>
       <Badge v-if="columnCount !== null" data-testid="grid-column-count-badge"
-        >{{ columnCount }} columns</Badge
+        >{{ t('studio.grid.columnCount.status', { count: columnCount }) }}</Badge
       >
       <Badge data-testid="grid-writable-badge">{{
-        effectivelyWritable ? 'read-write' : 'read-only'
+        effectivelyWritable ? t('studio.grid.writable.status') : t('common.state.readOnly.status')
       }}</Badge>
       <Badge v-if="rt?.count" data-testid="grid-row-count-badge"
-        >Σ {{ formatCount(rt.count.value) }} rows</Badge
+        >{{ t('studio.grid.rowCount.status', { count: rt.count.value }) }}</Badge
       >
       <span class="ml-auto flex items-center gap-1">
         <Badge data v-if="primaryKeyLabel" variant="info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</Badge>
@@ -220,7 +221,7 @@ function onCloseSearch(): void {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="refresh"
-          label="Refresh"
+          :label="t('common.action.refresh.label')"
           disabled-trigger
           data-testid="toolbar-refresh"
           :disabled="!!rt?.opId"
@@ -228,7 +229,7 @@ function onCloseSearch(): void {
         />
         <TooltipIconButton
           icon="debug-stop"
-          label="Stop"
+          :label="t('common.action.stop.label')"
           disabled-trigger
           :class="{ 'text-error': !!rt?.opId }"
           data-testid="toolbar-stop"
@@ -245,20 +246,20 @@ function onCloseSearch(): void {
       <div class="flex items-center gap-1.5 min-w-0">
         <template v-if="tabHasPending">
           <Badge variant="warn" data-testid="pending-count-chip"
-            >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</Badge
+            >{{ t('studio.grid.pending.rows.status', { count: pendingCount }) }}</Badge
           >
           <span
             v-if="offPageCount > 0"
             class="text-kira-sm text-muted-foreground truncate"
             data-testid="pending-off-page"
-            >{{ offPageCount }} staged change{{ offPageCount === 1 ? '' : 's' }} not on this page</span
+            >{{ t('studio.grid.pending.offPage.status', { count: offPageCount }) }}</span
           >
           <Popover :open="previewOpen" @update:open="previewOpen = $event">
             <div ref="previewAnchorRef" class="relative">
               <TooltipIconButton
                 icon="eye"
-                :label="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
-                aria-label="Preview the SQL for pending changes"
+                :label="isWritable ? t('studio.grid.previewCommand.label') : t('studio.common.connectionReadOnly.tooltip')"
+                :aria-label="t('studio.grid.previewCommand.label')"
                 disabled-trigger
                 data-testid="toolbar-preview-command"
                 :disabled="!isWritable || committing"
@@ -270,7 +271,7 @@ function onCloseSearch(): void {
           </Popover>
           <TooltipIconButton
             icon="discard"
-            label="Discard pending changes"
+            :label="t('studio.grid.discardPending.label')"
             disabled-trigger
             data-testid="toolbar-discard-changes"
             :disabled="!isWritable || committing"
@@ -278,7 +279,7 @@ function onCloseSearch(): void {
           />
           <TooltipIconButton
             icon="save"
-            label="Commit pending changes"
+            :label="t('studio.grid.commitPending.label')"
             disabled-trigger
             variant="toolbar-primary"
             data-testid="toolbar-commit-changes"
@@ -315,7 +316,7 @@ function onCloseSearch(): void {
             data-testid="reconnect-load"
             @click="onReconnectAndLoad"
           >
-            Reconnect & load
+            {{ t('studio.common.reconnectAndLoad.label') }}
           </Button>
         </Empty>
         <template v-else>
@@ -346,9 +347,7 @@ function onCloseSearch(): void {
                switching tabs or taking a screenshot must not mistake a bucket string for a literal
                value. -->
           <Alert strip v-if="rt?.maskPreview" variant="info" icon="eye-closed" data-testid="mask-preview-strip">
-            <AlertDescription>
-              Values shown are masked for this preview — not the stored data. Editing is off while it's on.
-            </AlertDescription>
+            <AlertDescription>{{ t('studio.grid.maskPreview.description') }}</AlertDescription>
           </Alert>
           <div class="flex-1 min-h-0 relative">
             <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />

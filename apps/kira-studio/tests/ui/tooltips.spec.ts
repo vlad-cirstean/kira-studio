@@ -193,7 +193,7 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
     .locator('.columns-menu-item.is-pk [data-testid="columns-menu-item"]')
     .first();
   await expect(pkCheckbox).toBeVisible();
-  await assertTooltipShows(page, pkCheckbox, /Primary key — always shown/);
+  await assertTooltipShows(page, pkCheckbox, /Primary key, always shown/);
   // reka's DismissableLayer dismisses only its own (highest) layer per Escape press — with the
   // tooltip's layer stacked above the menu's, one Escape closes the tooltip, not both at once.
   // Move off the trigger first (a real mouseleave, same as scenario 1's own close) so the

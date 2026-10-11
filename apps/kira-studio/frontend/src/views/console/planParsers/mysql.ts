@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import {
   isOverThreshold,
   maxEstimatedRows,
@@ -95,7 +96,9 @@ function tableNode(table: RawTable, thresholdRows: number, scans: ScanEstimate[]
     node.issues.push({
       severity: 'warn',
       code: 'filesort',
-      message: `"${node.relation ?? '?'}" was sorted with a temporary file (filesort)`,
+      message: t('studio.console.plan.issue.filesortTable.description', {
+        relation: node.relation ?? '?',
+      }),
     });
   }
   // D15: a derived table materialized into a temp table.
@@ -103,7 +106,9 @@ function tableNode(table: RawTable, thresholdRows: number, scans: ScanEstimate[]
     node.issues.push({
       severity: 'warn',
       code: 'temp-table',
-      message: `"${node.relation ?? '?'}" was materialized into a temporary table`,
+      message: t('studio.console.plan.issue.tempTable.description', {
+        relation: node.relation ?? '?',
+      }),
     });
   }
 
@@ -127,7 +132,7 @@ function blockNodes(block: RawBlock, thresholdRows: number, scans: ScanEstimate[
           {
             severity: 'warn',
             code: 'filesort',
-            message: 'a temporary sort file (filesort) was used',
+            message: t('studio.console.plan.issue.filesort.description'),
           },
         ]
       : [];
@@ -159,7 +164,7 @@ export function parseMysqlPlan(rawText: string, thresholdRows: number): QueryPla
   const queryCost =
     block.cost_info?.query_cost !== undefined ? Number(block.cost_info.query_cost) : undefined;
   const root: PlanNode = {
-    label: 'Query',
+    label: t('studio.console.plan.root.query.label'),
     cost: queryCost !== undefined ? { total: queryCost } : undefined,
     metrics: [],
     issues: [],

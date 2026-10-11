@@ -7534,9 +7534,6 @@
       "list": {
         "aria": "Keys"
       },
-      "reconnectAndLoad": {
-        "label": "Reconnect and load"
-      },
       "truncated": {
         "body": "This level stopped short of the full listing. Refresh it to load the rest."
       },
@@ -7554,6 +7551,15 @@
       "cellTruncated": {
         "tooltip": "Value truncated at {size}"
       },
+      "clearFilters": {
+        "tooltip": "Empty both fields and refetch"
+      },
+      "columns": {
+        "label": "Columns"
+      },
+      "connectionReadOnly": {
+        "tooltip": "Connection is read-only"
+      },
       "continue": {
         "label": "Continue"
       },
@@ -7563,20 +7569,85 @@
       "copyUrl": {
         "label": "Copy URL"
       },
+      "countFailed": {
+        "tooltip": "Count failed: {error}"
+      },
+      "documents": {
+        "aria": "Documents"
+      },
+      "fields": {
+        "label": "Fields"
+      },
       "grpc": {
         "label": "gRPC"
       },
       "import": {
         "label": "Import"
       },
+      "nodeKind": {
+        "bucket": {
+          "label": "Bucket"
+        },
+        "collection": {
+          "label": "Collection"
+        },
+        "connection": {
+          "label": "Connection"
+        },
+        "consumerGroup": {
+          "label": "Consumer group"
+        },
+        "function": {
+          "label": "Function"
+        },
+        "matview": {
+          "label": "Materialized view"
+        },
+        "namespace": {
+          "label": "Namespace"
+        },
+        "object": {
+          "label": "Object"
+        },
+        "partition": {
+          "label": "Partition"
+        },
+        "prefix": {
+          "label": "Prefix"
+        },
+        "queue": {
+          "label": "Queue"
+        },
+        "schema": {
+          "label": "Schema"
+        },
+        "sequence": {
+          "label": "Sequence"
+        },
+        "topic": {
+          "label": "Topic"
+        }
+      },
       "nullValue": {
         "label": "NULL"
+      },
+      "reconnectAndLoad": {
+        "label": "Reconnect and load"
       },
       "regenerate": {
         "label": "Regenerate"
       },
       "resizeList": {
         "aria": "Resize list"
+      },
+      "savedAndRecentFilters": {
+        "label": "Saved and recent filters"
+      },
+      "searchPage": {
+        "label": "Search this page"
+      },
+      "writeUnsupported": {
+        "tooltip": "Connection doesn’t support this action"
       }
     },
     "console": {
@@ -7594,11 +7665,25 @@
       "connectFailed": {
         "error": "Couldn’t connect."
       },
+      "diagnostics": {
+        "unknownColumn": {
+          "error": "“{table}” has no column “{column}”."
+        },
+        "unknownTable": {
+          "error": "Unknown table “{table}”. It isn’t in this connection’s DDL."
+        }
+      },
       "explain": {
         "blocked": {
           "tooltip": "Put the cursor in a read query to explain it"
         },
         "label": "Explain",
+        "noConnection": {
+          "error": "No active connection."
+        },
+        "nothingToExplain": {
+          "error": "This console has nothing to explain."
+        },
         "ready": {
           "tooltip": "Explain the statement under the cursor"
         },
@@ -7646,6 +7731,23 @@
           "error": "Unexpected trailing content after statement."
         }
       },
+      "lint": {
+        "invalidArgument": {
+          "error": "Invalid argument at offset {offset}."
+        },
+        "newlineSeparated": {
+          "error": "Statements are separated by semicolons, not newlines. This one spans multiple lines and runs as one command."
+        },
+        "unbalanced": {
+          "error": "Unbalanced {char}."
+        },
+        "unmatched": {
+          "error": "Unmatched {char}."
+        },
+        "unterminatedQuote": {
+          "error": "Unterminated quoted string."
+        }
+      },
       "newResultSet": {
         "add": {
           "tooltip": "Running adds a new result set; click to replace instead"
@@ -7678,6 +7780,67 @@
         "estimatedRows": {
           "status": "Estimated to read {count} row | Estimated to read {count} rows"
         },
+        "issue": {
+          "allParts": {
+            "description": "Every part of “{relation}” was read ({count} part). | Every part of “{relation}” was read ({count} parts)."
+          },
+          "filesort": {
+            "description": "A temporary sort file (filesort) was used."
+          },
+          "filesortKey": {
+            "description": "A temporary sort file (filesort) was used. Sort key {key}."
+          },
+          "filesortTable": {
+            "description": "“{relation}” was sorted with a temporary file (filesort)."
+          },
+          "fullScan": {
+            "description": "Full table scan on “{relation}”. No index was used."
+          },
+          "fullScanFilter": {
+            "description": "Full table scan on “{relation}” with a filter. No index was used."
+          },
+          "indexOnly": {
+            "description": "“{relation}” is read entirely from its index. No heap access needed."
+          },
+          "nestedLoopWide": {
+            "description": "Nested loop repeats a scan estimated at {count} row for every outer row. | Nested loop repeats a scan estimated at {count} rows for every outer row."
+          },
+          "nestedLoopWideUnknown": {
+            "description": "Nested loop repeats a wide scan for every outer row."
+          },
+          "pkNotNarrowed": {
+            "description": "The primary key on “{relation}” didn’t narrow the read. Every granule was selected."
+          },
+          "sqliteFullScan": {
+            "description": "{detail} is a full scan. No index narrowed the read."
+          },
+          "tempTable": {
+            "description": "“{relation}” was materialised into a temporary table."
+          },
+          "unusedIndex": {
+            "description": "“{relation}” has an index ({indexes}) the planner didn’t choose."
+          },
+          "wideScan": {
+            "description": "{label} is estimated to read {count} row. | {label} is estimated to read {count} rows."
+          }
+        },
+        "metric": {
+          "condition": {
+            "label": "{type} condition"
+          },
+          "granules": {
+            "label": "{type} granules"
+          },
+          "keys": {
+            "label": "{type} keys"
+          },
+          "parts": {
+            "label": "{type} parts"
+          },
+          "search": {
+            "label": "{type} search"
+          }
+        },
         "nativeCost": {
           "tooltip": "Cost units differ between engines, so this figure isn’t comparable to another engine’s"
         },
@@ -7690,6 +7853,9 @@
         "noIssues": {
           "empty": "No issues found"
         },
+        "notTabular": {
+          "error": "EXPLAIN didn’t return a tabular result."
+        },
         "overThreshold": {
           "status": "Estimated to read {count} row, at or above the {threshold}-row threshold | Estimated to read {count} rows, at or above the {threshold}-row threshold"
         },
@@ -7698,6 +7864,14 @@
           "label": "Raw",
           "tooltip": "Show the raw EXPLAIN output the server returned"
         },
+        "root": {
+          "query": {
+            "label": "Query"
+          },
+          "sqlite": {
+            "label": "Query plan"
+          }
+        },
         "sqliteNoEstimate": {
           "body": "SQLite’s query planner reports no row estimates, so the expensive-query threshold doesn’t apply here."
         }
@@ -7705,9 +7879,6 @@
       "result": {
         "close": {
           "aria": "Close result"
-        },
-        "documents": {
-          "aria": "Documents"
         },
         "noMatchingRows": {
           "empty": "No matching rows"
@@ -7748,6 +7919,347 @@
         "fallback": {
           "label": "Console"
         }
+      }
+    },
+    "copy": {
+      "allAsJson": {
+        "announce": "Copied all as JSON",
+        "label": "Copy all as JSON"
+      },
+      "asCsv": {
+        "label": "Copy as CSV"
+      },
+      "canonicalJson": {
+        "announce": "Copied canonical extended JSON",
+        "label": "Canonical extended JSON"
+      },
+      "cell": {
+        "announce": "Copied cell"
+      },
+      "column": {
+        "announce": "Copied column",
+        "label": "Copy column"
+      },
+      "columnName": {
+        "announce": "Copied column name",
+        "label": "Copy column name"
+      },
+      "csv": {
+        "announce": "Copied CSV"
+      },
+      "document": {
+        "label": "Copy document"
+      },
+      "format": {
+        "csv": {
+          "label": "CSV"
+        },
+        "json": {
+          "label": "JSON"
+        },
+        "tsv": {
+          "label": "TSV"
+        }
+      },
+      "plainJson": {
+        "announce": "Copied plain JSON",
+        "label": "Plain JSON"
+      },
+      "relaxedJson": {
+        "announce": "Copied relaxed extended JSON",
+        "label": "Relaxed extended JSON"
+      },
+      "rows": {
+        "label": "Copy rows"
+      },
+      "selection": {
+        "announce": "Copied selection"
+      },
+      "shellMode": {
+        "announce": "Copied in shell mode",
+        "label": "Shell mode"
+      },
+      "tsv": {
+        "announce": "Copied TSV"
+      },
+      "withHeader": {
+        "announce": "Copied with header",
+        "label": "Copy with header"
+      }
+    },
+    "definition": {
+      "comment": {
+        "label": "Comment"
+      },
+      "constraint": {
+        "openReferenced": {
+          "tooltip": "Open the definition of “{table}”"
+        },
+        "type": {
+          "check": {
+            "label": "Check"
+          },
+          "exclusion": {
+            "label": "Exclusion"
+          },
+          "foreignKey": {
+            "label": "Foreign key"
+          },
+          "primaryKey": {
+            "label": "Primary key"
+          },
+          "referencedBy": {
+            "label": "Referenced by"
+          }
+        }
+      },
+      "constraints": {
+        "heading": {
+          "label": "Constraints"
+        }
+      },
+      "copy": {
+        "tooltip": "Copy definition to clipboard"
+      },
+      "definition": {
+        "label": "Definition"
+      },
+      "foreignKey": {
+        "label": "FK"
+      },
+      "index": {
+        "primary": {
+          "label": "Primary"
+        }
+      },
+      "indexes": {
+        "heading": {
+          "label": "Indexes"
+        }
+      },
+      "menu": {
+        "addToProjection": {
+          "label": "Add to projection"
+        },
+        "sortBy": {
+          "label": "Sort by"
+        }
+      },
+      "method": {
+        "label": "Method"
+      },
+      "notNull": {
+        "label": "NOT NULL"
+      },
+      "nullable": {
+        "label": "Nullable"
+      },
+      "openConsole": {
+        "label": "Open in console",
+        "tooltip": "Open query console here"
+      },
+      "pane": {
+        "structure": {
+          "option": "Structure"
+        }
+      },
+      "primaryKey": {
+        "label": "PK"
+      },
+      "properties": {
+        "empty": "No properties"
+      },
+      "readOnlyComposed": {
+        "status": "Read-only, composed from catalog metadata"
+      },
+      "readOnlyServer": {
+        "status": "Read-only, from the server"
+      },
+      "search": {
+        "source": {
+          "tooltip": "Find in definition"
+        }
+      },
+      "structureFilter": {
+        "placeholder": "Filter columns, indexes and constraints"
+      },
+      "table": {
+        "label": "Table"
+      },
+      "unique": {
+        "label": "Unique"
+      },
+      "validation": {
+        "heading": {
+          "label": "Validation"
+        },
+        "noValidator": {
+          "empty": "No validator is set for this collection"
+        },
+        "required": {
+          "label": "Required"
+        }
+      }
+    },
+    "documents": {
+      "add": {
+        "label": "Add a document"
+      },
+      "count": {
+        "run": {
+          "aria": "Run an exact count",
+          "tooltip": "Run an exact countDocuments(). The estimate above is metadata"
+        }
+      },
+      "deleteConfirm": {
+        "body": "Delete the document with _id {id}.",
+        "title": "Delete document?"
+      },
+      "editing": {
+        "status": "Editing"
+      },
+      "empty": "No documents",
+      "filter": {
+        "tooltip": "Filter document passed to find()"
+      },
+      "gate": {
+        "noUpdate": {
+          "tooltip": "Connection doesn’t support update"
+        },
+        "projection": {
+          "tooltip": "Clear the field projection before editing. A projected document would replace the full one"
+        },
+        "truncated": {
+          "tooltip": "Document truncated at {size}, so it can’t be edited"
+        }
+      },
+      "menu": {
+        "toggleExpanded": {
+          "label": "Expand or collapse"
+        }
+      },
+      "pager": {
+        "countFirst": {
+          "tooltip": "Count documents first"
+        }
+      },
+      "projection": {
+        "empty": "No fields seen yet. Load a page first",
+        "footerClient": {
+          "hint": "Applied after fetch. Shows fields seen on the loaded page. _id is always returned."
+        },
+        "footerServer": {
+          "hint": "Applied server-side. Shows fields seen on the loaded page. _id is always returned."
+        },
+        "shown": {
+          "tooltip": "Showing {shown} of {total} fields"
+        }
+      },
+      "sort": {
+        "tooltip": "Sort document: 1 is ascending, -1 is descending"
+      }
+    },
+    "grid": {
+      "addRow": {
+        "label": "Add a row"
+      },
+      "columnCount": {
+        "status": "{count} column | {count} columns"
+      },
+      "columns": {
+        "footerClient": {
+          "hint": "Applied after fetch."
+        },
+        "footerServer": {
+          "hint": "Applied server-side."
+        },
+        "loading": {
+          "loading": "Loading columns…"
+        },
+        "primaryKey": {
+          "tooltip": "Primary key, always shown"
+        },
+        "shown": {
+          "tooltip": "Showing {shown} of {total} columns"
+        }
+      },
+      "commitPending": {
+        "label": "Commit pending changes"
+      },
+      "count": {
+        "approx": {
+          "tooltip": "About {count} row in total | About {count} rows in total"
+        },
+        "exact": {
+          "tooltip": "{count} row in total | {count} rows in total"
+        },
+        "refreshFailed": {
+          "tooltip": "Refresh failed: {error}"
+        },
+        "stale": {
+          "tooltip": "Count is stale. Click to refresh"
+        },
+        "tooltip": "Count all rows"
+      },
+      "deleteRows": {
+        "aria": "Delete selected rows",
+        "label": "Delete {count} row | Delete {count} rows"
+      },
+      "deleteUnsupported": {
+        "tooltip": "This connection doesn’t support deleting rows"
+      },
+      "discardPending": {
+        "label": "Discard pending changes"
+      },
+      "generateUnsupported": {
+        "tooltip": "This connection doesn’t support generating rows"
+      },
+      "maskedEdit": {
+        "tooltip": "Values are masked. Turn the preview off to edit"
+      },
+      "maskPreview": {
+        "aria": "Toggle masking preview",
+        "description": "Values shown are masked for this preview, not the stored data. Editing is off while it’s on.",
+        "off": {
+          "tooltip": "Turn off the masking preview"
+        },
+        "on": {
+          "tooltip": "Preview masked values"
+        },
+        "pendingFirst": {
+          "tooltip": "Commit or discard pending changes first"
+        }
+      },
+      "noPrimaryKey": {
+        "tooltip": "This table has no primary key, so a row can’t be addressed"
+      },
+      "pager": {
+        "countFirst": {
+          "tooltip": "Count rows first"
+        }
+      },
+      "pending": {
+        "offPage": {
+          "status": "{count} staged change not on this page | {count} staged changes not on this page"
+        },
+        "rows": {
+          "status": "{count} row pending | {count} rows pending"
+        }
+      },
+      "previewCommand": {
+        "label": "Preview the SQL for pending changes"
+      },
+      "primaryKey": {
+        "status": "PK {names}"
+      },
+      "rowCount": {
+        "status": "Σ {count} row | Σ {count} rows"
+      },
+      "selectRowsFirst": {
+        "tooltip": "Select one or more rows first"
+      },
+      "writable": {
+        "status": "Read-write"
       }
     },
     "grpc": {
@@ -7902,9 +8414,6 @@
           }
         },
         "mode": {
-          "fields": {
-            "label": "Fields"
-          },
           "label": "Mode",
           "uri": {
             "label": "Connection URI"

@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@theme/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { columnTypeIcon, columnTypeTextClass } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
@@ -39,19 +40,19 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 <template>
   <section class="flex flex-col gap-1.5" data-testid="definition-columns">
     <header class="flex items-center gap-1.5">
-      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Columns</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">{{ t('studio.common.columns.label') }}</span>
       <Badge>{{ columns.length }}</Badge>
     </header>
     <Table columns>
       <TableHeader>
         <TableRow class="hover:bg-transparent">
           <TableHead class="w-4"></TableHead>
-          <TableHead class="def-col-name">Name</TableHead>
-          <TableHead class="w-6">Key</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead class="w-20">Null?</TableHead>
-          <TableHead>Default</TableHead>
-          <TableHead class="max-w-60 overflow-hidden text-ellipsis">Comment</TableHead>
+          <TableHead class="def-col-name">{{ t('common.field.name.label') }}</TableHead>
+          <TableHead class="w-6">{{ t('common.field.key.label') }}</TableHead>
+          <TableHead>{{ t('common.field.type.label') }}</TableHead>
+          <TableHead class="w-20">{{ t('studio.definition.nullable.label') }}</TableHead>
+          <TableHead>{{ t('common.state.default.option') }}</TableHead>
+          <TableHead class="max-w-60 overflow-hidden text-ellipsis">{{ t('studio.definition.comment.label') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -70,8 +71,8 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           </TableCell>
           <TableCell class="def-col-name">{{ col.name }}</TableCell>
           <TableCell class="w-6">
-            <span v-if="keyLabel(col) === 'PK'" class="text-warn text-kira-sm">PK</span>
-            <span v-else-if="keyLabel(col) === 'FK'" class="text-info text-kira-sm">FK</span>
+            <span v-if="keyLabel(col) === 'PK'" class="text-warn text-kira-sm">{{ t('studio.definition.primaryKey.label') }}</span>
+            <span v-else-if="keyLabel(col) === 'FK'" class="text-info text-kira-sm">{{ t('studio.definition.foreignKey.label') }}</span>
           </TableCell>
           <TableCell class="whitespace-nowrap font-data text-muted-foreground">
             <span :class="columnTypeTextClass(col.dataType)">{{ col.dataType }}</span>
@@ -84,7 +85,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
               <TooltipContent>{{ typeDescription(col.dataType) }}</TooltipContent>
             </Tooltip>
           </TableCell>
-          <TableCell class="w-20 whitespace-nowrap font-data text-muted-foreground">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</TableCell>
+          <TableCell class="w-20 whitespace-nowrap font-data text-muted-foreground">{{ col.nullable ? t('studio.common.nullValue.label') : t('studio.definition.notNull.label') }}</TableCell>
           <TableCell class="whitespace-nowrap font-data text-muted-foreground">{{ col.defaultExpr ?? '' }}</TableCell>
           <TableCell class="max-w-60 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">{{ col.comment ?? '' }}</TableCell>
         </TableRow>

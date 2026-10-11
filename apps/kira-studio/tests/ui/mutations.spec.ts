@@ -315,8 +315,8 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   }
   await countButton.click();
   await hoverCount();
-  await expect(countTip).toContainText(/Count all rows — Σ \d/, { timeout: 10_000 });
-  const countBeforeCommit = (await countTip.textContent())?.match(/Count all rows — Σ [\d,]+/)?.[0];
+  await expect(countTip).toContainText(/\d[\d,]* rows in total/, { timeout: 10_000 });
+  const countBeforeCommit = (await countTip.textContent())?.match(/[\d,]+ rows in total/)?.[0];
   expect(countBeforeCommit).toBeTruthy();
 
   const deletedRowName = await cellText(page, 1, 'name');
@@ -332,14 +332,14 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
 
   // §7/F21/D18: a local mutation greys the count instead of blanking it.
   await hoverCount();
-  await expect(countTip).toContainText('stale, click to refresh', { timeout: 10_000 });
-  await expect(countTip).toContainText(`${countBeforeCommit} (stale, click to refresh)`);
+  await expect(countTip).toContainText('Count is stale. Click to refresh', { timeout: 10_000 });
+  await expect(countTip).toContainText(`${countBeforeCommit}. Count is stale. Click to refresh`);
 
   // Clicking it through produces a real recount and clears the stale mark.
   await countButton.click();
   await hoverCount();
   await expect(countTip).not.toContainText('stale', { timeout: 10_000 });
-  const countAfterCommit = (await countTip.textContent())?.match(/Count all rows — Σ [\d,]+/)?.[0];
+  const countAfterCommit = (await countTip.textContent())?.match(/[\d,]+ rows in total/)?.[0];
   expect(countAfterCommit).not.toBe(countBeforeCommit);
 
   // --- P43 F5/D7: a failed commit reports the server's own error, not an unhandled rejection —
