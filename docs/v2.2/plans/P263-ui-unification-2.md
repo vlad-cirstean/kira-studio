@@ -809,3 +809,38 @@ Scope `D="apps/kira-studio/frontend/src apps/kira-space/frontend/src apps/kira-s
 - `git diff --stat <foundation-base>..HEAD -- '*.go'` → empty.
 - Visual: shell left, dock and ADE panel handles identical in the Space `ade` and Studio workbench
   baselines; every `visual` project green on both apps.
+
+## Foundation result
+
+Base `d381439d6`. Commits (none pushed, no `--no-verify` at tip):
+
+- `5131e34c7` scrim and scrollbar state tokens, `pointer: fine` scrollbar
+- `d3562235d` tone vocabulary (`ok/warn/error/info`), Badge `data` prop, Alert `icon`/`strip`
+- `f6554088a` 14px checkbox/radio, compact switch, one focus/disabled/invalid recipe
+- `0b9ab5b95` tooltip defaults, content-sized dropdown, trailing indicators
+- `0b79ad81a` Spinner, StatusDot, InlineState, Skeleton, Kbd, Card, Table
+- `7269162dc` one resize handle look (`resizeHandleVariants`), 10px keyboard step, Home/End
+- `66259e6ce` guards U22-U38, per-stream allowlists, ARCHITECTURE paragraph
+- `5b1157e0a` fix: docker endpoint menu items `h-auto min-h-control py-1` for two-line content
+- `69ed219c6` visual baselines
+
+Allowlist entries: stream A 54 files, B 68, C 63.
+
+Verify: typecheck green, `bun run lint` green, `test:unit` 1793 pass, `test:ui:studio` 427 pass
+(one failure, docker engine dropdown, fixed in `5b1157e0a`), `test:ui:space` 457 pass,
+`test:ui:space-mobile` 53 pass 1 skipped, `test:visual:studio` and `:space` 13/13 after re-record.
+Baseline diffs reviewed: checked checkbox/switch now filled (old `data-checked:` classes never
+matched reka `data-state`), badges sans unless `data`, 2px menu item shifts, visible
+scrollbar thumb, handle thickness. No unintended diffs.
+
+Deviations:
+
+- Switch thumb `translate-x-3` (not 3.5): symmetric 2px gap.
+- Keyboard step is px: reka `keyboardResizeBy` is percent of group, so `WorkbenchShell` computes it from measured width.
+- `data-[state=checked]` replaces dead `data-checked:` selectors.
+- U29 flags `<TooltipProvider` only with attributes; app roots keep bare providers. `proto/grid` provider cleaned too.
+- U34 uses a real hex pattern (no `#123` false positives).
+- Permanent exemptions: `WorkbenchShell.vue` (U31), `ContextMenu.vue` (U27 swatch).
+- Allowlist whole-file entries apply only to U22+; stale entries fail the run.
+- `StreamView` handles sit at `right-0` inside the clipped cell.
+- Alerts in stream-owned files show doubled icons (hand-placed plus `icon` prop) until streams migrate.
