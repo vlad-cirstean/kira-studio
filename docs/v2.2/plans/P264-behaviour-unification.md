@@ -1265,3 +1265,28 @@ Implementation only. Stream-end test suites NOT run to completion per coordinato
 - `stream-b.txt`: 8 `permanent` lines only, each with reason (U57/U62 RepoFileView, U62 RepoDiffView, U60 AdeDayBand, U40 AdeWorkflowGraph, U41 and U62 AdeNotesEditor, U46 AdeReviewCompose, U52 useAgentsModel).
 - Deviations and foundation gaps: `P264-stream-b-findings.md`.
 - Ran: unit 1828 pass; full ui 460/469 (9 repo-graph/workspace failures, refresh pair confirmed identical at base); mobile writes + touched ade/memory/list-keyboard specs pass. Mobile full and visual PNGs not run.
+
+## Stream C result
+
+Chunks, commits:
+- C1 `93cba39ed`: git-ui components on shared context menu store, list navigation, behaviour helpers.
+- C2 `95e1d8be0`: git-ui state timers, docker-ui lists and formats.
+- C3 `2fbbdb3c1`: Automations and workbench chrome.
+- C4 `24c5191c2`: `list-keyboard-git` (Space) and `list-keyboard-docker` (Studio) specs; App.vue Escape no longer closes detail pane after closing a menu.
+- Findings `0217b02d3`: `P264-stream-c-findings.md`.
+
+Permanents in `stream-c.txt`: U41 App.vue, gridKeyboard.ts, AutocompleteField.vue; U62 CommitGrid.vue, AutocompleteField.vue; U52 scheduleText.ts; U47 SearchBox.vue, SearchResults.vue, gridKeyboard.ts, AutocompleteField.vue; U58 AutocompleteField.vue; U46 layoutClient.ts. Each has a reason. Guard passes.
+
+Deviations:
+- docker `ListState.vue` kept (guard script hardcodes it); now the empty block.
+- git-ui main.ts/MountRoot.vue unchanged: host Pinia and `<ContextMenu />` reused.
+- `cancellableTimer.ts` added (VueUse debounce plus generation guard).
+- Spec edits: Ctrl/Meta chord by UA in automations specs; accepted §5.1 shifts.
+- ContainerTable not in the docker keyboard spec.
+
+Verify:
+- `bun run test:unit`: 1824 pass.
+- Studio ui (docker, automations, prompts, update, tabs, settings, list-keyboard): 116 pass.
+- Studio visual automations-module: pass, no diff.
+- Space ui full: 445 pass; a varying set of repo-graph-* wall-clock specs (columns, lines, paging, refresh, badges, review-interaction, workspace) fail at 1s-class budgets under host load average ~30. `repo-graph-refresh:53` and `repo-graph-columns:217` fail identically with base `graphView.ts` restored, so not caused by this stream; left per ui-timing rule.
+- Space visual git-module: not run (host load; see handback).
